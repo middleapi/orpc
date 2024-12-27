@@ -102,8 +102,8 @@ export class Builder<TContext extends Context, TExtraContext extends Context> {
     })
   }
 
-  func<UFuncOutput = undefined>(
-    func: ProcedureFunc<TContext, TExtraContext, undefined, undefined, UFuncOutput>,
+  handler<UFuncOutput = undefined>(
+    handler: ProcedureFunc<TContext, TExtraContext, undefined, undefined, UFuncOutput>,
   ): DecoratedProcedure<TContext, TExtraContext, undefined, undefined, UFuncOutput> {
     return decorateProcedure(new Procedure({
       middlewares: this['~orpc'].middlewares,
@@ -111,7 +111,7 @@ export class Builder<TContext extends Context, TExtraContext extends Context> {
         InputSchema: undefined,
         OutputSchema: undefined,
       }),
-      func,
+      handler,
     }))
   }
 

@@ -157,8 +157,8 @@ describe('to DecoratedProcedure', () => {
     middlewares: [],
   })
 
-  it('func', () => {
-    const procedure = builder.func(async (input, context, meta) => {
+  it('handler', () => {
+    const procedure = builder.handler(async (input, context, meta) => {
       expectTypeOf(context).toEqualTypeOf<{ id?: string } | undefined>()
       expectTypeOf(input).toEqualTypeOf<{ id: number }>()
       expectTypeOf(meta).toEqualTypeOf<Meta>()
@@ -171,9 +171,9 @@ describe('to DecoratedProcedure', () => {
     >()
 
     // @ts-expect-error - invalid output
-    builder.func(async (input, context, meta) => ({ id: 1 }))
+    builder.handler(async (input, context, meta) => ({ id: 1 }))
 
     // @ts-expect-error - invalid output
-    builder.func(async (input, context, meta) => (true))
+    builder.handler(async (input, context, meta) => (true))
   })
 })

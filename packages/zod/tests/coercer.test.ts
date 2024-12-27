@@ -14,7 +14,7 @@ describe('zodCoercer', () => {
     const router = os.router({
       ping: os
         .input(z.object({ val: z.bigint() }))
-        .func(fn),
+        .handler(fn),
     })
 
     const handler = new OpenAPIServerlessHandler(router, {

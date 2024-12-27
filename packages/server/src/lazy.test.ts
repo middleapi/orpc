@@ -8,7 +8,7 @@ const procedure = new Procedure<WELL_CONTEXT, undefined, undefined, undefined, u
     InputSchema: undefined,
     OutputSchema: undefined,
   }),
-  func: vi.fn(),
+  handler: vi.fn(),
   middlewares: [],
 })
 

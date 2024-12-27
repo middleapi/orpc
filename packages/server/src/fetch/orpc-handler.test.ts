@@ -16,14 +16,14 @@ describe('oRPCHandler', () => {
       InputSchema: undefined,
       OutputSchema: undefined,
     }),
-    func: vi.fn(),
+    handler: vi.fn(),
   })
   const pong = new Procedure({
     contract: new ContractProcedure({
       InputSchema: undefined,
       OutputSchema: undefined,
     }),
-    func: vi.fn(),
+    handler: vi.fn(),
   })
 
   const router = {

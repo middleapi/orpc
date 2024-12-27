@@ -2,13 +2,13 @@ import { ORPCError } from '@orpc/server'
 import { planets } from '../data/planet'
 import { authed, pub } from '../orpc'
 
-export const listPlanets = pub.planet.list.func(
+export const listPlanets = pub.planet.list.handler(
   async (input, context, meta) => {
     return planets
   },
 )
 
-export const createPlanet = authed.planet.create.func(
+export const createPlanet = authed.planet.create.handler(
   async (input, context, meta) => {
     const id = planets.length + 1
 
@@ -26,7 +26,7 @@ export const createPlanet = authed.planet.create.func(
   },
 )
 
-export const findPlanet = pub.planet.find.func(
+export const findPlanet = pub.planet.find.handler(
   async (input, context, meta) => {
     const planet = planets.find(planet => planet.id === input.id)
 
@@ -41,7 +41,7 @@ export const findPlanet = pub.planet.find.func(
   },
 )
 
-export const updatePlanet = authed.planet.update.func(
+export const updatePlanet = authed.planet.update.handler(
   async (input, context, meta) => {
     const planet = planets.find(planet => planet.id === input.id)
 
@@ -60,7 +60,7 @@ export const updatePlanet = authed.planet.update.func(
   },
 )
 
-export const updatePlanetImage = authed.planet.updateImage.func(
+export const updatePlanetImage = authed.planet.updateImage.handler(
   async (input, context, meta) => {
     const planet = planets.find(planet => planet.id === input.id)
 
@@ -77,7 +77,7 @@ export const updatePlanetImage = authed.planet.updateImage.func(
   },
 )
 
-export const deletePlanet = authed.planet.delete.func(
+export const deletePlanet = authed.planet.delete.handler(
   async (input, context, meta) => {
     const planet = planets.find(planet => planet.id === input.id)
 

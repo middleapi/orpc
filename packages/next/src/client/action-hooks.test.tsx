@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { useAction } from './action-hooks'
 
 describe('useAction', () => {
-  const procedure = os.input(z.object({ value: z.string() })).func(async ({ value }) => {
+  const procedure = os.input(z.object({ value: z.string() })).handler(async ({ value }) => {
     await new Promise(resolve => setTimeout(resolve, 100))
     return value
   })

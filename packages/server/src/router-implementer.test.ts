@@ -32,12 +32,12 @@ const contract = oc.router({
 
 const pingImpl = new Procedure({
   contract: ping,
-  func: vi.fn(),
+  handler: vi.fn(),
 })
 
 const pongImpl = new Procedure({
   contract: pong,
-  func: vi.fn(),
+  handler: vi.fn(),
 })
 
 const router = {

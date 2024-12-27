@@ -13,13 +13,13 @@ export function createSafeAction<
   TContext extends Context,
   TInputSchema extends Schema,
   TOutputSchema extends Schema,
-  TFuncOutput extends SchemaInput<TOutputSchema>,
+  THandlerOutput extends SchemaInput<TOutputSchema>,
 >(
-  opt: CreateProcedureClientOptions<TContext, TInputSchema, TOutputSchema, TFuncOutput>,
-): SafeAction<SchemaInput<TInputSchema>, SchemaOutput<TOutputSchema, TFuncOutput>> {
+  opt: CreateProcedureClientOptions<TContext, TInputSchema, TOutputSchema, THandlerOutput>,
+): SafeAction<SchemaInput<TInputSchema>, SchemaOutput<TOutputSchema, THandlerOutput>> {
   const caller = createProcedureClient(opt)
 
-  const safeAction: SafeAction<SchemaInput<TInputSchema>, SchemaOutput<TOutputSchema, TFuncOutput>> = async (...[input, option]) => {
+  const safeAction: SafeAction<SchemaInput<TInputSchema>, SchemaOutput<TOutputSchema, THandlerOutput>> = async (...[input, option]) => {
     try {
       const output = await caller(input as any, option)
       return [output as any, undefined, 'success']

@@ -7,7 +7,7 @@ describe('isProcedure', () => {
       InputSchema: undefined,
       OutputSchema: undefined,
     }),
-    func: () => {},
+    handler: () => {},
   })
 
   it('works', () => {

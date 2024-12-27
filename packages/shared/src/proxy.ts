@@ -1,7 +1,7 @@
 import type { AnyFunction } from './function'
 
-export function createCallableObject<TObject extends object, TFunc extends AnyFunction>(obj: TObject, func: TFunc): TObject & TFunc {
-  const proxy = new Proxy(func, {
+export function createCallableObject<TObject extends object, THandler extends AnyFunction>(obj: TObject, handler: THandler): TObject & THandler {
+  const proxy = new Proxy(handler, {
     has(target, key) {
       return Reflect.has(obj, key) || Reflect.has(target, key)
     },

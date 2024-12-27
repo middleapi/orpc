@@ -7,7 +7,7 @@ import { NewUserSchema, UserSchema } from '../schemas/user'
 export const signup = pub
   .input(NewUserSchema)
   .output(UserSchema)
-  .func(async (input, context, meta) => {
+  .handler(async (input, context, meta) => {
     return {
       id: '28aa6286-48e9-4f23-adea-3486c86acd55',
       email: input.email,
@@ -18,7 +18,7 @@ export const signup = pub
 export const signin = pub
   .input(CredentialSchema)
   .output(TokenSchema)
-  .func(async (input, context, meta) => {
+  .handler(async (input, context, meta) => {
     return {
       token: 'token',
     }
@@ -26,7 +26,7 @@ export const signin = pub
 
 export const refresh = authed
   .output(TokenSchema)
-  .func(async (input, context, meta) => {
+  .handler(async (input, context, meta) => {
     return {
       token: 'new-token',
     }
@@ -34,12 +34,12 @@ export const refresh = authed
 
 export const revoke = authed
   .input(TokenSchema)
-  .func(async (input, context, meta) => {
+  .handler(async (input, context, meta) => {
     // Do something
   })
 
 export const me = authed
   .output(UserSchema)
-  .func(async (input, context, meta) => {
+  .handler(async (input, context, meta) => {
     return context.user
   })

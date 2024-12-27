@@ -58,7 +58,7 @@ export const editPost = authed
     const _output = result.output
     return result
   })
-  .func(() => 'Edited')
+  .handler(() => 'Edited')
 
 //
 //

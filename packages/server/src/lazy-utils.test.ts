@@ -9,7 +9,7 @@ describe('createLazyProcedureFormAnyLazy', () => {
       InputSchema: undefined,
       OutputSchema: undefined,
     }),
-    func: vi.fn(),
+    handler: vi.fn(),
   })
 
   it('return a Lazy<ANY_PROCEDURE>', async () => {

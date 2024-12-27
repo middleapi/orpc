@@ -6,8 +6,8 @@ import { ORPCProcedureMatcher } from './orpc-procedure-matcher'
 
 describe('oRPCProcedureMatcher', () => {
   const schema = z.object({ val: z.string().transform(v => Number(v)) })
-  const ping = os.input(schema).func(() => 'pong')
-  const pong = os.output(schema).func(() => ({ val: '1' }))
+  const ping = os.input(schema).handler(() => 'pong')
+  const pong = os.output(schema).handler(() => ({ val: '1' }))
 
   const router = {
     ping: os.lazy(() => Promise.resolve({ default: ping })),
@@ -43,21 +43,21 @@ describe('oRPCProcedureMatcher', () => {
     const result = await matcher.match('/nested/pong')
     expect(result?.path).toEqual(['nested', 'pong'])
     expect(result?.procedure).toSatisfy(isProcedure)
-    expect(result?.procedure['~orpc'].func).toBe(pong['~orpc'].func)
+    expect(result?.procedure['~orpc'].handler).toBe(pong['~orpc'].handler)
   })
 
   it('should handle deeply nested lazy-loaded procedures', async () => {
     const result = await matcher.match('/nested/ping')
     expect(result?.path).toEqual(['nested', 'ping'])
     expect(result?.procedure).toSatisfy(isProcedure)
-    expect(result?.procedure['~orpc'].func).toBe(ping['~orpc'].func)
+    expect(result?.procedure['~orpc'].handler).toBe(ping['~orpc'].handler)
   })
 
   it('should decode URI components in the path', async () => {
     const result = await matcher.match('/nested/%70ing') // '%70' decodes to 'p'
     expect(result?.path).toEqual(['nested', 'ping'])
     expect(result?.procedure).toSatisfy(isProcedure)
-    expect(result?.procedure['~orpc'].func).toBe(ping['~orpc'].func)
+    expect(result?.procedure['~orpc'].handler).toBe(ping['~orpc'].handler)
   })
 
   it('should handle empty path correctly', async () => {
@@ -69,7 +69,7 @@ describe('oRPCProcedureMatcher', () => {
     const result = await matcher.match('/nested/pong/')
     expect(result?.path).toEqual(['nested', 'pong'])
     expect(result?.procedure).toSatisfy(isProcedure)
-    expect(result?.procedure['~orpc'].func).toBe(pong['~orpc'].func)
+    expect(result?.procedure['~orpc'].handler).toBe(pong['~orpc'].handler)
   })
 
   it('should return undefined for a path that matches a non-lazy non-procedure', async () => {
@@ -81,6 +81,6 @@ describe('oRPCProcedureMatcher', () => {
     const result = await matcher.match('/ping')
     expect(result?.path).toEqual(['ping'])
     expect(result?.procedure).toSatisfy(isProcedure)
-    expect(result?.procedure['~orpc'].func).toBe(ping['~orpc'].func)
+    expect(result?.procedure['~orpc'].handler).toBe(ping['~orpc'].handler)
   })
 })

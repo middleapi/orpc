@@ -57,12 +57,12 @@ describe('to DecoratedProcedure', () => {
     middlewares: [global_mid],
   })
 
-  it('func', () => {
-    const func = vi.fn()
-    const procedure = implementer.func(func)
+  it('handler', () => {
+    const handler = vi.fn()
+    const procedure = implementer.handler(handler)
 
     expect(procedure).toSatisfy(isProcedure)
-    expect(procedure['~orpc'].func).toBe(func)
+    expect(procedure['~orpc'].handler).toBe(handler)
     expect(procedure['~orpc'].middlewares).toEqual([global_mid])
   })
 })

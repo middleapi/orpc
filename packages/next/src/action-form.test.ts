@@ -6,7 +6,7 @@ import { createFormAction } from './action-form'
 describe('createFormAction', () => {
   const procedure = os.input(z.object({
     big: z.bigint(),
-  })).func(async ({ big }) => big)
+  })).handler(async ({ big }) => big)
 
   it('should accept form data and auto-convert types', async () => {
     const onSuccess = vi.fn()

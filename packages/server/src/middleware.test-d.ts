@@ -71,11 +71,11 @@ describe('middleware', () => {
   })
 
   it('can infer types from function', () => {
-    const func = (input: 'input', context: { context: 'context' }, meta: MiddlewareMeta<'output'>) => {
+    const handler = (input: 'input', context: { context: 'context' }, meta: MiddlewareMeta<'output'>) => {
       return meta.next({ context: { extra: 'extra' as const } })
     }
 
-    type Inferred = typeof func extends Middleware<infer TContext, infer TExtraContext, infer TInput, infer TOutput>
+    type Inferred = typeof handler extends Middleware<infer TContext, infer TExtraContext, infer TInput, infer TOutput>
       ? [TContext, TExtraContext, TInput, TOutput]
       : never
 

@@ -21,7 +21,7 @@ describe('decorated lazy', () => {
       InputSchema: schema,
       OutputSchema: undefined,
     }),
-    func: vi.fn(),
+    handler: vi.fn(),
     middlewares: [],
   })
 

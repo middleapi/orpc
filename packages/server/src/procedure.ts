@@ -9,13 +9,13 @@ export interface ProcedureFunc<
   TExtraContext extends Context,
   TInputSchema extends Schema,
   TOutputSchema extends Schema,
-  TFuncOutput extends SchemaInput<TOutputSchema>,
+  THandlerOutput extends SchemaInput<TOutputSchema>,
 > {
   (
     input: SchemaOutput<TInputSchema>,
     context: MergeContext<TContext, TExtraContext>,
     meta: Meta,
-  ): Promisable<SchemaInput<TOutputSchema, TFuncOutput>>
+  ): Promisable<SchemaInput<TOutputSchema, THandlerOutput>>
 }
 
 export interface ProcedureDef<
@@ -23,11 +23,11 @@ export interface ProcedureDef<
   TExtraContext extends Context,
   TInputSchema extends Schema,
   TOutputSchema extends Schema,
-  TFuncOutput extends SchemaInput<TOutputSchema>,
+  THandlerOutput extends SchemaInput<TOutputSchema>,
 > {
   middlewares?: Middleware<MergeContext<TContext, TExtraContext>, Partial<TExtraContext> | undefined, SchemaOutput<TInputSchema>, any>[]
   contract: ContractProcedure<TInputSchema, TOutputSchema>
-  func: ProcedureFunc<TContext, TExtraContext, TInputSchema, TOutputSchema, TFuncOutput>
+  handler: ProcedureFunc<TContext, TExtraContext, TInputSchema, TOutputSchema, THandlerOutput>
 }
 
 export class Procedure<
@@ -35,12 +35,12 @@ export class Procedure<
   TExtraContext extends Context,
   TInputSchema extends Schema,
   TOutputSchema extends Schema,
-  TFuncOutput extends SchemaInput<TOutputSchema>,
+  THandlerOutput extends SchemaInput<TOutputSchema>,
 > {
   '~type' = 'Procedure' as const
-  '~orpc': ProcedureDef<TContext, TExtraContext, TInputSchema, TOutputSchema, TFuncOutput>
+  '~orpc': ProcedureDef<TContext, TExtraContext, TInputSchema, TOutputSchema, THandlerOutput>
 
-  constructor(def: ProcedureDef<TContext, TExtraContext, TInputSchema, TOutputSchema, TFuncOutput>) {
+  constructor(def: ProcedureDef<TContext, TExtraContext, TInputSchema, TOutputSchema, THandlerOutput>) {
     this['~orpc'] = def
   }
 }
@@ -64,7 +64,7 @@ export function isProcedure(item: unknown): item is ANY_PROCEDURE {
     && item['~orpc'] !== null
     && 'contract' in item['~orpc']
     && isContractProcedure(item['~orpc'].contract)
-    && 'func' in item['~orpc']
-    && typeof item['~orpc'].func === 'function'
+    && 'handler' in item['~orpc']
+    && typeof item['~orpc'].handler === 'function'
   )
 }

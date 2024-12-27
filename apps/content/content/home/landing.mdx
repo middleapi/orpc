@@ -17,10 +17,10 @@ export const getting = os
 	}))
 	.use(canMiddleware, (i) => i.id) // permission check by id
 	.output(z.string()) // validate output
-	.func(async (input) => 'Name and Avatar has been updated')
+	.handler(async (input) => 'Name and Avatar has been updated')
 ```
 
-> Only the `.func` method is required. All other chain methods are optional.
+> Only the `.handler` method is required. All other chain methods are optional.
 > 
 
 With [Middleware](/docs/server/middleware) and the [Procedure Builder](/docs/server/procedure), 
@@ -143,7 +143,7 @@ const getting = pub
 			}
 		})
 	})
-	.func((input, context, meta) => {
+	.handler((input, context, meta) => {
 		// ^ context.user is now guaranteed to be defined
 	})
 ```
@@ -160,7 +160,7 @@ const gettingContract = oc
 	
 const getting = os
 	.contract(gettingContract)
-	.func(async () => 'Worked')
+	.handler(async () => 'Worked')
 ```
 
 With [oRPC's Contract First Development](/docs/server/contract), you can easily separate the procedure's definition 

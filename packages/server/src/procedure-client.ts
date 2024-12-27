@@ -20,10 +20,10 @@ export type CreateProcedureClientOptions<
   TContext extends Context,
   TInputSchema extends Schema,
   TOutputSchema extends Schema,
-  TFuncOutput extends SchemaInput<TOutputSchema>,
+  THandlerOutput extends SchemaInput<TOutputSchema>,
 > =
   & {
-    procedure: Lazyable<Procedure<TContext, any, TInputSchema, TOutputSchema, TFuncOutput>>
+    procedure: Lazyable<Procedure<TContext, any, TInputSchema, TOutputSchema, THandlerOutput>>
 
     /**
      * This is helpful for logging and analytics.
@@ -38,16 +38,16 @@ export type CreateProcedureClientOptions<
      */
     context: Value<TContext>
   } | (undefined extends TContext ? { context?: undefined } : never))
-  & Hooks<unknown, SchemaOutput<TOutputSchema, TFuncOutput>, TContext, Meta>
+  & Hooks<unknown, SchemaOutput<TOutputSchema, THandlerOutput>, TContext, Meta>
 
 export function createProcedureClient<
   TContext extends Context = WELL_CONTEXT,
   TInputSchema extends Schema = undefined,
   TOutputSchema extends Schema = undefined,
-  TFuncOutput extends SchemaInput<TOutputSchema> = SchemaInput<TOutputSchema>,
+  THandlerOutput extends SchemaInput<TOutputSchema> = SchemaInput<TOutputSchema>,
 >(
-  options: CreateProcedureClientOptions<TContext, TInputSchema, TOutputSchema, TFuncOutput>,
-): ProcedureClient<SchemaInput<TInputSchema>, SchemaOutput<TOutputSchema, TFuncOutput>> {
+  options: CreateProcedureClientOptions<TContext, TInputSchema, TOutputSchema, THandlerOutput>,
+): ProcedureClient<SchemaInput<TInputSchema>, SchemaOutput<TOutputSchema, THandlerOutput>> {
   return async (...[input, callerOptions]) => {
     const path = options.path ?? []
     const { default: procedure } = await unlazy(options.procedure)
@@ -69,7 +69,7 @@ export function createProcedureClient<
         meta,
       )
 
-      return validateOutput(procedure, output) as SchemaOutput<TOutputSchema, TFuncOutput>
+      return validateOutput(procedure, output) as SchemaOutput<TOutputSchema, THandlerOutput>
     }
 
     return executeWithHooks({
@@ -140,7 +140,7 @@ async function executeMiddlewareChain(
     }
 
     const result = {
-      output: await procedure['~orpc'].func(input, currentContext, meta),
+      output: await procedure['~orpc'].handler(input, currentContext, meta),
       context: currentContext,
     }
 

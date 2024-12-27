@@ -7,7 +7,7 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-const func = vi.fn(() => ({ val: '123' }))
+const handler = vi.fn(() => ({ val: '123' }))
 const mid = vi.fn((_, __, meta) => meta.next({}))
 
 const schema = z.object({ val: z.string().transform(v => Number.parseInt(v)) })
@@ -19,7 +19,7 @@ const procedure = new Procedure<{ auth: boolean }, { db: string }, typeof schema
     inputExample: { val: 123 },
     outputExample: { val: 456 },
   }),
-  func,
+  handler,
   middlewares: [mid],
 })
 
@@ -147,7 +147,7 @@ it('can use middleware when has no middleware', () => {
       InputSchema: undefined,
       OutputSchema: undefined,
     }),
-    func: () => { },
+    handler: () => { },
   }))
 
   const mid = vi.fn()
@@ -164,7 +164,7 @@ it('can unshift middleware when has no middleware', () => {
       InputSchema: undefined,
       OutputSchema: undefined,
     }),
-    func: () => { },
+    handler: () => { },
   }))
 
   const mid1 = vi.fn()

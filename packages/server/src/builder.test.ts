@@ -98,13 +98,13 @@ describe('to ProcedureBuilder', () => {
 })
 
 describe('to DecoratedProcedure', () => {
-  it('func', () => {
+  it('handler', () => {
     const fn = vi.fn()
-    const result = builder.func(fn)
+    const result = builder.handler(fn)
 
     expect(result).toSatisfy(isProcedure)
     expect(result['~orpc'].middlewares).toEqual([mid])
-    expect(result['~orpc'].func).toBe(fn)
+    expect(result['~orpc'].handler).toBe(fn)
   })
 })
 

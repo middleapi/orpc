@@ -34,7 +34,7 @@ export const updateUser = os
       }),
     }),
   )
-  .func((input, context, meta) => {
+  .handler((input, context, meta) => {
     // ^ context.user is automatically injected
     // do something
   })

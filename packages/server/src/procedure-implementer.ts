@@ -76,13 +76,13 @@ export class ProcedureImplementer<
     })
   }
 
-  func<UFuncOutput extends SchemaInput<TOutputSchema>>(
-    func: ProcedureFunc<TContext, TExtraContext, TInputSchema, TOutputSchema, UFuncOutput>,
+  handler<UFuncOutput extends SchemaInput<TOutputSchema>>(
+    handler: ProcedureFunc<TContext, TExtraContext, TInputSchema, TOutputSchema, UFuncOutput>,
   ): DecoratedProcedure<TContext, TExtraContext, TInputSchema, TOutputSchema, UFuncOutput > {
     return decorateProcedure(new Procedure({
       middlewares: this['~orpc'].middlewares,
       contract: this['~orpc'].contract,
-      func,
+      handler,
     }))
   }
 }

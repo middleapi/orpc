@@ -17,8 +17,8 @@ describe('router fetch client', () => {
     },
   })
 
-  const ping = os.contract(pingContract).func(name => `ping ${name}`)
-  const pong = os.contract(pongContract).func(num => `pong ${num}`)
+  const ping = os.contract(pingContract).handler(name => `ping ${name}`)
+  const pong = os.contract(pongContract).handler(num => `pong ${num}`)
 
   const router = os.contract(contractRouter).router({
     ping,

@@ -5,7 +5,7 @@ import { ORPCHandler } from './orpc-handler'
 describe('oRPCHandler', () => {
   it('hooks', () => {
     const router = {
-      ping: os.context<{ userId?: string }>().func(() => 'pong'),
+      ping: os.context<{ userId?: string }>().handler(() => 'pong'),
     }
 
     const handler = new ORPCHandler(router, {

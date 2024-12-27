@@ -116,8 +116,8 @@ describe('to ProcedureBuilder', () => {
 })
 
 describe('to DecoratedProcedure', () => {
-  it('func', () => {
-    expectTypeOf(builder.func((input, context, meta) => {
+  it('handler', () => {
+    expectTypeOf(builder.handler((input, context, meta) => {
       expectTypeOf(input).toEqualTypeOf<unknown>()
       expectTypeOf(context).toEqualTypeOf<{ auth: boolean } & { db: string }>()
       expectTypeOf(meta).toEqualTypeOf<Meta>()

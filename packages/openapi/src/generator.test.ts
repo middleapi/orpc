@@ -652,7 +652,7 @@ it('should remove params on query', async () => {
 })
 
 it('works with lazy', async () => {
-  const ping = os.input(z.string()).output(z.string()).func(() => 'pong')
+  const ping = os.input(z.string()).output(z.string()).handler(() => 'pong')
 
   const lazyRouter = os.lazy(() => Promise.resolve({ default: {
     ping,
@@ -722,7 +722,7 @@ it('works will use contract instead of implemented', async () => {
   })
 
   const implemented = os.contract(contract).router({
-    ping: os.route({ path: '/implemented' }).func(() => 'pong'),
+    ping: os.route({ path: '/implemented' }).handler(() => 'pong'),
   })
 
   const spec = await generateOpenAPI({

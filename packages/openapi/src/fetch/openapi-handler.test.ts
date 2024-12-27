@@ -36,7 +36,7 @@ describe.each(hono)('openAPIHandler: %s', (_, hono) => {
       InputSchema: undefined,
       OutputSchema: undefined,
     }),
-    func: vi.fn(),
+    handler: vi.fn(),
   })
   const pong = new Procedure({
     contract: new ContractProcedure({
@@ -47,7 +47,7 @@ describe.each(hono)('openAPIHandler: %s', (_, hono) => {
         path: '/pong/{name}',
       },
     }),
-    func: vi.fn(),
+    handler: vi.fn(),
   })
 
   const router = {

@@ -12,14 +12,14 @@ describe('getRouterChild', () => {
       InputSchema: schema,
       OutputSchema: schema,
     }),
-    func: vi.fn(() => ({ val: '123' })),
+    handler: vi.fn(() => ({ val: '123' })),
   })
   const pong = new Procedure({
     contract: new ContractProcedure({
       InputSchema: undefined,
       OutputSchema: undefined,
     }),
-    func: vi.fn(() => ('output')),
+    handler: vi.fn(() => ('output')),
   })
 
   it('with procedure as router', () => {

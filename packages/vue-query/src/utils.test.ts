@@ -68,8 +68,8 @@ describe('deepUnref', () => {
 
   // Functions should remain unchanged
   it('should not unwrap functions', () => {
-    const func = () => 'hello'
-    expect(deepUnref(func)).toBe(func)
+    const handler = () => 'hello'
+    expect(deepUnref(handler)).toBe(handler)
 
     const inputWithFunc = {
       a: ref(1),

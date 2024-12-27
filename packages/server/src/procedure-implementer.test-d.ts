@@ -128,8 +128,8 @@ describe('to DecoratedProcedure', () => {
     middlewares: [global_mid],
   })
 
-  it('func', () => {
-    const procedure = implementer.func((input, context, meta) => {
+  it('handler', () => {
+    const procedure = implementer.handler((input, context, meta) => {
       expectTypeOf(context).toEqualTypeOf<({ id?: string } & { db: string }) | { db: string }>()
       expectTypeOf(input).toEqualTypeOf<{ val: number }>()
       expectTypeOf(meta).toEqualTypeOf<Meta>()
@@ -142,9 +142,9 @@ describe('to DecoratedProcedure', () => {
     >()
 
     // @ts-expect-error - invalid output
-    implementer.func(() => ({ val: 1 }))
+    implementer.handler(() => ({ val: 1 }))
 
     // @ts-expect-error - invalid output
-    implementer.func(() => {})
+    implementer.handler(() => {})
   })
 })

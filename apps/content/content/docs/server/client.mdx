@@ -13,16 +13,16 @@ import { os, createProcedureClient } from '@orpc/server'
 import { z } from 'zod'
 
 // ❌ Cannot call this procedure directly because undefined is not assignable to 'Context'
-const e1 = os.context<{ auth: boolean }>().func(() => 'pong')
+const e1 = os.context<{ auth: boolean }>().handler(() => 'pong')
 // @errors: 2349
 e1() // Error: Procedure 'e1' cannot be called directly
 
 // ✅ Can call this procedure directly because undefined is assignable to 'Context'
-const e2 = os.context<{ auth: boolean } | undefined>().func(() => 'pong')
+const e2 = os.context<{ auth: boolean } | undefined>().handler(() => 'pong')
 const o2 = await e2() // Ok, output is 'pong'
 
 // ✅ Can call this procedure directly because undefined is assignable to 'Context'
-const getting = os.input(z.object({ name: z.string() })).func(({ name }) => `Hello, ${name}!`)
+const getting = os.input(z.object({ name: z.string() })).handler(({ name }) => `Hello, ${name}!`)
 
 const router = os.router({
     getting
@@ -44,7 +44,7 @@ import { os, createProcedureClient } from '@orpc/server'
 
 type Context = { user?: { id: string } }
 
-const getting = os.context<Context>().func(() => 'pong')
+const getting = os.context<Context>().handler(() => 'pong')
 
 const gettingClient = createProcedureClient({
     procedure: getting,
@@ -68,7 +68,7 @@ To call multiple procedures with shared context, use a `Router Client`.
 import { os, createRouterClient } from '@orpc/server'
 
 const router = os.router({
-    ping: os.func(() => 'pong')
+    ping: os.handler(() => 'pong')
 })
 
 const client = createRouterClient({

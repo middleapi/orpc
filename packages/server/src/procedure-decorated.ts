@@ -12,17 +12,17 @@ export type DecoratedProcedure<
   TExtraContext extends Context,
   TInputSchema extends Schema,
   TOutputSchema extends Schema,
-  TFuncOutput extends SchemaInput<TOutputSchema>,
+  THandlerOutput extends SchemaInput<TOutputSchema>,
 > =
-  & Procedure<TContext, TExtraContext, TInputSchema, TOutputSchema, TFuncOutput>
+  & Procedure<TContext, TExtraContext, TInputSchema, TOutputSchema, THandlerOutput>
   & {
     prefix: (
       prefix: HTTPPath,
-    ) => DecoratedProcedure<TContext, TExtraContext, TInputSchema, TOutputSchema, TFuncOutput>
+    ) => DecoratedProcedure<TContext, TExtraContext, TInputSchema, TOutputSchema, THandlerOutput>
 
     route: (
       route: RouteOptions,
-    ) => DecoratedProcedure<TContext, TExtraContext, TInputSchema, TOutputSchema, TFuncOutput>
+    ) => DecoratedProcedure<TContext, TExtraContext, TInputSchema, TOutputSchema, THandlerOutput>
 
     use:
     & (
@@ -31,14 +31,14 @@ export type DecoratedProcedure<
           MergeContext<TContext, TExtraContext>,
           U,
           SchemaOutput<TInputSchema>,
-          SchemaInput<TOutputSchema, TFuncOutput>
+          SchemaInput<TOutputSchema, THandlerOutput>
         >,
       ) => DecoratedProcedure<
         TContext,
         MergeContext<TExtraContext, U>,
         TInputSchema,
         TOutputSchema,
-        TFuncOutput
+        THandlerOutput
       >
     )
     & (
@@ -50,10 +50,10 @@ export type DecoratedProcedure<
           MergeContext<TContext, TExtraContext>,
           UExtra,
           UInput,
-          SchemaInput<TOutputSchema, TFuncOutput>
+          SchemaInput<TOutputSchema, THandlerOutput>
         >,
         mapInput: MapInputMiddleware<
-          SchemaOutput<TInputSchema, TFuncOutput>,
+          SchemaOutput<TInputSchema, THandlerOutput>,
           UInput
         >,
       ) => DecoratedProcedure<
@@ -61,34 +61,34 @@ export type DecoratedProcedure<
         MergeContext<TExtraContext, UExtra>,
         TInputSchema,
         TOutputSchema,
-        TFuncOutput
+        THandlerOutput
       >
     )
 
-    unshiftTag: (...tags: string[]) => DecoratedProcedure<TContext, TExtraContext, TInputSchema, TOutputSchema, TFuncOutput>
+    unshiftTag: (...tags: string[]) => DecoratedProcedure<TContext, TExtraContext, TInputSchema, TOutputSchema, THandlerOutput>
 
     unshiftMiddleware: <U extends Context & Partial<MergeContext<TContext, TExtraContext>> | undefined = undefined>(
-      ...middlewares: Middleware<TContext, U, SchemaOutput<TInputSchema>, SchemaInput<TOutputSchema, TFuncOutput>>[]
-    ) => DecoratedProcedure<TContext, TExtraContext, TInputSchema, TOutputSchema, TFuncOutput>
+      ...middlewares: Middleware<TContext, U, SchemaOutput<TInputSchema>, SchemaInput<TOutputSchema, THandlerOutput>>[]
+    ) => DecoratedProcedure<TContext, TExtraContext, TInputSchema, TOutputSchema, THandlerOutput>
 
   }
-  & (undefined extends TContext ? ProcedureClient<SchemaInput<TInputSchema>, SchemaOutput<TOutputSchema, TFuncOutput>> : unknown)
+  & (undefined extends TContext ? ProcedureClient<SchemaInput<TInputSchema>, SchemaOutput<TOutputSchema, THandlerOutput>> : unknown)
 
 export function decorateProcedure<
   TContext extends Context,
   TExtraContext extends Context,
   TInputSchema extends Schema,
   TOutputSchema extends Schema,
-  TFuncOutput extends SchemaInput<TOutputSchema>,
+  THandlerOutput extends SchemaInput<TOutputSchema>,
 >(
-  procedure: Procedure<TContext, TExtraContext, TInputSchema, TOutputSchema, TFuncOutput>,
-): DecoratedProcedure<TContext, TExtraContext, TInputSchema, TOutputSchema, TFuncOutput> {
+  procedure: Procedure<TContext, TExtraContext, TInputSchema, TOutputSchema, THandlerOutput>,
+): DecoratedProcedure<TContext, TExtraContext, TInputSchema, TOutputSchema, THandlerOutput> {
   const caller = createProcedureClient({
     procedure,
     context: undefined as any,
   })
 
-  const decorated = caller as DecoratedProcedure<TContext, TExtraContext, TInputSchema, TOutputSchema, TFuncOutput>
+  const decorated = caller as DecoratedProcedure<TContext, TExtraContext, TInputSchema, TOutputSchema, THandlerOutput>
 
   decorated['~type'] = procedure['~type']
   decorated['~orpc'] = procedure['~orpc']

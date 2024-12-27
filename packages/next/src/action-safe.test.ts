@@ -5,7 +5,7 @@ import { createSafeAction } from './action-safe'
 describe('createSafeAction', () => {
   const procedure = os.input(z.object({
     name: z.string(),
-  })).func(async ({ name }) => name)
+  })).handler(async ({ name }) => name)
 
   it('should work and catch error', () => {
     const safe = createSafeAction({ procedure, path: ['name'] })

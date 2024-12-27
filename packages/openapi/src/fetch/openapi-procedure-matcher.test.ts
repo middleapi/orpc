@@ -16,8 +16,8 @@ beforeEach(() => {
 })
 
 describe.each(hono)('openAPIProcedureMatcher: %s', (_, hono) => {
-  const ping = os.route({ path: '/ping', method: 'GET' }).func(() => 'pong')
-  const pong = os.route({ path: '/pong/{name}' }).func(() => 'pong')
+  const ping = os.route({ path: '/ping', method: 'GET' }).handler(() => 'pong')
+  const pong = os.route({ path: '/pong/{name}' }).handler(() => 'pong')
 
   const pingLazyLoader = vi.fn(() => Promise.resolve({ default: ping }))
   const pongLazyLoader = vi.fn(() => Promise.resolve({ default: pong }))
@@ -43,7 +43,7 @@ describe.each(hono)('openAPIProcedureMatcher: %s', (_, hono) => {
     vi.clearAllMocks()
     const r2 = await matcher.match('GET', '/ping')
     expect(r2?.path).toEqual(['ping'])
-    expect(r2?.procedure['~orpc'].func).toBe(ping['~orpc'].func)
+    expect(r2?.procedure['~orpc'].handler).toBe(ping['~orpc'].handler)
 
     expect(pingLazyLoader).toBeCalledTimes(1)
     expect(pongLazyLoader).toBeCalledTimes(0)
@@ -60,7 +60,7 @@ describe.each(hono)('openAPIProcedureMatcher: %s', (_, hono) => {
     vi.clearAllMocks()
     const r4 = await matcher.match('GET', '/nested/ping')
     expect(r4?.path).toEqual(['nested', 'ping'])
-    expect(r4?.procedure['~orpc'].func).toBe(ping['~orpc'].func)
+    expect(r4?.procedure['~orpc'].handler).toBe(ping['~orpc'].handler)
 
     expect(pingLazyLoader).toBeCalledTimes(0)
     expect(pongLazyLoader).toBeCalledTimes(0)
@@ -72,7 +72,7 @@ describe.each(hono)('openAPIProcedureMatcher: %s', (_, hono) => {
 
     expect(r1?.path).toEqual(['pong'])
     expect(r1?.params).toEqual({ name: 'unnoq' })
-    expect(r1?.procedure['~orpc'].func).toBe(pong['~orpc'].func)
+    expect(r1?.procedure['~orpc'].handler).toBe(pong['~orpc'].handler)
   })
 
   it('not found', async () => {

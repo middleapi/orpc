@@ -70,7 +70,7 @@ export const authed /** require authed */ = base
   .contract(contract)
 
 export const router = pub.router({
-  getting: pub.getting.func((input, context, meta) => {
+  getting: pub.getting.handler((input, context, meta) => {
     return {
       message: `Hello, ${input.name}!`,
     }
@@ -95,7 +95,7 @@ export const router = pub.router({
 
         return result
       })
-      .func((input, context, meta) => {
+      .handler((input, context, meta) => {
         return {
           id: 'example',
           title: 'example',
@@ -103,7 +103,7 @@ export const router = pub.router({
         }
       }),
 
-    create: authed.post.create.func((input, context, meta) => {
+    create: authed.post.create.handler((input, context, meta) => {
       return {
         id: 'example',
         title: input.title,

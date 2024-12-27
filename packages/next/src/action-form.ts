@@ -15,8 +15,8 @@ export function createFormAction<
   TContext extends Context,
   TInputSchema extends Schema,
   TOutputSchema extends Schema,
-  TFuncOutput extends SchemaInput<TOutputSchema>,
->(opt: CreateProcedureClientOptions<TContext, TInputSchema, TOutputSchema, TFuncOutput> & CreateFormActionOptions): FormAction {
+  THandlerOutput extends SchemaInput<TOutputSchema>,
+>(opt: CreateProcedureClientOptions<TContext, TInputSchema, TOutputSchema, THandlerOutput> & CreateFormActionOptions): FormAction {
   const caller = createProcedureClient(opt)
 
   const formAction = async (input: FormData): Promise<void> => {
