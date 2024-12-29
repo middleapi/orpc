@@ -10,23 +10,23 @@ beforeEach(() => {
 })
 
 describe('ProcedureClient', () => {
-  const fn: ProcedureClient<string, number> = async (input, options) => {
+  const fn: ProcedureClient<string, number, unknown> = async (...[input, options]) => {
     expectTypeOf(input).toEqualTypeOf<string>()
-    expectTypeOf(options).toEqualTypeOf<WithSignal | undefined>()
+    expectTypeOf(options).toEqualTypeOf<(WithSignal & { context?: unknown }) | undefined>()
     return 123
   }
 
-  const fnWithOptionalInput: ProcedureClient<string | undefined, number> = async (...args) => {
+  const fnWithOptionalInput: ProcedureClient<string | undefined, number, unknown> = async (...args) => {
     const [input, options] = args
 
     expectTypeOf(input).toEqualTypeOf<string | undefined>()
-    expectTypeOf(options).toEqualTypeOf<WithSignal | undefined>()
+    expectTypeOf(options).toEqualTypeOf<(WithSignal & { context?: unknown }) | undefined>()
     return 123
   }
 
   it('just a function', () => {
-    expectTypeOf(fn).toEqualTypeOf<(input: string, options?: WithSignal) => Promise<number>>()
-    expectTypeOf(fnWithOptionalInput).toMatchTypeOf<(input: string | undefined, options?: WithSignal) => Promise<number>>()
+    expectTypeOf(fn).toMatchTypeOf<(input: string, options: WithSignal & { context?: unknown }) => Promise<number>>()
+    expectTypeOf(fnWithOptionalInput).toMatchTypeOf<(input: string | undefined, options: WithSignal & { context?: unknown }) => Promise<number>>()
   })
 
   it('infer correct input', () => {
@@ -59,6 +59,36 @@ describe('ProcedureClient', () => {
     // @ts-expect-error - input is required
     expectTypeOf(fn()).toEqualTypeOf<Promise<number>>()
   })
+
+  describe('context', () => {
+    it('can accept context', () => {
+      const client = {} as ProcedureClient<{ val: string }, { val: number }, { userId: string }>
+
+      client({ val: '123' }, { context: { userId: '123' } })
+      // @ts-expect-error - invalid context
+      client({ val: '123' }, { context: { userId: 123 } })
+      // @ts-expect-error - context is required
+      client({ val: '123' })
+    })
+
+    it('optional options when context is optional', () => {
+      const client = {} as ProcedureClient<{ val: string }, { val: number }, undefined | { userId: string }>
+
+      client({ val: '123' })
+      client({ val: '123' }, { context: { userId: '123' } })
+    })
+
+    it('can call without args when both input and context are optional', () => {
+      const client = {} as ProcedureClient<undefined | { val: string }, { val: number }, undefined | { userId: string }>
+
+      client()
+      client({ val: 'string' }, { context: { userId: '123' } })
+      // @ts-expect-error - input is invalid
+      client({ val: 123 }, { context: { userId: '123' } })
+      // @ts-expect-error - context is invalid
+      client({ val: '123' }, { context: { userId: 123 } })
+    })
+  })
 })
 
 describe('createProcedureClient', () => {
@@ -71,7 +101,7 @@ describe('createProcedureClient', () => {
       procedure,
     })
 
-    expectTypeOf(client).toEqualTypeOf<ProcedureClient<{ val: string }, { val: number }>>()
+    expectTypeOf(client).toEqualTypeOf<ProcedureClient<{ val: string }, { val: number }, unknown>>()
   })
 
   it('context can be optional and can be a sync or async function', () => {
@@ -127,7 +157,7 @@ describe('createProcedureClient', () => {
     createProcedureClient({
       procedure,
 
-      async execute(input, context, meta) {
+      async interceptor(input, context, meta) {
         expectTypeOf(input).toEqualTypeOf<unknown>()
         expectTypeOf(context).toEqualTypeOf<WELL_CONTEXT>()
         expectTypeOf(meta).toEqualTypeOf<Meta & { next: () => Promise<{ val: number }> }>()
@@ -192,5 +222,5 @@ it('support lazy procedure', () => {
     },
   })
 
-  expectTypeOf(client).toEqualTypeOf<ProcedureClient<{ val: string }, { val: number }>>()
+  expectTypeOf(client).toEqualTypeOf<ProcedureClient<{ val: string }, { val: number }, unknown>>()
 })

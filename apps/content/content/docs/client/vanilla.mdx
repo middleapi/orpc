@@ -14,14 +14,17 @@ npm i @orpc/client
 To create a fully typed client, you need either the type of the [router](/docs/server/router) you intend to use or the [contract](/docs/contract/builder).
 
 ```ts twoslash
-import { createORPCFetchClient, ORPCError } from '@orpc/client'
+import { createORPCClient, ORPCError } from '@orpc/client'
+import { ORPCLink } from '@orpc/client/fetch'
 import type { router } from 'examples/server'
 
-const client = createORPCFetchClient<typeof router /* or contract router */>({
-  baseURL: 'http://localhost:3000/api',
+const orpcLink = new ORPCLink({
+  url: 'http://localhost:3000/api',
   // fetch: optional override for the default fetch function
   // headers: provide additional headers
 })
+
+const client = createORPCClient<typeof router /* or contract router */>(orpcLink)
  
 //  File upload out of the box
 const output = await client.post.create({
@@ -33,4 +36,63 @@ const output = await client.post.create({
 // @noErrors
 client.post.
 //          ^|
+```
+
+## Client Context
+
+The `Client Context` feature allows you to pass additional contextual information (like caching policies) to your client calls.
+
+```ts twoslash
+import type { router } from 'examples/server'
+import { createORPCClient, ORPCError } from '@orpc/client'
+import { ORPCLink } from '@orpc/client/fetch'
+
+type ClientContext = { cache?: RequestCache } | undefined
+// if context is not undefinable, it will require you pass context in every call
+
+const orpcLink = new ORPCLink<ClientContext>({
+  url: 'http://localhost:3000/api',
+  // headers: provide additional headers
+  fetch: (input, init, context) => globalThis.fetch(input, {
+    ...init,
+    cache: context?.cache,
+  }),
+})
+
+const client = createORPCClient<typeof router, ClientContext>(orpcLink)
+
+client.getting({ name: 'unnoq' }, { context: { cache: 'force-cache' } })
+```
+
+> **Note**: This works seamlessly with [Vue Query](/docs/client/vue-query) and [React Query](/docs/client/react-query).
+
+## Dynamic Link
+
+With the **Dynamic Link** mechanism, you can define custom logic to dynamically choose between different links based on the request's context, path, or input.
+
+```ts twoslash
+import type { router } from 'examples/server'
+import { createORPCClient, DynamicLink, ORPCError } from '@orpc/client'
+import { ORPCLink } from '@orpc/client/fetch'
+
+const orpcLink1 = new ORPCLink({
+  url: 'http://localhost:3000/api',
+  // headers: provide additional headers
+})
+
+const orpcLink2 = new ORPCLink({
+  url: 'http://localhost:8000/api',
+  // headers: provide additional headers
+})
+
+const dynamicLink = new DynamicLink((path, input, options) => { // can be async
+  // const clientContext = options.context
+  if (path.includes('post')) {
+    return orpcLink1
+  }
+
+  return orpcLink2
+})
+
+const client = createORPCClient<typeof router>(dynamicLink)
 ```

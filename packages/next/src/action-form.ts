@@ -1,5 +1,6 @@
 import type { Schema, SchemaInput } from '@orpc/contract'
 import type { Context, CreateProcedureClientOptions } from '@orpc/server'
+import { JSONSerializer } from '@orpc/openapi'
 import { CompositeSchemaCoercer, OpenAPIPayloadCodec, type PublicOpenAPIPayloadCodec, type SchemaCoercer } from '@orpc/openapi/fetch'
 import { createProcedureClient, ORPCError, unlazy } from '@orpc/server'
 import { forbidden, notFound, unauthorized } from 'next/navigation'
@@ -21,7 +22,7 @@ export function createFormAction<
 
   const formAction = async (input: FormData): Promise<void> => {
     try {
-      const codec = opt.payloadCodec ?? new OpenAPIPayloadCodec()
+      const codec = opt.payloadCodec ?? new OpenAPIPayloadCodec(new JSONSerializer())
       const coercer = new CompositeSchemaCoercer(opt.schemaCoercers ?? [])
 
       const { default: procedure } = await unlazy(opt.procedure)

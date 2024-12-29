@@ -10,7 +10,7 @@ export interface BaseHookMeta<TOutput> {
 }
 
 export interface Hooks<TInput, TOutput, TContext, TMeta extends (Record<string, any> & { next?: never }) | undefined> {
-  execute?: Arrayable<(input: TInput, context: TContext, meta: (TMeta extends undefined ? unknown : TMeta) & BaseHookMeta<TOutput>) => Promise<TOutput>>
+  interceptor?: Arrayable<(input: TInput, context: TContext, meta: (TMeta extends undefined ? unknown : TMeta) & BaseHookMeta<TOutput>) => Promise<TOutput>>
   onStart?: Arrayable<(state: OnStartState<TInput>, context: TContext, meta: TMeta) => Promisable<void>>
   onSuccess?: Arrayable<(state: OnSuccessState<TInput, TOutput>, context: TContext, meta: TMeta) => Promisable<void>>
   onError?: Arrayable<(state: OnErrorState<TInput>, context: TContext, meta: TMeta) => Promisable<void>>
@@ -26,7 +26,7 @@ export async function executeWithHooks<TInput, TOutput, TContext, TMeta extends 
     execute: BaseHookMeta<TOutput>['next']
   },
 ): Promise<TOutput> {
-  const executes = convertToArray(options.hooks?.execute)
+  const interceptors = convertToArray(options.hooks?.interceptor)
   const onStarts = convertToArray(options.hooks?.onStart)
   const onSuccesses = convertToArray(options.hooks?.onSuccess)
   const onErrors = convertToArray(options.hooks?.onError)
@@ -35,7 +35,7 @@ export async function executeWithHooks<TInput, TOutput, TContext, TMeta extends 
   let currentExecuteIndex = 0
 
   const next = async (): Promise<TOutput> => {
-    const execute = executes[currentExecuteIndex]
+    const execute = interceptors[currentExecuteIndex]
 
     if (execute) {
       currentExecuteIndex++

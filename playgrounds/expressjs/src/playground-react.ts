@@ -6,7 +6,7 @@ import type { RouterClient } from '@orpc/server'
 import type { router } from './router'
 import { createORPCReact } from '@orpc/react'
 
-const { orpc } = createORPCReact <RouterClient<typeof router>>()
+const { orpc } = createORPCReact<RouterClient<typeof router, unknown>>()
 
 const listQuery = orpc.planet.list.useInfiniteQuery({
   input: {},

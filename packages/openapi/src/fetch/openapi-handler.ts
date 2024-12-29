@@ -2,6 +2,7 @@ import type { ConditionalFetchHandler, FetchOptions } from '@orpc/server/fetch'
 import type { PublicInputBuilderSimple } from './input-builder-simple'
 import { type Context, createProcedureClient, ORPCError, type Router, type WithSignal } from '@orpc/server'
 import { executeWithHooks, type Hooks, ORPC_HANDLER_HEADER, trim } from '@orpc/shared'
+import { JSONSerializer, type PublicJSONSerializer } from '../json-serializer'
 import { InputBuilderFull, type PublicInputBuilderFull } from './input-builder-full'
 import { InputBuilderSimple } from './input-builder-simple'
 import { OpenAPIPayloadCodec, type PublicOpenAPIPayloadCodec } from './openapi-payload-codec'
@@ -11,6 +12,7 @@ import { CompositeSchemaCoercer, type SchemaCoercer } from './schema-coercer'
 export type OpenAPIHandlerOptions<T extends Context> =
   & Hooks<Request, Response, T, WithSignal>
   & {
+    jsonSerializer?: PublicJSONSerializer
     procedureMatcher?: PublicOpenAPIProcedureMatcher
     payloadCodec?: PublicOpenAPIPayloadCodec
     inputBuilderSimple?: PublicInputBuilderSimple
@@ -30,8 +32,10 @@ export class OpenAPIHandler<T extends Context> implements ConditionalFetchHandle
     router: Router<T, any>,
     private readonly options?: NoInfer<OpenAPIHandlerOptions<T>>,
   ) {
+    const jsonSerializer = options?.jsonSerializer ?? new JSONSerializer()
+
     this.procedureMatcher = options?.procedureMatcher ?? new OpenAPIProcedureMatcher(hono, router)
-    this.payloadCodec = options?.payloadCodec ?? new OpenAPIPayloadCodec()
+    this.payloadCodec = options?.payloadCodec ?? new OpenAPIPayloadCodec(jsonSerializer)
     this.inputBuilderSimple = options?.inputBuilderSimple ?? new InputBuilderSimple()
     this.inputBuilderFull = options?.inputBuilderFull ?? new InputBuilderFull()
     this.compositeSchemaCoercer = new CompositeSchemaCoercer(options?.schemaCoercers ?? [])

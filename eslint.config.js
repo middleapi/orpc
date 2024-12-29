@@ -8,6 +8,7 @@ export default antfu({
     'ts/consistent-type-definitions': 'off',
     'react-refresh/only-export-components': 'off',
     'react/prefer-destructuring-assignment': 'off',
+    'react/no-context-provider': 'off',
   },
 }, {
   files: ['**/*.test.ts', '**/*.test.tsx', '**/*.test-d.ts', '**/*.test-d.tsx', 'apps/content/examples/**', 'playgrounds/**'],

@@ -72,7 +72,7 @@ export type DecoratedProcedure<
     ) => DecoratedProcedure<TContext, TExtraContext, TInputSchema, TOutputSchema, THandlerOutput>
 
   }
-  & (undefined extends TContext ? ProcedureClient<SchemaInput<TInputSchema>, SchemaOutput<TOutputSchema, THandlerOutput>> : unknown)
+  & (undefined extends TContext ? ProcedureClient<SchemaInput<TInputSchema>, SchemaOutput<TOutputSchema, THandlerOutput>, unknown> : unknown)
 
 export function decorateProcedure<
   TContext extends Context,

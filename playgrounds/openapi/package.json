@@ -1,7 +1,7 @@
 {
   "name": "orpc-openapi-playground",
   "type": "module",
-  "version": "0.18.0",
+  "version": "0.20.0",
   "private": true,
   "scripts": {
     "dev": "tsx --watch src/main.ts",

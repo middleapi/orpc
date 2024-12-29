@@ -23,7 +23,7 @@ export type UseActionState<TInput, TOutput> = {
 const idleState = { status: 'idle', isPending: false, isError: false, input: undefined, output: undefined, error: undefined } as const
 
 export function useAction<TInput, TOutput>(
-  action: ProcedureClient<TInput, TOutput>,
+  action: ProcedureClient<TInput, TOutput, any>,
   hooks?: Hooks<TInput, TOutput, undefined, undefined>,
 ): UseActionState<TInput, TOutput> {
   const [state, setState] = useState<Omit<UseActionState<TInput, TOutput>, 'execute' | 'reset'>>(idleState)
@@ -49,7 +49,7 @@ export function useAction<TInput, TOutput>(
       const output = await executeWithHooks({
         context: undefined,
         hooks: {
-          execute: [...convertToArray(hooks?.execute), ...convertToArray(executeHooks?.execute)],
+          interceptor: [...convertToArray(hooks?.interceptor), ...convertToArray(executeHooks?.interceptor)],
           onStart: [...convertToArray(hooks?.onStart), ...convertToArray(executeHooks?.onStart)],
           onSuccess: [...convertToArray(hooks?.onSuccess), ...convertToArray(executeHooks?.onSuccess)],
           onError: [...convertToArray(hooks?.onError), ...convertToArray(executeHooks?.onError)],

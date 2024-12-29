@@ -15,13 +15,17 @@ description: Simplify React Query usage with minimal integration using ORPC and 
 
 ```ts twoslash
 import { createORPCReactQueryUtils } from '@orpc/react-query';
-import { createORPCFetchClient } from '@orpc/client';
+import { createORPCClient } from '@orpc/client';
+import { ORPCLink } from '@orpc/client/fetch';
 import type { router } from 'examples/server';
 
-// Create an ORPC client
-export const client = createORPCFetchClient<typeof router>({
-  baseURL: 'http://localhost:3000/api',
-});
+const orpcLink = new ORPCLink({
+  url: 'http://localhost:3000/api',
+  // fetch: optional override for the default fetch function
+  // headers: provide additional headers
+})
+
+const client = createORPCClient<typeof router /* or contract router */>(orpcLink)
 
 // Create React Query utilities for ORPC
 export const orpc = createORPCReactQueryUtils(client);
@@ -35,13 +39,14 @@ orpc.getting.
 
 ```tsx twoslash
 import { createORPCReactQueryUtils, RouterUtils } from '@orpc/react-query';
-import { createORPCFetchClient } from '@orpc/client';
+import { createORPCClient } from '@orpc/client';
+import { ORPCLink } from '@orpc/client/fetch';
 import { RouterClient } from '@orpc/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { router } from 'examples/server';
 import * as React from 'react';
 
-const ORPCContext = React.createContext<RouterUtils<RouterClient<typeof router>> | undefined>(undefined);
+const ORPCContext = React.createContext<RouterUtils<RouterClient<typeof router, unknown>> | undefined>(undefined);
 
 export function useORPC() {
   const orpc = React.useContext(ORPCContext);
@@ -54,11 +59,15 @@ export function useORPC() {
 }
 
 export function ORPCProvider({ children }: { children: React.ReactNode }) {
-  const [client] = React.useState(() =>
-    createORPCFetchClient<typeof router>({
-      baseURL: 'http://localhost:3000/api',
-    })
-  );
+  const [client] = React.useState(() => {
+    const orpcLink = new ORPCLink({
+      url: 'http://localhost:3000/api',
+      // fetch: optional override for the default fetch function
+      // headers: provide additional headers
+    });
+
+    return createORPCClient<typeof router>(orpcLink);
+  });
   const [queryClient] = React.useState(() => new QueryClient());
 
   const orpc = React.useMemo(() => createORPCReactQueryUtils(client), [client]);

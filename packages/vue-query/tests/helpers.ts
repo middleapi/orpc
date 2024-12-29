@@ -1,4 +1,5 @@
-import { createORPCFetchClient } from '@orpc/client'
+import { createORPCClient } from '@orpc/client'
+import { ORPCLink } from '@orpc/client/fetch'
 import { os } from '@orpc/server'
 import { ORPCHandler } from '@orpc/server/fetch'
 import { QueryClient } from '@tanstack/vue-query'
@@ -87,15 +88,17 @@ export const appRouter = orpcServer.router({
 
 const orpcHandler = new ORPCHandler(appRouter)
 
-export const orpcClient = createORPCFetchClient<typeof appRouter>({
-  baseURL: 'http://localhost:3000',
+const orpcLink = new ORPCLink({
+  url: 'http://localhost:3000',
 
-  async fetch(...args) {
+  async fetch(input, init) {
     await new Promise(resolve => setTimeout(resolve, 100))
-    const request = new Request(...args)
+    const request = new Request(input, init)
     return orpcHandler.fetch(request)
   },
 })
+
+export const orpcClient = createORPCClient<typeof appRouter, { batch?: boolean } | undefined>(orpcLink)
 
 export const orpc = createORPCVueQueryUtils(orpcClient)
 

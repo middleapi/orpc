@@ -1,12 +1,15 @@
 import type { router } from '@/app/api/[...rest]/router'
-import { createORPCFetchClient } from '@orpc/client'
+import { createORPCClient } from '@orpc/client'
+import { ORPCLink } from '@orpc/client/fetch'
 import { createORPCReact } from '@orpc/react'
 
-export const orpcClient = createORPCFetchClient<typeof router>({
-  baseURL: 'http://localhost:3000/api',
+const orpcLink = new ORPCLink({
+  url: 'http://localhost:3000/api',
   headers: () => ({
     Authorization: 'Bearer default-token',
   }),
 })
+
+export const orpcClient = createORPCClient<typeof router>(orpcLink)
 
 export const { orpc, ORPCContext } = createORPCReact<typeof orpcClient>()

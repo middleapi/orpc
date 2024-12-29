@@ -9,8 +9,17 @@ import { ORPCError } from '@orpc/shared/error'
 import { unlazy } from './lazy'
 import { mergeContext } from './utils'
 
-export interface ProcedureClient<TInput, TOutput> {
-  (...opts: [input: TInput, options?: WithSignal] | (undefined extends TInput ? [] : never)): Promise<TOutput>
+export type ProcedureClientOptions<TClientContext> =
+  & WithSignal
+  & (undefined extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
+
+export interface ProcedureClient<TInput, TOutput, TClientContext> {
+  (
+    ...opts:
+      | [input: TInput, options: ProcedureClientOptions<TClientContext>]
+      | (undefined extends TInput & TClientContext ? [] : never)
+      | (undefined extends TClientContext ? [input: TInput] : never)
+  ): Promise<TOutput>
 }
 
 /**
@@ -47,7 +56,7 @@ export function createProcedureClient<
   THandlerOutput extends SchemaInput<TOutputSchema> = SchemaInput<TOutputSchema>,
 >(
   options: CreateProcedureClientOptions<TContext, TInputSchema, TOutputSchema, THandlerOutput>,
-): ProcedureClient<SchemaInput<TInputSchema>, SchemaOutput<TOutputSchema, THandlerOutput>> {
+): ProcedureClient<SchemaInput<TInputSchema>, SchemaOutput<TOutputSchema, THandlerOutput>, unknown> {
   return async (...[input, callerOptions]) => {
     const path = options.path ?? []
     const { default: procedure } = await unlazy(options.procedure)

@@ -1,8 +1,8 @@
 import { createServer } from 'node:http'
-import { generateOpenAPI } from '@orpc/openapi'
+import { OpenAPIGenerator } from '@orpc/openapi'
 import { OpenAPIServerHandler } from '@orpc/openapi/fetch'
 import { CompositeHandler, ORPCHandler } from '@orpc/server/fetch'
-import { ZodCoercer } from '@orpc/zod'
+import { ZodCoercer, ZodToJsonSchemaConverter } from '@orpc/zod'
 import { createServerAdapter } from '@whatwg-node/server'
 import { router } from './router'
 import './polyfill'
@@ -22,6 +22,12 @@ const orpcHandler = new ORPCHandler(router, {
 })
 const compositeHandler = new CompositeHandler([openAPIHandler, orpcHandler])
 
+const openAPIGenerator = new OpenAPIGenerator({
+  schemaConverters: [
+    new ZodToJsonSchemaConverter(),
+  ],
+})
+
 const server = createServer(
   createServerAdapter(async (request: Request) => {
     const url = new URL(request.url)
@@ -38,8 +44,7 @@ const server = createServer(
     }
 
     if (url.pathname === '/spec.json') {
-      const spec = await generateOpenAPI({
-        router,
+      const spec = await openAPIGenerator.generate(router, {
         info: {
           title: 'ORPC Playground',
           version: '1.0.0',

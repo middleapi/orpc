@@ -205,7 +205,7 @@ describe.each(procedureCases)('createProcedureClient - case %s', async (_, proce
       procedure,
       context,
       path: ['users'],
-      execute,
+      interceptor: execute,
       onStart,
       onSuccess,
       onError,

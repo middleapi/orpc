@@ -9,7 +9,7 @@ import { useQueries } from '@tanstack/react-query'
 import { useORPCContext } from '../react-context'
 import { createUseQueriesBuilders } from './builders'
 
-export interface UseQueries<T extends RouterClient<any>> {
+export interface UseQueries<T extends RouterClient<any, any>> {
   <U extends Array<any> = [], UCombinedResult = QueriesResults<U>>(
     build: (
       builders: UseQueriesBuilders<T>,
@@ -18,11 +18,11 @@ export interface UseQueries<T extends RouterClient<any>> {
   ): UCombinedResult
 }
 
-export interface UseQueriesFactoryOptions<T extends RouterClient<any>> {
+export interface UseQueriesFactoryOptions<T extends RouterClient<any, any>> {
   context: ORPCContext<T>
 }
 
-export function useQueriesFactory<T extends RouterClient<any>>(
+export function useQueriesFactory<T extends RouterClient<any, any>>(
   options: UseQueriesFactoryOptions<T>,
 ): UseQueries<T> {
   const Hook = (build: any, combine?: any): any => {

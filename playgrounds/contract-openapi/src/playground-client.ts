@@ -3,11 +3,14 @@
  */
 
 import type { contract } from './contract'
-import { createORPCFetchClient } from '@orpc/client'
+import { createORPCClient } from '@orpc/client'
+import { ORPCLink } from '@orpc/client/fetch'
 
-const orpc = createORPCFetchClient<typeof contract>({
-  baseURL: 'http://localhost:3000/api',
+const orpcLink = new ORPCLink({
+  url: 'http://localhost:3000/api',
 })
+
+const orpc = createORPCClient<typeof contract>(orpcLink)
 
 const planets = await orpc.planet.list({})
 

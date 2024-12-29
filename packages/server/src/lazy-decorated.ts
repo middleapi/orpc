@@ -13,7 +13,7 @@ export type DecoratedLazy<T> = T extends Lazy<infer U>
     & (
        T extends Procedure<infer UContext, any, infer UInputSchema, infer UOutputSchema, infer UFuncOutput>
          ? undefined extends UContext
-           ? ProcedureClient<SchemaInput<UInputSchema>, SchemaOutput<UOutputSchema, UFuncOutput>>
+           ? ProcedureClient<SchemaInput<UInputSchema>, SchemaOutput<UOutputSchema, UFuncOutput>, unknown>
            : unknown
          : {
              [K in keyof T]: T[K] extends object ? DecoratedLazy<T[K]> : never

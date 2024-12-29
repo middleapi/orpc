@@ -8,14 +8,14 @@ import { createORPCHooks } from './react-hooks'
 import { createORPCUtils } from './react-utils'
 import { useQueriesFactory } from './use-queries/hook'
 
-export type ORPCReact<T extends RouterClient<any>> =
+export type ORPCReact<T extends RouterClient<any, any>> =
   ORPCHooks<T> & {
     useContext: () => ORPCContextValue<T>
     useUtils: () => ORPCUtils<T>
     useQueries: UseQueries<T>
   }
 
-export function createORPCReact<T extends RouterClient<any>>(): {
+export function createORPCReact<T extends RouterClient<any, any>>(): {
   orpc: ORPCReact<T>
   ORPCContext: ORPCContext<T>
 } {

@@ -10,15 +10,15 @@ import { isProcedure } from './procedure'
 import { createProcedureClient } from './procedure-client'
 import { type ANY_ROUTER, getRouterChild, type Router } from './router'
 
-export type RouterClient<T extends ANY_ROUTER | ContractRouter> =
-T extends Lazy<infer U extends ANY_ROUTER | ContractRouter>
-  ? RouterClient<U>
-  : T extends
+export type RouterClient<TRouter extends ANY_ROUTER | ContractRouter, TClientContext> =
+TRouter extends Lazy<infer U extends ANY_ROUTER | ContractRouter>
+  ? RouterClient<U, TClientContext>
+  : TRouter extends
   | ContractProcedure<infer UInputSchema, infer UOutputSchema>
   | Procedure<any, any, infer UInputSchema, infer UOutputSchema, infer UFuncOutput>
-    ? ProcedureClient<SchemaInput<UInputSchema>, SchemaOutput<UOutputSchema, UFuncOutput>>
+    ? ProcedureClient<SchemaInput<UInputSchema>, SchemaOutput<UOutputSchema, UFuncOutput>, TClientContext>
     : {
-        [K in keyof T]: T[K] extends ANY_ROUTER | ContractRouter ? RouterClient<T[K]> : never
+        [K in keyof TRouter]: TRouter[K] extends ANY_ROUTER | ContractRouter ? RouterClient<TRouter[K], TClientContext> : never
       }
 
 export type CreateRouterClientOptions<
@@ -43,7 +43,7 @@ export function createRouterClient<
   TRouter extends ANY_ROUTER,
 >(
   options: CreateRouterClientOptions<TRouter>,
-): RouterClient<TRouter> {
+): RouterClient<TRouter, unknown> {
   if (isProcedure(options.router)) {
     const caller = createProcedureClient({
       ...options,

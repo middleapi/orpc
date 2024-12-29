@@ -42,7 +42,7 @@ describe('DecoratedLazy', () => {
     expectTypeOf(decorated).toMatchTypeOf<Lazy<ANY_PROCEDURE>>()
 
     expectTypeOf(decorated).toMatchTypeOf<
-      ProcedureClient<unknown, { val: number }>
+      ProcedureClient<unknown, { val: number }, unknown>
     >()
   })
 
@@ -53,19 +53,19 @@ describe('DecoratedLazy', () => {
     expectTypeOf({ router: decorated }).toMatchTypeOf<ANY_ROUTER>()
 
     expectTypeOf(decorated.ping).toMatchTypeOf<Lazy<ANY_PROCEDURE>>()
-    expectTypeOf(decorated.ping).toMatchTypeOf <ProcedureClient<unknown, { val: number }>>()
+    expectTypeOf(decorated.ping).toMatchTypeOf<ProcedureClient<unknown, { val: number }, unknown>>()
 
     expectTypeOf(decorated.pong).toMatchTypeOf<Lazy<ANY_PROCEDURE>>()
-    expectTypeOf(decorated.pong).toMatchTypeOf<ProcedureClient<{ val: string }, unknown>>()
+    expectTypeOf(decorated.pong).toMatchTypeOf<ProcedureClient<{ val: string }, unknown, unknown>>()
 
     expectTypeOf(decorated.nested).toMatchTypeOf<Lazy<ANY_ROUTER>>()
     expectTypeOf({ router: decorated.nested }).toMatchTypeOf<ANY_ROUTER>()
 
     expectTypeOf(decorated.nested.ping).toMatchTypeOf<Lazy<ANY_PROCEDURE>>()
-    expectTypeOf(decorated.nested.ping).toMatchTypeOf<ProcedureClient<unknown, { val: number }>>()
+    expectTypeOf(decorated.nested.ping).toMatchTypeOf<ProcedureClient<unknown, { val: number }, unknown>>()
 
     expectTypeOf(decorated.nested.pong).toMatchTypeOf<Lazy<ANY_PROCEDURE>>()
-    expectTypeOf(decorated.nested.pong).toMatchTypeOf<ProcedureClient<{ val: string }, unknown>>()
+    expectTypeOf(decorated.nested.pong).toMatchTypeOf<ProcedureClient<{ val: string }, unknown, unknown>>()
   })
 
   it('flat lazy', () => {

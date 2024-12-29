@@ -9,7 +9,7 @@ export function useSafeAction<TInput, TOutput>(
   action: SafeAction<TInput, TOutput>,
   hooks?: Hooks<TInput, TOutput, undefined, undefined>,
 ): UseActionState<TInput, TOutput> {
-  const normal: ProcedureClient<TInput, TOutput> = useCallback(async (...args) => {
+  const normal: ProcedureClient<TInput, TOutput, unknown> = useCallback(async (...args) => {
     const [output, errorJson, status] = await action(...args)
 
     if (status === 'error') {

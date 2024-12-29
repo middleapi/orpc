@@ -3,14 +3,14 @@ import type { ORPCContextValue } from './react-context'
 import { createGeneralUtils, type GeneralUtils } from './general-utils'
 import { createProcedureUtils, type ProcedureUtils } from './procedure-utils'
 
-export type ORPCUtils<T extends RouterClient<any>> =
-  T extends ProcedureClient<infer TInput, infer TOutput>
+export type ORPCUtils<T extends RouterClient<any, any>> =
+  T extends ProcedureClient<infer TInput, infer TOutput, any>
     ? ProcedureUtils<TInput, TOutput> & GeneralUtils<TInput, TOutput>
     : {
-      [K in keyof T]: T[K] extends RouterClient<any> ? ORPCUtils<T[K]> : never
+      [K in keyof T]: T[K] extends RouterClient<any, any> ? ORPCUtils<T[K]> : never
     } & GeneralUtils<unknown, unknown>
 
-export interface CreateORPCUtilsOptions<T extends RouterClient<any>> {
+export interface CreateORPCUtilsOptions<T extends RouterClient<any, any>> {
   contextValue: ORPCContextValue<T>
 
   /**
@@ -21,7 +21,7 @@ export interface CreateORPCUtilsOptions<T extends RouterClient<any>> {
   path?: string[]
 }
 
-export function createORPCUtils<T extends RouterClient<any>>(
+export function createORPCUtils<T extends RouterClient<any, any>>(
   options: CreateORPCUtilsOptions<T>,
 ): ORPCUtils<T> {
   const path = options.path ?? []

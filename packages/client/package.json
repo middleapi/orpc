@@ -1,7 +1,7 @@
 {
   "name": "@orpc/client",
   "type": "module",
-  "version": "0.18.0",
+  "version": "0.20.0",
   "license": "MIT",
   "homepage": "https://orpc.unnoq.com",
   "repository": {
@@ -20,6 +20,11 @@
         "import": "./dist/index.js",
         "default": "./dist/index.js"
       },
+      "./fetch": {
+        "types": "./dist/src/adapters/fetch/index.d.ts",
+        "import": "./dist/fetch.js",
+        "default": "./dist/fetch.js"
+      },
       "./🔒/*": {
         "types": "./dist/src/*.d.ts"
       }
@@ -27,6 +32,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
+    "./fetch": "./src/adapters/fetch/index.ts",
     "./🔒/*": {
       "types": "./src/*.ts"
     }
@@ -37,7 +43,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup --clean --sourcemap --entry.index=src/index.ts --format=esm --onSuccess='tsc -b --noCheck'",
+    "build": "tsup --clean --sourcemap --entry.index=src/index.ts --entry.fetch=src/adapters/fetch/index.ts --format=esm --onSuccess='tsc -b --noCheck'",
     "build:watch": "pnpm run build --watch",
     "type:check": "tsc -b"
   },

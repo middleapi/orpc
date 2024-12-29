@@ -28,6 +28,13 @@ describe('useQuery', () => {
     // @ts-expect-error input is invalid
     useQuery(orpc.user.find.queryOptions({ input: { id: 123 } }))
   })
+
+  it('infer types correctly with client context', async () => {
+    useQuery(orpc.user.find.queryOptions({ input: { id: '123' } }))
+    useQuery(orpc.user.find.queryOptions({ input: { id: '123' }, context: { batch: true } }))
+    // @ts-expect-error --- invalid context
+    useQuery(orpc.user.find.queryOptions({ input: { id: '123' }, context: { batch: 'invalid' } }))
+  })
 })
 
 describe('useInfiniteQuery', () => {
@@ -84,6 +91,25 @@ describe('useInfiniteQuery', () => {
       getNextPageParam: {} as any,
     }))
   })
+
+  it('infer types correctly with client context', async () => {
+    useInfiniteQuery(orpc.user.list.infiniteOptions({
+      input: { keyword: 'keyword' },
+      getNextPageParam: {} as any,
+    }))
+    useInfiniteQuery(orpc.user.list.infiniteOptions({
+      input: { keyword: 'keyword' },
+      getNextPageParam: {} as any,
+      context: { batch: true },
+    }))
+    // @ts-expect-error --- invalid context
+    useInfiniteQuery(orpc.user.list.infiniteOptions({
+      input: { keyword: 'keyword' },
+      getNextPageParam: {} as any,
+      // @ts-expect-error --- invalid context
+      context: { batch: 'invalid' },
+    }))
+  })
 })
 
 describe('useMutation', () => {
@@ -97,6 +123,13 @@ describe('useMutation', () => {
     expectTypeOf(query.data).toEqualTypeOf<{ id: string, name: string } | undefined>()
 
     expectTypeOf(query.mutateAsync).toMatchTypeOf<(input: { id: string }) => Promise<{ id: string, name: string }>>()
+  })
+
+  it('infer types correctly with client context', async () => {
+    useMutation(orpc.user.find.mutationOptions(({})))
+    useMutation(orpc.user.find.mutationOptions(({ context: { batch: true } })))
+    // @ts-expect-error --- invalid context
+    useMutation(orpc.user.find.mutationOptions(({ context: { batch: 'invalid' } })))
   })
 })
 
@@ -159,6 +192,25 @@ describe('useQueries', () => {
         orpc.user.find.queryOptions({
           // @ts-expect-error --- input must be a string
           input: { id: 1 },
+        }),
+      ],
+    })
+  })
+
+  it('infer types correctly with client context', async () => {
+    useQueries({
+      queries: [
+        orpc.user.find.queryOptions({
+          input: { id: '0' },
+        }),
+        orpc.user.find.queryOptions({
+          input: { id: '0' },
+          context: { batch: true },
+        }),
+        orpc.user.find.queryOptions({
+          input: { id: '0' },
+          // @ts-expect-error --- invalid context
+          context: { batch: 'invalid' },
         }),
       ],
     })

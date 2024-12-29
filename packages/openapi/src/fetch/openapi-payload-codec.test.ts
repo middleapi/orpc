@@ -1,7 +1,8 @@
+import { JSONSerializer } from '../json-serializer'
 import { OpenAPIPayloadCodec } from './openapi-payload-codec'
 
 describe('openAPIPayloadCodec', () => {
-  const codec = new OpenAPIPayloadCodec()
+  const codec = new OpenAPIPayloadCodec(new JSONSerializer())
 
   describe('encode', () => {
     it('should encode JSON data when accept header is application/json', async () => {

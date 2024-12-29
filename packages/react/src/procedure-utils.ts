@@ -154,7 +154,7 @@ export interface ProcedureUtils<TInput, TOutput> {
 }
 
 export interface CreateProcedureUtilsOptions<TInput, TOutput> {
-  client: ProcedureClient<TInput, TOutput>
+  client: ProcedureClient<TInput, TOutput, any>
   queryClient: QueryClient
 
   /**

@@ -117,7 +117,7 @@ describe('createRouterClient', () => {
     const onSuccess = vi.fn()
     const onError = vi.fn()
     const onFinish = vi.fn()
-    const execute = vi.fn()
+    const interceptor = vi.fn()
 
     const client = createRouterClient({
       router,
@@ -126,7 +126,7 @@ describe('createRouterClient', () => {
       onSuccess,
       onError,
       onFinish,
-      execute,
+      interceptor,
     })
 
     expect(client.pong({ val: '123' })).toEqual('__mocked__')
@@ -140,7 +140,7 @@ describe('createRouterClient', () => {
       onSuccess,
       onError,
       onFinish,
-      execute,
+      interceptor,
     }))
   })
 

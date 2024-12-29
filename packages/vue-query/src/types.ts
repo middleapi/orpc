@@ -16,8 +16,9 @@ export type NonUndefinedGuard<T> = T extends undefined ? never : T
 
 export type InferCursor<T> = T extends { cursor?: any } ? T['cursor'] : never
 
-export type QueryOptions<TInput, TOutput, TSelectData> =
+export type QueryOptions<TInput, TOutput, TClientContext, TSelectData> =
   & (undefined extends TInput ? { input?: MaybeDeepRef<TInput> } : { input: MaybeDeepRef<TInput> })
+  & (undefined extends TClientContext ? { context?: MaybeDeepRef<TClientContext> } : { context: MaybeDeepRef<TClientContext> })
   & SetOptional<{
     [P in keyof QueryObserverOptions<TOutput, DefaultError, TSelectData, TOutput, QueryKey>]: P extends 'enabled'
       ? MaybeRefOrGetter<QueryObserverOptions<TOutput, DefaultError, TSelectData, TOutput, QueryKey>[P]>
@@ -28,14 +29,16 @@ export type QueryOptions<TInput, TOutput, TSelectData> =
     initialData?: NonUndefinedGuard<TOutput> | (() => NonUndefinedGuard<TOutput>) | undefined
   }
 
-export type InfiniteOptions<TInput, TOutput, TSelectData> =
+export type InfiniteOptions<TInput, TOutput, TClientContext, TSelectData> =
   & (undefined extends TInput ? { input?: MaybeDeepRef<Omit<TInput, 'cursor'>> } : { input: MaybeDeepRef<Omit<TInput, 'cursor'>> })
+  & (undefined extends TClientContext ? { context?: MaybeDeepRef<TClientContext> } : { context: MaybeDeepRef<TClientContext> })
   & SetOptional<
     UseInfiniteQueryOptions<TOutput, DefaultError, TSelectData, TOutput, QueryKey, InferCursor<TInput>>,
     'queryKey' | (undefined extends InferCursor<TInput> ? 'initialPageParam' : never)
   >
 
-export type MutationOptions<TInput, TOutput> =
+export type MutationOptions<TInput, TOutput, TClientContext> =
+  & (undefined extends TClientContext ? { context?: MaybeDeepRef<TClientContext> } : { context: MaybeDeepRef<TClientContext> })
   & {
     [P in keyof MutationObserverOptions<TOutput, DefaultError, TInput, unknown>]: MaybeDeepRef<MutationObserverOptions<TOutput, DefaultError, TInput, unknown>[P]>
   }

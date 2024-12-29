@@ -29,29 +29,29 @@ const routerWithLazy = {
 
 describe('RouterClient', () => {
   it('router without lazy', () => {
-    const client = {} as RouterClient<typeof router>
+    const client = {} as RouterClient<typeof router, unknown>
 
     expectTypeOf(client.ping).toEqualTypeOf<
-      ProcedureClient<{ val: string }, { val: number }>
+      ProcedureClient<{ val: string }, { val: number }, unknown>
     >()
     expectTypeOf(client.pong).toEqualTypeOf<
-      ProcedureClient<unknown, unknown>
+      ProcedureClient<unknown, unknown, unknown>
     >()
 
     expectTypeOf(client.nested.ping).toEqualTypeOf<
-      ProcedureClient<{ val: string }, { val: number }>
+      ProcedureClient<{ val: string }, { val: number }, unknown>
     >()
     expectTypeOf(client.nested.pong).toEqualTypeOf<
-      ProcedureClient<unknown, unknown>
+      ProcedureClient<unknown, unknown, unknown>
     >()
   })
 
   it('support lazy', () => {
-    expectTypeOf<RouterClient<typeof routerWithLazy>>().toEqualTypeOf<RouterClient<typeof router>>()
+    expectTypeOf<RouterClient<typeof routerWithLazy, unknown>>().toEqualTypeOf<RouterClient<typeof router, unknown>>()
   })
 
   it('support procedure as router', () => {
-    expectTypeOf<RouterClient<typeof ping>>().toEqualTypeOf<ProcedureClient<{ val: string }, { val: number }>>()
+    expectTypeOf<RouterClient<typeof ping, unknown>>().toEqualTypeOf<ProcedureClient<{ val: string }, { val: number }, unknown>>()
   })
 })
 
@@ -62,13 +62,13 @@ describe('createRouterClient', () => {
       context: { auth: true },
     })
 
-    expectTypeOf(client).toMatchTypeOf<RouterClient<typeof router>>()
+    expectTypeOf(client).toMatchTypeOf<RouterClient<typeof router, unknown>>()
 
     const client2 = createRouterClient({
       router: routerWithLazy,
       context: { auth: true },
     })
-    expectTypeOf(client2).toMatchTypeOf<RouterClient<typeof routerWithLazy>>()
+    expectTypeOf(client2).toMatchTypeOf<RouterClient<typeof routerWithLazy, unknown>>()
   })
 
   it('required context when needed', () => {

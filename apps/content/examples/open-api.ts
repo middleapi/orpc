@@ -1,17 +1,22 @@
-import { generateOpenAPI } from '@orpc/openapi'
+import { OpenAPIGenerator } from '@orpc/openapi'
+import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { contract } from 'examples/contract'
 import { router } from 'examples/server'
 
-export const specFromServerRouter = generateOpenAPI({
-  router,
+const openAPIGenerator = new OpenAPIGenerator({
+  schemaConverters: [
+    new ZodToJsonSchemaConverter(),
+  ],
+})
+
+export const specFromServerRouter = await openAPIGenerator.generate(router, {
   info: {
     title: 'My App',
     version: '0.0.0',
   },
 })
 
-export const specFromContractRouter = generateOpenAPI({
-  router: contract,
+export const specFromContractRouter = await openAPIGenerator.generate(contract, {
   info: {
     title: 'My App',
     version: '0.0.0',

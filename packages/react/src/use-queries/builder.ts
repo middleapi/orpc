@@ -32,7 +32,7 @@ export interface UseQueriesBuilder<TInput, TOutput> {
 }
 
 export interface CreateUseQueriesBuilderOptions<TInput, TOutput> {
-  client: ProcedureClient<TInput, TOutput>
+  client: ProcedureClient<TInput, TOutput, any>
 
   /**
    * The path of procedure on server

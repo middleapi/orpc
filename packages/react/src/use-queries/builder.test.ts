@@ -16,7 +16,7 @@ it('createUseQueriesBuilder', async () => {
 
   expect(options.queryFn).toBeInstanceOf(Function)
 
-  const result = await (options as any).queryFn({} as any)
+  const result = await (options as any).queryFn({})
 
   expect(result).toEqual({
     id: '123',

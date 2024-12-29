@@ -2,7 +2,7 @@ import { oz } from '@orpc/zod'
 import { Format } from 'json-schema-typed/draft-2020-12'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { zodToJsonSchema } from './zod-to-json-schema'
+import { zodToJsonSchema } from './converter'
 
 describe('primitive types', () => {
   it('should convert string schema', () => {

@@ -2,14 +2,14 @@ import type { ProcedureClient, RouterClient } from '@orpc/server'
 import type {} from '@tanstack/react-query'
 import { createUseQueriesBuilder, type UseQueriesBuilder } from './builder'
 
-export type UseQueriesBuilders<T extends RouterClient<any>> =
-  T extends ProcedureClient<infer UInput, infer UOutput>
+export type UseQueriesBuilders<T extends RouterClient<any, any>> =
+  T extends ProcedureClient<infer UInput, infer UOutput, any>
     ? UseQueriesBuilder<UInput, UOutput>
     : {
-        [K in keyof T]: T[K] extends RouterClient<any> ? UseQueriesBuilders<T[K]> : never
+        [K in keyof T]: T[K] extends RouterClient<any, any> ? UseQueriesBuilders<T[K]> : never
       }
 
-export interface CreateUseQueriesBuildersOptions<T extends RouterClient<any>> {
+export interface CreateUseQueriesBuildersOptions<T extends RouterClient<any, any>> {
   client: T
 
   /**
@@ -18,7 +18,7 @@ export interface CreateUseQueriesBuildersOptions<T extends RouterClient<any>> {
   path?: string[]
 }
 
-export function createUseQueriesBuilders<T extends RouterClient<any>>(
+export function createUseQueriesBuilders<T extends RouterClient<any, any>>(
   options: CreateUseQueriesBuildersOptions<T>,
 ): UseQueriesBuilders<T> {
   const path = options.path ?? []

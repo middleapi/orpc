@@ -1,7 +1,7 @@
 import type { ContractRouter, HTTPPath, WELL_CONTRACT_PROCEDURE } from '@orpc/contract'
 import type { ANY_PROCEDURE, ANY_ROUTER, Lazy } from '@orpc/server'
 import { isContractProcedure } from '@orpc/contract'
-import { getRouterContract, isLazy, isProcedure } from '@orpc/server'
+import { getRouterContract, isLazy, isProcedure, unlazy } from '@orpc/server'
 
 export interface EachLeafOptions {
   router: ContractRouter | ANY_ROUTER
@@ -76,6 +76,29 @@ export function forEachContractProcedure(
   }
 
   return result
+}
+
+export async function forEachAllContractProcedure(
+  router: ContractRouter | ANY_ROUTER,
+  callback: (options: EachLeafCallbackOptions) => void,
+) {
+  const pending: EachLeafOptions[] = [{
+    path: [],
+    router,
+  }]
+
+  for (const item of pending) {
+    const lazies = forEachContractProcedure(item, callback)
+
+    for (const lazy of lazies) {
+      const { default: router } = await unlazy(lazy.router)
+
+      pending.push({
+        path: lazy.path,
+        router,
+      })
+    }
+  }
 }
 
 export function standardizeHTTPPath(path: HTTPPath): HTTPPath {

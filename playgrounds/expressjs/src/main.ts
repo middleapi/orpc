@@ -1,7 +1,7 @@
-import { generateOpenAPI } from '@orpc/openapi'
+import { OpenAPIGenerator } from '@orpc/openapi'
 import { OpenAPIServerHandler } from '@orpc/openapi/fetch'
 import { CompositeHandler, ORPCHandler } from '@orpc/server/fetch'
-import { ZodCoercer } from '@orpc/zod'
+import { ZodCoercer, ZodToJsonSchemaConverter } from '@orpc/zod'
 import { createServerAdapter } from '@whatwg-node/server'
 import express from 'express'
 import { router } from './router'
@@ -37,10 +37,14 @@ app.all(
     })
   }),
 )
+const openAPIGenerator = new OpenAPIGenerator({
+  schemaConverters: [
+    new ZodToJsonSchemaConverter(),
+  ],
+})
 
 app.get('/spec.json', async (req, res) => {
-  const spec = await generateOpenAPI({
-    router,
+  const spec = await openAPIGenerator.generate(router, {
     info: {
       title: 'ORPC Playground',
       version: '1.0.0',

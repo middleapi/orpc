@@ -1,9 +1,15 @@
-import { generateOpenAPI } from '@orpc/openapi'
+import { OpenAPIGenerator } from '@orpc/openapi'
+import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { router } from '~/server/router'
 
+const openAPIGenerator = new OpenAPIGenerator({
+  schemaConverters: [
+    new ZodToJsonSchemaConverter(),
+  ],
+})
+
 export default defineEventHandler(async (event) => {
-  const spec = await generateOpenAPI({
-    router,
+  const spec = await openAPIGenerator.generate(router, {
     info: {
       title: 'ORPC Playground',
       version: '1.0.0',

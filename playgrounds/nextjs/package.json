@@ -1,6 +1,6 @@
 {
   "name": "orpc-nextjs-playground",
-  "version": "0.18.0",
+  "version": "0.20.0",
   "private": true,
   "scripts": {
     "dev": "next dev --port 3000",

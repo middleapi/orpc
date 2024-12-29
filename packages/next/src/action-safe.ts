@@ -6,7 +6,8 @@ export type SafeAction<TInput, TOutput,
 > = ProcedureClient<
   TInput,
   | [TOutput, undefined, 'success']
-  | [undefined, WELL_ORPC_ERROR_JSON, 'error']
+  | [undefined, WELL_ORPC_ERROR_JSON, 'error'],
+  unknown
 >
 
 export function createSafeAction<
@@ -21,7 +22,7 @@ export function createSafeAction<
 
   const safeAction: SafeAction<SchemaInput<TInputSchema>, SchemaOutput<TOutputSchema, THandlerOutput>> = async (...[input, option]) => {
     try {
-      const output = await caller(input as any, option)
+      const output = await caller(input as any, option as any)
       return [output as any, undefined, 'success']
     }
     catch (e) {

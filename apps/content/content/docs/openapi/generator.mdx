@@ -87,12 +87,18 @@ export const router = pub.router({
 To generate an OpenAPI specification, you need either the type of the [router](/docs/server/router)  you intend to use or the [contract](/docs/contract/builder).
 
 ```ts twoslash
-import { generateOpenAPI } from '@orpc/openapi'
+import { OpenAPIGenerator } from '@orpc/openapi'
+import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { router } from 'examples/server'
 import { contract } from 'examples/contract'
 
-const spec = generateOpenAPI({
-    router: contract, // both router and contract are supported
+const openAPIGenerator = new OpenAPIGenerator({
+  schemaConverters: [
+    new ZodToJsonSchemaConverter(),
+  ],
+})
+
+const spec = await openAPIGenerator.generate(contract /* or router */, {
     info: {
         title: 'My App',
         version: '0.0.0',

@@ -1,11 +1,14 @@
+import type { PublicJSONSerializer } from '../json-serializer'
 import { ORPCError } from '@orpc/server'
-import { findDeepMatches, isPlainObject } from '@orpc/shared'
+import { findDeepMatches } from '@orpc/shared'
 import cd from 'content-disposition'
 import { safeParse } from 'fast-content-type-parse'
 import wcmatch from 'wildcard-match'
 import * as BracketNotation from './bracket-notation'
 
 export class OpenAPIPayloadCodec {
+  constructor(private readonly jsonSerializer: PublicJSONSerializer) {}
+
   encode(payload: unknown, accept?: string): { body: FormData | Blob | string | undefined, headers?: Headers } {
     const typeMatchers = (
       accept?.split(',').map(safeParse) ?? [{ type: '*/*' }]
@@ -30,7 +33,7 @@ export class OpenAPIPayloadCodec {
       }
     }
 
-    const handledPayload = this.serialize(payload)
+    const handledPayload = this.jsonSerializer.serialize(payload)
     const hasBlobs = findDeepMatches(v => v instanceof Blob, handledPayload).values.length > 0
 
     const isExpectedMultipartFormData = typeMatchers.some(isMatch =>
@@ -139,37 +142,6 @@ export class OpenAPIPayloadCodec {
         'content-type': 'application/x-www-form-urlencoded',
       }),
     }
-  }
-
-  serialize(payload: unknown): unknown {
-    if (payload instanceof Set)
-      return this.serialize([...payload])
-    if (payload instanceof Map)
-      return this.serialize([...payload.entries()])
-    if (Array.isArray(payload)) {
-      return payload.map(v => (v === undefined ? 'undefined' : this.serialize(v)))
-    }
-    if (Number.isNaN(payload))
-      return 'NaN'
-    if (typeof payload === 'bigint')
-      return payload.toString()
-    if (payload instanceof Date && Number.isNaN(payload.getTime())) {
-      return 'Invalid Date'
-    }
-    if (payload instanceof RegExp)
-      return payload.toString()
-    if (payload instanceof URL)
-      return payload.toString()
-    if (!isPlainObject(payload))
-      return payload
-    return Object.keys(payload).reduce(
-      (carry, key) => {
-        const val = payload[key]
-        carry[key] = this.serialize(val)
-        return carry
-      },
-      {} as Record<string, unknown>,
-    )
   }
 
   async decode(re: Request | Response | Headers | URLSearchParams | FormData): Promise<unknown> {

@@ -1,4 +1,6 @@
 import type { RouterClient } from '@orpc/server'
+import type { GeneralUtils } from './utils-general'
+import type { ProcedureUtils } from './utils-procedure'
 import { oc } from '@orpc/contract'
 import { os } from '@orpc/server'
 import { z } from 'zod'
@@ -23,7 +25,7 @@ const router = os.contract(contractRouter).router({
 
 describe('with contract router', () => {
   it('build correct types', () => {
-    const utils = createRouterUtils({} as RouterClient<typeof contractRouter>)
+    const utils = createRouterUtils({} as RouterClient<typeof contractRouter, unknown>)
 
     const generalUtils = createGeneralUtils([])
     const pingUtils = createProcedureUtils(ping, [])
@@ -41,7 +43,7 @@ describe('with contract router', () => {
 
 describe('with  router', () => {
   it('build correct types', () => {
-    const utils = createRouterUtils({} as RouterClient<typeof router>)
+    const utils = createRouterUtils({} as RouterClient<typeof router, unknown>)
 
     const generalUtils = createGeneralUtils([])
     const pingUtils = createProcedureUtils(ping, [])
@@ -55,4 +57,20 @@ describe('with  router', () => {
     expectTypeOf(utils.pong).toMatchTypeOf<typeof pongUtils>()
     expectTypeOf(utils.pong).toMatchTypeOf<typeof pongGeneralUtils>()
   })
+})
+
+it('with client context', () => {
+  const utils = createRouterUtils({} as RouterClient<typeof router, undefined | { batch?: boolean }>)
+
+  const generalUtils = {} as GeneralUtils<unknown>
+  const pingUtils = {} as ProcedureUtils<{ name: string }, string, undefined | { batch?: boolean }>
+  const pingGeneralUtils = createGeneralUtils<{ name: string }>(['ping'])
+  const pongUtils = {} as ProcedureUtils<number, string, undefined | { batch?: boolean }>
+  const pongGeneralUtils = {} as GeneralUtils<number>
+
+  expectTypeOf(utils).toMatchTypeOf<typeof generalUtils>()
+  expectTypeOf(utils.ping).toMatchTypeOf<typeof pingUtils>()
+  expectTypeOf(utils.ping).toMatchTypeOf<typeof pingGeneralUtils>()
+  expectTypeOf(utils.pong).toMatchTypeOf<typeof pongUtils>()
+  expectTypeOf(utils.pong).toMatchTypeOf<typeof pongGeneralUtils>()
 })

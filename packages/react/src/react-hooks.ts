@@ -4,14 +4,14 @@ import { createGeneralHooks, type GeneralHooks } from './general-hooks'
 import { orpcPathSymbol } from './orpc-path'
 import { createProcedureHooks, type ProcedureHooks } from './procedure-hooks'
 
-export type ORPCHooks<T extends RouterClient<any>> =
-  T extends ProcedureClient<infer TInput, infer TOutput>
+export type ORPCHooks<T extends RouterClient<any, any>> =
+  T extends ProcedureClient<infer TInput, infer TOutput, any>
     ? ProcedureHooks<TInput, TOutput> & GeneralHooks<TInput, TOutput>
     : {
-      [K in keyof T]: T[K] extends RouterClient<any> ? ORPCHooks<T[K]> : never
+      [K in keyof T]: T[K] extends RouterClient<any, any> ? ORPCHooks<T[K]> : never
     } & GeneralHooks<unknown, unknown>
 
-export interface CreateORPCHooksOptions<T extends RouterClient<any>> {
+export interface CreateORPCHooksOptions<T extends RouterClient<any, any>> {
   context: ORPCContext<T>
 
   /**
@@ -22,7 +22,7 @@ export interface CreateORPCHooksOptions<T extends RouterClient<any>> {
   path?: string[]
 }
 
-export function createORPCHooks<T extends RouterClient<any>>(
+export function createORPCHooks<T extends RouterClient<any, any>>(
   options: CreateORPCHooksOptions<T>,
 ): ORPCHooks<T> {
   const path = options.path ?? []
