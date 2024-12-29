@@ -80,7 +80,7 @@ const router = {
   user: {
     list: os
       .input(z.object({ cursor: z.number(), limit: z.number() }))
-      .func((input) => ({
+      .handler((input) => ({
         nextCursor: input.cursor + input.limit,
         users: [], // Fetch your actual data here
       })),

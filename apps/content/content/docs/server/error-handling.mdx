@@ -19,7 +19,7 @@ const ping = os
             // do something on finish
         }
     })
-    .func((input, context, meta) => {
+    .handler((input, context, meta) => {
         throw new ORPCError({
             code: 'NOT_FOUND',
             message: 'Not found',

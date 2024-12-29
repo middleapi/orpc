@@ -114,7 +114,7 @@ export const authed = pub
             }
         })
     })
-    .func(async (input, context, meta) => {
+    .handler(async (input, context, meta) => {
         
         const _expect1: NonNullable<typeof context['user']> = context.user
         const _expect2: string = context.say

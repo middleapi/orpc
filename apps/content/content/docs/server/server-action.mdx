@@ -57,7 +57,7 @@ export const updateUser = os
       }),
     }),
   )
-  .func((input, context, meta) => {
+  .handler((input, context, meta) => {
     // ^ context.user is automatically injected
      redirect('/some-where') // or return some thing
   })
@@ -189,7 +189,7 @@ type Context = { user?: { id: string } }
 const getting = os
 .context<Context>()
 .input(z.object({ name: z.string() }))
-.func(({ name }) => `Hello, ${name}!`)
+.handler(({ name }) => `Hello, ${name}!`)
 
 // @errors: 2349
 getting({ name: 'Unnoq' }) // ❌ cannot call this procedure directly, and cannot be used as a server action

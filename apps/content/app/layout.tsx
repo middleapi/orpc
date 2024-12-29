@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
-import { RootProvider } from 'fumadocs-ui/provider'
+import { Banner } from 'fumadocs-ui/components/banner'
 
+import { RootProvider } from 'fumadocs-ui/provider'
 import { GeistMono } from 'geist/font/mono'
 import { GeistSans } from 'geist/font/sans'
 import './global.css'
@@ -24,6 +25,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       suppressHydrationWarning
     >
       <body className="flex flex-col min-h-screen">
+        <Banner>
+          oRPC is currently pre-stable, please report any issues on our
+          {' '}
+          {' '}
+          Discord or GitHub 🚧
+        </Banner>
         <RootProvider
           search={{
             options: {

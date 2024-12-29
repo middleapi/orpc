@@ -1,5 +1,6 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared'
 import { Bluesky, Discord, Twitter } from '@/components/icons'
+import NavbarLogo from '@/components/ui/NavbarLogo'
 
 /**
  * Shared layout configurations
@@ -11,7 +12,7 @@ import { Bluesky, Discord, Twitter } from '@/components/icons'
 export const baseOptions: BaseLayoutProps = {
   githubUrl: 'https://github.com/unnoq/orpc',
   nav: {
-    title: 'oRPC',
+    title: <NavbarLogo />,
   },
   links: [
     {

@@ -32,7 +32,7 @@ const pub = os.context<ORPCContext>().use(async (input, context, meta) => {
 })
 
 export const router = pub.router({
-    getting: pub.func((input, context, meta) => {
+    getting: pub.handler((input, context, meta) => {
         // ^ context is combined from `initial context` and `middleware context`
     }),
 })
@@ -74,7 +74,7 @@ const authMid = base.middleware(async (input, context, meta) => {
 export const router = base.router({
     getting: base
         .use(authMid)
-        .func((input, context, meta) => {
+        .handler((input, context, meta) => {
             // ^ context is fully typed
         }),
 })
@@ -123,7 +123,7 @@ const authMid = base.middleware((input, context, meta) => {
 export const router = base.router({
     getting: base
         .use(authMid)
-        .func((input, context, meta) => {
+        .handler((input, context, meta) => {
             // ^ context is fully typed
         }),
 })
