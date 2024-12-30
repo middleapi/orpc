@@ -30,9 +30,9 @@ const _exampleSpec = {
   },
   openapi: '3.1.0',
   paths: {
-    '/getting': {
-      post: {
-        operationId: 'getting',
+    '/users': {
+      get: {
+        operationId: 'user.get',
         requestBody: {
           required: false,
           content: {
@@ -40,11 +40,11 @@ const _exampleSpec = {
               schema: {
                 type: 'object',
                 properties: {
-                  name: {
+                  id: {
                     type: 'string',
                   },
                 },
-                required: ['name'],
+                required: ['id'],
               },
             },
           },
@@ -57,11 +57,14 @@ const _exampleSpec = {
                 schema: {
                   type: 'object',
                   properties: {
-                    message: {
+                    username: {
+                      type: 'string',
+                    },
+                    avatar: {
                       type: 'string',
                     },
                   },
-                  required: ['message'],
+                  required: ['username', 'avatar'],
                 },
               },
             },
@@ -71,7 +74,7 @@ const _exampleSpec = {
     },
     '/posts/{id}': {
       get: {
-        operationId: 'post.find',
+        operationId: 'post.get',
         parameters: [
           {
             name: 'id',

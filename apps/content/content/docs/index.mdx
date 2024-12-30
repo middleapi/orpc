@@ -57,28 +57,32 @@ import { z } from 'zod'
 
 export type Context = { user?: { id: string } }
 
-// global pub, authed completely optional
-export const pub /** public access */ = os.context<Context>()
-export const authed /** require authed */ = pub.use((input, context, meta) => /** put auth logic here */ meta.next({}))
+// global publicProcedure, authProcedure completely optional
+export const publicProcedure = os.context<Context>()
+export const authProcedure = publicProcedure.use((input, context, meta) => {
+  /** put auth logic here */
+  return meta.next({})
+})
 
-export const router = pub.router({
-  getting: os
+export const router = publicProcedure.router({
+  getUser: os
     .input(
       z.object({
-        name: z.string(),
+        id: z.string(),
       }),
     )
     .handler(async (input, context, meta) => {
       return {
-        message: `Hello, ${input.name}!`,
+        username: 'example',
+        avatar: 'example',
       }
     }),
 
-  post: {
-    find: pub
+  posts: {
+    getPost: publicProcedure
       .input(
         z.object({
-          id: z.string({}),
+          id: z.string(),
         }),
       )
       .output(
@@ -113,7 +117,7 @@ export const router = pub.router({
         }
       }),
 
-    create: authed
+    createPost: authProcedure
       .input(
         z.object({
           title: z.string(),
@@ -200,15 +204,15 @@ const orpcLink = new ORPCLink({
 const client = createORPCClient<typeof router /* or contract router */>(orpcLink)
  
 //  File upload out of the box
-const output = await client.post.create({
+const output = await client.posts.createPost({
   title: 'My Amazing Title',
   description: 'This is a detailed description of my content',
   thumb: (document.getElementById('thumb') as HTMLInputElement).files[0]!,
 })
 
 // @noErrors
-client.post.
-//          ^|
+client.posts.
+//           ^|
 
 
 

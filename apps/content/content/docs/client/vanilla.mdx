@@ -27,15 +27,15 @@ const orpcLink = new ORPCLink({
 const client = createORPCClient<typeof router /* or contract router */>(orpcLink)
  
 //  File upload out of the box
-const output = await client.post.create({
+const output = await client.posts.createPost({
   title: 'My Amazing Title',
   description: 'This is a detailed description of my content',
   thumb: (document.getElementById('thumb') as HTMLInputElement).files[0]!,
 })
 
 // @noErrors
-client.post.
-//          ^|
+client.posts.
+//           ^|
 ```
 
 ## Client Context
@@ -75,7 +75,7 @@ const orpcLink = new ORPCLink<ClientContext>({
 
 const client = createORPCClient<typeof router, ClientContext>(orpcLink)
 
-client.getting({ name: 'unnoq' }, { context: { cache: 'force-cache' } })
+client.getUser({ id: '123' }, { context: { cache: 'force-cache' } })
 ```
 
 > **Note**: This works seamlessly with [Vue Query](/docs/client/vue-query) and [React Query](/docs/client/react-query).

@@ -12,9 +12,9 @@ import { os, ORPCError } from '@orpc/server'
 
 export type Context = { user?: { id: string } }
 
-export const pub /** public access */ = os.context<Context>()
+export const publicProcedure = os.context<Context>()
 
-const authMiddleware = pub.middleware(async (input, context, meta) => {
+const authMiddleware = publicProcedure.middleware(async (input, context, meta) => {
     if (!context.user) {
         throw new ORPCError({
             code: 'UNAUTHORIZED',
@@ -34,7 +34,7 @@ const authMiddleware = pub.middleware(async (input, context, meta) => {
 })
 
 // Now every procedure or router defined in this oRPC will be protected by authMiddleware
-export const authed /** require authed */ = pub.use(authMiddleware)
+export const authed /** require authed */ = publicProcedure.use(authMiddleware)
 ```
 
 ## Typed Input
@@ -86,10 +86,10 @@ type Context = {
     }
 }
 
-export const pub = os.context<Context>()
+export const publicProcedure = os.context<Context>()
 
 // Any procedure using this middleware will infer context.user as NonNullable<typeof context['user']>
-const authMiddleware = pub
+const authMiddleware = publicProcedure
     .middleware(async (input, context, meta) => {
         if (!context.user) {
             throw new ORPCError({ code: 'UNAUTHORIZED' })
@@ -102,7 +102,7 @@ const authMiddleware = pub
         })
     })
 
-export const authed = pub
+export const authed = publicProcedure
     .use(authMiddleware)
     .use((input, context, meta) => {
 

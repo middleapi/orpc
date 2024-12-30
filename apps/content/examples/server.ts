@@ -5,32 +5,36 @@ import { z } from 'zod'
 
 export type Context = { user?: { id: string } } | undefined
 
-// global pub, authed completely optional
-export const pub /** public access */ = os.context<Context>()
-export const authed /** require authed */ = pub.use((input, context, meta) => /** put auth logic here */ meta.next({}))
+// global publicProcedure, authProcedure completely optional
+export const publicProcedure = os.context<Context>()
+export const authProcedure = publicProcedure.use((input, context, meta) => {
+  /** put auth logic here */
+  return meta.next({})
+})
 
-export const router = pub.router({
-  getting: os
+export const router = publicProcedure.router({
+  getUser: os
     .input(
       z.object({
-        name: z.string(),
+        id: z.string(),
       }),
     )
     .handler(async (input, context, meta) => {
       return {
-        message: `Hello, ${input.name}!`,
+        id: input.id,
+        name: 'example',
       }
     }),
 
-  post: pub.prefix('/posts').router({
-    find: pub
+  posts: publicProcedure.prefix('/posts').router({
+    getPost: publicProcedure
       .route({
         path: '/{id}', // custom your OpenAPI
         method: 'GET',
       })
       .input(
         z.object({
-          id: z.string({}),
+          id: z.string(),
         }),
       )
       .output(
@@ -65,7 +69,7 @@ export const router = pub.router({
         }
       }),
 
-    create: authed
+    createPost: authProcedure
       .input(
         z.object({
           title: z.string(),

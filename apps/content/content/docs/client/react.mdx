@@ -26,7 +26,7 @@ export const { orpc, ORPCContext } = createORPCReact<RouterClient<typeof router 
 export function ORPCProvider({ children }: { children: React.ReactNode }) {
     const [client] = useState(() => {
         const orpcLink = new ORPCLink({
-            url: 'http://localhost:3000/api',
+            url: 'https://example.com/api',
             // fetch: optional override for the default fetch function
             // headers: provide additional headers
         })
@@ -54,13 +54,13 @@ You can create it globally or in a component based on your needs.
 ```tsx twoslash
 import { orpc } from 'examples/react'
 
-const { data: gettingData } = orpc.getting.useQuery({ name: 'unnoq' })
-const { data: postData } = orpc.post.find.useQuery({ id: 'example' })
-const { mutate: postMutate } = orpc.post.create.useMutation()
+const { data: gettingData } = orpc.getUser.useQuery({ id: '123' })
+const { data: postData } = orpc.posts.getPost.useQuery({ id: 'example' })
+const { mutate: postMutate } = orpc.posts.createPost.useMutation()
 
 // @noErrors
-orpc.post.find.
-//             ^|
+orpc.posts.getPost.
+//                 ^|
 
 
 
@@ -131,11 +131,11 @@ import { orpc } from 'examples/react'
 
 const utils = orpc.useUtils()
 utils.invalidate() // invalidate all queries
-const data = await utils.getting.fetchQuery({ name: 'unnoq' })
+const data = await utils.getUser.fetchQuery({ id: '123' })
 
 // @noErrors
-utils.post.find.
-//              ^|
+utils.posts.getPost.
+//                  ^|
 ```
 
 ## Use Queries
@@ -144,8 +144,8 @@ utils.post.find.
 import { orpc } from 'examples/react'
 
 const queries = orpc.useQueries(o => [
-  o.getting({ name: 'unnoq' }), 
-  o.post.find({ id: 'example' })
+  o.getUser({ id: '123' }), 
+  o.posts.getPost({ id: 'example' })
 ])
 ```
 
@@ -156,7 +156,7 @@ import { orpc } from 'examples/react'
 
 const {client, queryClient} = orpc.useContext()
 
-const data = await client.getting({ name: 'unnoq' })
+const data = await client.getUser({ id: '123' })
 ```
 
 ## Others

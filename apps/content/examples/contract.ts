@@ -8,20 +8,25 @@ import { z } from 'zod'
 // This contract can replace server router in most-case
 
 export const contract = oc.router({
-  getting: oc
+  getUser: oc
+    .route({
+      path: '/{id}',
+      method: 'GET',
+    })
     .input(
       z.object({
-        name: z.string(),
+        id: z.string(),
       }),
     )
     .output(
       z.object({
-        message: z.string(),
+        username: z.string(),
+        avatar: z.string(),
       }),
     ),
 
-  post: oc.prefix('/posts').router({
-    find: oc
+  posts: oc.prefix('/posts').router({
+    getPost: oc
       .route({
         path: '/{id}',
         method: 'GET',
@@ -39,7 +44,7 @@ export const contract = oc.router({
         }),
       ),
 
-    create: oc
+    createPost: oc
       .input(
         z.object({
           title: z.string(),
@@ -64,20 +69,24 @@ export type Outputs = InferContractRouterOutputs<typeof contract>
 
 export type Context = { user?: { id: string } }
 export const base = os.context<Context>()
-export const pub /** os with ... */ = base.contract(contract) // Ensure every implement must be match contract
-export const authed /** require authed */ = base
-  .use((input, context, meta) => /** put auth logic here */ meta.next({}))
+export const publicProcedure = base.contract(contract) // Ensure every implement must be match contract
+export const authProcedure = base
+  .use((input, context, meta) => {
+    /** put auth logic here */
+    return meta.next({})
+  })
   .contract(contract)
 
-export const router = pub.router({
-  getting: pub.getting.handler((input, context, meta) => {
+export const router = publicProcedure.router({
+  getUser: publicProcedure.getUser.handler((input, context, meta) => {
     return {
-      message: `Hello, ${input.name}!`,
+      username: `user_${input.id}`,
+      avatar: `avatar_${input.id}.png`,
     }
   }),
 
-  post: {
-    find: pub.post.find
+  posts: {
+    getPost: publicProcedure.posts.getPost
       .use(async (input, context, meta) => {
         if (!context.user) {
           throw new ORPCError({
@@ -103,7 +112,7 @@ export const router = pub.router({
         }
       }),
 
-    create: authed.post.create.handler((input, context, meta) => {
+    createPost: authProcedure.posts.createPost.handler((input, context, meta) => {
       return {
         id: 'example',
         title: input.title,

@@ -1,12 +1,12 @@
 ## Build Robust, Typesafe Functions
 
 ```tsx
-export const getting = os
+export const updateUser = os
 	.use(authMiddleware) // require auth
 	.use(cache('5m')) // cache the output
 	.route({
-		path: '/getting/{id}' // dynamic params support
-		method: 'POST' // custom OpenAPI method
+		path: '/users/{id}' // dynamic params support
+		method: 'PATCH' // custom OpenAPI method
 	})
 	.input(z.object({
 		id: z.bigint(),
@@ -16,8 +16,8 @@ export const getting = os
 		})
 	}))
 	.use(canMiddleware, (i) => i.id) // permission check by id
-	.output(z.string()) // validate output
-	.handler(async (input) => 'Name and Avatar has been updated')
+	.output(z.literal("success")) // validate output
+	.handler(async (input) => /* handle user update */)
 ```
 
 > Only the `.handler` method is required. All other chain methods are optional.
@@ -29,7 +29,7 @@ you can create **reusable logic** that ensures **type safety** and adds **power*
 ## Use as a Regular Function
 
 ```tsx
-const text = await getting({ 
+const updatedUser = await updateUser({ 
 	id: 1992n,
 	user: {
 		name: 'unnoq',
@@ -40,10 +40,10 @@ const text = await getting({
 
 The [Procedure Client](/docs/server/client) feature lets your procedures behave like regular TypeScript functions.
 
-## Expose It Online with a Fully Typed Client
+## Expose It In Your Frontend with a Fully Typed Client
 
 ```tsx
-const text = await orpc.getting({ 
+const updatedUser = await orpc.updateUser({ 
 	id: 1992n,
 	user: {
 		name: 'unnoq',
@@ -59,15 +59,15 @@ Our [Vanilla Client](/docs/client/vanilla) is fully typed and doesn't rely on ge
 ```ts
 // Fetch data with oRPC
 const { data, status } = useQuery(
-  orpc.post.find.queryOptions({ input: { id: 'example' } })
+  orpc.posts.getPost.queryOptions({ input: { id: 'example' } })
 );
 
 // Perform a mutation and invalidate related queries on success
 const { mutate, isPending } = useMutation(
-  orpc.getting.mutationOptions({
+  orpc.updateUser.mutationOptions({
     onSuccess() {
       queryClient.invalidateQueries({
-        queryKey: orpc.post.find.key({ input: { id: 'example' } }),
+        queryKey: orpc.post.getPost.key({ input: { id: 'example' } }),
       });
     },
   })
@@ -88,7 +88,7 @@ We now support [React Query Integration](/docs/client/react-query) and [Vue Quer
 ## Access via OpenAPI Standard
 
 ```bash
-curl -X POST http://localhost:2026/api/getting/1992 \
+curl -X PATCH https://example.com/api/users/1992 \
   -H "Content-Type: multipart/form-data" \
   -F "user[name]=unnoq" \
   -F "user[avatar]=@/path/to/your/image.jpg"
@@ -101,19 +101,18 @@ convert `1992` into a `bigint` and seamlessly parse objects like `user`.
 
 ```tsx
 // call directly from client
-const onSubmit = () => { getting({ /***/ }) }
+const onSubmit = () => { updateUser({ /***/ }) }
 // use with a hook
-const { execute, isPending, isError, error, output, input, status } = useAction(getting)
+const { execute, isPending, isError, error, output, input, status } = useAction(updateUser)
 // createSafeAction and useSafeAction if you want catch error on client
 // use as a form action
-const gettingFA = createFormAction({ 
-	procedure: getting,
+const updateUserFA = createFormAction({ 
+	procedure: updateUser,
 	schemaCoercers: [new ZodCoercer()],
 	onSuccess: () => redirect('/some-where')
 })
 
-
-<form action={gettingFA}>
+<form action={updateUserFA}>
   <input type="number" name="id" value="1992" />
   <input type="string" name="user[name]" value="unnoq" />
   <input type="file" name="user[avatar]" accept="image/*" />
@@ -129,9 +128,9 @@ Learn more about [Server Action](/docs/server/server-action).
 ```tsx
 type ORPCContext = { db: DB, user?: { id: string } }
 
-const pub /* public access */ = os.context<ORPCContext>()
+const publicProcedure = os.context<ORPCContext>()
 
-const getting = pub
+const createPost = publicProcedure
 	.use((input, context, meta) => {
 		if(!context.user){
 			throw new ORPCError({ code: 'UNAUTHORIZED' })
@@ -153,14 +152,14 @@ When you use [Initial Context](/docs/server/context#initial-context), every call
 ## **Contract-First Development**
 
 ```tsx
-const gettingContract = oc
+const userContract = oc
 	.route({/*something*/})
 	.input({/*something*/})
 	.output({/*something*/})
-	
-const getting = os
-	.contract(gettingContract)
-	.handler(async () => 'Worked')
+
+// All nested procedures will be embedded in the parent contract
+const contract = os
+	.contract(userContract)
 ```
 
 With [oRPC's Contract First Development](/docs/server/contract), you can easily separate the procedure's definition 

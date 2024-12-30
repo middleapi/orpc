@@ -28,20 +28,21 @@ import { oz } from '@orpc/zod'
 import { z } from 'zod'
 
 export const contract = oc.router({
-    getting: oc
-    .input(
-      z.object({
-        name: z.string(),
-      }),
-    )
-    .output(
-      z.object({
-        message: z.string(),
-      }),
-    ),
+  getUser: oc
+  .input(
+    z.object({
+      id: z.string(),
+    }),
+  )
+  .output(
+    z.object({
+      username: z.string(),
+      avatar: z.string(),
+    }),
+  ),
 
-  post: oc.prefix('/posts').router({
-    find: oc
+  posts: oc.prefix('/posts').router({
+    getPost: oc
       .route({
         path: '/{id}',
         method: 'GET',
@@ -59,7 +60,7 @@ export const contract = oc.router({
         }),
       ),
 
-    create: oc
+    createPost: oc
       .input(
         z.object({
           title: z.string(),
@@ -89,20 +90,24 @@ With your contract defined, implement the server logic:
 import { os, ORPCError } from '@orpc/server'
 import { contract } from 'examples/contract'
 
-export const pub /** public access */ = os.contract(contract) // Ensure every implement must be match contract
-export const authed /** require authed */ = os
-  .use((input, context, meta) => /** put auth logic here */ meta.next({}))
+export const publicProcedure = os.contract(contract) // Ensure every implement must be match contract
+export const authProcedure = os
+  .use((input, context, meta) => {
+    /** put auth logic here */
+    return meta.next({})
+  })
   .contract(contract)
 
-export const router = pub.router({
-  getting: pub.getting.handler((input, context, meta) => {
+export const router = publicProcedure.router({
+  getUser: publicProcedure.getUser.handler((input, context, meta) => {
     return {
-      message: `Hello, ${input.name}!`,
+      username: 'example',
+      avatar: 'example',
     }
   }),
 
-  post: {
-    find: pub.post.find
+  posts: {
+    getPost: publicProcedure.posts.getPost
       .handler((input, context, meta) => {
         return {
           id: 'example',
@@ -111,7 +116,7 @@ export const router = pub.router({
         }
       }),
 
-    create: authed.post.create.handler((input, context, meta) => {
+    createPost: authProcedure.posts.createPost.handler((input, context, meta) => {
       return {
         id: 'example',
         title: input.title,
@@ -134,7 +139,7 @@ import { ORPCLink } from '@orpc/client/fetch'
 import type { contract } from 'examples/contract'
 
 const orpcLink = new ORPCLink({
-  url: 'http://localhost:3000/prefix',
+  url: 'https://localhost:3000/prefix',
   // fetch: optional override for the default fetch function
   // headers: provide additional headers
 })
@@ -142,15 +147,15 @@ const orpcLink = new ORPCLink({
 const client = createORPCClient<typeof contract /* or server router */>(orpcLink)
  
 //  File upload out of the box
-const output = await client.post.create({
+const output = await client.posts.createPost({
   title: 'My Amazing Title',
   description: 'This is a detailed description of my content',
   thumb: (document.getElementById('thumb') as HTMLInputElement).files[0]!,
 })
 
 // @noErrors
-client.post.
-//          ^|
+client.posts.
+//           ^|
 
 
 

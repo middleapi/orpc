@@ -30,7 +30,7 @@ export const client = createORPCClient<typeof router>(orpcLink);
 export const orpc = createORPCVueQueryUtils(client);
 
 // @noErrors
-orpc.getting.
+orpc.getUser.
 //           ^|
 ```
 
@@ -57,15 +57,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { orpc } from 'examples/vue-query'
 
 // Fetch data
-const { data: gettingData } = useQuery(orpc.getting.queryOptions({ input: { name: 'unnoq' } }))
+const { data: gettingData } = useQuery(orpc.getUser.queryOptions({ input: { id: '123' } }))
 
 // Perform mutations
-const { mutate: postMutate } = useMutation(orpc.post.create.mutationOptions())
+const { mutate: postMutate } = useMutation(orpc.posts.createPost.mutationOptions())
 
 // Invalidate queries
 const queryClient = useQueryClient()
 queryClient.invalidateQueries({ queryKey: orpc.key() }) // Invalidate all queries
-queryClient.invalidateQueries({ queryKey: orpc.post.find.key({ input: { id: 'example' } }) }) // Specific queries
+queryClient.invalidateQueries({ queryKey: orpc.posts.getPost.key({ input: { id: 'example' } }) }) // Specific queries
 ```
 
 > **Note**: This library enhances [TanStack Query](https://tanstack.com/query/latest) by managing query keys and functions for you, providing a seamless developer experience.

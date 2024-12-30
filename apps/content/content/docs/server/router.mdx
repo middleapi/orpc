@@ -10,19 +10,20 @@ A router is a collection of procedures with utilities that help reduce code dupl
 ```ts twoslash
 import { os } from '@orpc/server'
 
-const findUser = os.route({path: '/'}).handler(() => {})
+const getUserHandler = os.route({ path: '/' }).handler(() => {})
+
+export const usersRouter = os.prefix('/users').router({
+    getUser: getUserHandler,
+})
 
 export const appRouter = os.router({
-    user: {
-        find: findUser,
-    },
-
-    nested: os
+    users: os
         .prefix('/users')  // Prefix will be concatenated with paths defined in route(...)
-        .use((input, context, meta) => /* Logic applies for all routes in this router */ meta.next({}))
-        .router({
-            find: findUser,
-        }),
+        .use((input, context, meta) => {
+            /* Logic applies for all routes in this router */
+            return meta.next({})
+        })
+        .router(usersRouter),
 })
 ```
 
@@ -36,7 +37,7 @@ You can add a prefix to all routes in a router:
 ```ts twoslash
 import { os } from '@orpc/server'
 
-const userRouter = os
+const usersRouter = os
     .prefix('/users')
     .router({
         // ...
@@ -68,22 +69,22 @@ Create hierarchical route structures:
 ```ts twoslash
 import { os } from '@orpc/server'
 
-const userRouter = os.router({
+const usersRouter = os.router({
     // ...
 })
 
-const postRouter = os.router({
+const postsRouter = os.router({
     // ...
 })
 
-const commentRouter = os.router({
+const commentsRouter = os.router({
     // ...
 })
 
 const apiRouter = os.router({
-    users: userRouter,
-    posts: postRouter,
-    comments: os.prefix('/comments').router(commentRouter),
+    users: usersRouter,
+    posts: postsRouter,
+    comments: os.prefix('/comments').router(commentsRouter),
 })
 ```
 
@@ -99,6 +100,6 @@ import { router } from 'examples/server'
 type Inputs = InferRouterInputs<typeof router>
 type Outputs = InferRouterOutputs<typeof router>
 
-type GettingInput = Inputs['getting']
-type PostFindOutput = Outputs['post']['find']
+type GetUserInput = Inputs['getUser']
+type GetPostOutput = Outputs['posts']['getPost']
 ```
