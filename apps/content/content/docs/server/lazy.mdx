@@ -16,13 +16,13 @@ Here's how you can set up and use them:
 ```typescript twoslash
 import { os } from '@orpc/server'
 
-const publicProcedure = os.context<{ user?: { id: string } } | undefined>()
+const publicRoute = os.context<{ user?: { id: string } } | undefined>()
 
 // Define a router with lazy loading
-const router = publicProcedure.router({
-    lazy: publicProcedure.lazy(() => import('examples/server')),
+const router = publicRoute.router({
+    lazy: publicRoute.lazy(() => import('examples/server')),
     // Please use .prefix when you use OpenAPI
-    better: publicProcedure.prefix('/some').lazy(() => import('examples/server'))
+    better: publicRoute.prefix('/some').lazy(() => import('examples/server'))
 })
 
 // Use the lazy-loaded router as if it were a regular one
@@ -48,9 +48,9 @@ const output = await router.lazy.getUser({ id: '123' })
 
    ```ts twoslash
     import { os } from '@orpc/server'
-    const publicProcedure = os.context<{ user?: { id: string } }>()
+    const publicRoute = os.context<{ user?: { id: string } }>()
 
-    const lazy = publicProcedure.prefix('/some').lazy(() => import('examples/server'))
+    const lazy = publicRoute.prefix('/some').lazy(() => import('examples/server'))
     ```
 
     Adding a prefix helps oRPC dynamically load the router only when it's needed, 

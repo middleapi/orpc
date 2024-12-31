@@ -57,14 +57,14 @@ import { z } from 'zod'
 
 export type Context = { user?: { id: string } }
 
-// global publicProcedure, authProcedure completely optional
-export const publicProcedure = os.context<Context>()
-export const authProcedure = publicProcedure.use((input, context, meta) => {
+// global publicRoute, authRoute completely optional
+export const publicRoute = os.context<Context>()
+export const authRoute = publicRoute.use((input, context, meta) => {
   /** put auth logic here */
   return meta.next({})
 })
 
-export const router = publicProcedure.router({
+export const router = publicRoute.router({
   getUser: os
     .input(
       z.object({
@@ -79,7 +79,7 @@ export const router = publicProcedure.router({
     }),
 
   posts: {
-    getPost: publicProcedure
+    getPost: publicRoute
       .input(
         z.object({
           id: z.string(),
@@ -117,7 +117,7 @@ export const router = publicProcedure.router({
         }
       }),
 
-    createPost: authProcedure
+    createPost: authRoute
       .input(
         z.object({
           title: z.string(),
