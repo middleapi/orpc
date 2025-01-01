@@ -20,7 +20,7 @@ import { headers } from 'next/headers'
 type ORPCContext = { db: 'fake-db', user?: { id: string } }
 const base = os.context<ORPCContext>() // define `initial context`
 
-const publicRoute = os.context<ORPCContext>().use(async (input, context, meta) => {
+const pub = os.context<ORPCContext>().use(async (input, context, meta) => {
     const headersList = await headers()
 
     // the `user` is `middleware context`, because it is created by middleware
@@ -31,8 +31,8 @@ const publicRoute = os.context<ORPCContext>().use(async (input, context, meta) =
     })
 })
 
-export const router = publicRoute.router({
-    getUser: publicRoute.handler((input, context, meta) => {
+export const router = pub.router({
+    getUser: pub.handler((input, context, meta) => {
         // ^ context is combined from `initial context` and `middleware context`
     }),
 })

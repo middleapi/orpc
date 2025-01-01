@@ -69,16 +69,16 @@ export type Outputs = InferContractRouterOutputs<typeof contract>
 
 export type Context = { user?: { id: string } }
 export const base = os.context<Context>()
-export const publicRoute = base.contract(contract) // Ensure every implement must be match contract
-export const authRoute = base
+export const pub = base.contract(contract) // Ensure every implement must be match contract
+export const authed = base
   .use((input, context, meta) => {
     /** put auth logic here */
     return meta.next({})
   })
   .contract(contract)
 
-export const router = publicRoute.router({
-  getUser: publicRoute.getUser.handler((input, context, meta) => {
+export const router = pub.router({
+  getUser: pub.getUser.handler((input, context, meta) => {
     return {
       username: `user_${input.id}`,
       avatar: `avatar_${input.id}.png`,
@@ -86,7 +86,7 @@ export const router = publicRoute.router({
   }),
 
   posts: {
-    getPost: publicRoute.posts.getPost
+    getPost: pub.posts.getPost
       .use(async (input, context, meta) => {
         if (!context.user) {
           throw new ORPCError({
@@ -112,7 +112,7 @@ export const router = publicRoute.router({
         }
       }),
 
-    createPost: authRoute.posts.createPost.handler((input, context, meta) => {
+    createPost: authed.posts.createPost.handler((input, context, meta) => {
       return {
         id: 'example',
         title: input.title,

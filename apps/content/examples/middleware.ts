@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 export type Context = { user?: { id: string } }
 
-export const publicRoute = os
+export const pub = os
   .context<Context>()
   .use(async (input, context, meta) => {
     // This middleware will apply to everything create from pub
@@ -20,7 +20,7 @@ export const publicRoute = os
     }
   })
 
-export const authMiddleware = publicRoute.middleware(async (input, context, meta) => {
+export const authMiddleware = pub.middleware(async (input, context, meta) => {
   if (!context.user) {
     throw new ORPCError({ code: 'UNAUTHORIZED' })
   }
@@ -33,7 +33,7 @@ export const authMiddleware = publicRoute.middleware(async (input, context, meta
   return result
 })
 
-export const authed = publicRoute.use(authMiddleware) // any procedure compose from authOS will be protected
+export const authed = pub.use(authMiddleware) // any procedure compose from authOS will be protected
 
 export const canEditPost = authMiddleware.concat(
   // Now you expect to have id in input

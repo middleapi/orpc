@@ -128,9 +128,9 @@ Learn more about [Server Action](/docs/server/server-action).
 ```tsx
 type ORPCContext = { db: DB, user?: { id: string } }
 
-const publicRoute = os.context<ORPCContext>()
+const pub = os.context<ORPCContext>()
 
-const createPost = publicRoute
+const createPost = pub
 	.use((input, context, meta) => {
 		if(!context.user){
 			throw new ORPCError({ code: 'UNAUTHORIZED' })

@@ -5,14 +5,14 @@ import { z } from 'zod'
 
 export type Context = { user?: { id: string } } | undefined
 
-// global publicRoute, authRoute completely optional
-export const publicRoute = os.context<Context>()
-export const authRoute = publicRoute.use((input, context, meta) => {
+// global pub, authed completely optional
+export const pub = os.context<Context>()
+export const authed = pub.use((input, context, meta) => {
   /** put auth logic here */
   return meta.next({})
 })
 
-export const router = publicRoute.router({
+export const router = pub.router({
   getUser: os
     .input(
       z.object({
@@ -26,8 +26,8 @@ export const router = publicRoute.router({
       }
     }),
 
-  posts: publicRoute.prefix('/posts').router({
-    getPost: publicRoute
+  posts: pub.prefix('/posts').router({
+    getPost: pub
       .route({
         path: '/{id}', // custom your OpenAPI
         method: 'GET',
@@ -69,7 +69,7 @@ export const router = publicRoute.router({
         }
       }),
 
-    createPost: authRoute
+    createPost: authed
       .input(
         z.object({
           title: z.string(),

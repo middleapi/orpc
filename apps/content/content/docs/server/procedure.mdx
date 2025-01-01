@@ -20,9 +20,9 @@ import { z } from 'zod'
 import { os, ORPCError } from '@orpc/server'
 
 // Define context type for full type inference
-const publicRoute = os.context<{user?: {id: string}}>()
+const pub = os.context<{user?: {id: string}}>()
 
-const getUser = publicRoute
+const getUser = pub
     .route({ method: 'GET', path: '/{id}' }) // Optional: if you want custom api under OpenAPI Specifications
     .input(z.object({ id: z.string() })) // Optional
     .output(z.object({ id: z.string(), name: z.string() })) // Optional
