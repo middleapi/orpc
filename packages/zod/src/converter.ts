@@ -153,7 +153,7 @@ export function zodToJsonSchema(
     }
   }
 
-  const childOptions = { ...options, isHandledCustomJSONSchema: false }
+  const childOptions = { ...options, isHandledCustomJSONSchema: false, isHandledZodDescription: false }
 
   const customType = getCustomZodType(schema__._def)
 

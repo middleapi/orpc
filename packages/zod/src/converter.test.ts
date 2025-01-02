@@ -390,33 +390,68 @@ describe('with custom json schema', () => {
   })
 })
 
-it('zod description', () => {
-  const schema = z.object({
-    name: z.string().describe('name description'),
+describe('zod description', () => {
+  it('should include descriptions for basic and nested properties', () => {
+    const schema = z.object({
+      name: z.string().describe('name description'),
 
-    nested: z.object({
-      name: z.string().describe('nested name description'),
-    }),
+      nested: z.object({
+        name: z.string().describe('nested name description'),
+      }),
+    })
+
+    expect(zodToJsonSchema(schema)).toEqual({
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'name description',
+        },
+        nested: {
+          type: 'object',
+          properties: {
+            name: {
+              type: 'string',
+              description: 'nested name description',
+            },
+          },
+          required: ['name'],
+        },
+      },
+      required: ['name', 'nested'],
+    })
   })
 
-  expect(zodToJsonSchema(schema)).toEqual({
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description: 'name description',
-      },
-      nested: {
-        type: 'object',
-        properties: {
-          name: {
-            type: 'string',
-            description: 'nested name description',
-          },
+  it('should include outer and inner descriptions', () => {
+    const schema = z.object({
+      name: z.string().describe('name description'),
+
+      nested: z.object({
+        name: z.string().describe('nested name description'),
+      }).describe('inner object description'),
+    }).describe('outer object description')
+
+    expect(zodToJsonSchema(schema)).toEqual({
+      type: 'object',
+      description: 'outer object description',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'name description',
         },
-        required: ['name'],
+        nested: {
+          type: 'object',
+          description: 'inner object description',
+          properties: {
+            name: {
+              type: 'string',
+              description: 'nested name description',
+            },
+          },
+          required: ['name'],
+        },
       },
-    },
-    required: ['name', 'nested'],
+      required: ['name', 'nested'],
+    })
   })
 })
