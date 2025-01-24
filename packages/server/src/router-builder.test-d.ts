@@ -1,7 +1,6 @@
-import type { ErrorMap, MergedErrorMap, Route, Schema } from '@orpc/contract'
+import type { ErrorMap, MergedErrorMap, ORPCErrorConstructorMap, Route, Schema } from '@orpc/contract'
 import type { baseErrorMap, BaseMeta } from '../../contract/tests/shared'
 import type { Context } from './context'
-import type { ORPCErrorConstructorMap } from './error'
 import type { Lazy } from './lazy'
 import type { MiddlewareOutputFn } from './middleware'
 import type { Procedure } from './procedure'

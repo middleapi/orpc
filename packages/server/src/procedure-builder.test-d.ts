@@ -1,7 +1,6 @@
-import type { ContractProcedure, ErrorMap, MergedErrorMap, Schema } from '@orpc/contract'
+import type { ContractProcedure, ErrorMap, MergedErrorMap, ORPCErrorConstructorMap, Schema } from '@orpc/contract'
 import type { CurrentContext, InitialContext } from '../tests/shared'
 import type { Context } from './context'
-import type { ORPCErrorConstructorMap } from './error'
 import type { MiddlewareOutputFn } from './middleware'
 import type { Procedure } from './procedure'
 import type { ProcedureBuilder } from './procedure-builder'

@@ -1,6 +1,5 @@
-import type { ContractProcedureDef, ErrorMap, MergedErrorMap, Meta, Route, Schema, SchemaOutput } from '@orpc/contract'
+import type { ContractProcedureDef, ErrorMap, MergedErrorMap, Meta, ORPCErrorConstructorMap, Route, Schema, SchemaOutput } from '@orpc/contract'
 import type { ConflictContextGuard, Context, MergedContext, TypeCurrentContext, TypeInitialContext } from './context'
-import type { ORPCErrorConstructorMap } from './error'
 import type { AnyMiddleware, MapInputMiddleware, Middleware } from './middleware'
 import type { ProcedureHandler } from './procedure'
 import { mergeErrorMap, mergeMeta, mergeRoute } from '@orpc/contract'

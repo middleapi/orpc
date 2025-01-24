@@ -1,6 +1,6 @@
+import type { ORPCErrorConstructorMap } from '@orpc/contract'
 import type { baseErrorMap, BaseMeta } from '../../contract/tests/shared'
 import type { CurrentContext } from '../tests/shared'
-import type { ORPCErrorConstructorMap } from './error'
 import type { Middleware } from './middleware'
 import type { DecoratedMiddleware } from './middleware-decorated'
 
