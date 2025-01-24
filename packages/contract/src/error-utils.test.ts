@@ -1,7 +1,62 @@
 import type { ErrorMap } from './error-map'
 import { z } from 'zod'
+import { outputSchema } from '../tests/shared'
 import { ORPCError } from './error-orpc'
-import { isDefinedError, validateORPCError } from './error-utils'
+import { createORPCErrorConstructorMap, isDefinedError, validateORPCError } from './error-utils'
+
+it('isDefinedError', () => {
+  expect(isDefinedError(new ORPCError('BAD_GATEWAY'))).toBe(false)
+  expect(isDefinedError(new ORPCError('BAD_GATEWAY', { defined: true }))).toBe(true)
+  expect(isDefinedError({ defined: true, code: 'BAD_GATEWAY' })).toBe(false)
+})
+
+describe('createORPCErrorConstructorMap', () => {
+  const errors = {
+    BAD_GATEWAY: {
+      status: 588,
+      message: 'default message',
+      data: outputSchema,
+    },
+  }
+
+  const constructors = createORPCErrorConstructorMap(errors)
+
+  it('works', () => {
+    const error = constructors.BAD_GATEWAY({ data: { output: 123 }, cause: 'cause' })
+
+    expect(error).toBeInstanceOf(ORPCError)
+    expect(error.code).toEqual('BAD_GATEWAY')
+    expect(error.status).toBe(588)
+    expect(error.defined).toBe(true)
+    expect(error.message).toBe('default message')
+    expect(error.data).toEqual({ output: 123 })
+    expect(error.cause).toBe('cause')
+  })
+
+  it('can override message', () => {
+    expect(
+      constructors.BAD_GATEWAY({ message: 'custom message', data: { output: 123 } }).message,
+    ).toBe('custom message')
+  })
+
+  it('can arbitrary access', () => {
+    // @ts-expect-error - invalid access
+    const error = constructors.ANY_THING({ data: 'DATA', message: 'MESSAGE', cause: 'cause' })
+
+    expect(error).toBeInstanceOf(ORPCError)
+    expect(error.code).toEqual('ANY_THING')
+    expect(error.status).toBe(500)
+    expect(error.defined).toBe(false)
+    expect(error.message).toBe('MESSAGE')
+    expect(error.data).toEqual('DATA')
+    expect(error.cause).toBe('cause')
+  })
+
+  it('not proxy when access with symbol', () => {
+    // @ts-expect-error - invalid access
+    expect(constructors[Symbol('something')]).toBeUndefined()
+  })
+})
 
 describe('validateORPCError', () => {
   const errors: ErrorMap = {
@@ -60,10 +115,4 @@ describe('validateORPCError', () => {
     expect(v1).not.toBe(e1)
     expect({ ...v1 }).toEqual({ ...e1, defined: true, data: { value: 123 } })
   })
-})
-
-it('isDefinedError', () => {
-  expect(isDefinedError(new ORPCError('BAD_GATEWAY'))).toBe(false)
-  expect(isDefinedError(new ORPCError('BAD_GATEWAY', { defined: true }))).toBe(true)
-  expect(isDefinedError({ defined: true, code: 'BAD_GATEWAY' })).toBe(false)
 })

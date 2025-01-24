@@ -12,7 +12,7 @@ describe('ContractProcedureClient', () => {
         'context',
         { input: number },
         { output: string },
-        Error | ORPCError<'BASE', { output: string }> | ORPCError<'OVERRIDE', { output: string }>
+        Error | ORPCError<'BASE', { output: string }> | ORPCError<'OVERRIDE', unknown>
       >
     >()
   })

@@ -10,9 +10,7 @@ export const baseErrorMap = {
   BASE: {
     data: outputSchema,
   },
-  OVERRIDE: {
-    data: outputSchema,
-  },
+  OVERRIDE: {},
 }
 
 export const baseRoute = { path: '/base' } as const
