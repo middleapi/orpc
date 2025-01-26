@@ -564,7 +564,11 @@ export function zodToJsonSchema(
 
     case ZodFirstPartyTypeKind.ZodDefault: {
       const schema_ = schema__ as ZodDefault<ZodTypeAny>
-      return zodToJsonSchema(schema_._def.innerType, childOptions)
+      const inner = zodToJsonSchema(schema_._def.innerType, childOptions)
+      if (childOptions.mode === 'output') {
+        return inner
+      }
+      return { ...inner, default: schema_._def.defaultValue() }
     }
 
     case ZodFirstPartyTypeKind.ZodEffects: {

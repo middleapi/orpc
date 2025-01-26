@@ -64,6 +64,37 @@ describe('primitive types', () => {
   })
 })
 
+describe('default values', () => {
+  it('should add the default property', () => {
+    const schema = z.string().default('test')
+    expect(zodToJsonSchema(schema)).toEqual({ type: 'string', default: 'test' })
+  })
+
+  it('should be skipped in outputs', () => {
+    const schema = z.string().default('test')
+    expect(zodToJsonSchema(schema, { mode: 'output' })).toEqual({ type: 'string' })
+  })
+
+  it('should not affect other constraints or properties', () => {
+    const schema = z
+      .string()
+      .min(5)
+      .max(10)
+      .email()
+      .regex(/^[a-z]+$/)
+      .default('testlong')
+
+    expect(zodToJsonSchema(schema)).toEqual({
+      type: 'string',
+      minLength: 5,
+      maxLength: 10,
+      format: Format.Email,
+      pattern: '^[a-z]+$',
+      default: 'testlong',
+    })
+  })
+})
+
 describe('array types', () => {
   it('should convert array schema', () => {
     const schema = z.array(z.string())
