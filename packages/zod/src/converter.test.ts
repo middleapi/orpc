@@ -69,6 +69,7 @@ describe('array types', () => {
     const schema = z.array(z.string())
     expect(zodToJsonSchema(schema)).toEqual({
       type: 'array',
+      items: { type: 'string' },
     })
   })
 
@@ -76,6 +77,9 @@ describe('array types', () => {
     const schema = z.array(z.string()).min(1).max(5)
     expect(zodToJsonSchema(schema)).toEqual({
       type: 'array',
+      items: {
+        type: 'string',
+      },
       minItems: 1,
       maxItems: 5,
     })
@@ -268,12 +272,36 @@ describe('lazy types', () => {
       }),
     )
 
+    const tree1 = {
+      type: 'object',
+      properties: {
+        value: { type: 'string' },
+        children: {
+          type: 'array',
+          items: {},
+        },
+      },
+      required: ['value'],
+    }
+    const tree2 = {
+      type: 'object',
+      properties: {
+        value: { type: 'string' },
+        children: {
+          type: 'array',
+          items: tree1,
+        },
+      },
+      required: ['value'],
+    }
+
     expect(zodToJsonSchema(treeSchema, { maxLazyDepth: 2 })).toEqual({
       type: 'object',
       properties: {
         value: { type: 'string' },
         children: {
           type: 'array',
+          items: tree2,
         },
       },
       required: ['value'],

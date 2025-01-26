@@ -364,6 +364,8 @@ export function zodToJsonSchema(
 
       const json: JSONSchema.JSONSchema = { type: 'array' }
 
+      json.items = zodToJsonSchema(def.type, childOptions)
+
       if (def.exactLength) {
         json.maxItems = def.exactLength.value
         json.minItems = def.exactLength.value
