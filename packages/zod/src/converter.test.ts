@@ -67,7 +67,13 @@ describe('primitive types', () => {
 describe('default values', () => {
   it('should add the default property', () => {
     const schema = z.string().default('test')
-    expect(zodToJsonSchema(schema)).toEqual({ type: 'string', default: 'test' })
+    expect(zodToJsonSchema(schema)).toEqual({
+      anyOf: [
+        { const: 'undefined' },
+        { type: 'string', default: 'test' },
+      ],
+      default: 'test',
+    })
   })
 
   it('should be skipped in outputs', () => {
