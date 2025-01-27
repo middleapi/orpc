@@ -568,7 +568,11 @@ export function zodToJsonSchema(
       if (childOptions.mode === 'output') {
         return inner
       }
-      return { ...inner, default: schema_._def.defaultValue() }
+
+      return {
+        anyOf: [UNDEFINED_JSON_SCHEMA, { ...inner, default: schema_._def.defaultValue() }],
+        default: schema_._def.defaultValue(),
+      }
     }
 
     case ZodFirstPartyTypeKind.ZodEffects: {

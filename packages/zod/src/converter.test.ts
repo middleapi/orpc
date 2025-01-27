@@ -82,15 +82,23 @@ describe('default values', () => {
       .max(10)
       .email()
       .regex(/^[a-z]+$/)
-      .default('testlong')
+      .default('test')
 
     expect(zodToJsonSchema(schema)).toEqual({
-      type: 'string',
-      minLength: 5,
-      maxLength: 10,
-      format: Format.Email,
-      pattern: '^[a-z]+$',
-      default: 'testlong',
+      anyOf: [
+        { const: 'undefined' },
+        {
+          type: 'string',
+          minLength: 5,
+          maxLength: 10,
+          format: Format.Email,
+          pattern: '^[a-z]+$',
+          // This is the resulting schema twice since, simiarly to ZodOptional,
+          // it is valid either in an object or in the anyOf.
+          default: 'test',
+        },
+      ],
+      default: 'test',
     })
   })
 })
