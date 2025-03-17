@@ -32,6 +32,6 @@ export default defineEventHandler(async (event) => {
       </html>
     `
 
-  event.node.res.setHeader('Content-Type', 'text/html')
-  event.node.res.end(html)
+  setResponseHeader(event, 'content-type', 'text/html')
+  return html
 })

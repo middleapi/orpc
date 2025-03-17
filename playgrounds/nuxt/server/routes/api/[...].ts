@@ -15,7 +15,8 @@ const openAPIHandler = new OpenAPIHandler(router, {
 })
 
 export default defineEventHandler(async (event) => {
-  const context = event.node.req.headers.authorization
+  const authorization = getHeader(event, 'authorization')
+  const context = authorization
     ? { user: { id: 'test', name: 'John Doe', email: 'john@doe.com' } }
     : {}
 
@@ -28,6 +29,6 @@ export default defineEventHandler(async (event) => {
     return
   }
 
-  event.node.res.statusCode = 404
-  event.node.res.end('Not found')
+  setResponseStatus(event, 404, 'Not Found')
+  return 'Not Found'
 })

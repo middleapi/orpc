@@ -30,8 +30,8 @@ export default defineEventHandler(async (event) => {
     return
   }
 
-  event.node.res.statusCode = 404
-  event.node.res.end('Not found')
+  setResponseStatus(event, 404, 'Not Found')
+  return 'Not found'
 })
 ```
 
