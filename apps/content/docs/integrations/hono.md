@@ -17,7 +17,7 @@ const app = new Hono()
 
 const handler = new RPCHandler(router)
 
-app.use('/rpc/*', createMiddleware(rpcHandler, {
+app.use('/rpc/*', createMiddleware(handler, {
   prefix: '/rpc',
   context: async (c) => {
     return {} // Provide initial context if needed

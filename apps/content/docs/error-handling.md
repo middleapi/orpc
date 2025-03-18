@@ -27,10 +27,10 @@ In the traditional approach you may throw any JavaScript error. However, using t
 
 ```ts
 const rateLimit = os.middleware(async ({ next }) => {
-  throw new ORPCError('RATE_LIMITED', ({
+  throw new ORPCError('RATE_LIMITED', {
     message: 'You are being rate limited',
     data: { retryAfter: 60 }
-  }))
+  })
   return next()
 })
 
@@ -109,10 +109,10 @@ const rateLimit = base.middleware(async ({ next, errors }) => {
     data: { retryAfter: 60 }
   })
   // OR --- both are equivalent
-  throw new ORPCError('RATE_LIMITED', ({
+  throw new ORPCError('RATE_LIMITED', {
     message: 'You are being rate limited',
     data: { retryAfter: 60 }
-  }))
+  })
   return next()
 })
 
