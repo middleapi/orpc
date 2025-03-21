@@ -14,8 +14,8 @@ This comparison table helps you understand how oRPC differs from other popular T
 | Feature                                  | oRPC | tRPC | ts-rest |
 | ---------------------------------------- | ---- | ---- | ------- |
 | End-to-end Input/Output Typesafe         | ✅   | ✅   | ✅      |
-| End-to-end Errors Typesafe               | ✅   | 🛑   | ✅      |
-| End-to-end File/Blob Typesafe            | ✅   | 🛑   | 🛑      |
+| End-to-end Errors Typesafe               | ✅   | ✅   | ✅      |
+| End-to-end File/Blob Typesafe            | ✅   | ✅   | 🛑      |
 | End-to-end Streaming Typesafe            | ✅   | ✅   | 🛑      |
 | Tanstack Query Integration (React)       | ✅   | ✅   | 🟡      |
 | Tanstack Query Integration (Vue)         | ✅   | 🛑   | 🟡      |
@@ -25,14 +25,14 @@ This comparison table helps you understand how oRPC differs from other popular T
 | With Contract-First Approach             | ✅   | 🛑   | ✅      |
 | Without Contract-First Approach          | ✅   | ✅   | 🛑      |
 | OpenAPI Support                          | ✅   | 🟡   | 🟡      |
-| Server Actions Support                   | ✅   | 🟡   | 🛑      |
-| Lazy Router                              | ✅   | 🛑   | 🛑      |
-| Native Types (Date, URL, Set, Maps, ...) | ✅   | 🟡   | 🛑      |
+| Server Actions Support                   | ✅   | ✅   | 🛑      |
+| Lazy Router                              | ✅   | ✅   | 🛑      |
+| Native Types (Date, URL, Set, Maps, ...) | ✅   | ✅   | 🛑      |
 | Streaming response (SSE)                 | ✅   | ✅   | 🛑      |
 | Standard Schema                          | ✅   | ✅   | 🛑      |
-| Plugins-able (CORS, ...)                 | ✅   | 🛑   | 🛑      |
-| Dedicated Zod Schemas                    | ✅   | 🛑   | 🛑      |
-| Use Native Modules on each runtime       | ✅   | 🟡   | 🟡      |
+| Plugins-able (CORS, ...)                 | ✅   | ✅   | 🛑      |
+| Dedicated Zod Schemas                    | ✅   | N/A   | 🛑      |
+| Use Native Modules on each runtime       | ✅   | ✅   | 🟡      |
 | Batch Request                            | 🛑   | ✅   | 🛑      |
 | WebSockets                               | 🛑   | ✅   | 🛑      |
 | Nest.js integration                      | 🛑   | 🟡   | ✅      |
