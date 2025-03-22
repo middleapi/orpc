@@ -31,7 +31,7 @@ This comparison table helps you understand how oRPC differs from other popular T
 | Streaming response (SSE)                 | ✅   | ✅   | 🛑      |
 | Standard Schema                          | ✅   | ✅   | 🛑      |
 | Plugins-able (CORS, ...)                 | ✅   | ✅   | 🛑      |
-| Dedicated Zod Schemas                    | ✅   | N/A   | 🛑      |
+| Dedicated Zod Schemas                    | ✅   | N/A  | 🛑      |
 | Use Native Modules on each runtime       | ✅   | ✅   | 🟡      |
 | Batch Request                            | 🛑   | ✅   | 🛑      |
 | WebSockets                               | 🛑   | ✅   | 🛑      |
