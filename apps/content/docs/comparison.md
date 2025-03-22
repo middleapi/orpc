@@ -14,8 +14,8 @@ This comparison table helps you understand how oRPC differs from other popular T
 | Feature                                  | oRPC | tRPC | ts-rest |
 | ---------------------------------------- | ---- | ---- | ------- |
 | End-to-end Input/Output Typesafe         | ✅   | ✅   | ✅      |
-| End-to-end Errors Typesafe               | ✅   | ✅   | ✅      |
-| End-to-end File/Blob Typesafe            | ✅   | ✅   | 🛑      |
+| End-to-end Errors Typesafe               | ✅   | 🟡   | ✅      |
+| End-to-end File/Blob Typesafe            | ✅   | 🟡   | 🛑      |
 | End-to-end Streaming Typesafe            | ✅   | ✅   | 🛑      |
 | Tanstack Query Integration (React)       | ✅   | ✅   | 🟡      |
 | Tanstack Query Integration (Vue)         | ✅   | 🛑   | 🟡      |
