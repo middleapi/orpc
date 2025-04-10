@@ -120,8 +120,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/zod
       '@pinia/colada':
-        specifier: ^0.13.6
-        version: 0.13.6(pinia@2.3.1(typescript@5.7.3)(vue@3.5.13(typescript@5.7.3)))
+        specifier: ^0.14.0
+        version: 0.14.2(pinia@2.3.1(typescript@5.7.3)(vue@3.5.13(typescript@5.7.3)))
       '@shikijs/vitepress-twoslash':
         specifier: ^2.5.0
         version: 2.5.0(@nuxt/kit@3.15.4(magicast@0.3.5))(typescript@5.7.3)
@@ -2424,6 +2424,11 @@ packages:
 
   '@pinia/colada@0.13.6':
     resolution: {integrity: sha512-Mzv3YefLmH7my1yuuhjvG202xxLwn5sAMml8k8NWilFFZMLe5fxtM7onbcUM8Ubhkjrm+s4TKO1Hxo78H6aDNw==}
+    peerDependencies:
+      pinia: ^2.2.6 || ^3.0.0
+
+  '@pinia/colada@0.14.2':
+    resolution: {integrity: sha512-nixr1cqkk5RHrafXfJPk7J/F1srCFZTvhrdNfUEx3/N2lRamcYlayniYDwqlRPOw8PHmsRKyRAGgwDiV76sGJA==}
     peerDependencies:
       pinia: ^2.2.6 || ^3.0.0
 
@@ -9354,6 +9359,11 @@ snapshots:
       '@parcel/watcher-win32-x64': 2.5.1
 
   '@pinia/colada@0.13.6(pinia@2.3.1(typescript@5.7.3)(vue@3.5.13(typescript@5.7.3)))':
+    dependencies:
+      '@vue/devtools-api': 7.7.2
+      pinia: 2.3.1(typescript@5.7.3)(vue@3.5.13(typescript@5.7.3))
+
+  '@pinia/colada@0.14.2(pinia@2.3.1(typescript@5.7.3)(vue@3.5.13(typescript@5.7.3)))':
     dependencies:
       '@vue/devtools-api': 7.7.2
       pinia: 2.3.1(typescript@5.7.3)(vue@3.5.13(typescript@5.7.3))
