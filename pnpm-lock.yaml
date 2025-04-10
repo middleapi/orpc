@@ -216,8 +216,8 @@ importers:
         specifier: 2.0.0-rc.26
         version: 2.0.0-rc.26
       valibot:
-        specifier: 1.0.0-beta.9
-        version: 1.0.0-beta.9(typescript@5.7.3)
+        specifier: 1.0.0
+        version: 1.0.0(typescript@5.7.3)
       zod:
         specifier: ^3.24.2
         version: 3.24.2
@@ -7240,14 +7240,6 @@ packages:
 
   valibot@1.0.0:
     resolution: {integrity: sha512-1Hc0ihzWxBar6NGeZv7fPLY0QuxFMyxwYR2sF1Blu7Wq7EnremwY2W02tit2ij2VJT8HcSkHAQqmFfl77f73Yw==}
-    peerDependencies:
-      typescript: '>=5'
-    peerDependenciesMeta:
-      typescript:
-        optional: true
-
-  valibot@1.0.0-beta.9:
-    resolution: {integrity: sha512-yEX8gMAZ2R1yI2uwOO4NCtVnJQx36zn3vD0omzzj9FhcoblvPukENIiRZXKZwCnqSeV80bMm8wNiGhQ0S8fiww==}
     peerDependencies:
       typescript: '>=5'
     peerDependenciesMeta:
@@ -15237,10 +15229,6 @@ snapshots:
   util-deprecate@1.0.2: {}
 
   valibot@1.0.0(typescript@5.7.3):
-    optionalDependencies:
-      typescript: 5.7.3
-
-  valibot@1.0.0-beta.9(typescript@5.7.3):
     optionalDependencies:
       typescript: 5.7.3
 
