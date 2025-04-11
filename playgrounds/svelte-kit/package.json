@@ -17,7 +17,7 @@
     "@orpc/server": "next",
     "@orpc/svelte-query": "next",
     "@orpc/zod": "next",
-    "@sveltejs/adapter-auto": "^4.0.0",
+    "@sveltejs/adapter-auto": "^6.0.0",
     "@sveltejs/kit": "^2.16.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
     "@tanstack/svelte-query": "^5.66.4",
