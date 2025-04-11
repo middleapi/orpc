@@ -11,7 +11,7 @@ description: Integrate oRPC with Hono
 
 ```ts
 import { Hono } from 'hono'
-import { createMiddleware, RPCHandler } from '@orpc/server/fetch'
+import { RPCHandler } from '@orpc/server/fetch'
 
 const app = new Hono()
 
