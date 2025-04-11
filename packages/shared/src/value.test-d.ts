@@ -1,4 +1,5 @@
-import { value, type Value } from './value'
+import type { Value } from './value'
+import { value } from './value'
 
 describe('value', () => {
   it('types', () => {

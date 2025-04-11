@@ -1,6 +1,7 @@
 import type { Context } from '../../context'
+import type { StandardHandlerPlugin } from '../standard'
 import type { FetchHandlerOptions } from './handler'
-import { CompositeStandardHandlerPlugin, type StandardHandlerPlugin } from '../standard'
+import { CompositeStandardHandlerPlugin } from '../standard'
 
 export interface FetchHandlerPlugin<T extends Context> extends StandardHandlerPlugin<T> {
   initRuntimeAdapter?(options: FetchHandlerOptions<T>): void

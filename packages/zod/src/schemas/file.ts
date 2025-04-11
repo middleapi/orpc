@@ -1,6 +1,8 @@
+import type { ZodEffects, ZodType, ZodTypeDef } from 'zod'
+import type { CustomParams } from './base'
 import wcmatch from 'wildcard-match'
-import { custom, type ZodEffects, type ZodType, type ZodTypeDef } from 'zod'
-import { composeParams, type CustomParams, setCustomZodDef } from './base'
+import { custom } from 'zod'
+import { composeParams, setCustomZodDef } from './base'
 
 export function file(
   params?: string | CustomParams | ((input: unknown) => CustomParams),

@@ -1,9 +1,10 @@
 import type { Interceptor, ThrowableError } from '@orpc/shared'
 import type { StandardLazyResponse, StandardRequest } from '@orpc/standard-server'
 import type { ClientContext, ClientLink, ClientOptions } from '../../types'
+import type { StandardLinkPlugin } from './plugin'
 import type { StandardLinkClient, StandardLinkCodec } from './types'
 import { intercept, toArray } from '@orpc/shared'
-import { CompositeStandardLinkPlugin, type StandardLinkPlugin } from './plugin'
+import { CompositeStandardLinkPlugin } from './plugin'
 
 export interface StandardLinkInterceptorOptions<T extends ClientContext> extends ClientOptions<T> {
   path: readonly string[]

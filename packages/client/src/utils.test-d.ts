@@ -62,6 +62,6 @@ describe('safe', async () => {
     const { error, data } = await safe({} as Promise<number>)
 
     expectTypeOf(error).toEqualTypeOf<Error | null>()
-    expectTypeOf(data).toEqualTypeOf<number | undefined >()
+    expectTypeOf(data).toEqualTypeOf<number | undefined>()
   })
 })

@@ -1,6 +1,7 @@
 import type { AnySchema } from '@orpc/contract'
 import type { ConditionalSchemaConverter, JSONSchema, SchemaConvertOptions } from '@orpc/openapi'
-import { type ConversionConfig, toJsonSchema } from '@valibot/to-json-schema'
+import type { ConversionConfig } from '@valibot/to-json-schema'
+import { toJsonSchema } from '@valibot/to-json-schema'
 
 export interface experimental_ValibotToJsonSchemaConverterOptions extends Pick<ConversionConfig, 'errorMode'> {
 

@@ -1,5 +1,7 @@
 import type { AnySchema, ContractProcedure, ErrorMap, MergedErrorMap, Schema } from '@orpc/contract'
 import type { OmitChainMethodDeep } from '@orpc/shared'
+import type { baseErrorMap, BaseMeta, inputSchema, outputSchema } from '../../contract/tests/shared'
+import type { CurrentContext, InitialContext } from '../tests/shared'
 import type { Builder } from './builder'
 import type { BuilderWithMiddlewares, ProcedureBuilder, ProcedureBuilderWithInput, ProcedureBuilderWithInputOutput, ProcedureBuilderWithOutput, RouterBuilder } from './builder-variants'
 import type { Context } from './context'
@@ -9,8 +11,8 @@ import type { Middleware, MiddlewareOutputFn } from './middleware'
 import type { Procedure } from './procedure'
 import type { DecoratedProcedure } from './procedure-decorated'
 import type { EnhancedRouter } from './router-utils'
-import { type baseErrorMap, type BaseMeta, generalSchema, type inputSchema, type outputSchema } from '../../contract/tests/shared'
-import { type CurrentContext, type InitialContext, router } from '../tests/shared'
+import { generalSchema } from '../../contract/tests/shared'
+import { router } from '../tests/shared'
 
 const generalBuilder = {} as Builder<
   InitialContext,

@@ -14,7 +14,7 @@ describe('eventIterator', async () => {
   it('can validate yields', async () => {
     const schema = eventIterator(z.object({ order: z.number() }))
 
-    const result = await schema['~standard'].validate((async function*() {
+    const result = await schema['~standard'].validate((async function* () {
       yield { order: 1 }
       yield withEventMeta({ order: 2 }, { id: 'id-2' })
       yield { order: '3' }
@@ -53,7 +53,7 @@ describe('eventIterator', async () => {
   it('can validate returns', async () => {
     const schema = eventIterator(z.object({ order: z.number() }), z.object({ order: z.number() }))
 
-    const result = await schema['~standard'].validate((async function*() {
+    const result = await schema['~standard'].validate((async function* () {
       return { order: 1 }
     })())
 
@@ -73,7 +73,7 @@ describe('eventIterator', async () => {
   it('not required returns schema', async () => {
     const schema = eventIterator(z.object({ order: z.number() }))
 
-    const result = await schema['~standard'].validate((async function*() {
+    const result = await schema['~standard'].validate((async function* () {
       return 'anything'
     })())
 

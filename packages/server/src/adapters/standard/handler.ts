@@ -5,11 +5,12 @@ import type { StandardLazyRequest, StandardResponse } from '@orpc/standard-serve
 import type { Context } from '../../context'
 import type { ProcedureClientInterceptorOptions } from '../../procedure-client'
 import type { Router } from '../../router'
+import type { StandardHandlerPlugin } from './plugin'
 import type { StandardCodec, StandardMatcher } from './types'
 import { ORPCError, toORPCError } from '@orpc/client'
 import { intercept, toArray } from '@orpc/shared'
 import { createProcedureClient } from '../../procedure-client'
-import { CompositeStandardHandlerPlugin, type StandardHandlerPlugin } from './plugin'
+import { CompositeStandardHandlerPlugin } from './plugin'
 
 export interface StandardHandleOptions<T extends Context> {
   prefix?: HTTPPath

@@ -16,7 +16,8 @@ import { RPCHandler } from '@orpc/server/fetch'
 import { router } from './shared/planet'
 // ---cut---
 import { onError, ORPCError, ValidationError } from '@orpc/server'
-import { ZodError, type ZodIssue } from 'zod'
+import { ZodError } from 'zod'
+import type { ZodIssue } from 'zod'
 
 const handler = new RPCHandler(router, {
   clientInterceptors: [
@@ -53,7 +54,8 @@ const handler = new RPCHandler(router, {
 ## Customizing with Middleware
 
 ```ts twoslash
-import { z, ZodError, type ZodIssue } from 'zod'
+import { z, ZodError } from 'zod'
+import type { ZodIssue } from 'zod'
 import { onError, ORPCError, os, ValidationError } from '@orpc/server'
 
 const base = os.use(onError((error) => {
@@ -105,7 +107,8 @@ As explained in the [error handling guide](/docs/error-handling#combining-both-a
 import { RPCHandler } from '@orpc/server/fetch'
 // ---cut---
 import { onError, ORPCError, os, ValidationError } from '@orpc/server'
-import { z, ZodError, type ZodIssue } from 'zod'
+import { z, ZodError } from 'zod'
+import type { ZodIssue } from 'zod'
 
 const base = os.errors({
   INPUT_VALIDATION_FAILED: {

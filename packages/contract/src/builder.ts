@@ -1,13 +1,17 @@
 import type { HTTPPath } from '@orpc/client'
 import type { ContractProcedureBuilder, ContractProcedureBuilderWithInput, ContractProcedureBuilderWithOutput, ContractRouterBuilder } from './builder-variants'
+import type { ErrorMap, MergedErrorMap } from './error'
+import type { Meta } from './meta'
 import type { ContractProcedureDef } from './procedure'
+import type { Route } from './route'
 import type { ContractRouter } from './router'
+import type { EnhanceContractRouterOptions, EnhancedContractRouter } from './router-utils'
 import type { AnySchema, Schema } from './schema'
-import { type ErrorMap, type MergedErrorMap, mergeErrorMap } from './error'
-import { mergeMeta, type Meta } from './meta'
+import { mergeErrorMap } from './error'
+import { mergeMeta } from './meta'
 import { ContractProcedure } from './procedure'
-import { mergePrefix, mergeRoute, mergeTags, type Route } from './route'
-import { enhanceContractRouter, type EnhanceContractRouterOptions, type EnhancedContractRouter } from './router-utils'
+import { mergePrefix, mergeRoute, mergeTags } from './route'
+import { enhanceContractRouter } from './router-utils'
 
 export interface ContractBuilderDef<
   TInputSchema extends AnySchema,

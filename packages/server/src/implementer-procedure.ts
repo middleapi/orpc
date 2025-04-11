@@ -71,7 +71,7 @@ export interface ImplementedProcedure<
       >
     >
   ): ImplementedProcedure<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta>
-    & ProcedureClient<TClientContext, TInputSchema, TOutputSchema, TErrorMap >
+    & ProcedureClient<TClientContext, TInputSchema, TOutputSchema, TErrorMap>
 
   /**
    * Make this procedure compatible with server action.

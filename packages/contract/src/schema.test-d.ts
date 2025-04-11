@@ -1,7 +1,8 @@
+import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './schema'
 import { type as arktypeType } from 'arktype'
 import * as v from 'valibot'
 import { z } from 'zod'
-import { type AnySchema, type InferSchemaInput, type InferSchemaOutput, type } from './schema'
+import { type } from './schema'
 
 const zod = z.object({
   value: z.string().transform(() => 123),

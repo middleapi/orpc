@@ -3,6 +3,7 @@ import type { StandardOpenAPIJsonSerializerOptions } from '@orpc/openapi-client/
 import type { AnyRouter } from '@orpc/server'
 import type { OpenAPI } from './openapi'
 import type { JSONSchema } from './schema'
+import type { ConditionalSchemaConverter, SchemaConverter } from './schema-converter'
 import { fallbackORPCErrorMessage, fallbackORPCErrorStatus } from '@orpc/client'
 import { toHttpPath } from '@orpc/client/standard'
 import { fallbackContractConfig, getEventIteratorSchemaDetails } from '@orpc/contract'
@@ -11,7 +12,7 @@ import { resolveContractProcedures } from '@orpc/server'
 import { clone, toArray } from '@orpc/shared'
 import { applyCustomOpenAPIOperation } from './openapi-custom'
 import { checkParamsSchema, toOpenAPIContent, toOpenAPIEventIteratorContent, toOpenAPIMethod, toOpenAPIParameters, toOpenAPIPath, toOpenAPISchema } from './openapi-utils'
-import { CompositeSchemaConverter, type ConditionalSchemaConverter, type SchemaConverter } from './schema-converter'
+import { CompositeSchemaConverter } from './schema-converter'
 import { applySchemaOptionality, isAnySchema, isObjectSchema, separateObjectSchema } from './schema-utils'
 
 class OpenAPIGeneratorError extends Error {}

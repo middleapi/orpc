@@ -1,6 +1,7 @@
 import type { ZodType, ZodTypeDef } from 'zod'
+import type { CustomParams } from './base'
 import { custom } from 'zod'
-import { composeParams, type CustomParams, setCustomZodDef } from './base'
+import { composeParams, setCustomZodDef } from './base'
 
 export function url(
   params?: string | CustomParams | ((input: unknown) => CustomParams),

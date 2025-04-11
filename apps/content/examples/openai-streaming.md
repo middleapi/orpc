@@ -28,7 +28,7 @@ const complete = os
       stream: true,
     })
 
-    yield * stream
+    yield* stream
   })
 
 const router = { complete }

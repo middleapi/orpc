@@ -116,7 +116,7 @@ describe('ProcedureUtils', () => {
       expectTypeOf(queries.value[1].data).toEqualTypeOf<UtilsOutput | undefined>()
 
       expectTypeOf(queries.value[0].error).toEqualTypeOf<null | ErrorFromErrorMap<typeof baseErrorMap>>()
-      expectTypeOf(queries.value[0].error).toEqualTypeOf<null | ErrorFromErrorMap < typeof baseErrorMap>>()
+      expectTypeOf(queries.value[0].error).toEqualTypeOf<null | ErrorFromErrorMap <typeof baseErrorMap>>()
     })
 
     it('works with fetchQuery', () => {

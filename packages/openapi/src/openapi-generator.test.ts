@@ -1,6 +1,7 @@
+import type { AnyContractProcedure } from '@orpc/contract'
 import type { PartialDeep } from '@orpc/shared'
 import type { OpenAPI } from './openapi'
-import { type AnyContractProcedure, eventIterator, oc } from '@orpc/contract'
+import { eventIterator, oc } from '@orpc/contract'
 import { z } from 'zod'
 import { oz, ZodToJsonSchemaConverter } from '../../zod/src'
 import { customOpenAPIOperation } from './openapi-custom'

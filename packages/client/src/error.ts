@@ -1,4 +1,5 @@
-import { isObject, type MaybeOptionalOptions } from '@orpc/shared'
+import type { MaybeOptionalOptions } from '@orpc/shared'
+import { isObject } from '@orpc/shared'
 
 export const COMMON_ORPC_ERROR_DEFS = {
   BAD_REQUEST: {
@@ -172,7 +173,7 @@ export function isORPCErrorJson(json: unknown): json is ORPCErrorJSON<ORPCErrorC
 export function createORPCErrorFromJson<TCode extends ORPCErrorCode, TData>(
   json: ORPCErrorJSON<TCode, TData>,
   options: ErrorOptions = {},
-): ORPCError < TCode, TData > {
+): ORPCError <TCode, TData> {
   return new ORPCError(json.code, {
     ...options,
     ...json,

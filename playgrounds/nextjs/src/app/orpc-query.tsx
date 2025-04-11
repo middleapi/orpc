@@ -40,7 +40,6 @@ export function ListPlanetsQuery() {
         <tbody>
           {data.pages.flatMap((page, i) =>
             page.map(planet => (
-            // eslint-disable-next-line react/no-array-index-key
               <tr key={`${planet.id}-${i}`}>
                 <td>{planet.id}</td>
                 <td>{planet.name}</td>

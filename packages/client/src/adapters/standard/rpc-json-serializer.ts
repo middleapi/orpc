@@ -1,4 +1,5 @@
-import { isObject, type Segment } from '@orpc/shared'
+import type { Segment } from '@orpc/shared'
+import { isObject } from '@orpc/shared'
 
 export const STANDARD_RPC_JSON_SERIALIZER_BUILT_IN_TYPES = {
   BIGINT: 0,

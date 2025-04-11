@@ -74,7 +74,7 @@ Integrate oRPC React Query utils into your React app with Context:
    ```ts twoslash
    import { router } from './shared/planet'
    // ---cut---
-   import { createContext, useContext } from 'react'
+   import { createContext, use } from 'react'
    import { RouterUtils } from '@orpc/react-query'
    import { RouterClient } from '@orpc/server'
 
@@ -83,7 +83,7 @@ Integrate oRPC React Query utils into your React app with Context:
    export const ORPCContext = createContext<ORPCReactUtils | undefined>(undefined)
 
    export function useORPC(): ORPCReactUtils {
-     const orpc = useContext(ORPCContext)
+     const orpc = use(ORPCContext)
      if (!orpc) {
        throw new Error('ORPCContext is not set up properly')
      }

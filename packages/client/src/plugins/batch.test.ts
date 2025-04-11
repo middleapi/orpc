@@ -135,7 +135,7 @@ describe('batchLinkPlugin', () => {
     )
   })
 
-  it.each([new FormData(), (async function*() {})()])('not batch on un-supported body', async (body) => {
+  it.each([new FormData(), (async function* () {})()])('not batch on un-supported body', async (body) => {
     encode.mockResolvedValueOnce({
       body,
       headers: {

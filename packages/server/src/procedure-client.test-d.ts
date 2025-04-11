@@ -4,9 +4,10 @@ import type { baseErrorMap, BaseMeta, inputSchema, outputSchema } from '../../co
 import type { Context } from './context'
 import type { ORPCErrorConstructorMap } from './error'
 import type { Procedure } from './procedure'
+import type { ProcedureClient } from './procedure-client'
 import { safe } from '@orpc/client'
 import { ping, pong } from '../tests/shared'
-import { createProcedureClient, type ProcedureClient } from './procedure-client'
+import { createProcedureClient } from './procedure-client'
 
 describe('ProcedureClient', () => {
   const client = {} as ProcedureClient<

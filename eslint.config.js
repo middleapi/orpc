@@ -2,15 +2,11 @@ import antfu from '@antfu/eslint-config'
 import pluginBan from 'eslint-plugin-ban'
 
 export default antfu({
-  react: true,
   formatters: true,
 }, {
   plugins: { ban: pluginBan },
   rules: {
     'ts/consistent-type-definitions': 'off',
-    'react-refresh/only-export-components': 'off',
-    'react/prefer-destructuring-assignment': 'off',
-    'react/no-context-provider': 'off',
     'ts/method-signature-style': ['off'],
     'ban/ban': [
       'error',
@@ -38,7 +34,6 @@ export default antfu({
   rules: {
     'unused-imports/no-unused-vars': 'off',
     'antfu/no-top-level-await': 'off',
-    'react-hooks/rules-of-hooks': 'off',
     'no-alert': 'off',
     'ban/ban': 'off',
   },
@@ -48,7 +43,6 @@ export default antfu({
     'no-console': 'off',
     'perfectionist/sort-imports': 'off',
     'import/first': 'off',
-    'react-hooks/rules-of-hooks': 'off',
     'ban/ban': 'off',
   },
 }, {

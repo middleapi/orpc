@@ -1,20 +1,23 @@
 import type { AnyContractRouter, ContractProcedure, InferContractRouterErrorMap, InferContractRouterMeta } from '@orpc/contract'
 import type { AnyFunction, IntersectPick } from '@orpc/shared'
+import type { BuilderConfig } from './builder'
 import type { Context, MergedCurrentContext, MergedInitialContext } from './context'
 import type { ORPCErrorConstructorMap } from './error'
 import type { ProcedureImplementer } from './implementer-procedure'
 import type { ImplementerInternalWithMiddlewares } from './implementer-variants'
 import type { Lazy } from './lazy'
 import type { AnyMiddleware, Middleware } from './middleware'
+import type { DecoratedMiddleware } from './middleware-decorated'
 import type { AnyRouter, Router } from './router'
+import type { EnhancedRouter } from './router-utils'
 import { getContractRouter, isContractProcedure } from '@orpc/contract'
-import { Builder, type BuilderConfig } from './builder'
+import { Builder } from './builder'
 import { fallbackConfig } from './config'
 import { lazy } from './lazy'
-import { type DecoratedMiddleware, decorateMiddleware } from './middleware-decorated'
+import { decorateMiddleware } from './middleware-decorated'
 import { addMiddleware } from './middleware-utils'
 import { setHiddenRouterContract } from './router-hidden'
-import { type EnhancedRouter, enhanceRouter } from './router-utils'
+import { enhanceRouter } from './router-utils'
 
 export interface RouterImplementer<
   T extends AnyContractRouter,
@@ -165,7 +168,7 @@ export function implementerInternal<
 export type Implementer<
   TContract extends AnyContractRouter,
   TInitialContext extends Context,
-  TCurrentContext extends Context ,
+  TCurrentContext extends Context,
 > =
   & {
     $context<U extends Context>(): Implementer<TContract, U & Record<never, never>, U> // We need `& Record<never, never>` to deal with `has no properties in common with type` error

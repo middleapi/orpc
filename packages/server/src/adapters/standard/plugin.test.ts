@@ -1,4 +1,5 @@
-import { CompositeStandardHandlerPlugin, type StandardHandlerPlugin } from './plugin'
+import type { StandardHandlerPlugin } from './plugin'
+import { CompositeStandardHandlerPlugin } from './plugin'
 
 describe('compositeStandardHandlerPlugin', () => {
   it('forward init and sort plugins', () => {

@@ -1,7 +1,8 @@
+import type { Value } from '@orpc/shared'
 import type { StandardHeaders } from '@orpc/standard-server'
 import type { StandardHandlerInterceptorOptions, StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard'
 import type { Context } from '../context'
-import { value, type Value } from '@orpc/shared'
+import { value } from '@orpc/shared'
 
 export interface CORSOptions<T extends Context> {
   origin?: Value<string | readonly string[] | null | undefined, [origin: string, options: StandardHandlerInterceptorOptions<T>]>

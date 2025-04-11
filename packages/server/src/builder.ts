@@ -127,7 +127,7 @@ export class Builder<
 
   errors<U extends ErrorMap>(
     errors: U,
-  ): Builder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, U>, TMeta > {
+  ): Builder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, U>, TMeta> {
     return new Builder({
       ...this['~orpc'],
       errorMap: mergeErrorMap(this['~orpc'].errorMap, errors),

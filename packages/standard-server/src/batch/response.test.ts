@@ -44,7 +44,7 @@ describe('parseBatchResponse', () => {
     const parsed = parseBatchResponse(toBatchResponse({
       status: 207,
       headers: { 'x-custom': 'value' },
-      body: (async function*() {
+      body: (async function* () {
         yield { headers: {} } as any
       })(),
     }))

@@ -1,7 +1,8 @@
 import type { Context } from '../../context'
 import type { Router } from '../../router'
+import type { StandardRPCHandlerOptions } from '../standard'
 import type { FetchHandlerOptions } from './handler'
-import { StandardRPCHandler, type StandardRPCHandlerOptions } from '../standard'
+import { StandardRPCHandler } from '../standard'
 import { FetchHandler } from './handler'
 
 export class RPCHandler<T extends Context> extends FetchHandler<T> {

@@ -1,9 +1,10 @@
 import type { Meta } from '@orpc/contract'
+import type { Value } from '@orpc/shared'
 import type { StandardHandlerInterceptorOptions, StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard'
 import type { Context } from '../context'
 import type { ProcedureClientInterceptorOptions } from '../procedure-client'
 import { ORPCError } from '@orpc/client'
-import { value, type Value } from '@orpc/shared'
+import { value } from '@orpc/shared'
 
 export interface SimpleCsrfProtectionHandlerPluginOptions<T extends Context> {
   /**

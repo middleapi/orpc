@@ -1,9 +1,12 @@
 import type { ClientContext } from '@orpc/client'
+import type { StandardLinkClient, StandardLinkOptions } from '@orpc/client/standard'
 import type { AnyContractRouter } from '@orpc/contract'
-import { StandardLink, type StandardLinkClient, type StandardLinkOptions } from '@orpc/client/standard'
+import type { StandardOpenAPIJsonSerializerOptions } from './openapi-json-serializer'
+import type { StandardOpenapiLinkCodecOptions } from './openapi-link-codec'
+import { StandardLink } from '@orpc/client/standard'
 import { StandardBracketNotationSerializer } from './bracket-notation'
-import { StandardOpenAPIJsonSerializer, type StandardOpenAPIJsonSerializerOptions } from './openapi-json-serializer'
-import { StandardOpenapiLinkCodec, type StandardOpenapiLinkCodecOptions } from './openapi-link-codec'
+import { StandardOpenAPIJsonSerializer } from './openapi-json-serializer'
+import { StandardOpenapiLinkCodec } from './openapi-link-codec'
 import { StandardOpenAPISerializer } from './openapi-serializer'
 
 export interface StandardOpenAPILinkOptions<T extends ClientContext>

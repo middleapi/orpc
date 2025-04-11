@@ -1,11 +1,13 @@
 import type { AnyContractProcedure, AnyContractRouter, EnhanceRouteOptions, ErrorMap, MergedErrorMap } from '@orpc/contract'
 import type { Context, MergedInitialContext } from './context'
+import type { Lazy, Lazyable } from './lazy'
 import type { AnyMiddleware } from './middleware'
+import type { AnyProcedure } from './procedure'
 import type { AnyRouter } from './router'
 import { enhanceRoute, isContractProcedure, mergeErrorMap, mergePrefix } from '@orpc/contract'
-import { getLazyMeta, isLazy, lazy, type Lazy, type Lazyable, unlazy } from './lazy'
+import { getLazyMeta, isLazy, lazy, unlazy } from './lazy'
 import { mergeMiddlewares } from './middleware-utils'
-import { type AnyProcedure, isProcedure, Procedure } from './procedure'
+import { isProcedure, Procedure } from './procedure'
 import { getHiddenRouterContract } from './router-hidden'
 
 export function getRouter<T extends Lazyable<AnyRouter | undefined>>(

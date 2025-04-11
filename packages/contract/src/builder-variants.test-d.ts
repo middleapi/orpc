@@ -1,11 +1,12 @@
 import type { OmitChainMethodDeep } from '@orpc/shared'
+import type { baseErrorMap, BaseMeta, inputSchema, outputSchema } from '../tests/shared'
 import type { ContractBuilder } from './builder'
 import type { ContractProcedureBuilder, ContractProcedureBuilderWithInput, ContractProcedureBuilderWithInputOutput, ContractProcedureBuilderWithOutput, ContractRouterBuilder } from './builder-variants'
 import type { MergedErrorMap } from './error'
 import type { ContractProcedure } from './procedure'
 import type { EnhancedContractRouter } from './router-utils'
 import type { Schema } from './schema'
-import { type baseErrorMap, type BaseMeta, generalSchema, type inputSchema, type outputSchema, ping, pong } from '../tests/shared'
+import { generalSchema, ping, pong } from '../tests/shared'
 
 const generalBuilder = {} as ContractBuilder<typeof inputSchema, typeof outputSchema, typeof baseErrorMap, BaseMeta>
 

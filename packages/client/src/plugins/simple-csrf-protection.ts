@@ -1,6 +1,7 @@
+import type { Value } from '@orpc/shared'
 import type { StandardLinkClientInterceptorOptions, StandardLinkOptions, StandardLinkPlugin } from '../adapters/standard'
 import type { ClientContext } from '../types'
-import { value, type Value } from '@orpc/shared'
+import { value } from '@orpc/shared'
 
 export interface SimpleCsrfProtectionLinkPluginOptions<T extends ClientContext> {
   /**

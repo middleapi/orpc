@@ -1,8 +1,10 @@
+import type { StandardRPCJsonSerializerOptions } from '@orpc/client/standard'
 import type { Context } from '../../context'
 import type { Router } from '../../router'
-import { StandardRPCJsonSerializer, type StandardRPCJsonSerializerOptions, StandardRPCSerializer } from '@orpc/client/standard'
+import type { StandardHandlerOptions } from './handler'
+import { StandardRPCJsonSerializer, StandardRPCSerializer } from '@orpc/client/standard'
 import { StrictGetMethodPlugin } from '../../plugins'
-import { StandardHandler, type StandardHandlerOptions } from './handler'
+import { StandardHandler } from './handler'
 import { StandardRPCCodec } from './rpc-codec'
 import { StandardRPCMatcher } from './rpc-matcher'
 

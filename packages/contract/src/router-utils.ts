@@ -1,7 +1,9 @@
+import type { ErrorMap, MergedErrorMap } from './error'
+import type { EnhanceRouteOptions } from './route'
 import type { AnyContractRouter } from './router'
-import { type ErrorMap, type MergedErrorMap, mergeErrorMap } from './error'
+import { mergeErrorMap } from './error'
 import { ContractProcedure, isContractProcedure } from './procedure'
-import { enhanceRoute, type EnhanceRouteOptions } from './route'
+import { enhanceRoute } from './route'
 
 export function getContractRouter(router: AnyContractRouter, path: readonly string[]): AnyContractRouter | undefined {
   let current: AnyContractRouter | undefined = router

@@ -1,5 +1,6 @@
+import type { AnyFunction } from '@orpc/shared'
 import type { Ref } from 'vue'
-import { type AnyFunction, isObject } from '@orpc/shared'
+import { isObject } from '@orpc/shared'
 import { isRef } from 'vue'
 
 export type UnrefDeep<T> = T extends Ref<infer U>

@@ -1,7 +1,9 @@
 import type { ClientContext } from '@orpc/client'
+import type { LinkFetchClientOptions } from '@orpc/client/fetch'
 import type { AnyContractRouter } from '@orpc/contract'
-import { LinkFetchClient, type LinkFetchClientOptions } from '@orpc/client/fetch'
-import { StandardOpenAPILink, type StandardOpenAPILinkOptions } from '../standard'
+import type { StandardOpenAPILinkOptions } from '../standard'
+import { LinkFetchClient } from '@orpc/client/fetch'
+import { StandardOpenAPILink } from '../standard'
 
 export interface OpenAPILinkOptions<T extends ClientContext>
   extends StandardOpenAPILinkOptions<T>, LinkFetchClientOptions<T> { }

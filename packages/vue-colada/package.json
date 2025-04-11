@@ -46,6 +46,6 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "pinia": "^2.3.0"
+    "pinia": "^3.0.0"
   }
 }
