@@ -15,7 +15,7 @@ oRPC also supports [Server Action](/docs/server-action) out-of-the-box.
 
 ::: code-group
 
-```ts [app/rpc/[[...rest]].ts]
+```ts [app/rpc/[[...rest]]/route.ts]
 import { RPCHandler } from '@orpc/server/fetch'
 
 const handler = new RPCHandler(router)
