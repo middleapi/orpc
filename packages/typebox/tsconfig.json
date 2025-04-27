@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.lib.json",
+  "compilerOptions": {
+    "rootDir": "src"
+  },
+  "references": [
+    { "path": "../openapi" },
+    { "path": "../contract" },
+    { "path": "../server" },
+    { "path": "../shared" }
+  ],
+  "include": ["src"],
+  "exclude": [
+    "**/*.test.*",
+    "**/*.test-d.ts",
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/__snapshots__/**"
+  ]
+}

@@ -1,10 +1,11 @@
 import type { IsEqual, Promisable } from '@orpc/shared'
+import type { TSchema } from '@sinclair/typebox'
 // eslint-disable-next-line no-restricted-imports
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 
 export type Schema<TInput, TOutput> = StandardSchemaV1<TInput, TOutput>
 
-export type AnySchema = Schema<any, any>
+export type AnySchema = Schema<any, any> | TSchema
 
 export type SchemaIssue = StandardSchemaV1.Issue
 

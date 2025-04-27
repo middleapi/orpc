@@ -1,17 +1,19 @@
 {
-  "name": "@orpc/contract",
+  "name": "@orpc/typebox",
   "type": "module",
   "version": "1.1.1",
+  "description": "oRPC adapter for TypeBox",
   "license": "MIT",
   "homepage": "https://orpc.unnoq.com",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/unnoq/orpc.git",
-    "directory": "packages/contract"
+    "directory": "packages/typebox"
   },
   "keywords": [
     "unnoq",
-    "orpc"
+    "orpc",
+    "typebox"
   ],
   "publishConfig": {
     "exports": {
@@ -33,15 +35,12 @@
     "build:watch": "pnpm run build --watch",
     "type:check": "tsc -b"
   },
-  "dependencies": {
-    "@orpc/client": "workspace:*",
-    "@orpc/shared": "workspace:*",
-    "@standard-schema/spec": "^1.0.0"
+  "peerDependencies": {
+    "@orpc/contract": "workspace:*",
+    "@orpc/server": "workspace:*",
+    "@sinclair/typebox": "^0.30.0"
   },
-  "devDependencies": {
-    "@sinclair/typebox": "^0.30.0",
-    "arktype": "2.1.20",
-    "valibot": "1.0.0",
-    "zod": "^3.24.2"
+  "dependencies": {
+    "@orpc/openapi": "workspace:*"
   }
 }
