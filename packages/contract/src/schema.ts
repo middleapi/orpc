@@ -1,5 +1,5 @@
 import type { IsEqual, Promisable } from '@orpc/shared'
-import type { TSchema } from '@sinclair/typebox'
+import type { Static, TSchema } from '@sinclair/typebox'
 // eslint-disable-next-line no-restricted-imports
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 
@@ -9,9 +9,9 @@ export type AnySchema = Schema<any, any> | TSchema
 
 export type SchemaIssue = StandardSchemaV1.Issue
 
-export type InferSchemaInput<T extends AnySchema> = T extends StandardSchemaV1<infer UInput, any> ? UInput : never
+export type InferSchemaInput<T extends AnySchema> = T extends StandardSchemaV1<infer UInput, any> ? UInput : T extends TSchema ? Static<T> : never
 
-export type InferSchemaOutput<T extends AnySchema> = T extends StandardSchemaV1<any, infer UOutput> ? UOutput : never
+export type InferSchemaOutput<T extends AnySchema> = T extends StandardSchemaV1<any, infer UOutput> ? UOutput : T extends TSchema ? Static<T> : never
 
 export type TypeRest<TInput, TOutput> =
   | [map: (input: TInput) => Promisable<TOutput>]
