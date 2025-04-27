@@ -4,7 +4,6 @@ import { experimental_TypeBoxToJsonSchemaConverter as TypeBoxToJsonSchemaConvert
 
 it('typeBoxToJsonSchemaConverter.convert', async () => {
   const converter = new TypeBoxToJsonSchemaConverter()
-  // The 'required' flag is true based on the current converter logic.
   expect(converter.convert(Type.String(), { strategy: 'input' })).toMatchObject([
     true,
     { type: 'string' },
