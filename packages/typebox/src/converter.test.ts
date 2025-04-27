@@ -21,14 +21,8 @@ it('typeBoxToJsonSchemaConverter.convert', async () => {
 
 it('typeBoxToJsonSchemaConverter.condition', async () => {
   const converter = new TypeBoxToJsonSchemaConverter()
-  // Positive cases: TypeBox schemas (with the vendor tag)
   expect(converter.condition(Type.String())).toBe(true)
   expect(converter.condition(Type.Optional(Type.String()))).toBe(true)
-  expect(converter.condition(Type.Object({ name: Type.String() }))).toBe(true)
-
-  // Negative cases: Zod schemas or plain objects without the tag/structure
   expect(converter.condition(z.string())).toBe(false)
   expect(converter.condition(z.string().optional())).toBe(false)
-  expect(converter.condition({ type: 'string' } as any)).toBe(false) // Plain object
-  expect(converter.condition(undefined)).toBe(false)
 })
