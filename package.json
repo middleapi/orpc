@@ -3,7 +3,7 @@
   "type": "module",
   "version": "1.1.1",
   "private": true,
-  "packageManager": "pnpm@10.8.1",
+  "packageManager": "pnpm@10.10.0",
   "scripts": {
     "prepare": "simple-git-hooks",
     "build": "pnpm run -r build",
