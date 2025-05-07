@@ -96,6 +96,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'Express', link: '/docs/integrations/express' },
+            { text: 'Fastify', link: '/docs/integrations/fastify' },
             { text: 'Next.js', link: '/docs/integrations/nextjs' },
             { text: 'Nuxt', link: '/docs/integrations/nuxt' },
             { text: 'Hono', link: '/docs/integrations/hono' },

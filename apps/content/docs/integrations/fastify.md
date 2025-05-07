@@ -17,23 +17,28 @@ Fastify automatically parses the request payload which interferes with oRPC, tha
 import { createServer } from 'node:http'
 import Fastify from 'fastify'
 import { RPCHandler } from '@orpc/server/node'
+import { CORSPlugin } from '@orpc/server/plugins'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  plugins: [
+    new CORSPlugin()
+  ]
+})
 
 const fastify = Fastify({
   logger: true,
-  serverFactory: (serverHandler) => {
+  serverFactory: (fastifyHandler) => {
     const server = createServer(async (req, res) => {
       const { matched } = await handler.handle(req, res, {
         context: {},
-        prefix: "/api",
+        prefix: '/rpc',
       })
 
       if (matched) {
         return
       }
 
-      serverHandler(req, res)
+      fastifyHandler(req, res)
     })
 
     return server
@@ -42,7 +47,8 @@ const fastify = Fastify({
 
 try {
   await fastify.listen({ port: 3000 })
-} catch (err) {
+}
+catch (err) {
   fastify.log.error(err)
   process.exit(1)
 }
