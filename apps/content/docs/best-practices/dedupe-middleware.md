@@ -87,6 +87,7 @@ Deduplication occurs only if the router middlewares is a **subset** of the **lea
 
 ```ts
 const router = os.use(logging).use(dbProvider).router({
+  // ✅ Deduplication occurs:
   ping: os.use(logging).use(dbProvider).use(auth).handler(({ context }) => 'ping'),
   pong: os.use(logging).use(dbProvider).handler(({ context }) => 'pong'),
 
@@ -99,6 +100,7 @@ const router = os.use(logging).use(dbProvider).router({
 // --- equivalent to ---
 
 const router = {
+  // ✅ Deduplication occurs:
   ping: os.use(logging).use(dbProvider).use(auth).handler(({ context }) => 'ping'),
   pong: os.use(logging).use(dbProvider).handler(({ context }) => 'pong'),
 
