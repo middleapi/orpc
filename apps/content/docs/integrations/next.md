@@ -13,7 +13,7 @@ oRPC also provides out-of-the-box support for [Server Action](/docs/server-actio
 
 ## Server
 
-You can integrate oRPC with TanStack Start using its [Route Handlers](https://nextjs.org/docs/app/building-your-application/routing/route-handlers).
+You can integrate oRPC with Next.js using its [Route Handlers](https://nextjs.org/docs/app/building-your-application/routing/route-handlers).
 
 ::: code-group
 
