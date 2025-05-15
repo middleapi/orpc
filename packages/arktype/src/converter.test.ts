@@ -3,12 +3,7 @@ import { z } from 'zod'
 import { experimental_ArkTypeToJsonSchemaConverter as ArkTypeToJsonSchemaConverter } from './converter'
 
 it('arkTypeToJsonSchemaConverter.convert', async () => {
-  const converter = new ArkTypeToJsonSchemaConverter({
-    fallback: {
-      default: ctx => ctx.base,
-      date: ctx => ({ ...ctx.base, type: 'string', format: 'date-time' }),
-    },
-  })
+  const converter = new ArkTypeToJsonSchemaConverter()
 
   expect(converter.convert(type('string'), { strategy: 'input' })).toEqual(
     [true, {

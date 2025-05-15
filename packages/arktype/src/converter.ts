@@ -3,11 +3,25 @@ import type { AnySchema } from '@orpc/contract'
 import type { ConditionalSchemaConverter, JSONSchema, SchemaConvertOptions } from '@orpc/openapi'
 import type { Type } from 'arktype'
 
+const defaultFallbacks: ToJsonSchema.FallbackOption = {
+  date: ctx => ({
+    ...ctx.base,
+    type: 'string',
+    format: 'date-time',
+  }),
+}
+
 export class experimental_ArkTypeToJsonSchemaConverter implements ConditionalSchemaConverter {
   options: ToJsonSchema.Options | undefined
 
   constructor(_options?: ToJsonSchema.Options) {
-    this.options = _options
+    this.options = {
+      ..._options,
+      fallback: {
+        ...defaultFallbacks,
+        ..._options?.fallback,
+      },
+    }
   }
 
   condition(schema: AnySchema | undefined): boolean {
