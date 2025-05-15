@@ -34,6 +34,7 @@
     "type:check": "tsc -b"
   },
   "peerDependencies": {
+    "@ark/schema": "*",
     "@orpc/contract": "workspace:*",
     "@orpc/server": "workspace:*",
     "arktype": "*"

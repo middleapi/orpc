@@ -164,6 +164,9 @@ importers:
 
   packages/arktype:
     dependencies:
+      '@ark/schema':
+        specifier: '*'
+        version: 0.46.0
       '@orpc/contract':
         specifier: workspace:*
         version: link:../contract
