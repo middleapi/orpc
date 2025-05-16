@@ -650,8 +650,8 @@ importers:
         specifier: ^5.8.3
         version: 5.8.3
       zod:
-        specifier: 3.25.0-beta.20250516T005923
-        version: 3.25.0-beta.20250516T005923
+        specifier: 3.25.0-canary.20250504T221648
+        version: 3.25.0-canary.20250504T221648
 
   playgrounds/contract-first:
     devDependencies:
@@ -11108,6 +11108,9 @@ packages:
 
   zod@3.25.0-beta.20250516T005923:
     resolution: {integrity: sha512-pWO2WHnFfmKl9X/AY55DGqiyArXkOSNDyLAotrpQzfsnLOCgzLDk1tZRfFyIqd68UaBk32gIsksYpCHzMXqZqg==}
+
+  zod@3.25.0-canary.20250504T221648:
+    resolution: {integrity: sha512-QVkIr1TwEultdcH2HeeY9++o/wuTwj+B/zOq1CBpbNksU/78hgpLnS1qdncr0F/zfk/KS1OfbRG8/Yoz5mQVGw==}
 
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
@@ -23217,5 +23220,7 @@ snapshots:
   zod@3.24.4: {}
 
   zod@3.25.0-beta.20250516T005923: {}
+
+  zod@3.25.0-canary.20250504T221648: {}
 
   zwitch@2.0.4: {}
