@@ -3,7 +3,14 @@ import { z } from 'zod'
 import { experimental_ArkTypeToJsonSchemaConverter as ArkTypeToJsonSchemaConverter } from './converter'
 
 it('arkTypeToJsonSchemaConverter.convert', async () => {
-  const converter = new ArkTypeToJsonSchemaConverter()
+  const converter = new ArkTypeToJsonSchemaConverter({
+    fallback: {
+      default: () => ({
+        'type': 'null',
+        'x-type': 'null',
+      }),
+    },
+  })
 
   expect(converter.convert(type('string'), { strategy: 'input' })).toEqual(
     [true, {
@@ -11,6 +18,7 @@ it('arkTypeToJsonSchemaConverter.convert', async () => {
       type: 'string',
     }],
   )
+
   expect(converter.convert(type({ a: 'string' }), { strategy: 'input' })).toEqual(
     [true, {
       $schema: 'https://json-schema.org/draft/2020-12/schema',
@@ -19,11 +27,20 @@ it('arkTypeToJsonSchemaConverter.convert', async () => {
       required: ['a'],
     }],
   )
+
   expect(converter.convert(type('Date'), { strategy: 'input' })).toEqual(
     [true, {
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       format: 'date-time',
       type: 'string',
+    }],
+  )
+
+  expect(converter.convert(type('Error'), { strategy: 'input' })).toEqual(
+    [true, {
+      '$schema': 'https://json-schema.org/draft/2020-12/schema',
+      'type': 'null',
+      'x-type': 'null',
     }],
   )
 })

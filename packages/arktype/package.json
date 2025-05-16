@@ -36,7 +36,6 @@
   "peerDependencies": {
     "@ark/schema": "*",
     "@orpc/contract": "workspace:*",
-    "@orpc/server": "workspace:*",
     "arktype": "*"
   },
   "dependencies": {
