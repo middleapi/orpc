@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@antfu/eslint-config':
-        specifier: ^4.13.1
-        version: 4.13.1(@vue/compiler-sfc@3.5.14)(eslint-plugin-format@1.0.1(eslint@9.27.0(jiti@2.4.2)))(eslint@9.27.0(jiti@2.4.2))(typescript@5.8.3)(vitest@3.1.4)
+        specifier: ^4.13.2
+        version: 4.13.2(@vue/compiler-sfc@3.5.14)(eslint-plugin-format@1.0.1(eslint@9.27.0(jiti@2.4.2)))(eslint@9.27.0(jiti@2.4.2))(typescript@5.8.3)(vitest@3.1.4)
       '@solidjs/testing-library':
         specifier: ^0.8.10
         version: 0.8.10(@solidjs/router@0.15.3(solid-js@1.9.7))(solid-js@1.9.7)
@@ -136,7 +136,7 @@ importers:
         version: 22.15.21
       openai:
         specifier: ^4.93.0
-        version: 4.100.0(ws@8.18.2)(zod@3.25.13)
+        version: 4.100.0(ws@8.18.2)(zod@3.25.15)
       pinia:
         specifier: ^3.0.2
         version: 3.0.2(typescript@5.8.3)(vue@3.5.14(typescript@5.8.3))
@@ -194,7 +194,7 @@ importers:
     devDependencies:
       zod:
         specifier: ^3.25.11
-        version: 3.25.13
+        version: 3.25.15
 
   packages/contract:
     dependencies:
@@ -216,7 +216,7 @@ importers:
         version: 1.1.0(typescript@5.8.3)
       zod:
         specifier: ^3.25.11
-        version: 3.25.13
+        version: 3.25.15
 
   packages/nest:
     dependencies:
@@ -262,7 +262,7 @@ importers:
         version: 11.1.1(@nestjs/common@11.1.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.1)(@nestjs/platform-express@11.1.1)
       '@ts-rest/core':
         specifier: ^3.52.1
-        version: 3.52.1(@types/node@22.15.21)(zod@3.25.13)
+        version: 3.52.1(@types/node@22.15.21)(zod@3.25.15)
       '@types/express':
         specifier: ^5.0.1
         version: 5.0.2
@@ -280,7 +280,7 @@ importers:
         version: 7.1.1
       zod:
         specifier: ^3.25.11
-        version: 3.25.13
+        version: 3.25.15
 
   packages/openapi:
     dependencies:
@@ -314,7 +314,7 @@ importers:
     devDependencies:
       zod:
         specifier: ^3.25.11
-        version: 3.25.13
+        version: 3.25.15
 
   packages/openapi-client:
     dependencies:
@@ -358,7 +358,7 @@ importers:
         version: 19.1.0
       zod:
         specifier: ^3.25.11
-        version: 3.25.13
+        version: 3.25.15
 
   packages/react-query:
     dependencies:
@@ -377,7 +377,7 @@ importers:
         version: 19.1.0
       zod:
         specifier: ^3.25.11
-        version: 3.25.13
+        version: 3.25.15
 
   packages/server:
     dependencies:
@@ -445,7 +445,7 @@ importers:
         version: 5.76.0(solid-js@1.9.7)
       zod:
         specifier: ^3.25.11
-        version: 3.25.13
+        version: 3.25.15
 
   packages/standard-server:
     dependencies:
@@ -511,7 +511,7 @@ importers:
         version: 5.76.0(svelte@5.32.1)
       zod:
         specifier: ^3.25.11
-        version: 3.25.13
+        version: 3.25.15
 
   packages/valibot:
     dependencies:
@@ -590,10 +590,10 @@ importers:
     devDependencies:
       zod:
         specifier: ^3.25.11
-        version: 3.25.13
+        version: 3.25.15
       zod-to-json-schema:
         specifier: ^3.24.5
-        version: 3.24.5(zod@3.25.13)
+        version: 3.24.5(zod@3.25.15)
 
   playgrounds/astro:
     devDependencies:
@@ -644,7 +644,7 @@ importers:
         version: 5.8.3
       zod:
         specifier: ^3.25.11
-        version: 3.25.13
+        version: 3.25.15
 
   playgrounds/contract-first:
     devDependencies:
@@ -680,7 +680,7 @@ importers:
         version: 5.8.3
       zod:
         specifier: ^3.25.11
-        version: 3.25.13
+        version: 3.25.15
 
   playgrounds/nest:
     devDependencies:
@@ -764,7 +764,7 @@ importers:
         version: 5.8.3
       zod:
         specifier: ^3.25.11
-        version: 3.25.13
+        version: 3.25.15
 
   playgrounds/next:
     devDependencies:
@@ -812,7 +812,7 @@ importers:
         version: 5.8.3
       zod:
         specifier: ^3.25.11
-        version: 3.25.13
+        version: 3.25.15
 
   playgrounds/nuxt:
     devDependencies:
@@ -845,7 +845,7 @@ importers:
         version: 4.5.1(vue@3.5.14(typescript@5.8.3))
       zod:
         specifier: ^3.25.11
-        version: 3.25.13
+        version: 3.25.15
 
   playgrounds/solid-start:
     devDependencies:
@@ -881,7 +881,7 @@ importers:
         version: 0.5.6(@types/node@22.15.21)(db0@0.3.2)(ioredis@5.6.1)(jiti@2.4.2)(terser@5.39.2)(tsx@4.19.4)(yaml@2.8.0)
       zod:
         specifier: ^3.25.11
-        version: 3.25.13
+        version: 3.25.15
 
   playgrounds/svelte-kit:
     devDependencies:
@@ -926,7 +926,7 @@ importers:
         version: 6.3.5(@types/node@22.15.21)(jiti@2.4.2)(terser@5.39.2)(tsx@4.19.4)(yaml@2.8.0)
       zod:
         specifier: ^3.25.11
-        version: 3.25.13
+        version: 3.25.15
 
   playgrounds/tanstack-start:
     devDependencies:
@@ -989,7 +989,7 @@ importers:
         version: 5.1.4(typescript@5.8.3)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(terser@5.39.2)(tsx@4.19.4)(yaml@2.8.0))
       zod:
         specifier: ^3.25.11
-        version: 3.25.13
+        version: 3.25.15
 
 packages:
 
@@ -1103,8 +1103,8 @@ packages:
     resolution: {integrity: sha512-QsmFuYdAyeCyg9WF/AJBhFXDUfCwmDFTEbsv5t5KPSP6slhk0GoLNZApniiFytU2siRlSxVNpve2uATyYuAYkQ==}
     engines: {node: ^18.19.1 || ^20.11.1 || >=22.0.0, npm: ^6.11.0 || ^7.5.6 || >=8.0.0, yarn: '>= 1.13.0'}
 
-  '@antfu/eslint-config@4.13.1':
-    resolution: {integrity: sha512-Ldv0gzQEDH/M+6NfhVBK/9NTDwsYJuHHJBPaFQN9X6LGd927sfEWzMHQdEbrA7f8Rr6abbinReifK7OjDipJ/g==}
+  '@antfu/eslint-config@4.13.2':
+    resolution: {integrity: sha512-F+IVIQUCfw6eW4H06c9a9USJ3UOnoBx4I0qsTL3kO6GcyJB6mwk+nawFf95DfHKT3fJKv58YPPz0XCmsY/w0XA==}
     hasBin: true
     peerDependencies:
       '@eslint-react/eslint-plugin': ^1.38.4
@@ -1669,36 +1669,6 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [android]
-
-  '@esbuild/darwin-arm64@0.20.2':
-    resolution: {integrity: sha512-4J6IRT+10J3aJH3l1yzEg9y3wkTDgDk7TSDFX+wKFiWjqWp/iCfLIYzGyasx9l0SAFPT1HwSCR+0w/h1ES/MjA==}
-    engines: {node: '>=12'}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@esbuild/darwin-arm64@0.21.5':
-    resolution: {integrity: sha512-DwqXqZyuk5AiWWf3UfLiRDJ5EDd49zg6O9wclZ7kUMv2WRFr4HKjXp/5t8JZ11QbQfUS6/cRCKGwYhtNAY88kQ==}
-    engines: {node: '>=12'}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@esbuild/darwin-arm64@0.24.2':
-    resolution: {integrity: sha512-kj3AnYWc+CekmZnS5IPu9D+HWtUI49hbnyqk0FLEJDbzCIQt7hg7ucF1SQAilhtYpIujfaHr6O0UHlzzSPdOeA==}
-    engines: {node: '>=18'}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@esbuild/darwin-arm64@0.25.2':
-    resolution: {integrity: sha512-MpM6LUVTXAzOvN4KbjzU/q5smzryuoNjlriAIx+06RpecwCkL9JpenNzpKd2YMzLJFOdPqBpuub6eVRP5IgiSA==}
-    engines: {node: '>=18'}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@esbuild/darwin-arm64@0.25.4':
-    resolution: {integrity: sha512-Y1giCfM4nlHDWEfSckMzeWNdQS31BQGs9/rouw6Ub91tkK79aIMTH3q9xHvzH8d0wDru5Ci0kWB8b3up/nl16g==}
-    engines: {node: '>=18'}
-    cpu: [arm64]
-    os: [darwin]
 
   '@esbuild/darwin-x64@0.20.2':
     resolution: {integrity: sha512-tBcXp9KNphnNH0dfhv8KYkZhjc+H3XBkF5DKtswJblV7KlT9EI2+jeA8DgBjp908WEuYll6pF+UStUCfEpdysA==}
@@ -6366,8 +6336,8 @@ packages:
     peerDependencies:
       eslint: ^9.5.0
 
-  eslint-flat-config-utils@2.0.1:
-    resolution: {integrity: sha512-brf0eAgQ6JlKj3bKfOTuuI7VcCZvi8ZCD1MMTVoEvS/d38j8cByZViLFALH/36+eqB17ukmfmKq3bWzGvizejA==}
+  eslint-flat-config-utils@2.1.0:
+    resolution: {integrity: sha512-6fjOJ9tS0k28ketkUcQ+kKptB4dBZY2VijMZ9rGn8Cwnn1SH0cZBoPXT8AHBFHxmHcLFQK9zbELDinZ2Mr1rng==}
 
   eslint-formatting-reporter@0.0.0:
     resolution: {integrity: sha512-k9RdyTqxqN/wNYVaTk/ds5B5rA8lgoAmvceYN7bcZMBwU7TuXx5ntewJv81eF3pIL/CiJE+pJZm36llG8yhyyw==}
@@ -11259,8 +11229,8 @@ packages:
       typescript: ^4.9.4 || ^5.0.2
       zod: ^3
 
-  zod@3.25.13:
-    resolution: {integrity: sha512-Q8mvk2iWi7rTDfpQBsu4ziE7A6AxgzJ5hzRyRYQkoV3A3niYsXVwDaP1Kbz3nWav6S+VZ6k2OznFn8ZyDHvIrg==}
+  zod@3.25.15:
+    resolution: {integrity: sha512-owVzP3IRiMeT3t72f+WpDeCa1xbPXZOJCxZRsotPHBDZwiwIaFAS1Vnf2eYTZLP2Zsc/106snGkhoCmO9YI2SQ==}
 
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
@@ -11433,7 +11403,7 @@ snapshots:
     transitivePeerDependencies:
       - chokidar
 
-  '@antfu/eslint-config@4.13.1(@vue/compiler-sfc@3.5.14)(eslint-plugin-format@1.0.1(eslint@9.27.0(jiti@2.4.2)))(eslint@9.27.0(jiti@2.4.2))(typescript@5.8.3)(vitest@3.1.4)':
+  '@antfu/eslint-config@4.13.2(@vue/compiler-sfc@3.5.14)(eslint-plugin-format@1.0.1(eslint@9.27.0(jiti@2.4.2)))(eslint@9.27.0(jiti@2.4.2))(typescript@5.8.3)(vitest@3.1.4)':
     dependencies:
       '@antfu/install-pkg': 1.1.0
       '@clack/prompts': 0.10.1
@@ -11447,7 +11417,7 @@ snapshots:
       cac: 6.7.14
       eslint: 9.27.0(jiti@2.4.2)
       eslint-config-flat-gitignore: 2.1.0(eslint@9.27.0(jiti@2.4.2))
-      eslint-flat-config-utils: 2.0.1
+      eslint-flat-config-utils: 2.1.0
       eslint-merge-processors: 2.0.0(eslint@9.27.0(jiti@2.4.2))
       eslint-plugin-antfu: 3.1.1(eslint@9.27.0(jiti@2.4.2))
       eslint-plugin-command: 3.2.0(eslint@9.27.0(jiti@2.4.2))
@@ -11884,7 +11854,7 @@ snapshots:
       '@babel/parser': 7.27.2
       '@babel/template': 7.27.2
       '@babel/types': 7.27.1
-      debug: 4.4.1
+      debug: 4.4.0
       globals: 11.12.0
     transitivePeerDependencies:
       - supports-color
@@ -12114,21 +12084,6 @@ snapshots:
     optional: true
 
   '@esbuild/android-x64@0.25.4':
-    optional: true
-
-  '@esbuild/darwin-arm64@0.20.2':
-    optional: true
-
-  '@esbuild/darwin-arm64@0.21.5':
-    optional: true
-
-  '@esbuild/darwin-arm64@0.24.2':
-    optional: true
-
-  '@esbuild/darwin-arm64@0.25.2':
-    optional: true
-
-  '@esbuild/darwin-arm64@0.25.4':
     optional: true
 
   '@esbuild/darwin-x64@0.20.2':
@@ -12586,7 +12541,7 @@ snapshots:
       '@antfu/install-pkg': 1.1.0
       '@antfu/utils': 8.1.1
       '@iconify/types': 2.0.0
-      debug: 4.4.0
+      debug: 4.4.1
       globals: 15.15.0
       kolorist: 1.8.0
       local-pkg: 1.1.1
@@ -13235,7 +13190,7 @@ snapshots:
       unixify: 1.0.0
       urlpattern-polyfill: 8.0.2
       yargs: 17.7.2
-      zod: 3.25.13
+      zod: 3.25.15
     transitivePeerDependencies:
       - encoding
       - rollup
@@ -13276,7 +13231,7 @@ snapshots:
       unixify: 1.0.0
       urlpattern-polyfill: 8.0.2
       yargs: 17.7.2
-      zod: 3.25.13
+      zod: 3.25.15
     transitivePeerDependencies:
       - encoding
       - rollup
@@ -14552,7 +14507,7 @@ snapshots:
       react-dom: 19.1.0(react@19.1.0)
       vinxi: 0.5.3(@types/node@22.15.21)(db0@0.3.2)(ioredis@5.6.1)(jiti@2.4.2)(terser@5.39.2)(tsx@4.19.4)(yaml@2.8.0)
       vite: 6.3.5(@types/node@22.15.21)(jiti@2.4.2)(terser@5.39.2)(tsx@4.19.4)(yaml@2.8.0)
-      zod: 3.25.13
+      zod: 3.25.15
     transitivePeerDependencies:
       - '@azure/app-configuration'
       - '@azure/cosmos'
@@ -14778,7 +14733,7 @@ snapshots:
       '@tanstack/virtual-file-routes': 1.115.0
       prettier: 3.5.3
       tsx: 4.19.4
-      zod: 3.25.13
+      zod: 3.25.15
     optionalDependencies:
       '@tanstack/react-router': 1.120.5(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
 
@@ -14800,7 +14755,7 @@ snapshots:
       babel-dead-code-elimination: 1.0.10
       chokidar: 3.6.0
       unplugin: 2.3.4
-      zod: 3.25.13
+      zod: 3.25.15
     optionalDependencies:
       '@tanstack/react-router': 1.120.5(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       vite: 6.3.5(@types/node@22.15.21)(jiti@2.4.2)(terser@5.39.2)(tsx@4.19.4)(yaml@2.8.0)
@@ -15058,10 +15013,10 @@ snapshots:
 
   '@trysound/sax@0.2.0': {}
 
-  '@ts-rest/core@3.52.1(@types/node@22.15.21)(zod@3.25.13)':
+  '@ts-rest/core@3.52.1(@types/node@22.15.21)(zod@3.25.15)':
     optionalDependencies:
       '@types/node': 22.15.21
-      zod: 3.25.13
+      zod: 3.25.15
 
   '@tsconfig/node10@1.0.11': {}
 
@@ -16428,9 +16383,9 @@ snapshots:
       xxhash-wasm: 1.1.0
       yargs-parser: 21.1.1
       yocto-spinner: 0.2.2
-      zod: 3.25.13
-      zod-to-json-schema: 3.24.5(zod@3.25.13)
-      zod-to-ts: 1.2.0(typescript@5.8.3)(zod@3.25.13)
+      zod: 3.25.15
+      zod-to-json-schema: 3.24.5(zod@3.25.15)
+      zod-to-ts: 1.2.0(typescript@5.8.3)(zod@3.25.15)
     optionalDependencies:
       sharp: 0.33.5
     transitivePeerDependencies:
@@ -17457,7 +17412,6 @@ snapshots:
       '@esbuild/android-arm': 0.20.2
       '@esbuild/android-arm64': 0.20.2
       '@esbuild/android-x64': 0.20.2
-      '@esbuild/darwin-arm64': 0.20.2
       '@esbuild/darwin-x64': 0.20.2
       '@esbuild/freebsd-arm64': 0.20.2
       '@esbuild/freebsd-x64': 0.20.2
@@ -17483,7 +17437,6 @@ snapshots:
       '@esbuild/android-arm': 0.21.5
       '@esbuild/android-arm64': 0.21.5
       '@esbuild/android-x64': 0.21.5
-      '@esbuild/darwin-arm64': 0.21.5
       '@esbuild/darwin-x64': 0.21.5
       '@esbuild/freebsd-arm64': 0.21.5
       '@esbuild/freebsd-x64': 0.21.5
@@ -17509,7 +17462,6 @@ snapshots:
       '@esbuild/android-arm': 0.24.2
       '@esbuild/android-arm64': 0.24.2
       '@esbuild/android-x64': 0.24.2
-      '@esbuild/darwin-arm64': 0.24.2
       '@esbuild/darwin-x64': 0.24.2
       '@esbuild/freebsd-arm64': 0.24.2
       '@esbuild/freebsd-x64': 0.24.2
@@ -17537,7 +17489,6 @@ snapshots:
       '@esbuild/android-arm': 0.25.2
       '@esbuild/android-arm64': 0.25.2
       '@esbuild/android-x64': 0.25.2
-      '@esbuild/darwin-arm64': 0.25.2
       '@esbuild/darwin-x64': 0.25.2
       '@esbuild/freebsd-arm64': 0.25.2
       '@esbuild/freebsd-x64': 0.25.2
@@ -17565,7 +17516,6 @@ snapshots:
       '@esbuild/android-arm': 0.25.4
       '@esbuild/android-arm64': 0.25.4
       '@esbuild/android-x64': 0.25.4
-      '@esbuild/darwin-arm64': 0.25.4
       '@esbuild/darwin-x64': 0.25.4
       '@esbuild/freebsd-arm64': 0.25.4
       '@esbuild/freebsd-x64': 0.25.4
@@ -17620,7 +17570,7 @@ snapshots:
       '@eslint/compat': 1.2.9(eslint@9.27.0(jiti@2.4.2))
       eslint: 9.27.0(jiti@2.4.2)
 
-  eslint-flat-config-utils@2.0.1:
+  eslint-flat-config-utils@2.1.0:
     dependencies:
       pathe: 2.0.3
 
@@ -20387,7 +20337,7 @@ snapshots:
       is-docker: 2.2.1
       is-wsl: 2.2.0
 
-  openai@4.100.0(ws@8.18.2)(zod@3.25.13):
+  openai@4.100.0(ws@8.18.2)(zod@3.25.15):
     dependencies:
       '@types/node': 18.19.103
       '@types/node-fetch': 2.6.12
@@ -20398,7 +20348,7 @@ snapshots:
       node-fetch: 2.7.0
     optionalDependencies:
       ws: 8.18.2
-      zod: 3.25.13
+      zod: 3.25.15
     transitivePeerDependencies:
       - encoding
 
@@ -22846,7 +22796,7 @@ snapshots:
       unenv: 1.10.0
       unstorage: 1.16.0(db0@0.3.2)(ioredis@5.6.1)
       vite: 6.3.5(@types/node@22.15.21)(jiti@2.4.2)(terser@5.39.2)(tsx@4.19.4)(yaml@2.8.0)
-      zod: 3.25.13
+      zod: 3.25.15
     transitivePeerDependencies:
       - '@azure/app-configuration'
       - '@azure/cosmos'
@@ -22924,7 +22874,7 @@ snapshots:
       unenv: 1.10.0
       unstorage: 1.16.0(db0@0.3.2)(ioredis@5.6.1)
       vite: 6.3.5(@types/node@22.15.21)(jiti@2.4.2)(terser@5.39.2)(tsx@4.19.4)(yaml@2.8.0)
-      zod: 3.25.13
+      zod: 3.25.15
     transitivePeerDependencies:
       - '@azure/app-configuration'
       - '@azure/cosmos'
@@ -23695,15 +23645,15 @@ snapshots:
       compress-commons: 6.0.2
       readable-stream: 4.7.0
 
-  zod-to-json-schema@3.24.5(zod@3.25.13):
+  zod-to-json-schema@3.24.5(zod@3.25.15):
     dependencies:
-      zod: 3.25.13
+      zod: 3.25.15
 
-  zod-to-ts@1.2.0(typescript@5.8.3)(zod@3.25.13):
+  zod-to-ts@1.2.0(typescript@5.8.3)(zod@3.25.15):
     dependencies:
       typescript: 5.8.3
-      zod: 3.25.13
+      zod: 3.25.15
 
-  zod@3.25.13: {}
+  zod@3.25.15: {}
 
   zwitch@2.0.4: {}
