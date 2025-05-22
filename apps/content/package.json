@@ -21,7 +21,7 @@
     "@orpc/vue-colada": "workspace:*",
     "@orpc/vue-query": "workspace:*",
     "@orpc/zod": "workspace:*",
-    "@pinia/colada": "^0.15.3",
+    "@pinia/colada": "^0.16.0",
     "@shikijs/vitepress-twoslash": "^3.0.0",
     "@tanstack/react-query": "^5.75.7",
     "@tanstack/solid-query": "^5.72.3",
