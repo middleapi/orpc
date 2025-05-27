@@ -17,12 +17,12 @@ import { z } from 'zod'
 // ---cut---
 import OpenAI from 'openai'
 
-const openapi = new OpenAI()
+const openai = new OpenAI()
 
 const complete = os
   .input(z.object({ content: z.string() }))
   .handler(async function* ({ input }) {
-    const stream = await openapi.chat.completions.create({
+    const stream = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [{ role: 'user', content: input.content }],
       stream: true,
