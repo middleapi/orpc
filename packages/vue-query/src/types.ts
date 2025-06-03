@@ -50,13 +50,13 @@ export interface experimental_StreamedOptionsBase<TOutput, TError> extends Query
 export type InfiniteOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TSelectData, TPageParam> =
   & (Record<never, never> extends TClientContext ? { context?: MaybeRefDeep<TClientContext> } : { context: MaybeRefDeep<TClientContext> })
   & {
-    [Property in keyof Omit<InfiniteQueryObserverOptions<TOutput, TError, TSelectData, TOutput, QueryKey, TPageParam>, 'queryKey' | 'enabled'>]:
-    MaybeRefDeep<InfiniteQueryObserverOptions<TOutput, TError, TSelectData, TOutput, QueryKey, TPageParam>[Property]>;
+    [Property in keyof Omit<InfiniteQueryObserverOptions<TOutput, TError, TSelectData, QueryKey, TPageParam>, 'queryKey' | 'enabled'>]:
+    MaybeRefDeep<InfiniteQueryObserverOptions<TOutput, TError, TSelectData, QueryKey, TPageParam>[Property]>;
   }
   & {
     input: MaybeRef<((pageParam: TPageParam) => MaybeRefDeep<TInput>) | SkipToken>
-    enabled?: MaybeRefOrGetter<InfiniteQueryObserverOptions<TOutput, TError, TSelectData, TOutput, QueryKey, TPageParam>['enabled']>
-    queryKey?: MaybeRefDeep<InfiniteQueryObserverOptions<TOutput, TError, TSelectData, TOutput, QueryKey, TPageParam>['queryKey']>
+    enabled?: MaybeRefOrGetter<InfiniteQueryObserverOptions<TOutput, TError, TSelectData, QueryKey, TPageParam>['enabled']>
+    queryKey?: MaybeRefDeep<InfiniteQueryObserverOptions<TOutput, TError, TSelectData, QueryKey, TPageParam>['queryKey']>
     shallow?: boolean
   }
 

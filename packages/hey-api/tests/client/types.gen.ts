@@ -53,6 +53,15 @@ export type GetPlanetData = {
     url: '/planets/{planetId}';
 };
 
+export type GetPlanetErrors = {
+    /**
+     * Not found
+     */
+    404: number;
+};
+
+export type GetPlanetError = GetPlanetErrors[keyof GetPlanetErrors];
+
 export type GetPlanetResponses = {
     /**
      * A planet

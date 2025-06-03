@@ -38,7 +38,7 @@
   },
   "peerDependencies": {
     "@orpc/client": "workspace:*",
-    "@tanstack/solid-query": ">=5.55.0",
+    "@tanstack/solid-query": ">=5.80.2",
     "solid-js": ">=1.9.0"
   },
   "dependencies": {
@@ -46,7 +46,7 @@
     "@orpc/tanstack-query": "workspace:*"
   },
   "devDependencies": {
-    "@tanstack/solid-query": "^5.77.2",
+    "@tanstack/solid-query": "^5.80.2",
     "zod": "^3.25.49"
   }
 }

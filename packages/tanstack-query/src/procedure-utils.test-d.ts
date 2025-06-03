@@ -299,7 +299,7 @@ describe('ProcedureUtils', () => {
         input: () => ({}),
         getNextPageParam,
         initialPageParam,
-      })).toExtend<InfiniteQueryObserverOptions<UtilsOutput, UtilsError, InfiniteData<UtilsOutput, number>, UtilsOutput, QueryKey, number>>()
+      })).toExtend<InfiniteQueryObserverOptions<UtilsOutput, UtilsError, InfiniteData<UtilsOutput, number>, QueryKey, number>>()
     })
 
     it('allow extend and override infinite options', () => {
@@ -324,7 +324,7 @@ describe('ProcedureUtils', () => {
         getNextPageParam,
         initialPageParam,
         select: mapped => ({ mapped }),
-      })).toExtend<InfiniteQueryObserverOptions<UtilsOutput, UtilsError, { mapped: InfiniteData<UtilsOutput, number> }, UtilsOutput, QueryKey, number>>()
+      })).toExtend<InfiniteQueryObserverOptions<UtilsOutput, UtilsError, { mapped: InfiniteData<UtilsOutput, number> }, QueryKey, number>>()
     })
   })
 

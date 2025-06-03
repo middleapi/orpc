@@ -57,7 +57,7 @@ export interface experimental_StreamedOptionsBase<TOutput, TError> extends Query
 export type InfiniteOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TSelectData, TPageParam> =
   & { input: ((pageParam: TPageParam) => TInput) | SkipToken }
   & (Record<never, never> extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
-  & SetOptional<InfiniteQueryObserverOptions<TOutput, TError, TSelectData, TOutput, QueryKey, TPageParam>, 'queryKey'>
+  & SetOptional<InfiniteQueryObserverOptions<TOutput, TError, TSelectData, QueryKey, TPageParam>, 'queryKey'>
 
 export interface InfiniteOptionsBase<TOutput, TError, TPageParam> {
   queryKey: QueryKey

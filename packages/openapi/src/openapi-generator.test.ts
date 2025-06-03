@@ -1,5 +1,4 @@
-import type { AnyContractProcedure, OpenAPI } from '@orpc/contract'
-import type { PartialDeep } from '@orpc/shared'
+import type { AnyContractProcedure } from '@orpc/contract'
 import { eventIterator, oc } from '@orpc/contract'
 import { z } from 'zod'
 import { oz, ZodToJsonSchemaConverter } from '../../zod/src'
@@ -9,7 +8,7 @@ import { OpenAPIGenerator } from './openapi-generator'
 type TestCase = {
   name: string
   contract: AnyContractProcedure
-  expected: PartialDeep<OpenAPI.PathsObject>
+  expected: any
   error?: undefined
 } | {
   name: string
