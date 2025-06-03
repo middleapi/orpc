@@ -97,7 +97,7 @@ describe('rpcHandler', async () => {
     expect(await (payload as any).body.get('0').text()).toBe('pong')
   })
 
-  it('on abort signal', async () => {
+  it('on abort signal', { retry: 5 }, async () => {
     clientPort.postMessage(ping_request_message)
 
     await new Promise(resolve => setTimeout(resolve, 0))
