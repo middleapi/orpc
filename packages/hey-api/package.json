@@ -40,7 +40,7 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "@hey-api/client-fetch": "^0.11.0",
-    "@hey-api/openapi-ts": "^0.69.2"
+    "@hey-api/client-fetch": "^0.12.0",
+    "@hey-api/openapi-ts": "^0.70.0"
   }
 }
