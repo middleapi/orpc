@@ -26,7 +26,7 @@
     "packages:changelog:github": "pnpm dlx changelogithub --draft"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^4.13.2",
+    "@antfu/eslint-config": "^4.13.3",
     "@solidjs/testing-library": "^0.8.10",
     "@sveltejs/vite-plugin-svelte": "^5.1.0",
     "@testing-library/jest-dom": "^6.6.3",
