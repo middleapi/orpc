@@ -13,8 +13,8 @@ export function standardizeHTTPPath(path: HTTPPath): HTTPPath {
 export function getDynamicParams(path: HTTPPath | undefined): { raw: string, name: string }[] | undefined {
   return path
     ? standardizeHTTPPath(path).match(/\/\{[^}]+\}/g)?.map(v => ({
-      raw: v,
-      name: v.match(/\{\+?([^}]+)\}/)![1]!,
-    }))
+        raw: v,
+        name: v.match(/\{\+?([^}]+)\}/)![1]!,
+      }))
     : undefined
 }
