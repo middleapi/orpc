@@ -23,7 +23,7 @@
     "@orpc/zod": "workspace:*",
     "@pinia/colada": "^0.17.0",
     "@shikijs/vitepress-twoslash": "^3.0.0",
-    "@tanstack/react-query": "^5.80.2",
+    "@tanstack/react-query": "^5.80.5",
     "@tanstack/solid-query": "^5.80.2",
     "@tanstack/svelte-query": "^5.80.2",
     "@tanstack/vue-query": "^5.80.2",

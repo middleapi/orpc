@@ -44,7 +44,7 @@
     "@angular/core": "^20.0.0",
     "@tanstack/angular-query-experimental": "^5.80.2",
     "@tanstack/query-core": "^5.80.2",
-    "@tanstack/react-query": "^5.80.2",
+    "@tanstack/react-query": "^5.80.5",
     "@tanstack/solid-query": "^5.80.2",
     "@tanstack/svelte-query": "^5.80.2",
     "@tanstack/vue-query": "^5.80.2",
