@@ -206,7 +206,7 @@ import * as z from 'zod'
 
 const InputSchema = z.object({
   file: oz.file(),
-  image: oz.file().mine(['image/png', 'image/jpeg']),
+  image: oz.file().mime(['image/png', 'image/jpeg']),
 })
 ```
 
