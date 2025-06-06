@@ -33,7 +33,7 @@
     "@testing-library/react": "^16.0.1",
     "@testing-library/svelte": "^5.2.7",
     "@testing-library/user-event": "^14.6.1",
-    "@types/node": "^22.15.18",
+    "@types/node": "^22.15.30",
     "@vitest/coverage-v8": "^3.0.4",
     "@vitest/ui": "^3.0.9",
     "@vue/test-utils": "^2.4.6",

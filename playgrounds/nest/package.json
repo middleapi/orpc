@@ -24,7 +24,7 @@
     "@swc/core": "^1.10.7",
     "@tanstack/react-query": "^5.80.5",
     "@types/express": "^5.0.1",
-    "@types/node": "^22.15.18",
+    "@types/node": "^22.15.30",
     "globals": "^16.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
