@@ -119,7 +119,7 @@ export const client: JsonifiedClient<RouterClient<typeof router>> = globalThis.$
 ```ts [lib/orpc.server.ts]
 'server only'
 
-import { createJsonifiedRouterClient } from '@orpc/openapi-client'
+import { createJsonifiedRouterClient } from '@orpc/openapi'
 
 globalThis.$client = createJsonifiedRouterClient(router, {
   /**
