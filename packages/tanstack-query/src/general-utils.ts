@@ -1,5 +1,5 @@
-import type { OperationKey, OperationKeyOptions, OperationType } from '@orpc/tanstack-query'
-import { generateOperationKey } from '@orpc/tanstack-query'
+import type { OperationKey, OperationKeyOptions, OperationType } from './types'
+import { generateOperationKey } from './key'
 
 /**
  * Utils at any level (procedure or router)
