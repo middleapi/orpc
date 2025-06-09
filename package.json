@@ -42,7 +42,7 @@
     "eslint-plugin-format": "^1.0.0",
     "jsdom": "^26.0.0",
     "lint-staged": "^16.0.0",
-    "msw": "^2.8.4",
+    "msw": "^2.10.2",
     "simple-git-hooks": "^2.11.1",
     "typescript": "^5.8.3",
     "unbuild": "^3.5.0",
