@@ -18,13 +18,13 @@
     "@orpc/tanstack-query": "next",
     "@orpc/zod": "next",
     "@sveltejs/adapter-auto": "^6.0.0",
-    "@sveltejs/kit": "^2.20.5",
+    "@sveltejs/kit": "^2.21.4",
     "@sveltejs/vite-plugin-svelte": "^5.1.0",
     "@tanstack/svelte-query": "^5.80.2",
-    "svelte": "^5.26.2",
+    "svelte": "^5.33.18",
     "svelte-check": "^4.0.0",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
-    "zod": "^3.25.49"
+    "zod": "^3.25.57"
   }
 }

@@ -34,20 +34,20 @@
     "@testing-library/svelte": "^5.2.7",
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.15.18",
-    "@vitest/coverage-v8": "^3.0.4",
-    "@vitest/ui": "^3.0.9",
+    "@vitest/coverage-v8": "^3.2.3",
+    "@vitest/ui": "^3.2.3",
     "@vue/test-utils": "^2.4.6",
     "eslint": "^9.15.0",
     "eslint-plugin-ban": "^2.0.0",
     "eslint-plugin-format": "^1.0.0",
     "jsdom": "^26.0.0",
     "lint-staged": "^16.0.0",
-    "msw": "^2.8.4",
+    "msw": "^2.10.2",
     "simple-git-hooks": "^2.11.1",
     "typescript": "^5.8.3",
     "unbuild": "^3.5.0",
     "vite-plugin-solid": "^2.11.6",
-    "vitest": "^3.0.4"
+    "vitest": "^3.2.3"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
