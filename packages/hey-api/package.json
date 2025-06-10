@@ -30,7 +30,6 @@
     "dist"
   ],
   "scripts": {
-    "build": "unbuild",
     "build:watch": "pnpm run build --watch",
     "type:check": "tsc -b",
     "prepare": "openapi-ts -i ./tests/spec.json -o ./tests/client -c @hey-api/client-fetch"

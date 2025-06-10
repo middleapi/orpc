@@ -6,8 +6,8 @@
   "packageManager": "pnpm@10.12.1",
   "scripts": {
     "prepare": "simple-git-hooks",
-    "build": "pnpm run -r build",
-    "build:packages": "pnpm --filter=\"./packages/*\" run -r build",
+    "build": "pnpm run build:packages && pnpm run -r build",
+    "build:packages": "tsdown",
     "preview": "pnpm run --parallel preview",
     "type:check": "pnpm run -r type:check && pnpm run -r type:check:test && tsc --noEmit",
     "test": "vitest run",
@@ -44,8 +44,8 @@
     "lint-staged": "^16.0.0",
     "msw": "^2.8.4",
     "simple-git-hooks": "^2.11.1",
+    "tsdown": "0.12.7",
     "typescript": "^5.8.3",
-    "unbuild": "^3.5.0",
     "vite-plugin-solid": "^2.11.6",
     "vitest": "^3.0.4"
   },

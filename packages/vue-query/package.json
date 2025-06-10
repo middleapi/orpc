@@ -32,7 +32,6 @@
     "dist"
   ],
   "scripts": {
-    "build": "unbuild",
     "build:watch": "pnpm run build --watch",
     "type:check": "tsc -b"
   },
