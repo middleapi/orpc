@@ -23,7 +23,7 @@
     "@orpc/zod": "next",
     "@tanstack/react-query": "^5.80.5",
     "@types/node": "^22.15.18",
-    "@types/react": "^19.1.7",
+    "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.5",
     "@vitejs/plugin-react": "^4.5.2",
     "electron": "^36.2.0",
@@ -33,6 +33,6 @@
     "react-dom": "^19.1.0",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
-    "zod": "^3.25.57"
+    "zod": "^3.25.61"
   }
 }

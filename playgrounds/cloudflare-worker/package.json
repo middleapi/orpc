@@ -12,17 +12,17 @@
     "cf-typegen": "wrangler types"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.5.0",
+    "@cloudflare/vite-plugin": "^1.5.1",
     "@orpc/client": "next",
     "@orpc/server": "next",
-    "@types/react": "^19.1.7",
+    "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.5.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",
-    "wrangler": "^4.19.1",
-    "zod": "^3.25.57"
+    "wrangler": "^4.19.2",
+    "zod": "^3.25.61"
   }
 }

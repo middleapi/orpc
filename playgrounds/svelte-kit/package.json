@@ -21,10 +21,10 @@
     "@sveltejs/kit": "^2.21.4",
     "@sveltejs/vite-plugin-svelte": "^5.1.0",
     "@tanstack/svelte-query": "^5.80.2",
-    "svelte": "^5.33.18",
+    "svelte": "^5.33.19",
     "svelte-check": "^4.0.0",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
-    "zod": "^3.25.57"
+    "zod": "^3.25.61"
   }
 }
