@@ -27,7 +27,7 @@
     "@tanstack/solid-query": "^5.80.2",
     "@tanstack/svelte-query": "^5.80.2",
     "@tanstack/vue-query": "^5.80.2",
-    "@types/node": "^22.15.18",
+    "@types/node": "^24.0.1",
     "openai": "^5.3.0",
     "pinia": "^3.0.2",
     "superjson": "^2.2.2",
