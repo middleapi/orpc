@@ -68,9 +68,9 @@
     "@ts-rest/core": "^3.52.1",
     "@types/express": "^5.0.3",
     "express": "^5.0.0",
-    "fastify": "^5.0.0",
+    "fastify": "^5.4.0",
     "rxjs": "^7.8.1",
     "supertest": "^7.1.0",
-    "zod": "^3.25.63"
+    "zod": "^3.25.64"
   }
 }
