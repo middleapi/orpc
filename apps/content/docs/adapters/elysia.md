@@ -23,7 +23,7 @@ const app = new Elysia()
 
     return response ?? new Response('Not Found', { status: 404 })
   }, {
-    parse: 'none' // disables the body parser so bodyUsed remains false.
+    parse: 'none' // Disable Elysia's body parser; oRPC handler needs raw body access, pre-parsing consumes it (bodyUsed=true).
   })
   .listen(3000)
 
