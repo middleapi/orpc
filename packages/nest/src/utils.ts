@@ -10,8 +10,8 @@ export function toNestPattern(path: HTTPPath): string {
     .replace(/\/\{([^}]+)\}/g, '/:$1')
 }
 
-export type PopulatedContractRouterPaths<T extends AnyContractRouter> =
-    T extends ContractProcedure<infer UInputSchema, infer UOutputSchema, infer UErrors, infer UMeta>
+export type PopulatedContractRouterPaths<T extends AnyContractRouter>
+    = T extends ContractProcedure<infer UInputSchema, infer UOutputSchema, infer UErrors, infer UMeta>
       ? ContractProcedure<UInputSchema, UOutputSchema, UErrors, UMeta>
       : {
           [K in keyof T]: T[K] extends AnyContractRouter ? PopulatedContractRouterPaths<T[K]> : never

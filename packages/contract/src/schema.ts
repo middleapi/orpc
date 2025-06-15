@@ -12,9 +12,9 @@ export type InferSchemaInput<T extends AnySchema> = T extends StandardSchemaV1<i
 
 export type InferSchemaOutput<T extends AnySchema> = T extends StandardSchemaV1<any, infer UOutput> ? UOutput : never
 
-export type TypeRest<TInput, TOutput> =
-  | [map: (input: TInput) => Promisable<TOutput>]
-  | (IsEqual<TInput, TOutput> extends true ? [] : never)
+export type TypeRest<TInput, TOutput>
+  = | [map: (input: TInput) => Promisable<TOutput>]
+    | (IsEqual<TInput, TOutput> extends true ? [] : never)
 
 /**
  * The schema for things can be trust without validation.

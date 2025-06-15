@@ -2,13 +2,13 @@ export interface StandardHeaders {
   [key: string]: string | string[] | undefined
 }
 
-export type StandardBody =
-  | undefined
-  | unknown
-  | Blob
-  | URLSearchParams
-  | FormData
-  | AsyncIterator<unknown | void, unknown | void, undefined>
+export type StandardBody
+  = | undefined
+    | unknown
+    | Blob
+    | URLSearchParams
+    | FormData
+    | AsyncIterator<unknown | void, unknown | void, undefined>
 
 export interface StandardRequest {
   method: string

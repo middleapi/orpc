@@ -35,14 +35,14 @@ export interface OperationContext {
   }
 }
 
-export type QueryKeyOptions<TInput> =
-  & (undefined extends TInput ? { input?: TInput | SkipToken } : { input: TInput | SkipToken })
-  & { queryKey?: QueryKey }
+export type QueryKeyOptions<TInput>
+  = & (undefined extends TInput ? { input?: TInput | SkipToken } : { input: TInput | SkipToken })
+    & { queryKey?: QueryKey }
 
-export type QueryOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TSelectData> =
-  & QueryKeyOptions<TInput>
-  & (Record<never, never> extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
-  & Omit<QueryObserverOptions<TOutput, TError, TSelectData>, 'queryKey'>
+export type QueryOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TSelectData>
+  = & QueryKeyOptions<TInput>
+    & (Record<never, never> extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
+    & Omit<QueryObserverOptions<TOutput, TError, TSelectData>, 'queryKey'>
 
 export interface QueryOptionsBase<TOutput, TError> {
   queryKey: DataTag<QueryKey, TOutput, TError>
@@ -52,21 +52,21 @@ export interface QueryOptionsBase<TOutput, TError> {
   enabled: boolean
 }
 
-export type experimental_StreamedKeyOptions<TInput> =
-  & QueryKeyOptions<TInput>
-  & { queryFnOptions?: experimental_StreamedQueryOptions }
+export type experimental_StreamedKeyOptions<TInput>
+  = & QueryKeyOptions<TInput>
+    & { queryFnOptions?: experimental_StreamedQueryOptions }
 
-export type experimental_StreamedOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TSelectData> =
-  & QueryOptionsIn<TClientContext, TInput, TOutput, TError, TSelectData>
-  & { queryFnOptions?: experimental_StreamedQueryOptions }
+export type experimental_StreamedOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TSelectData>
+  = & QueryOptionsIn<TClientContext, TInput, TOutput, TError, TSelectData>
+    & { queryFnOptions?: experimental_StreamedQueryOptions }
 
 export interface experimental_StreamedOptionsBase<TOutput, TError> extends QueryOptionsBase<TOutput, TError> {
 }
 
-export type InfiniteOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TSelectData, TPageParam> =
-  & { input: ((pageParam: TPageParam) => TInput) | SkipToken }
-  & (Record<never, never> extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
-  & SetOptional<InfiniteQueryObserverOptions<TOutput, TError, TSelectData, QueryKey, TPageParam>, 'queryKey'>
+export type InfiniteOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TSelectData, TPageParam>
+  = & { input: ((pageParam: TPageParam) => TInput) | SkipToken }
+    & (Record<never, never> extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
+    & SetOptional<InfiniteQueryObserverOptions<TOutput, TError, TSelectData, QueryKey, TPageParam>, 'queryKey'>
 
 export interface InfiniteOptionsBase<TOutput, TError, TPageParam> {
   queryKey: DataTag<QueryKey, InfiniteData<TOutput, TPageParam>, TError>
@@ -77,8 +77,8 @@ export interface InfiniteOptionsBase<TOutput, TError, TPageParam> {
   enabled: boolean
 }
 
-export type MutationOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TMutationContext> =
-    & (Record<never, never> extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
-    & MutationOptions<TInput, TOutput, TError, TMutationContext>
+export type MutationOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TMutationContext>
+    = & (Record<never, never> extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
+      & MutationOptions<TInput, TOutput, TError, TMutationContext>
 
 export type MutationOptions<TInput, TOutput, TError, TMutationContext> = MutationObserverOptions<TOutput, TError, TInput, TMutationContext>

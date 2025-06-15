@@ -61,9 +61,9 @@ export function onError<T, TOptions extends { next(): any }, TRest extends any[]
   }
 }
 
-export type OnFinishState<TResult, TError> =
-  | [error: TError, data: undefined, isSuccess: false]
-  | [error: null, data: TResult, isSuccess: true]
+export type OnFinishState<TResult, TError>
+  = | [error: TError, data: undefined, isSuccess: false]
+    | [error: null, data: TResult, isSuccess: true]
 
 /**
  * Can used for interceptors or middlewares

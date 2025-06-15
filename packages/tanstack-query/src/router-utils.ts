@@ -5,8 +5,8 @@ import { toArray } from '@orpc/shared'
 import { createGeneralUtils } from './general-utils'
 import { createProcedureUtils } from './procedure-utils'
 
-export type RouterUtils<T extends NestedClient<any>> =
-  T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
+export type RouterUtils<T extends NestedClient<any>>
+  = T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
     ? ProcedureUtils<UClientContext, UInput, UOutput, UError> & GeneralUtils<UInput>
     : {
       [K in keyof T]: T[K] extends NestedClient<any> ? RouterUtils<T[K]> : never

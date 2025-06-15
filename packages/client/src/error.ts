@@ -93,10 +93,10 @@ export function fallbackORPCErrorMessage(code: ORPCErrorCode, message: string | 
   return message || (COMMON_ORPC_ERROR_DEFS as any)[code]?.message || code
 }
 
-export type ORPCErrorOptions<TData> =
-  & ErrorOptions
-  & { defined?: boolean, status?: number, message?: string }
-  & (undefined extends TData ? { data?: TData } : { data: TData })
+export type ORPCErrorOptions<TData>
+  = & ErrorOptions
+    & { defined?: boolean, status?: number, message?: string }
+    & (undefined extends TData ? { data?: TData } : { data: TData })
 
 export class ORPCError<TCode extends ORPCErrorCode, TData> extends Error {
   readonly defined: boolean

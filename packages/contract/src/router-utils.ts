@@ -26,8 +26,8 @@ export function getContractRouter(router: AnyContractRouter, path: readonly stri
   return current
 }
 
-export type EnhancedContractRouter<T extends AnyContractRouter, TErrorMap extends ErrorMap> =
-    T extends ContractProcedure<infer UInputSchema, infer UOutputSchema, infer UErrors, infer UMeta>
+export type EnhancedContractRouter<T extends AnyContractRouter, TErrorMap extends ErrorMap>
+    = T extends ContractProcedure<infer UInputSchema, infer UOutputSchema, infer UErrors, infer UMeta>
       ? ContractProcedure<UInputSchema, UOutputSchema, MergedErrorMap<TErrorMap, UErrors>, UMeta>
       : {
           [K in keyof T]: T[K] extends AnyContractRouter ? EnhancedContractRouter<T[K], TErrorMap> : never

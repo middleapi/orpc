@@ -1,9 +1,9 @@
 import type { Context } from '../../context'
 import type { StandardHandleOptions } from './handler'
 
-export type FriendlyStandardHandleOptions<T extends Context> =
-  & Omit<StandardHandleOptions<T>, 'context'>
-  & (Record<never, never> extends T ? { context?: T } : { context: T })
+export type FriendlyStandardHandleOptions<T extends Context>
+  = & Omit<StandardHandleOptions<T>, 'context'>
+    & (Record<never, never> extends T ? { context?: T } : { context: T })
 
 export function resolveFriendlyStandardHandleOptions<T extends Context>(options: FriendlyStandardHandleOptions<T>): StandardHandleOptions<T> {
   return {

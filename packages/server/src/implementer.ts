@@ -88,16 +88,13 @@ export type ImplementerInternal<
   TContract extends AnyContractRouter,
   TInitialContext extends Context,
   TCurrentContext extends Context,
-> =
-  &(
-    TContract extends ContractProcedure<infer UInputSchema, infer UOutputSchema, infer UErrorMap, infer UMeta>
-      ? ProcedureImplementer<TInitialContext, TCurrentContext, UInputSchema, UOutputSchema, UErrorMap, UMeta>
-      : RouterImplementer<TContract, TInitialContext, TCurrentContext> & {
-        [K in keyof TContract]: TContract[K] extends AnyContractRouter
-          ? ImplementerInternal<TContract[K], TInitialContext, TCurrentContext>
-          : never
-      }
-   )
+> = TContract extends ContractProcedure<infer UInputSchema, infer UOutputSchema, infer UErrorMap, infer UMeta>
+  ? ProcedureImplementer<TInitialContext, TCurrentContext, UInputSchema, UOutputSchema, UErrorMap, UMeta>
+  : RouterImplementer<TContract, TInitialContext, TCurrentContext> & {
+    [K in keyof TContract]: TContract[K] extends AnyContractRouter
+      ? ImplementerInternal<TContract[K], TInitialContext, TCurrentContext>
+      : never
+  }
 
 export function implementerInternal<
   T extends AnyContractRouter,
@@ -195,8 +192,8 @@ export type Implementer<
   TContract extends AnyContractRouter,
   TInitialContext extends Context,
   TCurrentContext extends Context,
-> =
-  & {
+>
+  = & {
     /**
      * Set or override the initial context.
      *

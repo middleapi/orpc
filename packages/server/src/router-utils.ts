@@ -48,8 +48,8 @@ export function getRouter<T extends Lazyable<AnyRouter | undefined>>(
   return current as any
 }
 
-export type AccessibleLazyRouter<T extends Lazyable<AnyRouter | undefined>> =
-    T extends Lazy<infer U extends AnyRouter | undefined | Lazy<AnyRouter | undefined>>
+export type AccessibleLazyRouter<T extends Lazyable<AnyRouter | undefined>>
+    = T extends Lazy<infer U extends AnyRouter | undefined | Lazy<AnyRouter | undefined>>
       ? AccessibleLazyRouter<U>
       : T extends AnyProcedure | undefined
         ? Lazy<T>
@@ -78,8 +78,8 @@ export type EnhancedRouter<
   TInitialContext extends Context,
   TCurrentContext extends Context,
   TErrorMap extends ErrorMap,
-> =
-    T extends Lazy<infer U extends AnyRouter>
+>
+    = T extends Lazy<infer U extends AnyRouter>
       ? AccessibleLazyRouter<EnhancedRouter<U, TInitialContext, TCurrentContext, TErrorMap>>
       : T extends Procedure<
         infer UInitialContext,
@@ -237,8 +237,8 @@ export async function resolveContractProcedures(
   }
 }
 
-export type UnlaziedRouter<T extends AnyRouter> =
-  T extends AnyProcedure
+export type UnlaziedRouter<T extends AnyRouter>
+  = T extends AnyProcedure
     ? T
     : {
         [K in keyof T]: T[K] extends Lazyable<infer U extends AnyRouter> ? UnlaziedRouter<U> : never

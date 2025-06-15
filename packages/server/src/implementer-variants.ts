@@ -60,13 +60,10 @@ export type ImplementerInternalWithMiddlewares<
   TContract extends AnyContractRouter,
   TInitialContext extends Context,
   TCurrentContext extends Context,
-> =
-  &(
-    TContract extends ContractProcedure<infer UInputSchema, infer UOutputSchema, infer UErrorMap, infer UMeta>
-      ? ProcedureImplementer<TInitialContext, TCurrentContext, UInputSchema, UOutputSchema, UErrorMap, UMeta>
-      : RouterImplementerWithMiddlewares<TContract, TInitialContext, TCurrentContext> & {
-        [K in keyof TContract]: TContract[K] extends AnyContractRouter
-          ? ImplementerInternalWithMiddlewares<TContract[K], TInitialContext, TCurrentContext>
-          : never
-      }
-   )
+> = TContract extends ContractProcedure<infer UInputSchema, infer UOutputSchema, infer UErrorMap, infer UMeta>
+  ? ProcedureImplementer<TInitialContext, TCurrentContext, UInputSchema, UOutputSchema, UErrorMap, UMeta>
+  : RouterImplementerWithMiddlewares<TContract, TInitialContext, TCurrentContext> & {
+    [K in keyof TContract]: TContract[K] extends AnyContractRouter
+      ? ImplementerInternalWithMiddlewares<TContract[K], TInitialContext, TCurrentContext>
+      : never
+  }

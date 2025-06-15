@@ -11,9 +11,9 @@ export interface ClientOptions<T extends ClientContext> {
   context: T
 }
 
-export type FriendlyClientOptions<T extends ClientContext> =
-  & Omit<ClientOptions<T>, 'context'>
-  & (Record<never, never> extends T ? { context?: T } : { context: T })
+export type FriendlyClientOptions<T extends ClientContext>
+  = & Omit<ClientOptions<T>, 'context'>
+    & (Record<never, never> extends T ? { context?: T } : { context: T })
 
 export type ClientRest<TClientContext extends ClientContext, TInput> = Record<never, never> extends TClientContext
   ? undefined extends TInput

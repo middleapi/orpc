@@ -12,8 +12,8 @@ import { createProcedureClient } from './procedure-client'
 import { createAssertedLazyProcedure } from './procedure-utils'
 import { getRouter } from './router-utils'
 
-export type RouterClient<TRouter extends AnyRouter, TClientContext extends ClientContext = Record<never, never>> =
-  TRouter extends Procedure<any, any, infer UInputSchema, infer UOutputSchema, infer UErrorMap, any>
+export type RouterClient<TRouter extends AnyRouter, TClientContext extends ClientContext = Record<never, never>>
+  = TRouter extends Procedure<any, any, infer UInputSchema, infer UOutputSchema, infer UErrorMap, any>
     ? ProcedureClient<TClientContext, UInputSchema, UOutputSchema, UErrorMap>
     : {
         [K in keyof TRouter]: TRouter[K] extends Lazyable<infer U extends AnyRouter> ? RouterClient<U, TClientContext> : never

@@ -3,8 +3,8 @@ import type { ORPCError } from './error'
 import type { ClientContext, ClientOptions, ClientPromiseResult, FriendlyClientOptions } from './types'
 import { isDefinedError } from './error'
 
-export type SafeResult<TOutput, TError> =
-  | [error: null, data: TOutput, isDefined: false, isSuccess: true]
+export type SafeResult<TOutput, TError>
+  = | [error: null, data: TOutput, isDefined: false, isSuccess: true]
   & { error: null, data: TOutput, isDefined: false, isSuccess: true }
   | [error: Exclude<TError, ORPCError<any, any>>, data: undefined, isDefined: false, isSuccess: false]
   & { error: Exclude<TError, ORPCError<any, any>>, data: undefined, isDefined: false, isSuccess: false }

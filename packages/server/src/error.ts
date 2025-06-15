@@ -5,8 +5,8 @@ import { fallbackORPCErrorStatus, ORPCError } from '@orpc/client'
 
 export type ORPCErrorConstructorMapItemOptions<TData> = Omit<ORPCErrorOptions<TData>, 'defined' | 'status'>
 
-export type ORPCErrorConstructorMapItem<TCode extends ORPCErrorCode, TInData> =
-  (...rest: MaybeOptionalOptions<ORPCErrorConstructorMapItemOptions<TInData>>) => ORPCError<TCode, TInData>
+export type ORPCErrorConstructorMapItem<TCode extends ORPCErrorCode, TInData>
+  = (...rest: MaybeOptionalOptions<ORPCErrorConstructorMapItemOptions<TInData>>) => ORPCError<TCode, TInData>
 
 export type ORPCErrorConstructorMap<T extends ErrorMap> = {
   [K in keyof T]: K extends ORPCErrorCode

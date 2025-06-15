@@ -12,8 +12,8 @@ export interface UseServerActionOptions<TInput, TOutput, TError> {
 export interface UseServerActionExecuteOptions<TInput, TOutput, TError> extends Pick<UseServerActionOptions<TInput, TOutput, TError>, 'interceptors'> {
 }
 
-export type UseServerActionExecuteRest<TInput, TOutput, TError> =
-  undefined extends TInput
+export type UseServerActionExecuteRest<TInput, TOutput, TError>
+  = undefined extends TInput
     ? [input?: TInput, options?: UseServerActionExecuteOptions<TInput, TOutput, TError>]
     : [input: TInput, options?: UseServerActionExecuteOptions<TInput, TOutput, TError>]
 

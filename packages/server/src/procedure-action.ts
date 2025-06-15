@@ -7,9 +7,9 @@ export type ActionableError<T> = T extends ORPCError<infer U, infer V> ? ORPCErr
 
 export type UnactionableError<T> = T extends { defined: true } & ORPCErrorJSON<infer U, infer V> ? ORPCError<U, V> : ThrowableError
 
-export type ActionableClientRest<TInput> =
-  | [input: TInput]
-  | (undefined extends TInput ? [input?: TInput] : [input: TInput])
+export type ActionableClientRest<TInput>
+  = | [input: TInput]
+    | (undefined extends TInput ? [input?: TInput] : [input: TInput])
 
 export type ActionableClientResult<TOutput, TError extends ORPCErrorJSON<any, any>> = [error: null, data: TOutput] | [error: TError, data: undefined]
 

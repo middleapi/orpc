@@ -45,8 +45,8 @@ export type CreateProcedureClientOptions<
   TErrorMap extends ErrorMap,
   TMeta extends Meta,
   TClientContext extends ClientContext,
-> =
-  & {
+>
+  = & {
     /**
      * This is helpful for logging and analytics.
      */

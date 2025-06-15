@@ -1,7 +1,7 @@
 import type { Client, NestedClient, ORPCError } from '@orpc/client'
 
-export type JsonifiedValue<T> =
-    T extends string ? T
+export type JsonifiedValue<T>
+    = T extends string ? T
       : T extends number ? T
         : T extends boolean ? T
           : T extends null ? T
@@ -32,8 +32,8 @@ export type JsonifiedArray<T extends Array<unknown>> = T extends readonly []
  *
  * @see {@link https://orpc.unnoq.com/docs/openapi/client/openapi-link OpenAPI Link Docs}
  */
-export type JsonifiedClient<T extends NestedClient<any>> =
-T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
+export type JsonifiedClient<T extends NestedClient<any>>
+= T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
   ? Client<UClientContext, UInput, JsonifiedValue<UOutput>, UError extends ORPCError<infer UCode, infer UData> ? ORPCError<UCode, JsonifiedValue<UData>> : UError>
   : {
       [K in keyof T]: T[K] extends NestedClient<any> ? JsonifiedClient<T[K]> : T[K];
