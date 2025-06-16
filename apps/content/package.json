@@ -31,7 +31,7 @@
     "openai": "^5.3.0",
     "pinia": "^3.0.2",
     "superjson": "^2.2.2",
-    "svelte": "^5.34.1",
+    "svelte": "^5.34.3",
     "vitepress": "1.6.3",
     "vitepress-plugin-group-icons": "^1.4.1",
     "vitepress-plugin-llms": "^1.5.0",
