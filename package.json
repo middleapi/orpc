@@ -37,7 +37,7 @@
     "@vitest/coverage-v8": "^3.2.3",
     "@vitest/ui": "^3.2.3",
     "@vue/test-utils": "^2.4.6",
-    "eslint": "^9.15.0",
+    "eslint": "^9.29.0",
     "eslint-plugin-ban": "^2.0.0",
     "eslint-plugin-format": "^1.0.0",
     "jsdom": "^26.0.0",
