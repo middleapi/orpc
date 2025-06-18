@@ -34,7 +34,7 @@
     "type:check": "tsc -b"
   },
   "dependencies": {
-    "radash": "^12.1.0",
+    "radash": "^12.1.1",
     "type-fest": "^4.39.1"
   },
   "devDependencies": {
