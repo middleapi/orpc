@@ -34,8 +34,8 @@
     "@testing-library/svelte": "^5.2.7",
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.15.18",
-    "@vitest/coverage-v8": "^3.2.3",
-    "@vitest/ui": "^3.2.3",
+    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/ui": "^3.2.4",
     "@vue/test-utils": "^2.4.6",
     "eslint": "^9.29.0",
     "eslint-plugin-ban": "^2.0.0",
@@ -47,7 +47,7 @@
     "typescript": "^5.8.3",
     "unbuild": "^3.5.0",
     "vite-plugin-solid": "^2.11.6",
-    "vitest": "^3.2.3"
+    "vitest": "^3.2.4"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
