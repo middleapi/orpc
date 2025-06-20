@@ -286,7 +286,7 @@ const processedCases: SchemaTestCase[] = [
   },
   {
     schema: z.string().nullable(),
-    input: [true, { anyOf: [{ type: 'null' }, { type: 'string' }] }],
+    input: [true, { anyOf: [{ type: 'string' }, { type: 'null' }] }],
     ignoreZodToJsonSchema: true,
   },
   {

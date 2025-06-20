@@ -610,7 +610,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
 
         const [required, json] = this.convert(schema_._def.innerType, options, lazyDepth, false, false, structureDepth)
 
-        return [required, { anyOf: [{ type: 'null' }, json] }]
+        return [required, { anyOf: [json, { type: 'null' }] }]
       }
     }
 
