@@ -83,7 +83,7 @@ export default async function fetch(request: Request) {
   })
 
   if (matched) {
-    response
+    return response
   }
 
   return new Response('Not Found', { status: 404 })
