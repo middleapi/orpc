@@ -325,8 +325,8 @@ importers:
         specifier: ^8.0.1
         version: 8.0.1
       rou3:
-        specifier: ^0.7.1
-        version: 0.7.1
+        specifier: ^0.7.2
+        version: 0.7.2
     devDependencies:
       zod:
         specifier: ^3.25.67
@@ -10202,8 +10202,8 @@ packages:
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
 
-  rou3@0.7.1:
-    resolution: {integrity: sha512-uxflA2/4LtpKJ5lZ5sfdA6sILVQj428dezT1PfNdDM1l5OuUG3ogEPsL8fZeoJHHFXrpZKQwcTzyIbq5X3e7Ig==}
+  rou3@0.7.2:
+    resolution: {integrity: sha512-GQuhKsN8Tp4CJh81PUmLWS6VKlL38P+LIVpE+bW8OlVKuf+ICysK9Cnh8mGWE4wKkPmOQTpB9hvbLk0bRmHsMQ==}
 
   router@2.2.0:
     resolution: {integrity: sha512-nLTrUKm2UyiL7rlhapu/Zl45FwNgkZGaCpZbIHajDYgwlJCOzLSk+cIPAnsEqV955GjILJnKbdQC1nVPz+gAYQ==}
@@ -22991,7 +22991,7 @@ snapshots:
       fsevents: 2.3.3
     optional: true
 
-  rou3@0.7.1: {}
+  rou3@0.7.2: {}
 
   router@2.2.0:
     dependencies:

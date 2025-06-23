@@ -71,7 +71,7 @@
     "@orpc/shared": "workspace:*",
     "@orpc/standard-server": "workspace:*",
     "json-schema-typed": "^8.0.1",
-    "rou3": "^0.7.1"
+    "rou3": "^0.7.2"
   },
   "devDependencies": {
     "zod": "^3.25.67"
