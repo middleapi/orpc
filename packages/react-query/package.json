@@ -46,7 +46,7 @@
     "@orpc/tanstack-query": "workspace:*"
   },
   "devDependencies": {
-    "@tanstack/react-query": "^5.80.10",
+    "@tanstack/react-query": "^5.81.2",
     "react": "^19.1.0",
     "zod": "^3.25.67"
   }
