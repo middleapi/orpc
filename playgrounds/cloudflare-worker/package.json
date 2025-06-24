@@ -17,12 +17,12 @@
     "@orpc/server": "next",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.2",
-    "@vitejs/plugin-react": "^4.5.2",
+    "@vitejs/plugin-react": "^4.6.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",
-    "wrangler": "^4.20.5",
+    "wrangler": "^4.21.0",
     "zod": "^3.25.67"
   }
 }

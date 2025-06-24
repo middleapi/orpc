@@ -46,7 +46,7 @@
     "simple-git-hooks": "^2.11.1",
     "typescript": "^5.8.3",
     "unbuild": "^3.5.0",
-    "vite-plugin-solid": "^2.11.6",
+    "vite-plugin-solid": "^2.11.7",
     "vitest": "^3.2.4"
   },
   "pnpm": {
