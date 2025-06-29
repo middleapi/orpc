@@ -23,6 +23,7 @@ Use the `context` to track middleware execution and prevent duplication. For exa
 
 ```ts twoslash
 import { os } from '@orpc/server'
+
 declare function connectDb(): Promise<'a_fake_db'>
 // ---cut---
 const dbProvider = os

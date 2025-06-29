@@ -40,6 +40,7 @@ Before you begin, ensure you have already configured a [server-side client](/doc
 ```ts twoslash
 import { router } from './shared/planet'
 import { RouterClient } from '@orpc/server'
+
 declare const client: RouterClient<typeof router>
 // ---cut---
 import { createORPCReactQueryUtils } from '@orpc/react-query'
@@ -113,6 +114,7 @@ Integrate oRPC React Query utils into your React app with Context:
    import { RouterClient } from '@orpc/server'
    import { RouterUtils } from '@orpc/react-query'
    import { useQuery } from '@tanstack/react-query'
+
    declare function useORPC(): RouterUtils<RouterClient<typeof router>>
    // ---cut---
    const orpc = useORPC()

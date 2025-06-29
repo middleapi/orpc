@@ -44,6 +44,7 @@ Before you begin, ensure you have already configured a [server-side client](/doc
 ```ts twoslash
 import { router } from './shared/planet'
 import { RouterClient } from '@orpc/server'
+
 declare const client: RouterClient<typeof router>
 // ---cut---
 import { createTanstackQueryUtils } from '@orpc/tanstack-query'

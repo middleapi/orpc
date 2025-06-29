@@ -52,6 +52,7 @@ Extend native types by creating your own `StandardRPCCustomJsonSerializer` and a
    import type { StandardRPCCustomJsonSerializer } from '@orpc/client/standard'
    import { RPCHandler } from '@orpc/server/fetch'
    import { RPCLink } from '@orpc/client/fetch'
+
    declare const router: Record<never, never>
    declare const userSerializer: StandardRPCCustomJsonSerializer
    // ---cut---

@@ -46,6 +46,7 @@ Customize serialization by creating your own `StandardOpenAPICustomJsonSerialize
    import type { StandardOpenAPICustomJsonSerializer } from '@orpc/openapi-client/standard'
    import { OpenAPIHandler } from '@orpc/openapi/fetch'
    import { OpenAPIGenerator } from '@orpc/openapi'
+
    declare const router: Record<never, never>
    declare const userSerializer: StandardOpenAPICustomJsonSerializer
    // ---cut---
