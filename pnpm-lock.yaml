@@ -371,8 +371,8 @@ importers:
         specifier: ^8.0.1
         version: 8.0.1
       rou3:
-        specifier: ^0.7.2
-        version: 0.7.2
+        specifier: ^0.7.3
+        version: 0.7.3
     devDependencies:
       zod:
         specifier: ^3.25.67
@@ -1289,7 +1289,7 @@ importers:
         version: 1.121.41(@tanstack/react-query@5.81.2(react@19.1.0))(@tanstack/react-router@1.121.41(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(@tanstack/router-core@1.121.40)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       '@tanstack/react-start':
         specifier: ^1.121.41
-        version: 1.121.41(@tanstack/react-router@1.121.41(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(@vitejs/plugin-react@4.6.0(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(better-sqlite3@12.1.1)(encoding@0.1.13)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(vite-plugin-solid@2.11.7(@testing-library/jest-dom@6.6.3)(solid-js@1.9.7)(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0))(webpack@5.99.6)(xml2js@0.6.2)
+        version: 1.121.41(@tanstack/react-router@1.121.41(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(@vitejs/plugin-react@4.6.0(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(better-sqlite3@12.1.1)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(vite-plugin-solid@2.11.7(@testing-library/jest-dom@6.6.3)(solid-js@1.9.7)(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0))(webpack@5.99.6)(xml2js@0.6.2)
       '@types/node':
         specifier: ^22.15.18
         version: 22.15.30
@@ -10896,8 +10896,8 @@ packages:
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
 
-  rou3@0.7.2:
-    resolution: {integrity: sha512-GQuhKsN8Tp4CJh81PUmLWS6VKlL38P+LIVpE+bW8OlVKuf+ICysK9Cnh8mGWE4wKkPmOQTpB9hvbLk0bRmHsMQ==}
+  rou3@0.7.3:
+    resolution: {integrity: sha512-KKenF/hB2iIhS1ohj226LT+/8uKCBpSMqeS4V1UPN9vad99uLoyIhrULRRB1skaB40LQHcBlSsAi3sT8MaoDDQ==}
 
   roughjs@4.6.6:
     resolution: {integrity: sha512-ZUz/69+SYpFN/g/lUlo2FXcIjRkSu3nDarreVdGGndHEBJ6cXPdKguS8JGxwj5HA5xIbVKSmLgr5b3AWxtRfvQ==}
@@ -15132,12 +15132,12 @@ snapshots:
       uuid: 11.1.0
       write-file-atomic: 6.0.0
 
-  '@netlify/functions@3.1.10(encoding@0.1.13)(rollup@4.44.1)':
+  '@netlify/functions@3.1.10(rollup@4.44.1)':
     dependencies:
       '@netlify/blobs': 9.1.2
       '@netlify/dev-utils': 2.2.0
       '@netlify/serverless-functions-api': 1.41.2
-      '@netlify/zip-it-and-ship-it': 12.2.0(encoding@0.1.13)(rollup@4.44.1)
+      '@netlify/zip-it-and-ship-it': 12.2.0(rollup@4.44.1)
       cron-parser: 4.9.0
       decache: 4.6.2
       extract-zip: 2.0.1
@@ -15221,13 +15221,13 @@ snapshots:
       - rollup
       - supports-color
 
-  '@netlify/zip-it-and-ship-it@12.2.0(encoding@0.1.13)(rollup@4.44.1)':
+  '@netlify/zip-it-and-ship-it@12.2.0(rollup@4.44.1)':
     dependencies:
       '@babel/parser': 7.27.7
       '@babel/types': 7.27.6
       '@netlify/binary-info': 1.0.0
       '@netlify/serverless-functions-api': 2.1.2
-      '@vercel/nft': 0.29.4(encoding@0.1.13)(rollup@4.44.1)
+      '@vercel/nft': 0.29.4(rollup@4.44.1)
       archiver: 7.0.1
       common-path-prefix: 3.0.0
       copy-file: 11.0.0
@@ -16451,9 +16451,9 @@ snapshots:
       tiny-invariant: 1.3.3
       tiny-warning: 1.0.3
 
-  '@tanstack/react-start-plugin@1.121.41(@tanstack/react-router@1.121.41(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(@vitejs/plugin-react@4.6.0(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(better-sqlite3@12.1.1)(encoding@0.1.13)(vite-plugin-solid@2.11.7(@testing-library/jest-dom@6.6.3)(solid-js@1.9.7)(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0))(webpack@5.99.6)(xml2js@0.6.2)':
+  '@tanstack/react-start-plugin@1.121.41(@tanstack/react-router@1.121.41(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(@vitejs/plugin-react@4.6.0(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(better-sqlite3@12.1.1)(vite-plugin-solid@2.11.7(@testing-library/jest-dom@6.6.3)(solid-js@1.9.7)(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0))(webpack@5.99.6)(xml2js@0.6.2)':
     dependencies:
-      '@tanstack/start-plugin-core': 1.121.41(@tanstack/react-router@1.121.41(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(better-sqlite3@12.1.1)(encoding@0.1.13)(vite-plugin-solid@2.11.7(@testing-library/jest-dom@6.6.3)(solid-js@1.9.7)(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0))(webpack@5.99.6)(xml2js@0.6.2)
+      '@tanstack/start-plugin-core': 1.121.41(@tanstack/react-router@1.121.41(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(better-sqlite3@12.1.1)(vite-plugin-solid@2.11.7(@testing-library/jest-dom@6.6.3)(solid-js@1.9.7)(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0))(webpack@5.99.6)(xml2js@0.6.2)
       '@vitejs/plugin-react': 4.6.0(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0))
       vite: 6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)
       zod: 3.25.67
@@ -16501,10 +16501,10 @@ snapshots:
       react: 19.1.0
       react-dom: 19.1.0(react@19.1.0)
 
-  '@tanstack/react-start@1.121.41(@tanstack/react-router@1.121.41(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(@vitejs/plugin-react@4.6.0(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(better-sqlite3@12.1.1)(encoding@0.1.13)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(vite-plugin-solid@2.11.7(@testing-library/jest-dom@6.6.3)(solid-js@1.9.7)(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0))(webpack@5.99.6)(xml2js@0.6.2)':
+  '@tanstack/react-start@1.121.41(@tanstack/react-router@1.121.41(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(@vitejs/plugin-react@4.6.0(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(better-sqlite3@12.1.1)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(vite-plugin-solid@2.11.7(@testing-library/jest-dom@6.6.3)(solid-js@1.9.7)(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0))(webpack@5.99.6)(xml2js@0.6.2)':
     dependencies:
       '@tanstack/react-start-client': 1.121.41(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
-      '@tanstack/react-start-plugin': 1.121.41(@tanstack/react-router@1.121.41(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(@vitejs/plugin-react@4.6.0(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(better-sqlite3@12.1.1)(encoding@0.1.13)(vite-plugin-solid@2.11.7(@testing-library/jest-dom@6.6.3)(solid-js@1.9.7)(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0))(webpack@5.99.6)(xml2js@0.6.2)
+      '@tanstack/react-start-plugin': 1.121.41(@tanstack/react-router@1.121.41(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(@vitejs/plugin-react@4.6.0(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(better-sqlite3@12.1.1)(vite-plugin-solid@2.11.7(@testing-library/jest-dom@6.6.3)(solid-js@1.9.7)(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0))(webpack@5.99.6)(xml2js@0.6.2)
       '@tanstack/react-start-server': 1.121.41(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       '@tanstack/start-server-functions-client': 1.121.40(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0))
       '@tanstack/start-server-functions-server': 1.121.36(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0))
@@ -16662,7 +16662,7 @@ snapshots:
       tiny-invariant: 1.3.3
       tiny-warning: 1.0.3
 
-  '@tanstack/start-plugin-core@1.121.41(@tanstack/react-router@1.121.41(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(better-sqlite3@12.1.1)(encoding@0.1.13)(vite-plugin-solid@2.11.7(@testing-library/jest-dom@6.6.3)(solid-js@1.9.7)(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0))(webpack@5.99.6)(xml2js@0.6.2)':
+  '@tanstack/start-plugin-core@1.121.41(@tanstack/react-router@1.121.41(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(better-sqlite3@12.1.1)(vite-plugin-solid@2.11.7(@testing-library/jest-dom@6.6.3)(solid-js@1.9.7)(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)))(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0))(webpack@5.99.6)(xml2js@0.6.2)':
     dependencies:
       '@babel/code-frame': 7.26.2
       '@babel/core': 7.27.7
@@ -16678,7 +16678,7 @@ snapshots:
       babel-dead-code-elimination: 1.0.10
       cheerio: 1.1.0
       h3: 1.13.0
-      nitropack: 2.11.13(better-sqlite3@12.1.1)(encoding@0.1.13)(xml2js@0.6.2)
+      nitropack: 2.11.13(better-sqlite3@12.1.1)(xml2js@0.6.2)
       pathe: 2.0.3
       ufo: 1.6.1
       vite: 6.3.5(@types/node@22.15.30)(jiti@2.4.2)(terser@5.39.2)(tsx@4.20.3)(yaml@2.8.0)
@@ -17426,7 +17426,7 @@ snapshots:
       - rollup
       - supports-color
 
-  '@vercel/nft@0.29.4(encoding@0.1.13)(rollup@4.44.1)':
+  '@vercel/nft@0.29.4(rollup@4.44.1)':
     dependencies:
       '@mapbox/node-pre-gyp': 2.0.0(encoding@0.1.13)
       '@rollup/pluginutils': 5.2.0(rollup@4.44.1)
@@ -23149,10 +23149,10 @@ snapshots:
       - supports-color
       - uploadthing
 
-  nitropack@2.11.13(better-sqlite3@12.1.1)(encoding@0.1.13)(xml2js@0.6.2):
+  nitropack@2.11.13(better-sqlite3@12.1.1)(xml2js@0.6.2):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.4.0
-      '@netlify/functions': 3.1.10(encoding@0.1.13)(rollup@4.44.1)
+      '@netlify/functions': 3.1.10(rollup@4.44.1)
       '@rollup/plugin-alias': 5.1.1(rollup@4.44.1)
       '@rollup/plugin-commonjs': 28.0.6(rollup@4.44.1)
       '@rollup/plugin-inject': 5.0.5(rollup@4.44.1)
@@ -23160,7 +23160,7 @@ snapshots:
       '@rollup/plugin-node-resolve': 16.0.1(rollup@4.44.1)
       '@rollup/plugin-replace': 6.0.2(rollup@4.44.1)
       '@rollup/plugin-terser': 0.4.4(rollup@4.44.1)
-      '@vercel/nft': 0.29.4(encoding@0.1.13)(rollup@4.44.1)
+      '@vercel/nft': 0.29.4(rollup@4.44.1)
       archiver: 7.0.1
       c12: 3.0.4(magicast@0.3.5)
       chokidar: 4.0.3
@@ -24951,7 +24951,7 @@ snapshots:
       '@rollup/rollup-win32-x64-msvc': 4.44.1
       fsevents: 2.3.3
 
-  rou3@0.7.2: {}
+  rou3@0.7.3: {}
 
   roughjs@4.6.6:
     dependencies:
