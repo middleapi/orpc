@@ -21,7 +21,7 @@
     "@orpc/server": "next",
     "@orpc/tanstack-query": "next",
     "@orpc/zod": "next",
-    "@tanstack/react-query": "^5.80.10",
+    "@tanstack/react-query": "^5.81.5",
     "@types/node": "^22.15.18",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.5",
