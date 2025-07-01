@@ -48,6 +48,7 @@ Before you begin, ensure you have already configured a [server-side client](/doc
 ```ts twoslash
 import { router } from './shared/planet'
 import { RouterClient } from '@orpc/server'
+
 declare const client: RouterClient<typeof router>
 // ---cut---
 import { createORPCVueColadaUtils } from '@orpc/vue-colada'
@@ -82,6 +83,7 @@ import { router } from './shared/planet'
 import { RouterClient } from '@orpc/server'
 import { RouterUtils } from '@orpc/vue-colada'
 import { useQuery } from '@pinia/colada'
+
 declare const orpc: RouterUtils<RouterClient<typeof router>>
 // ---cut---
 const query = useQuery(orpc.planet.find.queryOptions({
@@ -100,6 +102,7 @@ import { router } from './shared/planet'
 import { RouterClient } from '@orpc/server'
 import { RouterUtils } from '@orpc/vue-colada'
 import { useMutation } from '@pinia/colada'
+
 declare const orpc: RouterUtils<RouterClient<typeof router>>
 // ---cut---
 const mutation = useMutation(orpc.planet.create.mutationOptions({
@@ -119,6 +122,7 @@ import { router } from './shared/planet'
 import { RouterClient } from '@orpc/server'
 import { RouterUtils } from '@orpc/vue-colada'
 import { useQueryCache } from '@pinia/colada'
+
 declare const orpc: RouterUtils<RouterClient<typeof router>>
 // ---cut---
 const queryCache = useQueryCache()

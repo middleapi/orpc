@@ -40,6 +40,7 @@ Before you begin, ensure you have already configured a [server-side client](/doc
 ```ts twoslash
 import { router } from './shared/planet'
 import { RouterClient } from '@orpc/server'
+
 declare const client: RouterClient<typeof router>
 // ---cut---
 import { createORPCSolidQueryUtils } from '@orpc/solid-query'
@@ -75,6 +76,7 @@ Unlike the React version, when creating a Solid Query Signal, the first argument
 import type { router } from './shared/planet'
 import type { RouterClient } from '@orpc/server'
 import type { RouterUtils } from '@orpc/solid-query'
+
 declare const orpc: RouterUtils<RouterClient<typeof router>>
 declare const condition: boolean
 // ---cut---

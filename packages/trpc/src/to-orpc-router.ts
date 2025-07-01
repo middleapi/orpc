@@ -1,8 +1,9 @@
-import type { Parser } from '@trpc/server/unstable-core-do-not-import'
+import type { AnyProcedure, AnyRouter, inferRouterContext } from '@trpc/server'
+import type { inferRouterMeta, Parser } from '@trpc/server/unstable-core-do-not-import'
 import * as ORPC from '@orpc/server'
 import { isTypescriptObject } from '@orpc/shared'
-import { type AnyProcedure, type AnyRouter, type inferRouterContext, TRPCError } from '@trpc/server'
-import { getHTTPStatusCodeFromError, type inferRouterMeta } from '@trpc/server/unstable-core-do-not-import'
+import { TRPCError } from '@trpc/server'
+import { getHTTPStatusCodeFromError } from '@trpc/server/unstable-core-do-not-import'
 
 export interface experimental_ORPCMeta extends ORPC.Route {
 

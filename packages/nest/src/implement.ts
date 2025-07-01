@@ -37,10 +37,10 @@ const MethodDecoratorMap = {
 export function Implement<T extends ContractRouter<any>>(
   contract: T,
 ): <U extends Promisable<Router<T, Record<never, never>>>>(
-    target: Record<PropertyKey, any>,
-    propertyKey: string,
-    descriptor: TypedPropertyDescriptor<(...args: any[]) => U>
-  ) => void {
+  target: Record<PropertyKey, any>,
+  propertyKey: string,
+  descriptor: TypedPropertyDescriptor<(...args: any[]) => U>
+) => void {
   if (isContractProcedure(contract)) {
     const method = fallbackContractConfig('defaultMethod', contract['~orpc'].route.method)
     const path = contract['~orpc'].route.path

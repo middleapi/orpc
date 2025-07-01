@@ -40,6 +40,7 @@ Before you begin, ensure you have already configured a [server-side client](/doc
 ```ts twoslash
 import { router } from './shared/planet'
 import { RouterClient } from '@orpc/server'
+
 declare const client: RouterClient<typeof router>
 // ---cut---
 import { createORPCSvelteQueryUtils } from '@orpc/svelte-query'
@@ -73,6 +74,7 @@ To create reactive queries, use Svelte's legacy `derived` API from `svelte/store
 import type { router } from './shared/planet'
 import type { RouterClient } from '@orpc/server'
 import type { RouterUtils } from '@orpc/svelte-query'
+
 declare const orpc: RouterUtils<RouterClient<typeof router>>
 declare const condition: boolean
 // ---cut---

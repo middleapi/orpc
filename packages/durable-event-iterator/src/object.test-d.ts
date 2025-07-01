@@ -1,6 +1,5 @@
 import type { Client } from '@orpc/client'
-import type { InferDurableEventIteratorObjectRPC } from './object'
-import type { DurableEventIteratorObject } from './object'
+import type { DurableEventIteratorObject, InferDurableEventIteratorObjectRPC } from './object'
 
 it('InferDurableEventIteratorObjectRPC', () => {
   interface TestObject extends DurableEventIteratorObject<any, any> {
