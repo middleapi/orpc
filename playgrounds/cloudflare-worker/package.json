@@ -12,7 +12,7 @@
     "cf-typegen": "wrangler types"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.7.5",
+    "@cloudflare/vite-plugin": "^1.8.0",
     "@orpc/client": "next",
     "@orpc/experimental-durable-event-iterator": "next",
     "@orpc/server": "next",
