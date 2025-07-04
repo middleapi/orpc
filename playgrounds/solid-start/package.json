@@ -14,11 +14,11 @@
     "@orpc/tanstack-query": "next",
     "@orpc/zod": "next",
     "@solidjs/router": "^0.15.3",
-    "@solidjs/start": "^1.1.5",
+    "@solidjs/start": "^1.1.6",
     "@tanstack/solid-query": "^5.81.5",
     "solid-js": "^1.9.5",
     "vinxi": "^0.5.8",
     "vite-plugin-top-level-await": "^1.5.0",
-    "zod": "^3.25.67"
+    "zod": "^3.25.73"
   }
 }
