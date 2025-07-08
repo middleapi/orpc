@@ -40,6 +40,6 @@
   "devDependencies": {
     "@types/node": "^22.15.18",
     "@types/supertest": "^6.0.3",
-    "supertest": "^7.1.0"
+    "supertest": "^7.1.3"
   }
 }

@@ -19,6 +19,6 @@
     "nuxt": "^3.17.6",
     "vue": "latest",
     "vue-router": "latest",
-    "zod": "^3.25.75"
+    "zod": "^3.25.76"
   }
 }
