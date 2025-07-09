@@ -29,7 +29,7 @@
     "@tanstack/vue-query": "^5.81.5",
     "@types/node": "^22.15.18",
     "mermaid": "^11.8.1",
-    "openai": "^5.8.2",
+    "openai": "^5.8.3",
     "pinia": "^3.0.2",
     "superjson": "^2.2.2",
     "svelte": "^5.35.4",

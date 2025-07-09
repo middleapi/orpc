@@ -20,7 +20,7 @@
     "@orpc/openapi-client": "next",
     "@orpc/tanstack-query": "next",
     "@orpc/zod": "next",
-    "@swc/cli": "^0.7.7",
+    "@swc/cli": "^0.7.8",
     "@swc/core": "^1.12.11",
     "@tanstack/react-query": "^5.81.5",
     "@types/express": "^5.0.3",
