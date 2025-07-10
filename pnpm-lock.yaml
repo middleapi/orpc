@@ -280,8 +280,8 @@ importers:
         version: link:../shared
     devDependencies:
       '@hey-api/openapi-ts':
-        specifier: ^0.78.2
-        version: 0.78.2(magicast@0.3.5)(typescript@5.8.3)
+        specifier: ^0.78.3
+        version: 0.78.3(magicast@0.3.5)(typescript@5.8.3)
 
   packages/nest:
     dependencies:
@@ -2637,8 +2637,8 @@ packages:
     resolution: {integrity: sha512-yktiFZoWPtEW8QKS65eqKwA5MTKp88CyiL8q72WynrBs/73SAaxlSWlA2zW/DZlywZ5hX1OYzrCC0wFdvO9c2w==}
     engines: {node: '>= 16'}
 
-  '@hey-api/openapi-ts@0.78.2':
-    resolution: {integrity: sha512-gi/htSDqbhtURhJKBpMqIA6QgTX/0GI+gqPZSuDAflcti7OuJyhecUkQkhFQddU1hNahLy79r6qugE5TGGuwUA==}
+  '@hey-api/openapi-ts@0.78.3':
+    resolution: {integrity: sha512-uTP/EGA/mM4MsFN0xGcQ4fkFxeaAUGT2T1VKnNBv6WUwRY7J59Wg8kVuRXn3dLeI/IWUDwNNdHU0SfnEbXEmYw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=22.10.0}
     hasBin: true
     peerDependencies:
@@ -14220,7 +14220,7 @@ snapshots:
       js-yaml: 4.1.0
       lodash: 4.17.21
 
-  '@hey-api/openapi-ts@0.78.2(magicast@0.3.5)(typescript@5.8.3)':
+  '@hey-api/openapi-ts@0.78.3(magicast@0.3.5)(typescript@5.8.3)':
     dependencies:
       '@hey-api/json-schema-ref-parser': 1.0.6
       ansi-colors: 4.1.3
