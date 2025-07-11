@@ -50,7 +50,7 @@ However, if you're deriving the contract from a [router](/docs/router), importin
     })
     ```
     
-    This usage doesn't make the client type-safe, because `as any` bypass any typescript inference, so you can use `as typeof router` if you want better types
+This usage doesn't make the client type-safe, because `as any` bypasses TypeScript's type inference. To correctly type the client, cast the imported contract to the type of your server-side router, as shown in the example below.
 
     ```ts
     import contract from './contract.json' // [!code highlight]
