@@ -49,3 +49,14 @@ However, if you're deriving the contract from a [router](/docs/router), importin
       url: 'http://localhost:3000/api',
     })
     ```
+    
+    This usage doesn't make the client type-safe, because `as any` bypass any typescript inference, so you can use `as typeof router` if you want better types
+
+    ```ts
+    import contract from './contract.json' // [!code highlight]
+    import type { Router } from '../server/router' // Be sure to use "import type" and not "import" here
+
+    const link = new OpenAPILink(contract as Router, {
+      url: 'http://localhost:3000/api',
+    })
+    ```
