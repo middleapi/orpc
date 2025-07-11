@@ -20,7 +20,7 @@
     "@orpc/zod": "next",
     "@sveltejs/adapter-auto": "^6.0.0",
     "@sveltejs/kit": "^2.22.2",
-    "@sveltejs/vite-plugin-svelte": "^5.1.0",
+    "@sveltejs/vite-plugin-svelte": "^6.0.0",
     "@tanstack/svelte-query": "^5.81.5",
     "svelte": "^5.35.4",
     "svelte-check": "^4.2.2",
