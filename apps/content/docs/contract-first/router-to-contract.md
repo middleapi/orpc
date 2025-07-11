@@ -45,18 +45,11 @@ However, if you're deriving the contract from a [router](/docs/router), importin
     ```ts
     import contract from './contract.json' // [!code highlight]
 
-    const link = new OpenAPILink(contract as any, {
+    const link = new OpenAPILink(contract as typeof router, {
       url: 'http://localhost:3000/api',
     })
     ```
-    
-This usage doesn't make the client type-safe, because `as any` bypasses TypeScript's type inference. To correctly type the client, cast the imported contract to the type of your server-side router, as shown in the example below.
 
-    ```ts
-    import contract from './contract.json' // [!code highlight]
-    import type { Router } from '../server/router' // Be sure to use "import type" and not "import" here
-
-    const link = new OpenAPILink(contract as Router, {
-      url: 'http://localhost:3000/api',
-    })
-    ```
+    ::: warning
+    Cast `contract` to `typeof router` to ensure type safety, since standard schema types cannot be serialized to JSON so we must manually cast them.
+    :::
