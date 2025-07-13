@@ -208,8 +208,8 @@ importers:
         version: link:../standard-server-peer
     devDependencies:
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   packages/contract:
     dependencies:
@@ -233,8 +233,8 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0(typescript@5.8.3)
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   packages/durable-event-iterator:
     dependencies:
@@ -302,8 +302,8 @@ importers:
         version: 8.0.1
     devDependencies:
       zod:
-        specifier: ^3.25.74
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   packages/nest:
     dependencies:
@@ -349,7 +349,7 @@ importers:
         version: 11.1.3(@nestjs/common@11.1.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.3)(@nestjs/platform-express@11.1.3)
       '@ts-rest/core':
         specifier: ^3.52.1
-        version: 3.52.1(@types/node@22.16.3)(zod@3.25.76)
+        version: 3.52.1(@types/node@22.16.3)(zod@4.0.5)
       '@types/express':
         specifier: ^5.0.3
         version: 5.0.3
@@ -366,8 +366,8 @@ importers:
         specifier: ^7.1.3
         version: 7.1.3
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   packages/openapi:
     dependencies:
@@ -397,8 +397,8 @@ importers:
         version: 0.7.3
     devDependencies:
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   packages/openapi-client:
     dependencies:
@@ -441,8 +441,8 @@ importers:
         specifier: ^19.1.0
         version: 19.1.0
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   packages/react-query:
     dependencies:
@@ -463,8 +463,8 @@ importers:
         specifier: ^19.1.0
         version: 19.1.0
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   packages/server:
     dependencies:
@@ -525,8 +525,8 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0(typescript@5.8.3)
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   packages/solid-query:
     dependencies:
@@ -547,8 +547,8 @@ importers:
         specifier: ^5.81.5
         version: 5.82.0(solid-js@1.9.7)
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   packages/standard-server:
     dependencies:
@@ -641,8 +641,8 @@ importers:
         specifier: ^5.81.5
         version: 5.82.0(svelte@5.35.6)
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   packages/tanstack-query:
     dependencies:
@@ -681,8 +681,8 @@ importers:
         specifier: ^3.5.17
         version: 3.5.17(typescript@5.8.3)
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   packages/trpc:
     dependencies:
@@ -700,8 +700,8 @@ importers:
         specifier: ^11.4.3
         version: 11.4.3(typescript@5.8.3)
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   packages/valibot:
     dependencies:
@@ -785,11 +785,11 @@ importers:
         version: 5.1.4
     devDependencies:
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
       zod-to-json-schema:
         specifier: ^3.24.6
-        version: 3.24.6(zod@3.25.76)
+        version: 3.24.6(zod@4.0.5)
 
   playgrounds/astro:
     devDependencies:
@@ -842,8 +842,8 @@ importers:
         specifier: ^5.8.3
         version: 5.8.3
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   playgrounds/browser-extension:
     devDependencies:
@@ -890,8 +890,8 @@ importers:
         specifier: ^0.20.6
         version: 0.20.7(@types/node@22.16.3)(jiti@2.4.2)(rollup@4.44.2)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0)
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   playgrounds/cloudflare-worker:
     devDependencies:
@@ -932,8 +932,8 @@ importers:
         specifier: ^4.23.0
         version: 4.24.3(@cloudflare/workers-types@4.20250711.0)
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   playgrounds/contract-first:
     devDependencies:
@@ -971,8 +971,8 @@ importers:
         specifier: ^5.8.3
         version: 5.8.3
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   playgrounds/electron:
     devDependencies:
@@ -1034,8 +1034,8 @@ importers:
         specifier: ^6.3.5
         version: 6.3.5(@types/node@22.16.3)(jiti@2.4.2)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0)
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   playgrounds/nest:
     devDependencies:
@@ -1118,8 +1118,8 @@ importers:
         specifier: ^3.5.0
         version: 3.5.0(typescript@5.8.3)(vue@3.5.17(typescript@5.8.3))
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   playgrounds/next:
     devDependencies:
@@ -1169,8 +1169,8 @@ importers:
         specifier: ^5.8.3
         version: 5.8.3
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   playgrounds/nuxt:
     devDependencies:
@@ -1205,8 +1205,8 @@ importers:
         specifier: latest
         version: 4.5.1(vue@3.5.17(typescript@5.8.3))
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   playgrounds/solid-start:
     devDependencies:
@@ -1247,8 +1247,8 @@ importers:
         specifier: ^1.5.0
         version: 1.5.0(@swc/helpers@0.5.17)(rollup@4.44.2)(vite@6.3.5(@types/node@22.16.3)(jiti@2.4.2)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0))
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   playgrounds/svelte-kit:
     devDependencies:
@@ -1295,8 +1295,8 @@ importers:
         specifier: ^6.3.5
         version: 6.3.5(@types/node@22.16.3)(jiti@2.4.2)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0)
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
   playgrounds/tanstack-start:
     devDependencies:
@@ -1361,8 +1361,8 @@ importers:
         specifier: ^5.1.4
         version: 5.1.4(typescript@5.8.3)(vite@6.3.5(@types/node@22.16.3)(jiti@2.4.2)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0))
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.0.5
+        version: 4.0.5
 
 packages:
 
@@ -12594,6 +12594,9 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
+  zod@4.0.5:
+    resolution: {integrity: sha512-/5UuuRPStvHXu7RS+gmvRf4NXrNxpSllGwDnCBcJZtQsKrviYXm54yDGV2KYNLT5kq0lHGcl7lqWJLgSaG+tgA==}
+
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
@@ -16104,10 +16107,10 @@ snapshots:
 
   '@trysound/sax@0.2.0': {}
 
-  '@ts-rest/core@3.52.1(@types/node@22.16.3)(zod@3.25.76)':
+  '@ts-rest/core@3.52.1(@types/node@22.16.3)(zod@4.0.5)':
     optionalDependencies:
       '@types/node': 22.16.3
-      zod: 3.25.76
+      zod: 4.0.5
 
   '@tsconfig/node10@1.0.11': {}
 
@@ -25941,6 +25944,10 @@ snapshots:
     dependencies:
       zod: 3.25.76
 
+  zod-to-json-schema@3.24.6(zod@4.0.5):
+    dependencies:
+      zod: 4.0.5
+
   zod-to-ts@1.2.0(typescript@5.8.3)(zod@3.25.76):
     dependencies:
       typescript: 5.8.3
@@ -25949,5 +25956,7 @@ snapshots:
   zod@3.22.3: {}
 
   zod@3.25.76: {}
+
+  zod@4.0.5: {}
 
   zwitch@2.0.4: {}
