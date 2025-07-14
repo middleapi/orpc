@@ -6,7 +6,7 @@ titleTemplate: ':title'
 
 # oRPC v1 Announcement - Typesafe APIs Made Simple 🪄
 
-oRPC is a thing help you build type-safe APIs with TypeScript. It's has own goal but can fairly be compared to other libraries like tRPC, ts-rest, next-safe-action, etc. or even serve as an alternative to them.
+oRPC is a thing help you build type-safe APIs with TypeScript. It has its own goal but can fairly be compared to other libraries like tRPC, ts-rest, next-safe-action, etc. or even serve as an alternative to them.
 
 ## My Story
 
@@ -97,7 +97,7 @@ Benchmark results can vary across environments and depend heavily on factors lik
 :::
 
 ::: info
-You can read more about comparion [here](/docs/comparison)
+You can read more about comparison [here](/docs/comparison)
 :::
 
 ## ts-rest alternative
@@ -105,7 +105,7 @@ You can read more about comparion [here](/docs/comparison)
 After running into the OpenAPI issues with tRPC, I tried ts-rest. While it helped with OpenAPI, I soon found it was missing features I relied on from tRPC, like flexible middleware and easy handling of certain data types (like Dates or Files). After using it for some APIs, I felt it wasn't the complete solution I wanted. This frustration was a key reason I started building oRPC.
 
 ::: info
-You can read more about comparion [here](/docs/comparison)
+You can read more about comparison [here](/docs/comparison)
 :::
 
 ## next-safe-action alternative
