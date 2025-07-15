@@ -7,6 +7,7 @@ import {
 } from './registries'
 
 const customSchema1 = z.string().meta({
+  title: 'Custom String Schema',
   description: 'description',
   examples: ['a', 'b'],
 })
@@ -45,11 +46,20 @@ JSON_SCHEMA_OUTPUT_REGISTRY.add(customSchema3, {
   examples: ['1'],
 })
 
+const customSchemaWithTitleOnly = z.string().meta({
+  title: 'Title Only Schema',
+})
+
+const unionSchema = z.union([
+  z.string().meta({ title: 'String Option' }),
+  z.number().meta({ title: 'Number Option' }),
+])
+
 testSchemaConverter([
   {
     name: 'customSchema1',
     schema: customSchema1,
-    input: [true, { type: 'string', description: 'description', examples: ['a', 'b'] }],
+    input: [true, { type: 'string', title: 'Custom String Schema', description: 'description', examples: ['a', 'b'] }],
   },
   {
     name: 'customSchema1_unsupported_examples',
@@ -92,5 +102,20 @@ testSchemaConverter([
     name: 'string.readonly()',
     schema: z.string().readonly(),
     input: [true, { type: 'string', readOnly: true }],
+  },
+  {
+    name: 'customSchemaWithTitleOnly',
+    schema: customSchemaWithTitleOnly,
+    input: [true, { type: 'string', title: 'Title Only Schema' }],
+  },
+  {
+    name: 'unionSchema',
+    schema: unionSchema,
+    input: [true, {
+      anyOf: [
+        { type: 'string', title: 'String Option' },
+        { type: 'number', title: 'Number Option' },
+      ],
+    }],
   },
 ])

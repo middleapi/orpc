@@ -581,6 +581,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
 
     if (global) {
       return {
+        title: global.title,
         description: global.description,
         examples: Array.isArray(global.examples) ? global.examples : undefined,
       }
