@@ -17,7 +17,7 @@
     "@orpc/tanstack-query": "next",
     "@orpc/zod": "next",
     "@tanstack/react-query": "^5.83.0",
-    "@types/node": "^22.15.18",
+    "@types/node": "^24.0.13",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3",
     "zod": "^4.0.5"
