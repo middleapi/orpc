@@ -1,4 +1,4 @@
-'server only'
+import 'server-only'
 
 import { router } from '@/router'
 import { createRouterClient } from '@orpc/server'
