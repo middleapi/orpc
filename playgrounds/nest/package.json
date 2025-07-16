@@ -9,9 +9,9 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
-    "@nestjs/common": "^11.1.0",
-    "@nestjs/core": "^11.0.1",
-    "@nestjs/platform-express": "^11.1.0",
+    "@nestjs/common": "^11.1.4",
+    "@nestjs/core": "^11.1.4",
+    "@nestjs/platform-express": "^11.1.4",
     "@nestjs/schematics": "^11.0.0",
     "@orpc/client": "next",
     "@orpc/contract": "next",
