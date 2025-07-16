@@ -143,7 +143,7 @@ export const client: RouterClient<typeof router> = globalThis.$client ?? createO
 ```
 
 ```ts [lib/orpc.server.ts]
-'server only'
+import 'server-only'
 
 import { headers } from 'next/headers'
 import { createRouterClient } from '@orpc/server'

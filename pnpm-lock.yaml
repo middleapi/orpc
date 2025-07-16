@@ -1122,10 +1122,6 @@ importers:
         version: 4.0.5
 
   playgrounds/next:
-    dependencies:
-      server-only:
-        specifier: ^0.0.1
-        version: 0.0.1
     devDependencies:
       '@orpc/client':
         specifier: next
@@ -1169,6 +1165,9 @@ importers:
       react-dom:
         specifier: ^19.1.0
         version: 19.1.0(react@19.1.0)
+      server-only:
+        specifier: ^0.0.1
+        version: 0.0.1
       typescript:
         specifier: ^5.8.3
         version: 5.8.3

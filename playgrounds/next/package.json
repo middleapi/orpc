@@ -9,9 +9,6 @@
     "lint": "next lint",
     "type:check": "tsc --noEmit"
   },
-  "dependencies": {
-    "server-only": "^0.0.1"
-  },
   "devDependencies": {
     "@orpc/client": "next",
     "@orpc/json-schema": "next",
@@ -27,6 +24,7 @@
     "next": "^15.3.5",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "server-only": "^0.0.1",
     "typescript": "^5.8.3",
     "zod": "^4.0.5"
   }

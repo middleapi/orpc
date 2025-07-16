@@ -65,7 +65,7 @@ export const client: RouterClient<typeof router> = globalThis.$client ?? createO
 ```
 
 ```ts [lib/orpc.server.ts]
-'server only'
+import 'server-only'
 
 import { createRouterClient } from '@orpc/server'
 
@@ -117,7 +117,7 @@ export const client: JsonifiedClient<RouterClient<typeof router>> = globalThis.$
 ```
 
 ```ts [lib/orpc.server.ts]
-'server only'
+import 'server-only'
 
 import { createJsonifiedRouterClient } from '@orpc/openapi'
 
@@ -137,7 +137,7 @@ globalThis.$client = createJsonifiedRouterClient(router, {
 
 :::
 
-Finally, import `lib/orpc.server.ts` before anything else and on the **server only**. For example, in Next.js add it to `instrumentation.ts` and `app/layout.tsx`:
+Finally, ensure `lib/orpc.server.ts` is imported before any other code on the server. In Next.js, add it to both `instrumentation.ts` and `app/layout.tsx`:
 
 ::: code-group
 
@@ -166,7 +166,7 @@ oRPC doesn't restrict you to any specific approach for optimizing SSR - you can 
 :::
 
 ```ts [lib/orpc.server.ts]
-'server only'
+import 'server-only'
 
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
