@@ -51,7 +51,7 @@
     "@orpc/contract": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "jose": "^6.0.11",
+    "jose": "^6.0.12",
     "partysocket": "^1.1.4",
     "valibot": "^1.1.0"
   },
