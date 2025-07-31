@@ -8,13 +8,13 @@ import type { AccessibleLazyRouter, EnhancedRouter, UnlaziedRouter } from './rou
 import { ping, pong } from '../tests/shared'
 
 it('AccessibleLazyRouter', () => {
-    type Accessible = AccessibleLazyRouter<Lazy<typeof router>>
+  type Accessible = AccessibleLazyRouter<Lazy<typeof router>>
 
-    expectTypeOf<Accessible['ping']>().toEqualTypeOf<Lazy<typeof ping>>()
-    expectTypeOf<Accessible['nested']['ping']>().toEqualTypeOf<Lazy<typeof ping>>()
+  expectTypeOf<Accessible['ping']>().toEqualTypeOf<Lazy<typeof ping>>()
+  expectTypeOf<Accessible['nested']['ping']>().toEqualTypeOf<Lazy<typeof ping>>()
 
-    expectTypeOf<Accessible['pong']>().toEqualTypeOf<Lazy<typeof pong>>()
-    expectTypeOf<Accessible['nested']['pong']>().toEqualTypeOf<Lazy<typeof pong>>()
+  expectTypeOf<Accessible['pong']>().toEqualTypeOf<Lazy<typeof pong>>()
+  expectTypeOf<Accessible['nested']['pong']>().toEqualTypeOf<Lazy<typeof pong>>()
 })
 
 it('EnhancedRouter', () => {
@@ -75,14 +75,14 @@ it('EnhancedRouter', () => {
 })
 
 it('UnlaziedRouter', () => {
-    type Unlazied = UnlaziedRouter<typeof router>
+  type Unlazied = UnlaziedRouter<typeof router>
 
-    expectTypeOf<Unlazied>().toEqualTypeOf({
+  expectTypeOf<Unlazied>().toEqualTypeOf({
+    ping,
+    pong,
+    nested: {
       ping,
       pong,
-      nested: {
-        ping,
-        pong,
-      },
-    })
+    },
+  })
 })
