@@ -8,7 +8,7 @@
     "serve": "vitepress serve"
   },
   "devDependencies": {
-    "@ai-sdk/google": "2.0.0-beta.12",
+    "@ai-sdk/google": "2.0.0",
     "@ai-sdk/react": "2.0.0-beta.23",
     "@orpc/arktype": "workspace:*",
     "@orpc/client": "workspace:*",
