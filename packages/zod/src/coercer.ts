@@ -28,7 +28,27 @@ import { guard, isObject } from '@orpc/shared'
 import { ZodFirstPartyTypeKind } from 'zod/v3'
 import { getCustomZodDef } from './schemas/base'
 
+export interface ZodSmartCoercionPluginOptions {
+  /**
+   * Whether individual values should be promoted to a singleton array.
+   * Useful for query-string-like parameters.
+   *
+   * @example
+   * const QueryParams = z.object({ param: z.string().array() });
+   *
+   * // without promoteToSingletonArray:
+   * // ?param=a => { param: 'a' }
+   *
+   * // with promoteToSingletonArray:
+   * // ?param=a => { param: ['a'] }
+   */
+  promoteToSingletonArray?: boolean
+}
+
 export class ZodSmartCoercionPlugin<TContext extends Context> implements StandardHandlerPlugin<TContext> {
+  constructor(private readonly options: ZodSmartCoercionPluginOptions = {}) {
+  }
+
   init(options: StandardHandlerOptions<TContext>): void {
     options.clientInterceptors ??= []
 
@@ -39,7 +59,7 @@ export class ZodSmartCoercionPlugin<TContext extends Context> implements Standar
         return options.next()
       }
 
-      const coercedInput = zodCoerceInternal(inputSchema as ZodTypeAny, options.input)
+      const coercedInput = zodCoerceInternal(inputSchema as ZodTypeAny, options.input, this.options)
 
       return options.next({ ...options, input: coercedInput })
     })
@@ -49,6 +69,7 @@ export class ZodSmartCoercionPlugin<TContext extends Context> implements Standar
 function zodCoerceInternal(
   schema: ZodTypeAny,
   value: unknown,
+  options?: ZodSmartCoercionPluginOptions,
 ): unknown {
   const customZodDef = getCustomZodDef(schema._def)
 
@@ -189,6 +210,10 @@ function zodCoerceInternal(
 
       if (Array.isArray(value)) {
         return value.map(v => zodCoerceInternal(schema_._def.type, v))
+      }
+
+      if (options?.promoteToSingletonArray) {
+        return [zodCoerceInternal(schema_._def.type, value, options)]
       }
 
       return value

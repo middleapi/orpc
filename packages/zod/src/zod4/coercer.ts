@@ -24,10 +24,30 @@ import type {
 } from 'zod/v4/core'
 import { guard, isObject } from '@orpc/shared'
 
+export interface experimental_ZodSmartCoercionPluginOptions {
+  /**
+   * Whether individual values should be promoted to a singleton array.
+   * Useful for query-string-like parameters.
+   *
+   * @example
+   * const QueryParams = z.object({ param: z.string().array() });
+   *
+   * // without promoteToSingletonArray:
+   * // ?param=a => { param: 'a' }
+   *
+   * // with promoteToSingletonArray:
+   * // ?param=a => { param: ['a'] }
+   */
+  promoteToSingletonArray?: boolean
+}
+
 /**
  * @deprecated Use [Smart Coercion Plugin](https://orpc.unnoq.com/docs/openapi/plugins/smart-coercion) instead.
  */
 export class experimental_ZodSmartCoercionPlugin<TContext extends Context> implements StandardHandlerPlugin<TContext> {
+  constructor(private readonly options: experimental_ZodSmartCoercionPluginOptions = {}) {
+  }
+
   init(options: StandardHandlerOptions<TContext>): void {
     options.clientInterceptors ??= []
 
@@ -112,6 +132,10 @@ export class experimental_ZodSmartCoercionPlugin<TContext extends Context> imple
 
         if (Array.isArray(value)) {
           return value.map(v => this.#coerce(array._zod.def.element, v))
+        }
+
+        if (this.options?.promoteToSingletonArray) {
+          return [this.#coerce(array._zod.def.element, value)]
         }
 
         return value
