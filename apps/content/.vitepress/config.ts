@@ -131,6 +131,7 @@ export default withMermaid(defineConfig({
           collapsed: true,
           items: [
             { text: 'CORS', link: '/docs/plugins/cors' },
+            { text: 'Context Storage', link: '/docs/plugins/context-storage' },
             { text: 'Request Headers', link: '/docs/plugins/request-headers' },
             { text: 'Response Headers', link: '/docs/plugins/response-headers' },
             { text: 'Hibernation', link: '/docs/plugins/hibernation' },
