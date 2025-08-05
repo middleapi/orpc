@@ -43,7 +43,7 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "@trpc/server": "^11.4.3",
+    "@trpc/server": "^11.4.4",
     "zod": "^4.0.14"
   }
 }
