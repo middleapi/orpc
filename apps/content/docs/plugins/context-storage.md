@@ -17,12 +17,14 @@ This plugin is beneficial when you need to:
 - Build middleware or decorators that operate on the current request context
 
 ::: warning Runtime Support
+
 This plugin uses `AsyncLocalStorage` from Node.js `async_hooks`. Make sure your runtime supports it:
 
 - **Node.js**: Supported natively
 - **Cloudflare Workers**: Requires `nodejs_compat` or `nodejs_als` flag in `wrangler.toml`
 - **Other runtimes**: Check AsyncLocalStorage compatibility
-  :::
+
+:::
 
 ## Setup
 
