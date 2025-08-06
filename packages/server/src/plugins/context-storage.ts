@@ -44,9 +44,7 @@ export class ContextStoragePlugin<T extends Context> implements StandardHandlerP
     // Add interceptor at the beginning to ensure context is available for all subsequent interceptors
     options.rootInterceptors.unshift(async (interceptorOptions) => {
       // Store the context in AsyncLocalStorage and run the next interceptor
-      return asyncLocalStorage.run(interceptorOptions.context, async () => {
-        return interceptorOptions.next()
-      })
+      return asyncLocalStorage.run(interceptorOptions.context, interceptorOptions.next)
     })
   }
 }
