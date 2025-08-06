@@ -42,14 +42,14 @@
   },
   "devDependencies": {
     "@angular/core": "^20.1.4",
-    "@tanstack/angular-query-experimental": "^5.83.0",
-    "@tanstack/query-core": "^5.83.0",
-    "@tanstack/react-query": "^5.83.0",
-    "@tanstack/solid-query": "^5.83.0",
-    "@tanstack/svelte-query": "^5.83.0",
-    "@tanstack/vue-query": "^5.83.0",
-    "svelte": "^5.37.1",
+    "@tanstack/angular-query-experimental": "^5.84.1",
+    "@tanstack/query-core": "^5.83.1",
+    "@tanstack/react-query": "^5.84.1",
+    "@tanstack/solid-query": "^5.83.1",
+    "@tanstack/svelte-query": "^5.83.1",
+    "@tanstack/vue-query": "^5.83.1",
+    "svelte": "^5.37.3",
     "vue": "^3.5.18",
-    "zod": "^4.0.14"
+    "zod": "^4.0.15"
   }
 }
