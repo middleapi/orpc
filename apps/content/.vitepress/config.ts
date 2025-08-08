@@ -24,6 +24,10 @@ export default withMermaid(defineConfig({
       transformerTwoslash(),
     ],
   },
+  sitemap: {
+    hostname: 'https://orpc.unnoq.com',
+    lastmodDateOnly: true,
+  },
   themeConfig: {
     logo: '/logo.webp',
     siteTitle: '',
