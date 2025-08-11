@@ -60,17 +60,17 @@
     "@orpc/standard-server-node": "workspace:*"
   },
   "devDependencies": {
-    "@nestjs/common": "^11.1.5",
-    "@nestjs/core": "^11.1.5",
-    "@nestjs/platform-express": "^11.1.5",
-    "@nestjs/platform-fastify": "^11.1.5",
-    "@nestjs/testing": "^11.1.5",
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/platform-express": "^11.1.6",
+    "@nestjs/platform-fastify": "^11.1.6",
+    "@nestjs/testing": "^11.1.6",
     "@ts-rest/core": "^3.52.1",
     "@types/express": "^5.0.3",
     "express": "^5.0.0",
     "fastify": "^5.4.0",
     "rxjs": "^7.8.1",
     "supertest": "^7.1.4",
-    "zod": "^4.0.14"
+    "zod": "^4.0.17"
   }
 }
