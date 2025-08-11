@@ -9,9 +9,9 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.10",
-    "@nestjs/common": "^11.1.5",
-    "@nestjs/core": "^11.1.5",
-    "@nestjs/platform-express": "^11.1.5",
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/platform-express": "^11.1.6",
     "@nestjs/schematics": "^11.0.7",
     "@orpc/client": "next",
     "@orpc/contract": "next",
@@ -22,7 +22,7 @@
     "@orpc/zod": "next",
     "@swc/cli": "^0.7.7",
     "@swc/core": "^1.13.3",
-    "@tanstack/react-query": "^5.83.0",
+    "@tanstack/react-query": "^5.84.2",
     "@types/express": "^5.0.3",
     "@types/node": "^22.15.30",
     "globals": "^16.3.0",
@@ -32,8 +32,8 @@
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.8.3",
+    "typescript": "^5.9.2",
     "unbuild": "^3.6.0",
-    "zod": "^4.0.14"
+    "zod": "^4.0.17"
   }
 }
