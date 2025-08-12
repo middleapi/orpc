@@ -335,6 +335,10 @@ const serializer = new StandardRPCJsonSerializer({
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      queryKeyHashFn(queryKey) {
+        const [json, meta] = serializer.serialize(queryKey)
+        return JSON.stringify({ json, meta })
+      },
       staleTime: 60 * 1000, // > 0 to prevent immediate refetching on mount
     },
     dehydrate: {
@@ -376,6 +380,10 @@ export function createQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
+        queryKeyHashFn(queryKey) {
+          const [json, meta] = serializer.serialize(queryKey)
+          return JSON.stringify({ json, meta })
+        },
         staleTime: 60 * 1000, // > 0 to prevent immediate refetching on mount
       },
       dehydrate: {
