@@ -39,7 +39,7 @@
     "@vitest/ui": "^3.2.4",
     "@vue/test-utils": "^2.4.6",
     "better-sqlite3": "^12.2.0",
-    "bumpp": "^10.2.1",
+    "bumpp": "^10.2.3",
     "changelogithub": "^13.16.0",
     "eslint": "^9.33.0",
     "eslint-plugin-ban": "^2.0.0",
