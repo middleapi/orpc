@@ -37,6 +37,6 @@
     "@orpc/standard-server": "workspace:*"
   },
   "devDependencies": {
-    "@hono/node-server": "^1.18.0"
+    "@hono/node-server": "^1.18.2"
   }
 }
