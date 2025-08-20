@@ -37,7 +37,7 @@
     "@types/node": "^22.15.30",
     "ai": "5.0.14",
     "markdown-it-task-lists": "^2.1.1",
-    "mermaid": "^11.9.0",
+    "mermaid": "^11.10.0",
     "openai": "^5.12.2",
     "pinia": "^3.0.2",
     "superjson": "^2.2.2",
