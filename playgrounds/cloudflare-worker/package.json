@@ -12,7 +12,7 @@
     "cf-typegen": "wrangler types"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.11.6",
+    "@cloudflare/vite-plugin": "^1.11.7",
     "@orpc/client": "next",
     "@orpc/experimental-durable-event-iterator": "next",
     "@orpc/json-schema": "next",
@@ -29,7 +29,7 @@
     "react-dom": "^19.1.1",
     "typescript": "^5.9.2",
     "vite": "^6.3.5",
-    "wrangler": "^4.31.0",
+    "wrangler": "^4.32.0",
     "zod": "^4.0.17"
   }
 }
