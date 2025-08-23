@@ -27,10 +27,10 @@
     "@orpc/tanstack-query": "next",
     "@tanstack/react-query": "^5.85.5",
     "@types/bun": "latest",
-    "@types/react": "^19.1.10",
+    "@types/react": "^19.1.11",
     "@types/react-dom": "^19.1.7",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "zod": "^4.0.17"
+    "zod": "^4.1.0"
   }
 }
