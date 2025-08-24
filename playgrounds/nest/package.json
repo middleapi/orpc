@@ -29,7 +29,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "source-map-support": "^0.5.21",
-    "ts-loader": "^9.5.2",
+    "ts-loader": "^9.5.4",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.2",
