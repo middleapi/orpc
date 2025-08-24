@@ -1,4 +1,4 @@
-import type { Meta } from '@orpc/contract'
+import type { ErrorMap, Meta } from '@orpc/contract'
 import type { IntersectPick } from '@orpc/shared'
 import type { Context, MergedCurrentContext, MergedInitialContext } from './context'
 import type { ORPCErrorConstructorMap } from './error'
@@ -12,6 +12,11 @@ export interface DecoratedMiddleware<
   TErrorConstructorMap extends ORPCErrorConstructorMap<any>,
   TMeta extends Meta,
 > extends Middleware<TInContext, TOutContext, TInput, TOutput, TErrorConstructorMap, TMeta> {
+  /**
+   * Error map associated with this middleware (if any)
+   * @internal
+   */
+  errorMap?: ErrorMap
   /**
    * Change the expected input type by providing a map function.
    */
@@ -78,6 +83,8 @@ export interface DecoratedMiddleware<
   >
 }
 
+export type AnyDecoratedMiddleware = DecoratedMiddleware<any, any, any, any, any, any>
+
 export function decorateMiddleware<
   TInContext extends Context,
   TOutContext extends Context,
@@ -87,21 +94,33 @@ export function decorateMiddleware<
   TMeta extends Meta,
 >(
   middleware: Middleware<TInContext, TOutContext, TInput, TOutput, TErrorConstructorMap, TMeta>,
+  errorMap?: ErrorMap,
 ): DecoratedMiddleware<TInContext, TOutContext, TInput, TOutput, TErrorConstructorMap, TMeta> {
   const decorated = ((...args) => middleware(...args)) as DecoratedMiddleware<TInContext, TOutContext, TInput, TOutput, TErrorConstructorMap, TMeta>
+
+  // Attach error map if provided
+  if (errorMap) {
+    decorated.errorMap = errorMap
+  }
 
   decorated.mapInput = (mapInput) => {
     const mapped = decorateMiddleware(
       (options, input, ...rest) => middleware(options as any, mapInput(input as any), ...rest as [any]),
+      decorated.errorMap, // Preserve error map
     )
 
     return mapped as any
   }
 
-  decorated.concat = (concatMiddleware: AnyMiddleware, mapInput?: MapInputMiddleware<any, any>) => {
+  decorated.concat = (concatMiddleware: AnyMiddleware | AnyDecoratedMiddleware, mapInput?: MapInputMiddleware<any, any>) => {
     const mapped = mapInput
       ? decorateMiddleware(concatMiddleware).mapInput(mapInput)
       : concatMiddleware
+
+    const combinedErrorMap = {
+      ...decorated.errorMap,
+      ...('errorMap' in concatMiddleware ? concatMiddleware.errorMap : undefined),
+    }
 
     const concatted = decorateMiddleware((options, input, output, ...rest) => {
       const merged = middleware({
@@ -114,7 +133,7 @@ export function decorateMiddleware<
       } as any, input as any, output as any, ...rest)
 
       return merged
-    })
+    }, combinedErrorMap)
 
     return concatted as any
   }

@@ -12,6 +12,7 @@ import type { IntersectPick, MaybeOptionalOptions } from '@orpc/shared'
 import type { Context, MergedCurrentContext, MergedInitialContext } from './context'
 import type { ORPCErrorConstructorMap } from './error'
 import type { AnyMiddleware, MapInputMiddleware, Middleware } from './middleware'
+import type { AnyDecoratedMiddleware } from './middleware-decorated'
 import type { ProcedureActionableClient } from './procedure-action'
 import type { CreateProcedureClientOptions, ProcedureClient } from './procedure-client'
 import { mergeErrorMap, mergeMeta, mergeRoute } from '@orpc/contract'
@@ -136,14 +137,22 @@ export class DecoratedProcedure<
     TMeta
   >
 
-  use(middleware: AnyMiddleware, mapInput?: MapInputMiddleware<any, any>): DecoratedProcedure<any, any, any, any, any, any> {
+  use(middleware: AnyMiddleware | AnyDecoratedMiddleware, mapInput?: MapInputMiddleware<any, any>): DecoratedProcedure<any, any, any, any, any, any> {
     const mapped = mapInput
       ? decorateMiddleware(middleware).mapInput(mapInput)
       : middleware
 
+    if (!('errorMap' in middleware) || !middleware.errorMap) {
+      return new DecoratedProcedure({
+        ...this['~orpc'],
+        middlewares: addMiddleware(this['~orpc'].middlewares, mapped),
+      })
+    }
+
     return new DecoratedProcedure({
       ...this['~orpc'],
       middlewares: addMiddleware(this['~orpc'].middlewares, mapped),
+      errorMap: mergeErrorMap(this['~orpc'].errorMap, middleware.errorMap),
     })
   }
 

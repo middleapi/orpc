@@ -6,7 +6,7 @@ import type { Context, MergedCurrentContext, MergedInitialContext } from './cont
 import type { ORPCErrorConstructorMap } from './error'
 import type { Lazy } from './lazy'
 import type { AnyMiddleware, MapInputMiddleware, Middleware } from './middleware'
-import type { DecoratedMiddleware } from './middleware-decorated'
+import type { AnyDecoratedMiddleware, DecoratedMiddleware } from './middleware-decorated'
 import type { ProcedureHandler } from './procedure'
 import type { Router } from './router'
 import type { EnhancedRouter, EnhanceRouterOptions } from './router-utils'
@@ -146,7 +146,7 @@ export class Builder<
   middleware<UOutContext extends IntersectPick<TCurrentContext, UOutContext>, TInput, TOutput = any>( // = any here is important to make middleware can be used in any output by default
     middleware: Middleware<TInitialContext, UOutContext, TInput, TOutput, ORPCErrorConstructorMap<TErrorMap>, TMeta>,
   ): DecoratedMiddleware<TInitialContext, UOutContext, TInput, TOutput, any, TMeta> { // any ensures middleware can used in any procedure
-    return decorateMiddleware(middleware)
+    return decorateMiddleware(middleware, this['~orpc'].errorMap)
   }
 
   /**
@@ -190,16 +190,24 @@ export class Builder<
   >
 
   use(
-    middleware: AnyMiddleware,
+    middleware: AnyMiddleware | AnyDecoratedMiddleware,
     mapInput?: MapInputMiddleware<any, any>,
   ): BuilderWithMiddlewares<any, any, any, any, any, any> {
     const mapped = mapInput
       ? decorateMiddleware(middleware).mapInput(mapInput)
       : middleware
 
+    if (!('errorMap' in middleware) || !middleware.errorMap) {
+      return new Builder({
+        ...this['~orpc'],
+        middlewares: addMiddleware(this['~orpc'].middlewares, mapped),
+      }) as any
+    }
+
     return new Builder({
       ...this['~orpc'],
       middlewares: addMiddleware(this['~orpc'].middlewares, mapped),
+      errorMap: mergeErrorMap(this['~orpc'].errorMap, middleware.errorMap),
     }) as any
   }
 

@@ -130,7 +130,7 @@ describe('builder', () => {
 
     expect(applied).toBe(decorateMiddlewareSpy.mock.results[0]?.value)
     expect(decorateMiddlewareSpy).toBeCalledTimes(1)
-    expect(decorateMiddlewareSpy).toBeCalledWith(mid)
+    expect(decorateMiddlewareSpy).toBeCalledWith(mid, def.errorMap)
   })
 
   it('.errors', () => {
