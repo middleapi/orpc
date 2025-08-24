@@ -93,7 +93,8 @@ export function decorateMiddleware<
   TErrorConstructorMap extends ORPCErrorConstructorMap<any>,
   TMeta extends Meta,
 >(
-  middleware: Middleware<TInContext, TOutContext, TInput, TOutput, TErrorConstructorMap, TMeta>,
+  middleware: Middleware<TInContext, TOutContext, TInput, TOutput, TErrorConstructorMap, TMeta>
+    | DecoratedMiddleware<TInContext, TOutContext, TInput, TOutput, TErrorConstructorMap, TMeta>,
   errorMap?: ErrorMap,
 ): DecoratedMiddleware<TInContext, TOutContext, TInput, TOutput, TErrorConstructorMap, TMeta> {
   const decorated = ((...args) => middleware(...args)) as DecoratedMiddleware<TInContext, TOutContext, TInput, TOutput, TErrorConstructorMap, TMeta>
@@ -101,6 +102,9 @@ export function decorateMiddleware<
   // Attach error map if provided
   if (errorMap) {
     decorated.errorMap = errorMap
+  }
+  if ('errorMap' in middleware) {
+    decorated.errorMap = middleware.errorMap
   }
 
   decorated.mapInput = (mapInput) => {
