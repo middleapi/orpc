@@ -21,7 +21,7 @@ export interface EventPublisherSubscribeIteratorOptions extends EventPublisherOp
   /**
    * Aborts the async iterator. Throws if aborted before or during pulling.
    */
-  signal?: AbortSignal
+  signal?: AbortSignal | undefined
 }
 
 export class EventPublisher<T extends Record<PropertyKey, any>> {
