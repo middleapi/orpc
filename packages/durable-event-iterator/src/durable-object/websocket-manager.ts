@@ -6,6 +6,8 @@ import { encodeHibernationRPCEvent } from '@orpc/server/hibernation'
 import { DURABLE_EVENT_ITERATOR_HIBERNATION_ID_KEY, DURABLE_EVENT_ITERATOR_TOKEN_PAYLOAD_KEY } from './consts'
 
 export interface DurableEventIteratorObjectWebsocketManagerOptions extends StandardRPCJsonSerializerOptions {
+  shouldKickWs?: (payload: DurableEventIteratorTokenPayload) => boolean | Promise<boolean>
+
 }
 
 export type DurableEventIteratorObjectWebsocketInternalAttachment<
@@ -29,7 +31,8 @@ export type DurableEventIteratorObjectWebsocketAttachment
     & {
       [K in keyof DurableEventIteratorObjectWebsocketInternalAttachment<any>]?: never
     }
-
+const CLOSE_EXPIRED = 4001
+const CLOSE_REVOKED = 4003
 export class DurableEventIteratorObjectWebsocketManager<
   TEventPayload extends object,
   TTokenAttachment extends TokenAttachment,
@@ -41,18 +44,56 @@ export class DurableEventIteratorObjectWebsocketManager<
     private readonly options: DurableEventIteratorObjectWebsocketManagerOptions = {},
   ) {}
 
-  publishEvent(wss: readonly WebSocket[], payload: TEventPayload): void {
-    payload = this.eventStorage.storeEvent(payload)
+  async kickIfInvalid(ws: WebSocket): Promise<boolean> {
+    const att = this.deserializeAttachment(ws)
+    const payload = att?.[DURABLE_EVENT_ITERATOR_TOKEN_PAYLOAD_KEY]
+    if (payload === undefined) {
+      // Maybe the connection not finished the subscription process yet
+      return false
+    }
+    const now = Math.floor(Date.now() / 1000)
 
+    // exp check
+    if (payload?.exp !== undefined && now >= payload.exp) {
+      try {
+        ws.close(CLOSE_EXPIRED, 'token expired')
+      }
+      catch {}
+      return true
+    }
+
+    // optional revocation hook
+    let isRevoked = false
+    if (this.options.shouldKickWs) {
+      try {
+        isRevoked = await this.options?.shouldKickWs?.(payload)
+      }
+      catch {}
+    }
+
+    if (isRevoked) {
+      try {
+        ws.close(CLOSE_REVOKED, 'token revoked')
+      }
+      catch {}
+      return true
+    }
+
+    return false
+  }
+
+  async publishEvent(wss: readonly WebSocket[], payload: TEventPayload): Promise<void> {
+    payload = this.eventStorage.storeEvent(payload)
     for (const ws of wss) {
       const attachment = this.deserializeAttachment(ws)
       const hibernationEventIteratorId = attachment?.[DURABLE_EVENT_ITERATOR_HIBERNATION_ID_KEY]
-
       if (hibernationEventIteratorId === undefined) {
         // Maybe the connection not finished the subscription process yet
         continue
       }
-
+      const isInvalid = await this.kickIfInvalid(ws)
+      if (isInvalid)
+        continue
       ws.send(encodeHibernationRPCEvent(hibernationEventIteratorId, payload, this.options))
     }
   }
@@ -65,13 +106,14 @@ export class DurableEventIteratorObjectWebsocketManager<
    * @param hibernationId
    * @param after - The last event id or date after which to send events.
    */
-  sendEventsAfter(
+  async sendEventsAfter(
     ws: WebSocket,
     hibernationId: string,
     after: string | Date,
-  ): void {
+  ): Promise<void> {
+    if (await this.kickIfInvalid(ws))
+      return
     const events = this.eventStorage.getEventsAfter(after)
-
     for (const event of events) {
       ws.send(encodeHibernationRPCEvent(hibernationId, event, this.options))
     }

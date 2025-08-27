@@ -7,7 +7,7 @@ import { durableEventIteratorRouter } from './handler'
 import { DurableEventIteratorObjectWebsocketManager } from './websocket-manager'
 
 describe('durableEventIteratorRouter', async () => {
-  const date = 144434837
+  const date = Date.now()
 
   const tokenPayload = {
     att: { some: 'attachment' },

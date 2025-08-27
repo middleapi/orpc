@@ -40,7 +40,12 @@ export const durableEventIteratorRouter = base.router({
     })
   }),
 
-  call: base.call.handler(({ context, input, signal, lastEventId }) => {
+  call: base.call.handler(async ({ context, input, signal, lastEventId }) => {
+    if (await context.websocketManager.kickIfInvalid(context.currentWebsocket)) {
+      throw new ORPCError('UNAUTHORIZED', {
+        message: `Current token is invalid!`,
+      })
+    }
     const allowMethods = context.websocketManager.deserializeAttachment(context.currentWebsocket)[DURABLE_EVENT_ITERATOR_TOKEN_PAYLOAD_KEY].rpc
     const [method, ...path] = input.path
 
@@ -49,7 +54,6 @@ export const durableEventIteratorRouter = base.router({
         message: `Method "${method}" is not allowed.`,
       })
     }
-
     const nestedClient = (context.object as any)[method](context.currentWebsocket)
 
     const client = get(nestedClient, path) as Client<any, any, any, any>
