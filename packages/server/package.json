@@ -138,7 +138,7 @@
   "devDependencies": {
     "@types/ws": "^8.18.1",
     "crossws": "^0.4.1",
-    "next": "^15.5.0",
+    "next": "^15.5.2",
     "supertest": "^7.1.4",
     "ws": "^8.18.3"
   }

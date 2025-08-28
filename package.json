@@ -48,7 +48,7 @@
     "knip": "^5.63.0",
     "lint-staged": "^16.1.5",
     "msw": "^2.10.5",
-    "pkg-pr-new": "^0.0.57",
+    "pkg-pr-new": "^0.0.58",
     "sherif": "^1.6.1",
     "simple-git-hooks": "^2.11.1",
     "typescript": "^5.9.2",
