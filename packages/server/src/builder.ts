@@ -10,7 +10,10 @@ import type { DecoratedMiddleware } from './middleware-decorated'
 import type { ProcedureHandler } from './procedure'
 import type { Router } from './router'
 import type { EnhancedRouter, EnhanceRouterOptions } from './router-utils'
-import { mergeErrorMap, mergeMeta, mergePrefix, mergeRoute, mergeTags } from '@orpc/contract'
+import { ORPCError } from '@orpc/client'
+import { mergeErrorMap, mergeMeta, mergePrefix, mergeRoute, mergeTags, ValidationError } from '@orpc/contract'
+import { getDynamicParams } from '@orpc/openapi-client/standard'
+import * as z from 'zod'
 import { fallbackConfig } from './config'
 import { lazy } from './lazy'
 import { decorateMiddleware } from './middleware-decorated'
@@ -289,10 +292,38 @@ export class Builder<
    */
   prefix(
     prefix: HTTPPath,
+  ): RouterBuilder<TInitialContext, TCurrentContext, TErrorMap, TMeta>
+
+  /**
+   * Prefixes all procedures in the router with dynamic parameter validation using Zod.
+   * The provided prefix is post-appended to any existing router prefix.
+   * Parameters in the prefix path (e.g., /{id}) are validated using the provided Zod schemas.
+   *
+   * @note This option does not affect procedures that do not define a path in their route definition.
+   *
+   * @see {@link https://orpc.unnoq.com/docs/openapi/routing#route-prefixes OpenAPI Route Prefixes Docs}
+   */
+  prefix<TParamsSchema extends Record<string, z.ZodSchema>>(
+    prefix: HTTPPath,
+    paramsSchema: TParamsSchema,
+  ): RouterBuilder<TInitialContext, TCurrentContext, TErrorMap, TMeta>
+
+  prefix(
+    prefix: HTTPPath,
+    paramsSchema?: Record<string, z.ZodSchema>,
   ): RouterBuilder<TInitialContext, TCurrentContext, TErrorMap, TMeta> {
+    let middlewares = this['~orpc'].middlewares
+
+    // If paramsSchema is provided, add validation middleware
+    if (paramsSchema) {
+      const validationMiddleware = createParamsValidationMiddleware(prefix, paramsSchema)
+      middlewares = addMiddleware(middlewares, validationMiddleware)
+    }
+
     return new Builder({
       ...this['~orpc'],
       prefix: mergePrefix(this['~orpc'].prefix, prefix),
+      middlewares,
     }) as any
   }
 
@@ -330,6 +361,98 @@ export class Builder<
     loader: () => Promise<{ default: U }>,
   ): EnhancedRouter<Lazy<U>, TInitialContext, TCurrentContext, TErrorMap> {
     return enhanceRouter(lazy(loader), this['~orpc']) as any // Type instantiation is excessively deep and possibly infinite
+  }
+}
+
+/**
+ * Creates a middleware that validates path parameters extracted from the URL using Zod
+ * @internal
+ */
+function createParamsValidationMiddleware(
+  prefix: HTTPPath,
+  paramsSchema: Record<string, z.ZodSchema>,
+): AnyMiddleware {
+  const dynamicParams = getDynamicParams(prefix)
+
+  if (!dynamicParams?.length) {
+    // No dynamic params in prefix, return a no-op middleware
+    return async ({ next }) => {
+      return next({})
+    }
+  }
+
+  return async ({ next, context }) => {
+    // Extract params from context if available
+    const params = (context as any).params as Record<string, string> | undefined
+
+    if (!params) {
+      return next({})
+    }
+
+    const validatedParams: Record<string, any> = {}
+    const issues: Array<{ path: string[], message: string }> = []
+
+    for (const param of dynamicParams) {
+      const paramName = param.name
+      const paramValue = params[paramName]
+      const zodSchema = paramsSchema[paramName]
+
+      if (!zodSchema) {
+        // Parameter not defined in schema, skip validation
+        validatedParams[paramName] = paramValue
+        continue
+      }
+
+      if (paramValue === undefined) {
+        issues.push({
+          path: [paramName],
+          message: `Required parameter '${paramName}' is missing`,
+        })
+        continue
+      }
+
+      try {
+        // Use Zod for validation
+        const validatedValue = zodSchema.parse(paramValue)
+        validatedParams[paramName] = validatedValue
+      }
+      catch (error) {
+        if (error instanceof z.ZodError) {
+          // Format Zod validation errors
+          error.issues.forEach((issue) => {
+            issues.push({
+              path: [paramName, ...issue.path.map(p => String(p))],
+              message: issue.message,
+            })
+          })
+        }
+        else {
+          issues.push({
+            path: [paramName],
+            message: `Invalid parameter '${paramName}': ${error instanceof Error ? error.message : 'Unknown error'}`,
+          })
+        }
+      }
+    }
+
+    if (issues.length > 0) {
+      throw new ORPCError('BAD_REQUEST', {
+        message: 'Parameter validation failed',
+        data: { issues },
+        cause: new ValidationError({
+          message: 'Parameter validation failed',
+          issues,
+        }),
+      })
+    }
+
+    // Merge validated params into context
+    return next({
+      context: {
+        ...context,
+        params: validatedParams,
+      },
+    })
   }
 }
 
