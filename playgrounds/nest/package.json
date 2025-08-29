@@ -34,6 +34,6 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.2",
     "unbuild": "^3.6.1",
-    "zod": "^4.1.3"
+    "zod": "^4.1.5"
   }
 }
