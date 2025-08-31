@@ -32,33 +32,45 @@ export interface DurableEventIteratorLinkPluginOptions extends Omit<RPCLinkOptio
 /**
  * @see {@link https://orpc.unnoq.com/docs/integrations/durable-event-iterator Durable Event Iterator Integration}
  */
-export class DurableEventIteratorLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
+export class DurableEventIteratorLinkPlugin<T extends ClientContext>
+implements StandardLinkPlugin<T> {
   readonly CONTEXT_SYMBOL = Symbol('ORPC_DURABLE_EVENT_ITERATOR_LINK_PLUGIN_CONTEXT')
-
-  order = 2_100_000 // make sure execute before the batch plugin
+  order = 2_100_000
 
   private readonly url: DurableEventIteratorLinkPluginOptions['url']
   private readonly WebSocket: DurableEventIteratorLinkPluginOptions['WebSocket']
   private readonly linkOptions: Omit<RPCLinkOptions<object>, 'websocket'>
 
-  constructor({ url, WebSocket, ...options }: DurableEventIteratorLinkPluginOptions) {
+  constructor(opts: DurableEventIteratorLinkPluginOptions) {
+    const { url, WebSocket, ...rest } = opts
     this.url = url
     this.WebSocket = WebSocket
-    this.linkOptions = options
+    this.linkOptions = rest
   }
 
   init(options: StandardLinkOptions<T>): void {
     options.interceptors ??= []
     options.clientInterceptors ??= []
 
-    options.interceptors.push(async (options) => {
-      const pluginContext: DurableEventIteratorLinkPluginContext = {}
+    // Mark responses that carry a DEI token
+    options.clientInterceptors.push(async (clientOptions) => {
+      const ctx = clientOptions.context[this.CONTEXT_SYMBOL] as DurableEventIteratorLinkPluginContext | undefined
+      if (!ctx)
+        throw new TypeError('[DurableEventIteratorLinkPlugin] Plugin context has been corrupted or modified by another plugin or interceptor')
 
-      const output = await options.next({
-        ...options,
+      const res = await clientOptions.next()
+      ctx.isDurableEventIteratorResponse = res.headers[DURABLE_EVENT_ITERATOR_PLUGIN_HEADER_KEY] === DURABLE_EVENT_ITERATOR_PLUGIN_HEADER_VALUE
+      return res
+    })
+
+    // Turn the token into a resilient iterator (PartySocket-powered)
+    options.interceptors.push(async (interceptorOptions) => {
+      const pluginContext: DurableEventIteratorLinkPluginContext = {}
+      const output = await interceptorOptions.next({
+        ...interceptorOptions,
         context: {
           [this.CONTEXT_SYMBOL]: pluginContext,
-          ...options.context,
+          ...interceptorOptions.context,
         },
       })
 
@@ -66,14 +78,48 @@ export class DurableEventIteratorLinkPlugin<T extends ClientContext> implements 
         return output
       }
 
-      const token = output as string
-      const url = new URL(await value(this.url))
-      url.searchParams.append(DURABLE_EVENT_ITERATOR_TOKEN_PARAM, token)
+      // Token returned from this call (use once for the first connect)
+      let initialToken = output as string
 
-      const durableWs = new ReconnectableWebSocket(url.toString(), undefined, {
-        WebSocket: this.WebSocket,
-      })
+      // Save a snapshot of this exact call so we can re-fetch fresh tokens later
+      const upstreamNext = interceptorOptions.next
+      const snapshot = {
+        path: interceptorOptions.path,
+        input: interceptorOptions.input,
+        context: { [this.CONTEXT_SYMBOL]: pluginContext, ...interceptorOptions.context },
+        signal: interceptorOptions.signal,
+        lastEventId: interceptorOptions.lastEventId,
+      }
 
+      const refetchToken = async (): Promise<string> => {
+        const fresh = await upstreamNext(snapshot)
+        // Server sets the header + returns the token string again.
+        return fresh as string
+      }
+
+      const buildUrl = async (token: string): Promise<string> => {
+        const u = new URL(await value(this.url))
+        u.searchParams.set(DURABLE_EVENT_ITERATOR_TOKEN_PARAM, token)
+        return u.toString()
+      }
+
+      // One PartySocket drives everything; its URL provider pulls tokens.
+      let first = true
+      const durableWs = new ReconnectableWebSocket(
+        async () => {
+          if (first) {
+            first = false
+            return buildUrl(initialToken)
+          }
+          const nextToken = await refetchToken()
+          initialToken = nextToken // keep latest for visibility
+          return buildUrl(nextToken)
+        },
+        undefined,
+        {
+          WebSocket: this.WebSocket,
+        },
+      )
       const durableLink = new RPCLink<ClientRetryPluginContext>({
         ...this.linkOptions,
         websocket: durableWs,
@@ -101,24 +147,10 @@ export class DurableEventIteratorLinkPlugin<T extends ClientContext> implements 
       }
 
       const durableIterator = createClientDurableEventIterator(iterator, link, {
-        token,
+        token: initialToken,
       })
 
       return durableIterator
-    })
-
-    options.clientInterceptors.push(async (options) => {
-      const pluginContext = options.context[this.CONTEXT_SYMBOL] as DurableEventIteratorLinkPluginContext | undefined
-
-      if (!pluginContext) {
-        throw new TypeError('[DurableEventIteratorLinkPlugin] Plugin context has been corrupted or modified by another plugin or interceptor')
-      }
-
-      const response = await options.next()
-
-      pluginContext.isDurableEventIteratorResponse = response.headers[DURABLE_EVENT_ITERATOR_PLUGIN_HEADER_KEY] === DURABLE_EVENT_ITERATOR_PLUGIN_HEADER_VALUE
-
-      return response
     })
   }
 }
