@@ -46,7 +46,7 @@
     "eslint-plugin-format": "^1.0.1",
     "jsdom": "^26.0.0",
     "knip": "^5.63.0",
-    "lint-staged": "^16.1.5",
+    "lint-staged": "^16.1.6",
     "msw": "^2.11.1",
     "pkg-pr-new": "^0.0.58",
     "sherif": "^1.6.1",
