@@ -302,8 +302,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       jose:
-        specifier: ^6.0.12
-        version: 6.0.12
+        specifier: ^6.1.0
+        version: 6.1.0
       partysocket:
         specifier: ^1.1.4
         version: 1.1.5
@@ -10370,8 +10370,8 @@ packages:
     resolution: {integrity: sha512-twQoecYPiVA5K/h6SxtORw/Bs3ar+mLUtoPSc7iMXzQzK8d7eJ/R09wmTwAjiamETn1cXYPGfNnu7DMoHgu12w==}
     hasBin: true
 
-  jose@6.0.12:
-    resolution: {integrity: sha512-T8xypXs8CpmiIi78k0E+Lk7T2zlK4zDyg+o1CZ4AkOHgDg98ogdP2BeZ61lTFKFyoEwJ9RgAgN+SdM3iPgNonQ==}
+  jose@6.1.0:
+    resolution: {integrity: sha512-TTQJyoEoKcC1lscpVDCSsVgYzUDg/0Bt3WE//WiTPK6uOCQC2KZS4MpugbMWt/zyjkopgZoXhZuCi00gLudfUA==}
 
   js-beautify@1.15.4:
     resolution: {integrity: sha512-9/KXeZUKKJwqCXUdBxFJ3vPh467OCckSBmYDwSK/EtV090K+iMJ7zx2S3HLVDIWFQdqMIsZWbnaGiba18aWhaA==}
@@ -25669,7 +25669,7 @@ snapshots:
 
   jiti@2.5.1: {}
 
-  jose@6.0.12: {}
+  jose@6.1.0: {}
 
   js-beautify@1.15.4:
     dependencies:
