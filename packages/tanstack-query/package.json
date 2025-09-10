@@ -41,14 +41,14 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "@angular/core": "^20.2.3",
-    "@tanstack/angular-query-experimental": "^5.85.9",
-    "@tanstack/query-core": "^5.85.9",
-    "@tanstack/react-query": "^5.85.9",
-    "@tanstack/solid-query": "^5.85.9",
-    "@tanstack/svelte-query": "^5.85.9",
-    "@tanstack/vue-query": "^5.85.9",
-    "svelte": "^5.38.6",
+    "@angular/core": "^20.2.4",
+    "@tanstack/angular-query-experimental": "^5.87.3",
+    "@tanstack/query-core": "^5.87.1",
+    "@tanstack/react-query": "^5.87.1",
+    "@tanstack/solid-query": "^5.87.1",
+    "@tanstack/svelte-query": "^5.87.1",
+    "@tanstack/vue-query": "^5.87.1",
+    "svelte": "^5.38.8",
     "vue": "^3.5.21",
     "zod": "^4.1.5"
   }
