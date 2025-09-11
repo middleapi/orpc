@@ -87,7 +87,7 @@ export class PlanetController {
   }
 
   /**
-   * Implement entire a contract
+   * Implement entire contract
    */
   @Implement(contract.planet)
   planet() {
