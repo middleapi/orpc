@@ -46,8 +46,8 @@
     "openapi-types": "^12.1.3"
   },
   "devDependencies": {
-    "arktype": "2.1.21",
+    "arktype": "2.1.22",
     "valibot": "^1.1.0",
-    "zod": "^4.1.5"
+    "zod": "^4.1.8"
   }
 }

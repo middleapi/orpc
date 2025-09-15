@@ -41,6 +41,6 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "zod": "^4.1.5"
+    "zod": "^4.1.8"
   }
 }
