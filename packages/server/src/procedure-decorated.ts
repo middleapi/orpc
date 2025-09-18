@@ -38,13 +38,13 @@ export class DecoratedProcedure<
   errors<U extends ErrorMap>(
     errors: U,
   ): DecoratedProcedure<
-      TInitialContext,
-      TCurrentContext,
-      TInputSchema,
-      TOutputSchema,
-      MergedErrorMap<TErrorMap, U>,
-      TMeta
-    > {
+    TInitialContext,
+    TCurrentContext,
+    TInputSchema,
+    TOutputSchema,
+    MergedErrorMap<TErrorMap, U>,
+    TMeta
+  > {
     return new DecoratedProcedure({
       ...this['~orpc'],
       errorMap: mergeErrorMap(this['~orpc'].errorMap, errors),

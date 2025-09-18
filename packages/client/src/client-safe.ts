@@ -4,11 +4,11 @@ import { isTypescriptObject } from '@orpc/shared'
 import { safe } from './utils'
 
 export type SafeClient<T extends NestedClient<any>>
-    = T extends Client<infer UContext, infer UInput, infer UOutput, infer UError>
-      ? (...rest: ClientRest<UContext, UInput>) => Promise<SafeResult<UOutput, UError>>
-      : {
-          [K in keyof T]: T[K] extends NestedClient<any> ? SafeClient<T[K]> : never
-        }
+  = T extends Client<infer UContext, infer UInput, infer UOutput, infer UError>
+    ? (...rest: ClientRest<UContext, UInput>) => Promise<SafeResult<UOutput, UError>>
+    : {
+        [K in keyof T]: T[K] extends NestedClient<any> ? SafeClient<T[K]> : never
+      }
 
 /**
  * Create a safe client that automatically wraps all procedure calls with the `safe` util.

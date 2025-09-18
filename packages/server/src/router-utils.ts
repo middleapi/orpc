@@ -49,13 +49,13 @@ export function getRouter<T extends Lazyable<AnyRouter | undefined>>(
 }
 
 export type AccessibleLazyRouter<T extends Lazyable<AnyRouter | undefined>>
-    = T extends Lazy<infer U extends AnyRouter | undefined | Lazy<AnyRouter | undefined>>
-      ? AccessibleLazyRouter<U>
-      : T extends AnyProcedure | undefined
-        ? Lazy<T>
-        : Lazy<T> & {
-          [K in keyof T]: T[K] extends Lazyable<AnyRouter> ? AccessibleLazyRouter<T[K]> : never
-        }
+  = T extends Lazy<infer U extends AnyRouter | undefined | Lazy<AnyRouter | undefined>>
+    ? AccessibleLazyRouter<U>
+    : T extends AnyProcedure | undefined
+      ? Lazy<T>
+      : Lazy<T> & {
+        [K in keyof T]: T[K] extends Lazyable<AnyRouter> ? AccessibleLazyRouter<T[K]> : never
+      }
 
 export function createAccessibleLazyRouter<T extends Lazy<AnyRouter | undefined>>(lazied: T): AccessibleLazyRouter<T> {
   const recursive = new Proxy(lazied, {
@@ -79,27 +79,27 @@ export type EnhancedRouter<
   TCurrentContext extends Context,
   TErrorMap extends ErrorMap,
 >
-    = T extends Lazy<infer U extends AnyRouter>
-      ? AccessibleLazyRouter<EnhancedRouter<U, TInitialContext, TCurrentContext, TErrorMap>>
-      : T extends Procedure<
-        infer UInitialContext,
-        infer UCurrentContext,
-        infer UInputSchema,
-        infer UOutputSchema,
-        infer UErrorMap,
-        infer UMeta
+  = T extends Lazy<infer U extends AnyRouter>
+    ? AccessibleLazyRouter<EnhancedRouter<U, TInitialContext, TCurrentContext, TErrorMap>>
+    : T extends Procedure<
+      infer UInitialContext,
+      infer UCurrentContext,
+      infer UInputSchema,
+      infer UOutputSchema,
+      infer UErrorMap,
+      infer UMeta
+    >
+      ? Procedure<
+        MergedInitialContext<TInitialContext, UInitialContext, TCurrentContext>,
+        UCurrentContext,
+        UInputSchema,
+        UOutputSchema,
+        MergedErrorMap<TErrorMap, UErrorMap>,
+        UMeta
       >
-        ? Procedure<
-          MergedInitialContext<TInitialContext, UInitialContext, TCurrentContext>,
-          UCurrentContext,
-          UInputSchema,
-          UOutputSchema,
-          MergedErrorMap<TErrorMap, UErrorMap>,
-          UMeta
-        >
-        : {
-            [K in keyof T]: T[K] extends Lazyable<AnyRouter> ? EnhancedRouter<T[K], TInitialContext, TCurrentContext, TErrorMap> : never
-          }
+      : {
+          [K in keyof T]: T[K] extends Lazyable<AnyRouter> ? EnhancedRouter<T[K], TInitialContext, TCurrentContext, TErrorMap> : never
+        }
 
 export interface EnhanceRouterOptions<TErrorMap extends ErrorMap> extends EnhanceRouteOptions {
   middlewares: readonly AnyMiddleware[]

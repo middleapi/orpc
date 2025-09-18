@@ -31,7 +31,7 @@ export function CreatePlanetMutationForm() {
 
           const name = form.get('name') as string
           const description
-          = (form.get('description') as string | null) ?? undefined
+            = (form.get('description') as string | null) ?? undefined
           const image = form.get('image') as File
 
           mutate({

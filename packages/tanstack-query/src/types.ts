@@ -79,7 +79,7 @@ export interface InfiniteOptionsBase<TOutput, TError, TPageParam> {
 }
 
 export type MutationOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TMutationContext>
-    = & (Record<never, never> extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
-      & MutationOptions<TInput, TOutput, TError, TMutationContext>
+  = & (Record<never, never> extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
+    & MutationOptions<TInput, TOutput, TError, TMutationContext>
 
 export type MutationOptions<TInput, TOutput, TError, TMutationContext> = MutationObserverOptions<TOutput, TError, TInput, TMutationContext>

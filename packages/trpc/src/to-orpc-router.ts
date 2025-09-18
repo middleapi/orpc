@@ -17,21 +17,21 @@ export type ToORPCOutput<T>
     : T
 
 export type ToORPCRouterResult<TContext extends ORPC.Context, TMeta extends ORPC.Meta, TRecord extends Record<string, any>>
-    = {
-      [K in keyof TRecord]:
-      TRecord[K] extends AnyProcedure
-        ? ORPC.Procedure<
-          TContext,
+  = {
+    [K in keyof TRecord]:
+    TRecord[K] extends AnyProcedure
+      ? ORPC.Procedure<
+        TContext,
           object,
           ORPC.Schema<TRecord[K]['_def']['$types']['input'], unknown>,
           ORPC.Schema<unknown, ToORPCOutput<TRecord[K]['_def']['$types']['output']>>,
           object,
           TMeta
-        >
-        : TRecord[K] extends Record<string, any>
-          ? ToORPCRouterResult<TContext, TMeta, TRecord[K]>
-          : never
-    }
+      >
+      : TRecord[K] extends Record<string, any>
+        ? ToORPCRouterResult<TContext, TMeta, TRecord[K]>
+        : never
+  }
 
 /**
  * Convert a tRPC router to an oRPC router.
@@ -41,10 +41,10 @@ export type ToORPCRouterResult<TContext extends ORPC.Context, TMeta extends ORPC
 export function toORPCRouter<T extends AnyRouter>(
   router: T,
 ): ToORPCRouterResult<
-    inferRouterContext<T>,
-    inferRouterMeta<T>,
-    T['_def']['record']
-  > {
+  inferRouterContext<T>,
+  inferRouterMeta<T>,
+  T['_def']['record']
+> {
   const result = {
     ...lazyToORPCRouter(router._def.lazy),
     ...recordToORPCRouterRecord(router._def.record),

@@ -149,22 +149,22 @@ describe('ImplementerWithMiddlewares', () => {
 
   it('each procedure is a ProcedureImplementer', () => {
     type ExpectedPing = ProcedureImplementer<
-        InitialContext,
-        CurrentContext,
+      InitialContext,
+      CurrentContext,
         typeof inputSchema,
         typeof outputSchema,
         typeof baseErrorMap,
         BaseMeta
-      >
+    >
 
     type ExpectedPong = ProcedureImplementer<
-        InitialContext,
-        CurrentContext,
-        Schema<unknown, unknown>,
-        Schema<unknown, unknown>,
-        Record<never, never>,
-        Meta
-      >
+      InitialContext,
+      CurrentContext,
+      Schema<unknown, unknown>,
+      Schema<unknown, unknown>,
+      Record<never, never>,
+      Meta
+    >
 
     expectTypeOf(implementer.ping).toEqualTypeOf<ExpectedPing>()
     expectTypeOf(implementer.nested.ping).toEqualTypeOf<ExpectedPing>()

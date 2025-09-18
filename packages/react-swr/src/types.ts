@@ -48,7 +48,7 @@ export type CreateMatcherOptions<TStrategy extends MatcherStrategy, TInput>
 export type Matcher = (key?: unknown) => boolean
 
 export type CreateFetcherOptions<TClientContext extends ClientContext>
-= (Record<never, never> extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
+  = (Record<never, never> extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
 
 export function resolveCreateFetcherOptions<T extends CreateFetcherOptions<any>>(
   options: T,

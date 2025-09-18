@@ -29,7 +29,7 @@ export class NodeHttpHandler<T extends Context> implements NodeHttpHandler<T> {
 
   constructor(
     private readonly standardHandler: StandardHandler<T>,
-      options: NoInfer<NodeHttpHandlerOptions<T>> = {},
+    options: NoInfer<NodeHttpHandlerOptions<T>> = {},
   ) {
     const plugin = new CompositeNodeHttpHandlerPlugin(options.plugins)
 

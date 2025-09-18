@@ -11,11 +11,11 @@ export function toNestPattern(path: HTTPPath): string {
 }
 
 export type PopulatedContractRouterPaths<T extends AnyContractRouter>
-    = T extends ContractProcedure<infer UInputSchema, infer UOutputSchema, infer UErrors, infer UMeta>
-      ? ContractProcedure<UInputSchema, UOutputSchema, UErrors, UMeta>
-      : {
-          [K in keyof T]: T[K] extends AnyContractRouter ? PopulatedContractRouterPaths<T[K]> : never
-        }
+  = T extends ContractProcedure<infer UInputSchema, infer UOutputSchema, infer UErrors, infer UMeta>
+    ? ContractProcedure<UInputSchema, UOutputSchema, UErrors, UMeta>
+    : {
+        [K in keyof T]: T[K] extends AnyContractRouter ? PopulatedContractRouterPaths<T[K]> : never
+      }
 
 export interface PopulateContractRouterPathsOptions {
   path?: readonly string[]

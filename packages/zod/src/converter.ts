@@ -200,7 +200,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
               break
             case 'emoji':
               json.pattern
-                  = '^(\\p{Extended_Pictographic}|\\p{Emoji_Component})+$'
+                = '^(\\p{Extended_Pictographic}|\\p{Emoji_Component})+$'
               break
             case 'nanoid':
               json.pattern = '^[a-zA-Z0-9_-]{21}$'
