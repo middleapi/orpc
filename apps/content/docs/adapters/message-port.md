@@ -29,7 +29,7 @@ import { RPCHandler } from '@orpc/server/message-port'
 const handler = new RPCHandler(router)
 
 handler.upgrade(serverPort, {
-  context: {}, // Optionally provide an initial context
+  context: {}, // Provide initial context if needed
 })
 
 serverPort.start()

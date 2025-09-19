@@ -129,8 +129,8 @@ export default withMermaid(defineConfig({
             { text: 'Solid Start', link: '/docs/adapters/solid-start' },
             { text: 'Svelte Kit', link: '/docs/adapters/svelte-kit' },
             { text: 'Tanstack Start', link: '/docs/adapters/tanstack-start' },
-            { text: 'Worker Threads', link: '/docs/adapters/worker-threads' },
             { text: 'Web Workers', link: '/docs/adapters/web-workers' },
+            { text: 'Worker Threads', link: '/docs/adapters/worker-threads' },
           ],
         },
         {

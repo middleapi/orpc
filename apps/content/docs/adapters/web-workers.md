@@ -1,19 +1,17 @@
 ---
-title: Web Workers
-description: Enable type-safe communication between your web app and its Web Worker.
+title: Web Workers Adapter
+description: Enable type-safe communication with Web Workers using oRPC.
 ---
 
 # Web Workers Adapter
 
-Use [Vite Web Workers](https://vite.dev/guide/features.html#web-workers) with oRPC for type-safe communication via the [Message Port Adapter](/docs/adapters/message-port).
+[Web Workers](https://developer.mozilla.org/en-US/docs/Web/API/Worker) allow JavaScript code to run in background threads, separate from the main thread of a web page. This prevents blocking the UI while performing computationally intensive tasks. Web Workers are also supported in modern runtimes like [Bun](https://bun.com/docs/api/workers), [Deno](https://docs.deno.com/examples/web_workers/), etc.
 
-:::info
-This guide is specific to Vite, but Comlink Web Workers should also work out of the box.
-:::
+With oRPC, you can establish type-safe communication channels between your main thread and Web Workers. For additional context, see the [Message Port Adapter](/docs/adapters/message-port) guide.
 
 ## Web Worker
 
-Listen for a `MessagePort` sent from the web application and upgrade it:
+Configure your Web Worker to handle oRPC requests by upgrading it with a message port handler:
 
 ```ts
 import { RPCHandler } from '@orpc/server/message-port'
@@ -21,23 +19,36 @@ import { RPCHandler } from '@orpc/server/message-port'
 const handler = new RPCHandler(router)
 
 handler.upgrade(self, {
-  context: {}
+  context: {}, // Provide initial context if needed
 })
 ```
 
-## Web Application Client
+## Main Thread
 
-Import the Web Worker implementation and use the exposed Worker interface to initialize the client link.
+Create a link to communicate with your Web Worker:
 
 ```ts
-import OrpcWorker from './worker?worker'
-import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/message-port'
-import type { RouterClient } from '@orpc/server'
-
-const orpcWorker = new OrpcWorker()
 
 export const link = new RPCLink({
-  port: orpcWorker
+  port: new Worker('some-worker.ts')
 })
 ```
+
+:::details Using Web Workers in Vite Applications?
+You can leverage [Vite Web Workers feature](https://vite.dev/guide/features.html#web-workers) for streamlined development:
+
+```ts
+import SomeWorker from './some-worker.ts?worker' // [!code highlight]
+import { RPCLink } from '@orpc/client/message-port'
+
+export const link = new RPCLink({
+  port: new SomeWorker()
+})
+```
+
+:::
+
+:::info
+This only shows how to configure the link. For full client examples, see [Client-Side Clients](/docs/client/client-side).
+:::

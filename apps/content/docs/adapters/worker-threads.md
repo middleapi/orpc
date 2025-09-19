@@ -19,7 +19,9 @@ const handler = new RPCHandler(router)
 
 parentPort.on('message', (message) => {
   if (message instanceof MessagePort) {
-    handler.upgrade(message)
+    handler.upgrade(message, {
+      context: {}, // Provide initial context if needed
+    })
 
     message.start()
   }
