@@ -2,7 +2,6 @@ import type { GetNextPageParamFunction, InfiniteData } from '@tanstack/angular-q
 import type { ErrorFromErrorMap } from '../../contract/src/error'
 import type { baseErrorMap } from '../../contract/tests/shared'
 import type { ProcedureUtils } from './procedure-utils'
-import { signal } from '@angular/core'
 import { injectInfiniteQuery, injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental'
 import { injectQueries } from '@tanstack/angular-query-experimental/inject-queries-experimental'
 
@@ -58,8 +57,8 @@ describe('ProcedureUtils', () => {
     })
 
     it('injectQueries', () => {
-      const queries = injectQueries({
-        queries: signal([
+      const queries = injectQueries(() => ({
+        queries: [
           optionalUtils.queryOptions(),
           optionalUtils.queryOptions({
             input: { search: 'search' },
@@ -68,20 +67,16 @@ describe('ProcedureUtils', () => {
           optionalUtils.queryOptions({
             select: data => ({ mapped: data }),
           }),
-        ]),
-      })
+        ],
+      }))
 
-      // @ts-expect-error - TODO: fix this, injectQueries not work at all
-      expectTypeOf(queries()[0].data).toEqualTypeOf<UtilsOutput | undefined>()
-      // @ts-expect-error - TODO: fix this, injectQueries not work at all
-      expectTypeOf(queries()[1].data).toEqualTypeOf<UtilsOutput | undefined>()
-      expectTypeOf(queries()[2].data).toEqualTypeOf<{ mapped: UtilsOutput } | undefined>()
+      expectTypeOf(queries()[0].data()).toEqualTypeOf<UtilsOutput | undefined>()
+      expectTypeOf(queries()[1].data()).toEqualTypeOf<UtilsOutput | undefined>()
+      expectTypeOf(queries()[2].data()).toEqualTypeOf<{ mapped: UtilsOutput } | undefined>()
 
-      // @ts-expect-error - TODO: fix this, injectQueries not work at all
-      expectTypeOf(queries()[0].error).toEqualTypeOf<null | UtilsError>()
-      // @ts-expect-error - TODO: fix this, injectQueries not work at all
-      expectTypeOf(queries()[1].error).toEqualTypeOf<null | UtilsError>()
-      expectTypeOf(queries()[2].error).toEqualTypeOf<null | UtilsError>()
+      expectTypeOf(queries()[0].error()).toEqualTypeOf<null | UtilsError>()
+      expectTypeOf(queries()[1].error()).toEqualTypeOf<null | UtilsError>()
+      expectTypeOf(queries()[2].error()).toEqualTypeOf<null | UtilsError>()
     })
 
     it('fetchQuery', () => {
@@ -124,8 +119,8 @@ describe('ProcedureUtils', () => {
     })
 
     it('injectQueries', () => {
-      const queries = injectQueries({
-        queries: signal([
+      const queries = injectQueries(() => ({
+        queries: [
           streamUtils.experimental_streamedOptions(),
           streamUtils.experimental_streamedOptions({
             input: { search: 'search' },
@@ -134,20 +129,16 @@ describe('ProcedureUtils', () => {
           streamUtils.experimental_streamedOptions({
             select: data => ({ mapped: data }),
           }),
-        ]),
-      })
+        ],
+      }))
 
-      // @ts-expect-error - TODO: fix this, injectQueries not working
-      expectTypeOf(queries()[0].data).toEqualTypeOf<UtilsOutput | undefined>()
-      // @ts-expect-error - TODO: fix this, injectQueries not work at all
-      expectTypeOf(queries()[1].data).toEqualTypeOf<UtilsOutput | undefined>()
-      expectTypeOf(queries()[2].data).toEqualTypeOf<{ mapped: UtilsOutput } | undefined>()
+      expectTypeOf(queries()[0].data()).toEqualTypeOf<UtilsOutput | undefined>()
+      expectTypeOf(queries()[1].data()).toEqualTypeOf<UtilsOutput | undefined>()
+      expectTypeOf(queries()[2].data()).toEqualTypeOf<{ mapped: UtilsOutput } | undefined>()
 
-      // @ts-expect-error - TODO: fix this, injectQueries not work at all
-      expectTypeOf(queries()[0].error).toEqualTypeOf<null | UtilsError>()
-      // @ts-expect-error - TODO: fix this, injectQueries not work at all
-      expectTypeOf(queries()[1].error).toEqualTypeOf<null | UtilsError>()
-      expectTypeOf(queries()[2].error).toEqualTypeOf<null | UtilsError>()
+      expectTypeOf(queries()[0].error()).toEqualTypeOf<null | UtilsError>()
+      expectTypeOf(queries()[1].error()).toEqualTypeOf<null | UtilsError>()
+      expectTypeOf(queries()[2].error()).toEqualTypeOf<null | UtilsError>()
     })
 
     it('fetchQuery', () => {
@@ -190,8 +181,8 @@ describe('ProcedureUtils', () => {
     })
 
     it('injectQueries', () => {
-      const queries = injectQueries({
-        queries: signal([
+      const queries = injectQueries(() => ({
+        queries: [
           streamUtils.experimental_liveOptions(),
           streamUtils.experimental_liveOptions({
             input: { search: 'search' },
@@ -200,20 +191,16 @@ describe('ProcedureUtils', () => {
           streamUtils.experimental_liveOptions({
             select: data => ({ mapped: data }),
           }),
-        ]),
-      })
+        ],
+      }))
 
-      // @ts-expect-error - TODO: fix this, injectQueries not working
-      expectTypeOf(queries()[0].data).toEqualTypeOf<UtilsOutput[number] | undefined>()
-      // @ts-expect-error - TODO: fix this, injectQueries not work at all
-      expectTypeOf(queries()[1].data).toEqualTypeOf<UtilsOutput[number] | undefined>()
-      expectTypeOf(queries()[2].data).toEqualTypeOf<{ mapped: UtilsOutput[number] } | undefined>()
+      expectTypeOf(queries()[0].data()).toEqualTypeOf<UtilsOutput[number] | undefined>()
+      expectTypeOf(queries()[1].data()).toEqualTypeOf<UtilsOutput[number] | undefined>()
+      expectTypeOf(queries()[2].data()).toEqualTypeOf<{ mapped: UtilsOutput[number] } | undefined>()
 
-      // @ts-expect-error - TODO: fix this, injectQueries not work at all
-      expectTypeOf(queries()[0].error).toEqualTypeOf<null | UtilsError>()
-      // @ts-expect-error - TODO: fix this, injectQueries not work at all
-      expectTypeOf(queries()[1].error).toEqualTypeOf<null | UtilsError>()
-      expectTypeOf(queries()[2].error).toEqualTypeOf<null | UtilsError>()
+      expectTypeOf(queries()[0].error()).toEqualTypeOf<null | UtilsError>()
+      expectTypeOf(queries()[1].error()).toEqualTypeOf<null | UtilsError>()
+      expectTypeOf(queries()[2].error()).toEqualTypeOf<null | UtilsError>()
     })
 
     it('fetchQuery', () => {
