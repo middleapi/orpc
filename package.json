@@ -34,7 +34,7 @@
     "@testing-library/svelte": "^5.2.7",
     "@testing-library/user-event": "^14.6.1",
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^22.15.30",
+    "@types/node": "^24.5.2",
     "@vitest/coverage-v8": "^3.2.4",
     "@vitest/ui": "^3.2.4",
     "@vue/test-utils": "^2.4.6",
