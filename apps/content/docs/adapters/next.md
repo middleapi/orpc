@@ -164,7 +164,14 @@ globalThis.$client = createRouterClient(router, {
 
 ```ts [instrumentation.ts]
 export async function register() {
+  // Option 1: Simple global import (works with both Edge and Node.js runtimes)
   await import('./lib/orpc.server')
+
+  // Option 2: Conditional import (only when using Node.js specific features)
+  // Use this if your server-side client uses Node.js APIs like fs, crypto, etc.
+  // if (process.env.NEXT_RUNTIME === "nodejs") {
+  //   await import('./lib/orpc.server')
+  // }
 }
 ```
 
