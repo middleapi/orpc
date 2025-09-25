@@ -143,7 +143,7 @@ Finally, ensure `lib/orpc.server.ts` is imported before any other code on the se
 
 ```ts [instrumentation.ts]
 export async function register() {
-  // Conditionally import if multiple runtimes (Node.js/Edge) compatibility is required
+  // Conditionally import if facing runtime compatibility issues
   // if (process.env.NEXT_RUNTIME === "nodejs") {
   await import('./lib/orpc.server')
   // }
