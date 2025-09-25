@@ -15,7 +15,7 @@ You set up an oRPC server inside TanStack Start using its [Server Routes](https:
 
 ```ts [src/routes/api/rpc.$.ts]
 import { RPCHandler } from '@orpc/server/fetch'
-import { createServerFileRoute } from '@tanstack/react-start/server'
+import { createFileRoute } from '@tanstack/react-router'
 
 const handler = new RPCHandler(router)
 
@@ -28,13 +28,17 @@ async function handle({ request }: { request: Request }) {
   return response ?? new Response('Not Found', { status: 404 })
 }
 
-export const ServerRoute = createServerFileRoute('/api/rpc/$').methods({
-  HEAD: handle,
-  GET: handle,
-  POST: handle,
-  PUT: handle,
-  PATCH: handle,
-  DELETE: handle,
+export const Route = createFileRoute('/api/$')({
+  server: {
+    handlers: {
+      HEAD: handle,
+      GET: handle,
+      POST: handle,
+      PUT: handle,
+      PATCH: handle,
+      DELETE: handle,
+    },
+  },
 })
 ```
 

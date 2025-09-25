@@ -5,7 +5,7 @@ import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { createTanstackQueryUtils } from '@orpc/tanstack-query'
 import { BatchLinkPlugin } from '@orpc/client/plugins'
-import { getHeaders } from '@tanstack/react-start/server'
+import { getRequestHeaders } from '@tanstack/react-start/server'
 import { createIsomorphicFn } from '@tanstack/react-start'
 
 /**
@@ -23,7 +23,7 @@ const getORPCClient = createIsomorphicFn()
      * For per-request context, use middleware context or pass a function as the initial context.
      */
     context: async () => ({
-      headers: getHeaders(), // provide headers if initial context required
+      headers: getRequestHeaders(), // provide headers if initial context required
     }),
   }))
   .client((): RouterClient<typeof router> => {

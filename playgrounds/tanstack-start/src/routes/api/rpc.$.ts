@@ -1,7 +1,7 @@
 import '~/polyfill'
 
 import { RPCHandler } from '@orpc/server/fetch'
-import { createServerFileRoute } from '@tanstack/react-start/server'
+import { createFileRoute } from '@tanstack/react-router'
 import { router } from '~/routers'
 
 const handler = new RPCHandler(router)
@@ -15,11 +15,15 @@ async function handle({ request }: { request: Request }) {
   return response ?? new Response('Not Found', { status: 404 })
 }
 
-export const ServerRoute = createServerFileRoute('/api/rpc/$').methods({
-  HEAD: handle,
-  GET: handle,
-  POST: handle,
-  PUT: handle,
-  PATCH: handle,
-  DELETE: handle,
+export const Route = createFileRoute('/api/rpc/$')({
+  server: {
+    handlers: {
+      HEAD: handle,
+      GET: handle,
+      POST: handle,
+      PUT: handle,
+      PATCH: handle,
+      DELETE: handle,
+    },
+  },
 })
