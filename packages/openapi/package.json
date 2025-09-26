@@ -71,7 +71,7 @@
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
     "@orpc/standard-server": "workspace:*",
-    "rou3": "^0.7.3"
+    "rou3": "^0.7.5"
   },
   "devDependencies": {
     "zod": "^4.1.11"
