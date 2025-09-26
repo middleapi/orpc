@@ -188,7 +188,7 @@ export class DurableIteratorLinkPlugin<T extends ClientContext> implements Stand
           },
           Math.max(
             refreshTokenBeforeExpireTimeoutId === undefined ? 0 : delayMilliseconds,
-            (tokenAndPayload.payload.exp - Math.floor(Date.now() / 1000) - beforeSeconds) * 1000,
+            ((tokenAndPayload.payload.exp - beforeSeconds) * 1000) - Date.now(),
           ),
         )
       }
