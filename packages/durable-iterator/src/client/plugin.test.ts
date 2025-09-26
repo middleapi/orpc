@@ -4,6 +4,7 @@ import { StandardRPCHandler } from '@orpc/server/standard'
 import { isAsyncIteratorObject, sleep } from '@orpc/shared'
 import { decodeRequestMessage, encodeResponseMessage, MessageType } from '@orpc/standard-server-peer'
 import { WebSocket as ReconnectableWebSocket } from 'partysocket'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DURABLE_ITERATOR_TOKEN_PARAM } from '../consts'
 import { DurableIteratorError } from '../error'
 import { DurableIterator } from '../iterator'
@@ -11,6 +12,8 @@ import { DurableIteratorHandlerPlugin } from '../plugin'
 import { parseDurableIteratorToken } from '../schemas'
 import { getClientDurableIteratorToken } from './iterator'
 import { DurableIteratorLinkPlugin } from './plugin'
+
+const realSetTimeout = globalThis.setTimeout
 
 vi.mock('partysocket', () => {
   return {
@@ -145,6 +148,16 @@ describe('durableIteratorLinkPlugin', async () => {
   })
 
   describe('refresh expired token', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2022-01-01T00:00:00.000Z'))
+    })
+    afterEach(async () => {
+      await new Promise(resolve => realSetTimeout(resolve, 1000)) // await for all promises resolved
+      expect(vi.getTimerCount()).toBe(0) // every is cleanup
+      vi.restoreAllMocks()
+    })
+
     it('works', async () => {
       refreshTokenBeforeExpireInSeconds.mockImplementation(() => 9)
       durableIteratorHandler.mockImplementation(
@@ -176,6 +189,8 @@ describe('durableIteratorLinkPlugin', async () => {
       const output = await outputPromise
       expect(output).toSatisfy(isAsyncIteratorObject)
 
+      expect(vi.getTimerCount()).toBe(1) // refresh token is enabled
+
       const urlProvider = vi.mocked(ReconnectableWebSocket).mock.calls[0]![0] as any
       const ws = vi.mocked(ReconnectableWebSocket).mock.results[0]!.value
       ws.send.mockClear()
@@ -185,20 +200,26 @@ describe('durableIteratorLinkPlugin', async () => {
       expect(token1).toBeTypeOf('string')
       expect(durableIteratorHandler).toHaveBeenCalledTimes(1)
 
-      await sleep(500)
+      vi.advanceTimersByTime(500) // not expired yet
+      expect(vi.getTimerCount()).toBe(1) // no refresh executed
       expect(await urlProvider()).toEqual(url1)
       expect(getClientDurableIteratorToken(output)).toEqual(token1)
-      expect(durableIteratorHandler).toHaveBeenCalledTimes(1) // not expired yet
+      expect(durableIteratorHandler).toHaveBeenCalledTimes(1)
 
-      await sleep(500)
+      vi.advanceTimersByTime(500) // expired
+      expect(vi.getTimerCount()).toBe(0) // refresh token executed
+      await new Promise(r => realSetTimeout(r, 10)) // wait for token refresh promise
       const url2 = await urlProvider()
       expect(url2).not.toEqual(url1)
       const token2 = getClientDurableIteratorToken(output)
       expect(token2).not.toEqual(token1)
       expect(durableIteratorHandler).toHaveBeenCalledTimes(2)
       expect(ws.send).toHaveBeenCalledTimes(1) // send set token request to durable iterator
+      expect(vi.getTimerCount()).toBe(1) // new timer started
 
-      await sleep(2000) // wait next retry + refreshTokenDelayInSeconds delay
+      vi.advanceTimersByTime(2000) // wait next retry + refreshTokenDelayInSeconds delay
+      expect(vi.getTimerCount()).toBe(0) // refresh token executed
+      await new Promise(r => realSetTimeout(r, 10)) // wait for token refresh promise
       const url3 = await urlProvider()
       expect(url3).not.toEqual(url1)
       expect(url3).not.toEqual(url2)
@@ -207,6 +228,7 @@ describe('durableIteratorLinkPlugin', async () => {
       expect(token3).not.toEqual(token2)
       expect(durableIteratorHandler).toHaveBeenCalledTimes(3)
       expect(ws.send).toHaveBeenCalledTimes(2) // send set token request to durable iterator
+      expect(vi.getTimerCount()).toBe(1) // new timer started
 
       expect(refreshTokenBeforeExpireInSeconds).toHaveBeenCalledTimes(3)
       expect(refreshTokenBeforeExpireInSeconds).toHaveBeenCalledWith(
@@ -253,28 +275,12 @@ describe('durableIteratorLinkPlugin', async () => {
       const output = await outputPromise
       expect(output).toSatisfy(isAsyncIteratorObject)
 
-      const urlProvider = vi.mocked(ReconnectableWebSocket).mock.calls[0]![0] as any
-
-      const url1 = await urlProvider()
-      expect(durableIteratorHandler).toHaveBeenCalledTimes(1)
-      expect(await urlProvider()).toEqual(url1)
-      expect(durableIteratorHandler).toHaveBeenCalledTimes(1) // not expired yet
-
-      await sleep(1000)
-      const url2 = await urlProvider()
-      expect(url1).toEqual(url2)
-      expect(durableIteratorHandler).toHaveBeenCalledTimes(1) // no refresh happened
-
-      expect(refreshTokenBeforeExpireInSeconds).toHaveBeenCalledTimes(1)
-      expect(refreshTokenBeforeExpireInSeconds).toHaveBeenCalledWith(
-        parseDurableIteratorToken(new URL(url1).searchParams.get(DURABLE_ITERATOR_TOKEN_PARAM)!),
-        expect.objectContaining({ path: ['durableIterator'] }),
-      )
+      expect(vi.getTimerCount()).toBe(0) // refresh token is disabled
 
       await output.return() // cleanup
     })
 
-    it('if refresh token is invalid', { timeout: 10000 }, async () => {
+    it('if refresh token is invalid', async () => {
       refreshTokenBeforeExpireInSeconds.mockImplementation(() => 9)
       durableIteratorHandler.mockImplementationOnce(
         () => new DurableIterator<any, any>('some-room', {
@@ -305,20 +311,28 @@ describe('durableIteratorLinkPlugin', async () => {
       const output = await outputPromise
       expect(output).toSatisfy(isAsyncIteratorObject)
 
+      expect(vi.getTimerCount()).toBe(1) // refresh token is enabled
+
       const urlProvider = vi.mocked(ReconnectableWebSocket).mock.calls[0]![0] as any
 
       const url = await urlProvider()
       expect(durableIteratorHandler).toHaveBeenCalledTimes(1)
 
       durableIteratorHandler.mockResolvedValueOnce('invalid-token' as any)
-      await sleep(1000) // wait first retry trigger
+      vi.advanceTimersByTime(1000) // wait first retry trigger
+      expect(vi.getTimerCount()).toBe(0) // refresh token executed
+      await new Promise(resolve => realSetTimeout(resolve, 10)) // wait for token refresh promise
       await expect(urlProvider()).resolves.toBe(url) // not change url because new token is invalid
       expect(durableIteratorHandler).toHaveBeenCalledTimes(2)
+      expect(vi.getTimerCount()).toBe(1) // timer created by retry helper
 
       durableIteratorHandler.mockResolvedValueOnce({} as any)
-      await sleep(2000) // wait next retry
+      vi.advanceTimersByTime(2000) // wait next retry
+      expect(vi.getTimerCount()).toBe(0) // refresh token executed
+      await new Promise(resolve => realSetTimeout(resolve, 10)) // wait for token refresh promise
       await expect(urlProvider()).resolves.toBe(url) // not change url because new token is invalid
       expect(durableIteratorHandler).toHaveBeenCalledTimes(3)
+      expect(vi.getTimerCount()).toBe(1) // timer created by retry helper
 
       // only called once, because it still retrying after invalid token
       expect(refreshTokenBeforeExpireInSeconds).toHaveBeenCalledTimes(1)
@@ -334,10 +348,13 @@ describe('durableIteratorLinkPlugin', async () => {
         await sleep(2000)
         return {} as any
       })
-      await sleep(2000) // wait next retry
+      vi.advanceTimersByTime(2000) // wait next retry
+      expect(vi.getTimerCount()).toBe(0) // refresh token executed
+      await new Promise(resolve => realSetTimeout(resolve, 10)) // wait for token refresh trigger
       await output.return() // cleanup
 
-      await sleep(2000)
+      vi.advanceTimersByTime(2000) // wait handler throw
+      await new Promise(resolve => realSetTimeout(resolve, 10)) // wait for token refresh reject
       expect(unhandledRejectionHandler).toHaveBeenCalledTimes(1)
       expect(unhandledRejectionHandler.mock.calls[0]![0]).toEqual(
         new DurableIteratorError(`Expected valid token for procedure durableIterator`),
@@ -375,14 +392,19 @@ describe('durableIteratorLinkPlugin', async () => {
       const output = await outputPromise
       expect(output).toSatisfy(isAsyncIteratorObject)
 
+      expect(vi.getTimerCount()).toBe(1) // refresh token is enabled
+
       durableIteratorHandler.mockResolvedValueOnce(
         new DurableIterator<any, any>('a-different-channel', { signingKey: 'signing-key' }).rpc('getUser', 'sendMessage') as any,
       )
 
-      await sleep(1000)
+      vi.advanceTimersByTime(1000)
+      expect(vi.getTimerCount()).toBe(0) // refresh token executed
+      await new Promise(resolve => realSetTimeout(resolve, 10)) // wait for token refresh promise
       const ws = vi.mocked(ReconnectableWebSocket).mock.results[0]!.value
       expect(ws.reconnect).toHaveBeenCalledTimes(1)
       expect(await (ReconnectableWebSocket as any).mock.calls[0]![0]()).toContain('a-different-channel')
+      expect(vi.getTimerCount()).toBe(1) // new refresh token timer created
 
       await output.return() // cleanup
     })
@@ -419,6 +441,8 @@ describe('durableIteratorLinkPlugin', async () => {
       const output = await outputPromise
       expect(output).toSatisfy(isAsyncIteratorObject)
 
+      expect(vi.getTimerCount()).toBe(1) // refresh token is enabled
+
       durableIteratorHandler.mockImplementationOnce(
         () => new DurableIterator<any, any>('some-room', {
           tags: ['a-different-tag'],
@@ -427,10 +451,13 @@ describe('durableIteratorLinkPlugin', async () => {
         }) as any,
       )
 
-      await sleep(1000)
+      vi.advanceTimersByTime(1000)
+      expect(vi.getTimerCount()).toBe(0) // refresh token executed
+      await new Promise(resolve => realSetTimeout(resolve, 10)) // wait for token refresh promise
       const ws = vi.mocked(ReconnectableWebSocket).mock.results[0]!.value
       expect(ws.reconnect).toHaveBeenCalledTimes(1)
       expect(await (ReconnectableWebSocket as any).mock.calls[0]![0]()).toContain('a-different-tag')
+      expect(vi.getTimerCount()).toBe(1) // new refresh token timer created
 
       await output.return() // cleanup
     })
