@@ -155,7 +155,7 @@ describe('durableIteratorLinkPlugin', async () => {
     afterEach(async () => {
       await new Promise(resolve => realSetTimeout(resolve, 1000)) // await for all promises resolved
       expect(vi.getTimerCount()).toBe(0) // every is cleanup
-      vi.restoreAllMocks()
+      vi.useRealTimers()
     })
 
     it('works', async () => {
