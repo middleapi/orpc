@@ -21,7 +21,11 @@ describe('toStandardUrl', () => {
 
   it('malformed input', () => {
     expect(toStandardUrl({ headers: { host: ':::' }, socket: {}, url: '/hello' } as any).href).toEqual('http://localhost/hello')
+    expect(toStandardUrl({ headers: { host: ':::' }, socket: { encrypted: true }, url: '/hello' } as any).href).toEqual('https://localhost/hello')
+
     expect(toStandardUrl({ headers: { host: 'test/test' }, socket: {}, url: '/hello' } as any).href).toEqual('http://test/hello')
+    expect(toStandardUrl({ headers: { host: 'test/test' }, socket: { encrypted: true }, url: '/hello' } as any).href).toEqual('https://test/hello')
+
     expect(toStandardUrl({ headers: {}, socket: {}, url: '////' } as any).href).toEqual('http://localhost////')
     expect(toStandardUrl({ headers: {}, socket: {}, url: ':::' } as any).href).toEqual('http://localhost/:::')
   })
