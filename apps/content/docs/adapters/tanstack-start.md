@@ -28,7 +28,7 @@ async function handle({ request }: { request: Request }) {
   return response ?? new Response('Not Found', { status: 404 })
 }
 
-export const Route = createFileRoute('/api/$')({
+export const Route = createFileRoute('/api/rpc/$')({
   server: {
     handlers: {
       HEAD: handle,
