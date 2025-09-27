@@ -18,4 +18,11 @@ describe('toStandardUrl', () => {
     expect(toStandardUrl({ url: '/foo/bar', headers: {}, socket: {} } as any).pathname).toEqual('/foo/bar')
     expect(toStandardUrl({ url: '/', originalUrl: '/foo/bar/baz', headers: {}, socket: {} } as any).pathname).toEqual('/foo/bar/baz')
   })
+
+  it('malformed input', () => {
+    expect(toStandardUrl({ headers: { host: ':::' }, socket: {}, url: '/hello' } as any).href).toEqual('http://localhost/hello')
+    expect(toStandardUrl({ headers: { host: 'test/test' }, socket: {}, url: '/hello' } as any).href).toEqual('http://test/hello')
+    expect(toStandardUrl({ headers: {}, socket: {}, url: '////' } as any).href).toEqual('http://localhost////')
+    expect(toStandardUrl({ headers: {}, socket: {}, url: ':::' } as any).href).toEqual('http://localhost/:::')
+  })
 })
