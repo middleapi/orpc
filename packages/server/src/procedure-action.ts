@@ -2,6 +2,7 @@ import type { Client, ORPCError, ORPCErrorJSON } from '@orpc/client'
 import type { AnySchema, ErrorFromErrorMap, ErrorMap, InferSchemaInput, InferSchemaOutput } from '@orpc/contract'
 import type { ThrowableError } from '@orpc/shared'
 import { toORPCError } from '@orpc/client'
+import { isObject } from '@orpc/shared'
 
 export type ActionableError<T> = T extends ORPCError<infer U, infer V> ? ORPCErrorJSON<U, V> & { defined: true } : ORPCErrorJSON<string, unknown> & { defined: false }
 
@@ -35,11 +36,20 @@ export function createActionableClient<TInput, TOutput, TError>(
       return [null, await client(input)]
     }
     catch (error) {
+      // special next.js errors
       if (
         error instanceof Error
         && 'digest' in error
         && typeof error.digest === 'string'
         && error.digest.startsWith('NEXT_')
+      ) {
+        throw error
+      }
+
+      // special tanstack router errors
+      if (
+        (error instanceof Response && 'options' in error && isObject(error.options))
+        || (isObject(error) && error.isNotFound === true)
       ) {
         throw error
       }

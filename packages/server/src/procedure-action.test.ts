@@ -1,5 +1,6 @@
 import { ORPCError } from '@orpc/client'
-import { forbidden, notFound, redirect, unauthorized } from 'next/navigation'
+import * as tanstackRouter from '@tanstack/router-core'
+import * as next from 'next/navigation'
 import { createActionableClient } from './procedure-action'
 
 describe('createActionableClient', () => {
@@ -37,17 +38,27 @@ describe('createActionableClient', () => {
   })
 
   it.each([
-    [() => redirect('/foo')],
-    [() => forbidden()],
-    [() => unauthorized()],
-    [() => notFound()],
-  ])('should rethrow next.js error', async (error) => {
+    [() => next.redirect('/foo')],
+    [() => next.forbidden()],
+    [() => next.unauthorized()],
+    [() => next.notFound()],
+    [() => tanstackRouter.redirect({ to: '.login' })],
+    [() => tanstackRouter.notFound()],
+  ])('should rethrow next.js or tanstack router error', async (createError) => {
     (process as any).env.__NEXT_EXPERIMENTAL_AUTH_INTERRUPTS = true
 
+    let error
+
     client.mockImplementationOnce(() => {
-      error()
+      try {
+        throw createError()
+      }
+      catch (e) {
+        error = e
+        throw e
+      }
     })
 
-    await expect(action('input')).rejects.toThrowError()
+    await expect(action('input')).rejects.toBe(error)
   })
 })
