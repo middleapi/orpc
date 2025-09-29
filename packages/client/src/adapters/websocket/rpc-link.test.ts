@@ -56,7 +56,7 @@ describe('rpcLink', () => {
 
     expect(id).toBeTypeOf('string')
     expect(payload).toEqual({
-      url: new URL('orpc:/ping'),
+      url: new URL('orpc://localhost/ping'),
       body: { json: 'input' },
       headers: {},
       method: 'POST',
