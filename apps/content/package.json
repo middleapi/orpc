@@ -9,7 +9,7 @@
   },
   "devDependencies": {
     "@ai-sdk/google": "2.0.17",
-    "@ai-sdk/react": "2.0.56",
+    "@ai-sdk/react": "2.0.57",
     "@opentelemetry/instrumentation": "^0.205.0",
     "@opentelemetry/sdk-node": "^0.205.0",
     "@opentelemetry/sdk-trace-web": "^2.1.0",
@@ -36,7 +36,7 @@
     "@tanstack/svelte-query": "^5.90.2",
     "@tanstack/vue-query": "^5.90.2",
     "@types/node": "^22.15.30",
-    "ai": "5.0.56",
+    "ai": "5.0.57",
     "markdown-it-task-lists": "^2.1.1",
     "mermaid": "^11.12.0",
     "openai": "^5.23.1",

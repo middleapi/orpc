@@ -22,7 +22,7 @@
     "@orpc/tanstack-query": "next",
     "@orpc/zod": "next",
     "@tanstack/react-query": "^5.90.2",
-    "@types/react": "^19.1.14",
+    "@types/react": "^19.1.15",
     "@types/react-dom": "^19.1.9",
     "@wxt-dev/module-react": "^1.1.5",
     "react": "^19.1.1",
