@@ -10,6 +10,9 @@
     </p>
     <hr>
     <OrpcMutation />
+    <hr>
     <OrpcQuery />
+    <hr>
+    <OrpcStream />
   </div>
 </template>

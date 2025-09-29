@@ -4,6 +4,7 @@ import { DurableIteratorLinkPlugin } from '@orpc/experimental-durable-iterator/c
 import type { RouterClient } from '@orpc/server'
 import { createTanstackQueryUtils } from '@orpc/tanstack-query'
 import type { router } from '../../worker/routers'
+import { BatchLinkPlugin } from '@orpc/client/plugins'
 
 const link = new RPCLink({
   url: `${window.location.origin}/rpc`,
@@ -11,6 +12,13 @@ const link = new RPCLink({
     new DurableIteratorLinkPlugin({
       url: `${window.location.origin}/chat-room`,
       refreshTokenBeforeExpireInSeconds: 10 * 60, // 10 minutes
+    }),
+    new BatchLinkPlugin({
+      exclude: ({ path }) => path[0] === 'sse',
+      groups: [{
+        condition: () => true,
+        context: {},
+      }],
     }),
   ],
 })

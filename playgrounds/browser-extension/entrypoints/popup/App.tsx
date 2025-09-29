@@ -1,5 +1,6 @@
 import { CreatePlanetMutationForm } from './components/orpc-mutation'
 import { ListPlanetsQuery } from './components/orpc-query'
+import { EventIteratorQueries } from './components/orpc-stream'
 
 export default function App() {
   return (
@@ -9,6 +10,8 @@ export default function App() {
       <CreatePlanetMutationForm />
       <hr />
       <ListPlanetsQuery />
+      <hr />
+      <EventIteratorQueries />
     </div>
   )
 }
