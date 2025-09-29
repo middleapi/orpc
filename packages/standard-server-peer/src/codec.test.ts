@@ -49,6 +49,8 @@ describe('encode/decode request message', () => {
   })
 
   describe.each([
+    ['GET', new URL('orpc://localhost/api/v1/users/1?a=1&b=2'), {}],
+    ['GET', new URL('orpc:///localhost/api/v1/users/1?a=1&b=2'), {}],
     ['GET', new URL('orpc://example.com/api/v1/users/1?a=1&b=2'), {}],
     ['GET', new URL('orpc:///example.com/api/v1/users/1?a=1&b=2'), {}],
     ['GET', new URL('orpc:/api/v1/users/1?a=1&b=2'), {}],

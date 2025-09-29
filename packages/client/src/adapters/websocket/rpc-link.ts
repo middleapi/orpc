@@ -17,6 +17,6 @@ export class RPCLink<T extends ClientContext> extends StandardRPCLink<T> {
   constructor(options: RPCLinkOptions<T>) {
     const linkClient = new LinkWebsocketClient(options)
 
-    super(linkClient, { ...options, url: 'orpc:/' })
+    super(linkClient, { ...options, url: 'orpc://localhost' })
   }
 }
