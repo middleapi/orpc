@@ -35,6 +35,10 @@ export const ping = os
 We recommend using [Runtime Context](/docs/context#execution-context) instead of [Initial Context](/docs/context#initial-context) when working with Server Actions.
 :::
 
+:::warning
+Special errors such as `redirect`, `notFound`, and similar are **only supported in [Next.js](https://nextjs.org/) and [TanStack Start](https://tanstack.com/start/latest)** at the moment.
+:::
+
 ## Client Side
 
 On the client, import and call your procedure as follows:
