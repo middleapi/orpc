@@ -1,5 +1,6 @@
 import { CreatePlanetMutationForm } from './orpc-mutation'
 import { ListPlanetsQuery } from './orpc-query'
+import { EventIteratorQueries } from './orpc-stream'
 
 export default function Home() {
   return (
@@ -16,6 +17,8 @@ export default function Home() {
       <CreatePlanetMutationForm />
       <hr />
       <ListPlanetsQuery />
+      <hr />
+      <EventIteratorQueries />
     </main>
   )
 }

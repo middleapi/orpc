@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { CreatePlanetMutationForm } from '~/components/orpc-mutation'
 import { ListPlanetsQuery } from '~/components/orpc-query'
+import { EventIteratorQueries } from '~/components/orpc-stream'
 
 export const Route = createFileRoute('/')({
   component: RouteComponent,
@@ -19,6 +20,8 @@ function RouteComponent() {
       <CreatePlanetMutationForm />
       <hr />
       <ListPlanetsQuery />
+      <hr />
+      <EventIteratorQueries />
     </div>
   )
 }

@@ -31,6 +31,7 @@ const getORPCClient = createIsomorphicFn()
       url: `${window.location.origin}/api/rpc`,
       plugins: [
         new BatchLinkPlugin({
+          exclude: ({ path }) => path[0] === 'sse',
           groups: [{
             condition: () => true,
             context: {},

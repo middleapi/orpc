@@ -3,6 +3,7 @@ import { CreatePlanetMutationForm } from './components/orpc-mutation'
 import { ListPlanetsQuery } from './components/orpc-query'
 import '@scalar/api-reference-react/style.css'
 import { ApiReferenceReact } from '@scalar/api-reference-react'
+import { EventIteratorQueries } from './components/orpc-stream'
 
 export default function App() {
   if (location.pathname === '/api') {
@@ -31,6 +32,8 @@ export default function App() {
       <ListPlanetsQuery />
       <hr />
       <ChatRoom />
+      <hr />
+      <EventIteratorQueries />
     </main>
   )
 }

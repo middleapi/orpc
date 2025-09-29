@@ -3,12 +3,16 @@ import { RPCHandler } from '@orpc/server/fetch'
 import { router } from '~/routers'
 import { onError } from '@orpc/server'
 import '~/polyfill'
+import { BatchHandlerPlugin } from '@orpc/server/plugins'
 
 const handler = new RPCHandler(router, {
   interceptors: [
     onError((error) => {
       console.error(error)
     }),
+  ],
+  plugins: [
+    new BatchHandlerPlugin(),
   ],
 })
 

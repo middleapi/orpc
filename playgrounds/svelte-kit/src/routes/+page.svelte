@@ -2,6 +2,7 @@
   import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
   import OrpcMutation from './orpc-mutation.svelte';
   import OrpcQuery from './orpc-query.svelte';
+  import OrpcStream from './orpc-stream.svelte';
 
   const queryClient = new QueryClient();
 </script>
@@ -20,5 +21,7 @@
     <OrpcMutation />
     <hr />
     <OrpcQuery />
+    <hr />
+    <OrpcStream />
   </div>
 </QueryClientProvider>

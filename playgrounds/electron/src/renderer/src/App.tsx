@@ -1,5 +1,6 @@
 import { CreatePlanetMutationForm } from './components/orpc-mutation'
 import { ListPlanetsQuery } from './components/orpc-query'
+import { EventIteratorQueries } from './components/orpc-stream'
 
 function App(): React.JSX.Element {
   return (
@@ -9,6 +10,8 @@ function App(): React.JSX.Element {
       <CreatePlanetMutationForm />
       <hr />
       <ListPlanetsQuery />
+      <hr />
+      <EventIteratorQueries />
     </div>
   )
 }
