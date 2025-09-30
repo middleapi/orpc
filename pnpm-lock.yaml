@@ -302,8 +302,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       partysocket:
-        specifier: ^1.1.5
-        version: 1.1.5
+        specifier: ^1.1.6
+        version: 1.1.6
       valibot:
         specifier: ^1.1.0
         version: 1.1.0(typescript@5.8.3)
@@ -12350,8 +12350,8 @@ packages:
     resolution: {integrity: sha512-CiyeOxFT/JZyN5m0z9PfXw4SCBJ6Sygz1Dpl0wqjlhDEGGBP1GnsUVEL0p63hoG1fcj3fHynXi9NYO4nWOL+qQ==}
     engines: {node: '>= 0.8'}
 
-  partysocket@1.1.5:
-    resolution: {integrity: sha512-8uw9foq9bij4sKLCtTSHvyqMrMTQ5FJjrHc7BjoM2s95Vu7xYCN63ABpI7OZHC7ZMP5xaom/A+SsoFPXmTV6ZQ==}
+  partysocket@1.1.6:
+    resolution: {integrity: sha512-LkEk8N9hMDDsDT0iDK0zuwUDFVrVMUXFXCeN3850Ng8wtjPqPBeJlwdeY6ROlJSEh3tPoTTasXoSBYH76y118w==}
 
   path-browserify@1.0.1:
     resolution: {integrity: sha512-b7uo2UCUOYZcnF/3ID0lulOJi/bafxa1xPe7ZPsammBSpjSWQkjNxlt635YGS2MiR9GjvuXCtz2emr3jbsz98g==}
@@ -28658,7 +28658,7 @@ snapshots:
 
   parseurl@1.3.3: {}
 
-  partysocket@1.1.5:
+  partysocket@1.1.6:
     dependencies:
       event-target-polyfill: 0.0.4
 
