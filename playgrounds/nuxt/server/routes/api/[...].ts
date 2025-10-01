@@ -2,11 +2,11 @@ import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { onError } from '@orpc/server'
 import { ZodToJsonSchemaConverter } from '@orpc/zod/zod4'
 import { experimental_SmartCoercionPlugin as SmartCoercionPlugin } from '@orpc/json-schema'
-import { router } from '~/server/routers'
+import { router } from '../../routers'
 import { OpenAPIReferencePlugin } from '@orpc/openapi/plugins'
-import { NewUserSchema, UserSchema } from '~/server/schemas/user'
-import { CredentialSchema, TokenSchema } from '~/server/schemas/auth'
-import { NewPlanetSchema, PlanetSchema, UpdatePlanetSchema } from '~/server/schemas/planet'
+import { NewUserSchema, UserSchema } from '../../schemas/user'
+import { CredentialSchema, TokenSchema } from '../../schemas/auth'
+import { NewPlanetSchema, PlanetSchema, UpdatePlanetSchema } from '../../schemas/planet'
 
 const openAPIHandler = new OpenAPIHandler(router, {
   interceptors: [

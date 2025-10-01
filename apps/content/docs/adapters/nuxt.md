@@ -49,7 +49,7 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc-
 
 To make the oRPC client compatible with SSR, set it up inside a [Nuxt Plugin](https://nuxt.com/docs/guide/directory-structure/plugins).
 
-```ts [plugins/orpc.ts]
+```ts [app/plugins/orpc.ts]
 export default defineNuxtPlugin(() => {
   const event = useRequestEvent()
 
@@ -78,7 +78,7 @@ To reduce HTTP requests and improve latency during SSR, you can utilize a [Serve
 
 ::: code-group
 
-```ts [plugins/orpc.client.ts]
+```ts [app/plugins/orpc.client.ts]
 export default defineNuxtPlugin(() => {
   const link = new RPCLink({
     url: `${window.location.origin}/rpc`,
@@ -95,7 +95,7 @@ export default defineNuxtPlugin(() => {
 })
 ```
 
-```ts [plugins/orpc.server.ts]
+```ts [app/plugins/orpc.server.ts]
 export default defineNuxtPlugin((nuxt) => {
   const event = useRequestEvent()
 

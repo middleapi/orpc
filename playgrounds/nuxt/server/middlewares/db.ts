@@ -97,9 +97,9 @@ export function createFakeDB(): DB {
         }
 
         planets[index] = {
-          ...planets[index],
+          ...planets[index]!,
           ...planet,
-          imageUrl: planet.image ? `https://example.com/cdn/${planet.image.name}` : planets[index].imageUrl,
+          imageUrl: planet.image ? `https://example.com/cdn/${planet.image.name}` : planets[index]!.imageUrl,
         }
 
         return planets[index]

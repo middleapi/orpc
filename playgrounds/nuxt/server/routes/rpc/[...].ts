@@ -1,7 +1,7 @@
 import { onError } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { BatchHandlerPlugin } from '@orpc/server/plugins'
-import { router } from '~/server/routers'
+import { router } from '../../routers'
 
 const rpcHandler = new RPCHandler(router, {
   interceptors: [

@@ -1,5 +1,5 @@
 import { createRouterClient } from '@orpc/server'
-import { router } from '~/server/routers'
+import { router } from '../../server/routers'
 import { createTanstackQueryUtils } from '@orpc/tanstack-query'
 
 /**
