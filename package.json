@@ -29,7 +29,7 @@
     "@antfu/eslint-config": "^5.4.1",
     "@solidjs/testing-library": "^0.8.10",
     "@sveltejs/vite-plugin-svelte": "^6.2.1",
-    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/jest-dom": "^6.9.0",
     "@testing-library/react": "^16.0.1",
     "@testing-library/svelte": "^5.2.7",
     "@testing-library/user-event": "^14.6.1",
@@ -51,7 +51,7 @@
     "pkg-pr-new": "^0.0.60",
     "sherif": "^1.6.1",
     "simple-git-hooks": "^2.11.1",
-    "typescript": "^5.9.2",
+    "typescript": "^5.9.3",
     "unbuild": "^3.6.1",
     "vite-plugin-solid": "^2.11.8",
     "vitest": "^3.2.4"
