@@ -453,8 +453,8 @@ importers:
         specifier: workspace:*
         version: link:../standard-server
       rou3:
-        specifier: ^0.7.5
-        version: 0.7.5
+        specifier: ^0.7.7
+        version: 0.7.7
     devDependencies:
       zod:
         specifier: ^4.1.11
@@ -13464,9 +13464,6 @@ packages:
     resolution: {integrity: sha512-CLEVl+MnPAiKh5pl4dEWSyMTpuflgNQiLGhMv8ezD5W/qP8AKvmYpCOKRRNOh7oRKnauBZ4SyeYkMS+1VSyKwQ==}
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
-
-  rou3@0.7.5:
-    resolution: {integrity: sha512-bwUHDHw1HSARty7TWNV71R0NZs5fOt74OM+hcMdJyPfchfRktEmxLoMSNa7PwEp6WqJ0a3feKztsIfTUEYhskw==}
 
   rou3@0.7.7:
     resolution: {integrity: sha512-z+6o7c3DarUbuBMLIdhzj2CqJLtUWrGk4fZlf07dIMitX3UpBXeInJ3lMD9huxj9yh9eo1RqtXf9aL0YzkDDUA==}
@@ -30248,8 +30245,6 @@ snapshots:
       '@rollup/rollup-win32-x64-gnu': 4.52.4
       '@rollup/rollup-win32-x64-msvc': 4.52.4
       fsevents: 2.3.3
-
-  rou3@0.7.5: {}
 
   rou3@0.7.7: {}
 
