@@ -23,7 +23,7 @@
     "@tanstack/react-router-devtools": "^1.132.31",
     "@tanstack/react-router-ssr-query": "^1.132.31",
     "@tanstack/react-start": "^1.132.32",
-    "@types/node": "^22.15.30",
+    "@types/node": "^24.6.2",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
