@@ -12,7 +12,7 @@
     "@nestjs/common": "^11.1.6",
     "@nestjs/core": "^11.1.6",
     "@nestjs/platform-express": "^11.1.6",
-    "@nestjs/schematics": "^11.0.7",
+    "@nestjs/schematics": "^11.0.8",
     "@orpc/client": "next",
     "@orpc/contract": "next",
     "@orpc/nest": "next",
