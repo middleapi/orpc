@@ -13,12 +13,12 @@
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/auto-instrumentations-node": "^0.64.6",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.205.0",
-    "@opentelemetry/instrumentation": "^0.205.0",
-    "@opentelemetry/instrumentation-document-load": "^0.51.2",
+    "@opentelemetry/auto-instrumentations-node": "^0.65.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.206.0",
+    "@opentelemetry/instrumentation": "^0.206.0",
+    "@opentelemetry/instrumentation-document-load": "^0.52.0",
     "@opentelemetry/resources": "^2.1.0",
-    "@opentelemetry/sdk-node": "^0.205.0",
+    "@opentelemetry/sdk-node": "^0.206.0",
     "@opentelemetry/sdk-trace-node": "^2.1.0",
     "@opentelemetry/sdk-trace-web": "^2.1.0",
     "@orpc/client": "next",
@@ -27,10 +27,10 @@
     "@orpc/tanstack-query": "next",
     "@tanstack/react-query": "^5.90.2",
     "@types/bun": "latest",
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "zod": "^4.1.11"
+    "zod": "^4.1.12"
   }
 }
