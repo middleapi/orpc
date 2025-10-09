@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.lib.json",
+  "references": [
+    { "path": "../shared" }
+  ],
+  "include": ["src"],
+  "exclude": [
+    "**/*.bench.*",
+    "**/*.test.*",
+    "**/*.test-d.ts",
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/__snapshots__/**"
+  ]
+}
