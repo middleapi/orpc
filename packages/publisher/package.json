@@ -19,11 +19,17 @@
         "types": "./dist/index.d.mts",
         "import": "./dist/index.mjs",
         "default": "./dist/index.mjs"
+      },
+      "./memory": {
+        "types": "./dist/adapters/memory.d.mts",
+        "import": "./dist/adapters/memory.mjs",
+        "default": "./dist/adapters/memory.mjs"
       }
     }
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./memory": "./src/adapters/memory.ts"
   },
   "files": [
     "dist"
@@ -34,6 +40,7 @@
     "type:check": "tsc -b"
   },
   "dependencies": {
-    "@orpc/shared": "workspace:*"
+    "@orpc/shared": "workspace:*",
+    "@orpc/standard-server": "workspace:*"
   }
 }
