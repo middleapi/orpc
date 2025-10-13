@@ -97,3 +97,103 @@ export const orpc = {
   c: clientC,
 }
 ```
+
+## Utilities
+
+::: info
+These utilities can be used for any kind of oRPC client.
+:::
+
+### Infer Client Input Map
+
+```ts twoslash
+import type { orpc as client } from './shared/planet'
+// ---cut---
+import type { InferClientInputMap } from '@orpc/client'
+
+type InputMap = InferClientInputMap<typeof client>
+
+type FindPlanetInput = InputMap['planet']['find']
+```
+
+Recursively infers the **input types** from a client. Produces a nested map where each endpoint's input type is preserved.
+
+### Infer Client Body Input Map
+
+```ts twoslash
+import type { orpc as client } from './shared/planet'
+// ---cut---
+import type { InferClientBodyInputMap } from '@orpc/client'
+
+type BodyInputMap = InferClientBodyInputMap<typeof client>
+
+type FindPlanetBodyInput = BodyInputMap['planet']['find']
+```
+
+Recursively infers the **body input types** from a client. If an endpoint's input includes `{ body: ... }`, only the `body` portion is extracted. Produces a nested map of body input types.
+
+### Infer Client Output Map
+
+```ts twoslash
+import type { orpc as client } from './shared/planet'
+// ---cut---
+import type { InferClientOutputMap } from '@orpc/client'
+
+type OutputMap = InferClientOutputMap<typeof client>
+
+type FindPlanetOutput = OutputMap['planet']['find']
+```
+
+Recursively infers the **output types** from a client. Produces a nested map where each endpoint's output type is preserved.
+
+### Infer Client Body Output Map
+
+```ts twoslash
+import type { orpc as client } from './shared/planet'
+// ---cut---
+import type { InferClientBodyOutputMap } from '@orpc/client'
+
+type BodyOutputMap = InferClientBodyOutputMap<typeof client>
+
+type FindPlanetBodyOutput = BodyOutputMap['planet']['find']
+```
+
+Recursively infers the **body output types** from a client. If an endpoint's output includes `{ body: ... }`, only the `body` portion is extracted. Produces a nested map of body output types.
+
+### Infer Client Error Map
+
+```ts twoslash
+import type { orpc as client } from './shared/planet'
+// ---cut---
+import type { InferClientErrorMap } from '@orpc/client'
+
+type ErrorMap = InferClientErrorMap<typeof client>
+
+type FindPlanetError = ErrorMap['planet']['find']
+```
+
+Recursively infers the **error types** from a client. Produces a nested map where each endpoint's error type is preserved.
+
+### Infer Client Error Union
+
+```ts twoslash
+import type { orpc as client } from './shared/planet'
+// ---cut---
+import type { InferClientErrorUnion } from '@orpc/client'
+
+type AllErrors = InferClientErrorUnion<typeof client>
+```
+
+Recursively infers a **union of all error types** from a client. Useful when you want to handle all possible errors from any endpoint at once.
+
+### Infer Client Context
+
+```ts twoslash
+import type { orpc as client } from './shared/planet'
+// ---cut---
+import type { InferClientContext } from '@orpc/client'
+
+type Context = InferClientContext<typeof client>
+```
+
+Infers the client context type from a client.
