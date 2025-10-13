@@ -41,6 +41,20 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
     return Number.isFinite(this.retentionSeconds) && this.retentionSeconds > 0
   }
 
+  /**
+   * Useful for measuring memory usage.
+   *
+   * @internal
+   *
+   */
+  get size(): number {
+    let size = this.redisListener ? 1 : 0
+    for (const listeners of this.listeners) {
+      size += listeners[1].size || 1 // empty set should never happen so we treat it as a single event
+    }
+    return size
+  }
+
   constructor(
     private readonly redis: Redis,
     { resumeRetentionSeconds, prefix, ...options }: IORedisPublisherOptions = {},
@@ -52,7 +66,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
     this.serializer = new StandardRPCJsonSerializer(options)
   }
 
-  protected lastCleanupTime: number | undefined
+  protected lastCleanupTimes: Map<string, number> = new Map()
   override async publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void> {
     const key = this.prefixKey(event)
 
@@ -61,12 +75,21 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
     let id: string | undefined
     if (this.isResumeEnabled) {
       const now = Date.now()
-      if (this.lastCleanupTime === undefined || this.lastCleanupTime + this.retentionSeconds * 1000 < now) {
-        this.lastCleanupTime = now
+
+      // cleanup for more efficiency memory
+      for (const [key, lastCleanupTime] of this.lastCleanupTimes) {
+        if (lastCleanupTime + this.retentionSeconds * 1000 < now) {
+          this.lastCleanupTimes.delete(key)
+        }
+      }
+
+      if (!this.lastCleanupTimes.has(key)) {
+        this.lastCleanupTimes.set(key, now)
+
         const result = await this.redis.multi()
-          .expire(key, this.retentionSeconds * 2) // double to avoid expires new events
-          .xtrim(key, 'MINID', `${now - this.retentionSeconds * 1000}-0`)
           .xadd(key, '*', stringifyJSON(serialized))
+          .xtrim(key, 'MINID', `${now - this.retentionSeconds * 1000}-0`)
+          .expire(key, this.retentionSeconds * 2) // double to avoid expires new events
           .exec()
 
         if (result) {
@@ -77,7 +100,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
           }
         }
 
-        id = (result![2]![1] as string | null) ?? undefined
+        id = (result![0]![1] as string | null) ?? undefined
       }
       else {
         const result = await this.redis.xadd(key, '*', stringifyJSON(serialized))
@@ -130,7 +153,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
 
     void (async () => {
       try {
-        if (typeof lastEventId === 'string') {
+        if (this.isResumeEnabled && typeof lastEventId === 'string') {
           const results = await this.redis.xread('STREAMS', key, lastEventId)
 
           if (results && results[0]) {
