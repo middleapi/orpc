@@ -43,7 +43,7 @@ export abstract class Publisher<T extends Record<string, object>> {
   /**
    * Publish an event to subscribers
    */
-  abstract publish<K extends keyof T>(event: K, payload: T[K]): Promise<void>
+  abstract publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void>
 
   /**
    * Subscribes to a specific event using a callback function.
@@ -52,7 +52,7 @@ export abstract class Publisher<T extends Record<string, object>> {
    * @remarks
    * This method should be protected to avoid conflicts with `subscribe` method
    */
-  protected abstract subscribeListener<K extends keyof T>(
+  protected abstract subscribeListener<K extends keyof T & string>(
     event: K,
     listener: (payload: T[K]) => void,
     options?: PublisherSubscribeListenerOptions
@@ -72,7 +72,7 @@ export abstract class Publisher<T extends Record<string, object>> {
    * unsubscribe()
    * ```
    */
-  subscribe<K extends keyof T>(event: K, listener: (payload: T[K]) => void, options?: PublisherSubscribeListenerOptions): Promise<() => Promise<void>>
+  subscribe<K extends keyof T & string>(event: K, listener: (payload: T[K]) => void, options?: PublisherSubscribeListenerOptions): Promise<() => Promise<void>>
   /**
    * Subscribes to a specific event using an async iterator.
    * Useful for `for await...of` loops with optional buffering and abort support.
@@ -84,8 +84,8 @@ export abstract class Publisher<T extends Record<string, object>> {
    * }
    * ```
    */
-  subscribe<K extends keyof T>(event: K, options?: PublisherSubscribeIteratorOptions): AsyncIteratorClass<T[K], void, void>
-  subscribe<K extends keyof T>(
+  subscribe<K extends keyof T & string>(event: K, options?: PublisherSubscribeIteratorOptions): AsyncIteratorClass<T[K], void, void>
+  subscribe<K extends keyof T & string>(
     event: K,
     listenerOrOptions?: ((payload: T[K]) => void) | PublisherSubscribeIteratorOptions,
     listenerOptions?: PublisherSubscribeListenerOptions,

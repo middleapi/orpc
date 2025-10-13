@@ -40,7 +40,7 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
     return size
   }
 
-  private get isResumeEnabled(): boolean {
+  protected get isResumeEnabled(): boolean {
     return Number.isFinite(this.retentionSeconds) && this.retentionSeconds > 0
   }
 
@@ -50,7 +50,7 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
     this.retentionSeconds = resumeRetentionSeconds ?? Number.NaN
   }
 
-  async publish<K extends keyof T>(event: K, payload: T[K]): Promise<void> {
+  async publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void> {
     this.cleanup()
 
     if (this.isResumeEnabled) {
@@ -69,7 +69,7 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
     this.eventPublisher.publish(event, payload)
   }
 
-  protected async subscribeListener<K extends keyof T>(event: K, listener: (payload: T[K]) => void, options?: PublisherSubscribeListenerOptions): Promise<() => Promise<void>> {
+  protected async subscribeListener<K extends keyof T & string>(event: K, listener: (payload: T[K]) => void, options?: PublisherSubscribeListenerOptions): Promise<() => Promise<void>> {
     if (this.isResumeEnabled && typeof options?.lastEventId === 'string') {
       const events = this.events.get(event)
       if (events) {
@@ -89,8 +89,8 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
     }
   }
 
-  private lastCleanupTime: number | null = null
-  private cleanup(): void {
+  protected lastCleanupTime: number | null = null
+  protected cleanup(): void {
     if (!this.isResumeEnabled) {
       return
     }
