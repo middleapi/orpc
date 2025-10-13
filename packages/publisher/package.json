@@ -39,8 +39,20 @@
     "build:watch": "pnpm run build --watch",
     "type:check": "tsc -b"
   },
+  "peerDependencies": {
+    "ioredis": ">=5.8.1"
+  },
+  "peerDependenciesMeta": {
+    "ioredis": {
+      "optional": true
+    }
+  },
   "dependencies": {
+    "@orpc/client": "workspace:*",
     "@orpc/shared": "workspace:*",
     "@orpc/standard-server": "workspace:*"
+  },
+  "devDependencies": {
+    "ioredis": "^5.8.1"
   }
 }

@@ -494,12 +494,19 @@ importers:
 
   packages/publisher:
     dependencies:
+      '@orpc/client':
+        specifier: workspace:*
+        version: link:../client
       '@orpc/shared':
         specifier: workspace:*
         version: link:../shared
       '@orpc/standard-server':
         specifier: workspace:*
         version: link:../standard-server
+    devDependencies:
+      ioredis:
+        specifier: ^5.8.1
+        version: 5.8.1
 
   packages/react:
     dependencies:
@@ -1043,7 +1050,7 @@ importers:
         version: 5.90.2(react@19.2.0)
       '@types/bun':
         specifier: latest
-        version: 1.2.23(@types/react@19.2.0)
+        version: 1.3.0(@types/react@19.2.0)
       '@types/react':
         specifier: ^19.2.0
         version: 19.2.0
@@ -1385,7 +1392,7 @@ importers:
         version: 5.90.2(vue@3.5.22(typescript@5.8.3))
       nuxt:
         specifier: ^4.1.2
-        version: 4.1.2(@netlify/blobs@9.1.2)(@parcel/watcher@2.5.1)(@types/node@24.7.0)(@upstash/redis@1.35.5)(@vue/compiler-sfc@3.5.22)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(eslint@9.37.0(jiti@2.6.0))(ioredis@5.8.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.52.4)(terser@5.44.0)(tsx@4.20.6)(typescript@5.8.3)(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.0)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1))(xml2js@0.6.2)(yaml@2.8.1)
+        version: 4.1.2(@netlify/blobs@9.1.2)(@parcel/watcher@2.5.1)(@types/node@24.7.0)(@upstash/redis@1.35.5)(@vue/compiler-sfc@3.5.22)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(eslint@9.37.0(jiti@2.6.0))(ioredis@5.8.1)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.52.4)(terser@5.44.0)(tsx@4.20.6)(typescript@5.8.3)(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.0)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1))(xml2js@0.6.2)(yaml@2.8.1)
       vue:
         specifier: latest
         version: 3.5.22(typescript@5.8.3)
@@ -1421,7 +1428,7 @@ importers:
         version: 0.15.3(solid-js@1.9.9)
       '@solidjs/start':
         specifier: ^1.2.0
-        version: 1.2.0(@testing-library/jest-dom@6.9.1)(solid-js@1.9.9)(vinxi@0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1))(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1))
+        version: 1.2.0(@testing-library/jest-dom@6.9.1)(solid-js@1.9.9)(vinxi@0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.1)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1))(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1))
       '@tanstack/solid-query':
         specifier: ^5.90.3
         version: 5.90.3(solid-js@1.9.9)
@@ -1430,7 +1437,7 @@ importers:
         version: 1.9.9
       vinxi:
         specifier: ^0.5.8
-        version: 0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1)
+        version: 0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.1)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1)
       vite-plugin-top-level-await:
         specifier: ^1.6.0
         version: 1.6.0(@swc/helpers@0.5.17)(rollup@4.52.4)(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1))
@@ -6884,8 +6891,8 @@ packages:
   '@types/braces@3.0.5':
     resolution: {integrity: sha512-SQFof9H+LXeWNz8wDe7oN5zu7ket0qwMu5vZubW4GCJ8Kkeh6nBWUz87+KTz/G3Kqsrp0j/W253XJb3KMEeg3w==}
 
-  '@types/bun@1.2.23':
-    resolution: {integrity: sha512-le8ueOY5b6VKYf19xT3McVbXqLqmxzPXHsQT/q9JHgikJ2X22wyTW3g3ohz2ZMnp7dod6aduIiq8A14Xyimm0A==}
+  '@types/bun@1.3.0':
+    resolution: {integrity: sha512-+lAGCYjXjip2qY375xX/scJeVRmZ5cY0wyHYyCYxNcdEXrQ4AOe3gACgd4iQ8ksOslJtW4VNxBJ8llUwc3a6AA==}
 
   '@types/bunyan@1.8.11':
     resolution: {integrity: sha512-758fRH7umIMk5qt5ELmRMff4mLDlN+xyYzC+dkPTdKwbSkJFvz6xwyScrytPU0QIBbRRwbiE8/BIg8bpajerNQ==}
@@ -8323,8 +8330,8 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
-  bun-types@1.2.23:
-    resolution: {integrity: sha512-R9f0hKAZXgFU3mlrA0YpE/fiDvwV0FT9rORApt2aQVWSuJDzZOyB5QLc0N/4HF57CS8IXJ6+L5E4W1bW6NS2Aw==}
+  bun-types@1.3.0:
+    resolution: {integrity: sha512-u8X0thhx+yJ0KmkxuEo9HAtdfgCBaM/aI9K90VQcQioAmkVp3SG3FkwWGibUFz3WdXAdcsqOcbU40lK7tbHdkQ==}
     peerDependencies:
       '@types/react': ^19
 
@@ -10842,10 +10849,6 @@ packages:
   internmap@2.0.3:
     resolution: {integrity: sha512-5Hh7Y1wQbvY5ooGgPbDaL5iYLAPzMTUrjMulskHLH6wnv/A+1q5rgEaiuqEjB+oxGXIVZs1FF+R/KPN3ZSQYYg==}
     engines: {node: '>=12'}
-
-  ioredis@5.8.0:
-    resolution: {integrity: sha512-AUXbKn9gvo9hHKvk6LbZJQSKn/qIfkWXrnsyL9Yrf+oeXmla9Nmf6XEumOddyhM8neynpK5oAV6r9r99KBuwzA==}
-    engines: {node: '>=12.22.0'}
 
   ioredis@5.8.1:
     resolution: {integrity: sha512-Qho8TgIamqEPdgiMadJwzRMW3TudIg6vpg4YONokGDudy4eqRIJtDbVX72pfLBcWxvbn3qm/40TyGUObdW4tLQ==}
@@ -21140,11 +21143,11 @@ snapshots:
     dependencies:
       solid-js: 1.9.9
 
-  '@solidjs/start@1.2.0(@testing-library/jest-dom@6.9.1)(solid-js@1.9.9)(vinxi@0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1))(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1))':
+  '@solidjs/start@1.2.0(@testing-library/jest-dom@6.9.1)(solid-js@1.9.9)(vinxi@0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.1)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1))(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1))':
     dependencies:
       '@tanstack/server-functions-plugin': 1.121.21(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1))
-      '@vinxi/plugin-directives': 0.5.1(vinxi@0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1))
-      '@vinxi/server-components': 0.5.1(vinxi@0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1))
+      '@vinxi/plugin-directives': 0.5.1(vinxi@0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.1)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1))
+      '@vinxi/server-components': 0.5.1(vinxi@0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.1)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1))
       cookie-es: 2.0.0
       defu: 6.1.4
       error-stack-parser: 2.1.4
@@ -21156,7 +21159,7 @@ snapshots:
       source-map-js: 1.2.1
       terracotta: 1.0.6(solid-js@1.9.9)
       tinyglobby: 0.2.15
-      vinxi: 0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1)
+      vinxi: 0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.1)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1)
       vite-plugin-solid: 2.11.9(@testing-library/jest-dom@6.9.1)(solid-js@1.9.9)(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1))
     transitivePeerDependencies:
       - '@testing-library/jest-dom'
@@ -21814,9 +21817,9 @@ snapshots:
 
   '@types/braces@3.0.5': {}
 
-  '@types/bun@1.2.23(@types/react@19.2.0)':
+  '@types/bun@1.3.0(@types/react@19.2.0)':
     dependencies:
-      bun-types: 1.2.23(@types/react@19.2.0)
+      bun-types: 1.3.0(@types/react@19.2.0)
     transitivePeerDependencies:
       - '@types/react'
 
@@ -22402,7 +22405,7 @@ snapshots:
       untun: 0.1.3
       uqr: 0.1.2
 
-  '@vinxi/plugin-directives@0.5.1(vinxi@0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1))':
+  '@vinxi/plugin-directives@0.5.1(vinxi@0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.1)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1))':
     dependencies:
       '@babel/parser': 7.28.4
       acorn: 8.15.0
@@ -22413,18 +22416,18 @@ snapshots:
       magicast: 0.2.11
       recast: 0.23.11
       tslib: 2.8.1
-      vinxi: 0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1)
+      vinxi: 0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.1)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1)
 
-  '@vinxi/server-components@0.5.1(vinxi@0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1))':
+  '@vinxi/server-components@0.5.1(vinxi@0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.1)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1))':
     dependencies:
-      '@vinxi/plugin-directives': 0.5.1(vinxi@0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1))
+      '@vinxi/plugin-directives': 0.5.1(vinxi@0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.1)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1))
       acorn: 8.15.0
       acorn-loose: 8.5.2
       acorn-typescript: 1.4.13(acorn@8.15.0)
       astring: 1.9.0
       magicast: 0.2.11
       recast: 0.23.11
-      vinxi: 0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1)
+      vinxi: 0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.1)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1)
 
   '@vitejs/plugin-react@4.7.0(vite@6.3.6(@types/node@24.7.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1))':
     dependencies:
@@ -23797,7 +23800,7 @@ snapshots:
     transitivePeerDependencies:
       - magicast
 
-  bun-types@1.2.23(@types/react@19.2.0):
+  bun-types@1.3.0(@types/react@19.2.0):
     dependencies:
       '@types/node': 22.18.8
       '@types/react': 19.2.0
@@ -26954,20 +26957,6 @@ snapshots:
 
   internmap@2.0.3: {}
 
-  ioredis@5.8.0:
-    dependencies:
-      '@ioredis/commands': 1.4.0
-      cluster-key-slot: 1.1.2
-      debug: 4.4.3
-      denque: 2.1.0
-      lodash.defaults: 4.2.0
-      lodash.isarguments: 3.1.0
-      redis-errors: 1.2.0
-      redis-parser: 3.0.0
-      standard-as-callback: 2.1.0
-    transitivePeerDependencies:
-      - supports-color
-
   ioredis@5.8.1:
     dependencies:
       '@ioredis/commands': 1.4.0
@@ -26981,7 +26970,6 @@ snapshots:
       standard-as-callback: 2.1.0
     transitivePeerDependencies:
       - supports-color
-    optional: true
 
   ip-address@10.0.1: {}
 
@@ -28427,7 +28415,7 @@ snapshots:
       h3: 1.15.4
       hookable: 5.5.3
       httpxy: 0.1.7
-      ioredis: 5.8.0
+      ioredis: 5.8.1
       jiti: 2.6.1
       klona: 2.0.6
       knitwork: 1.2.0
@@ -28460,7 +28448,7 @@ snapshots:
       unenv: 2.0.0-rc.21
       unimport: 5.4.0
       unplugin-utils: 0.2.5
-      unstorage: 1.17.1(@netlify/blobs@9.1.2)(@upstash/redis@1.35.5)(db0@0.3.2(better-sqlite3@12.4.1))(ioredis@5.8.0)
+      unstorage: 1.17.1(@netlify/blobs@9.1.2)(@upstash/redis@1.35.5)(db0@0.3.2(better-sqlite3@12.4.1))(ioredis@5.8.1)
       untyped: 2.0.0
       unwasm: 0.3.9
       youch: 4.1.0-beta.8
@@ -28530,7 +28518,7 @@ snapshots:
       h3: 1.15.4
       hookable: 5.5.3
       httpxy: 0.1.7
-      ioredis: 5.8.0
+      ioredis: 5.8.1
       jiti: 2.6.0
       klona: 2.0.6
       knitwork: 1.2.0
@@ -28563,7 +28551,7 @@ snapshots:
       unenv: 2.0.0-rc.21
       unimport: 5.4.0
       unplugin-utils: 0.3.0
-      unstorage: 1.17.1(@netlify/blobs@9.1.2)(@upstash/redis@1.35.5)(db0@0.3.2(better-sqlite3@12.4.1))(ioredis@5.8.0)
+      unstorage: 1.17.1(@netlify/blobs@9.1.2)(@upstash/redis@1.35.5)(db0@0.3.2(better-sqlite3@12.4.1))(ioredis@5.8.1)
       untyped: 2.0.0
       unwasm: 0.3.11
       youch: 4.1.0-beta.11
@@ -28713,7 +28701,7 @@ snapshots:
     dependencies:
       boolbase: 1.0.0
 
-  nuxt@4.1.2(@netlify/blobs@9.1.2)(@parcel/watcher@2.5.1)(@types/node@24.7.0)(@upstash/redis@1.35.5)(@vue/compiler-sfc@3.5.22)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(eslint@9.37.0(jiti@2.6.0))(ioredis@5.8.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.52.4)(terser@5.44.0)(tsx@4.20.6)(typescript@5.8.3)(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.0)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1))(xml2js@0.6.2)(yaml@2.8.1):
+  nuxt@4.1.2(@netlify/blobs@9.1.2)(@parcel/watcher@2.5.1)(@types/node@24.7.0)(@upstash/redis@1.35.5)(@vue/compiler-sfc@3.5.22)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(eslint@9.37.0(jiti@2.6.0))(ioredis@5.8.1)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.52.4)(terser@5.44.0)(tsx@4.20.6)(typescript@5.8.3)(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.0)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1))(xml2js@0.6.2)(yaml@2.8.1):
     dependencies:
       '@nuxt/cli': 3.28.0(magicast@0.3.5)
       '@nuxt/devalue': 2.0.2
@@ -28772,7 +28760,7 @@ snapshots:
       unimport: 5.4.0
       unplugin: 2.3.10
       unplugin-vue-router: 0.15.0(@vue/compiler-sfc@3.5.22)(typescript@5.8.3)(vue-router@4.5.1(vue@3.5.22(typescript@5.8.3)))(vue@3.5.22(typescript@5.8.3))
-      unstorage: 1.17.1(@netlify/blobs@9.1.2)(@upstash/redis@1.35.5)(db0@0.3.2(better-sqlite3@12.4.1))(ioredis@5.8.0)
+      unstorage: 1.17.1(@netlify/blobs@9.1.2)(@upstash/redis@1.35.5)(db0@0.3.2(better-sqlite3@12.4.1))(ioredis@5.8.1)
       untyped: 2.0.0
       vue: 3.5.22(typescript@5.8.3)
       vue-bundle-renderer: 2.1.2
@@ -31825,7 +31813,7 @@ snapshots:
       picomatch: 4.0.3
       webpack-virtual-modules: 0.6.2
 
-  unstorage@1.16.1(@netlify/blobs@9.1.2)(@upstash/redis@1.35.5)(db0@0.3.2(better-sqlite3@12.4.1))(ioredis@5.8.0):
+  unstorage@1.16.1(@netlify/blobs@9.1.2)(@upstash/redis@1.35.5)(db0@0.3.2(better-sqlite3@12.4.1))(ioredis@5.8.1):
     dependencies:
       anymatch: 3.1.3
       chokidar: 4.0.3
@@ -31839,23 +31827,7 @@ snapshots:
       '@netlify/blobs': 9.1.2
       '@upstash/redis': 1.35.5
       db0: 0.3.2(better-sqlite3@12.4.1)
-      ioredis: 5.8.0
-
-  unstorage@1.17.1(@netlify/blobs@9.1.2)(@upstash/redis@1.35.5)(db0@0.3.2(better-sqlite3@12.4.1))(ioredis@5.8.0):
-    dependencies:
-      anymatch: 3.1.3
-      chokidar: 4.0.3
-      destr: 2.0.5
-      h3: 1.15.4
-      lru-cache: 10.4.3
-      node-fetch-native: 1.6.7
-      ofetch: 1.4.1
-      ufo: 1.6.1
-    optionalDependencies:
-      '@netlify/blobs': 9.1.2
-      '@upstash/redis': 1.35.5
-      db0: 0.3.2(better-sqlite3@12.4.1)
-      ioredis: 5.8.0
+      ioredis: 5.8.1
 
   unstorage@1.17.1(@netlify/blobs@9.1.2)(@upstash/redis@1.35.5)(db0@0.3.2(better-sqlite3@12.4.1))(ioredis@5.8.1):
     dependencies:
@@ -32009,7 +31981,7 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
 
-  vinxi@0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1):
+  vinxi@0.5.8(@netlify/blobs@9.1.2)(@types/node@24.7.0)(@upstash/redis@1.35.5)(better-sqlite3@12.4.1)(db0@0.3.2(better-sqlite3@12.4.1))(encoding@0.1.13)(ioredis@5.8.1)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(xml2js@0.6.2)(yaml@2.8.1):
     dependencies:
       '@babel/core': 7.28.0
       '@babel/plugin-syntax-jsx': 7.27.1(@babel/core@7.28.0)
@@ -32042,7 +32014,7 @@ snapshots:
       ufo: 1.6.1
       unctx: 2.4.1
       unenv: 1.10.0
-      unstorage: 1.16.1(@netlify/blobs@9.1.2)(@upstash/redis@1.35.5)(db0@0.3.2(better-sqlite3@12.4.1))(ioredis@5.8.0)
+      unstorage: 1.16.1(@netlify/blobs@9.1.2)(@upstash/redis@1.35.5)(db0@0.3.2(better-sqlite3@12.4.1))(ioredis@5.8.1)
       vite: 6.3.6(@types/node@24.7.0)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1)
       zod: 3.25.76
     transitivePeerDependencies:
