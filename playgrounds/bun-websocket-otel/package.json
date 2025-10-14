@@ -25,10 +25,10 @@
     "@orpc/otel": "next",
     "@orpc/server": "next",
     "@orpc/tanstack-query": "next",
-    "@tanstack/react-query": "^5.90.2",
+    "@tanstack/react-query": "^5.90.3",
     "@types/bun": "latest",
     "@types/react": "^19.2.2",
-    "@types/react-dom": "^19.2.1",
+    "@types/react-dom": "^19.2.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "zod": "^4.1.12"
