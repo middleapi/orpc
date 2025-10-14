@@ -9,7 +9,7 @@ describe('postMessagePortMessage', () => {
     const data = 'hello'
     postMessagePortMessage(mockPort, data)
     expect(mockPort.postMessage).toBeCalledTimes(1)
-    expect(mockPort.postMessage).toHaveBeenCalledWith(data)
+    expect(mockPort.postMessage).toHaveBeenCalledWith(data, undefined)
   })
 })
 
