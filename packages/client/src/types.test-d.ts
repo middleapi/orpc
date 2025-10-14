@@ -1,5 +1,5 @@
 import type { ORPCError } from './error'
-import type { Client, ClientContext, InferClientBodyInputMap, InferClientBodyOutputMap, InferClientErrorMap, InferClientErrorUnion, InferClientInputMap, InferClientOutputMap } from './types'
+import type { Client, ClientContext, InferClientBodyInputs, InferClientBodyOutputs, InferClientErrors, InferClientErrorUnion, InferClientInputs, InferClientOutputs } from './types'
 
 describe('client', () => {
   const client: Client<{ cache?: boolean }, string, number, Error | ORPCError<'OVERRIDE', unknown>> = async (...args) => {
@@ -95,8 +95,8 @@ describe('infer utilities', () => {
     }
   }
 
-  it('InferClientInputMap', () => {
-    expectTypeOf<InferClientInputMap<ORPC>>().toEqualTypeOf<{
+  it('InferClientInputs', () => {
+    expectTypeOf<InferClientInputs<ORPC>>().toEqualTypeOf<{
       ping: string
       pong: { body: number }
       nested: {
@@ -106,8 +106,8 @@ describe('infer utilities', () => {
     }>()
   })
 
-  it('InferClientBodyInputMap', () => {
-    expectTypeOf<InferClientBodyInputMap<ORPC>>().toEqualTypeOf<{
+  it('InferClientBodyInputs', () => {
+    expectTypeOf<InferClientBodyInputs<ORPC>>().toEqualTypeOf<{
       ping: string
       pong: number
       nested: {
@@ -117,8 +117,8 @@ describe('infer utilities', () => {
     }>()
   })
 
-  it('InferClientOutputMap', () => {
-    expectTypeOf<InferClientOutputMap<ORPC>>().toEqualTypeOf<{
+  it('InferClientOutputs', () => {
+    expectTypeOf<InferClientOutputs<ORPC>>().toEqualTypeOf<{
       ping: number
       pong: { body: string }
       nested: {
@@ -128,8 +128,8 @@ describe('infer utilities', () => {
     }>()
   })
 
-  it('InferClientBodyOutputMap', () => {
-    expectTypeOf<InferClientBodyOutputMap<ORPC>>().toEqualTypeOf<{
+  it('InferClientBodyOutputs', () => {
+    expectTypeOf<InferClientBodyOutputs<ORPC>>().toEqualTypeOf<{
       ping: number
       pong: string
       nested: {
@@ -139,8 +139,8 @@ describe('infer utilities', () => {
     }>()
   })
 
-  it('InferClientErrorMap', () => {
-    expectTypeOf<InferClientErrorMap<ORPC>>().toEqualTypeOf<{
+  it('InferClientErrors', () => {
+    expectTypeOf<InferClientErrors<ORPC>>().toEqualTypeOf<{
       ping: Error | ORPCError<'PING', unknown>
       pong: Error
       nested: {

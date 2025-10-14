@@ -42,11 +42,11 @@ export interface ClientLink<TClientContext extends ClientContext> {
  *
  * Produces a nested map where each endpoint's input type is preserved.
  */
-export type InferClientInputMap<T extends NestedClient<any>>
+export type InferClientInputs<T extends NestedClient<any>>
   = T extends Client<any, infer U, any, any>
     ? U
     : {
-        [K in keyof T]: T[K] extends NestedClient<any> ? InferClientInputMap<T[K]> : never
+        [K in keyof T]: T[K] extends NestedClient<any> ? InferClientInputs<T[K]> : never
       }
 
 /**
@@ -55,11 +55,11 @@ export type InferClientInputMap<T extends NestedClient<any>>
  * If an endpoint’s input includes `{ body: ... }`, only the `body` portion is extracted.
  * Produces a nested map of body input types.
  */
-export type InferClientBodyInputMap<T extends NestedClient<any>>
+export type InferClientBodyInputs<T extends NestedClient<any>>
   = T extends Client<any, infer U, any, any>
     ? U extends { body: infer UBody } ? UBody : U
     : {
-        [K in keyof T]: T[K] extends NestedClient<any> ? InferClientBodyInputMap<T[K]> : never
+        [K in keyof T]: T[K] extends NestedClient<any> ? InferClientBodyInputs<T[K]> : never
       }
 
 /**
@@ -67,11 +67,11 @@ export type InferClientBodyInputMap<T extends NestedClient<any>>
  *
  * Produces a nested map where each endpoint's output type is preserved.
  */
-export type InferClientOutputMap<T extends NestedClient<any>>
+export type InferClientOutputs<T extends NestedClient<any>>
   = T extends Client<any, any, infer U, any>
     ? U
     : {
-        [K in keyof T]: T[K] extends NestedClient<any> ? InferClientOutputMap<T[K]> : never
+        [K in keyof T]: T[K] extends NestedClient<any> ? InferClientOutputs<T[K]> : never
       }
 
 /**
@@ -80,11 +80,11 @@ export type InferClientOutputMap<T extends NestedClient<any>>
  * If an endpoint’s output includes `{ body: ... }`, only the `body` portion is extracted.
  * Produces a nested map of body output types.
  */
-export type InferClientBodyOutputMap<T extends NestedClient<any>>
+export type InferClientBodyOutputs<T extends NestedClient<any>>
   = T extends Client<any, any, infer U, any>
     ? U extends { body: infer UBody } ? UBody : U
     : {
-        [K in keyof T]: T[K] extends NestedClient<any> ? InferClientBodyOutputMap<T[K]> : never
+        [K in keyof T]: T[K] extends NestedClient<any> ? InferClientBodyOutputs<T[K]> : never
       }
 
 /**
@@ -92,11 +92,11 @@ export type InferClientBodyOutputMap<T extends NestedClient<any>>
  *
  * Produces a nested map where each endpoint's error type is preserved.
  */
-export type InferClientErrorMap<T extends NestedClient<any>>
+export type InferClientErrors<T extends NestedClient<any>>
   = T extends Client<any, any, any, infer U>
     ? U
     : {
-        [K in keyof T]: T[K] extends NestedClient<any> ? InferClientErrorMap<T[K]> : never
+        [K in keyof T]: T[K] extends NestedClient<any> ? InferClientErrors<T[K]> : never
       }
 
 /**
