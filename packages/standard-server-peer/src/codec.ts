@@ -8,9 +8,10 @@ const SHORTABLE_ORIGIN_MATCHER = /^orpc:\/\/localhost\//
 
 export enum MessageType {
   REQUEST = 1,
-  RESPONSE = 2,
-  EVENT_ITERATOR = 3,
-  ABORT_SIGNAL = 4,
+  REQUEST_RAW = 2,
+  RESPONSE = 3,
+  EVENT_ITERATOR = 4,
+  ABORT_SIGNAL = 5,
 }
 
 export type EventIteratorEvent = 'message' | 'error' | 'done'
@@ -23,6 +24,7 @@ export interface EventIteratorPayload {
 
 export interface RequestMessageMap {
   [MessageType.REQUEST]: Omit<StandardRequest, 'signal'>
+  [MessageType.REQUEST_RAW]: Omit<StandardRequest, 'signal'>
   [MessageType.EVENT_ITERATOR]: EventIteratorPayload
   [MessageType.ABORT_SIGNAL]: void
 }
@@ -132,6 +134,10 @@ export async function encodeRequestMessage<T extends keyof RequestMessageMap>(
   const baseMessage: BaseMessageFormat<SerializedRequestPayload> = {
     i: id,
     p: serializedPayload,
+  }
+
+  if (type === MessageType.REQUEST_RAW) {
+    return baseMessage
   }
 
   if (processedBody instanceof Blob) {
@@ -323,6 +329,10 @@ async function encodeRawMessage(data: object, blob?: Blob): Promise<EncodedMessa
 }
 
 async function decodeRawMessage(raw: EncodedMessage): Promise<{ json: any, buffer?: Uint8Array }> {
+  if (typeof raw === 'object' && !(raw instanceof Uint8Array)) {
+    return { json: raw }
+  }
+
   if (typeof raw === 'string') {
     return { json: JSON.parse(raw) }
   }

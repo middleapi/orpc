@@ -9,6 +9,7 @@ export interface ClientOptions<T extends ClientContext> {
   signal?: AbortSignal
   lastEventId?: string | undefined
   context: T
+  transfer?: Transferable[]
 }
 
 export type FriendlyClientOptions<T extends ClientContext>

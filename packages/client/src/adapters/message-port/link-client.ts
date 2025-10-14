@@ -13,8 +13,8 @@ export class LinkMessagePortClient<T extends ClientContext> implements StandardL
   private readonly peer: ClientPeer
 
   constructor(options: LinkMessagePortClientOptions) {
-    this.peer = new ClientPeer((message) => {
-      return postMessagePortMessage(options.port, message)
+    this.peer = new ClientPeer((message, messageOptions) => {
+      return postMessagePortMessage(options.port, message, messageOptions)
     })
 
     onMessagePortMessage(options.port, async (message) => {
@@ -26,8 +26,8 @@ export class LinkMessagePortClient<T extends ClientContext> implements StandardL
     })
   }
 
-  async call(request: StandardRequest, _options: ClientOptions<T>, _path: readonly string[], _input: unknown): Promise<StandardLazyResponse> {
-    const response = await this.peer.request(request)
+  async call(request: StandardRequest, options: ClientOptions<T>, _path: readonly string[], _input: unknown): Promise<StandardLazyResponse> {
+    const response = await this.peer.request(request, { raw: true, transfer: options.transfer })
     return { ...response, body: () => Promise.resolve(response.body) }
   }
 }
