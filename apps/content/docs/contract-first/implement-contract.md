@@ -47,7 +47,7 @@ const os = implement(contract) // fully replaces the os from @orpc/server
 
 ## Implementing Procedures
 
-Define a procedure by attaching a `.handler` to its corresponding contract, ensuring it adheres to the contract’s specifications.
+Define a procedure by attaching a `.handler` to its corresponding contract, ensuring it adheres to the contract's specifications.
 
 ```ts twoslash
 import { contract } from './shared/planet'

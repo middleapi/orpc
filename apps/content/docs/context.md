@@ -5,7 +5,7 @@ description: Understanding context in oRPC
 
 # Context in oRPC
 
-oRPC’s context mechanism provides a type-safe dependency injection pattern. It lets you supply required dependencies either explicitly or dynamically through middleware. There are two types:
+oRPC's context mechanism provides a type-safe dependency injection pattern. It lets you supply required dependencies either explicitly or dynamically through middleware. There are two types:
 
 - **Initial Context:** Provided explicitly when invoking a procedure.
 - **Execution Context:** Generated during procedure execution, typically by middleware.
@@ -80,7 +80,7 @@ const getting = base.handler(async ({ context }) => {
 export const router = { getting }
 ```
 
-When using execution context, you don’t need to pass any context manually:
+When using execution context, you don't need to pass any context manually:
 
 ```ts twoslash
 import { os } from '@orpc/server'

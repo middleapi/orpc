@@ -25,7 +25,7 @@ const handler = new RPCHandler(router, {
 ```
 
 ::: info
-The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc-handler), [OpenAPIHandler](/docs/openapi/openapi-handler) or custom implementations. Note that this plugin uses its own protocol for batching requests and responses, which is different from the handler’s native protocol.
+The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc-handler), [OpenAPIHandler](/docs/openapi/openapi-handler) or custom implementations. Note that this plugin uses its own protocol for batching requests and responses, which is different from the handler's native protocol.
 :::
 
 ### Client

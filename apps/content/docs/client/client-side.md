@@ -172,7 +172,7 @@ type Errors = InferClientErrors<typeof client>
 type FindPlanetError = Errors['planet']['find']
 ```
 
-Recursively infers the **error types** from a client. Produces a nested map where each endpoint's error type is preserved.
+Recursively infers the **error types** from a client when using [type-safe error handling](/docs/error-handling#type‐safe-error-handling). Produces a nested map where each endpoint's error type is preserved.
 
 ### Infer Client Error Union
 
@@ -184,7 +184,7 @@ import type { InferClientErrorUnion } from '@orpc/client'
 type AllErrors = InferClientErrorUnion<typeof client>
 ```
 
-Recursively infers a **union of all error types** from a client. Useful when you want to handle all possible errors from any endpoint at once.
+Recursively infers a **union of all error types** from a client when using [type-safe error handling](/docs/error-handling#type‐safe-error-handling). Useful when you want to handle all possible errors from any endpoint at once.
 
 ### Infer Client Context
 

@@ -48,7 +48,7 @@ Do not pass sensitive data in the `ORPCError.data` field.
 
 ## Type‑Safe Error Handling
 
-For a fully type‑safe error management experience, define your error types using the `.errors` method. This lets the client infer the error’s structure and handle it accordingly. You can use any [Standard Schema](https://github.com/standard-schema/standard-schema?tab=readme-ov-file#what-schema-libraries-implement-the-spec) library to validate error data.
+For a fully type‑safe error management experience, define your error types using the `.errors` method. This lets the client infer the error's structure and handle it accordingly. You can use any [Standard Schema](https://github.com/standard-schema/standard-schema?tab=readme-ov-file#what-schema-libraries-implement-the-spec) library to validate error data.
 
 ```ts twoslash
 import { os } from '@orpc/server'

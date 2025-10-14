@@ -5,7 +5,7 @@ description: Seamlessly integrate oRPC with Tanstack Query
 
 # Tanstack Query Integration
 
-[Tanstack Query](https://tanstack.com/query/latest) is a robust solution for asynchronous state management. oRPC’s integration with Tanstack Query is lightweight and straightforward - there’s no extra overhead.
+[Tanstack Query](https://tanstack.com/query/latest) is a robust solution for asynchronous state management. oRPC's integration with Tanstack Query is lightweight and straightforward - there's no extra overhead.
 
 | Library | Tanstack Query | oRPC Integration          |
 | ------- | -------------- | ------------------------- |

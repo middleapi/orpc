@@ -211,7 +211,7 @@ This is a quick overview of how to use oRPC. For more details, please refer to t
 oRPC is inspired by existing solutions that prioritize type safety and developer experience. Special acknowledgments to:
 
 - [tRPC](https://trpc.io): For pioneering the concept of end-to-end type-safe RPC and influencing the development of type-safe APIs.
-- [ts-rest](https://ts-rest.com): For its emphasis on contract-first development and OpenAPI integration, which have greatly inspired oRPC’s feature set.
+- [ts-rest](https://ts-rest.com): For its emphasis on contract-first development and OpenAPI integration, which have greatly inspired oRPC's feature set.
 
 ## License
 

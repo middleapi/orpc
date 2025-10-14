@@ -52,7 +52,7 @@ export type InferClientInputs<T extends NestedClient<any>>
 /**
  * Recursively infers the **body input types** from a client.
  *
- * If an endpoint’s input includes `{ body: ... }`, only the `body` portion is extracted.
+ * If an endpoint's input includes `{ body: ... }`, only the `body` portion is extracted.
  * Produces a nested map of body input types.
  */
 export type InferClientBodyInputs<T extends NestedClient<any>>
@@ -77,7 +77,7 @@ export type InferClientOutputs<T extends NestedClient<any>>
 /**
  * Recursively infers the **body output types** from a client.
  *
- * If an endpoint’s output includes `{ body: ... }`, only the `body` portion is extracted.
+ * If an endpoint's output includes `{ body: ... }`, only the `body` portion is extracted.
  * Produces a nested map of body output types.
  */
 export type InferClientBodyOutputs<T extends NestedClient<any>>
@@ -88,7 +88,7 @@ export type InferClientBodyOutputs<T extends NestedClient<any>>
       }
 
 /**
- * Recursively infers the **error types** from a client.
+ * Recursively infers the **error types** from a client when you use [type-safe errors](https://orpc.unnoq.com/docs/error-handling#type‐safe-error-handling).
  *
  * Produces a nested map where each endpoint's error type is preserved.
  */
@@ -100,7 +100,7 @@ export type InferClientErrors<T extends NestedClient<any>>
       }
 
 /**
- * Recursively infers a **union of all error types** from a client.
+ * Recursively infers a **union of all error types** from a client when you use [type-safe errors](https://orpc.unnoq.com/docs/error-handling#type‐safe-error-handling).
  *
  * Useful when you want to handle all possible errors from any endpoint at once.
  */

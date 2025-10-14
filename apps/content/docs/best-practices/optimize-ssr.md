@@ -35,7 +35,7 @@ But how? A naive `typeof window === 'undefined'` check works, but exposes your r
 
 ## Implementation
 
-We’ll use `globalThis` to share the server client without bundling it into client code.
+We'll use `globalThis` to share the server client without bundling it into client code.
 
 ::: code-group
 
