@@ -70,7 +70,7 @@ export class ClientPeer {
     return controller
   }
 
-  async request(request: StandardRequest, options: RequestOptions): Promise<StandardResponse> {
+  async request(request: StandardRequest, options?: RequestOptions): Promise<StandardResponse> {
     const signal = request.signal
 
     return runWithSpan(
@@ -97,7 +97,7 @@ export class ClientPeer {
            * such as event iterator messages, signal messages, etc.
            * Otherwise, the server may not recognize them as part of the request.
            */
-          if (options.raw) {
+          if (options?.raw) {
             await this.send(id, MessageType.REQUEST_RAW, request, {
               transfer: options.transfer,
             })
