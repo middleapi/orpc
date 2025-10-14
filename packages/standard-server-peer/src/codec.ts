@@ -329,7 +329,7 @@ async function encodeRawMessage(data: object, blob?: Blob): Promise<EncodedMessa
 }
 
 async function decodeRawMessage(raw: EncodedMessage): Promise<{ json: any, buffer?: Uint8Array }> {
-  if (typeof raw === 'object' && !(raw instanceof Uint8Array)) {
+  if (raw.constructor === Object) {
     return { json: raw }
   }
 
