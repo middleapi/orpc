@@ -65,25 +65,3 @@ const postORPC = createORPCSvelteQueryUtils(postClient, {
   path: ['post']
 })
 ```
-
-## Reactivity
-
-To create reactive queries, use Svelte's legacy `derived` API from `svelte/store`. With the [Tanstack Svelte v5 branch](https://github.com/TanStack/query/discussions/7413), oRPC should work out of the box.
-
-```ts twoslash
-import type { router } from './shared/planet'
-import type { RouterClient } from '@orpc/server'
-import type { RouterUtils } from '@orpc/svelte-query'
-
-declare const orpc: RouterUtils<RouterClient<typeof router>>
-declare const condition: boolean
-// ---cut---
-import { createQuery } from '@tanstack/svelte-query'
-import { derived, writable } from 'svelte/store'
-
-const id = writable(123)
-
-const query = createQuery(
-  derived(id, $id => orpc.planet.find.queryOptions({ input: { id: $id } })),
-)
-```
