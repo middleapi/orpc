@@ -3,7 +3,7 @@
  */
 export interface MessagePortMainLike {
   on: <T extends string>(event: T, callback: (event?: { data: any }) => void) => void
-  postMessage: (data: any) => void
+  postMessage: (data: any, options?: StructuredSerializeOptions) => void
 }
 
 /**

@@ -3,7 +3,7 @@ import type { Context } from '../../context'
 import type { StandardHandler } from '../standard'
 import type { HandleStandardServerPeerMessageOptions } from '../standard-peer'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
-import { ServerPeer } from '@orpc/standard-server-peer'
+import { decodeRequestMessage, ServerPeer } from '@orpc/standard-server-peer'
 import { createServerPeerHandleRequestFn } from '../standard-peer'
 
 export interface ServerWebSocket {
@@ -36,7 +36,7 @@ export class BunWsHandler<T extends Context> {
       : new Uint8Array(message.buffer, message.byteOffset, message.byteLength)
 
     await peer.message(
-      encodedMessage,
+      await decodeRequestMessage(encodedMessage),
       createServerPeerHandleRequestFn(this.standardHandler, resolveMaybeOptionalOptions(rest)),
     )
   }

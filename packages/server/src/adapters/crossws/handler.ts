@@ -4,7 +4,7 @@ import type { Context } from '../../context'
 import type { StandardHandler } from '../standard'
 import type { HandleStandardServerPeerMessageOptions } from '../standard-peer'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
-import { ServerPeer } from '@orpc/standard-server-peer'
+import { decodeRequestMessage, ServerPeer } from '@orpc/standard-server-peer'
 import { createServerPeerHandleRequestFn } from '../standard-peer'
 
 export class experimental_CrosswsHandler<T extends Context> {
@@ -31,7 +31,7 @@ export class experimental_CrosswsHandler<T extends Context> {
     const encodedMessage = typeof message.rawData === 'string' ? message.rawData : message.uint8Array()
 
     await peer.message(
-      encodedMessage,
+      await decodeRequestMessage(encodedMessage),
       createServerPeerHandleRequestFn(this.standardHandler, resolveMaybeOptionalOptions(rest)),
     )
   }

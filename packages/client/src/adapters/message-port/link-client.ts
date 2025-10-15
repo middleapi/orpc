@@ -2,7 +2,7 @@ import type { StandardLazyResponse, StandardRequest } from '@orpc/standard-serve
 import type { BaseMessageFormat, MessageType, RequestMessageMap, SerializedRequestPayload } from '@orpc/standard-server-peer'
 import type { ClientContext, ClientOptions } from '../../types'
 import type { StandardLinkClient } from '../standard'
-import type { SupportedMessagePort } from './message-port'
+import type { SupportedMessagePort, SupportedMessagePortData } from './message-port'
 import { ClientPeer } from '@orpc/standard-server-peer'
 import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from './message-port'
 
@@ -33,7 +33,7 @@ export class LinkMessagePortClient<T extends ClientContext> implements StandardL
     })
 
     onMessagePortMessage(options.port, async (message) => {
-      await this.peer.message(message)
+      await this.peer.message(message as Exclude<SupportedMessagePortData, object>)
     })
 
     onMessagePortClose(options.port, () => {

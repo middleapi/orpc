@@ -2,7 +2,7 @@ import type { StandardLazyResponse, StandardRequest } from '@orpc/standard-serve
 import type { ClientContext, ClientOptions } from '../../types'
 import type { StandardLinkClient } from '../standard'
 import { readAsBuffer } from '@orpc/shared'
-import { ClientPeer } from '@orpc/standard-server-peer'
+import { ClientPeer, encodeRequestMessage } from '@orpc/standard-server-peer'
 
 /**
  * Some env maybe not available WebSocket global
@@ -28,8 +28,9 @@ export class LinkWebsocketClient<T extends ClientContext> implements StandardLin
       }
     })
 
-    this.peer = new ClientPeer(async (message) => {
+    this.peer = new ClientPeer(async (id, type, payload) => {
       await untilOpen
+      const message = await encodeRequestMessage(id, type, payload)
       return options.websocket.send(message)
     })
 

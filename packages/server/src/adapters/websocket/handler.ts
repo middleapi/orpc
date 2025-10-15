@@ -3,7 +3,7 @@ import type { Context } from '../../context'
 import type { StandardHandler } from '../standard'
 import type { HandleStandardServerPeerMessageOptions } from '../standard-peer'
 import { readAsBuffer, resolveMaybeOptionalOptions } from '@orpc/shared'
-import { ServerPeer } from '@orpc/standard-server-peer'
+import { decodeRequestMessage, ServerPeer } from '@orpc/standard-server-peer'
 import { createServerPeerHandleRequestFn } from '../standard-peer'
 
 export type MinimalWebsocket = Pick<WebSocket, 'addEventListener' | 'send'>
@@ -57,7 +57,7 @@ export class WebsocketHandler<T extends Context> {
       : data
 
     await peer.message(
-      message,
+      await decodeRequestMessage(message),
       createServerPeerHandleRequestFn(this.#handler, resolveMaybeOptionalOptions(rest)),
     )
   }

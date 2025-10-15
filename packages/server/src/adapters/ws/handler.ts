@@ -6,7 +6,7 @@ import type {
   HandleStandardServerPeerMessageOptions,
 } from '../standard-peer'
 import { readAsBuffer, resolveMaybeOptionalOptions } from '@orpc/shared'
-import { ServerPeer } from '@orpc/standard-server-peer'
+import { decodeRequestMessage, ServerPeer } from '@orpc/standard-server-peer'
 import { createServerPeerHandleRequestFn } from '../standard-peer'
 
 export class WsHandler<T extends Context> {
@@ -27,7 +27,7 @@ export class WsHandler<T extends Context> {
         : event.data
 
       await peer.message(
-        message,
+        await decodeRequestMessage(message),
         createServerPeerHandleRequestFn(this.standardHandler, resolveMaybeOptionalOptions(rest)),
       )
     })

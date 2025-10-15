@@ -1,6 +1,7 @@
 import type { EncodedMessage, ServerPeer, ServerPeerHandleRequestFn } from '@orpc/standard-server-peer'
 import type { Context } from '../../context'
 import type { FriendlyStandardHandleOptions, StandardHandler } from '../standard'
+import { decodeRequestMessage } from '@orpc/standard-server-peer'
 import { resolveFriendlyStandardHandleOptions } from '../standard'
 
 export type HandleStandardServerPeerMessageOptions<T extends Context>
@@ -15,7 +16,8 @@ export async function handleStandardServerPeerMessage<T extends Context>(
   message: EncodedMessage,
   options: HandleStandardServerPeerMessageOptions<T>,
 ): Promise<void> {
-  const [id, request] = await peer.message(message)
+  const decoded = await decodeRequestMessage(message)
+  const [id, request] = await peer.message(decoded)
 
   if (!request) {
     return

@@ -5,6 +5,11 @@ export type HTTPMethod = 'HEAD' | 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
 
 export type ClientContext = Record<PropertyKey, any>
 
+declare global {
+  // @ts-expect-error TS2300
+  type Transferable = Transferable extends unknown ? Transferable : never
+}
+
 export interface ClientOptions<T extends ClientContext> {
   signal?: AbortSignal
   lastEventId?: string | undefined
