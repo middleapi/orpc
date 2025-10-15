@@ -1,6 +1,6 @@
 import { isAsyncIteratorObject } from '@orpc/shared'
 import { getEventMeta, HibernationEventIterator, withEventMeta } from '@orpc/standard-server'
-import { decodeResponseMessage, encodeRequestMessage, MessageType } from './codec'
+import { decodeRequestMessage, decodeResponseMessage, encodeRequestMessage, MessageType } from './codec'
 import { ServerPeer } from './server'
 
 describe('serverPeer', () => {
@@ -41,10 +41,9 @@ describe('serverPeer', () => {
   it('simple request/response', async () => {
     handle.mockResolvedValueOnce(baseResponse)
 
-    await peer.message(
-      await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest),
-      handle,
-    )
+    const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest)
+    const decoded = await decodeRequestMessage(encoded)
+    await peer.message(decoded, handle)
 
     expect(send).toHaveBeenCalledTimes(1)
     expect(await decodeResponseMessage(send.mock.calls[0]![0])).toEqual([REQUEST_ID, MessageType.RESPONSE, baseResponse])
@@ -54,16 +53,14 @@ describe('serverPeer', () => {
 
   it('multiple simple request/response', async () => {
     handle.mockResolvedValueOnce(baseResponse)
-    const [id, request] = await peer.message(
-      await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest),
-      handle,
-    )
+    const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest)
+    const decoded = await decodeRequestMessage(encoded)
+    const [id, request] = await peer.message(decoded, handle)
 
     handle.mockResolvedValueOnce({ ...baseResponse, body: '__SECOND__' })
-    const [id2, request2] = await peer.message(
-      await encodeRequestMessage(REQUEST_ID + 1, MessageType.REQUEST, { ...baseRequest, body: '__SECOND__' }),
-      handle,
-    )
+    const encoded2 = await encodeRequestMessage(REQUEST_ID + 1, MessageType.REQUEST, { ...baseRequest, body: '__SECOND__' })
+    const decoded2 = await decodeRequestMessage(encoded2)
+    const [id2, request2] = await peer.message(decoded2, handle)
 
     expect(id).toBe(REQUEST_ID)
     expect(request).toEqual({
@@ -89,15 +86,16 @@ describe('serverPeer', () => {
     it('signal', async () => {
       handle.mockImplementationOnce(async (request) => {
         expect(request.signal.aborted).toBe(false)
-        await peer.message(await encodeRequestMessage(REQUEST_ID, MessageType.ABORT_SIGNAL, undefined))
+        const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.ABORT_SIGNAL, undefined)
+        const decoded = await decodeRequestMessage(encoded)
+        await peer.message(decoded)
         expect(request.signal.aborted).toBe(true)
         return baseResponse
       })
 
-      await peer.message(
-        await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest),
-        handle,
-      )
+      const encoded2 = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest)
+      const decoded2 = await decodeRequestMessage(encoded2)
+      await peer.message(decoded2, handle)
 
       expect(handle).toHaveBeenCalledTimes(1)
     })
@@ -109,15 +107,17 @@ describe('serverPeer', () => {
       }
 
       handle.mockImplementationOnce(async (request) => {
-        await peer.message(
-          await encodeRequestMessage(REQUEST_ID, MessageType.EVENT_ITERATOR, { event: 'message', data: 'hello' }),
-        )
-        await peer.message(
-          await encodeRequestMessage(REQUEST_ID, MessageType.EVENT_ITERATOR, { event: 'message', data: { hello2: true }, meta: { id: 'id-1' } }),
-        )
-        await peer.message(
-          await encodeRequestMessage(REQUEST_ID, MessageType.EVENT_ITERATOR, { event: 'done', data: 'hello3' }),
-        )
+        const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.EVENT_ITERATOR, { event: 'message', data: 'hello' })
+        const decoded = await decodeRequestMessage(encoded)
+        await peer.message(decoded)
+
+        const encoded2 = await encodeRequestMessage(REQUEST_ID, MessageType.EVENT_ITERATOR, { event: 'message', data: { hello2: true }, meta: { id: 'id-1' } })
+        const decoded2 = await decodeRequestMessage(encoded2)
+        await peer.message(decoded2)
+
+        const encoded3 = await encodeRequestMessage(REQUEST_ID, MessageType.EVENT_ITERATOR, { event: 'done', data: 'hello3' })
+        const decoded3 = await decodeRequestMessage(encoded3)
+        await peer.message(decoded3)
 
         expect(request).toEqual({
           ...clientRequest,
@@ -158,10 +158,9 @@ describe('serverPeer', () => {
         return baseResponse
       })
 
-      await peer.message(
-        await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, clientRequest),
-        handle,
-      )
+      const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, clientRequest)
+      const decoded = await decodeRequestMessage(encoded)
+      await peer.message(decoded, handle)
 
       expect(send).toHaveBeenCalledTimes(1)
     })
@@ -173,7 +172,9 @@ describe('serverPeer', () => {
       }
 
       handle.mockImplementationOnce(async (request) => {
-        await peer.message(await encodeRequestMessage(REQUEST_ID, MessageType.EVENT_ITERATOR, { event: 'message', data: 'hello' }))
+        const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.EVENT_ITERATOR, { event: 'message', data: 'hello' })
+        const decoded = await decodeRequestMessage(encoded)
+        await peer.message(decoded)
 
         expect(request).toEqual({
           ...clientRequest,
@@ -203,10 +204,9 @@ describe('serverPeer', () => {
         return baseResponse
       })
 
-      await peer.message(
-        await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, clientRequest),
-        handle,
-      )
+      const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, clientRequest)
+      const decoded = await decodeRequestMessage(encoded)
+      await peer.message(decoded, handle)
 
       expect(send).toHaveBeenCalledTimes(2)
       expect(handle).toHaveBeenCalledTimes(1)
@@ -219,7 +219,9 @@ describe('serverPeer', () => {
       }
 
       handle.mockImplementationOnce(async (request) => {
-        await peer.message(await encodeRequestMessage(REQUEST_ID, MessageType.EVENT_ITERATOR, { event: 'message', data: 'hello' }))
+        const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.EVENT_ITERATOR, { event: 'message', data: 'hello' })
+        const decoded = await decodeRequestMessage(encoded)
+        await peer.message(decoded)
 
         expect(request).toEqual({
           ...clientRequest,
@@ -249,10 +251,9 @@ describe('serverPeer', () => {
         return baseResponse
       })
 
-      await peer.message(
-        await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, clientRequest),
-        handle,
-      )
+      const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, clientRequest)
+      const decoded = await decodeRequestMessage(encoded)
+      await peer.message(decoded, handle)
 
       expect(send).toHaveBeenCalledTimes(2)
       expect(handle).toHaveBeenCalledTimes(1)
@@ -278,10 +279,9 @@ describe('serverPeer', () => {
         return baseResponse
       })
 
-      await peer.message(
-        await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, clientRequest),
-        handle,
-      )
+      const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, clientRequest)
+      const decoded = await decodeRequestMessage(encoded)
+      await peer.message(decoded, handle)
 
       expect(handle).toHaveBeenCalledTimes(1)
     })
@@ -309,10 +309,9 @@ describe('serverPeer', () => {
         return baseResponse
       })
 
-      await peer.message(
-        await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, clientRequest),
-        handle,
-      )
+      const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, clientRequest)
+      const decoded = await decodeRequestMessage(encoded)
+      await peer.message(decoded, handle)
 
       expect(handle).toHaveBeenCalledTimes(1)
     })
@@ -322,12 +321,9 @@ describe('serverPeer', () => {
         throw new Error('some error')
       })
 
-      await expect(
-        peer.message(
-          await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest),
-          handle,
-        ),
-      ).rejects.toThrow('some error')
+      const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest)
+      const decoded = await decodeRequestMessage(encoded)
+      await expect(peer.message(decoded, handle)).rejects.toThrow('some error')
 
       expect(handle).toHaveBeenCalledTimes(1)
       expect(send).toHaveBeenCalledTimes(0)
@@ -345,10 +341,9 @@ describe('serverPeer', () => {
         })(),
       })
 
-      await peer.message(
-        await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest),
-        handle,
-      )
+      const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest)
+      const decoded = await decodeRequestMessage(encoded)
+      await peer.message(decoded, handle)
 
       expect(handle).toHaveBeenCalledTimes(1)
 
@@ -388,16 +383,17 @@ describe('serverPeer', () => {
         })(),
       })
 
-      const promise = peer.message(
-        await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest),
-        handle,
-      )
+      const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest)
+      const decoded = await decodeRequestMessage(encoded)
+      const promise = peer.message(decoded, handle)
 
       await new Promise(resolve => setTimeout(resolve, 0))
 
       expect(send).toHaveBeenCalledTimes(2)
 
-      await peer.message(await encodeRequestMessage(REQUEST_ID, MessageType.ABORT_SIGNAL, undefined))
+      const encoded2 = await encodeRequestMessage(REQUEST_ID, MessageType.ABORT_SIGNAL, undefined)
+      const decoded2 = await decodeRequestMessage(encoded2)
+      await peer.message(decoded2)
 
       await new Promise(resolve => setTimeout(resolve, 100))
 
@@ -430,12 +426,9 @@ describe('serverPeer', () => {
         })(),
       })
 
-      await expect(
-        peer.message(
-          await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest),
-          handle,
-        ),
-      ).rejects.toThrow('some error')
+      const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest)
+      const decoded = await decodeRequestMessage(encoded)
+      await expect(peer.message(decoded, handle)).rejects.toThrow('some error')
 
       expect(handle).toHaveBeenCalledTimes(1)
 
@@ -465,10 +458,9 @@ describe('serverPeer', () => {
         body: new HibernationEventIterator(callback),
       })
 
-      await peer.message(
-        await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest),
-        handle,
-      )
+      const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest)
+      const decoded = await decodeRequestMessage(encoded)
+      await peer.message(decoded, handle)
 
       expect(handle).toHaveBeenCalledTimes(1)
 
@@ -494,10 +486,9 @@ describe('serverPeer', () => {
         body: file,
       })
 
-      await peer.message(
-        await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest),
-        handle,
-      )
+      const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest)
+      const decoded = await decodeRequestMessage(encoded)
+      await peer.message(decoded, handle)
 
       expect(handle).toHaveBeenCalledTimes(1)
 
@@ -523,10 +514,9 @@ describe('serverPeer', () => {
         body: formData,
       })
 
-      await peer.message(
-        await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest),
-        handle,
-      )
+      const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest)
+      const decoded = await decodeRequestMessage(encoded)
+      await peer.message(decoded, handle)
 
       expect(handle).toHaveBeenCalledTimes(1)
 
@@ -548,10 +538,9 @@ describe('serverPeer', () => {
 
       handle.mockResolvedValueOnce(baseResponse)
 
-      await expect(peer.message(
-        await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest),
-        handle,
-      )).rejects.toThrow('send error')
+      const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest)
+      const decoded = await decodeRequestMessage(encoded)
+      await expect(peer.message(decoded, handle)).rejects.toThrow('send error')
 
       expect(handle).toHaveBeenCalledTimes(1)
 
@@ -572,10 +561,12 @@ describe('serverPeer', () => {
         return baseResponse
       })
 
-      await peer.message(await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, {
+      const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, {
         ...baseRequest,
         body: (async function* () {})(),
-      }), handle)
+      })
+      const decoded = await decodeRequestMessage(encoded)
+      await peer.message(decoded, handle)
 
       expect(handle).toHaveBeenCalledTimes(1)
 
@@ -614,12 +605,9 @@ describe('serverPeer', () => {
         })(),
       })
 
-      await expect(
-        peer.message(
-          await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest),
-          handle,
-        ),
-      ).rejects.toThrow('cleanup error')
+      const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest)
+      const decoded = await decodeRequestMessage(encoded)
+      await expect(peer.message(decoded, handle)).rejects.toThrow('cleanup error')
 
       expect(handle).toHaveBeenCalledTimes(1)
 
@@ -638,15 +626,14 @@ describe('serverPeer', () => {
       peer.close()
     })
 
+    const encoded = await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest)
+    const decoded = await decodeRequestMessage(encoded)
+    const encoded2 = await encodeRequestMessage(REQUEST_ID + 1, MessageType.REQUEST, baseRequest)
+    const decoded2 = await decodeRequestMessage(encoded2)
+
     await Promise.all([
-      peer.message(
-        await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest),
-        handle,
-      ),
-      peer.message(
-        await encodeRequestMessage(REQUEST_ID + 1, MessageType.REQUEST, baseRequest),
-        handle,
-      ),
+      peer.message(decoded, handle),
+      peer.message(decoded2, handle),
     ])
 
     expect(handle).toHaveBeenCalledTimes(2)
