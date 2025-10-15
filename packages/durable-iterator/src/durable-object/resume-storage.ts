@@ -13,9 +13,9 @@ export interface EventResumeStorageOptions extends StandardRPCJsonSerializerOpti
    *
    * @remarks
    * - Use infinite values to disable
-   * - Note that event cleanup is deferred for performance reasons — meaning some
-   *  expired events may still be available for a short period of time, and clients
-   *  might still receive them.
+   * - Note that for performance, expired event cleanup is deferred. This means
+   *  expired events may remain in storage for a short period beyond their
+   *  retention time.
    *
    * @default NaN (disabled)
    */
