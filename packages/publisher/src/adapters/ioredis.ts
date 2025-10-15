@@ -10,6 +10,19 @@ type SerializedPayload = { json: object, meta: StandardRPCJsonSerializedMetaItem
 
 export interface IORedisPublisherOptions extends PublisherOptions, StandardRPCJsonSerializerOptions {
   /**
+   * Redis commander instance (used for execute short-lived commands)
+   */
+  commander: Redis
+
+  /**
+   * redis listener instance (used for listening to events)
+   *
+   * @remark
+   * - `lazyConnect: true` option is supported
+   */
+  listener: Redis
+
+  /**
    * How long (in seconds) to retain events for replay.
    *
    * @remark
@@ -31,6 +44,9 @@ export interface IORedisPublisherOptions extends PublisherOptions, StandardRPCJs
 }
 
 export class IORedisPublisher<T extends Record<string, object>> extends Publisher<T> {
+  protected readonly commander: Redis
+  protected readonly listener: Redis
+
   protected readonly prefix: string
   protected readonly serializer: StandardRPCJsonSerializer
   protected readonly retentionSeconds: number
@@ -56,11 +72,12 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
   }
 
   constructor(
-    private readonly redis: Redis,
-    { resumeRetentionSeconds, prefix, ...options }: IORedisPublisherOptions = {},
+    { commander, listener, resumeRetentionSeconds, prefix, ...options }: IORedisPublisherOptions,
   ) {
     super(options)
 
+    this.commander = commander
+    this.listener = listener
     this.prefix = prefix ?? 'orpc:publisher:'
     this.retentionSeconds = resumeRetentionSeconds ?? Number.NaN
     this.serializer = new StandardRPCJsonSerializer(options)
@@ -86,7 +103,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
       if (!this.lastCleanupTimes.has(key)) {
         this.lastCleanupTimes.set(key, now)
 
-        const result = await this.redis.multi()
+        const result = await this.commander.multi()
           .xadd(key, '*', stringifyJSON(serialized))
           .xtrim(key, 'MINID', `${now - this.retentionSeconds * 1000}-0`)
           .expire(key, this.retentionSeconds * 2) // double to avoid expires new events
@@ -103,12 +120,12 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
         id = (result![0]![1] as string | null) ?? undefined
       }
       else {
-        const result = await this.redis.xadd(key, '*', stringifyJSON(serialized))
+        const result = await this.commander.xadd(key, '*', stringifyJSON(serialized))
         id = result ?? undefined
       }
     }
 
-    await this.redis.publish(key, stringifyJSON({ ...serialized, id }))
+    await this.commander.publish(key, stringifyJSON({ ...serialized, id }))
   }
 
   protected override async subscribeListener<K extends keyof T & string>(event: K, _listener: (payload: T[K]) => void, options?: PublisherSubscribeListenerOptions): Promise<() => Promise<void>> {
@@ -140,12 +157,12 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
         }
       }
 
-      this.redis.on('message', this.redisListener)
+      this.listener.on('message', this.redisListener)
     }
 
     let listeners = this.listeners.get(key)
     if (!listeners) {
-      await this.redis.subscribe(key)
+      await this.listener.subscribe(key)
       this.listeners.set(key, listeners = new Set()) // only set after subscribe successfully
     }
 
@@ -154,7 +171,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
     void (async () => {
       try {
         if (this.isResumeEnabled && typeof lastEventId === 'string') {
-          const results = await this.redis.xread('STREAMS', key, lastEventId)
+          const results = await this.commander.xread('STREAMS', key, lastEventId)
 
           if (results && results[0]) {
             const [_, items] = results[0]
@@ -189,11 +206,11 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
         this.listeners.delete(key) // should execute before async to avoid throw
 
         if (this.redisListener && this.listeners.size === 0) {
-          this.redis.off('message', this.redisListener)
+          this.listener.off('message', this.redisListener)
           this.redisListener = undefined
         }
 
-        await this.redis.unsubscribe(key)
+        await this.listener.unsubscribe(key)
       }
     }
   }

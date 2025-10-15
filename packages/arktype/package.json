@@ -40,5 +40,8 @@
   },
   "dependencies": {
     "@orpc/openapi": "workspace:*"
+  },
+  "devDependencies": {
+    "zod": "^4.1.11"
   }
 }

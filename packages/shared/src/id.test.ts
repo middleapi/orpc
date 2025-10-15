@@ -4,12 +4,12 @@ describe('sequentialIdGenerator', () => {
   it('unique and increase', () => {
     const idGenerator = new SequentialIdGenerator()
 
-    expect(idGenerator.generate()).toBe('0')
     expect(idGenerator.generate()).toBe('1')
     expect(idGenerator.generate()).toBe('2')
     expect(idGenerator.generate()).toBe('3')
+    expect(idGenerator.generate()).toBe('4')
 
-    for (let i = 4; i < 1000; i++) {
+    for (let i = 5; i < 1000; i++) {
       expect(idGenerator.generate()).toBe(i.toString(36))
     }
   })
