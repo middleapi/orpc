@@ -3,7 +3,7 @@
   import { createInfiniteQuery } from '@tanstack/svelte-query';
 
   const query = createInfiniteQuery(
-    orpc.planet.list.infiniteOptions({
+    () => orpc.planet.list.infiniteOptions({
       input: cursor => ({ cursor, limit: 10 }),
       getNextPageParam: lastPage => lastPage.length === 10 ? lastPage.at(-1)?.id : null,
       initialPageParam: 0,
@@ -11,9 +11,9 @@
   );
 </script>
 
-{#if $query.status === 'pending'}
+{#if query.status === 'pending'}
   <p>Loading...</p>
-{:else if $query.status === 'success'}
+{:else if query.status === 'success'}
   <div>
     <h2>oRPC and TanStack Query | List Planets example</h2>
     <table>
@@ -26,7 +26,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each $query.data.pages as page}
+        {#each query.data.pages as page}
           {#each page as planet}
             <tr>
               <td>{planet.id}</td>
@@ -41,12 +41,12 @@
         <tr>
           <td colspan="4">
             <button
-              on:click={() => $query.fetchNextPage()}
-              disabled={!$query.hasNextPage}
+              on:click={() => query.fetchNextPage()}
+              disabled={!query.hasNextPage}
             >
               Load more
             </button>
-            <button on:click={() => $query.refetch()}> Refresh </button>
+            <button on:click={() => query.refetch()}> Refresh </button>
           </td>
         </tr>
       </tfoot>

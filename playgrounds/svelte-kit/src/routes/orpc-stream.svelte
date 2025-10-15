@@ -3,7 +3,7 @@
   import { createQuery } from '@tanstack/svelte-query';
 
   const streamed = createQuery(
-    orpc.sse.experimental_streamedOptions({
+    () => orpc.sse.experimental_streamedOptions({
       queryFnOptions: { maxChunks: 3 }
     })
   );
@@ -13,6 +13,6 @@
 <div>
   <h2>oRPC and Tanstack Query | Event Iterator example</h2>
   <pre>
-{JSON.stringify($streamed.data, null, 2)}
+{JSON.stringify(streamed.data, null, 2)}
   </pre>
 </div>  

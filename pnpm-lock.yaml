@@ -177,8 +177,8 @@ importers:
         specifier: ^5.90.4
         version: 5.90.4(solid-js@1.9.9)
       '@tanstack/svelte-query':
-        specifier: ^5.90.2
-        version: 5.90.2(svelte@5.39.12)
+        specifier: ^6.0.1
+        version: 6.0.1(svelte@5.39.12)
       '@tanstack/vue-query':
         specifier: ^5.90.3
         version: 5.90.3(vue@3.5.22(typescript@5.8.3))
@@ -736,8 +736,8 @@ importers:
         version: 5.39.12
     devDependencies:
       '@tanstack/svelte-query':
-        specifier: ^5.90.2
-        version: 5.90.2(svelte@5.39.12)
+        specifier: ^6.0.1
+        version: 6.0.1(svelte@5.39.12)
       zod:
         specifier: ^4.1.12
         version: 4.1.12
@@ -767,8 +767,8 @@ importers:
         specifier: ^5.90.4
         version: 5.90.4(solid-js@1.9.9)
       '@tanstack/svelte-query':
-        specifier: ^5.90.2
-        version: 5.90.2(svelte@5.39.12)
+        specifier: ^6.0.1
+        version: 6.0.1(svelte@5.39.12)
       '@tanstack/vue-query':
         specifier: ^5.90.3
         version: 5.90.3(vue@3.5.22(typescript@5.8.3))
@@ -1459,8 +1459,8 @@ importers:
         specifier: ^6.2.1
         version: 6.2.1(svelte@5.39.12)(vite@7.1.9(@types/node@24.7.2)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1))
       '@tanstack/svelte-query':
-        specifier: ^5.90.2
-        version: 5.90.2(svelte@5.39.12)
+        specifier: ^6.0.1
+        version: 6.0.1(svelte@5.39.12)
       svelte:
         specifier: ^5.39.12
         version: 5.39.12
@@ -6493,9 +6493,6 @@ packages:
     resolution: {integrity: sha512-Wo1iKt2b9OT7d+YGhvEPD3DXvPv2etTusIMhMUoG7fbhmxcXCtIjJDEygy91Y2JFlwGyjqiBPRozme7UD8hoqg==}
     engines: {node: '>=12'}
 
-  '@tanstack/query-core@5.90.2':
-    resolution: {integrity: sha512-k/TcR3YalnzibscALLwxeiLUub6jN5EDLwKDiO7q5f4ICEoptJ+n9+7vcEFy5/x/i6Q+Lb/tXrsKCggf5uQJXQ==}
-
   '@tanstack/query-core@5.90.3':
     resolution: {integrity: sha512-HtPOnCwmx4dd35PfXU8jjkhwYrsHfuqgC8RCJIwWglmhIUIlzPP0ZcEkDAc+UtAWCiLm7T8rxeEfHZlz3hYMCA==}
 
@@ -6652,10 +6649,10 @@ packages:
   '@tanstack/store@0.7.7':
     resolution: {integrity: sha512-xa6pTan1bcaqYDS9BDpSiS63qa6EoDkPN9RsRaxHuDdVDNntzq3xNwR5YKTU/V3SkSyC9T4YVOPh2zRQN0nhIQ==}
 
-  '@tanstack/svelte-query@5.90.2':
-    resolution: {integrity: sha512-owjnp0w8sOXlMhLZhucHrsYvCjgjHrVyII/wlqMGefxKFyroZS3xCwTee+IUx7UHbL+QmKr/HQTeTqhgxmxPQw==}
+  '@tanstack/svelte-query@6.0.1':
+    resolution: {integrity: sha512-si5xsb/aeUZFvWgF5IxOPDpQ1g1fqTX7NF//bTEFrbLdAk68LmkWzY5QCwknZp5cBdU50qJfGY19hbAfMYeiOQ==}
     peerDependencies:
-      svelte: ^3.54.0 || ^4.0.0 || ^5.0.0
+      svelte: ^5.25.0
 
   '@tanstack/virtual-core@3.13.12':
     resolution: {integrity: sha512-1YBOJfRHV4sXUmWsFSf5rQor4Ss82G8dQWLRbnk3GA4jeP8hQt1hxXh0tmflpC0dz3VgEv/1+qwPyLeWkQuPFA==}
@@ -13877,11 +13874,6 @@ packages:
   sprintf-js@1.1.3:
     resolution: {integrity: sha512-Oo+0REFV59/rz3gfJNKQiBlwfHaSESl1pcGyABQsnnIfWOFt6JNj5gCog2U6MLZ//IGYD+nA8nI+mTShREReaA==}
 
-  srvx@0.8.15:
-    resolution: {integrity: sha512-poPs1GuctQLpiJ/1Pb8e+5b5lju9hQU7wxJ6NkYVUw7ZZExeRoYwyiaOekal+rDZc99MO/J2y9+SGFpHBKRSpQ==}
-    engines: {node: '>=20.16.0'}
-    hasBin: true
-
   srvx@0.8.16:
     resolution: {integrity: sha512-hmcGW4CgroeSmzgF1Ihwgl+Ths0JqAJ7HwjP2X7e3JzY7u4IydLMcdnlqGQiQGUswz+PO9oh/KtCpOISIvs9QQ==}
     engines: {node: '>=20.16.0'}
@@ -18598,7 +18590,7 @@ snapshots:
       pkg-types: 2.3.0
       scule: 1.3.0
       semver: 7.7.3
-      srvx: 0.8.15
+      srvx: 0.8.16
       std-env: 3.9.0
       tinyexec: 1.0.1
       ufo: 1.6.1
@@ -21300,8 +21292,6 @@ snapshots:
     dependencies:
       remove-accents: 0.5.0
 
-  '@tanstack/query-core@5.90.2': {}
-
   '@tanstack/query-core@5.90.3': {}
 
   '@tanstack/query-devtools@5.90.1': {}
@@ -21595,9 +21585,9 @@ snapshots:
 
   '@tanstack/store@0.7.7': {}
 
-  '@tanstack/svelte-query@5.90.2(svelte@5.39.12)':
+  '@tanstack/svelte-query@6.0.1(svelte@5.39.12)':
     dependencies:
-      '@tanstack/query-core': 5.90.2
+      '@tanstack/query-core': 5.90.3
       svelte: 5.39.12
 
   '@tanstack/virtual-core@3.13.12': {}
@@ -30772,10 +30762,6 @@ snapshots:
 
   sprintf-js@1.1.3:
     optional: true
-
-  srvx@0.8.15:
-    dependencies:
-      cookie-es: 2.0.0
 
   srvx@0.8.16: {}
 
