@@ -1,7 +1,7 @@
 import { AbortError, isAsyncIteratorObject } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@orpc/standard-server'
 import { ClientPeer } from './client'
-import { decodeRequestMessage, encodeResponseMessage, MessageType } from './codec'
+import { decodeRequestMessage, encodeRequestMessage, encodeResponseMessage, MessageType } from './codec'
 
 describe('clientPeer', () => {
   const send = vi.fn()
@@ -38,7 +38,7 @@ describe('clientPeer', () => {
     expect(peer.request(baseRequest)).resolves.toEqual(baseResponse)
 
     await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1))
-    expect(await decodeRequestMessage(send.mock.calls[0]![0])).toEqual(['0', MessageType.REQUEST, baseRequest])
+    expect(send.mock.calls[0]!).toEqual(['0', MessageType.REQUEST, baseRequest, undefined])
 
     peer.message(await encodeResponseMessage('0', MessageType.RESPONSE, baseResponse))
   })
@@ -48,8 +48,8 @@ describe('clientPeer', () => {
     expect(peer.request({ ...baseRequest, body: '__SECOND__' })).resolves.toEqual({ ...baseResponse, body: '__SECOND__' })
 
     await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2))
-    expect(await decodeRequestMessage(send.mock.calls[0]![0])).toEqual(['0', MessageType.REQUEST, baseRequest])
-    expect(await decodeRequestMessage(send.mock.calls[1]![0])).toEqual(['1', MessageType.REQUEST, { ...baseRequest, body: '__SECOND__' }])
+    expect(send.mock.calls[0]!).toEqual(['0', MessageType.REQUEST, baseRequest, undefined])
+    expect(send.mock.calls[1]!).toEqual(['1', MessageType.REQUEST, { ...baseRequest, body: '__SECOND__' }, undefined])
 
     peer.message(await encodeResponseMessage('0', MessageType.RESPONSE, baseResponse))
     peer.message(await encodeResponseMessage('1', MessageType.RESPONSE, { ...baseResponse, body: '__SECOND__' }))
@@ -90,8 +90,8 @@ describe('clientPeer', () => {
       controller.abort()
 
       await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2))
-      expect(await decodeRequestMessage(send.mock.calls[0]![0])).toEqual(['0', MessageType.REQUEST, baseRequest])
-      expect(await decodeRequestMessage(send.mock.calls[1]![0])).toEqual(['0', MessageType.ABORT_SIGNAL, undefined])
+      expect(send.mock.calls[0]!).toEqual(['0', MessageType.REQUEST, request, undefined])
+      expect(send.mock.calls[1]!).toEqual(['0', MessageType.ABORT_SIGNAL, undefined, undefined])
 
       await peer.message(await encodeResponseMessage('0', MessageType.RESPONSE, baseResponse))
     })
@@ -112,11 +112,11 @@ describe('clientPeer', () => {
       expect(peer.request(request)).rejects.toThrow('This operation was aborted')
 
       await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1))
-      expect(await decodeRequestMessage(send.mock.calls[0]![0])).toEqual(['0', MessageType.REQUEST, baseRequest])
+      expect(send.mock.calls[0]!).toEqual(['0', MessageType.REQUEST, request, undefined])
 
       controller.abort()
       await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2))
-      expect(await decodeRequestMessage(send.mock.calls[1]![0])).toEqual(['0', MessageType.ABORT_SIGNAL, undefined])
+      expect(send.mock.calls[1]!).toEqual(['0', MessageType.ABORT_SIGNAL, undefined, undefined])
 
       await peer.message(await encodeResponseMessage('0', MessageType.RESPONSE, baseResponse))
     })
@@ -149,11 +149,12 @@ describe('clientPeer', () => {
       expect(peer.request(request)).resolves.toEqual(baseResponse)
 
       await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(4))
-      expect(await decodeRequestMessage(send.mock.calls[0]![0]))
-        .toEqual(['0', MessageType.REQUEST, { ...request, body: undefined, headers: { ...request.headers, 'content-type': 'text/event-stream' } }])
-      expect(await decodeRequestMessage(send.mock.calls[1]![0])).toEqual(['0', MessageType.EVENT_ITERATOR, { event: 'message', data: 'hello' }])
-      expect(await decodeRequestMessage(send.mock.calls[2]![0])).toEqual(['0', MessageType.EVENT_ITERATOR, { event: 'message', data: { hello2: true }, meta: { id: 'id-1' } }])
-      expect(await decodeRequestMessage(send.mock.calls[3]![0])).toEqual(['0', MessageType.EVENT_ITERATOR, { event: 'done' }])
+      const encoded = await encodeRequestMessage(send.mock.calls[0]![0], send.mock.calls[0]![1], send.mock.calls[0]![2])
+      const decoded = await decodeRequestMessage(encoded)
+      expect(decoded).toEqual(['0', MessageType.REQUEST, { ...request, body: undefined, headers: { ...request.headers, 'content-type': 'text/event-stream' } }])
+      expect(send.mock.calls[1]!).toEqual(['0', MessageType.EVENT_ITERATOR, { event: 'message', data: 'hello' }, undefined])
+      expect(send.mock.calls[2]!).toEqual(['0', MessageType.EVENT_ITERATOR, { event: 'message', data: { hello2: true }, meta: { id: 'id-1' } }, undefined])
+      expect(send.mock.calls[3]!).toEqual(['0', MessageType.EVENT_ITERATOR, { event: 'done' }, undefined])
 
       peer.message(await encodeResponseMessage('0', MessageType.RESPONSE, baseResponse))
     })
@@ -219,13 +220,14 @@ describe('clientPeer', () => {
       const promise = expect(peer.request(request)).resolves.toEqual(baseResponse)
 
       await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(3))
-      expect(await decodeRequestMessage(send.mock.calls[0]![0]))
-        .toEqual(['0', MessageType.REQUEST, { ...request, body: undefined, headers: { ...request.headers, 'content-type': 'text/event-stream' } }])
-      expect(await decodeRequestMessage(send.mock.calls[1]![0])).toEqual(['0', MessageType.EVENT_ITERATOR, { event: 'message', data: 'hello' }])
+      const encoded = await encodeRequestMessage(send.mock.calls[0]![0], send.mock.calls[0]![1], send.mock.calls[0]![2])
+      const decoded = await decodeRequestMessage(encoded)
+      expect(decoded).toEqual(['0', MessageType.REQUEST, { ...request, body: undefined, headers: { ...request.headers, 'content-type': 'text/event-stream' } }])
+      expect(send.mock.calls[1]!).toEqual(['0', MessageType.EVENT_ITERATOR, { event: 'message', data: 'hello' }, undefined])
       /**
        * Should send an error event even when the error is not an instance of ErrorEvent.
        */
-      expect(await decodeRequestMessage(send.mock.calls[2]![0])).toEqual(['0', MessageType.EVENT_ITERATOR, { event: 'error' }])
+      expect(send.mock.calls[2]!).toEqual(['0', MessageType.EVENT_ITERATOR, { event: 'error' }, undefined])
 
       peer.message(await encodeResponseMessage('0', MessageType.RESPONSE, baseResponse))
 
@@ -243,7 +245,9 @@ describe('clientPeer', () => {
       expect(peer.request(request)).resolves.toEqual(baseResponse)
 
       await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1))
-      expect(await decodeRequestMessage(send.mock.calls[0]![0]))
+      const encoded = await encodeRequestMessage(send.mock.calls[0]![0], send.mock.calls[0]![1], send.mock.calls[0]![2])
+      const decoded = await decodeRequestMessage(encoded)
+      expect(decoded)
         .toEqual(['0', MessageType.REQUEST, {
           ...request,
           headers: {
@@ -269,7 +273,9 @@ describe('clientPeer', () => {
       expect(peer.request(request)).resolves.toEqual(baseResponse)
 
       await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1))
-      expect(await decodeRequestMessage(send.mock.calls[0]![0]))
+      const encoded = await encodeRequestMessage(send.mock.calls[0]![0], send.mock.calls[0]![1], send.mock.calls[0]![2])
+      const decoded = await decodeRequestMessage(encoded)
+      expect(decoded)
         .toEqual(['0', MessageType.REQUEST, {
           ...request,
           headers: {
@@ -437,7 +443,7 @@ describe('clientPeer', () => {
       expect(await iterator.next()).toEqual({ done: true, value: undefined })
 
       expect(send).toHaveBeenCalledTimes(2)
-      expect(await decodeRequestMessage(send.mock.calls[1]![0])).toEqual(['0', MessageType.ABORT_SIGNAL, undefined])
+      expect(send.mock.calls[1]!).toEqual(['0', MessageType.ABORT_SIGNAL, undefined, undefined])
     })
 
     it('iterator and server success response while sending', async () => {

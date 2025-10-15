@@ -97,9 +97,7 @@ export class ClientPeer {
            * such as event iterator messages, signal messages, etc.
            * Otherwise, the server may not recognize them as part of the request.
            */
-          await this.send(id, MessageType.REQUEST, request, {
-            transfer: options?.transfer,
-          })
+          await this.send(id, MessageType.REQUEST, request, options)
 
           if (signal?.aborted) {
             await this.send(id, MessageType.ABORT_SIGNAL, undefined)
