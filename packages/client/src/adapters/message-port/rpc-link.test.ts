@@ -1,5 +1,5 @@
 import { MessageChannel } from 'node:worker_threads'
-import { decodeRequestMessage, encodeResponseMessage, MessageType } from '@orpc/standard-server-peer'
+import { decodeMessagePortRequest, encodeResponseMessage, MessageType } from '@orpc/standard-server-peer'
 import { createORPCClient } from '../../client'
 import { RPCLink } from './rpc-link'
 
@@ -32,7 +32,7 @@ describe('rpcLink', () => {
 
     await vi.waitFor(() => expect(sentMessages.length).toBe(1))
 
-    const [id, , payload] = (await decodeRequestMessage(sentMessages[0]))
+    const [id, , payload] = (await decodeMessagePortRequest(sentMessages[0]))!
 
     expect(id).toBeTypeOf('string')
     expect(payload).toEqual({
@@ -52,7 +52,7 @@ describe('rpcLink', () => {
 
     await vi.waitFor(() => expect(sentMessages.length).toBe(1))
 
-    const [id, , payload] = (await decodeRequestMessage(sentMessages[0]))
+    const [id, , payload] = (await decodeMessagePortRequest(sentMessages[0]))!
 
     expect(id).toBeTypeOf('string')
     expect(payload).toEqual({

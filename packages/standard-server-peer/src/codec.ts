@@ -344,3 +344,76 @@ async function decodeRawMessage(raw: EncodedMessage): Promise<{ json: any, buffe
     buffer: bufferPart,
   }
 }
+
+export async function encodeMessagePortRequest<T extends keyof RequestMessageMap>(
+  id: string,
+  type: T,
+  payload: RequestMessageMap[T],
+): Promise<BaseMessageFormat<SerializedRequestPayload> | void> {
+  if (type !== MessageType.REQUEST)
+    return
+
+  const request = payload as RequestMessageMap[MessageType.REQUEST]
+
+  const { body: processedBody, headers: processedHeaders } = await serializeUnclonableObjects(
+    request.body,
+    request.headers,
+  )
+
+  const p: SerializedRequestPayload = {
+    u: request.url.toString().replace(SHORTABLE_ORIGIN_MATCHER, '/'),
+    b: processedBody,
+    h: Object.keys(processedHeaders).length > 0 ? processedHeaders : undefined,
+  }
+
+  const message: BaseMessageFormat<SerializedRequestPayload> = {
+    i: id,
+    t: type,
+    p,
+  }
+
+  return message
+}
+
+export async function decodeMessagePortRequest(raw: BaseMessageFormat<SerializedRequestPayload>): Promise<DecodedRequestMessage | void> {
+  const { i, t, p } = raw
+  if (t && t !== MessageType.REQUEST)
+    return
+
+  const body = await deserializeUnclonableObjects(p.h ?? {}, p.b)
+  const payload = {
+    url: p.u.startsWith('/') ? new URL(`${SHORTABLE_ORIGIN}${p.u}`) : new URL(p.u),
+    headers: p.h ?? {},
+    method: p.m ?? 'POST',
+    body,
+  }
+
+  return [i, t ?? MessageType.REQUEST, payload]
+}
+
+export async function serializeUnclonableObjects(
+  body: StandardBody,
+  originalHeaders: StandardHeaders | undefined,
+): Promise<{ body: StandardBody | Blob | string | undefined, headers: StandardHeaders }> {
+  const headers: StandardHeaders = { ...originalHeaders }
+
+  if (body instanceof FormData) {
+    const tempRes = new Response(body)
+    headers['content-type'] = tempRes.headers.get('content-type')!
+    const formDataBlob = await tempRes.blob()
+    return { body: await readAsBuffer(formDataBlob), headers }
+  }
+
+  return { body, headers }
+}
+
+export async function deserializeUnclonableObjects(headers: StandardHeaders, body: unknown): Promise<StandardBody> {
+  const contentType = flattenHeader(headers['content-type'])
+
+  if (contentType?.startsWith('multipart/form-data')) {
+    const tempRes = new Response(body as Uint8Array, { headers: { 'content-type': contentType } })
+    return tempRes.formData()
+  }
+
+  return body
+}

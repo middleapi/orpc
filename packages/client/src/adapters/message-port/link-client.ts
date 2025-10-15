@@ -1,9 +1,8 @@
 import type { StandardLazyResponse, StandardRequest } from '@orpc/standard-server'
-import type { BaseMessageFormat, MessageType, RequestMessageMap, SerializedRequestPayload } from '@orpc/standard-server-peer'
 import type { ClientContext, ClientOptions } from '../../types'
 import type { StandardLinkClient } from '../standard'
 import type { SupportedMessagePort, SupportedMessagePortData } from './message-port'
-import { ClientPeer } from '@orpc/standard-server-peer'
+import { ClientPeer, encodeMessagePortRequest } from '@orpc/standard-server-peer'
 import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from './message-port'
 
 export interface LinkMessagePortClientOptions {
@@ -14,20 +13,10 @@ export class LinkMessagePortClient<T extends ClientContext> implements StandardL
   private readonly peer: ClientPeer
 
   constructor(options: LinkMessagePortClientOptions) {
-    this.peer = new ClientPeer((id, type, payload, payloadOptions) => {
-      const SHORTABLE_ORIGIN_MATCHER = /^orpc:\/\/localhost\//
-      const request = payload as RequestMessageMap[MessageType.REQUEST]
-
-      const p: SerializedRequestPayload = {
-        u: request.url.toString().replace(SHORTABLE_ORIGIN_MATCHER, '/'),
-        b: request.body,
-      }
-
-      const message: BaseMessageFormat<SerializedRequestPayload> = {
-        i: id,
-        t: type,
-        p,
-      }
+    this.peer = new ClientPeer(async (id, type, payload, payloadOptions) => {
+      const message = await encodeMessagePortRequest(id, type, payload)
+      if (!message)
+        return
 
       return postMessagePortMessage(options.port, message, payloadOptions)
     })

@@ -1,4 +1,4 @@
-import { encodeRequestMessage, MessageType } from '@orpc/standard-server-peer'
+import { encodeMessagePortRequest, MessageType } from '@orpc/standard-server-peer'
 import { os } from '../../builder'
 import { RPCHandler } from './rpc-handler'
 
@@ -34,18 +34,22 @@ describe('rpcHandler', async () => {
     handler.upgrade(serverPort)
   })
 
-  const string_request_message = await encodeRequestMessage('19', MessageType.REQUEST, {
+  const request_message = await encodeMessagePortRequest('19', MessageType.REQUEST, {
     url: new URL('orpc://localhost/ping'),
     body: { json: 'input' },
     headers: {},
     method: 'POST',
-  }) as string
+  })
 
-  const buffer_request_message = new TextEncoder().encode(string_request_message)
+  const buffer_request_message = await encodeMessagePortRequest('19', MessageType.REQUEST, {
+    url: new URL('orpc://localhost/ping'),
+    body: { json: new Uint8Array([1, 2, 3]) },
+    headers: {},
+    method: 'POST',
+  })
 
   it('work with string event', async () => {
-    clientPort.postMessage(string_request_message)
-
+    clientPort.postMessage(request_message)
     await vi.waitFor(() => expect(sentMessages.length).toBe(1))
   })
 
@@ -55,7 +59,7 @@ describe('rpcHandler', async () => {
   })
 
   it('abort on close', { retry: 3 }, async () => {
-    clientPort.postMessage(string_request_message)
+    clientPort.postMessage(request_message)
 
     await new Promise(resolve => setTimeout(resolve, 0))
 
