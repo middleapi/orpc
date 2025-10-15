@@ -2,16 +2,17 @@ import { getEventMeta, withEventMeta } from '@orpc/standard-server'
 import { StandardRPCJsonSerializer } from '../../client/src/adapters/standard/rpc-json-serializer'
 import { StandardRPCSerializer } from '../../client/src/adapters/standard/rpc-serializer'
 import { supportedDataTypes } from '../../client/tests/shared'
-import { ClientPeer, decodeRequestMessage, ServerPeer } from '../src'
+import { ClientPeer, decodeRequestMessage, encodeRequestMessage, ServerPeer } from '../src'
 
 describe('client/server peer', () => {
   let server: ServerPeer
 
-  const client = new ClientPeer(async (raw) => {
+  const client = new ClientPeer(async (id, type, payload) => {
     server ??= new ServerPeer(async (raw) => {
       await client.message(typeof raw === 'string' ? Math.random() < 0.5 ? raw : new TextEncoder().encode(raw) : raw)
     })
 
+    const raw = await encodeRequestMessage(id, type, payload)
     const encoded = typeof raw === 'string'
       ? Math.random() < 0.5 ? raw : new TextEncoder().encode(raw) /** increase coverage  */
       : raw
