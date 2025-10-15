@@ -57,6 +57,6 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251011.0",
     "@orpc/standard-server-peer": "workspace:*",
-    "@types/node": "^22.15.30"
+    "@types/node": "^24.7.2"
   }
 }
