@@ -1,11 +1,14 @@
 import type { Promisable } from '@orpc/shared'
+import type { encodeRequestMessage } from './codec'
 
-export type EncodedMessage = object | string | ArrayBufferLike | Uint8Array
+export interface AdapterSendFn {
+  (...args: [...Parameters<typeof encodeRequestMessage>, options?: StructuredSerializeOptions]): Promisable<void>
+}
+
+export type EncodedMessage = string | ArrayBufferLike | Uint8Array
 
 export interface EncodedMessageSendFn {
-  (message: EncodedMessage, options?: StructuredSerializeOptions): Promisable<void>
+  (message: EncodedMessage): Promisable<void>
 }
 
-export interface RequestOptions extends StructuredSerializeOptions {
-  raw: boolean
-}
+export interface RequestOptions extends StructuredSerializeOptions {}

@@ -1,10 +1,10 @@
 import type { AsyncIdQueueCloseOptions } from '@orpc/shared'
 import type { StandardRequest, StandardResponse } from '@orpc/standard-server'
-import type { EventIteratorPayload } from './codec'
-import type { EncodedMessage, EncodedMessageSendFn, RequestOptions } from './types'
+import type { encodeRequestMessage, EventIteratorPayload } from './codec'
+import type { AdapterSendFn, EncodedMessage, RequestOptions } from './types'
 import { AsyncIdQueue, clone, getGlobalOtelConfig, isAsyncIteratorObject, runWithSpan, SequentialIdGenerator } from '@orpc/shared'
 import { isEventIteratorHeaders } from '@orpc/standard-server'
-import { decodeResponseMessage, encodeRequestMessage, MessageType } from './codec'
+import { decodeResponseMessage, MessageType } from './codec'
 import { resolveEventIterator, toEventIterator } from './event-iterator'
 
 export interface ClientPeerCloseOptions extends AsyncIdQueueCloseOptions {
@@ -42,14 +42,14 @@ export class ClientPeer {
   private readonly send: (...args: [...Parameters<typeof encodeRequestMessage>, options?: StructuredSerializeOptions]) => Promise<void>
 
   constructor(
-    send: EncodedMessageSendFn,
+    send: AdapterSendFn,
   ) {
-    this.send = async (id, type, payload, options) => encodeRequestMessage(id, type, payload).then(async (raw) => {
+    this.send = async (id, type, payload, options) => {
       // only send message if still open
       if (this.serverControllers.has(id)) {
-        await send(raw, options)
+        await send(id, type, payload, options)
       }
-    })
+    }
   }
 
   get length(): number {
@@ -97,14 +97,9 @@ export class ClientPeer {
            * such as event iterator messages, signal messages, etc.
            * Otherwise, the server may not recognize them as part of the request.
            */
-          if (options?.raw) {
-            await this.send(id, MessageType.REQUEST_RAW, request, {
-              transfer: options.transfer,
-            })
-          }
-          else {
-            await this.send(id, MessageType.REQUEST, request)
-          }
+          await this.send(id, MessageType.REQUEST, request, {
+            transfer: options?.transfer,
+          })
 
           if (signal?.aborted) {
             await this.send(id, MessageType.ABORT_SIGNAL, undefined)

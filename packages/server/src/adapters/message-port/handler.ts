@@ -1,5 +1,6 @@
 import type { SupportedMessagePort } from '@orpc/client/message-port'
 import type { MaybeOptionalOptions } from '@orpc/shared'
+import type { BaseMessageFormat, SerializedRequestPayload } from '@orpc/standard-server-peer'
 import type { Context } from '../../context'
 import type { StandardHandler } from '../standard'
 import type {
@@ -7,7 +8,7 @@ import type {
 } from '../standard-peer'
 import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from '@orpc/client/message-port'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
-import { ServerPeer } from '@orpc/standard-server-peer'
+import { MessageType, ServerPeer } from '@orpc/standard-server-peer'
 import { createServerPeerHandleRequestFn } from '../standard-peer'
 
 export class MessagePortHandler<T extends Context> {
@@ -24,9 +25,21 @@ export class MessagePortHandler<T extends Context> {
       return postMessagePortMessage(port, message)
     })
 
-    onMessagePortMessage(port, async (message) => {
+    onMessagePortMessage(port, async (raw) => {
+      const { i, t, p } = raw as BaseMessageFormat<SerializedRequestPayload>
+      if (t && t !== MessageType.REQUEST)
+        return
+
+      const SHORTABLE_ORIGIN = 'orpc://localhost'
+      const payload = {
+        url: p.u.startsWith('/') ? new URL(`${SHORTABLE_ORIGIN}${p.u}`) : new URL(p.u),
+        headers: p.h ?? {},
+        method: p.m ?? 'POST',
+        body: p.b,
+      }
+
       await peer.message(
-        message,
+        [i, t ?? MessageType.REQUEST, payload],
         createServerPeerHandleRequestFn(this.standardHandler, resolveMaybeOptionalOptions(rest)),
       )
     })

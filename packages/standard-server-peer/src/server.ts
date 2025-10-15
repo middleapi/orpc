@@ -1,10 +1,10 @@
 import type { AsyncIdQueueCloseOptions } from '@orpc/shared'
 import type { StandardRequest, StandardResponse } from '@orpc/standard-server'
-import type { EventIteratorPayload } from './codec'
-import type { EncodedMessage, EncodedMessageSendFn } from './types'
+import type { DecodedRequestMessage, EventIteratorPayload } from './codec'
+import type { EncodedMessageSendFn } from './types'
 import { AbortError, AsyncIdQueue, getGlobalOtelConfig, isAsyncIteratorObject, runWithSpan } from '@orpc/shared'
 import { HibernationEventIterator, isEventIteratorHeaders } from '@orpc/standard-server'
-import { decodeRequestMessage, encodeResponseMessage, MessageType } from './codec'
+import { encodeResponseMessage, MessageType } from './codec'
 import { resolveEventIterator, toEventIterator } from './event-iterator'
 
 export interface ServerPeerHandleRequestFn {
@@ -61,10 +61,10 @@ export class ServerPeer {
    * @todo This method will return Promise<void> in the next major version.
    */
   async message(
-    raw: EncodedMessage,
+    message: DecodedRequestMessage,
     handleRequest?: ServerPeerHandleRequestFn,
   ): Promise<[id: string, StandardRequest | undefined]> {
-    const [id, type, payload] = await decodeRequestMessage(raw)
+    const [id, type, payload] = message
 
     if (type === MessageType.ABORT_SIGNAL) {
       this.close({ id, reason: new AbortError('Client aborted the request') })
