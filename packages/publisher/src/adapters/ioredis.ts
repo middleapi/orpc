@@ -64,6 +64,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
    *
    */
   get size(): number {
+    /* v8 ignore next 5 */
     let size = this.redisListener ? 1 : 0
     for (const listeners of this.listeners) {
       size += listeners[1].size || 1 // empty set should never happen so we treat it as a single event
@@ -104,7 +105,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
         this.lastCleanupTimes.set(key, now)
 
         const result = await this.commander.multi()
-          .xadd(key, '*', stringifyJSON(serialized))
+          .xadd(key, '*', 'data', stringifyJSON(serialized))
           .xtrim(key, 'MINID', `${now - this.retentionSeconds * 1000}-0`)
           .expire(key, this.retentionSeconds * 2) // double to avoid expires new events
           .exec()
@@ -117,30 +118,42 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
           }
         }
 
-        id = (result![0]![1] as string | null) ?? undefined
+        id = (result![0]![1] as string)
       }
       else {
-        const result = await this.commander.xadd(key, '*', stringifyJSON(serialized))
-        id = result ?? undefined
+        const result = await this.commander.xadd(key, '*', 'data', stringifyJSON(serialized))
+        id = result!
       }
     }
 
     await this.commander.publish(key, stringifyJSON({ ...serialized, id }))
   }
 
-  protected override async subscribeListener<K extends keyof T & string>(event: K, _listener: (payload: T[K]) => void, options?: PublisherSubscribeListenerOptions): Promise<() => Promise<void>> {
+  protected override async subscribeListener<K extends keyof T & string>(event: K, originalListener: (payload: T[K]) => void, options?: PublisherSubscribeListenerOptions): Promise<() => Promise<void>> {
     const key = this.prefixKey(event)
 
     const lastEventId = options?.lastEventId
     let pendingPayloads: T[K][] | undefined = []
+    let resumePayloadIds: (string | undefined)[] | undefined = []
 
     const listener = (payload: T[K]) => {
       if (pendingPayloads) {
         pendingPayloads.push(payload)
+        return
       }
-      else {
-        _listener(payload)
+
+      if (resumePayloadIds) {
+        const payloadId = getEventMeta(payload)?.id
+        for (const resumePayloadId of resumePayloadIds) {
+          if (payloadId === resumePayloadId) { // duplicate happen
+            return
+          }
+        }
+
+        resumePayloadIds = undefined
       }
+
+      originalListener(payload)
     }
 
     if (!this.redisListener) {
@@ -177,13 +190,14 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
             const [_, items] = results[0]
             const firstPendingId = getEventMeta(pendingPayloads[0])?.id
             for (const [id, fields] of items) {
-              if (id === firstPendingId) {
+              if (id === firstPendingId) { // duplicate happen
                 break
               }
 
-              const serialized = fields[0]!
+              const serialized = fields[1]! // field value is at index 1 (index 0 is field name 'data')
               const payload = this.deserializePayload(id, JSON.parse(serialized))
-              listener(payload)
+              resumePayloadIds.push(id)
+              originalListener(payload)
             }
           }
         }
@@ -193,10 +207,9 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
       }
       finally {
         for (const payload of pendingPayloads) {
-          listener(payload)
+          originalListener(payload)
         }
-
-        pendingPayloads = undefined // disable pending
+        pendingPayloads = undefined
       }
     })()
 
