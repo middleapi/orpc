@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  SRH_TOKEN: default
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -27,6 +30,15 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis/redis-stack-server:6.2.6-v6 # 6.2 is the Upstash compatible Redis version
+      srh:
+        image: hiett/serverless-redis-http:latest
+        env:
+          SRH_MODE: env # We are using env mode because we are only connecting to one server.
+          SRH_TOKEN: ${{ env.SRH_TOKEN }}
+          SRH_CONNECTION_STRING: redis://redis:6379
     steps:
       - uses: actions/checkout@v4
 
@@ -40,6 +52,10 @@ jobs:
       - run: pnpm i
 
       - run: pnpm run test:coverage
+        env:
+          REDIS_URL: redis://redis:6379
+          UPSTASH_REDIS_REST_URL: http://srh:80
+          UPSTASH_REDIS_REST_TOKEN: ${{ env.SRH_TOKEN }}
 
       - uses: codecov/codecov-action@v5
         with:

@@ -1,0 +1,14 @@
+version: '3'
+services:
+  redis:
+    image: redis/redis-stack-server:6.2.6-v6 # 6.2 is the Upstash compatible Redis version
+    ports:
+      - '6379:6379'
+  serverless-redis-http:
+    ports:
+      - '8079:80'
+    image: hiett/serverless-redis-http:latest
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: default
+      SRH_CONNECTION_STRING: 'redis://redis:6379'
