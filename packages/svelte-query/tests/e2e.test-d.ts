@@ -1,7 +1,6 @@
 import type { InfiniteData } from '@tanstack/svelte-query'
 import { isDefinedError } from '@orpc/client'
 import { createInfiniteQuery, createMutation, createQueries, createQuery } from '@tanstack/svelte-query'
-import { get } from 'svelte/store'
 import { orpc as client } from '../../client/tests/shared'
 import { orpc, queryClient } from './shared'
 
@@ -22,7 +21,7 @@ it('.call', () => {
 
 describe('.queryOptions', () => {
   it('createQuery', () => {
-    const queryStore = createQuery(orpc.ping.queryOptions({
+    const query = createQuery(() => orpc.ping.queryOptions({
       input: { input: 123 },
       retry(failureCount, error) {
         if (isDefinedError(error) && error.code === 'BASE') {
@@ -33,8 +32,6 @@ describe('.queryOptions', () => {
       },
     }))
 
-    const query = get(queryStore)
-
     if (query.status === 'error' && isDefinedError(query.error) && query.error.code === 'OVERRIDE') {
       expectTypeOf(query.error.data).toEqualTypeOf<unknown>()
     }
@@ -43,14 +40,14 @@ describe('.queryOptions', () => {
       expectTypeOf(query.data).toEqualTypeOf<{ output: string }>()
     }
 
-    createQuery(orpc.ping.queryOptions({
+    createQuery(() => orpc.ping.queryOptions({
       // @ts-expect-error --- input is invalid
       input: {
         input: '123',
       },
     }))
 
-    createQuery(orpc.ping.queryOptions({
+    createQuery(() => orpc.ping.queryOptions({
       input: { input: 123 },
       context: {
         // @ts-expect-error --- cache is invalid
@@ -60,7 +57,7 @@ describe('.queryOptions', () => {
   })
 
   it('createQueries', async () => {
-    const queriesStore = createQueries({
+    const queries = createQueries(() => ({
       queries: [
         orpc.ping.queryOptions({
           input: { input: 123 },
@@ -77,9 +74,7 @@ describe('.queryOptions', () => {
           context: { cache: '123' },
         }),
       ],
-    })
-
-    const queries = get(queriesStore)
+    }))
 
     if (queries[0].status === 'error' && isDefinedError(queries[0].error) && queries[0].error.code === 'BASE') {
       expectTypeOf(queries[0].error.data).toEqualTypeOf<{ output: string }>()
@@ -115,7 +110,7 @@ describe('.queryOptions', () => {
 
 describe('.infiniteOptions', () => {
   it('createInfiniteQuery', () => {
-    const queryStore = createInfiniteQuery(orpc.nested.ping.infiniteOptions({
+    const query = createInfiniteQuery(() => orpc.nested.ping.infiniteOptions({
       input: pagePram => ({ input: pagePram }),
       getNextPageParam: () => 2,
       initialPageParam: 2,
@@ -128,8 +123,6 @@ describe('.infiniteOptions', () => {
       },
     }))
 
-    const query = get(queryStore)
-
     if (query.status === 'error' && isDefinedError(query.error) && query.error.code === 'OVERRIDE') {
       expectTypeOf(query.error.data).toEqualTypeOf<unknown>()
     }
@@ -139,7 +132,7 @@ describe('.infiniteOptions', () => {
     }
 
     // @ts-expect-error --- input is invalid
-    createInfiniteQuery(orpc.nested.ping.infiniteOptions({
+    createInfiniteQuery(() => orpc.nested.ping.infiniteOptions({
       // @ts-expect-error --- input is invalid
       input: pagePram => ({
         input: pagePram,
@@ -149,7 +142,7 @@ describe('.infiniteOptions', () => {
     }))
 
     // @ts-expect-error --- cache is invalid
-    createInfiniteQuery(orpc.nested.ping.infiniteOptions({
+    createInfiniteQuery(() => orpc.nested.ping.infiniteOptions({
       input: pagePram => ({ input: pagePram }),
       context: {
         // @ts-expect-error --- cache is invalid
@@ -173,15 +166,13 @@ describe('.infiniteOptions', () => {
 
 describe('.mutationOptions', () => {
   it('createMutation', async () => {
-    const mutationStore = createMutation(orpc.ping.mutationOptions({
+    const mutation = createMutation(() => orpc.ping.mutationOptions({
       onError(error, variables) {
         if (isDefinedError(error) && error.code === 'BASE') {
           expectTypeOf(error.data).toEqualTypeOf<{ output: string }>()
         }
       },
     }))
-
-    const mutation = get(mutationStore)
 
     if (mutation.status === 'error' && isDefinedError(mutation.error) && mutation.error.code === 'OVERRIDE') {
       expectTypeOf(mutation.error.data).toEqualTypeOf<unknown>()
@@ -198,7 +189,7 @@ describe('.mutationOptions', () => {
       input: 'INVALID',
     })
 
-    createMutation(orpc.ping.mutationOptions({
+    createMutation(() => orpc.ping.mutationOptions({
       context: {
         // @ts-expect-error --- cache is invalid
         cache: 123,

@@ -5,7 +5,7 @@
   const queryClient = useQueryClient();
 
   const mutation = createMutation(
-    orpc.planet.create.mutationOptions({
+    () => orpc.planet.create.mutationOptions({
       onSuccess() {
         queryClient.invalidateQueries({
           queryKey: orpc.planet.key(),
@@ -27,7 +27,7 @@
     const description = (form.get('description') as string | null) ?? undefined;
     const image = form.get('image') as File;
 
-    $mutation.mutate({
+    mutation.mutate({
       name,
       description,
       image: image.size > 0 ? image : undefined,

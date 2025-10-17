@@ -14,7 +14,7 @@ In oRPC, a procedure like a standard function but comes with built-in support fo
 
 ## Overview
 
-Here’s an example of defining a procedure in oRPC:
+Here's an example of defining a procedure in oRPC:
 
 ```ts
 import { os } from '@orpc/server'
@@ -45,7 +45,7 @@ By explicitly specifying the `.output` or your `handler's return type`, you enab
 
 ### `type` Utility
 
-For simple use-case without external libraries, use oRPC’s built-in `type` utility. It takes a mapping function as its first argument:
+For simple use-case without external libraries, use oRPC's built-in `type` utility. It takes a mapping function as its first argument:
 
 ```ts twoslash
 import { os, type } from '@orpc/server'

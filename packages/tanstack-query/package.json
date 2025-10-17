@@ -1,7 +1,7 @@
 {
   "name": "@orpc/tanstack-query",
   "type": "module",
-  "version": "1.9.3",
+  "version": "1.9.4",
   "license": "MIT",
   "homepage": "https://orpc.unnoq.com",
   "repository": {
@@ -41,15 +41,15 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "@angular/core": "^20.3.3",
-    "@tanstack/angular-query-experimental": "^5.90.2",
-    "@tanstack/query-core": "^5.90.2",
-    "@tanstack/react-query": "^5.90.2",
-    "@tanstack/solid-query": "^5.90.3",
-    "@tanstack/svelte-query": "^5.90.2",
-    "@tanstack/vue-query": "^5.90.2",
-    "svelte": "^5.39.9",
+    "@angular/core": "^20.3.6",
+    "@tanstack/angular-query-experimental": "^5.90.5",
+    "@tanstack/query-core": "^5.90.5",
+    "@tanstack/react-query": "^5.90.5",
+    "@tanstack/solid-query": "^5.90.6",
+    "@tanstack/svelte-query": "^6.0.3",
+    "@tanstack/vue-query": "^5.90.5",
+    "svelte": "^5.40.2",
     "vue": "^3.5.22",
-    "zod": "^4.1.11"
+    "zod": "^4.1.12"
   }
 }

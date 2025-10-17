@@ -1,7 +1,7 @@
 {
   "name": "@orpc/experimental-durable-iterator",
   "type": "module",
-  "version": "1.9.3",
+  "version": "1.9.4",
   "license": "MIT",
   "homepage": "https://orpc.unnoq.com",
   "repository": {
@@ -55,7 +55,7 @@
     "valibot": "^1.1.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20251004.0",
+    "@cloudflare/workers-types": "^4.20251011.0",
     "@orpc/standard-server-peer": "workspace:*",
     "@types/node": "^22.15.30"
   }

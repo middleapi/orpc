@@ -1,7 +1,7 @@
 {
   "name": "@orpc/shared",
   "type": "module",
-  "version": "1.9.3",
+  "version": "1.9.4",
   "license": "MIT",
   "homepage": "https://orpc.unnoq.com",
   "repository": {
@@ -43,12 +43,12 @@
   },
   "dependencies": {
     "radash": "^12.1.1",
-    "type-fest": "^5.0.1"
+    "type-fest": "^5.1.0"
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.0",
-    "arktype": "2.1.22",
+    "arktype": "2.1.23",
     "valibot": "^1.1.0",
-    "zod": "^4.1.11"
+    "zod": "^4.1.12"
   }
 }

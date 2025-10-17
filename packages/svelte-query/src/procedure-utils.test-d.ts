@@ -4,7 +4,6 @@ import type { GetNextPageParamFunction, InfiniteData } from '@tanstack/svelte-qu
 import type { baseErrorMap } from '../../contract/tests/shared'
 import type { ProcedureUtils } from './procedure-utils'
 import { createInfiniteQuery, createMutation, createQueries, createQuery, skipToken } from '@tanstack/svelte-query'
-import { get } from 'svelte/store'
 import { queryClient } from '../tests/shared'
 
 describe('ProcedureUtils', () => {
@@ -77,7 +76,7 @@ describe('ProcedureUtils', () => {
 
     describe('createQuery', () => {
       it('without initial data', () => {
-        const query = createQuery(utils.queryOptions({
+        const query = createQuery(() => utils.queryOptions({
           select: data => ({ mapped: data }),
           throwOnError(error) {
             expectTypeOf(error).toEqualTypeOf<ErrorFromErrorMap<typeof baseErrorMap>>()
@@ -85,23 +84,23 @@ describe('ProcedureUtils', () => {
           },
         }))
 
-        expectTypeOf(get(query).data).toEqualTypeOf<{ mapped: UtilsOutput } | undefined>()
-        expectTypeOf(get(query).error).toEqualTypeOf<ErrorFromErrorMap<typeof baseErrorMap> | null>()
+        expectTypeOf(query.data).toEqualTypeOf<{ mapped: UtilsOutput } | undefined>()
+        expectTypeOf(query.error).toEqualTypeOf<ErrorFromErrorMap<typeof baseErrorMap> | null>()
       })
 
       it('with initial data', () => {
-        const query = createQuery(utils.queryOptions({
+        const query = createQuery(() => utils.queryOptions({
           select: data => ({ mapped: data }),
           initialData: [{ title: 'title' }],
         }))
 
-        expectTypeOf(get(query).data).toEqualTypeOf<{ mapped: UtilsOutput }>()
-        expectTypeOf(get(query).error).toEqualTypeOf<ErrorFromErrorMap<typeof baseErrorMap> | null>()
+        expectTypeOf(query.data).toEqualTypeOf<{ mapped: UtilsOutput }>()
+        expectTypeOf(query.error).toEqualTypeOf<ErrorFromErrorMap<typeof baseErrorMap> | null>()
       })
     })
 
     it('works with createQueries', async () => {
-      const queries = createQueries(({
+      const queries = createQueries(() => ({
         queries: [
           utils.queryOptions({
             select: data => ({ mapped: data }),
@@ -113,11 +112,11 @@ describe('ProcedureUtils', () => {
         ],
       }))
 
-      expectTypeOf(get(queries)[0].data).toEqualTypeOf<{ mapped: UtilsOutput } | undefined>()
-      expectTypeOf(get(queries)[1].data).toEqualTypeOf<UtilsOutput | undefined>()
+      expectTypeOf(queries[0].data).toEqualTypeOf<{ mapped: UtilsOutput } | undefined>()
+      expectTypeOf(queries[1].data).toEqualTypeOf<UtilsOutput | undefined>()
 
-      expectTypeOf(get(queries)[0].error).toEqualTypeOf<null | ErrorFromErrorMap<typeof baseErrorMap>>()
-      expectTypeOf(get(queries)[1].error).toEqualTypeOf<null | ErrorFromErrorMap<typeof baseErrorMap>>()
+      expectTypeOf(queries[0].error).toEqualTypeOf<null | ErrorFromErrorMap<typeof baseErrorMap>>()
+      expectTypeOf(queries[1].error).toEqualTypeOf<null | ErrorFromErrorMap<typeof baseErrorMap>>()
     })
 
     it('works with fetchQuery', () => {
@@ -242,7 +241,7 @@ describe('ProcedureUtils', () => {
 
     describe('works with createInfiniteQuery', () => {
       it('without initial data', () => {
-        const query = createInfiniteQuery(utils.infiniteOptions({
+        const query = createInfiniteQuery(() => utils.infiniteOptions({
           input: () => ({}),
           getNextPageParam,
           initialPageParam,
@@ -253,12 +252,12 @@ describe('ProcedureUtils', () => {
           },
         }))
 
-        expectTypeOf(get(query).data).toEqualTypeOf<{ mapped: InfiniteData<UtilsOutput, number> } | undefined>()
-        expectTypeOf(get(query).error).toEqualTypeOf<ErrorFromErrorMap<typeof baseErrorMap> | null>()
+        expectTypeOf(query.data).toEqualTypeOf<{ mapped: InfiniteData<UtilsOutput, number> } | undefined>()
+        expectTypeOf(query.error).toEqualTypeOf<ErrorFromErrorMap<typeof baseErrorMap> | null>()
       })
 
       it('with initial data', () => {
-        const query = createInfiniteQuery(utils.infiniteOptions({
+        const query = createInfiniteQuery(() => utils.infiniteOptions({
           input: () => ({}),
           getNextPageParam,
           initialPageParam,
@@ -267,8 +266,8 @@ describe('ProcedureUtils', () => {
         }))
 
         // FIXME: Don't know why but seem tanstack/svelte-query doesn't handle initialData like react-query
-        // expectTypeOf(get(query).data).toEqualTypeOf<{ mapped: InfiniteData<UtilsOutput, number> }>()
-        expectTypeOf(get(query).error).toEqualTypeOf<ErrorFromErrorMap<typeof baseErrorMap> | null>()
+        // expectTypeOf(query.data).toEqualTypeOf<{ mapped: InfiniteData<UtilsOutput, number> }>()
+        expectTypeOf(query.error).toEqualTypeOf<ErrorFromErrorMap<typeof baseErrorMap> | null>()
       })
     })
 
@@ -308,7 +307,7 @@ describe('ProcedureUtils', () => {
     })
 
     it('works with createMutation', () => {
-      const mutation = createMutation(utils.mutationOptions({
+      const mutation = createMutation(() => utils.mutationOptions({
         onSuccess: (data, input) => {
           expectTypeOf(data).toEqualTypeOf<UtilsOutput>()
           expectTypeOf(input).toEqualTypeOf<UtilsInput>()
@@ -318,15 +317,13 @@ describe('ProcedureUtils', () => {
         },
       }))
 
-      const value = get(mutation)
-
-      expectTypeOf<Parameters<typeof value.mutate>[0]>().toEqualTypeOf<UtilsInput>()
-      expectTypeOf(value.data).toEqualTypeOf<UtilsOutput | undefined>()
-      expectTypeOf(value.error).toEqualTypeOf<ErrorFromErrorMap<typeof baseErrorMap> | null>()
+      expectTypeOf<Parameters<typeof mutation.mutate>[0]>().toEqualTypeOf<UtilsInput>()
+      expectTypeOf(mutation.data).toEqualTypeOf<UtilsOutput | undefined>()
+      expectTypeOf(mutation.error).toEqualTypeOf<ErrorFromErrorMap<typeof baseErrorMap> | null>()
     })
 
     it('infer correct mutation context type', () => {
-      createMutation({
+      createMutation(() => ({
         ...utils.mutationOptions({
           onMutate: v => ({ mutationContext: true }),
           onError: (e, v, context) => {
@@ -336,7 +333,7 @@ describe('ProcedureUtils', () => {
         onSettled: (d, e, v, context) => {
           expectTypeOf(context?.mutationContext).toEqualTypeOf<undefined | boolean>()
         },
-      })
+      }))
     })
   })
 })

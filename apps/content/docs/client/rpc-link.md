@@ -43,7 +43,7 @@ export const client: RouterClient<typeof router> = createORPCClient(link)
 
 ## Using Client Context
 
-Client context lets you pass extra information when calling procedures and dynamically modify RPCLink’s behavior.
+Client context lets you pass extra information when calling procedures and dynamically modify RPCLink's behavior.
 
 ```ts twoslash
 import { router } from './shared/planet'

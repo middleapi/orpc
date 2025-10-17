@@ -169,7 +169,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
 
             /**
              * JSON Schema's "regex" format means the string _is_ a regex pattern.
-             * Zod’s regex expects the string _to match_ a pattern.
+             * Zod's regex expects the string _to match_ a pattern.
              * These differ, so we ignore the "regex" format here.
              */
             if (typeof format === 'string' && format !== 'regex' && json.contentEncoding === undefined) {

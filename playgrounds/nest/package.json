@@ -1,6 +1,6 @@
 {
   "name": "@orpc/nest-playground",
-  "version": "1.9.3",
+  "version": "1.9.4",
   "private": true,
   "scripts": {
     "preview": "nest build && unbuild --stub && node dist/main.mjs",
@@ -12,7 +12,7 @@
     "@nestjs/common": "^11.1.6",
     "@nestjs/core": "^11.1.6",
     "@nestjs/platform-express": "^11.1.6",
-    "@nestjs/schematics": "^11.0.8",
+    "@nestjs/schematics": "^11.0.9",
     "@orpc/client": "next",
     "@orpc/contract": "next",
     "@orpc/nest": "next",
@@ -22,7 +22,7 @@
     "@orpc/zod": "next",
     "@swc/cli": "^0.7.7",
     "@swc/core": "^1.13.20",
-    "@tanstack/react-query": "^5.90.2",
+    "@tanstack/react-query": "^5.90.5",
     "@types/express": "^5.0.3",
     "@types/node": "^22.15.30",
     "globals": "^16.4.0",
@@ -34,6 +34,6 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3",
     "unbuild": "^3.6.1",
-    "zod": "^4.1.11"
+    "zod": "^4.1.12"
   }
 }

@@ -2,7 +2,7 @@ import { transformerTwoslash } from '@shikijs/vitepress-twoslash'
 import markdownItTaskLists from 'markdown-it-task-lists'
 import { defineConfig } from 'vitepress'
 import { groupIconMdPlugin, groupIconVitePlugin, localIconLoader } from 'vitepress-plugin-group-icons'
-import llmstxt from 'vitepress-plugin-llms'
+import llmstxt, { copyOrDownloadAsMarkdownButtons } from 'vitepress-plugin-llms'
 import { withMermaid } from 'vitepress-plugin-mermaid'
 
 export default withMermaid(defineConfig({
@@ -19,6 +19,7 @@ export default withMermaid(defineConfig({
     config(md) {
       md.use(groupIconMdPlugin)
       md.use(markdownItTaskLists)
+      md.use(copyOrDownloadAsMarkdownButtons)
     },
     codeTransformers: [
       transformerTwoslash(),

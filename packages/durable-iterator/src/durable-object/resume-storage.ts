@@ -13,6 +13,9 @@ export interface EventResumeStorageOptions extends StandardRPCJsonSerializerOpti
    *
    * @remarks
    * - Use infinite values to disable
+   * - Note that for performance, expired event cleanup is deferred. This means
+   *  expired events may remain in storage for a short period beyond their
+   *  retention time.
    *
    * @default NaN (disabled)
    */
@@ -197,7 +200,16 @@ export class EventResumeStorage<T extends object> {
     this.initSchema()
   }
 
+  private lastCleanupTime: number | undefined
   private cleanupExpiredEvents(): void {
+    const now = Date.now()
+    // defer cleanup to improve performance
+    if (this.lastCleanupTime && this.lastCleanupTime + this.retentionSeconds * 1000 > now) {
+      return
+    }
+
+    this.lastCleanupTime = now
+
     this.durableState.storage.sql.exec(`
       DELETE FROM "${this.schemaPrefix}events" WHERE stored_at < unixepoch() - ?
     `, this.retentionSeconds)

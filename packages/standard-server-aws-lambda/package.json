@@ -1,7 +1,7 @@
 {
   "name": "@orpc/standard-server-aws-lambda",
   "type": "module",
-  "version": "1.9.3",
+  "version": "1.9.4",
   "license": "MIT",
   "homepage": "https://orpc.unnoq.com",
   "repository": {
@@ -39,7 +39,7 @@
     "@orpc/standard-server-node": "workspace:*"
   },
   "devDependencies": {
-    "@types/aws-lambda": "^8.10.155",
+    "@types/aws-lambda": "^8.10.156",
     "@types/node": "^22.15.30"
   }
 }

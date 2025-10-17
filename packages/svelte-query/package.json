@@ -1,7 +1,7 @@
 {
   "name": "@orpc/svelte-query",
   "type": "module",
-  "version": "1.9.3",
+  "version": "1.9.4",
   "license": "MIT",
   "homepage": "https://orpc.unnoq.com",
   "repository": {
@@ -46,7 +46,7 @@
     "@orpc/tanstack-query": "workspace:*"
   },
   "devDependencies": {
-    "@tanstack/svelte-query": "^5.90.2",
-    "zod": "^4.1.11"
+    "@tanstack/svelte-query": "^6.0.3",
+    "zod": "^4.1.12"
   }
 }
