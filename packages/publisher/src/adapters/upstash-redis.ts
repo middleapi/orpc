@@ -1,27 +1,13 @@
 import type { StandardRPCJsonSerializedMetaItem, StandardRPCJsonSerializerOptions } from '@orpc/client/standard'
-import type Redis from 'ioredis'
+import type { Redis } from '@upstash/redis'
 import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
 import { StandardRPCJsonSerializer } from '@orpc/client/standard'
-import { stringifyJSON } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@orpc/standard-server'
 import { Publisher } from '../publisher'
 
 type SerializedPayload = { json: object, meta: StandardRPCJsonSerializedMetaItem[], eventMeta: ReturnType<typeof getEventMeta> }
 
-export interface IORedisPublisherOptions extends PublisherOptions, StandardRPCJsonSerializerOptions {
-  /**
-   * Redis commander instance (used for execute short-lived commands)
-   */
-  commander: Redis
-
-  /**
-   * redis listener instance (used for listening to events)
-   *
-   * @remark
-   * - `lazyConnect: true` option is supported
-   */
-  listener: Redis
-
+export interface UpstashRedisPublisherOptions extends PublisherOptions, StandardRPCJsonSerializerOptions {
   /**
    * How long (in seconds) to retain events for replay.
    *
@@ -43,15 +29,12 @@ export interface IORedisPublisherOptions extends PublisherOptions, StandardRPCJs
   prefix?: string
 }
 
-export class IORedisPublisher<T extends Record<string, object>> extends Publisher<T> {
-  protected readonly commander: Redis
-  protected readonly listener: Redis
-
+export class UpstashRedisPublisher<T extends Record<string, object>> extends Publisher<T> {
   protected readonly prefix: string
   protected readonly serializer: StandardRPCJsonSerializer
   protected readonly retentionSeconds: number
-  protected readonly listeners = new Map<string, Set<(payload: any) => void>>()
-  protected redisListener: ((channel: string, message: string) => void) | undefined
+  protected readonly listenersMap = new Map<string, Set<(payload: any) => void>>()
+  protected readonly subscriptionsMap = new Map<string, any>() // Upstash subscription objects
 
   protected get isResumeEnabled(): boolean {
     return Number.isFinite(this.retentionSeconds) && this.retentionSeconds > 0
@@ -72,20 +55,19 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
    */
   get size(): number {
     /* v8 ignore next 5 */
-    let size = this.redisListener ? 1 : 0
-    for (const listeners of this.listeners) {
+    let size = 0
+    for (const listeners of this.listenersMap) {
       size += listeners[1].size || 1 // empty set should never happen so we treat it as a single event
     }
     return size
   }
 
   constructor(
-    { commander, listener, resumeRetentionSeconds, prefix, ...options }: IORedisPublisherOptions,
+    protected readonly redis: Redis,
+    { resumeRetentionSeconds, prefix, ...options }: UpstashRedisPublisherOptions = {},
   ) {
     super(options)
 
-    this.commander = commander
-    this.listener = listener
     this.prefix = prefix ?? 'orpc:publisher:'
     this.retentionSeconds = resumeRetentionSeconds ?? Number.NaN
     this.serializer = new StandardRPCJsonSerializer(options)
@@ -111,29 +93,21 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
       if (!this.lastCleanupTimes.has(key)) {
         this.lastCleanupTimes.set(key, now)
 
-        const result = await this.commander.multi()
-          .xadd(key, '*', 'data', stringifyJSON(serialized))
-          .xtrim(key, 'MINID', this.xtrimExactness as '~', `${now - this.retentionSeconds * 1000}-0`)
-          .expire(key, this.retentionSeconds * 2) // double to avoid expires new events
+        const results = await this.redis.multi()
+          .xadd(key, '*', { data: serialized })
+          .xtrim(key, { strategy: 'MINID', exactness: this.xtrimExactness, threshold: `${now - this.retentionSeconds * 1000}-0` })
+          .expire(key, this.retentionSeconds * 2)
           .exec()
 
-        if (result) {
-          for (const [error] of result) {
-            if (error) {
-              throw error
-            }
-          }
-        }
-
-        id = (result![0]![1] as string)
+        id = results[0]
       }
       else {
-        const result = await this.commander.xadd(key, '*', 'data', stringifyJSON(serialized))
-        id = result!
+        const result = await this.redis.xadd(key, '*', { data: serialized })
+        id = result
       }
     }
 
-    await this.commander.publish(key, stringifyJSON({ ...serialized, id }))
+    await this.redis.publish(key, { ...serialized, id })
   }
 
   protected override async subscribeListener<K extends keyof T & string>(event: K, originalListener: (payload: T[K]) => void, options?: PublisherSubscribeListenerOptions): Promise<() => Promise<void>> {
@@ -163,13 +137,16 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
       originalListener(payload)
     }
 
-    if (!this.redisListener) {
-      this.redisListener = (channel: string, message: string) => {
+    // Get or create subscription for this channel
+    let subscription = this.subscriptionsMap.get(key) as ReturnType<typeof this.redis.subscribe> | undefined
+    if (!subscription) {
+      subscription = this.redis.subscribe(key)
+      subscription.on('message', (event) => {
         try {
-          const listeners = this.listeners.get(channel)
+          const listeners = this.listenersMap.get(event.channel)
 
           if (listeners) {
-            const { id, ...rest } = JSON.parse(message)
+            const { id, ...rest } = event.message as any
             const payload = this.deserializePayload(id, rest)
 
             for (const listener of listeners) {
@@ -178,18 +155,34 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
           }
         }
         catch {
-          // error can happen when message is invalid
+          // there error can happen when event.message is invalid
           // TODO: log error
         }
-      }
+      })
 
-      this.listener.on('message', this.redisListener)
+      let resolvePromise: (value?: unknown) => void
+      let rejectPromise: (error: Error) => void
+      const promise = new Promise((resolve, reject) => {
+        resolvePromise = resolve
+        rejectPromise = reject
+      })
+
+      subscription.on('error', (error) => {
+        rejectPromise(error)
+      })
+
+      subscription.on('subscribe', () => {
+        resolvePromise()
+      })
+
+      await promise
+
+      this.subscriptionsMap.set(key, subscription) // only set after subscription is ready
     }
 
-    let listeners = this.listeners.get(key)
+    let listeners = this.listenersMap.get(key)
     if (!listeners) {
-      await this.listener.subscribe(key)
-      this.listeners.set(key, listeners = new Set()) // only set after subscribe successfully
+      this.listenersMap.set(key, listeners = new Set())
     }
 
     listeners.add(listener)
@@ -197,10 +190,10 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
     void (async () => {
       try {
         if (this.isResumeEnabled && typeof lastEventId === 'string') {
-          const results = await this.commander.xread('STREAMS', key, lastEventId)
+          const results = await this.redis.xread(key, lastEventId)
 
           if (results && results[0]) {
-            const [_, items] = results[0]
+            const [_, items] = results[0] as any
             const firstPendingId = getEventMeta(pendingPayloads[0])?.id
             for (const [id, fields] of items) {
               if (id === firstPendingId) { // duplicate happen
@@ -208,7 +201,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
               }
 
               const serialized = fields[1]! // field value is at index 1 (index 0 is field name 'data')
-              const payload = this.deserializePayload(id, JSON.parse(serialized))
+              const payload = this.deserializePayload(id, serialized)
               resumePayloadIds.push(id)
               originalListener(payload)
             }
@@ -216,6 +209,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
         }
       }
       catch {
+        // error can happen when result from xread is invalid
         // TODO: log error
       }
       finally {
@@ -228,15 +222,15 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
 
     return async () => {
       listeners.delete(listener)
+
       if (listeners.size === 0) {
-        this.listeners.delete(key) // should execute before async to avoid throw
+        this.listenersMap.delete(key) // should execute before async to avoid throw
+        const subscription = this.subscriptionsMap.get(key)
 
-        if (this.redisListener && this.listeners.size === 0) {
-          this.listener.off('message', this.redisListener)
-          this.redisListener = undefined
+        if (subscription) {
+          this.subscriptionsMap.delete(key)
+          await subscription.unsubscribe()
         }
-
-        await this.listener.unsubscribe(key)
       }
     }
   }

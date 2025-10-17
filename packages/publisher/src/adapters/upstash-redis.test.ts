@@ -1,38 +1,35 @@
 import { getEventMeta, withEventMeta } from '@orpc/standard-server'
-import { Redis } from 'ioredis'
-import { IORedisPublisher } from './ioredis'
+import { Redis } from '@upstash/redis'
+import { UpstashRedisPublisher } from './upstash-redis'
 
-describe('ioredis publisher', () => {
-  const REDIS_URL = process.env.REDIS_URL
-  if (!REDIS_URL) {
-    throw new Error('These tests require REDIS_URL env variable')
+describe('upstash redis publisher', { concurrent: false }, () => {
+  const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL
+  const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
+
+  if (!UPSTASH_REDIS_REST_URL || !UPSTASH_REDIS_REST_TOKEN) {
+    throw new Error('These tests require UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN env variables')
   }
 
-  let publisher: IORedisPublisher<any>
-  let commander: Redis
-  let listener: Redis
+  let publisher: UpstashRedisPublisher<any>
+  let redis: Redis
 
   beforeAll(() => {
-    commander = new Redis(REDIS_URL)
-    listener = new Redis(REDIS_URL)
+    redis = new Redis({
+      url: UPSTASH_REDIS_REST_URL,
+      token: UPSTASH_REDIS_REST_TOKEN,
+    })
+  })
+
+  beforeEach(async () => {
+    await redis.flushall()
   })
 
   afterEach(async () => {
-    // Use a separate commander for cleanup since listener might be in subscriber mode
-    await commander.flushall()
-    expect(publisher.size).toEqual(0) // ensure cleanup correctly
-  })
-
-  afterAll(async () => {
-    commander.disconnect()
-    listener.disconnect()
+    expect(publisher.size).toEqual(0) // ensure unsubscribed correctly
   })
 
   it('without resume: can pub/sub but not resume', async () => {
-    publisher = new IORedisPublisher({
-      commander,
-      listener,
-    }) // resume is disabled by default
+    publisher = new UpstashRedisPublisher(redis) // resume is disabled by default
 
     const listener1 = vi.fn()
     const listener2 = vi.fn()
@@ -47,7 +44,7 @@ describe('ioredis publisher', () => {
     await publisher.publish('event3', payload2)
 
     // Wait for messages to be received
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await new Promise(resolve => setTimeout(resolve, 150))
 
     expect(listener1).toHaveBeenCalledTimes(1)
     expect(listener1.mock.calls[0]![0]).toEqual(payload1)
@@ -59,7 +56,7 @@ describe('ioredis publisher', () => {
     await publisher.publish('event2', payload2)
 
     // Wait for messages to be received
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await new Promise(resolve => setTimeout(resolve, 150))
 
     expect(listener1).toHaveBeenCalledTimes(1)
     expect(listener2).toHaveBeenCalledTimes(1)
@@ -70,7 +67,7 @@ describe('ioredis publisher', () => {
     const unsub11 = await publisher.subscribe('event1', listener1, { lastEventId: '0' })
 
     // Wait a bit to ensure no resume happens
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await new Promise(resolve => setTimeout(resolve, 150))
 
     expect(listener1).toHaveBeenCalledTimes(1) // resume not happens
     await unsub11()
@@ -78,9 +75,7 @@ describe('ioredis publisher', () => {
 
   describe('with resume', () => {
     it('basic pub/sub', async () => {
-      publisher = new IORedisPublisher({
-        commander,
-        listener,
+      publisher = new UpstashRedisPublisher(redis, {
         resumeRetentionSeconds: 10,
       })
 
@@ -91,7 +86,7 @@ describe('ioredis publisher', () => {
       await publisher.publish('event1', payload1)
 
       // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise(resolve => setTimeout(resolve, 150))
 
       expect(listener1).toHaveBeenCalledTimes(1)
       expect(listener1).toHaveBeenCalledWith(expect.objectContaining(payload1))
@@ -100,9 +95,7 @@ describe('ioredis publisher', () => {
     })
 
     it('can pub/sub and resume', async () => {
-      publisher = new IORedisPublisher({
-        commander,
-        listener,
+      publisher = new UpstashRedisPublisher(redis, {
         resumeRetentionSeconds: 10,
       })
 
@@ -119,7 +112,7 @@ describe('ioredis publisher', () => {
       await publisher.publish('event3', payload2)
 
       // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise(resolve => setTimeout(resolve, 150))
 
       expect(listener1).toHaveBeenCalledTimes(1)
       expect(listener1).toHaveBeenCalledWith(expect.objectContaining(payload1))
@@ -131,7 +124,7 @@ describe('ioredis publisher', () => {
       await publisher.publish('event2', payload2)
 
       // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise(resolve => setTimeout(resolve, 150))
 
       expect(listener1).toHaveBeenCalledTimes(1)
       expect(listener2).toHaveBeenCalledTimes(1)
@@ -143,20 +136,17 @@ describe('ioredis publisher', () => {
       const unsub3 = await publisher.subscribe('event1', listener3, { lastEventId: '0' })
 
       // Wait for resume to complete
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise(resolve => setTimeout(resolve, 150))
 
       expect(listener3).toHaveBeenCalledTimes(2) // resume happens
       expect(listener3).toHaveBeenNthCalledWith(1, expect.objectContaining(payload1))
       expect(listener3).toHaveBeenNthCalledWith(2, expect.objectContaining(payload2))
 
       await unsub3()
-      expect(publisher.size).toEqual(0) // all listeners unsubscribed
     })
 
     it('control event.id', async () => {
-      publisher = new IORedisPublisher({
-        commander,
-        listener,
+      publisher = new UpstashRedisPublisher(redis, {
         resumeRetentionSeconds: 10,
       })
 
@@ -170,7 +160,7 @@ describe('ioredis publisher', () => {
       await publisher.publish('event1', payload2)
 
       // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise(resolve => setTimeout(resolve, 150))
 
       expect(listener1).toHaveBeenCalledTimes(2)
       expect(listener1).toHaveBeenNthCalledWith(1, expect.toSatisfy((p) => {
@@ -211,26 +201,22 @@ describe('ioredis publisher', () => {
 
       await unsub1()
       await unsub2()
-      expect(publisher.size).toEqual(0) // ensure no memory leak
     })
 
     it('resume event.id > lastEventId and in order', async () => {
-      publisher = new IORedisPublisher({
-        commander,
-        listener,
+      publisher = new UpstashRedisPublisher(redis, {
         resumeRetentionSeconds: 10,
       })
 
       const listener1 = vi.fn()
       const unsub1 = await publisher.subscribe('event', listener1)
 
-      // Publish 10 events
       for (let i = 1; i <= 10; i++) {
         await publisher.publish('event', { order: i })
       }
 
       // Wait for all events to be received
-      await new Promise(resolve => setTimeout(resolve, 200))
+      await new Promise(resolve => setTimeout(resolve, 150))
 
       expect(listener1).toHaveBeenCalledTimes(10)
 
@@ -249,7 +235,7 @@ describe('ioredis publisher', () => {
       const unsub2 = await publisher.subscribe('event', listener2, { lastEventId: fifthEventId })
 
       // Wait for resume to complete
-      await new Promise(resolve => setTimeout(resolve, 300))
+      await new Promise(resolve => setTimeout(resolve, 150))
 
       // Should have received events 6-10 (5 events)
       expect(listener2).toHaveBeenCalledTimes(5)
@@ -265,12 +251,10 @@ describe('ioredis publisher', () => {
       }
 
       await unsub2()
-    }, 10000) // Increase timeout to 10 seconds
+    })
 
     it('handles multiple subscribers on same event', async () => {
-      publisher = new IORedisPublisher({
-        commander,
-        listener,
+      publisher = new UpstashRedisPublisher(redis, {
         resumeRetentionSeconds: 10,
       })
 
@@ -286,7 +270,7 @@ describe('ioredis publisher', () => {
       await publisher.publish('event1', payload)
 
       // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise(resolve => setTimeout(resolve, 150))
 
       expect(listener1).toHaveBeenCalledTimes(1)
       expect(listener2).toHaveBeenCalledTimes(1)
@@ -299,14 +283,10 @@ describe('ioredis publisher', () => {
       await unsub1()
       await unsub2()
       await unsub3()
-
-      expect(publisher.size).toEqual(0)
     })
 
     it('handles custom prefix', async () => {
-      publisher = new IORedisPublisher({
-        commander,
-        listener,
+      publisher = new UpstashRedisPublisher(redis, {
         prefix: 'custom:prefix:',
         resumeRetentionSeconds: 10,
       })
@@ -318,13 +298,13 @@ describe('ioredis publisher', () => {
       await publisher.publish('event1', payload)
 
       // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise(resolve => setTimeout(resolve, 150))
 
       expect(listener1).toHaveBeenCalledTimes(1)
       expect(listener1).toHaveBeenCalledWith(expect.objectContaining(payload))
 
       // Verify the key uses custom prefix
-      const keys = await commander.keys('custom:prefix:*')
+      const keys = await redis.keys('custom:prefix:*')
       expect(keys.length).toBeGreaterThan(0)
       expect(keys.some(k => k.includes('custom:prefix:event1'))).toBe(true)
 
@@ -339,9 +319,7 @@ describe('ioredis publisher', () => {
         ) {}
       }
 
-      publisher = new IORedisPublisher({
-        commander,
-        listener,
+      publisher = new UpstashRedisPublisher(redis, {
         resumeRetentionSeconds: 10,
         customJsonSerializers: [
           {
@@ -369,7 +347,7 @@ describe('ioredis publisher', () => {
       await publisher.publish('event1', payload)
 
       // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise(resolve => setTimeout(resolve, 150))
 
       expect(listener1).toHaveBeenCalledTimes(1)
       const received = listener1.mock.calls[0]![0]
@@ -383,9 +361,7 @@ describe('ioredis publisher', () => {
     })
 
     it('handles errors during resume gracefully', async () => {
-      publisher = new IORedisPublisher({
-        commander,
-        listener,
+      publisher = new UpstashRedisPublisher(redis, {
         resumeRetentionSeconds: 10,
       })
 
@@ -398,7 +374,7 @@ describe('ioredis publisher', () => {
       await publisher.publish('event1', { order: 1 })
 
       // Wait for message to be received (should still work despite resume error)
-      await new Promise(resolve => setTimeout(resolve, 200))
+      await new Promise(resolve => setTimeout(resolve, 150))
 
       // Should have received the new event even though resume failed
       expect(listener1).toHaveBeenCalledTimes(1)
@@ -408,11 +384,8 @@ describe('ioredis publisher', () => {
     })
 
     it('handles race condition where events published during resume', { repeats: 10 }, async () => {
-      publisher = new IORedisPublisher({
-        commander,
-        listener,
+      publisher = new UpstashRedisPublisher(redis, {
         resumeRetentionSeconds: 10,
-        prefix: 'race:test:',
       })
 
       await publisher.publish('event1', { order: 1 })
@@ -443,9 +416,7 @@ describe('ioredis publisher', () => {
 
     describe('cleanup retention', () => {
       it('handles cleanup of expired events on publish', async () => {
-        publisher = new IORedisPublisher({
-          commander,
-          listener,
+        publisher = new UpstashRedisPublisher(redis, {
           resumeRetentionSeconds: 1, // 1 second retention
           prefix: 'cleanup:test:',
         })
@@ -459,9 +430,10 @@ describe('ioredis publisher', () => {
         await publisher.publish('event1', { order: 2 })
         await publisher.publish('event1', { order: 3 })
 
-        const beforeCleanup = await commander.xread('STREAMS', key1, '0')
+        // Verify events are stored using xread
+        const beforeCleanup = await redis.xread(key1, '0') as any
 
-        expect(beforeCleanup![0]![1].length).toBe(3) // 3 events for event1
+        expect(beforeCleanup[0][1].length).toBe(3) // 3 events for event1
 
         // Wait for retention to expire
         await new Promise(resolve => setTimeout(resolve, 1100))
@@ -470,16 +442,14 @@ describe('ioredis publisher', () => {
         await publisher.publish('event1', { order: 4 })
 
         // Verify cleanup happened using xread - old events should be trimmed
-        const afterCleanup = await commander.xread('STREAMS', key1, '0')
+        const afterCleanup = await redis.xread(key1, '0') as any
 
         // event1 should only have the new event (order: 4), old ones trimmed
-        expect(afterCleanup![0]![1].length).toBe(1)
+        expect(afterCleanup[0][1].length).toBe(1)
       })
 
       it('verifies Redis auto-expires keys after retention period * 2', async () => {
-        publisher = new IORedisPublisher({
-          commander,
-          listener,
+        publisher = new UpstashRedisPublisher(redis, {
           resumeRetentionSeconds: 1,
           prefix: 'test:expire:',
         })
@@ -490,7 +460,7 @@ describe('ioredis publisher', () => {
         await publisher.publish('event1', { order: 1 })
 
         // Verify key exists
-        const ttl1 = await commander.ttl(key)
+        const ttl1 = await redis.ttl(key)
         expect(ttl1).toBeGreaterThan(0)
         expect(ttl1).toBeLessThanOrEqual(2) // (2 * retentionSeconds)
 
@@ -498,64 +468,58 @@ describe('ioredis publisher', () => {
         await new Promise(resolve => setTimeout(resolve, 2500))
 
         // Verify key has been auto-expired by Redis
-        const exists = await commander.exists(key)
+        const exists = await redis.exists(key)
         expect(exists).toBe(0)
       })
     })
   })
 
   describe('edge cases', () => {
-    it('handles transaction errors during publish', async () => {
-      // Create a mock commander that will fail on multi
-      const mockCommander = {
-        ...commander,
-        multi: () => ({
-          xadd: () => ({ xtrim: () => ({ expire: () => ({ exec: async () => [[new Error('Transaction failed')]] }) }) }),
-        }),
-        publish: commander.publish.bind(commander),
-      } as any
-
-      publisher = new IORedisPublisher({
-        commander: mockCommander,
-        listener,
-        resumeRetentionSeconds: 10,
-      })
-
-      // This should throw the transaction error
-      await expect(publisher.publish('event1', { order: 1 })).rejects.toThrow('Transaction failed')
-    })
-
     it('only subscribe to redis-listener when needed', async () => {
-      publisher = new IORedisPublisher({
-        commander,
-        listener,
+      const originalSubscribe = redis.subscribe.bind(redis)
+      const unsubscribeSpys: any[] = []
+      const subscribeSpy = vi.spyOn(redis, 'subscribe')
+      subscribeSpy.mockImplementation((...args) => {
+        const subscription = originalSubscribe(...args)
+        unsubscribeSpys.push(vi.spyOn(subscription, 'unsubscribe'))
+        return subscription
       })
-
-      expect(listener.listenerCount('message')).toBe(0)
+      publisher = new UpstashRedisPublisher(redis)
 
       const listener1 = vi.fn()
       const unsub1 = await publisher.subscribe('event1', listener1)
-
-      expect(listener.listenerCount('message')).toBe(1)
-
       const unsub2 = await publisher.subscribe('event1', listener1)
 
-      expect(listener.listenerCount('message')).toBe(1) // reuse listener
+      expect(subscribeSpy).toHaveBeenCalledTimes(1)
+      expect(unsubscribeSpys[0]).toBeCalledTimes(0)
 
       await unsub1()
-      await unsub2()
+      expect(unsubscribeSpys[0]).toBeCalledTimes(0)
 
-      expect(listener.listenerCount('message')).toBe(0)
-      expect(publisher.size).toBe(0)
+      await unsub2()
+      expect(unsubscribeSpys[0]).toBeCalledTimes(1) // unsubscribed in redis
+
+      expect(unsubscribeSpys.length).toBe(1) // ensure only subscribe once
+    })
+
+    it('subscribe should throw & on connection error', async () => {
+      const redis = new Redis({
+        url: 'http://invalid:6379',
+        token: 'invalid',
+      })
+
+      publisher = new UpstashRedisPublisher(redis)
+
+      await expect(publisher.subscribe('event1', () => { })).rejects.toThrow()
     })
 
     it('gracefully handles invalid subscription message', async () => {
-      publisher = new IORedisPublisher({ commander, listener })
+      publisher = new UpstashRedisPublisher(redis)
 
       const listener1 = vi.fn()
       const unsub1 = await publisher.subscribe('event1', listener1)
 
-      await commander.publish('orpc:publisher:event1', 'invalid message')
+      await redis.publish('orpc:publisher:event1', 'invalid message')
 
       // Wait for message to be received
       await new Promise(resolve => setTimeout(resolve, 150))

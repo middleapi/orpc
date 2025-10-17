@@ -24,12 +24,24 @@
         "types": "./dist/adapters/memory.d.mts",
         "import": "./dist/adapters/memory.mjs",
         "default": "./dist/adapters/memory.mjs"
+      },
+      "./ioredis": {
+        "types": "./dist/adapters/ioredis.d.mts",
+        "import": "./dist/adapters/ioredis.mjs",
+        "default": "./dist/adapters/ioredis.mjs"
+      },
+      "./upstash-redis": {
+        "types": "./dist/adapters/upstash-redis.d.mts",
+        "import": "./dist/adapters/upstash-redis.mjs",
+        "default": "./dist/adapters/upstash-redis.mjs"
       }
     }
   },
   "exports": {
     ".": "./src/index.ts",
-    "./memory": "./src/adapters/memory.ts"
+    "./memory": "./src/adapters/memory.ts",
+    "./ioredis": "./src/adapters/ioredis.ts",
+    "./upstash-redis": "./src/adapters/upstash-redis.ts"
   },
   "files": [
     "dist"
@@ -40,9 +52,13 @@
     "type:check": "tsc -b"
   },
   "peerDependencies": {
+    "@upstash/redis": ">=1.35.6",
     "ioredis": ">=5.8.1"
   },
   "peerDependenciesMeta": {
+    "@upstash/redis": {
+      "optional": true
+    },
     "ioredis": {
       "optional": true
     }
@@ -53,6 +69,7 @@
     "@orpc/standard-server": "workspace:*"
   },
   "devDependencies": {
+    "@upstash/redis": "^1.35.6",
     "ioredis": "^5.8.1"
   }
 }
