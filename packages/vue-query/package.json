@@ -46,6 +46,6 @@
     "@orpc/tanstack-query": "workspace:*"
   },
   "devDependencies": {
-    "@tanstack/vue-query": "^5.90.3"
+    "@tanstack/vue-query": "^5.90.5"
   }
 }

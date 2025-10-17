@@ -12,7 +12,7 @@
     "cf-typegen": "wrangler types"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.13.12",
+    "@cloudflare/vite-plugin": "^1.13.13",
     "@orpc/client": "next",
     "@orpc/experimental-durable-iterator": "next",
     "@orpc/json-schema": "next",
@@ -20,16 +20,16 @@
     "@orpc/server": "next",
     "@orpc/tanstack-query": "next",
     "@orpc/zod": "next",
-    "@scalar/api-reference-react": "^0.8.0",
-    "@tanstack/react-query": "^5.90.3",
+    "@scalar/api-reference-react": "^0.8.1",
+    "@tanstack/react-query": "^5.90.5",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.0.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "typescript": "^5.9.3",
-    "vite": "^7.1.9",
-    "wrangler": "^4.42.2",
+    "vite": "^7.1.10",
+    "wrangler": "^4.43.0",
     "zod": "^4.1.12"
   }
 }

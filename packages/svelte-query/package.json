@@ -46,7 +46,7 @@
     "@orpc/tanstack-query": "workspace:*"
   },
   "devDependencies": {
-    "@tanstack/svelte-query": "^6.0.1",
+    "@tanstack/svelte-query": "^6.0.3",
     "zod": "^4.1.12"
   }
 }
