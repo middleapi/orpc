@@ -213,10 +213,12 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
         // TODO: log error
       }
       finally {
-        for (const payload of pendingPayloads) {
-          originalListener(payload)
-        }
+        const pending = pendingPayloads
         pendingPayloads = undefined
+
+        for (const payload of pending) {
+          listener(payload) // listener instead of originalListener for deduplication
+        }
       }
     })()
 

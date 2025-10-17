@@ -3,7 +3,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte'
 import { svelteTesting } from '@testing-library/svelte/vite'
 import { loadEnv } from 'vite'
 import solid from 'vite-plugin-solid'
-import { defineConfig } from 'vitest/config'
+import { defaultExclude, defineConfig } from 'vitest/config'
 
 export default defineConfig(({ mode }) => ({
   test: {
@@ -12,8 +12,22 @@ export default defineConfig(({ mode }) => ({
       {
         test: {
           globals: true,
-          include: ['**/*.test.ts'],
           setupFiles: ['./vitest.javascript.ts'],
+          include: ['**/*.test.ts'],
+          exclude: [...defaultExclude, './packages/publisher/src/adapters/**/*'],
+        },
+      },
+      {
+        test: {
+          globals: true,
+          setupFiles: ['./vitest.javascript.ts'],
+          include: ['./packages/publisher/src/adapters/**/*.test.ts'],
+          pool: 'threads',
+          poolOptions: {
+            threads: {
+              singleThread: true,
+            },
+          },
         },
       },
       {
