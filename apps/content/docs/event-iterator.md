@@ -106,53 +106,29 @@ const example = os
   })
 ```
 
-## Event Publisher
+## Publisher Combination
 
-oRPC includes a built-in `EventPublisher` for real-time features like chat, notifications, or live updates. It supports broadcasting and subscribing to named events.
+You can combine the event iterator with [Publisher Helper](/docs/helpers/publisher) to build real-time features like chat, notifications, or live updates.
 
-::: code-group
-
-```ts [Static Events]
-import { EventPublisher } from '@orpc/server'
-
-const publisher = new EventPublisher<{
+```ts
+const publisher = new MemoryPublisher<{
   'something-updated': {
     id: string
   }
 }>()
 
-const livePlanet = os
+const live = os
   .handler(async function* ({ input, signal }) {
-    for await (const payload of publisher.subscribe('something-updated', { signal })) { // [!code highlight]
-      // handle payload here and yield something to client
+    const iterator = publisher.subscribe('something-updated', { signal })
+    for await (const payload of iterator) {
+      // Handle payload here or yield directly to client
+      yield payload
     }
   })
 
-const update = os
+const publish = os
   .input(z.object({ id: z.string() }))
-  .handler(({ input }) => {
-    publisher.publish('something-updated', { id: input.id }) // [!code highlight]
+  .handler(async ({ input }) => {
+    await publisher.publish('something-updated', { id: input.id })
   })
 ```
-
-```ts [Dynamic Events]
-import { EventPublisher } from '@orpc/server'
-
-const publisher = new EventPublisher<Record<string, { message: string }>>()
-
-const onMessage = os
-  .input(z.object({ channel: z.string() }))
-  .handler(async function* ({ input, signal }) {
-    for await (const payload of publisher.subscribe(input.channel, { signal })) { // [!code highlight]
-      yield payload.message
-    }
-  })
-
-const sendMessage = os
-  .input(z.object({ channel: z.string(), message: z.string() }))
-  .handler(({ input }) => {
-    publisher.publish(input.channel, { message: input.message }) // [!code highlight]
-  })
-```
-
-:::

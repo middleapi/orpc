@@ -160,6 +160,7 @@ export default withMermaid(defineConfig({
             { text: 'Cookie', link: '/docs/helpers/cookie' },
             { text: 'Encryption', link: '/docs/helpers/encryption' },
             { text: 'Form Data', link: '/docs/helpers/form-data' },
+            { text: 'Publisher', link: '/docs/helpers/publisher' },
             { text: 'Signing', link: '/docs/helpers/signing' },
           ],
         },
