@@ -4,6 +4,7 @@ import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../pub
 import { StandardRPCJsonSerializer } from '@orpc/client/standard'
 import { getEventMeta, withEventMeta } from '@orpc/standard-server'
 import { Publisher } from '../publisher'
+import { compareRedisStreamIds } from '../utils'
 
 type SerializedPayload = { json: object, meta: StandardRPCJsonSerializedMetaItem[], eventMeta: ReturnType<typeof getEventMeta> }
 
@@ -115,7 +116,7 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
 
     const lastEventId = options?.lastEventId
     let pendingPayloads: T[K][] | undefined = []
-    let resumePayloadIds: (string | undefined)[] | undefined = []
+    let lastResumePayloadId: string | undefined
 
     const listener = (payload: T[K]) => {
       if (pendingPayloads) {
@@ -123,15 +124,13 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
         return
       }
 
-      if (resumePayloadIds) {
-        const payloadId = getEventMeta(payload)?.id
-        for (const resumePayloadId of resumePayloadIds) {
-          if (payloadId === resumePayloadId) { // duplicate happen
-            return
-          }
-        }
-
-        resumePayloadIds = undefined
+      const payloadId = getEventMeta(payload)?.id
+      if (
+        payloadId !== undefined // if resume is enabled payloadId will be defined
+        && lastResumePayloadId !== undefined // when resume happen
+        && compareRedisStreamIds(payloadId, lastResumePayloadId) <= 0 // when duplicate happen
+      ) {
+        return
       }
 
       originalListener(payload)
@@ -194,15 +193,11 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
 
           if (results && results[0]) {
             const [_, items] = results[0] as any
-            const firstPendingId = getEventMeta(pendingPayloads[0])?.id
-            for (const [id, fields] of items) {
-              if (id === firstPendingId) { // duplicate happen
-                break
-              }
 
+            for (const [id, fields] of items) {
               const serialized = fields[1]! // field value is at index 1 (index 0 is field name 'data')
               const payload = this.deserializePayload(id, serialized)
-              resumePayloadIds.push(id)
+              lastResumePayloadId = id
               originalListener(payload)
             }
           }

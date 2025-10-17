@@ -46,10 +46,9 @@ describe('ioredis publisher', () => {
     await publisher.publish('event1', payload1)
     await publisher.publish('event3', payload2)
 
-    // Wait for messages to be received
-    await new Promise(resolve => setTimeout(resolve, 100))
-
-    expect(listener1).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => {
+      expect(listener1).toHaveBeenCalledTimes(1)
+    })
     expect(listener1.mock.calls[0]![0]).toEqual(payload1)
     expect(listener2).toHaveBeenCalledTimes(0)
 
@@ -58,19 +57,18 @@ describe('ioredis publisher', () => {
     await publisher.publish('event1', payload2)
     await publisher.publish('event2', payload2)
 
-    // Wait for messages to be received
-    await new Promise(resolve => setTimeout(resolve, 100))
-
-    expect(listener1).toHaveBeenCalledTimes(1)
-    expect(listener2).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => {
+      expect(listener2).toHaveBeenCalledTimes(1)
+    })
     expect(listener2.mock.calls[0]![0]).toEqual(payload2)
+    expect(listener1).toHaveBeenCalledTimes(1)
 
     await unsub2()
 
     const unsub11 = await publisher.subscribe('event1', listener1, { lastEventId: '0' })
 
     // Wait a bit to ensure no resume happens
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await new Promise(resolve => setTimeout(resolve, 1000))
 
     expect(listener1).toHaveBeenCalledTimes(1) // resume not happens
     await unsub11()
@@ -90,10 +88,9 @@ describe('ioredis publisher', () => {
       const payload1 = { order: 1 }
       await publisher.publish('event1', payload1)
 
-      // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      expect(listener1).toHaveBeenCalledTimes(1)
+      await vi.waitFor(() => {
+        expect(listener1).toHaveBeenCalledTimes(1)
+      })
       expect(listener1).toHaveBeenCalledWith(expect.objectContaining(payload1))
 
       await unsub1()
@@ -118,10 +115,9 @@ describe('ioredis publisher', () => {
       await publisher.publish('event1', payload1)
       await publisher.publish('event3', payload2)
 
-      // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      expect(listener1).toHaveBeenCalledTimes(1)
+      await vi.waitFor(() => {
+        expect(listener1).toHaveBeenCalledTimes(1)
+      })
       expect(listener1).toHaveBeenCalledWith(expect.objectContaining(payload1))
       expect(listener2).toHaveBeenCalledTimes(0)
 
@@ -130,22 +126,20 @@ describe('ioredis publisher', () => {
       await publisher.publish('event1', payload2)
       await publisher.publish('event2', payload2)
 
-      // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      expect(listener1).toHaveBeenCalledTimes(1)
-      expect(listener2).toHaveBeenCalledTimes(1)
+      await vi.waitFor(() => {
+        expect(listener2).toHaveBeenCalledTimes(1)
+      })
       expect(listener2).toHaveBeenCalledWith(expect.objectContaining(payload2))
+      expect(listener1).toHaveBeenCalledTimes(1)
 
       await unsub2()
 
       const listener3 = vi.fn()
       const unsub3 = await publisher.subscribe('event1', listener3, { lastEventId: '0' })
 
-      // Wait for resume to complete
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      expect(listener3).toHaveBeenCalledTimes(2) // resume happens
+      await vi.waitFor(() => {
+        expect(listener3).toHaveBeenCalledTimes(2)
+      })
       expect(listener3).toHaveBeenNthCalledWith(1, expect.objectContaining(payload1))
       expect(listener3).toHaveBeenNthCalledWith(2, expect.objectContaining(payload2))
 
@@ -169,10 +163,9 @@ describe('ioredis publisher', () => {
       await publisher.publish('event1', payload1)
       await publisher.publish('event1', payload2)
 
-      // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      expect(listener1).toHaveBeenCalledTimes(2)
+      await vi.waitFor(() => {
+        expect(listener1).toHaveBeenCalledTimes(2)
+      })
       expect(listener1).toHaveBeenNthCalledWith(1, expect.toSatisfy((p) => {
         expect(p).not.toBe(payload1)
         expect(p).toEqual(payload1)
@@ -196,10 +189,9 @@ describe('ioredis publisher', () => {
       const listener2 = vi.fn()
       const unsub2 = await publisher.subscribe('event1', listener2, { lastEventId: firstEventId })
 
-      // Wait for resume to complete
-      await new Promise(resolve => setTimeout(resolve, 150))
-
-      expect(listener2).toHaveBeenCalledTimes(1) // only second event
+      await vi.waitFor(() => {
+        expect(listener2).toHaveBeenCalledTimes(1) // resume
+      })
       expect(listener2).toHaveBeenNthCalledWith(1, expect.toSatisfy((p) => {
         expect(p).not.toBe(payload2)
         expect(p).toEqual(payload2)
@@ -229,10 +221,9 @@ describe('ioredis publisher', () => {
         await publisher.publish('event', { order: i })
       }
 
-      // Wait for all events to be received
-      await new Promise(resolve => setTimeout(resolve, 200))
-
-      expect(listener1).toHaveBeenCalledTimes(10)
+      await vi.waitFor(() => {
+        expect(listener1).toHaveBeenCalledTimes(10)
+      })
 
       // Get the ID of the 5th event
       const fifthEventId = getEventMeta(listener1.mock.calls[4]![0])?.id
@@ -249,10 +240,9 @@ describe('ioredis publisher', () => {
       const unsub2 = await publisher.subscribe('event', listener2, { lastEventId: fifthEventId })
 
       // Wait for resume to complete
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      // Should have received events 6-10 (5 events)
-      expect(listener2).toHaveBeenCalledTimes(5)
+      await vi.waitFor(() => {
+        expect(listener2).toHaveBeenCalledTimes(5)
+      })
       expect(listener2).toHaveBeenNthCalledWith(1, expect.objectContaining({ order: 6 }))
       expect(listener2).toHaveBeenNthCalledWith(2, expect.objectContaining({ order: 7 }))
       expect(listener2).toHaveBeenNthCalledWith(5, expect.objectContaining({ order: 10 }))
@@ -265,7 +255,7 @@ describe('ioredis publisher', () => {
       }
 
       await unsub2()
-    }, 10000) // Increase timeout to 10 seconds
+    })
 
     it('handles multiple subscribers on same event', async () => {
       publisher = new IORedisPublisher({
@@ -285,12 +275,11 @@ describe('ioredis publisher', () => {
       const payload = { order: 1 }
       await publisher.publish('event1', payload)
 
-      // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      expect(listener1).toHaveBeenCalledTimes(1)
-      expect(listener2).toHaveBeenCalledTimes(1)
-      expect(listener3).toHaveBeenCalledTimes(1)
+      await vi.waitFor(() => {
+        expect(listener1).toHaveBeenCalledTimes(1)
+        expect(listener2).toHaveBeenCalledTimes(1)
+        expect(listener3).toHaveBeenCalledTimes(1)
+      })
 
       expect(listener1).toHaveBeenCalledWith(expect.objectContaining(payload))
       expect(listener2).toHaveBeenCalledWith(expect.objectContaining(payload))
@@ -317,10 +306,9 @@ describe('ioredis publisher', () => {
       const payload = { order: 1 }
       await publisher.publish('event1', payload)
 
-      // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      expect(listener1).toHaveBeenCalledTimes(1)
+      await vi.waitFor(() => {
+        expect(listener1).toHaveBeenCalledTimes(1)
+      })
       expect(listener1).toHaveBeenCalledWith(expect.objectContaining(payload))
 
       // Verify the key uses custom prefix
@@ -368,10 +356,9 @@ describe('ioredis publisher', () => {
 
       await publisher.publish('event1', payload)
 
-      // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      expect(listener1).toHaveBeenCalledTimes(1)
+      await vi.waitFor(() => {
+        expect(listener1).toHaveBeenCalledTimes(1)
+      })
       const received = listener1.mock.calls[0]![0]
       expect(received.order).toBe(1)
       expect(received.nested.value).toBe('test')
@@ -397,11 +384,12 @@ describe('ioredis publisher', () => {
       // Publish an event
       await publisher.publish('event1', { order: 1 })
 
-      // Wait for message to be received (should still work despite resume error)
-      await new Promise(resolve => setTimeout(resolve, 200))
+      await new Promise(resolve => setTimeout(resolve, 1000)) // wait until resume is finished
 
-      // Should have received the new event even though resume failed
-      expect(listener1).toHaveBeenCalledTimes(1)
+      await vi.waitFor(() => {
+        // Should have received the new event even though resume failed
+        expect(listener1).toHaveBeenCalledTimes(1)
+      })
       expect(listener1).toHaveBeenCalledWith(expect.objectContaining({ order: 1 }))
 
       await unsub1()
@@ -416,7 +404,7 @@ describe('ioredis publisher', () => {
       })
 
       await publisher.publish('event1', { order: 1 })
-      await new Promise(resolve => setTimeout(resolve, 150)) // wait for publish to finish
+      await new Promise(resolve => setTimeout(resolve, 150)) // wait a bit
       await publisher.publish('event1', { order: 2 })
 
       publisher.publish('event1', { order: 3 })
@@ -427,10 +415,9 @@ describe('ioredis publisher', () => {
       await publisher.publish('event1', { order: 5 })
       await publisher.publish('event1', { order: 6 })
 
-      // Wait for publish to finish
-      await new Promise(resolve => setTimeout(resolve, 150))
-
-      expect(listener1).toHaveBeenCalledTimes(6) // no duplicates
+      await vi.waitFor(() => {
+        expect(listener1).toHaveBeenCalledTimes(6) // no duplicates
+      })
       expect(listener1).toHaveBeenNthCalledWith(1, expect.objectContaining({ order: 1 }))
       expect(listener1).toHaveBeenNthCalledWith(2, expect.objectContaining({ order: 2 }))
       expect(listener1).toHaveBeenNthCalledWith(3, expect.objectContaining({ order: 3 }))
@@ -455,13 +442,14 @@ describe('ioredis publisher', () => {
         const key1 = 'cleanup:test:event1'
 
         // Publish events to event1
-        await publisher.publish('event1', { order: 1 })
-        await publisher.publish('event1', { order: 2 })
-        await publisher.publish('event1', { order: 3 })
+        await Promise.all([
+          publisher.publish('event1', { order: 1 }),
+          publisher.publish('event1', { order: 2 }),
+          publisher.publish('event1', { order: 3 }),
+        ])
 
         const beforeCleanup = await commander.xread('STREAMS', key1, '0')
-
-        expect(beforeCleanup![0]![1].length).toBe(3) // 3 events for event1
+        expect(beforeCleanup![0]![1].length).toBe(3)
 
         // Wait for retention to expire
         await new Promise(resolve => setTimeout(resolve, 1100))
@@ -469,11 +457,8 @@ describe('ioredis publisher', () => {
         // Trigger cleanup by publishing a new event to event1
         await publisher.publish('event1', { order: 4 })
 
-        // Verify cleanup happened using xread - old events should be trimmed
         const afterCleanup = await commander.xread('STREAMS', key1, '0')
-
-        // event1 should only have the new event (order: 4), old ones trimmed
-        expect(afterCleanup![0]![1].length).toBe(1)
+        expect(afterCleanup![0]![1].length).toBe(1) // old events should be trimmed
       })
 
       it('verifies Redis auto-expires keys after retention period * 2', async () => {
@@ -558,7 +543,7 @@ describe('ioredis publisher', () => {
       await commander.publish('orpc:publisher:event1', 'invalid message')
 
       // Wait for message to be received
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise(resolve => setTimeout(resolve, 1000))
 
       await unsub1()
     })

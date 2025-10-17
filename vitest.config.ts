@@ -20,14 +20,15 @@ export default defineConfig(({ mode }) => ({
       {
         test: {
           globals: true,
-          setupFiles: ['./vitest.javascript.ts'],
-          include: ['./packages/publisher/src/adapters/**/*.test.ts'],
+          testTimeout: 20000,
           pool: 'threads',
           poolOptions: {
             threads: {
-              singleThread: true,
+              singleThread: true, // disable fileParallelism
             },
           },
+          setupFiles: ['./vitest.javascript.ts'],
+          include: ['./packages/publisher/src/adapters/**/*.test.ts'],
         },
       },
       {

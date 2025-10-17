@@ -2,7 +2,7 @@ import { getEventMeta, withEventMeta } from '@orpc/standard-server'
 import { Redis } from '@upstash/redis'
 import { UpstashRedisPublisher } from './upstash-redis'
 
-describe('upstash redis publisher', { concurrent: false }, () => {
+describe('upstash redis publisher', () => {
   const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL
   const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
 
@@ -43,10 +43,9 @@ describe('upstash redis publisher', { concurrent: false }, () => {
     await publisher.publish('event1', payload1)
     await publisher.publish('event3', payload2)
 
-    // Wait for messages to be received
-    await new Promise(resolve => setTimeout(resolve, 150))
-
-    expect(listener1).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => {
+      expect(listener1).toHaveBeenCalledTimes(1)
+    })
     expect(listener1.mock.calls[0]![0]).toEqual(payload1)
     expect(listener2).toHaveBeenCalledTimes(0)
 
@@ -55,19 +54,18 @@ describe('upstash redis publisher', { concurrent: false }, () => {
     await publisher.publish('event1', payload2)
     await publisher.publish('event2', payload2)
 
-    // Wait for messages to be received
-    await new Promise(resolve => setTimeout(resolve, 150))
-
-    expect(listener1).toHaveBeenCalledTimes(1)
-    expect(listener2).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => {
+      expect(listener2).toHaveBeenCalledTimes(1)
+    })
     expect(listener2.mock.calls[0]![0]).toEqual(payload2)
+    expect(listener1).toHaveBeenCalledTimes(1)
 
     await unsub2()
 
     const unsub11 = await publisher.subscribe('event1', listener1, { lastEventId: '0' })
 
     // Wait a bit to ensure no resume happens
-    await new Promise(resolve => setTimeout(resolve, 150))
+    await new Promise(resolve => setTimeout(resolve, 1000))
 
     expect(listener1).toHaveBeenCalledTimes(1) // resume not happens
     await unsub11()
@@ -85,10 +83,9 @@ describe('upstash redis publisher', { concurrent: false }, () => {
       const payload1 = { order: 1 }
       await publisher.publish('event1', payload1)
 
-      // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 150))
-
-      expect(listener1).toHaveBeenCalledTimes(1)
+      await vi.waitFor(() => {
+        expect(listener1).toHaveBeenCalledTimes(1)
+      })
       expect(listener1).toHaveBeenCalledWith(expect.objectContaining(payload1))
 
       await unsub1()
@@ -111,10 +108,9 @@ describe('upstash redis publisher', { concurrent: false }, () => {
       await publisher.publish('event1', payload1)
       await publisher.publish('event3', payload2)
 
-      // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 150))
-
-      expect(listener1).toHaveBeenCalledTimes(1)
+      await vi.waitFor(() => {
+        expect(listener1).toHaveBeenCalledTimes(1)
+      })
       expect(listener1).toHaveBeenCalledWith(expect.objectContaining(payload1))
       expect(listener2).toHaveBeenCalledTimes(0)
 
@@ -123,11 +119,10 @@ describe('upstash redis publisher', { concurrent: false }, () => {
       await publisher.publish('event1', payload2)
       await publisher.publish('event2', payload2)
 
-      // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 150))
-
+      await vi.waitFor(() => {
+        expect(listener2).toHaveBeenCalledTimes(1)
+      })
       expect(listener1).toHaveBeenCalledTimes(1)
-      expect(listener2).toHaveBeenCalledTimes(1)
       expect(listener2).toHaveBeenCalledWith(expect.objectContaining(payload2))
 
       await unsub2()
@@ -135,10 +130,9 @@ describe('upstash redis publisher', { concurrent: false }, () => {
       const listener3 = vi.fn()
       const unsub3 = await publisher.subscribe('event1', listener3, { lastEventId: '0' })
 
-      // Wait for resume to complete
-      await new Promise(resolve => setTimeout(resolve, 150))
-
-      expect(listener3).toHaveBeenCalledTimes(2) // resume happens
+      await vi.waitFor(() => {
+        expect(listener3).toHaveBeenCalledTimes(2) // resume happens
+      })
       expect(listener3).toHaveBeenNthCalledWith(1, expect.objectContaining(payload1))
       expect(listener3).toHaveBeenNthCalledWith(2, expect.objectContaining(payload2))
 
@@ -159,10 +153,9 @@ describe('upstash redis publisher', { concurrent: false }, () => {
       await publisher.publish('event1', payload1)
       await publisher.publish('event1', payload2)
 
-      // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 150))
-
-      expect(listener1).toHaveBeenCalledTimes(2)
+      await vi.waitFor(() => {
+        expect(listener1).toHaveBeenCalledTimes(2)
+      })
       expect(listener1).toHaveBeenNthCalledWith(1, expect.toSatisfy((p) => {
         expect(p).not.toBe(payload1)
         expect(p).toEqual(payload1)
@@ -186,10 +179,9 @@ describe('upstash redis publisher', { concurrent: false }, () => {
       const listener2 = vi.fn()
       const unsub2 = await publisher.subscribe('event1', listener2, { lastEventId: firstEventId })
 
-      // Wait for resume to complete
-      await new Promise(resolve => setTimeout(resolve, 150))
-
-      expect(listener2).toHaveBeenCalledTimes(1) // only second event
+      await vi.waitFor(() => {
+        expect(listener2).toHaveBeenCalledTimes(1) // only second event
+      })
       expect(listener2).toHaveBeenNthCalledWith(1, expect.toSatisfy((p) => {
         expect(p).not.toBe(payload2)
         expect(p).toEqual(payload2)
@@ -205,7 +197,7 @@ describe('upstash redis publisher', { concurrent: false }, () => {
 
     it('resume event.id > lastEventId and in order', async () => {
       publisher = new UpstashRedisPublisher(redis, {
-        resumeRetentionSeconds: 10,
+        resumeRetentionSeconds: 60,
       })
 
       const listener1 = vi.fn()
@@ -215,12 +207,10 @@ describe('upstash redis publisher', { concurrent: false }, () => {
         await publisher.publish('event', { order: i })
       }
 
-      // Wait for all events to be received
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await vi.waitFor(() => {
+        expect(listener1).toHaveBeenCalledTimes(10)
+      })
 
-      expect(listener1).toHaveBeenCalledTimes(10)
-
-      // Get the ID of the 5th event
       const fifthEventId = getEventMeta(listener1.mock.calls[4]![0])?.id
 
       if (!fifthEventId) {
@@ -229,16 +219,12 @@ describe('upstash redis publisher', { concurrent: false }, () => {
 
       await unsub1()
 
-      // Now subscribe with lastEventId set to the 5th event
-      // Should receive events 6-10
       const listener2 = vi.fn()
       const unsub2 = await publisher.subscribe('event', listener2, { lastEventId: fifthEventId })
 
-      // Wait for resume to complete
-      await new Promise(resolve => setTimeout(resolve, 150))
-
-      // Should have received events 6-10 (5 events)
-      expect(listener2).toHaveBeenCalledTimes(5)
+      await vi.waitFor(() => {
+        expect(listener2).toHaveBeenCalledTimes(5)
+      })
       expect(listener2).toHaveBeenNthCalledWith(1, expect.objectContaining({ order: 6 }))
       expect(listener2).toHaveBeenNthCalledWith(2, expect.objectContaining({ order: 7 }))
       expect(listener2).toHaveBeenNthCalledWith(5, expect.objectContaining({ order: 10 }))
@@ -269,12 +255,11 @@ describe('upstash redis publisher', { concurrent: false }, () => {
       const payload = { order: 1 }
       await publisher.publish('event1', payload)
 
-      // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 150))
-
-      expect(listener1).toHaveBeenCalledTimes(1)
-      expect(listener2).toHaveBeenCalledTimes(1)
-      expect(listener3).toHaveBeenCalledTimes(1)
+      await vi.waitFor(() => {
+        expect(listener1).toHaveBeenCalledTimes(1)
+        expect(listener2).toHaveBeenCalledTimes(1)
+        expect(listener3).toHaveBeenCalledTimes(1)
+      })
 
       expect(listener1).toHaveBeenCalledWith(expect.objectContaining(payload))
       expect(listener2).toHaveBeenCalledWith(expect.objectContaining(payload))
@@ -297,10 +282,9 @@ describe('upstash redis publisher', { concurrent: false }, () => {
       const payload = { order: 1 }
       await publisher.publish('event1', payload)
 
-      // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 150))
-
-      expect(listener1).toHaveBeenCalledTimes(1)
+      await vi.waitFor(() => {
+        expect(listener1).toHaveBeenCalledTimes(1)
+      })
       expect(listener1).toHaveBeenCalledWith(expect.objectContaining(payload))
 
       // Verify the key uses custom prefix
@@ -346,10 +330,9 @@ describe('upstash redis publisher', { concurrent: false }, () => {
 
       await publisher.publish('event1', payload)
 
-      // Wait for messages to be received
-      await new Promise(resolve => setTimeout(resolve, 150))
-
-      expect(listener1).toHaveBeenCalledTimes(1)
+      await vi.waitFor(() => {
+        expect(listener1).toHaveBeenCalledTimes(1)
+      })
       const received = listener1.mock.calls[0]![0]
       expect(received.order).toBe(1)
       expect(received.nested.value).toBe('test')
@@ -373,11 +356,11 @@ describe('upstash redis publisher', { concurrent: false }, () => {
       // Publish an event
       await publisher.publish('event1', { order: 1 })
 
-      // Wait for message to be received (should still work despite resume error)
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise(resolve => setTimeout(resolve, 1000)) // wait until resume is finished
 
-      // Should have received the new event even though resume failed
-      expect(listener1).toHaveBeenCalledTimes(1)
+      await vi.waitFor(() => {
+        expect(listener1).toHaveBeenCalledTimes(1)
+      })
       expect(listener1).toHaveBeenCalledWith(expect.objectContaining({ order: 1 }))
 
       await unsub1()
@@ -389,7 +372,7 @@ describe('upstash redis publisher', { concurrent: false }, () => {
       })
 
       await publisher.publish('event1', { order: 1 })
-      await new Promise(resolve => setTimeout(resolve, 150)) // wait for publish to finish
+      await new Promise(resolve => setTimeout(resolve, 150)) // wait a bit
       await publisher.publish('event1', { order: 2 })
 
       publisher.publish('event1', { order: 3 })
@@ -400,10 +383,9 @@ describe('upstash redis publisher', { concurrent: false }, () => {
       await publisher.publish('event1', { order: 5 })
       await publisher.publish('event1', { order: 6 })
 
-      // Wait for publish to finish
-      await new Promise(resolve => setTimeout(resolve, 150))
-
-      expect(listener1).toHaveBeenCalledTimes(6) // no duplicates
+      await vi.waitFor(() => {
+        expect(listener1).toHaveBeenCalledTimes(6) // no duplicates
+      })
       expect(listener1).toHaveBeenNthCalledWith(1, expect.objectContaining({ order: 1 }))
       expect(listener1).toHaveBeenNthCalledWith(2, expect.objectContaining({ order: 2 }))
       expect(listener1).toHaveBeenNthCalledWith(3, expect.objectContaining({ order: 3 }))
@@ -426,13 +408,13 @@ describe('upstash redis publisher', { concurrent: false }, () => {
         const key1 = 'cleanup:test:event1'
 
         // Publish events to event1
-        await publisher.publish('event1', { order: 1 })
-        await publisher.publish('event1', { order: 2 })
-        await publisher.publish('event1', { order: 3 })
+        await Promise.all([
+          publisher.publish('event1', { order: 1 }),
+          publisher.publish('event1', { order: 2 }),
+          publisher.publish('event1', { order: 3 }),
+        ])
 
-        // Verify events are stored using xread
         const beforeCleanup = await redis.xread(key1, '0') as any
-
         expect(beforeCleanup[0][1].length).toBe(3) // 3 events for event1
 
         // Wait for retention to expire
@@ -441,11 +423,8 @@ describe('upstash redis publisher', { concurrent: false }, () => {
         // Trigger cleanup by publishing a new event to event1
         await publisher.publish('event1', { order: 4 })
 
-        // Verify cleanup happened using xread - old events should be trimmed
         const afterCleanup = await redis.xread(key1, '0') as any
-
-        // event1 should only have the new event (order: 4), old ones trimmed
-        expect(afterCleanup[0][1].length).toBe(1)
+        expect(afterCleanup[0][1].length).toBe(1) // old events should be trimmed
       })
 
       it('verifies Redis auto-expires keys after retention period * 2', async () => {
@@ -521,8 +500,7 @@ describe('upstash redis publisher', { concurrent: false }, () => {
 
       await redis.publish('orpc:publisher:event1', 'invalid message')
 
-      // Wait for message to be received
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise(resolve => setTimeout(resolve, 1000)) // ensure message received
 
       await unsub1()
     })
