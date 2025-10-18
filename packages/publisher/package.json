@@ -1,7 +1,7 @@
 {
   "name": "@orpc/experimental-publisher",
   "type": "module",
-  "version": "1.9.3",
+  "version": "0.0.0",
   "license": "MIT",
   "homepage": "https://orpc.unnoq.com",
   "repository": {
