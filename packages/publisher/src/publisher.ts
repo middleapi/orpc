@@ -73,6 +73,11 @@ export abstract class Publisher<T extends Record<string, object>> {
    * ```ts
    * const unsubscribe = publisher.subscribe('event', (payload) => {
    *   console.log(payload)
+   * }, {
+   *   lastEventId,
+   *   onError: (error) => {
+   *     // handle error (consider unsubscribe if error can't be recovered)
+   *   }
    * })
    *
    * // Later
@@ -86,7 +91,7 @@ export abstract class Publisher<T extends Record<string, object>> {
    *
    * @example
    * ```ts
-   * for await (const payload of publisher.subscribe('event', { signal })) {
+   * for await (const payload of publisher.subscribe('event', { signal, lastEventId })) {
    *   console.log(payload)
    * }
    * ```
