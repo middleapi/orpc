@@ -470,6 +470,30 @@ describe.concurrent('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL |
     await unsub1()
   })
 
+  it('subscribe should throw & on connection error', async () => {
+    const invalidRedis = new Redis({
+      url: 'http://invalid:6379',
+      token: 'invalid',
+    })
+
+    const publisher = createTestingPublisher({}, invalidRedis)
+
+    const listener1 = vi.fn()
+    const onError1 = vi.fn()
+    const listener2 = vi.fn()
+    const onError2 = vi.fn()
+
+    await Promise.all([ // race condition
+      expect(publisher.subscribe('event1', listener1, { onError: onError1 })).rejects.toThrow(),
+      expect(publisher.subscribe('event1', listener1, { onError: onError1 })).rejects.toThrow(),
+      expect(publisher.subscribe('event2', listener2, { onError: onError2 })).rejects.toThrow(),
+    ])
+    expect(listener1).toHaveBeenCalledTimes(0)
+    expect(listener2).toHaveBeenCalledTimes(0)
+    expect(onError1).toHaveBeenCalledTimes(0) // error happen before register listener
+    expect(onError2).toHaveBeenCalledTimes(0) // error happen before register listener
+  })
+
   describe('edge cases', () => {
     it('only subscribe to redis-listener when needed', async () => {
       // use dedicated redis instance
@@ -501,21 +525,6 @@ describe.concurrent('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL |
       expect(unsubscribeSpys.length).toBe(1) // ensure only subscribe once
     })
 
-    it('subscribe should throw & on connection error', async () => {
-      const invalidRedis = new Redis({
-        url: 'http://invalid:6379',
-        token: 'invalid',
-      })
-
-      const publisher = createTestingPublisher({}, invalidRedis)
-
-      const listener1 = vi.fn()
-      const onError = vi.fn()
-      await expect(publisher.subscribe('event1', listener1, { onError })).rejects.toThrow()
-      expect(listener1).toHaveBeenCalledTimes(0)
-      expect(onError).toHaveBeenCalledTimes(1)
-    })
-
     it('gracefully handles invalid subscription message', async () => {
       const prefix = `invalid:${crypto.randomUUID()}:`
       const publisher = createTestingPublisher({
@@ -526,14 +535,22 @@ describe.concurrent('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL |
       const onError = vi.fn()
       const unsub1 = await publisher.subscribe('event1', listener1, { onError })
 
+      // use two onError to ensure redis-onError handle correctly to populate to all onError
+      const listener2 = vi.fn()
+      const onError2 = vi.fn()
+      const unsub2 = await publisher.subscribe('event1', listener2, { onError: onError2 })
+
       await redis.publish(`${prefix}event1`, 'invalid message')
 
       await vi.waitFor(() => {
         expect(onError).toHaveBeenCalledTimes(1)
+        expect(onError2).toHaveBeenCalledTimes(1)
       })
       expect(listener1).toHaveBeenCalledTimes(0)
+      expect(listener2).toHaveBeenCalledTimes(0)
 
       await unsub1()
+      await unsub2()
     })
   })
 })

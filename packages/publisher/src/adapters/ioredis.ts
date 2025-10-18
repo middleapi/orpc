@@ -52,8 +52,12 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
   protected readonly serializer: StandardRPCJsonSerializer
   protected readonly retentionSeconds: number
   protected readonly listenerPromiseMap = new Map<string, Promise<any>>()
-  protected readonly listenersMap = new Map<string, Set<(payload: any) => void>>()
-  protected redisListener: ((channel: string, message: string) => void) | undefined
+  protected readonly listenersMap = new Map<string, ((payload: any) => void)[]>()
+  protected readonly onErrorsMap = new Map<string, ((error: ThrowableError) => void)[]>()
+  protected redisListenerAndOnError: undefined | {
+    listener: (channel: string, message: string) => void
+    onError: (error: ThrowableError) => void
+  }
 
   protected get isResumeEnabled(): boolean {
     return Number.isFinite(this.retentionSeconds) && this.retentionSeconds > 0
@@ -73,10 +77,13 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
    *
    */
   get size(): number {
-    /* v8 ignore next 5 */
-    let size = this.redisListener ? 1 : 0
+    /* v8 ignore next 8 */
+    let size = this.redisListenerAndOnError ? 1 : 0
     for (const listeners of this.listenersMap) {
-      size += listeners[1].size || 1 // empty set should never happen so we treat it as a single event
+      size += listeners[1].length || 1 // empty array should never happen so we treat it as a single event
+    }
+    for (const onErrors of this.onErrorsMap) {
+      size += onErrors[1].length || 1 // empty array should never happen so we treat it as a single event
     }
     return size
   }
@@ -138,11 +145,13 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
     await this.commander.publish(key, stringifyJSON({ ...serialized, id }))
   }
 
-  protected override async subscribeListener<K extends keyof T & string>(event: K, originalListener: (payload: T[K]) => void, options?: PublisherSubscribeListenerOptions): Promise<() => Promise<void>> {
+  protected override async subscribeListener<K extends keyof T & string>(
+    event: K,
+    originalListener: (payload: T[K]) => void,
+    { lastEventId, onError }: PublisherSubscribeListenerOptions = {},
+  ): Promise<() => Promise<void>> {
     const key = this.prefixKey(event)
 
-    const lastEventId = options?.lastEventId
-    const onError = options?.onError
     let pendingPayloads: T[K][] | undefined = []
     const resumePayloadIds = new Set<string>()
 
@@ -163,8 +172,16 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
       originalListener(payload)
     }
 
-    if (!this.redisListener) {
-      this.redisListener = (channel: string, message: string) => {
+    if (!this.redisListenerAndOnError) {
+      const redisOnError = (error: ThrowableError) => {
+        for (const [_, onErrors] of this.onErrorsMap) {
+          for (const onError of onErrors) {
+            onError(error)
+          }
+        }
+      }
+
+      const redisListener = (channel: string, message: string) => {
         try {
           const listeners = this.listenersMap.get(channel)
 
@@ -179,11 +196,19 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
         }
         catch (error) {
           // error can happen when message is invalid
-          onError?.(error as ThrowableError)
+          const onErrors = this.onErrorsMap.get(channel)
+          if (onErrors) {
+            for (const onError of onErrors) {
+              onError(error as ThrowableError)
+            }
+          }
         }
       }
 
-      this.listener.on('message', this.redisListener)
+      this.redisListenerAndOnError = { listener: redisListener, onError: redisOnError }
+
+      this.listener.on('message', redisListener)
+      this.listener.on('error', redisOnError)
     }
 
     // avoid race condition when multiple listeners subscribe to the same channel on first time
@@ -195,19 +220,29 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
         const promise = this.listener.subscribe(key)
         this.listenerPromiseMap.set(key, promise)
         await promise
-        this.listenersMap.set(key, listeners = new Set()) // only set after subscribe successfully
+        this.listenersMap.set(key, listeners = []) // only set after subscribe successfully
       }
       finally {
         this.listenerPromiseMap.delete(key)
 
         if (this.listenersMap.size === 0) { // error happen + no listener
-          this.listener.off('message', this.redisListener)
-          this.redisListener = undefined
+          this.listener.off('message', this.redisListenerAndOnError.listener)
+          this.listener.off('error', this.redisListenerAndOnError.onError)
+          this.redisListenerAndOnError = undefined
         }
       }
     }
 
-    listeners.add(listener)
+    listeners.push(listener)
+
+    if (onError) { // add onError after subscribe success
+      let onErrors = this.onErrorsMap.get(key)
+      if (!onErrors) {
+        this.onErrorsMap.set(key, onErrors = [])
+      }
+
+      onErrors.push(onError)
+    }
 
     void (async () => {
       try {
@@ -240,24 +275,25 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
       }
     })()
 
-    // listen error after async to avoid throw -> can't off
-    if (onError) {
-      this.listener.on('error', onError)
-    }
-
     return async () => {
-      listeners.delete(listener)
+      listeners.splice(listeners.indexOf(listener), 1)
 
       if (onError) {
-        this.listener.off('error', onError)
+        const onErrors = this.onErrorsMap.get(key)
+        if (onErrors) {
+          onErrors.splice(onErrors.indexOf(onError), 1)
+        }
       }
 
-      if (listeners.size === 0) {
-        this.listenersMap.delete(key) // should execute before async to avoid race condition
+      if (listeners.length === 0) { // onErrors always has lower length than listeners
+        // should execute before async to avoid race condition
+        this.listenersMap.delete(key)
+        this.onErrorsMap.delete(key)
 
-        if (this.redisListener && this.listenersMap.size === 0) {
-          this.listener.off('message', this.redisListener)
-          this.redisListener = undefined
+        if (this.redisListenerAndOnError && this.listenersMap.size === 0) {
+          this.listener.off('message', this.redisListenerAndOnError.listener)
+          this.listener.off('error', this.redisListenerAndOnError.onError)
+          this.redisListenerAndOnError = undefined
         }
 
         await this.listener.unsubscribe(key)

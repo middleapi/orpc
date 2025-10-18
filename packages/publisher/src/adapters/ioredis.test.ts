@@ -487,6 +487,61 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
     await unsub1()
   })
 
+  it('subscribe should throw & on connection error', async () => {
+    const invalidListener = new Redis('redis://invalid', {
+      maxRetriesPerRequest: 0,
+    })
+
+    const publisher = createTestingPublisher({ listener: invalidListener })
+
+    const listener1 = vi.fn()
+    const onError1 = vi.fn()
+    const listener2 = vi.fn()
+    const onError2 = vi.fn()
+
+    await Promise.all([ // race condition
+      expect(publisher.subscribe('event1', listener1, { onError: onError1 })).rejects.toThrow(),
+      expect(publisher.subscribe('event1', listener1, { onError: onError1 })).rejects.toThrow(),
+      expect(publisher.subscribe('event2', listener2, { onError: onError2 })).rejects.toThrow(),
+    ])
+
+    expect(listener1).toHaveBeenCalledTimes(0)
+    expect(listener2).toHaveBeenCalledTimes(0)
+    expect(onError1).toHaveBeenCalledTimes(0) // error happen before register listener
+    expect(onError2).toHaveBeenCalledTimes(0) // error happen before register listener
+  })
+
+  it('onError should trigger on connection error', async ({ onTestFinished }) => {
+    const listener = new Redis(REDIS_URL!, {
+      maxRetriesPerRequest: 0,
+    })
+    onTestFinished(async () => {
+      await listener.quit()
+    })
+
+    const publisher = createTestingPublisher({ listener })
+
+    const listener1 = vi.fn()
+    const onError1 = vi.fn()
+    const listener2 = vi.fn()
+    const onError2 = vi.fn()
+
+    const unsub1 = await publisher.subscribe('event1', listener1, { onError: onError1 })
+    const unsub11 = await publisher.subscribe('event1', listener1, { onError: onError1 })
+    const unsub2 = await publisher.subscribe('event2', listener2, { onError: onError2 })
+
+    ;(listener as any).connector.stream.destroy(new Error('Simulated network failure'))
+
+    await vi.waitFor(() => {
+      expect(onError1).toHaveBeenCalledTimes(2)
+      expect(onError2).toHaveBeenCalledTimes(1)
+    })
+
+    await unsub1()
+    await unsub11()
+    await unsub2()
+  })
+
   describe('edge cases', () => {
     it('handles transaction errors during publish', async () => {
       // Create a mock commander that will fail on multi
@@ -507,7 +562,7 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
       await expect(publisher.publish('event1', { order: 1 })).rejects.toThrow('Transaction failed')
     })
 
-    it('only subscribe to redis-listener when needed', async () => {
+    it('only subscribe to redis-listener when needed', async ({ onTestFinished }) => {
       // use dedicated listener
       const listener = new Redis(REDIS_URL!)
       onTestFinished(async () => {
@@ -517,6 +572,7 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
       const publisher = createTestingPublisher({ listener })
 
       expect(listener.listenerCount('message')).toBe(0)
+      expect(listener.listenerCount('error')).toBe(0)
 
       const listener1 = vi.fn()
       const onError1 = vi.fn()
@@ -529,7 +585,7 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
       const unsub2 = await publisher.subscribe('event1', listener1, { onError: onError2 })
 
       expect(listener.listenerCount('message')).toBe(1) // reuse listener
-      expect(listener.listenerCount('error')).toBe(2) // not reuse error listener
+      expect(listener.listenerCount('error')).toBe(1) // reuse onError
 
       await unsub1()
       expect(listener.listenerCount('message')).toBe(1)
@@ -542,20 +598,6 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
       expect(publisher.size).toBe(0)
     })
 
-    it('subscribe should throw & on connection error', async () => {
-      const invalidListener = new Redis('redis://invalid', {
-        maxRetriesPerRequest: 0,
-      })
-
-      const publisher = createTestingPublisher({ listener: invalidListener })
-
-      const listener1 = vi.fn()
-      const onError = vi.fn()
-      await expect(publisher.subscribe('event1', listener1, { onError })).rejects.toThrow()
-      expect(listener1).toHaveBeenCalledTimes(0)
-      expect(onError).toHaveBeenCalledTimes(0) // error happen before register listener
-    })
-
     it('gracefully handles invalid subscription message', async () => {
       const prefix = `invalid:${crypto.randomUUID()}:`
       const publisher = createTestingPublisher({
@@ -566,13 +608,22 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
       const onError1 = vi.fn()
       const unsub1 = await publisher.subscribe('event1', listener1, { onError: onError1 })
 
+      // use two onError to ensure redis-onError handle correctly to populate to all onError
+      const listener2 = vi.fn()
+      const onError2 = vi.fn()
+      const unsub2 = await publisher.subscribe('event1', listener2, { onError: onError2 })
+
       await commander.publish(`${prefix}event1`, 'invalid message')
 
       await vi.waitFor(() => {
         expect(onError1).toHaveBeenCalledTimes(1)
+        expect(onError2).toHaveBeenCalledTimes(1)
       })
+      expect(listener1).toHaveBeenCalledTimes(0)
+      expect(listener2).toHaveBeenCalledTimes(0)
 
       await unsub1()
+      await unsub2()
     })
   })
 })

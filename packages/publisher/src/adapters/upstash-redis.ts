@@ -35,7 +35,8 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
   protected readonly prefix: string
   protected readonly serializer: StandardRPCJsonSerializer
   protected readonly retentionSeconds: number
-  protected readonly listenersMap = new Map<string, Set<(payload: any) => void>>()
+  protected readonly listenersMap = new Map<string, ((payload: any) => void)[]>()
+  protected readonly onErrorsMap = new Map<string, ((error: ThrowableError) => void)[]>()
   protected readonly subscriptionPromiseMap = new Map<string, Promise<void>>()
   protected readonly subscriptionsMap = new Map<string, any>() // Upstash subscription objects
 
@@ -57,10 +58,13 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
    *
    */
   get size(): number {
-    /* v8 ignore next 5 */
+    /* v8 ignore next 8 */
     let size = 0
     for (const listeners of this.listenersMap) {
-      size += listeners[1].size || 1 // empty set should never happen so we treat it as a single event
+      size += listeners[1].length || 1 // empty array should never happen so we treat it as a single event
+    }
+    for (const onErrors of this.onErrorsMap) {
+      size += onErrors[1].length || 1 // empty array should never happen so we treat it as a single event
     }
     return size
   }
@@ -113,10 +117,13 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
     await this.redis.publish(key, { ...serialized, id })
   }
 
-  protected override async subscribeListener<K extends keyof T & string>(event: K, originalListener: (payload: T[K]) => void, options?: PublisherSubscribeListenerOptions): Promise<() => Promise<void>> {
+  protected override async subscribeListener<K extends keyof T & string>(
+    event: K,
+    originalListener: (payload: T[K]) => void,
+    { lastEventId, onError }: PublisherSubscribeListenerOptions = {},
+  ): Promise<() => Promise<void>> {
     const key = this.prefixKey(event)
 
-    const lastEventId = options?.lastEventId
     let pendingPayloads: T[K][] | undefined = []
     const resumePayloadIds = new Set<string>()
 
@@ -143,6 +150,15 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
     // Get or create subscription for this channel
     let subscription = this.subscriptionsMap.get(key) as ReturnType<typeof this.redis.subscribe> | undefined
     if (!subscription) {
+      const dispatchErrorForKey = (error: ThrowableError) => {
+        const onErrors = this.onErrorsMap.get(key)
+        if (onErrors) {
+          for (const onError of onErrors) {
+            onError(error)
+          }
+        }
+      }
+
       subscription = this.redis.subscribe(key)
       subscription.on('message', (event) => {
         try {
@@ -159,7 +175,7 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
         }
         catch (error) {
           // there error can happen when event.message is invalid
-          options?.onError?.(error as ThrowableError)
+          dispatchErrorForKey(error as ThrowableError)
         }
       })
 
@@ -172,7 +188,7 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
 
       subscription.on('error', (error) => {
         rejectPromise(error)
-        options?.onError?.(error)
+        dispatchErrorForKey(error)
       })
 
       subscription.on('subscribe', () => {
@@ -191,10 +207,18 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
 
     let listeners = this.listenersMap.get(key)
     if (!listeners) {
-      this.listenersMap.set(key, listeners = new Set())
+      this.listenersMap.set(key, listeners = [])
     }
 
-    listeners.add(listener)
+    listeners.push(listener)
+
+    if (onError) {
+      let onErrors = this.onErrorsMap.get(key)
+      if (!onErrors) {
+        this.onErrorsMap.set(key, onErrors = [])
+      }
+      onErrors.push(onError)
+    }
 
     void (async () => {
       try {
@@ -215,7 +239,7 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
       }
       catch (error) {
         // error can happen when result from xread is invalid
-        options?.onError?.(error as ThrowableError)
+        onError?.(error as ThrowableError)
       }
       finally {
         const pending = pendingPayloads
@@ -228,10 +252,19 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
     })()
 
     return async () => {
-      listeners.delete(listener)
+      listeners.splice(listeners.indexOf(listener), 1)
 
-      if (listeners.size === 0) {
+      if (onError) {
+        const onErrors = this.onErrorsMap.get(key)
+        if (onErrors) {
+          onErrors.splice(onErrors.indexOf(onError), 1)
+        }
+      }
+
+      if (listeners.length === 0) { // onErrors always has lower length than listeners
         this.listenersMap.delete(key)
+        this.onErrorsMap.delete(key)
+
         const subscription = this.subscriptionsMap.get(key)
 
         if (subscription) {
