@@ -186,10 +186,6 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
       this.listener.on('message', this.redisListener)
     }
 
-    if (onError) {
-      this.listener.on('error', onError)
-    }
-
     // avoid race condition when multiple listeners subscribe to the same channel on first time
     await this.listenerPromiseMap.get(key)
 
@@ -203,6 +199,11 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
       }
       finally {
         this.listenerPromiseMap.delete(key)
+
+        if (this.listenersMap.size === 0) { // error happen + no listener
+          this.listener.off('message', this.redisListener)
+          this.redisListener = undefined
+        }
       }
     }
 
@@ -238,6 +239,11 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
         }
       }
     })()
+
+    // listen error after async to avoid throw -> can't off
+    if (onError) {
+      this.listener.on('error', onError)
+    }
 
     return async () => {
       listeners.delete(listener)

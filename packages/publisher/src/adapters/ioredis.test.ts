@@ -38,6 +38,10 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
     await commander.quit()
     await listener.quit()
 
+    expect(commander.listenerCount('message')).toEqual(0)
+    expect(commander.listenerCount('error')).toEqual(0)
+    expect(listener.listenerCount('message')).toEqual(0)
+    expect(listener.listenerCount('error')).toEqual(0)
     for (const publisher of createdPublishers) {
       expect(publisher.size).toEqual(0) // ensure cleanup correctly
     }
@@ -549,7 +553,7 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
       const onError = vi.fn()
       await expect(publisher.subscribe('event1', listener1, { onError })).rejects.toThrow()
       expect(listener1).toHaveBeenCalledTimes(0)
-      expect(onError).toHaveBeenCalledTimes(1)
+      expect(onError).toHaveBeenCalledTimes(0) // error happen before register listener
     })
 
     it('gracefully handles invalid subscription message', async () => {
