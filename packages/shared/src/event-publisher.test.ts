@@ -265,5 +265,39 @@ describe('eventPublisher', () => {
 
       await promise
     })
+
+    it('support reuse lister for multiple time', async () => {
+      const listener = vi.fn()
+
+      const unsub1 = pub.subscribe('event', listener)
+      const unsub2 = pub.subscribe('event', listener)
+
+      pub.publish('event', 'payload1')
+      expect(listener).toHaveBeenCalledTimes(2)
+
+      unsub1()
+      pub.publish('event', 'payload2')
+      expect(listener).toHaveBeenCalledTimes(3)
+
+      unsub2()
+    })
+
+    it('safely unsub multiple times', async () => {
+      const listener1 = vi.fn()
+      const listener2 = vi.fn()
+
+      const unsub1 = pub.subscribe('event', listener1)
+      const unsub2 = pub.subscribe('event', listener2)
+
+      unsub1()
+      unsub1()
+      unsub1()
+
+      pub.publish('event', 'payload1')
+      expect(listener1).toHaveBeenCalledTimes(0)
+      expect(listener2).toHaveBeenCalledTimes(1)
+
+      unsub2()
+    })
   })
 })

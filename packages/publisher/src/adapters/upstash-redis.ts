@@ -3,7 +3,7 @@ import type { ThrowableError } from '@orpc/shared'
 import type { Redis } from '@upstash/redis'
 import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
 import { StandardRPCJsonSerializer } from '@orpc/client/standard'
-import { fallback } from '@orpc/shared'
+import { fallback, once } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@orpc/standard-server'
 import { Publisher } from '../publisher'
 
@@ -35,8 +35,8 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
   protected readonly prefix: string
   protected readonly serializer: StandardRPCJsonSerializer
   protected readonly retentionSeconds: number
-  protected readonly listenersMap = new Map<string, ((payload: any) => void)[]>()
-  protected readonly onErrorsMap = new Map<string, ((error: ThrowableError) => void)[]>()
+  protected readonly listenersMap = new Map<string, Array<(payload: any) => void>>()
+  protected readonly onErrorsMap = new Map<string, Array<(error: ThrowableError) => void>>()
   protected readonly subscriptionPromiseMap = new Map<string, Promise<void>>()
   protected readonly subscriptionsMap = new Map<string, any>() // Upstash subscription objects
 
@@ -209,7 +209,6 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
     if (!listeners) {
       this.listenersMap.set(key, listeners = [])
     }
-
     listeners.push(listener)
 
     if (onError) {
@@ -251,7 +250,7 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
       }
     })()
 
-    return async () => {
+    return once(async () => {
       listeners.splice(listeners.indexOf(listener), 1)
 
       if (onError) {
@@ -268,11 +267,13 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
         const subscription = this.subscriptionsMap.get(key)
 
         if (subscription) {
-          this.subscriptionsMap.delete(key) // should execute before async to avoid race condition
+          this.subscriptionsMap.delete(key)
+
+          // should execute all logic before async to avoid race condition problem
           await subscription.unsubscribe()
         }
       }
-    }
+    })
   }
 
   protected prefixKey(key: string): string {

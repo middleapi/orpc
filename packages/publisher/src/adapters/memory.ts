@@ -1,5 +1,5 @@
 import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
-import { compareSequentialIds, EventPublisher, SequentialIdGenerator } from '@orpc/shared'
+import { compareSequentialIds, EventPublisher, once, SequentialIdGenerator } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@orpc/standard-server'
 import { Publisher } from '../publisher'
 
@@ -22,7 +22,7 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
   private readonly eventPublisher = new EventPublisher<T>()
   private readonly idGenerator = new SequentialIdGenerator()
   private readonly retentionSeconds: number
-  private readonly events: Map<keyof T, { expiresAt: number, payload: T[keyof T] }[]> = new Map()
+  private readonly eventsMap: Map<keyof T, Array<{ expiresAt: number, payload: T[keyof T] }>> = new Map()
 
   /**
    * Useful for measuring memory usage.
@@ -32,7 +32,7 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
    */
   get size(): number {
     let size = this.eventPublisher.size
-    for (const events of this.events) {
+    for (const events of this.eventsMap) {
       /* v8 ignore next 1 */
       size += events[1].length || 1 // empty array should never happen so we treat it as a single event
     }
@@ -57,9 +57,9 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
       const now = Date.now()
       const expiresAt = now + this.retentionSeconds * 1000
 
-      let events = this.events.get(event)
+      let events = this.eventsMap.get(event)
       if (!events) {
-        this.events.set(event, events = [])
+        this.eventsMap.set(event, events = [])
       }
 
       payload = withEventMeta(payload, { ...getEventMeta(payload), id: this.idGenerator.generate() })
@@ -71,7 +71,7 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
 
   protected async subscribeListener<K extends keyof T & string>(event: K, listener: (payload: T[K]) => void, options?: PublisherSubscribeListenerOptions): Promise<() => Promise<void>> {
     if (this.isResumeEnabled && typeof options?.lastEventId === 'string') {
-      const events = this.events.get(event)
+      const events = this.eventsMap.get(event)
       if (events) {
         for (const { payload } of events) {
           const id = getEventMeta(payload)?.id
@@ -84,9 +84,9 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
 
     const syncUnsub = this.eventPublisher.subscribe(event, listener)
 
-    return async () => {
+    return once(async () => {
       syncUnsub()
-    }
+    })
   }
 
   protected lastCleanupTime: number | null = null
@@ -103,14 +103,14 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
 
     this.lastCleanupTime = now
 
-    for (const [event, events] of this.events) {
+    for (const [event, events] of this.eventsMap) {
       const validEvents = events.filter(event => event.expiresAt > now)
 
       if (validEvents.length > 0) {
-        this.events.set(event, validEvents)
+        this.eventsMap.set(event, validEvents)
       }
       else {
-        this.events.delete(event)
+        this.eventsMap.delete(event)
       }
     }
   }

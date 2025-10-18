@@ -3,7 +3,7 @@ import type { ThrowableError } from '@orpc/shared'
 import type Redis from 'ioredis'
 import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
 import { StandardRPCJsonSerializer } from '@orpc/client/standard'
-import { fallback, stringifyJSON } from '@orpc/shared'
+import { fallback, once, stringifyJSON } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@orpc/standard-server'
 import { Publisher } from '../publisher'
 
@@ -52,8 +52,8 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
   protected readonly serializer: StandardRPCJsonSerializer
   protected readonly retentionSeconds: number
   protected readonly listenerPromiseMap = new Map<string, Promise<any>>()
-  protected readonly listenersMap = new Map<string, ((payload: any) => void)[]>()
-  protected readonly onErrorsMap = new Map<string, ((error: ThrowableError) => void)[]>()
+  protected readonly listenersMap = new Map<string, Array<(payload: any) => void>>()
+  protected readonly onErrorsMap = new Map<string, Array<(error: ThrowableError) => void>>()
   protected redisListenerAndOnError: undefined | {
     listener: (channel: string, message: string) => void
     onError: (error: ThrowableError) => void
@@ -206,7 +206,6 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
       }
 
       this.redisListenerAndOnError = { listener: redisListener, onError: redisOnError }
-
       this.listener.on('message', redisListener)
       this.listener.on('error', redisOnError)
     }
@@ -232,7 +231,6 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
         }
       }
     }
-
     listeners.push(listener)
 
     if (onError) { // add onError after subscribe success
@@ -240,7 +238,6 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
       if (!onErrors) {
         this.onErrorsMap.set(key, onErrors = [])
       }
-
       onErrors.push(onError)
     }
 
@@ -275,7 +272,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
       }
     })()
 
-    return async () => {
+    return once(async () => {
       listeners.splice(listeners.indexOf(listener), 1)
 
       if (onError) {
@@ -286,7 +283,6 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
       }
 
       if (listeners.length === 0) { // onErrors always has lower length than listeners
-        // should execute before async to avoid race condition
         this.listenersMap.delete(key)
         this.onErrorsMap.delete(key)
 
@@ -296,9 +292,10 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
           this.redisListenerAndOnError = undefined
         }
 
+        // should execute all logic before async to avoid race condition problem
         await this.listener.unsubscribe(key)
       }
-    }
+    })
   }
 
   protected prefixKey(key: string): string {

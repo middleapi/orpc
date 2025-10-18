@@ -1,3 +1,4 @@
+import { once } from './function'
 import { AsyncIteratorClass } from './iterator'
 
 export interface EventPublisherOptions {
@@ -25,7 +26,7 @@ export interface EventPublisherSubscribeIteratorOptions extends EventPublisherOp
 }
 
 export class EventPublisher<T extends Record<PropertyKey, any>> {
-  #listenersMap = new Map<keyof T, Set<(payload: any) => void>>()
+  #listenersMap = new Map<keyof T, Array<(payload: any) => void>>()
   #maxBufferedEvents: number
 
   constructor(options: EventPublisherOptions = {}) {
@@ -86,18 +87,17 @@ export class EventPublisher<T extends Record<PropertyKey, any>> {
       let listeners = this.#listenersMap.get(event)
 
       if (!listeners) {
-        this.#listenersMap.set(event, listeners = new Set())
+        this.#listenersMap.set(event, listeners = [])
       }
+      listeners.push(listenerOrOptions)
 
-      listeners.add(listenerOrOptions)
+      return once(() => {
+        listeners.splice(listeners.indexOf(listenerOrOptions), 1)
 
-      return () => {
-        listeners.delete(listenerOrOptions)
-
-        if (listeners.size === 0) {
+        if (listeners.length === 0) {
           this.#listenersMap.delete(event)
         }
-      }
+      })
     }
 
     const signal = listenerOrOptions?.signal
