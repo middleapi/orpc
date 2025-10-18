@@ -1,5 +1,5 @@
 import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
-import { compareSequentialIds, EventPublisher, once, SequentialIdGenerator } from '@orpc/shared'
+import { compareSequentialIds, EventPublisher, SequentialIdGenerator } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@orpc/standard-server'
 import { Publisher } from '../publisher'
 
@@ -84,9 +84,9 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
 
     const syncUnsub = this.eventPublisher.subscribe(event, listener)
 
-    return once(async () => {
+    return async () => {
       syncUnsub()
-    })
+    }
   }
 
   protected lastCleanupTime: number | null = null

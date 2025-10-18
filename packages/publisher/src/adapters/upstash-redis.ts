@@ -250,7 +250,7 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
       }
     })()
 
-    return once(async () => {
+    const cleanupListener = once(() => {
       listeners.splice(listeners.indexOf(listener), 1)
 
       if (onError) {
@@ -259,6 +259,10 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
           onErrors.splice(onErrors.indexOf(onError), 1)
         }
       }
+    })
+
+    return async () => {
+      cleanupListener()
 
       if (listeners.length === 0) { // onErrors always has lower length than listeners
         this.listenersMap.delete(key)
@@ -273,7 +277,7 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
           await subscription.unsubscribe()
         }
       }
-    })
+    }
   }
 
   protected prefixKey(key: string): string {

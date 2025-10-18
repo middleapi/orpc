@@ -272,15 +272,22 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
       }
     })()
 
-    return once(async () => {
+    const cleanupListeners = once(() => {
       listeners.splice(listeners.indexOf(listener), 1)
 
       if (onError) {
         const onErrors = this.onErrorsMap.get(key)
         if (onErrors) {
-          onErrors.splice(onErrors.indexOf(onError), 1)
+          const index = onErrors.indexOf(onError)
+          if (index !== -1) {
+            onErrors.splice(index, 1)
+          }
         }
       }
+    })
+
+    return async () => {
+      cleanupListeners()
 
       if (listeners.length === 0) { // onErrors always has lower length than listeners
         this.listenersMap.delete(key)
@@ -295,7 +302,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
         // should execute all logic before async to avoid race condition problem
         await this.listener.unsubscribe(key)
       }
-    })
+    }
   }
 
   protected prefixKey(key: string): string {

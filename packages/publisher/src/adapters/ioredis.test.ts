@@ -626,7 +626,7 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
       await unsub2()
     })
 
-    it('support use same listener multiple times', async () => {
+    it('support reuse same listener and unsub multiple times', async () => {
       const publisher = createTestingPublisher()
 
       const listener = vi.fn()
@@ -640,34 +640,13 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
       })
 
       await unsub1()
+      await unsub1()
+      await unsub1()
 
       await publisher.publish('event1', { order: 2 })
 
       await vi.waitFor(() => {
         expect(listener).toHaveBeenCalledTimes(3)
-      })
-
-      await unsub2()
-    })
-
-    it('safely to unsub multiple times', async () => {
-      const publisher = createTestingPublisher()
-
-      const listener1 = vi.fn()
-      const unsub1 = await publisher.subscribe('event1', listener1)
-      const listener2 = vi.fn()
-      const unsub2 = await publisher.subscribe('event1', listener2)
-
-      // ensure unsub multiple times not effect other listener
-      await unsub1()
-      await unsub1()
-      await unsub1()
-
-      await publisher.publish('event1', { order: 1 })
-
-      await vi.waitFor(() => {
-        expect(listener1).toHaveBeenCalledTimes(0)
-        expect(listener2).toHaveBeenCalledTimes(1)
       })
 
       await unsub2()

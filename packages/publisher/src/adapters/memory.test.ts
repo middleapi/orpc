@@ -176,8 +176,8 @@ describe('memoryPublisher', () => {
       expect(publisher.size).toEqual(1) // 1 event is stored
     })
 
-    it('support use same listener multiple times', async () => {
-      const publisher = new MemoryPublisher()
+    it('support reuse same listener and unsub multiple times', async () => {
+      const publisher = new MemoryPublisher({ resumeRetentionSeconds: 1 })
 
       const listener = vi.fn()
       const unsub1 = await publisher.subscribe('event1', listener)
@@ -190,35 +190,14 @@ describe('memoryPublisher', () => {
       })
 
       await unsub1()
+      await unsub1()
+      await unsub1()
 
       await publisher.publish('event1', { order: 2 })
 
       await vi.waitFor(() => {
         expect(listener).toHaveBeenCalledTimes(3)
       })
-
-      await unsub2()
-
-      expect(publisher.size).toEqual(0)
-    })
-
-    it('safely to unsub multiple times', async () => {
-      const publisher = new MemoryPublisher({ resumeRetentionSeconds: 1 })
-
-      const listener1 = vi.fn()
-      const unsub1 = await publisher.subscribe('event1', listener1)
-      const listener2 = vi.fn()
-      const unsub2 = await publisher.subscribe('event1', listener2)
-
-      // ensure unsub not accidentally effect other listener
-      await unsub1()
-      await unsub1()
-      await unsub1()
-
-      await publisher.publish('event1', { order: 1 })
-
-      expect(listener1).toHaveBeenCalledTimes(0)
-      expect(listener2).toHaveBeenCalledTimes(1)
 
       await unsub2()
     })
