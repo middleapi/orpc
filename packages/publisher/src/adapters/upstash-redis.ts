@@ -2,6 +2,7 @@ import type { StandardRPCJsonSerializedMetaItem, StandardRPCJsonSerializerOption
 import type { Redis } from '@upstash/redis'
 import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
 import { StandardRPCJsonSerializer } from '@orpc/client/standard'
+import { fallback } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@orpc/standard-server'
 import { Publisher } from '../publisher'
 
@@ -69,7 +70,7 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
   ) {
     super(options)
 
-    this.prefix = prefix ?? 'orpc:publisher:'
+    this.prefix = fallback(prefix, 'orpc:publisher:') // use fallback to improve test-coverage
     this.retentionSeconds = resumeRetentionSeconds ?? Number.NaN
     this.serializer = new StandardRPCJsonSerializer(options)
   }

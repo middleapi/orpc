@@ -1,3 +1,4 @@
+import type { UpstashRedisPublisherOptions } from './upstash-redis'
 import { getEventMeta, withEventMeta } from '@orpc/standard-server'
 import { Redis } from '@upstash/redis'
 import { UpstashRedisPublisher } from './upstash-redis'
@@ -5,9 +6,24 @@ import { UpstashRedisPublisher } from './upstash-redis'
 const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL
 const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
 
-describe('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_REDIS_REST_TOKEN, timeout: 20000 }, () => {
-  let publisher: UpstashRedisPublisher<any>
+describe.concurrent('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_REDIS_REST_TOKEN, timeout: 20000 }, () => {
   let redis: Redis
+
+  function createPublisher(options: UpstashRedisPublisherOptions = {}, useRedis = redis) {
+    const publisher = new UpstashRedisPublisher(useRedis, {
+      prefix: crypto.randomUUID(), // isolated from other tests
+      ...options,
+    })
+
+    publisher.xtrimExactness = '=' // for easier testing
+
+    return {
+      publisher,
+      [Symbol.dispose]: () => {
+        expect(publisher.size).toEqual(0) // ensure cleanup correctly
+      },
+    }
+  }
 
   beforeAll(() => {
     redis = new Redis({
@@ -16,16 +32,9 @@ describe('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_
     })
   })
 
-  beforeEach(async () => {
-    await redis.flushall()
-  })
-
-  afterEach(async () => {
-    expect(publisher.size).toEqual(0) // ensure unsubscribed correctly
-  })
-
   it('without resume: can pub/sub but not resume', async () => {
-    publisher = new UpstashRedisPublisher(redis) // resume is disabled by default
+    using resource = createPublisher() // resume is disabled by default
+    const { publisher } = resource
 
     const listener1 = vi.fn()
     const listener2 = vi.fn()
@@ -69,9 +78,10 @@ describe('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_
 
   describe('with resume', () => {
     it('basic pub/sub', async () => {
-      publisher = new UpstashRedisPublisher(redis, {
+      using resource = createPublisher({
         resumeRetentionSeconds: 10,
       })
+      const { publisher } = resource
 
       const listener1 = vi.fn()
       const unsub1 = await publisher.subscribe('event1', listener1)
@@ -88,9 +98,10 @@ describe('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_
     })
 
     it('can pub/sub and resume', async () => {
-      publisher = new UpstashRedisPublisher(redis, {
+      using resource = createPublisher({
         resumeRetentionSeconds: 10,
       })
+      const { publisher } = resource
 
       const listener1 = vi.fn()
       const listener2 = vi.fn()
@@ -136,9 +147,10 @@ describe('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_
     })
 
     it('control event.id', async () => {
-      publisher = new UpstashRedisPublisher(redis, {
+      using resource = createPublisher({
         resumeRetentionSeconds: 10,
       })
+      const { publisher } = resource
 
       const listener1 = vi.fn()
       const unsub1 = await publisher.subscribe('event1', listener1)
@@ -192,9 +204,10 @@ describe('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_
     })
 
     it('resume event.id > lastEventId and in order', async () => {
-      publisher = new UpstashRedisPublisher(redis, {
+      using resource = createPublisher({
         resumeRetentionSeconds: 60,
       })
+      const { publisher } = resource
 
       const listener1 = vi.fn()
       const unsub1 = await publisher.subscribe('event', listener1)
@@ -236,9 +249,10 @@ describe('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_
     })
 
     it('handles multiple subscribers on same event', async () => {
-      publisher = new UpstashRedisPublisher(redis, {
+      using resource = createPublisher({
         resumeRetentionSeconds: 10,
       })
+      const { publisher } = resource
 
       const listener1 = vi.fn()
       const listener2 = vi.fn()
@@ -266,83 +280,11 @@ describe('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_
       await unsub3()
     })
 
-    it('handles custom prefix', async () => {
-      publisher = new UpstashRedisPublisher(redis, {
-        prefix: 'custom:prefix:',
-        resumeRetentionSeconds: 10,
-      })
-
-      const listener1 = vi.fn()
-      const unsub1 = await publisher.subscribe('event1', listener1)
-
-      const payload = { order: 1 }
-      await publisher.publish('event1', payload)
-
-      await vi.waitFor(() => {
-        expect(listener1).toHaveBeenCalledTimes(1)
-      })
-      expect(listener1).toHaveBeenCalledWith(expect.objectContaining(payload))
-
-      // Verify the key uses custom prefix
-      const keys = await redis.keys('custom:prefix:*')
-      expect(keys.length).toBeGreaterThan(0)
-      expect(keys.some(k => k.includes('custom:prefix:event1'))).toBe(true)
-
-      await unsub1()
-    })
-
-    it('handles serialization with complex objects and custom serializers', async () => {
-      class Person {
-        constructor(
-          public name: string,
-          public date: Date,
-        ) {}
-      }
-
-      publisher = new UpstashRedisPublisher(redis, {
-        resumeRetentionSeconds: 10,
-        customJsonSerializers: [
-          {
-            condition: data => data instanceof Person,
-            type: 20,
-            serialize: person => ({ name: person.name, date: person.date }),
-            deserialize: data => new Person(data.name, data.date),
-          },
-        ],
-      })
-
-      const listener1 = vi.fn()
-      const unsub1 = await publisher.subscribe('event1', listener1)
-
-      const payload = {
-        order: 1,
-        nested: {
-          value: 'test',
-          array: [1, 2, 3],
-        },
-        date: new Date('2024-01-01'),
-        person: new Person('John Doe', new Date('2023-01-01')),
-      }
-
-      await publisher.publish('event1', payload)
-
-      await vi.waitFor(() => {
-        expect(listener1).toHaveBeenCalledTimes(1)
-      })
-      const received = listener1.mock.calls[0]![0]
-      expect(received.order).toBe(1)
-      expect(received.nested.value).toBe('test')
-      expect(received.nested.array).toEqual([1, 2, 3])
-      expect(received.date).toEqual(new Date('2024-01-01'))
-      expect(received.person).toEqual(new Person('John Doe', new Date('2023-01-01')))
-
-      await unsub1()
-    })
-
     it('handles errors during resume gracefully', async () => {
-      publisher = new UpstashRedisPublisher(redis, {
+      using resource = createPublisher({
         resumeRetentionSeconds: 10,
       })
+      const { publisher } = resource
 
       const listener1 = vi.fn()
 
@@ -363,9 +305,10 @@ describe('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_
     })
 
     it('handles race condition where events published during resume', { repeats: 3 }, async () => {
-      publisher = new UpstashRedisPublisher(redis, {
+      using resource = createPublisher({
         resumeRetentionSeconds: 10,
       })
+      const { publisher } = resource
 
       await publisher.publish('event1', { order: 1 })
       await new Promise(resolve => setTimeout(resolve, 150)) // wait a bit
@@ -394,14 +337,14 @@ describe('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_
 
     describe('cleanup retention', () => {
       it('handles cleanup of expired events on publish', async () => {
-        publisher = new UpstashRedisPublisher(redis, {
-          resumeRetentionSeconds: 1, // 1 second retention
-          prefix: 'cleanup:test:',
+        const prefix = `cleanup:${crypto.randomUUID()}:`
+        using resource = createPublisher({
+          resumeRetentionSeconds: 1,
+          prefix,
         })
+        const { publisher } = resource
 
-        publisher.xtrimExactness = '=' // for easier testing
-
-        const key1 = 'cleanup:test:event1'
+        const key1 = `${prefix}event1`
 
         // Publish events to event1
         await Promise.all([
@@ -424,12 +367,14 @@ describe('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_
       })
 
       it('verifies Redis auto-expires keys after retention period * 2', async () => {
-        publisher = new UpstashRedisPublisher(redis, {
+        const prefix = `expire:${crypto.randomUUID()}:`
+        using resource = createPublisher({
           resumeRetentionSeconds: 1,
-          prefix: 'test:expire:',
+          prefix,
         })
+        const { publisher } = resource
 
-        const key = 'test:expire:event1'
+        const key = `${prefix}event1`
 
         // Publish an event
         await publisher.publish('event1', { order: 1 })
@@ -449,8 +394,89 @@ describe('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_
     })
   })
 
+  it('handles prefix correctly', async () => {
+    const prefix = `custom:${crypto.randomUUID()}:`
+    using resource = createPublisher({
+      resumeRetentionSeconds: 10,
+      prefix,
+    })
+    const { publisher } = resource
+
+    const listener1 = vi.fn()
+    const unsub1 = await publisher.subscribe('event1', listener1)
+
+    // verify channel use prefix
+    const numSub: any = await redis.exec(['PUBSUB', 'NUMSUB', `${prefix}event1`])
+    expect(numSub[1]).toBe(1)
+
+    const payload = { order: 1 }
+    await publisher.publish('event1', payload)
+    await vi.waitFor(() => {
+      expect(listener1).toHaveBeenCalledTimes(1)
+    })
+    expect(listener1).toHaveBeenCalledWith(expect.objectContaining(payload))
+
+    // veryfy key use prefix
+    const keys = await redis.keys(`${prefix}*`)
+    expect(keys.some(k => k.includes(`${prefix}event1`))).toBe(true)
+
+    await unsub1()
+  })
+
+  it('handles serialization with complex objects and custom serializers', async () => {
+    class Person {
+      constructor(
+        public name: string,
+        public date: Date,
+      ) { }
+    }
+
+    using resource = createPublisher({
+      resumeRetentionSeconds: 10,
+      customJsonSerializers: [
+        {
+          condition: data => data instanceof Person,
+          type: 20,
+          serialize: person => ({ name: person.name, date: person.date }),
+          deserialize: data => new Person(data.name, data.date),
+        },
+      ],
+    })
+    const { publisher } = resource
+
+    const listener1 = vi.fn()
+    const unsub1 = await publisher.subscribe('event1', listener1)
+
+    const payload = {
+      order: 1,
+      nested: {
+        value: 'test',
+        array: [1, 2, 3],
+      },
+      date: new Date('2024-01-01'),
+      person: new Person('John Doe', new Date('2023-01-01')),
+    }
+
+    await publisher.publish('event1', payload)
+
+    await vi.waitFor(() => {
+      expect(listener1).toHaveBeenCalledTimes(1)
+    })
+    const received = listener1.mock.calls[0]![0]
+    expect(received.order).toBe(1)
+    expect(received.nested.value).toBe('test')
+    expect(received.nested.array).toEqual([1, 2, 3])
+    expect(received.date).toEqual(new Date('2024-01-01'))
+    expect(received.person).toEqual(new Person('John Doe', new Date('2023-01-01')))
+
+    await unsub1()
+  })
+
   describe('edge cases', () => {
     it('only subscribe to redis-listener when needed', async () => {
+      // use dedicated redis instance
+      const redis = new Redis({ url: UPSTASH_REDIS_REST_URL, token: UPSTASH_REDIS_REST_TOKEN })
+
       const originalSubscribe = redis.subscribe.bind(redis)
       const unsubscribeSpys: any[] = []
       const subscribeSpy = vi.spyOn(redis, 'subscribe')
@@ -459,7 +485,8 @@ describe('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_
         unsubscribeSpys.push(vi.spyOn(subscription, 'unsubscribe'))
         return subscription
       })
-      publisher = new UpstashRedisPublisher(redis)
+      using resource = createPublisher({}, redis)
+      const { publisher } = resource
 
       const listener1 = vi.fn()
       const unsub1 = await publisher.subscribe('event1', listener1)
@@ -478,23 +505,28 @@ describe('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_
     })
 
     it('subscribe should throw & on connection error', async () => {
-      const redis = new Redis({
+      const invalidRedis = new Redis({
         url: 'http://invalid:6379',
         token: 'invalid',
       })
 
-      publisher = new UpstashRedisPublisher(redis)
+      using resource = createPublisher({}, invalidRedis)
+      const { publisher } = resource
 
       await expect(publisher.subscribe('event1', () => { })).rejects.toThrow()
     })
 
     it('gracefully handles invalid subscription message', async () => {
-      publisher = new UpstashRedisPublisher(redis)
+      const prefix = `invalid:${crypto.randomUUID()}:`
+      using resource = createPublisher({
+        prefix,
+      })
+      const { publisher } = resource
 
       const listener1 = vi.fn()
       const unsub1 = await publisher.subscribe('event1', listener1)
 
-      await redis.publish('orpc:publisher:event1', 'invalid message')
+      await redis.publish(`${prefix}event1`, 'invalid message')
 
       await new Promise(resolve => setTimeout(resolve, 1000)) // ensure message received
 

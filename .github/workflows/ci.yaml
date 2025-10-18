@@ -35,6 +35,8 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+        ports:
+          - 6379:6379
     steps:
       - uses: actions/checkout@v4
 
@@ -49,7 +51,7 @@ jobs:
 
       - run: pnpm run test:coverage
         env:
-          REDIS_URL: redis://redis:6379
+          REDIS_URL: redis://localhost:6379
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
