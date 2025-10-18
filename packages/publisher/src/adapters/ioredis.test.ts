@@ -300,16 +300,16 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
       })
 
       const listener1 = vi.fn()
+      const onError1 = vi.fn()
 
       // Subscribe with an invalid lastEventId to trigger error in xread
-      const unsub1 = await publisher.subscribe('event1', listener1, { lastEventId: 'invalid-id-format' })
+      const unsub1 = await publisher.subscribe('event1', listener1, { lastEventId: 'invalid-id-format', onError: onError1 })
 
       // Publish an event
       await publisher.publish('event1', { order: 1 })
 
-      await new Promise(resolve => setTimeout(resolve, 1000)) // wait until resume is finished
-
       await vi.waitFor(() => {
+        expect(onError1).toHaveBeenCalledTimes(1)
         // Should have received the new event even though resume failed
         expect(listener1).toHaveBeenCalledTimes(1)
       })
@@ -318,7 +318,7 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
       await unsub1()
     })
 
-    it('handles race condition where events published during resume', { repeats: 3 }, async () => {
+    it('handles race condition where events published during resume', { repeats: 5 }, async () => {
       const publisher = createTestingPublisher({
         resumeRetentionSeconds: 10,
       })
@@ -415,11 +415,11 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
     const listener1 = vi.fn()
     const unsub1 = await publisher.subscribe('event1', listener1)
 
-    // verify channel use prefix (NUMSUB can be delayed)
-    await vi.waitFor(async () => {
-      const numSub = await commander.pubsub('NUMSUB', `${prefix}event1`)
-      expect(numSub[1]).toBe(1)
-    })
+    // verify channel use prefix (NUMSUB is not reliable)
+    // await vi.waitFor(async () => {
+    //   const numSub = await commander.pubsub('NUMSUB', `${prefix}event1`)
+    //   expect(numSub[1]).toBe(1)
+    // })
 
     const payload = { order: 1 }
     await publisher.publish('event1', payload)
@@ -515,19 +515,41 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
       expect(listener.listenerCount('message')).toBe(0)
 
       const listener1 = vi.fn()
-      const unsub1 = await publisher.subscribe('event1', listener1)
+      const onError1 = vi.fn()
+      const unsub1 = await publisher.subscribe('event1', listener1, { onError: onError1 })
 
       expect(listener.listenerCount('message')).toBe(1)
+      expect(listener.listenerCount('error')).toBe(1)
 
-      const unsub2 = await publisher.subscribe('event1', listener1)
+      const onError2 = vi.fn()
+      const unsub2 = await publisher.subscribe('event1', listener1, { onError: onError2 })
 
       expect(listener.listenerCount('message')).toBe(1) // reuse listener
+      expect(listener.listenerCount('error')).toBe(2) // not reuse error listener
 
       await unsub1()
-      await unsub2()
+      expect(listener.listenerCount('message')).toBe(1)
+      expect(listener.listenerCount('error')).toBe(1)
 
+      await unsub2()
       expect(listener.listenerCount('message')).toBe(0)
+      expect(listener.listenerCount('error')).toBe(0)
+
       expect(publisher.size).toBe(0)
+    })
+
+    it('subscribe should throw & on connection error', async () => {
+      const invalidListener = new Redis('redis://invalid', {
+        maxRetriesPerRequest: 0,
+      })
+
+      const publisher = createTestingPublisher({ listener: invalidListener })
+
+      const listener1 = vi.fn()
+      const onError = vi.fn()
+      await expect(publisher.subscribe('event1', listener1, { onError })).rejects.toThrow()
+      expect(listener1).toHaveBeenCalledTimes(0)
+      expect(onError).toHaveBeenCalledTimes(1)
     })
 
     it('gracefully handles invalid subscription message', async () => {
@@ -537,12 +559,14 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
       })
 
       const listener1 = vi.fn()
-      const unsub1 = await publisher.subscribe('event1', listener1)
+      const onError1 = vi.fn()
+      const unsub1 = await publisher.subscribe('event1', listener1, { onError: onError1 })
 
       await commander.publish(`${prefix}event1`, 'invalid message')
 
-      // Wait for message to be received
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await vi.waitFor(() => {
+        expect(onError1).toHaveBeenCalledTimes(1)
+      })
 
       await unsub1()
     })

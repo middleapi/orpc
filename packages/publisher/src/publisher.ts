@@ -1,3 +1,4 @@
+import type { ThrowableError } from '@orpc/shared'
 import { AsyncIteratorClass } from '@orpc/shared'
 
 export interface PublisherOptions {
@@ -22,9 +23,15 @@ export interface PublisherSubscribeListenerOptions {
    * Resume from a specific event ID
    */
   lastEventId?: string | undefined
+
+  /**
+   * Triggered when an error occur
+   */
+  onError?: (error: ThrowableError) => void
 }
 
-export interface PublisherSubscribeIteratorOptions extends PublisherSubscribeListenerOptions, PublisherOptions {
+export interface PublisherSubscribeIteratorOptions
+  extends Pick<PublisherSubscribeListenerOptions, 'lastEventId'>, Pick<PublisherOptions, 'maxBufferedEvents'> {
   /**
    * Abort signal, automatically unsubscribes on abort
    */
@@ -101,6 +108,7 @@ export abstract class Publisher<T extends Record<string, object>> {
 
     const bufferedEvents: T[K][] = []
     const pullResolvers: [(result: IteratorResult<T[K]>) => void, (error: Error) => void][] = []
+    let subscriptionError: { error: ThrowableError } | undefined
 
     const unsubscribePromise = this.subscribe(event, (payload) => {
       const resolver = pullResolvers.shift()
@@ -115,23 +123,41 @@ export abstract class Publisher<T extends Record<string, object>> {
           bufferedEvents.shift()
         }
       }
+    }, {
+      lastEventId: listenerOrOptions?.lastEventId,
+      onError: (error) => {
+        subscriptionError = { error }
+        pullResolvers.forEach(resolver => resolver[1](error))
+        signal?.removeEventListener('abort', abortListener)
+        pullResolvers.length = 0
+        bufferedEvents.length = 0
+        unsubscribePromise.then(unsubscribe => unsubscribe()).catch(() => {
+          // TODO: log error
+        })
+      },
     })
 
-    const abortListener = (event: any) => {
+    function abortListener(event: any) {
       pullResolvers.forEach(resolver => resolver[1](event.target.reason))
       pullResolvers.length = 0
       bufferedEvents.length = 0
-      unsubscribePromise.then(unsubscribe => unsubscribe()).catch(() => {}) // ignore error
+      unsubscribePromise.then(unsubscribe => unsubscribe()).catch(() => {
+        // TODO: log error
+      })
     }
 
     signal?.addEventListener('abort', abortListener, { once: true })
 
     return new AsyncIteratorClass(async () => {
-      await unsubscribePromise // make sure subscription is ready
+      if (subscriptionError) {
+        throw subscriptionError.error
+      }
 
       if (signal?.aborted) {
         throw signal.reason
       }
+
+      await unsubscribePromise // make sure subscription is ready
 
       if (bufferedEvents.length > 0) {
         return { done: false, value: bufferedEvents.shift()! }
@@ -141,8 +167,8 @@ export abstract class Publisher<T extends Record<string, object>> {
         pullResolvers.push([resolve, reject])
       })
     }, async () => {
-      signal?.removeEventListener('abort', abortListener)
       pullResolvers.forEach(resolver => resolver[0]({ done: true, value: undefined }))
+      signal?.removeEventListener('abort', abortListener)
       pullResolvers.length = 0
       bufferedEvents.length = 0
 

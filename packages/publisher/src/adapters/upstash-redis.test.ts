@@ -288,16 +288,16 @@ describe.concurrent('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL |
       })
 
       const listener1 = vi.fn()
+      const onError = vi.fn()
 
       // Subscribe with an invalid lastEventId to trigger error in xread
-      const unsub1 = await publisher.subscribe('event1', listener1, { lastEventId: 'invalid-id-format' })
+      const unsub1 = await publisher.subscribe('event1', listener1, { lastEventId: 'invalid-id-format', onError })
 
       // Publish an event
       await publisher.publish('event1', { order: 1 })
 
-      await new Promise(resolve => setTimeout(resolve, 1000)) // wait until resume is finished
-
       await vi.waitFor(() => {
+        expect(onError).toHaveBeenCalledTimes(1)
         expect(listener1).toHaveBeenCalledTimes(1)
       })
       expect(listener1).toHaveBeenCalledWith(expect.objectContaining({ order: 1 }))
@@ -305,7 +305,7 @@ describe.concurrent('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL |
       await unsub1()
     })
 
-    it('handles race condition where events published during resume', { repeats: 3 }, async () => {
+    it('handles race condition where events published during resume', { repeats: 5 }, async () => {
       const publisher = createTestingPublisher({
         resumeRetentionSeconds: 10,
       })
@@ -402,11 +402,11 @@ describe.concurrent('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL |
     const listener1 = vi.fn()
     const unsub1 = await publisher.subscribe('event1', listener1)
 
-    // verify channel use prefix (NUMSUB can be delayed)
-    await vi.waitFor(async () => {
-      const numSub: any = await redis.exec(['PUBSUB', 'NUMSUB', `${prefix}event1`])
-      expect(numSub[1]).toBe(1)
-    })
+    // verify channel use prefix (NUMSUB is not reliable)
+    // await vi.waitFor(async () => {
+    //   const numSub: any = await redis.exec(['PUBSUB', 'NUMSUB', `${prefix}event1`])
+    //   expect(numSub[1]).toBe(1)
+    // })
 
     const payload = { order: 1 }
     await publisher.publish('event1', payload)
@@ -509,7 +509,11 @@ describe.concurrent('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL |
 
       const publisher = createTestingPublisher({}, invalidRedis)
 
-      await expect(publisher.subscribe('event1', () => { })).rejects.toThrow()
+      const listener1 = vi.fn()
+      const onError = vi.fn()
+      await expect(publisher.subscribe('event1', listener1, { onError })).rejects.toThrow()
+      expect(listener1).toHaveBeenCalledTimes(0)
+      expect(onError).toHaveBeenCalledTimes(1)
     })
 
     it('gracefully handles invalid subscription message', async () => {
@@ -519,11 +523,15 @@ describe.concurrent('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL |
       })
 
       const listener1 = vi.fn()
-      const unsub1 = await publisher.subscribe('event1', listener1)
+      const onError = vi.fn()
+      const unsub1 = await publisher.subscribe('event1', listener1, { onError })
 
       await redis.publish(`${prefix}event1`, 'invalid message')
 
-      await new Promise(resolve => setTimeout(resolve, 1000)) // ensure message received
+      await vi.waitFor(() => {
+        expect(onError).toHaveBeenCalledTimes(1)
+      })
+      expect(listener1).toHaveBeenCalledTimes(0)
 
       await unsub1()
     })

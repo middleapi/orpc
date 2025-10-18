@@ -1,4 +1,5 @@
 import type { StandardRPCJsonSerializedMetaItem, StandardRPCJsonSerializerOptions } from '@orpc/client/standard'
+import type { ThrowableError } from '@orpc/shared'
 import type { Redis } from '@upstash/redis'
 import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
 import { StandardRPCJsonSerializer } from '@orpc/client/standard'
@@ -156,9 +157,9 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
             }
           }
         }
-        catch {
+        catch (error) {
           // there error can happen when event.message is invalid
-          // TODO: log error
+          options?.onError?.(error as ThrowableError)
         }
       })
 
@@ -171,6 +172,7 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
 
       subscription.on('error', (error) => {
         rejectPromise(error)
+        options?.onError?.(error)
       })
 
       subscription.on('subscribe', () => {
@@ -211,9 +213,9 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
           }
         }
       }
-      catch {
+      catch (error) {
         // error can happen when result from xread is invalid
-        // TODO: log error
+        options?.onError?.(error as ThrowableError)
       }
       finally {
         const pending = pendingPayloads

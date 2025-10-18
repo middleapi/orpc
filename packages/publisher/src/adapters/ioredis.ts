@@ -1,4 +1,5 @@
 import type { StandardRPCJsonSerializedMetaItem, StandardRPCJsonSerializerOptions } from '@orpc/client/standard'
+import type { ThrowableError } from '@orpc/shared'
 import type Redis from 'ioredis'
 import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
 import { StandardRPCJsonSerializer } from '@orpc/client/standard'
@@ -141,6 +142,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
     const key = this.prefixKey(event)
 
     const lastEventId = options?.lastEventId
+    const onError = options?.onError
     let pendingPayloads: T[K][] | undefined = []
     const resumePayloadIds = new Set<string>()
 
@@ -175,13 +177,17 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
             }
           }
         }
-        catch {
+        catch (error) {
           // error can happen when message is invalid
-          // TODO: log error
+          onError?.(error as ThrowableError)
         }
       }
 
       this.listener.on('message', this.redisListener)
+    }
+
+    if (onError) {
+      this.listener.on('error', onError)
     }
 
     // avoid race condition when multiple listeners subscribe to the same channel on first time
@@ -219,9 +225,9 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
           }
         }
       }
-      catch {
+      catch (error) {
         // error happen when message is invalid
-        // TODO: log error
+        onError?.(error as ThrowableError)
       }
       finally {
         const pending = pendingPayloads
@@ -235,6 +241,11 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
 
     return async () => {
       listeners.delete(listener)
+
+      if (onError) {
+        this.listener.off('error', onError)
+      }
+
       if (listeners.size === 0) {
         this.listenersMap.delete(key) // should execute before async to avoid race condition
 

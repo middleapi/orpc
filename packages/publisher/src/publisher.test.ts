@@ -3,10 +3,11 @@ import { Publisher } from './publisher'
 
 // Concrete implementation for testing
 class TestPublisher<T extends Record<string, object>> extends Publisher<T> {
-  listeners = new Map<keyof T, Set<(payload: any) => void>>()
+  optionsMap = new Map<keyof T, (PublisherSubscribeListenerOptions | undefined)[]>()
+  listenersMap = new Map<keyof T, Set<(payload: any) => void>>()
 
   async publish<K extends keyof T>(event: K, payload: T[K]): Promise<void> {
-    const eventListeners = this.listeners.get(event)
+    const eventListeners = this.listenersMap.get(event)
     if (eventListeners) {
       eventListeners.forEach(listener => listener(payload))
     }
@@ -17,13 +18,18 @@ class TestPublisher<T extends Record<string, object>> extends Publisher<T> {
     listener: (payload: T[K]) => void,
     options?: PublisherSubscribeListenerOptions,
   ): Promise<() => Promise<void>> {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, new Set())
+    if (!this.optionsMap.has(event)) {
+      this.optionsMap.set(event, [])
     }
-    this.listeners.get(event)!.add(listener)
+    this.optionsMap.get(event)!.push(options)
+
+    if (!this.listenersMap.has(event)) {
+      this.listenersMap.set(event, new Set())
+    }
+    this.listenersMap.get(event)!.add(listener)
 
     return async () => {
-      this.listeners.get(event)?.delete(listener)
+      this.listenersMap.get(event)?.delete(listener)
     }
   }
 }
@@ -43,7 +49,7 @@ describe('publisher', () => {
 
   afterEach(() => {
     let size = 0
-    for (const listeners of publisher.listeners.values()) {
+    for (const listeners of publisher.listenersMap.values()) {
       size += listeners.size
     }
     expect(size).toBe(0) // ensure all listeners are unsubscribed correctly
@@ -88,6 +94,15 @@ describe('publisher', () => {
 
       expect(listener).toHaveBeenCalledTimes(1)
       expect(listener).toHaveBeenCalledWith({ text: 'first' })
+    })
+
+    it('should forward options to subscribeListener', async () => {
+      const listener = vi.fn()
+      const options = { lastEventId: '123' }
+      const unsubscribe = await publisher.subscribe('message', listener, options)
+      expect(publisher.optionsMap.get('message')![0]).toBe(options)
+
+      await unsubscribe()
     })
   })
 
@@ -296,6 +311,27 @@ describe('publisher', () => {
       await iterator.return()
 
       expect(received).toHaveLength(100)
+    })
+
+    it('should forward lastEventId to subscribeListener', async () => {
+      const unsub = publisher.subscribe('message', { lastEventId: '__test__' })
+      expect(publisher.optionsMap.get('message')?.[0]?.lastEventId).toBe('__test__')
+      await unsub.return()
+    })
+
+    describe('should stop onError trigger', async () => {
+      it('error happen before pull', async () => {
+        const iterator = publisher.subscribe('message')
+        publisher.optionsMap.get('message')?.[0]?.onError?.(new Error('Test error'))
+        await expect(iterator.next()).rejects.toThrow('Test error')
+      })
+
+      it('error happen after pull', async () => {
+        const iterator = publisher.subscribe('message', { signal: AbortSignal.timeout(100) })
+        const promise = expect(iterator.next()).rejects.toThrow('Test error')
+        publisher.optionsMap.get('message')?.[0]?.onError?.(new Error('Test error'))
+        await promise
+      })
     })
   })
 })
