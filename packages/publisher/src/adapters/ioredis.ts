@@ -2,7 +2,7 @@ import type { StandardRPCJsonSerializedMetaItem, StandardRPCJsonSerializerOption
 import type Redis from 'ioredis'
 import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
 import { StandardRPCJsonSerializer } from '@orpc/client/standard'
-import { stringifyJSON } from '@orpc/shared'
+import { fallback, stringifyJSON } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@orpc/standard-server'
 import { Publisher } from '../publisher'
 
@@ -87,7 +87,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
 
     this.commander = commander
     this.listener = listener
-    this.prefix = prefix ?? 'orpc:publisher:'
+    this.prefix = fallback(prefix, 'orpc:publisher:') // use fallback to improve test-coverage
     this.retentionSeconds = resumeRetentionSeconds ?? Number.NaN
     this.serializer = new StandardRPCJsonSerializer(options)
   }
