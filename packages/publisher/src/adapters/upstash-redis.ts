@@ -75,7 +75,7 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
     this.serializer = new StandardRPCJsonSerializer(options)
   }
 
-  protected lastCleanupTimes: Map<string, number> = new Map()
+  protected lastCleanupTimeMap: Map<string, number> = new Map()
   override async publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void> {
     const key = this.prefixKey(event)
 
@@ -86,14 +86,14 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
       const now = Date.now()
 
       // cleanup for more efficiency memory
-      for (const [key, lastCleanupTime] of this.lastCleanupTimes) {
+      for (const [mapKey, lastCleanupTime] of this.lastCleanupTimeMap) {
         if (lastCleanupTime + this.retentionSeconds * 1000 < now) {
-          this.lastCleanupTimes.delete(key)
+          this.lastCleanupTimeMap.delete(mapKey)
         }
       }
 
-      if (!this.lastCleanupTimes.has(key)) {
-        this.lastCleanupTimes.set(key, now)
+      if (!this.lastCleanupTimeMap.has(key)) {
+        this.lastCleanupTimeMap.set(key, now)
 
         const results = await this.redis.multi()
           .xadd(key, '*', { data: serialized })

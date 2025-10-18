@@ -9,7 +9,7 @@ const REDIS_URL = process.env.REDIS_URL
  * These tests depend on a real Redis server — make sure to set the `REDIS_URL` env.
  * When writing new tests, always use unique keys to avoid conflicts with other test cases.
  */
-describe.concurrent('upstash redis publisher', { skip: !REDIS_URL, timeout: 20000 }, () => {
+describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, () => {
   let commander: Redis
   let listener: Redis
 
@@ -37,8 +37,8 @@ describe.concurrent('upstash redis publisher', { skip: !REDIS_URL, timeout: 2000
   })
 
   afterAll(async () => {
-    commander.disconnect()
-    listener.disconnect()
+    await commander.quit()
+    await listener.quit()
   })
 
   it('without resume: can pub/sub but not resume', async () => {
@@ -515,7 +515,9 @@ describe.concurrent('upstash redis publisher', { skip: !REDIS_URL, timeout: 2000
     it('only subscribe to redis-listener when needed', async () => {
       // use dedicated listener
       const listener = new Redis(REDIS_URL!)
-      onTestFinished(() => listener.disconnect())
+      onTestFinished(async () => {
+        await listener.quit()
+      })
 
       using resource = createPublisher({ listener })
       const { publisher } = resource
