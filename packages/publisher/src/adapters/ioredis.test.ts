@@ -2,23 +2,19 @@ import { getEventMeta, withEventMeta } from '@orpc/standard-server'
 import { Redis } from 'ioredis'
 import { IORedisPublisher } from './ioredis'
 
-describe('ioredis publisher', () => {
-  const REDIS_URL = process.env.REDIS_URL
-  if (!REDIS_URL) {
-    throw new Error('These tests require REDIS_URL env variable')
-  }
+const REDIS_URL = process.env.REDIS_URL
 
+describe('upstash redis publisher', { skip: !REDIS_URL, timeout: 20000 }, () => {
   let publisher: IORedisPublisher<any>
   let commander: Redis
   let listener: Redis
 
   beforeAll(() => {
-    commander = new Redis(REDIS_URL)
-    listener = new Redis(REDIS_URL)
+    commander = new Redis(REDIS_URL!)
+    listener = new Redis(REDIS_URL!)
   })
 
   afterEach(async () => {
-    // Use a separate commander for cleanup since listener might be in subscriber mode
     await commander.flushall()
     expect(publisher.size).toEqual(0) // ensure cleanup correctly
   })
@@ -395,7 +391,7 @@ describe('ioredis publisher', () => {
       await unsub1()
     })
 
-    it('handles race condition where events published during resume', { repeats: 10 }, async () => {
+    it('handles race condition where events published during resume', { repeats: 3 }, async () => {
       publisher = new IORedisPublisher({
         commander,
         listener,

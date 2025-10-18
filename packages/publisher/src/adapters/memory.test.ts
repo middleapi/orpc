@@ -45,7 +45,7 @@ describe('memoryPublisher', () => {
     })
 
     afterEach(() => {
-      vi.restoreAllMocks()
+      vi.useRealTimers()
     })
 
     it('can pub/sub and resume', async () => {

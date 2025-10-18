@@ -190,6 +190,7 @@ const publisher = new IORedisPublisher<{
   commander: new Redis(), // For executing short-lived commands
   subscriber: new Redis(), // For subscribing to events
   resumeRetentionSeconds: 60 * 2, // Retain events for 2 minutes
+  prefix: 'orpc:publisher:', // avoid conflict with other keys
 })
 ```
 
@@ -213,6 +214,7 @@ const publisher = new UpstashRedisPublisher<{
   }
 }>(redis, {
   resumeRetentionSeconds: 60 * 2, // Retain events for 2 minutes
+  prefix: 'orpc:publisher:', // avoid conflict with other keys
 })
 ```
 

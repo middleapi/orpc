@@ -4,7 +4,6 @@ import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../pub
 import { StandardRPCJsonSerializer } from '@orpc/client/standard'
 import { getEventMeta, withEventMeta } from '@orpc/standard-server'
 import { Publisher } from '../publisher'
-import { compareRedisStreamIds } from '../utils'
 
 type SerializedPayload = { json: object, meta: StandardRPCJsonSerializedMetaItem[], eventMeta: ReturnType<typeof getEventMeta> }
 
@@ -35,6 +34,7 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
   protected readonly serializer: StandardRPCJsonSerializer
   protected readonly retentionSeconds: number
   protected readonly listenersMap = new Map<string, Set<(payload: any) => void>>()
+  protected readonly subscriptionPromiseMap = new Map<string, Promise<void>>()
   protected readonly subscriptionsMap = new Map<string, any>() // Upstash subscription objects
 
   protected get isResumeEnabled(): boolean {
@@ -116,7 +116,7 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
 
     const lastEventId = options?.lastEventId
     let pendingPayloads: T[K][] | undefined = []
-    let lastResumePayloadId: string | undefined
+    const resumePayloadIds = new Set<string>()
 
     const listener = (payload: T[K]) => {
       if (pendingPayloads) {
@@ -127,14 +127,16 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
       const payloadId = getEventMeta(payload)?.id
       if (
         payloadId !== undefined // if resume is enabled payloadId will be defined
-        && lastResumePayloadId !== undefined // when resume happen
-        && compareRedisStreamIds(payloadId, lastResumePayloadId) <= 0 // when duplicate happen
+        && resumePayloadIds.has(payloadId) // duplicate happen
       ) {
         return
       }
 
       originalListener(payload)
     }
+
+    // avoid race condition when multiple listeners subscribe to the same channel on first time
+    await this.subscriptionPromiseMap.get(key)
 
     // Get or create subscription for this channel
     let subscription = this.subscriptionsMap.get(key) as ReturnType<typeof this.redis.subscribe> | undefined
@@ -159,9 +161,9 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
         }
       })
 
-      let resolvePromise: (value?: unknown) => void
+      let resolvePromise: () => void
       let rejectPromise: (error: Error) => void
-      const promise = new Promise((resolve, reject) => {
+      const promise = new Promise<void>((resolve, reject) => {
         resolvePromise = resolve
         rejectPromise = reject
       })
@@ -174,9 +176,14 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
         resolvePromise()
       })
 
-      await promise
-
-      this.subscriptionsMap.set(key, subscription) // only set after subscription is ready
+      try {
+        this.subscriptionPromiseMap.set(key, promise)
+        await promise
+        this.subscriptionsMap.set(key, subscription) // set after subscription is ready
+      }
+      finally {
+        this.subscriptionPromiseMap.delete(key)
+      }
     }
 
     let listeners = this.listenersMap.get(key)
@@ -197,7 +204,7 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
             for (const [id, fields] of items) {
               const serialized = fields[1]! // field value is at index 1 (index 0 is field name 'data')
               const payload = this.deserializePayload(id, serialized)
-              lastResumePayloadId = id
+              resumePayloadIds.add(id)
               originalListener(payload)
             }
           }

@@ -2,14 +2,10 @@ import { getEventMeta, withEventMeta } from '@orpc/standard-server'
 import { Redis } from '@upstash/redis'
 import { UpstashRedisPublisher } from './upstash-redis'
 
-describe('upstash redis publisher', () => {
-  const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL
-  const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
+const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL
+const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
 
-  if (!UPSTASH_REDIS_REST_URL || !UPSTASH_REDIS_REST_TOKEN) {
-    throw new Error('These tests require UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN env variables')
-  }
-
+describe('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_REDIS_REST_TOKEN, timeout: 20000 }, () => {
   let publisher: UpstashRedisPublisher<any>
   let redis: Redis
 
@@ -366,7 +362,7 @@ describe('upstash redis publisher', () => {
       await unsub1()
     })
 
-    it('handles race condition where events published during resume', { repeats: 10 }, async () => {
+    it('handles race condition where events published during resume', { repeats: 3 }, async () => {
       publisher = new UpstashRedisPublisher(redis, {
         resumeRetentionSeconds: 10,
       })

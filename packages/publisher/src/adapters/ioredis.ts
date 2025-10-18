@@ -5,7 +5,6 @@ import { StandardRPCJsonSerializer } from '@orpc/client/standard'
 import { stringifyJSON } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@orpc/standard-server'
 import { Publisher } from '../publisher'
-import { compareRedisStreamIds } from '../utils'
 
 type SerializedPayload = { json: object, meta: StandardRPCJsonSerializedMetaItem[], eventMeta: ReturnType<typeof getEventMeta> }
 
@@ -51,7 +50,8 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
   protected readonly prefix: string
   protected readonly serializer: StandardRPCJsonSerializer
   protected readonly retentionSeconds: number
-  protected readonly listeners = new Map<string, Set<(payload: any) => void>>()
+  protected readonly listenerPromiseMap = new Map<string, Promise<any>>()
+  protected readonly listenersMap = new Map<string, Set<(payload: any) => void>>()
   protected redisListener: ((channel: string, message: string) => void) | undefined
 
   protected get isResumeEnabled(): boolean {
@@ -74,7 +74,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
   get size(): number {
     /* v8 ignore next 5 */
     let size = this.redisListener ? 1 : 0
-    for (const listeners of this.listeners) {
+    for (const listeners of this.listenersMap) {
       size += listeners[1].size || 1 // empty set should never happen so we treat it as a single event
     }
     return size
@@ -142,7 +142,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
 
     const lastEventId = options?.lastEventId
     let pendingPayloads: T[K][] | undefined = []
-    let lastResumePayloadId: string | undefined
+    const resumePayloadIds = new Set<string>()
 
     const listener = (payload: T[K]) => {
       if (pendingPayloads) {
@@ -153,8 +153,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
       const payloadId = getEventMeta(payload)?.id
       if (
         payloadId !== undefined // if resume is enabled payloadId will be defined
-        && lastResumePayloadId !== undefined // when resume happen
-        && compareRedisStreamIds(payloadId, lastResumePayloadId) <= 0 // when duplicate happen
+        && resumePayloadIds.has(payloadId) // duplicate happen
       ) {
         return
       }
@@ -165,7 +164,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
     if (!this.redisListener) {
       this.redisListener = (channel: string, message: string) => {
         try {
-          const listeners = this.listeners.get(channel)
+          const listeners = this.listenersMap.get(channel)
 
           if (listeners) {
             const { id, ...rest } = JSON.parse(message)
@@ -185,10 +184,20 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
       this.listener.on('message', this.redisListener)
     }
 
-    let listeners = this.listeners.get(key)
+    // avoid race condition when multiple listeners subscribe to the same channel on first time
+    await this.listenerPromiseMap.get(key)
+
+    let listeners = this.listenersMap.get(key)
     if (!listeners) {
-      await this.listener.subscribe(key)
-      this.listeners.set(key, listeners = new Set()) // only set after subscribe successfully
+      try {
+        const promise = this.listener.subscribe(key)
+        this.listenerPromiseMap.set(key, promise)
+        await promise
+        this.listenersMap.set(key, listeners = new Set()) // only set after subscribe successfully
+      }
+      finally {
+        this.listenerPromiseMap.delete(key)
+      }
     }
 
     listeners.add(listener)
@@ -204,7 +213,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
             for (const [id, fields] of items) {
               const serialized = fields[1]! // field value is at index 1 (index 0 is field name 'data')
               const payload = this.deserializePayload(id, JSON.parse(serialized))
-              lastResumePayloadId = id
+              resumePayloadIds.add(id)
               originalListener(payload)
             }
           }
@@ -227,9 +236,9 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
     return async () => {
       listeners.delete(listener)
       if (listeners.size === 0) {
-        this.listeners.delete(key) // should execute before async to avoid throw
+        this.listenersMap.delete(key) // should execute before async to avoid throw
 
-        if (this.redisListener && this.listeners.size === 0) {
+        if (this.redisListener && this.listenersMap.size === 0) {
           this.listener.off('message', this.redisListener)
           this.redisListener = undefined
         }

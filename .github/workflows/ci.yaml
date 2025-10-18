@@ -29,7 +29,12 @@ jobs:
     runs-on: ubuntu-latest
     services:
       redis:
-        image: redis:alpine
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
