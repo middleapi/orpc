@@ -539,13 +539,16 @@ describe.concurrent('upstash redis publisher', { skip: !REDIS_URL, timeout: 2000
     })
 
     it('gracefully handles invalid subscription message', async () => {
-      using resource = createPublisher()
+      const prefix = `invalid:${crypto.randomUUID()}:`
+      using resource = createPublisher({
+        prefix,
+      })
       const { publisher } = resource
 
       const listener1 = vi.fn()
       const unsub1 = await publisher.subscribe('event1', listener1)
 
-      await commander.publish('orpc:publisher:event1', 'invalid message')
+      await commander.publish(`${prefix}event1`, 'invalid message')
 
       // Wait for message to be received
       await new Promise(resolve => setTimeout(resolve, 1000))
