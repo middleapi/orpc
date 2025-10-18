@@ -5,6 +5,10 @@ import { IORedisPublisher } from './ioredis'
 
 const REDIS_URL = process.env.REDIS_URL
 
+/**
+ * These tests depend on a real Redis server — make sure to set the `REDIS_URL` env.
+ * When writing new tests, always use unique keys to avoid conflicts with other test cases.
+ */
 describe.concurrent('upstash redis publisher', { skip: !REDIS_URL, timeout: 20000 }, () => {
   let commander: Redis
   let listener: Redis

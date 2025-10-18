@@ -6,6 +6,10 @@ import { UpstashRedisPublisher } from './upstash-redis'
 const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL
 const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
 
+/**
+ * These tests depend on a real Upstash redis server — make sure to set the `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` envs.
+ * When writing new tests, always use unique keys to avoid conflicts with other test cases.
+ */
 describe.concurrent('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_REDIS_REST_TOKEN, timeout: 20000 }, () => {
   let redis: Redis
 
