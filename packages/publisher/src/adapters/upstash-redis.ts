@@ -229,11 +229,11 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
       listeners.delete(listener)
 
       if (listeners.size === 0) {
-        this.listenersMap.delete(key) // should execute before async to avoid throw
+        this.listenersMap.delete(key)
         const subscription = this.subscriptionsMap.get(key)
 
         if (subscription) {
-          this.subscriptionsMap.delete(key)
+          this.subscriptionsMap.delete(key) // should execute before async to avoid race condition
           await subscription.unsubscribe()
         }
       }

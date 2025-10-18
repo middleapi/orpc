@@ -236,7 +236,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
     return async () => {
       listeners.delete(listener)
       if (listeners.size === 0) {
-        this.listenersMap.delete(key) // should execute before async to avoid throw
+        this.listenersMap.delete(key) // should execute before async to avoid race condition
 
         if (this.redisListener && this.listenersMap.size === 0) {
           this.listener.off('message', this.redisListener)
