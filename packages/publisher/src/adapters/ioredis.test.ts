@@ -265,7 +265,7 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
       await unsub2()
     })
 
-    it('handles multiple subscribers on same event', async () => {
+    it('handles multiple subscribers on same event with race condition', { repeats: 3 }, async () => {
       const publisher = createTestingPublisher({
         resumeRetentionSeconds: 10,
       })
@@ -274,8 +274,10 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
       const listener2 = vi.fn()
       const listener3 = vi.fn()
 
-      const unsub1 = await publisher.subscribe('event1', listener1)
-      const unsub2 = await publisher.subscribe('event1', listener2)
+      const [unsub1, unsub2] = await Promise.all([ // race condition
+        publisher.subscribe('event1', listener1),
+        publisher.subscribe('event1', listener2),
+      ])
       const unsub3 = await publisher.subscribe('event1', listener3)
 
       const payload = { order: 1 }
@@ -287,15 +289,25 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
         expect(listener3).toHaveBeenCalledTimes(1)
       })
 
-      expect(listener1).toHaveBeenCalledWith(expect.objectContaining(payload))
-      expect(listener2).toHaveBeenCalledWith(expect.objectContaining(payload))
-      expect(listener3).toHaveBeenCalledWith(expect.objectContaining(payload))
+      expect(listener1).toHaveBeenCalledWith({ order: 1 })
+      expect(listener2).toHaveBeenCalledWith({ order: 1 })
+      expect(listener3).toHaveBeenCalledWith({ order: 1 })
 
       await unsub1()
+
+      await publisher.publish('event1', { order: 2 })
+
+      await vi.waitFor(() => {
+        expect(listener1).toHaveBeenCalledTimes(1)
+        expect(listener2).toHaveBeenCalledTimes(2)
+        expect(listener3).toHaveBeenCalledTimes(2)
+      })
+
+      expect(listener2).toHaveBeenNthCalledWith(2, { order: 2 })
+      expect(listener3).toHaveBeenNthCalledWith(2, { order: 2 })
+
       await unsub2()
       await unsub3()
-
-      expect(publisher.size).toEqual(0)
     })
 
     it('handles errors during resume gracefully', async () => {
@@ -627,26 +639,37 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
     })
 
     it('support reuse same listener and unsub multiple times', async () => {
-      const publisher = createTestingPublisher()
+      const prefix = `invalid:${crypto.randomUUID()}:`
+      const publisher = createTestingPublisher({ prefix })
 
       const listener = vi.fn()
-      const unsub1 = await publisher.subscribe('event1', listener)
-      const unsub2 = await publisher.subscribe('event1', listener)
+      const onError = vi.fn()
 
-      await publisher.publish('event1', { order: 1 })
+      const unsub1 = await publisher.subscribe('event1', listener, { onError })
+      const unsub2 = await publisher.subscribe('event1', listener, { onError })
+
+      await Promise.all([
+        publisher.publish('event1', { order: 1 }),
+        commander.publish(`${prefix}event1`, 'invalid message'),
+      ])
 
       await vi.waitFor(() => {
         expect(listener).toHaveBeenCalledTimes(2)
+        expect(onError).toHaveBeenCalledTimes(2)
       })
 
       await unsub1()
       await unsub1()
       await unsub1()
 
-      await publisher.publish('event1', { order: 2 })
+      await Promise.all([
+        publisher.publish('event1', { order: 2 }),
+        commander.publish(`${prefix}event1`, 'invalid message'),
+      ])
 
       await vi.waitFor(() => {
         expect(listener).toHaveBeenCalledTimes(3)
+        expect(onError).toHaveBeenCalledTimes(3)
       })
 
       await unsub2()

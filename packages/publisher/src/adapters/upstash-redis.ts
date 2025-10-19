@@ -144,10 +144,12 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
       originalListener(payload)
     }
 
-    // avoid race condition when multiple listeners subscribe to the same channel on first time
-    await this.subscriptionPromiseMap.get(key)
-
-    // Get or create subscription for this channel
+    const subscriptionPromise = this.subscriptionPromiseMap.get(key)
+    if (subscriptionPromise) {
+      // Avoid race conditions when multiple listeners subscribe to the same channel at once.
+      // Await only if subscriptionPromise exists, and ensure no other `await` occurs between its set and await.
+      await subscriptionPromise
+    }
     let subscription = this.subscriptionsMap.get(key) as ReturnType<typeof this.redis.subscribe> | undefined
     if (!subscription) {
       const dispatchErrorForKey = (error: ThrowableError) => {
@@ -250,7 +252,7 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
       }
     })()
 
-    const cleanupListener = once(() => {
+    const cleanupListeners = once(() => {
       listeners.splice(listeners.indexOf(listener), 1)
 
       if (onError) {
@@ -262,7 +264,7 @@ export class UpstashRedisPublisher<T extends Record<string, object>> extends Pub
     })
 
     return async () => {
-      cleanupListener()
+      cleanupListeners()
 
       if (listeners.length === 0) { // onErrors always has lower length than listeners
         this.listenersMap.delete(key)

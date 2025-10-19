@@ -106,9 +106,9 @@ const example = os
   })
 ```
 
-## Publisher Combination
+## Publisher Helper
 
-You can combine the event iterator with [Publisher Helper](/docs/helpers/publisher) to build real-time features like chat, notifications, or live updates.
+You can combine the event iterator with the [Publisher Helper](/docs/helpers/publisher) to build real-time features like chat, notifications, or live updates with resume support.
 
 ```ts
 const publisher = new MemoryPublisher<{
@@ -132,3 +132,54 @@ const publish = os
     await publisher.publish('something-updated', { id: input.id })
   })
 ```
+
+## Event Publisher
+
+Unlike the [Publisher Helper](/docs/helpers/publisher), the `EventPublisher` is more lightweight with synchronous publishing and no resume support.
+
+::: code-group
+
+```ts [Static Events]
+import { EventPublisher } from '@orpc/server'
+
+const publisher = new EventPublisher<{
+  'something-updated': {
+    id: string
+  }
+}>()
+
+const livePlanet = os
+  .handler(async function* ({ input, signal }) {
+    for await (const payload of publisher.subscribe('something-updated', { signal })) { // [!code highlight]
+      // handle payload here and yield something to client
+    }
+  })
+
+const update = os
+  .input(z.object({ id: z.string() }))
+  .handler(({ input }) => {
+    publisher.publish('something-updated', { id: input.id }) // [!code highlight]
+  })
+```
+
+```ts [Dynamic Events]
+import { EventPublisher } from '@orpc/server'
+
+const publisher = new EventPublisher<Record<string, { message: string }>>()
+
+const onMessage = os
+  .input(z.object({ channel: z.string() }))
+  .handler(async function* ({ input, signal }) {
+    for await (const payload of publisher.subscribe(input.channel, { signal })) { // [!code highlight]
+      yield payload.message
+    }
+  })
+
+const sendMessage = os
+  .input(z.object({ channel: z.string(), message: z.string() }))
+  .handler(({ input }) => {
+    publisher.publish(input.channel, { message: input.message }) // [!code highlight]
+  })
+```
+
+:::

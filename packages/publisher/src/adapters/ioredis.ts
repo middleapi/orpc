@@ -51,7 +51,7 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
   protected readonly prefix: string
   protected readonly serializer: StandardRPCJsonSerializer
   protected readonly retentionSeconds: number
-  protected readonly listenerPromiseMap = new Map<string, Promise<any>>()
+  protected readonly subscriptionPromiseMap = new Map<string, Promise<any>>()
   protected readonly listenersMap = new Map<string, Array<(payload: any) => void>>()
   protected readonly onErrorsMap = new Map<string, Array<(error: ThrowableError) => void>>()
   protected redisListenerAndOnError: undefined | {
@@ -210,19 +210,22 @@ export class IORedisPublisher<T extends Record<string, object>> extends Publishe
       this.listener.on('error', redisOnError)
     }
 
-    // avoid race condition when multiple listeners subscribe to the same channel on first time
-    await this.listenerPromiseMap.get(key)
-
+    const subscriptionPromise = this.subscriptionPromiseMap.get(key)
+    if (subscriptionPromise) {
+      // Avoid race conditions when multiple listeners subscribe to the same channel at once.
+      // Await only if subscriptionPromise exists, and ensure no other `await` occurs between its set and await.
+      await subscriptionPromise
+    }
     let listeners = this.listenersMap.get(key)
     if (!listeners) {
       try {
         const promise = this.listener.subscribe(key)
-        this.listenerPromiseMap.set(key, promise)
+        this.subscriptionPromiseMap.set(key, promise)
         await promise
         this.listenersMap.set(key, listeners = []) // only set after subscribe successfully
       }
       finally {
-        this.listenerPromiseMap.delete(key)
+        this.subscriptionPromiseMap.delete(key)
 
         if (this.listenersMap.size === 0) { // error happen + no listener
           this.listener.off('message', this.redisListenerAndOnError.listener)
