@@ -10,6 +10,7 @@ export * from './utils'
 export {
   AsyncIteratorClass,
   asyncIteratorToStream as eventIteratorToStream,
+  asyncIteratorToUnproxiedDataStream as eventIteratorToUnproxiedDataStream,
   EventPublisher,
   onError,
   onFinish,

@@ -59,13 +59,13 @@ export const chat = os
 const client = { chat }
 // ---cut---
 import { useChat } from '@ai-sdk/react'
-import { eventIteratorToStream } from '@orpc/client'
+import { eventIteratorToUnproxiedDataStream } from '@orpc/client'
 
 export function Example() {
   const { messages, sendMessage, status } = useChat({
     transport: {
       async sendMessages(options) {
-        return eventIteratorToStream(await client.chat({
+        return eventIteratorToUnproxiedDataStream(await client.chat({
           chatId: options.chatId,
           messages: options.messages,
         }, { signal: options.abortSignal }))
@@ -114,4 +114,8 @@ export function Example() {
 
 ::: info
 The `reconnectToStream` function is not supported by default, which is fine for most use cases. If you need reconnection support, implement it similar to `sendMessages` with custom reconnection logic. See this [reconnect example](<https://github.com/vercel/ai-chatbot/blob/main/app/(chat)/api/chat/%5Bid%5D/stream/route.ts>).
+:::
+
+::: info
+Use `eventIteratorToUnproxiedDataStream` instead of `eventIteratorToStream`. AI SDK uses `structuredClone` internally, which doesn't support proxied data. Since oRPC sometimes uses proxies to track event metadata, unproxy the data before passing it to AI SDK.
 :::

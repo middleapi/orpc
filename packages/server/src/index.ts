@@ -43,6 +43,7 @@ export type { IntersectPick } from '@orpc/shared'
 export {
   AsyncIteratorClass,
   asyncIteratorToStream as eventIteratorToStream,
+  asyncIteratorToUnproxiedDataStream as eventIteratorToUnproxiedDataStream,
   EventPublisher,
   onError,
   onFinish,
