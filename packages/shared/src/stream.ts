@@ -57,7 +57,13 @@ export function asyncIteratorToUnproxiedDataStream<T>(
         controller.close()
       }
       else {
-        controller.enqueue(isObject(value) ? { ...value } : value)
+        const unproxied = isObject(value)
+          ? { ...value }
+          : Array.isArray(value)
+            ? [...value] as T
+            : value
+
+        controller.enqueue(unproxied)
       }
     },
     async cancel() {

@@ -208,10 +208,17 @@ describe('asyncIteratorToUnproxiedDataStream', () => {
   }
 
   it('should convert an AsyncIterator to ReadableStream and unproxied data', async () => {
+    const date = new Date()
+    const set = new Set([date])
+
     async function* generator() {
       yield 1
       yield proxy({ order: 2 })
       yield { order: 3 }
+      yield [4]
+      yield proxy([5])
+      yield date // support native Date
+      yield set // support native Set
     }
 
     const asyncIterator = generator()
@@ -232,9 +239,13 @@ describe('asyncIteratorToUnproxiedDataStream', () => {
       1,
       { order: 2 },
       { order: 3 },
+      [4],
+      [5],
+      date,
+      set,
     ])
 
-    expect(results.every(isProxied)).toBe(false)
+    expect(results.some(isProxied)).toBe(false)
   })
 
   it('should handle empty async iterator', async () => {
