@@ -265,51 +265,6 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
       await unsub2()
     })
 
-    it('handles multiple subscribers on same event with race condition', { repeats: 3 }, async () => {
-      const publisher = createTestingPublisher({
-        resumeRetentionSeconds: 10,
-      })
-
-      const listener1 = vi.fn()
-      const listener2 = vi.fn()
-      const listener3 = vi.fn()
-
-      const [unsub1, unsub2] = await Promise.all([ // race condition
-        publisher.subscribe('event1', listener1),
-        publisher.subscribe('event1', listener2),
-      ])
-      const unsub3 = await publisher.subscribe('event1', listener3)
-
-      const payload = { order: 1 }
-      await publisher.publish('event1', payload)
-
-      await vi.waitFor(() => {
-        expect(listener1).toHaveBeenCalledTimes(1)
-        expect(listener2).toHaveBeenCalledTimes(1)
-        expect(listener3).toHaveBeenCalledTimes(1)
-      })
-
-      expect(listener1).toHaveBeenCalledWith({ order: 1 })
-      expect(listener2).toHaveBeenCalledWith({ order: 1 })
-      expect(listener3).toHaveBeenCalledWith({ order: 1 })
-
-      await unsub1()
-
-      await publisher.publish('event1', { order: 2 })
-
-      await vi.waitFor(() => {
-        expect(listener1).toHaveBeenCalledTimes(1)
-        expect(listener2).toHaveBeenCalledTimes(2)
-        expect(listener3).toHaveBeenCalledTimes(2)
-      })
-
-      expect(listener2).toHaveBeenNthCalledWith(2, { order: 2 })
-      expect(listener3).toHaveBeenNthCalledWith(2, { order: 2 })
-
-      await unsub2()
-      await unsub3()
-    })
-
     it('handles errors during resume gracefully', async () => {
       const publisher = createTestingPublisher({
         resumeRetentionSeconds: 10,
@@ -419,6 +374,51 @@ describe.concurrent('ioredis publisher', { skip: !REDIS_URL, timeout: 20000 }, (
         expect(exists).toBe(0)
       })
     })
+  })
+
+  it('handles multiple subscribers on same event with race condition', { repeats: 3 }, async () => {
+    const publisher = createTestingPublisher({
+      resumeRetentionSeconds: 10,
+    })
+
+    const listener1 = vi.fn()
+    const listener2 = vi.fn()
+    const listener3 = vi.fn()
+
+    const [unsub1, unsub2] = await Promise.all([ // race condition
+      publisher.subscribe('event1', listener1),
+      publisher.subscribe('event1', listener2),
+    ])
+    const unsub3 = await publisher.subscribe('event1', listener3)
+
+    const payload = { order: 1 }
+    await publisher.publish('event1', payload)
+
+    await vi.waitFor(() => {
+      expect(listener1).toHaveBeenCalledTimes(1)
+      expect(listener2).toHaveBeenCalledTimes(1)
+      expect(listener3).toHaveBeenCalledTimes(1)
+    })
+
+    expect(listener1).toHaveBeenCalledWith({ order: 1 })
+    expect(listener2).toHaveBeenCalledWith({ order: 1 })
+    expect(listener3).toHaveBeenCalledWith({ order: 1 })
+
+    await unsub1()
+
+    await publisher.publish('event1', { order: 2 })
+
+    await vi.waitFor(() => {
+      expect(listener1).toHaveBeenCalledTimes(1)
+      expect(listener2).toHaveBeenCalledTimes(2)
+      expect(listener3).toHaveBeenCalledTimes(2)
+    })
+
+    expect(listener2).toHaveBeenNthCalledWith(2, { order: 2 })
+    expect(listener3).toHaveBeenNthCalledWith(2, { order: 2 })
+
+    await unsub2()
+    await unsub3()
   })
 
   it('handles prefix correctly', async () => {
