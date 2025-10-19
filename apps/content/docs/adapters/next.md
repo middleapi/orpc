@@ -47,7 +47,7 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc-
 
 ::: details Pages Router Support?
 
-```ts [pages/rpc/[[...rest]].ts]
+```ts [pages/api/rpc/[[...rest]].ts]
 import { RPCHandler } from '@orpc/server/node'
 
 const handler = new RPCHandler(router)
@@ -60,7 +60,7 @@ export const config = {
 
 export default async (req, res) => {
   const { matched } = await handler.handle(req, res, {
-    prefix: '/rpc',
+    prefix: '/api/rpc',
     context: {}, // Provide initial context if needed
   })
 
