@@ -118,6 +118,6 @@ The `reconnectToStream` function is not supported by default, which is fine for 
 
 ::: info
 Prefer `eventIteratorToUnproxiedDataStream` over `eventIteratorToStream`.
-AI SDK uses `structuredClone`, which doesn't support proxied data.
+AI SDK internally uses `structuredClone`, which doesn't support proxied data.
 oRPC may proxy events for metadata, so unproxy before passing to AI SDK.
 :::
