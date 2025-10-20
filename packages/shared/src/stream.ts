@@ -60,7 +60,7 @@ export function asyncIteratorToUnproxiedDataStream<T>(
         const unproxied = isObject(value)
           ? { ...value }
           : Array.isArray(value)
-            ? [...value] as T
+            ? value.map(i => i) as T // use .map instead of ... to deal with sparse arrays
             : value
 
         controller.enqueue(unproxied)
