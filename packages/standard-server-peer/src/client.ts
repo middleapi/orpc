@@ -1,11 +1,15 @@
-import type { AsyncIdQueueCloseOptions } from '@orpc/shared'
+import type { AsyncIdQueueCloseOptions, Promisable } from '@orpc/shared'
 import type { StandardRequest, StandardResponse } from '@orpc/standard-server'
-import type { EventIteratorPayload } from './codec'
+import type { DecodedRequestMessage, DecodedResponseMessage, EventIteratorPayload } from './codec'
 import type { EncodedMessage, EncodedMessageSendFn } from './types'
 import { AsyncIdQueue, clone, getGlobalOtelConfig, isAsyncIteratorObject, runWithSpan, SequentialIdGenerator } from '@orpc/shared'
 import { isEventIteratorHeaders } from '@orpc/standard-server'
 import { decodeResponseMessage, encodeRequestMessage, MessageType } from './codec'
 import { resolveEventIterator, toEventIterator } from './event-iterator'
+
+export interface experimental_RequestMessageSendFn {
+  (message: DecodedRequestMessage): Promisable<void>
+}
 
 export interface ClientPeerCloseOptions extends AsyncIdQueueCloseOptions {
   /**
@@ -17,6 +21,40 @@ export interface ClientPeerCloseOptions extends AsyncIdQueueCloseOptions {
 }
 
 export class ClientPeer {
+  private readonly peer: experimental_ClientPeerWithoutCodec
+
+  constructor(
+    send: EncodedMessageSendFn,
+  ) {
+    // eslint-disable-next-line new-cap
+    this.peer = new experimental_ClientPeerWithoutCodec(async ([id, type, payload]) => {
+      await send(await encodeRequestMessage(id, type, payload))
+    })
+  }
+
+  get length(): number {
+    return this.peer.length
+  }
+
+  open(id: string): AbortController {
+    /* v8 ignore next 2 - alias */
+    return this.peer.open(id)
+  }
+
+  async request(request: StandardRequest): Promise<StandardResponse> {
+    return this.peer.request(request)
+  }
+
+  async message(raw: EncodedMessage): Promise<void> {
+    return this.peer.message(await decodeResponseMessage(raw))
+  }
+
+  close(options: AsyncIdQueueCloseOptions = {}): void {
+    return this.peer.close(options)
+  }
+}
+
+export class experimental_ClientPeerWithoutCodec {
   private readonly idGenerator = new SequentialIdGenerator()
 
   /**
@@ -39,17 +77,18 @@ export class ClientPeer {
    */
   private readonly cleanupFns = new Map<string, (() => void)[]>()
 
-  private readonly send: (...args: Parameters<typeof encodeRequestMessage>) => Promise<void>
+  private readonly send: experimental_RequestMessageSendFn
 
   constructor(
-    send: EncodedMessageSendFn,
+    send: experimental_RequestMessageSendFn,
   ) {
-    this.send = async (id, ...rest) => encodeRequestMessage(id, ...rest).then(async (raw) => {
+    this.send = async (message) => {
+      const id = message[0]
       // only send message if still open
       if (this.serverControllers.has(id)) {
-        await send(raw)
+        await send(message)
       }
-    })
+    }
   }
 
   get length(): number {
@@ -97,16 +136,16 @@ export class ClientPeer {
            * such as event iterator messages, signal messages, etc.
            * Otherwise, the server may not recognize them as part of the request.
            */
-          await this.send(id, MessageType.REQUEST, request)
+          await this.send([id, MessageType.REQUEST, request])
 
           if (signal?.aborted) {
-            await this.send(id, MessageType.ABORT_SIGNAL, undefined)
+            await this.send([id, MessageType.ABORT_SIGNAL, undefined])
             throw signal.reason
           }
 
           let abortListener: () => void
           signal?.addEventListener('abort', abortListener = async () => {
-            await this.send(id, MessageType.ABORT_SIGNAL, undefined)
+            await this.send([id, MessageType.ABORT_SIGNAL, undefined])
             this.close({ id, reason: signal.reason })
           }, { once: true })
           /**
@@ -133,7 +172,7 @@ export class ClientPeer {
                 return 'abort'
               }
 
-              await this.send(id, MessageType.EVENT_ITERATOR, payload)
+              await this.send([id, MessageType.EVENT_ITERATOR, payload])
 
               return 'next'
             })
@@ -148,7 +187,7 @@ export class ClientPeer {
               async (reason) => {
                 try {
                   if (reason !== 'next') {
-                    await this.send(id, MessageType.ABORT_SIGNAL, undefined)
+                    await this.send([id, MessageType.ABORT_SIGNAL, undefined])
                   }
                 }
                 finally {
@@ -175,9 +214,7 @@ export class ClientPeer {
     )
   }
 
-  async message(raw: EncodedMessage): Promise<void> {
-    const [id, type, payload] = await decodeResponseMessage(raw)
-
+  async message([id, type, payload]: DecodedResponseMessage): Promise<void> {
     if (type === MessageType.ABORT_SIGNAL) {
       this.serverControllers.get(id)?.abort()
       return

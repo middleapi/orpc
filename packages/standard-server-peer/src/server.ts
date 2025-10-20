@@ -1,11 +1,15 @@
-import type { AsyncIdQueueCloseOptions } from '@orpc/shared'
+import type { AsyncIdQueueCloseOptions, Promisable } from '@orpc/shared'
 import type { StandardRequest, StandardResponse } from '@orpc/standard-server'
-import type { EventIteratorPayload } from './codec'
+import type { DecodedRequestMessage, DecodedResponseMessage, EventIteratorPayload } from './codec'
 import type { EncodedMessage, EncodedMessageSendFn } from './types'
 import { AbortError, AsyncIdQueue, getGlobalOtelConfig, isAsyncIteratorObject, runWithSpan } from '@orpc/shared'
 import { HibernationEventIterator, isEventIteratorHeaders } from '@orpc/standard-server'
 import { decodeRequestMessage, encodeResponseMessage, MessageType } from './codec'
 import { resolveEventIterator, toEventIterator } from './event-iterator'
+
+export interface experimental_ResponseMessageSendFn {
+  (message: DecodedResponseMessage): Promisable<void>
+}
 
 export interface ServerPeerHandleRequestFn {
   (request: StandardRequest): Promise<StandardResponse>
@@ -21,6 +25,50 @@ export interface ServerPeerCloseOptions extends AsyncIdQueueCloseOptions {
 }
 
 export class ServerPeer {
+  private readonly peer: experimental_ServerPeerWithoutCodec
+
+  constructor(
+    send: EncodedMessageSendFn,
+  ) {
+    // eslint-disable-next-line new-cap
+    this.peer = new experimental_ServerPeerWithoutCodec(async ([id, type, payload]) => {
+      await send(await encodeResponseMessage(id, type, payload))
+    })
+  }
+
+  get length(): number {
+    return this.peer.length
+  }
+
+  open(id: string): AbortController {
+    /* v8 ignore next 2 - alias */
+    return this.peer.open(id)
+  }
+
+  /**
+   * @todo This method will return Promise<void> in the next major version.
+   */
+  async message(
+    raw: EncodedMessage,
+    handleRequest?: ServerPeerHandleRequestFn,
+  ): Promise<[id: string, StandardRequest | undefined]> {
+    return this.peer.message(await decodeRequestMessage(raw), handleRequest)
+  }
+
+  /**
+   * @deprecated Please pass the `handleRequest` (second arg) function to the `message` method instead.
+   */
+  async response(id: string, response: StandardResponse): Promise<void> {
+    /* v8 ignore next 2 - alias */
+    return this.peer.response(id, response)
+  }
+
+  close({ abort = true, ...options }: ServerPeerCloseOptions = {}): void {
+    return this.peer.close({ ...options, abort })
+  }
+}
+
+export class experimental_ServerPeerWithoutCodec {
   /**
    * Queue of event iterator messages sent from client, awaiting consumption
    */
@@ -30,17 +78,18 @@ export class ServerPeer {
    */
   private readonly clientControllers = new Map<string, AbortController>()
 
-  private readonly send: (...args: Parameters<typeof encodeResponseMessage>) => Promise<void>
+  private readonly send: experimental_ResponseMessageSendFn
 
   constructor(
-    send: EncodedMessageSendFn,
+    send: experimental_ResponseMessageSendFn,
   ) {
-    this.send = (id, ...rest) => encodeResponseMessage(id, ...rest).then(async (raw) => {
+    this.send = async (message) => {
+      const id = message[0]
       // only send message if still open
       if (this.clientControllers.has(id)) {
-        await send(raw)
+        await send(message)
       }
-    })
+    }
   }
 
   get length(): number {
@@ -61,11 +110,9 @@ export class ServerPeer {
    * @todo This method will return Promise<void> in the next major version.
    */
   async message(
-    raw: EncodedMessage,
+    [id, type, payload]: DecodedRequestMessage,
     handleRequest?: ServerPeerHandleRequestFn,
   ): Promise<[id: string, StandardRequest | undefined]> {
-    const [id, type, payload] = await decodeRequestMessage(raw)
-
     if (type === MessageType.ABORT_SIGNAL) {
       this.close({ id, reason: new AbortError('Client aborted the request') })
       return [id, undefined]
@@ -90,7 +137,7 @@ export class ServerPeer {
             id,
             async (reason) => {
               if (reason !== 'next') {
-                await this.send(id, MessageType.ABORT_SIGNAL, undefined)
+                await this.send([id, MessageType.ABORT_SIGNAL, undefined])
               }
             },
             { signal },
@@ -156,7 +203,7 @@ export class ServerPeer {
        * We should send response message before event iterator messages,
        * so the server can recognize them as part of the response.
        */
-      await this.send(id, MessageType.RESPONSE, response)
+      await this.send([id, MessageType.RESPONSE, response])
 
       if (!signal.aborted && isAsyncIteratorObject(response.body)) {
         if (response.body instanceof HibernationEventIterator) {
@@ -170,7 +217,7 @@ export class ServerPeer {
               return 'abort'
             }
 
-            await this.send(id, MessageType.EVENT_ITERATOR, payload)
+            await this.send([id, MessageType.EVENT_ITERATOR, payload])
 
             return 'next'
           })
