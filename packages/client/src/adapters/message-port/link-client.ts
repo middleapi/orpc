@@ -12,8 +12,9 @@ export interface LinkMessagePortClientOptions {
   port: SupportedMessagePort
 
   /**
-   * Specify transferable objects (like ArrayBuffers, MessagePorts)
-   * that should be transferred rather than cloned when sending messages.
+   * By default, oRPC serializes request/response messages to string/binary data before send over message port.
+   * But if needed, you can define the this option to utilize full power of [MessagePort: postMessage() method](https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage),
+   * such as transfer ownership of objects to the other side or support unserializable objects like `OffscreenCanvas`.
    *
    * @remarks
    * - return null | undefined to disable this feature
@@ -22,9 +23,12 @@ export interface LinkMessagePortClientOptions {
    * @example
    * ```ts
    * experimental_transfer: (message) => {
-   *   return deepFindTransferableObjects(message)
+   *   const transfer = deepFindTransferableObjects(message) // implement your own logic
+   *   return transfer.length ? transfer : null // only enable when needed
    * }
    * ```
+   *
+   * @see {@link https://orpc.unnoq.com/docs/adapters/message-port#transfer Message Port Transfer Docs}
    */
   experimental_transfer?: Value<Promisable<object[] | null | undefined>, [message: DecodedRequestMessage]>
 }
@@ -35,7 +39,7 @@ export class LinkMessagePortClient<T extends ClientContext> implements StandardL
   constructor(options: LinkMessagePortClientOptions) {
     this.peer = new ClientPeerWithoutCodec(async (message) => {
       const [id, type, payload] = message
-      const transfer = options.experimental_transfer && await value(options.experimental_transfer, message)
+      const transfer = await value(options.experimental_transfer, message)
 
       if (transfer) {
         return postMessagePortMessage(options.port, serializeRequestMessage(id, type, payload), transfer)
