@@ -1,14 +1,14 @@
 import type { SupportedMessagePort } from '@orpc/client/message-port'
 import type { MaybeOptionalOptions, Promisable, Value } from '@orpc/shared'
-import type { DecodedRequestMessage, DecodedResponseMessage } from '@orpc/standard-server-peer'
+import type { DecodedResponseMessage, serializeRequestMessage } from '@orpc/standard-server-peer'
 import type { Context } from '../../context'
 import type { StandardHandler } from '../standard'
 import type {
   HandleStandardServerPeerMessageOptions,
 } from '../standard-peer'
 import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from '@orpc/client/message-port'
-import { resolveMaybeOptionalOptions, value } from '@orpc/shared'
-import { decodeRequestMessage, encodeResponseMessage, experimental_ServerPeerWithoutCodec as ServerPeerWithoutCodec } from '@orpc/standard-server-peer'
+import { isObject, resolveMaybeOptionalOptions, value } from '@orpc/shared'
+import { decodeRequestMessage, deserializeRequestMessage, encodeResponseMessage, serializeResponseMessage, experimental_ServerPeerWithoutCodec as ServerPeerWithoutCodec } from '@orpc/standard-server-peer'
 import { createServerPeerHandleRequestFn } from '../standard-peer'
 
 export interface MessagePortHandlerOptions<_T extends Context> {
@@ -45,24 +45,29 @@ export class MessagePortHandler<T extends Context> {
     ...rest: MaybeOptionalOptions<HandleStandardServerPeerMessageOptions<T>>
   ): void {
     const peer = new ServerPeerWithoutCodec(async (message) => {
+      const [id, type, payload] = message
       const transfer = this.transfer && await value(this.transfer, message)
 
       if (transfer) {
-        return postMessagePortMessage(port, message, transfer)
+        return postMessagePortMessage(port, serializeResponseMessage(id, type, payload), transfer)
       }
 
-      const [id, type, payload] = message
       return postMessagePortMessage(port, await encodeResponseMessage(id, type, payload))
     })
 
     onMessagePortMessage(port, async (message) => {
-      if (Array.isArray(message)) {
-        return await peer.message(message as DecodedRequestMessage)
+      const handleFn = createServerPeerHandleRequestFn(this.standardHandler, resolveMaybeOptionalOptions(rest))
+
+      if (isObject(message)) {
+        return await peer.message(
+          deserializeRequestMessage(message as any as ReturnType<typeof serializeRequestMessage>),
+          handleFn,
+        )
       }
 
       await peer.message(
         await decodeRequestMessage(message),
-        createServerPeerHandleRequestFn(this.standardHandler, resolveMaybeOptionalOptions(rest)),
+        handleFn,
       )
     })
 
