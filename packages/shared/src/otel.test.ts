@@ -1,4 +1,4 @@
-import { getGlobalOtelConfig, runInSpanContext, runWithSpan, setGlobalOtelConfig, setSpanAttribute, setSpanError, startSpan, toOtelException, toSpanAttributeValue } from './otel'
+import { getGlobalOtelConfig, isInSentryContext, runInSpanContext, runWithSpan, setGlobalOtelConfig, setSpanAttribute, setSpanError, startSpan, toOtelException, toSpanAttributeValue } from './otel'
 
 function createMockSpan(name = 'test-span') {
   return {
@@ -359,6 +359,37 @@ describe('tracing', () => {
 
       await expect(runInSpanContext(mockSpan as any, fn)).rejects.toThrow('Function error')
       expect(fn).toHaveBeenCalledWith()
+    })
+  })
+
+  describe('isInSentryContext', () => {
+    it('return true when the sentry symbol is defined in the context', () => {
+      const mockConfig = createMockOtelConfig()
+      mockConfig.context.active.mockReturnValue({
+        getValue: vi.fn((key) => {
+          const symbol = Symbol.for('sentry_scopes')
+          return key === symbol ? symbol : undefined
+        }),
+      })
+
+      setGlobalOtelConfig(mockConfig as any)
+
+      expect(isInSentryContext()).toEqual(true)
+    })
+
+    it('return false when there isn\'t any context', () => {
+      expect(isInSentryContext()).toEqual(false)
+    })
+
+    it('return false when there isn\'t any sentry symbol in the context', () => {
+      const mockConfig = createMockOtelConfig()
+      mockConfig.context.active.mockReturnValue({
+        getValue: vi.fn(() => undefined),
+      })
+
+      setGlobalOtelConfig(mockConfig as any)
+
+      expect(isInSentryContext()).toEqual(false)
     })
   })
 })

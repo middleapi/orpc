@@ -1,10 +1,10 @@
 import type { AsyncIteratorClassCleanupFn, SetSpanErrorOptions } from '@orpc/shared'
 import type { AsyncIdQueue } from '../../shared/src/queue'
 import type { EventIteratorPayload } from './codec'
-import { AsyncIteratorClass, isTypescriptObject, runInSpanContext, runWithSpan, setSpanError, startSpan } from '@orpc/shared'
+import { AsyncIteratorClass, isInSentryContext, isTypescriptObject, runInSpanContext, runWithSpan, setSpanError, startSpan } from '@orpc/shared'
 import { ErrorEvent, getEventMeta, withEventMeta } from '@orpc/standard-server'
 
-export interface ToEventIteratorOptions extends SetSpanErrorOptions {}
+export interface ToEventIteratorOptions extends SetSpanErrorOptions { }
 
 export function toEventIterator(
   queue: AsyncIdQueue<EventIteratorPayload>,
@@ -95,6 +95,9 @@ export function resolveEventIterator(
   return runWithSpan(
     { name: 'stream_event_iterator' },
     async (span) => {
+      if (isInSentryContext()) {
+        span?.setAttribute('sentry.op', 'orpc')
+      }
       while (true) {
         const payload: EventIteratorPayload = await (async () => {
           try {

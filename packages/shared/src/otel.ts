@@ -8,6 +8,13 @@ import { ORPC_SHARED_PACKAGE_NAME, ORPC_SHARED_PACKAGE_VERSION } from './consts'
 const SPAN_ERROR_STATUS = 2 satisfies SpanStatusCode.ERROR // avoid runtime dependency on @opentelemetry/api
 
 /**
+ * Symbol used to add the sentry scope to the open telemetry context.
+ *
+ * See https://github.com/getsentry/sentry-javascript/blob/910b40bb38635d1889a97f701c46c44fb3038b93/packages/opentelemetry/src/constants.ts#L12
+ */
+const SENTRY_SCOPE_SYMBOL = Symbol.for('sentry_scopes')
+
+/**
  * We should use globalThis + a unique key to store global state.
  * If use a global variable/symbol, it can create multiple instances in different contexts.
  */
@@ -191,4 +198,12 @@ export async function runInSpanContext<T>(
 
   const ctx = otelConfig.trace.setSpan(otelConfig.context.active(), span)
   return otelConfig.context.with(ctx, fn)
+}
+
+/**
+ * Checks if the current context is a Sentry context.
+ */
+export function isInSentryContext(): boolean {
+  const context = getGlobalOtelConfig()?.context
+  return context?.active()?.getValue(SENTRY_SCOPE_SYMBOL) !== undefined
 }

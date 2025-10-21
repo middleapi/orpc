@@ -7,7 +7,7 @@ import type { Lazyable } from './lazy'
 import type { AnyProcedure, Procedure, ProcedureHandlerOptions } from './procedure'
 import { mapEventIterator, ORPCError } from '@orpc/client'
 import { validateORPCError, ValidationError } from '@orpc/contract'
-import { asyncIteratorWithSpan, intercept, isAsyncIteratorObject, overlayProxy, resolveMaybeOptionalOptions, runWithSpan, toArray, value } from '@orpc/shared'
+import { asyncIteratorWithSpan, intercept, isAsyncIteratorObject, isInSentryContext, overlayProxy, resolveMaybeOptionalOptions, runWithSpan, toArray, value } from '@orpc/shared'
 import { HibernationEventIterator } from '@orpc/standard-server'
 import { mergeCurrentContext } from './context'
 import { createORPCErrorConstructorMap } from './error'
@@ -111,6 +111,9 @@ export function createProcedureClient<
         { name: 'call_procedure', signal: callerOptions?.signal },
         (span) => {
           span?.setAttribute('procedure.path', [...path])
+          if (isInSentryContext()) {
+            span?.setAttribute('sentry.op', 'orpc')
+          }
 
           return intercept(
             toArray(options.interceptors),
@@ -173,7 +176,10 @@ async function validateInput(procedure: AnyProcedure, input: unknown): Promise<a
 
   return runWithSpan(
     { name: 'validate_input' },
-    async () => {
+    async (span) => {
+      if (isInSentryContext()) {
+        span?.setAttribute('sentry.op', 'orpc')
+      }
       const result = await schema['~standard'].validate(input)
 
       if (result.issues) {
@@ -204,7 +210,10 @@ async function validateOutput(procedure: AnyProcedure, output: unknown): Promise
 
   return runWithSpan(
     { name: 'validate_output' },
-    async () => {
+    async (span) => {
+      if (isInSentryContext()) {
+        span?.setAttribute('sentry.op', 'orpc')
+      }
       const result = await schema['~standard'].validate(output)
 
       if (result.issues) {
@@ -243,6 +252,9 @@ async function executeProcedureInternal(procedure: AnyProcedure, options: Proced
           async (span) => {
             span?.setAttribute('middleware.index', index)
             span?.setAttribute('middleware.name', mid.name)
+            if (isInSentryContext()) {
+              span?.setAttribute('sentry.op', 'orpc')
+            }
 
             const result = await mid({
               ...options,
@@ -262,7 +274,13 @@ async function executeProcedureInternal(procedure: AnyProcedure, options: Proced
         )
       : await runWithSpan(
           { name: 'handler', signal: options.signal },
-          () => procedure['~orpc'].handler({ ...options, context, input: currentInput }),
+          (span) => {
+            if (isInSentryContext()) {
+              span?.setAttribute('sentry.op', 'orpc')
+            }
+
+            procedure['~orpc'].handler({ ...options, context, input: currentInput })
+          },
         )
 
     if (index === outputValidationIndex) {

@@ -1,10 +1,10 @@
 import type { StandardBody } from '@orpc/standard-server'
 import type { ToEventIteratorOptions, ToEventStreamOptions } from './event-iterator'
-import { isAsyncIteratorObject, parseEmptyableJSON, runWithSpan, stringifyJSON } from '@orpc/shared'
+import { isAsyncIteratorObject, isInSentryContext, parseEmptyableJSON, runWithSpan, stringifyJSON } from '@orpc/shared'
 import { generateContentDisposition, getFilenameFromContentDisposition } from '@orpc/standard-server'
 import { toEventIterator, toEventStream } from './event-iterator'
 
-export interface ToStandardBodyOptions extends ToEventIteratorOptions {}
+export interface ToStandardBodyOptions extends ToEventIteratorOptions { }
 
 export function toStandardBody(
   re: Request | Response,
@@ -12,7 +12,10 @@ export function toStandardBody(
 ): Promise<StandardBody> {
   return runWithSpan(
     { name: 'parse_standard_body', signal: options.signal },
-    async () => {
+    async (span) => {
+      if (isInSentryContext()) {
+        span?.setAttribute('sentry.op', 'orpc')
+      }
       const contentDisposition = re.headers.get('content-disposition')
 
       if (typeof contentDisposition === 'string') {
@@ -56,7 +59,7 @@ export function toStandardBody(
   )
 }
 
-export interface ToFetchBodyOptions extends ToEventStreamOptions {}
+export interface ToFetchBodyOptions extends ToEventStreamOptions { }
 
 /**
  * @param body

@@ -3,7 +3,7 @@ import type { StandardHeaders, StandardRequest } from '@orpc/standard-server'
 import type { BatchResponseBodyItem } from '@orpc/standard-server/batch'
 import type { StandardHandlerInterceptorOptions, StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard'
 import type { Context } from '../context'
-import { AsyncIteratorClass, isAsyncIteratorObject, runWithSpan, setSpanError, value } from '@orpc/shared'
+import { AsyncIteratorClass, isAsyncIteratorObject, isInSentryContext, runWithSpan, setSpanError, value } from '@orpc/shared'
 import { flattenHeader } from '@orpc/standard-server'
 import { parseBatchRequest, toBatchResponse } from '@orpc/standard-server/batch'
 
@@ -80,6 +80,9 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
       try {
         return await runWithSpan({ name: 'handle_batch_request' }, async (span) => {
+          if (isInSentryContext()) {
+            span?.setAttribute('sentry.op', 'orpc')
+          }
           const mode = xHeader === 'buffered' ? 'buffered' : 'streaming'
 
           isParsing = true

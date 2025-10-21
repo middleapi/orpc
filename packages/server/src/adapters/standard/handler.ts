@@ -8,7 +8,7 @@ import type { Router } from '../../router'
 import type { StandardHandlerPlugin } from './plugin'
 import type { StandardCodec, StandardMatcher } from './types'
 import { ORPCError, toORPCError } from '@orpc/client'
-import { asyncIteratorWithSpan, intercept, isAsyncIteratorObject, ORPC_NAME, runWithSpan, setSpanError, toArray } from '@orpc/shared'
+import { asyncIteratorWithSpan, intercept, isAsyncIteratorObject, isInSentryContext, ORPC_NAME, runWithSpan, setSpanError, toArray } from '@orpc/shared'
 import { flattenHeader } from '@orpc/standard-server'
 import { createProcedureClient } from '../../procedure-client'
 import { CompositeStandardHandlerPlugin } from './plugin'
@@ -83,6 +83,9 @@ export class StandardHandler<T extends Context> {
         return runWithSpan(
           { name: `${request.method} ${request.url.pathname}` },
           async (span) => {
+            if (isInSentryContext()) {
+              span?.setAttribute('sentry.op', 'orpc')
+            }
             let step: 'decode_input' | 'call_procedure' | undefined
 
             try {
@@ -99,7 +102,12 @@ export class StandardHandler<T extends Context> {
 
                   const match = await runWithSpan(
                     { name: 'find_procedure' },
-                    () => this.matcher.match(method, `/${pathname.replace(/^\/|\/$/g, '')}`),
+                    (span) => {
+                      if (isInSentryContext()) {
+                        span?.setAttribute('sentry.op', 'orpc')
+                      }
+                      return this.matcher.match(method, `/${pathname.replace(/^\/|\/$/g, '')}`)
+                    },
                   )
 
                   if (!match) {
@@ -116,7 +124,12 @@ export class StandardHandler<T extends Context> {
                   step = 'decode_input'
                   let input = await runWithSpan(
                     { name: 'decode_input' },
-                    () => this.codec.decode(request, match.params, match.procedure),
+                    (span) => {
+                      if (isInSentryContext()) {
+                        span?.setAttribute('sentry.op', 'orpc')
+                      }
+                      return this.codec.decode(request, match.params, match.procedure)
+                    },
                   )
                   step = undefined
 
@@ -153,10 +166,10 @@ export class StandardHandler<T extends Context> {
               )
             }
             catch (e) {
-            /**
-             * Only errors that happen outside of the `call_procedure` step should be set as an error.
-             * Because a business logic error should not be considered as a protocol-level error.
-             */
+              /**
+               * Only errors that happen outside of the `call_procedure` step should be set as an error.
+               * Because a business logic error should not be considered as a protocol-level error.
+               */
               if (step !== 'call_procedure') {
                 setSpanError(span, e)
               }

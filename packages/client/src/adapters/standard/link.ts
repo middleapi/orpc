@@ -3,7 +3,7 @@ import type { StandardLazyResponse, StandardRequest } from '@orpc/standard-serve
 import type { ClientContext, ClientLink, ClientOptions } from '../../types'
 import type { StandardLinkPlugin } from './plugin'
 import type { StandardLinkClient, StandardLinkCodec } from './types'
-import { asyncIteratorWithSpan, getGlobalOtelConfig, intercept, isAsyncIteratorObject, ORPC_NAME, runWithSpan, toArray } from '@orpc/shared'
+import { asyncIteratorWithSpan, getGlobalOtelConfig, intercept, isAsyncIteratorObject, isInSentryContext, ORPC_NAME, runWithSpan, toArray } from '@orpc/shared'
 import { CompositeStandardLinkPlugin } from './plugin'
 
 export interface StandardLinkInterceptorOptions<T extends ClientContext> extends ClientOptions<T> {
@@ -50,6 +50,9 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
          */
         span?.setAttribute('rpc.system', ORPC_NAME)
         span?.setAttribute('rpc.method', path.join('.'))
+        if (isInSentryContext()) {
+          span?.setAttribute('sentry.op', 'orpc')
+        }
 
         if (isAsyncIteratorObject(input)) {
           input = asyncIteratorWithSpan(
@@ -59,10 +62,10 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
         }
 
         return intercept(this.interceptors, { ...options, path, input }, async ({ path, input, ...options }) => {
-        /**
-         * In browsers, the OpenTelemetry context manager may not work reliably with async functions,
-         * so we manually manage the context here.
-         */
+          /**
+           * In browsers, the OpenTelemetry context manager may not work reliably with async functions,
+           * so we manually manage the context here.
+           */
           const otelConfig = getGlobalOtelConfig()
           let otelContext: ReturnType<Exclude<typeof otelConfig, undefined>['context']['active']> | undefined
           const currentSpan = otelConfig?.trace.getActiveSpan() ?? span
@@ -72,7 +75,13 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
 
           const request = await runWithSpan(
             { name: 'encode_request', context: otelContext },
-            () => this.codec.encode(path, input, options),
+            (span) => {
+              if (isInSentryContext()) {
+                span?.setAttribute('sentry.op', 'orpc')
+              }
+
+              return this.codec.encode(path, input, options)
+            },
           )
 
           const response = await intercept(
@@ -81,14 +90,26 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
             ({ input, path, request, ...options }) => {
               return runWithSpan(
                 { name: 'send_request', signal: options.signal, context: otelContext },
-                () => this.sender.call(request, options, path, input),
+                (span) => {
+                  if (isInSentryContext()) {
+                    span?.setAttribute('sentry.op', 'orpc')
+                  }
+
+                  return this.sender.call(request, options, path, input)
+                },
               )
             },
           )
 
           const output = await runWithSpan(
             { name: 'decode_response', context: otelContext },
-            () => this.codec.decode(response, options, path, input),
+            (span) => {
+              if (isInSentryContext()) {
+                span?.setAttribute('sentry.op', 'orpc')
+              }
+
+              return this.codec.decode(response, options, path, input)
+            },
           )
 
           if (isAsyncIteratorObject(output)) {
