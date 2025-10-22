@@ -53,26 +53,28 @@ export class MessagePortHandler<T extends Context> {
       const transfer = await value(this.transfer, message, port)
 
       if (transfer) {
-        return postMessagePortMessage(port, serializeResponseMessage(id, type, payload), transfer)
+        postMessagePortMessage(port, serializeResponseMessage(id, type, payload), transfer)
       }
-
-      return postMessagePortMessage(port, await encodeResponseMessage(id, type, payload))
+      else {
+        postMessagePortMessage(port, await encodeResponseMessage(id, type, payload))
+      }
     })
 
     onMessagePortMessage(port, async (message) => {
       const handleFn = createServerPeerHandleRequestFn(this.standardHandler, resolveMaybeOptionalOptions(rest))
 
       if (isObject(message)) {
-        return await peer.message(
+        await peer.message(
           deserializeRequestMessage(message as any as ReturnType<typeof serializeRequestMessage>),
           handleFn,
         )
       }
-
-      await peer.message(
-        await decodeRequestMessage(message),
-        handleFn,
-      )
+      else {
+        await peer.message(
+          await decodeRequestMessage(message),
+          handleFn,
+        )
+      }
     })
 
     onMessagePortClose(port, () => {

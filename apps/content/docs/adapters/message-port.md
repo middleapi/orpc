@@ -77,7 +77,7 @@ const link = new RPCLink({
 :::
 
 ::: warning
-When `transfer` returns an array, messages using [the structured clone algorithm](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm) for sending, which doesn't support all data types such as [Event Iterator's Metadata](/docs/event-iterator#last-event-id-event-metadata). So I recommend you only enable this only when needed.
+When `transfer` returns an array, messages using [the structured clone algorithm](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm) for sending, which doesn't support all data types such as [Event Iterator's Metadata](/docs/event-iterator#last-event-id-event-metadata). So I recommend you only enable this when needed.
 :::
 
 ::: tip

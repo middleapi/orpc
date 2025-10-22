@@ -42,18 +42,20 @@ export class LinkMessagePortClient<T extends ClientContext> implements StandardL
       const transfer = await value(options.experimental_transfer, message)
 
       if (transfer) {
-        return postMessagePortMessage(options.port, serializeRequestMessage(id, type, payload), transfer)
+        postMessagePortMessage(options.port, serializeRequestMessage(id, type, payload), transfer)
       }
-
-      return postMessagePortMessage(options.port, await encodeRequestMessage(id, type, payload))
+      else {
+        postMessagePortMessage(options.port, await encodeRequestMessage(id, type, payload))
+      }
     })
 
     onMessagePortMessage(options.port, async (message) => {
       if (isObject(message)) {
-        return await this.peer.message(deserializeResponseMessage(message as any as ReturnType<typeof serializeResponseMessage>))
+        await this.peer.message(deserializeResponseMessage(message as any as ReturnType<typeof serializeResponseMessage>))
       }
-
-      return await this.peer.message(await decodeResponseMessage(message))
+      else {
+        await this.peer.message(await decodeResponseMessage(message))
+      }
     })
 
     onMessagePortClose(options.port, () => {
