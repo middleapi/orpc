@@ -22,7 +22,7 @@ export interface LinkMessagePortClientOptions {
    * @warning Make sure your message port supports `transfer` before using this feature.
    * @example
    * ```ts
-   * experimental_transfer: (message) => {
+   * experimental_transfer: (message, port) => {
    *   const transfer = deepFindTransferableObjects(message) // implement your own logic
    *   return transfer.length ? transfer : null // only enable when needed
    * }
@@ -30,7 +30,7 @@ export interface LinkMessagePortClientOptions {
    *
    * @see {@link https://orpc.unnoq.com/docs/adapters/message-port#transfer Message Port Transfer Docs}
    */
-  experimental_transfer?: Value<Promisable<object[] | null | undefined>, [message: DecodedRequestMessage]>
+  experimental_transfer?: Value<Promisable<object[] | null | undefined>, [message: DecodedRequestMessage, port: SupportedMessagePort]>
 }
 
 export class LinkMessagePortClient<T extends ClientContext> implements StandardLinkClient<T> {
@@ -39,7 +39,7 @@ export class LinkMessagePortClient<T extends ClientContext> implements StandardL
   constructor(options: LinkMessagePortClientOptions) {
     this.peer = new ClientPeerWithoutCodec(async (message) => {
       const [id, type, payload] = message
-      const transfer = await value(options.experimental_transfer, message)
+      const transfer = await value(options.experimental_transfer, message, options.port)
 
       if (transfer) {
         postMessagePortMessage(options.port, serializeRequestMessage(id, type, payload), transfer)

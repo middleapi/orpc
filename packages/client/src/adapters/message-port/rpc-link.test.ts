@@ -90,7 +90,7 @@ describe('rpcLink', () => {
       body: { json: expect.toBeOneOf([array]) },
       headers: {},
       method: 'POST',
-    })])
+    })], expect.toBeOneOf([clientPort]))
 
     expect(id).toBeTypeOf('string')
     expect(payload).toEqual({
