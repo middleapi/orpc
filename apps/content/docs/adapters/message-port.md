@@ -56,8 +56,8 @@ By default, oRPC serializes request/response messages to string/binary data befo
 ::: code-group
 
 ```ts [handler]
-handler.upgrade(serverPort, {
-  experimental_transfer: (message) => {
+const handler = new RPCHandler(router, {
+  experimental_transfer: (message, port) => {
     const transfer = deepFindTransferableObjects(message) // implement your own logic
     return transfer.length ? transfer : null // only enable when needed
   }

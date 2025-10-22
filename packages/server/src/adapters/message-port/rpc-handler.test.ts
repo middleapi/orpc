@@ -78,7 +78,7 @@ describe('rpcHandler', async () => {
     expect(transfer).toHaveBeenCalledWith([id, type, expect.objectContaining({
       body: { json: expect.toBeOneOf([array]) },
       headers: {},
-    })])
+    })], expect.toBeOneOf([serverPort]))
 
     expect(id).toBeTypeOf('string')
     expect(payload).toEqual({

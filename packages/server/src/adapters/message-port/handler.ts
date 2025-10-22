@@ -23,7 +23,7 @@ export interface MessagePortHandlerOptions<_T extends Context> {
    * @warning Make sure your message port supports `transfer` before using this feature.
    * @example
    * ```ts
-   * experimental_transfer: (message) => {
+   * experimental_transfer: (message, port) => {
    *   const transfer = deepFindTransferableObjects(message) // implement your own logic
    *   return transfer.length ? transfer : null // only enable when needed
    * }
@@ -31,7 +31,7 @@ export interface MessagePortHandlerOptions<_T extends Context> {
    *
    * @see {@link https://orpc.unnoq.com/docs/adapters/message-port#transfer Message Port Transfer Docs}
    */
-  experimental_transfer?: Value<Promisable<object[] | null | undefined>, [message: DecodedResponseMessage]>
+  experimental_transfer?: Value<Promisable<object[] | null | undefined>, [message: DecodedResponseMessage, port: SupportedMessagePort]>
 }
 
 export class MessagePortHandler<T extends Context> {
@@ -50,7 +50,7 @@ export class MessagePortHandler<T extends Context> {
   ): void {
     const peer = new ServerPeerWithoutCodec(async (message) => {
       const [id, type, payload] = message
-      const transfer = await value(this.transfer, message)
+      const transfer = await value(this.transfer, message, port)
 
       if (transfer) {
         return postMessagePortMessage(port, serializeResponseMessage(id, type, payload), transfer)
