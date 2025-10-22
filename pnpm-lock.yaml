@@ -706,6 +706,34 @@ importers:
         specifier: ^22.15.30
         version: 22.18.11
 
+  packages/standard-server-fastify:
+    dependencies:
+      '@orpc/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@orpc/standard-server':
+        specifier: workspace:*
+        version: link:../standard-server
+      '@orpc/standard-server-node':
+        specifier: workspace:*
+        version: link:../standard-server-node
+    devDependencies:
+      '@fastify/cookie':
+        specifier: ^11.0.2
+        version: 11.0.2
+      '@types/node':
+        specifier: ^22.15.30
+        version: 22.18.11
+      '@types/supertest':
+        specifier: ^6.0.3
+        version: 6.0.3
+      fastify:
+        specifier: ^5.6.1
+        version: 5.6.1
+      supertest:
+        specifier: ^7.1.4
+        version: 7.1.4
+
   packages/standard-server-fetch:
     dependencies:
       '@orpc/shared':
@@ -2912,6 +2940,9 @@ packages:
   '@fastify/busboy@2.1.1':
     resolution: {integrity: sha512-vBZP4NlzfOlerQTnba4aqZoMhE/a9HY7HRqoOPaETQcSQuWEIyZMHGfVu6w9wGtGK5fED5qRs2DteVCjOH60sA==}
     engines: {node: '>=14'}
+
+  '@fastify/cookie@11.0.2':
+    resolution: {integrity: sha512-GWdwdGlgJxyvNv+QcKiGNevSspMQXncjMZ1J8IvuDQk0jvkzgWWZFNC2En3s+nHndZBGV8IbLwOI/sxCZw/mzA==}
 
   '@fastify/cors@11.1.0':
     resolution: {integrity: sha512-sUw8ed8wP2SouWZTIbA7V2OQtMNpLj2W6qJOYhNdcmINTu6gsxVYXjQiM9mdi8UUDlcoDDJ/W2syPo1WB2QjYA==}
@@ -15924,6 +15955,11 @@ snapshots:
       fast-uri: 3.1.0
 
   '@fastify/busboy@2.1.1': {}
+
+  '@fastify/cookie@11.0.2':
+    dependencies:
+      cookie: 1.0.2
+      fastify-plugin: 5.1.0
 
   '@fastify/cors@11.1.0':
     dependencies:
