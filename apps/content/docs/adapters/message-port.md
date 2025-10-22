@@ -51,7 +51,7 @@ This only shows how to configure the link. For full client examples, see [Client
 
 ## Transfer
 
-By default, oRPC serializes request/response messages to string/binary data before send over message port. But if needed, you can define the `transfer` option to utilize full power of [MessagePort: postMessage() method](https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage), such as transfer ownership of objects to the other side or support unserializable objects like `OffscreenCanvas`.
+By default, oRPC serializes request/response messages to string/binary data before sending over message port. If needed, you can define the `transfer` option to utilize full power of [MessagePort: postMessage() method](https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage), such as transferring ownership of objects to the other side or support unserializable objects like `OffscreenCanvas`.
 
 ::: code-group
 
