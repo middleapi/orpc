@@ -1,4 +1,5 @@
 import { Readable } from 'node:stream'
+import FastifyCookie from '@fastify/cookie'
 import * as StandardServerNode from '@orpc/standard-server-node'
 import Fastify from 'fastify'
 import request from 'supertest'
@@ -247,6 +248,34 @@ describe('sendStandardResponse', () => {
       await vi.waitFor(() => {
         expect(cancelMock).toHaveBeenCalledTimes(1)
       })
+    })
+
+    it('work with @fastify/cookie', async ({ onTestFinished }) => {
+      const fastify = Fastify()
+      onTestFinished(() => fastify.close())
+
+      await fastify.register(FastifyCookie)
+
+      fastify.get('/', async (req, reply) => {
+        reply.cookie('foo', 'bar')
+        await sendStandardResponse(reply, {
+          status: 207,
+          headers: {},
+          body: { foo: 'bar' },
+        })
+      })
+
+      await fastify.ready()
+      const res = await request(fastify.server).get('/')
+
+      expect(res.headers).toMatchObject({
+        'content-type': 'application/json; charset=utf-8',
+        'set-cookie': [
+          expect.stringContaining('foo=bar'),
+        ],
+      })
+
+      expect(res.text).toEqual(JSON.stringify({ foo: 'bar' }))
     })
   })
 })

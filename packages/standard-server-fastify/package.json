@@ -1,7 +1,7 @@
 {
   "name": "@orpc/standard-server-fastify",
   "type": "module",
-  "version": "1.10.0",
+  "version": "0.0.0",
   "license": "MIT",
   "homepage": "https://orpc.unnoq.com",
   "repository": {
@@ -10,7 +10,8 @@
     "directory": "packages/standard-server-fastify"
   },
   "keywords": [
-    "orpc"
+    "orpc",
+    "fastify"
   ],
   "publishConfig": {
     "exports": {
