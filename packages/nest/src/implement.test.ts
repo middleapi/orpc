@@ -480,7 +480,7 @@ describe('@Implement', async () => {
     }).compile()
 
     const adapter = new FastifyAdapter()
-    await adapter.register(FastifyCookie, {})
+    await adapter.register(FastifyCookie as any)
     const app = moduleRef.createNestApplication(adapter)
     await app.init()
     await app.getHttpAdapter().getInstance().ready()
