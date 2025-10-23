@@ -100,18 +100,12 @@ describe('fastifyHandler', async () => {
 
   it('on mismatch', async () => {
     vi.mocked(toStandardLazyRequest).mockReturnValueOnce(standardRequest)
-    handle.mockReturnValueOnce({
-      matched: false,
-      response: undefined,
-    })
+    handle.mockReturnValueOnce({ matched: false })
 
     const options = { prefix: '/api/v1', context: { db: 'postgres' } } as const
     const result = await handler.handle(req, reply, options)
 
-    expect(result).toEqual({
-      matched: false,
-      response: undefined,
-    })
+    expect(result).toEqual({ matched: false })
 
     expect(handle).toHaveBeenCalledOnce()
     expect(handle).toHaveBeenCalledWith(

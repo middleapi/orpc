@@ -19,7 +19,7 @@ export interface FastifyHandlerOptions<T extends Context> extends SendStandardRe
   adapterInterceptors?: Interceptor<FastifyInterceptorOptions<T>, Promise<FastifyHandleResult>>[]
 }
 
-export class FastifyHandler<T extends Context> implements FastifyHandler<T> {
+export class FastifyHandler<T extends Context> {
   private readonly sendStandardResponseOptions: SendStandardResponseOptions
   private readonly adapterInterceptors: Exclude<FastifyHandlerOptions<T>['adapterInterceptors'], undefined>
 

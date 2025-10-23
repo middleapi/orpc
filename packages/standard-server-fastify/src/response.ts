@@ -20,15 +20,6 @@ export function sendStandardResponse(
 
     reply.status(standardResponse.status)
     reply.headers(resHeaders)
-
-    if (resBody === undefined) {
-      reply.send()
-    }
-    else if (typeof resBody === 'string') {
-      reply.send(resBody)
-    }
-    else {
-      reply.send(resBody)
-    }
+    reply.send(resBody)
   })
 }

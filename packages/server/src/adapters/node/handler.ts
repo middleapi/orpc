@@ -23,7 +23,7 @@ export interface NodeHttpHandlerOptions<T extends Context> extends SendStandardR
   plugins?: NodeHttpHandlerPlugin<T>[]
 }
 
-export class NodeHttpHandler<T extends Context> implements NodeHttpHandler<T> {
+export class NodeHttpHandler<T extends Context> {
   private readonly sendStandardResponseOptions: SendStandardResponseOptions
   private readonly adapterInterceptors: Exclude<NodeHttpHandlerOptions<T>['adapterInterceptors'], undefined>
 

@@ -38,9 +38,8 @@ describe('sendStandardResponse', () => {
     expect(endSpy).toBeCalledWith()
 
     expect(res.status).toBe(207)
-    expect(res.headers).toMatchObject({
-      'x-custom-header': 'custom-value',
-    })
+    expect(res.headers['content-type']).toEqual(undefined)
+    expect(res.headers['x-custom-header']).toEqual('custom-value')
 
     expect(res.text).toEqual('')
   })
