@@ -16,7 +16,6 @@ Fastify parses common request content types by default. oRPC will use the parsed
 ```ts
 import Fastify from 'fastify'
 import { RPCHandler } from '@orpc/server/fastify'
-import { CORSPlugin } from '@orpc/server/plugins'
 import { onError } from '@orpc/server'
 
 const handler = new RPCHandler(router, {

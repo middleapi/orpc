@@ -10,7 +10,7 @@ export function toStandardLazyRequest(
   const signal = toAbortSignal(reply.raw)
 
   return {
-    method: toStandardMethod(req.method),
+    method: toStandardMethod(req.raw.method),
     url: toStandardUrl(req.raw),
     headers: req.headers,
     body: once(async () => {

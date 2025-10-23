@@ -44,7 +44,7 @@ describe('toStandardLazyRequest', () => {
     expect(standardRequest.signal).toBe(toAbortSignalSpy.mock.results[0]!.value)
 
     expect(toStandardMethodSpy).toBeCalledTimes(1)
-    expect(toStandardMethodSpy).toBeCalledWith(fastifyReq.method)
+    expect(toStandardMethodSpy).toBeCalledWith(fastifyReq.raw.method)
     expect(standardRequest.method).toBe(toStandardMethodSpy.mock.results[0]!.value)
 
     expect(toStandardUrlSpy).toBeCalledTimes(1)

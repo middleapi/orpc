@@ -37,6 +37,7 @@ Abstracts runtime environments, allowing oRPC adapters to run seamlessly across 
 - [standard-server](https://github.com/unnoq/orpc/tree/main/packages/standard-server)
 - [standard-server-fetch](https://github.com/unnoq/orpc/tree/main/packages/standard-server-fetch)
 - [standard-server-node](https://github.com/unnoq/orpc/tree/main/packages/standard-server-node)
+- [standard-server-fastify](https://github.com/unnoq/orpc/tree/main/packages/standard-server-fastify)
 - [standard-server-aws-lambda](https://github.com/unnoq/orpc/tree/main/packages/standard-server-aws-lambda)
 - [standard-server-peer](https://github.com/unnoq/orpc/tree/main/packages/standard-server-peer)
 
