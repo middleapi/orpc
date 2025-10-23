@@ -396,10 +396,16 @@ importers:
       '@orpc/standard-server':
         specifier: workspace:*
         version: link:../standard-server
+      '@orpc/standard-server-fastify':
+        specifier: workspace:*
+        version: link:../standard-server-fastify
       '@orpc/standard-server-node':
         specifier: workspace:*
         version: link:../standard-server-node
     devDependencies:
+      '@fastify/cookie':
+        specifier: ^11.0.2
+        version: 11.0.2
       '@nestjs/common':
         specifier: ^11.1.6
         version: 11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2)

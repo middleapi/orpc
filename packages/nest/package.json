@@ -57,9 +57,11 @@
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
     "@orpc/standard-server": "workspace:*",
+    "@orpc/standard-server-fastify": "workspace:*",
     "@orpc/standard-server-node": "workspace:*"
   },
   "devDependencies": {
+    "@fastify/cookie": "^11.0.2",
     "@nestjs/common": "^11.1.6",
     "@nestjs/core": "^11.1.6",
     "@nestjs/platform-express": "^11.1.6",

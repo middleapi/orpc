@@ -4,7 +4,6 @@ import type { Router } from '@orpc/server'
 import type { StandardParams } from '@orpc/server/standard'
 import type { Promisable } from '@orpc/shared'
 import type { StandardResponse } from '@orpc/standard-server'
-import type { NodeHttpRequest, NodeHttpResponse } from '@orpc/standard-server-node'
 import type { Request, Response } from 'express'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
@@ -17,7 +16,8 @@ import { StandardOpenAPICodec } from '@orpc/openapi/standard'
 import { createProcedureClient, getRouter, isProcedure, ORPCError, unlazy } from '@orpc/server'
 import { get } from '@orpc/shared'
 import { flattenHeader } from '@orpc/standard-server'
-import { sendStandardResponse, toStandardLazyRequest } from '@orpc/standard-server-node'
+import * as StandardServerFastify from '@orpc/standard-server-fastify'
+import * as StandardServerNode from '@orpc/standard-server-node'
 import { mergeMap } from 'rxjs'
 import { ORPC_MODULE_CONFIG_SYMBOL } from './module'
 import { toNestPattern } from './utils'
@@ -120,15 +120,9 @@ export class ImplementInterceptor implements NestInterceptor {
         const req: Request | FastifyRequest = ctx.switchToHttp().getRequest()
         const res: Response | FastifyReply = ctx.switchToHttp().getResponse()
 
-        const nodeReq: NodeHttpRequest = 'raw' in req ? req.raw : req
-        const nodeRes: NodeHttpResponse = 'raw' in res ? res.raw : res
-
-        const standardRequest = toStandardLazyRequest(nodeReq, nodeRes)
-        const fallbackStandardBody = standardRequest.body.bind(standardRequest)
-        // Prefer NestJS parsed body (in nodejs body only allow parse once)
-        standardRequest.body = () => Promise.resolve(
-          req.body === undefined ? fallbackStandardBody() : req.body,
-        )
+        const standardRequest = 'raw' in req
+          ? StandardServerFastify.toStandardLazyRequest(req, res as FastifyReply)
+          : StandardServerNode.toStandardLazyRequest(req, res as Response)
 
         const standardResponse: StandardResponse = await (async () => {
           let isDecoding = false
@@ -159,7 +153,12 @@ export class ImplementInterceptor implements NestInterceptor {
           }
         })()
 
-        await sendStandardResponse(nodeRes, standardResponse, this.config)
+        if ('raw' in res) {
+          await StandardServerFastify.sendStandardResponse(res, standardResponse, this.config)
+        }
+        else {
+          await StandardServerNode.sendStandardResponse(res, standardResponse, this.config)
+        }
       }),
     )
   }

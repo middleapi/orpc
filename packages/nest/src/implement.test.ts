@@ -1,6 +1,8 @@
 import type { NodeHttpRequest } from '@orpc/standard-server-node'
 import type { Request } from 'express'
-import { Controller, Req } from '@nestjs/common'
+import type { FastifyReply } from 'fastify'
+import FastifyCookie from '@fastify/cookie'
+import { Controller, Req, Res } from '@nestjs/common'
 import { REQUEST } from '@nestjs/core'
 import { FastifyAdapter } from '@nestjs/platform-fastify'
 import { Test } from '@nestjs/testing'
@@ -460,6 +462,43 @@ describe('@Implement', async () => {
     expect(sendStandardResponseSpy).toHaveBeenCalledTimes(1)
     expect(sendStandardResponseSpy).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({
       eventIteratorKeepAliveComment: '__TEST__',
+    }))
+  })
+
+  it('work with fastify/cookie', async () => {
+    @Controller()
+    class FastifyController {
+      @Implement(contract.ping)
+      pong(@Res({ passthrough: true }) reply: FastifyReply) {
+        reply.cookie('foo', 'bar')
+        return implement(contract.ping).handler(ping_handler)
+      }
+    }
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [FastifyController],
+    }).compile()
+
+    const adapter = new FastifyAdapter()
+    await adapter.register(FastifyCookie, {})
+    const app = moduleRef.createNestApplication(adapter)
+    await app.init()
+    await app.getHttpAdapter().getInstance().ready()
+
+    const httpServer = app.getHttpServer()
+
+    const res = await supertest(httpServer)
+      .post('/ping?param=value&param2[]=value2&param2[]=value3')
+      .set('x-custom', 'value')
+      .send({ hello: 'world' })
+
+    expect(res.statusCode).toEqual(200)
+    expect(res.body).toEqual('pong')
+    expect(res.headers).toEqual(expect.objectContaining({
+      'x-ping': 'pong',
+      'set-cookie': [
+        expect.stringContaining('foo=bar'),
+      ],
     }))
   })
 })
