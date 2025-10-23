@@ -608,6 +608,9 @@ importers:
       '@orpc/standard-server-aws-lambda':
         specifier: workspace:*
         version: link:../standard-server-aws-lambda
+      '@orpc/standard-server-fastify':
+        specifier: workspace:*
+        version: link:../standard-server-fastify
       '@orpc/standard-server-fetch':
         specifier: workspace:*
         version: link:../standard-server-fetch

@@ -136,6 +136,7 @@
     "@orpc/shared": "workspace:*",
     "@orpc/standard-server": "workspace:*",
     "@orpc/standard-server-aws-lambda": "workspace:*",
+    "@orpc/standard-server-fastify": "workspace:*",
     "@orpc/standard-server-fetch": "workspace:*",
     "@orpc/standard-server-node": "workspace:*",
     "@orpc/standard-server-peer": "workspace:*",
