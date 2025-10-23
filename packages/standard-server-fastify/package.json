@@ -36,6 +36,11 @@
   "peerDependencies": {
     "fastify": ">=5.6.1"
   },
+  "peerDependenciesMeta": {
+    "fastify": {
+      "optional": true
+    }
+  },
   "dependencies": {
     "@orpc/shared": "workspace:*",
     "@orpc/standard-server": "workspace:*",

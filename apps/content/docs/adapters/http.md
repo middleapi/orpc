@@ -13,6 +13,7 @@ oRPC includes built-in HTTP support, making it easy to expose RPC endpoints in a
 | ------------ | -------------------------------------------------------------------------------------------------------------------------- |
 | `fetch`      | [MDN Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) (Browser, Bun, Deno, Cloudflare Workers, etc.) |
 | `node`       | Node.js built-in [`http`](https://nodejs.org/api/http.html)/[`http2`](https://nodejs.org/api/http2.html)                   |
+| `fastify`    | [Fastify](https://fastify.dev/)                                                                                            |
 | `aws-lambda` | [AWS Lambda](https://aws.amazon.com/lambda/)                                                                               |
 
 ::: code-group
@@ -119,6 +120,33 @@ Deno.serve(async (request) => {
 
   return new Response('Not found', { status: 404 })
 })
+```
+
+```ts [fastify]
+import Fastify from 'fastify'
+import { RPCHandler } from '@orpc/server/fastify'
+
+const rpcHandler = new RPCHandler(router)
+
+const fastify = Fastify()
+
+fastify.addContentTypeParser('*', (request, payload, done) => {
+  // Fully utilize oRPC feature by allowing any content type
+  // And let oRPC parse the body manually by passing `undefined`
+  done(null, undefined)
+})
+
+fastify.all('/rpc/*', async (req, reply) => {
+  const { matched } = await rpcHandler.handle(req, reply, {
+    prefix: '/rpc',
+  })
+
+  if (!matched) {
+    reply.status(404).send('Not found')
+  }
+})
+
+fastify.listen({ port: 3000 }).then(() => console.log('Listening on 127.0.0.1:3000'))
 ```
 
 ```ts [aws-lambda]

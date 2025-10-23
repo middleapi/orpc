@@ -18,7 +18,7 @@ export function sendStandardResponse(
 
     const resBody = toNodeHttpBody(standardResponse.body, resHeaders, options)
 
-    reply.statusCode = standardResponse.status
+    reply.status(standardResponse.status)
     reply.headers(resHeaders)
 
     if (resBody === undefined) {

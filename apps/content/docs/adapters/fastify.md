@@ -8,50 +8,45 @@ description: Use oRPC inside an Fastify project
 [Fastify](https://fastify.dev/) is a web framework highly focused on providing the best developer experience with the least overhead and a powerful plugin architecture. For additional context, refer to the [HTTP Adapter](/docs/adapters/http) guide.
 
 ::: warning
-Fastify automatically parses the request payload which interferes with oRPC, that apply its own parser. To avoid errors, it's necessary to create a node http server and pass the requests to oRPC first, and if there's no match, pass it to Fastify.
+Fastify parses common request content types by default. oRPC will use the parsed body when available.
 :::
 
 ## Basic
 
 ```ts
-import { createServer } from 'node:http'
 import Fastify from 'fastify'
-import { RPCHandler } from '@orpc/server/node'
+import { RPCHandler } from '@orpc/server/fastify'
 import { CORSPlugin } from '@orpc/server/plugins'
+import { onError } from '@orpc/server'
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new CORSPlugin()
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    })
   ]
 })
 
-const fastify = Fastify({
-  logger: true,
-  serverFactory: (fastifyHandler) => {
-    const server = createServer(async (req, res) => {
-      const { matched } = await handler.handle(req, res, {
-        context: {},
-        prefix: '/rpc',
-      })
+const fastify = Fastify()
 
-      if (matched) {
-        return
-      }
-
-      fastifyHandler(req, res)
-    })
-
-    return server
-  },
+fastify.addContentTypeParser('*', (request, payload, done) => {
+  // Fully utilize oRPC feature by allowing any content type
+  // And let oRPC parse the body manually by passing `undefined`
+  done(null, undefined)
 })
 
-try {
-  await fastify.listen({ port: 3000 })
-}
-catch (err) {
-  fastify.log.error(err)
-  process.exit(1)
-}
+fastify.all('/rpc/*', async (req, reply) => {
+  const { matched } = await handler.handle(req, reply, {
+    prefix: '/rpc',
+    context: {} // Provide initial context if needed
+  })
+
+  if (!matched) {
+    reply.status(404).send('Not found')
+  }
+})
+
+fastify.listen({ port: 3000 }).then(() => console.log('Server running on http://localhost:3000'))
 ```
 
 ::: info
