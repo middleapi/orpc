@@ -1,5 +1,4 @@
 import { me, signin, signup } from './auth'
-import { ping, pingVoid } from './ping'
 import { createPlanet, findPlanet, listPlanets, updatePlanet } from './planet'
 import { sse } from './sse'
 
@@ -18,9 +17,4 @@ export const router = {
   },
 
   sse,
-
-  ping: {
-    run: ping,
-    runVoid: pingVoid,
-  },
 }
