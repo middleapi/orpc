@@ -2,6 +2,7 @@
 
 import { orpc } from '@/lib/orpc'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useCallback } from 'react'
 
 export function CreatePlanetMutationForm() {
   const queryClient = useQueryClient()
@@ -19,6 +20,15 @@ export function CreatePlanetMutationForm() {
       },
     }),
   )
+
+  const { mutate: testMutate } = useMutation(orpc.ping.run.mutationOptions())
+  const { mutate: testVoidMutate } = useMutation(orpc.ping.runVoid.mutationOptions())
+
+  useCallback(() => {
+    testMutate() // this will throw an error if z.void() is not default of input schema
+    testMutate(undefined) // this will not throw an error
+    testVoidMutate() // this will not throw an error
+  }, [testMutate, testVoidMutate])
 
   return (
     <div>
