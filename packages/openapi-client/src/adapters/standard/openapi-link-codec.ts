@@ -201,7 +201,7 @@ export class StandardOpenapiLinkCodec<T extends ClientContext> implements Standa
     }
   }
 
-  async decode(response: StandardLazyResponse, _options: ClientOptions<T>, path: readonly string[], _input: unknown): Promise<unknown> {
+  async decode(response: StandardLazyResponse, _options: ClientOptions<T>, path: readonly string[]): Promise<unknown> {
     const isOk = !isORPCErrorStatus(response.status)
 
     const deserialized = await (async () => {
