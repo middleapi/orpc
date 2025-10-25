@@ -102,22 +102,22 @@ export class OpenAPIGenerator {
    *
    * @see {@link https://orpc.unnoq.com/docs/openapi/openapi-specification OpenAPI Specification Docs}
    */
-  async generate(router: AnyContractRouter | AnyRouter, options: OpenAPIGeneratorGenerateOptions = {}): Promise<OpenAPI.Document> {
-    const filter = options.filter
+  async generate(
+    router: AnyContractRouter | AnyRouter,
+    { customErrorResponseBodySchema, commonSchemas, filter: baseFilter, exclude, ...baseDoc }: OpenAPIGeneratorGenerateOptions = {},
+  ): Promise<OpenAPI.Document> {
+    const filter = baseFilter
       ?? (({ contract, path }: TraverseContractProcedureCallbackOptions) => {
-        return !(options.exclude?.(contract, path) ?? false)
+        return !(exclude?.(contract, path) ?? false)
       })
 
     const doc: OpenAPI.Document = {
-      ...clone(options),
-      info: options.info ?? { title: 'API Reference', version: '0.0.0' },
+      ...clone(baseDoc),
+      info: baseDoc.info ?? { title: 'API Reference', version: '0.0.0' },
       openapi: '3.1.1',
-      exclude: undefined,
-      filter: undefined,
-      commonSchemas: undefined,
     } as OpenAPI.Document
 
-    const { baseSchemaConvertOptions, undefinedErrorJsonSchema } = await this.#resolveCommonSchemas(doc, options.commonSchemas)
+    const { baseSchemaConvertOptions, undefinedErrorJsonSchema } = await this.#resolveCommonSchemas(doc, commonSchemas)
 
     const contracts: TraverseContractProcedureCallbackOptions[] = []
 
@@ -156,7 +156,7 @@ export class OpenAPIGenerator {
 
           await this.#request(doc, operationObjectRef, def, baseSchemaConvertOptions)
           await this.#successResponse(doc, operationObjectRef, def, baseSchemaConvertOptions)
-          await this.#errorResponse(operationObjectRef, def, baseSchemaConvertOptions, undefinedErrorJsonSchema, options.customErrorResponseBodySchema)
+          await this.#errorResponse(operationObjectRef, def, baseSchemaConvertOptions, undefinedErrorJsonSchema, customErrorResponseBodySchema)
         }
 
         if (typeof def.route.spec === 'function') {

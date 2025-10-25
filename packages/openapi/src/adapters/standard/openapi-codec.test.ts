@@ -264,21 +264,50 @@ describe('standardOpenAPICodec', () => {
     })
   })
 
-  it('.encodeError', async () => {
-    serializer.serialize.mockReturnValueOnce('__serialized__')
+  describe('.encodeError', () => {
+    it('works', async () => {
+      serializer.serialize.mockReturnValueOnce('__serialized__')
 
-    const error = new ORPCError('BAD_GATEWAY', {
-      data: '__data__',
+      const error = new ORPCError('BAD_GATEWAY', {
+        data: '__data__',
+      })
+      const response = codec.encodeError(error)
+
+      expect(response).toEqual({
+        status: error.status,
+        headers: {},
+        body: '__serialized__',
+      })
+
+      expect(serializer.serialize).toHaveBeenCalledOnce()
+      expect(serializer.serialize).toHaveBeenCalledWith(error.toJSON(), { outputFormat: 'plain' })
     })
-    const response = codec.encodeError(error)
 
-    expect(response).toEqual({
-      status: error.status,
-      headers: {},
-      body: '__serialized__',
+    it('customErrorResponseBodyEncoder', async () => {
+      const customErrorResponseBodyEncoder = vi.fn(() => '__custom_error_body__')
+
+      const codec = new StandardOpenAPICodec(serializer, {
+        customErrorResponseBodyEncoder,
+      })
+
+      serializer.serialize.mockReturnValueOnce('__serialized__')
+
+      const error = new ORPCError('BAD_GATEWAY', {
+        data: '__data__',
+      })
+      const response = codec.encodeError(error)
+
+      expect(response).toEqual({
+        status: error.status,
+        headers: {},
+        body: '__serialized__',
+      })
+
+      expect(customErrorResponseBodyEncoder).toHaveBeenCalledTimes(1)
+      expect(customErrorResponseBodyEncoder).toHaveBeenCalledWith(error)
+
+      expect(serializer.serialize).toHaveBeenCalledOnce()
+      expect(serializer.serialize).toHaveBeenCalledWith('__custom_error_body__', { outputFormat: 'plain' })
     })
-
-    expect(serializer.serialize).toHaveBeenCalledOnce()
-    expect(serializer.serialize).toHaveBeenCalledWith(error.toJSON(), { outputFormat: 'plain' })
   })
 })
