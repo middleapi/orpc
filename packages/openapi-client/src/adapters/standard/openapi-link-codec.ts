@@ -33,7 +33,7 @@ export interface StandardOpenapiLinkCodecOptions<T extends ClientContext> {
   /**
    * Customize how a response body is decoded into an ORPC error.
    * Useful when the default decoder cannot fully interpret
-   * your server’s error format.
+   * your server's error format.
    *
    * @remarks
    * - Return `null | undefined` to fallback to default behavior.
@@ -230,7 +230,7 @@ export class StandardOpenapiLinkCodec<T extends ClientContext> implements Standa
     if (!isOk) {
       const error = this.customErrorResponseBodyDecoder?.(deserialized, response)
 
-      if (error === null || error === undefined) {
+      if (error !== null && error !== undefined) {
         throw error
       }
 
