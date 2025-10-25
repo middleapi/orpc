@@ -38,7 +38,7 @@ export interface StandardOpenapiLinkCodecOptions<T extends ClientContext> {
    * @remarks
    * - Return `null | undefined` to fallback to default behavior.
    */
-  customErrorResponseBodyDecoder?: (deserializedBody: unknown) => ORPCError<any, any> | null | undefined
+  customErrorResponseBodyDecoder?: (deserializedBody: unknown, response: StandardLazyResponse) => ORPCError<any, any> | null | undefined
 }
 
 export class StandardOpenapiLinkCodec<T extends ClientContext> implements StandardLinkCodec<T> {
@@ -228,7 +228,7 @@ export class StandardOpenapiLinkCodec<T extends ClientContext> implements Standa
     })()
 
     if (!isOk) {
-      const error = this.customErrorResponseBodyDecoder?.(deserialized)
+      const error = this.customErrorResponseBodyDecoder?.(deserialized, response)
 
       if (error === null || error === undefined) {
         throw error

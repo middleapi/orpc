@@ -82,7 +82,7 @@ When your backend isn't oRPC or uses a custom error format, you can instruct [Op
 
 ```ts
 const link = OpenAPILink(contract, {
-  customErrorResponseBodyDecoder: (body) => {
+  customErrorResponseBodyDecoder: (body, response) => {
     if (isORPCErrorJson(body)) {
       return createORPCErrorFromJson(body)
     }
