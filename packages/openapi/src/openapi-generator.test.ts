@@ -1581,7 +1581,14 @@ describe('openAPIGenerator', () => {
       }),
     }
 
-    const customErrorResponseBodySchema = vi.fn(() => ({ type: 'object', description: 'custom' }))
+    let time = 1
+    const customErrorResponseBodySchema = vi.fn(() => {
+      if (time++ === 3) {
+        return null // fallback to default
+      }
+
+      return ({ type: 'object', description: 'custom' })
+    })
     const spec = await openAPIGenerator.generate(router, {
       customErrorResponseBodySchema,
     })
@@ -1620,7 +1627,15 @@ describe('openAPIGenerator', () => {
             operationId: 'pong',
             responses: {
               200: expect.any(Object),
-              500: { description: '500', content: { 'application/json': { schema: customErrorResponseBodySchema.mock.results[2]!.value } } },
+              500: { description: '500', content: { 'application/json': {
+                schema: expect.toSatisfy((schema) => { // default behavior
+                  expect(schema).not.toEqual(customErrorResponseBodySchema.mock.results[2]!.value)
+
+                  expect(schema).toEqual({ oneOf: expect.any(Array) })
+
+                  return true
+                }),
+              } } },
             },
           },
         },

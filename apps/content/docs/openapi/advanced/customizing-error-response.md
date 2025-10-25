@@ -61,7 +61,6 @@ const spec = await generator.generate(router, {
           status: { const: status },
           message: { type: 'string', default: defaultMessage },
           data: dataSchema,
-          test: { type: 'string' },
         },
         required: dataRequired ? ['defined', 'code', 'status', 'message', 'data'] : ['defined', 'code', 'status', 'message'],
       })
