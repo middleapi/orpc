@@ -47,7 +47,9 @@ npx degit unnoq/orpc/playgrounds/cloudflare-worker orpc-cloudflare-worker-playgr
 npx degit unnoq/orpc/playgrounds/bun-websocket-otel orpc-bun-websocket-otel-playground
 npx degit unnoq/orpc/playgrounds/electron orpc-electron-playground
 npx degit unnoq/orpc/playgrounds/browser-extension orpc-browser-extension-playground
-npx degit hunterwilhelm/orpc-community-playgrounds/vue-bun orpc-vue-bun-playground
+
+# Community (clone at your own risk)
+npx degit hunterwilhelm/orpc-community-playgrounds/vue-bun orpc-vue-bun-monorepo-playground
 ```
 
 For each project, set up the development environment:
