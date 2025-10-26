@@ -68,6 +68,19 @@ export interface OpenAPIGeneratorGenerateOptions extends Partial<Omit<OpenAPI.Do
     error: 'UndefinedError'
     schema?: never
   }>
+
+  /**
+   * Define a custom JSON schema for the error response body when using
+   * type-safe errors. Helps align ORPC error formatting with existing API
+   * response standards or conventions.
+   *
+   * @remarks
+   * - Return `null | undefined` to use the default error response body shaper.
+   */
+  customErrorResponseBodySchema?: Value<
+    JSONSchema | undefined | null,
+    [definedErrors: [code: string, defaultMessage: string, dataRequired: boolean, dataSchema: JSONSchema][], status: number]
+  >
 }
 
 /**
@@ -89,22 +102,22 @@ export class OpenAPIGenerator {
    *
    * @see {@link https://orpc.unnoq.com/docs/openapi/openapi-specification OpenAPI Specification Docs}
    */
-  async generate(router: AnyContractRouter | AnyRouter, options: OpenAPIGeneratorGenerateOptions = {}): Promise<OpenAPI.Document> {
-    const filter = options.filter
+  async generate(
+    router: AnyContractRouter | AnyRouter,
+    { customErrorResponseBodySchema, commonSchemas, filter: baseFilter, exclude, ...baseDoc }: OpenAPIGeneratorGenerateOptions = {},
+  ): Promise<OpenAPI.Document> {
+    const filter = baseFilter
       ?? (({ contract, path }: TraverseContractProcedureCallbackOptions) => {
-        return !(options.exclude?.(contract, path) ?? false)
+        return !(exclude?.(contract, path) ?? false)
       })
 
     const doc: OpenAPI.Document = {
-      ...clone(options),
-      info: options.info ?? { title: 'API Reference', version: '0.0.0' },
+      ...clone(baseDoc),
+      info: baseDoc.info ?? { title: 'API Reference', version: '0.0.0' },
       openapi: '3.1.1',
-      exclude: undefined,
-      filter: undefined,
-      commonSchemas: undefined,
     } as OpenAPI.Document
 
-    const { baseSchemaConvertOptions, undefinedErrorJsonSchema } = await this.#resolveCommonSchemas(doc, options.commonSchemas)
+    const { baseSchemaConvertOptions, undefinedErrorJsonSchema } = await this.#resolveCommonSchemas(doc, commonSchemas)
 
     const contracts: TraverseContractProcedureCallbackOptions[] = []
 
@@ -143,7 +156,7 @@ export class OpenAPIGenerator {
 
           await this.#request(doc, operationObjectRef, def, baseSchemaConvertOptions)
           await this.#successResponse(doc, operationObjectRef, def, baseSchemaConvertOptions)
-          await this.#errorResponse(operationObjectRef, def, baseSchemaConvertOptions, undefinedErrorJsonSchema)
+          await this.#errorResponse(operationObjectRef, def, baseSchemaConvertOptions, undefinedErrorJsonSchema, customErrorResponseBodySchema)
         }
 
         if (typeof def.route.spec === 'function') {
@@ -529,10 +542,15 @@ export class OpenAPIGenerator {
     def: AnyContractProcedure['~orpc'],
     baseSchemaConvertOptions: Pick<SchemaConvertOptions, 'components'>,
     undefinedErrorSchema: JSONSchema,
+    customErrorResponseBodySchema: OpenAPIGeneratorGenerateOptions['customErrorResponseBodySchema'],
   ): Promise<void> {
     const errorMap = def.errorMap as ErrorMap
 
-    const errors: Record<string, JSONSchema[]> = {}
+    const errorResponsesByStatus: Record<string, {
+      status: number
+      errorSchemaVariants: JSONSchema[]
+      definedErrorDefinitions: [code: string, defaultMessage: string, required: boolean, schema: JSONSchema][]
+    }> = {}
 
     for (const code in errorMap) {
       const config = errorMap[code]
@@ -542,18 +560,20 @@ export class OpenAPIGenerator {
       }
 
       const status = fallbackORPCErrorStatus(code, config.status)
-      const message = fallbackORPCErrorMessage(code, config.message)
+      const defaultMessage = fallbackORPCErrorMessage(code, config.message)
+
+      errorResponsesByStatus[status] ??= { status, definedErrorDefinitions: [], errorSchemaVariants: [] }
 
       const [dataRequired, dataSchema] = await this.converter.convert(config.data, { ...baseSchemaConvertOptions, strategy: 'output' })
 
-      errors[status] ??= []
-      errors[status].push({
+      errorResponsesByStatus[status].definedErrorDefinitions.push([code, defaultMessage, dataRequired, dataSchema])
+      errorResponsesByStatus[status].errorSchemaVariants.push({
         type: 'object',
         properties: {
           defined: { const: true },
           code: { const: code },
           status: { const: status },
-          message: { type: 'string', default: message },
+          message: { type: 'string', default: defaultMessage },
           data: dataSchema,
         },
         required: dataRequired ? ['defined', 'code', 'status', 'message', 'data'] : ['defined', 'code', 'status', 'message'],
@@ -562,14 +582,16 @@ export class OpenAPIGenerator {
 
     ref.responses ??= {}
 
-    for (const status in errors) {
-      const schemas = errors[status]!
+    for (const statusString in errorResponsesByStatus) {
+      const errorResponse = errorResponsesByStatus[statusString]!
 
-      ref.responses[status] = {
-        description: status,
-        content: toOpenAPIContent({
+      const customBodySchema = value(customErrorResponseBodySchema, errorResponse.definedErrorDefinitions, errorResponse.status)
+
+      ref.responses[statusString] = {
+        description: statusString,
+        content: toOpenAPIContent(customBodySchema ?? {
           oneOf: [
-            ...schemas,
+            ...errorResponse.errorSchemaVariants,
             undefinedErrorSchema,
           ],
         }),

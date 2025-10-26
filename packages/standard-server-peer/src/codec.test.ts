@@ -1,11 +1,299 @@
 import type { StandardHeaders } from '@orpc/standard-server'
-import { decodeRequestMessage, decodeResponseMessage, encodeRequestMessage, encodeResponseMessage, MessageType } from './codec'
+import type { EventIteratorPayload, RequestMessageMap, ResponseMessageMap } from './codec'
+import { decodeRequestMessage, decodeResponseMessage, deserializeRequestMessage, deserializeResponseMessage, encodeRequestMessage, encodeResponseMessage, MessageType, serializeRequestMessage, serializeResponseMessage } from './codec'
 
 const MB10Headers: StandardHeaders = {}
 
 for (let i = 0; i < 300000; i++) {
   MB10Headers[`header-${i}`] = Array.from({ length: 10 }, () => String.fromCharCode(Math.floor(Math.random() * 256))).join('')
 }
+
+describe('serializeRequestMessage & deserializeRequestMessage', () => {
+  it('should serialize and deserialize a basic POST request', () => {
+    const id = 'req-123'
+    const payload: RequestMessageMap[MessageType.REQUEST] = {
+      url: new URL('orpc://localhost/api/users'),
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: { name: 'John' },
+    }
+
+    const serialized = serializeRequestMessage(id, MessageType.REQUEST, payload)
+
+    expect(serialized).toEqual({
+      i: 'req-123',
+      p: {
+        u: '/api/users',
+        b: { name: 'John' },
+        h: { 'content-type': 'application/json' },
+        m: undefined, // POST is default
+      },
+    })
+
+    const [decodedId, decodedType, decodedPayload] = deserializeRequestMessage(serialized) as any
+
+    expect(decodedId).toBe(id)
+    expect(decodedType).toBe(MessageType.REQUEST)
+    expect(decodedPayload.url.toString()).toBe('orpc://localhost/api/users')
+    expect(decodedPayload.method).toBe('POST')
+    expect(decodedPayload.headers).toEqual({ 'content-type': 'application/json' })
+    expect(decodedPayload.body).toEqual({ name: 'John' })
+  })
+
+  it('should serialize and deserialize a GET request with full URL', () => {
+    const id = 'req-456'
+    const payload: RequestMessageMap[MessageType.REQUEST] = {
+      url: new URL('https://api.example.com/data'),
+      method: 'GET',
+      headers: {},
+      body: null,
+    }
+
+    const serialized = serializeRequestMessage(id, MessageType.REQUEST, payload)
+
+    expect(serialized).toEqual({
+      i: 'req-456',
+      p: {
+        u: 'https://api.example.com/data',
+        b: null,
+        h: undefined, // empty headers omitted
+        m: 'GET',
+      },
+    })
+
+    const [decodedId, decodedType, decodedPayload] = deserializeRequestMessage(serialized) as any
+
+    expect(decodedId).toBe(id)
+    expect(decodedType).toBe(MessageType.REQUEST)
+    expect(decodedPayload.url.toString()).toBe('https://api.example.com/data')
+    expect(decodedPayload.method).toBe('GET')
+    expect(decodedPayload.body).toBe(null)
+  })
+
+  it('should handle Blob data in body (without checking instanceof)', () => {
+    const id = 'req-blob'
+    const blobData = new Blob(['test content'], { type: 'text/plain' })
+
+    const payload: RequestMessageMap[MessageType.REQUEST] = {
+      url: new URL('orpc://localhost/upload'),
+      method: 'POST',
+      headers: { 'content-type': 'text/plain' },
+      body: blobData,
+    }
+
+    const serialized = serializeRequestMessage(id, MessageType.REQUEST, payload) as any
+
+    // The serialize function doesn't check instanceof Blob, just passes it through
+    expect(serialized.p.b).toBe(blobData)
+
+    const [decodedId, decodedType, decodedPayload] = deserializeRequestMessage(serialized) as any
+
+    expect(decodedId).toBe(id)
+    expect(decodedPayload.body).toBe(blobData)
+  })
+
+  it('should serialize and deserialize event iterator message', () => {
+    const id = 'iter-789'
+    const payload: EventIteratorPayload = {
+      event: 'message',
+      data: { count: 42 },
+      meta: { comments: ['__TEST__'] },
+    }
+
+    const serialized = serializeRequestMessage(id, MessageType.EVENT_ITERATOR, payload)
+
+    expect(serialized).toEqual({
+      i: 'iter-789',
+      t: MessageType.EVENT_ITERATOR,
+      p: {
+        e: 'message',
+        d: { count: 42 },
+        m: { comments: ['__TEST__'] },
+      },
+    })
+
+    const [decodedId, decodedType, decodedPayload] = deserializeRequestMessage(serialized)
+
+    expect(decodedId).toBe(id)
+    expect(decodedType).toBe(MessageType.EVENT_ITERATOR)
+    expect(decodedPayload).toEqual(payload)
+  })
+
+  it('should serialize and deserialize abort signal message', () => {
+    const id = 'abort-001'
+
+    const serialized = serializeRequestMessage(id, MessageType.ABORT_SIGNAL, undefined)
+
+    expect(serialized).toEqual({
+      i: 'abort-001',
+      t: MessageType.ABORT_SIGNAL,
+      p: undefined,
+    })
+
+    const [decodedId, decodedType, decodedPayload] = deserializeRequestMessage(serialized)
+
+    expect(decodedId).toBe(id)
+    expect(decodedType).toBe(MessageType.ABORT_SIGNAL)
+    expect(decodedPayload).toBeUndefined()
+  })
+
+  it('should omit empty headers and default POST method', () => {
+    const id = 'req-minimal'
+    const payload: RequestMessageMap[MessageType.REQUEST] = {
+      url: new URL('orpc://localhost/test'),
+      method: 'POST',
+      headers: {},
+      body: 'data',
+    }
+
+    const serialized = serializeRequestMessage(id, MessageType.REQUEST, payload) as any
+
+    expect(serialized.p.h).toBeUndefined()
+    expect(serialized.p.m).toBeUndefined()
+  })
+})
+
+describe('serializeResponseMessage & deserializeResponseMessage', () => {
+  it('should serialize and deserialize a successful response', () => {
+    const id = 'res-123'
+    const payload: ResponseMessageMap[MessageType.RESPONSE] = {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      body: { success: true, data: [1, 2, 3] },
+    }
+
+    const serialized = serializeResponseMessage(id, MessageType.RESPONSE, payload)
+
+    expect(serialized).toEqual({
+      i: 'res-123',
+      p: {
+        s: undefined, // 200 is default
+        h: { 'content-type': 'application/json' },
+        b: { success: true, data: [1, 2, 3] },
+      },
+    })
+
+    const [decodedId, decodedType, decodedPayload] = deserializeResponseMessage(serialized) as any
+
+    expect(decodedId).toBe(id)
+    expect(decodedType).toBe(MessageType.RESPONSE)
+    expect(decodedPayload.status).toBe(200)
+    expect(decodedPayload.headers).toEqual({ 'content-type': 'application/json' })
+    expect(decodedPayload.body).toEqual({ success: true, data: [1, 2, 3] })
+  })
+
+  it('should handle Blob data in response body (without checking instanceof)', () => {
+    const id = 'res-blob'
+    const blobData = new Blob(['response data'], { type: 'application/octet-stream' })
+
+    const payload: ResponseMessageMap[MessageType.RESPONSE] = {
+      status: 200,
+      headers: { 'content-type': 'application/octet-stream' },
+      body: blobData,
+    }
+
+    const serialized = serializeResponseMessage(id, MessageType.RESPONSE, payload) as any
+
+    // The serialize function doesn't check instanceof Blob, just passes it through
+    expect(serialized.p.b).toBe(blobData)
+
+    const [decodedId, decodedType, decodedPayload] = deserializeResponseMessage(serialized) as any
+
+    expect(decodedId).toBe(id)
+    expect(decodedPayload.body).toBe(blobData)
+    expect(decodedPayload.status).toBe(200)
+  })
+
+  it('should serialize and deserialize event iterator response', () => {
+    const id = 'res-iter'
+    const payload: EventIteratorPayload = {
+      event: 'error',
+      data: { message: 'Something went wrong' },
+      meta: { comments: ['__TEST__'] },
+    }
+
+    const serialized = serializeResponseMessage(id, MessageType.EVENT_ITERATOR, payload)
+
+    expect(serialized).toEqual({
+      i: 'res-iter',
+      t: MessageType.EVENT_ITERATOR,
+      p: {
+        e: 'error',
+        d: { message: 'Something went wrong' },
+        m: { comments: ['__TEST__'] },
+      },
+    })
+
+    const [decodedId, decodedType, decodedPayload] = deserializeResponseMessage(serialized)
+
+    expect(decodedId).toBe(id)
+    expect(decodedType).toBe(MessageType.EVENT_ITERATOR)
+    expect(decodedPayload).toEqual(payload)
+  })
+
+  it('should serialize and deserialize abort signal response', () => {
+    const id = 'res-abort'
+
+    const serialized = serializeResponseMessage(id, MessageType.ABORT_SIGNAL, undefined)
+
+    expect(serialized).toEqual({
+      i: 'res-abort',
+      t: MessageType.ABORT_SIGNAL,
+      p: undefined,
+    })
+
+    const [decodedId, decodedType, decodedPayload] = deserializeResponseMessage(serialized)
+
+    expect(decodedId).toBe(id)
+    expect(decodedType).toBe(MessageType.ABORT_SIGNAL)
+    expect(decodedPayload).toBeUndefined()
+  })
+
+  it('should omit default status 200 and empty headers', () => {
+    const id = 'res-minimal'
+    const payload: ResponseMessageMap[MessageType.RESPONSE] = {
+      status: 200,
+      headers: {},
+      body: 'OK',
+    }
+
+    const serialized = serializeResponseMessage(id, MessageType.RESPONSE, payload) as any
+
+    expect(serialized.p.s).toBeUndefined()
+    expect(serialized.p.h).toBeUndefined()
+  })
+
+  it('should handle various status codes', () => {
+    const testCases = [
+      { status: 201, shouldSerialize: true },
+      { status: 204, shouldSerialize: true },
+      { status: 301, shouldSerialize: true },
+      { status: 400, shouldSerialize: true },
+      { status: 500, shouldSerialize: true },
+      { status: 200, shouldSerialize: false }, // default
+    ]
+
+    testCases.forEach(({ status, shouldSerialize }) => {
+      const payload: ResponseMessageMap[MessageType.RESPONSE] = {
+        status,
+        headers: {},
+        body: null,
+      }
+
+      const serialized = serializeResponseMessage('test-id', MessageType.RESPONSE, payload) as any
+
+      if (shouldSerialize) {
+        expect(serialized.p.s).toBe(status)
+      }
+      else {
+        expect(serialized.p.s).toBeUndefined()
+      }
+
+      const [, , decodedPayload] = deserializeResponseMessage(serialized) as any
+      expect(decodedPayload.status).toBe(status)
+    })
+  })
+})
 
 describe('encode/decode request message', () => {
   it('abort signal', async () => {

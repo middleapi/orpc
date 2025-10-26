@@ -1554,4 +1554,92 @@ describe('openAPIGenerator', () => {
       })
     })
   })
+
+  it('customErrorResponseBodySchema', async () => {
+    const openAPIGenerator = new OpenAPIGenerator({
+      schemaConverters: [
+        new ZodToJsonSchemaConverter(),
+      ],
+    })
+
+    const router = {
+      ping: oc.errors({
+        BAD_REQUEST: {
+          data: z.string().describe('data_BAD_REQUEST'),
+        },
+        BAD_REQUEST_2: {
+          status: 400,
+          message: 'message_BAD_REQUEST_2',
+        },
+        NOT_FOUND: {},
+      }),
+      pong: oc.route({ method: 'GET', path: '/pong' }).errors({
+        INTERNAL_SERVER_ERROR: {
+          message: 'message_INTERNAL_SERVER_ERROR',
+          data: z.string().describe('data_BAD_REQUEST_2'),
+        },
+      }),
+    }
+
+    let time = 1
+    const customErrorResponseBodySchema = vi.fn(() => {
+      if (time++ === 3) {
+        return null // fallback to default
+      }
+
+      return ({ type: 'object', description: 'custom' })
+    })
+    const spec = await openAPIGenerator.generate(router, {
+      customErrorResponseBodySchema,
+    })
+
+    expect(customErrorResponseBodySchema).toHaveBeenCalledTimes(3)
+    expect(customErrorResponseBodySchema).toHaveBeenNthCalledWith(1, [
+      ['BAD_REQUEST', 'Bad Request', true, { description: 'data_BAD_REQUEST', type: 'string' }],
+      ['BAD_REQUEST_2', 'message_BAD_REQUEST_2', false, { }],
+    ], 400)
+    expect(customErrorResponseBodySchema).toHaveBeenNthCalledWith(2, [
+      ['NOT_FOUND', 'Not Found', false, { }],
+    ], 404)
+    expect(customErrorResponseBodySchema).toHaveBeenNthCalledWith(3, [
+      ['INTERNAL_SERVER_ERROR', 'message_INTERNAL_SERVER_ERROR', true, { description: 'data_BAD_REQUEST_2', type: 'string' }],
+    ], 500)
+
+    expect(spec).toEqual({
+      openapi: '3.1.1',
+      info: {
+        title: 'API Reference',
+        version: '0.0.0',
+      },
+      paths: {
+        '/ping': {
+          post: {
+            operationId: 'ping',
+            responses: {
+              200: expect.any(Object),
+              400: { description: '400', content: { 'application/json': { schema: customErrorResponseBodySchema.mock.results[0]!.value } } },
+              404: { description: '404', content: { 'application/json': { schema: customErrorResponseBodySchema.mock.results[1]!.value } } },
+            },
+          },
+        },
+        '/pong': {
+          get: {
+            operationId: 'pong',
+            responses: {
+              200: expect.any(Object),
+              500: { description: '500', content: { 'application/json': {
+                schema: expect.toSatisfy((schema) => { // default behavior
+                  expect(schema).not.toEqual(customErrorResponseBodySchema.mock.results[2]!.value)
+
+                  expect(schema).toEqual({ oneOf: expect.any(Array) })
+
+                  return true
+                }),
+              } } },
+            },
+          },
+        },
+      },
+    })
+  })
 })

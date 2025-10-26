@@ -11,6 +11,18 @@ describe('postMessagePortMessage', () => {
     expect(mockPort.postMessage).toBeCalledTimes(1)
     expect(mockPort.postMessage).toHaveBeenCalledWith(data)
   })
+
+  it('calls postMessage on the port with transfer', () => {
+    const mockPort = {
+      addEventListener: vi.fn(),
+      postMessage: vi.fn(),
+    }
+    const data = new Uint8Array([1, 2, 3])
+    const transfer = [data.buffer]
+    postMessagePortMessage(mockPort, data, transfer)
+    expect(mockPort.postMessage).toBeCalledTimes(1)
+    expect(mockPort.postMessage).toHaveBeenCalledWith(data, transfer)
+  })
 })
 
 describe('onMessagePortMessage', () => {

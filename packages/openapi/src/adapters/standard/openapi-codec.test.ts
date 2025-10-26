@@ -264,21 +264,57 @@ describe('standardOpenAPICodec', () => {
     })
   })
 
-  it('.encodeError', async () => {
-    serializer.serialize.mockReturnValueOnce('__serialized__')
+  describe('.encodeError', () => {
+    it('works', async () => {
+      serializer.serialize.mockReturnValueOnce('__serialized__')
 
-    const error = new ORPCError('BAD_GATEWAY', {
-      data: '__data__',
+      const error = new ORPCError('BAD_GATEWAY', {
+        data: '__data__',
+      })
+      const response = codec.encodeError(error)
+
+      expect(response).toEqual({
+        status: error.status,
+        headers: {},
+        body: '__serialized__',
+      })
+
+      expect(serializer.serialize).toHaveBeenCalledOnce()
+      expect(serializer.serialize).toHaveBeenCalledWith(error.toJSON(), { outputFormat: 'plain' })
     })
-    const response = codec.encodeError(error)
 
-    expect(response).toEqual({
-      status: error.status,
-      headers: {},
-      body: '__serialized__',
+    it('customErrorResponseBodyEncoder', async () => {
+      let time = 1
+      const customErrorResponseBodyEncoder = vi.fn(() => {
+        if (time++ === 2) {
+          return null // default behavior
+        }
+
+        return '__custom_error_body__'
+      })
+
+      const codec = new StandardOpenAPICodec(serializer, {
+        customErrorResponseBodyEncoder,
+      })
+
+      let time2 = 1
+      serializer.serialize.mockImplementation(() => `__serialized${time2++}__`)
+
+      const error1 = new ORPCError('BAD_GATEWAY', { data: '__data1__' })
+      const response1 = codec.encodeError(error1)
+      expect(response1).toEqual({ status: error1.status, headers: {}, body: '__serialized1__' })
+
+      const error2 = new ORPCError('TEST_2', { data: '__data2__' })
+      const response2 = codec.encodeError(error2)
+      expect(response2).toEqual({ status: error2.status, headers: {}, body: '__serialized2__' })
+
+      expect(customErrorResponseBodyEncoder).toHaveBeenCalledTimes(2)
+      expect(customErrorResponseBodyEncoder).toHaveBeenNthCalledWith(1, error1)
+      expect(customErrorResponseBodyEncoder).toHaveBeenNthCalledWith(2, error2)
+
+      expect(serializer.serialize).toHaveBeenCalledTimes(2)
+      expect(serializer.serialize).toHaveBeenNthCalledWith(1, '__custom_error_body__', { outputFormat: 'plain' })
+      expect(serializer.serialize).toHaveBeenNthCalledWith(2, error2.toJSON(), { outputFormat: 'plain' }) // default behavior
     })
-
-    expect(serializer.serialize).toHaveBeenCalledOnce()
-    expect(serializer.serialize).toHaveBeenCalledWith(error.toJSON(), { outputFormat: 'plain' })
   })
 })

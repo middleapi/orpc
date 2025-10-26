@@ -7,10 +7,27 @@ import { isORPCErrorStatus } from '@orpc/client'
 import { fallbackContractConfig } from '@orpc/contract'
 import { isObject, stringifyJSON } from '@orpc/shared'
 
+export interface StandardOpenAPICodecOptions {
+  /**
+   * Customize how an ORPC error is encoded into a response body.
+   * Use this if your API needs a different error output structure.
+   *
+   * @remarks
+   * - Return `null | undefined` to fallback to default behavior
+   *
+   * @default ((e) => e.toJSON())
+   */
+  customErrorResponseBodyEncoder?: (error: ORPCError<any, any>) => unknown
+}
+
 export class StandardOpenAPICodec implements StandardCodec {
+  private readonly customErrorResponseBodyEncoder: StandardOpenAPICodecOptions['customErrorResponseBodyEncoder']
+
   constructor(
     private readonly serializer: StandardOpenAPISerializer,
+    options: StandardOpenAPICodecOptions = {},
   ) {
+    this.customErrorResponseBodyEncoder = options.customErrorResponseBodyEncoder
   }
 
   async decode(request: StandardLazyRequest, params: StandardParams | undefined, procedure: AnyProcedure): Promise<unknown> {
@@ -88,10 +105,12 @@ export class StandardOpenAPICodec implements StandardCodec {
   }
 
   encodeError(error: ORPCError<any, any>): StandardResponse {
+    const body = this.customErrorResponseBodyEncoder?.(error) ?? error.toJSON()
+
     return {
       status: error.status,
       headers: {},
-      body: this.serializer.serialize(error.toJSON(), { outputFormat: 'plain' }),
+      body: this.serializer.serialize(body, { outputFormat: 'plain' }),
     }
   }
 

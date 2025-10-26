@@ -135,10 +135,12 @@ function recordError(eventName: string, reason: unknown) {
 
 process.on('uncaughtException', (reason) => {
   recordError('uncaughtException', reason)
+  // process.exit(1) // uncomment to restore default Node.js behavior
 })
 
 process.on('unhandledRejection', (reason) => {
   recordError('unhandledRejection', reason)
+  // process.exit(1) // uncomment to restore default Node.js behavior
 })
 ```
 

@@ -459,5 +459,31 @@ describe('standardOpenapiLinkCodecOptions', () => {
         status: 201,
       }, { context: {}, signal }, ['ping'])).rejects.toThrow('Invalid OpenAPI response format.')
     })
+
+    it('customErrorResponseBodyDecoder', async () => {
+      const error = new ORPCError('TEST')
+      let time = 1
+      const customErrorResponseBodyDecoder = vi.fn(() => {
+        if (time++ === 2) {
+          return null // fallback to default
+        }
+        return error
+      })
+
+      const codec = new StandardOpenapiLinkCodec({ ping: oc }, serializer, {
+        url: 'http://localhost:3000',
+        customErrorResponseBodyDecoder,
+      })
+
+      const response1 = { headers: { 'x-custom': 'value' }, body: async () => 'body', status: 400 }
+      await expect(codec.decode(response1, { context: {} }, ['ping'])).rejects.toSatisfy(e => e === error)
+
+      const response2 = { headers: { 'x-custom': 'value2' }, body: async () => 'body2', status: 405 }
+      await expect(codec.decode(response2, { context: {} }, ['ping'])).rejects.toSatisfy(e => e.status === 405) // default behavior
+
+      expect(customErrorResponseBodyDecoder).toHaveBeenCalledTimes(2)
+      expect(customErrorResponseBodyDecoder).toHaveBeenCalledWith(deserialize.mock.results[0]!.value, response1)
+      expect(customErrorResponseBodyDecoder).toHaveBeenCalledWith(deserialize.mock.results[1]!.value, response2)
+    })
   })
 })

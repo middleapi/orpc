@@ -1,7 +1,7 @@
 {
   "name": "@orpc/openapi",
   "type": "module",
-  "version": "1.10.0",
+  "version": "1.10.1",
   "license": "MIT",
   "homepage": "https://orpc.unnoq.com",
   "repository": {
@@ -77,7 +77,7 @@
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
     "@orpc/standard-server": "workspace:*",
-    "rou3": "^0.7.7"
+    "rou3": "^0.7.8"
   },
   "devDependencies": {
     "fastify": "^5.6.1",

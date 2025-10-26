@@ -29,11 +29,22 @@ export interface StandardOpenapiLinkCodecOptions<T extends ClientContext> {
         path: readonly string[],
         input: unknown,
   ]>
+
+  /**
+   * Customize how a response body is decoded into an ORPC error.
+   * Useful when the default decoder cannot fully interpret
+   * your server's error format.
+   *
+   * @remarks
+   * - Return `null | undefined` to fallback to default behavior.
+   */
+  customErrorResponseBodyDecoder?: (deserializedBody: unknown, response: StandardLazyResponse) => ORPCError<any, any> | null | undefined
 }
 
 export class StandardOpenapiLinkCodec<T extends ClientContext> implements StandardLinkCodec<T> {
   private readonly baseUrl: Exclude<StandardOpenapiLinkCodecOptions<T>['url'], undefined>
   private readonly headers: Exclude<StandardOpenapiLinkCodecOptions<T>['headers'], undefined>
+  private readonly customErrorResponseBodyDecoder: StandardOpenapiLinkCodecOptions<T>['customErrorResponseBodyDecoder']
 
   constructor(
     private readonly contract: AnyContractRouter,
@@ -42,6 +53,7 @@ export class StandardOpenapiLinkCodec<T extends ClientContext> implements Standa
   ) {
     this.baseUrl = options.url
     this.headers = options.headers ?? {}
+    this.customErrorResponseBodyDecoder = options.customErrorResponseBodyDecoder
   }
 
   async encode(path: readonly string[], input: unknown, options: ClientOptions<T>): Promise<StandardRequest> {
@@ -216,6 +228,12 @@ export class StandardOpenapiLinkCodec<T extends ClientContext> implements Standa
     })()
 
     if (!isOk) {
+      const error = this.customErrorResponseBodyDecoder?.(deserialized, response)
+
+      if (error !== null && error !== undefined) {
+        throw error
+      }
+
       if (isORPCErrorJson(deserialized)) {
         throw createORPCErrorFromJson(deserialized)
       }

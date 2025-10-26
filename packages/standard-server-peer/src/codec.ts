@@ -33,7 +33,7 @@ export interface ResponseMessageMap {
   [MessageType.ABORT_SIGNAL]: void
 }
 
-interface BaseMessageFormat<P = unknown> {
+export interface BaseMessageFormat<P = unknown> {
   /**
    * Client-guaranteed unique identifier
    */
@@ -47,13 +47,13 @@ interface BaseMessageFormat<P = unknown> {
   p: P
 }
 
-interface SerializedEventIteratorPayload {
+export interface SerializedEventIteratorPayload {
   e: EventIteratorEvent
   d: unknown
   m?: EventMeta
 }
 
-interface SerializedRequestPayload {
+export interface SerializedRequestPayload {
   /**
    * The url of the request
    *
@@ -74,7 +74,7 @@ interface SerializedRequestPayload {
   m?: string
 }
 
-interface SerializedResponsePayload {
+export interface SerializedResponsePayload {
   /**
    * @default 200
    */
@@ -88,18 +88,21 @@ interface SerializedResponsePayload {
   b: StandardBody
 }
 
-type DecodedMessageUnion<TMap extends RequestMessageMap | ResponseMessageMap> = {
+export type DecodedMessageUnion<TMap extends RequestMessageMap | ResponseMessageMap> = {
   [K in keyof TMap]: [id: string, type: K, payload: TMap[K]]
 }[keyof TMap]
 
 export type DecodedRequestMessage = DecodedMessageUnion<RequestMessageMap>
 export type DecodedResponseMessage = DecodedMessageUnion<ResponseMessageMap>
 
-export async function encodeRequestMessage<T extends keyof RequestMessageMap>(
+/**
+ * New serialization functions without Blob handling
+ */
+export function serializeRequestMessage<T extends keyof RequestMessageMap>(
   id: string,
   type: T,
   payload: RequestMessageMap[T],
-): Promise<EncodedMessage> {
+): BaseMessageFormat {
   if (type === MessageType.EVENT_ITERATOR) {
     const eventPayload = payload as EventIteratorPayload
     const serializedPayload: SerializedEventIteratorPayload = {
@@ -108,11 +111,119 @@ export async function encodeRequestMessage<T extends keyof RequestMessageMap>(
       m: eventPayload.meta,
     }
 
-    return encodeRawMessage({ i: id, t: type, p: serializedPayload })
+    return { i: id, t: type, p: serializedPayload }
   }
 
   if (type === MessageType.ABORT_SIGNAL) {
-    return encodeRawMessage({ i: id, t: type, p: payload })
+    return { i: id, t: type, p: payload }
+  }
+
+  const request = payload as RequestMessageMap[MessageType.REQUEST]
+
+  const serializedPayload: SerializedRequestPayload = {
+    u: request.url.toString().replace(SHORTABLE_ORIGIN_MATCHER, '/'),
+    b: request.body,
+    h: Object.keys(request.headers).length > 0 ? request.headers : undefined,
+    m: request.method === 'POST' ? undefined : request.method,
+  }
+
+  return {
+    i: id,
+    p: serializedPayload,
+  }
+}
+
+export function deserializeRequestMessage(message: BaseMessageFormat): DecodedRequestMessage {
+  const id: string = message.i
+  const type: MessageType = message.t ?? MessageType.REQUEST
+
+  if (type === MessageType.EVENT_ITERATOR) {
+    const payload = message.p as SerializedEventIteratorPayload
+
+    return [id, type, { event: payload.e, data: payload.d, meta: payload.m }]
+  }
+
+  if (type === MessageType.ABORT_SIGNAL) {
+    return [id, type, message.p as undefined]
+  }
+
+  const payload = message.p as SerializedRequestPayload
+
+  return [id, MessageType.REQUEST, {
+    url: payload.u.startsWith('/') ? new URL(`${SHORTABLE_ORIGIN}${payload.u}`) : new URL(payload.u),
+    headers: payload.h ?? {},
+    method: payload.m ?? 'POST',
+    body: payload.b,
+  }]
+}
+
+export function serializeResponseMessage<T extends keyof ResponseMessageMap>(
+  id: string,
+  type: T,
+  payload: ResponseMessageMap[T],
+): BaseMessageFormat {
+  if (type === MessageType.EVENT_ITERATOR) {
+    const eventPayload = payload as EventIteratorPayload
+    const serializedPayload: SerializedEventIteratorPayload = {
+      e: eventPayload.event,
+      d: eventPayload.data,
+      m: eventPayload.meta,
+    }
+    return { i: id, t: type, p: serializedPayload }
+  }
+
+  if (type === MessageType.ABORT_SIGNAL) {
+    return { i: id, t: type, p: undefined }
+  }
+
+  const response = payload as StandardResponse
+
+  const serializedPayload: SerializedResponsePayload = {
+    s: response.status === 200 ? undefined : response.status,
+    h: Object.keys(response.headers).length > 0 ? response.headers : undefined,
+    b: response.body,
+  }
+
+  return {
+    i: id,
+    p: serializedPayload,
+  }
+}
+
+export function deserializeResponseMessage(message: BaseMessageFormat): DecodedResponseMessage {
+  const id: string = message.i
+  const type: MessageType | undefined = message.t
+
+  if (type === MessageType.EVENT_ITERATOR) {
+    const payload = message.p as SerializedEventIteratorPayload
+
+    return [id, type, { event: payload.e, data: payload.d, meta: payload.m }]
+  }
+
+  if (type === MessageType.ABORT_SIGNAL) {
+    return [id, type, message.p as undefined]
+  }
+
+  const payload = message.p as SerializedResponsePayload
+
+  return [id, MessageType.RESPONSE, {
+    status: payload.s ?? 200,
+    headers: payload.h ?? {},
+    body: payload.b,
+  }]
+}
+
+/**
+ * Original encode/decode functions now using the new serialize/deserialize functions
+ */
+
+export async function encodeRequestMessage<T extends keyof RequestMessageMap>(
+  id: string,
+  type: T,
+  payload: RequestMessageMap[T],
+): Promise<EncodedMessage> {
+  if (type === MessageType.EVENT_ITERATOR || type === MessageType.ABORT_SIGNAL) {
+    return encodeRawMessage(serializeRequestMessage(id, type, payload))
   }
 
   const request = payload as RequestMessageMap[MessageType.REQUEST]
@@ -122,17 +233,13 @@ export async function encodeRequestMessage<T extends keyof RequestMessageMap>(
     request.headers,
   )
 
-  const serializedPayload: SerializedRequestPayload = {
-    u: request.url.toString().replace(SHORTABLE_ORIGIN_MATCHER, '/'),
-    b: processedBody instanceof Blob ? undefined : processedBody,
-    h: Object.keys(processedHeaders).length > 0 ? processedHeaders : undefined,
-    m: request.method === 'POST' ? undefined : request.method,
+  const modifiedRequest: RequestMessageMap[MessageType.REQUEST] = {
+    ...request,
+    body: processedBody instanceof Blob ? undefined : processedBody,
+    headers: processedHeaders,
   }
 
-  const baseMessage: BaseMessageFormat<SerializedRequestPayload> = {
-    i: id,
-    p: serializedPayload,
-  }
+  const baseMessage = serializeRequestMessage(id, MessageType.REQUEST, modifiedRequest)
 
   if (processedBody instanceof Blob) {
     return encodeRawMessage(baseMessage, processedBody)
@@ -144,30 +251,16 @@ export async function encodeRequestMessage<T extends keyof RequestMessageMap>(
 export async function decodeRequestMessage(raw: EncodedMessage): Promise<DecodedRequestMessage> {
   const { json: message, buffer } = await decodeRawMessage(raw)
 
-  const id: string = message.i
-  const type: MessageType = message.t
+  const [id, type, payload] = deserializeRequestMessage(message)
 
-  if (type === MessageType.EVENT_ITERATOR) {
-    const payload = message.p as SerializedEventIteratorPayload
-
-    return [id, type, { event: payload.e, data: payload.d, meta: payload.m }]
+  if (type === MessageType.EVENT_ITERATOR || type === MessageType.ABORT_SIGNAL) {
+    return [id, type, payload as any]
   }
 
-  if (type === MessageType.ABORT_SIGNAL) {
-    return [id, type, message.p]
-  }
+  const request = payload as RequestMessageMap[MessageType.REQUEST]
+  const body = await deserializeBody(request.headers, request.body, buffer)
 
-  const payload = message.p as SerializedRequestPayload
-
-  const headers = payload.h ?? {}
-  const body = await deserializeBody(headers, payload.b, buffer)
-
-  return [id, MessageType.REQUEST, {
-    url: payload.u.startsWith('/') ? new URL(`${SHORTABLE_ORIGIN}${payload.u}`) : new URL(payload.u),
-    headers,
-    method: payload.m ?? 'POST',
-    body,
-  }]
+  return [id, type, { ...request, body }]
 }
 
 export async function encodeResponseMessage<T extends keyof ResponseMessageMap>(
@@ -175,18 +268,8 @@ export async function encodeResponseMessage<T extends keyof ResponseMessageMap>(
   type: T,
   payload: ResponseMessageMap[T],
 ): Promise<EncodedMessage> {
-  if (type === MessageType.EVENT_ITERATOR) {
-    const eventPayload = payload as EventIteratorPayload
-    const serializedPayload: SerializedEventIteratorPayload = {
-      e: eventPayload.event,
-      d: eventPayload.data,
-      m: eventPayload.meta,
-    }
-    return encodeRawMessage({ i: id, t: type, p: serializedPayload })
-  }
-
-  if (type === MessageType.ABORT_SIGNAL) {
-    return encodeRawMessage({ i: id, t: type, p: undefined })
+  if (type === MessageType.EVENT_ITERATOR || type === MessageType.ABORT_SIGNAL) {
+    return encodeRawMessage(serializeResponseMessage(id, type, payload))
   }
 
   const response = payload as StandardResponse
@@ -195,16 +278,13 @@ export async function encodeResponseMessage<T extends keyof ResponseMessageMap>(
     response.headers,
   )
 
-  const serializedPayload: SerializedResponsePayload = {
-    s: response.status === 200 ? undefined : response.status,
-    h: Object.keys(processedHeaders).length > 0 ? processedHeaders : undefined,
-    b: processedBody instanceof Blob ? undefined : processedBody,
+  const modifiedResponse: StandardResponse = {
+    ...response,
+    body: processedBody instanceof Blob ? undefined : processedBody,
+    headers: processedHeaders,
   }
 
-  const baseMessage: BaseMessageFormat<SerializedResponsePayload> = {
-    i: id,
-    p: serializedPayload,
-  }
+  const baseMessage = serializeResponseMessage(id, MessageType.RESPONSE, modifiedResponse)
 
   if (processedBody instanceof Blob) {
     return encodeRawMessage(baseMessage, processedBody)
@@ -216,25 +296,16 @@ export async function encodeResponseMessage<T extends keyof ResponseMessageMap>(
 export async function decodeResponseMessage(raw: EncodedMessage): Promise<DecodedResponseMessage> {
   const { json: message, buffer } = await decodeRawMessage(raw)
 
-  const id: string = message.i
-  const type: MessageType | undefined = message.t
+  const [id, type, payload] = deserializeResponseMessage(message)
 
-  if (type === MessageType.EVENT_ITERATOR) {
-    const payload = message.p as SerializedEventIteratorPayload
-
-    return [id, type, { event: payload.e, data: payload.d, meta: payload.m }]
+  if (type === MessageType.EVENT_ITERATOR || type === MessageType.ABORT_SIGNAL) {
+    return [id, type, payload as any]
   }
 
-  if (type === MessageType.ABORT_SIGNAL) {
-    return [id, type, message.p]
-  }
+  const response = payload as StandardResponse
+  const body = await deserializeBody(response.headers, response.body, buffer)
 
-  const payload = message.p as SerializedResponsePayload
-
-  const headers = payload.h ?? {}
-  const body = await deserializeBody(headers, payload.b, buffer)
-
-  return [id, MessageType.RESPONSE, { status: payload.s ?? 200, headers, body }]
+  return [id, type, { ...response, body }]
 }
 
 /**

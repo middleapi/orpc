@@ -48,3 +48,38 @@ clientPort.start()
 :::info
 This only shows how to configure the link. For full client examples, see [Client-Side Clients](/docs/client/client-side).
 :::
+
+## Transfer
+
+By default, oRPC serializes request/response messages to string/binary data before sending over message port. If needed, you can define the `transfer` option to utilize full power of [MessagePort: postMessage() method](https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage), such as transferring ownership of objects to the other side or support unserializable objects like `OffscreenCanvas`.
+
+::: code-group
+
+```ts [handler]
+const handler = new RPCHandler(router, {
+  experimental_transfer: (message, port) => {
+    const transfer = deepFindTransferableObjects(message) // implement your own logic
+    return transfer.length ? transfer : null // only enable when needed
+  }
+})
+```
+
+```ts [link]
+const link = new RPCLink({
+  port: clientPort,
+  experimental_transfer: (message) => {
+    const transfer = deepFindTransferableObjects(message) // implement your own logic
+    return transfer.length ? transfer : null // only enable when needed
+  }
+})
+```
+
+:::
+
+::: warning
+When `transfer` returns an array, messages using [the structured clone algorithm](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm) for sending, which doesn't support all data types such as [Event Iterator's Metadata](/docs/event-iterator#last-event-id-event-metadata). So I recommend you only enable this when needed.
+:::
+
+::: tip
+The `transfer` option run after [RPC JSON Serializer](/docs/advanced/rpc-json-serializer) so you can combine them together to support more data types.
+:::
