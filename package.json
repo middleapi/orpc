@@ -45,7 +45,7 @@
     "eslint-plugin-ban": "^2.0.0",
     "eslint-plugin-format": "^1.0.2",
     "jsdom": "^27.0.1",
-    "knip": "^5.66.2",
+    "knip": "^5.66.3",
     "lint-staged": "^16.2.6",
     "msw": "^2.11.6",
     "pkg-pr-new": "^0.0.60",
