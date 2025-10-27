@@ -248,7 +248,7 @@ importers:
         version: 2.1.23
     devDependencies:
       zod:
-        specifier: ^4.1.11
+        specifier: ^4.1.12
         version: 4.1.12
 
   packages/client:
@@ -646,7 +646,7 @@ importers:
         specifier: ^8.18.3
         version: 8.18.3
       zod:
-        specifier: ^4.1.11
+        specifier: ^4.1.12
         version: 4.1.12
 
   packages/shared:
@@ -893,7 +893,7 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0(typescript@5.8.3)
       zod:
-        specifier: ^4.1.11
+        specifier: ^4.1.12
         version: 4.1.12
 
   packages/vue-colada:
