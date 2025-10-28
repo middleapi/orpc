@@ -99,9 +99,9 @@ export class RPCHandler<T extends Context> {
         = e instanceof ORPCError
           ? e
           : new ORPCError('INTERNAL_ERROR', {
-            message: 'An error occurred while processing the request.',
-            cause: e,
-          })
+              message: 'An error occurred while processing the request.',
+              cause: e,
+            })
 
       const response = new Response(JSON.stringify(error.toJSON()), {
         status: error.status,

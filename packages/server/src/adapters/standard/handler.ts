@@ -163,9 +163,9 @@ export class StandardHandler<T extends Context> {
 
               const error = step === 'decode_input' && !(e instanceof ORPCError)
                 ? new ORPCError('BAD_REQUEST', {
-                  message: `Malformed request. Ensure the request body is properly formatted and the 'Content-Type' header is set correctly.`,
-                  cause: e,
-                })
+                    message: `Malformed request. Ensure the request body is properly formatted and the 'Content-Type' header is set correctly.`,
+                    cause: e,
+                  })
                 : toORPCError(e)
 
               const response = this.codec.encodeError(error)

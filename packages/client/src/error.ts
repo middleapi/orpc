@@ -183,9 +183,9 @@ export function toORPCError(error: unknown): ORPCError<any, any> {
   return error instanceof ORPCError
     ? error
     : new ORPCError('INTERNAL_SERVER_ERROR', {
-      message: 'Internal server error',
-      cause: error,
-    })
+        message: 'Internal server error',
+        cause: error,
+      })
 }
 
 export function isORPCErrorStatus(status: number): boolean {

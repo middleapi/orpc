@@ -41,7 +41,7 @@ export function Implement<T extends ContractRouter<any>>(
 ): <U extends Promisable<Router<T, Record<never, never>>>>(
   target: Record<PropertyKey, any>,
   propertyKey: string,
-  descriptor: TypedPropertyDescriptor<(...args: any[]) => U>
+  descriptor: TypedPropertyDescriptor<(...args: any[]) => U>,
 ) => void {
   if (isContractProcedure(contract)) {
     const method = fallbackContractConfig('defaultMethod', contract['~orpc'].route.method)
@@ -144,9 +144,9 @@ export class ImplementInterceptor implements NestInterceptor {
           catch (e) {
             const error = isDecoding && !(e instanceof ORPCError)
               ? new ORPCError('BAD_REQUEST', {
-                message: `Malformed request. Ensure the request body is properly formatted and the 'Content-Type' header is set correctly.`,
-                cause: e,
-              })
+                  message: `Malformed request. Ensure the request body is properly formatted and the 'Content-Type' header is set correctly.`,
+                  cause: e,
+                })
               : toORPCError(e)
 
             return codec.encodeError(error)

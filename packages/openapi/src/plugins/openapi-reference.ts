@@ -79,7 +79,7 @@ export interface OpenAPIReferencePluginOptions<T extends Context> extends OpenAP
     config: Record<string, unknown> | undefined,
     spec: OpenAPI.Document,
     docsProvider: 'scalar' | 'swagger',
-    cssUrl: string | undefined
+    cssUrl: string | undefined,
   ) => string
 }
 
