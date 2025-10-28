@@ -467,8 +467,8 @@ importers:
         specifier: workspace:*
         version: link:../standard-server
       rou3:
-        specifier: ^0.7.8
-        version: 0.7.8
+        specifier: ^0.7.9
+        version: 0.7.9
     devDependencies:
       fastify:
         specifier: ^5.6.1
@@ -12351,8 +12351,8 @@ packages:
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
 
-  rou3@0.7.8:
-    resolution: {integrity: sha512-21X/el5fdOaEsqwl3an/d9kpZ8hshVIyrwFCpsoleJ4ccAGRbN+PVoxyXzWXkHDxfMkVnLe4yzx+imz2qoem2Q==}
+  rou3@0.7.9:
+    resolution: {integrity: sha512-+JM7c8swGkoXkWRkIz7qpYN9Bls7Rj/vuSGaxtoKHIe8Ba1ci+mXnqzqtJFrXSbvEazNL9v83P2RiXae9NSbfQ==}
 
   roughjs@4.6.6:
     resolution: {integrity: sha512-ZUz/69+SYpFN/g/lUlo2FXcIjRkSu3nDarreVdGGndHEBJ6cXPdKguS8JGxwj5HA5xIbVKSmLgr5b3AWxtRfvQ==}
@@ -24328,7 +24328,7 @@ snapshots:
     dependencies:
       cookie-es: 2.0.0
       fetchdts: 0.1.7
-      rou3: 0.7.8
+      rou3: 0.7.9
       srvx: 0.8.16
     optionalDependencies:
       crossws: 0.4.1(srvx@0.8.16)
@@ -27730,7 +27730,7 @@ snapshots:
       '@rollup/rollup-win32-x64-msvc': 4.52.5
       fsevents: 2.3.3
 
-  rou3@0.7.8: {}
+  rou3@0.7.9: {}
 
   roughjs@4.6.6:
     dependencies:
