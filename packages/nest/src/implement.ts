@@ -9,7 +9,6 @@ import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
 import type { ORPCModuleConfig } from './module'
 import { applyDecorators, Delete, Get, Head, Inject, Injectable, Optional, Patch, Post, Put, UseInterceptors } from '@nestjs/common'
-import { toORPCError } from '@orpc/client'
 import { fallbackContractConfig, isContractProcedure } from '@orpc/contract'
 import { StandardBracketNotationSerializer, StandardOpenAPIJsonSerializer, StandardOpenAPISerializer } from '@orpc/openapi-client/standard'
 import { StandardOpenAPICodec } from '@orpc/openapi/standard'
@@ -124,40 +123,63 @@ export class ImplementInterceptor implements NestInterceptor {
           ? StandardServerFastify.toStandardLazyRequest(req, res as FastifyReply)
           : StandardServerNode.toStandardLazyRequest(req, res as Response)
 
-        const standardResponse: StandardResponse = await (async () => {
-          let isDecoding = false
+        // Pass the original NestJS request as context
+        const contextWithRequest = {
+          ...(this.config?.context || {}),
+          request: req,
+          response: res,
+        }
 
+        const client = createProcedureClient(procedure, {
+          ...this.config,
+          context: contextWithRequest,
+        })
+        const standardResponse: StandardResponse = await (async (): Promise<StandardResponse> => {
+        // Decode input - catch only non-ORPC decoding errors and convert to ORPCError
+          let input: Awaited<ReturnType<typeof codec.decode>>
           try {
-            const client = createProcedureClient(procedure, this.config)
+            input = await codec.decode(standardRequest, flattenParams(req.params as NestParams), procedure)
+          }
+          catch (e: any) {
+            let error: ORPCError<any, any> = e
+            // Malformed request - wrap in ORPCError and let exception filters handle it
+            if (!(e instanceof ORPCError)) {
+              error = new ORPCError('BAD_REQUEST', {
+                message: `Malformed request. Ensure the request body is properly formatted and the 'Content-Type' header is set correctly.`,
+                cause: e,
+              })
+            }
+            return codec.encodeError(error)
+          }
 
-            isDecoding = true
-            const input = await codec.decode(standardRequest, flattenParams(req.params as NestParams), procedure)
-            isDecoding = false
+          // Execute handler - let all errors bubble up to NestJS exception filters
+          const output = await client(input, {
+            signal: standardRequest.signal,
+            lastEventId: flattenHeader(standardRequest.headers['last-event-id']),
+          })
 
-            const output = await client(input, {
-              signal: standardRequest.signal,
-              lastEventId: flattenHeader(standardRequest.headers['last-event-id']),
-            })
-
+          // Encode output - catch only non-ORPC encoding errors and convert to ORPCError
+          try {
             return codec.encode(output, procedure)
           }
-          catch (e) {
-            const error = isDecoding && !(e instanceof ORPCError)
-              ? new ORPCError('BAD_REQUEST', {
-                  message: `Malformed request. Ensure the request body is properly formatted and the 'Content-Type' header is set correctly.`,
-                  cause: e,
-                })
-              : toORPCError(e)
-
+          catch (e: any) {
+            let error: ORPCError<any, any> = e
+            // Encoding error means our handler returned invalid data
+            if (!(e instanceof ORPCError)) {
+              error = new ORPCError('INTERNAL_SERVER_ERROR', {
+                message: `Failed to encode response. The handler may have returned data that doesn't match the contract output schema.`,
+                cause: e,
+              })
+            }
             return codec.encodeError(error)
           }
         })()
-
+        // Set status and headers
         if ('raw' in res) {
-          await StandardServerFastify.sendStandardResponse(res, standardResponse, this.config)
+          return StandardServerFastify.setStandardResponse(res as FastifyReply, standardResponse, this.config)
         }
         else {
-          await StandardServerNode.sendStandardResponse(res, standardResponse, this.config)
+          return StandardServerNode.setStandardResponse(res as Response, standardResponse, this.config)
         }
       }),
     )

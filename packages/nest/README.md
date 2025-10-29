@@ -68,6 +68,34 @@ You can find the full documentation [here](https://orpc.unnoq.com).
 
 Deeply integrate oRPC with [NestJS](https://nestjs.com/). Read the [documentation](https://orpc.unnoq.com/docs/openapi/integrations/implement-contract-in-nest) for more information.
 
+### Error Handling
+
+oRPC provides an optional `ORPCExceptionFilter` that catches `ORPCError` instances and converts them to standardized oRPC error responses. You can choose to:
+
+1. **Use the built-in filter** for standard oRPC error responses
+2. **Handle ORPCError in your own custom exception filters** for custom error formatting
+3. **Let NestJS default error handling take over**
+
+```ts
+import { ORPCExceptionFilter } from '@orpc/nest'
+
+// Option 1: Register globally in your app
+app.useGlobalFilters(new ORPCExceptionFilter())
+
+// Option 2: Register as a provider in your module
+@Module({
+  providers: [
+    {
+      provide: APP_FILTER,
+      useClass: ORPCExceptionFilter,
+    },
+  ],
+})
+export class AppModule {}
+```
+
+**Note:** All errors thrown in oRPC handlers (including decoding/encoding errors) are now allowed to bubble up to NestJS exception filters. This gives you full control over error handling while maintaining compatibility with NestJS's exception filter system.
+
 ### Implement Contract
 
 An overview of how to implement an [oRPC contract](https://orpc.unnoq.com/docs/contract-first/define-contract) in NestJS.

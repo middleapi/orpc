@@ -3,7 +3,7 @@ import type { Request } from 'express'
 import type { FastifyReply } from 'fastify'
 import FastifyCookie from '@fastify/cookie'
 import { Controller, Req, Res } from '@nestjs/common'
-import { REQUEST } from '@nestjs/core'
+import { APP_FILTER, REQUEST } from '@nestjs/core'
 import { FastifyAdapter } from '@nestjs/platform-fastify'
 import { Test } from '@nestjs/testing'
 import { oc, ORPCError } from '@orpc/contract'
@@ -11,11 +11,13 @@ import { implement, lazy } from '@orpc/server'
 import * as StandardServerNode from '@orpc/standard-server-node'
 import supertest from 'supertest'
 import { expect, it, vi } from 'vitest'
-import * as z from 'zod'
+import { z } from 'zod'
+import { ORPCExceptionFilter } from './filters/orpc-exception.filter'
 import { Implement } from './implement'
 import { ORPCModule } from './module'
 
 const sendStandardResponseSpy = vi.spyOn(StandardServerNode, 'sendStandardResponse')
+const setStandardResponseSpy = vi.spyOn(StandardServerNode, 'setStandardResponse')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -134,6 +136,14 @@ describe('@Implement', async () => {
   ] as const)('type: $1', async (Controller, _) => {
     const moduleRef = await Test.createTestingModule({
       controllers: [Controller],
+      // The pong test throw errors and need this filter to match the
+      // expected behaviour.
+      providers: [
+        {
+          provide: APP_FILTER,
+          useClass: ORPCExceptionFilter,
+        },
+      ],
     }).compile()
 
     const app = moduleRef.createNestApplication()
@@ -186,6 +196,7 @@ describe('@Implement', async () => {
           name: 'world',
         },
       }))
+      expect(sendStandardResponseSpy).toHaveBeenCalledTimes(1)
 
       expect(req).toBeDefined()
       expect(req!.method).toEqual('GET')
@@ -369,6 +380,7 @@ describe('@Implement', async () => {
     }).compile()
 
     const app = moduleRef.createNestApplication()
+    app.useGlobalFilters(new ORPCExceptionFilter())
     await app.init()
 
     const httpServer = app.getHttpServer()
@@ -411,8 +423,8 @@ describe('@Implement', async () => {
     expect(res.body).toEqual('pong')
 
     expect(interceptor).toHaveBeenCalledTimes(1)
-    expect(sendStandardResponseSpy).toHaveBeenCalledTimes(1)
-    expect(sendStandardResponseSpy).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({
+    expect(setStandardResponseSpy).toHaveBeenCalledTimes(1)
+    expect(setStandardResponseSpy).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({
       eventIteratorKeepAliveComment: '__TEST__',
     }))
   })
@@ -459,8 +471,8 @@ describe('@Implement', async () => {
         }),
       }),
     }))
-    expect(sendStandardResponseSpy).toHaveBeenCalledTimes(1)
-    expect(sendStandardResponseSpy).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({
+    expect(setStandardResponseSpy).toHaveBeenCalledTimes(1)
+    expect(setStandardResponseSpy).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({
       eventIteratorKeepAliveComment: '__TEST__',
     }))
   })

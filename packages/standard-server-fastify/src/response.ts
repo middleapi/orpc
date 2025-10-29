@@ -1,7 +1,7 @@
 import type { StandardHeaders, StandardResponse } from '@orpc/standard-server'
 import type { ToNodeHttpBodyOptions } from '@orpc/standard-server-node'
 import type { FastifyReply } from 'fastify'
-import { toNodeHttpBody } from '@orpc/standard-server-node'
+import { toNodeHttpBody, toResponseBody } from '@orpc/standard-server-node'
 
 export interface SendStandardResponseOptions extends ToNodeHttpBodyOptions { }
 
@@ -21,5 +21,24 @@ export function sendStandardResponse(
     reply.status(standardResponse.status)
     reply.headers(resHeaders)
     reply.send(resBody)
+  })
+}
+
+export function setStandardResponse(
+  reply: FastifyReply,
+  standardResponse: StandardResponse,
+  options: SendStandardResponseOptions = {},
+) {
+  return new Promise((resolve, reject) => {
+    reply.raw.once('error', reject)
+    reply.raw.once('close', resolve)
+
+    const resHeaders: StandardHeaders = { ...standardResponse.headers }
+
+    const resBody = toResponseBody(standardResponse.body, resHeaders, options)
+
+    reply.code(standardResponse.status)
+    reply.headers(resHeaders)
+    return resolve(resBody)
   })
 }

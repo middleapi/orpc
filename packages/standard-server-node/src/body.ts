@@ -54,7 +54,7 @@ export interface ToNodeHttpBodyOptions extends ToEventStreamOptions {}
 
 /**
  * @param body
- * @param headers - WARNING: The headers can be changed by the function and effects on the original headers.
+ * @param headers - WARNING: The headers can be mutated by the function and may affect the original headers.
  * @param options
  */
 export function toNodeHttpBody(
@@ -101,6 +101,64 @@ export function toNodeHttpBody(
   headers['content-type'] = 'application/json'
 
   return stringifyJSON(body)
+}
+
+/**
+ * @param body
+ * @param headers - WARNING: The headers can be mutated by the function and may affect the original headers.
+ * @param options
+ */
+export function toResponseBody(
+  body: StandardBody,
+  headers: StandardHeaders,
+  options: ToNodeHttpBodyOptions = {},
+): Readable | undefined | StandardBody {
+  const currentContentDisposition = flattenHeader(headers['content-disposition'])
+
+  delete headers['content-type']
+  delete headers['content-disposition']
+
+  if (body === undefined) {
+    return
+  }
+
+  if (body instanceof Blob) {
+    headers['content-type'] = body.type
+    headers['content-length'] = body.size.toString()
+    headers['content-disposition'] = currentContentDisposition ?? generateContentDisposition(body instanceof File ? body.name : 'blob')
+
+    return Readable.fromWeb(body.stream())
+  }
+
+  if (body instanceof FormData) {
+    const response = new Response(body)
+    headers['content-type'] = response.headers.get('content-type')!
+
+    return Readable.fromWeb(response.body!)
+  }
+
+  if (body instanceof URLSearchParams) {
+    headers['content-type'] = 'application/x-www-form-urlencoded'
+
+    return body.toString()
+  }
+
+  if (isAsyncIteratorObject(body)) {
+    headers['content-type'] = 'text/event-stream'
+
+    return toEventStream(body, options)
+  }
+
+  headers['content-type'] = 'application/json'
+  // It seems like Nest/Node, in case of a string body, remove or alter the string if
+  // content type json is not set.
+  // We also need to "double" stringify it, else the string will be encoded as an Array
+  // This match the behavior of #toNodeHttpBody
+  if (typeof body === 'string') {
+    return stringifyJSON(body)
+  }
+
+  return body
 }
 
 function _streamToFormData(stream: Readable, contentType: string): Promise<FormData> {

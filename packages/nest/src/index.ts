@@ -1,3 +1,4 @@
+export * from './filters/orpc-exception.filter'
 export * from './implement'
 export { Implement as Impl } from './implement'
 export * from './module'
