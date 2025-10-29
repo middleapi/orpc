@@ -11,8 +11,15 @@ description: Use oRPC inside an Remix project
 
 ```ts [app/routes/rpc.$.ts]
 import { RPCHandler } from '@orpc/server/fetch'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { response } = await handler.handle(request, {

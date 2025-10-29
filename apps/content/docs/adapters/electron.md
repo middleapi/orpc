@@ -13,8 +13,15 @@ Listen for a port sent from the renderer, then upgrade it:
 
 ```ts
 import { RPCHandler } from '@orpc/server/message-port'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 app.whenReady().then(() => {
   ipcMain.on('start-orpc-server', async (event) => {

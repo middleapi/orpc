@@ -15,8 +15,15 @@ You set up an oRPC server inside Nuxt using its [Server Routes](https://nuxt.com
 
 ```ts [server/routes/rpc/[...].ts]
 import { RPCHandler } from '@orpc/server/fetch'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 export default defineEventHandler(async (event) => {
   const request = toWebRequest(event)

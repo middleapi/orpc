@@ -14,8 +14,15 @@ Listen for a `MessagePort` sent from the main thread and upgrade it:
 ```ts
 import { parentPort } from 'node:worker_threads'
 import { RPCHandler } from '@orpc/server/message-port'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 parentPort.on('message', (message) => {
   if (message instanceof MessagePort) {

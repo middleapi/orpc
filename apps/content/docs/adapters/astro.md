@@ -13,8 +13,15 @@ description: Use oRPC inside an Astro project
 
 ```ts [pages/rpc/[...rest].ts]
 import { RPCHandler } from '@orpc/server/fetch'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 export const prerender = false
 

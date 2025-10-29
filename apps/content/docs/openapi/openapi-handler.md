@@ -72,7 +72,9 @@ import { onError } from '@orpc/server'
 const handler = new OpenAPIHandler(router, {
   plugins: [new CORSPlugin()],
   interceptors: [
-    onError(error => console.error(error))
+    onError((error) => {
+      console.error(error)
+    }),
   ],
 })
 

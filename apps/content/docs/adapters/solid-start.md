@@ -14,8 +14,15 @@ description: Use oRPC inside a Solid Start project
 ```ts [src/routes/rpc/[...rest].ts]
 import type { APIEvent } from '@solidjs/start/server'
 import { RPCHandler } from '@orpc/server/fetch'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 async function handle({ request }: APIEvent) {
   const { response } = await handler.handle(request, {

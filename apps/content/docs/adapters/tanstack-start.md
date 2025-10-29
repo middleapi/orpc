@@ -16,8 +16,15 @@ You set up an oRPC server inside TanStack Start using its [Server Routes](https:
 ```ts [src/routes/api/rpc.$.ts]
 import { RPCHandler } from '@orpc/server/fetch'
 import { createFileRoute } from '@tanstack/react-router'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 async function handle({ request }: { request: Request }) {
   const { response } = await handler.handle(request, {

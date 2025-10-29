@@ -20,8 +20,15 @@ oRPC provides built-in WebSocket support for low-latency, bidirectional RPC.
 
 ```ts [Websocket]
 import { RPCHandler } from '@orpc/server/websocket'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 Deno.serve((req) => {
   if (req.headers.get('upgrade') !== 'websocket') {
@@ -41,11 +48,18 @@ Deno.serve((req) => {
 ```ts [CrossWS]
 import { createServer } from 'node:http'
 import { experimental_RPCHandler as RPCHandler } from '@orpc/server/crossws'
+import { onError } from '@orpc/server'
 
 // any crossws adapter is supported
 import crossws from 'crossws/adapters/node'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 const ws = crossws({
   hooks: {
@@ -74,8 +88,15 @@ server.on('upgrade', (req, socket, head) => {
 ```ts [WS]
 import { WebSocketServer } from 'ws'
 import { RPCHandler } from '@orpc/server/ws'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 const wss = new WebSocketServer({ port: 8080 })
 
@@ -88,8 +109,15 @@ wss.on('connection', (ws) => {
 
 ```ts [Bun WebSocket]
 import { RPCHandler } from '@orpc/server/bun-ws'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 Bun.serve({
   fetch(req, server) {
@@ -114,8 +142,15 @@ Bun.serve({
 
 ```ts [Websocket Hibernation]
 import { RPCHandler } from '@orpc/server/websocket'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 export class ChatRoom extends DurableObject {
   async fetch(): Promise<Response> {

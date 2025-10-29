@@ -22,11 +22,17 @@ oRPC includes built-in HTTP support, making it easy to expose RPC endpoints in a
 import { createServer } from 'node:http' // or 'node:http2'
 import { RPCHandler } from '@orpc/server/node'
 import { CORSPlugin } from '@orpc/server/plugins'
+import { onError } from '@orpc/server'
 
 const handler = new RPCHandler(router, {
   plugins: [
     new CORSPlugin()
-  ]
+  ],
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
 })
 
 const server = createServer(async (req, res) => {
@@ -49,11 +55,17 @@ server.listen(3000, '127.0.0.1', () => console.log('Listening on 127.0.0.1:3000'
 ```ts [bun]
 import { RPCHandler } from '@orpc/server/fetch'
 import { CORSPlugin } from '@orpc/server/plugins'
+import { onError } from '@orpc/server'
 
 const handler = new RPCHandler(router, {
   plugins: [
     new CORSPlugin()
-  ]
+  ],
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
 })
 
 Bun.serve({
@@ -75,11 +87,17 @@ Bun.serve({
 ```ts [cloudflare]
 import { RPCHandler } from '@orpc/server/fetch'
 import { CORSPlugin } from '@orpc/server/plugins'
+import { onError } from '@orpc/server'
 
 const handler = new RPCHandler(router, {
   plugins: [
     new CORSPlugin()
-  ]
+  ],
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
 })
 
 export default {
@@ -101,11 +119,17 @@ export default {
 ```ts [deno]
 import { RPCHandler } from '@orpc/server/fetch'
 import { CORSPlugin } from '@orpc/server/plugins'
+import { onError } from '@orpc/server'
 
 const handler = new RPCHandler(router, {
   plugins: [
     new CORSPlugin()
-  ]
+  ],
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
 })
 
 Deno.serve(async (request) => {
@@ -125,8 +149,15 @@ Deno.serve(async (request) => {
 ```ts [fastify]
 import Fastify from 'fastify'
 import { RPCHandler } from '@orpc/server/fastify'
+import { onError } from '@orpc/server'
 
-const rpcHandler = new RPCHandler(router)
+const rpcHandler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 const fastify = Fastify()
 
@@ -152,8 +183,15 @@ fastify.listen({ port: 3000 }).then(() => console.log('Listening on 127.0.0.1:30
 ```ts [aws-lambda]
 import { APIGatewayProxyEventV2 } from 'aws-lambda'
 import { RPCHandler } from '@orpc/server/aws-lambda'
+import { onError } from '@orpc/server'
 
-const rpcHandler = new RPCHandler(router)
+const rpcHandler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 /**
  * oRPC only supports [AWS Lambda response streaming](https://aws.amazon.com/blogs/compute/introducing-aws-lambda-response-streaming/).

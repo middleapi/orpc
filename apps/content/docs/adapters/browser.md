@@ -19,8 +19,15 @@ The browser extension [Message Passing API](https://developer.chrome.com/docs/ex
 
 ```ts [server]
 import { RPCHandler } from '@orpc/server/message-port'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 browser.runtime.onConnect.addListener((port) => {
   handler.upgrade(port, {
@@ -53,8 +60,15 @@ To enable communication between two window contexts (e.g. parent and popup), one
 
 ```ts [opener]
 import { RPCHandler } from '@orpc/server/message-port'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 window.addEventListener('message', (event) => {
   if (event.data instanceof MessagePort) {
@@ -123,8 +137,15 @@ window.addEventListener('message', (event) => {
 
 ```ts [server]
 import { RPCHandler } from '@orpc/server/message-port'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 browser.runtime.onConnect.addListener((port) => {
   handler.upgrade(port, {

@@ -126,9 +126,15 @@ import { router } from './shared/planet'
 import { createServer } from 'node:http'
 import { OpenAPIHandler } from '@orpc/openapi/node'
 import { CORSPlugin } from '@orpc/server/plugins'
+import { onError } from '@orpc/server'
 
 const handler = new OpenAPIHandler(router, {
-  plugins: [new CORSPlugin()]
+  plugins: [new CORSPlugin()],
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
 })
 
 const server = createServer(async (req, res) => {

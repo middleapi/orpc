@@ -88,7 +88,9 @@ Learn more about [oRPC OpenAPI Specification Generation](/docs/openapi/openapi-s
 const handler = new OpenAPIHandler(orpcRouter, {
   plugins: [new CORSPlugin()],
   interceptors: [
-    onError(error => console.error(error))
+    onError((error) => {
+      console.error(error)
+    }),
   ],
 })
 

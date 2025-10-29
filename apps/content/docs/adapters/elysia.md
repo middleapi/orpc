@@ -11,9 +11,16 @@ description: Use oRPC inside an Elysia project
 
 ```ts
 import { Elysia } from 'elysia'
-import { OpenAPIHandler } from '@orpc/openapi/fetch'
+import { RPCHandler } from '@orpc/server/fetch'
+import { onError } from '@orpc/server'
 
-const handler = new OpenAPIHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 const app = new Elysia()
   .all('/rpc*', async ({ request }: { request: Request }) => {

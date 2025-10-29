@@ -19,8 +19,15 @@ You set up an oRPC server inside Next.js using its [Route Handlers](https://next
 
 ```ts [app/rpc/[[...rest]]/route.ts]
 import { RPCHandler } from '@orpc/server/fetch'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 async function handleRequest(request: Request) {
   const { response } = await handler.handle(request, {
@@ -49,8 +56,15 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc-
 
 ```ts [pages/api/rpc/[[...rest]].ts]
 import { RPCHandler } from '@orpc/server/node'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 export const config = {
   api: {

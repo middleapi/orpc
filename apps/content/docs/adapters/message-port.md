@@ -25,8 +25,15 @@ const clientPort = channel.port2
 
 ```ts [server]
 import { RPCHandler } from '@orpc/server/message-port'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 handler.upgrade(serverPort, {
   context: {}, // Provide initial context if needed

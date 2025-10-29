@@ -14,8 +14,15 @@ description: Use oRPC inside an Svelte Kit project
 ```ts [src/routes/rpc/[...rest]/+server.ts]
 import { error } from '@sveltejs/kit'
 import { RPCHandler } from '@orpc/server/fetch'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 const handle: RequestHandler = async ({ request }) => {
   const { response } = await handler.handle(request, {

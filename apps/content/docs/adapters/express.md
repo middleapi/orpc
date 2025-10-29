@@ -17,12 +17,19 @@ Express's [body-parser](https://expressjs.com/en/resources/middleware/body-parse
 import express from 'express'
 import cors from 'cors'
 import { RPCHandler } from '@orpc/server/node'
+import { onError } from '@orpc/server'
 
 const app = express()
 
 app.use(cors())
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 app.use('/rpc{/*path}', async (req, res, next) => {
   const { matched } = await handler.handle(req, res, {

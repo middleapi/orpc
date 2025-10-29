@@ -15,8 +15,15 @@ Configure your Web Worker to handle oRPC requests by upgrading it with a message
 
 ```ts
 import { RPCHandler } from '@orpc/server/message-port'
+import { onError } from '@orpc/server'
 
-const handler = new RPCHandler(router)
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
 
 handler.upgrade(self, {
   context: {}, // Provide initial context if needed
