@@ -12,14 +12,14 @@ export interface CreateAiSdkToolMeta extends Meta {
 export class CreateToolError extends Error {}
 
 export function createTool<TInput, TOutput>(
-  contract: ContractProcedure<Schema<any, TInput>, Schema<any, TOutput>, any, CreateAiSdkToolMeta>,
+  contract: ContractProcedure<Schema<any, TInput>, Schema<TOutput, any>, any, CreateAiSdkToolMeta>,
   options: SetOptional<Tool<TInput, TOutput>, 'inputSchema' | 'outputSchema'>,
 ): Tool<TInput, TOutput> {
   if (contract['~orpc'].inputSchema === undefined) {
     throw new CreateToolError('Cannot create tool from a contract procedure without input schema.')
   }
 
-  return tool({
+  return tool<TInput, TOutput>({
     inputSchema: contract['~orpc'].inputSchema,
     outputSchema: contract['~orpc'].outputSchema,
     description: contract['~orpc'].route.summary ?? contract['~orpc'].route.description,

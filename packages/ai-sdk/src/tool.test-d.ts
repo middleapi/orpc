@@ -33,6 +33,38 @@ describe('createTool', () => {
     })
   })
 
+  it('infer correct input & output', () => {
+    const contract = oc
+      .route({
+        summary: 'Get the weather in a location',
+      })
+      .input(z.object({
+        stringToNumber: z.string().transform(val => Number(val)),
+      }))
+      .output(z.object({
+        numberToBoolean: z.number().transform(val => Boolean(val)),
+      }))
+
+    const tool = createTool(contract, {
+      execute: async ({ stringToNumber }) => {
+        expectTypeOf(stringToNumber).toEqualTypeOf<number>()
+
+        return {
+          numberToBoolean: stringToNumber,
+        }
+      },
+    })
+
+    const tool2 = createTool(contract, {
+      // @ts-expect-error invalid numberToBoolean
+      execute: async ({ stringToNumber }) => {
+        return {
+          numberToBoolean: true,
+        }
+      },
+    })
+  })
+
   it('throw on missing inputSchema is correct, because tool require inputSchema', () => {
     tool({
       inputSchema: z.object({}),
