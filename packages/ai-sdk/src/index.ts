@@ -1,3 +1,5 @@
+export * from './tool'
+
 export {
   AsyncIteratorClass,
   asyncIteratorToStream as eventIteratorToStream,

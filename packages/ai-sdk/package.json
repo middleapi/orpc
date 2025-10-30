@@ -36,8 +36,12 @@
   "peerDependencies": {
     "ai": ">=5.0.76"
   },
+  "dependencies": {
+    "@orpc/contract": "workspace:*",
+    "@orpc/shared": "workspace:*"
+  },
   "devDependencies": {
-    "ai": "^5.0.76",
+    "ai": "6.0.0-beta.85",
     "zod": "^4.1.12"
   }
 }

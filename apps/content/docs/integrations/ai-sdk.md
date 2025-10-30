@@ -121,3 +121,48 @@ Prefer `eventIteratorToUnproxiedDataStream` over `eventIteratorToStream`.
 AI SDK internally uses `structuredClone`, which doesn't support proxied data.
 oRPC may proxy events for [metadata](/docs/event-iterator#last-event-id-event-metadata), so unproxy before passing to AI SDK.
 :::
+
+## `createTool` helper
+
+The `createTool` helper from `@orpc/ai-sdk` leverages your existing [oRPC contract](/docs/contract-first/define-contract) definitions to create [AI SDK tools](https://ai-sdk.dev/docs/foundations/tools).
+
+```ts twoslash
+import { oc } from '@orpc/contract'
+import {
+  CREATE_AI_SDK_TOOL_META_SYMBOL,
+  CreateAiSdkToolMeta,
+  createTool
+} from '@orpc/ai-sdk'
+import { z } from 'zod'
+
+interface ORPCMeta extends CreateAiSdkToolMeta {} // optional extend meta
+const base = oc.$meta<ORPCMeta>({})
+
+const getWeatherContract = base
+  .meta({
+    [CREATE_AI_SDK_TOOL_META_SYMBOL]: {
+      name: 'custom-tool-name', // AI SDK tool name
+    },
+  })
+  .route({
+    summary: 'Get the weather in a location', // AI SDK tool description
+  })
+  .input(z.object({
+    location: z.string().describe('The location to get the weather for'),
+  }))
+  .output(z.object({
+    location: z.string().describe('The location the weather is for'),
+    temperature: z.number().describe('The temperature in Celsius'),
+  }))
+
+const getWeatherTool = createTool(getWeatherContract, {
+  execute: async ({ location }) => ({
+    location,
+    temperature: 72 + Math.floor(Math.random() * 21) - 10,
+  }),
+})
+```
+
+::: warning
+The `createTool` helper requires a contract with an `input` schema defined
+:::

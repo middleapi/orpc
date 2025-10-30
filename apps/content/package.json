@@ -13,6 +13,7 @@
     "@opentelemetry/instrumentation": "^0.207.0",
     "@opentelemetry/sdk-node": "^0.207.0",
     "@opentelemetry/sdk-trace-web": "^2.2.0",
+    "@orpc/ai-sdk": "workspace:*",
     "@orpc/arktype": "workspace:*",
     "@orpc/client": "workspace:*",
     "@orpc/contract": "workspace:*",

@@ -117,6 +117,9 @@ importers:
       '@opentelemetry/sdk-trace-web':
         specifier: ^2.2.0
         version: 2.2.0(@opentelemetry/api@1.9.0)
+      '@orpc/ai-sdk':
+        specifier: workspace:*
+        version: link:../../packages/ai-sdk
       '@orpc/arktype':
         specifier: workspace:*
         version: link:../../packages/arktype
@@ -233,10 +236,17 @@ importers:
         version: 4.1.12
 
   packages/ai-sdk:
+    dependencies:
+      '@orpc/contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@orpc/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       ai:
-        specifier: 5.0.76
-        version: 5.0.76(zod@4.1.12)
+        specifier: 6.0.0-beta.85
+        version: 6.0.0-beta.85(@valibot/to-json-schema@1.3.0(valibot@1.1.0(typescript@5.8.3)))(arktype@2.1.23)(zod@4.1.12)
       zod:
         specifier: ^4.1.12
         version: 4.1.12
@@ -1660,6 +1670,12 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  '@ai-sdk/gateway@2.0.0-beta.47':
+    resolution: {integrity: sha512-VsVveIENbzNSh477/UwihpIWcsmIudizlGPdDZ1L+kEDDOxULqt/avLt/qxKR8/8+4+xrGDVRFIkfM4RUadRug==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/google@2.0.23':
     resolution: {integrity: sha512-VbCnKR+6aWUVLkAiSW5gUEtST7KueEmlt+d6qwDikxlLnFG9pzy59je8MiDVeM5G2tuSXbvZQF78PGIfXDBmow==}
     engines: {node: '>=18'}
@@ -1672,8 +1688,28 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  '@ai-sdk/provider-utils@4.0.0-beta.28':
+    resolution: {integrity: sha512-IJk4or+ultCcWiSHRRx3tP7Dxy8kSplhpkUlw+8c2eoEjXnFbp+Bz/BUI59JlGqSOhcnLMxPCWQqZR/a/IPDCw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@valibot/to-json-schema': ^1.3.0
+      arktype: ^2.1.22
+      effect: ^3.18.4
+      zod: ^3.25.76 || ^4.1.8
+    peerDependenciesMeta:
+      '@valibot/to-json-schema':
+        optional: true
+      arktype:
+        optional: true
+      effect:
+        optional: true
+
   '@ai-sdk/provider@2.0.0':
     resolution: {integrity: sha512-6o7Y2SeO9vFKB8lArHXehNuusnpddKPk7xqL7T2/b+OvXMRIXUO1rR4wcv1hAFUAT9avGZshty3Wlua/XA7TvA==}
+    engines: {node: '>=18'}
+
+  '@ai-sdk/provider@3.0.0-beta.13':
+    resolution: {integrity: sha512-I1dQccnA+G8/RTrVDoHfjFdUG534z+371D1hZVeo8yLWoaLMvRiPrk+fIJkkGjvdZ3OQdsQMDNw3WCKW6GFSbw==}
     engines: {node: '>=18'}
 
   '@ai-sdk/react@2.0.76':
@@ -7165,6 +7201,12 @@ packages:
 
   ai@5.0.76:
     resolution: {integrity: sha512-ZCxi1vrpyCUnDbtYrO/W8GLvyacV9689f00yshTIQ3mFFphbD7eIv40a2AOZBv3GGRA7SSRYIDnr56wcS/gyQg==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  ai@6.0.0-beta.85:
+    resolution: {integrity: sha512-5qMfpZz5e2Yj/QkZPC9iBivV557txXW3FOvs39UWsnnkvsGxW0uCDcyMpZMRDQkRJoB8XiyVFJuj+6Kvrnebwg==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -14643,6 +14685,17 @@ snapshots:
       '@vercel/oidc': 3.0.3
       zod: 4.1.12
 
+  '@ai-sdk/gateway@2.0.0-beta.47(@valibot/to-json-schema@1.3.0(valibot@1.1.0(typescript@5.8.3)))(arktype@2.1.23)(zod@4.1.12)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.0-beta.13
+      '@ai-sdk/provider-utils': 4.0.0-beta.28(@valibot/to-json-schema@1.3.0(valibot@1.1.0(typescript@5.8.3)))(arktype@2.1.23)(zod@4.1.12)
+      '@vercel/oidc': 3.0.3
+      zod: 4.1.12
+    transitivePeerDependencies:
+      - '@valibot/to-json-schema'
+      - arktype
+      - effect
+
   '@ai-sdk/google@2.0.23(zod@4.1.12)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
@@ -14656,7 +14709,21 @@ snapshots:
       eventsource-parser: 3.0.6
       zod: 4.1.12
 
+  '@ai-sdk/provider-utils@4.0.0-beta.28(@valibot/to-json-schema@1.3.0(valibot@1.1.0(typescript@5.8.3)))(arktype@2.1.23)(zod@4.1.12)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.0-beta.13
+      '@standard-schema/spec': 1.0.0
+      eventsource-parser: 3.0.6
+      zod: 4.1.12
+    optionalDependencies:
+      '@valibot/to-json-schema': 1.3.0(valibot@1.1.0(typescript@5.8.3))
+      arktype: 2.1.23
+
   '@ai-sdk/provider@2.0.0':
+    dependencies:
+      json-schema: 0.4.0
+
+  '@ai-sdk/provider@3.0.0-beta.13':
     dependencies:
       json-schema: 0.4.0
 
@@ -21312,6 +21379,18 @@ snapshots:
       '@ai-sdk/provider-utils': 3.0.12(zod@4.1.12)
       '@opentelemetry/api': 1.9.0
       zod: 4.1.12
+
+  ai@6.0.0-beta.85(@valibot/to-json-schema@1.3.0(valibot@1.1.0(typescript@5.8.3)))(arktype@2.1.23)(zod@4.1.12):
+    dependencies:
+      '@ai-sdk/gateway': 2.0.0-beta.47(@valibot/to-json-schema@1.3.0(valibot@1.1.0(typescript@5.8.3)))(arktype@2.1.23)(zod@4.1.12)
+      '@ai-sdk/provider': 3.0.0-beta.13
+      '@ai-sdk/provider-utils': 4.0.0-beta.28(@valibot/to-json-schema@1.3.0(valibot@1.1.0(typescript@5.8.3)))(arktype@2.1.23)(zod@4.1.12)
+      '@opentelemetry/api': 1.9.0
+      zod: 4.1.12
+    transitivePeerDependencies:
+      - '@valibot/to-json-schema'
+      - arktype
+      - effect
 
   ajv-draft-04@1.0.0(ajv@8.17.1):
     optionalDependencies:
