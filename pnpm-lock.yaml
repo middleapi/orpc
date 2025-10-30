@@ -232,6 +232,15 @@ importers:
         specifier: ^4.1.12
         version: 4.1.12
 
+  packages/ai-sdk:
+    devDependencies:
+      ai:
+        specifier: 5.0.76
+        version: 5.0.76(zod@4.1.12)
+      zod:
+        specifier: ^4.1.12
+        version: 4.1.12
+
   packages/arktype:
     dependencies:
       '@ark/schema':

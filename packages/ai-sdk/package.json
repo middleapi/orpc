@@ -1,0 +1,43 @@
+{
+  "name": "@orpc/ai-sdk",
+  "type": "module",
+  "version": "0.0.0",
+  "license": "MIT",
+  "homepage": "https://orpc.unnoq.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unnoq/orpc.git",
+    "directory": "packages/ai-sdk"
+  },
+  "keywords": [
+    "ai-sdk",
+    "orpc"
+  ],
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
+      }
+    }
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "unbuild",
+    "build:watch": "pnpm run build --watch",
+    "type:check": "tsc -b"
+  },
+  "peerDependencies": {
+    "ai": ">=5.0.76"
+  },
+  "devDependencies": {
+    "ai": "^5.0.76",
+    "zod": "^4.1.12"
+  }
+}
