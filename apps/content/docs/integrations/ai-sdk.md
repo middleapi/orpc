@@ -122,25 +122,25 @@ AI SDK internally uses `structuredClone`, which doesn't support proxied data.
 oRPC may proxy events for [metadata](/docs/event-iterator#last-event-id-event-metadata), so unproxy before passing to AI SDK.
 :::
 
-## `createTool` helper
+## `implementTool` helper
 
-The `createTool` helper from `@orpc/ai-sdk` leverages your existing [oRPC contract](/docs/contract-first/define-contract) definitions to create [AI SDK tools](https://ai-sdk.dev/docs/foundations/tools).
+Implements [procedure contract](/docs/contract-first/define-contract) as an [AI SDK tools](https://ai-sdk.dev/docs/foundations/tools) by leveraging existing contract definitions.
 
 ```ts twoslash
 import { oc } from '@orpc/contract'
 import {
-  CREATE_AI_SDK_TOOL_META_SYMBOL,
-  CreateAiSdkToolMeta,
-  createTool
+  AI_SDK_TOOL_META_SYMBOL,
+  AiSdkToolMeta,
+  implementTool
 } from '@orpc/ai-sdk'
 import { z } from 'zod'
 
-interface ORPCMeta extends CreateAiSdkToolMeta {} // optional extend meta
+interface ORPCMeta extends AiSdkToolMeta {} // optional extend meta
 const base = oc.$meta<ORPCMeta>({})
 
 const getWeatherContract = base
   .meta({
-    [CREATE_AI_SDK_TOOL_META_SYMBOL]: {
+    [AI_SDK_TOOL_META_SYMBOL]: {
       name: 'custom-tool-name', // AI SDK tool name
     },
   })
@@ -155,7 +155,7 @@ const getWeatherContract = base
     temperature: z.number().describe('The temperature in Celsius'),
   }))
 
-const getWeatherTool = createTool(getWeatherContract, {
+const getWeatherTool = implementTool(getWeatherContract, {
   execute: async ({ location }) => ({
     location,
     temperature: 72 + Math.floor(Math.random() * 21) - 10,
@@ -164,5 +164,59 @@ const getWeatherTool = createTool(getWeatherContract, {
 ```
 
 ::: warning
-The `createTool` helper requires a contract with an `input` schema defined
+The `implementTool` helper requires a contract with an `input` schema defined
+:::
+
+::: info
+Standard [procedures](/docs/procedure) are also compatible with [procedure contracts](/docs/contract-first/define-contract).
+:::
+
+## `createTool` helper
+
+Converts a [procedure](/docs/procedure) into an [AI SDK Tool](https://ai-sdk.dev/docs/foundations/tools) by leveraging existing procedure definitions.
+
+```ts twoslash
+import { os } from '@orpc/server'
+import {
+  AI_SDK_TOOL_META_SYMBOL,
+  AiSdkToolMeta,
+  createTool
+} from '@orpc/ai-sdk'
+import { z } from 'zod'
+
+interface ORPCMeta extends AiSdkToolMeta {} // optional extend meta
+const base = os.$meta<ORPCMeta>({})
+
+const getWeatherProcedure = base
+  .meta({
+    [AI_SDK_TOOL_META_SYMBOL]: {
+      name: 'custom-tool-name', // AI SDK tool name
+    },
+  })
+  .route({
+    summary: 'Get the weather in a location',
+  })
+  .input(z.object({
+    location: z.string().describe('The location to get the weather for'),
+  }))
+  .output(z.object({
+    location: z.string().describe('The location the weather is for'),
+    temperature: z.number().describe('The temperature in Celsius'),
+  }))
+  .handler(async ({ input }) => ({
+    location: input.location,
+    temperature: 72 + Math.floor(Math.random() * 21) - 10,
+  }))
+
+const getWeatherTool = createTool(getWeatherProcedure, {
+  context: {}, // provide initial context if needed
+})
+```
+
+::: warning
+The `createTool` helper requires a procedure with an `input` schema defined
+:::
+
+::: warning
+Validation occurs twice (once for the tool, once for the procedure call). So validation may fail if `inputSchema` or `outputSchema` transform the data into different shapes.
 :::

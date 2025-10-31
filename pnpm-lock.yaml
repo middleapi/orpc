@@ -237,9 +237,15 @@ importers:
 
   packages/ai-sdk:
     dependencies:
+      '@orpc/client':
+        specifier: workspace:*
+        version: link:../client
       '@orpc/contract':
         specifier: workspace:*
         version: link:../contract
+      '@orpc/server':
+        specifier: workspace:*
+        version: link:../server
       '@orpc/shared':
         specifier: workspace:*
         version: link:../shared

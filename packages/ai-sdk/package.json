@@ -37,7 +37,9 @@
     "ai": ">=5.0.76"
   },
   "dependencies": {
+    "@orpc/client": "workspace:*",
     "@orpc/contract": "workspace:*",
+    "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
