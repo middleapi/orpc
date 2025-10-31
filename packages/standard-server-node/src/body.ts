@@ -50,9 +50,7 @@ export function toStandardBody(req: NodeHttpRequest, options: ToStandardBodyOpti
   })
 }
 
-export interface ToNodeHttpBodyOptions extends ToEventStreamOptions {
-  shouldStringifyBody?: boolean
-}
+export interface ToNodeHttpBodyOptions extends ToEventStreamOptions {}
 
 /**
  * @param body
@@ -62,11 +60,8 @@ export interface ToNodeHttpBodyOptions extends ToEventStreamOptions {
 export function toNodeHttpBody(
   body: StandardBody,
   headers: StandardHeaders,
-  options: ToNodeHttpBodyOptions = { shouldStringifyBody: true },
+  options: ToNodeHttpBodyOptions = {},
 ): Readable | undefined | string {
-  if (options.shouldStringifyBody === undefined) {
-    options.shouldStringifyBody = true
-  }
   const currentContentDisposition = flattenHeader(headers['content-disposition'])
 
   delete headers['content-type']
@@ -105,9 +100,6 @@ export function toNodeHttpBody(
 
   headers['content-type'] = 'application/json'
 
-  if (options.shouldStringifyBody === false && typeof body !== 'string') {
-    return body as unknown as string
-  }
   return stringifyJSON(body)
 }
 

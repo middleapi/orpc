@@ -1,6 +1,8 @@
 import type { ArgumentsHost, CallHandler, CanActivate, ExceptionFilter, ExecutionContext, INestApplication, MiddlewareConsumer, NestInterceptor, NestMiddleware, PipeTransform } from '@nestjs/common'
+import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import type { Observable } from 'rxjs'
-import { Catch, Controller, ForbiddenException, HttpException, Injectable, Module, SetMetadata, UseGuards, UseInterceptors } from '@nestjs/common'
+import fastifyCompress from '@fastify/compress'
+import { Catch, Controller, ForbiddenException, HttpException, Injectable, Module, Req, SetMetadata, UseGuards, UseInterceptors } from '@nestjs/common'
 import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core'
 import { ExpressAdapter } from '@nestjs/platform-express'
 import { FastifyAdapter } from '@nestjs/platform-fastify'
@@ -8,12 +10,14 @@ import { Test } from '@nestjs/testing'
 import { oc } from '@orpc/contract'
 import { implement } from '@orpc/server'
 import * as StandardServerNode from '@orpc/standard-server-node'
+// eslint-disable-next-line no-restricted-imports -- needed for testing compression middleware integration
+import compression from 'compression'
 import { map } from 'rxjs'
 import request from 'supertest'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
-import { Implement, ORPCExceptionFilter, ORPCModule } from '.'
+import { Implement, ORPCModule } from '.'
 
 // 1. oRPC Contract
 const testContract = {
@@ -71,7 +75,16 @@ const testGuardContract = {
     .output(z.object({ message: z.string(), user: z.string() })),
 }
 
-// 2. A real controller for the 'raw' output test
+// Contract for testing compression middleware
+const testCompressionContract = {
+  data: oc.route({
+    path: '/large-data',
+    method: 'GET',
+  })
+    .output(z.object({ data: z.string(), size: z.number() })),
+}
+
+// 2. A controller for the 'raw' output test
 @Controller()
 class TestRawController {
   @Implement(testContract.hello)
@@ -98,7 +111,7 @@ class TestDetailedController {
   }
 }
 
-// 4. Interceptor that modifies the response body (must be declared before controllers that use it)
+// 4. Interceptor that modifies the response body
 @Injectable()
 class ResponseTransformInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
@@ -113,8 +126,7 @@ class ResponseTransformInterceptor implements NestInterceptor {
     )
   }
 }
-
-// 5. Controller with interceptor to test response transformation
+// 4. Controller with interceptor to test response transformation
 @Controller()
 class TestInterceptorController {
   @Implement(testContract.hello)
@@ -193,20 +205,18 @@ class AuthenticatedGuard implements CanActivate {
 }
 
 // 11. Controller for testing guards (method-level)
-// IMPORTANT: The @Implement interceptor passes the NestJS request/response
-// as part of the oRPC context, allowing handlers to access guard modifications
-// like properties set on the original request (standard practice).
-// This solves the limitation where oRPC creates its own standardized request object.
+// Also try accessing request modifications made by guards
 @Controller()
 class TestGuardController {
   @UseGuards(ApiKeyGuard, AuthenticatedGuard)
   @RequireRole('admin')
   @Implement(testGuardContract.protected)
-  protected() {
-    return implement(testGuardContract.protected).handler(async ({ input, context }) => {
-      const req = (context as any).request
+  protected(
+    @Req()
+    req: any,
+  ) {
+    return implement(testGuardContract.protected).handler(async () => {
       const user = req?.user
-
       return {
         message: 'Access granted',
         user: user?.name || 'Unknown',
@@ -235,6 +245,22 @@ class UpperCasePipe implements PipeTransform {
   }
 }
 
+// 13. Controller for testing compression middleware
+@Controller()
+class TestCompressionController {
+  @Implement(testCompressionContract.data)
+  data() {
+    return implement(testCompressionContract.data).handler(async () => {
+      // Return a response that can be compressed (1kb minimum)
+      const largeData = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. '.repeat(50)
+      return {
+        data: largeData,
+        size: largeData.length,
+      }
+    })
+  }
+}
+
 // 9. Global interceptor that modifies the response
 @Injectable()
 class GlobalLoggingInterceptor implements NestInterceptor {
@@ -249,7 +275,7 @@ class GlobalLoggingInterceptor implements NestInterceptor {
   }
 }
 
-// 9. Global filter that catches HTTP exceptions
+// 10. Global filter that catches HTTP exceptions
 @Catch(HttpException)
 class GlobalHttpExceptionFilter implements ExceptionFilter {
   catch(exception: HttpException, host: ArgumentsHost) {
@@ -269,7 +295,7 @@ class GlobalHttpExceptionFilter implements ExceptionFilter {
   }
 }
 
-// 10. Custom Middleware
+// 11. Custom Middleware
 class CustomHeaderMiddleware implements NestMiddleware {
   use(req: any, res: any, next: (error?: any) => void) {
     res.setHeader('X-Custom-Middleware', 'hello')
@@ -277,15 +303,10 @@ class CustomHeaderMiddleware implements NestMiddleware {
   }
 }
 
-// 10. Test Modules for each controller
+// Test Modules for each controller
 @Module({
   controllers: [TestRawController],
-  providers: [
-    {
-      provide: APP_FILTER,
-      useClass: ORPCExceptionFilter,
-    },
-  ],
+  providers: [],
 })
 class TestRawModule {
   configure(consumer: MiddlewareConsumer) {
@@ -295,12 +316,7 @@ class TestRawModule {
 
 @Module({
   controllers: [TestDetailedController],
-  providers: [
-    {
-      provide: APP_FILTER,
-      useClass: ORPCExceptionFilter,
-    },
-  ],
+  providers: [],
 })
 class TestDetailedModule {
   configure(consumer: MiddlewareConsumer) {
@@ -312,10 +328,6 @@ class TestDetailedModule {
   controllers: [TestInterceptorController],
   providers: [
     ResponseTransformInterceptor,
-    {
-      provide: APP_FILTER,
-      useClass: ORPCExceptionFilter,
-    },
   ],
 })
 class TestInterceptorModule {
@@ -330,10 +342,6 @@ class TestInterceptorModule {
     {
       provide: APP_PIPE,
       useClass: UpperCasePipe,
-    },
-    {
-      provide: APP_FILTER,
-      useClass: ORPCExceptionFilter,
     },
   ],
 })
@@ -350,23 +358,13 @@ class TestPipeModule {
       provide: APP_FILTER,
       useClass: GlobalHttpExceptionFilter,
     },
-    // this will not run because GlobalHttpExceptionFilter sends the response first
-    {
-      provide: APP_FILTER,
-      useClass: ORPCExceptionFilter,
-    },
   ],
 })
 class TestErrorModule {}
 
 @Module({
   controllers: [TestGuardController],
-  providers: [
-    {
-      provide: APP_FILTER,
-      useClass: ORPCExceptionFilter,
-    },
-  ],
+  providers: [],
 })
 class TestGuardModule {
   configure(consumer: MiddlewareConsumer) {
@@ -381,15 +379,21 @@ class TestGuardModule {
       provide: APP_INTERCEPTOR,
       useClass: GlobalLoggingInterceptor,
     },
-    {
-      provide: APP_FILTER,
-      useClass: ORPCExceptionFilter,
-    },
   ],
 })
 class TestGlobalInterceptorModule {
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(CustomHeaderMiddleware).forRoutes('*')
+  }
+}
+
+@Module({
+  controllers: [TestCompressionController],
+})
+class TestCompressionModule {
+  configure(consumer: MiddlewareConsumer) {
+    // Use the actual compression middleware for Express
+    consumer.apply(compression()).forRoutes('*')
   }
 }
 
@@ -410,6 +414,12 @@ describe('oRPC Nest Middleware Integration', () => {
 
         app = moduleFixture.createNestApplication(adapter())
         app.enableCors()
+
+        // Register compression for Fastify
+        if (adapterName === 'Fastify') {
+          await (app as NestFastifyApplication).register(fastifyCompress)
+        }
+
         await app.init()
         if (adapterName === 'Fastify') {
           await (app as any).getHttpAdapter().getInstance().ready()
@@ -575,6 +585,25 @@ describe('oRPC Nest Middleware Integration', () => {
           .then((response) => {
             expect(response.body.globalInterceptor).toBe(true)
           })
+      })
+
+      it('should work with compression middleware that accesses oRPC response body', async () => {
+        await createApp(TestCompressionModule, {})
+
+        // Make a request with Accept-Encoding header to enable compression
+        const response = await request(app.getHttpServer())
+          .get('/large-data')
+          .set('Accept-Encoding', 'gzip, deflate')
+          .expect(200)
+
+        // Verify compression was applied (check for content-encoding header)
+        // Note: compression middleware only compresses responses above a certain threshold (default 1kb)
+        expect(['gzip', 'deflate']).toContain(response.headers['content-encoding'])
+
+        // Verify that the oRPC handler response is correctly returned (supertest auto-decompresses)
+        expect(response.body).toHaveProperty('data')
+        expect(response.body).toHaveProperty('size')
+        expect(response.body.size).toBeGreaterThan(0)
       })
     })
   }

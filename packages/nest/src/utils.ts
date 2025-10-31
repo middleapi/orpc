@@ -1,14 +1,15 @@
 import type { AnyContractRouter, HTTPPath } from '@orpc/contract'
 import type { StandardBody, StandardHeaders, StandardResponse } from '@orpc/standard-server'
-import type { NodeHttpResponse } from '@orpc/standard-server-node'
+import type { NodeHttpResponse, ToNodeHttpBodyOptions } from '@orpc/standard-server-node'
 import type { FastifyReply } from 'fastify/types/reply'
-import type { SendStandardResponseOptions } from '../../standard-server-aws-lambda/src'
+import { Blob } from 'node:buffer'
 import { Readable } from 'node:stream'
 import { toHttpPath } from '@orpc/client/standard'
 import { ContractProcedure, isContractProcedure } from '@orpc/contract'
 import { standardizeHTTPPath } from '@orpc/openapi-client/standard'
-import { toArray } from '@orpc/shared'
-import { toNodeHttpBody } from '@orpc/standard-server-node'
+import { isAsyncIteratorObject, omit, stringifyJSON, toArray } from '@orpc/shared'
+import { flattenHeader, generateContentDisposition } from '@orpc/standard-server'
+import { toEventStream } from '@orpc/standard-server-node'
 
 export function toNestPattern(path: HTTPPath): string {
   return standardizeHTTPPath(path)
@@ -64,66 +65,106 @@ export function populateContractRouterPaths<T extends AnyContractRouter>(router:
 export function setStandardFastifyResponse(
   reply: FastifyReply,
   standardResponse: StandardResponse,
-  options: SendStandardResponseOptions = { shouldStringifyBody: false },
+  options: ToNodeHttpBodyOptions = {},
 ) {
-  if (options.shouldStringifyBody === undefined) {
-    options.shouldStringifyBody = false
-  }
-
   return new Promise((resolve, reject) => {
     reply.raw.once('error', reject)
     reply.raw.once('close', resolve)
 
-    const resHeaders: StandardHeaders = { ...standardResponse.headers }
-
-    const resBody = toNodeHttpBody(standardResponse.body, resHeaders, options)
+    const { headers, body } = getStandardHttpBodyAndHeaders(standardResponse.body, standardResponse.headers, options)
 
     reply.code(standardResponse.status)
-    reply.headers(resHeaders)
-    return resolve(resBody)
+    reply.headers(headers)
+    return resolve(body)
   })
 }
 
 export function setStandardNodeResponse(
   res: NodeHttpResponse,
   standardResponse: StandardResponse,
-  options: SendStandardResponseOptions = { shouldStringifyBody: false },
+  options: ToNodeHttpBodyOptions = {},
 ): Promise<void | StandardBody | undefined> {
-  if (options.shouldStringifyBody === undefined) {
-    options.shouldStringifyBody = false
-  }
-
   return new Promise((resolve, reject) => {
     res.once('error', reject)
     res.once('close', resolve)
 
-    const resHeaders: StandardHeaders = { ...standardResponse.headers }
-
-    const resBody = toNodeHttpBody(standardResponse.body, resHeaders, options)
+    const { headers, body } = getStandardHttpBodyAndHeaders(standardResponse.body, standardResponse.headers, options)
 
     res.statusCode = standardResponse.status
-    for (const [key, value] of Object.entries(resHeaders)) {
+    for (const [key, value] of Object.entries(headers)) {
       if (value !== undefined) {
         res.setHeader(key, value)
       }
     }
 
-    if (resBody === undefined) {
+    if (body === undefined) {
       return resolve(undefined)
     }
-    else if (resBody instanceof Readable) {
+    else if (body instanceof Readable) {
       res.once('close', () => {
-        if (!resBody.closed) {
-          resBody.destroy(res.errored ?? undefined)
+        if (!body.closed) {
+          body.destroy(res.errored ?? undefined)
         }
       })
 
-      resBody.once('error', error => res.destroy(error))
+      body.once('error', error => res.destroy(error))
 
-      resBody.pipe(res)
+      body.pipe(res)
+      body.once('end', () => resolve(undefined))
     }
     else {
-      return resolve(resBody)
+      return resolve(body)
     }
   })
+}
+
+export function getStandardHttpBodyAndHeaders(
+  body: StandardBody,
+  headers: StandardHeaders,
+  options: ToNodeHttpBodyOptions = {},
+): { body: Readable | undefined | string, headers: StandardHeaders } {
+  const newHeaders: StandardHeaders = { ...omit(headers, ['content-disposition', 'content-type']) }
+
+  if (body === undefined) {
+    return { body: undefined, headers: newHeaders }
+  }
+
+  if (body instanceof Blob) {
+    newHeaders['content-type'] = body.type
+    newHeaders['content-length'] = body.size.toString()
+    const currentContentDisposition = flattenHeader(headers['content-disposition'])
+    newHeaders['content-disposition'] = currentContentDisposition ?? generateContentDisposition(body instanceof File ? body.name : 'blob')
+
+    return { body: Readable.fromWeb(body.stream()), headers: newHeaders }
+  }
+
+  if (body instanceof FormData) {
+    const response = new Response(body)
+    newHeaders['content-type'] = response.headers.get('content-type')!
+    // The FormData type inferred is from React and not NodeJS, so we need to cast it
+    return { body: Readable.fromWeb(response.body as any), headers: newHeaders }
+  }
+
+  if (body instanceof URLSearchParams) {
+    newHeaders['content-type'] = 'application/x-www-form-urlencoded'
+
+    return { body: body.toString(), headers: newHeaders }
+  }
+
+  if (isAsyncIteratorObject(body)) {
+    newHeaders['content-type'] = 'text/event-stream'
+
+    return { body: toEventStream(body, options), headers: newHeaders }
+  }
+
+  newHeaders['content-type'] = 'application/json'
+  // It seems like Nest/Node, in case of a string body, remove or alter the string if
+  // content type json is not set.
+  // We also need to "double" stringify it, else the string will be encoded as an Array
+  // This match the behavior of #toNodeHttpBody
+  if (typeof body === 'string') {
+    return { body: stringifyJSON(body), headers: newHeaders }
+  }
+
+  return { body: body as unknown as string, headers: newHeaders }
 }

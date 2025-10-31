@@ -123,17 +123,8 @@ export class ImplementInterceptor implements NestInterceptor {
           ? StandardServerFastify.toStandardLazyRequest(req, res as FastifyReply)
           : StandardServerNode.toStandardLazyRequest(req, res as Response)
 
-        // Pass the original NestJS request as context
-        const contextWithRequest = {
-          ...(this.config?.context || {}),
-          request: req,
-          response: res,
-        }
+        const client = createProcedureClient(procedure, this.config)
 
-        const client = createProcedureClient(procedure, {
-          ...this.config,
-          context: contextWithRequest,
-        })
         const standardResponse: StandardResponse = await (async (): Promise<StandardResponse> => {
         // Decode input - catch only non-ORPC decoding errors and convert to ORPCError
           let input: Awaited<ReturnType<typeof codec.decode>>
