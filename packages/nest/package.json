@@ -61,6 +61,7 @@
     "@orpc/standard-server-node": "workspace:*"
   },
   "devDependencies": {
+    "@fastify/compress": "^8.1.0",
     "@fastify/cookie": "^11.0.2",
     "@nestjs/common": "^11.1.8",
     "@nestjs/core": "^11.1.8",
@@ -68,7 +69,9 @@
     "@nestjs/platform-fastify": "^11.1.8",
     "@nestjs/testing": "^11.1.8",
     "@ts-rest/core": "^3.52.1",
+    "@types/compression": "^1.8.1",
     "@types/express": "^5.0.5",
+    "compression": "^1.8.1",
     "express": "^5.0.0",
     "fastify": "^5.6.1",
     "rxjs": "^7.8.1",
