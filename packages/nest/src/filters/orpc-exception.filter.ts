@@ -45,7 +45,7 @@ const codec = new StandardOpenAPICodec(
 @Injectable()
 export class ORPCExceptionFilter implements ExceptionFilter {
   constructor(
-    private config: StandardServerNode.SendStandardResponseOptions | undefined,
+    private config?: StandardServerNode.SendStandardResponseOptions | undefined,
   ) {}
 
   async catch(exception: ORPCError<any, any>, host: ArgumentsHost) {

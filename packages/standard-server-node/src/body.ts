@@ -50,7 +50,9 @@ export function toStandardBody(req: NodeHttpRequest, options: ToStandardBodyOpti
   })
 }
 
-export interface ToNodeHttpBodyOptions extends ToEventStreamOptions {}
+export interface ToNodeHttpBodyOptions extends ToEventStreamOptions {
+  shouldStringifyBody?: boolean
+}
 
 /**
  * @param body
@@ -60,8 +62,11 @@ export interface ToNodeHttpBodyOptions extends ToEventStreamOptions {}
 export function toNodeHttpBody(
   body: StandardBody,
   headers: StandardHeaders,
-  options: ToNodeHttpBodyOptions = {},
+  options: ToNodeHttpBodyOptions = { shouldStringifyBody: true },
 ): Readable | undefined | string {
+  if (options.shouldStringifyBody === undefined) {
+    options.shouldStringifyBody = true
+  }
   const currentContentDisposition = flattenHeader(headers['content-disposition'])
 
   delete headers['content-type']
@@ -100,65 +105,10 @@ export function toNodeHttpBody(
 
   headers['content-type'] = 'application/json'
 
+  if (options.shouldStringifyBody === false && typeof body !== 'string') {
+    return body as unknown as string
+  }
   return stringifyJSON(body)
-}
-
-/**
- * @param body
- * @param headers - WARNING: The headers can be mutated by the function and may affect the original headers.
- * @param options
- */
-export function toResponseBody(
-  body: StandardBody,
-  headers: StandardHeaders,
-  options: ToNodeHttpBodyOptions = {},
-): Readable | undefined | StandardBody {
-  const currentContentDisposition = flattenHeader(headers['content-disposition'])
-
-  delete headers['content-type']
-  delete headers['content-disposition']
-
-  if (body === undefined) {
-    return
-  }
-
-  if (body instanceof Blob) {
-    headers['content-type'] = body.type
-    headers['content-length'] = body.size.toString()
-    headers['content-disposition'] = currentContentDisposition ?? generateContentDisposition(body instanceof File ? body.name : 'blob')
-
-    return Readable.fromWeb(body.stream())
-  }
-
-  if (body instanceof FormData) {
-    const response = new Response(body)
-    headers['content-type'] = response.headers.get('content-type')!
-
-    return Readable.fromWeb(response.body!)
-  }
-
-  if (body instanceof URLSearchParams) {
-    headers['content-type'] = 'application/x-www-form-urlencoded'
-
-    return body.toString()
-  }
-
-  if (isAsyncIteratorObject(body)) {
-    headers['content-type'] = 'text/event-stream'
-
-    return toEventStream(body, options)
-  }
-
-  headers['content-type'] = 'application/json'
-  // It seems like Nest/Node, in case of a string body, remove or alter the string if
-  // content type json is not set.
-  // We also need to "double" stringify it, else the string will be encoded as an Array
-  // This match the behavior of #toNodeHttpBody
-  if (typeof body === 'string') {
-    return stringifyJSON(body)
-  }
-
-  return body
 }
 
 function _streamToFormData(stream: Readable, contentType: string): Promise<FormData> {

@@ -10,14 +10,15 @@ import { oc, ORPCError } from '@orpc/contract'
 import { implement, lazy } from '@orpc/server'
 import * as StandardServerNode from '@orpc/standard-server-node'
 import supertest from 'supertest'
-import { expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { ORPCExceptionFilter } from './filters/orpc-exception.filter'
 import { Implement } from './implement'
 import { ORPCModule } from './module'
+import * as Utils from './utils'
 
 const sendStandardResponseSpy = vi.spyOn(StandardServerNode, 'sendStandardResponse')
-const setStandardResponseSpy = vi.spyOn(StandardServerNode, 'setStandardResponse')
+const setStandardResponseSpy = vi.spyOn(Utils, 'setStandardNodeResponse')
 
 beforeEach(() => {
   vi.clearAllMocks()

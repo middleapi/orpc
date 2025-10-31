@@ -19,7 +19,7 @@ import * as StandardServerFastify from '@orpc/standard-server-fastify'
 import * as StandardServerNode from '@orpc/standard-server-node'
 import { mergeMap } from 'rxjs'
 import { ORPC_MODULE_CONFIG_SYMBOL } from './module'
-import { toNestPattern } from './utils'
+import { setStandardFastifyResponse, setStandardNodeResponse, toNestPattern } from './utils'
 
 const MethodDecoratorMap = {
   HEAD: Head,
@@ -176,10 +176,10 @@ export class ImplementInterceptor implements NestInterceptor {
         })()
         // Set status and headers
         if ('raw' in res) {
-          return StandardServerFastify.setStandardResponse(res as FastifyReply, standardResponse, this.config)
+          return setStandardFastifyResponse(res as FastifyReply, standardResponse, this.config)
         }
         else {
-          return StandardServerNode.setStandardResponse(res as Response, standardResponse, this.config)
+          return setStandardNodeResponse(res as Response, standardResponse, this.config)
         }
       }),
     )
