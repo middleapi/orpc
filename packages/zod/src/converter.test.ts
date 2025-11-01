@@ -212,7 +212,7 @@ const combinationCases: SchemaTestCase[] = [
   },
   {
     schema: z.union([z.string(), z.undefined()]),
-    input: [false, { type: 'string' }],
+    input: [false, { anyOf: [{ type: 'string' }] }],
   },
   {
     schema: z.intersection(z.string(), z.number()),

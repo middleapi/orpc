@@ -15,7 +15,7 @@ testSchemaConverter([
   {
     name: 'union([z.string(), z.undefined()])',
     schema: z.union([z.string(), z.undefined()]),
-    input: [false, { type: 'string' }],
+    input: [false, { anyOf: [{ type: 'string' }] }],
   },
   {
     name: 'intersection(z.string(), z.number())',

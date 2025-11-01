@@ -325,7 +325,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
             let required = true
 
             for (const item of union._zod.def.options) {
-              const [itemRequired, itemJson] = this.#convert(item, options, lazyDepth, structureDepth)
+              const [itemRequired, itemJson] = this.#convert(item, options, lazyDepth, structureDepth + 1)
 
               if (!itemRequired) {
                 required = false
@@ -343,7 +343,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
               }
             }
 
-            return [required, anyOf.length === 1 ? anyOf[0]! : { anyOf }]
+            return [required, { anyOf }]
           }
 
           case 'intersection': {
@@ -353,7 +353,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
             let required = false
 
             for (const item of [intersection._zod.def.left, intersection._zod.def.right]) {
-              const [itemRequired, itemJson] = this.#convert(item, options, lazyDepth, structureDepth)
+              const [itemRequired, itemJson] = this.#convert(item, options, lazyDepth, structureDepth + 1)
 
               json.allOf.push(itemJson)
 

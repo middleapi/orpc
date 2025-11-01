@@ -513,7 +513,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
         let required = true
 
         for (const item of schema_._def.options) {
-          const [itemRequired, itemJson] = this.convert(item, options, lazyDepth, false, false, structureDepth)
+          const [itemRequired, itemJson] = this.convert(item, options, lazyDepth, false, false, structureDepth + 1)
 
           if (!itemRequired) {
             required = false
@@ -527,10 +527,6 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
           }
         }
 
-        if (anyOf.length === 1) {
-          return [required, anyOf[0]!]
-        }
-
         return [required, { anyOf }]
       }
 
@@ -541,7 +537,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
         let required: boolean = false
 
         for (const item of [schema_._def.left, schema_._def.right]) {
-          const [itemRequired, itemJson] = this.convert(item, options, lazyDepth, false, false, structureDepth)
+          const [itemRequired, itemJson] = this.convert(item, options, lazyDepth, false, false, structureDepth + 1)
 
           allOf.push(itemJson)
 
