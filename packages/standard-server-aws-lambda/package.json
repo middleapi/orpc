@@ -40,6 +40,6 @@
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.157",
-    "@types/node": "^22.15.30"
+    "@types/node": "^24.9.2"
   }
 }
