@@ -76,6 +76,26 @@ export class StandardOpenapiLinkCodec<T extends ClientContext> implements Standa
       : this.#encodeDetailed(procedure, path, input, options, baseUrl, headers)
   }
 
+  #createURL(baseUrl: string | URL): URL {
+    if (baseUrl instanceof URL) {
+      return baseUrl
+    }
+
+    if (baseUrl.startsWith('/')) {
+      if (typeof location !== 'undefined' && location.origin) {
+        return new URL(baseUrl, location.origin)
+      }
+
+      throw new TypeError(
+        `[StandardOpenapiLinkCodec] Relative URL "${baseUrl}" requires a base URL. `
+        + `In browser environments, this is automatically resolved using location.origin. `
+        + `In server environments, please provide an absolute URL like "http://localhost:3000${baseUrl}".`,
+      )
+    }
+
+    return new URL(baseUrl)
+  }
+
   #encodeCompact(
     procedure: AnyContractProcedure,
     path: readonly string[],
@@ -106,7 +126,7 @@ export class StandardOpenapiLinkCodec<T extends ClientContext> implements Standa
     }
 
     const method = fallbackContractConfig('defaultMethod', procedure['~orpc'].route.method)
-    const url = new URL(baseUrl)
+    const url = this.#createURL(baseUrl)
     url.pathname = `${url.pathname.replace(/\/$/, '')}${httpPath}`
 
     if (method === 'GET') {
@@ -171,7 +191,7 @@ export class StandardOpenapiLinkCodec<T extends ClientContext> implements Standa
     }
 
     const method = fallbackContractConfig('defaultMethod', procedure['~orpc'].route.method)
-    const url = new URL(baseUrl)
+    const url = this.#createURL(baseUrl)
     url.pathname = `${url.pathname.replace(/\/$/, '')}${httpPath}`
 
     if (input?.query !== undefined) {

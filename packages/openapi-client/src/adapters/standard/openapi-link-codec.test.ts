@@ -486,4 +486,38 @@ describe('standardOpenapiLinkCodecOptions', () => {
       expect(customErrorResponseBodyDecoder).toHaveBeenCalledWith(deserialize.mock.results[1]!.value, response2)
     })
   })
+
+  describe('relative URL', () => {
+    it('works in browser environment', async () => {
+      const originalLocation = (globalThis as any).location
+      ;(globalThis as any).location = { origin: 'http://localhost:3000' }
+
+      const codec = new StandardOpenapiLinkCodec({ ping: oc }, serializer, {
+        url: '/api',
+      })
+
+      const request = await codec.encode(['ping'], 'input', { context: {} })
+
+      expect(request.url.toString()).toEqual('http://localhost:3000/api/ping')
+      expect(request.url.origin).toEqual('http://localhost:3000')
+      expect(request.url.pathname).toEqual('/api/ping')
+
+      ;(globalThis as any).location = originalLocation
+    })
+
+    it('throw error in non-browser environment', async () => {
+      const originalLocation = (globalThis as any).location
+      ;(globalThis as any).location = undefined
+
+      const codec = new StandardOpenapiLinkCodec({ ping: oc }, serializer, {
+        url: '/api',
+      })
+
+      await expect(codec.encode(['ping'], 'input', { context: {} })).rejects.toThrow(
+        '[StandardOpenapiLinkCodec] Relative URL "/api" requires a base URL',
+      )
+
+      ;(globalThis as any).location = originalLocation
+    })
+  })
 })
