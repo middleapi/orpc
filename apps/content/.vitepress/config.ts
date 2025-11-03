@@ -284,6 +284,7 @@ export default withMermaid(defineConfig({
           collapsed: true,
           items: [
             { text: 'Customizing Error Response', link: '/docs/openapi/advanced/customizing-error-response' },
+            { text: 'Disabling Output Validation', link: '/docs/openapi/advanced/disabling-output-validation' },
             { text: 'Expanding Type Support for OpenAPI Link', link: '/docs/openapi/advanced/expanding-type-support-for-openapi-link' },
             { text: 'OpenAPI JSON Serializer', link: '/docs/openapi/advanced/openapi-json-serializer' },
             { text: 'Redirect Response', link: '/docs/openapi/advanced/redirect-response' },
