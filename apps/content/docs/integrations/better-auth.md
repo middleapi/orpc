@@ -46,9 +46,7 @@ export const authMiddleware = base.middleware(async ({ context, next }) => {
   })
 
   if (!sessionData?.session || !sessionData?.user) {
-    throw new ORPCError({
-      code: 'UNAUTHORIZED',
-    })
+    throw new ORPCError('UNAUTHORIZED')
   }
 
   // Adds session and user to the context
