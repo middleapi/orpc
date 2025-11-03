@@ -184,6 +184,7 @@ export default withMermaid(defineConfig({
           collapsed: true,
           items: [
             { text: 'AI SDK', link: '/docs/integrations/ai-sdk' },
+            { text: 'Better Auth', link: '/docs/integrations/better-auth' },
             { text: 'Durable Iterator', link: '/docs/integrations/durable-iterator' },
             { text: 'Hey API', link: '/docs/integrations/hey-api' },
             { text: 'OpenTelemetry', link: '/docs/integrations/opentelemetry' },
