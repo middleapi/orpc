@@ -9,7 +9,7 @@ By default, oRPC validates procedure outputs against their [defined schemas](/do
 
 ## Configuration
 
-Set `initialOutputValidationIndex` to `NaN` in the [`$config`](/docs/builder#config) method:
+Set `initialOutputValidationIndex` to `NaN` in the [`$config`](/docs/procedure#initial-configuration) method:
 
 ```ts
 import { os } from '@orpc/server'
