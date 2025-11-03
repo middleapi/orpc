@@ -17,7 +17,7 @@ import request from 'supertest'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
-import { Implement, ORPCModule } from '.'
+import { Implement, ORPCModule } from '..'
 
 // 1. oRPC Contract
 const testContract = {
@@ -601,6 +601,8 @@ describe('oRPC Nest Middleware Integration', () => {
         expect(['gzip', 'deflate']).toContain(response.headers['content-encoding'])
 
         // Verify that the oRPC handler response is correctly returned (supertest auto-decompresses)
+        // Works because compression middleware monkeypatch the res.send method to access the body or
+        // use a fastify hook to access the reply payload
         expect(response.body).toHaveProperty('data')
         expect(response.body).toHaveProperty('size')
         expect(response.body.size).toBeGreaterThan(0)
