@@ -54,7 +54,8 @@ export const authMiddleware = base.middleware(async ({ context, next }) => {
   // Adds session and user to the context
   return next({
     context: {
-      ...sessionData
+      session: sessionData.session,
+      user: sessionData.user
     },
   })
 })
