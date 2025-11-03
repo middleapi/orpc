@@ -17,7 +17,7 @@ import request from 'supertest'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
-import { Implement, ORPCModule } from '.'
+import { Implement, ORPCModule } from '../src'
 
 // 1. oRPC Contract
 const testContract = {

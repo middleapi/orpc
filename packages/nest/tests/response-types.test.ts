@@ -8,8 +8,8 @@ import { implement, withEventMeta } from '@orpc/server'
 import request from 'supertest'
 import { afterEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { Implement } from './implement'
-import { ORPCModule } from './module'
+import { Implement } from '../src/implement'
+import { ORPCModule } from '../src/module'
 
 /**
  * Test suite for validating all supported ORPC response types work correctly
