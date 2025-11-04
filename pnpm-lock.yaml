@@ -568,6 +568,9 @@ importers:
       '@upstash/ratelimit':
         specifier: ^2.0.7
         version: 2.0.7(@upstash/redis@1.35.6)
+      '@upstash/redis':
+        specifier: ^1.35.6
+        version: 1.35.6
       ioredis:
         specifier: ^5.8.2
         version: 5.8.2
