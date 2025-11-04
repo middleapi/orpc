@@ -89,12 +89,12 @@ function toORPCProcedure(procedure: AnyProcedure) {
   return new ORPC.Procedure({
     errorMap: {},
     meta: procedure._def.meta ?? {},
-    inputValidationIndex: 0,
-    outputValidationIndex: 0,
     route: get(procedure._def.meta, ['route']) ?? {},
     middlewares: [],
-    inputSchema: toDisabledStandardSchema(procedure._def.inputs.at(-1)),
-    outputSchema: toDisabledStandardSchema((procedure as any)._def.output),
+    inputSchema: toStandardSchema(procedure._def.inputs.at(-1)),
+    outputSchema: toStandardSchema((procedure._def as any).output),
+    inputValidationIndex: Number.NaN, // disable input validation
+    outputValidationIndex: Number.NaN, // disable output validation
     handler: async ({ context, signal, path, input, lastEventId }) => {
       try {
         const trpcInput = lastEventId !== undefined && (input === undefined || isObject(input))
@@ -151,26 +151,10 @@ function toORPCProcedure(procedure: AnyProcedure) {
  * Wraps a TRPC schema to disable validation in the ORPC context.
  * This is necessary because tRPC procedure calling already validates the input/output,
  */
-function toDisabledStandardSchema(schema: undefined | Parser): undefined | ORPC.Schema<unknown, unknown> {
+function toStandardSchema(schema: undefined | Parser): undefined | ORPC.Schema<unknown, unknown> {
   if (!isTypescriptObject(schema) || !('~standard' in schema) || !isTypescriptObject(schema['~standard'])) {
     return undefined
   }
 
-  return new Proxy(schema as any, {
-    get: (target, prop) => {
-      if (prop === '~standard') {
-        return new Proxy(target['~standard'], {
-          get: (target, prop) => {
-            if (prop === 'validate') {
-              return (value: any) => ({ value })
-            }
-
-            return Reflect.get(target, prop, target)
-          },
-        })
-      }
-
-      return Reflect.get(target, prop, target)
-    },
-  })
+  return schema as any
 }
