@@ -156,7 +156,7 @@ export function createTool<
         disabledValidation,
         input as InferSchemaInput<TInputSchema>,
         { signal: callingOptions.abortSignal, ...options },
-      ) as InferSchemaInput<TOutputSchema>
+      ) as Promise<InferSchemaInput<TOutputSchema>>
     }) satisfies (Tool<InferSchemaOutput<TInputSchema>, InferSchemaInput<TOutputSchema>>['execute']),
     ...options,
   } as any)
