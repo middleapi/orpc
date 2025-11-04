@@ -1,0 +1,75 @@
+{
+  "name": "@orpc/experimental-ratelimit",
+  "type": "module",
+  "version": "0.0.0",
+  "license": "MIT",
+  "homepage": "https://orpc.unnoq.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unnoq/orpc.git",
+    "directory": "packages/ratelimit"
+  },
+  "keywords": [
+    "unnoq",
+    "orpc"
+  ],
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "./memory": {
+        "types": "./dist/adapters/memory.d.mts",
+        "import": "./dist/adapters/memory.mjs",
+        "default": "./dist/adapters/memory.mjs"
+      },
+      "./ioredis": {
+        "types": "./dist/adapters/ioredis.d.mts",
+        "import": "./dist/adapters/ioredis.mjs",
+        "default": "./dist/adapters/ioredis.mjs"
+      },
+      "./upstash-ratelimit": {
+        "types": "./dist/adapters/upstash-ratelimit.d.mts",
+        "import": "./dist/adapters/upstash-ratelimit.mjs",
+        "default": "./dist/adapters/upstash-ratelimit.mjs"
+      }
+    }
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./memory": "./src/adapters/memory.ts",
+    "./ioredis": "./src/adapters/ioredis.ts",
+    "./upstash-ratelimit": "./src/adapters/upstash-ratelimit.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "unbuild",
+    "build:watch": "pnpm run build --watch",
+    "type:check": "tsc -b"
+  },
+  "peerDependencies": {
+    "@upstash/ratelimit": ">=2.0.7",
+    "ioredis": ">=5.8.1"
+  },
+  "peerDependenciesMeta": {
+    "@upstash/ratelimit": {
+      "optional": true
+    },
+    "ioredis": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@orpc/client": "workspace:*",
+    "@orpc/shared": "workspace:*",
+    "@orpc/standard-server": "workspace:*"
+  },
+  "devDependencies": {
+    "@upstash/ratelimit": "^2.0.7",
+    "ioredis": "^5.8.2"
+  }
+}
