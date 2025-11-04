@@ -22,7 +22,7 @@
     "@sveltejs/kit": "^2.48.4",
     "@sveltejs/vite-plugin-svelte": "^6.2.1",
     "@tanstack/svelte-query": "^6.0.3",
-    "svelte": "^5.43.2",
+    "svelte": "^5.43.3",
     "svelte-check": "^4.3.3",
     "typescript": "^5.9.3",
     "vite": "^7.1.12",
