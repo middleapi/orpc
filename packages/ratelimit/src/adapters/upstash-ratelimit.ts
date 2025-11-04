@@ -26,11 +26,11 @@ export interface UpstashRatelimiterOptions {
 }
 
 export class UpstashRatelimiter implements Ratelimiter {
-  protected blockingUntilReady: UpstashRatelimiterOptions['blockingUntilReady']
-  protected waitUtil: UpstashRatelimiterOptions['waitUtil']
+  private blockingUntilReady: UpstashRatelimiterOptions['blockingUntilReady']
+  private waitUtil: UpstashRatelimiterOptions['waitUtil']
 
   constructor(
-    protected readonly ratelimit: Ratelimit,
+    private readonly ratelimit: Ratelimit,
     options: UpstashRatelimiterOptions = {},
   ) {
     this.blockingUntilReady = options.blockingUntilReady
