@@ -1,0 +1,155 @@
+import type Redis from 'ioredis'
+import type { Ratelimiter, RatelimiterLimitResult } from '../types'
+import { fallback } from '@orpc/shared'
+
+/**
+ * Sliding window Lua script for Redis.
+ *
+ * This script implements atomic sliding window rate limiting using Redis sorted sets.
+ * It removes expired entries, checks the current count, and adds new requests atomically.
+ *
+ * @returns A tuple with [success, limit, remaining, resetAtMs] where:
+ * - success: 1 if request is allowed, 0 if rate limited
+ * - limit: The maximum number of requests allowed
+ * - remaining: Number of requests remaining in the window
+ * - resetAtMs: Unix timestamp (in milliseconds) when the window resets
+ */
+const SLIDING_WINDOW_LUA_SCRIPT = `
+  local key = KEYS[1]
+  local now = tonumber(ARGV[1])
+  local window = tonumber(ARGV[2])
+  local limit = tonumber(ARGV[3])
+  
+  local windowStart = now - window
+  -- Set TTL to window + small buffer (converted to seconds for EXPIRE)
+  -- The buffer ensures the key doesn't expire while still in use
+  local ttl = math.ceil(window / 1000) + 1
+  
+  -- Remove expired entries
+  redis.call('ZREMRANGEBYSCORE', key, 0, windowStart)
+  
+  -- Get all valid entries with scores in one call
+  -- This replaces separate ZCARD and ZRANGE operations
+  local entries = redis.call('ZRANGE', key, 0, -1, 'WITHSCORES')
+  local current = #entries / 2  -- Each entry has value + score
+  
+  -- Calculate reset time (when oldest entry expires)
+  local resetAtMs
+  if current > 0 then
+    resetAtMs = tonumber(entries[2]) + window  -- entries[2] is the oldest score
+  else
+    resetAtMs = now + window
+  end
+  
+  -- Check if limit is exceeded
+  if current >= limit then
+    return {0, limit, 0, resetAtMs}
+  end
+  
+  -- Add current request
+  redis.call('ZADD', key, now, now)
+  redis.call('EXPIRE', key, ttl)
+  
+  -- Calculate remaining requests
+  local remaining = limit - current - 1
+  
+  return {1, limit, remaining, resetAtMs}
+`
+
+export class IORedisRatelimiterError extends Error {}
+
+export interface IORedisRatelimiterOptions {
+  /**
+   * Block until the request may pass or timeout is reached.
+   */
+  blockingUntilReady?: {
+    enabled: boolean
+    timeoutMs: number
+  }
+
+  /**
+   * The prefix to use for Redis keys.
+   *
+   * @default orpc:ratelimit:
+   */
+  prefix?: string
+
+  /**
+   * Maximum number of requests allowed within the window.
+   */
+  maxRequests: number
+
+  /**
+   * The duration of the sliding window in milliseconds.
+   */
+  windowMs: number
+
+}
+
+export class IORedisRatelimiter implements Ratelimiter {
+  private readonly prefix: string
+  private readonly maxRequests: number
+  private readonly windowMs: number
+  private readonly blockingUntilReady: IORedisRatelimiterOptions['blockingUntilReady']
+
+  constructor(
+    private readonly redis: Redis,
+    options: IORedisRatelimiterOptions,
+  ) {
+    this.prefix = fallback(options.prefix, 'orpc:ratelimit:')
+    this.maxRequests = options.maxRequests
+    this.windowMs = options.windowMs
+    this.blockingUntilReady = options.blockingUntilReady
+  }
+
+  async limit(key: string): Promise<Required<RatelimiterLimitResult>> {
+    const prefixedKey = `${this.prefix}${key}`
+
+    if (this.blockingUntilReady?.enabled) {
+      return await this.blockUntilReady(prefixedKey, this.blockingUntilReady.timeoutMs)
+    }
+
+    return await this.checkLimit(prefixedKey)
+  }
+
+  private async checkLimit(key: string) {
+    const result = await this.redis.eval(
+      SLIDING_WINDOW_LUA_SCRIPT,
+      1,
+      key,
+      Date.now().toString(),
+      this.windowMs.toString(),
+      this.maxRequests.toString(),
+    ) as unknown
+
+    if (!Array.isArray(result) || result.length !== 4) {
+      throw new IORedisRatelimiterError('Invalid response from rate limit script')
+    }
+
+    const [success, limit, remaining, resetAtMs] = result as [number, number, number, number]
+
+    return {
+      success: success === 1,
+      limit,
+      remaining,
+      resetAtMs,
+    }
+  }
+
+  private async blockUntilReady(key: string, timeoutMs: number) {
+    const deadlineAtMs = Date.now() + timeoutMs
+    let result: Awaited<ReturnType<typeof this.checkLimit>>
+
+    while (true) {
+      result = await this.checkLimit(key)
+
+      if (result.success || result.resetAtMs > deadlineAtMs) {
+        break
+      }
+
+      await new Promise(resolve => setTimeout(resolve, result.resetAtMs - Date.now()))
+    }
+
+    return result
+  }
+}

@@ -37,12 +37,17 @@ export class UpstashRatelimiter implements Ratelimiter {
     this.waitUtil = options.waitUtil
   }
 
-  async limit(key: string): Promise<RatelimiterLimitResult> {
+  async limit(key: string): Promise<Required<RatelimiterLimitResult>> {
     const result = this.blockingUntilReady?.enabled
       ? await this.ratelimit.blockUntilReady(key, this.blockingUntilReady.timeoutMs)
       : await this.ratelimit.limit(key)
 
     this.waitUtil?.(result.pending)
-    return result
+    return {
+      success: result.success,
+      limit: result.limit,
+      remaining: result.remaining,
+      resetAtMs: result.reset,
+    }
   }
 }

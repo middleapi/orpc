@@ -74,7 +74,7 @@ describe.concurrent(
 
       const result1 = await ratelimiter.limit(key)
       expect(waitUntilSpy).toHaveBeenCalledTimes(1)
-      expect(waitUntilSpy).toHaveBeenCalledWith(result1.pending)
+      expect(waitUntilSpy).toHaveBeenCalledWith(expect.any(Promise))
     })
   },
 )
