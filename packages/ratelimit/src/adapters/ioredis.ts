@@ -3,9 +3,9 @@ import type { Ratelimiter, RatelimiterLimitResult } from '../types'
 import { fallback } from '@orpc/shared'
 
 /**
- * Sliding window Lua script for Redis.
+ * Sliding window log Lua script for Redis.
  *
- * This script implements atomic sliding window rate limiting using Redis sorted sets.
+ * This script implements atomic sliding window log rate limiting using Redis sorted sets.
  * It removes expired entries, checks the current count, and adds new requests atomically.
  *
  * @returns A tuple with [success, limit, remaining, resetAtMs] where:
@@ -14,46 +14,38 @@ import { fallback } from '@orpc/shared'
  * - remaining: Number of requests remaining in the window
  * - resetAtMs: Unix timestamp (in milliseconds) when the window resets
  */
-const SLIDING_WINDOW_LUA_SCRIPT = `
-  local key = KEYS[1]
-  local now = tonumber(ARGV[1])
-  local window = tonumber(ARGV[2])
-  local limit = tonumber(ARGV[3])
-  
-  local windowStart = now - window
-  -- Set TTL to window + small buffer (converted to seconds for EXPIRE)
-  -- The buffer ensures the key doesn't expire while still in use
-  local ttl = math.ceil(window / 1000) + 1
-  
-  -- Remove expired entries
-  redis.call('ZREMRANGEBYSCORE', key, 0, windowStart)
-  
-  -- Get all valid entries with scores in one call
-  -- This replaces separate ZCARD and ZRANGE operations
-  local entries = redis.call('ZRANGE', key, 0, -1, 'WITHSCORES')
-  local current = #entries / 2  -- Each entry has value + score
-  
-  -- Calculate reset time (when oldest entry expires)
-  local resetAtMs
-  if current > 0 then
-    resetAtMs = tonumber(entries[2]) + window  -- entries[2] is the oldest score
-  else
-    resetAtMs = now + window
-  end
-  
-  -- Check if limit is exceeded
-  if current >= limit then
-    return {0, limit, 0, resetAtMs}
-  end
-  
+const SLIDING_WINDOW_LOG_LUA_SCRIPT = `
+local key = KEYS[1]
+local now_ms = tonumber(ARGV[1])
+local window_ms = tonumber(ARGV[2])
+local limit = tonumber(ARGV[3])
+
+local window_start_ms = now_ms - window_ms
+
+-- Remove old entries outside the current window
+redis.call('ZREMRANGEBYSCORE', key, '-inf', window_start_ms)
+
+-- Count requests in the current window
+local current_count = redis.call('ZCARD', key)
+
+-- Calculate reset time (end of current window)
+local oldest_entry = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+local reset_at
+if #oldest_entry > 0 then
+  reset_at = tonumber(oldest_entry[2]) + window_ms
+else
+  reset_at = now_ms + window_ms
+end
+
+if current_count < limit then
   -- Add current request
-  redis.call('ZADD', key, now, now)
-  redis.call('EXPIRE', key, ttl)
-  
-  -- Calculate remaining requests
-  local remaining = limit - current - 1
-  
-  return {1, limit, remaining, resetAtMs}
+  redis.call('ZADD', key, now_ms, now_ms .. ':' .. math.random())
+  redis.call('PEXPIRE', key, window_ms)
+
+  return {1, limit, limit - current_count - 1, reset_at}
+else
+  return {0, limit, 0, reset_at}
+end
 `
 
 export class IORedisRatelimiterError extends Error {}
@@ -114,7 +106,7 @@ export class IORedisRatelimiter implements Ratelimiter {
 
   private async checkLimit(key: string) {
     const result = await this.redis.eval(
-      SLIDING_WINDOW_LUA_SCRIPT,
+      SLIDING_WINDOW_LOG_LUA_SCRIPT,
       1,
       key,
       Date.now().toString(),

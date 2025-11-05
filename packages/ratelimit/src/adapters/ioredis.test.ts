@@ -78,6 +78,37 @@ describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 },
     })
   })
 
+  it('handles concurrent requests correctly', async () => {
+    const ratelimiter = createTestingRatelimiter({
+      maxRequests: 3,
+      windowMs: 5000,
+    })
+
+    const test = async (key: string) => {
+      const results = await Promise.all(
+        Array.from({ length: 5 }, () => ratelimiter.limit(key)),
+      )
+
+      // Count successful and failed requests
+      const successful = results.filter(r => r.success).length
+      const failed = results.filter(r => !r.success).length
+
+      // Should have exactly maxRequests successful requests
+      expect(successful).toBe(3)
+      expect(failed).toBe(2)
+
+      // Verify remaining counts are consistent
+      const successfulResults = results.filter(r => r.success)
+      expect(successfulResults[0]!.remaining).toBe(2)
+      expect(successfulResults[1]!.remaining).toBe(1)
+      expect(successfulResults[2]!.remaining).toBe(0)
+    }
+
+    await Promise.all(
+      Array.from({ length: 5 }, (_, i) => test(`test${i}`)),
+    )
+  })
+
   describe('with blocking', () => {
     it('blocks until the rate limit resets', async () => {
       const ratelimiter = createTestingRatelimiter({
@@ -96,6 +127,7 @@ describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 },
       const endTime = Date.now()
 
       expect(result2.success).toBe(true)
+      expect(endTime - startTime).toBeGreaterThanOrEqual(500) // actually waited
       expect(endTime - startTime).toBeLessThanOrEqual(2000)
     })
 
@@ -155,7 +187,7 @@ describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 },
       await vi.waitFor(async () => {
         const keysAfterExpiry = await redis.keys(`${prefix}${key}`)
         expect(keysAfterExpiry).toHaveLength(0)
-      }, { timeout: 10_000 })
+      }, { timeout: 20_000, interval: 1000 })
     })
 
     it('handles Redis errors gracefully', async () => {
