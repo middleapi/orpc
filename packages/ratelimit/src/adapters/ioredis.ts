@@ -138,18 +138,15 @@ export class IORedisRatelimiter implements Ratelimiter {
 
   private async blockUntilReady(key: string, timeoutMs: number) {
     const deadlineAtMs = Date.now() + timeoutMs
-    let result: Awaited<ReturnType<typeof this.checkLimit>>
 
     while (true) {
-      result = await this.checkLimit(key)
+      const result = await this.checkLimit(key)
 
       if (result.success || result.resetAtMs > deadlineAtMs) {
-        break
+        return result
       }
 
       await new Promise(resolve => setTimeout(resolve, result.resetAtMs - Date.now()))
     }
-
-    return result
   }
 }
