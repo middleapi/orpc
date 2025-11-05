@@ -1,0 +1,119 @@
+import type { Ratelimiter, RatelimiterLimitResult } from '../types'
+
+export interface MemoryRatelimiterOptions {
+  /**
+   * Block until the request may pass or timeout is reached.
+   */
+  blockingUntilReady?: {
+    enabled: boolean
+    timeoutMs: number
+  }
+
+  /**
+   * Maximum number of requests allowed within the window.
+   */
+  maxRequests: number
+
+  /**
+   * The duration of the sliding window in milliseconds.
+   */
+  windowMs: number
+
+}
+
+export class MemoryRatelimiter implements Ratelimiter {
+  private readonly maxRequests: number
+  private readonly windowMs: number
+  private readonly blockingUntilReady: MemoryRatelimiterOptions['blockingUntilReady']
+  private readonly store: Map<string, number[]>
+  private lastCleanupTime: number | null = null
+
+  constructor(options: MemoryRatelimiterOptions) {
+    this.maxRequests = options.maxRequests
+    this.windowMs = options.windowMs
+    this.blockingUntilReady = options.blockingUntilReady
+    this.store = new Map()
+  }
+
+  limit(key: string): Promise<Required<RatelimiterLimitResult>> {
+    this.cleanup()
+
+    if (this.blockingUntilReady?.enabled) {
+      return this.blockUntilReady(key, this.blockingUntilReady.timeoutMs)
+    }
+
+    return this.checkLimit(key)
+  }
+
+  private cleanup(): void {
+    const now = Date.now()
+
+    // Only clean up once per window to avoid excessive processing
+    if (this.lastCleanupTime !== null && this.lastCleanupTime + this.windowMs > now) {
+      return
+    }
+
+    this.lastCleanupTime = now
+    const windowStart = now - this.windowMs
+
+    for (const [key, timestamps] of this.store) {
+      // remove expired timestamps
+      timestamps.splice(0, timestamps.findIndex(timestamp => timestamp < windowStart) + 1)
+
+      if (timestamps.length === 0) {
+        this.store.delete(key)
+      }
+    }
+  }
+
+  private async checkLimit(key: string): Promise<Required<RatelimiterLimitResult>> {
+    const now = Date.now()
+    const windowStart = now - this.windowMs
+
+    let timestamps = this.store.get(key)
+    if (timestamps) {
+      // Remove expired timestamps
+      timestamps.splice(0, timestamps.findIndex(timestamp => timestamp < windowStart) + 1)
+    }
+    else {
+      this.store.set(key, timestamps = [])
+    }
+
+    // Calculate reset time based on oldest timestamp or current time if no timestamps
+    const resetAtMs = timestamps[0] !== undefined
+      ? timestamps[0] + this.windowMs
+      : now + this.windowMs
+
+    if (timestamps.length >= this.maxRequests) {
+      return {
+        success: false,
+        limit: this.maxRequests,
+        remaining: 0,
+        resetAtMs,
+      }
+    }
+
+    timestamps.push(now)
+
+    return {
+      success: true,
+      limit: this.maxRequests,
+      remaining: this.maxRequests - timestamps.length,
+      resetAtMs,
+    }
+  }
+
+  private async blockUntilReady(key: string, timeoutMs: number): Promise<Required<RatelimiterLimitResult>> {
+    const deadlineAtMs = Date.now() + timeoutMs
+
+    while (true) {
+      const result = await this.checkLimit(key)
+
+      if (result.success || result.resetAtMs > deadlineAtMs) {
+        return result
+      }
+
+      await new Promise(resolve => setTimeout(resolve, result.resetAtMs - Date.now()))
+    }
+  }
+}
