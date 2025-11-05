@@ -1,6 +1,6 @@
-import type { IORedisRatelimiterOptions } from './ioredis'
+import type { IORedisRatelimiterOptions } from './redis'
 import { Redis } from 'ioredis'
-import { IORedisRatelimiter } from './ioredis'
+import { IORedisRatelimiter } from './redis'
 
 const REDIS_URL = process.env.REDIS_URL
 
@@ -12,7 +12,8 @@ describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 },
   let redis: Redis
 
   function createTestingRatelimiter(options: Partial<IORedisRatelimiterOptions> = {}) {
-    const ratelimiter = new IORedisRatelimiter(redis, {
+    const ratelimiter = new IORedisRatelimiter({
+      eval: redis.eval.bind(redis),
       prefix: `test:${crypto.randomUUID()}:`, // isolated from other tests
       maxRequests: 10,
       windowMs: 60000,
@@ -191,22 +192,20 @@ describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 },
     })
 
     it('handles Redis errors gracefully', async () => {
-      const mockRedis = {
-        ...redis,
+      const ratelimiter = new IORedisRatelimiter({
         eval: async () => { throw new Error('Redis error') },
-      } as any
-
-      const ratelimiter = new IORedisRatelimiter(mockRedis, { maxRequests: 10, windowMs: 60000 })
+        maxRequests: 10,
+        windowMs: 60000,
+      })
       await expect(ratelimiter.limit('some-key')).rejects.toThrow('Redis error')
     })
 
     it('handles invalid script response', async () => {
-      const mockRedis = {
-        ...redis,
+      const ratelimiter = new IORedisRatelimiter({
         eval: async () => [1, 2, 3], // Invalid response, should have 4 elements
-      } as any
-
-      const ratelimiter = new IORedisRatelimiter(mockRedis, { maxRequests: 10, windowMs: 60000 })
+        maxRequests: 10,
+        windowMs: 60000,
+      })
       await expect(ratelimiter.limit('some-key')).rejects.toThrow('Invalid response from rate limit script')
     })
   })

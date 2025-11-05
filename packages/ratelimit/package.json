@@ -10,8 +10,8 @@
     "directory": "packages/ratelimit"
   },
   "keywords": [
-    "unnoq",
-    "orpc"
+    "orpc",
+    "ratelimit"
   ],
   "publishConfig": {
     "exports": {
@@ -25,10 +25,10 @@
         "import": "./dist/adapters/memory.mjs",
         "default": "./dist/adapters/memory.mjs"
       },
-      "./ioredis": {
-        "types": "./dist/adapters/ioredis.d.mts",
-        "import": "./dist/adapters/ioredis.mjs",
-        "default": "./dist/adapters/ioredis.mjs"
+      "./redis": {
+        "types": "./dist/adapters/redis.d.mts",
+        "import": "./dist/adapters/redis.mjs",
+        "default": "./dist/adapters/redis.mjs"
       },
       "./upstash-ratelimit": {
         "types": "./dist/adapters/upstash-ratelimit.d.mts",
@@ -40,7 +40,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./memory": "./src/adapters/memory.ts",
-    "./ioredis": "./src/adapters/ioredis.ts",
+    "./redis": "./src/adapters/redis.ts",
     "./upstash-ratelimit": "./src/adapters/upstash-ratelimit.ts"
   },
   "files": [
@@ -52,14 +52,10 @@
     "type:check": "tsc -b"
   },
   "peerDependencies": {
-    "@upstash/ratelimit": ">=2.0.7",
-    "ioredis": ">=5.8.1"
+    "@upstash/ratelimit": ">=2.0.7"
   },
   "peerDependenciesMeta": {
     "@upstash/ratelimit": {
-      "optional": true
-    },
-    "ioredis": {
       "optional": true
     }
   },

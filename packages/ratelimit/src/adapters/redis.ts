@@ -1,4 +1,3 @@
-import type Redis from 'ioredis'
 import type { Ratelimiter, RatelimiterLimitResult } from '../types'
 import { fallback } from '@orpc/shared'
 
@@ -51,6 +50,8 @@ end
 export class IORedisRatelimiterError extends Error {}
 
 export interface IORedisRatelimiterOptions {
+  eval: (script: string, numKeys: number, ...args: string[]) => Promise<unknown>
+
   /**
    * Block until the request may pass or timeout is reached.
    */
@@ -75,19 +76,19 @@ export interface IORedisRatelimiterOptions {
    * The duration of the sliding window in milliseconds.
    */
   windowMs: number
-
 }
 
 export class IORedisRatelimiter implements Ratelimiter {
+  private readonly eval: IORedisRatelimiterOptions['eval']
   private readonly prefix: string
   private readonly maxRequests: number
   private readonly windowMs: number
   private readonly blockingUntilReady: IORedisRatelimiterOptions['blockingUntilReady']
 
   constructor(
-    private readonly redis: Redis,
     options: IORedisRatelimiterOptions,
   ) {
+    this.eval = options.eval
     this.prefix = fallback(options.prefix, 'orpc:ratelimit:')
     this.maxRequests = options.maxRequests
     this.windowMs = options.windowMs
@@ -105,7 +106,7 @@ export class IORedisRatelimiter implements Ratelimiter {
   }
 
   private async checkLimit(key: string) {
-    const result = await this.redis.eval(
+    const result = await this.eval(
       SLIDING_WINDOW_LOG_LUA_SCRIPT,
       1,
       key,
