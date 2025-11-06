@@ -211,16 +211,13 @@ export function simplifyComposedObjectJsonSchemasAndRefs(schema: JSONSchema, doc
       for (const [key, value] of Object.entries(u.properties)) {
         let entry = mergedUnionPropertyMap.get(key)
         if (!entry) {
-          entry = { required: false, schemas: [] }
+          const required = objectUnionSchemas.every(s => s.required?.includes(key))
+
+          entry = { required, schemas: [] }
           mergedUnionPropertyMap.set(key, entry)
         }
         entry.schemas.push(value)
       }
-    }
-  }
-  for (const [key, entry] of mergedUnionPropertyMap) {
-    if (objectUnionSchemas.every(s => s.required?.includes(key))) {
-      entry.required = true
     }
   }
 
@@ -240,17 +237,14 @@ export function simplifyComposedObjectJsonSchemasAndRefs(schema: JSONSchema, doc
       for (const [key, value] of Object.entries(u.properties)) {
         let entry = mergedInteractionPropertyMap.get(key)
         if (!entry) {
-          entry = { required: false, schemas: [] }
+          const required = objectIntersectionSchemas.some(s => s.required?.includes(key))
+
+          entry = { required, schemas: [] }
           mergedInteractionPropertyMap.set(key, entry)
         }
 
         entry.schemas.push(value)
       }
-    }
-  }
-  for (const [key, entry] of mergedInteractionPropertyMap) {
-    if (objectIntersectionSchemas.some(s => s.required?.includes(key))) {
-      entry.required = true
     }
   }
 
