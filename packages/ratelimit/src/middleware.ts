@@ -6,7 +6,7 @@ import { ORPCError } from '@orpc/server'
 import { toArray, value } from '@orpc/shared'
 import { RATELIMIT_HANDLER_CONTEXT_SYMBOL } from './handler-plugin'
 
-const RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL = Symbol('ORPC_RATE_LIMIT_MIDDLEWARE_CONTEXT')
+export const RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL = Symbol('ORPC_RATE_LIMIT_MIDDLEWARE_CONTEXT')
 
 export interface RatelimiterMiddlewareContext {
   /**
@@ -42,8 +42,8 @@ export interface CreateRatelimitMiddlewareOptions<
 
 export function createRatelimitMiddleware<
   TInContext extends Context,
-  TInput,
-  TMeta extends Meta,
+  TInput = unknown,
+  TMeta extends Meta = Record<never, never>,
 >(
   { dedupe = true, ...options }: CreateRatelimitMiddlewareOptions<TInContext, TInput, TMeta>,
 ): Middleware<TInContext, Record<never, never>, TInput, any, any, TMeta> {
