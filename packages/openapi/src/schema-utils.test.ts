@@ -1,6 +1,16 @@
 import type { JSONSchema, ObjectSchema } from './schema'
 import { isObject } from '@orpc/shared'
-import { applySchemaOptionality, expandArrayableSchema, expandUnionSchema, filterSchemaBranches, isAnySchema, isFileSchema, isObjectSchema, isPrimitiveSchema, separateObjectSchema } from './schema-utils'
+import {
+  applySchemaOptionality,
+  expandArrayableSchema,
+  expandUnionSchema,
+  filterSchemaBranches,
+  isAnySchema,
+  isFileSchema,
+  isObjectSchema,
+  isPrimitiveSchema,
+  separateObjectSchema,
+} from './schema-utils'
 
 it('isFileSchema', () => {
   expect(isFileSchema({ type: 'string', contentMediaType: 'image/png' })).toBe(true)

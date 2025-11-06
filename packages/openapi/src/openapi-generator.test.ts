@@ -1642,4 +1642,102 @@ describe('openAPIGenerator', () => {
       },
     })
   })
+
+  it('expand support for union/interaction of object schemas in some cases', async () => {
+    const openAPIGenerator = new OpenAPIGenerator({
+      schemaConverters: [
+        new ZodToJsonSchemaConverter(),
+      ],
+    })
+
+    const schema = z.discriminatedUnion('type', [
+      z.object({
+        type: z.literal('a'),
+        a: z.string(),
+      }),
+      z.object({
+        type: z.literal('b'),
+        b: z.number(),
+      }),
+    ])
+
+    const router = {
+      ping: oc
+        .route({ path: '/{type}' })
+        .input(schema),
+      pong: oc.route({ method: 'GET' })
+        .input(schema),
+    }
+
+    const spec = await openAPIGenerator.generate(router)
+
+    expect(spec.paths!['/{type}']!.post).toEqual({
+      operationId: 'ping',
+      parameters: [
+        {
+          name: 'type',
+          in: 'path',
+          required: true,
+          schema: {
+            anyOf: [
+              { const: 'a' },
+              { const: 'b' },
+            ],
+          },
+        },
+      ],
+      requestBody: {
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                a: { type: 'string' },
+                b: { type: 'number' },
+              },
+              required: [],
+            },
+          },
+        },
+        required: false,
+      },
+      responses: expect.any(Object),
+    })
+
+    expect(spec.paths!['/pong']!.get).toEqual({
+      operationId: 'pong',
+      parameters: [
+        {
+          allowEmptyValue: true,
+          allowReserved: true,
+          name: 'type',
+          in: 'query',
+          required: true,
+          schema: {
+            anyOf: [
+              { const: 'a' },
+              { const: 'b' },
+            ],
+          },
+        },
+        {
+          allowEmptyValue: true,
+          allowReserved: true,
+          name: 'a',
+          in: 'query',
+          schema: { type: 'string' },
+          required: false,
+        },
+        {
+          allowEmptyValue: true,
+          allowReserved: true,
+          name: 'b',
+          in: 'query',
+          schema: { type: 'number' },
+          required: false,
+        },
+      ],
+      responses: expect.any(Object),
+    })
+  })
 })

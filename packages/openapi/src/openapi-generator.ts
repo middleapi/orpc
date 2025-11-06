@@ -11,7 +11,7 @@ import { getDynamicParams, StandardOpenAPIJsonSerializer } from '@orpc/openapi-c
 import { resolveContractProcedures } from '@orpc/server'
 import { clone, stringifyJSON, toArray, value } from '@orpc/shared'
 import { applyCustomOpenAPIOperation } from './openapi-custom'
-import { checkParamsSchema, resolveOpenAPIJsonSchemaRef, toOpenAPIContent, toOpenAPIEventIteratorContent, toOpenAPIMethod, toOpenAPIParameters, toOpenAPIPath, toOpenAPISchema } from './openapi-utils'
+import { checkParamsSchema, resolveOpenAPIJsonSchemaRef, simplifyComposedObjectJsonSchemasAndRefs, toOpenAPIContent, toOpenAPIEventIteratorContent, toOpenAPIMethod, toOpenAPIParameters, toOpenAPIPath, toOpenAPISchema } from './openapi-utils'
 import { CompositeSchemaConverter } from './schema-converter'
 import { applySchemaOptionality, expandUnionSchema, isAnySchema, isObjectSchema, separateObjectSchema } from './schema-utils'
 
@@ -304,12 +304,15 @@ export class OpenAPIGenerator {
       {
         ...baseSchemaConvertOptions,
         strategy: 'input',
-        minStructureDepthForRef: dynamicParams?.length || inputStructure === 'detailed' ? 1 : 0,
       },
     )
 
     if (isAnySchema(schema) && !dynamicParams?.length) {
       return
+    }
+
+    if (inputStructure === 'detailed' || (inputStructure === 'compact' && (dynamicParams?.length || method === 'GET'))) {
+      schema = simplifyComposedObjectJsonSchemasAndRefs(schema, doc)
     }
 
     if (inputStructure === 'compact') {
@@ -336,16 +339,14 @@ export class OpenAPIGenerator {
       }
 
       if (method === 'GET') {
-        const resolvedSchema = resolveOpenAPIJsonSchemaRef(doc, schema)
-
-        if (!isObjectSchema(resolvedSchema)) {
+        if (!isObjectSchema(schema)) {
           throw new OpenAPIGeneratorError(
             'When method is "GET", input schema must satisfy: object | any | unknown',
           )
         }
 
         ref.parameters ??= []
-        ref.parameters.push(...toOpenAPIParameters(resolvedSchema, 'query'))
+        ref.parameters.push(...toOpenAPIParameters(schema, 'query'))
       }
       else {
         ref.requestBody = {

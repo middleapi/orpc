@@ -1,6 +1,16 @@
 import type { OpenAPI } from '@orpc/contract'
 import type { FileSchema, JSONSchema, ObjectSchema } from './schema'
-import { checkParamsSchema, resolveOpenAPIJsonSchemaRef, toOpenAPIContent, toOpenAPIEventIteratorContent, toOpenAPIMethod, toOpenAPIParameters, toOpenAPIPath, toOpenAPISchema } from './openapi-utils'
+import {
+  checkParamsSchema,
+  resolveOpenAPIJsonSchemaRef,
+  simplifyComposedObjectJsonSchemasAndRefs,
+  toOpenAPIContent,
+  toOpenAPIEventIteratorContent,
+  toOpenAPIMethod,
+  toOpenAPIParameters,
+  toOpenAPIPath,
+  toOpenAPISchema,
+} from './openapi-utils'
 
 it('toOpenAPIPath', () => {
   expect(toOpenAPIPath('/path')).toBe('/path')
@@ -371,5 +381,438 @@ describe('resolveOpenAPIJsonSchemaRef', () => {
 
   it('not resolve if $ref not found', () => {
     expect(resolveOpenAPIJsonSchemaRef(doc, { $ref: '#/components/schemas/not-found' })).toEqual({ $ref: '#/components/schemas/not-found' })
+  })
+})
+
+describe('simplifyComposedObjectJsonSchemasAndRefs', () => {
+  it('does not simplify non-object or non-composed schemas', () => {
+    expect(simplifyComposedObjectJsonSchemasAndRefs(true)).toEqual(true)
+    expect(simplifyComposedObjectJsonSchemasAndRefs({ type: 'string' })).toEqual({ type: 'string' })
+    expect(simplifyComposedObjectJsonSchemasAndRefs({ anyOf: [{ type: 'string' }, { type: 'number' }] })).toEqual({ anyOf: [{ type: 'string' }, { type: 'number' }] })
+    expect(simplifyComposedObjectJsonSchemasAndRefs({ allOf: [{ type: 'array' }] })).toEqual({ allOf: [{ type: 'array' }] })
+
+    expect(simplifyComposedObjectJsonSchemasAndRefs({
+      anyOf: [
+        { type: 'object', properties: { a: { type: 'string' } } },
+        { type: 'number' },
+      ],
+    })).toEqual({
+      anyOf: [
+        { type: 'object', properties: { a: { type: 'string' } } },
+        { type: 'number' },
+      ],
+    })
+
+    expect(simplifyComposedObjectJsonSchemasAndRefs({
+      description: 'description',
+      type: 'object',
+      properties: { a: { type: 'string' } },
+      additionalProperties: false,
+    })).toEqual({
+      description: 'description',
+      type: 'object',
+      properties: { a: { type: 'string' } },
+      additionalProperties: false,
+    })
+  })
+
+  it('only remain type, properties, required logics', () => {
+    expect(simplifyComposedObjectJsonSchemasAndRefs({
+      anyOf: [
+        {
+          type: 'object',
+          properties: { a: { type: 'string' } },
+          required: ['a'],
+          description: 'description a',
+        },
+        {
+          type: 'object',
+          properties: { b: { type: 'number' } },
+          required: ['b'],
+          additionalProperties: false,
+        },
+      ],
+      description: 'object description',
+      additionalProperties: true,
+    })).toEqual({
+      type: 'object',
+      properties: {
+        a: { type: 'string' },
+        b: { type: 'number' },
+      },
+      required: [],
+    })
+  })
+
+  describe.each(['anyOf', 'oneOf'])('%s', (keyword) => {
+    it('ignore additional object logic', () => {
+      expect(simplifyComposedObjectJsonSchemasAndRefs({
+        description: 'animal',
+        [keyword]: [
+          {
+            type: 'object',
+            properties: { type: { const: 'pig' }, weight: { type: 'number' } },
+            required: ['type', 'weight'],
+            additionalProperties: false,
+          },
+          {
+            type: 'object',
+            properties: { type: { const: 'dog' }, barkVolume: { type: 'number' } },
+            required: ['type', 'barkVolume'],
+            patternProperties: {
+              '^S_': { type: 'string' },
+              '^I_': { type: 'integer' },
+            },
+          },
+        ],
+      })).toEqual({
+        type: 'object',
+        properties: {
+          type: { anyOf: [{ const: 'pig' }, { const: 'dog' }] },
+          weight: { type: 'number' },
+          barkVolume: { type: 'number' },
+        },
+        required: ['type'],
+      })
+    })
+
+    it('handles empty', () => {
+      expect(simplifyComposedObjectJsonSchemasAndRefs({
+        description: 'empty',
+        [keyword]: [],
+      })).toEqual({
+        description: 'empty',
+        [keyword]: [],
+      })
+    })
+
+    it('does not merge mixed object and non-object schemas', () => {
+      expect(simplifyComposedObjectJsonSchemasAndRefs({
+        [keyword]: [
+          { type: 'object', properties: { a: { type: 'string' } } },
+          { type: 'boolean' },
+        ],
+      })).toEqual({
+        [keyword]: [
+          { type: 'object', properties: { a: { type: 'string' } } },
+          { type: 'boolean' },
+        ],
+      })
+    })
+
+    it('merges object schemas with discriminated union', () => {
+      expect(simplifyComposedObjectJsonSchemasAndRefs({
+        description: 'animal',
+        [keyword]: [
+          {
+            type: 'object',
+            properties: { type: { const: 'pig' }, weight: { type: 'number' } },
+            required: ['type', 'weight'],
+          },
+          {
+            type: 'object',
+            properties: { type: { const: 'dog' }, barkVolume: { type: 'number' } },
+            required: ['type', 'barkVolume'],
+          },
+        ],
+      })).toEqual({
+        type: 'object',
+        properties: {
+          type: { anyOf: [{ const: 'pig' }, { const: 'dog' }] },
+          weight: { type: 'number' },
+          barkVolume: { type: 'number' },
+        },
+        required: ['type'],
+      })
+    })
+
+    it('handle required & dedupe schemas correctly', () => {
+      expect(simplifyComposedObjectJsonSchemasAndRefs({
+        [keyword]: [
+          { type: 'object', properties: { a: { type: 'string' }, b: { type: 'string' } }, required: ['a'] },
+          { type: 'object', properties: { a: { type: 'string' }, c: { type: 'string' } }, required: ['a', 'c'] },
+        ],
+      })).toEqual({
+        type: 'object',
+        properties: {
+          a: { type: 'string' },
+          b: { type: 'string' },
+          c: { type: 'string' },
+        },
+        required: ['a'],
+      })
+    })
+
+    it('handles nested union recursively', () => {
+      expect(simplifyComposedObjectJsonSchemasAndRefs({
+        [keyword]: [
+          { [keyword]: [{ type: 'string' }, { type: 'number' }] },
+          { type: 'boolean' },
+        ],
+      })).toEqual({
+        [keyword]: [
+          { [keyword]: [{ type: 'string' }, { type: 'number' }] },
+          { type: 'boolean' },
+        ],
+      })
+    })
+  })
+
+  describe('allOf', () => {
+    it('handles empty', () => {
+      expect(simplifyComposedObjectJsonSchemasAndRefs({
+        description: 'empty',
+        allOf: [],
+      })).toEqual({
+        description: 'empty',
+        allOf: [],
+      })
+    })
+
+    it('merges object schemas', () => {
+      expect(simplifyComposedObjectJsonSchemasAndRefs({
+        allOf: [
+          { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+          { type: 'object', properties: { b: { type: 'number' } }, required: ['b'] },
+        ],
+      })).toEqual({
+        type: 'object',
+        properties: {
+          a: { type: 'string' },
+          b: { type: 'number' },
+        },
+        required: ['a', 'b'],
+      })
+    })
+
+    it('merges overlapping properties with allOf', () => {
+      expect(simplifyComposedObjectJsonSchemasAndRefs({
+        allOf: [
+          { type: 'object', properties: { a: { type: 'string', minLength: 1 } }, required: ['a'] },
+          { type: 'object', properties: { a: { type: 'string', maxLength: 10 } }, required: ['a'] },
+        ],
+      })).toEqual({
+        type: 'object',
+        properties: {
+          a: { allOf: [{ type: 'string', minLength: 1 }, { type: 'string', maxLength: 10 }] },
+        },
+        required: ['a'],
+      })
+    })
+
+    it('handle required correctly & dedupe schemas', () => {
+      expect(simplifyComposedObjectJsonSchemasAndRefs({
+        allOf: [
+          { type: 'object', properties: { a: { type: 'string' }, b: { type: 'string' } }, required: ['a'] },
+          { type: 'object', properties: { a: { type: 'string' }, c: { type: 'string' } }, required: ['a', 'c'] },
+        ],
+      })).toEqual({
+        type: 'object',
+        properties: {
+          a: { type: 'string' },
+          b: { type: 'string' },
+          c: { type: 'string' },
+        },
+        required: ['a', 'c'],
+      })
+    })
+
+    it('handle nested compositions', () => {
+      expect(simplifyComposedObjectJsonSchemasAndRefs({
+        allOf: [
+          {
+            allOf: [
+              { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+              { type: 'object', properties: { b: { type: 'number' } } },
+            ],
+          },
+          { type: 'object', properties: { c: { type: 'boolean' } }, required: ['c'] },
+        ],
+      })).toEqual({
+        type: 'object',
+        properties: {
+          a: { type: 'string' },
+          b: { type: 'number' },
+          c: { type: 'boolean' },
+        },
+        required: ['a', 'c'],
+      })
+    })
+  })
+
+  describe('combined compositions', () => {
+    it('recursively simplifies oneOf with nested allOf', () => {
+      expect(simplifyComposedObjectJsonSchemasAndRefs({
+        oneOf: [
+          {
+            allOf: [
+              { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+              { type: 'object', properties: { b: { type: 'number' } }, required: ['b'] },
+            ],
+          },
+          {
+            allOf: [
+              { type: 'object', properties: { a: { type: 'number' } }, required: ['a'] },
+              { type: 'object', properties: { c: { type: 'boolean' } }, required: ['c'] },
+            ],
+          },
+        ],
+      })).toEqual({
+        type: 'object',
+        properties: {
+          a: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+          b: { type: 'number' },
+          c: { type: 'boolean' },
+        },
+        required: ['a'],
+      })
+    })
+
+    it('recursively simplifies anyOf with nested allOf', () => {
+      expect(simplifyComposedObjectJsonSchemasAndRefs({
+        anyOf: [
+          {
+            allOf: [
+              { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+              { type: 'object', properties: { b: { type: 'number' } }, required: ['b'] },
+            ],
+          },
+          {
+            allOf: [
+              { type: 'object', properties: { c: { type: 'boolean' } }, required: ['c'] },
+              { type: 'object', properties: { d: { type: 'string' } }, required: ['d'] },
+            ],
+          },
+        ],
+      })).toEqual({
+        type: 'object',
+        properties: {
+          a: { type: 'string' },
+          b: { type: 'number' },
+          c: { type: 'boolean' },
+          d: { type: 'string' },
+        },
+        required: [],
+      })
+    })
+
+    it('handles deeply nested compositions', () => {
+      expect(simplifyComposedObjectJsonSchemasAndRefs({
+        anyOf: [
+          {
+            allOf: [
+              { type: 'object', properties: { a: { type: 'string' } } },
+            ],
+          },
+        ],
+      })).toEqual({
+        type: 'object',
+        properties: { a: { type: 'string' } },
+        required: [],
+      })
+    })
+
+    it('can simplify composed schemas with many compositions', () => {
+      expect(simplifyComposedObjectJsonSchemasAndRefs({
+        anyOf: [{ type: 'object', properties: { a: { type: 'string' } }, required: ['a'] }],
+        allOf: [{ type: 'object', properties: { b: { type: 'number' } }, required: ['b'] }],
+      })).toEqual({
+        type: 'object',
+        properties: {
+          a: { type: 'string' },
+          b: { type: 'number' },
+        },
+        required: ['a', 'b'],
+      })
+    })
+
+    it('dedupes schemas when anyOf and allOf coexist at the same level', () => {
+      expect(simplifyComposedObjectJsonSchemasAndRefs({
+        allOf: [
+          { type: 'object', properties: { a: { type: 'string' }, b: { type: 'string' } }, required: ['a'] },
+          { type: 'object', properties: { a: { type: 'string' }, c: { type: 'string' } }, required: ['a', 'c'] },
+        ],
+        anyOf: [
+          { type: 'object', properties: { a: { type: 'string' }, b: { type: 'string' } }, required: ['a'] },
+          { type: 'object', properties: { a: { type: 'number' }, d: { type: 'string' } }, required: ['a', 'd'] },
+        ],
+      })).toEqual({
+        type: 'object',
+        properties: {
+          a: {
+            allOf: [
+              { type: 'string' },
+              { anyOf: [{ type: 'string' }, { type: 'number' }] },
+            ],
+          },
+          b: { type: 'string' },
+          c: { type: 'string' },
+          d: { type: 'string' },
+        },
+        required: ['a', 'c'],
+      })
+    })
+  })
+
+  describe('with $ref', () => {
+    const doc = {
+      components: {
+        schemas: {
+          Base: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+            },
+            required: ['id'],
+          },
+          Extended: {
+            allOf: [
+              { $ref: '#/components/schemas/Base' },
+              {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                },
+                required: ['name'],
+              },
+            ],
+          },
+        },
+      },
+    } as any
+
+    it('resolves $ref before simplifying', () => {
+      expect(simplifyComposedObjectJsonSchemasAndRefs(
+        { $ref: '#/components/schemas/Extended' },
+        doc,
+      )).toEqual({
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          name: { type: 'string' },
+        },
+        required: ['id', 'name'],
+      })
+
+      expect(simplifyComposedObjectJsonSchemasAndRefs({
+        allOf: [
+          { $ref: '#/components/schemas/Base' },
+          {
+            type: 'object',
+            properties: {
+              age: { type: 'number' },
+            },
+            required: ['age'],
+          },
+        ],
+      }, doc)).toEqual({
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          age: { type: 'number' },
+        },
+        required: ['id', 'age'],
+      })
+    })
   })
 })

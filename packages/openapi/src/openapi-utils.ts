@@ -2,8 +2,8 @@ import type { HTTPMethod, HTTPPath } from '@orpc/client'
 import type { OpenAPI } from '@orpc/contract'
 import type { FileSchema, JSONSchema, ObjectSchema } from './schema'
 import { standardizeHTTPPath } from '@orpc/openapi-client/standard'
-import { findDeepMatches, isObject } from '@orpc/shared'
-import { expandArrayableSchema, filterSchemaBranches, isFileSchema, isPrimitiveSchema } from './schema-utils'
+import { findDeepMatches, isObject, stringifyJSON, toArray } from '@orpc/shared'
+import { expandArrayableSchema, filterSchemaBranches, isFileSchema, isObjectSchema, isPrimitiveSchema } from './schema-utils'
 
 /**
  * @internal
@@ -176,4 +176,141 @@ export function resolveOpenAPIJsonSchemaRef(doc: OpenAPI.Document, schema: JSONS
   const name = schema.$ref.slice(OPENAPI_JSON_SCHEMA_REF_PREFIX.length)
   const resolved = doc.components?.schemas?.[name]
   return resolved as JSONSchema ?? schema
+}
+
+/**
+ * Simplifies composed object JSON Schemas (using anyOf, oneOf, allOf) by flattening nested compositions
+ *
+ * @warning The result is looser than the original schema and may not fully validate the same data.
+ */
+export function simplifyComposedObjectJsonSchemasAndRefs(schema: JSONSchema, doc?: OpenAPI.Document): JSONSchema {
+  if (doc) {
+    schema = resolveOpenAPIJsonSchemaRef(doc, schema)
+  }
+
+  if (typeof schema !== 'object' || (!schema.anyOf && !schema.oneOf && !schema.allOf)) {
+    return schema
+  }
+
+  const unionSchemas = [
+    ...toArray(schema.anyOf?.map(s => simplifyComposedObjectJsonSchemasAndRefs(s, doc))),
+    ...toArray(schema.oneOf?.map(s => simplifyComposedObjectJsonSchemasAndRefs(s, doc))),
+  ]
+
+  const objectUnionSchemas: ObjectSchema[] = []
+  for (const u of unionSchemas) {
+    if (!isObjectSchema(u)) {
+      return schema
+    }
+
+    objectUnionSchemas.push(u)
+  }
+
+  const mergedUnionPropertyMap: Map<string, { required: boolean, schemas: JSONSchema[] }> = new Map()
+  for (const u of objectUnionSchemas) {
+    if (u.properties) {
+      for (const [key, value] of Object.entries(u.properties)) {
+        let entry = mergedUnionPropertyMap.get(key)
+        if (!entry) {
+          entry = { required: false, schemas: [value] }
+          mergedUnionPropertyMap.set(key, entry)
+        }
+        else {
+          entry.schemas.push(value)
+        }
+
+        if (!entry.required && objectUnionSchemas.every(s => s.required?.includes(key))) {
+          entry.required = true
+        }
+      }
+    }
+  }
+
+  const intersectionSchemas = toArray(schema.allOf?.map(s => simplifyComposedObjectJsonSchemasAndRefs(s, doc)))
+  const mergedInteractionPropertyMap: Map<string, { required: boolean, schemas: JSONSchema[] }> = new Map()
+  for (const u of intersectionSchemas) {
+    if (!isObjectSchema(u)) {
+      return schema
+    }
+
+    if (u.properties) {
+      for (const [key, value] of Object.entries(u.properties)) {
+        let entry = mergedInteractionPropertyMap.get(key)
+        if (!entry) {
+          entry = { required: false, schemas: [value] }
+          mergedInteractionPropertyMap.set(key, entry)
+        }
+        else {
+          entry.schemas.push(value)
+        }
+
+        if (u.required?.includes(key)) {
+          entry.required = true
+        }
+      }
+    }
+  }
+
+  const resultObjectSchema: { type: 'object', properties: Record<string, JSONSchema>, required: string[] } = { type: 'object', properties: {}, required: [] }
+
+  const keys = new Set<string>([
+    ...mergedUnionPropertyMap.keys(),
+    ...mergedInteractionPropertyMap.keys(),
+  ])
+
+  if (keys.size === 0) {
+    return schema
+  }
+
+  const deduplicateSchemas = (schemas: JSONSchema[]): JSONSchema[] => {
+    const seen = new Set<string>()
+    const result: JSONSchema[] = []
+    for (const schema of schemas) {
+      const key = stringifyJSON(schema)
+      if (!seen.has(key)) {
+        seen.add(key)
+        result.push(schema)
+      }
+    }
+    return result
+  }
+
+  for (const key of keys) {
+    const unionEntry = mergedUnionPropertyMap.get(key)
+    const intersectionEntry = mergedInteractionPropertyMap.get(key)
+
+    resultObjectSchema.properties[key] = (() => {
+      const dedupedUnionSchemas = unionEntry ? deduplicateSchemas(unionEntry.schemas) : []
+      const dedupedIntersectionSchemas = intersectionEntry ? deduplicateSchemas(intersectionEntry.schemas) : []
+
+      if (!dedupedUnionSchemas.length) {
+        return dedupedIntersectionSchemas.length === 1
+          ? dedupedIntersectionSchemas[0]!
+          : { allOf: dedupedIntersectionSchemas }
+      }
+
+      if (!dedupedIntersectionSchemas.length) {
+        return dedupedUnionSchemas.length === 1
+          ? dedupedUnionSchemas[0]!
+          : { anyOf: dedupedUnionSchemas }
+      }
+
+      const allOf = deduplicateSchemas([
+        ...dedupedIntersectionSchemas,
+        dedupedUnionSchemas.length === 1
+          ? dedupedUnionSchemas[0]!
+          : { anyOf: dedupedUnionSchemas },
+      ])
+
+      return allOf.length === 1
+        ? allOf[0]!
+        : { allOf }
+    })()
+
+    if ((!unionEntry || unionEntry.required) && (!intersectionEntry || intersectionEntry.required)) {
+      resultObjectSchema.required.push(key)
+    }
+  }
+
+  return resultObjectSchema
 }
