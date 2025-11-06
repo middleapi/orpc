@@ -6,7 +6,7 @@ export interface MemoryRatelimiterOptions {
    */
   blockingUntilReady?: {
     enabled: boolean
-    timeoutMs: number
+    timeout: number
   }
 
   /**
@@ -17,20 +17,20 @@ export interface MemoryRatelimiterOptions {
   /**
    * The duration of the sliding window in milliseconds.
    */
-  windowMs: number
+  window: number
 
 }
 
 export class MemoryRatelimiter implements Ratelimiter {
   private readonly maxRequests: number
-  private readonly windowMs: number
+  private readonly window: number
   private readonly blockingUntilReady: MemoryRatelimiterOptions['blockingUntilReady']
   private readonly store: Map<string, number[]>
   private lastCleanupTime: number | null = null
 
   constructor(options: MemoryRatelimiterOptions) {
     this.maxRequests = options.maxRequests
-    this.windowMs = options.windowMs
+    this.window = options.window
     this.blockingUntilReady = options.blockingUntilReady
     this.store = new Map()
   }
@@ -39,7 +39,7 @@ export class MemoryRatelimiter implements Ratelimiter {
     this.cleanup()
 
     if (this.blockingUntilReady?.enabled) {
-      return this.blockUntilReady(key, this.blockingUntilReady.timeoutMs)
+      return this.blockUntilReady(key, this.blockingUntilReady.timeout)
     }
 
     return this.checkLimit(key)
@@ -49,12 +49,12 @@ export class MemoryRatelimiter implements Ratelimiter {
     const now = Date.now()
 
     // Only clean up once per window to avoid excessive processing
-    if (this.lastCleanupTime !== null && this.lastCleanupTime + this.windowMs > now) {
+    if (this.lastCleanupTime !== null && this.lastCleanupTime + this.window > now) {
       return
     }
 
     this.lastCleanupTime = now
-    const windowStart = now - this.windowMs
+    const windowStart = now - this.window
 
     for (const [key, timestamps] of this.store) {
       // remove expired timestamps
@@ -68,7 +68,7 @@ export class MemoryRatelimiter implements Ratelimiter {
 
   private async checkLimit(key: string): Promise<Required<RatelimiterLimitResult>> {
     const now = Date.now()
-    const windowStart = now - this.windowMs
+    const windowStart = now - this.window
 
     let timestamps = this.store.get(key)
     if (timestamps) {
@@ -80,16 +80,16 @@ export class MemoryRatelimiter implements Ratelimiter {
     }
 
     // Calculate reset time based on oldest timestamp or current time if no timestamps
-    const resetAtMs = timestamps[0] !== undefined
-      ? timestamps[0] + this.windowMs
-      : now + this.windowMs
+    const reset = timestamps[0] !== undefined
+      ? timestamps[0] + this.window
+      : now + this.window
 
     if (timestamps.length >= this.maxRequests) {
       return {
         success: false,
         limit: this.maxRequests,
         remaining: 0,
-        resetAtMs,
+        reset,
       }
     }
 
@@ -99,7 +99,7 @@ export class MemoryRatelimiter implements Ratelimiter {
       success: true,
       limit: this.maxRequests,
       remaining: this.maxRequests - timestamps.length,
-      resetAtMs,
+      reset,
     }
   }
 
@@ -109,11 +109,11 @@ export class MemoryRatelimiter implements Ratelimiter {
     while (true) {
       const result = await this.checkLimit(key)
 
-      if (result.success || result.resetAtMs > deadlineAtMs) {
+      if (result.success || result.reset > deadlineAtMs) {
         return result
       }
 
-      await new Promise(resolve => setTimeout(resolve, result.resetAtMs - Date.now()))
+      await new Promise(resolve => setTimeout(resolve, result.reset - Date.now()))
     }
   }
 }

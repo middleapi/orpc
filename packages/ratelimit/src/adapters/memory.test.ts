@@ -6,7 +6,7 @@ describe('memoryRatelimiter', () => {
   function createTestingRatelimiter(options: Partial<ConstructorParameters<typeof MemoryRatelimiter>[0]> = {}) {
     return new MemoryRatelimiter({
       maxRequests: 2,
-      windowMs: 1000,
+      window: 1000,
       ...options,
     })
   }
@@ -19,24 +19,24 @@ describe('memoryRatelimiter', () => {
       expect(result1.success).toBe(true)
       expect(result1.remaining).toBe(1)
       expect(result1.limit).toBe(2)
-      expect(result1.resetAtMs).toBeGreaterThan(Date.now())
+      expect(result1.reset).toBeGreaterThan(Date.now())
 
       const result2 = await ratelimiter.limit('test')
       expect(result2.success).toBe(true)
       expect(result2.remaining).toBe(0)
       expect(result2.limit).toBe(2)
-      expect(result2.resetAtMs).toEqual(result1.resetAtMs)
+      expect(result2.reset).toEqual(result1.reset)
 
       const result3 = await ratelimiter.limit('test')
       expect(result3.success).toBe(false)
       expect(result3.remaining).toBe(0)
       expect(result3.limit).toBe(2)
-      expect(result3.resetAtMs).toEqual(result1.resetAtMs)
+      expect(result3.reset).toEqual(result1.reset)
     })
 
     it('should reset after window expires', async () => {
       const ratelimiter = createTestingRatelimiter({
-        windowMs: 200,
+        window: 200,
       })
 
       const result1 = await ratelimiter.limit('test')
@@ -66,10 +66,10 @@ describe('memoryRatelimiter', () => {
     it('should block until ready', async () => {
       const ratelimiter = createTestingRatelimiter({
         maxRequests: 1,
-        windowMs: 1000,
+        window: 1000,
         blockingUntilReady: {
           enabled: true,
-          timeoutMs: 2000,
+          timeout: 2000,
         },
       })
 
@@ -87,10 +87,10 @@ describe('memoryRatelimiter', () => {
     it('should respect timeout', async () => {
       const ratelimiter = createTestingRatelimiter({
         maxRequests: 1,
-        windowMs: 2000,
+        window: 2000,
         blockingUntilReady: {
           enabled: true,
-          timeoutMs: 1000,
+          timeout: 1000,
         },
       })
 
@@ -105,7 +105,7 @@ describe('memoryRatelimiter', () => {
   it('should handle concurrent requests correctly', async () => {
     const ratelimiter = createTestingRatelimiter({
       maxRequests: 3,
-      windowMs: 1000,
+      window: 1000,
     })
 
     const test = async (key: string, request: number) => {
@@ -137,7 +137,7 @@ describe('memoryRatelimiter', () => {
     it('should cleanup expired entries on next limit call', async () => {
       const ratelimiter = createTestingRatelimiter({
         maxRequests: 2,
-        windowMs: 200,
+        window: 200,
       })
 
       await ratelimiter.limit('test')

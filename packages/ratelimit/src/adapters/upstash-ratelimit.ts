@@ -7,7 +7,7 @@ export interface UpstashRatelimiterOptions {
    */
   blockingUntilReady?: {
     enabled: boolean
-    timeoutMs: number
+    timeout: number
   }
 
   /**
@@ -39,15 +39,10 @@ export class UpstashRatelimiter implements Ratelimiter {
 
   async limit(key: string): Promise<Required<RatelimiterLimitResult>> {
     const result = this.blockingUntilReady?.enabled
-      ? await this.ratelimit.blockUntilReady(key, this.blockingUntilReady.timeoutMs)
+      ? await this.ratelimit.blockUntilReady(key, this.blockingUntilReady.timeout)
       : await this.ratelimit.limit(key)
 
     this.waitUtil?.(result.pending)
-    return {
-      success: result.success,
-      limit: result.limit,
-      remaining: result.remaining,
-      resetAtMs: result.reset,
-    }
+    return result
   }
 }

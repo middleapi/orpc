@@ -16,7 +16,7 @@ describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 },
       eval: redis.eval.bind(redis),
       prefix: `test:${crypto.randomUUID()}:`, // isolated from other tests
       maxRequests: 10,
-      windowMs: 60000,
+      window: 60000,
       ...options,
     })
     return ratelimiter
@@ -33,24 +33,24 @@ describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 },
 
   describe('without blocking', () => {
     it('allows requests within the limit', async () => {
-      const ratelimiter = createTestingRatelimiter({ maxRequests: 2, windowMs: 5000 })
+      const ratelimiter = createTestingRatelimiter({ maxRequests: 2, window: 5000 })
       const key = 'user1'
 
       const result1 = await ratelimiter.limit(key)
       expect(result1.success).toBe(true)
       expect(result1.limit).toBe(2)
       expect(result1.remaining).toBe(1)
-      expect(result1.resetAtMs).toBeGreaterThan(Date.now())
+      expect(result1.reset).toBeGreaterThan(Date.now())
 
       const result2 = await ratelimiter.limit(key)
       expect(result2.success).toBe(true)
       expect(result2.limit).toBe(2)
       expect(result2.remaining).toBe(0)
-      expect(result2.resetAtMs).toEqual(result1.resetAtMs)
+      expect(result2.reset).toEqual(result1.reset)
     })
 
     it('denies requests exceeding the limit', async () => {
-      const ratelimiter = createTestingRatelimiter({ maxRequests: 1, windowMs: 5000 })
+      const ratelimiter = createTestingRatelimiter({ maxRequests: 1, window: 5000 })
       const key = 'user2'
 
       // reach the limit
@@ -62,7 +62,7 @@ describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 },
     })
 
     it('resets the limit after the window expires', async () => {
-      const ratelimiter = createTestingRatelimiter({ maxRequests: 1, windowMs: 2000 })
+      const ratelimiter = createTestingRatelimiter({ maxRequests: 1, window: 2000 })
       const key = 'user3'
 
       // reach the limit
@@ -82,7 +82,7 @@ describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 },
   it('handles concurrent requests correctly', async () => {
     const ratelimiter = createTestingRatelimiter({
       maxRequests: 3,
-      windowMs: 5000,
+      window: 5000,
     })
 
     const test = async (key: string) => {
@@ -114,8 +114,8 @@ describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 },
     it('blocks until the rate limit resets', async () => {
       const ratelimiter = createTestingRatelimiter({
         maxRequests: 1,
-        windowMs: 2000,
-        blockingUntilReady: { enabled: true, timeoutMs: 2000 },
+        window: 2000,
+        blockingUntilReady: { enabled: true, timeout: 2000 },
       })
       const key = 'user-blocking-1'
 
@@ -135,8 +135,8 @@ describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 },
     it('times out if the reset time is beyond the timeout', async () => {
       const ratelimiter = createTestingRatelimiter({
         maxRequests: 1,
-        windowMs: 60_000,
-        blockingUntilReady: { enabled: true, timeoutMs: 2000 },
+        window: 60_000,
+        blockingUntilReady: { enabled: true, timeout: 2000 },
       })
       const key = 'user-blocking-2'
 
@@ -153,8 +153,8 @@ describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 },
     it('handles concurrent blocking requests correctly', async () => {
       const ratelimiter = createTestingRatelimiter({
         maxRequests: 2,
-        windowMs: 1000,
-        blockingUntilReady: { enabled: true, timeoutMs: 2000 },
+        window: 1000,
+        blockingUntilReady: { enabled: true, timeout: 2000 },
       })
       const key = 'user-concurrent-blocking'
 
@@ -173,7 +173,7 @@ describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 },
     it('uses the correct prefix for keys & auto expiration', async () => {
       const prefix = `custom-prefix:${crypto.randomUUID()}:`
       const ratelimiter = createTestingRatelimiter({
-        windowMs: 1000,
+        window: 1000,
         prefix,
         maxRequests: 1,
       })
@@ -195,7 +195,7 @@ describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 },
       const ratelimiter = new IORedisRatelimiter({
         eval: async () => { throw new Error('Redis error') },
         maxRequests: 10,
-        windowMs: 60000,
+        window: 60000,
       })
       await expect(ratelimiter.limit('some-key')).rejects.toThrow('Redis error')
     })
@@ -204,7 +204,7 @@ describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 },
       const ratelimiter = new IORedisRatelimiter({
         eval: async () => [1, 2, 3], // Invalid response, should have 4 elements
         maxRequests: 10,
-        windowMs: 60000,
+        window: 60000,
       })
       await expect(ratelimiter.limit('some-key')).rejects.toThrow('Invalid response from rate limit script')
     })

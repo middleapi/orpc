@@ -47,8 +47,6 @@ else
 end
 `
 
-export class IORedisRatelimiterError extends Error {}
-
 export interface IORedisRatelimiterOptions {
   eval: (script: string, numKeys: number, ...args: string[]) => Promise<unknown>
 
@@ -57,7 +55,7 @@ export interface IORedisRatelimiterOptions {
    */
   blockingUntilReady?: {
     enabled: boolean
-    timeoutMs: number
+    timeout: number
   }
 
   /**
@@ -75,14 +73,14 @@ export interface IORedisRatelimiterOptions {
   /**
    * The duration of the sliding window in milliseconds.
    */
-  windowMs: number
+  window: number
 }
 
 export class IORedisRatelimiter implements Ratelimiter {
   private readonly eval: IORedisRatelimiterOptions['eval']
   private readonly prefix: string
   private readonly maxRequests: number
-  private readonly windowMs: number
+  private readonly window: number
   private readonly blockingUntilReady: IORedisRatelimiterOptions['blockingUntilReady']
 
   constructor(
@@ -91,7 +89,7 @@ export class IORedisRatelimiter implements Ratelimiter {
     this.eval = options.eval
     this.prefix = fallback(options.prefix, 'orpc:ratelimit:')
     this.maxRequests = options.maxRequests
-    this.windowMs = options.windowMs
+    this.window = options.window
     this.blockingUntilReady = options.blockingUntilReady
   }
 
@@ -99,7 +97,7 @@ export class IORedisRatelimiter implements Ratelimiter {
     const prefixedKey = `${this.prefix}${key}`
 
     if (this.blockingUntilReady?.enabled) {
-      return await this.blockUntilReady(prefixedKey, this.blockingUntilReady.timeoutMs)
+      return await this.blockUntilReady(prefixedKey, this.blockingUntilReady.timeout)
     }
 
     return await this.checkLimit(prefixedKey)
@@ -111,21 +109,21 @@ export class IORedisRatelimiter implements Ratelimiter {
       1,
       key,
       Date.now().toString(),
-      this.windowMs.toString(),
+      this.window.toString(),
       this.maxRequests.toString(),
     ) as unknown
 
     if (!Array.isArray(result) || result.length !== 4) {
-      throw new IORedisRatelimiterError('Invalid response from rate limit script')
+      throw new TypeError('Invalid response from rate limit script')
     }
 
-    const [success, limit, remaining, resetAtMs] = result as [number, number, number, number]
+    const [success, limit, remaining, reset] = result as [number, number, number, number]
 
     return {
       success: success === 1,
       limit,
       remaining,
-      resetAtMs,
+      reset,
     }
   }
 
@@ -135,11 +133,11 @@ export class IORedisRatelimiter implements Ratelimiter {
     while (true) {
       const result = await this.checkLimit(key)
 
-      if (result.success || result.resetAtMs > deadlineAtMs) {
+      if (result.success || result.reset > deadlineAtMs) {
         return result
       }
 
-      await new Promise(resolve => setTimeout(resolve, result.resetAtMs - Date.now()))
+      await new Promise(resolve => setTimeout(resolve, result.reset - Date.now()))
     }
   }
 }

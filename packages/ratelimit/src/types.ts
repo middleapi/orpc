@@ -14,7 +14,7 @@ export interface RatelimiterLimitResult {
   /**
    * Unix timestamp in milliseconds when the limits are reset.
    */
-  resetAtMs?: number
+  reset?: number
 }
 
 export interface Ratelimiter {

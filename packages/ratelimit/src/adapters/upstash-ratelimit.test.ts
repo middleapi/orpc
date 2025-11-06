@@ -47,7 +47,7 @@ describe.concurrent(
       const ratelimiter = createTestingRatelimiter({
         blockingUntilReady: {
           enabled: true,
-          timeoutMs,
+          timeout: timeoutMs,
         },
       })
       const key = `test-blocking-${crypto.randomUUID()}`
