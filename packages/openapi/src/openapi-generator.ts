@@ -368,7 +368,7 @@ export class OpenAPIGenerator {
     }
 
     const resolvedParamSchema = schema.properties?.params !== undefined
-      ? resolveOpenAPIJsonSchemaRef(doc, schema.properties.params)
+      ? simplifyComposedObjectJsonSchemasAndRefs(schema.properties.params, doc)
       : undefined
 
     if (
@@ -386,7 +386,7 @@ export class OpenAPIGenerator {
     for (const from of ['params', 'query', 'headers']) {
       const fromSchema = schema.properties?.[from]
       if (fromSchema !== undefined) {
-        const resolvedSchema = resolveOpenAPIJsonSchemaRef(doc, fromSchema)
+        const resolvedSchema = simplifyComposedObjectJsonSchemasAndRefs(fromSchema, doc)
 
         if (!isObjectSchema(resolvedSchema)) {
           throw error
@@ -470,15 +470,17 @@ export class OpenAPIGenerator {
         But got: ${stringifyJSON(item)}
       `)
 
-      if (!isObjectSchema(item)) {
+      const simplifiedItem = simplifyComposedObjectJsonSchemasAndRefs(item, doc)
+
+      if (!isObjectSchema(simplifiedItem)) {
         throw error
       }
 
       let schemaStatus: number | undefined
       let schemaDescription: string | undefined
 
-      if (item.properties?.status !== undefined) {
-        const statusSchema = resolveOpenAPIJsonSchemaRef(doc, item.properties.status)
+      if (simplifiedItem.properties?.status !== undefined) {
+        const statusSchema = resolveOpenAPIJsonSchemaRef(doc, simplifiedItem.properties.status)
 
         if (typeof statusSchema !== 'object'
           || statusSchema.const === undefined
@@ -510,8 +512,8 @@ export class OpenAPIGenerator {
         description: itemDescription,
       }
 
-      if (item.properties?.headers !== undefined) {
-        const headersSchema = resolveOpenAPIJsonSchemaRef(doc, item.properties.headers)
+      if (simplifiedItem.properties?.headers !== undefined) {
+        const headersSchema = simplifyComposedObjectJsonSchemasAndRefs(simplifiedItem.properties.headers, doc)
 
         if (!isObjectSchema(headersSchema)) {
           throw error
@@ -524,15 +526,15 @@ export class OpenAPIGenerator {
             ref.responses[itemStatus].headers ??= {}
             ref.responses[itemStatus].headers[key] = {
               schema: toOpenAPISchema(headerSchema) as any,
-              required: item.required?.includes('headers') && headersSchema.required?.includes(key),
+              required: simplifiedItem.required?.includes('headers') && headersSchema.required?.includes(key),
             }
           }
         }
       }
 
-      if (item.properties?.body !== undefined) {
+      if (simplifiedItem.properties?.body !== undefined) {
         ref.responses[itemStatus].content = toOpenAPIContent(
-          applySchemaOptionality(item.required?.includes('body') ?? false, item.properties.body),
+          applySchemaOptionality(simplifiedItem.required?.includes('body') ?? false, simplifiedItem.properties.body),
         )
       }
     }
