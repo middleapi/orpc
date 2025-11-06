@@ -66,15 +66,15 @@ describe.concurrent(
     })
 
     it('should use waitUntil callback when provided', async () => {
-      const waitUntilSpy = vi.fn()
+      const waitUntil = vi.fn()
       const ratelimiter = createTestingRatelimiter({
-        waitUtil: waitUntilSpy,
+        waitUntil,
       })
       const key = `test-waituntil-${crypto.randomUUID()}`
 
       const result1 = await ratelimiter.limit(key)
-      expect(waitUntilSpy).toHaveBeenCalledTimes(1)
-      expect(waitUntilSpy).toHaveBeenCalledWith(expect.any(Promise))
+      expect(waitUntil).toHaveBeenCalledTimes(1)
+      expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise))
     })
   },
 )

@@ -22,19 +22,19 @@ export interface UpstashRatelimiterOptions {
    * })
    * ```
    */
-  waitUtil?: (promise: Promise<any>) => any
+  waitUntil?: (promise: Promise<any>) => any
 }
 
 export class UpstashRatelimiter implements Ratelimiter {
   private blockingUntilReady: UpstashRatelimiterOptions['blockingUntilReady']
-  private waitUtil: UpstashRatelimiterOptions['waitUtil']
+  private waitUntil: UpstashRatelimiterOptions['waitUntil']
 
   constructor(
     private readonly ratelimit: Ratelimit,
     options: UpstashRatelimiterOptions = {},
   ) {
     this.blockingUntilReady = options.blockingUntilReady
-    this.waitUtil = options.waitUtil
+    this.waitUntil = options.waitUntil
   }
 
   async limit(key: string): Promise<Required<RatelimiterLimitResult>> {
@@ -42,7 +42,7 @@ export class UpstashRatelimiter implements Ratelimiter {
       ? await this.ratelimit.blockUntilReady(key, this.blockingUntilReady.timeout)
       : await this.ratelimit.limit(key)
 
-    this.waitUtil?.(result.pending)
+    this.waitUntil?.(result.pending)
     return result
   }
 }

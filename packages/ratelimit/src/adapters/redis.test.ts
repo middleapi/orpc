@@ -1,6 +1,6 @@
-import type { IORedisRatelimiterOptions } from './redis'
+import type { RedisRatelimiterOptions } from './redis'
 import { Redis } from 'ioredis'
-import { IORedisRatelimiter } from './redis'
+import { RedisRatelimiter } from './redis'
 
 const REDIS_URL = process.env.REDIS_URL
 
@@ -11,8 +11,8 @@ const REDIS_URL = process.env.REDIS_URL
 describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 }, () => {
   let redis: Redis
 
-  function createTestingRatelimiter(options: Partial<IORedisRatelimiterOptions> = {}) {
-    const ratelimiter = new IORedisRatelimiter({
+  function createTestingRatelimiter(options: Partial<RedisRatelimiterOptions> = {}) {
+    const ratelimiter = new RedisRatelimiter({
       eval: redis.eval.bind(redis),
       prefix: `test:${crypto.randomUUID()}:`, // isolated from other tests
       maxRequests: 10,
@@ -192,7 +192,7 @@ describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 },
     })
 
     it('handles Redis errors gracefully', async () => {
-      const ratelimiter = new IORedisRatelimiter({
+      const ratelimiter = new RedisRatelimiter({
         eval: async () => { throw new Error('Redis error') },
         maxRequests: 10,
         window: 60000,
@@ -201,7 +201,7 @@ describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 },
     })
 
     it('handles invalid script response', async () => {
-      const ratelimiter = new IORedisRatelimiter({
+      const ratelimiter = new RedisRatelimiter({
         eval: async () => [1, 2, 3], // Invalid response, should have 4 elements
         maxRequests: 10,
         window: 60000,

@@ -47,7 +47,7 @@ else
 end
 `
 
-export interface IORedisRatelimiterOptions {
+export interface RedisRatelimiterOptions {
   eval: (script: string, numKeys: number, ...args: string[]) => Promise<unknown>
 
   /**
@@ -76,15 +76,15 @@ export interface IORedisRatelimiterOptions {
   window: number
 }
 
-export class IORedisRatelimiter implements Ratelimiter {
-  private readonly eval: IORedisRatelimiterOptions['eval']
+export class RedisRatelimiter implements Ratelimiter {
+  private readonly eval: RedisRatelimiterOptions['eval']
   private readonly prefix: string
   private readonly maxRequests: number
   private readonly window: number
-  private readonly blockingUntilReady: IORedisRatelimiterOptions['blockingUntilReady']
+  private readonly blockingUntilReady: RedisRatelimiterOptions['blockingUntilReady']
 
   constructor(
-    options: IORedisRatelimiterOptions,
+    options: RedisRatelimiterOptions,
   ) {
     this.eval = options.eval
     this.prefix = fallback(options.prefix, 'orpc:ratelimit:')
