@@ -75,8 +75,9 @@ function parseRetryAfter(retryAfter: string | string[] | undefined): number | un
   }
 
   // Try parsing as delay-seconds (integer)
+  // Ensure the entire string is a valid integer
   const delaySeconds = Number.parseInt(value, 10)
-  if (!Number.isNaN(delaySeconds) && delaySeconds >= 0) {
+  if (!Number.isNaN(delaySeconds) && delaySeconds >= 0 && String(delaySeconds) === value.trim()) {
     return delaySeconds * 1000
   }
 
@@ -88,6 +89,11 @@ function parseRetryAfter(retryAfter: string | string[] | undefined): number | un
   }
 
   return undefined
+}
+
+interface ErrorDataWithHeaders {
+  headers?: Record<string, string | string[] | undefined>
+  [key: string]: unknown
 }
 
 /**
@@ -102,12 +108,13 @@ function getRetryAfterFromError(error: unknown): number | undefined {
   }
 
   // Check if the error has response data with headers
-  const data = error.data
+  const data = error.data as unknown
   if (!data || typeof data !== 'object' || !('headers' in data)) {
     return undefined
   }
 
-  const headers = (data as any).headers
+  const errorData = data as ErrorDataWithHeaders
+  const headers = errorData.headers
   if (!headers || typeof headers !== 'object') {
     return undefined
   }

@@ -15,6 +15,28 @@ interface ORPCClientContext extends ClientRetryPluginContext {
 
 }
 
+/**
+ * Helper function to create an ORPCError with Retry-After header
+ */
+function createErrorWithRetryAfter(status: number, message: string, retryAfter: string): ORPCError<string, any> {
+  const error = new ORPCError('SERVICE_UNAVAILABLE', {
+    status,
+    message,
+  })
+  // Mock the response data with headers
+  Object.defineProperty(error, 'data', {
+    value: {
+      status,
+      headers: {
+        'retry-after': retryAfter,
+      },
+    },
+    writable: false,
+    enumerable: true,
+  })
+  return error
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
 })
@@ -561,18 +583,7 @@ describe('clientRetryPlugin', () => {
       handlerFn.mockImplementation(() => {
         callCount++
         if (callCount < 3) {
-          const error = new ORPCError('SERVICE_UNAVAILABLE', {
-            status: 503,
-            message: 'Service temporarily unavailable',
-          })
-          // Mock the response with retry-after header
-          ;(error as any).data = {
-            status: 503,
-            headers: {
-              'retry-after': '1',
-            },
-          }
-          throw error
+          throw createErrorWithRetryAfter(503, 'Service temporarily unavailable', '1')
         }
         return 'success'
       })
@@ -591,22 +602,12 @@ describe('clientRetryPlugin', () => {
 
     it('should use Retry-After header value (HTTP date)', { retry: 5 }, async () => {
       let callCount = 0
+      const retryAfterDate = new Date(Date.now() + 1000).toUTCString()
+
       handlerFn.mockImplementation(() => {
         callCount++
         if (callCount < 2) {
-          const retryAfterDate = new Date(Date.now() + 1000).toUTCString()
-          const error = new ORPCError('TOO_MANY_REQUESTS', {
-            status: 429,
-            message: 'Too many requests',
-          })
-          // Mock the response with retry-after header
-          ;(error as any).data = {
-            status: 429,
-            headers: {
-              'retry-after': retryAfterDate,
-            },
-          }
-          throw error
+          throw createErrorWithRetryAfter(429, 'Too many requests', retryAfterDate)
         }
         return 'success'
       })
@@ -642,17 +643,7 @@ describe('clientRetryPlugin', () => {
       handlerFn.mockImplementation(() => {
         callCount++
         if (callCount < 3) {
-          const error = new ORPCError('SERVICE_UNAVAILABLE', {
-            status: 503,
-            message: 'Service temporarily unavailable',
-          })
-          ;(error as any).data = {
-            status: 503,
-            headers: {
-              'retry-after': '5',
-            },
-          }
-          throw error
+          throw createErrorWithRetryAfter(503, 'Service temporarily unavailable', '5')
         }
         return 'success'
       })
@@ -710,20 +701,8 @@ describe('clientRetryPlugin', () => {
     })
 
     it('should work with retry-after and timeout together', { retry: 5 }, async () => {
-      let callCount = 0
       handlerFn.mockImplementation(() => {
-        callCount++
-        const error = new ORPCError('TOO_MANY_REQUESTS', {
-          status: 429,
-          message: 'Too many requests',
-        })
-        ;(error as any).data = {
-          status: 429,
-          headers: {
-            'retry-after': '1',
-          },
-        }
-        throw error
+        throw createErrorWithRetryAfter(429, 'Too many requests', '1')
       })
 
       const start = Date.now()
@@ -773,17 +752,7 @@ describe('clientRetryPlugin', () => {
       handlerFn.mockImplementation(async function* () {
         callCount++
         if (callCount < 3) {
-          const error = new ORPCError('SERVICE_UNAVAILABLE', {
-            status: 503,
-            message: 'Service temporarily unavailable',
-          })
-          ;(error as any).data = {
-            status: 503,
-            headers: {
-              'retry-after': '1',
-            },
-          }
-          throw error
+          throw createErrorWithRetryAfter(503, 'Service temporarily unavailable', '1')
         }
         yield 'success'
       })
