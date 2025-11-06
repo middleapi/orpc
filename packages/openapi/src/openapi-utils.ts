@@ -307,7 +307,7 @@ export function simplifyComposedObjectJsonSchemasAndRefs(schema: JSONSchema, doc
         : { allOf }
     })()
 
-    if ((!unionEntry || unionEntry.required) && (!intersectionEntry || intersectionEntry.required)) {
+    if (unionEntry?.required || intersectionEntry?.required) {
       resultObjectSchema.required.push(key)
     }
   }
