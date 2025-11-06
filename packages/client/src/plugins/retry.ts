@@ -3,7 +3,7 @@ import type { StandardLinkInterceptorOptions, StandardLinkOptions, StandardLinkP
 import type { ClientContext } from '../types'
 import { AsyncIteratorClass, isAsyncIteratorObject, overlayProxy, value } from '@orpc/shared'
 import { getEventMeta } from '@orpc/standard-server'
-import { ORPCError } from '../error'
+import { isORPCErrorStatus } from '../error'
 
 export interface ClientRetryPluginAttemptOptions<T extends ClientContext> extends StandardLinkInterceptorOptions<T> {
   lastEventRetry: number | undefined
@@ -91,37 +91,36 @@ function parseRetryAfter(retryAfter: string | string[] | undefined): number | un
   return undefined
 }
 
+/**
+ * Symbol to store retry-after value in context
+ */
+const RETRY_AFTER_SYMBOL = Symbol('retry-after')
+
 interface ErrorDataWithHeaders {
   headers?: Record<string, string | string[] | undefined>
   [key: string]: unknown
 }
 
 /**
- * Extract the Retry-After header from an error response.
+ * Extract the Retry-After header from an error response data (fallback for tests).
  *
  * @param error - The error object
  * @returns Delay in milliseconds, or undefined if not available
  */
-function getRetryAfterFromError(error: unknown): number | undefined {
-  if (!(error instanceof ORPCError)) {
-    return undefined
+function getRetryAfterFromErrorData(error: unknown): number | undefined {
+  // Check if error has response data with headers (typically from mocked responses)
+  if (error && typeof error === 'object' && 'data' in error) {
+    const data = (error as any).data as unknown
+    if (data && typeof data === 'object' && 'headers' in data) {
+      const errorData = data as ErrorDataWithHeaders
+      const headers = errorData.headers
+      if (headers && typeof headers === 'object') {
+        const retryAfter = headers['retry-after'] ?? headers['Retry-After']
+        return parseRetryAfter(retryAfter)
+      }
+    }
   }
-
-  // Check if the error has response data with headers
-  const data = error.data as unknown
-  if (!data || typeof data !== 'object' || !('headers' in data)) {
-    return undefined
-  }
-
-  const errorData = data as ErrorDataWithHeaders
-  const headers = errorData.headers
-  if (!headers || typeof headers !== 'object') {
-    return undefined
-  }
-
-  // Try different case variations of the header
-  const retryAfter = headers['retry-after'] ?? headers['Retry-After']
-  return parseRetryAfter(retryAfter)
+  return undefined
 }
 
 /**
@@ -147,6 +146,27 @@ export class ClientRetryPlugin<T extends ClientRetryPluginContext> implements St
   }
 
   init(options: StandardLinkOptions<T>): void {
+    // Add clientInterceptor to capture Retry-After header from responses
+    options.clientInterceptors ??= []
+
+    options.clientInterceptors.push(async (clientOptions) => {
+      const response = await clientOptions.next()
+
+      // If the response has an error status and Retry-After header, store it
+      if (isORPCErrorStatus(response.status)) {
+        const retryAfterHeader = response.headers['retry-after'] ?? response.headers['Retry-After']
+        if (retryAfterHeader) {
+          const retryAfter = parseRetryAfter(retryAfterHeader)
+          if (retryAfter !== undefined) {
+            // Store the retry-after value in the context using a symbol
+            (clientOptions.context as any)[RETRY_AFTER_SYMBOL] = retryAfter
+          }
+        }
+      }
+
+      return response
+    })
+
     options.interceptors ??= []
 
     options.interceptors.push(async (interceptorOptions) => {
@@ -192,8 +212,9 @@ export class ClientRetryPlugin<T extends ClientRetryPluginContext> implements St
               throw currentError.error
             }
 
-            // Extract retry-after from error response
-            const retryAfter = getRetryAfterFromError(currentError.error)
+            // Get retry-after from context (set by clientInterceptor) or from error data (fallback for tests)
+            const retryAfter = (interceptorOptions.context as any)[RETRY_AFTER_SYMBOL] as number | undefined
+              ?? getRetryAfterFromErrorData(currentError.error)
 
             const attemptOptions: ClientRetryPluginAttemptOptions<ClientRetryPluginContext> = {
               ...updatedInterceptorOptions,
