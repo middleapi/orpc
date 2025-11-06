@@ -6,13 +6,15 @@ import { ORPCError } from '@orpc/server'
 import { toArray, value } from '@orpc/shared'
 import { RATELIMIT_HANDLER_CONTEXT_SYMBOL } from './handler-plugin'
 
-export const RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL = Symbol('ORPC_RATE_LIMIT_MIDDLEWARE_CONTEXT')
+export const RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL: unique symbol = Symbol('ORPC_RATE_LIMIT_MIDDLEWARE_CONTEXT')
 
 export interface RatelimiterMiddlewareContext {
-  /**
-   * The applied limits in this request, mainly for deduplication purposes
-   */
-  limits: { limiter: Ratelimiter, key: string }[]
+  [RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL]?: {
+    /**
+     * The applied limits in this request, mainly for deduplication purposes
+     */
+    limits: { limiter: Ratelimiter, key: string }[]
+  }
 }
 
 export interface CreateRatelimitMiddlewareOptions<
@@ -53,14 +55,14 @@ export function createRatelimitMiddleware<
       value(options.key, middlewareOptions, input),
     ])
 
-    const middlewareContext: RatelimiterMiddlewareContext | undefined = middlewareOptions.context[RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL]
+    const middlewareContext: RatelimiterMiddlewareContext[typeof RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL] = middlewareOptions.context[RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL]
     if (dedupe && middlewareContext?.limits.some(l => l.key === key && l.limiter === limiter)) {
       return middlewareOptions.next()
     }
 
     const result = await limiter.limit(key)
 
-    const pluginContext: RatelimitHandlerPluginContext | undefined = middlewareOptions.context[RATELIMIT_HANDLER_CONTEXT_SYMBOL]
+    const pluginContext: Exclude<RatelimitHandlerPluginContext[typeof RATELIMIT_HANDLER_CONTEXT_SYMBOL], undefined> = middlewareOptions.context[RATELIMIT_HANDLER_CONTEXT_SYMBOL]
     if (pluginContext) {
       pluginContext.ratelimitResult = result
     }

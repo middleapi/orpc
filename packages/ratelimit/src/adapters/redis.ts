@@ -7,11 +7,11 @@ import { fallback } from '@orpc/shared'
  * This script implements atomic sliding window log rate limiting using Redis sorted sets.
  * It removes expired entries, checks the current count, and adds new requests atomically.
  *
- * @returns A tuple with [success, limit, remaining, resetAtMs] where:
+ * @returns A tuple with [success, limit, remaining, reset] where:
  * - success: 1 if request is allowed, 0 if rate limited
  * - limit: The maximum number of requests allowed
  * - remaining: Number of requests remaining in the window
- * - resetAtMs: Unix timestamp (in milliseconds) when the window resets
+ * - reset: Unix timestamp (in milliseconds) when the window resets
  */
 const SLIDING_WINDOW_LOG_LUA_SCRIPT = `
 local key = KEYS[1]

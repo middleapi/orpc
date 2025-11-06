@@ -232,7 +232,7 @@ describe('createRatelimitMiddleware', () => {
         undefined,
         { context: {} },
       )
-      expect((ctx[RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL] as RatelimiterMiddlewareContext).limits)
+      expect(ctx[RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL].limits)
         .toEqual([{ limiter: l1, key: 'k1' }, { limiter: l2, key: 'k2' }])
     })
 
