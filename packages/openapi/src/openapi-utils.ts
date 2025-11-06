@@ -196,7 +196,6 @@ export function simplifyComposedObjectJsonSchemasAndRefs(schema: JSONSchema, doc
     ...toArray(schema.anyOf?.map(s => simplifyComposedObjectJsonSchemasAndRefs(s, doc))),
     ...toArray(schema.oneOf?.map(s => simplifyComposedObjectJsonSchemasAndRefs(s, doc))),
   ]
-
   const objectUnionSchemas: ObjectSchema[] = []
   for (const u of unionSchemas) {
     if (!isObjectSchema(u)) {
@@ -219,45 +218,47 @@ export function simplifyComposedObjectJsonSchemasAndRefs(schema: JSONSchema, doc
       }
     }
   }
-
-  for (const [key, entry] of mergedUnionPropertyMap.entries()) {
+  for (const [key, entry] of mergedUnionPropertyMap) {
     if (objectUnionSchemas.every(s => s.required?.includes(key))) {
       entry.required = true
     }
   }
 
   const intersectionSchemas = toArray(schema.allOf?.map(s => simplifyComposedObjectJsonSchemasAndRefs(s, doc)))
-  const mergedInteractionPropertyMap: Map<string, { required: boolean, schemas: JSONSchema[] }> = new Map()
+  const objectIntersectionSchemas: ObjectSchema[] = []
   for (const u of intersectionSchemas) {
     if (!isObjectSchema(u)) {
       return schema
     }
 
+    objectIntersectionSchemas.push(u)
+  }
+
+  const mergedInteractionPropertyMap: Map<string, { required: boolean, schemas: JSONSchema[] }> = new Map()
+  for (const u of objectIntersectionSchemas) {
     if (u.properties) {
       for (const [key, value] of Object.entries(u.properties)) {
         let entry = mergedInteractionPropertyMap.get(key)
         if (!entry) {
-          entry = { required: false, schemas: [value] }
+          entry = { required: false, schemas: [] }
           mergedInteractionPropertyMap.set(key, entry)
         }
-        else {
-          entry.schemas.push(value)
-        }
 
-        if (u.required?.includes(key)) {
-          entry.required = true
-        }
+        entry.schemas.push(value)
       }
+    }
+  }
+  for (const [key, entry] of mergedInteractionPropertyMap) {
+    if (objectIntersectionSchemas.some(s => s.required?.includes(key))) {
+      entry.required = true
     }
   }
 
   const resultObjectSchema: { type: 'object', properties: Record<string, JSONSchema>, required: string[] } = { type: 'object', properties: {}, required: [] }
-
   const keys = new Set<string>([
     ...mergedUnionPropertyMap.keys(),
     ...mergedInteractionPropertyMap.keys(),
   ])
-
   if (keys.size === 0) {
     return schema
   }
