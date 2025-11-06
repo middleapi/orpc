@@ -558,6 +558,9 @@ importers:
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
+      '@orpc/server':
+        specifier: workspace:*
+        version: link:../server
       '@orpc/shared':
         specifier: workspace:*
         version: link:../shared

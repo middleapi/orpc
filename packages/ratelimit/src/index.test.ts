@@ -1,3 +1,3 @@
-it('exports Publisher', async () => {
-  expect(Object.keys(await import('./index'))).toContain('Publisher')
+it('exports createRatelimitMiddleware', async () => {
+  expect(Object.keys(await import('./index'))).toContain('createRatelimitMiddleware')
 })

@@ -61,6 +61,7 @@
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
+    "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
     "@orpc/standard-server": "workspace:*"
   },
