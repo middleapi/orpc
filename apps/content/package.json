@@ -18,6 +18,7 @@
     "@orpc/client": "workspace:*",
     "@orpc/contract": "workspace:*",
     "@orpc/experimental-publisher": "workspace:*",
+    "@orpc/experimental-ratelimit": "workspace:*",
     "@orpc/experimental-react-swr": "workspace:*",
     "@orpc/openapi": "workspace:*",
     "@orpc/openapi-client": "workspace:*",

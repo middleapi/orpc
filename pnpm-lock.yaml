@@ -132,6 +132,9 @@ importers:
       '@orpc/experimental-publisher':
         specifier: workspace:*
         version: link:../../packages/publisher
+      '@orpc/experimental-ratelimit':
+        specifier: workspace:*
+        version: link:../../packages/ratelimit
       '@orpc/experimental-react-swr':
         specifier: workspace:*
         version: link:../../packages/react-swr
