@@ -58,7 +58,8 @@ export class MemoryRatelimiter implements Ratelimiter {
 
     for (const [key, timestamps] of this.store) {
       // remove expired timestamps
-      timestamps.splice(0, timestamps.findIndex(timestamp => timestamp < windowStart) + 1)
+      const idx = timestamps.findIndex(timestamp => timestamp >= windowStart)
+      timestamps.splice(0, idx === -1 ? timestamps.length : idx)
 
       if (timestamps.length === 0) {
         this.store.delete(key)
@@ -73,7 +74,8 @@ export class MemoryRatelimiter implements Ratelimiter {
     let timestamps = this.store.get(key)
     if (timestamps) {
       // Remove expired timestamps
-      timestamps.splice(0, timestamps.findIndex(timestamp => timestamp < windowStart) + 1)
+      const idx = timestamps.findIndex(timestamp => timestamp >= windowStart)
+      timestamps.splice(0, idx === -1 ? timestamps.length : idx)
     }
     else {
       this.store.set(key, timestamps = [])

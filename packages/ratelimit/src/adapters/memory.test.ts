@@ -37,16 +37,21 @@ describe('memoryRatelimiter', () => {
     it('should reset after window expires', async () => {
       const ratelimiter = createTestingRatelimiter({
         window: 200,
+        maxRequests: 3.0,
       })
 
       const result1 = await ratelimiter.limit('test')
-      expect(result1.remaining).toBe(1)
+      expect(result1.remaining).toBe(2)
+      const result2 = await ratelimiter.limit('test')
+      expect(result2.remaining).toBe(1)
+      const result3 = await ratelimiter.limit('test')
+      expect(result3.remaining).toBe(0)
 
       await sleep(210)
 
-      const result2 = await ratelimiter.limit('test')
-      expect(result2.success).toBe(true)
-      expect(result2.remaining).toBe(1)
+      const result4 = await ratelimiter.limit('test')
+      expect(result4.success).toBe(true)
+      expect(result4.remaining).toBe(2)
     })
 
     it('should handle multiple keys independently', async () => {
@@ -140,19 +145,58 @@ describe('memoryRatelimiter', () => {
         window: 200,
       })
 
-      await ratelimiter.limit('test')
-
-      // @ts-expect-error accessing private property for testing
-      expect(ratelimiter.store.size).toBe(1)
-
-      // move time forward to pass window
-      await sleep(210)
-
-      // Make another limit call to different key to trigger cleanup
+      await ratelimiter.limit('test1')
       await ratelimiter.limit('test2')
 
       // @ts-expect-error accessing private property for testing
-      expect(ratelimiter.store.size).toBe(1) // Only test2 should remain
+      expect(ratelimiter.store.size).toBe(2)
+
+      await sleep(210)
+
+      // Trigger cleanup - test1 should be removed
+      await ratelimiter.limit('test2')
+
+      // @ts-expect-error accessing private property for testing
+      expect(ratelimiter.store.size).toBe(1)
+    })
+
+    it('should handle cleanup with all expired timestamps', async () => {
+      const ratelimiter = createTestingRatelimiter({
+        maxRequests: 2,
+        window: 150,
+      })
+
+      await ratelimiter.limit('test1')
+      await sleep(160)
+
+      // @ts-expect-error accessing private property for testing
+      ratelimiter.lastCleanupTime = Date.now() - 200
+
+      // Trigger cleanup - test1 has all timestamps expired (idx === -1 branch)
+      await ratelimiter.limit('test2')
+
+      // @ts-expect-error accessing private property for testing
+      expect(ratelimiter.store.has('test1')).toBe(false)
+    })
+
+    it('should handle cleanup with partially expired timestamps', async () => {
+      const ratelimiter = createTestingRatelimiter({
+        maxRequests: 3,
+        window: 150,
+      })
+
+      await ratelimiter.limit('test1')
+      await sleep(160)
+      await ratelimiter.limit('test1')
+
+      // @ts-expect-error accessing private property for testing
+      ratelimiter.lastCleanupTime = Date.now() - 200
+
+      // Trigger cleanup - test1 has partial timestamps expired (idx !== -1 branch)
+      await ratelimiter.limit('test2')
+
+      // @ts-expect-error accessing private property for testing
+      expect(ratelimiter.store.get('test1')?.length).toBe(1)
     })
   })
 })
