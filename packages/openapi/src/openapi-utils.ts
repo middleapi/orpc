@@ -212,17 +212,17 @@ export function simplifyComposedObjectJsonSchemasAndRefs(schema: JSONSchema, doc
       for (const [key, value] of Object.entries(u.properties)) {
         let entry = mergedUnionPropertyMap.get(key)
         if (!entry) {
-          entry = { required: false, schemas: [value] }
+          entry = { required: false, schemas: [] }
           mergedUnionPropertyMap.set(key, entry)
         }
-        else {
-          entry.schemas.push(value)
-        }
-
-        if (!entry.required && objectUnionSchemas.every(s => s.required?.includes(key))) {
-          entry.required = true
-        }
+        entry.schemas.push(value)
       }
+    }
+  }
+
+  for (const [key, entry] of mergedUnionPropertyMap.entries()) {
+    if (objectUnionSchemas.every(s => s.required?.includes(key))) {
+      entry.required = true
     }
   }
 
