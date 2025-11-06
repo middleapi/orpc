@@ -554,4 +554,272 @@ describe('clientRetryPlugin', () => {
       expect(cleanup).toHaveBeenCalledTimes(2)
     })
   })
+
+  describe('retry-after header', () => {
+    it('should use Retry-After header value (delay-seconds)', { retry: 5 }, async () => {
+      let callCount = 0
+      handlerFn.mockImplementation(() => {
+        callCount++
+        if (callCount < 3) {
+          const error = new ORPCError('SERVICE_UNAVAILABLE', {
+            status: 503,
+            message: 'Service temporarily unavailable',
+          })
+          // Mock the response with retry-after header
+          ;(error as any).data = {
+            status: 503,
+            headers: {
+              'retry-after': '1',
+            },
+          }
+          throw error
+        }
+        return 'success'
+      })
+
+      const start = Date.now()
+      const result = await client('hello', { context: { retry: 3 } })
+
+      expect(result).toBe('success')
+      expect(handlerFn).toHaveBeenCalledTimes(3)
+
+      // Should have waited ~2 seconds (2 retries * 1 second)
+      const elapsed = Date.now() - start
+      expect(elapsed).toBeGreaterThanOrEqual(2000)
+      expect(elapsed).toBeLessThanOrEqual(2500)
+    })
+
+    it('should use Retry-After header value (HTTP date)', { retry: 5 }, async () => {
+      let callCount = 0
+      handlerFn.mockImplementation(() => {
+        callCount++
+        if (callCount < 2) {
+          const retryAfterDate = new Date(Date.now() + 1000).toUTCString()
+          const error = new ORPCError('TOO_MANY_REQUESTS', {
+            status: 429,
+            message: 'Too many requests',
+          })
+          // Mock the response with retry-after header
+          ;(error as any).data = {
+            status: 429,
+            headers: {
+              'retry-after': retryAfterDate,
+            },
+          }
+          throw error
+        }
+        return 'success'
+      })
+
+      const start = Date.now()
+      const result = await client('hello', { context: { retry: 3 } })
+
+      expect(result).toBe('success')
+      expect(handlerFn).toHaveBeenCalledTimes(2)
+
+      // Should have waited ~1 second
+      const elapsed = Date.now() - start
+      expect(elapsed).toBeGreaterThanOrEqual(1000)
+      expect(elapsed).toBeLessThanOrEqual(1500)
+    })
+
+    it('should fallback to default delay if Retry-After is missing', { retry: 5 }, async () => {
+      handlerFn.mockRejectedValue(new Error('fail'))
+
+      const start = Date.now()
+      await expect(client('hello', { context: { retry: 2, retryDelay: 100 } })).rejects.toThrow('Internal server error')
+
+      expect(handlerFn).toHaveBeenCalledTimes(3)
+
+      // Should have used default delay of 100ms * 2 retries
+      const elapsed = Date.now() - start
+      expect(elapsed).toBeGreaterThanOrEqual(200)
+      expect(elapsed).toBeLessThanOrEqual(300)
+    })
+
+    it('should allow custom retryDelay to override retry-after', { retry: 5 }, async () => {
+      let callCount = 0
+      handlerFn.mockImplementation(() => {
+        callCount++
+        if (callCount < 3) {
+          const error = new ORPCError('SERVICE_UNAVAILABLE', {
+            status: 503,
+            message: 'Service temporarily unavailable',
+          })
+          ;(error as any).data = {
+            status: 503,
+            headers: {
+              'retry-after': '5',
+            },
+          }
+          throw error
+        }
+        return 'success'
+      })
+
+      const start = Date.now()
+      const result = await client('hello', { context: { retry: 3, retryDelay: 50 } })
+
+      expect(result).toBe('success')
+      expect(handlerFn).toHaveBeenCalledTimes(3)
+
+      // Should have used custom delay of 50ms instead of retry-after 5000ms
+      const elapsed = Date.now() - start
+      expect(elapsed).toBeGreaterThanOrEqual(100)
+      expect(elapsed).toBeLessThanOrEqual(200)
+    })
+  })
+
+  describe('retry timeout', () => {
+    it('should stop retrying after timeout is exceeded', { retry: 5 }, async () => {
+      handlerFn.mockRejectedValue(new Error('fail'))
+
+      const start = Date.now()
+      await expect(
+        client('hello', {
+          context: {
+            retry: 10,
+            retryDelay: 100,
+            retryTimeout: 250,
+          },
+        }),
+      ).rejects.toThrow('Internal server error')
+
+      const elapsed = Date.now() - start
+
+      // Should have stopped after ~250ms, allowing only 2 retries (100ms + 100ms)
+      expect(handlerFn).toHaveBeenCalledTimes(3) // initial + 2 retries
+      expect(elapsed).toBeGreaterThanOrEqual(200)
+      expect(elapsed).toBeLessThanOrEqual(350)
+    })
+
+    it('should not retry if timeout is 0', async () => {
+      handlerFn.mockRejectedValue(new Error('fail'))
+
+      await expect(
+        client('hello', {
+          context: {
+            retry: 3,
+            retryDelay: 100,
+            retryTimeout: 0,
+          },
+        }),
+      ).rejects.toThrow('Internal server error')
+
+      expect(handlerFn).toHaveBeenCalledTimes(1)
+    })
+
+    it('should work with retry-after and timeout together', { retry: 5 }, async () => {
+      let callCount = 0
+      handlerFn.mockImplementation(() => {
+        callCount++
+        const error = new ORPCError('TOO_MANY_REQUESTS', {
+          status: 429,
+          message: 'Too many requests',
+        })
+        ;(error as any).data = {
+          status: 429,
+          headers: {
+            'retry-after': '1',
+          },
+        }
+        throw error
+      })
+
+      const start = Date.now()
+      await expect(
+        client('hello', {
+          context: {
+            retry: 10,
+            retryTimeout: 2500,
+          },
+        }),
+      ).rejects.toThrow('Too many requests')
+
+      const elapsed = Date.now() - start
+
+      // Should have stopped after ~2500ms, allowing only 2 retries (1000ms + 1000ms)
+      expect(handlerFn).toHaveBeenCalledTimes(3) // initial + 2 retries
+      expect(elapsed).toBeGreaterThanOrEqual(2000)
+      expect(elapsed).toBeLessThanOrEqual(3000)
+    })
+
+    it('should not enforce timeout if retryTimeout is undefined', { retry: 5 }, async () => {
+      let callCount = 0
+      handlerFn.mockImplementation(() => {
+        callCount++
+        if (callCount < 4) {
+          throw new Error('fail')
+        }
+        return 'success'
+      })
+
+      const result = await client('hello', {
+        context: {
+          retry: 5,
+          retryDelay: 50,
+          retryTimeout: undefined,
+        },
+      })
+
+      expect(result).toBe('success')
+      expect(handlerFn).toHaveBeenCalledTimes(4)
+    })
+  })
+
+  describe('retry-after with event iterator', () => {
+    it('should use Retry-After header in event iterator', { retry: 5 }, async () => {
+      let callCount = 0
+      handlerFn.mockImplementation(async function* () {
+        callCount++
+        if (callCount < 3) {
+          const error = new ORPCError('SERVICE_UNAVAILABLE', {
+            status: 503,
+            message: 'Service temporarily unavailable',
+          })
+          ;(error as any).data = {
+            status: 503,
+            headers: {
+              'retry-after': '1',
+            },
+          }
+          throw error
+        }
+        yield 'success'
+      })
+
+      const start = Date.now()
+      const iterator = await client('hello', { context: { retry: 3 } })
+
+      const result = await iterator.next()
+      expect(result.value).toBe('success')
+      expect(handlerFn).toHaveBeenCalledTimes(3)
+
+      const elapsed = Date.now() - start
+      expect(elapsed).toBeGreaterThanOrEqual(2000)
+      expect(elapsed).toBeLessThanOrEqual(2500)
+    })
+
+    it('should respect timeout in event iterator', { retry: 5 }, async () => {
+      handlerFn.mockImplementation(async function* () {
+        throw new Error('fail')
+      })
+
+      const start = Date.now()
+      const iterator = await client('hello', {
+        context: {
+          retry: 10,
+          retryDelay: 100,
+          retryTimeout: 250,
+        },
+      })
+
+      await expect(iterator.next()).rejects.toThrow('Internal server error')
+
+      const elapsed = Date.now() - start
+      expect(handlerFn).toHaveBeenCalledTimes(3)
+      expect(elapsed).toBeGreaterThanOrEqual(200)
+      expect(elapsed).toBeLessThanOrEqual(350)
+    })
+  })
 })
