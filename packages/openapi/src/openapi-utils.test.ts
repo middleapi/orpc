@@ -752,6 +752,51 @@ describe('simplifyComposedObjectJsonSchemasAndRefs', () => {
         required: ['a', 'c'],
       })
     })
+
+    it('schema with object and composed schemas in the same level', () => {
+      expect(simplifyComposedObjectJsonSchemasAndRefs({
+        properties: {
+          a: { type: 'string' },
+          b: { type: 'string' },
+        },
+        required: ['a'],
+        anyOf: [
+          {
+            type: 'object',
+            properties: {
+              b: { type: 'number' },
+              c: { type: 'boolean' },
+            },
+            required: ['b', 'c'],
+          },
+          {
+            type: 'object',
+            properties: {
+              c: { type: 'boolean' },
+            },
+            required: ['c'],
+          },
+        ],
+        allOf: [
+          {
+            type: 'object',
+            properties: {
+              f: { type: 'string' },
+            },
+            required: ['f'],
+          },
+        ],
+      })).toEqual({
+        type: 'object',
+        properties: {
+          a: { type: 'string' },
+          b: { allOf: [{ type: 'string' }, { type: 'number' }] },
+          c: { type: 'boolean' },
+          f: { type: 'string' },
+        },
+        required: ['c', 'f', 'a'],
+      })
+    })
   })
 
   describe('with $ref', () => {

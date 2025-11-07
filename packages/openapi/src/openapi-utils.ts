@@ -248,6 +248,23 @@ export function simplifyComposedObjectJsonSchemasAndRefs(schema: JSONSchema, doc
     }
   }
 
+  // if object schema in the same level with anyOf/oneOf/allOf
+  if (schema.properties) {
+    for (const [key, value] of Object.entries(schema.properties)) {
+      let entry = mergedInteractionPropertyMap.get(key)
+      if (!entry) {
+        entry = { required: false, schemas: [] }
+        mergedInteractionPropertyMap.set(key, entry)
+      }
+
+      entry.schemas.push(value)
+
+      if (!entry.required && schema.required?.includes(key)) {
+        entry.required = true
+      }
+    }
+  }
+
   const resultObjectSchema: { type: 'object', properties: Record<string, JSONSchema>, required: string[] } = { type: 'object', properties: {}, required: [] }
   const keys = new Set<string>([
     ...mergedUnionPropertyMap.keys(),
