@@ -48,7 +48,7 @@ end
 `
 
 export interface RedisRatelimiterOptions {
-  eval: (script: string, numKeys: number, ...args: string[]) => Promise<unknown>
+  eval: (script: string, numKeys: number, ...rest: string[]) => Promise<unknown>
 
   /**
    * Block until the request may pass or timeout is reached.
@@ -111,7 +111,7 @@ export class RedisRatelimiter implements Ratelimiter {
       Date.now().toString(),
       this.window.toString(),
       this.maxRequests.toString(),
-    ) as unknown
+    )
 
     if (!Array.isArray(result) || result.length !== 4) {
       throw new TypeError('Invalid response from rate limit script')

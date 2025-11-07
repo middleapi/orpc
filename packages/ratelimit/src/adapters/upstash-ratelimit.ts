@@ -18,7 +18,7 @@ export interface UpstashRatelimiterOptions {
    * On Vercel Edge or Cloudflare workers, you might need `.bind` before assign:
    * ```ts
    * const ratelimiter = new UpstashRatelimiter(ratelimit, {
-   *   waitUtil: ctx.waitUntil.bind(ctx),
+   *   waitUntil: ctx.waitUntil.bind(ctx),
    * })
    * ```
    */

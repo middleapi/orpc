@@ -3,6 +3,7 @@
   "references": [
     { "path": "../shared" },
     { "path": "../client" },
+    { "path": "../server" },
     { "path": "../standard-server" }
   ],
   "include": ["src"],

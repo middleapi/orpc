@@ -32,7 +32,7 @@ export interface CreateRatelimitMiddlewareOptions<
    */
   key: Value<Promisable<string>, [middlewareOptions: MiddlewareOptions<TInContext, unknown, Record<never, never>, TMeta>, input: TInput]>
   /**
-   * If you ratelimit middleware is used multiple times
+   * If your ratelimit middleware is used multiple times
    * or you invoke a procedure inside another procedure (shared the same context) that also has
    * ratelimit middleware **with the same limiter and key**, this option
    * will ensure that the limit is only applied once per request.
@@ -55,14 +55,14 @@ export function createRatelimitMiddleware<
       value(options.key, middlewareOptions, input),
     ])
 
-    const middlewareContext: RatelimiterMiddlewareContext[typeof RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL] = middlewareOptions.context[RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL]
+    const middlewareContext = (middlewareOptions.context as RatelimiterMiddlewareContext)[RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL]
     if (dedupe && middlewareContext?.limits.some(l => l.key === key && l.limiter === limiter)) {
       return middlewareOptions.next()
     }
 
     const result = await limiter.limit(key)
 
-    const pluginContext: Exclude<RatelimitHandlerPluginContext[typeof RATELIMIT_HANDLER_CONTEXT_SYMBOL], undefined> = middlewareOptions.context[RATELIMIT_HANDLER_CONTEXT_SYMBOL]
+    const pluginContext = (middlewareOptions.context as RatelimitHandlerPluginContext)[RATELIMIT_HANDLER_CONTEXT_SYMBOL]
     if (pluginContext) {
       pluginContext.ratelimitResult = result
     }
@@ -80,7 +80,7 @@ export function createRatelimitMiddleware<
     return middlewareOptions.next({
       context: {
         [RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL]: {
-          ...middlewareOptions,
+          ...middlewareContext,
           limits: [
             ...toArray(middlewareContext?.limits),
             { limiter, key },

@@ -59,8 +59,8 @@ import { Redis } from 'ioredis'
 const redis = new Redis('redis://localhost:6379')
 
 const limiter = new RedisRatelimiter({
-  eval: async (script: string, numKeys: number, ...args: string[]) => {
-    return redis.eval(script, numKeys, ...args)
+  eval: async (script, numKeys, ...rest) => {
+    return redis.eval(script, numKeys, ...rest)
   },
   maxRequests: 100,
   window: 60000,
@@ -93,7 +93,7 @@ const limiter = new UpstashRatelimiter(ratelimit)
 ```
 
 ::: tip Edge Runtime Support
-For Edge runtime like Vercel Edge or Cloudflare Workers, pass the `waitUntil` function to enable background analytics:
+For Edge runtime like Vercel Edge or Cloudflare Workers, pass the `waitUntil` function to better handle background tasks:
 
 ```ts
 const limiter = new UpstashRatelimiter(ratelimit, {

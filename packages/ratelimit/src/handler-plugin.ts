@@ -4,7 +4,7 @@ import type { RatelimiterLimitResult } from './types'
 
 export const RATELIMIT_HANDLER_CONTEXT_SYMBOL: unique symbol = Symbol('ORPC_RATE_LIMIT_HANDLER_CONTEXT')
 
-export interface RatelimitHandlerPluginContext extends Context {
+export interface RatelimitHandlerPluginContext {
   [RATELIMIT_HANDLER_CONTEXT_SYMBOL]?: {
     /**
      * The result of the ratelimiter after applying limits
@@ -13,17 +13,15 @@ export interface RatelimitHandlerPluginContext extends Context {
   }
 }
 
-export class RatelimitHandlerPlugin<T extends RatelimitHandlerPluginContext> implements StandardHandlerPlugin<T> {
-  /**
-   * this plugin should lower priority than response headers plugin,
-   * if user want override rate limit headers
-   */
-  order = 100_000
-
+export class RatelimitHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
   init(options: StandardHandlerOptions<T>): void {
     options.rootInterceptors ??= []
 
-    options.rootInterceptors.push(async (interceptorOptions) => {
+    /**
+     * This plugin should set headers before "response headers" plugin or user defined interceptors
+     * In case user wants to override ratelimit headers
+     */
+    options.rootInterceptors.unshift(async (interceptorOptions) => {
       const handlerContext: Exclude<RatelimitHandlerPluginContext[typeof RATELIMIT_HANDLER_CONTEXT_SYMBOL], undefined> = {}
 
       const result = await interceptorOptions.next({
