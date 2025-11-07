@@ -231,6 +231,11 @@ export function simplifyComposedObjectJsonSchemasAndRefs(schema: JSONSchema, doc
     objectIntersectionSchemas.push(u)
   }
 
+  // if object schema in the same level with anyOf/oneOf/allOf
+  if (isObjectSchema(schema)) {
+    objectIntersectionSchemas.push(schema)
+  }
+
   const mergedInteractionPropertyMap: Map<string, { required: boolean, schemas: JSONSchema[] }> = new Map()
   for (const u of objectIntersectionSchemas) {
     if (u.properties) {
@@ -244,23 +249,6 @@ export function simplifyComposedObjectJsonSchemasAndRefs(schema: JSONSchema, doc
         }
 
         entry.schemas.push(value)
-      }
-    }
-  }
-
-  // if object schema in the same level with anyOf/oneOf/allOf
-  if (schema.properties) {
-    for (const [key, value] of Object.entries(schema.properties)) {
-      let entry = mergedInteractionPropertyMap.get(key)
-      if (!entry) {
-        entry = { required: false, schemas: [] }
-        mergedInteractionPropertyMap.set(key, entry)
-      }
-
-      entry.schemas.push(value)
-
-      if (!entry.required && schema.required?.includes(key)) {
-        entry.required = true
       }
     }
   }

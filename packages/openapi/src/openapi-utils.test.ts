@@ -755,6 +755,7 @@ describe('simplifyComposedObjectJsonSchemasAndRefs', () => {
 
     it('schema with object and composed schemas in the same level', () => {
       expect(simplifyComposedObjectJsonSchemasAndRefs({
+        type: 'object',
         properties: {
           a: { type: 'string' },
           b: { type: 'string' },
