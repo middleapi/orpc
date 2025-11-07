@@ -117,7 +117,15 @@ export class RedisRatelimiter implements Ratelimiter {
       throw new TypeError('Invalid response from rate limit script')
     }
 
-    const [success, limit, remaining, reset] = result as [number, number, number, number]
+    const numbers = result.map((item) => {
+      const num = Number(item)
+      if (!Number.isInteger(num)) {
+        throw new TypeError('Invalid response from rate limit script')
+      }
+      return num
+    })
+
+    const [success, limit, remaining, reset] = numbers as [number, number, number, number]
 
     return {
       success: success === 1,

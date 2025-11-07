@@ -208,5 +208,14 @@ describe.concurrent('ioredis ratelimiter', { skip: !REDIS_URL, timeout: 20000 },
       })
       await expect(ratelimiter.limit('some-key')).rejects.toThrow('Invalid response from rate limit script')
     })
+
+    it('handles invalid script response 2', async () => {
+      const ratelimiter = new RedisRatelimiter({
+        eval: async () => ['a', 'b', 'c', 'd'], // should be integers
+        maxRequests: 10,
+        window: 60000,
+      })
+      await expect(ratelimiter.limit('some-key')).rejects.toThrow('Invalid response from rate limit script')
+    })
   })
 })
