@@ -1,6 +1,7 @@
 import type { Context } from '@orpc/server'
 import type { StandardHandlerOptions, StandardHandlerPlugin } from '@orpc/server/standard'
 import type { RatelimiterLimitResult } from './types'
+import { COMMON_ORPC_ERROR_DEFS } from '@orpc/client'
 
 export const RATELIMIT_HANDLER_CONTEXT_SYMBOL: unique symbol = Symbol('ORPC_RATE_LIMIT_HANDLER_CONTEXT')
 
@@ -48,7 +49,7 @@ export class RatelimitHandlerPlugin<T extends Context> implements StandardHandle
               'ratelimit-limit': handlerContext.ratelimitResult.limit?.toString(),
               'ratelimit-remaining': handlerContext.ratelimitResult.remaining?.toString(),
               'ratelimit-reset': handlerContext.ratelimitResult.reset?.toString(),
-              'retry-after': !handlerContext.ratelimitResult.success && result.response.status === 429 && handlerContext.ratelimitResult.reset !== undefined
+              'retry-after': !handlerContext.ratelimitResult.success && result.response.status === COMMON_ORPC_ERROR_DEFS.TOO_MANY_REQUESTS.status && handlerContext.ratelimitResult.reset !== undefined
                 ? Math.max(0, Math.ceil((handlerContext.ratelimitResult.reset - Date.now()) / 1000)).toString()
                 : undefined,
             },
