@@ -1667,6 +1667,18 @@ describe('openAPIGenerator', () => {
         .input(schema),
       pong: oc.route({ method: 'GET' })
         .input(schema),
+      peng: oc
+        .route({ path: '/{id}', inputStructure: 'detailed', outputStructure: 'detailed' })
+        .input(z.object({
+          params: z.union([z.object({ id: z.string() }), z.object({ id: z.number() })]),
+          query: schema,
+          headers: schema,
+          body: schema,
+        }))
+        .output(z.object({
+          headers: schema,
+          body: schema,
+        })),
     }
 
     const spec = await openAPIGenerator.generate(router)
@@ -1738,6 +1750,129 @@ describe('openAPIGenerator', () => {
         },
       ],
       responses: expect.any(Object),
+    })
+
+    expect(spec.paths!['/{id}']!.post).toEqual({
+      operationId: 'peng',
+      parameters: [
+        {
+          name: 'id',
+          in: 'path',
+          required: true,
+          schema: {
+            anyOf: [
+              {
+                type: 'string',
+              },
+              {
+                type: 'number',
+              },
+            ],
+          },
+        },
+        {
+          name: 'type',
+          in: 'query',
+          required: true,
+          schema: {
+            anyOf: [
+              {
+                const: 'a',
+              },
+              {
+                const: 'b',
+              },
+            ],
+          },
+          allowEmptyValue: true,
+          allowReserved: true,
+        },
+        {
+          name: 'a',
+          in: 'query',
+          required: false,
+          schema: {
+            type: 'string',
+          },
+          allowEmptyValue: true,
+          allowReserved: true,
+        },
+        {
+          name: 'b',
+          in: 'query',
+          required: false,
+          schema: {
+            type: 'number',
+          },
+          allowEmptyValue: true,
+          allowReserved: true,
+        },
+        {
+          name: 'type',
+          in: 'header',
+          required: true,
+          schema: {
+            anyOf: [
+              {
+                const: 'a',
+              },
+              {
+                const: 'b',
+              },
+            ],
+          },
+        },
+        {
+          name: 'a',
+          in: 'header',
+          required: false,
+          schema: {
+            type: 'string',
+          },
+        },
+        {
+          name: 'b',
+          in: 'header',
+          required: false,
+          schema: {
+            type: 'number',
+          },
+        },
+      ],
+      requestBody: expect.any(Object),
+      responses: {
+        200: {
+          description: 'OK',
+          headers: {
+            type: {
+              schema: {
+                anyOf: [
+                  {
+                    const: 'a',
+                  },
+                  {
+                    const: 'b',
+                  },
+                ],
+              },
+              required: true,
+            },
+            a: {
+              schema: {
+                type: 'string',
+              },
+              required: false,
+            },
+            b: {
+              schema: {
+                type: 'number',
+              },
+              required: false,
+            },
+          },
+          content: expect.any(Object),
+        },
+      },
     })
   })
 })
