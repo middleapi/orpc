@@ -193,7 +193,7 @@ describe('clientRetryPlugin', () => {
     expect(handlerFn).toHaveBeenCalledTimes(0)
   })
 
-  it('should stop retry when timeout is exceeded', { retry: 5 }, async () => {
+  it('should stop retry when timeout is exceeded', async () => {
     handlerFn.mockRejectedValue(new Error('fail'))
 
     const start = Date.now()
@@ -208,7 +208,7 @@ describe('clientRetryPlugin', () => {
     expect(handlerFn).toHaveBeenCalledTimes(4)
   })
 
-  it('should not apply timeout when not configured', { retry: 5 }, async () => {
+  it('should not apply timeout when not configured', async () => {
     handlerFn.mockRejectedValue(new Error('fail'))
 
     const start = Date.now()
@@ -587,7 +587,7 @@ describe('clientRetryPlugin', () => {
       expect(cleanup).toHaveBeenCalledTimes(2)
     })
 
-    it('should stop retry when timeout is exceeded', { retry: 5 }, async () => {
+    it('should stop retry when timeout is exceeded', async () => {
       handlerFn.mockImplementation(async function* () {
         throw new Error('fail')
       })
@@ -606,7 +606,7 @@ describe('clientRetryPlugin', () => {
       expect(handlerFn).toHaveBeenCalledTimes(4)
     })
 
-    it('should not apply timeout when not configured', { retry: 5 }, async () => {
+    it('should not apply timeout when not configured', async () => {
       handlerFn.mockImplementation(async function* () {
         throw new Error('fail')
       })

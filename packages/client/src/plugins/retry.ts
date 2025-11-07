@@ -97,7 +97,7 @@ export class ClientRetryPlugin<T extends ClientRetryPluginContext> implements St
       let lastEventRetry: undefined | number
       let callback: void | ((isSuccess: boolean) => void)
       let attemptIndex = 0
-      const startTime = timeout !== undefined ? Date.now() : undefined
+      const startTime = Date.now()
 
       const next = async (initialError?: { error: unknown }) => {
         let currentError = initialError
@@ -110,7 +110,7 @@ export class ClientRetryPlugin<T extends ClientRetryPluginContext> implements St
               throw currentError.error
             }
 
-            if (startTime !== undefined && Date.now() - startTime >= timeout!) {
+            if (timeout !== undefined && Date.now() - startTime >= timeout) {
               throw currentError.error
             }
 
