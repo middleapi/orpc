@@ -17,6 +17,13 @@ export interface RatelimiterMiddlewareContext {
   }
 }
 
+/**
+ * Options for creating a rate limit middleware.
+ *
+ * @template TInContext - The input context type
+ * @template TInput - The input type
+ * @template TMeta - The metadata type
+ */
 export interface CreateRatelimitMiddlewareOptions<
   TInContext extends Context,
   TInput,

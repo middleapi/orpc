@@ -13,6 +13,17 @@ export interface RatelimitHandlerPluginContext {
   }
 }
 
+/**
+ * Handler plugin that automatically adds rate limit headers to responses.
+ *
+ * This plugin intercepts all requests and adds the following headers based on the rate limit result:
+ * - `ratelimit-limit`: Maximum number of requests allowed within a window
+ * - `ratelimit-remaining`: Number of requests remaining in the current window
+ * - `ratelimit-reset`: Unix timestamp (ms) when the rate limit resets
+ * - `retry-after`: Seconds to wait before retrying (only for 429 responses)
+ *
+ * The plugin must be used in conjunction with the ratelimit middleware to function properly.
+ */
 export class RatelimitHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
   init(options: StandardHandlerOptions<T>): void {
     options.rootInterceptors ??= []
