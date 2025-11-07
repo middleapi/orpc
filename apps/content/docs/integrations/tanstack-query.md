@@ -204,7 +204,7 @@ const planet = await orpc.planet.find.call({ id: 123 })
 
 ## Reactive Options
 
-In reactive libraries like Vue or Solid, **TanStack Query** supports passing computed values as options. The exact usage varies by framework, so refer to the [Tanstack Query documentation](https://tanstack.com/query/latest/docs/guides/reactive-options) for details.
+In reactive libraries like Vue or Solid, **TanStack Query** supports passing computed values as options. The exact usage varies by framework, so refer to the documentation for [Vue](https://tanstack.com/query/latest/docs/framework/vue/reactivity) or [Solid](https://tanstack.com/query/latest/docs/framework/solid/reference/useQuery#reactive-options) for details.
 
 ::: code-group
 

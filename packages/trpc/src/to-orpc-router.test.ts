@@ -1,4 +1,4 @@
-import { call, createRouterClient, getEventMeta, isLazy, isProcedure, ORPCError, unlazy } from '@orpc/server'
+import { call, createRouterClient, getEventMeta, isLazy, isProcedure, ORPCError, Procedure, unlazy } from '@orpc/server'
 import { isAsyncIteratorObject } from '@orpc/shared'
 import { tracked, TRPCError } from '@trpc/server'
 import * as z from 'zod'
@@ -31,15 +31,22 @@ describe('toORPCRouter', async () => {
     expect(await unlazy(orpcRouter.lazy.lazy.throw)).toEqual({ default: expect.toSatisfy(isProcedure) })
   })
 
-  it('with disabled input/output', async () => {
+  it('with input/output schema and validation happen inside handler only', async () => {
     expect((orpcRouter as any).ping['~orpc'].inputSchema['~standard'].vendor).toBe('zod')
     expect((orpcRouter as any).ping['~orpc'].inputSchema._def).toBe(inputSchema._def)
+    expect((orpcRouter as any).ping['~orpc'].inputValidationIndex).toBe(Number.NaN) // input validation is disabled
+
     expect((orpcRouter as any).ping['~orpc'].outputSchema['~standard'].vendor).toBe('zod')
     expect((orpcRouter as any).ping['~orpc'].outputSchema._def).toBe(outputSchema._def)
+    expect((orpcRouter as any).ping['~orpc'].outputValidationIndex).toBe(Number.NaN) // output validation is disabled
 
-    const invalidValue = 'INVALID'
-    expect((orpcRouter as any).ping['~orpc'].inputSchema['~standard'].validate(invalidValue)).toEqual({ value: invalidValue })
-    expect((orpcRouter as any).ping['~orpc'].outputSchema['~standard'].validate(invalidValue)).toEqual({ value: invalidValue })
+    const withoutHandlerProcedure = new Procedure({
+      ...(orpcRouter as any).ping['~orpc'],
+      handler: async ({ input }) => input,
+    })
+
+    await expect(call(withoutHandlerProcedure, 'invalid')).resolves.toEqual('invalid') // validation not happen at oRPC level
+    await expect(call((orpcRouter as any).ping, 'invalid')).rejects.toThrow('Invalid input') // validation happen at tRPC level
   })
 
   it('meta/route', async () => {

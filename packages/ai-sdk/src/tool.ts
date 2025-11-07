@@ -1,9 +1,9 @@
 import type { ClientOptions } from '@orpc/client'
 import type { AnySchema, ContractProcedure, ErrorMap, InferSchemaInput, InferSchemaOutput, Meta, Schema } from '@orpc/contract'
-import type { Context, CreateProcedureClientOptions, Procedure } from '@orpc/server'
+import type { Context, CreateProcedureClientOptions } from '@orpc/server'
 import type { MaybeOptionalOptions, SetOptional } from '@orpc/shared'
 import type { Tool } from 'ai'
-import { call } from '@orpc/server'
+import { call, Procedure } from '@orpc/server'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
 import { tool } from 'ai'
 
@@ -88,8 +88,6 @@ export function implementTool<TOutInput, TInOutput>(
  * by leveraging existing procedure definitions.
  *
  * @warning Requires a contract with an `input` schema defined.
- * @warning Validation occurs twice (once for the tool, once for the procedure call).
- * So validation may fail if inputSchema or outputSchema transform the data into different shapes.
  *
  * @example
  * ```ts
@@ -147,9 +145,19 @@ export function createTool<
   const options = resolveMaybeOptionalOptions(rest)
 
   return implementTool(procedure, {
-    execute: (input: InferSchemaOutput<TInputSchema>) => {
-      return call(procedure, input as InferSchemaInput<TInputSchema>, options)
-    },
+    execute: ((input, callingOptions) => {
+      const disabledValidation = new Procedure({
+        ...procedure['~orpc'],
+        inputValidationIndex: Number.NaN, // disable input validation
+        outputValidationIndex: Number.NaN, // disable output validation
+      })
+
+      return call(
+        disabledValidation,
+        input as InferSchemaInput<TInputSchema>,
+        { signal: callingOptions.abortSignal, ...options },
+      ) as Promise<InferSchemaInput<TOutputSchema>>
+    }) satisfies (Tool<InferSchemaOutput<TInputSchema>, InferSchemaInput<TOutputSchema>>['execute']),
     ...options,
   } as any)
 }

@@ -652,3 +652,21 @@ it('has helper `output` in meta', async () => {
 
   expect(preMid1).toReturnWith(Promise.resolve({ output: { val: '99990' }, context: {} }))
 })
+
+it('support disable input/output validation by setting validation index to NaN', async () => {
+  const procedure = new Procedure({
+    inputSchema: schema,
+    outputSchema: schema,
+    errorMap: {},
+    route: {},
+    meta: {},
+    handler: ({ input }) => input,
+    middlewares: [],
+    inputValidationIndex: Number.NaN,
+    outputValidationIndex: Number.NaN,
+  })
+
+  const client = createProcedureClient(procedure)
+
+  await expect(client('invalid' as any)).resolves.toEqual('invalid')
+})

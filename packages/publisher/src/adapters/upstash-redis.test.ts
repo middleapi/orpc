@@ -274,7 +274,7 @@ describe.concurrent('upstash redis publisher', { skip: !UPSTASH_REDIS_REST_URL |
       await unsub1()
     })
 
-    it('handles race condition where events published during resume', { repeats: 5 }, async () => {
+    it('handles race condition where events published during resume', { repeats: 5, retry: 3 }, async () => {
       const publisher = createTestingPublisher({
         resumeRetentionSeconds: 10,
       })

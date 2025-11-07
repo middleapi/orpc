@@ -160,6 +160,7 @@ const getWeatherTool = implementTool(getWeatherContract, {
     location,
     temperature: 72 + Math.floor(Math.random() * 21) - 10,
   }),
+  // ...add any additional configuration or overrides here
 })
 ```
 
@@ -210,13 +211,10 @@ const getWeatherProcedure = base
 
 const getWeatherTool = createTool(getWeatherProcedure, {
   context: {}, // provide initial context if needed
+  // ...add any additional configuration or overrides here
 })
 ```
 
 ::: warning
 The `createTool` helper requires a procedure with an `input` schema defined
-:::
-
-::: warning
-Validation occurs twice (once for the tool, once for the procedure call). So validation may fail if `inputSchema` or `outputSchema` transform the data into different shapes.
 :::

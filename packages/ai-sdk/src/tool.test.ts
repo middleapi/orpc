@@ -71,6 +71,7 @@ describe('implementTool', () => {
 })
 
 describe('createTool', () => {
+  const abortSignal = (new AbortController()).signal
   const base = os.$meta<AiSdkToolMeta>({})
 
   const inputSchema = z.object({
@@ -80,7 +81,7 @@ describe('createTool', () => {
     greeting: z.string().describe('Greeting message'),
   })
 
-  it('can create a tool', () => {
+  it('can create a tool', async () => {
     const handler = vi.fn(async ({ input }) => {
       return {
         greeting: `Hello, ${input.name}!`,
@@ -103,13 +104,27 @@ describe('createTool', () => {
     expect(tool.outputSchema).toBe(outputSchema)
     expect(tool.description).toBe('Greet a person')
 
-    return expect(
-      (tool as any).execute({ name: 'Alice' }),
-    ).resolves.toEqual({ greeting: 'Hello, Alice!' })
+    await expect((tool as any).execute({ name: 'Alice' }, { abortSignal })).resolves.toEqual({ greeting: 'Hello, Alice!' })
 
     expect(handler).toHaveBeenCalledWith(expect.objectContaining({
+      signal: abortSignal,
       input: { name: 'Alice' },
       context: { authToken: 'auth-token' },
     }))
+  })
+
+  it('disable validation at oRPC level to avoid twice times validation', async () => {
+    const procedure
+      = base
+        .route({
+          summary: 'Greet a person',
+        })
+        .input(inputSchema)
+        .output(outputSchema)
+        .handler(({ input }) => input as any)
+
+    const tool = createTool(procedure)
+
+    await expect(tool.execute?.('invalid' as any, { abortSignal } as any)).resolves.toEqual('invalid')
   })
 })
