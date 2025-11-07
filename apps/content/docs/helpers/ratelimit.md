@@ -146,7 +146,7 @@ if (!result.success) {
 
 ## `createRatelimitMiddleware`
 
-The `createRatelimitMiddleware` helper simplifies rate limiting in oRPC procedures.
+The `createRatelimitMiddleware` helper creates middleware for oRPC procedures to enforce rate limits.
 
 ```ts twoslash
 import { call, os } from '@orpc/server'
@@ -212,7 +212,7 @@ const result = await call(
 
 ## Handler Plugin
 
-The `RatelimitHandlerPlugin` automatically adds rate limit headers (`RateLimit-*` and `Retry-After`) to HTTP responses when using middleware created with `createRatelimitMiddleware`.
+The `RatelimitHandlerPlugin` automatically adds HTTP rate-limiting headers (`RateLimit-*` and `Retry-After`) to responses when used with middleware created by [`createRatelimitMiddleware`](#createratelimitmiddleware).
 
 ```ts
 import { RatelimitHandlerPlugin } from '@orpc/experimental-ratelimit'

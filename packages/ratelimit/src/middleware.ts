@@ -42,6 +42,12 @@ export interface CreateRatelimitMiddlewareOptions<
   dedupe?: boolean
 }
 
+/**
+ * Creates a middleware that enforces rate limits in oRPC procedures.
+ * Supports per-request deduplication and integrates with the ratelimit handler plugin.
+ *
+ * @see {@link https://orpc.unnoq.com/docs/helpers/ratelimit#createratelimitmiddleware Ratelimit middleware}
+ */
 export function createRatelimitMiddleware<
   TInContext extends Context,
   TInput = unknown,
