@@ -110,7 +110,7 @@ export class ClientRetryPlugin<T extends ClientRetryPluginContext> implements St
               throw currentError.error
             }
 
-            if (startTime !== undefined && timeout !== undefined && Date.now() - startTime >= timeout) {
+            if (startTime !== undefined && Date.now() - startTime >= timeout!) {
               throw currentError.error
             }
 
