@@ -5,7 +5,7 @@ description: A plugin for oRPC that automatically retries requests based on serv
 
 # Retry After Plugin
 
-The **Retry After Plugin** automatically retries requests requests based on server `Retry-After` headers. This is particularly useful for handling rate limiting and temporary server unavailability.
+The **Retry After Plugin** automatically retries requests based on server `Retry-After` headers. This is particularly useful for handling rate limiting and temporary server unavailability.
 
 ## Usage
 
