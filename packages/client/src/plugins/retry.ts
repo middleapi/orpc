@@ -37,6 +37,14 @@ export interface ClientRetryPluginContext {
    * The hook called when retrying, and return the unsubscribe function.
    */
   onRetry?: (options: ClientRetryPluginAttemptOptions<ClientRetryPluginContext>) => void | ((isSuccess: boolean) => void)
+
+  /**
+   * Maximum time in milliseconds for all retry attempts.
+   * If the total time exceeds this timeout, retries will stop.
+   *
+   * @default undefined (no timeout)
+   */
+  timeout?: number
 }
 
 export class ClientRetryPluginInvalidEventIteratorRetryResponse extends Error { }
@@ -55,6 +63,7 @@ export class ClientRetryPlugin<T extends ClientRetryPluginContext> implements St
   private readonly defaultRetryDelay: Exclude<ClientRetryPluginContext['retryDelay'], undefined>
   private readonly defaultShouldRetry: Exclude<ClientRetryPluginContext['shouldRetry'], undefined>
   private readonly defaultOnRetry: ClientRetryPluginContext['onRetry']
+  private readonly defaultTimeout: ClientRetryPluginContext['timeout']
 
   order = 1_800_000
 
@@ -63,6 +72,7 @@ export class ClientRetryPlugin<T extends ClientRetryPluginContext> implements St
     this.defaultRetryDelay = options.default?.retryDelay ?? (o => o.lastEventRetry ?? 2000)
     this.defaultShouldRetry = options.default?.shouldRetry ?? true
     this.defaultOnRetry = options.default?.onRetry
+    this.defaultTimeout = options.default?.timeout
   }
 
   init(options: StandardLinkOptions<T>): void {
@@ -77,6 +87,7 @@ export class ClientRetryPlugin<T extends ClientRetryPluginContext> implements St
       const retryDelay = interceptorOptions.context.retryDelay ?? this.defaultRetryDelay
       const shouldRetry = interceptorOptions.context.shouldRetry ?? this.defaultShouldRetry
       const onRetry = interceptorOptions.context.onRetry ?? this.defaultOnRetry
+      const timeout = interceptorOptions.context.timeout ?? this.defaultTimeout
 
       if (maxAttempts <= 0) {
         return interceptorOptions.next()
@@ -86,6 +97,7 @@ export class ClientRetryPlugin<T extends ClientRetryPluginContext> implements St
       let lastEventRetry: undefined | number
       let callback: void | ((isSuccess: boolean) => void)
       let attemptIndex = 0
+      const startTime = timeout !== undefined ? Date.now() : undefined
 
       const next = async (initialError?: { error: unknown }) => {
         let currentError = initialError
@@ -95,6 +107,10 @@ export class ClientRetryPlugin<T extends ClientRetryPluginContext> implements St
 
           if (currentError) {
             if (attemptIndex >= maxAttempts) {
+              throw currentError.error
+            }
+
+            if (startTime !== undefined && timeout !== undefined && Date.now() - startTime >= timeout) {
               throw currentError.error
             }
 

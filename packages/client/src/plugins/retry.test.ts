@@ -193,6 +193,39 @@ describe('clientRetryPlugin', () => {
     expect(handlerFn).toHaveBeenCalledTimes(0)
   })
 
+  it('should stop retry when timeout is exceeded', { retry: 5 }, async () => {
+    handlerFn.mockRejectedValue(new Error('fail'))
+
+    const start = Date.now()
+    await expect(client('hello', { context: { retry: 10, retryDelay: 50, timeout: 120 } })).rejects.toThrow('Internal server error')
+
+    const elapsed = Date.now() - start
+    expect(elapsed).toBeGreaterThanOrEqual(100)
+    expect(elapsed).toBeLessThanOrEqual(170)
+
+    // Should have attempted 1 initial + 3 retries with delays (50ms + 50ms + 50ms = 150ms)
+    // After the 3rd retry completes, the timeout check prevents further retries
+    expect(handlerFn).toHaveBeenCalledTimes(4)
+  })
+
+  it('should not apply timeout when not configured', { retry: 5 }, async () => {
+    handlerFn.mockRejectedValue(new Error('fail'))
+
+    const start = Date.now()
+    await expect(client('hello', { context: { retry: 4, retryDelay: 50 } })).rejects.toThrow('Internal server error')
+
+    expect(Date.now() - start).toBeGreaterThanOrEqual(200)
+    expect(handlerFn).toHaveBeenCalledTimes(5)
+  })
+
+  it('should allow timeout of 0 to prevent any retry', async () => {
+    handlerFn.mockRejectedValue(new Error('fail'))
+
+    await expect(client('hello', { context: { retry: 3, retryDelay: 0, timeout: 0 } })).rejects.toThrow('Internal server error')
+
+    expect(handlerFn).toHaveBeenCalledTimes(1)
+  })
+
   describe('event iterator', () => {
     it('should not retry by default', async () => {
       handlerFn.mockImplementation(async function* () {
@@ -552,6 +585,51 @@ describe('clientRetryPlugin', () => {
       await iterator.return()
       await promise
       expect(cleanup).toHaveBeenCalledTimes(2)
+    })
+
+    it('should stop retry when timeout is exceeded', { retry: 5 }, async () => {
+      handlerFn.mockImplementation(async function* () {
+        throw new Error('fail')
+      })
+
+      const start = Date.now()
+      const iterator = await client('hello', { context: { retry: 10, retryDelay: 50, timeout: 120 } })
+
+      await expect(iterator.next()).rejects.toThrow('Internal server error')
+
+      const elapsed = Date.now() - start
+      expect(elapsed).toBeGreaterThanOrEqual(100)
+      expect(elapsed).toBeLessThanOrEqual(170)
+
+      // Should have attempted 1 initial + 3 retries with delays (50ms + 50ms + 50ms = 150ms)
+      // After the 3rd retry completes, the timeout check prevents further retries
+      expect(handlerFn).toHaveBeenCalledTimes(4)
+    })
+
+    it('should not apply timeout when not configured', { retry: 5 }, async () => {
+      handlerFn.mockImplementation(async function* () {
+        throw new Error('fail')
+      })
+
+      const start = Date.now()
+      const iterator = await client('hello', { context: { retry: 4, retryDelay: 50 } })
+
+      await expect(iterator.next()).rejects.toThrow('Internal server error')
+
+      expect(Date.now() - start).toBeGreaterThanOrEqual(200)
+      expect(handlerFn).toHaveBeenCalledTimes(5)
+    })
+
+    it('should allow timeout of 0 to prevent any retry', async () => {
+      handlerFn.mockImplementation(async function* () {
+        throw new Error('fail')
+      })
+
+      const iterator = await client('hello', { context: { retry: 3, retryDelay: 0, timeout: 0 } })
+
+      await expect(iterator.next()).rejects.toThrow('Internal server error')
+
+      expect(handlerFn).toHaveBeenCalledTimes(1)
     })
   })
 })
