@@ -120,6 +120,34 @@ describe('ratelimitHandlerPlugin', () => {
     expect(result.response.headers['retry-after']).toBeUndefined()
   })
 
+  it('clamps retry-after to 0 when reset is in the past', async () => {
+    const resetTime = Date.now() - 5000 // 5 seconds ago
+
+    const options: any = { rootInterceptors: [] }
+    new RatelimitHandlerPlugin().init(options)
+
+    options.rootInterceptors.push(async ({ context }: any) => {
+      context[RATELIMIT_HANDLER_CONTEXT_SYMBOL].ratelimitResult = {
+        success: false,
+        reset: resetTime,
+      }
+
+      return {
+        matched: true as const,
+        response: { status: 429, headers: {}, body: 'too many requests' },
+      }
+    })
+
+    const handler = new StandardHandler({}, new StandardRPCMatcher(), {} as any, options)
+    const result = await handler.handle(createMockRequest('https://example.com/ping'), { context: {} })
+
+    if (!result.matched) {
+      throw new Error('request should match')
+    }
+
+    expect(result.response.headers['retry-after']).toBe('0')
+  })
+
   it('does not add headers when ratelimitResult is undefined', async () => {
     const options: any = { rootInterceptors: [] }
     new RatelimitHandlerPlugin().init(options)

@@ -49,7 +49,7 @@ export class RatelimitHandlerPlugin<T extends Context> implements StandardHandle
               'ratelimit-remaining': handlerContext.ratelimitResult.remaining?.toString(),
               'ratelimit-reset': handlerContext.ratelimitResult.reset?.toString(),
               'retry-after': !handlerContext.ratelimitResult.success && result.response.status === 429 && handlerContext.ratelimitResult.reset !== undefined
-                ? Math.ceil((handlerContext.ratelimitResult.reset - Date.now()) / 1000).toString()
+                ? Math.max(0, Math.ceil((handlerContext.ratelimitResult.reset - Date.now()) / 1000)).toString()
                 : undefined,
             },
           },
