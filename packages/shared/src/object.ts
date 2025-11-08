@@ -76,7 +76,7 @@ export function clone<T>(value: T): T {
   return value
 }
 
-export function get(object: unknown, path: readonly string[]): unknown {
+export function get(object: unknown, path: readonly PropertyKey[]): unknown {
   let current: unknown = object
 
   for (const key of path) {

@@ -1,0 +1,172 @@
+import type { Context } from '@orpc/server'
+import type { StandardHandlerInterceptorOptions, StandardHandlerOptions, StandardHandlerPlugin } from '@orpc/server/standard'
+import type { Bindings, Logger } from 'pino'
+import type { LoggerContext } from './context'
+import { mapEventIterator } from '@orpc/client'
+import { isAsyncIteratorObject, overlayProxy } from '@orpc/shared'
+import pino from 'pino'
+import { CONTEXT_LOGGER_SYMBOL, getLogger } from './context'
+
+export interface LoggingHandlerPluginOptions<T extends Context> {
+  /**
+   * Logger instance to use for logging.
+   *
+   * @default pino()
+   */
+  logger?: Logger
+
+  /**
+   * Function to generate a unique ID for each request.
+   *
+   * @default () => crypto.randomUUID()
+   */
+  generateId?: (logger: Logger, options: StandardHandlerInterceptorOptions<T>) => string
+
+  /**
+   * Enables info-level lifecycle logging for each request.
+   *
+   * @example
+   * - request received
+   * - request handled
+   *
+   * @default undefined (disabled)
+   */
+  logRequestLifecycle?: boolean
+
+  /**
+   * Enables logging when requests are aborted.
+   *
+   * @example
+   * - request is aborted (reason)
+   *
+   * @remarks If a signal is used for multiple requests, this may lead to un-efficient memory usage (listeners never removed).
+   *
+   * @default undefined (disabled)
+   */
+  logAbort?: boolean
+}
+
+export class LoggingHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
+  private readonly logger: Exclude<LoggingHandlerPluginOptions<T>['logger'], undefined>
+  private readonly generateId: Exclude<LoggingHandlerPluginOptions<T>['generateId'], undefined>
+  private readonly logRequestLifecycle: LoggingHandlerPluginOptions<T>['logRequestLifecycle']
+  private readonly logAbort: LoggingHandlerPluginOptions<T>['logAbort']
+
+  constructor(
+    options: LoggingHandlerPluginOptions<T> = {},
+  ) {
+    this.logger = options.logger ?? pino()
+    this.generateId = options.generateId ?? (() => crypto.randomUUID())
+    this.logRequestLifecycle = options.logRequestLifecycle
+    this.logAbort = options.logAbort
+  }
+
+  init(options: StandardHandlerOptions<T>): void {
+    options.rootInterceptors ??= []
+    options.interceptors ??= []
+    options.clientInterceptors ??= []
+
+    options.rootInterceptors.unshift(async (interceptorOptions) => {
+      const logger = ((interceptorOptions.context as LoggerContext)[CONTEXT_LOGGER_SYMBOL] ?? this.logger).child({})
+
+      const currentBindings = logger.bindings()
+      const extraBindings: Bindings = {
+        orpc: { ...currentBindings.orpc, id: this.generateId(logger, interceptorOptions) },
+      }
+
+      /**
+       * pino-http might have already set req info in bindings
+       */
+      if (!currentBindings.req) {
+        extraBindings.req = { url: interceptorOptions.request.url, method: interceptorOptions.request.method }
+      }
+
+      logger.setBindings(extraBindings)
+
+      try {
+        return await interceptorOptions.next({
+          ...interceptorOptions,
+          context: {
+            ...interceptorOptions.context,
+            [CONTEXT_LOGGER_SYMBOL]: logger,
+          },
+        })
+      }
+      catch (error) {
+        /**
+         * Any error here is internal (interceptor/framework), not business logic.
+         * Indicates unexpected handler failure.
+         */
+        this.logger.error(error)
+        throw error
+      }
+    })
+
+    options.interceptors.unshift(async ({ next, context, request }) => {
+      const logger = getLogger(context)
+
+      if (this.logAbort) {
+        request.signal?.addEventListener('abort', () => {
+          logger?.info(`request is aborted (${String(request.signal?.reason)})`)
+        }, { once: true })
+      }
+
+      try {
+        if (this.logRequestLifecycle) {
+          logger?.info('request received')
+        }
+
+        const result = await next()
+
+        if (this.logRequestLifecycle) {
+          logger?.info(result.matched ? 'request handled' : 'no matching procedure found')
+        }
+
+        return result
+      }
+      catch (error) {
+        /**
+         * DON'T treat aborted signal as error if happen during business logic
+         */
+        if (request.signal?.aborted && request.signal.reason === error) {
+          logger?.info(error)
+        }
+        else {
+          logger?.error(error)
+        }
+        throw error
+      }
+    })
+
+    options.clientInterceptors.unshift(async ({ next, path, context, signal }) => {
+      const logger = getLogger(context)
+      logger?.setBindings({ orpc: { ...logger.bindings().orpc, path } })
+
+      const output = await next()
+
+      if (isAsyncIteratorObject(output)) {
+        return overlayProxy(output, mapEventIterator(
+          output,
+          {
+            value: v => v,
+            error: async (error) => {
+              /**
+               * DON'T treat aborted signal as error if happen during business logic,
+               * Because this is streaming response, so the error can't catch by `interceptors` above.
+               */
+              if (signal?.aborted && signal.reason === error) {
+                logger?.info(error)
+              }
+              else {
+                logger?.error(error)
+              }
+              return error
+            },
+          },
+        ))
+      }
+
+      return output
+    })
+  }
+}

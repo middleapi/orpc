@@ -153,6 +153,7 @@ export default withMermaid(defineConfig({
             { text: 'Body Limit', link: '/docs/plugins/body-limit' },
             { text: 'Simple CSRF Protection', link: '/docs/plugins/simple-csrf-protection' },
             { text: 'Strict GET method', link: '/docs/plugins/strict-get-method' },
+            { text: 'Logging', link: '/docs/integrations/pino' },
           ],
         },
         {
@@ -190,6 +191,7 @@ export default withMermaid(defineConfig({
             { text: 'Hey API', link: '/docs/integrations/hey-api' },
             { text: 'OpenTelemetry', link: '/docs/integrations/opentelemetry' },
             { text: 'Pinia Colada', link: '/docs/integrations/pinia-colada' },
+            { text: 'Pino', link: '/docs/integrations/pino' },
             { text: 'React SWR', link: '/docs/integrations/react-swr' },
             { text: 'Sentry', link: '/docs/integrations/sentry' },
             { text: 'Tanstack Query', link: '/docs/integrations/tanstack-query' },
