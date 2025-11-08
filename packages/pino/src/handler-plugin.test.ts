@@ -302,11 +302,15 @@ describe('loggingHandlerPlugin', () => {
 
       // Check that child logger was created
       expect(globalSpies.child).toHaveBeenCalled()
+      expect(globalSpies.child).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orpc: expect.objectContaining({ id: 'test-id' }),
+        }),
+      )
 
       // Verify id and req were set
       expect(globalSpies.setBindings).toHaveBeenCalledWith(
         expect.objectContaining({
-          orpc: expect.objectContaining({ id: 'test-id' }),
           req: { url: request.url, method: 'GET' },
         }),
       )
