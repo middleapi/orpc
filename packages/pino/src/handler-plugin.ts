@@ -1,6 +1,6 @@
 import type { Context } from '@orpc/server'
 import type { StandardHandlerInterceptorOptions, StandardHandlerOptions, StandardHandlerPlugin } from '@orpc/server/standard'
-import type { Bindings, Logger } from 'pino'
+import type { Logger } from 'pino'
 import type { LoggerContext } from './context'
 import { mapEventIterator } from '@orpc/client'
 import { isAsyncIteratorObject, overlayProxy } from '@orpc/shared'
@@ -20,7 +20,7 @@ export interface LoggingHandlerPluginOptions<T extends Context> {
    *
    * @default () => crypto.randomUUID()
    */
-  generateId?: (logger: Logger, options: StandardHandlerInterceptorOptions<T>) => string
+  generateId?: (options: StandardHandlerInterceptorOptions<T>) => string
 
   /**
    * Enables info-level lifecycle logging for each request.
@@ -67,21 +67,20 @@ export class LoggingHandlerPlugin<T extends Context> implements StandardHandlerP
     options.clientInterceptors ??= []
 
     options.rootInterceptors.unshift(async (interceptorOptions) => {
-      const logger = ((interceptorOptions.context as LoggerContext)[CONTEXT_LOGGER_SYMBOL] ?? this.logger).child({})
-
-      const currentBindings = logger.bindings()
-      const extraBindings: Bindings = {
-        orpc: { ...currentBindings.orpc, id: this.generateId(logger, interceptorOptions) },
-      }
+      const logger = (
+        (interceptorOptions.context as LoggerContext)[CONTEXT_LOGGER_SYMBOL] ?? this.logger
+      ).child({
+        orpc: { id: this.generateId(interceptorOptions) },
+      })
 
       /**
        * pino-http might have already set req info in bindings
        */
-      if (!currentBindings.req) {
-        extraBindings.req = { url: interceptorOptions.request.url, method: interceptorOptions.request.method }
+      if (!logger.bindings().req) {
+        logger.setBindings({
+          req: { url: interceptorOptions.request.url, method: interceptorOptions.request.method },
+        })
       }
-
-      logger.setBindings(extraBindings)
 
       try {
         return await interceptorOptions.next({

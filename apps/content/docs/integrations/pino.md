@@ -51,7 +51,7 @@ const handler = new RPCHandler(router, {
   plugins: [
     new LoggingHandlerPlugin({
       logger, // Custom logger instance
-      generateId: () => crypto.randomUUID(), // Custom ID generator
+      generateId: ({ request }) => crypto.randomUUID(), // Custom ID generator
       logRequestLifecycle: true, // Log request start/end (disabled by default)
       logAbort: true, // Log when requests are aborted (disabled by default)
     }),
@@ -69,7 +69,7 @@ For improved log readability during development, consider using [pino-pretty](ht
 
 ## Using the Logger in Your Code
 
-You can access the logger from context object using the `getLogger` function:
+You can access the logger from the context object using the `getLogger` function:
 
 ```ts
 import { getLogger } from '@orpc/experimental-pino'
