@@ -539,6 +539,9 @@ importers:
 
   packages/pino:
     dependencies:
+      '@orpc/client':
+        specifier: workspace:*
+        version: link:../client
       '@orpc/server':
         specifier: workspace:*
         version: link:../server

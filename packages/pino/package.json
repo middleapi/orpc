@@ -37,6 +37,7 @@
     "pino": ">=10.1.0"
   },
   "dependencies": {
+    "@orpc/client": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*"
   },
