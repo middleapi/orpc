@@ -49,7 +49,9 @@ function createRequest(method: string, url: string, signal?: AbortSignal): Stand
   return {
     method,
     url: new URL(url),
-    headers: {},
+    headers: {
+      'content-type': 'application/json',
+    },
     body: () => Promise.resolve(undefined),
     signal,
   }
@@ -66,7 +68,10 @@ describe('loggingHandlerPlugin', () => {
     const baseLogger = new FakeLogger({ orpc: {} })
     const handler = new StandardHandler(
       {
-        ping: os.handler(() => 'pong'),
+        ping: os.handler(() => {
+          // make sure request/response always log event on error.
+          throw new Error('boom')
+        }),
       },
       new StandardRPCMatcher(),
       codec,
@@ -78,8 +83,13 @@ describe('loggingHandlerPlugin', () => {
     // matched request
     const request1 = createRequest('GET', 'http://localhost/ping')
     await handler.handle(request1, { prefix: undefined, context: {} })
-    expect(globalSpies.info).toHaveBeenCalledWith('request received')
-    expect(globalSpies.info).toHaveBeenCalledWith('request handled')
+    expect(globalSpies.info).toHaveBeenNthCalledWith(1, 'request received')
+    expect(globalSpies.info).toHaveBeenNthCalledWith(2, {
+      msg: 'request handled',
+      res: {
+        status: 500,
+      },
+    })
 
     // unmatched request
     vi.clearAllMocks()
@@ -297,7 +307,7 @@ describe('loggingHandlerPlugin', () => {
         },
       )
 
-      const request = createRequest('GET', 'http://localhost/ping')
+      const request = createRequest('POST', 'http://localhost/ping')
       await handler.handle(request, { prefix: undefined, context: {} })
 
       // Check that child logger was created
@@ -311,7 +321,13 @@ describe('loggingHandlerPlugin', () => {
       // Verify id and req were set
       expect(globalSpies.setBindings).toHaveBeenCalledWith(
         expect.objectContaining({
-          req: { url: request.url, method: 'GET' },
+          req: {
+            url: request.url,
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+            },
+          },
         }),
       )
       expect(globalSpies.error).not.toHaveBeenCalled()

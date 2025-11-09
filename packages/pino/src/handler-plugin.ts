@@ -79,7 +79,15 @@ export class LoggingHandlerPlugin<T extends Context> implements StandardHandlerP
        */
       if (!logger.bindings().req) {
         logger.setBindings({
-          req: { url: interceptorOptions.request.url, method: interceptorOptions.request.method },
+          req: {
+            url: interceptorOptions.request.url,
+            method: interceptorOptions.request.method,
+            headers: {
+              'content-type': interceptorOptions.request.headers['content-type'],
+              'content-length': interceptorOptions.request.headers['content-length'],
+              'content-disposition': interceptorOptions.request.headers['content-disposition'],
+            },
+          },
         })
       }
 
@@ -103,7 +111,17 @@ export class LoggingHandlerPlugin<T extends Context> implements StandardHandlerP
         })
 
         if (this.logRequestResponse) {
-          logger?.info(result.matched ? 'request handled' : 'no matching procedure found')
+          if (result.matched) {
+            logger?.info({
+              msg: 'request handled',
+              res: {
+                status: result.response.status,
+              },
+            })
+          }
+          else {
+            logger?.info('no matching procedure found')
+          }
         }
 
         return result
