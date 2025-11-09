@@ -62,7 +62,7 @@ describe('loggingHandlerPlugin', () => {
     vi.clearAllMocks()
   })
 
-  it('logs request lifecycle for matched and unmatched requests', async () => {
+  it('logs request response for matched and unmatched requests', async () => {
     const baseLogger = new FakeLogger({ orpc: {} })
     const handler = new StandardHandler(
       {
@@ -71,7 +71,7 @@ describe('loggingHandlerPlugin', () => {
       new StandardRPCMatcher(),
       codec,
       {
-        plugins: [new LoggingHandlerPlugin({ logger: baseLogger as any, logRequestLifecycle: true })],
+        plugins: [new LoggingHandlerPlugin({ logger: baseLogger as any, logRequestResponse: true })],
       },
     )
 
@@ -102,7 +102,7 @@ describe('loggingHandlerPlugin', () => {
       new StandardRPCMatcher(),
       codec,
       {
-        plugins: [new LoggingHandlerPlugin({ logger: baseLogger as any, logAbort: true })],
+        plugins: [new LoggingHandlerPlugin({ logger: baseLogger as any, logRequestAbort: true })],
       },
     )
 

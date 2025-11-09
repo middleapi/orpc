@@ -23,15 +23,16 @@ export interface LoggingHandlerPluginOptions<T extends Context> {
   generateId?: (options: StandardHandlerInterceptorOptions<T>) => string
 
   /**
-   * Enables info-level lifecycle logging for each request.
+   * Enables logging for request/response events.
    *
    * @example
    * - request received
    * - request handled
+   * - no matching procedure found
    *
    * @default undefined (disabled)
    */
-  logRequestLifecycle?: boolean
+  logRequestResponse?: boolean
 
   /**
    * Enables logging when requests are aborted.
@@ -43,22 +44,22 @@ export interface LoggingHandlerPluginOptions<T extends Context> {
    *
    * @default undefined (disabled)
    */
-  logAbort?: boolean
+  logRequestAbort?: boolean
 }
 
 export class LoggingHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
   private readonly logger: Exclude<LoggingHandlerPluginOptions<T>['logger'], undefined>
   private readonly generateId: Exclude<LoggingHandlerPluginOptions<T>['generateId'], undefined>
-  private readonly logRequestLifecycle: LoggingHandlerPluginOptions<T>['logRequestLifecycle']
-  private readonly logAbort: LoggingHandlerPluginOptions<T>['logAbort']
+  private readonly logRequestResponse: LoggingHandlerPluginOptions<T>['logRequestResponse']
+  private readonly logRequestAbort: LoggingHandlerPluginOptions<T>['logRequestAbort']
 
   constructor(
     options: LoggingHandlerPluginOptions<T> = {},
   ) {
     this.logger = options.logger ?? pino()
     this.generateId = options.generateId ?? (() => crypto.randomUUID())
-    this.logRequestLifecycle = options.logRequestLifecycle
-    this.logAbort = options.logAbort
+    this.logRequestResponse = options.logRequestResponse
+    this.logRequestAbort = options.logRequestAbort
   }
 
   init(options: StandardHandlerOptions<T>): void {
@@ -82,14 +83,30 @@ export class LoggingHandlerPlugin<T extends Context> implements StandardHandlerP
         })
       }
 
+      if (this.logRequestAbort) {
+        interceptorOptions.request.signal?.addEventListener('abort', () => {
+          logger?.info(`request is aborted (${String(interceptorOptions.request.signal?.reason)})`)
+        }, { once: true })
+      }
+
       try {
-        return await interceptorOptions.next({
+        if (this.logRequestResponse) {
+          logger?.info('request received')
+        }
+
+        const result = await interceptorOptions.next({
           ...interceptorOptions,
           context: {
             ...interceptorOptions.context,
             [CONTEXT_LOGGER_SYMBOL]: logger,
           },
         })
+
+        if (this.logRequestResponse) {
+          logger?.info(result.matched ? 'request handled' : 'no matching procedure found')
+        }
+
+        return result
       }
       catch (error) {
         /**
@@ -102,28 +119,12 @@ export class LoggingHandlerPlugin<T extends Context> implements StandardHandlerP
     })
 
     options.interceptors.unshift(async ({ next, context, request }) => {
-      const logger = getLogger(context)
-
-      if (this.logAbort) {
-        request.signal?.addEventListener('abort', () => {
-          logger?.info(`request is aborted (${String(request.signal?.reason)})`)
-        }, { once: true })
-      }
-
       try {
-        if (this.logRequestLifecycle) {
-          logger?.info('request received')
-        }
-
-        const result = await next()
-
-        if (this.logRequestLifecycle) {
-          logger?.info(result.matched ? 'request handled' : 'no matching procedure found')
-        }
-
-        return result
+        return await next()
       }
       catch (error) {
+        const logger = getLogger(context)
+
         /**
          * DON'T treat aborted signal as error if happen during business logic
          */

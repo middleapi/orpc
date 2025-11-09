@@ -52,8 +52,8 @@ const handler = new RPCHandler(router, {
     new LoggingHandlerPlugin({
       logger, // Custom logger instance
       generateId: ({ request }) => crypto.randomUUID(), // Custom ID generator
-      logRequestLifecycle: true, // Log request start/end (disabled by default)
-      logAbort: true, // Log when requests are aborted (disabled by default)
+      logRequestResponse: true, // Log request start/end (disabled by default)
+      logRequestAbort: true, // Log when requests are aborted (disabled by default)
     }),
   ],
 })
@@ -65,6 +65,11 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc-
 
 ::: tip
 For improved log readability during development, consider using [pino-pretty](https://github.com/pinojs/pino-pretty) to format your logs in a human-friendly way.
+
+```bash
+npm run dev | npx pino-pretty
+```
+
 :::
 
 ## Using the Logger in Your Code
@@ -89,7 +94,11 @@ const procedure = os.handler(({ context }) => {
 You can provide a custom logger instance for specific requests by passing it through the context. This is especially useful when integrating with [pino-http](https://github.com/pinojs/pino-http) for enhanced HTTP logging:
 
 ```ts
-import { CONTEXT_LOGGER_SYMBOL, LoggerContext, LoggingHandlerPlugin } from '@orpc/experimental-pino'
+import {
+  CONTEXT_LOGGER_SYMBOL,
+  LoggerContext,
+  LoggingHandlerPlugin
+} from '@orpc/experimental-pino'
 
 const logger = pino()
 const httpLogger = pinoHttp({ logger })
