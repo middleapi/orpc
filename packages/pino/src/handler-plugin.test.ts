@@ -123,6 +123,11 @@ describe('loggingHandlerPlugin', () => {
     await promise
 
     expect(globalSpies.info).toHaveBeenCalledWith('request is aborted (manual)')
+
+    // if aborted before handling
+    const request2 = createRequest('GET', 'http://localhost/ping', controller.signal)
+    await handler.handle(request2, { prefix: undefined, context: {} })
+    expect(globalSpies.info).toHaveBeenCalledWith('request was aborted before handling (manual)')
   })
 
   it('logs business error as error and abort error as info', async () => {

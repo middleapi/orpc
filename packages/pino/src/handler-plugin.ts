@@ -92,9 +92,16 @@ export class LoggingHandlerPlugin<T extends Context> implements StandardHandlerP
       }
 
       if (this.logRequestAbort) {
-        interceptorOptions.request.signal?.addEventListener('abort', () => {
-          logger?.info(`request is aborted (${String(interceptorOptions.request.signal?.reason)})`)
-        }, { once: true })
+        const signal = interceptorOptions.request.signal
+
+        if (signal?.aborted) {
+          logger?.info(`request was aborted before handling (${String(signal.reason)})`)
+        }
+        else {
+          signal?.addEventListener('abort', () => {
+            logger?.info(`request is aborted (${String(signal.reason)})`)
+          }, { once: true })
+        }
       }
 
       try {
