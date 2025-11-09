@@ -30,7 +30,7 @@ export interface LoggingHandlerPluginOptions<T extends Context> {
    * - request handled
    * - no matching procedure found
    *
-   * @default undefined (disabled)
+   * @default false
    */
   logRequestResponse?: boolean
 
@@ -42,7 +42,7 @@ export interface LoggingHandlerPluginOptions<T extends Context> {
    *
    * @remarks If a signal is used for multiple requests, this may lead to un-efficient memory usage (listeners never removed).
    *
-   * @default undefined (disabled)
+   * @default false
    */
   logRequestAbort?: boolean
 }
@@ -50,16 +50,16 @@ export interface LoggingHandlerPluginOptions<T extends Context> {
 export class LoggingHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
   private readonly logger: Exclude<LoggingHandlerPluginOptions<T>['logger'], undefined>
   private readonly generateId: Exclude<LoggingHandlerPluginOptions<T>['generateId'], undefined>
-  private readonly logRequestResponse: LoggingHandlerPluginOptions<T>['logRequestResponse']
-  private readonly logRequestAbort: LoggingHandlerPluginOptions<T>['logRequestAbort']
+  private readonly logRequestResponse: Exclude<LoggingHandlerPluginOptions<T>['logRequestResponse'], undefined>
+  private readonly logRequestAbort: Exclude<LoggingHandlerPluginOptions<T>['logRequestAbort'], undefined>
 
   constructor(
     options: LoggingHandlerPluginOptions<T> = {},
   ) {
     this.logger = options.logger ?? pino()
     this.generateId = options.generateId ?? (() => crypto.randomUUID())
-    this.logRequestResponse = options.logRequestResponse
-    this.logRequestAbort = options.logRequestAbort
+    this.logRequestResponse = options.logRequestResponse ?? false
+    this.logRequestAbort = options.logRequestAbort ?? false
   }
 
   init(options: StandardHandlerOptions<T>): void {
