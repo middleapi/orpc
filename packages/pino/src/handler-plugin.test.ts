@@ -18,24 +18,27 @@ const globalSpies = {
 class FakeLogger {
   private _bindings: any
 
-  constructor(initial: any = {}) {
+  constructor(initial: any = {}, private childDeep: number = 0) {
     this._bindings = initial
   }
 
   child(opts: any) {
     globalSpies.child(opts)
-    return new FakeLogger({ ...this._bindings, ...opts })
+    return new FakeLogger({ ...this._bindings, ...opts }, this.childDeep + 1)
   }
 
   info(...args: any[]) {
+    expect(this.childDeep).toBeGreaterThan(0) // Ensure child logger is used
     globalSpies.info(...args)
   }
 
   error(...args: any[]) {
+    expect(this.childDeep).toBeGreaterThan(0) // Ensure child logger is used
     globalSpies.error(...args)
   }
 
   setBindings(bindings: any) {
+    expect(this.childDeep).toBeGreaterThan(0) // Ensure child logger is used
     globalSpies.setBindings(bindings)
     this._bindings = { ...this._bindings, ...bindings }
   }
@@ -179,7 +182,8 @@ describe('loggingHandlerPlugin', () => {
     expect(globalSpies.info).toHaveBeenCalledWith(abortError)
   })
 
-  it('logs internal errors using base logger', async () => {
+  it('logs internal errors', async () => {
+    const error = new Error('internal-error')
     const baseLogger = new FakeLogger({ orpc: {} })
     const handler = new StandardHandler(
       {
@@ -191,7 +195,7 @@ describe('loggingHandlerPlugin', () => {
         plugins: [new LoggingHandlerPlugin({ logger: baseLogger as any })],
         rootInterceptors: [
           async () => {
-            throw new Error('internal')
+            throw error
           },
         ],
       },
@@ -199,8 +203,8 @@ describe('loggingHandlerPlugin', () => {
 
     const request = createRequest('GET', 'http://localhost/ping')
     // Root interceptor errors are thrown, not encoded in response
-    await expect(handler.handle(request, { prefix: undefined, context: {} })).rejects.toThrow('internal')
-    expect(globalSpies.error).toHaveBeenCalledWith(expect.any(Error))
+    await expect(handler.handle(request, { prefix: undefined, context: {} })).rejects.toThrow(error)
+    expect(globalSpies.error).toHaveBeenCalledWith(error)
   })
 
   it('sets path on client interceptor and handles non-stream output', async () => {

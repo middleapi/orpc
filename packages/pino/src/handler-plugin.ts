@@ -138,7 +138,7 @@ export class LoggingHandlerPlugin<T extends Context> implements StandardHandlerP
          * Any error here is internal (interceptor/framework), not business logic.
          * Indicates unexpected handler failure.
          */
-        this.logger.error(error)
+        logger.error(error)
         throw error
       }
     })
