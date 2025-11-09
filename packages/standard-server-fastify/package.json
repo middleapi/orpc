@@ -50,7 +50,7 @@
     "@fastify/cookie": "^11.0.2",
     "@types/node": "^22.15.30",
     "@types/supertest": "^6.0.3",
-    "fastify": "^5.6.1",
+    "fastify": "^5.6.2",
     "supertest": "^7.1.4"
   }
 }

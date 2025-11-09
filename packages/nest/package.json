@@ -70,7 +70,7 @@
     "@ts-rest/core": "^3.52.1",
     "@types/express": "^5.0.5",
     "express": "^5.0.0",
-    "fastify": "^5.6.1",
+    "fastify": "^5.6.2",
     "rxjs": "^7.8.1",
     "supertest": "^7.1.4",
     "zod": "^4.1.12"
