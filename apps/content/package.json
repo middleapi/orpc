@@ -8,8 +8,8 @@
     "serve": "vitepress serve"
   },
   "devDependencies": {
-    "@ai-sdk/google": "2.0.29",
-    "@ai-sdk/react": "2.0.89",
+    "@ai-sdk/google": "2.0.30",
+    "@ai-sdk/react": "2.0.90",
     "@opentelemetry/instrumentation": "^0.208.0",
     "@opentelemetry/sdk-node": "^0.208.0",
     "@opentelemetry/sdk-trace-web": "^2.2.0",
@@ -48,7 +48,7 @@
     "svelte": "^5.43.5",
     "vitepress": "1.6.4",
     "vitepress-plugin-group-icons": "^1.6.5",
-    "vitepress-plugin-llms": "^1.9.0",
+    "vitepress-plugin-llms": "^1.9.1",
     "vitepress-plugin-mermaid": "^2.0.17",
     "vitepress-plugin-shiki-twoslash": "^0.0.6",
     "vue": "^3.5.24",
