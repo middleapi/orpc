@@ -43,53 +43,67 @@ export function experimental_serializableStreamedQuery<
     const query = context.client
       .getQueryCache()
       .find({ queryKey: context.queryKey, exact: true })
-    const isRefetch = !!query && query.state.data !== undefined
+    const hasPreviousData = !!query && query.state.data !== undefined
 
-    if (isRefetch && refetchMode === 'reset') {
-      query.setState({
-        status: 'pending',
-        data: undefined,
-        error: null,
-        fetchStatus: 'fetching',
-      })
+    if (hasPreviousData) {
+      if (refetchMode === 'reset') {
+        query.setState({
+          status: 'pending',
+          data: undefined,
+          error: null,
+          fetchStatus: 'fetching',
+        })
+      }
+      else {
+        context.client.setQueryData<Array<TQueryFnData>>(
+          context.queryKey,
+          (prev = []) => limitArraySize(prev, maxChunks),
+        )
+      }
     }
 
     let result: Array<TQueryFnData> = []
     const stream = await queryFn(context)
+    const shouldUpdateCacheDuringStream = !hasPreviousData || refetchMode !== 'replace'
+
+    // after resolve stream successfully we can treat result as empty array
+    context.client.setQueryData<Array<TQueryFnData>>(
+      context.queryKey,
+      (prev = []) => limitArraySize(prev, maxChunks),
+    )
 
     for await (const chunk of stream) {
       if (context.signal.aborted) {
         throw context.signal.reason
       }
 
-      // don't append to the cache directly when replace-refetching
-      if (!isRefetch || refetchMode !== 'replace') {
+      result.push(chunk)
+      result = limitArraySize(result, maxChunks)
+
+      if (shouldUpdateCacheDuringStream) {
         context.client.setQueryData<Array<TQueryFnData>>(
           context.queryKey,
-          (prev = []) => {
-            return addToEnd(prev, chunk, maxChunks)
-          },
+          (prev = []) => limitArraySize([...prev, chunk], maxChunks),
         )
       }
-      result = addToEnd(result, chunk, maxChunks)
     }
 
-    // finalize result: replace-refetching needs to write to the cache
-    if (isRefetch && refetchMode === 'replace') {
+    if (!shouldUpdateCacheDuringStream) {
       context.client.setQueryData<Array<TQueryFnData>>(context.queryKey, result)
     }
 
-    // this is additional, in case nothing is fetched
-    const currentResult = context.client.getQueryData(context.queryKey)
-    if (!Array.isArray(currentResult)) {
-      return result
+    const cachedData = context.client.getQueryData<Array<TQueryFnData>>(context.queryKey)
+    if (cachedData) {
+      return limitArraySize(cachedData, maxChunks)
     }
 
-    return currentResult as Array<TQueryFnData>
+    return result
   }
 }
 
-function addToEnd<T>(items: Array<T>, item: T, max: number): Array<T> {
-  const newItems = [...items, item]
-  return newItems.length > max ? newItems.slice(newItems.length - max) : newItems
+function limitArraySize<T>(items: Array<T>, maxSize: number): Array<T> {
+  if (items.length <= maxSize) {
+    return items
+  }
+  return items.slice(items.length - maxSize)
 }
