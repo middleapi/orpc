@@ -209,7 +209,7 @@ export function deserializeResponseMessage(message: BaseMessageFormat): DecodedR
   return [id, MessageType.RESPONSE, {
     status: payload?.s ?? 200,
     headers: payload?.h ?? {},
-    body: payload?.b,
+    body: payload?.b ?? null,
   }]
 }
 
