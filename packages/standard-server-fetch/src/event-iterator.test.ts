@@ -413,19 +413,30 @@ describe('toEventStream', () => {
         .pipeThrough(new TextDecoderStream())
         .getReader()
 
-      let now = Date.now()
+      const now = Date.now()
       await expect(reader.read()).resolves.toEqual({ done: false, value: ': ping\n\n' })
-      await expect(reader.read()).resolves.toEqual({ done: false, value: ': ping\n\n' })
-      await expect(reader.read()).resolves.toEqual({ done: false, value: 'event: message\ndata: "hello"\n\n' })
-      expect(Date.now() - now).toBeGreaterThanOrEqual(80)
-      expect(Date.now() - now).toBeLessThan(120)
+      expect(Date.now() - now).toBeGreaterThanOrEqual(40)
+      expect(Date.now() - now).toBeLessThan(50)
 
-      now = Date.now()
       await expect(reader.read()).resolves.toEqual({ done: false, value: ': ping\n\n' })
-      await expect(reader.read()).resolves.toEqual({ done: false, value: ': ping\n\n' })
-      await expect(reader.read()).resolves.toEqual({ done: false, value: 'event: message\ndata: "hello"\n\n' })
       expect(Date.now() - now).toBeGreaterThanOrEqual(80)
-      expect(Date.now() - now).toBeLessThan(120)
+      expect(Date.now() - now).toBeLessThan(100)
+
+      await expect(reader.read()).resolves.toEqual({ done: false, value: 'event: message\ndata: "hello"\n\n' })
+      expect(Date.now() - now).toBeGreaterThanOrEqual(100)
+      expect(Date.now() - now).toBeLessThan(130)
+
+      await expect(reader.read()).resolves.toEqual({ done: false, value: ': ping\n\n' })
+      expect(Date.now() - now).toBeGreaterThanOrEqual(140)
+      expect(Date.now() - now).toBeLessThan(180)
+
+      await expect(reader.read()).resolves.toEqual({ done: false, value: ': ping\n\n' })
+      expect(Date.now() - now).toBeGreaterThanOrEqual(180)
+      expect(Date.now() - now).toBeLessThan(230)
+
+      await expect(reader.read()).resolves.toEqual({ done: false, value: 'event: message\ndata: "hello"\n\n' })
+      expect(Date.now() - now).toBeGreaterThanOrEqual(200)
+      expect(Date.now() - now).toBeLessThan(260)
 
       expect(startSpanSpy).toHaveBeenCalledTimes(1)
       expect(runInSpanContextSpy).toHaveBeenCalledTimes(3)
@@ -450,15 +461,14 @@ describe('toEventStream', () => {
         .pipeThrough(new TextDecoderStream())
         .getReader()
 
-      let now = Date.now()
+      const now = Date.now()
       await expect(reader.read()).resolves.toEqual({ done: false, value: 'event: message\ndata: "hello"\n\n' })
       expect(Date.now() - now).toBeGreaterThanOrEqual(100)
       expect(Date.now() - now).toBeLessThan(110)
 
-      now = Date.now()
       await expect(reader.read()).resolves.toEqual({ done: false, value: 'event: message\ndata: "hello"\n\n' })
-      expect(Date.now() - now).toBeGreaterThanOrEqual(100)
-      expect(Date.now() - now).toBeLessThan(110)
+      expect(Date.now() - now).toBeGreaterThanOrEqual(200)
+      expect(Date.now() - now).toBeLessThan(220)
 
       expect(startSpanSpy).toHaveBeenCalledTimes(1)
       expect(runInSpanContextSpy).toHaveBeenCalledTimes(3)
@@ -487,6 +497,7 @@ describe('toEventStream', () => {
       expect(Date.now() - start).toBeLessThan(10)
       await expect(reader.read()).resolves.toEqual({ done: false, value: 'event: message\ndata: "hello"\n\n' })
       expect(Date.now() - start).toBeGreaterThanOrEqual(50)
+      expect(Date.now() - start).toBeLessThan(60)
     })
 
     it('disabled', async () => {
@@ -507,6 +518,7 @@ describe('toEventStream', () => {
       const start = Date.now()
       await expect(reader.read()).resolves.toEqual({ done: false, value: 'event: message\ndata: "hello"\n\n' })
       expect(Date.now() - start).toBeGreaterThanOrEqual(50)
+      expect(Date.now() - start).toBeLessThan(60)
     })
   })
 })
@@ -517,9 +529,10 @@ it.each([
 ])('toEventStream + toEventIterator: %#', async (...values) => {
   const iterator = toEventIterator(toEventStream((async function* () {
     for (const value of values) {
+      await new Promise(resolve => setTimeout(resolve, 50))
       yield value
     }
-  })(), { eventIteratorKeepAliveInterval: 0 }))
+  })(), { eventIteratorKeepAliveInterval: 10 }))
 
   for await (const value of iterator) {
     expect(value).toEqual(values.shift())
