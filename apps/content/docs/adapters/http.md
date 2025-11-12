@@ -248,7 +248,7 @@ The `link` can be any supported oRPC link, such as [RPCLink](/docs/client/rpc-li
 This only shows how to configure the http link. For full client examples, see [Client-Side Clients](/docs/client/client-side).
 :::
 
-## Event Iterator Configuration
+## Event Iterator Options
 
 HTTP adapters provide reliability features for streaming [Event Iterators](/docs/event-iterator):
 
