@@ -24,6 +24,7 @@ featuring pre-configured examples accessible instantly via StackBlitz or local s
 | Bun WebSocket + OpenTelemetry    |                                                                                                        | [View Source](https://github.com/unnoq/orpc/tree/main/playgrounds/bun-websocket-otel)        |
 | Electron Playground              |                                                                                                        | [View Source](https://github.com/unnoq/orpc/tree/main/playgrounds/electron)                  |
 | Browser Extension Playground     |                                                                                                        | [View Source](https://github.com/unnoq/orpc/tree/main/playgrounds/browser-extension)         |
+| Multiservice Monorepo Playground |                                                                                                        | [View Source](https://github.com/unnoq/orpc-multiservice-monorepo-playground)                |
 | Vue + Bun + Monorepo (Community) |                                                                                                        | [View Source](https://github.com/hunterwilhelm/orpc-community-playgrounds/tree/main/vue-bun) |
 
 :::warning
@@ -47,6 +48,7 @@ npx degit unnoq/orpc/playgrounds/cloudflare-worker orpc-cloudflare-worker-playgr
 npx degit unnoq/orpc/playgrounds/bun-websocket-otel orpc-bun-websocket-otel-playground
 npx degit unnoq/orpc/playgrounds/electron orpc-electron-playground
 npx degit unnoq/orpc/playgrounds/browser-extension orpc-browser-extension-playground
+npx degit unnoq/orpc-multiservice-monorepo-playground orpc-multiservice-monorepo-playground
 
 # Community (clone at your own risk)
 npx degit hunterwilhelm/orpc-community-playgrounds/vue-bun orpc-vue-bun-monorepo-playground
