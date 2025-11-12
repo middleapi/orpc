@@ -139,7 +139,7 @@ export interface ToEventStreamOptions {
 
   /**
    * If true, an initial comment is sent immediately upon stream start to flush headers.
-   * This allows clients to establish the connection early without waiting for the first event.
+   * This allows the receiving side to establish the connection without waiting for the first event.
    *
    * @default true
    */

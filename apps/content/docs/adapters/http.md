@@ -280,7 +280,7 @@ Link options apply when streaming from **client to server**, not server to clien
 
 ### Initial Comment
 
-Sends an initial comment immediately when the stream starts to flush response headers early. This allows clients to establish the connection without waiting for the first event.
+Sends an initial comment immediately when the stream starts to flush response headers early. This allows the receiving side to establish the connection without waiting for the first event.
 
 | Option                               | Default | Description                    |
 | ------------------------------------ | ------- | ------------------------------ |
