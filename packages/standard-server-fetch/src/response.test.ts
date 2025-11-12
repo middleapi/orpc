@@ -64,6 +64,7 @@ describe('toFetchResponse', () => {
 
     const reader = response.body!.pipeThrough(new TextDecoderStream()).getReader()
 
+    expect((await reader.read()).value).toEqual(': \n\n')
     expect((await reader.read()).value).toEqual('event: message\ndata: "foo"\n\n')
     await reader.cancel()
     await vi.waitFor(() => {

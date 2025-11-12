@@ -179,7 +179,7 @@ describe('sendStandardResponse', () => {
       'x-custom-header': 'custom-value',
     })
 
-    expect(res.text).toEqual('event: message\ndata: "foo"\n\nevent: message\ndata: "bar"\n\nevent: done\ndata: "baz"\n\n')
+    expect(res.text).toEqual(': \n\nevent: message\ndata: "foo"\n\nevent: message\ndata: "bar"\n\nevent: done\ndata: "baz"\n\n')
   })
 
   describe('edge case', () => {

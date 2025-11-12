@@ -154,28 +154,6 @@ const link = new OpenAPILink({
 
 Unlike traditional SSE, the [Event Iterator](/docs/event-iterator) does not automatically retry on error. To enable automatic retries, refer to the [Client Retry Plugin](/docs/plugins/client-retry).
 
-## Event Iterator Keep Alive
-
-:::warning
-These options for sending [Event Iterator](/docs/event-iterator) from **client to the server**, not from **the server to client** as used in [RPCHandler Event Iterator Keep Alive](/docs/rpc-handler#event-iterator-keep-alive) or [OpenAPIHandler Event Iterator Keep Alive](/docs/openapi/openapi-handler#event-iterator-keep-alive).
-
-**In 99% of cases, you don't need to configure these options.**
-:::
-
-To keep [Event Iterator](/docs/event-iterator) connections alive, `OpenAPILink` periodically sends a ping comment to the server. You can configure this behavior using the following options:
-
-- `eventIteratorKeepAliveEnabled` (default: `true`) – Enables or disables pings.
-- `eventIteratorKeepAliveInterval` (default: `5000`) – Time between pings (in milliseconds).
-- `eventIteratorKeepAliveComment` (default: `''`) – Custom content for ping messages.
-
-```ts
-const link = new OpenAPILink({
-  eventIteratorKeepAliveEnabled: true,
-  eventIteratorKeepAliveInterval: 5000, // 5 seconds
-  eventIteratorKeepAliveComment: '',
-})
-```
-
 ## Lifecycle
 
 The `OpenAPILink` follows the same lifecycle as the [RPCLink Lifecycle](/docs/client/rpc-link#lifecycle), ensuring consistent behavior across different link types.

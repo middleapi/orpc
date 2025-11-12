@@ -157,7 +157,7 @@ describe('sendStandardResponse', () => {
       'x-custom-header': 'custom-value',
     })
 
-    expect(res.text).toEqual('event: message\ndata: "foo"\n\nevent: message\ndata: "bar"\n\nevent: done\ndata: "baz"\n\n')
+    expect(res.text).toEqual(': \n\nevent: message\ndata: "foo"\n\nevent: message\ndata: "bar"\n\nevent: done\ndata: "baz"\n\n')
   })
 
   describe('stream destroy while sending', () => {
@@ -200,6 +200,7 @@ describe('sendStandardResponse', () => {
       await new Promise(r => setTimeout(r, 110))
 
       expect(chunks).toEqual([
+        Buffer.from(': \n\n'),
         Buffer.from('event: message\ndata: 1\n\n'),
         Buffer.from('event: message\ndata: 2\n\n'),
       ])
@@ -256,6 +257,7 @@ describe('sendStandardResponse', () => {
       await new Promise(r => setTimeout(r, 110))
 
       expect(chunks).toEqual([
+        Buffer.from(': \n\n'),
         Buffer.from('event: message\ndata: 1\n\n'),
         Buffer.from('event: message\ndata: 2\n\n'),
       ])

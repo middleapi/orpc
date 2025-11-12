@@ -130,6 +130,7 @@ describe('sendStandardResponse', () => {
     })
 
     expect(chunks).toEqual([
+      Buffer.from(': \n\n'),
       Buffer.from('event: message\ndata: "foo"\n\n'),
       Buffer.from('event: message\ndata: "bar"\n\n'),
     ])
@@ -175,6 +176,7 @@ describe('sendStandardResponse', () => {
       await new Promise(r => setTimeout(r, 110))
 
       expect(chunks).toEqual([
+        Buffer.from(': \n\n'),
         Buffer.from('event: message\ndata: 1\n\n'),
         Buffer.from('event: message\ndata: 2\n\n'),
       ])
@@ -229,6 +231,7 @@ describe('sendStandardResponse', () => {
       await new Promise(r => setTimeout(r, 110))
 
       expect(chunks).toEqual([
+        Buffer.from(': \n\n'),
         Buffer.from('event: message\ndata: 1\n\n'),
         Buffer.from('event: message\ndata: 2\n\n'),
       ])

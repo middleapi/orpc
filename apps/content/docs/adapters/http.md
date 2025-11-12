@@ -247,3 +247,52 @@ The `link` can be any supported oRPC link, such as [RPCLink](/docs/client/rpc-li
 ::: info
 This only shows how to configure the http link. For full client examples, see [Client-Side Clients](/docs/client/client-side).
 :::
+
+## Event Iterator Configuration
+
+HTTP adapters provide reliability features for streaming [Event Iterators](/docs/event-iterator):
+
+```ts
+const handler = new RPCHandler(router, {
+  eventIteratorInitialCommentEnabled: true,
+  eventIteratorInitialComment: 'start',
+  eventIteratorKeepAliveEnabled: true,
+  eventIteratorKeepAliveInterval: 5000,
+  eventIteratorKeepAliveComment: '',
+})
+
+const link = new OpenAPILink({
+  eventIteratorInitialCommentEnabled: true,
+  eventIteratorInitialComment: 'start',
+  eventIteratorKeepAliveEnabled: true,
+  eventIteratorKeepAliveInterval: 5000,
+  eventIteratorKeepAliveComment: '',
+})
+```
+
+::: info
+These options are available for HTTP-based handlers and links only.
+:::
+
+::: warning
+Link options apply when streaming from **client to server**, not server to client (as with handlers). In most cases, you don't need to configure these on the link.
+:::
+
+### Initial Comment
+
+Sends an initial comment immediately when the stream starts to flush response headers early. This allows clients to establish the connection without waiting for the first event.
+
+| Option                               | Default | Description                    |
+| ------------------------------------ | ------- | ------------------------------ |
+| `eventIteratorInitialCommentEnabled` | `true`  | Enable/disable initial comment |
+| `eventIteratorInitialComment`        | `''`    | Custom comment content         |
+
+### Keep-Alive Comments
+
+Sends periodic comments during inactivity to prevent connection timeouts.
+
+| Option                           | Default | Description                        |
+| -------------------------------- | ------- | ---------------------------------- |
+| `eventIteratorKeepAliveEnabled`  | `true`  | Enable/disable keep-alive comments |
+| `eventIteratorKeepAliveInterval` | `5000`  | Interval in milliseconds           |
+| `eventIteratorKeepAliveComment`  | `''`    | Custom comment content             |

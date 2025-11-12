@@ -83,22 +83,6 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-## Event Iterator Keep Alive
-
-To keep [Event Iterator](/docs/event-iterator) connections alive, `RPCHandler` periodically sends a ping comment to the client. You can configure this behavior using the following options:
-
-- `eventIteratorKeepAliveEnabled` (default: `true`) – Enables or disables pings.
-- `eventIteratorKeepAliveInterval` (default: `5000`) – Time between pings (in milliseconds).
-- `eventIteratorKeepAliveComment` (default: `''`) – Custom content for ping comments.
-
-```ts
-const handler = new RPCHandler(router, {
-  eventIteratorKeepAliveEnabled: true,
-  eventIteratorKeepAliveInterval: 5000, // 5 seconds
-  eventIteratorKeepAliveComment: '',
-})
-```
-
 ## Default Plugins
 
 `RPCHandler` automatically enables **essential plugins** for security reasons.

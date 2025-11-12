@@ -32,6 +32,7 @@ it('toEventStream', async () => {
     .pipeThrough(new TextDecoderStream())
     .getReader()
 
+  expect((await reader.read())).toEqual({ done: false, value: ': \n\n' })
   expect((await reader.read())).toEqual({ done: false, value: 'event: message\ndata: 1\n\n' })
   expect((await reader.read())).toEqual({ done: false, value: 'event: message\ndata: 2\n\n' })
   expect((await reader.read())).toEqual({ done: false, value: 'event: message\ndata: 3\n\n' })

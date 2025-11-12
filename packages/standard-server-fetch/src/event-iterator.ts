@@ -136,6 +136,21 @@ export interface ToEventStreamOptions {
    * @default ''
    */
   eventIteratorKeepAliveComment?: string
+
+  /**
+   * If true, an initial comment is sent immediately upon stream start to flush headers.
+   * This allows clients to establish the connection early without waiting for the first event.
+   *
+   * @default true
+   */
+  eventIteratorInitialCommentEnabled?: boolean
+
+  /**
+   * The content of the initial comment sent upon stream start. Must not include newline characters.
+   *
+   * @default ''
+   */
+  eventIteratorInitialComment?: string
 }
 
 export function toEventStream(
@@ -145,14 +160,22 @@ export function toEventStream(
   const keepAliveEnabled = options.eventIteratorKeepAliveEnabled ?? true
   const keepAliveInterval = options.eventIteratorKeepAliveInterval ?? 5000
   const keepAliveComment = options.eventIteratorKeepAliveComment ?? ''
+  const initialCommentEnabled = options.eventIteratorInitialCommentEnabled ?? true
+  const initialComment = options.eventIteratorInitialComment ?? ''
 
   let cancelled = false
   let timeout: ReturnType<typeof setInterval> | undefined
   let span: ReturnType<typeof startSpan> | undefined
 
   const stream = new ReadableStream<string>({
-    start() {
+    start(controller) {
       span = startSpan('stream_event_iterator')
+
+      if (initialCommentEnabled) {
+        controller.enqueue(encodeEventMessage({
+          comments: [initialComment],
+        }))
+      }
     },
     async pull(controller) {
       try {

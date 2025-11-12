@@ -218,7 +218,10 @@ describe('toEventStream', () => {
       return withEventMeta({ order: 4 }, { id: 'id-4', retry: 40000 })
     }
 
-    const reader = toEventStream(gen(), {})
+    const reader = toEventStream(gen(), {
+      eventIteratorInitialCommentEnabled: false,
+      eventIteratorKeepAliveEnabled: false,
+    })
       .pipeThrough(new TextDecoderStream())
       .getReader()
 
@@ -239,7 +242,10 @@ describe('toEventStream', () => {
       yield undefined
     }
 
-    const reader = toEventStream(gen(), {})
+    const reader = toEventStream(gen(), {
+      eventIteratorInitialCommentEnabled: false,
+      eventIteratorKeepAliveEnabled: false,
+    })
       .pipeThrough(new TextDecoderStream())
       .getReader()
 
@@ -260,7 +266,10 @@ describe('toEventStream', () => {
       throw withEventMeta(new Error('order-4'), { id: 'id-4', retry: 40000 })
     }
 
-    const reader = toEventStream(gen(), {})
+    const reader = toEventStream(gen(), {
+      eventIteratorInitialCommentEnabled: false,
+      eventIteratorKeepAliveEnabled: false,
+    })
       .pipeThrough(new TextDecoderStream())
       .getReader()
 
@@ -281,7 +290,10 @@ describe('toEventStream', () => {
       throw withEventMeta(new ErrorEvent({ data: { order: 4 } }), { id: 'id-4', retry: 40000 })
     }
 
-    const reader = toEventStream(gen(), {})
+    const reader = toEventStream(gen(), {
+      eventIteratorInitialCommentEnabled: false,
+      eventIteratorKeepAliveEnabled: false,
+    })
       .pipeThrough(new TextDecoderStream())
       .getReader()
 
@@ -310,7 +322,10 @@ describe('toEventStream', () => {
       }
     }
 
-    const stream = toEventStream(gen(), {})
+    const stream = toEventStream(gen(), {
+      eventIteratorInitialCommentEnabled: false,
+      eventIteratorKeepAliveEnabled: false,
+    })
 
     const reader = stream.getReader()
     await reader.read()
@@ -339,7 +354,10 @@ describe('toEventStream', () => {
       }
     }
 
-    const stream = toEventStream(gen(), {})
+    const stream = toEventStream(gen(), {
+      eventIteratorInitialCommentEnabled: false,
+      eventIteratorKeepAliveEnabled: false,
+    })
 
     const reader = stream.getReader()
     await reader.read()
@@ -369,7 +387,10 @@ describe('toEventStream', () => {
       }
     }
 
-    const stream = toEventStream(gen(), {})
+    const stream = toEventStream(gen(), {
+      eventIteratorInitialCommentEnabled: false,
+      eventIteratorKeepAliveEnabled: false,
+    })
 
     const reader = stream.getReader()
     await reader.read()
@@ -395,6 +416,7 @@ describe('toEventStream', () => {
     }
 
     const stream = toEventStream(gen(), {
+      eventIteratorInitialCommentEnabled: false,
       eventIteratorKeepAliveEnabled: true,
       eventIteratorKeepAliveInterval: 40,
       eventIteratorKeepAliveComment: 'ping',
@@ -420,6 +442,29 @@ describe('toEventStream', () => {
 
     expect(startSpanSpy).toHaveBeenCalledTimes(1)
     expect(runInSpanContextSpy).toHaveBeenCalledTimes(3)
+  })
+
+  it('initial comment', async () => {
+    async function* gen() {
+      await shared.sleep(50)
+      yield 'hello'
+    }
+
+    const stream = toEventStream(gen(), {
+      eventIteratorInitialCommentEnabled: true,
+      eventIteratorInitialComment: 'stream-started',
+      eventIteratorKeepAliveEnabled: false,
+    })
+
+    const reader = stream
+      .pipeThrough(new TextDecoderStream())
+      .getReader()
+
+    const start = Date.now()
+    await expect(reader.read()).resolves.toEqual({ done: false, value: ': stream-started\n\n' })
+    expect(Date.now() - start).toBeLessThan(10)
+    await expect(reader.read()).resolves.toEqual({ done: false, value: 'event: message\ndata: "hello"\n\n' })
+    expect(Date.now() - start).toBeGreaterThanOrEqual(50)
   })
 })
 

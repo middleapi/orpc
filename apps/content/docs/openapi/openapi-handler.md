@@ -102,22 +102,6 @@ const handler = new OpenAPIHandler(router, {
 })
 ```
 
-## Event Iterator Keep Alive
-
-To keep [Event Iterator](/docs/event-iterator) connections alive, `OpenAPIHandler` periodically sends a ping comment to the client. You can configure this behavior using the following options:
-
-- `eventIteratorKeepAliveEnabled` (default: `true`) – Enables or disables pings.
-- `eventIteratorKeepAliveInterval` (default: `5000`) – Time between pings (in milliseconds).
-- `eventIteratorKeepAliveComment` (default: `''`) – Custom content for ping comments.
-
-```ts
-const handler = new OpenAPIHandler(router, {
-  eventIteratorKeepAliveEnabled: true,
-  eventIteratorKeepAliveInterval: 5000, // 5 seconds
-  eventIteratorKeepAliveComment: '',
-})
-```
-
 ## Lifecycle
 
 The `OpenAPIHandler` follows the same lifecycle as the [RPCHandler Lifecycle](/docs/rpc-handler#lifecycle), ensuring consistent behavior across different handler types.
