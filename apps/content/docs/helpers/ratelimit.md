@@ -72,7 +72,7 @@ const limiter = new RedisRatelimiter({
 You can use any Redis client that supports Lua script evaluation by providing an `eval` function.
 :::
 
-### Upstash Adapter
+### Upstash Ratelimit Adapter
 
 Adapter for [@upstash/ratelimit](https://www.npmjs.com/package/@upstash/ratelimit), optimized for serverless environments like Vercel Edge and Cloudflare Workers.
 
@@ -102,6 +102,22 @@ const limiter = new UpstashRatelimiter(ratelimit, {
 ```
 
 :::
+
+### Cloudflare Ratelimit Adapter
+
+Adapter for [Cloudflare Workers Ratelimit](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/).
+
+```ts
+import { CloudflareRatelimiter } from '@orpc/experimental-ratelimit/cloudflare-ratelimit'
+
+export default {
+  async fetch(request, env) {
+    const limiter = new CloudflareRatelimiter(env.MY_RATE_LIMITER)
+
+    return new Response(`Hello World!`)
+  }
+}
+```
 
 ## Blocking Mode
 

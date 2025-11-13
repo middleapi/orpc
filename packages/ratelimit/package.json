@@ -34,6 +34,11 @@
         "types": "./dist/adapters/upstash-ratelimit.d.mts",
         "import": "./dist/adapters/upstash-ratelimit.mjs",
         "default": "./dist/adapters/upstash-ratelimit.mjs"
+      },
+      "./cloudflare-ratelimit": {
+        "types": "./dist/adapters/cloudflare-ratelimit.d.mts",
+        "import": "./dist/adapters/cloudflare-ratelimit.mjs",
+        "default": "./dist/adapters/cloudflare-ratelimit.mjs"
       }
     }
   },
@@ -41,7 +46,8 @@
     ".": "./src/index.ts",
     "./memory": "./src/adapters/memory.ts",
     "./redis": "./src/adapters/redis.ts",
-    "./upstash-ratelimit": "./src/adapters/upstash-ratelimit.ts"
+    "./upstash-ratelimit": "./src/adapters/upstash-ratelimit.ts",
+    "./cloudflare-ratelimit": "./src/adapters/cloudflare-ratelimit.ts"
   },
   "files": [
     "dist"
