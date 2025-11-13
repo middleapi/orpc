@@ -1,4 +1,4 @@
-import type { Ratelimiter, RatelimiterLimitResult } from '@orpc/experimental-ratelimit'
+import type { Ratelimiter, RatelimiterLimitResult } from '../types'
 
 export class CloudflareRatelimiter implements Ratelimiter {
   constructor(
