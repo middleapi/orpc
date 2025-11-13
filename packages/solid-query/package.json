@@ -46,7 +46,7 @@
     "@orpc/tanstack-query": "workspace:*"
   },
   "devDependencies": {
-    "@tanstack/solid-query": "^5.90.10",
+    "@tanstack/solid-query": "^5.90.11",
     "zod": "^4.1.12"
   }
 }
