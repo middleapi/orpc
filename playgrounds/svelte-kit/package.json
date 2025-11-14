@@ -21,9 +21,9 @@
     "@sveltejs/adapter-auto": "^7.0.0",
     "@sveltejs/kit": "^2.48.4",
     "@sveltejs/vite-plugin-svelte": "^6.2.1",
-    "@tanstack/svelte-query": "^6.0.5",
-    "svelte": "^5.43.5",
-    "svelte-check": "^4.3.3",
+    "@tanstack/svelte-query": "^6.0.6",
+    "svelte": "^5.43.6",
+    "svelte-check": "^4.3.4",
     "typescript": "^5.9.3",
     "vite": "^7.2.2",
     "zod": "^4.1.12"
