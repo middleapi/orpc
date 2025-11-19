@@ -8,7 +8,7 @@
     "type:check": "tsc --noEmit"
   },
   "devDependencies": {
-    "@nestjs/cli": "^11.0.10",
+    "@nestjs/cli": "^11.0.12",
     "@nestjs/common": "^11.1.9",
     "@nestjs/core": "^11.1.9",
     "@nestjs/platform-express": "^11.1.9",
