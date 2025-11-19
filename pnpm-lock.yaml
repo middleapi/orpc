@@ -1299,13 +1299,13 @@ importers:
     devDependencies:
       '@electron-toolkit/preload':
         specifier: ^3.0.2
-        version: 3.0.2(electron@38.5.0)
+        version: 3.0.2(electron@39.2.2)
       '@electron-toolkit/tsconfig':
         specifier: ^2.0.0
         version: 2.0.0(@types/node@22.18.13)
       '@electron-toolkit/utils':
         specifier: ^4.0.0
-        version: 4.0.0(electron@38.5.0)
+        version: 4.0.0(electron@39.2.2)
       '@orpc/client':
         specifier: next
         version: link:../../packages/client
@@ -1334,8 +1334,8 @@ importers:
         specifier: ^5.1.1
         version: 5.1.1(vite@7.2.2(@types/node@22.18.13)(jiti@2.6.1)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1))
       electron:
-        specifier: ^38.4.0
-        version: 38.5.0
+        specifier: ^39.2.2
+        version: 39.2.2
       electron-builder:
         specifier: ^26.0.12
         version: 26.0.12(electron-builder-squirrel-windows@26.0.12)
@@ -6698,8 +6698,8 @@ packages:
   '@types/node@22.18.13':
     resolution: {integrity: sha512-Bo45YKIjnmFtv6I1TuC8AaHBbqXtIo+Om5fE4QiU1Tj8QR/qt+8O3BAtOimG5IFmwaWiPmB3Mv3jtYzBA4Us2A==}
 
-  '@types/node@22.19.0':
-    resolution: {integrity: sha512-xpr/lmLPQEj+TUnHmR+Ab91/glhJvsqcjB+yY0Ix9GO70H6Lb4FHH5GeqdOE5btAx7eIMwuHkp4H2MSkLcqWbA==}
+  '@types/node@22.19.1':
+    resolution: {integrity: sha512-LCCV0HdSZZZb34qifBsyWlUmok6W7ouER+oQIGBScS8EsZsQbrtFTUrDX4hOl+CS6p7cnNC4td+qrSVGSCTUfQ==}
 
   '@types/node@24.10.0':
     resolution: {integrity: sha512-qzQZRBqkFsYyaSWXuEHc2WR9c0a0CXwiE5FWUvn7ZM+vdy1uZLfCunD38UzhuB7YN/J11ndbDBcTmOdxJo9Q7A==}
@@ -8972,8 +8972,8 @@ packages:
     resolution: {integrity: sha512-bO3y10YikuUwUuDUQRM4KfwNkKhnpVO7IPdbsrejwN9/AABJzzTQ4GeHwyzNSrVO+tEH3/Np255a3sVZpZDjvg==}
     engines: {node: '>=8.0.0'}
 
-  electron@38.5.0:
-    resolution: {integrity: sha512-dbC7V+eZweerYMJfxQldzHOg37a1VdNMCKxrJxlkp3cA30gOXtXSg4ZYs07L5+QwI19WOy1uyvtEUgbw1RRsCQ==}
+  electron@39.2.2:
+    resolution: {integrity: sha512-NgOmMSWwP4bvZBQOUtP1biMjOP4fYXghqmT3QjLJoUod9NnnoB6I4Th4l3BuX5zae/ohcLh67olqPE5aDiq0Gg==}
     engines: {node: '>= 12.20.55'}
     hasBin: true
 
@@ -15845,17 +15845,17 @@ snapshots:
 
   '@dxup/unimport@0.1.1': {}
 
-  '@electron-toolkit/preload@3.0.2(electron@38.5.0)':
+  '@electron-toolkit/preload@3.0.2(electron@39.2.2)':
     dependencies:
-      electron: 38.5.0
+      electron: 39.2.2
 
   '@electron-toolkit/tsconfig@2.0.0(@types/node@22.18.13)':
     dependencies:
       '@types/node': 22.18.13
 
-  '@electron-toolkit/utils@4.0.0(electron@38.5.0)':
+  '@electron-toolkit/utils@4.0.0(electron@39.2.2)':
     dependencies:
-      electron: 38.5.0
+      electron: 39.2.2
 
   '@electron/asar@3.2.18':
     dependencies:
@@ -19456,7 +19456,7 @@ snapshots:
   '@scalar/icons@0.5.0(typescript@5.8.3)':
     dependencies:
       '@phosphor-icons/core': 2.1.1
-      '@types/node': 22.19.0
+      '@types/node': 22.19.1
       chalk: 5.6.2
       vue: 3.5.24(typescript@5.8.3)
     transitivePeerDependencies:
@@ -20537,13 +20537,13 @@ snapshots:
 
   '@types/bunyan@1.8.11':
     dependencies:
-      '@types/node': 22.19.0
+      '@types/node': 22.19.1
 
   '@types/cacheable-request@6.0.3':
     dependencies:
       '@types/http-cache-semantics': 4.0.4
       '@types/keyv': 3.1.4
-      '@types/node': 22.19.0
+      '@types/node': 22.19.1
       '@types/responselike': 1.0.3
 
   '@types/chai@5.2.3':
@@ -20558,7 +20558,7 @@ snapshots:
 
   '@types/connect@3.4.38':
     dependencies:
-      '@types/node': 22.19.0
+      '@types/node': 22.19.1
 
   '@types/cookie@0.6.0': {}
 
@@ -20720,11 +20720,11 @@ snapshots:
 
   '@types/fontkit@2.0.8':
     dependencies:
-      '@types/node': 22.19.0
+      '@types/node': 22.19.1
 
   '@types/fs-extra@9.0.13':
     dependencies:
-      '@types/node': 22.18.13
+      '@types/node': 22.19.1
 
   '@types/geojson@7946.0.16': {}
 
@@ -20742,7 +20742,7 @@ snapshots:
 
   '@types/keyv@3.1.4':
     dependencies:
-      '@types/node': 22.19.0
+      '@types/node': 22.19.1
 
   '@types/linkify-it@5.0.0': {}
 
@@ -20759,7 +20759,7 @@ snapshots:
 
   '@types/memcached@2.2.10':
     dependencies:
-      '@types/node': 22.19.0
+      '@types/node': 22.19.1
 
   '@types/methods@1.1.4': {}
 
@@ -20775,7 +20775,7 @@ snapshots:
 
   '@types/mysql@2.15.27':
     dependencies:
-      '@types/node': 22.19.0
+      '@types/node': 22.19.1
 
   '@types/nlcst@2.0.3':
     dependencies:
@@ -20785,7 +20785,7 @@ snapshots:
     dependencies:
       undici-types: 6.21.0
 
-  '@types/node@22.19.0':
+  '@types/node@22.19.1':
     dependencies:
       undici-types: 6.21.0
 
@@ -20800,7 +20800,7 @@ snapshots:
 
   '@types/oracledb@6.5.2':
     dependencies:
-      '@types/node': 22.19.0
+      '@types/node': 22.19.1
 
   '@types/parse-path@7.1.0':
     dependencies:
@@ -20812,19 +20812,19 @@ snapshots:
 
   '@types/pg@8.15.5':
     dependencies:
-      '@types/node': 22.19.0
+      '@types/node': 22.19.1
       pg-protocol: 1.10.3
       pg-types: 2.2.0
 
   '@types/pg@8.15.6':
     dependencies:
-      '@types/node': 22.19.0
+      '@types/node': 22.19.1
       pg-protocol: 1.10.3
       pg-types: 2.2.0
 
   '@types/plist@3.0.5':
     dependencies:
-      '@types/node': 22.19.0
+      '@types/node': 22.19.1
       xmlbuilder: 15.1.1
     optional: true
 
@@ -20844,16 +20844,16 @@ snapshots:
 
   '@types/responselike@1.0.3':
     dependencies:
-      '@types/node': 22.19.0
+      '@types/node': 22.19.1
 
   '@types/send@0.17.6':
     dependencies:
       '@types/mime': 1.3.5
-      '@types/node': 22.18.13
+      '@types/node': 22.19.1
 
   '@types/send@1.2.1':
     dependencies:
-      '@types/node': 22.18.13
+      '@types/node': 22.19.1
 
   '@types/serve-static@1.15.10':
     dependencies:
@@ -20879,7 +20879,7 @@ snapshots:
 
   '@types/tedious@4.0.14':
     dependencies:
-      '@types/node': 22.19.0
+      '@types/node': 22.19.1
 
   '@types/trusted-types@2.0.7':
     optional: true
@@ -20901,7 +20901,7 @@ snapshots:
 
   '@types/yauzl@2.10.3':
     dependencies:
-      '@types/node': 22.18.13
+      '@types/node': 22.19.1
     optional: true
 
   '@typescript-eslint/eslint-plugin@8.46.2(@typescript-eslint/parser@8.46.2(eslint@9.39.1(jiti@2.6.1))(typescript@5.8.3))(eslint@9.39.1(jiti@2.6.1))(typescript@5.8.3)':
@@ -22740,7 +22740,7 @@ snapshots:
 
   chrome-launcher@1.2.0:
     dependencies:
-      '@types/node': 24.10.0
+      '@types/node': 22.19.1
       escape-string-regexp: 4.0.0
       is-wsl: 2.2.0
       lighthouse-logger: 2.0.2
@@ -23666,10 +23666,10 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron@38.5.0:
+  electron@39.2.2:
     dependencies:
       '@electron/get': 2.0.3
-      '@types/node': 22.18.13
+      '@types/node': 22.19.1
       extract-zip: 2.0.1
     transitivePeerDependencies:
       - supports-color
@@ -25478,7 +25478,7 @@ snapshots:
 
   jest-worker@27.5.1:
     dependencies:
-      '@types/node': 22.19.0
+      '@types/node': 22.19.1
       merge-stream: 2.0.0
       supports-color: 8.1.1
 
@@ -27708,7 +27708,7 @@ snapshots:
       '@protobufjs/path': 1.1.2
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.0
-      '@types/node': 22.19.0
+      '@types/node': 22.19.1
       long: 5.3.2
 
   protocols@2.0.2: {}
