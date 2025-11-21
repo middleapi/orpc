@@ -38,7 +38,8 @@
     "@orpc/interop": "workspace:*",
     "@orpc/openapi": "workspace:*",
     "@orpc/server": "workspace:*",
-    "@orpc/shared": "workspace:*"
+    "@orpc/shared": "workspace:*",
+    "json-schema-typed": "^8.0.2"
   },
   "devDependencies": {
     "zod": "^4.1.12"

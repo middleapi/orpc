@@ -73,8 +73,6 @@ A compatibility layer that builds & re-exports upstream packages that don't yet 
 
 **Included packages:**
 
-- [json-schema-typed](https://www.npmjs.com/package/json-schema-typed) to address issue [RemyRylan/json-schema-typed#116](https://github.com/RemyRylan/json-schema-typed/issues/116)
-
 - [compression](https://www.npmjs.com/package/compression) for esm compatibility
 
 ## Sponsors

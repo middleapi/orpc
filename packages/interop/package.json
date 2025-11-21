@@ -15,26 +15,6 @@
   ],
   "publishConfig": {
     "exports": {
-      "./json-schema-typed": {
-        "types": "./dist/json-schema-typed/index.d.mts",
-        "import": "./dist/json-schema-typed/index.mjs",
-        "default": "./dist/json-schema-typed/index.mjs"
-      },
-      "./json-schema-typed/draft-07": {
-        "types": "./dist/json-schema-typed/draft-07.d.mts",
-        "import": "./dist/json-schema-typed/draft-07.mjs",
-        "default": "./dist/json-schema-typed/draft-07.mjs"
-      },
-      "./json-schema-typed/draft-2019-09": {
-        "types": "./dist/json-schema-typed/draft-2019-09.d.mts",
-        "import": "./dist/json-schema-typed/draft-2019-09.mjs",
-        "default": "./dist/json-schema-typed/draft-2019-09.mjs"
-      },
-      "./json-schema-typed/draft-2020-12": {
-        "types": "./dist/json-schema-typed/draft-2020-12.d.mts",
-        "import": "./dist/json-schema-typed/draft-2020-12.mjs",
-        "default": "./dist/json-schema-typed/draft-2020-12.mjs"
-      },
       "./compression": {
         "types": "./dist/compression/index.d.mts",
         "import": "./dist/compression/index.mjs",
@@ -43,10 +23,6 @@
     }
   },
   "exports": {
-    "./json-schema-typed": "./src/json-schema-typed/index.ts",
-    "./json-schema-typed/draft-07": "./src/json-schema-typed/draft-07.ts",
-    "./json-schema-typed/draft-2019-09": "./src/json-schema-typed/draft-2019-09.ts",
-    "./json-schema-typed/draft-2020-12": "./src/json-schema-typed/draft-2020-12.ts",
     "./compression": "./src/compression/index.ts"
   },
   "files": [
@@ -59,7 +35,6 @@
   },
   "devDependencies": {
     "@types/compression": "^1.8.1",
-    "compression": "^1.8.1",
-    "json-schema-typed": "^8.0.1"
+    "compression": "^1.8.1"
   }
 }
