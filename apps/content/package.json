@@ -8,8 +8,8 @@
     "serve": "vitepress serve"
   },
   "devDependencies": {
-    "@ai-sdk/google": "2.0.34",
-    "@ai-sdk/react": "2.0.93",
+    "@ai-sdk/google": "2.0.40",
+    "@ai-sdk/react": "2.0.98",
     "@opentelemetry/instrumentation": "^0.208.0",
     "@opentelemetry/sdk-node": "^0.208.0",
     "@opentelemetry/sdk-trace-web": "^2.2.0",
@@ -32,7 +32,7 @@
     "@orpc/vue-query": "workspace:*",
     "@orpc/zod": "workspace:*",
     "@pinia/colada": "^0.17.8",
-    "@sentry/node": "^10.25.0",
+    "@sentry/node": "^10.26.0",
     "@shikijs/vitepress-twoslash": "^3.15.0",
     "@tanstack/react-query": "^5.90.10",
     "@tanstack/solid-query": "^5.90.13",
@@ -45,7 +45,7 @@
     "openai": "^6.9.1",
     "pinia": "^3.0.4",
     "superjson": "^2.2.5",
-    "svelte": "^5.43.10",
+    "svelte": "^5.43.14",
     "vitepress": "1.6.4",
     "vitepress-plugin-group-icons": "^1.6.5",
     "vitepress-plugin-llms": "^1.9.3",
