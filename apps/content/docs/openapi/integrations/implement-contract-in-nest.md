@@ -223,18 +223,36 @@ Configure the `@orpc/nest` module by importing `ORPCModule` in your NestJS appli
 import { REQUEST } from '@nestjs/core'
 import { onError, ORPCModule } from '@orpc/nest'
 import { Request } from 'express' // if you use express adapter
+import { experimental_SmartCoercionPlugin as SmartCoercionPlugin } from '@orpc/json-schema'
+import { ZodToJsonSchemaConverter } from '@orpc/zod/zod4'
+
+declare module '@orpc/nest' {
+  /**
+   * Extend oRPC global context to make it type-safe inside your handlers/middlewares
+   */
+  interface ORPCGlobalContext {
+    request: Request
+  }
+}
 
 @Module({
   imports: [
-    ORPCModule.forRootAsync({ // or .forRoot
+    ORPCModule.forRootAsync({ // use forRoot for static configuration
       useFactory: (request: Request) => ({
+        context: { request }, // oRPC context, accessible from middlewares, etc.
+        eventIteratorKeepAliveInterval: 5000, // 5 seconds
         interceptors: [
           onError((error) => {
             console.error(error)
           }),
         ],
-        context: { request }, // oRPC context, accessible from middlewares, etc.
-        eventIteratorKeepAliveInterval: 5000, // 5 seconds
+        plugins: [
+          new SmartCoercionPlugin({
+            schemaConverters: [
+              new ZodToJsonSchemaConverter(),
+            ],
+          }),
+        ],
       }),
       inject: [REQUEST],
     }),
@@ -244,10 +262,7 @@ export class AppModule {}
 ```
 
 ::: info
-
-- **`interceptors`** - [Server-side client interceptors](/docs/client/server-side#lifecycle) for intercepting input, output, and errors.
-- **`eventIteratorKeepAliveInterval`** - Keep-alive interval for event streams (see [Event Iterator Keep Alive](/docs/rpc-handler#event-iterator-keep-alive))
-
+These configurations are optional and support most options available in [OpenAPIHandler](/docs/openapi/openapi-handler).
 :::
 
 ## Create a Type-Safe Client

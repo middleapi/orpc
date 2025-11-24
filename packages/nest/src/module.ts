@@ -1,15 +1,33 @@
 import type { DynamicModule } from '@nestjs/common'
-import type { AnySchema } from '@orpc/contract'
-import type { CreateProcedureClientOptions } from '@orpc/server'
+import type { StandardBracketNotationSerializerOptions, StandardOpenAPIJsonSerializerOptions } from '@orpc/openapi-client/standard'
+import type { StandardHandlerOptions } from '@orpc/server/standard'
 import type { SendStandardResponseOptions } from '@orpc/standard-server-node'
 import { Module } from '@nestjs/common'
 import { ImplementInterceptor } from './implement'
 
 export const ORPC_MODULE_CONFIG_SYMBOL = Symbol('ORPC_MODULE_CONFIG')
 
+/**
+ * You can extend this interface to add global context properties.
+ * @example
+ * ```ts
+ * declare module '@orpc/nest' {
+ *   interface ORPCGlobalContext {
+ *     user: { id: string; name: string }
+ *   }
+ * }
+ * ```
+ */
+export interface ORPCGlobalContext {
+
+}
+
 export interface ORPCModuleConfig extends
-  CreateProcedureClientOptions<object, AnySchema, object, object, object>,
-  SendStandardResponseOptions {
+  StandardHandlerOptions<ORPCGlobalContext>,
+  SendStandardResponseOptions,
+  StandardOpenAPIJsonSerializerOptions,
+  StandardBracketNotationSerializerOptions {
+  context?: ORPCGlobalContext
 }
 
 @Module({})

@@ -15,6 +15,7 @@
     "@nestjs/schematics": "^11.0.9",
     "@orpc/client": "next",
     "@orpc/contract": "next",
+    "@orpc/json-schema": "next",
     "@orpc/nest": "next",
     "@orpc/openapi": "next",
     "@orpc/openapi-client": "next",

@@ -7,6 +7,7 @@ import { REQUEST } from '@nestjs/core'
 import { FastifyAdapter } from '@nestjs/platform-fastify'
 import { Test } from '@nestjs/testing'
 import { oc, ORPCError } from '@orpc/contract'
+import * as StandardOpenAPIClientModule from '@orpc/openapi-client/standard'
 import { implement, lazy } from '@orpc/server'
 import * as StandardServerNode from '@orpc/standard-server-node'
 import supertest from 'supertest'
@@ -14,6 +15,15 @@ import { expect, it, vi } from 'vitest'
 import * as z from 'zod'
 import { Implement } from './implement'
 import { ORPCModule } from './module'
+
+vi.mock('@orpc/openapi-client/standard', async (importActual) => {
+  const actual = await importActual<any>()
+  return {
+    ...actual,
+    StandardOpenAPIJsonSerializer: vi.fn().mockImplementation((...args: any[]) => new actual.StandardOpenAPIJsonSerializer(...args)),
+    StandardBracketNotationSerializer: vi.fn().mockImplementation((...args: any[]) => new actual.StandardBracketNotationSerializer(...args)),
+  }
+})
 
 const sendStandardResponseSpy = vi.spyOn(StandardServerNode, 'sendStandardResponse')
 
@@ -387,11 +397,21 @@ describe('@Implement', async () => {
 
   it('works with ORPCModule.forRoot', async () => {
     const interceptor = vi.fn(({ next }) => next())
+    const interceptors = [interceptor]
+    const customJsonSerializers = [
+      {
+        condition: (data: unknown) => data === 'special',
+        serialize: () => 'SPECIAL_SERIALIZED',
+      },
+    ]
     const moduleRef = await Test.createTestingModule({
       imports: [
         ORPCModule.forRoot({
-          interceptors: [interceptor],
+          interceptors,
+          context: { customValue: 42 },
           eventIteratorKeepAliveComment: '__TEST__',
+          customJsonSerializers,
+          maxBracketNotationArrayIndex: 9404,
         }),
       ],
       controllers: [ImplProcedureController],
@@ -410,7 +430,18 @@ describe('@Implement', async () => {
     expect(res.statusCode).toEqual(200)
     expect(res.body).toEqual('pong')
 
+    expect(StandardOpenAPIClientModule.StandardOpenAPIJsonSerializer).toHaveBeenCalledWith(expect.objectContaining({
+      customJsonSerializers,
+    }))
+    // make sure the config object is cloned internally
+    expect(vi.mocked(StandardOpenAPIClientModule.StandardOpenAPIJsonSerializer).mock.calls[0][0]?.customJsonSerializers).not.toBe(customJsonSerializers)
+
+    expect(StandardOpenAPIClientModule.StandardBracketNotationSerializer).toHaveBeenCalledWith(expect.objectContaining({
+      maxBracketNotationArrayIndex: 9404,
+    }))
+
     expect(interceptor).toHaveBeenCalledTimes(1)
+    expect(interceptor).toHaveBeenCalledWith(expect.objectContaining({ context: { customValue: 42 } }))
     expect(sendStandardResponseSpy).toHaveBeenCalledTimes(1)
     expect(sendStandardResponseSpy).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({
       eventIteratorKeepAliveComment: '__TEST__',
@@ -419,15 +450,22 @@ describe('@Implement', async () => {
 
   it('works with ORPCModule.forRootAsync', async () => {
     const interceptor = vi.fn(({ next }) => next())
+    const interceptors = [interceptor]
+    const customJsonSerializers = [
+      {
+        condition: (data: unknown) => data === 'special',
+        serialize: () => 'SPECIAL_SERIALIZED',
+      },
+    ]
     const moduleRef = await Test.createTestingModule({
       imports: [
         ORPCModule.forRootAsync({
           useFactory: async (request: Request) => ({
-            interceptors: [interceptor],
+            interceptors,
             eventIteratorKeepAliveComment: '__TEST__',
-            context: {
-              request,
-            },
+            context: { request, customValue: 42 },
+            customJsonSerializers,
+            maxBracketNotationArrayIndex: 23979,
           }),
           inject: [REQUEST],
         }),
@@ -448,6 +486,16 @@ describe('@Implement', async () => {
     expect(res.statusCode).toEqual(200)
     expect(res.body).toEqual('pong')
 
+    expect(StandardOpenAPIClientModule.StandardOpenAPIJsonSerializer).toHaveBeenCalledWith(expect.objectContaining({
+      customJsonSerializers,
+    }))
+    // make sure the config object is cloned internally
+    expect(vi.mocked(StandardOpenAPIClientModule.StandardOpenAPIJsonSerializer).mock.calls[0][0]?.customJsonSerializers).not.toBe(customJsonSerializers)
+
+    expect(StandardOpenAPIClientModule.StandardBracketNotationSerializer).toHaveBeenCalledWith(expect.objectContaining({
+      maxBracketNotationArrayIndex: 23979,
+    }))
+
     expect(interceptor).toHaveBeenCalledTimes(1)
     expect(interceptor).toHaveBeenCalledWith(expect.objectContaining({
       context: expect.objectContaining({
@@ -457,6 +505,7 @@ describe('@Implement', async () => {
             'x-custom': 'value',
           }),
         }),
+        customValue: 42,
       }),
     }))
     expect(sendStandardResponseSpy).toHaveBeenCalledTimes(1)

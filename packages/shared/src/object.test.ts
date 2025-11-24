@@ -76,13 +76,17 @@ it('isTypescriptObject', () => {
 it('clone', () => {
   expect(clone(null)).toBeNull()
 
-  const obj = { a: 1, arr: [2, 3], nested: { arr: [{ b: 4 }] } }
+  const symbol = Symbol('a')
+  const obj = { a: 1, arr: [2, 3], nested: { arr: [{ b: 4 }], [symbol]: { [symbol]: 5 } } }
   const cloned = clone(obj)
 
   expect(cloned).toEqual(obj)
   expect(cloned).not.toBe(obj)
   expect(cloned.arr).not.toBe(obj.arr)
   expect(cloned.nested.arr).not.toBe(obj.nested.arr)
+  expect(cloned.nested[symbol]).toEqual(obj.nested[symbol])
+  expect(cloned.nested[symbol]).not.toBe(obj.nested[symbol])
+  expect(cloned.nested[symbol][symbol]).toBe(5)
 })
 
 it('get', () => {
