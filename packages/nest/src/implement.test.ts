@@ -434,7 +434,7 @@ describe('@Implement', async () => {
       customJsonSerializers,
     }))
     // make sure the config object is cloned internally
-    expect(vi.mocked(StandardOpenAPIClientModule.StandardOpenAPIJsonSerializer).mock.calls[0][0]?.customJsonSerializers).not.toBe(customJsonSerializers)
+    expect(vi.mocked(StandardOpenAPIClientModule.StandardOpenAPIJsonSerializer).mock.calls[0]![0]?.customJsonSerializers).not.toBe(customJsonSerializers)
 
     expect(StandardOpenAPIClientModule.StandardBracketNotationSerializer).toHaveBeenCalledWith(expect.objectContaining({
       maxBracketNotationArrayIndex: 9404,
@@ -490,7 +490,7 @@ describe('@Implement', async () => {
       customJsonSerializers,
     }))
     // make sure the config object is cloned internally
-    expect(vi.mocked(StandardOpenAPIClientModule.StandardOpenAPIJsonSerializer).mock.calls[0][0]?.customJsonSerializers).not.toBe(customJsonSerializers)
+    expect(vi.mocked(StandardOpenAPIClientModule.StandardOpenAPIJsonSerializer).mock.calls[0]![0]?.customJsonSerializers).not.toBe(customJsonSerializers)
 
     expect(StandardOpenAPIClientModule.StandardBracketNotationSerializer).toHaveBeenCalledWith(expect.objectContaining({
       maxBracketNotationArrayIndex: 23979,

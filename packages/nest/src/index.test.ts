@@ -17,5 +17,5 @@ it('implement is aliased', () => {
 
   expect(ServerModule.implement).toHaveBeenCalledTimes(1)
   expect(ServerModule.implement).toHaveBeenCalledWith(contract, options)
-  expect(impl).toBe(vi.mocked(ServerModule.implement).mock.results[0].value)
+  expect(impl).toBe(vi.mocked(ServerModule.implement).mock.results[0]!.value)
 })
