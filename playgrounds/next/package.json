@@ -18,13 +18,13 @@
     "@orpc/zod": "next",
     "@tanstack/react-query": "^5.90.10",
     "@types/node": "^22.15.30",
-    "@types/react": "^19.2.6",
+    "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
-    "next": "^16.0.3",
+    "next": "^16.0.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "server-only": "^0.0.1",
     "typescript": "^5.9.3",
-    "zod": "^4.1.12"
+    "zod": "^4.1.13"
   }
 }

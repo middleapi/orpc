@@ -47,6 +47,6 @@
   },
   "devDependencies": {
     "@tanstack/solid-query": "^5.90.13",
-    "zod": "^4.1.12"
+    "zod": "^4.1.13"
   }
 }
