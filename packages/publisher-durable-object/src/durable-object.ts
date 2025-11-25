@@ -77,19 +77,15 @@ export class PublisherDurableObject<Env = Cloudflare.Env, Props = {}> extends Du
   }
 
   private async handlePublish(request: Request): Promise<Response> {
-    let serialized = await request.text()
+    let stringified = await request.text()
 
     if (this.isResumeEnabled) {
-      serialized = stringifyJSON(
-        this.storeEvent(
-          JSON.parse(serialized),
-        ),
-      )
+      stringified = this.storeEvent(stringified)
     }
 
     for (const ws of this.ctx.getWebSockets()) {
       try {
-        ws.send(serialized)
+        ws.send(stringified)
       }
       catch (e) {
         console.error('Failed to send message to websocket:', e)
@@ -111,26 +107,27 @@ export class PublisherDurableObject<Env = Cloudflare.Env, Props = {}> extends Du
     return new Response(null, { status: 101, webSocket: client })
   }
 
-  private storeEvent(message: SerializedMessage): SerializedMessage {
+  private storeEvent(stringified: string): string {
     this.cleanupExpiredEvents()
 
-    const payload = stringifyJSON(message)
-
-    const insertEvent = (): SerializedMessage => {
+    const insertEvent = () => {
       /**
        * SQLite INTEGER can exceed JavaScript's safe integer range,
        * so we cast to TEXT for safe ID handling in resume operations.
        */
       const result = this.ctx.storage.sql.exec(
         `INSERT INTO "${this.resumeSchemaPrefix}events" (payload) VALUES (?) RETURNING CAST(id AS TEXT) as id`,
-        payload,
+        stringified,
       )
 
+      const message: SerializedMessage = JSON.parse(stringified)
       const id = result.one()?.id as string
-      return {
+      const updatedIdMessage: SerializedMessage = {
         ...message,
         meta: { ...message.meta, id },
       }
+
+      return stringifyJSON(updatedIdMessage)
     }
 
     try {
