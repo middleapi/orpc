@@ -3,7 +3,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte'
 import { svelteTesting } from '@testing-library/svelte/vite'
 import { loadEnv } from 'vite'
 import solid from 'vite-plugin-solid'
-import { defaultExclude, defineConfig } from 'vitest/config'
+import { defineConfig } from 'vitest/config'
 
 export default defineConfig(({ mode }) => ({
   test: {
@@ -14,7 +14,6 @@ export default defineConfig(({ mode }) => ({
           globals: true,
           setupFiles: ['./vitest.javascript.ts'],
           include: ['**/*.test.ts'],
-          exclude: [...defaultExclude, 'packages/publisher-durable-object/tests/**'],
         },
       },
       {
@@ -66,7 +65,6 @@ export default defineConfig(({ mode }) => ({
           conditions: ['development', 'browser'],
         },
       },
-      'packages/publisher-durable-object/tests/vitest.config.ts',
     ],
   },
 }))
