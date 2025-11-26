@@ -148,11 +148,12 @@ while (true) {
 
 ## Available Adapters
 
-| Name                    | Resume Support | Description                                                      |
-| ----------------------- | -------------- | ---------------------------------------------------------------- |
-| `MemoryPublisher`       | ✅             | A simple in-memory publisher                                     |
-| `IORedisPublisher`      | ✅             | Adapter for [ioredis](https://github.com/redis/ioredis)          |
-| `UpstashRedisPublisher` | ✅             | Adapter for [Upstash Redis](https://github.com/upstash/redis-js) |
+| Name                     | Resume Support | Description                                                                                  |
+| ------------------------ | -------------- | -------------------------------------------------------------------------------------------- |
+| `MemoryPublisher`        | ✅             | A simple in-memory publisher                                                                 |
+| `IORedisPublisher`       | ✅             | Adapter for [ioredis](https://github.com/redis/ioredis)                                      |
+| `UpstashRedisPublisher`  | ✅             | Adapter for [Upstash Redis](https://github.com/upstash/redis-js)                             |
+| `PublisherDurableObject` | ✅             | Adapter for [Cloudflare Durable Objects](https://developers.cloudflare.com/durable-objects/) |
 
 ::: info
 If you'd like to add a new publisher adapter, please open an issue.
