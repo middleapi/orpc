@@ -66,7 +66,7 @@ export class ResumeStorage {
       return stringified
     }
 
-    await this.ensureReady()
+    await this.ensureSchemaAndCleanup()
 
     const message: SerializedMessage = JSON.parse(stringified)
 
@@ -98,7 +98,7 @@ export class ResumeStorage {
        * May cause data loss, but prevents total failure.
        */
       console.error('Failed to insert event, resetting resume storage schema.', e)
-      await this.resetData()
+      await this.resetSchema()
       return insertEvent()
     }
   }
@@ -111,7 +111,7 @@ export class ResumeStorage {
       return []
     }
 
-    await this.ensureReady()
+    await this.ensureSchemaAndCleanup()
 
     /**
      * SQLite INTEGER can exceed JavaScript's safe integer range,
@@ -143,79 +143,85 @@ export class ResumeStorage {
    */
   async alarm(): Promise<void> {
     this.isInitedAlarm = true // triggered form alarm means it's already initialized
-    await this.ensureReady()
+    await this.ensureSchemaAndCleanup()
 
-    const hasActiveWebSockets = this.ctx.getWebSockets().length > 0
-    if (hasActiveWebSockets) {
-      await this.scheduleAlarm()
-      return
-    }
+    const shouldReschedule = await this.ctx.blockConcurrencyWhile(async () => {
+      const hasActiveWebSockets = this.ctx.getWebSockets().length > 0
+      if (hasActiveWebSockets) {
+        return true
+      }
 
-    const activeEventsCount = this.ctx.storage.sql.exec(`
-      SELECT COUNT(*) as count
-      FROM "${this.schemaPrefix}events"
-    `)
+      const activeEventsCount = this.ctx.storage.sql.exec(`
+        SELECT COUNT(*) as count
+        FROM "${this.schemaPrefix}events"
+      `)
+      const hasActiveEvents = (activeEventsCount.one()?.count as number) > 0
+      if (hasActiveEvents) {
+        return true
+      }
 
-    const hasActiveEvents = (activeEventsCount.one()?.count as number) > 0
-    if (hasActiveEvents) {
-      await this.scheduleAlarm()
-      return
-    }
-
-    await this.ctx.blockConcurrencyWhile(async () => {
       // if durable object receive events after deletion, re-initialize should happen again
       // and reset before deleteAll to avoid errors
       this.isInitedSchema = false
       this.isInitedAlarm = false
       await this.ctx.storage.deleteAll()
+
+      return false
     })
+
+    if (shouldReschedule) {
+      await this.scheduleAlarm()
+    }
   }
 
-  private async ensureReady(): Promise<void> {
-    if (this.isInitedSchema) {
-      const now = Date.now()
-
-      // Defer cleanup to improve performance
-      if (this.lastCleanupTime && this.lastCleanupTime + this.retentionSeconds * 1000 > now) {
-        return
-      }
-
-      this.lastCleanupTime = now
+  private async ensureSchemaAndCleanup(): Promise<void> {
+    if (!this.isInitedSchema) {
+      this.ctx.storage.sql.exec(`
+        CREATE TABLE IF NOT EXISTS "${this.schemaPrefix}events" (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          payload TEXT NOT NULL,
+          stored_at INTEGER NOT NULL DEFAULT (unixepoch())
+        )
+      `)
 
       this.ctx.storage.sql.exec(`
-        DELETE FROM "${this.schemaPrefix}events" WHERE stored_at < unixepoch() - ?
-      `, this.retentionSeconds)
+        CREATE INDEX IF NOT EXISTS "${this.schemaPrefix}idx_events_id" ON "${this.schemaPrefix}events" (id)
+      `)
+
+      this.ctx.storage.sql.exec(`
+        CREATE INDEX IF NOT EXISTS "${this.schemaPrefix}idx_events_stored_at" ON "${this.schemaPrefix}events" (stored_at)
+      `)
+
+      this.isInitedSchema = true
+      this.lastCleanupTime = Date.now() // schema just created, nothing to cleanup
+
+      // we only need to schedule alarm once after schema is initialized
+      if (!this.isInitedAlarm) {
+        await this.scheduleAlarm()
+        this.isInitedAlarm = true
+      }
 
       return
     }
 
-    const result = this.ctx.storage.sql.exec(`
-      CREATE TABLE IF NOT EXISTS "${this.schemaPrefix}events" (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        payload TEXT NOT NULL,
-        stored_at INTEGER NOT NULL DEFAULT (unixepoch())
-      )
-    `)
+    const now = Date.now()
 
-    this.ctx.storage.sql.exec(`
-      CREATE INDEX IF NOT EXISTS "${this.schemaPrefix}idx_events_id" ON "${this.schemaPrefix}events" (id)
-    `)
-
-    this.ctx.storage.sql.exec(`
-      CREATE INDEX IF NOT EXISTS "${this.schemaPrefix}idx_events_stored_at" ON "${this.schemaPrefix}events" (stored_at)
-    `)
-
-    this.isInitedSchema = true
-    if (!this.isInitedAlarm || result.rowsWritten > 0) {
-      await this.scheduleAlarm()
-      this.isInitedAlarm = true
+    // Defer cleanup to improve performance
+    if (this.lastCleanupTime && this.lastCleanupTime + this.retentionSeconds * 1000 > now) {
+      return
     }
+
+    this.lastCleanupTime = now
+
+    this.ctx.storage.sql.exec(`
+      DELETE FROM "${this.schemaPrefix}events" WHERE stored_at < unixepoch() - ?
+    `, this.retentionSeconds)
   }
 
-  private async resetData(): Promise<void> {
+  private async resetSchema(): Promise<void> {
     this.ctx.storage.sql.exec(`DROP TABLE IF EXISTS "${this.schemaPrefix}events"`)
     this.isInitedSchema = false // make sure schema is re-initialized
-    await this.ensureReady()
+    await this.ensureSchemaAndCleanup()
   }
 
   private scheduleAlarm(): Promise<void> {

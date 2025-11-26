@@ -46,10 +46,10 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
       meta: getEventMeta(payload),
     }
 
-    const response = await stub.fetch(new Request('http://localhost/publish', {
+    const response = await stub.fetch('http://localhost/publish', {
       method: 'POST',
       body: stringifyJSON(serialized),
-    }))
+    })
 
     if (!response.ok) {
       throw new Error(`Failed to publish event: ${response.status} ${response.statusText}`, {
