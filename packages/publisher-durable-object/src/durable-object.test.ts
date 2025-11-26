@@ -1,4 +1,3 @@
-import { sleep } from '@orpc/shared'
 import { createDurableObjectState, createWebSocket } from '../tests/shared'
 import { PublisherDurableObject } from './durable-object'
 
@@ -10,12 +9,14 @@ vi.mock('cloudflare:workers', () => ({
 
 // Mock WebSocketPair globally for Cloudflare Workers environment
 let mockServerWebSocket: any = null
+let mockClientWebSocket: any = null
 ;(globalThis as any).WebSocketPair = class {
   '0': WebSocket
   '1': WebSocket
   constructor() {
     const serverWs = mockServerWebSocket ?? createWebSocket()
-    this['0'] = { close: vi.fn() } as any
+    const clientWs = mockClientWebSocket ?? { close: vi.fn() }
+    this['0'] = clientWs as any
     this['1'] = serverWs
   }
 }
@@ -37,369 +38,228 @@ class MockResponse extends OriginalResponse {
 
 beforeEach(() => {
   mockServerWebSocket = null
+  mockClientWebSocket = null
 })
 
 describe('publisherDurableObject', () => {
-  describe('resume disabled (default)', () => {
-    it('does not create schema when resume is disabled', () => {
-      const ctx = createDurableObjectState()
-      void new PublisherDurableObject(ctx, {})
+  describe('handlePublish', () => {
+    it('should broadcast message to all connected websockets', async () => {
+      const state = createDurableObjectState()
+      const durableObject = new PublisherDurableObject(state, {})
 
-      expect(ctx.storage.sql.exec('SELECT name FROM sqlite_master WHERE type=?', 'table').toArray()).toEqual([])
-      expect(ctx.storage.setAlarm).not.toHaveBeenCalled()
-    })
+      // First, create some websocket connections
+      const ws1 = createWebSocket()
+      const ws2 = createWebSocket()
+      mockServerWebSocket = ws1
+      await durableObject.fetch(new Request('https://example.com/subscribe'))
+      mockServerWebSocket = ws2
+      await durableObject.fetch(new Request('https://example.com/subscribe'))
 
-    it('can publishes messages', async () => {
-      const ctx = createDurableObjectState()
-      const durable = new PublisherDurableObject(ctx, {})
-      const ws = createWebSocket()
-      ctx.acceptWebSocket(ws)
-
-      const message = JSON.stringify({ data: { json: 'data' }, meta: { comments: ['test'] } })
-      const request = new Request('http://localhost/publish', {
+      // Now publish a message
+      const message = JSON.stringify({ data: 'broadcast test' })
+      const request = new Request('https://example.com/publish', {
         method: 'POST',
         body: message,
       })
 
-      const response = await durable.fetch(request)
+      await durableObject.fetch(request)
+
+      expect(ws1.send).toHaveBeenCalledWith(message)
+      expect(ws2.send).toHaveBeenCalledWith(message)
+    })
+
+    it('should handle websocket send errors gracefully', async () => {
+      const state = createDurableObjectState()
+      const durableObject = new PublisherDurableObject(state, {})
+
+      // Create a websocket that throws on send
+      const failingWs = createWebSocket()
+      failingWs.send = vi.fn().mockImplementation(() => {
+        throw new Error('WebSocket send failed')
+      })
+      const successWs = createWebSocket()
+
+      mockServerWebSocket = failingWs
+      await durableObject.fetch(new Request('https://example.com/subscribe'))
+      mockServerWebSocket = successWs
+      await durableObject.fetch(new Request('https://example.com/subscribe'))
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      const message = JSON.stringify({ data: 'test' })
+      const request = new Request('https://example.com/publish', {
+        method: 'POST',
+        body: message,
+      })
+
+      const response = await durableObject.fetch(request)
+
+      // Should still return 204 even if some websockets fail
+      expect(response.status).toBe(204)
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to send message to websocket:', expect.any(Error))
+      // The successful websocket should still receive the message
+      expect(successWs.send).toHaveBeenCalledWith(message)
+
+      consoleErrorSpy.mockRestore()
+    })
+
+    it('should work with resume storage enabled', async () => {
+      const state = createDurableObjectState()
+      const durableObject = new PublisherDurableObject(state, {}, {
+        resume: { retentionSeconds: 60 },
+      })
+
+      const ws = createWebSocket()
+      mockServerWebSocket = ws
+      await durableObject.fetch(new Request('https://example.com/subscribe'))
+
+      const message = JSON.stringify({ meta: {}, payload: { data: 'test' } })
+      const request = new Request('https://example.com/publish', {
+        method: 'POST',
+        body: message,
+      })
+
+      const response = await durableObject.fetch(request)
 
       expect(response.status).toBe(204)
-      expect(ws.send).toHaveBeenCalledWith(message)
+      // Message should be sent with an ID added by resume storage
+      expect(ws.send).toHaveBeenCalled()
+      const sentMessage = JSON.parse(ws.send.mock.calls[0][0])
+      expect(sentMessage.meta.id).toBeDefined()
     })
+  })
 
-    it('can subscribes', async () => {
-      const ctx = createDurableObjectState()
-      const durable = new PublisherDurableObject(ctx, {})
+  describe('handleSubscribe', () => {
+    it('should upgrade websocket correctly', async () => {
+      const state = createDurableObjectState()
+      const durableObject = new PublisherDurableObject(state, {})
 
-      const request = new Request('http://localhost/subscribe', {
-        headers: { 'last-event-id': '0' },
-      })
+      const serverWs = createWebSocket()
+      mockServerWebSocket = serverWs
+      const clientWs = createWebSocket()
+      mockClientWebSocket = clientWs
 
-      const response = await durable.fetch(request)
+      const request = new Request('https://example.com/subscribe')
+      const response = await durableObject.fetch(request)
 
-      expect(ctx.acceptWebSocket).toHaveBeenCalled()
       expect(response.status).toBe(101)
-      expect((response as any).webSocket).toBeDefined()
-    })
-  })
-
-  describe('resume enabled', () => {
-    it('creates schema and schedules alarm on first init', () => {
-      const ctx = createDurableObjectState()
-      void new PublisherDurableObject(ctx, {}, { resumeRetentionSeconds: 60 })
-
-      const tables = ctx.storage.sql.exec('SELECT name FROM sqlite_master WHERE type=?', 'table').toArray()
-      expect(tables.map((t: any) => t.name)).toContain('orpc:publisher:resume:events')
-      expect(ctx.waitUntil).toHaveBeenCalled()
-      expect(ctx.storage.setAlarm).toHaveBeenCalled()
+      expect((response as any).webSocket).toBe(clientWs)
+      expect(state.acceptWebSocket).toHaveBeenCalledWith(serverWs)
     })
 
-    it('cleans up expired events on subsequent init (not first time)', () => {
-      const ctx = createDurableObjectState()
-      // First init creates table
-      void new PublisherDurableObject(ctx, {}, { resumeRetentionSeconds: 60 })
+    it('should not replay events when last-event-id header is not provided', async () => {
+      const state = createDurableObjectState()
+      const durableObject = new PublisherDurableObject(state, {}, {
+        resume: { retentionSeconds: 60 },
+      })
 
-      ctx.waitUntil.mockClear()
-      ctx.storage.setAlarm.mockClear()
+      // First publish some messages
+      await durableObject.fetch(new Request('https://example.com/publish', {
+        method: 'POST',
+        body: JSON.stringify({ meta: {}, payload: { data: 'event1' } }),
+      }))
 
-      // Second init should cleanup, not schedule alarm
-      void new PublisherDurableObject(ctx, {}, { resumeRetentionSeconds: 60 })
+      const serverWs = createWebSocket()
+      mockServerWebSocket = serverWs
 
-      expect(ctx.waitUntil).not.toHaveBeenCalled()
-      expect(ctx.storage.setAlarm).not.toHaveBeenCalled()
+      // Subscribe without last-event-id
+      const request = new Request('https://example.com/subscribe')
+      await durableObject.fetch(request)
+
+      // Should not replay any events
+      expect(serverWs.send).not.toHaveBeenCalled()
     })
 
-    it('stores events with auto-generated IDs', async () => {
-      const ctx = createDurableObjectState()
-      const durable = new PublisherDurableObject(ctx, {}, { resumeRetentionSeconds: 60 })
-      const ws = createWebSocket()
-      ctx.acceptWebSocket(ws)
+    it('should replay events after last-event-id when header is provided', async () => {
+      const state = createDurableObjectState()
+      const durableObject = new PublisherDurableObject(state, {}, {
+        resume: { retentionSeconds: 60 },
+      })
 
-      await durable.fetch(new Request('http://localhost/publish', {
+      // First publish some messages
+      await durableObject.fetch(new Request('https://example.com/publish', {
         method: 'POST',
-        body: JSON.stringify({ data: 'event1' }),
+        body: JSON.stringify({ meta: {}, payload: { data: 'event1' } }),
+      }))
+      await durableObject.fetch(new Request('https://example.com/publish', {
+        method: 'POST',
+        body: JSON.stringify({ meta: {}, payload: { data: 'event2' } }),
+      }))
+      await durableObject.fetch(new Request('https://example.com/publish', {
+        method: 'POST',
+        body: JSON.stringify({ meta: {}, payload: { data: 'event3' } }),
       }))
 
-      await durable.fetch(new Request('http://localhost/publish', {
-        method: 'POST',
-        body: JSON.stringify({ data: 'event2', meta: { retry: 1000, id: 'should be overwritten' } }),
-      }))
+      const serverWs = createWebSocket()
+      mockServerWebSocket = serverWs
 
-      expect(ws.send).toHaveBeenNthCalledWith(1, '{"data":"event1","meta":{"id":"1"}}')
-      expect(ws.send).toHaveBeenNthCalledWith(2, '{"data":"event2","meta":{"retry":1000,"id":"2"}}')
-
-      const stored = ctx.storage.sql.exec('SELECT * FROM "orpc:publisher:resume:events"').toArray()
-      expect(stored).toHaveLength(2)
-    })
-
-    it('replays events from lastEventId', async () => {
-      const ctx = createDurableObjectState()
-      const durable = new PublisherDurableObject(ctx, {}, { resumeRetentionSeconds: 60 })
-      const publisher = createWebSocket()
-      ctx.acceptWebSocket(publisher)
-
-      // Store some events
-      await durable.fetch(new Request('http://localhost/publish', {
-        method: 'POST',
-        body: JSON.stringify({ data: 'event1' }),
-      }))
-      await durable.fetch(new Request('http://localhost/publish', {
-        method: 'POST',
-        body: JSON.stringify({ data: 'event2' }),
-      }))
-      await durable.fetch(new Request('http://localhost/publish', {
-        method: 'POST',
-        body: JSON.stringify({ data: 'event3' }),
-      }))
-
-      // New subscriber with lastEventId = 1 should get events 2 and 3
-      const subscriber = createWebSocket()
-      // Mock WebSocketPair
-      const originalWebSocketPair = (globalThis as any).WebSocketPair
-      ;(globalThis as any).WebSocketPair = class {
-        '0': WebSocket
-        '1': WebSocket
-        constructor() {
-          this['0'] = {} as WebSocket
-          this['1'] = subscriber
-        }
-      }
-
-      await durable.fetch(new Request('http://localhost/subscribe', {
+      // Subscribe with last-event-id = '1' (should get events 2 and 3)
+      const request = new Request('https://example.com/subscribe', {
         headers: { 'last-event-id': '1' },
-      }))
+      })
+      await durableObject.fetch(request)
 
-      ;(globalThis as any).WebSocketPair = originalWebSocketPair
-
-      expect(subscriber.send).toHaveBeenCalledTimes(2)
-      expect(subscriber.send).toHaveBeenNthCalledWith(1, '{"data":"event2","meta":{"id":"2"}}')
-      expect(subscriber.send).toHaveBeenNthCalledWith(2, '{"data":"event3","meta":{"id":"3"}}')
+      expect(serverWs.send).toHaveBeenCalledTimes(2)
+      const event2 = JSON.parse(serverWs.send.mock.calls[0][0])
+      const event3 = JSON.parse(serverWs.send.mock.calls[1][0])
+      expect(event2.payload.data).toBe('event2')
+      expect(event3.payload.data).toBe('event3')
     })
 
-    it('handles replay errors gracefully', async () => {
-      const ctx = createDurableObjectState()
-      const durable = new PublisherDurableObject(ctx, {}, { resumeRetentionSeconds: 60 })
-      const publisher = createWebSocket()
-      ctx.acceptWebSocket(publisher)
-
-      // Store some events
-      await durable.fetch(new Request('http://localhost/publish', {
-        method: 'POST',
-        body: JSON.stringify({ data: 'event1' }),
-      }))
-      await durable.fetch(new Request('http://localhost/publish', {
-        method: 'POST',
-        body: JSON.stringify({ data: 'event2' }),
-      }))
-
-      // New subscriber that throws on send
-      const subscriber = createWebSocket()
-      subscriber.send.mockImplementation(() => {
-        throw new Error('WebSocket closed')
+    it('should handle replay send errors gracefully', async () => {
+      const state = createDurableObjectState()
+      const durableObject = new PublisherDurableObject(state, {}, {
+        resume: { retentionSeconds: 60 },
       })
 
-      const originalWebSocketPair = (globalThis as any).WebSocketPair
-      ;(globalThis as any).WebSocketPair = class {
-        '0': WebSocket
-        '1': WebSocket
-        constructor() {
-          this['0'] = {} as WebSocket
-          this['1'] = subscriber
+      // First publish some messages
+      await durableObject.fetch(new Request('https://example.com/publish', {
+        method: 'POST',
+        body: JSON.stringify({ meta: {}, payload: { data: 'event1' } }),
+      }))
+      await durableObject.fetch(new Request('https://example.com/publish', {
+        method: 'POST',
+        body: JSON.stringify({ meta: {}, payload: { data: 'event2' } }),
+      }))
+
+      const serverWs = createWebSocket()
+      let callCount = 0
+      serverWs.send = vi.fn().mockImplementation(() => {
+        callCount++
+        if (callCount === 1) {
+          throw new Error('Failed to send')
         }
-      }
+      })
+      mockServerWebSocket = serverWs
 
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-      await durable.fetch(new Request('http://localhost/subscribe', {
+      const request = new Request('https://example.com/subscribe', {
         headers: { 'last-event-id': '0' },
-      }))
-
-      ;(globalThis as any).WebSocketPair = originalWebSocketPair
-
-      // Should have tried to send both events and logged errors
-      expect(subscriber.send).toHaveBeenCalledTimes(2)
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to replay event to websocket:', expect.any(Error))
-
-      consoleSpy.mockRestore()
-    })
-
-    it('expires events after retention period', async () => {
-      const ctx = createDurableObjectState()
-      const durable = new PublisherDurableObject(ctx, {}, { resumeRetentionSeconds: 1 })
-      const ws = createWebSocket()
-      ctx.acceptWebSocket(ws)
-
-      await durable.fetch(new Request('http://localhost/publish', {
-        method: 'POST',
-        body: JSON.stringify({ data: 'event1' }),
-      }))
-
-      expect(ctx.storage.sql.exec('SELECT count(*) as count FROM "orpc:publisher:resume:events"').one().count).toBe(1)
-
-      await sleep(2000)
-
-      // Trigger cleanup via another publish
-      await durable.fetch(new Request('http://localhost/publish', {
-        method: 'POST',
-        body: JSON.stringify({ data: 'event2' }),
-      }))
-
-      // First event should be expired, only second remains
-      expect(ctx.storage.sql.exec('SELECT count(*) as count FROM "orpc:publisher:resume:events"').one().count).toBe(1)
-    })
-
-    it('resets schema on ID overflow', async () => {
-      const ctx = createDurableObjectState()
-      const durable = new PublisherDurableObject(ctx, {}, { resumeRetentionSeconds: 60 })
-      const ws = createWebSocket()
-      ctx.acceptWebSocket(ws)
-
-      // Simulate ID near overflow by inserting a high ID
-      ctx.storage.sql.exec(
-        `INSERT INTO "orpc:publisher:resume:events" (id, payload) VALUES (?, ?)`,
-        '9223372036854775807',
-        '{"data":"old"}',
-      )
-      expect(ctx.storage.sql.exec('SELECT count(*) as count FROM "orpc:publisher:resume:events"').one().count).toBe(1)
-
-      // Next insert should trigger reset
-      await durable.fetch(new Request('http://localhost/publish', {
-        method: 'POST',
-        body: JSON.stringify({ data: 'new' }),
-      }))
-
-      // Should have reset and only have the new event
-      expect(ctx.storage.sql.exec('SELECT count(*) as count FROM "orpc:publisher:resume:events"').one().count).toBe(1)
-      expect(ws.send).toHaveBeenLastCalledWith('{"data":"new","meta":{"id":"1"}}')
-    })
-
-    it('supports custom schema prefix', () => {
-      const ctx = createDurableObjectState()
-      void new PublisherDurableObject(ctx, {}, {
-        resumeRetentionSeconds: 60,
-        resumeSchemaPrefix: 'custom:prefix:',
       })
+      const response = await durableObject.fetch(request)
 
-      const tables = ctx.storage.sql.exec('SELECT name FROM sqlite_master WHERE type=?', 'table').toArray()
-      expect(tables.map((t: any) => t.name)).toContain('custom:prefix:events')
+      // Should still complete and return 101
+      expect(response.status).toBe(101)
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to replay event to websocket:', expect.any(Error))
+      // Should have attempted to send both events
+      expect(serverWs.send).toHaveBeenCalledTimes(2)
+
+      consoleErrorSpy.mockRestore()
     })
   })
 
-  describe('alarm behavior', () => {
-    it('reschedules alarm when there are active connections', async () => {
-      const ctx = createDurableObjectState()
-      const durable = new PublisherDurableObject(ctx, {}, { resumeRetentionSeconds: 60 })
-      const ws = createWebSocket()
-      ctx.acceptWebSocket(ws)
-
-      ctx.storage.setAlarm.mockClear()
-      await durable.alarm()
-
-      expect(ctx.storage.setAlarm).toHaveBeenCalled()
-      expect(ctx.storage.deleteAll).not.toHaveBeenCalled()
-    })
-
-    it('reschedules alarm when there are recent events', async () => {
-      const ctx = createDurableObjectState()
-      const durable = new PublisherDurableObject(ctx, {}, { resumeRetentionSeconds: 60 })
-      const ws = createWebSocket()
-      ctx.acceptWebSocket(ws)
-
-      // Store an event
-      await durable.fetch(new Request('http://localhost/publish', {
-        method: 'POST',
-        body: JSON.stringify({ data: 'event' }),
-      }))
-
-      // Remove websocket to simulate disconnect
-      ctx.getWebSockets.mockReturnValue([])
-      ctx.storage.setAlarm.mockClear()
-
-      await durable.alarm()
-
-      expect(ctx.storage.setAlarm).toHaveBeenCalled()
-      expect(ctx.storage.deleteAll).not.toHaveBeenCalled()
-    })
-
-    it('deletes all data when inactive', async () => {
-      const ctx = createDurableObjectState()
-      const durable = new PublisherDurableObject(ctx, {}, { resumeRetentionSeconds: 1 })
-      const ws = createWebSocket()
-      ctx.acceptWebSocket(ws)
-
-      // Store an event
-      await durable.fetch(new Request('http://localhost/publish', {
-        method: 'POST',
-        body: JSON.stringify({ data: 'event' }),
-      }))
-
-      // Disconnect and wait for expiry
-      ctx.getWebSockets.mockReturnValue([])
-      await sleep(2000)
-
-      ctx.storage.setAlarm.mockClear()
-      await durable.alarm()
-
-      expect(ctx.storage.deleteAll).toHaveBeenCalled()
-      expect(ctx.storage.setAlarm).not.toHaveBeenCalled()
-    })
-
-    it('still works when resume is disabled after being enabled', async () => {
-      const ctx = createDurableObjectState()
-      void new PublisherDurableObject(ctx, {}, { resumeRetentionSeconds: 60 })
-      const durable = new PublisherDurableObject(ctx, {}, { resumeRetentionSeconds: Number.NaN })
-
-      await durable.alarm()
-
-      expect(ctx.storage.deleteAll).toHaveBeenCalled()
-    })
-  })
-
-  describe('publish/subscribe flow', () => {
-    it('broadcasts to all connected websockets', async () => {
-      const ctx = createDurableObjectState()
-      const durable = new PublisherDurableObject(ctx, {})
-
-      const ws1 = createWebSocket()
-      const ws2 = createWebSocket()
-      const ws3 = createWebSocket()
-      ctx.acceptWebSocket(ws1)
-      ctx.acceptWebSocket(ws2)
-      ctx.acceptWebSocket(ws3)
-
-      await durable.fetch(new Request('http://localhost/publish', {
-        method: 'POST',
-        body: JSON.stringify({ data: 'broadcast' }),
-      }))
-
-      expect(ws1.send).toHaveBeenCalledWith('{"data":"broadcast"}')
-      expect(ws2.send).toHaveBeenCalledWith('{"data":"broadcast"}')
-      expect(ws3.send).toHaveBeenCalledWith('{"data":"broadcast"}')
-    })
-
-    it('handles websocket send errors gracefully', async () => {
-      const ctx = createDurableObjectState()
-      const durable = new PublisherDurableObject(ctx, {})
-
-      const ws1 = createWebSocket()
-      const ws2 = createWebSocket()
-      ws1.send.mockImplementation(() => {
-        throw new Error('WebSocket closed')
+  describe('alarm', () => {
+    it('should forward to resume storage alarm', async () => {
+      const state = createDurableObjectState()
+      const durableObject = new PublisherDurableObject(state, {}, {
+        resume: { retentionSeconds: 60 },
       })
-      ctx.acceptWebSocket(ws1)
-      ctx.acceptWebSocket(ws2)
 
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      await durableObject.alarm()
 
-      await durable.fetch(new Request('http://localhost/publish', {
-        method: 'POST',
-        body: JSON.stringify({ data: 'test' }),
-      }))
-
-      expect(consoleSpy).toHaveBeenCalled()
-      expect(ws2.send).toHaveBeenCalledWith('{"data":"test"}')
-
-      consoleSpy.mockRestore()
+      // Should delete all since no websockets and no events
+      expect(state.storage.deleteAll).toHaveBeenCalled()
     })
   })
 })

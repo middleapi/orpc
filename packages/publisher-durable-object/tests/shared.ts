@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3'
+import { vi } from 'vitest'
 
 export function createDurableObjectState(): any {
   const db = new Database(':memory:')
@@ -33,14 +34,22 @@ export function createDurableObjectState(): any {
         },
       },
       setAlarm: vi.fn(),
-      deleteAll: vi.fn(),
+      deleteAll: vi.fn(async () => {
+        const tables = db.prepare(`
+          SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'
+        `).all() as { name: string }[]
+
+        for (const table of tables) {
+          db.prepare(`DROP TABLE IF EXISTS "${table.name}"`).run()
+        }
+      }),
     },
     waitUntil: vi.fn(),
     acceptWebSocket: vi.fn((ws: any) => {
       websockets.push(ws)
     }),
     getWebSockets: vi.fn(() => websockets),
-    blockConcurrencyWhile: vi.fn(async (fn: () => Promise<void>) => fn()),
+    blockConcurrencyWhile: vi.fn((fn: () => Promise<void>) => fn()),
   }
 }
 

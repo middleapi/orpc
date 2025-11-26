@@ -1,4 +1,5 @@
 import { getEventMeta, withEventMeta } from '@orpc/standard-server'
+import { describe, expect, it, vi } from 'vitest'
 import { DurablePublisher } from './durable-publisher'
 
 function createMockNamespace() {
@@ -85,13 +86,31 @@ type TestEvents = {
   complex: { date: Date, nested: { items: string[] } }
 }
 
+class Person {
+  constructor(public name: string, public age: number) {}
+}
+
+const customJsonSerializers = [
+  {
+    type: 100,
+    condition: (data: unknown): data is Person => data instanceof Person,
+    serialize: (data: Person) => ({ name: data.name, age: data.age }),
+    deserialize: (serialized: any) => new Person(serialized.name, serialized.age),
+  },
+]
+
 describe('durablePublisher', () => {
   describe('publish', () => {
     it('should serialized and publish event to durable object', async () => {
       const namespace = createMockNamespace()
-      const publisher = new DurablePublisher(namespace as any)
+      const publisher = new DurablePublisher(namespace as any, {
+        customJsonSerializers,
+      })
 
-      const payload = withEventMeta({ date: new Date() }, { id: 'event-1', retry: 5000, comments: ['test'] })
+      const payload = withEventMeta({
+        date: new Date(),
+        person: new Person('Alice', 30),
+      }, { id: 'event-1', retry: 5000, comments: ['test'] })
       await publisher.publish('message', payload)
 
       expect(namespace.getByName).toHaveBeenCalledWith('message')
@@ -102,8 +121,8 @@ describe('durablePublisher', () => {
       expect(messages).toHaveLength(1)
       const parsed = JSON.parse(messages[0]!)
       expect(parsed.data).toEqual({
-        json: { date: payload.date.toISOString() },
-        meta: [[1, 'date']],
+        json: { date: payload.date.toISOString(), person: { name: 'Alice', age: 30 } },
+        meta: [[1, 'date'], [100, 'person']],
       })
       expect(parsed.meta).toEqual({ id: 'event-1', retry: 5000, comments: ['test'] })
     })
@@ -162,7 +181,7 @@ describe('durablePublisher', () => {
     })
 
     const stringifiedMessage = JSON.stringify({
-      data: { json: { text: 'received' }, meta: [] },
+      data: { json: { person: { name: 'Alice', age: 30 } }, meta: [[100, 'person']] },
       meta: { id: '1' },
     })
     it.each([
@@ -186,7 +205,7 @@ describe('durablePublisher', () => {
 
       expect(listener).toHaveBeenCalledTimes(1)
       const received = listener.mock.calls[0]![0]
-      expect(received).toEqual({ text: 'received' })
+      expect(received).toEqual({ person: new Person('Alice', 30) })
       expect(getEventMeta(received)).toEqual({ id: '1' })
 
       await unsub()

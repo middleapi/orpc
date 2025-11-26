@@ -191,6 +191,7 @@ const publisher = new IORedisPublisher<{
   subscriber: new Redis(), // For subscribing to events
   resumeRetentionSeconds: 60 * 2, // Retain events for 2 minutes to support resume
   prefix: 'orpc:publisher:', // avoid conflict with other keys
+  customJsonSerializers: [] // optional custom serializers
 })
 ```
 
@@ -215,9 +216,43 @@ const publisher = new UpstashRedisPublisher<{
 }>(redis, {
   resumeRetentionSeconds: 60 * 2, // Retain events for 2 minutes to support resume
   prefix: 'orpc:publisher:', // avoid conflict with other keys
+  customJsonSerializers: [] // optional custom serializers
 })
 ```
 
 ::: info
 Resume support is disabled by default in `UpstashRedisPublisher`. Enable it by setting `resumeRetentionSeconds` to an appropriate value.
+:::
+
+### Cloudflare Durable Object
+
+```ts
+import { DurablePublisher, PublisherDurableObject } from '@orpc/experimental-publisher-durable-object'
+
+export class PublisherDO extends PublisherDurableObject {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env, {
+      resume: {
+        retentionSeconds: 60 * 2, // Retain events for 2 minutes to support resume
+      },
+    })
+  }
+}
+
+export default {
+  async fetch(request, env) {
+    const publisher = new DurablePublisher<{
+      'something-updated': {
+        id: string
+      }
+    }>(env.PUBLISHER_DO, {
+      prefix: 'publisher1', // avoid conflict with other keys
+      customJsonSerializers: [] // optional custom serializers
+    })
+  },
+}
+```
+
+::: info
+Resume support is disabled by default in `PublisherDurableObject`. Enable it by setting `resume.retentionSeconds` to an appropriate value.
 :::

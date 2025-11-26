@@ -1,7 +1,7 @@
 {
   "name": "@orpc/experimental-publisher-durable-object",
   "type": "module",
-  "version": "1.11.3",
+  "version": "0.0.0",
   "license": "MIT",
   "homepage": "https://orpc.unnoq.com",
   "repository": {
@@ -31,7 +31,8 @@
   "scripts": {
     "build": "unbuild",
     "build:watch": "pnpm run build --watch",
-    "type:check": "tsc -b"
+    "type:check": "tsc -b",
+    "type:check:test": "tsc -p tsconfig.test.json --noEmit"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",

@@ -1,0 +1,19 @@
+{
+  "name": "publisher-durable-object-test",
+  "main": "e2e.ts",
+  "compatibility_date": "2024-01-01",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PUBLISHER_DO",
+        "class_name": "PublisherDO"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["PublisherDO"]
+    }
+  ]
+}
