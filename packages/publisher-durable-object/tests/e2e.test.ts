@@ -2,6 +2,7 @@ import type { RouterClient } from '../../server/src/router-client'
 import type { router } from './e2e'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
+// @ts-expect-error cloudflare:test has no types
 import { env } from 'cloudflare:test'
 import { describe, expect, it, vi } from 'vitest'
 import worker from './e2e'

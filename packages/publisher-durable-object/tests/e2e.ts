@@ -1,4 +1,4 @@
-import type { DurableObjectNamespace, DurableObjectState, ExportedHandler } from '@cloudflare/workers-types/experimental'
+import type { DurableObjectNamespace, DurableObjectState, ExportedHandler } from '@cloudflare/workers-types'
 import type { Publisher } from '@orpc/experimental-publisher'
 import { onError, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
@@ -27,7 +27,7 @@ export const router = {
 }
 
 export class PublisherDO extends PublisherDurableObject {
-  constructor(ctx: DurableObjectState, env: Env) {
+  constructor(ctx: DurableObjectState<any>, env: Env) {
     super(ctx, env, {
       resume: {
         retentionSeconds: 1,

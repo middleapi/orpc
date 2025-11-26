@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDurableObjectState, createWebSocket } from '../tests/shared'
 import { PublisherDurableObject } from './durable-object'
 
@@ -24,14 +25,14 @@ let mockClientWebSocket: any = null
 // Mock Response to support status 101 with webSocket (Cloudflare-specific)
 const OriginalResponse = globalThis.Response
 class MockResponse extends OriginalResponse {
-  webSocket?: WebSocket
+  override webSocket: WebSocket | null
   constructor(body: BodyInit | null, init?: ResponseInit & { webSocket?: WebSocket }) {
     // Use 200 for the actual Response to avoid the range error
     const status = init?.status === 101 ? 200 : init?.status
     super(body, { ...init, status })
     // Store the intended status for assertions
     Object.defineProperty(this, 'status', { value: init?.status ?? 200 })
-    this.webSocket = init?.webSocket
+    this.webSocket = init?.webSocket ?? null
   }
 }
 ;(globalThis as any).Response = MockResponse

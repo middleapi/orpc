@@ -4,6 +4,7 @@
     "types": ["node", "@cloudflare/workers-types"]
   },
   "references": [
+    { "path": "../client" },
     { "path": "../shared" },
     { "path": "../publisher" },
     { "path": "../standard-server" }

@@ -167,7 +167,7 @@ describe('durablePublisher', () => {
   describe('subscribe', () => {
     it('should subscribe to events via websocket', async () => {
       const namespace = createMockNamespace()
-      const publisher = new DurablePublisher(namespace)
+      const publisher = new DurablePublisher(namespace as any)
 
       const listener = vi.fn()
       const unsub = await publisher.subscribe('message', listener)
