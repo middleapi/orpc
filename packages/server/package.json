@@ -143,7 +143,7 @@
     "cookie": "^1.0.2"
   },
   "devDependencies": {
-    "@tanstack/router-core": "^1.136.8",
+    "@tanstack/router-core": "^1.139.1",
     "@types/ws": "^8.18.1",
     "crossws": "^0.4.1",
     "fastify": "^5.6.2",

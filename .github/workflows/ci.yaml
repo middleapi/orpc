@@ -25,6 +25,10 @@ jobs:
 
       - run: pnpm run type:check
 
+      - name: Ensure apps/content builds successfully
+        working-directory: apps/content
+        run: pnpm run build
+
   test:
     runs-on: ubuntu-latest
     services:

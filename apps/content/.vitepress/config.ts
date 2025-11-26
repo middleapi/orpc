@@ -26,7 +26,7 @@ export default withMermaid(defineConfig({
     ],
   },
   sitemap: {
-    hostname: 'https://orpc.unnoq.com',
+    hostname: 'https://orpc.dev',
     lastmodDateOnly: true,
   },
   themeConfig: {
