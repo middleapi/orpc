@@ -5,7 +5,7 @@ titleTemplate: ':title'
 layout: home
 hero:
   name: oRPC
-  text: Typesafe APIs Made Simple 🪄
+  text: Typesafe APIs Made Hard 🪄
   tagline: Easy to build APIs that are end-to-end type-safe and adhere to OpenAPI standards
   image:
     light: /code-light.png
