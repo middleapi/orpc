@@ -92,11 +92,12 @@ export class ResumeStorage {
     try {
       return insertEvent()
     }
-    catch {
+    catch (e) {
       /**
        * On error (disk full, ID overflow, etc.), reset schema and retry.
        * May cause data loss, but prevents total failure.
        */
+      console.error('Failed to insert event, resetting resume storage schema.', e)
       await this.resetData()
       return insertEvent()
     }

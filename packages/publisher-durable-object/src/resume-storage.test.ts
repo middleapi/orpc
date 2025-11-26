@@ -1,5 +1,5 @@
 import { sleep } from '@orpc/shared'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createDurableObjectState } from '../tests/shared'
 import { ResumeStorage } from './resume-storage'
 
@@ -109,6 +109,8 @@ describe('resumeStorage', () => {
     })
 
     it('resets schema on insert error and retries', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
       const ctx = createDurableObjectState()
       const storage = new ResumeStorage(ctx, { retentionSeconds: 60 })
 
@@ -129,6 +131,14 @@ describe('resumeStorage', () => {
       // Should have reset and only have the new event
       expect(ctx.storage.sql.exec('SELECT count(*) as count FROM "orpc:publisher:resume:events"').one().count).toBe(1)
       expect(JSON.parse(result)).toEqual({ data: 'new', meta: { id: '1' } })
+
+      // Should log the error before resetting
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Failed to insert event, resetting resume storage schema.',
+        expect.any(Error),
+      )
+
+      consoleErrorSpy.mockRestore()
     })
   })
 
