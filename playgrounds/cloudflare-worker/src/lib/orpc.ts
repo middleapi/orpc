@@ -15,7 +15,7 @@ const link = new RPCLink({
       refreshTokenBeforeExpireInSeconds: 10 * 60, // 10 minutes
     }),
     new BatchLinkPlugin({
-      exclude: ({ path }) => path[0] === 'sse',
+      exclude: ({ path }) => path.includes('sse') || path.includes('on'),
       groups: [{
         condition: () => true,
         context: {},
