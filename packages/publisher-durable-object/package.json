@@ -1,7 +1,7 @@
 {
   "name": "@orpc/experimental-publisher-durable-object",
   "type": "module",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "license": "MIT",
   "homepage": "https://orpc.unnoq.com",
   "repository": {
