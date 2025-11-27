@@ -3,7 +3,6 @@ import type { BuilderConfig, Context, Implementer } from '@orpc/server'
 import type { ORPCGlobalContext } from './module'
 import { implement as baseImplement } from '@orpc/server'
 
-export * from './exception-filter'
 export * from './implement'
 export { Implement as Impl } from './implement'
 export * from './module'

@@ -143,22 +143,20 @@ export class ImplementInterceptor implements NestInterceptor {
           context: this.config.context,
         })
 
-        if (!result.matched) {
-          return
+        if (result.matched) {
+          return intercept(
+            toArray(this.config.sendResponseInterceptors),
+            { request: req, response: res, standardResponse: result.response },
+            async ({ response, standardResponse }) => {
+              if ('raw' in response) {
+                await StandardServerFastify.sendStandardResponse(response, standardResponse, this.config)
+              }
+              else {
+                await StandardServerNode.sendStandardResponse(response, standardResponse, this.config)
+              }
+            },
+          )
         }
-
-        return intercept(
-          toArray(this.config.sendResponseInterceptors),
-          { request: req, response: res, standardResponse: result.response },
-          async ({ response, standardResponse }) => {
-            if ('raw' in response) {
-              await StandardServerFastify.sendStandardResponse(response, standardResponse, this.config)
-            }
-            else {
-              await StandardServerNode.sendStandardResponse(response, standardResponse, this.config)
-            }
-          },
-        )
       }),
     )
   }
