@@ -8,13 +8,13 @@ import type { Request, Response } from 'express'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
 import type { ORPCModuleConfig } from './module'
-import { applyDecorators, Delete, Get, Head, Inject, Injectable, Optional, Patch, Post, Put, UseInterceptors } from '@nestjs/common'
+import { applyDecorators, Delete, Get, Head, HttpCode, Inject, Injectable, Optional, Patch, Post, Put, UseInterceptors } from '@nestjs/common'
 import { toORPCError } from '@orpc/client'
 import { fallbackContractConfig, isContractProcedure } from '@orpc/contract'
 import { StandardBracketNotationSerializer, StandardOpenAPIJsonSerializer, StandardOpenAPISerializer } from '@orpc/openapi-client/standard'
 import { StandardOpenAPICodec } from '@orpc/openapi/standard'
 import { createProcedureClient, getRouter, isProcedure, ORPCError, unlazy } from '@orpc/server'
-import { get } from '@orpc/shared'
+import { get, intercept, toArray } from '@orpc/shared'
 import { flattenHeader } from '@orpc/standard-server'
 import * as StandardServerFastify from '@orpc/standard-server-fastify'
 import * as StandardServerNode from '@orpc/standard-server-node'
@@ -58,6 +58,7 @@ export function Implement<T extends ContractRouter<any>>(
     return (target, propertyKey, descriptor) => {
       applyDecorators(
         MethodDecoratorMap[method](toNestPattern(path)),
+        HttpCode(fallbackContractConfig('defaultSuccessStatus', contract['~orpc'].route.successStatus)),
         UseInterceptors(ImplementInterceptor),
       )(target, propertyKey, descriptor)
     }
@@ -90,23 +91,26 @@ export function Implement<T extends ContractRouter<any>>(
   }
 }
 
-const codec = new StandardOpenAPICodec(
-  new StandardOpenAPISerializer(
-    new StandardOpenAPIJsonSerializer(),
-    new StandardBracketNotationSerializer(),
-  ),
-)
-
 type NestParams = Record<string, string | string[]>
 
 @Injectable()
 export class ImplementInterceptor implements NestInterceptor {
+  private readonly config: ORPCModuleConfig
   constructor(
-    @Inject(ORPC_MODULE_CONFIG_SYMBOL) @Optional() private readonly config: ORPCModuleConfig | undefined,
+    @Inject(ORPC_MODULE_CONFIG_SYMBOL) @Optional() config: ORPCModuleConfig | undefined,
   ) {
+    // @Optional() does not allow set default value so we need to do it here
+    this.config = config ?? {}
   }
 
   intercept(ctx: ExecutionContext, next: CallHandler<any>): Observable<any> {
+    const codec = new StandardOpenAPICodec(
+      new StandardOpenAPISerializer(
+        new StandardOpenAPIJsonSerializer(this.config),
+        new StandardBracketNotationSerializer(this.config),
+      ),
+    )
+
     return next.handle().pipe(
       mergeMap(async (impl: unknown) => {
         const { default: procedure } = await unlazy(impl)
@@ -153,12 +157,18 @@ export class ImplementInterceptor implements NestInterceptor {
           }
         })()
 
-        if ('raw' in res) {
-          await StandardServerFastify.sendStandardResponse(res, standardResponse, this.config)
-        }
-        else {
-          await StandardServerNode.sendStandardResponse(res, standardResponse, this.config)
-        }
+        return intercept(
+          toArray(this.config.sendResponseInterceptors),
+          { request: req, response: res, standardResponse },
+          async ({ response, standardResponse }) => {
+            if ('raw' in response) {
+              await StandardServerFastify.sendStandardResponse(response, standardResponse, this.config)
+            }
+            else {
+              await StandardServerNode.sendStandardResponse(response, standardResponse, this.config)
+            }
+          },
+        )
       }),
     )
   }

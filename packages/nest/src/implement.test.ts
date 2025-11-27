@@ -10,7 +10,7 @@ import { oc, ORPCError } from '@orpc/contract'
 import { implement, lazy } from '@orpc/server'
 import * as StandardServerNode from '@orpc/standard-server-node'
 import supertest from 'supertest'
-import { expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as z from 'zod'
 import { Implement } from './implement'
 import { ORPCModule } from './module'
@@ -48,6 +48,7 @@ describe('@Implement', async () => {
       peng: oc.route({
         path: '/{+path}',
         method: 'DELETE',
+        successStatus: 202,
       }).input(z.object({
         path: z.string(),
       })),
@@ -198,7 +199,7 @@ describe('@Implement', async () => {
     it('case: call peng', async () => {
       const res = await supertest(httpServer).delete('/world/who%3F')
 
-      expect(res.statusCode).toEqual(200)
+      expect(res.statusCode).toEqual(202)
       expect(res.body).toEqual('peng world/who?')
 
       expect(peng_handler).toHaveBeenCalledTimes(1)
@@ -211,6 +212,17 @@ describe('@Implement', async () => {
       expect(req).toBeDefined()
       expect(req!.method).toEqual('DELETE')
       expect(req!.url).toEqual('/world/who%3F')
+    })
+
+    it('support dynamic success status', async () => {
+      ping_handler.mockResolvedValueOnce({ body: 'pong', headers: { 'x-ping': 'pong' }, status: 203 } as any)
+
+      const res = await supertest(httpServer)
+        .post('/ping?param=value&param2[]=value2&param2[]=value3')
+        .set('x-custom', 'value')
+        .send({ hello: 'world' })
+
+      expect(res.statusCode).toEqual(203)
     })
   })
 
@@ -385,120 +397,197 @@ describe('@Implement', async () => {
     ])
   })
 
-  it('works with ORPCModule.forRoot', async () => {
-    const interceptor = vi.fn(({ next }) => next())
-    const moduleRef = await Test.createTestingModule({
-      imports: [
-        ORPCModule.forRoot({
-          interceptors: [interceptor],
-          eventIteratorKeepAliveComment: '__TEST__',
-        }),
-      ],
-      controllers: [ImplProcedureController],
-    }).compile()
-
-    const app = moduleRef.createNestApplication()
-    await app.init()
-
-    const httpServer = app.getHttpServer()
-
-    const res = await supertest(httpServer)
-      .post('/ping?param=value&param2[]=value2&param2[]=value3')
-      .set('x-custom', 'value')
-      .send({ hello: 'world' })
-
-    expect(res.statusCode).toEqual(200)
-    expect(res.body).toEqual('pong')
-
-    expect(interceptor).toHaveBeenCalledTimes(1)
-    expect(sendStandardResponseSpy).toHaveBeenCalledTimes(1)
-    expect(sendStandardResponseSpy).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({
-      eventIteratorKeepAliveComment: '__TEST__',
-    }))
-  })
-
-  it('works with ORPCModule.forRootAsync', async () => {
-    const interceptor = vi.fn(({ next }) => next())
-    const moduleRef = await Test.createTestingModule({
-      imports: [
-        ORPCModule.forRootAsync({
-          useFactory: async (request: Request) => ({
+  describe('module configuration', () => {
+    it('works with ORPCModule.forRoot', async () => {
+      const interceptor = vi.fn(({ next }) => next())
+      const moduleRef = await Test.createTestingModule({
+        imports: [
+          ORPCModule.forRoot({
             interceptors: [interceptor],
             eventIteratorKeepAliveComment: '__TEST__',
-            context: {
-              request,
-            },
+            customJsonSerializers: [
+              {
+                condition: data => data === 'pong',
+                serialize: () => '__PONG__',
+              },
+            ],
           }),
-          inject: [REQUEST],
-        }),
-      ],
-      controllers: [ImplProcedureController],
-    }).compile()
+        ],
+        controllers: [ImplProcedureController],
+      }).compile()
 
-    const app = moduleRef.createNestApplication()
-    await app.init()
+      const app = moduleRef.createNestApplication()
+      await app.init()
 
-    const httpServer = app.getHttpServer()
+      const httpServer = app.getHttpServer()
 
-    const res = await supertest(httpServer)
-      .post('/ping?param=value&param2[]=value2&param2[]=value3')
-      .set('x-custom', 'value')
-      .send({ hello: 'world' })
+      const res = await supertest(httpServer)
+        .post('/ping?param=value&param2[]=value2&param2[]=value3')
+        .set('x-custom', 'value')
+        .send({ hello: 'world' })
 
-    expect(res.statusCode).toEqual(200)
-    expect(res.body).toEqual('pong')
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual('__PONG__')
 
-    expect(interceptor).toHaveBeenCalledTimes(1)
-    expect(interceptor).toHaveBeenCalledWith(expect.objectContaining({
-      context: expect.objectContaining({
-        request: expect.objectContaining({
-          url: '/ping?param=value&param2[]=value2&param2[]=value3',
-          headers: expect.objectContaining({
-            'x-custom': 'value',
+      expect(interceptor).toHaveBeenCalledTimes(1)
+      expect(sendStandardResponseSpy).toHaveBeenCalledTimes(1)
+      expect(sendStandardResponseSpy).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({
+        eventIteratorKeepAliveComment: '__TEST__',
+      }))
+    })
+
+    it('works with ORPCModule.forRootAsync', async () => {
+      const interceptor = vi.fn(({ next }) => next())
+      const moduleRef = await Test.createTestingModule({
+        imports: [
+          ORPCModule.forRootAsync({
+            useFactory: async (request: Request) => ({
+              interceptors: [interceptor],
+              eventIteratorKeepAliveComment: '__TEST__',
+              context: {
+                request,
+              },
+              customJsonSerializers: [
+                {
+                  condition: data => data === 'pong',
+                  serialize: () => '__PONG__',
+                },
+              ],
+            }),
+            inject: [REQUEST],
+          }),
+        ],
+        controllers: [ImplProcedureController],
+      }).compile()
+
+      const app = moduleRef.createNestApplication()
+      await app.init()
+
+      const httpServer = app.getHttpServer()
+
+      const res = await supertest(httpServer)
+        .post('/ping?param=value&param2[]=value2&param2[]=value3')
+        .set('x-custom', 'value')
+        .send({ hello: 'world' })
+
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual('__PONG__')
+
+      expect(interceptor).toHaveBeenCalledTimes(1)
+      expect(interceptor).toHaveBeenCalledWith(expect.objectContaining({
+        context: expect.objectContaining({
+          request: expect.objectContaining({
+            url: '/ping?param=value&param2[]=value2&param2[]=value3',
+            headers: expect.objectContaining({
+              'x-custom': 'value',
+            }),
           }),
         }),
-      }),
-    }))
-    expect(sendStandardResponseSpy).toHaveBeenCalledTimes(1)
-    expect(sendStandardResponseSpy).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({
-      eventIteratorKeepAliveComment: '__TEST__',
-    }))
+      }))
+      expect(sendStandardResponseSpy).toHaveBeenCalledTimes(1)
+      expect(sendStandardResponseSpy).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({
+        eventIteratorKeepAliveComment: '__TEST__',
+      }))
+    })
+
+    describe('sendResponseInterceptors', () => {
+      it('can override response with default status', async () => {
+        const moduleRef = await Test.createTestingModule({
+          imports: [
+            ORPCModule.forRoot({
+              sendResponseInterceptors: [
+                async ({ standardResponse }) => {
+                  expect(standardResponse.status).toBe(202)
+
+                  return { custom: true }
+                },
+              ],
+            }),
+          ],
+          controllers: [ImplProcedureController],
+        }).compile()
+
+        const app = moduleRef.createNestApplication()
+        await app.init()
+
+        const httpServer = app.getHttpServer()
+
+        const res = await supertest(httpServer).delete('/world/who%3F')
+
+        expect(res.statusCode).toEqual(202)
+        expect(res.text).toEqual('{"custom":true}')
+      })
+
+      it('can override response with any status', async () => {
+        const moduleRef = await Test.createTestingModule({
+          imports: [
+            ORPCModule.forRoot({
+              sendResponseInterceptors: [
+                async ({ standardResponse, response }) => {
+                  expect(standardResponse.status).toBe(200)
+                  expect(standardResponse.body).toBe('pong')
+
+                  response.status(202)
+                  return { custom: true }
+                },
+              ],
+            }),
+          ],
+          controllers: [ImplProcedureController],
+        }).compile()
+
+        const app = moduleRef.createNestApplication()
+        await app.init()
+
+        const httpServer = app.getHttpServer()
+
+        const res = await supertest(httpServer)
+          .post('/ping?param=value&param2[]=value2&param2[]=value3')
+          .set('x-custom', 'value')
+          .send({ hello: 'world' })
+
+        expect(res.statusCode).toEqual(202)
+        expect(res.text).toEqual('{"custom":true}')
+      })
+    })
   })
 
-  it('work with fastify/cookie', async () => {
-    @Controller()
-    class FastifyController {
-      @Implement(contract.ping)
-      pong(@Res({ passthrough: true }) reply: FastifyReply) {
-        reply.cookie('foo', 'bar')
-        return implement(contract.ping).handler(ping_handler)
+  describe('compatibility', () => {
+    it('work with fastify/cookie', async () => {
+      @Controller()
+      class FastifyController {
+        @Implement(contract.ping)
+        pong(@Res({ passthrough: true }) reply: FastifyReply) {
+          reply.cookie('foo', 'bar')
+          return implement(contract.ping).handler(ping_handler)
+        }
       }
-    }
 
-    const moduleRef = await Test.createTestingModule({
-      controllers: [FastifyController],
-    }).compile()
+      const moduleRef = await Test.createTestingModule({
+        controllers: [FastifyController],
+      }).compile()
 
-    const adapter = new FastifyAdapter()
-    await adapter.register(FastifyCookie as any)
-    const app = moduleRef.createNestApplication(adapter)
-    await app.init()
-    await app.getHttpAdapter().getInstance().ready()
+      const adapter = new FastifyAdapter()
+      await adapter.register(FastifyCookie as any)
+      const app = moduleRef.createNestApplication(adapter)
+      await app.init()
+      await app.getHttpAdapter().getInstance().ready()
 
-    const httpServer = app.getHttpServer()
+      const httpServer = app.getHttpServer()
 
-    const res = await supertest(httpServer)
-      .post('/ping?param=value&param2[]=value2&param2[]=value3')
-      .set('x-custom', 'value')
-      .send({ hello: 'world' })
+      const res = await supertest(httpServer)
+        .post('/ping?param=value&param2[]=value2&param2[]=value3')
+        .set('x-custom', 'value')
+        .send({ hello: 'world' })
 
-    expect(res.statusCode).toEqual(200)
-    expect(res.body).toEqual('pong')
-    expect(res.headers).toEqual(expect.objectContaining({
-      'x-ping': 'pong',
-      'set-cookie': [
-        expect.stringContaining('foo=bar'),
-      ],
-    }))
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual('pong')
+      expect(res.headers).toEqual(expect.objectContaining({
+        'x-ping': 'pong',
+        'set-cookie': [
+          expect.stringContaining('foo=bar'),
+        ],
+      }))
+    })
   })
 })

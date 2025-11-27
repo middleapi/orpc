@@ -1,6 +1,9 @@
 import type { DynamicModule } from '@nestjs/common'
 import type { AnySchema } from '@orpc/contract'
+import type { StandardBracketNotationSerializerOptions, StandardOpenAPIJsonSerializerOptions } from '@orpc/openapi-client/standard'
 import type { CreateProcedureClientOptions } from '@orpc/server'
+import type { Interceptor } from '@orpc/shared'
+import type { StandardResponse } from '@orpc/standard-server'
 import type { SendStandardResponseOptions } from '@orpc/standard-server-node'
 import { Module } from '@nestjs/common'
 import { ImplementInterceptor } from './implement'
@@ -9,7 +12,13 @@ export const ORPC_MODULE_CONFIG_SYMBOL = Symbol('ORPC_MODULE_CONFIG')
 
 export interface ORPCModuleConfig extends
   CreateProcedureClientOptions<object, AnySchema, object, object, object>,
-  SendStandardResponseOptions {
+  SendStandardResponseOptions,
+  StandardOpenAPIJsonSerializerOptions,
+  StandardBracketNotationSerializerOptions {
+  sendResponseInterceptors?: Interceptor<
+    { request: any, response: any, standardResponse: StandardResponse },
+    unknown
+  >[]
 }
 
 @Module({})
