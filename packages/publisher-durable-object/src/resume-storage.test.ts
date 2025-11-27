@@ -257,7 +257,7 @@ describe('resumeStorage', () => {
       await storage.store(JSON.stringify({ data: 'event' }))
 
       ctx.getWebSockets.mockReturnValue([])
-      await sleep(2000) // wait for event to expire
+      await sleep(3000) // wait for event to expire
 
       ctx.storage.setAlarm.mockClear()
       await storage.alarm()
@@ -277,7 +277,7 @@ describe('resumeStorage', () => {
 
       await storage.store(JSON.stringify({ data: 'event' }))
       ctx.getWebSockets.mockReturnValue([])
-      await sleep(2000)
+      await sleep(3000)
 
       await storage.alarm()
 
