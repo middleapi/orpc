@@ -7,7 +7,7 @@ import type { StandardResponse } from '@orpc/standard-server'
 import type { Request, Response } from 'express'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
-import type { ORPCModuleConfig } from './module'
+import type { ORPCGlobalContext, ORPCModuleConfig } from './module'
 import { applyDecorators, Delete, Get, Head, HttpCode, Inject, Injectable, Optional, Patch, Post, Put, UseInterceptors } from '@nestjs/common'
 import { toORPCError } from '@orpc/client'
 import { fallbackContractConfig, isContractProcedure } from '@orpc/contract'
@@ -38,7 +38,7 @@ const MethodDecoratorMap = {
  */
 export function Implement<T extends ContractRouter<any>>(
   contract: T,
-): <U extends Promisable<Router<T, Record<never, never>>>>(
+): <U extends Promisable<Router<T, ORPCGlobalContext>>>(
   target: Record<PropertyKey, any>,
   propertyKey: string,
   descriptor: TypedPropertyDescriptor<(...args: any[]) => U>,
@@ -100,7 +100,7 @@ export class ImplementInterceptor implements NestInterceptor {
     @Inject(ORPC_MODULE_CONFIG_SYMBOL) @Optional() config: ORPCModuleConfig | undefined,
   ) {
     // @Optional() does not allow set default value so we need to do it here
-    this.config = config ?? {}
+    this.config = config ?? {} as ORPCModuleConfig
   }
 
   intercept(ctx: ExecutionContext, next: CallHandler<any>): Observable<any> {

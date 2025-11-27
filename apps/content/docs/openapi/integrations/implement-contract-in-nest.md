@@ -224,6 +224,15 @@ import { REQUEST } from '@nestjs/core'
 import { onError, ORPCModule } from '@orpc/nest'
 import { Request } from 'express' // if you use express adapter
 
+declare module '@orpc/nest' {
+  /**
+   * Extend oRPC global context to make it type-safe inside your handlers/middlewares
+   */
+  interface ORPCGlobalContext {
+    request: Request
+  }
+}
+
 @Module({
   imports: [
     ORPCModule.forRootAsync({ // or use .forRoot for static config

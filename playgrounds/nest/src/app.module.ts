@@ -6,16 +6,31 @@ import { PlanetService } from './planet/planet.service'
 import { ReferenceController } from './reference/reference.controller'
 import { ReferenceService } from './reference/reference.service'
 import { onError, ORPCModule } from '@orpc/nest'
+import { REQUEST } from '@nestjs/core'
+
+declare module '@orpc/nest' {
+  /**
+   * Extend oRPC global context to make it type-safe inside your handlers/middlewares
+   */
+  interface ORPCGlobalContext {
+    request: Request
+  }
+}
 
 @Module({
   imports: [
-    ORPCModule.forRoot({
-      interceptors: [
-        onError((error) => {
-          console.error(error)
-        }),
-      ],
-      eventIteratorKeepAliveInterval: 5000, // 5 seconds
+    ORPCModule.forRootAsync({ // or use .forRoot for static config
+      useFactory: (request: Request) => ({
+        interceptors: [
+          onError((error) => {
+            console.error(error)
+          }),
+        ],
+        context: { request }, // oRPC context, accessible from middlewares, etc.
+        eventIteratorKeepAliveInterval: 5000, // 5 seconds
+        customJsonSerializers: [],
+      }),
+      inject: [REQUEST],
     }),
   ],
   controllers: [AuthController, PlanetController, ReferenceController, OtherController],

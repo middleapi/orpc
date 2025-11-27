@@ -10,8 +10,23 @@ import { ImplementInterceptor } from './implement'
 
 export const ORPC_MODULE_CONFIG_SYMBOL = Symbol('ORPC_MODULE_CONFIG')
 
+/**
+ * You can extend this interface to add global context properties.
+ * @example
+ * ```ts
+ * declare module '@orpc/nest' {
+ *   interface ORPCGlobalContext {
+ *     user: { id: string; name: string }
+ *   }
+ * }
+ * ```
+ */
+export interface ORPCGlobalContext {
+
+}
+
 export interface ORPCModuleConfig extends
-  CreateProcedureClientOptions<object, AnySchema, object, object, object>,
+  CreateProcedureClientOptions<ORPCGlobalContext, AnySchema, object, object, object>,
   SendStandardResponseOptions,
   StandardOpenAPIJsonSerializerOptions,
   StandardBracketNotationSerializerOptions {
