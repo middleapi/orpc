@@ -26,7 +26,7 @@ export const ORPC_MODULE_CONFIG_SYMBOL = Symbol('ORPC_MODULE_CONFIG')
 export interface ORPCGlobalContext {
 
 }
-
+// TODO: replace CreateProcedureClientOptions with StandardHandlerOptions
 export interface ORPCModuleConfig extends
   CreateProcedureClientOptions<ORPCGlobalContext, AnySchema, object, object, object>,
   SendStandardResponseOptions,
