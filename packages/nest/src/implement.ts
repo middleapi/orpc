@@ -107,6 +107,7 @@ export class ImplementInterceptor implements NestInterceptor {
         new StandardOpenAPIJsonSerializer(this.config),
         new StandardBracketNotationSerializer(this.config),
       ),
+      this.config,
     )
   }
 

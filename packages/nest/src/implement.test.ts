@@ -639,6 +639,35 @@ describe('@Implement', async () => {
         path: ['__PATH__'],
       }))
     })
+
+    it('custom error response body encoder', async () => {
+      const moduleRef = await Test.createTestingModule({
+        imports: [
+          ORPCModule.forRoot({
+            customErrorResponseBodyEncoder: error => ({
+              custom: true,
+              code: error.code,
+              data: error.data,
+            }),
+          }),
+        ],
+        controllers: [ImplProcedureController],
+      }).compile()
+
+      const app = moduleRef.createNestApplication()
+      await app.init()
+
+      const httpServer = app.getHttpServer()
+
+      const res = await supertest(httpServer).get('/pong/world')
+
+      expect(res.statusCode).toEqual(408)
+      expect(res.body).toEqual({
+        custom: true,
+        code: 'TEST',
+        data: 'pong world',
+      })
+    })
   })
 
   describe('compatibility', () => {
