@@ -245,6 +245,7 @@ declare module '@orpc/nest' {
         context: { request }, // oRPC context, accessible from middlewares, etc.
         eventIteratorKeepAliveInterval: 5000, // 5 seconds
         customJsonSerializers: [],
+        plugins: [], // almost oRPC plugins are compatible
       }),
       inject: [REQUEST],
     }),

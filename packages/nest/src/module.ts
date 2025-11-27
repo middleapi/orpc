@@ -2,6 +2,7 @@ import type { DynamicModule } from '@nestjs/common'
 import type { AnySchema } from '@orpc/contract'
 import type { StandardBracketNotationSerializerOptions, StandardOpenAPIJsonSerializerOptions } from '@orpc/openapi-client/standard'
 import type { CreateProcedureClientOptions } from '@orpc/server'
+import type { StandardHandlerOptions } from '@orpc/server/standard'
 import type { Interceptor } from '@orpc/shared'
 import type { StandardResponse } from '@orpc/standard-server'
 import type { SendStandardResponseOptions } from '@orpc/standard-server-node'
@@ -30,6 +31,8 @@ export interface ORPCModuleConfig extends
   SendStandardResponseOptions,
   StandardOpenAPIJsonSerializerOptions,
   StandardBracketNotationSerializerOptions {
+  plugins?: StandardHandlerOptions<ORPCGlobalContext>['plugins']
+
   sendResponseInterceptors?: Interceptor<
     { request: any, response: any, standardResponse: StandardResponse },
     unknown

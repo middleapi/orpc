@@ -3,19 +3,17 @@ import type { ContractRouter } from '@orpc/contract'
 import type { Router } from '@orpc/server'
 import type { StandardParams } from '@orpc/server/standard'
 import type { Promisable } from '@orpc/shared'
-import type { StandardResponse } from '@orpc/standard-server'
 import type { Request, Response } from 'express'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
 import type { ORPCGlobalContext, ORPCModuleConfig } from './module'
 import { applyDecorators, Delete, Get, Head, HttpCode, Inject, Injectable, Optional, Patch, Post, Put, UseInterceptors } from '@nestjs/common'
-import { toORPCError } from '@orpc/client'
 import { fallbackContractConfig, isContractProcedure } from '@orpc/contract'
 import { StandardBracketNotationSerializer, StandardOpenAPIJsonSerializer, StandardOpenAPISerializer } from '@orpc/openapi-client/standard'
 import { StandardOpenAPICodec } from '@orpc/openapi/standard'
-import { createProcedureClient, getRouter, isProcedure, ORPCError, unlazy } from '@orpc/server'
+import { getRouter, isProcedure, unlazy } from '@orpc/server'
+import { StandardHandler } from '@orpc/server/standard'
 import { get, intercept, toArray } from '@orpc/shared'
-import { flattenHeader } from '@orpc/standard-server'
 import * as StandardServerFastify from '@orpc/standard-server-fastify'
 import * as StandardServerNode from '@orpc/standard-server-node'
 import { mergeMap } from 'rxjs'
@@ -95,14 +93,14 @@ type NestParams = Record<string, string | string[]>
 
 @Injectable()
 export class ImplementInterceptor implements NestInterceptor {
-  private readonly config: ORPCModuleConfig
+  private readonly config: Partial<ORPCModuleConfig>
   private readonly codec: StandardOpenAPICodec
 
   constructor(
     @Inject(ORPC_MODULE_CONFIG_SYMBOL) @Optional() config: ORPCModuleConfig | undefined,
   ) {
     // @Optional() does not allow set default value so we need to do it here
-    this.config = config ?? {} as ORPCModuleConfig
+    this.config = config ?? {}
 
     this.codec = new StandardOpenAPICodec(
       new StandardOpenAPISerializer(
@@ -130,38 +128,27 @@ export class ImplementInterceptor implements NestInterceptor {
           ? StandardServerFastify.toStandardLazyRequest(req, res as FastifyReply)
           : StandardServerNode.toStandardLazyRequest(req, res as Response)
 
-        const standardResponse: StandardResponse = await (async () => {
-          let isDecoding = false
+        const handler = new StandardHandler(procedure, {
+          init: () => {},
+          match: () => Promise.resolve({ path: toArray(this.config.path), procedure, params: flattenParams(req.params as NestParams) }),
+        }, this.codec, {
+          // Since plugins can modify options directly, so we need to clone to avoid affecting other handlers/requests
+          // TODO: improve plugins system to avoid this cloning
+          clientInterceptors: [...toArray(this.config.interceptors)],
+          plugins: [...toArray(this.config.plugins)],
+        })
 
-          try {
-            const client = createProcedureClient(procedure, this.config)
+        const result = await handler.handle(standardRequest, {
+          context: this.config.context,
+        })
 
-            isDecoding = true
-            const input = await this.codec.decode(standardRequest, flattenParams(req.params as NestParams), procedure)
-            isDecoding = false
-
-            const output = await client(input, {
-              signal: standardRequest.signal,
-              lastEventId: flattenHeader(standardRequest.headers['last-event-id']),
-            })
-
-            return this.codec.encode(output, procedure)
-          }
-          catch (e) {
-            const error = isDecoding && !(e instanceof ORPCError)
-              ? new ORPCError('BAD_REQUEST', {
-                  message: `Malformed request. Ensure the request body is properly formatted and the 'Content-Type' header is set correctly.`,
-                  cause: e,
-                })
-              : toORPCError(e)
-
-            return this.codec.encodeError(error)
-          }
-        })()
+        if (!result.matched) {
+          return
+        }
 
         return intercept(
           toArray(this.config.sendResponseInterceptors),
-          { request: req, response: res, standardResponse },
+          { request: req, response: res, standardResponse: result.response },
           async ({ response, standardResponse }) => {
             if ('raw' in response) {
               await StandardServerFastify.sendStandardResponse(response, standardResponse, this.config)

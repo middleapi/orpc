@@ -7,6 +7,8 @@ import { ReferenceController } from './reference/reference.controller'
 import { ReferenceService } from './reference/reference.service'
 import { onError, ORPCModule } from '@orpc/nest'
 import { REQUEST } from '@nestjs/core'
+import { experimental_SmartCoercionPlugin as SmartCoercionPlugin } from '@orpc/json-schema'
+import { ZodToJsonSchemaConverter } from '@orpc/zod/zod4'
 
 declare module '@orpc/nest' {
   /**
@@ -29,6 +31,13 @@ declare module '@orpc/nest' {
         context: { request }, // oRPC context, accessible from middlewares, etc.
         eventIteratorKeepAliveInterval: 5000, // 5 seconds
         customJsonSerializers: [],
+        plugins: [
+          new SmartCoercionPlugin({
+            schemaConverters: [
+              new ZodToJsonSchemaConverter(),
+            ],
+          }),
+        ], // almost oRPC plugins are compatible
       }),
       inject: [REQUEST],
     }),

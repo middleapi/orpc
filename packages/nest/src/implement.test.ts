@@ -550,6 +550,95 @@ describe('@Implement', async () => {
         expect(res.text).toEqual('{"custom":true}')
       })
     })
+
+    it('plugins', async () => {
+      const clientInterceptor = vi.fn(({ next }) => next())
+      const clientInterceptors = [clientInterceptor]
+      const interceptor = vi.fn(({ next }) => next())
+      const plugins = [{
+        init(options: any) {
+          options.clientInterceptors ??= []
+          options.clientInterceptors.push(interceptor)
+        },
+      }]
+
+      // Use this clientInterceptors, plugins arrays
+      // to verify that handler options is cloned before applying plugins.
+      // Without proper cloning, interceptors would run multiple times and affect subsequent requests.
+      const moduleRef = await Test.createTestingModule({
+        imports: [
+          ORPCModule.forRoot({
+            context: { thisIsContext: true },
+            interceptors: clientInterceptors,
+            path: ['__PATH__'],
+            plugins,
+          }),
+        ],
+        controllers: [ImplProcedureController],
+      }).compile()
+
+      const app = moduleRef.createNestApplication()
+      await app.init()
+      const httpServer = app.getHttpServer()
+
+      const res1 = await supertest(httpServer).delete('/world/who%3F')
+      expect(res1.statusCode).toEqual(202)
+      expect(interceptor).toHaveBeenCalledTimes(1)
+      expect(interceptor).toHaveBeenCalledWith(expect.objectContaining({
+        context: expect.objectContaining({
+          thisIsContext: true,
+        }),
+        path: ['__PATH__'],
+      }))
+      expect(clientInterceptor).toHaveBeenCalledTimes(1)
+      expect(clientInterceptor).toHaveBeenCalledWith(expect.objectContaining({
+        context: expect.objectContaining({
+          thisIsContext: true,
+        }),
+        path: ['__PATH__'],
+      }))
+
+      interceptor.mockClear()
+      clientInterceptor.mockClear()
+      const res2 = await supertest(httpServer)
+        .post('/ping?param=value&param2[]=value2&param2[]=value3')
+        .set('x-custom', 'value')
+        .send({ hello: 'world' })
+      expect(res2.statusCode).toEqual(200)
+      expect(interceptor).toHaveBeenCalledTimes(1)
+      expect(interceptor).toHaveBeenCalledWith(expect.objectContaining({
+        context: expect.objectContaining({
+          thisIsContext: true,
+        }),
+        path: ['__PATH__'],
+      }))
+      expect(clientInterceptor).toHaveBeenCalledTimes(1)
+      expect(clientInterceptor).toHaveBeenCalledWith(expect.objectContaining({
+        context: expect.objectContaining({
+          thisIsContext: true,
+        }),
+        path: ['__PATH__'],
+      }))
+
+      interceptor.mockClear()
+      clientInterceptor.mockClear()
+      const res3 = await supertest(httpServer).delete('/world/who%3F')
+      expect(res3.statusCode).toEqual(202)
+      expect(interceptor).toHaveBeenCalledTimes(1)
+      expect(interceptor).toHaveBeenCalledWith(expect.objectContaining({
+        context: expect.objectContaining({
+          thisIsContext: true,
+        }),
+        path: ['__PATH__'],
+      }))
+      expect(clientInterceptor).toHaveBeenCalledTimes(1)
+      expect(clientInterceptor).toHaveBeenCalledWith(expect.objectContaining({
+        context: expect.objectContaining({
+          thisIsContext: true,
+        }),
+        path: ['__PATH__'],
+      }))
+    })
   })
 
   describe('compatibility', () => {

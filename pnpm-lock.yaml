@@ -1384,6 +1384,9 @@ importers:
       '@orpc/contract':
         specifier: next
         version: link:../../packages/contract
+      '@orpc/json-schema':
+        specifier: next
+        version: link:../../packages/json-schema
       '@orpc/nest':
         specifier: next
         version: link:../../packages/nest
