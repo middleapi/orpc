@@ -220,6 +220,7 @@ oRPC will use NestJS parsed body when it's available, and only use the oRPC pars
 Configure the `@orpc/nest` module by importing `ORPCModule` in your NestJS application:
 
 ```ts
+import { Module } from '@nestjs/common'
 import { REQUEST } from '@nestjs/core'
 import { onError, ORPCModule } from '@orpc/nest'
 import { Request } from 'express' // if you use express adapter
@@ -245,7 +246,7 @@ declare module '@orpc/nest' {
         context: { request }, // oRPC context, accessible from middlewares, etc.
         eventIteratorKeepAliveInterval: 5000, // 5 seconds
         customJsonSerializers: [],
-        plugins: [], // almost oRPC plugins are compatible
+        plugins: [], // most oRPC plugins are compatible
       }),
       inject: [REQUEST],
     }),
@@ -293,8 +294,9 @@ Please refer to the [OpenAPILink](/docs/openapi/client/openapi-link) documentati
 By default, oRPC sends the response directly without returning it to the NestJS handler. However, you may want to preserve the return behavior for compatibility with certain NestJS features or third-party libraries.
 
 ```ts
+import { Module } from '@nestjs/common'
 import { ORPCModule } from '@orpc/nest'
-import { Request } from 'express' // if you use express adapter
+import { Response } from 'express' // if you use express adapter
 import { isObject } from '@orpc/shared' // checks if value is a plain object (not a class instance)
 
 @Module({
@@ -307,7 +309,7 @@ import { isObject } from '@orpc/shared' // checks if value is a plain object (no
             || standardResponse.status >= 300
             || !(isObject(standardResponse.body) || Array.isArray(standardResponse.body))
           ) {
-            // Only object and array is valid to return as response body
+            // Only object and array are valid to return as response body
             // the rest should fallback to default oRPC behavior
             return next()
           }
