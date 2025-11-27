@@ -254,6 +254,19 @@ export default {
 }
 ```
 
+::: warning
+You must enable the [`enable_request_signal`](https://developers.cloudflare.com/workers/configuration/compatibility-flags/#enable-requestsignal-for-incoming-requests) compatibility flag in your workers to support request abort signals, which are necessary for properly cleaning up subscriptions.
+
+```json
+{
+  "compatibility_flags": [
+    "enable_request_signal"
+  ]
+}
+```
+
+:::
+
 ::: info
 Resume support is disabled by default in `PublisherDurableObject`. Enable it by setting `resume.retentionSeconds` to an appropriate value.
 :::

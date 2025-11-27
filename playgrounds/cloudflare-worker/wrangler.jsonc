@@ -7,6 +7,9 @@
   "name": "orpc-cloudflare-worker-playground",
   "main": "worker/index.ts",
   "compatibility_date": "2025-06-07",
+  "compatibility_flags": [
+    "enable_request_signal"
+  ],
   "assets": {
     "not_found_handling": "single-page-application"
   },

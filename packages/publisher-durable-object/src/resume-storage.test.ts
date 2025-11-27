@@ -23,7 +23,7 @@ describe('resumeStorage', () => {
 
       expect(result).toBe(message)
       expect(ctx.storage.sql.exec('SELECT name FROM sqlite_master WHERE type=?', 'table').toArray()).toEqual([])
-      expect(ctx.storage.setAlarm).not.toHaveBeenCalled()
+      expect(ctx.storage.setAlarm).not.toHaveBeenCalledOnce()
     })
 
     it('creates schema lazily and alarm on first store', async () => {
@@ -40,7 +40,7 @@ describe('resumeStorage', () => {
       tables = ctx.storage.sql.exec('SELECT name FROM sqlite_master WHERE type=?', 'table').toArray()
       expect(tables.map((t: any) => t.name)).toContain('orpc:publisher:resume:events')
 
-      expect(ctx.storage.setAlarm).toHaveBeenCalled()
+      expect(ctx.storage.setAlarm).toHaveBeenCalledOnce()
     })
 
     it('stores events with auto-generated IDs', async () => {
@@ -80,32 +80,6 @@ describe('resumeStorage', () => {
 
       const tables = ctx.storage.sql.exec('SELECT name FROM sqlite_master WHERE type=?', 'table').toArray()
       expect(tables.map((t: any) => t.name)).toContain('custom:prefix:events')
-    })
-
-    it('cleans up expired events during store', async () => {
-      const ctx = createDurableObjectState()
-      const storage = new ResumeStorage(ctx, { retentionSeconds: 1 })
-
-      await storage.store(JSON.stringify({ data: 'event1' }))
-      expect(ctx.storage.sql.exec('SELECT count(*) as count FROM "orpc:publisher:resume:events"').one().count).toBe(1)
-
-      await sleep(2100) // wait for event to expire
-
-      await storage.store(JSON.stringify({ data: 'event2' }))
-
-      // First event should be expired, only second remains
-      expect(ctx.storage.sql.exec('SELECT count(*) as count FROM "orpc:publisher:resume:events"').one().count).toBe(1)
-    })
-
-    it('does not clean up before retention period', async () => {
-      const ctx = createDurableObjectState()
-      const storage = new ResumeStorage(ctx, { retentionSeconds: 60 })
-
-      await storage.store(JSON.stringify({ data: 'event1' }))
-      await storage.store(JSON.stringify({ data: 'event2' }))
-      await storage.store(JSON.stringify({ data: 'event3' }))
-
-      expect(ctx.storage.sql.exec('SELECT count(*) as count FROM "orpc:publisher:resume:events"').one().count).toBe(3)
     })
 
     it('resets schema on insert error and retries', async () => {
@@ -167,7 +141,7 @@ describe('resumeStorage', () => {
       tables = ctx.storage.sql.exec('SELECT name FROM sqlite_master WHERE type=?', 'table').toArray()
       expect(tables.map((t: any) => t.name)).toContain('orpc:publisher:resume:events')
 
-      expect(ctx.storage.setAlarm).toHaveBeenCalled()
+      expect(ctx.storage.setAlarm).toHaveBeenCalledOnce()
     })
 
     it('returns all events after the specified ID', async () => {
@@ -246,7 +220,7 @@ describe('resumeStorage', () => {
       tables = ctx.storage.sql.exec('SELECT name FROM sqlite_master WHERE type=?', 'table').toArray()
       expect(tables.map((t: any) => t.name)).toContain('orpc:publisher:resume:events')
 
-      expect(ctx.storage.setAlarm).toHaveBeenCalled()
+      expect(ctx.storage.setAlarm).toHaveBeenCalledOnce()
     })
 
     it('reschedules alarm when there are active websocket connections', async () => {
@@ -258,7 +232,7 @@ describe('resumeStorage', () => {
 
       await storage.alarm()
 
-      expect(ctx.storage.setAlarm).toHaveBeenCalled()
+      expect(ctx.storage.setAlarm).toHaveBeenCalledOnce()
       expect(ctx.storage.deleteAll).not.toHaveBeenCalled()
     })
 
@@ -272,7 +246,7 @@ describe('resumeStorage', () => {
 
       await storage.alarm()
 
-      expect(ctx.storage.setAlarm).toHaveBeenCalled()
+      expect(ctx.storage.setAlarm).toHaveBeenCalledOnce()
       expect(ctx.storage.deleteAll).not.toHaveBeenCalled()
     })
 
@@ -291,8 +265,9 @@ describe('resumeStorage', () => {
       const tables = ctx.storage.sql.exec('SELECT name FROM sqlite_master WHERE type=?', 'table').toArray()
       expect(tables.map((t: any) => t.name)).not.toContain('orpc:publisher:resume:events')
 
-      expect(ctx.blockConcurrencyWhile).toHaveBeenCalled()
-      expect(ctx.storage.deleteAll).toHaveBeenCalled()
+      expect(ctx.blockConcurrencyWhile).toHaveBeenCalledOnce()
+      expect(ctx.storage.deleteAll).toHaveBeenCalledOnce()
+      expect(ctx.blockConcurrencyWhile).toHaveBeenCalledBefore(ctx.storage.deleteAll)
       expect(ctx.storage.setAlarm).not.toHaveBeenCalled()
     })
 
@@ -315,7 +290,7 @@ describe('resumeStorage', () => {
 
       tables = ctx.storage.sql.exec('SELECT name FROM sqlite_master WHERE type=?', 'table').toArray()
       expect(tables.map((t: any) => t.name)).toContain('orpc:publisher:resume:events')
-      expect(ctx.storage.setAlarm).toHaveBeenCalled()
+      expect(ctx.storage.setAlarm).toHaveBeenCalledOnce()
     })
 
     it('uses custom inactiveDataRetentionTime for alarm scheduling', async () => {
@@ -340,6 +315,22 @@ describe('resumeStorage', () => {
   })
 
   describe('schema & alarm initialization', () => {
+    it('should not create schema if setAlarm throws error', async () => {
+      const ctx = createDurableObjectState()
+      ctx.storage.setAlarm.mockRejectedValue(new Error('Alarm scheduling failed'))
+
+      const storage = new ResumeStorage(ctx, { retentionSeconds: 60 })
+
+      await expect(storage.store(JSON.stringify({ data: 'event1' }))).rejects.toThrow('Alarm scheduling failed')
+      await expect(storage.getEventsAfter('0')).rejects.toThrow('Alarm scheduling failed')
+
+      // Schema should not init because alarm scheduling failed
+      const tables = ctx.storage.sql.exec('SELECT name FROM sqlite_master WHERE type=?', 'table').toArray()
+      expect(tables.map((t: any) => t.name)).not.toContain('orpc:publisher:resume:events')
+
+      expect(ctx.storage.setAlarm).toHaveBeenCalledTimes(2)
+    })
+
     it('should only initialize schema and alarm once', async () => {
       const ctx = createDurableObjectState()
       const storage = new ResumeStorage(ctx, { retentionSeconds: 1 })
@@ -379,6 +370,56 @@ describe('resumeStorage', () => {
       await storage2.store(JSON.stringify({ data: 'test2' }))
 
       expect(ctx.storage.sql.exec('SELECT count(*) as count FROM "orpc:publisher:resume:events"').one().count).toBe(2)
+    })
+  })
+
+  describe('cleanup expired events', () => {
+    it('cleans up expired events during store/getEventsAfter/alarm', { timeout: 20_000, retry: 3 }, async () => {
+      const ctx = createDurableObjectState()
+      const storage1 = new ResumeStorage(ctx, { retentionSeconds: 1 })
+      const storage2 = new ResumeStorage(ctx, { retentionSeconds: 1 })
+      // ensure ctx is active
+      ctx.getWebSockets.mockReturnValue([{ readyState: 1 }])
+
+      await storage1.store(JSON.stringify({ data: 'event1' }))
+      await storage2.store(JSON.stringify({ data: 'event2' }))
+      // Both events should be stored
+      expect(ctx.storage.sql.exec('SELECT count(*) as count FROM "orpc:publisher:resume:events"').one().count).toBe(2)
+
+      await sleep(2100) // wait for event to expire
+      await storage1.store(JSON.stringify({ data: 'event2' }))
+      // First event should be expired, only second remains
+      expect(ctx.storage.sql.exec('SELECT count(*) as count FROM "orpc:publisher:resume:events"').one().count).toBe(1)
+
+      await sleep(2100) // wait for event to expire
+      const storage3 = new ResumeStorage(ctx, { retentionSeconds: 1 })
+      await storage3.getEventsAfter('0')
+      // All previous events should be expired
+      expect(ctx.storage.sql.exec('SELECT count(*) as count FROM "orpc:publisher:resume:events"').one().count).toBe(0)
+
+      await storage3.store(JSON.stringify({ data: 'event3' }))
+      // New event should be stored correctly
+      expect(ctx.storage.sql.exec('SELECT count(*) as count FROM "orpc:publisher:resume:events"').one().count).toBe(1)
+
+      await sleep(2100) // wait for event to expire
+      await storage3.alarm()
+      // All previous events should be expired
+      expect(ctx.storage.sql.exec('SELECT count(*) as count FROM "orpc:publisher:resume:events"').one().count).toBe(0)
+
+      await storage1.store(JSON.stringify({ data: 'event4' }))
+      // New event should be stored correctly
+      expect(ctx.storage.sql.exec('SELECT count(*) as count FROM "orpc:publisher:resume:events"').one().count).toBe(1)
+
+      await sleep(2100) // wait for event to expire
+      const storage4 = new ResumeStorage(ctx, { retentionSeconds: 2 })
+      await storage4.alarm()
+      // event4 shouldn't be expired yet because retentionSeconds is now 2
+      expect(ctx.storage.sql.exec('SELECT count(*) as count FROM "orpc:publisher:resume:events"').one().count).toBe(1)
+
+      await sleep(2100) // wait for event to expire
+      await storage4.alarm()
+      // now event4 should be expired
+      expect(ctx.storage.sql.exec('SELECT count(*) as count FROM "orpc:publisher:resume:events"').one().count).toBe(0)
     })
   })
 })

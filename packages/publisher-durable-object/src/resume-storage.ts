@@ -175,8 +175,14 @@ export class ResumeStorage {
   }
 
   private async ensureSchemaAndCleanup(): Promise<void> {
+    if (!this.isInitedAlarm) {
+      // ensure cleanup alarm/schedule is scheduled before anything schema-related
+      await this.scheduleAlarm()
+      this.isInitedAlarm = true
+    }
+
     if (!this.isInitedSchema) {
-      this.ctx.storage.sql.exec(`
+      const initTableResult = this.ctx.storage.sql.exec(`
         CREATE TABLE IF NOT EXISTS "${this.schemaPrefix}events" (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           payload TEXT NOT NULL,
@@ -193,15 +199,10 @@ export class ResumeStorage {
       `)
 
       this.isInitedSchema = true
-      this.lastCleanupTime = Date.now() // schema just created, nothing to cleanup
 
-      // we only need to schedule alarm once after schema is initialized
-      if (!this.isInitedAlarm) {
-        await this.scheduleAlarm()
-        this.isInitedAlarm = true
+      if (initTableResult.rowsWritten > 0) {
+        this.lastCleanupTime = Date.now() // schema just created, nothing to cleanup
       }
-
-      return
     }
 
     const now = Date.now()
