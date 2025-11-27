@@ -85,6 +85,18 @@ it('clone', () => {
   expect(cloned.nested.arr).not.toBe(obj.nested.arr)
 })
 
+it('clone with symbol properties', () => {
+  const sym = Symbol('test')
+  const nestedSym = Symbol('nested')
+  const obj = { a: 1, [sym]: { b: 2, [nestedSym]: 3 } }
+  const cloned = clone(obj)
+
+  expect(cloned.a).toBe(1)
+  expect(cloned[sym]).toEqual({ b: 2, [nestedSym]: 3 })
+  expect(cloned[sym]).not.toBe(obj[sym])
+  expect(cloned[sym][nestedSym]).toBe(3)
+})
+
 it('get', () => {
   expect(get({ a: { b: 1 } }, ['a', 'b'])).toEqual(1)
   expect(get({ a: { b: 1 } }, ['a', 'b', 'c'])).toEqual(undefined)

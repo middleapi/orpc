@@ -70,6 +70,10 @@ export function clone<T>(value: T): T {
       result[key] = clone(value[key])
     }
 
+    for (const sym of Object.getOwnPropertySymbols(value)) {
+      result[sym] = clone(value[sym])
+    }
+
     return result as any
   }
 
