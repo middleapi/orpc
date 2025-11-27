@@ -6,8 +6,7 @@ export interface PublisherDurableObjectOptions {
   resume?: ResumeStorageOptions
 }
 
-// eslint-disable-next-line ts/no-empty-object-type -- Props = {} is default behavior of DurableObject
-export class PublisherDurableObject<Env = Cloudflare.Env, Props = {}> extends DurableObject<Env, Props> {
+export class PublisherDurableObject<Env = Cloudflare.Env, Props = unknown> extends DurableObject<Env, Props> {
   private readonly resumeStorage: ResumeStorage
 
   constructor(ctx: DurableObjectState<Props>, env: Env, options: PublisherDurableObjectOptions = {}) {

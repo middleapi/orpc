@@ -1238,6 +1238,12 @@ importers:
       '@orpc/experimental-durable-iterator':
         specifier: next
         version: link:../../packages/durable-iterator
+      '@orpc/experimental-publisher':
+        specifier: next
+        version: link:../../packages/publisher
+      '@orpc/experimental-publisher-durable-object':
+        specifier: next
+        version: link:../../packages/publisher-durable-object
       '@orpc/json-schema':
         specifier: next
         version: link:../../packages/json-schema

@@ -11,6 +11,7 @@ import { NewUserSchema, UserSchema } from './schemas/user'
 import { CredentialSchema, TokenSchema } from './schemas/auth'
 import { NewPlanetSchema, PlanetSchema, UpdatePlanetSchema } from './schemas/planet'
 import { DurableIteratorHandlerPlugin } from '@orpc/experimental-durable-iterator'
+import { DurablePublisher } from '@orpc/experimental-publisher-durable-object'
 
 const rpcHandler = new RPCHandler(router, {
   interceptors: [
@@ -81,6 +82,7 @@ const openAPIHandler = new OpenAPIHandler(router, {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url)
+    const messagePublisher = new DurablePublisher<any>(env.PUBLISHER_DO)
 
     if (url.pathname === '/chat-room') {
       return upgradeDurableIteratorRequest(request, {
@@ -93,6 +95,7 @@ export default {
       prefix: '/rpc',
       context: {
         env,
+        messagePublisher,
       },
     })
 
@@ -104,6 +107,7 @@ export default {
       prefix: '/api',
       context: {
         env,
+        messagePublisher,
       },
     })
 
@@ -116,3 +120,4 @@ export default {
 } satisfies ExportedHandler<Env>
 
 export { ChatRoom } from './dos/chat-room'
+export { PublisherDO } from './dos/publisher'

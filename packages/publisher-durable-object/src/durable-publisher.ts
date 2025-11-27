@@ -28,7 +28,7 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
   private readonly getStubByName: Exclude<DurablePublisherOptions['getStubByName'], undefined>
 
   constructor(
-    private readonly namespace: DurableObjectNamespace,
+    private readonly namespace: DurableObjectNamespace<any>,
     { prefix, getStubByName, ...options }: DurablePublisherOptions = {},
   ) {
     super(options)

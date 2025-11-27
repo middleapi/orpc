@@ -18,11 +18,13 @@
   },
   "durable_objects": {
     "bindings": [
-      { "name": "CHAT_ROOM", "class_name": "ChatRoom" }
+      { "name": "CHAT_ROOM", "class_name": "ChatRoom" },
+      { "name": "PUBLISHER_DO", "class_name": "PublisherDO" }
     ]
   },
   "migrations": [
-    { "tag": "new-chat-room", "new_sqlite_classes": ["ChatRoom"] }
+    { "tag": "new-chat-room", "new_sqlite_classes": ["ChatRoom"] },
+    { "tag": "new-publisher-do", "new_sqlite_classes": ["PublisherDO"] }
   ]
   /**
    * Smart Placement
