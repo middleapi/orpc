@@ -96,21 +96,23 @@ type NestParams = Record<string, string | string[]>
 @Injectable()
 export class ImplementInterceptor implements NestInterceptor {
   private readonly config: ORPCModuleConfig
+  private readonly codec: StandardOpenAPICodec
+
   constructor(
     @Inject(ORPC_MODULE_CONFIG_SYMBOL) @Optional() config: ORPCModuleConfig | undefined,
   ) {
     // @Optional() does not allow set default value so we need to do it here
     this.config = config ?? {} as ORPCModuleConfig
-  }
 
-  intercept(ctx: ExecutionContext, next: CallHandler<any>): Observable<any> {
-    const codec = new StandardOpenAPICodec(
+    this.codec = new StandardOpenAPICodec(
       new StandardOpenAPISerializer(
         new StandardOpenAPIJsonSerializer(this.config),
         new StandardBracketNotationSerializer(this.config),
       ),
     )
+  }
 
+  intercept(ctx: ExecutionContext, next: CallHandler<any>): Observable<any> {
     return next.handle().pipe(
       mergeMap(async (impl: unknown) => {
         const { default: procedure } = await unlazy(impl)
@@ -135,7 +137,7 @@ export class ImplementInterceptor implements NestInterceptor {
             const client = createProcedureClient(procedure, this.config)
 
             isDecoding = true
-            const input = await codec.decode(standardRequest, flattenParams(req.params as NestParams), procedure)
+            const input = await this.codec.decode(standardRequest, flattenParams(req.params as NestParams), procedure)
             isDecoding = false
 
             const output = await client(input, {
@@ -143,7 +145,7 @@ export class ImplementInterceptor implements NestInterceptor {
               lastEventId: flattenHeader(standardRequest.headers['last-event-id']),
             })
 
-            return codec.encode(output, procedure)
+            return this.codec.encode(output, procedure)
           }
           catch (e) {
             const error = isDecoding && !(e instanceof ORPCError)
@@ -153,7 +155,7 @@ export class ImplementInterceptor implements NestInterceptor {
                 })
               : toORPCError(e)
 
-            return codec.encodeError(error)
+            return this.codec.encodeError(error)
           }
         })()
 
