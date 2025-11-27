@@ -142,7 +142,7 @@ export class ResumeStorage {
    * Inactivity means: no active connections AND no active events.
    */
   async alarm(): Promise<void> {
-    this.isInitedAlarm = true // triggered form alarm means it's already initialized
+    this.isInitedAlarm = true // triggered from alarm means it's already initialized
     await this.ensureSchemaAndCleanup()
 
     const shouldReschedule = await this.ctx.blockConcurrencyWhile(async () => {
