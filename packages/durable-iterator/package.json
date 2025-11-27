@@ -52,7 +52,7 @@
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
     "partysocket": "^1.1.6",
-    "valibot": "^1.1.0"
+    "valibot": "^1.2.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251121.0",
