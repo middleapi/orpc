@@ -4,6 +4,7 @@ import { vi } from 'vitest'
 export function createDurableObjectState(): any {
   const db = new Database(':memory:')
   const websockets: any[] = []
+  let currentAlarm: number | null = null
 
   return {
     storage: {
@@ -33,8 +34,12 @@ export function createDurableObjectState(): any {
           }
         },
       },
-      setAlarm: vi.fn(),
+      setAlarm: vi.fn(async (time: number) => {
+        currentAlarm = time
+      }),
+      getAlarm: vi.fn(async () => currentAlarm),
       deleteAll: vi.fn(async () => {
+        currentAlarm = null
         const tables = db.prepare(`
           SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'
         `).all() as { name: string }[]

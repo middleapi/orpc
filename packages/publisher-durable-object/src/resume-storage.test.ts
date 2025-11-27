@@ -331,6 +331,27 @@ describe('resumeStorage', () => {
       expect(ctx.storage.setAlarm).toHaveBeenCalledTimes(2)
     })
 
+    it('should not schedule alarm if one is already scheduled', async () => {
+      const ctx = createDurableObjectState()
+      const storage = new ResumeStorage(ctx, { retentionSeconds: 60 })
+
+      // Simulate an alarm already scheduled from a previous DO session
+      ctx.storage.getAlarm.mockReturnValue(Date.now() + 60000)
+
+      await storage.store(JSON.stringify({ data: 'event1' }))
+      await storage.store(JSON.stringify({ data: 'event2' }))
+      await storage.getEventsAfter('0')
+
+      // Schema should exist
+      const tables = ctx.storage.sql.exec('SELECT name FROM sqlite_master WHERE type=?', 'table').toArray()
+      expect(tables.map((t: any) => t.name)).toContain('orpc:publisher:resume:events')
+
+      // setAlarm should not have been called since alarm is already scheduled
+      expect(ctx.storage.setAlarm).not.toHaveBeenCalled()
+      // getAlarm should have been called to check existing alarm
+      expect(ctx.storage.getAlarm).toHaveBeenCalledOnce()
+    })
+
     it('should only initialize schema and alarm once', async () => {
       const ctx = createDurableObjectState()
       const storage = new ResumeStorage(ctx, { retentionSeconds: 1 })

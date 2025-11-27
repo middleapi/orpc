@@ -176,8 +176,12 @@ export class ResumeStorage {
 
   private async ensureSchemaAndCleanup(): Promise<void> {
     if (!this.isInitedAlarm) {
-      // ensure cleanup alarm/schedule is scheduled before anything schema-related
-      await this.scheduleAlarm()
+      const currentAlarm = await this.ctx.storage.getAlarm()
+      // alarm may have been scheduled in a previous Durable Object session
+      if (currentAlarm === null) {
+        // ensure cleanup alarm/schedule is scheduled before anything schema-related
+        await this.scheduleAlarm()
+      }
       this.isInitedAlarm = true
     }
 
