@@ -226,6 +226,47 @@ const query = useQuery(computed(
 
 :::
 
+## Default Options
+
+You can configure default options for all query/mutation utilities using `experimental_defaults`. This is useful for setting common options like `staleTime`, `retry`, or `context` across your procedures.
+
+```ts
+const orpc = createTanstackQueryUtils(client, {
+  experimental_defaults: {
+    planet: {
+      find: {
+        queryOptions: {
+          staleTime: 60 * 1000, // 1 minute
+          retry: 3,
+        },
+      },
+      list: {
+        infiniteOptions: {
+          staleTime: 30 * 1000,
+        },
+      },
+      create: {
+        mutationOptions: {
+          onSuccess: (output, input, _, ctx) => {
+            ctx.client.invalidateQueries({ queryKey: orpc.planet.key() })
+          },
+        },
+      },
+    },
+  },
+})
+
+// These will automatically use the default options
+const query = useQuery(orpc.planet.find.queryOptions({ input: { id: 123 } }))
+const mutation = useMutation(orpc.planet.create.mutationOptions())
+
+// User-provided options override defaults
+const customQuery = useQuery(orpc.planet.find.queryOptions({
+  input: { id: 123 },
+  staleTime: 0, // overrides the default
+}))
+```
+
 ## Client Context
 
 ::: warning
