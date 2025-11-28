@@ -2,7 +2,7 @@ import type { Client } from '@orpc/client'
 import type { ErrorFromErrorMap } from '@orpc/contract'
 import type { GetNextPageParamFunction, InfiniteData, InfiniteQueryObserverOptions, MutationObserverOptions, QueryFunction, QueryKey, QueryObserverOptions } from '@tanstack/query-core'
 import type { baseErrorMap } from '../../contract/tests/shared'
-import type { ProcedureUtils } from './procedure-utils'
+import type { experimental_ProcedureUtilsDefaults, ProcedureUtils } from './procedure-utils'
 import { QueryClient, skipToken } from '@tanstack/query-core'
 
 describe('ProcedureUtils', () => {
@@ -744,5 +744,196 @@ describe('ProcedureUtils', () => {
         onMutate: variables => ({ customContext: true }),
       })).toExtend<MutationObserverOptions<UtilsOutput, UtilsError, UtilsInput, { customContext: boolean }>>()
     })
+  })
+})
+
+describe('ProcedureUtilsDefaults', () => {
+  type TestClientContext = { batch?: boolean }
+  type TestInput = { search?: string }
+  type TestOutput = { title: string }
+  type TestError = Error
+
+  type TestDefaults = experimental_ProcedureUtilsDefaults<TestClientContext, TestInput, TestOutput, TestError>
+
+  it('should have exact same keys as ProcedureUtils excluding call', () => {
+    // Ensures every utility method in ProcedureUtils (except 'call') has a corresponding key in ProcedureUtilsDefaults
+    type ProcedureUtilsKeys = Exclude<keyof ProcedureUtils<any, any, any, any>, 'call'>
+    type DefaultsKeys = keyof experimental_ProcedureUtilsDefaults<any, any, any, any>
+
+    expectTypeOf<DefaultsKeys>().toEqualTypeOf<ProcedureUtilsKeys>()
+  })
+
+  it('all properties should be optional', () => {
+    const emptyDefaults: TestDefaults = {}
+    expectTypeOf(emptyDefaults).toExtend<TestDefaults>()
+  })
+
+  it('queryKey should accept Partial<QueryKeyOptions>', () => {
+    const defaults: TestDefaults = {
+      queryKey: {
+        input: { search: 'test' },
+      },
+    }
+    expectTypeOf(defaults).toExtend<TestDefaults>()
+
+    const _invalid: TestDefaults = {
+      queryKey: {
+        // @ts-expect-error - invalid input type
+        input: { invalid: 'test' },
+      },
+    }
+  })
+
+  it('queryOptions should accept Partial<QueryOptionsIn>', () => {
+    const defaults: TestDefaults = {
+      queryOptions: {
+        input: { search: 'test' },
+        staleTime: 1000,
+        context: { batch: true },
+      },
+    }
+    expectTypeOf(defaults).toExtend<TestDefaults>()
+
+    const _invalid: TestDefaults = {
+      queryOptions: {
+        // @ts-expect-error - invalid input type
+        input: { invalid: 'test' },
+      },
+    }
+  })
+
+  it('experimental_streamedKey should accept Partial<experimental_StreamedKeyOptions>', () => {
+    const defaults: TestDefaults = {
+      experimental_streamedKey: {
+        input: { search: 'test' },
+        queryFnOptions: { maxChunks: 10 },
+      },
+    }
+    expectTypeOf(defaults).toExtend<TestDefaults>()
+
+    const _invalid: TestDefaults = {
+      experimental_streamedKey: {
+        // @ts-expect-error - invalid input type
+        input: { invalid: 'test' },
+      },
+    }
+  })
+
+  it('experimental_streamedOptions should accept Partial<StreamedOptionsIn>', () => {
+    const defaults: TestDefaults = {
+      experimental_streamedOptions: {
+        input: { search: 'test' },
+        staleTime: 1000,
+      },
+    }
+    expectTypeOf(defaults).toExtend<TestDefaults>()
+
+    const _invalid: TestDefaults = {
+      experimental_streamedOptions: {
+        // @ts-expect-error - invalid input type
+        input: { invalid: 'test' },
+      },
+    }
+  })
+
+  it('experimental_liveKey should accept Partial<QueryKeyOptions>', () => {
+    const defaults: TestDefaults = {
+      experimental_liveKey: {
+        input: { search: 'test' },
+      },
+    }
+    expectTypeOf(defaults).toExtend<TestDefaults>()
+
+    const _invalid: TestDefaults = {
+      experimental_liveKey: {
+        // @ts-expect-error - invalid input type
+        input: { invalid: 'test' },
+      },
+    }
+  })
+
+  it('experimental_liveOptions should accept Partial<StreamedOptionsIn>', () => {
+    const defaults: TestDefaults = {
+      experimental_liveOptions: {
+        input: { search: 'test' },
+        staleTime: 1000,
+      },
+    }
+    expectTypeOf(defaults).toExtend<TestDefaults>()
+
+    const _invalid: TestDefaults = {
+      experimental_liveOptions: {
+        // @ts-expect-error - invalid input type
+        input: { invalid: 'test' },
+      },
+    }
+  })
+
+  it('infiniteKey should accept Partial input, initialPageParam, queryKey', () => {
+    const defaults: TestDefaults = {
+      infiniteKey: {
+        initialPageParam: 0,
+        queryKey: ['custom-key'],
+      },
+    }
+    expectTypeOf(defaults).toExtend<TestDefaults>()
+
+    const _invalid: TestDefaults = {
+      infiniteKey: {
+        // @ts-expect-error - invalid input type
+        input: { invalid: 'test' },
+      },
+    }
+  })
+
+  it('infiniteOptions should accept Partial<InfiniteOptionsIn>', () => {
+    const defaults: TestDefaults = {
+      infiniteOptions: {
+        staleTime: 1000,
+      },
+    }
+    expectTypeOf(defaults).toExtend<TestDefaults>()
+
+    const _invalid: TestDefaults = {
+      infiniteOptions: {
+        // @ts-expect-error - invalid input type
+        input: { invalid: 'test' },
+      },
+    }
+  })
+
+  it('mutationKey should accept Partial mutationKey', () => {
+    const defaults: TestDefaults = {
+      mutationKey: {
+        mutationKey: ['custom-mutation-key'],
+      },
+    }
+    expectTypeOf(defaults).toExtend<TestDefaults>()
+
+    const _invalid: TestDefaults = {
+      mutationKey: {
+        // @ts-expect-error - invalid mutationKey type
+        mutationKey: 1,
+      },
+    }
+  })
+
+  it('mutationOptions should accept Partial<MutationOptionsIn>', () => {
+    const defaults: TestDefaults = {
+      mutationOptions: {
+        onSuccess: (output) => {
+          expectTypeOf(output).toEqualTypeOf<TestOutput>()
+        },
+        context: { batch: true },
+      },
+    }
+    expectTypeOf(defaults).toExtend<TestDefaults>()
+
+    const _invalid: TestDefaults = {
+      mutationOptions: {
+        // @ts-expect-error - invalid context type
+        context: { batch: 'invalid' },
+      },
+    }
   })
 })

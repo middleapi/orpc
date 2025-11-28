@@ -57,4 +57,38 @@ describe('createRouterUtils', () => {
     const utils = createRouterUtils(client) as any
     expect(utils[Symbol.for('a')]).toBe(undefined)
   })
+
+  it('with defaults', () => {
+    const keyDefaults = {
+      queryOptions: {
+        staleTime: 1000,
+      },
+      mutationOptions: {
+        context: { foo: 'bar' },
+      },
+    }
+
+    const utils = createRouterUtils(client, {
+      experimental_defaults: {
+        key: keyDefaults,
+      },
+    }) as any
+
+    vi.clearAllMocks()
+    const keyUtils = utils.key
+
+    expect(procedureUtilsSpy).toHaveBeenCalledWith(client.key, {
+      path: ['key'],
+      experimental_defaults: keyDefaults,
+    })
+    expect(keyUtils.queryOptions().staleTime).toBeDefined()
+
+    vi.clearAllMocks()
+    const pongUtils = keyUtils.pong
+
+    expect(procedureUtilsSpy).toHaveBeenCalledWith(client.key.pong, {
+      path: ['key', 'pong'],
+    })
+    expect(pongUtils.queryOptions().staleTime).not.toBeDefined()
+  })
 })

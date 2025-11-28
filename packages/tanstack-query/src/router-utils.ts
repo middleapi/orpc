@@ -1,7 +1,7 @@
 import type { Client, NestedClient } from '@orpc/client'
 import type { GeneralUtils } from './general-utils'
-import type { ProcedureUtils } from './procedure-utils'
-import { toArray } from '@orpc/shared'
+import type { experimental_ProcedureUtilsDefaults, ProcedureUtils } from './procedure-utils'
+import { get, toArray } from '@orpc/shared'
 import { createGeneralUtils } from './general-utils'
 import { createProcedureUtils } from './procedure-utils'
 
@@ -12,8 +12,19 @@ export type RouterUtils<T extends NestedClient<any>>
       [K in keyof T]: T[K] extends NestedClient<any> ? RouterUtils<T[K]> : never
     } & GeneralUtils<unknown>
 
-export interface CreateRouterUtilsOptions {
+export type experimental_RouterUtilsDefaults<T extends NestedClient<any>>
+  = T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
+    ? experimental_ProcedureUtilsDefaults<UClientContext, UInput, UOutput, UError>
+    : {
+        [K in keyof T]?: T[K] extends NestedClient<any> ? experimental_RouterUtilsDefaults<T[K]> : never
+      }
+
+/**
+ * @todo remove default generic types on v2
+ */
+export interface CreateRouterUtilsOptions<T extends NestedClient<any> = NestedClient<any>> {
   path?: readonly string[]
+  experimental_defaults?: experimental_RouterUtilsDefaults<T>
 }
 
 /**
@@ -24,12 +35,15 @@ export interface CreateRouterUtilsOptions {
  */
 export function createRouterUtils<T extends NestedClient<any>>(
   client: T,
-  options: CreateRouterUtilsOptions = {},
+  options: CreateRouterUtilsOptions<T> = {},
 ): RouterUtils<T> {
   const path = toArray(options.path)
 
   const generalUtils = createGeneralUtils(path)
-  const procedureUtils = createProcedureUtils(client as any, { path })
+  const procedureUtils = createProcedureUtils(client as any, {
+    path,
+    experimental_defaults: options.experimental_defaults,
+  })
 
   const recursive = new Proxy({
     ...generalUtils,
@@ -42,7 +56,11 @@ export function createRouterUtils<T extends NestedClient<any>>(
         return value
       }
 
-      const nextUtils = createRouterUtils((client as any)[prop], { ...options, path: [...path, prop] })
+      const nextUtils = createRouterUtils((client as any)[prop], {
+        ...options,
+        path: [...path, prop],
+        experimental_defaults: get(options.experimental_defaults, [prop]) as any,
+      })
 
       if (typeof value !== 'function') {
         return nextUtils

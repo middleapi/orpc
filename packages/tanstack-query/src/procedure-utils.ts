@@ -146,24 +146,133 @@ export interface ProcedureUtils<TClientContext extends ClientContext, TInput, TO
   ): NoInfer<MutationOptions<TInput, TOutput, TError, UMutationContext>>
 }
 
-export interface CreateProcedureUtilsOptions {
+export interface experimental_ProcedureUtilsDefaults<TClientContext extends ClientContext, TInput, TOutput, TError> {
+  /**
+   * Default options for queryKey utility
+   *
+   * @see {@link https://orpc.unnoq.com/docs/integrations/tanstack-query#query-mutation-key Tanstack Query/Mutation Key Docs}
+   */
+  queryKey?: Partial<
+    QueryKeyOptions<TInput>
+  >
+
+  /**
+   * Default options for queryOptions utility
+   *
+   * @see {@link https://orpc.unnoq.com/docs/integrations/tanstack-query#query-options Tanstack Query Options Utility Docs}
+   */
+  queryOptions?: Partial<
+    QueryOptionsIn<TClientContext, TInput, TOutput, TError, unknown>
+  >
+
+  /**
+   * Default options for experimental_streamedKey utility
+   *
+   * @see {@link https://orpc.unnoq.com/docs/integrations/tanstack-query#query-mutation-key Tanstack Query/Mutation Key Docs}
+   */
+  experimental_streamedKey?: Partial<
+    experimental_StreamedKeyOptions<TInput>
+  >
+
+  /**
+   * Default options for experimental_streamedOptions utility
+   *
+   * @see {@link https://orpc.unnoq.com/docs/integrations/tanstack-query#streamed-query-options Tanstack Streamed Query Options Utility Docs}
+   */
+  experimental_streamedOptions?: Partial<
+    StreamedOptionsIn<TClientContext, TInput, experimental_StreamedQueryOutput<TOutput>, TError, unknown>
+  >
+
+  /**
+   * Default options for experimental_liveKey utility
+   *
+   * @see {@link https://orpc.unnoq.com/docs/integrations/tanstack-query#query-mutation-key Tanstack Query/Mutation Key Docs}
+   */
+  experimental_liveKey?: Partial<
+    QueryKeyOptions<TInput>
+  >
+
+  /**
+   * Default options for experimental_liveOptions utility
+   *
+   * @see {@link https://orpc.unnoq.com/docs/integrations/tanstack-query#live-query-options Tanstack Live Query Options Utility Docs}
+   */
+  experimental_liveOptions?: Partial<
+    StreamedOptionsIn<TClientContext, TInput, experimental_LiveQueryOutput<TOutput>, TError, unknown>
+  >
+
+  /**
+   * Default options for infiniteKey utility
+   *
+   * @see {@link https://orpc.unnoq.com/docs/integrations/tanstack-query#query-mutation-key Tanstack Query/Mutation Key Docs}
+   */
+  infiniteKey?: Partial<
+    Pick<
+      InfiniteOptionsIn<TClientContext, TInput, TOutput, TError, InfiniteData<TOutput, unknown>, unknown>,
+      'input' | 'initialPageParam' | 'queryKey'
+    >
+  >
+
+  /**
+   * Default options for infiniteOptions utility
+   *
+   * @see {@link https://orpc.unnoq.com/docs/integrations/tanstack-query#infinite-query-options Tanstack Infinite Query Options Utility Docs}
+   */
+  infiniteOptions?: Partial<
+    InfiniteOptionsIn<TClientContext, TInput, TOutput, TError, unknown, unknown>
+  >
+
+  /**
+   * Default options for mutationKey utility
+   *
+   * @see {@link https://orpc.unnoq.com/docs/integrations/tanstack-query#query-mutation-key Tanstack Query/Mutation Key Docs}
+   */
+  mutationKey?: Partial<
+    Pick<
+      MutationOptionsIn<TClientContext, TInput, TOutput, TError, any>,
+      'mutationKey'
+    >
+  >
+
+  /**
+   * Default options for mutationOptions utility
+   *
+   * @see {@link https://orpc.unnoq.com/docs/integrations/tanstack-query#mutation-options Tanstack Mutation Options Docs}
+   */
+  mutationOptions?: Partial<
+    MutationOptionsIn<TClientContext, TInput, TOutput, TError, unknown>
+  >
+}
+
+/**
+ * @todo remove default generic types on v2
+ */
+export interface CreateProcedureUtilsOptions<
+  TClientContext extends ClientContext = ClientContext,
+  TInput = unknown,
+  TOutput = unknown,
+  TError = unknown,
+> {
   path: readonly string[]
+  experimental_defaults?: experimental_ProcedureUtilsDefaults<TClientContext, TInput, TOutput, TError>
 }
 
 export function createProcedureUtils<TClientContext extends ClientContext, TInput, TOutput, TError>(
   client: Client<TClientContext, TInput, TOutput, TError>,
-  options: CreateProcedureUtilsOptions,
+  options: CreateProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>,
 ): ProcedureUtils<TClientContext, TInput, TOutput, TError> {
   const utils: ProcedureUtils<TClientContext, TInput, TOutput, TError> = {
     call: client,
 
     queryKey(...[optionsIn = {} as any]) {
+      optionsIn = { ...options.experimental_defaults?.queryKey, ...optionsIn }
       const queryKey = optionsIn.queryKey ?? generateOperationKey(options.path, { type: 'query', input: optionsIn.input })
 
       return queryKey
     },
 
     queryOptions(...[optionsIn = {} as any]) {
+      optionsIn = { ...options.experimental_defaults?.queryOptions, ...optionsIn }
       const queryKey = utils.queryKey(optionsIn)
 
       return {
@@ -190,12 +299,14 @@ export function createProcedureUtils<TClientContext extends ClientContext, TInpu
     },
 
     experimental_streamedKey(...[optionsIn = {} as any]) {
+      optionsIn = { ...options.experimental_defaults?.experimental_streamedKey, ...optionsIn }
       const queryKey = optionsIn.queryKey ?? generateOperationKey(options.path, { type: 'streamed', input: optionsIn.input, fnOptions: optionsIn.queryFnOptions })
 
       return queryKey
     },
 
     experimental_streamedOptions(...[optionsIn = {} as any]) {
+      optionsIn = { ...options.experimental_defaults?.experimental_streamedOptions, ...optionsIn }
       const queryKey = utils.experimental_streamedKey(optionsIn)
 
       return {
@@ -231,12 +342,14 @@ export function createProcedureUtils<TClientContext extends ClientContext, TInpu
     },
 
     experimental_liveKey(...[optionsIn = {} as any]) {
+      optionsIn = { ...options.experimental_defaults?.experimental_liveKey, ...optionsIn }
       const queryKey = optionsIn.queryKey ?? generateOperationKey(options.path, { type: 'live', input: optionsIn.input })
 
       return queryKey
     },
 
     experimental_liveOptions(...[optionsIn = {} as any]) {
+      optionsIn = { ...options.experimental_defaults?.experimental_liveOptions, ...optionsIn }
       const queryKey = utils.experimental_liveKey(optionsIn)
 
       return {
@@ -269,6 +382,7 @@ export function createProcedureUtils<TClientContext extends ClientContext, TInpu
     },
 
     infiniteKey(optionsIn) {
+      optionsIn = { ...options.experimental_defaults?.infiniteKey, ...optionsIn }
       const queryKey = optionsIn.queryKey ?? generateOperationKey(options.path, {
         type: 'infinite',
         input: optionsIn.input === skipToken ? skipToken : optionsIn.input(optionsIn.initialPageParam) as any,
@@ -278,6 +392,7 @@ export function createProcedureUtils<TClientContext extends ClientContext, TInpu
     },
 
     infiniteOptions(optionsIn) {
+      optionsIn = { ...options.experimental_defaults?.infiniteOptions, ...optionsIn }
       const queryKey = utils.infiniteKey(optionsIn as any)
 
       return {
@@ -304,12 +419,14 @@ export function createProcedureUtils<TClientContext extends ClientContext, TInpu
     },
 
     mutationKey(...[optionsIn = {} as any]) {
+      optionsIn = { ...options.experimental_defaults?.mutationKey, ...optionsIn }
       const mutationKey = optionsIn.mutationKey ?? generateOperationKey(options.path, { type: 'mutation' })
 
       return mutationKey
     },
 
     mutationOptions(...[optionsIn = {} as any]) {
+      optionsIn = { ...options.experimental_defaults?.mutationOptions, ...optionsIn }
       const mutationKey = utils.mutationKey(optionsIn)
 
       return {
