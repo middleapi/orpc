@@ -228,7 +228,7 @@ const query = useQuery(computed(
 
 ## Default Options
 
-You can configure default options for all query/mutation utilities using `experimental_defaults`. This is useful for setting common options like `staleTime`, `retry`, or `context` across your procedures.
+You can configure default options for all query/mutation utilities using `experimental_defaults`. These options are [spread merged](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_syntax) with user-provided options, allowing you to set defaults while still enabling customization on a per-call basis.
 
 ```ts
 const orpc = createTanstackQueryUtils(client, {
