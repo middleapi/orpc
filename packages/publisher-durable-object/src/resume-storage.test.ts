@@ -293,22 +293,22 @@ describe('resumeStorage', () => {
       expect(ctx.storage.setAlarm).toHaveBeenCalledOnce()
     })
 
-    it('uses custom inactiveDataRetentionTime for alarm scheduling', async () => {
+    it('uses custom cleanupIntervalSeconds for alarm scheduling', async () => {
       const ctx = createDurableObjectState()
       const storage = new ResumeStorage(ctx, {
         retentionSeconds: 60,
-        inactiveDataRetentionTime: 120,
+        cleanupIntervalSeconds: 120,
       })
 
       await storage.store(JSON.stringify({ data: 'test' }))
 
-      // Alarm should be scheduled at retentionSeconds + inactiveDataRetentionTime
+      // Alarm should be scheduled at cleanupIntervalSeconds
       expect(ctx.storage.setAlarm).toHaveBeenCalledWith(
         expect.any(Number),
       )
 
       const alarmTime = ctx.storage.setAlarm.mock.calls[0]![0]
-      const expectedDelay = (60 + 120) * 1000
+      const expectedDelay = 120 * 1000
       expect(alarmTime).toBeGreaterThanOrEqual(Date.now() + expectedDelay - 1000)
       expect(alarmTime).toBeLessThanOrEqual(Date.now() + expectedDelay + 1000)
     })

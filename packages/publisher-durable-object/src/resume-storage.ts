@@ -18,14 +18,15 @@ export interface ResumeStorageOptions {
   retentionSeconds?: number
 
   /**
-   * How long (in seconds) of inactivity before auto-deleting the durable object's data.
-   * Inactivity means no active WebSocket connections and no events within the retention period.
+   * Interval (in seconds) between cleanup checks for the Durable Object.
    *
-   * The alarm is scheduled at `retentionSeconds + inactiveDataRetentionTime`.
+   * At each interval, verify whether the Durable Object is inactive
+   * (no active WebSocket connections and no stored events). If inactive, all
+   * data is deleted to free resources; otherwise, another check is scheduled.
    *
-   * @default 6 * 60 * 60 (6 hours)
+   * @default 12 * 60 * 60 (12 hours)
    */
-  inactiveDataRetentionTime?: number
+  cleanupIntervalSeconds?: number
 
   /**
    * Prefix for the resume storage table schema.
@@ -38,7 +39,7 @@ export interface ResumeStorageOptions {
 
 export class ResumeStorage {
   private readonly retentionSeconds: number
-  private readonly inactiveDataRetentionTime: number
+  private readonly cleanupIntervalSeconds: number
   private readonly schemaPrefix: string
 
   private isInitedSchema = false
@@ -54,7 +55,7 @@ export class ResumeStorage {
     options: ResumeStorageOptions = {},
   ) {
     this.retentionSeconds = options.retentionSeconds ?? 0
-    this.inactiveDataRetentionTime = options.inactiveDataRetentionTime ?? 6 * 60 * 60
+    this.cleanupIntervalSeconds = options.cleanupIntervalSeconds ?? 12 * 60 * 60
     this.schemaPrefix = options.schemaPrefix ?? 'orpc:publisher:resume:'
   }
 
@@ -230,6 +231,6 @@ export class ResumeStorage {
   }
 
   private scheduleAlarm(): Promise<void> {
-    return this.ctx.storage.setAlarm(Date.now() + (this.retentionSeconds + this.inactiveDataRetentionTime) * 1000)
+    return this.ctx.storage.setAlarm(Date.now() + this.cleanupIntervalSeconds * 1000)
   }
 }
