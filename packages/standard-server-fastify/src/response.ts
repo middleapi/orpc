@@ -1,7 +1,7 @@
 import type { StandardHeaders, StandardResponse } from '@orpc/standard-server'
 import type { ToNodeHttpBodyOptions } from '@orpc/standard-server-node'
 import type { FastifyReply } from 'fastify'
-import { toNodeHttpBody } from '@orpc/standard-server-node'
+import { toNodeHttpBody, toNodeHttpHeaders } from '@orpc/standard-server-node'
 
 export interface SendStandardResponseOptions extends ToNodeHttpBodyOptions { }
 
@@ -19,7 +19,9 @@ export function sendStandardResponse(
     const resBody = toNodeHttpBody(standardResponse.body, resHeaders, options)
 
     reply.status(standardResponse.status)
-    reply.headers(resHeaders)
+    // fastify treat undefined headers as empty string, so remember to use toNodeHttpHeaders
+    // to filter out undefined headers
+    reply.headers(toNodeHttpHeaders(resHeaders))
     reply.send(resBody)
   })
 }

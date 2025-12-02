@@ -4,9 +4,11 @@ import { Buffer } from 'node:buffer'
 import Stream from 'node:stream'
 import request from 'supertest'
 import * as Body from './body'
+import * as Headers from './headers'
 import { sendStandardResponse } from './response'
 
 const toNodeHttpBodySpy = vi.spyOn(Body, 'toNodeHttpBody')
+const toNodeHttpHeadersSpy = vi.spyOn(Headers, 'toNodeHttpHeaders')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -34,11 +36,16 @@ describe('sendStandardResponse', () => {
       'x-custom-header': 'custom-value',
     }, options)
 
+    expect(toNodeHttpHeadersSpy).toBeCalledTimes(1)
+    expect(toNodeHttpHeadersSpy).toBeCalledWith({
+      'x-custom-header': 'custom-value',
+    })
+
     expect(endSpy).toBeCalledTimes(1)
     expect(endSpy).toBeCalledWith()
 
     expect(res.status).toBe(207)
-    expect(res.headers['content-type']).toEqual(undefined)
+    expect(res.headers).not.toHaveProperty('content-type')
     expect(res.headers['x-custom-header']).toEqual('custom-value')
 
     expect(res.text).toEqual('')
@@ -65,6 +72,12 @@ describe('sendStandardResponse', () => {
       'content-type': 'application/json',
       'x-custom-header': 'custom-value',
     }, options)
+
+    expect(toNodeHttpHeadersSpy).toBeCalledTimes(1)
+    expect(toNodeHttpHeadersSpy).toBeCalledWith({
+      'content-type': 'application/json',
+      'x-custom-header': 'custom-value',
+    })
 
     expect(endSpy).toBeCalledTimes(1)
     expect(endSpy).toBeCalledWith(toNodeHttpBodySpy.mock.results[0]!.value)
@@ -102,6 +115,14 @@ describe('sendStandardResponse', () => {
       'content-type': 'text/plain',
       'x-custom-header': 'custom-value',
     }, options)
+
+    expect(toNodeHttpHeadersSpy).toBeCalledTimes(1)
+    expect(toNodeHttpHeadersSpy).toBeCalledWith({
+      'content-disposition': 'inline; filename="blob"; filename*=utf-8\'\'blob',
+      'content-length': '3',
+      'content-type': 'text/plain',
+      'x-custom-header': 'custom-value',
+    })
 
     expect(endSpy).toBeCalledTimes(1)
     expect(endSpy).toBeCalledWith()
@@ -147,6 +168,12 @@ describe('sendStandardResponse', () => {
       'content-type': 'text/event-stream',
       'x-custom-header': 'custom-value',
     }, options)
+
+    expect(toNodeHttpHeadersSpy).toBeCalledTimes(1)
+    expect(toNodeHttpHeadersSpy).toBeCalledWith({
+      'content-type': 'text/event-stream',
+      'x-custom-header': 'custom-value',
+    })
 
     expect(endSpy).toBeCalledTimes(1)
     expect(endSpy).toBeCalledWith()

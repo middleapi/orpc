@@ -2,6 +2,7 @@ import type { StandardHeaders, StandardResponse } from '@orpc/standard-server'
 import type { ToNodeHttpBodyOptions } from './body'
 import type { NodeHttpResponse } from './types'
 import { toNodeHttpBody } from './body'
+import { toNodeHttpHeaders } from './headers'
 
 export interface SendStandardResponseOptions extends ToNodeHttpBodyOptions {}
 
@@ -18,7 +19,9 @@ export function sendStandardResponse(
 
     const resBody = toNodeHttpBody(standardResponse.body, resHeaders, options)
 
-    res.writeHead(standardResponse.status, resHeaders)
+    // nodejs throws error when header is undefined, so remember to use toNodeHttpHeaders
+    // to filter out undefined headers
+    res.writeHead(standardResponse.status, toNodeHttpHeaders(resHeaders))
 
     if (resBody === undefined) {
       res.end()
