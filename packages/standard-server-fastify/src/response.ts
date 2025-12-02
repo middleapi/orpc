@@ -19,7 +19,7 @@ export function sendStandardResponse(
     const resBody = toNodeHttpBody(standardResponse.body, resHeaders, options)
 
     reply.status(standardResponse.status)
-    // fastify treat undefined headers as empty string, so remember to use toNodeHttpHeaders
+    // Fastify treats undefined headers as empty string, so remember to use toNodeHttpHeaders
     // to filter out undefined headers
     reply.headers(toNodeHttpHeaders(resHeaders))
     reply.send(resBody)
