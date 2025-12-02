@@ -6,7 +6,7 @@ export function toNodeHttpHeaders(headers: StandardHeaders): OutgoingHttpHeaders
 
   for (const key in headers) {
     const value = headers[key]
-    // nodejs not allow header is undefined
+    // nodejs does not allow headers to be undefined
     if (value !== undefined) {
       nodeHttpHeaders[key] = value
     }
