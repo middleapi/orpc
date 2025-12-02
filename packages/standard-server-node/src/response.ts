@@ -19,7 +19,7 @@ export function sendStandardResponse(
 
     const resBody = toNodeHttpBody(standardResponse.body, resHeaders, options)
 
-    // nodejs throws error when header is undefined, so remember to use toNodeHttpHeaders
+    // Node.js throws an error when a header is undefined, so remember to use toNodeHttpHeaders
     // to filter out undefined headers
     res.writeHead(standardResponse.status, toNodeHttpHeaders(resHeaders))
 
