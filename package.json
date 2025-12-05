@@ -57,17 +57,6 @@
     "vite-plugin-solid": "^2.11.10",
     "vitest": "^3.2.4"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3",
-      "electron",
-      "esbuild"
-    ],
-    "overrides": {
-      "@wxt-dev/storage": "1.2.0",
-      "typescript": "~5.8.3"
-    }
-  },
   "simple-git-hooks": {
     "pre-commit": "pnpm lint-staged"
   },

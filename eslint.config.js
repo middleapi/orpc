@@ -53,6 +53,7 @@ export default antfu({
         },
       ],
     }],
+    'pnpm/json-enforce-catalog': 'off',
   },
 }, {
   files: ['**/*.test.ts', '**/*.test.tsx', '**/*.test-d.ts', '**/*.test-d.tsx', 'apps/content/shared/**', 'playgrounds/**', 'packages/*/playground/**'],

@@ -1,4 +1,15 @@
+catalogMode: prefer
+cleanupUnusedCatalogs: true
+shellEmulator: true
+trustPolicy: no-downgrade
 packages:
   - 'apps/*'
   - 'packages/*'
   - 'playgrounds/*'
+overrides:
+  '@wxt-dev/storage': 1.2.0
+  typescript: ~5.8.3
+onlyBuiltDependencies:
+  - better-sqlite3
+  - electron
+  - esbuild
