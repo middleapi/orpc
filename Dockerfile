@@ -103,20 +103,20 @@ ENV NODE_ENV=production
 ENV PORT=3000
 EXPOSE 3000
 WORKDIR /app/playgrounds/svelte-kit
-CMD ["node", "build"]
+CMD ["node", "./build/index.js"]
 
 # --- SolidStart production ---
 FROM runtime-base AS solid-prod
 COPY playgrounds/solid-start/package.json ./playgrounds/solid-start/
 RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY --from=solid-build /app/packages ./packages
-COPY --from=solid-build /app/playgrounds/solid-start/dist ./playgrounds/solid-start/dist
+COPY --from=solid-build /app/playgrounds/solid-start/.output ./playgrounds/solid-start/.output
 USER node
 ENV NODE_ENV=production
 ENV PORT=3000
 EXPOSE 3000
 WORKDIR /app/playgrounds/solid-start
-CMD ["node", "./dist/server"]
+CMD ["node", ".output/server/index.mjs"]
 
 # --- TanStack Start production ---
 FROM runtime-base AS tanstack-prod
@@ -129,7 +129,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 EXPOSE 3000
 WORKDIR /app/playgrounds/tanstack-start
-CMD ["node", "./dist/server"]
+CMD ["node", "./dist/server/index.mjs"]
 
 # Default target
 FROM dev
