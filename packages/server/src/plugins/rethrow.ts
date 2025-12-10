@@ -14,7 +14,7 @@ export interface experimental_RethrowHandlerPluginOptions<T extends Context> {
    *     // Rethrow all non-ORPCError errors
    *     return !(error instanceof ORPCError)
    *   }
-   * }
+   * })
    * ```
    */
   filter: Value<boolean, [error: ThrowableError, options: StandardHandlerInterceptorOptions<T>]>
