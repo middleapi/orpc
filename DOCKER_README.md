@@ -70,26 +70,26 @@ docker build -t orpc-dev .
 docker run -it --rm -p 3000:3000 -v $(pwd)/playgrounds/next:/app/playgrounds/next orpc-dev pnpm --filter next dev
 ```
 
-### Build and Run Production
+### Build and Run Production (all frameworks)
 
 ```bash
-# Next.js
+# Next.js (build + run)
 docker build --target next-prod -t orpc-next .
 docker run -d -p 3000:3000 --name orpc-next orpc-next
 
-# Nuxt
+# Nuxt (build + run)
 docker build --target nuxt-prod -t orpc-nuxt .
 docker run -d -p 3000:3000 --name orpc-nuxt orpc-nuxt
 
-# SvelteKit
+# SvelteKit (build + run)
 docker build --target svelte-prod -t orpc-svelte .
 docker run -d -p 3000:3000 --name orpc-svelte orpc-svelte
 
-# SolidStart
+# SolidStart (build + run)
 docker build --target solid-prod -t orpc-solid .
 docker run -d -p 3000:3000 --name orpc-solid orpc-solid
 
-# TanStack Start
+# TanStack Start (build + run)
 docker build --target tanstack-prod -t orpc-tanstack .
 docker run -d -p 3000:3000 --name orpc-tanstack orpc-tanstack
 ```
@@ -142,8 +142,3 @@ To remove all containers and images:
 ```bash
 docker compose down --rmi all
 ```
-
-## Image Size Optimization
-
-1. Build only the target you need: `docker build --target next-prod ...`.
-2. For smaller prod images later, we can add per-app `pnpm --filter ... --prod` installs or standalone outputs.
