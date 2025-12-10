@@ -1,0 +1,166 @@
+version: '3.8'
+
+services:
+  # Next.js playground
+  next-app:
+    build:
+      context: .
+      target: dev
+    container_name: orpc-next
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./playgrounds/next:/app/playgrounds/next
+      - ./packages:/app/packages
+      - /app/playgrounds/next/node_modules
+      - /app/packages/node_modules
+    environment:
+      - NODE_ENV=development
+    command: pnpm --filter next dev
+    profiles:
+      - next
+
+  # Nuxt playground
+  nuxt-app:
+    build:
+      context: .
+      target: dev
+    container_name: orpc-nuxt
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./playgrounds/nuxt:/app/playgrounds/nuxt
+      - ./packages:/app/packages
+      - /app/playgrounds/nuxt/node_modules
+      - /app/packages/node_modules
+    environment:
+      - NODE_ENV=development
+    command: pnpm --filter nuxt dev
+    profiles:
+      - nuxt
+
+  # SvelteKit playground
+  svelte-app:
+    build:
+      context: .
+      target: dev
+    container_name: orpc-svelte
+    ports:
+      - "3002:5173"
+    volumes:
+      - ./playgrounds/svelte-kit:/app/playgrounds/svelte-kit
+      - ./packages:/app/packages
+      - /app/playgrounds/svelte-kit/node_modules
+      - /app/packages/node_modules
+    environment:
+      - NODE_ENV=development
+    command: pnpm --filter svelte-kit dev
+    profiles:
+      - svelte
+
+  # SolidStart playground
+  solid-app:
+    build:
+      context: .
+      target: dev
+    container_name: orpc-solid
+    ports:
+      - "3003:3000"
+    volumes:
+      - ./playgrounds/solid-start:/app/playgrounds/solid-start
+      - ./packages:/app/packages
+      - /app/playgrounds/solid-start/node_modules
+      - /app/packages/node_modules
+    environment:
+      - NODE_ENV=development
+    command: pnpm --filter solid-start dev
+    profiles:
+      - solid
+
+  # TanStack Start playground
+  tanstack-app:
+    build:
+      context: .
+      target: dev
+    container_name: orpc-tanstack
+    ports:
+      - "3004:3000"
+    volumes:
+      - ./playgrounds/tanstack-start:/app/playgrounds/tanstack-start
+      - ./packages:/app/packages
+      - /app/playgrounds/tanstack-start/node_modules
+      - /app/packages/node_modules
+    environment:
+      - NODE_ENV=development
+    command: pnpm --filter tanstack-start dev
+    profiles:
+      - tanstack
+
+  # Production Next.js app
+  next-prod:
+    build:
+      context: .
+      target: next-prod
+    container_name: orpc-next-prod
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    profiles:
+      - production-next
+
+  # Production Nuxt app
+  nuxt-prod:
+    build:
+      context: .
+      target: nuxt-prod
+    container_name: orpc-nuxt-prod
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    profiles:
+      - production-nuxt
+
+  # Production SvelteKit app
+  svelte-prod:
+    build:
+      context: .
+      target: svelte-prod
+    container_name: orpc-svelte-prod
+    ports:
+      - "3002:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    profiles:
+      - production-svelte
+
+  # Production SolidStart app
+  solid-prod:
+    build:
+      context: .
+      target: solid-prod
+    container_name: orpc-solid-prod
+    ports:
+      - "3003:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    profiles:
+      - production-solid
+
+  # Production TanStack Start app
+  tanstack-prod:
+    build:
+      context: .
+      target: tanstack-prod
+    container_name: orpc-tanstack-prod
+    ports:
+      - "3004:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    profiles:
+      - production-tanstack
