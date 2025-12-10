@@ -150,6 +150,7 @@ export default withMermaid(defineConfig({
             { text: 'Batch Requests', link: '/docs/plugins/batch-requests' },
             { text: 'Client Retry', link: '/docs/plugins/client-retry' },
             { text: 'Retry After', link: '/docs/plugins/retry-after' },
+            { text: 'Rethrow Handler', link: '/docs/plugins/rethrow-handler' },
             { text: 'Compression', link: '/docs/plugins/compression' },
             { text: 'Body Limit', link: '/docs/plugins/body-limit' },
             { text: 'Simple CSRF Protection', link: '/docs/plugins/simple-csrf-protection' },

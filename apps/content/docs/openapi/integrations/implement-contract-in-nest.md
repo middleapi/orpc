@@ -222,8 +222,11 @@ Configure the `@orpc/nest` module by importing `ORPCModule` in your NestJS appli
 ```ts
 import { Module } from '@nestjs/common'
 import { REQUEST } from '@nestjs/core'
-import { onError, ORPCModule } from '@orpc/nest'
+import { onError, ORPCError, ORPCModule } from '@orpc/nest'
 import { Request } from 'express' // if you use express adapter
+import {
+  experimental_RethrowHandlerPlugin as RethrowHandlerPlugin,
+} from '@orpc/server/plugins'
 
 declare module '@orpc/nest' {
   /**
@@ -246,7 +249,15 @@ declare module '@orpc/nest' {
         context: { request }, // oRPC context, accessible from middlewares, etc.
         eventIteratorKeepAliveInterval: 5000, // 5 seconds
         customJsonSerializers: [],
-        plugins: [], // most oRPC plugins are compatible
+        plugins: [
+          new RethrowHandlerPlugin({
+            filter: (error) => {
+              // Rethrow all non-ORPCError errors
+              // This allows unhandled exceptions to bubble up to NestJS global exception filters
+              return !(error instanceof ORPCError)
+            },
+          })
+        ], // most oRPC plugins are compatible
       }),
       inject: [REQUEST],
     }),
