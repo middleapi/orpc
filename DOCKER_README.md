@@ -83,12 +83,15 @@ docker run -d -p 3000:3000 --name orpc-nuxt orpc-nuxt
 
 # SvelteKit
 docker build --target svelte-prod -t orpc-svelte .
+docker run -d -p 3000:3000 --name orpc-svelte orpc-svelte
 
 # SolidStart
 docker build --target solid-prod -t orpc-solid .
+docker run -d -p 3000:3000 --name orpc-solid orpc-solid
 
 # TanStack Start
 docker build --target tanstack-prod -t orpc-tanstack .
+docker run -d -p 3000:3000 --name orpc-tanstack orpc-tanstack
 ```
 
 ## Multi-stage Builds Explained
@@ -142,6 +145,5 @@ docker compose down --rmi all
 
 ## Image Size Optimization
 
-1. Keep `.dockerignore` up to date (you can swap in `.dockerignore.optimized` if you want to exclude more).
-2. Build only the target you need: `docker build --target next-prod ...`.
-3. For smaller prod images later, we can add per-app `pnpm --filter ... --prod` installs or standalone outputs.
+1. Build only the target you need: `docker build --target next-prod ...`.
+2. For smaller prod images later, we can add per-app `pnpm --filter ... --prod` installs or standalone outputs.
