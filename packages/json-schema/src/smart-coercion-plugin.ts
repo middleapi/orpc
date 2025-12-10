@@ -6,19 +6,19 @@ import type { JsonSchema } from './types'
 import { CompositeSchemaConverter } from '@orpc/openapi'
 import { toArray } from '@orpc/shared'
 import {
-  experimental_JsonSchemaCoercer as JsonSchemaCoercer,
+  JsonSchemaCoercer,
 } from './coercer'
 
-export interface experimental_SmartCoercionPluginOptions {
+export interface SmartCoercionPluginOptions {
   schemaConverters?: readonly ConditionalSchemaConverter[]
 }
 
-export class experimental_SmartCoercionPlugin<T extends Context> implements StandardHandlerPlugin<T> {
+export class SmartCoercionPlugin<T extends Context> implements StandardHandlerPlugin<T> {
   private readonly converter: SchemaConverter
   private readonly coercer: JsonSchemaCoercer
   private readonly cache: WeakMap<AnySchema, JsonSchema> = new WeakMap()
 
-  constructor(options: experimental_SmartCoercionPluginOptions = {}) {
+  constructor(options: SmartCoercionPluginOptions = {}) {
     this.converter = new CompositeSchemaConverter(toArray(options.schemaConverters))
     this.coercer = new JsonSchemaCoercer()
   }

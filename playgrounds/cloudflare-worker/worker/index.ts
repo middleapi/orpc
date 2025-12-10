@@ -1,7 +1,7 @@
 import { RPCHandler } from '@orpc/server/fetch'
 import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { OpenAPIReferencePlugin } from '@orpc/openapi/plugins'
-import { experimental_SmartCoercionPlugin as SmartCoercionPlugin } from '@orpc/json-schema'
+import { SmartCoercionPlugin } from '@orpc/json-schema'
 import { upgradeDurableIteratorRequest } from '@orpc/experimental-durable-iterator/durable-object'
 import { BatchHandlerPlugin } from '@orpc/server/plugins'
 import { router } from './routers'
