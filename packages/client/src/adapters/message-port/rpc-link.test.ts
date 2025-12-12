@@ -40,7 +40,7 @@ describe('rpcLink', () => {
 
     expect(id).toBeTypeOf('string')
     expect(payload).toEqual({
-      url: new URL('orpc://localhost/ping'),
+      url: new URL('http://orpc/ping'),
       body: { json: 'input' },
       headers: {},
       method: 'POST',
@@ -60,7 +60,7 @@ describe('rpcLink', () => {
 
     expect(id).toBeTypeOf('string')
     expect(payload).toEqual({
-      url: new URL('orpc://localhost/ping'),
+      url: new URL('http://orpc/ping'),
       body: expect.any(FormData),
       headers: expect.any(Object),
       method: 'POST',
@@ -86,7 +86,7 @@ describe('rpcLink', () => {
 
     expect(transfer).toHaveBeenCalledTimes(1)
     expect(transfer).toHaveBeenCalledWith([id, type, expect.objectContaining({
-      url: new URL('orpc://localhost/ping'),
+      url: new URL('http://orpc/ping'),
       body: { json: expect.toBeOneOf([array]) },
       headers: {},
       method: 'POST',
@@ -94,7 +94,7 @@ describe('rpcLink', () => {
 
     expect(id).toBeTypeOf('string')
     expect(payload).toEqual({
-      url: new URL('orpc://localhost/ping'),
+      url: new URL('http://orpc/ping'),
       body: { json: expect.toSatisfy(v => v !== array && v instanceof Uint8Array && v.byteLength === 3) },
       headers: {},
       method: 'POST',

@@ -24,7 +24,7 @@ describe('rpcHandler', async () => {
 
   const ping_request_message = {
     rawData: await encodeRequestMessage('19', MessageType.REQUEST, {
-      url: new URL('orpc://localhost/ping'),
+      url: new URL('http://orpc/ping'),
       body: { json: 'input' },
       headers: {},
       method: 'POST',

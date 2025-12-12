@@ -16,6 +16,6 @@ export interface RPCLinkOptions<T extends ClientContext>
 export class RPCLink<T extends ClientContext> extends StandardRPCLink<T> {
   constructor(options: RPCLinkOptions<T>) {
     const linkClient = new LinkMessagePortClient(options)
-    super(linkClient, { ...options, url: 'orpc://localhost' })
+    super(linkClient, { ...options, url: 'http://orpc' })
   }
 }
