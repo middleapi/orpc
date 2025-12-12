@@ -3,8 +3,8 @@ import type { EncodedMessage } from './types'
 import { isAsyncIteratorObject, readAsBuffer, stringifyJSON } from '@orpc/shared'
 import { flattenHeader, generateContentDisposition, getFilenameFromContentDisposition } from '@orpc/standard-server'
 
-const SHORTABLE_ORIGIN = 'orpc://localhost'
-const SHORTABLE_ORIGIN_MATCHER = /^orpc:\/\/localhost\//
+const SHORTABLE_ORIGIN = 'http://orpc'
+const SHORTABLE_ORIGIN_MATCHER = /^http:\/\/orpc\//
 
 export enum MessageType {
   REQUEST = 1,
@@ -57,7 +57,7 @@ export interface SerializedRequestPayload {
   /**
    * The url of the request
    *
-   * might be relative path if origin is `orpc://localhost`
+   * might be relative path if origin is `http://orpc`
    */
   u: string
 

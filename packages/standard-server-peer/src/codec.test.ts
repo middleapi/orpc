@@ -12,7 +12,7 @@ describe('serializeRequestMessage & deserializeRequestMessage', () => {
   it('should serialize and deserialize a basic POST request', () => {
     const id = 'req-123'
     const payload: RequestMessageMap[MessageType.REQUEST] = {
-      url: new URL('orpc://localhost/api/users'),
+      url: new URL('http://orpc/api/users'),
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: { name: 'John' },
@@ -34,7 +34,7 @@ describe('serializeRequestMessage & deserializeRequestMessage', () => {
 
     expect(decodedId).toBe(id)
     expect(decodedType).toBe(MessageType.REQUEST)
-    expect(decodedPayload.url.toString()).toBe('orpc://localhost/api/users')
+    expect(decodedPayload.url.toString()).toBe('http://orpc/api/users')
     expect(decodedPayload.method).toBe('POST')
     expect(decodedPayload.headers).toEqual({ 'content-type': 'application/json' })
     expect(decodedPayload.body).toEqual({ name: 'John' })
@@ -75,7 +75,7 @@ describe('serializeRequestMessage & deserializeRequestMessage', () => {
     const blobData = new Blob(['test content'], { type: 'text/plain' })
 
     const payload: RequestMessageMap[MessageType.REQUEST] = {
-      url: new URL('orpc://localhost/upload'),
+      url: new URL('http://orpc/upload'),
       method: 'POST',
       headers: { 'content-type': 'text/plain' },
       body: blobData,
@@ -140,7 +140,7 @@ describe('serializeRequestMessage & deserializeRequestMessage', () => {
   it('should omit empty headers and default POST method', () => {
     const id = 'req-minimal'
     const payload: RequestMessageMap[MessageType.REQUEST] = {
-      url: new URL('orpc://localhost/test'),
+      url: new URL('http://orpc/test'),
       method: 'POST',
       headers: {},
       body: 'data',
@@ -337,12 +337,12 @@ describe('encode/decode request message', () => {
   })
 
   describe.each([
-    ['GET', new URL('orpc://localhost/api/v1/users/1?a=1&b=2'), {}],
-    ['GET', new URL('orpc:///localhost/api/v1/users/1?a=1&b=2'), {}],
-    ['GET', new URL('orpc://example.com/api/v1/users/1?a=1&b=2'), {}],
-    ['GET', new URL('orpc:///example.com/api/v1/users/1?a=1&b=2'), {}],
-    ['GET', new URL('orpc:/api/v1/users/1?a=1&b=2'), {}],
-    ['GET', new URL('orpc://api/v1/users/1?a=1&b=2'), {}],
+    ['GET', new URL('http://orpc/api/v1/users/1?a=1&b=2'), {}],
+    ['GET', new URL('http:///orpc/api/v1/users/1?a=1&b=2'), {}],
+    ['GET', new URL('http://example.com/api/v1/users/1?a=1&b=2'), {}],
+    ['GET', new URL('http:///example.com/api/v1/users/1?a=1&b=2'), {}],
+    ['GET', new URL('http:/api/v1/users/1?a=1&b=2'), {}],
+    ['GET', new URL('http://api/v1/users/1?a=1&b=2'), {}],
     ['GET', new URL('https://example.com/api/v1/users/1?a=1&b=2'), {}],
     ['POST', new URL('https://example.com/api/v1/users/1'), { 'x-custom-header': 'value' }],
     ['DELETE', new URL('https://example.com/api/v1/users/1'), { }],
