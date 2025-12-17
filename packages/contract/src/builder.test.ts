@@ -43,6 +43,7 @@ describe('contractBuilder', () => {
 
     const applied = builder.$route(route)
     expect(applied).toBeInstanceOf(ContractBuilder)
+    expect(applied).not.toBe(builder)
     expect(applied['~orpc']).toEqual({
       ...def,
       route,
@@ -52,6 +53,7 @@ describe('contractBuilder', () => {
   it('.$input', () => {
     const applied = builder.$input(generalSchema)
     expect(applied).toBeInstanceOf(ContractBuilder)
+    expect(applied).not.toBe(builder)
     expect(applied['~orpc']).toEqual({
       ...def,
       inputSchema: generalSchema,
