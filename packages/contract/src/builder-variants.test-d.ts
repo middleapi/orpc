@@ -14,7 +14,7 @@ describe('ContractProcedureBuilder', () => {
   const builder = {} as ContractProcedureBuilder<typeof inputSchema, typeof outputSchema, typeof baseErrorMap, BaseMeta>
 
   it('backward compatibility', () => {
-    const expected = {} as OmitChainMethodDeep<typeof generalBuilder, '$meta' | '$route' | 'prefix' | 'tag' | 'router'>
+    const expected = {} as OmitChainMethodDeep<typeof generalBuilder, '$meta' | '$route' | '$input' | 'prefix' | 'tag' | 'router'>
 
     expectTypeOf(builder).toMatchTypeOf(expected)
     expectTypeOf<keyof typeof builder>().toEqualTypeOf<keyof typeof expected>()
@@ -95,7 +95,7 @@ describe('ContractProcedureBuilderWithInput', () => {
   const builder = {} as ContractProcedureBuilderWithInput<typeof inputSchema, typeof outputSchema, typeof baseErrorMap, BaseMeta>
 
   it('backward compatibility', () => {
-    const expected = {} as OmitChainMethodDeep<typeof generalBuilder, '$meta' | '$route' | 'prefix' | 'tag' | 'router' | 'input'>
+    const expected = {} as OmitChainMethodDeep<typeof generalBuilder, '$meta' | '$route' | '$input' | 'prefix' | 'tag' | 'router' | 'input'>
 
     expectTypeOf(builder).toMatchTypeOf(expected)
     expectTypeOf<keyof typeof builder>().toEqualTypeOf<keyof typeof expected>()
@@ -162,7 +162,7 @@ describe('ContractProcedureBuilderWithOutput', () => {
   const builder = {} as ContractProcedureBuilderWithOutput<typeof inputSchema, typeof outputSchema, typeof baseErrorMap, BaseMeta>
 
   it('backward compatibility', () => {
-    const expected = {} as OmitChainMethodDeep<typeof generalBuilder, '$meta' | '$route' | 'prefix' | 'tag' | 'router' | 'output'>
+    const expected = {} as OmitChainMethodDeep<typeof generalBuilder, '$meta' | '$route' | '$input' | 'prefix' | 'tag' | 'router' | 'output'>
 
     expectTypeOf(builder).toMatchTypeOf(expected)
     expectTypeOf<keyof typeof builder>().toEqualTypeOf<keyof typeof expected>()
@@ -229,7 +229,7 @@ it('ContractProcedureBuilderWithInputOutput', () => {
   const builder = {} as ContractProcedureBuilderWithInputOutput<typeof inputSchema, typeof outputSchema, typeof baseErrorMap, BaseMeta>
 
   it('backward compatibility', () => {
-    const expected = {} as OmitChainMethodDeep<typeof generalBuilder, '$meta' | '$route' | 'prefix' | 'tag' | 'router' | 'input' | 'output'>
+    const expected = {} as OmitChainMethodDeep<typeof generalBuilder, '$meta' | '$route' | '$input' | 'prefix' | 'tag' | 'router' | 'input' | 'output'>
 
     expectTypeOf(builder).toMatchTypeOf(expected)
     expectTypeOf<keyof typeof builder>().toEqualTypeOf<keyof typeof expected>()
@@ -282,7 +282,7 @@ describe('ContractRouterBuilder', () => {
   const builder = {} as ContractRouterBuilder<typeof baseErrorMap, BaseMeta>
 
   it('backward compatibility', () => {
-    const expected = {} as OmitChainMethodDeep<typeof generalBuilder, '$meta' | '$route' | 'route' | 'meta' | 'input' | 'output'>
+    const expected = {} as OmitChainMethodDeep<typeof generalBuilder, '$meta' | '$route' | '$input' | 'route' | 'meta' | 'input' | 'output'>
 
     // expectTypeOf(builder).toMatchTypeOf(expected)
     expectTypeOf<keyof typeof builder>().toEqualTypeOf<keyof typeof expected>()
