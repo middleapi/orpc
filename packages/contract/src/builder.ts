@@ -74,6 +74,20 @@ export class ContractBuilder<
   }
 
   /**
+   * Sets or overrides the initial input schema.
+   *
+   * @see {@link https://orpc.dev/docs/procedure#initial-configuration Initial Procedure Configuration Docs}
+   */
+  $input<U extends AnySchema>(
+    initialInputSchema?: U,
+  ): ContractBuilder<U, TOutputSchema, TErrorMap, TMeta> {
+    return new ContractBuilder({
+      ...this['~orpc'],
+      inputSchema: initialInputSchema,
+    })
+  }
+
+  /**
    * Adds type-safe custom errors to the contract.
    * The provided errors are spared-merged with any existing errors in the contract.
    *

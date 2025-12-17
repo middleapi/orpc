@@ -49,6 +49,15 @@ describe('contractBuilder', () => {
     })
   })
 
+  it('.$input', () => {
+    const applied = builder.$input(generalSchema)
+    expect(applied).toBeInstanceOf(ContractBuilder)
+    expect(applied['~orpc']).toEqual({
+      ...def,
+      inputSchema: generalSchema,
+    })
+  })
+
   it('.errors', () => {
     const errors = { BAD_GATEWAY: { data: outputSchema }, OVERRIDE: { message: 'override' } } as const
 
