@@ -69,7 +69,25 @@ describe('toOpenAPIContent', () => {
     })
   })
 
-  it('body contain file schema', () => {
+  it('body contain required file schema', () => {
+    const schema: JSONSchema = {
+      type: 'object',
+      properties: {
+        a: { type: 'string' },
+        b: { type: 'number' },
+        c: fileSchema,
+      },
+      required: ['a', 'c'],
+    }
+
+    expect(toOpenAPIContent(schema)).toEqual({
+      'multipart/form-data': {
+        schema,
+      },
+    })
+  })
+
+  it('body contain optional file schema', () => {
     const schema: JSONSchema = {
       type: 'object',
       properties: {
@@ -80,8 +98,10 @@ describe('toOpenAPIContent', () => {
       required: ['a'],
     }
 
-    // File schemas cannot be transmitted as JSON, only multipart/form-data
     expect(toOpenAPIContent(schema)).toEqual({
+      'application/json': {
+        schema,
+      },
       'multipart/form-data': {
         schema,
       },
