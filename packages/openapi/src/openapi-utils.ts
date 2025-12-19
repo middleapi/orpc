@@ -36,7 +36,7 @@ export function toOpenAPIContent(schema: JSONSchema): Record<string, OpenAPI.Med
   if (restSchema !== undefined) {
     const fileMatches = findDeepMatches(v => isObject(v) && isFileSchema(v), restSchema)
     const hasFileSchema = fileMatches.values.length > 0
-    const hasRequiredFileSchema = isObjectSchema(restSchema) && fileMatches.maps.some((path) => {
+    const hasRequiredBlobSchema = isObjectSchema(restSchema) && fileMatches.maps.some((path) => {
       return path[0] === 'properties'
         && typeof path[1] === 'string'
         && restSchema.required?.includes(path[1])
@@ -48,7 +48,7 @@ export function toOpenAPIContent(schema: JSONSchema): Record<string, OpenAPI.Med
       }
     }
 
-    if (!hasRequiredFileSchema) {
+    if (!hasRequiredBlobSchema) {
       content['application/json'] = {
         schema: toOpenAPISchema(restSchema),
       }
