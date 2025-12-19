@@ -34,14 +34,16 @@ export function toOpenAPIContent(schema: JSONSchema): Record<string, OpenAPI.Med
   }
 
   if (restSchema !== undefined) {
-    content['application/json'] = {
-      schema: toOpenAPISchema(restSchema),
-    }
+    const hasFileSchema = findDeepMatches(v => isObject(v) && isFileSchema(v), restSchema).values.length > 0
 
-    const isStillHasFileSchema = findDeepMatches(v => isObject(v) && isFileSchema(v), restSchema).values.length > 0
-
-    if (isStillHasFileSchema) {
+    if (hasFileSchema) {
+      // File schemas cannot be transmitted as JSON, only multipart/form-data
       content['multipart/form-data'] = {
+        schema: toOpenAPISchema(restSchema),
+      }
+    }
+    else {
+      content['application/json'] = {
         schema: toOpenAPISchema(restSchema),
       }
     }

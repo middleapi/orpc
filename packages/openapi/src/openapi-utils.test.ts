@@ -80,10 +80,8 @@ describe('toOpenAPIContent', () => {
       required: ['a'],
     }
 
+    // File schemas cannot be transmitted as JSON, only multipart/form-data
     expect(toOpenAPIContent(schema)).toEqual({
-      'application/json': {
-        schema,
-      },
       'multipart/form-data': {
         schema,
       },
