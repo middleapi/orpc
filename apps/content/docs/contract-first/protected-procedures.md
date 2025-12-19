@@ -5,7 +5,7 @@ description: Learn how to create protected procedures with authentication middle
 
 # Protected Procedures
 
-You can build protected procedures by defining [errors](/docs/error-handling) in your contract, chaining authentication [middleware](/docs/middleware) on top of a implementer, and then using it in your procedures.
+You can build protected procedures by defining [errors](/docs/error-handling) in your contract, chaining authentication [middleware](/docs/middleware) on top of an implementer, and then using it in your procedures.
 
 ## Define Error in Contracts
 
@@ -36,7 +36,7 @@ export const contract = oc
 
 ## Type-Safe Errors in Middleware
 
-Middlewares can also throw type-safe errors. However, once not every procedure defined in your contract contains the error used in the middleware, you must use **type narrowing** to make the error accessible from the `errors` object.
+Middlewares can also throw type-safe errors. However, since not every procedure defined in your contract may contain the error used in the middleware, you must use **type narrowing** to make the error accessible from the `errors` object.
 
 ```ts
 export const authMiddleware = implement(contract)
