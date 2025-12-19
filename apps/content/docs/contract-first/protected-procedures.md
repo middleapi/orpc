@@ -64,7 +64,7 @@ export const authMiddleware = implement(contract)
 
 Start by creating a public implementer with your contract. Then extend it with an authentication middleware to create the protected one:
 
-```ts twoslash
+```ts
 export const pub = implement(contract)
   .use(dbProviderMiddleware)
 
