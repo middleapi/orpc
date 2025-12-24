@@ -573,6 +573,15 @@ export class AutoOpenAPIPlugin<
   }
 
   /**
+   * Escapes HTML special characters to prevent XSS attacks.
+   *
+   * @private
+   */
+  #esc(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  }
+
+  /**
    * Renders the default HTML for the API documentation page.
    * Can be overridden by providing a custom renderDocsHtml function in options.
    *
@@ -584,7 +593,7 @@ export class AutoOpenAPIPlugin<
     head: string,
     scriptUrl: string,
     config: Record<string, unknown> | undefined,
-    spec: OpenAPI.Document,
+    _spec: OpenAPI.Document,
     docsProvider: DocsProvider,
     cssUrl: string | undefined,
   ): string {
@@ -615,17 +624,17 @@ export class AutoOpenAPIPlugin<
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
-  <link rel="stylesheet" href="${cssUrl}">
+  <title>${this.#esc(title)}</title>
+  ${cssUrl ? `<link rel="stylesheet" href="${this.#esc(cssUrl)}">` : ''}
   ${head}
 </head>
 <body>
   <div id="swagger-ui"></div>
-  <script src="${scriptUrl}"></script>
+  <script src="${this.#esc(scriptUrl)}"></script>
   <script>
     window.onload = () => {
       SwaggerUIBundle({
-        url: "${specUrl}",
+        url: "${this.#esc(specUrl)}",
         dom_id: '#swagger-ui',
         ${configSpread}
       })
@@ -647,19 +656,19 @@ export class AutoOpenAPIPlugin<
     scriptUrl: string,
     config: Record<string, unknown> | undefined,
   ): string {
-    const configAttr = config ? `data-configuration='${stringifyJSON(config)}'` : ''
+    const configAttr = config ? `data-configuration="${this.#esc(stringifyJSON(config))}"` : ''
 
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
+  <title>${this.#esc(title)}</title>
   ${head}
 </head>
 <body>
-  <script id="api-reference" data-url="${specUrl}" ${configAttr}></script>
-  <script src="${scriptUrl}"></script>
+  <script id="api-reference" data-url="${this.#esc(specUrl)}" ${configAttr}></script>
+  <script src="${this.#esc(scriptUrl)}"></script>
 </body>
 </html>`
   }
