@@ -1,7 +1,8 @@
-import { ping, pong, router } from '../tests/shared'
+import { inputSchema, outputSchema, ping, pong, router } from '../tests/shared'
+import { oc } from './builder'
 import { isContractProcedure } from './procedure'
 import { enhanceRoute } from './route'
-import { enhanceContractRouter, getContractRouter, minifyContractRouter } from './router-utils'
+import { enhanceContractRouter, getContractRouter, minifyContractRouter, populateContractRouterPaths } from './router-utils'
 
 it('getContractRouter', () => {
   expect(getContractRouter(router, [])).toEqual(router)
@@ -71,4 +72,30 @@ it('minifyContractRouter', () => {
 
   expect((minified as any).nested.pong).toSatisfy(isContractProcedure)
   expect((minified as any).nested.pong).toEqual(minifiedPong)
+})
+
+it('populateContractRouterPaths', () => {
+  const contract = {
+    ping: oc.input(inputSchema),
+    pong: oc.route({
+      path: '/pong/{id}',
+    }),
+    nested: {
+      ping: oc.output(outputSchema),
+      pong: oc.route({
+        path: '/pong2/{id}',
+      }),
+    },
+  }
+
+  const populated = populateContractRouterPaths(contract)
+
+  expect(populated.pong['~orpc'].route.path).toBe('/pong/{id}')
+  expect(populated.nested.pong['~orpc'].route.path).toBe('/pong2/{id}')
+
+  expect(populated.ping['~orpc'].route.path).toBe('/ping')
+  expect(populated.ping['~orpc'].inputSchema).toBe(inputSchema)
+
+  expect(populated.nested.ping['~orpc'].route.path).toBe('/nested/ping')
+  expect(populated.nested.ping['~orpc'].outputSchema).toBe(outputSchema)
 })

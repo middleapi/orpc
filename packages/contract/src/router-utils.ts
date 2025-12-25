@@ -2,6 +2,8 @@ import type { ErrorMap, MergedErrorMap } from './error'
 import type { AnyContractProcedure } from './procedure'
 import type { EnhanceRouteOptions } from './route'
 import type { AnyContractRouter } from './router'
+import { toHttpPath } from '@orpc/client/standard'
+import { toArray } from '@orpc/shared'
 import { mergeErrorMap } from './error'
 import { ContractProcedure, isContractProcedure } from './procedure'
 import { enhanceRoute } from './route'
@@ -88,4 +90,49 @@ export function minifyContractRouter(router: AnyContractRouter): AnyContractRout
   }
 
   return json
+}
+
+export type PopulatedContractRouterPaths<T extends AnyContractRouter>
+  = T extends ContractProcedure<infer UInputSchema, infer UOutputSchema, infer UErrors, infer UMeta>
+    ? ContractProcedure<UInputSchema, UOutputSchema, UErrors, UMeta>
+    : {
+        [K in keyof T]: T[K] extends AnyContractRouter ? PopulatedContractRouterPaths<T[K]> : never
+      }
+
+export interface PopulateContractRouterPathsOptions {
+  path?: readonly string[]
+}
+
+/**
+ * Automatically populates missing route paths using the router's nested keys.
+ *
+ * Constructs paths by joining router keys with `/`.
+ * Useful for NestJS integration that require explicit route paths.
+ *
+ * @see {@link https://orpc.dev/docs/openapi/integrations/implement-contract-in-nest#define-your-contract NestJS Implement Contract Docs}
+ */
+export function populateContractRouterPaths<T extends AnyContractRouter>(router: T, options: PopulateContractRouterPathsOptions = {}): PopulatedContractRouterPaths<T> {
+  const path = toArray(options.path)
+
+  if (isContractProcedure(router)) {
+    if (router['~orpc'].route.path === undefined) {
+      return new ContractProcedure({
+        ...router['~orpc'],
+        route: {
+          ...router['~orpc'].route,
+          path: toHttpPath(path),
+        },
+      }) as any
+    }
+
+    return router as any
+  }
+
+  const populated: Record<string, any> = {}
+
+  for (const key in router) {
+    populated[key] = populateContractRouterPaths(router[key]!, { ...options, path: [...path, key] })
+  }
+
+  return populated as any
 }

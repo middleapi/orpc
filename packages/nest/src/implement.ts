@@ -49,7 +49,7 @@ export function Implement<T extends ContractRouter<any>>(
       throw new Error(`
         @Implement decorator requires contract to have a 'path'.
         Please define one using 'path' property on the '.route' method.
-        Or use "populateContractRouterPaths" utility to automatically fill in any missing paths.
+        Or use "populateContractRouterPaths" from "@orpc/contract" utility to automatically fill in any missing paths.
       `)
     }
 
