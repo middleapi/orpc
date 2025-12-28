@@ -43,12 +43,12 @@
   },
   "dependencies": {
     "radash": "^12.1.1",
-    "type-fest": "^5.2.0"
+    "type-fest": "^5.3.1"
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.0",
     "arktype": "2.1.27",
     "valibot": "^1.2.0",
-    "zod": "^4.1.12"
+    "zod": "^4.2.1"
   }
 }

@@ -1,7 +1,3 @@
-catalogMode: prefer
-cleanupUnusedCatalogs: true
-shellEmulator: true
-trustPolicy: no-downgrade
 packages:
   - 'apps/*'
   - 'packages/*'
@@ -13,3 +9,8 @@ onlyBuiltDependencies:
   - better-sqlite3
   - electron
   - esbuild
+
+useNodeVersion: 22.21.1
+preferWorkspacePackages: true
+linkWorkspacePackages: true
+shamefullyHoist: true

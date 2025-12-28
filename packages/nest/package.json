@@ -62,17 +62,17 @@
   },
   "devDependencies": {
     "@fastify/cookie": "^11.0.2",
-    "@nestjs/common": "^11.1.9",
-    "@nestjs/core": "^11.1.9",
-    "@nestjs/platform-express": "^11.1.9",
-    "@nestjs/platform-fastify": "^11.1.9",
-    "@nestjs/testing": "^11.1.9",
+    "@nestjs/common": "^11.1.10",
+    "@nestjs/core": "^11.1.10",
+    "@nestjs/platform-express": "^11.1.10",
+    "@nestjs/platform-fastify": "^11.1.10",
+    "@nestjs/testing": "^11.1.10",
     "@ts-rest/core": "^3.52.1",
     "@types/express": "^5.0.6",
     "express": "^5.2.1",
     "fastify": "^5.6.2",
-    "rxjs": "^7.8.1",
+    "rxjs": "^7.8.2",
     "supertest": "^7.1.4",
-    "zod": "^4.1.12"
+    "zod": "^4.2.1"
   }
 }

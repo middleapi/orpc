@@ -38,7 +38,7 @@
     "@orpc/standard-server-fetch": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^22.15.30",
+    "@types/node": "^22.19.3",
     "@types/supertest": "^6.0.3",
     "supertest": "^7.1.4"
   }

@@ -51,12 +51,12 @@
     "@orpc/contract": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "partysocket": "^1.1.6",
+    "partysocket": "^1.1.10",
     "valibot": "^1.2.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20251202.0",
+    "@cloudflare/workers-types": "^4.20251228.0",
     "@orpc/standard-server-peer": "workspace:*",
-    "@types/node": "^22.15.30"
+    "@types/node": "^22.19.3"
   }
 }

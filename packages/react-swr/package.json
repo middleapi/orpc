@@ -41,6 +41,6 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "swr": "^2.3.7"
+    "swr": "^2.3.8"
   }
 }

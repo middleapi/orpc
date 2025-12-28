@@ -19,13 +19,13 @@
     "@orpc/tanstack-query": "next",
     "@orpc/zod": "next",
     "@sveltejs/adapter-auto": "^7.0.0",
-    "@sveltejs/kit": "^2.49.0",
+    "@sveltejs/kit": "^2.49.2",
     "@sveltejs/vite-plugin-svelte": "^6.2.1",
-    "@tanstack/svelte-query": "^6.0.8",
-    "svelte": "^5.45.3",
-    "svelte-check": "^4.3.4",
-    "typescript": "^5.9.3",
-    "vite": "^7.2.6",
-    "zod": "^4.1.12"
+    "@tanstack/svelte-query": "^6.0.10",
+    "svelte": "^5.46.1",
+    "svelte-check": "^4.3.5",
+    "typescript": "~5.8.3",
+    "vite": "^7.3.0",
+    "zod": "^4.2.1"
   }
 }

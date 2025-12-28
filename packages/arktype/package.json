@@ -42,6 +42,8 @@
     "@orpc/openapi": "workspace:*"
   },
   "devDependencies": {
-    "zod": "^4.1.12"
+    "@ark/schema": "^0.56.0",
+    "arktype": "^2.1.29",
+    "zod": "^4.2.1"
   }
 }

@@ -40,6 +40,6 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "@hey-api/openapi-ts": "^0.80.8"
+    "@hey-api/openapi-ts": "^0.80.18"
   }
 }
