@@ -8,8 +8,8 @@
     "serve": "vitepress serve"
   },
   "devDependencies": {
-    "@ai-sdk/google": "2.0.44",
-    "@ai-sdk/react": "2.0.106",
+    "@ai-sdk/google": "^3.0.1",
+    "@ai-sdk/react": "^3.0.3",
     "@opentelemetry/instrumentation": "^0.208.0",
     "@opentelemetry/sdk-node": "^0.208.0",
     "@opentelemetry/sdk-trace-web": "^2.2.0",
