@@ -519,7 +519,15 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
 
           case 'pipe': {
             const pipe = schema as $ZodPipe
-            return this.#convert(options.strategy === 'input' ? pipe._zod.def.in : pipe._zod.def.out, options, lazyDepth, structureDepth)
+            return this.#convert(
+              // prefer out schema when in schema is preprocess/transform
+              options.strategy === 'input' && pipe._zod.def.in._zod.def.type !== 'transform'
+                ? pipe._zod.def.in
+                : pipe._zod.def.out,
+              options,
+              lazyDepth,
+              structureDepth,
+            )
           }
 
           case 'readonly': {
