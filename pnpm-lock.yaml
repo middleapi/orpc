@@ -58,8 +58,8 @@ importers:
         specifier: ^10.3.2
         version: 10.3.2(magicast@0.3.5)
       changelogithub:
-        specifier: ^13.16.1
-        version: 13.16.1(magicast@0.3.5)
+        specifier: ^14.0.0
+        version: 14.0.0(magicast@0.3.5)
       eslint:
         specifier: ^9.39.2
         version: 9.39.2(jiti@2.6.1)
@@ -7820,8 +7820,8 @@ packages:
     resolution: {integrity: sha512-cTZXBcJMl3pudE40WENOakXkcVtrbBpbkmSkM20NdRiUqa4+VYRdXdEsgQ0BNQ6JBE2YymTNWtPKVF7UCTN5+g==}
     hasBin: true
 
-  changelogithub@13.16.1:
-    resolution: {integrity: sha512-h4etOmEM/wtqBWKPbnHoqv2C8moRCCEGTckwwWpvRgr/t1tY0MbyjQbZKy1ETQ7gn1UTQMJkCSRQ4KxiQ+HfSQ==}
+  changelogithub@14.0.0:
+    resolution: {integrity: sha512-VBuDqqU2si6tNjraFIuUEIVP++y77w+jt5CMnLCXjdP6OEBWUcbNYgIPq+aKQH4Yp2KkGKAjqP8dDmJutICk6g==}
     engines: {node: '>=12.0.0'}
     hasBin: true
 
@@ -14263,6 +14263,7 @@ packages:
   whatwg-encoding@3.1.1:
     resolution: {integrity: sha512-6qN4hJdMwfYBtE3YBTTHhoeuUrDBPZmbQaxWAqSALV/MeEnR5z1xd8UKud2RAkFoPkmB+hli1TZSnyi84xz1vQ==}
     engines: {node: '>=18'}
+    deprecated: Use @exodus/bytes instead for a more spec-conformant and faster implementation
 
   whatwg-mimetype@4.0.0:
     resolution: {integrity: sha512-QaKxh0eNIi2mE9p2vEdzfagOKHCcj1pJ56EEHGQOVxp8r9/iszLUUV7v89x9O1p/T+NlTM5W7jW6+cz4Fq1YVg==}
@@ -21934,7 +21935,7 @@ snapshots:
     transitivePeerDependencies:
       - magicast
 
-  changelogithub@13.16.1(magicast@0.3.5):
+  changelogithub@14.0.0(magicast@0.3.5):
     dependencies:
       ansis: 4.2.0
       c12: 3.3.3(magicast@0.3.5)

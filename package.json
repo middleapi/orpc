@@ -41,7 +41,7 @@
     "@vue/test-utils": "^2.4.6",
     "better-sqlite3": "^12.5.0",
     "bumpp": "^10.3.2",
-    "changelogithub": "^13.16.1",
+    "changelogithub": "^14.0.0",
     "eslint": "^9.39.2",
     "eslint-plugin-ban": "^2.0.0",
     "eslint-plugin-format": "^1.1.0",
