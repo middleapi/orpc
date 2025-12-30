@@ -21,13 +21,13 @@
     "@orpc/server": "next",
     "@orpc/tanstack-query": "next",
     "@orpc/zod": "next",
-    "@tanstack/react-query": "^5.90.12",
+    "@tanstack/react-query": "^5.90.15",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@wxt-dev/module-react": "^1.1.5",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "typescript": "~5.8.3",
+    "typescript": "~5.9.3",
     "wxt": "^0.20.13",
     "zod": "^4.2.1"
   }
