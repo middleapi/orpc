@@ -55,7 +55,7 @@
     "valibot": "^1.2.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20251230.0",
+    "@cloudflare/workers-types": "^4.20251231.0",
     "@orpc/standard-server-peer": "workspace:*",
     "@types/node": "^22.19.3"
   }

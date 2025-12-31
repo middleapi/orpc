@@ -23,7 +23,7 @@
     "@orpc/zod": "next",
     "@swc/cli": "^0.7.9",
     "@swc/core": "^1.15.8",
-    "@tanstack/react-query": "^5.90.15",
+    "@tanstack/react-query": "^5.90.16",
     "@types/express": "^5.0.6",
     "@types/node": "^22.19.3",
     "globals": "^16.5.0",
@@ -35,6 +35,6 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "~5.9.3",
     "unbuild": "^3.6.1",
-    "zod": "^4.2.1"
+    "zod": "^4.3.2"
   }
 }

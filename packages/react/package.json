@@ -53,6 +53,6 @@
   },
   "devDependencies": {
     "react": "^19.2.3",
-    "zod": "^4.2.1"
+    "zod": "^4.3.2"
   }
 }

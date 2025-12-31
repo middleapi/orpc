@@ -42,6 +42,6 @@
     "json-schema-typed": "^8.0.2"
   },
   "devDependencies": {
-    "zod": "^4.2.1"
+    "zod": "^4.3.2"
   }
 }

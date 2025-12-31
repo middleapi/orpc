@@ -16,10 +16,10 @@
     "@orpc/zod": "next",
     "@solidjs/router": "^0.15.4",
     "@solidjs/start": "^1.2.1",
-    "@tanstack/solid-query": "^5.90.18",
+    "@tanstack/solid-query": "^5.90.19",
     "solid-js": "^1.9.10",
     "vinxi": "^0.5.10",
     "vite-plugin-top-level-await": "^1.6.0",
-    "zod": "^4.2.1"
+    "zod": "^4.3.2"
   }
 }
