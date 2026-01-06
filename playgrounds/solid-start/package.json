@@ -20,6 +20,6 @@
     "solid-js": "^1.9.10",
     "vinxi": "^0.5.10",
     "vite-plugin-top-level-await": "^1.6.0",
-    "zod": "^4.3.2"
+    "zod": "^4.3.5"
   }
 }

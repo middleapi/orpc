@@ -47,6 +47,6 @@
   },
   "devDependencies": {
     "@tanstack/svelte-query": "^6.0.14",
-    "zod": "^4.3.2"
+    "zod": "^4.3.5"
   }
 }
