@@ -44,7 +44,7 @@
     "changelogithub": "^14.0.0",
     "eslint": "^9.39.2",
     "eslint-plugin-ban": "^2.0.0",
-    "eslint-plugin-format": "^1.1.0",
+    "eslint-plugin-format": "^1.2.0",
     "jsdom": "^27.4.0",
     "knip": "^5.78.0",
     "lint-staged": "^16.2.7",
