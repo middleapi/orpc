@@ -22,10 +22,10 @@
     "@tanstack/react-query": "^5.90.16",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
-    "astro": "^5.16.6",
+    "astro": "^5.16.7",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "typescript": "~5.9.3",
-    "zod": "^4.3.2"
+    "zod": "^4.3.5"
   }
 }

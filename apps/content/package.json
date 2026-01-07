@@ -8,8 +8,8 @@
     "serve": "vitepress serve"
   },
   "devDependencies": {
-    "@ai-sdk/google": "^3.0.2",
-    "@ai-sdk/react": "^3.0.5",
+    "@ai-sdk/google": "^3.0.6",
+    "@ai-sdk/react": "^3.0.19",
     "@opentelemetry/instrumentation": "^0.208.0",
     "@opentelemetry/sdk-node": "^0.208.0",
     "@opentelemetry/sdk-trace-web": "^2.2.0",
@@ -31,15 +31,15 @@
     "@orpc/vue-colada": "workspace:*",
     "@orpc/vue-query": "workspace:*",
     "@orpc/zod": "workspace:*",
-    "@pinia/colada": "^0.20.0",
+    "@pinia/colada": "^0.21.0",
     "@sentry/node": "^10.32.1",
-    "@shikijs/vitepress-twoslash": "^3.20.0",
+    "@shikijs/vitepress-twoslash": "^3.21.0",
     "@tanstack/react-query": "^5.90.16",
     "@tanstack/solid-query": "^5.90.19",
     "@tanstack/svelte-query": "^6.0.14",
     "@tanstack/vue-query": "^5.92.5",
     "@types/node": "^22.19.3",
-    "ai": "^6.0.5",
+    "ai": "^6.0.19",
     "markdown-it-task-lists": "^2.1.1",
     "mermaid": "^11.12.2",
     "openai": "^6.15.0",
@@ -52,6 +52,6 @@
     "vitepress-plugin-mermaid": "^2.0.17",
     "vitepress-plugin-shiki-twoslash": "^0.0.6",
     "vue": "^3.5.26",
-    "zod": "^4.3.2"
+    "zod": "^4.3.5"
   }
 }
