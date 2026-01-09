@@ -925,11 +925,11 @@ importers:
         version: link:../shared
     devDependencies:
       '@angular/core':
-        specifier: ^21.0.6
-        version: 21.0.6(rxjs@7.8.2)
+        specifier: ^21.0.7
+        version: 21.0.7(rxjs@7.8.2)
       '@tanstack/angular-query-experimental':
         specifier: ^5.90.20
-        version: 5.90.20(@angular/common@21.0.1(@angular/core@21.0.6(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.0.6(rxjs@7.8.2))
+        version: 5.90.20(@angular/common@21.0.1(@angular/core@21.0.7(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.0.7(rxjs@7.8.2))
       '@tanstack/query-core':
         specifier: ^5.90.16
         version: 5.90.16
@@ -1913,11 +1913,11 @@ packages:
       '@angular/core': 21.0.1
       rxjs: ^6.5.3 || ^7.4.0
 
-  '@angular/core@21.0.6':
-    resolution: {integrity: sha512-SvWbOkkrsqprYJSBmzQEWkWjfZB/jkRYyFp2ClMJBPqOLxP1a+i3Om2rolcNQjZPz87bs9FszwgRlXUy7sw5cQ==}
+  '@angular/core@21.0.7':
+    resolution: {integrity: sha512-MvgRRse2PaEleQFp+35rj7ew5gBmBh3wp5yNDYPTiPaVp1I3fJ08VYSpldodaXmdkdWRB+OU4WJhnFkagyRx7A==}
     engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0}
     peerDependencies:
-      '@angular/compiler': 21.0.6
+      '@angular/compiler': 21.0.7
       rxjs: ^6.5.3 || ^7.4.0
       zone.js: ~0.15.0 || ~0.16.0
     peerDependenciesMeta:
@@ -12638,6 +12638,10 @@ packages:
   sax@1.4.3:
     resolution: {integrity: sha512-yqYn1JhPczigF94DMS+shiDMjDowYO6y9+wB/4WgO0Y19jWYk0lQ4tuG5KI7kj4FTp1wxPj5IFfcrz/s1c3jjQ==}
 
+  sax@1.4.4:
+    resolution: {integrity: sha512-1n3r/tGXO6b6VXMdFT54SHzT9ytu9yr7TaELowdYpMqY/Ao7EnlQGmAQ1+RatX7Tkkdm6hONI2owqNx2aZj5Sw==}
+    engines: {node: '>=11.0.0'}
+
   saxes@6.0.0:
     resolution: {integrity: sha512-xAg7SOnEhrm5zI3puOOKyy1OMcMlIJZYNJY7xLBwSze0UjhPLnWfj2GF2EpT0jmzaJKIWKHLsaSSajf35bcYnA==}
     engines: {node: '>=v12.22.7'}
@@ -15037,13 +15041,13 @@ snapshots:
     transitivePeerDependencies:
       - chokidar
 
-  '@angular/common@21.0.1(@angular/core@21.0.6(rxjs@7.8.2))(rxjs@7.8.2)':
+  '@angular/common@21.0.1(@angular/core@21.0.7(rxjs@7.8.2))(rxjs@7.8.2)':
     dependencies:
-      '@angular/core': 21.0.6(rxjs@7.8.2)
+      '@angular/core': 21.0.7(rxjs@7.8.2)
       rxjs: 7.8.2
       tslib: 2.8.1
 
-  '@angular/core@21.0.6(rxjs@7.8.2)':
+  '@angular/core@21.0.7(rxjs@7.8.2)':
     dependencies:
       rxjs: 7.8.2
       tslib: 2.8.1
@@ -19875,10 +19879,10 @@ snapshots:
     dependencies:
       defer-to-connect: 2.0.1
 
-  '@tanstack/angular-query-experimental@5.90.20(@angular/common@21.0.1(@angular/core@21.0.6(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.0.6(rxjs@7.8.2))':
+  '@tanstack/angular-query-experimental@5.90.20(@angular/common@21.0.1(@angular/core@21.0.7(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.0.7(rxjs@7.8.2))':
     dependencies:
-      '@angular/common': 21.0.1(@angular/core@21.0.6(rxjs@7.8.2))(rxjs@7.8.2)
-      '@angular/core': 21.0.6(rxjs@7.8.2)
+      '@angular/common': 21.0.1(@angular/core@21.0.7(rxjs@7.8.2))(rxjs@7.8.2)
+      '@angular/core': 21.0.7(rxjs@7.8.2)
       '@tanstack/query-core': 5.90.16
     optionalDependencies:
       '@tanstack/query-devtools': 5.92.0
@@ -22149,7 +22153,7 @@ snapshots:
   builder-util-runtime@9.3.1:
     dependencies:
       debug: 4.4.3
-      sax: 1.4.3
+      sax: 1.4.4
     transitivePeerDependencies:
       - supports-color
 
@@ -28117,6 +28121,8 @@ snapshots:
       truncate-utf8-bytes: 1.0.2
 
   sax@1.4.3: {}
+
+  sax@1.4.4: {}
 
   saxes@6.0.0:
     dependencies:
