@@ -16,7 +16,7 @@
     "@orpc/server": "next",
     "@orpc/tanstack-query": "next",
     "@orpc/zod": "next",
-    "@tanstack/vue-query": "^5.92.5",
+    "@tanstack/vue-query": "^5.92.6",
     "nuxt": "^4.2.2",
     "vue": "latest",
     "vue-router": "latest",
