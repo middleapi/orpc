@@ -42,6 +42,6 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "pino": "^10.1.1"
+    "pino": "^10.2.0"
   }
 }

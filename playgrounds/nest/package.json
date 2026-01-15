@@ -8,10 +8,10 @@
     "type:check": "tsc --noEmit"
   },
   "devDependencies": {
-    "@nestjs/cli": "^11.0.14",
-    "@nestjs/common": "^11.1.11",
-    "@nestjs/core": "^11.1.11",
-    "@nestjs/platform-express": "^11.1.11",
+    "@nestjs/cli": "^11.0.15",
+    "@nestjs/common": "^11.1.12",
+    "@nestjs/core": "^11.1.12",
+    "@nestjs/platform-express": "^11.1.12",
     "@nestjs/schematics": "^11.0.9",
     "@orpc/client": "next",
     "@orpc/contract": "next",
