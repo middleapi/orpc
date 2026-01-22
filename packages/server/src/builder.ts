@@ -336,7 +336,7 @@ export class Builder<
 export const os = new Builder<
   Record<never, never>,
   Record<never, never>,
-  Schema<unknown, unknown>,
+  Schema<void, unknown>,
   Schema<unknown, unknown>,
   Record<never, never>,
   Record<never, never>
