@@ -41,6 +41,6 @@
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/instrumentation": "^0.210.0"
+    "@opentelemetry/instrumentation": "^0.211.0"
   }
 }
