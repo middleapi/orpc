@@ -51,7 +51,7 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "react": "^19.2.3",
-    "zod": "^4.3.2"
+    "react": "^19.2.4",
+    "zod": "^4.3.6"
   }
 }

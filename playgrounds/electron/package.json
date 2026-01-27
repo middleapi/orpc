@@ -21,18 +21,18 @@
     "@orpc/server": "next",
     "@orpc/tanstack-query": "next",
     "@orpc/zod": "next",
-    "@tanstack/react-query": "^5.90.19",
+    "@tanstack/react-query": "^5.90.20",
     "@types/node": "^22.19.3",
-    "@types/react": "^19.2.8",
+    "@types/react": "^19.2.9",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.2",
     "electron": "^39.2.7",
     "electron-builder": "^26.4.0",
     "electron-vite": "^5.0.0",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "typescript": "~5.9.3",
     "vite": "^7.3.1",
-    "zod": "^4.3.5"
+    "zod": "^4.3.6"
   }
 }

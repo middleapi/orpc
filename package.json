@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^7.2.0",
-    "@cloudflare/vitest-pool-workers": "^0.12.5",
+    "@cloudflare/vitest-pool-workers": "^0.12.6",
     "@solidjs/testing-library": "^0.8.10",
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "@testing-library/jest-dom": "^6.9.1",
@@ -52,7 +52,7 @@
     "pkg-pr-new": "^0.0.62",
     "sherif": "^1.10.0",
     "simple-git-hooks": "^2.13.1",
-    "typescript": "~5.8.3",
+    "typescript": "~5.9.3",
     "unbuild": "^3.6.1",
     "vite-plugin-solid": "^2.11.10",
     "vitest": "^3.2.4"
