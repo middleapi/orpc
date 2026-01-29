@@ -201,7 +201,7 @@ export class ContractBuilder<
 }
 
 export const oc = new ContractBuilder<
-  Schema<unknown, unknown>,
+  Schema<void, unknown>,
   Schema<unknown, unknown>,
   Record<never, never>,
   Record<never, never>
