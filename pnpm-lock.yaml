@@ -462,8 +462,8 @@ importers:
         specifier: ^5.2.1
         version: 5.2.1
       fastify:
-        specifier: ^5.7.2
-        version: 5.7.2
+        specifier: ^5.7.3
+        version: 5.7.3
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
@@ -505,8 +505,8 @@ importers:
         version: 0.7.12
     devDependencies:
       fastify:
-        specifier: ^5.7.2
-        version: 5.7.2
+        specifier: ^5.7.3
+        version: 5.7.3
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -734,8 +734,8 @@ importers:
         specifier: ^0.4.3
         version: 0.4.3(srvx@0.10.1)
       fastify:
-        specifier: ^5.7.2
-        version: 5.7.2
+        specifier: ^5.7.3
+        version: 5.7.3
       next:
         specifier: ^16.1.5
         version: 16.1.5(@babel/core@7.28.6)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -843,8 +843,8 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
       fastify:
-        specifier: ^5.7.2
-        version: 5.7.2
+        specifier: ^5.7.3
+        version: 5.7.3
       supertest:
         specifier: ^7.2.2
         version: 7.2.2
@@ -1567,7 +1567,7 @@ importers:
         version: 3.5.27(typescript@5.8.3)
       vue-router:
         specifier: latest
-        version: 5.0.0(@vue/compiler-sfc@3.5.27)(pinia@3.0.4(typescript@5.8.3)(vue@3.5.27(typescript@5.8.3)))(vue@3.5.27(typescript@5.8.3))
+        version: 5.0.2(@pinia/colada@0.21.2(pinia@3.0.4(typescript@5.8.3)(vue@3.5.27(typescript@5.8.3)))(vue@3.5.27(typescript@5.8.3)))(@vue/compiler-sfc@3.5.27)(pinia@3.0.4(typescript@5.8.3)(vue@3.5.27(typescript@5.8.3)))(vue@3.5.27(typescript@5.8.3))
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -9512,8 +9512,8 @@ packages:
   fastify@5.6.2:
     resolution: {integrity: sha512-dPugdGnsvYkBlENLhCgX8yhyGCsCPrpA8lFWbTNU428l+YOnLgYHR69hzV8HWPC79n536EqzqQtvhtdaCE0dKg==}
 
-  fastify@5.7.2:
-    resolution: {integrity: sha512-dBJolW+hm6N/yJVf6J5E1BxOBNkuXNl405nrfeR8SpvGWG3aCC2XDHyiFBdow8Win1kj7sjawQc257JlYY6M/A==}
+  fastify@5.7.3:
+    resolution: {integrity: sha512-QHzWSmTNUg9Ba8tNXzb92FTH77K+c8yeQPH80EeSIc9wyZj85jbPisMP0rwmyKv8oJwUFPe1UpN8HkNIXwCnUQ==}
 
   fastq@1.20.1:
     resolution: {integrity: sha512-GGToxJ/w1x32s/D2EKND7kTil4n8OVk/9mycTc4VDza13lOvpUZTGX3mFSCtV9ksdGBVzvsyAVLM6mHFThxXxw==}
@@ -13874,6 +13874,10 @@ packages:
     resolution: {integrity: sha512-5uKD0nqiYVzlmCRs01Fhs2BdkEgBS3SAVP6ndrBsuK42iC2+JHyxM05Rm9G8+5mkmRtzMZGY8Ct5+mliZxU/Ww==}
     engines: {node: '>=18.12.0'}
 
+  unplugin@3.0.0:
+    resolution: {integrity: sha512-0Mqk3AT2TZCXWKdcoaufeXNukv2mTrEZExeXlHIOZXdqYoHHr4n51pymnwV8x2BOVxwXbK2HLlI7usrqMpycdg==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+
   unstorage@1.17.4:
     resolution: {integrity: sha512-fHK0yNg38tBiJKp/Vgsq4j0JEsCmgqH58HAn707S7zGkArbZsVr/CwINoi+nh3h98BRCwKvx1K3Xg9u3VV83sw==}
     peerDependencies:
@@ -14457,10 +14461,10 @@ packages:
     peerDependencies:
       vue: ^3.5.0
 
-  vue-router@5.0.0:
-    resolution: {integrity: sha512-xWHlps4o1ScODWqvyapl0v1uGy0g7ozmsTSO/dguyGb/9RL6oSU2HfN/8oMXnoFOH1BuTaAkbiOz4OWdkfjcZg==}
+  vue-router@5.0.2:
+    resolution: {integrity: sha512-YFhwaE5c5JcJpNB1arpkl4/GnO32wiUWRB+OEj1T0DlDxEZoOfbltl2xEwktNU/9o1sGcGburIXSpbLpPFe/6w==}
     peerDependencies:
-      '@pinia/colada': ^0.18.1
+      '@pinia/colada': '>=0.21.2'
       '@vue/compiler-sfc': ^3.5.17
       pinia: ^3.0.4
       vue: ^3.5.0
@@ -24235,7 +24239,7 @@ snapshots:
       semver: 7.7.3
       toad-cache: 3.7.0
 
-  fastify@5.7.2:
+  fastify@5.7.3:
     dependencies:
       '@fastify/ajv-compiler': 4.0.5
       '@fastify/error': 4.2.0
@@ -29578,6 +29582,12 @@ snapshots:
       picomatch: 4.0.3
       webpack-virtual-modules: 0.6.2
 
+  unplugin@3.0.0:
+    dependencies:
+      '@jridgewell/remapping': 2.3.5
+      picomatch: 4.0.3
+      webpack-virtual-modules: 0.6.2
+
   unstorage@1.17.4(@upstash/redis@1.36.1)(db0@0.3.4(better-sqlite3@12.6.2))(ioredis@5.9.2):
     dependencies:
       anymatch: 3.1.3
@@ -30287,7 +30297,7 @@ snapshots:
       '@vue/devtools-api': 6.6.4
       vue: 3.5.27(typescript@5.8.3)
 
-  vue-router@5.0.0(@vue/compiler-sfc@3.5.27)(pinia@3.0.4(typescript@5.8.3)(vue@3.5.27(typescript@5.8.3)))(vue@3.5.27(typescript@5.8.3)):
+  vue-router@5.0.2(@pinia/colada@0.21.2(pinia@3.0.4(typescript@5.8.3)(vue@3.5.27(typescript@5.8.3)))(vue@3.5.27(typescript@5.8.3)))(@vue/compiler-sfc@3.5.27)(pinia@3.0.4(typescript@5.8.3)(vue@3.5.27(typescript@5.8.3)))(vue@3.5.27(typescript@5.8.3)):
     dependencies:
       '@babel/generator': 7.28.6
       '@vue-macros/common': 3.1.2(vue@3.5.27(typescript@5.8.3))
@@ -30303,11 +30313,12 @@ snapshots:
       picomatch: 4.0.3
       scule: 1.3.0
       tinyglobby: 0.2.15
-      unplugin: 2.3.11
+      unplugin: 3.0.0
       unplugin-utils: 0.3.1
       vue: 3.5.27(typescript@5.8.3)
       yaml: 2.8.2
     optionalDependencies:
+      '@pinia/colada': 0.21.2(pinia@3.0.4(typescript@5.8.3)(vue@3.5.27(typescript@5.8.3)))(vue@3.5.27(typescript@5.8.3))
       '@vue/compiler-sfc': 3.5.27
       pinia: 3.0.4(typescript@5.8.3)(vue@3.5.27(typescript@5.8.3))
 

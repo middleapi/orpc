@@ -145,7 +145,7 @@
     "@tanstack/router-core": "^1.157.16",
     "@types/ws": "^8.18.1",
     "crossws": "^0.4.3",
-    "fastify": "^5.7.2",
+    "fastify": "^5.7.3",
     "next": "^16.1.5",
     "supertest": "^7.1.4",
     "ws": "^8.18.3",

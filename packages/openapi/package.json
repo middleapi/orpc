@@ -80,7 +80,7 @@
     "rou3": "^0.7.12"
   },
   "devDependencies": {
-    "fastify": "^5.7.2",
+    "fastify": "^5.7.3",
     "zod": "^4.3.6"
   }
 }
