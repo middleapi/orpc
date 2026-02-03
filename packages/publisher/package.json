@@ -68,7 +68,7 @@
     "@orpc/standard-server": "workspace:*"
   },
   "devDependencies": {
-    "@upstash/redis": "^1.36.0",
+    "@upstash/redis": "^1.36.2",
     "ioredis": "^5.9.2"
   }
 }
