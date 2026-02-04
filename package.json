@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^7.2.0",
-    "@cloudflare/vitest-pool-workers": "^0.12.8",
+    "@cloudflare/vitest-pool-workers": "^0.12.9",
     "@solidjs/testing-library": "^0.8.10",
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "@testing-library/jest-dom": "^6.9.1",
@@ -48,7 +48,7 @@
     "jsdom": "^27.4.0",
     "knip": "^5.83.0",
     "lint-staged": "^16.2.7",
-    "msw": "^2.12.7",
+    "msw": "^2.12.8",
     "pkg-pr-new": "^0.0.63",
     "sherif": "^1.10.0",
     "simple-git-hooks": "^2.13.1",
