@@ -38,7 +38,7 @@
     "@tanstack/solid-query": "^5.90.23",
     "@tanstack/svelte-query": "^6.0.18",
     "@tanstack/vue-query": "^5.92.9",
-    "@types/node": "^22.19.3",
+    "@types/node": "^25.2.2",
     "ai": "^6.0.73",
     "markdown-it-task-lists": "^2.1.1",
     "mermaid": "^11.12.2",
