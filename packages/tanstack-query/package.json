@@ -48,8 +48,8 @@
     "@tanstack/solid-query": "^5.90.23",
     "@tanstack/svelte-query": "^6.0.18",
     "@tanstack/vue-query": "^5.92.9",
-    "svelte": "^5.49.2",
-    "vue": "^3.5.27",
+    "svelte": "^5.50.1",
+    "vue": "^3.5.28",
     "zod": "^4.3.6"
   }
 }
