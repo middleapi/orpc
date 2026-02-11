@@ -108,6 +108,7 @@ function toORPCProcedure(procedure: AnyProcedure) {
           type: procedure._def.type,
           input: trpcInput,
           getRawInput: () => trpcInput,
+          batchIndex: 0,
         })
 
         if (isAsyncIterable(output)) {
