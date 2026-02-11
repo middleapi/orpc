@@ -482,7 +482,8 @@ export class OpenAPIGenerator {
       if (simplifiedItem.properties?.status !== undefined) {
         const statusSchema = resolveOpenAPIJsonSchemaRef(doc, simplifiedItem.properties.status)
 
-        if (typeof statusSchema !== 'object'
+        if (
+          typeof statusSchema !== 'object'
           || statusSchema.const === undefined
           || typeof statusSchema.const !== 'number'
           || !Number.isInteger(statusSchema.const)
