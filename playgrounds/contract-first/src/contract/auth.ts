@@ -29,4 +29,9 @@ export const me = oc
     summary: 'Get the current user',
     tags: ['Authentication'],
   })
+  .errors({
+    UNAUTHORIZED: {
+      message: 'User is not authenticated',
+    },
+  })
   .output(UserSchema)
