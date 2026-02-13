@@ -42,7 +42,7 @@
   },
   "dependencies": {
     "radash": "^12.1.1",
-    "type-fest": "^5.4.3"
+    "type-fest": "^5.4.4"
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.0",
