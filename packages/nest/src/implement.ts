@@ -15,10 +15,18 @@ import { getRouter, isProcedure, unlazy } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
 import { get, intercept, toArray } from '@orpc/shared'
 import * as StandardServerFastify from '@orpc/standard-server-fastify'
+import * as StandardServerFetch from '@orpc/standard-server-fetch'
 import * as StandardServerNode from '@orpc/standard-server-node'
 import { mergeMap } from 'rxjs'
 import { ORPC_MODULE_CONFIG_SYMBOL } from './module'
 import { toNestPattern } from './utils'
+
+interface HonoContext {
+  req: { raw: globalThis.Request }
+  res?: globalThis.Response
+  finalized: boolean
+  newResponse: (body: BodyInit | null, init?: ResponseInit) => globalThis.Response
+}
 
 const MethodDecoratorMap = {
   HEAD: Head,
@@ -122,12 +130,21 @@ export class ImplementInterceptor implements NestInterceptor {
           `)
         }
 
-        const req: Request | FastifyRequest = ctx.switchToHttp().getRequest()
-        const res: Response | FastifyReply = ctx.switchToHttp().getResponse()
+        const req: Request | FastifyRequest | HonoContext['req'] = ctx.switchToHttp().getRequest()
+        const res: Response | FastifyReply | HonoContext = ctx.switchToHttp().getResponse()
 
-        const standardRequest = 'raw' in req
-          ? StandardServerFastify.toStandardLazyRequest(req, res as FastifyReply)
-          : StandardServerNode.toStandardLazyRequest(req, res as Response)
+        const isHono = 'finalized' in res && typeof (res as HonoContext).newResponse === 'function'
+        const isFastify = 'raw' in req && !isHono
+
+        const standardRequest = (() => {
+          if (isHono) {
+            return StandardServerFetch.toStandardLazyRequest((req as HonoContext['req']).raw)
+          }
+          if (isFastify) {
+            return StandardServerFastify.toStandardLazyRequest(req as FastifyRequest, res as FastifyReply)
+          }
+          return StandardServerNode.toStandardLazyRequest(req as Request, res as Response)
+        })()
 
         const handler = new StandardHandler(procedure, {
           init: () => {},
@@ -148,11 +165,14 @@ export class ImplementInterceptor implements NestInterceptor {
             toArray(this.config.sendResponseInterceptors),
             { request: req, response: res, standardResponse: result.response },
             async ({ response, standardResponse }) => {
-              if ('raw' in response) {
-                await StandardServerFastify.sendStandardResponse(response, standardResponse, this.config)
+              if (isHono) {
+                (response as HonoContext).res = StandardServerFetch.toFetchResponse(standardResponse, this.config)
+              }
+              else if (isFastify) {
+                await StandardServerFastify.sendStandardResponse(response as FastifyReply, standardResponse, this.config)
               }
               else {
-                await StandardServerNode.sendStandardResponse(response, standardResponse, this.config)
+                await StandardServerNode.sendStandardResponse(response as Response, standardResponse, this.config)
               }
             },
           )
