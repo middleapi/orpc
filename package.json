@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^7.4.3",
-    "@cloudflare/vitest-pool-workers": "^0.12.11",
+    "@cloudflare/vitest-pool-workers": "^0.12.12",
     "@solidjs/testing-library": "^0.8.10",
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "@testing-library/jest-dom": "^6.9.1",
