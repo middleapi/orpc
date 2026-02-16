@@ -50,7 +50,7 @@
     "@orpc/contract": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "partysocket": "^1.1.11",
+    "partysocket": "^1.1.13",
     "valibot": "^1.2.0"
   },
   "devDependencies": {
