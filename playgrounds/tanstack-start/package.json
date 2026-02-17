@@ -19,10 +19,10 @@
     "@orpc/zod": "next",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-query-devtools": "^5.91.3",
-    "@tanstack/react-router": "^1.159.5",
-    "@tanstack/react-router-devtools": "^1.159.5",
-    "@tanstack/react-router-ssr-query": "^1.159.5",
-    "@tanstack/react-start": "^1.159.5",
+    "@tanstack/react-router": "^1.160.2",
+    "@tanstack/react-router-devtools": "^1.160.2",
+    "@tanstack/react-router-ssr-query": "^1.160.2",
+    "@tanstack/react-start": "^1.160.2",
     "@types/node": "^22.19.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -30,7 +30,7 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "vite": "^7.3.1",
-    "vite-tsconfig-paths": "^6.1.0",
+    "vite-tsconfig-paths": "^6.1.1",
     "zod": "^4.3.6"
   }
 }
