@@ -8,8 +8,8 @@
     "serve": "vitepress serve"
   },
   "devDependencies": {
-    "@ai-sdk/google": "^3.0.29",
-    "@ai-sdk/react": "^3.0.93",
+    "@ai-sdk/google": "^3.0.30",
+    "@ai-sdk/react": "^3.0.96",
     "@opentelemetry/instrumentation": "^0.212.0",
     "@opentelemetry/sdk-node": "^0.212.0",
     "@opentelemetry/sdk-trace-web": "^2.5.1",
@@ -39,7 +39,7 @@
     "@tanstack/svelte-query": "^6.0.18",
     "@tanstack/vue-query": "^5.92.9",
     "@types/node": "^22.19.3",
-    "ai": "^6.0.91",
+    "ai": "^6.0.94",
     "markdown-it-task-lists": "^2.1.1",
     "mermaid": "^11.12.3",
     "openai": "^6.22.0",
