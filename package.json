@@ -42,7 +42,7 @@
     "better-sqlite3": "^12.6.2",
     "bumpp": "^10.4.1",
     "changelogithub": "^14.0.0",
-    "eslint": "^10.0.0",
+    "eslint": "^10.0.1",
     "eslint-plugin-ban": "^2.0.0",
     "eslint-plugin-format": "^1.4.0",
     "jsdom": "^28.1.0",
