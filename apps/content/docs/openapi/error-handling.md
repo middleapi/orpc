@@ -21,6 +21,7 @@ By default, oRPC maps common error codes to standard HTTP status codes:
 | NOT_ACCEPTABLE         |              406 | Not Acceptable         |
 | TIMEOUT                |              408 | Request Timeout        |
 | CONFLICT               |              409 | Conflict               |
+| GONE                   |              410 | Gone                   |
 | PRECONDITION_FAILED    |              412 | Precondition Failed    |
 | PAYLOAD_TOO_LARGE      |              413 | Payload Too Large      |
 | UNSUPPORTED_MEDIA_TYPE |              415 | Unsupported Media Type |
