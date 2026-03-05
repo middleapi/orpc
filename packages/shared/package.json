@@ -46,7 +46,7 @@
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.0",
-    "arktype": "2.1.29",
+    "arktype": "2.2.0",
     "valibot": "^1.2.0",
     "zod": "^4.3.6"
   }
