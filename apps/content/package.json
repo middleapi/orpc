@@ -42,7 +42,7 @@
     "ai": "^6.0.116",
     "markdown-it-task-lists": "^2.1.1",
     "mermaid": "^11.12.3",
-    "openai": "^6.25.0",
+    "openai": "^6.27.0",
     "pinia": "^3.0.4",
     "superjson": "^2.2.6",
     "svelte": "^5.53.7",
@@ -51,7 +51,7 @@
     "vitepress-plugin-llms": "^1.11.0",
     "vitepress-plugin-mermaid": "^2.0.17",
     "vitepress-plugin-shiki-twoslash": "^0.0.6",
-    "vue": "^3.5.29",
+    "vue": "^3.5.30",
     "zod": "^4.3.6"
   }
 }
