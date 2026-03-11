@@ -10,7 +10,7 @@
     "type:check": "astro check"
   },
   "devDependencies": {
-    "@astrojs/check": "^0.9.6",
+    "@astrojs/check": "^0.9.7",
     "@astrojs/react": "^4.4.2",
     "@orpc/client": "next",
     "@orpc/json-schema": "next",
