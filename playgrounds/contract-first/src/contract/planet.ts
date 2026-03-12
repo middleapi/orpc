@@ -24,6 +24,9 @@ export const createPlanet = oc
     summary: 'Create a planet',
     tags: ['Planets'],
   })
+  .errors({
+    UNAUTHORIZED: { message: 'User is not authenticated' },
+  })
   .input(NewPlanetSchema)
   .output(PlanetSchema)
 
@@ -49,6 +52,7 @@ export const updatePlanet = oc
     tags: ['Planets'],
   })
   .errors({
+    UNAUTHORIZED: { message: 'User is not authenticated' },
     NOT_FOUND: {
       message: 'Planet not found',
       data: z.object({ id: UpdatePlanetSchema.shape.id }),
