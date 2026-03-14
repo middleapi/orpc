@@ -925,11 +925,11 @@ importers:
         version: link:../shared
     devDependencies:
       '@angular/core':
-        specifier: ^21.2.2
-        version: 21.2.2(rxjs@7.8.2)
+        specifier: ^21.2.4
+        version: 21.2.4(rxjs@7.8.2)
       '@tanstack/angular-query-experimental':
         specifier: ^5.90.25
-        version: 5.90.25(@angular/common@21.0.1(@angular/core@21.2.2(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.2.2(rxjs@7.8.2))
+        version: 5.90.25(@angular/common@21.0.1(@angular/core@21.2.4(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.2.4(rxjs@7.8.2))
       '@tanstack/query-core':
         specifier: ^5.90.20
         version: 5.90.20
@@ -1935,11 +1935,11 @@ packages:
       '@angular/core': 21.0.1
       rxjs: ^6.5.3 || ^7.4.0
 
-  '@angular/core@21.2.2':
-    resolution: {integrity: sha512-ljiyiFjR6dgK27CNlOcMrjsDPYKFf2Rl89WLwGEGMOj0cJg/PSLQqpW/fbSkSB3SDgwG/WhXQ4Wrw525OKMupg==}
+  '@angular/core@21.2.4':
+    resolution: {integrity: sha512-2+gd67ZuXHpGOqeb2o7XZPueEWEP81eJza2tSHkT5QMV8lnYllDEmaNnkPxnIjSLGP1O3PmiXxo4z8ibHkLZwg==}
     engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0}
     peerDependencies:
-      '@angular/compiler': 21.2.2
+      '@angular/compiler': 21.2.4
       rxjs: ^6.5.3 || ^7.4.0
       zone.js: ~0.15.0 || ~0.16.0
     peerDependenciesMeta:
@@ -15642,13 +15642,13 @@ snapshots:
     transitivePeerDependencies:
       - chokidar
 
-  '@angular/common@21.0.1(@angular/core@21.2.2(rxjs@7.8.2))(rxjs@7.8.2)':
+  '@angular/common@21.0.1(@angular/core@21.2.4(rxjs@7.8.2))(rxjs@7.8.2)':
     dependencies:
-      '@angular/core': 21.2.2(rxjs@7.8.2)
+      '@angular/core': 21.2.4(rxjs@7.8.2)
       rxjs: 7.8.2
       tslib: 2.8.1
 
-  '@angular/core@21.2.2(rxjs@7.8.2)':
+  '@angular/core@21.2.4(rxjs@7.8.2)':
     dependencies:
       rxjs: 7.8.2
       tslib: 2.8.1
@@ -20802,10 +20802,10 @@ snapshots:
     dependencies:
       defer-to-connect: 2.0.1
 
-  '@tanstack/angular-query-experimental@5.90.25(@angular/common@21.0.1(@angular/core@21.2.2(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.2.2(rxjs@7.8.2))':
+  '@tanstack/angular-query-experimental@5.90.25(@angular/common@21.0.1(@angular/core@21.2.4(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.2.4(rxjs@7.8.2))':
     dependencies:
-      '@angular/common': 21.0.1(@angular/core@21.2.2(rxjs@7.8.2))(rxjs@7.8.2)
-      '@angular/core': 21.2.2(rxjs@7.8.2)
+      '@angular/common': 21.0.1(@angular/core@21.2.4(rxjs@7.8.2))(rxjs@7.8.2)
+      '@angular/core': 21.2.4(rxjs@7.8.2)
       '@tanstack/query-core': 5.90.20
     optionalDependencies:
       '@tanstack/query-devtools': 5.93.0
