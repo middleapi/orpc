@@ -173,6 +173,24 @@ testSchemaSmartCoercion([
     input: '123n',
   },
   {
+    name: 'nativeEnum(NumericEnum) - 1',
+    schema: z.enum(NumericEnum),
+    input: '1',
+    expected: 1,
+  },
+  {
+    name: 'nativeEnum(MixedEnum) - 1',
+    schema: z.enum(MixedEnum),
+    input: '1',
+    expected: 1,
+  },
+  {
+    name: 'nativeEnum(MixedEnum) - b',
+    schema: z.enum(MixedEnum),
+    input: 'b',
+    expected: 'b',
+  },
+  {
     name: 'enum - 123',
     schema: z.enum(['123', '456']),
     input: '123',

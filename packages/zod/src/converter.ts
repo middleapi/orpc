@@ -40,6 +40,8 @@ import { ZodFirstPartyTypeKind } from 'zod/v3'
 import { getCustomJsonSchema } from './custom-json-schema'
 import { getCustomZodDef } from './schemas/base'
 
+import { getValidEnumValues } from './util'
+
 export interface ZodToJsonSchemaOptions {
   /**
    * Max depth of lazy type
@@ -72,15 +74,6 @@ export interface ZodToJsonSchemaOptions {
    * @default { not: {} }
    */
   unsupportedJsonSchema?: Exclude<JSONSchema, boolean>
-}
-
-function getValidEnumValues(obj: any): any[] {
-  const validKeys = Object.keys(obj).filter((k: any) => typeof obj[obj[k]] !== 'number')
-  const filtered: any = {}
-  for (const k of validKeys) {
-    filtered[k] = obj[k]
-  }
-  return Object.values(filtered)
 }
 
 export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
