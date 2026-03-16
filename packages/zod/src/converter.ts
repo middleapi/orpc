@@ -74,6 +74,15 @@ export interface ZodToJsonSchemaOptions {
   unsupportedJsonSchema?: Exclude<JSONSchema, boolean>
 }
 
+function getValidEnumValues(obj: any): any[] {
+  const validKeys = Object.keys(obj).filter((k: any) => typeof obj[obj[k]] !== 'number')
+  const filtered: any = {}
+  for (const k of validKeys) {
+    filtered[k] = obj[k]
+  }
+  return Object.values(filtered)
+}
+
 export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
   private readonly maxLazyDepth: Exclude<ZodToJsonSchemaOptions['maxLazyDepth'], undefined>
   private readonly maxStructureDepth: Exclude<ZodToJsonSchemaOptions['maxStructureDepth'], undefined>
@@ -348,8 +357,14 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
 
       case ZodFirstPartyTypeKind.ZodNativeEnum: {
         const schema_ = schema as ZodNativeEnum<EnumLike>
-
-        return [true, { type: typeof Object.values(schema_._def.values)[0] === 'number' ? 'number' : 'string', enum: Object.values(schema_._def.values) }]
+        const values = getValidEnumValues(schema_._def.values)
+        const hasString = values.some(v => typeof v === 'string')
+        const hasNumber = values.some(v => typeof v === 'number')
+        const type = hasString && hasNumber ? undefined : hasNumber ? 'number' : 'string'
+        const json: any = { enum: values }
+        if (type)
+          json.type = type
+        return [true, json]
       }
 
       case ZodFirstPartyTypeKind.ZodArray: {

@@ -6,6 +6,16 @@ enum TestEnum {
   STRING = 'string',
 }
 
+enum NumericEnum {
+  A = 1,
+  B = 2,
+}
+
+enum MixedEnum {
+  A = 1,
+  B = 'b',
+}
+
 testSchemaSmartCoercion([
   {
     name: 'number - 12345',

@@ -28,6 +28,15 @@ import { guard, isObject } from '@orpc/shared'
 import { ZodFirstPartyTypeKind } from 'zod/v3'
 import { getCustomZodDef } from './schemas/base'
 
+function getValidEnumValues(obj: any): any[] {
+  const validKeys = Object.keys(obj).filter((k: any) => typeof obj[obj[k]] !== 'number')
+  const filtered: any = {}
+  for (const k of validKeys) {
+    filtered[k] = obj[k]
+  }
+  return Object.values(filtered)
+}
+
 export class ZodSmartCoercionPlugin<TContext extends Context> implements StandardHandlerPlugin<TContext> {
   init(options: StandardHandlerOptions<TContext>): void {
     options.clientInterceptors ??= []
@@ -126,13 +135,14 @@ function zodCoerceInternal(
 
     case ZodFirstPartyTypeKind.ZodNativeEnum: {
       const schema_ = schema as ZodNativeEnum<EnumLike>
+      const values = getValidEnumValues(schema_._def.values)
 
-      if (Object.values(schema_._def.values).includes(value as any)) {
+      if (values.includes(value as any)) {
         return value
       }
 
       if (typeof value === 'string') {
-        for (const expectedValue of Object.values(schema_._def.values)) {
+        for (const expectedValue of values) {
           if (expectedValue.toString() === value) {
             return expectedValue
           }

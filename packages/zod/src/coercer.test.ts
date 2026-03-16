@@ -15,6 +15,16 @@ enum TestEnum {
   STRING = 'string',
 }
 
+enum NumericEnum {
+  A = 1,
+  B = 2,
+}
+
+enum MixedEnum {
+  A = 1,
+  B = 'b',
+}
+
 const nativeCases: TestCase[] = [
   {
     schema: z.number(),
@@ -140,6 +150,31 @@ const nativeCases: TestCase[] = [
     schema: z.nativeEnum(TestEnum),
     input: '123n',
     expected: '123n',
+  },
+  {
+    schema: z.nativeEnum(TestEnum),
+    input: 'NUMBER',
+    expected: 'NUMBER',
+  },
+  {
+    schema: z.nativeEnum(NumericEnum),
+    input: '1',
+    expected: 1,
+  },
+  {
+    schema: z.nativeEnum(NumericEnum),
+    input: 'A',
+    expected: 'A', // invalid, should just return value since coercion failed, OR it shouldn't coerce 'A' to 1! wait, does Zod accept 'A'? NO.
+  },
+  {
+    schema: z.nativeEnum(MixedEnum),
+    input: '1',
+    expected: 1,
+  },
+  {
+    schema: z.nativeEnum(MixedEnum),
+    input: 'b',
+    expected: 'b',
   },
 ]
 
