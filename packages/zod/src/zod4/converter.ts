@@ -442,9 +442,10 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
           case 'enum': {
             const enum_ = schema as $ZodEnum
             const values = getValidEnumValues(enum_._zod.def.entries)
-            const hasString = values.some(v => typeof v === 'string')
-            const hasNumber = values.some(v => typeof v === 'number')
-            const type = hasString && hasNumber ? undefined : hasNumber ? 'number' : 'string'
+            const allString = values.every(v => typeof v === 'string')
+            const allNumber = values.every(v => typeof v === 'number')
+            const allBoolean = values.every(v => typeof v === 'boolean')
+            const type = allString ? 'string' : allNumber ? 'number' : allBoolean ? 'boolean' : undefined
             const json: any = { enum: values }
             if (type)
               json.type = type
