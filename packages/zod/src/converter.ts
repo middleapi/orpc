@@ -40,8 +40,6 @@ import { ZodFirstPartyTypeKind } from 'zod/v3'
 import { getCustomJsonSchema } from './custom-json-schema'
 import { getCustomZodDef } from './schemas/base'
 
-import { getValidEnumValues } from './util'
-
 export interface ZodToJsonSchemaOptions {
   /**
    * Max depth of lazy type
@@ -344,17 +342,18 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
 
       case ZodFirstPartyTypeKind.ZodEnum: {
         const schema_ = schema as ZodEnum<[string, ...string[]]>
-
-        return [true, { type: 'string', enum: schema_._def.values }]
+        const values = schema_._def.values
+        const type = values.every(v => typeof v === 'string') ? 'string' : values.every(v => typeof v === 'number' && Number.isFinite(v)) ? 'number' : undefined
+        const json: any = { enum: values }
+        if (type)
+          json.type = type
+        return [true, json]
       }
 
       case ZodFirstPartyTypeKind.ZodNativeEnum: {
         const schema_ = schema as ZodNativeEnum<EnumLike>
-        const values = getValidEnumValues(schema_._def.values)
-        const allString = values.every(v => typeof v === 'string')
-        const allNumber = values.every(v => typeof v === 'number')
-        const allBoolean = values.every(v => typeof v === 'boolean')
-        const type = allString ? 'string' : allNumber ? 'number' : allBoolean ? 'boolean' : undefined
+        const values = Object.values(schema_._def.values)
+        const type = values.every(v => typeof v === 'string') ? 'string' : values.every(v => typeof v === 'number' && Number.isFinite(v)) ? 'number' : undefined
         const json: any = { enum: values }
         if (type)
           json.type = type

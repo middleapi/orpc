@@ -85,17 +85,6 @@ export interface ZodToJsonSchemaConverterOptions {
   >[]
 }
 
-function getValidEnumValues(obj: any): any[] {
-  if (Array.isArray(obj))
-    return obj
-  const validKeys = Object.keys(obj).filter((k: any) => typeof obj[obj[k]] !== 'number')
-  const filtered: any = {}
-  for (const k of validKeys) {
-    filtered[k] = obj[k]
-  }
-  return Object.values(filtered)
-}
-
 export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
   private readonly maxLazyDepth: Exclude<ZodToJsonSchemaConverterOptions['maxLazyDepth'], undefined>
   private readonly maxStructureDepth: Exclude<ZodToJsonSchemaConverterOptions['maxStructureDepth'], undefined>
@@ -441,11 +430,8 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
 
           case 'enum': {
             const enum_ = schema as $ZodEnum
-            const values = getValidEnumValues(enum_._zod.def.entries)
-            const allString = values.every(v => typeof v === 'string')
-            const allNumber = values.every(v => typeof v === 'number')
-            const allBoolean = values.every(v => typeof v === 'boolean')
-            const type = allString ? 'string' : allNumber ? 'number' : allBoolean ? 'boolean' : undefined
+            const values = Object.values(enum_._zod.def.entries)
+            const type = values.every(v => typeof v === 'string') ? 'string' : values.every(v => typeof v === 'number' && Number.isFinite(v)) ? 'number' : undefined
             const json: any = { enum: values }
             if (type)
               json.type = type

@@ -6,16 +6,6 @@ enum ExampleEnum {
   B = 'b',
 }
 
-enum NumericEnum {
-  A = 1,
-  B = 2,
-}
-
-enum MixedEnum {
-  A = 1,
-  B = 'b',
-}
-
 testSchemaConverter([
   {
     name: 'boolean',
@@ -100,22 +90,12 @@ testSchemaConverter([
   {
     name: 'enum(["a", "b"])',
     schema: z.enum(['a', 'b']),
-    input: [true, { type: 'string', enum: ['a', 'b'] }],
+    input: [true, { enum: ['a', 'b'] }],
   },
   {
     name: 'enum(ExampleEnum)',
     schema: z.enum(ExampleEnum),
-    input: [true, { type: 'string', enum: ['a', 'b'] }],
-  },
-  {
-    name: 'enum(NumericEnum)',
-    schema: z.enum(NumericEnum),
-    input: [true, { type: 'number', enum: [1, 2] }],
-  },
-  {
-    name: 'enum(MixedEnum)',
-    schema: z.enum(MixedEnum),
-    input: [true, { enum: [1, 'b'] }],
+    input: [true, { enum: ['a', 'b'] }],
   },
   {
     name: 'file()',

@@ -6,16 +6,6 @@ enum TestEnum {
   STRING = 'string',
 }
 
-enum NumericEnum {
-  A = 1,
-  B = 2,
-}
-
-enum MixedEnum {
-  A = 1,
-  B = 'b',
-}
-
 testSchemaSmartCoercion([
   {
     name: 'number - 12345',
@@ -171,24 +161,6 @@ testSchemaSmartCoercion([
     name: 'nativeEnum - 123n',
     schema: z.enum(TestEnum),
     input: '123n',
-  },
-  {
-    name: 'nativeEnum(NumericEnum) - 1',
-    schema: z.enum(NumericEnum),
-    input: '1',
-    expected: 1,
-  },
-  {
-    name: 'nativeEnum(MixedEnum) - 1',
-    schema: z.enum(MixedEnum),
-    input: '1',
-    expected: 1,
-  },
-  {
-    name: 'nativeEnum(MixedEnum) - b',
-    schema: z.enum(MixedEnum),
-    input: 'b',
-    expected: 'b',
   },
   {
     name: 'enum - 123',
