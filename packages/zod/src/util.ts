@@ -1,4 +1,7 @@
 export function getValidEnumValues(obj: any): any[] {
+  if (Array.isArray(obj))
+    return obj
+
   const validKeys = Object.keys(obj).filter(
     (k: any) => typeof obj[obj[k]] !== 'number',
   )
