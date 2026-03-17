@@ -193,11 +193,11 @@ const nativeCases: SchemaTestCase[] = [
   },
   {
     schema: z.enum(['a', 'b']),
-    input: [true, { enum: ['a', 'b'] }],
+    input: [true, { type: 'string', enum: ['a', 'b'] }],
   },
   {
     schema: z.nativeEnum(ExampleEnum),
-    input: [true, { enum: ['a', 'b'] }],
+    input: [true, { type: 'string', enum: ['a', 'b'] }],
   },
 ]
 

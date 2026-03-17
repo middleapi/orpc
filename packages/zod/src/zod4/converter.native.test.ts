@@ -90,12 +90,12 @@ testSchemaConverter([
   {
     name: 'enum(["a", "b"])',
     schema: z.enum(['a', 'b']),
-    input: [true, { enum: ['a', 'b'] }],
+    input: [true, { type: 'string', enum: ['a', 'b'] }],
   },
   {
     name: 'enum(ExampleEnum)',
     schema: z.enum(ExampleEnum),
-    input: [true, { enum: ['a', 'b'] }],
+    input: [true, { type: 'string', enum: ['a', 'b'] }],
   },
   {
     name: 'file()',
