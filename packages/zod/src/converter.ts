@@ -343,6 +343,14 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
       case ZodFirstPartyTypeKind.ZodEnum: {
         const schema_ = schema as ZodEnum<[string, ...string[]]>
         const values = schema_._def.values
+        const json: any = { enum: values, type: 'string' }
+
+        return [true, json]
+      }
+
+      case ZodFirstPartyTypeKind.ZodNativeEnum: {
+        const schema_ = schema as ZodNativeEnum<EnumLike>
+        const values = getEnumValues(schema_._def.values)
         const json: any = { enum: values }
 
         if (values.every(v => typeof v === 'string')) {
@@ -352,16 +360,6 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
           json.type = 'number'
         }
 
-        return [true, json]
-      }
-
-      case ZodFirstPartyTypeKind.ZodNativeEnum: {
-        const schema_ = schema as ZodNativeEnum<EnumLike>
-        const values = Object.values(schema_._def.values)
-        const type = values.every(v => typeof v === 'string') ? 'string' : values.every(v => typeof v === 'number' && Number.isFinite(v)) ? 'number' : undefined
-        const json: any = { enum: values }
-        if (type)
-          json.type = type
         return [true, json]
       }
 
@@ -701,4 +699,15 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
       ? { anyOf: [schema, this.unsupportedJsonSchema] }
       : { anyOf: [schema, { type: 'null' }] }
   }
+}
+
+/**
+ * https://github.com/colinhacks/zod/blob/main/packages/zod/src/v4/core/util.ts#L206C8-L212C2
+ */
+function getEnumValues(entries: EnumLike) {
+  const numericValues = Object.values(entries).filter(v => typeof v === 'number')
+  const values = Object.entries(entries)
+    .filter(([k, _]) => !numericValues.includes(+k))
+    .map(([_, v]) => v)
+  return values
 }
