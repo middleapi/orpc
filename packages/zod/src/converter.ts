@@ -343,7 +343,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
       case ZodFirstPartyTypeKind.ZodEnum: {
         const schema_ = schema as ZodEnum<[string, ...string[]]>
 
-        return [true, { enum: schema_._def.values }]
+        return [true, { type: 'string', enum: schema_._def.values }]
       }
 
       case ZodFirstPartyTypeKind.ZodNativeEnum: {
