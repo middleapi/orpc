@@ -77,7 +77,7 @@
     "@orpc/shared": "workspace:*",
     "@orpc/standard-server": "workspace:*",
     "json-schema-typed": "^8.0.2",
-    "rou3": "^0.7.12"
+    "rou3": "^0.8.1"
   },
   "devDependencies": {
     "fastify": "^5.8.2",
