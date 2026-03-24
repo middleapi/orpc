@@ -79,7 +79,6 @@ describe('toStandardBody', () => {
       json: {
         text: '滚滚长江东逝水',
       },
-      meta: undefined,
     }
 
     const chunks = splitBufferInsideCharacter(JSON.stringify(original), '江')
