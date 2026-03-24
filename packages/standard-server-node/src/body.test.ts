@@ -99,6 +99,17 @@ describe('toStandardBody', () => {
     expect(standardBody).toBe(original)
   })
 
+  it('text with utf-8 characters split across chunk boundaries end with incomplete utf8', async () => {
+    const original = '海内存知己,天涯若比邻'
+    const chunks = splitBufferInsideCharacter(original, '存')
+    const incompleteUtf8 = Buffer.from([230, 181])
+    const request = createChunkedRequest('text/plain', [...chunks, incompleteUtf8])
+
+    const standardBody = await toStandardBody(request)
+
+    expect(standardBody).toBe(`${original}�`)
+  })
+
   it('json but empty body', async () => {
     let standardBody: StandardBody = {} as any
 
