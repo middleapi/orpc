@@ -16,6 +16,29 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+function createChunkedRequest(contentType: string, chunks: Buffer[]): IncomingMessage {
+  const request = Readable.from(chunks) as IncomingMessage
+  request.headers = {
+    'content-type': contentType,
+  }
+  return request
+}
+
+function splitBufferInsideCharacter(text: string, splitCharacter: string): Buffer[] {
+  const buffer = Buffer.from(text)
+  const splitBytes = Buffer.from(splitCharacter)
+  const splitIndex = buffer.indexOf(splitBytes)
+
+  if (splitIndex === -1) {
+    throw new Error(`split character not found: ${splitCharacter}`)
+  }
+
+  return [
+    buffer.subarray(0, splitIndex + 1),
+    buffer.subarray(splitIndex + 1),
+  ]
+}
+
 describe('toStandardBody', () => {
   it('undefined', async () => {
     let standardBody: StandardBody = {} as any
@@ -49,6 +72,32 @@ describe('toStandardBody', () => {
     }).post('/').send({ foo: 'bar' })
 
     expect(standardBody).toEqual({ foo: 'bar' })
+  })
+
+  it('json with utf-8 characters split across chunk boundaries', async () => {
+    const original = {
+      json: {
+        text: '滚滚长江东逝水',
+      },
+      meta: undefined,
+    }
+
+    const chunks = splitBufferInsideCharacter(JSON.stringify(original), '江')
+    const request = createChunkedRequest('application/json', chunks)
+
+    const standardBody = await toStandardBody(request)
+
+    expect(standardBody).toEqual(original)
+  })
+
+  it('text with utf-8 characters split across chunk boundaries', async () => {
+    const original = '海内存知己,天涯若比邻'
+    const chunks = splitBufferInsideCharacter(original, '存')
+    const request = createChunkedRequest('text/plain', chunks)
+
+    const standardBody = await toStandardBody(request)
+
+    expect(standardBody).toBe(original)
   })
 
   it('json but empty body', async () => {

@@ -1,8 +1,9 @@
 import type { StandardBody, StandardHeaders } from '@orpc/standard-server'
-import type { Buffer } from 'node:buffer'
 import type { ToEventIteratorOptions, ToEventStreamOptions } from './event-iterator'
 import type { NodeHttpRequest } from './types'
+import { Buffer } from 'node:buffer'
 import { Readable } from 'node:stream'
+import { StringDecoder } from 'node:string_decoder'
 import { isAsyncIteratorObject, parseEmptyableJSON, runWithSpan, stringifyJSON } from '@orpc/shared'
 import { flattenHeader, generateContentDisposition, getFilenameFromContentDisposition } from '@orpc/standard-server'
 import { toEventIterator, toEventStream } from './event-iterator'
@@ -114,13 +115,17 @@ function _streamToFormData(stream: Readable, contentType: string): Promise<FormD
 }
 
 async function _streamToString(stream: Readable): Promise<string> {
-  let string = ''
+  // Default to UTF-8 decoding for request text bodies.
+  const decoder = new StringDecoder('utf8')
+  let text = ''
 
   for await (const chunk of stream) {
-    string += chunk.toString()
+    text += decoder.write(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
   }
 
-  return string
+  text += decoder.end()
+
+  return text
 }
 
 async function _streamToFile(stream: Readable, fileName: string, contentType: string): Promise<File> {
