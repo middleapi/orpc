@@ -136,6 +136,30 @@ describe.each([
   })
 })
 
+describe('standardRPCJsonSerializer: undefined in arrays produces JSON-safe output', () => {
+  const serializer = new StandardRPCJsonSerializer()
+
+  it('serialize uses null as placeholder for undefined array elements', () => {
+    const [json] = serializer.serialize([undefined, 'a', undefined])
+    expect(json).toEqual([null, 'a', null])
+  })
+
+  it('round-trips undefined array elements through JSON.parse(JSON.stringify(...))', () => {
+    const [json, meta, maps, blobs] = serializer.serialize([undefined, 'a', undefined])
+    const result = JSON.parse(JSON.stringify({ json, meta, maps }))
+    const deserialized = serializer.deserialize(result.json, result.meta, result.maps, (i: number) => blobs[i]!)
+    expect(deserialized).toEqual([undefined, 'a', undefined])
+  })
+
+  it('round-trips nested undefined array elements (e.g. TanStack Query pageParams)', () => {
+    const data = { pageParams: [undefined, 'cursor_abc'], pages: [{ items: [1, 2] }] }
+    const [json, meta, maps, blobs] = serializer.serialize(data)
+    const result = JSON.parse(JSON.stringify({ json, meta, maps }))
+    const deserialized = serializer.deserialize(result.json, result.meta, result.maps, (i: number) => blobs[i]!)
+    expect(deserialized).toEqual(data)
+  })
+})
+
 describe('standardRPCJsonSerializer: custom serializers', () => {
   it('should throw when type is duplicated', () => {
     expect(() => {
