@@ -302,7 +302,7 @@ describe('non-procedure primitive values in router tree', () => {
   describe('unlazyRouter', () => {
     it('does not infinite-recurse on a string value in router', async () => {
       const routerWithString = { pong, FOO: 'bar' } as any
-      await expect(unlazyRouter(routerWithString)).resolves.toBeDefined()
+      await expect(unlazyRouter(routerWithString)).resolves.toEqual({ pong, FOO: 'bar' })
     })
 
     it('handles a router that is itself a primitive', async () => {
