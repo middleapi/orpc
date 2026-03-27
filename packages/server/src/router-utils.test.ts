@@ -220,3 +220,94 @@ it('unlazyRouter', async () => {
     },
   })
 })
+
+describe('non-procedure primitive values in router tree', () => {
+  const defaultOptions = {
+    errorMap: {},
+    middlewares: [],
+    prefix: undefined,
+    tags: [],
+    dedupeLeadingMiddlewares: false,
+  } as const
+
+  describe('enhanceRouter', () => {
+    it('does not infinite-recurse on a string value', () => {
+      const routerWithString = { ping: pong, FOO: 'bar' } as any
+      expect(() => enhanceRouter(routerWithString, defaultOptions)).not.toThrow()
+    })
+
+    it('does not infinite-recurse on a single-character string', () => {
+      const routerWithChar = { ping: pong, X: 'a' } as any
+      expect(() => enhanceRouter(routerWithChar, defaultOptions)).not.toThrow()
+    })
+
+    it('does not infinite-recurse on a number value', () => {
+      const routerWithNumber = { ping: pong, VERSION: 42 } as any
+      expect(() => enhanceRouter(routerWithNumber, defaultOptions)).not.toThrow()
+    })
+
+    it('does not infinite-recurse on a boolean value', () => {
+      const routerWithBool = { ping: pong, ENABLED: true } as any
+      expect(() => enhanceRouter(routerWithBool, defaultOptions)).not.toThrow()
+    })
+
+    it('does not throw on null value', () => {
+      const routerWithNull = { ping: pong, BAD: null } as any
+      expect(() => enhanceRouter(routerWithNull, defaultOptions)).not.toThrow()
+    })
+
+    it('does not throw on undefined value', () => {
+      const routerWithUndefined = { ping: pong, BAD: undefined } as any
+      expect(() => enhanceRouter(routerWithUndefined, defaultOptions)).not.toThrow()
+    })
+
+    it('returns primitive values as-is', () => {
+      const routerWithPrimitives = { ping: pong, FOO: 'bar', NUM: 99 } as any
+      const enhanced = enhanceRouter(routerWithPrimitives, defaultOptions)
+      expect(enhanced.FOO).toBe('bar')
+      expect(enhanced.NUM).toBe(99)
+    })
+
+    it('still enhances valid procedures alongside primitives', () => {
+      const routerWithMixed = { pong, CONST: 'hello' } as any
+      const enhanced = enhanceRouter(routerWithMixed, defaultOptions)
+      expect(enhanced.pong).toBeDefined()
+      expect(enhanced.pong['~orpc']).toBeDefined()
+      expect(enhanced.CONST).toBe('hello')
+    })
+  })
+
+  describe('traverseContractProcedures', () => {
+    it('does not infinite-recurse on a string value in router', () => {
+      const routerWithString = { pong, FOO: 'bar' } as any
+      const callback = vi.fn()
+      expect(() => traverseContractProcedures({ router: routerWithString, path: [] }, callback)).not.toThrow()
+      // pong should still be traversed
+      expect(callback).toHaveBeenCalledWith({ contract: pong, path: ['pong'] })
+    })
+
+    it('does not infinite-recurse on a number value in router', () => {
+      const routerWithNumber = { pong, VERSION: 42 } as any
+      const callback = vi.fn()
+      expect(() => traverseContractProcedures({ router: routerWithNumber, path: [] }, callback)).not.toThrow()
+    })
+
+    it('handles a router that is itself a primitive', () => {
+      const callback = vi.fn()
+      expect(() => traverseContractProcedures({ router: 'hello' as any, path: [] }, callback)).not.toThrow()
+      expect(callback).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('unlazyRouter', () => {
+    it('does not infinite-recurse on a string value in router', async () => {
+      const routerWithString = { pong, FOO: 'bar' } as any
+      await expect(unlazyRouter(routerWithString)).resolves.toBeDefined()
+    })
+
+    it('handles a router that is itself a primitive', async () => {
+      const result = await unlazyRouter('hello' as any)
+      expect(result).toBe('hello')
+    })
+  })
+})

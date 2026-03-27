@@ -150,6 +150,10 @@ export function enhanceRouter<
     return enhanced as any
   }
 
+  if (typeof router !== 'object' || router === null) {
+    return router as any
+  }
+
   const enhanced = {} as Record<string, any>
 
   for (const key in router) {
@@ -206,7 +210,7 @@ export function traverseContractProcedures(
     })
   }
 
-  else {
+  else if (typeof currentRouter === 'object' && currentRouter !== null) {
     for (const key in currentRouter) {
       traverseContractProcedures(
         {
@@ -251,6 +255,10 @@ export type UnlaziedRouter<T extends AnyRouter>
 
 export async function unlazyRouter<T extends AnyRouter>(router: T): Promise<UnlaziedRouter<T>> {
   if (isProcedure(router)) {
+    return router as any
+  }
+
+  if (typeof router !== 'object' || router === null) {
     return router as any
   }
 
