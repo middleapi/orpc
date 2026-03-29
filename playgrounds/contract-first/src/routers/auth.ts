@@ -15,6 +15,6 @@ export const signin = pub.auth.signin
   })
 
 export const me = authed.auth.me
-  .handler(async ({ input, context }) => {
+  .handler(async ({ context }) => {
     return context.user
   })
