@@ -45,7 +45,7 @@
     "type-fest": "^5.4.4"
   },
   "devDependencies": {
-    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/api": "^1.9.1",
     "arktype": "2.2.0",
     "valibot": "^1.2.0",
     "zod": "^4.3.6"
