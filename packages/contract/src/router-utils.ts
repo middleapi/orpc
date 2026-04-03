@@ -53,6 +53,10 @@ export function enhanceContractRouter<T extends AnyContractRouter, TErrorMap ext
     return enhanced as any
   }
 
+  if (typeof router !== 'object' || router === null) {
+    return router as any
+  }
+
   const enhanced: Record<string, any> = {}
 
   for (const key in router) {
@@ -81,6 +85,10 @@ export function minifyContractRouter(router: AnyContractRouter): AnyContractRout
     }
 
     return procedure
+  }
+
+  if (typeof router !== 'object' || router === null) {
+    return router as any
   }
 
   const json: Record<string, AnyContractRouter> = {}
@@ -125,6 +133,10 @@ export function populateContractRouterPaths<T extends AnyContractRouter>(router:
       }) as any
     }
 
+    return router as any
+  }
+
+  if (typeof router !== 'object' || router === null) {
     return router as any
   }
 

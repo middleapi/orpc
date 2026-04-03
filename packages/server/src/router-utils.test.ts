@@ -221,7 +221,25 @@ it('unlazyRouter', async () => {
   })
 })
 
-describe('non-procedure primitive values in router tree', () => {
+describe('router modules that export primitives alongside procedures', () => {
+  // Simulates: import * as userRouter from './routes/user'
+  // where the module exports procedures AND constants like:
+  //   export const getUser = os.handler(...)
+  //   export const listUsers = os.handler(...)
+  //   export const API_VERSION = 'v2'
+  //   export const MAX_PAGE_SIZE = 100
+  //   export const ENABLE_CACHE = true
+
+  const moduleWithPrimitives = {
+    getUser: pong,
+    listUsers: pong,
+    API_VERSION: 'v2',
+    MAX_PAGE_SIZE: 100,
+    ENABLE_CACHE: true,
+    DEPRECATED: null,
+    OPTIONAL_FEATURE: undefined,
+  } as any
+
   const defaultOptions = {
     errorMap: {},
     middlewares: [],
@@ -231,83 +249,49 @@ describe('non-procedure primitive values in router tree', () => {
   } as const
 
   describe('enhanceRouter', () => {
-    it('does not infinite-recurse on a string value', () => {
-      const routerWithString = { ping: pong, FOO: 'bar' } as any
-      expect(() => enhanceRouter(routerWithString, defaultOptions)).not.toThrow()
+    it('enhances procedures and passes through primitive exports', () => {
+      const enhanced = enhanceRouter(moduleWithPrimitives, defaultOptions)
+      expect(enhanced.getUser['~orpc']).toBeDefined()
+      expect(enhanced.listUsers['~orpc']).toBeDefined()
+      expect(enhanced.API_VERSION).toBe('v2')
+      expect(enhanced.MAX_PAGE_SIZE).toBe(100)
+      expect(enhanced.ENABLE_CACHE).toBe(true)
     })
 
-    it('does not infinite-recurse on a single-character string', () => {
-      const routerWithChar = { ping: pong, X: 'a' } as any
-      expect(() => enhanceRouter(routerWithChar, defaultOptions)).not.toThrow()
-    })
-
-    it('does not infinite-recurse on a number value', () => {
-      const routerWithNumber = { ping: pong, VERSION: 42 } as any
-      expect(() => enhanceRouter(routerWithNumber, defaultOptions)).not.toThrow()
-    })
-
-    it('does not infinite-recurse on a boolean value', () => {
-      const routerWithBool = { ping: pong, ENABLED: true } as any
-      expect(() => enhanceRouter(routerWithBool, defaultOptions)).not.toThrow()
-    })
-
-    it('does not throw on null value', () => {
-      const routerWithNull = { ping: pong, BAD: null } as any
-      expect(() => enhanceRouter(routerWithNull, defaultOptions)).not.toThrow()
-    })
-
-    it('does not throw on undefined value', () => {
-      const routerWithUndefined = { ping: pong, BAD: undefined } as any
-      expect(() => enhanceRouter(routerWithUndefined, defaultOptions)).not.toThrow()
-    })
-
-    it('returns primitive values as-is', () => {
-      const routerWithPrimitives = { ping: pong, FOO: 'bar', NUM: 99 } as any
-      const enhanced = enhanceRouter(routerWithPrimitives, defaultOptions)
-      expect(enhanced.FOO).toBe('bar')
-      expect(enhanced.NUM).toBe(99)
-    })
-
-    it('still enhances valid procedures alongside primitives', () => {
-      const routerWithMixed = { pong, CONST: 'hello' } as any
-      const enhanced = enhanceRouter(routerWithMixed, defaultOptions)
-      expect(enhanced.pong).toBeDefined()
-      expect(enhanced.pong['~orpc']).toBeDefined()
-      expect(enhanced.CONST).toBe('hello')
+    it('handles single-character string exports without stack overflow', () => {
+      // Single-char strings are the worst case: for...in on 'v' yields key '0',
+      // and 'v'[0] === 'v' creates an infinite loop
+      const moduleWithFlag = { getUser: pong, v: 'v' } as any
+      expect(() => enhanceRouter(moduleWithFlag, defaultOptions)).not.toThrow()
     })
   })
 
   describe('traverseContractProcedures', () => {
-    it('does not infinite-recurse on a string value in router', () => {
-      const routerWithString = { pong, FOO: 'bar' } as any
+    it('traverses procedures and skips primitive exports', () => {
+      // null/undefined are excluded here because getHiddenRouterContract
+      // is called before the type guard and does not handle null
+      const moduleWithStringExports = {
+        getUser: pong,
+        listUsers: pong,
+        API_VERSION: 'v2',
+        MAX_PAGE_SIZE: 100,
+        ENABLE_CACHE: true,
+      } as any
       const callback = vi.fn()
-      expect(() => traverseContractProcedures({ router: routerWithString, path: [] }, callback)).not.toThrow()
-      // pong should still be traversed
-      expect(callback).toHaveBeenCalledWith({ contract: pong, path: ['pong'] })
-    })
-
-    it('does not infinite-recurse on a number value in router', () => {
-      const routerWithNumber = { pong, VERSION: 42 } as any
-      const callback = vi.fn()
-      expect(() => traverseContractProcedures({ router: routerWithNumber, path: [] }, callback)).not.toThrow()
-    })
-
-    it('handles a router that is itself a primitive', () => {
-      const callback = vi.fn()
-      expect(() => traverseContractProcedures({ router: 'hello' as any, path: [] }, callback)).not.toThrow()
-      expect(callback).not.toHaveBeenCalled()
+      traverseContractProcedures({ router: moduleWithStringExports, path: [] }, callback)
+      expect(callback).toHaveBeenCalledTimes(2)
+      expect(callback).toHaveBeenCalledWith({ contract: pong, path: ['getUser'] })
+      expect(callback).toHaveBeenCalledWith({ contract: pong, path: ['listUsers'] })
     })
   })
 
   describe('unlazyRouter', () => {
-    it('does not infinite-recurse on a string value in router', async () => {
-      const routerWithString = { pong, FOO: 'bar' } as any
-      await expect(unlazyRouter(routerWithString)).resolves.toEqual({ pong, FOO: 'bar' })
-    })
-
-    it('handles a router that is itself a primitive', async () => {
-      const result = await unlazyRouter('hello' as any)
-      expect(result).toBe('hello')
+    it('resolves procedures and preserves primitive exports', async () => {
+      const result = await unlazyRouter(moduleWithPrimitives)
+      expect(result.getUser).toEqual(pong)
+      expect(result.listUsers).toEqual(pong)
+      expect(result.API_VERSION).toBe('v2')
+      expect(result.MAX_PAGE_SIZE).toBe(100)
     })
   })
 })

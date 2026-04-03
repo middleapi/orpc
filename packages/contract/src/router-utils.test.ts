@@ -74,6 +74,85 @@ it('minifyContractRouter', () => {
   expect((minified as any).nested.pong).toEqual(minifiedPong)
 })
 
+describe('contract modules that export primitives alongside procedures', () => {
+  // Simulates: import * as userContract from './contracts/user'
+  // where the module exports contract procedures AND constants like:
+  //   export const getUser = oc.input(userSchema)
+  //   export const listUsers = oc.input(listSchema)
+  //   export const API_VERSION = 'v2'
+  //   export const MAX_PAGE_SIZE = 100
+  //   export const ENABLE_CACHE = true
+
+  const moduleWithPrimitives = {
+    getUser: ping,
+    listUsers: pong,
+    API_VERSION: 'v2',
+    MAX_PAGE_SIZE: 100,
+    ENABLE_CACHE: true,
+    DEPRECATED: null,
+    OPTIONAL_FEATURE: undefined,
+  } as any
+
+  describe('enhanceContractRouter', () => {
+    const options = { errorMap: {}, prefix: '/api', tags: ['api'] } as const
+
+    it('enhances procedures and passes through primitive exports', () => {
+      const enhanced = enhanceContractRouter(moduleWithPrimitives, options)
+      expect(isContractProcedure(enhanced.getUser)).toBe(true)
+      expect(isContractProcedure(enhanced.listUsers)).toBe(true)
+      expect(enhanced.API_VERSION).toBe('v2')
+      expect(enhanced.MAX_PAGE_SIZE).toBe(100)
+      expect(enhanced.ENABLE_CACHE).toBe(true)
+    })
+
+    it('handles single-character string exports without stack overflow', () => {
+      // Single-char strings are the worst case: for...in on 'v' yields key '0',
+      // and 'v'[0] === 'v' creates an infinite loop
+      const moduleWithFlag = { getUser: ping, v: 'v' } as any
+      expect(() => enhanceContractRouter(moduleWithFlag, options)).not.toThrow()
+    })
+  })
+
+  describe('minifyContractRouter', () => {
+    it('minifies procedures and passes through primitive exports', () => {
+      const minified = minifyContractRouter(moduleWithPrimitives)
+      expect(isContractProcedure((minified as any).getUser)).toBe(true)
+      expect(isContractProcedure((minified as any).listUsers)).toBe(true)
+      expect((minified as any).API_VERSION).toBe('v2')
+      expect((minified as any).MAX_PAGE_SIZE).toBe(100)
+    })
+
+    it('handles single-character string exports without stack overflow', () => {
+      const moduleWithFlag = { getUser: ping, v: 'v' } as any
+      expect(() => minifyContractRouter(moduleWithFlag)).not.toThrow()
+    })
+  })
+
+  describe('populateContractRouterPaths', () => {
+    it('populates procedure paths and passes through primitive exports', () => {
+      const moduleForPaths = {
+        getUser: oc.input(inputSchema),
+        listUsers: oc.output(outputSchema),
+        API_VERSION: 'v2',
+        MAX_PAGE_SIZE: 100,
+        ENABLE_CACHE: true,
+      } as any
+      const populated = populateContractRouterPaths(moduleForPaths)
+      expect(isContractProcedure(populated.getUser)).toBe(true)
+      expect(populated.getUser['~orpc'].route.path).toBe('/getUser')
+      expect(isContractProcedure(populated.listUsers)).toBe(true)
+      expect(populated.listUsers['~orpc'].route.path).toBe('/listUsers')
+      expect(populated.API_VERSION).toBe('v2')
+      expect(populated.MAX_PAGE_SIZE).toBe(100)
+    })
+
+    it('handles single-character string exports without stack overflow', () => {
+      const moduleWithFlag = { getUser: oc.input(inputSchema), v: 'v' } as any
+      expect(() => populateContractRouterPaths(moduleWithFlag)).not.toThrow()
+    })
+  })
+})
+
 it('populateContractRouterPaths', () => {
   const contract = {
     ping: oc.input(inputSchema),
