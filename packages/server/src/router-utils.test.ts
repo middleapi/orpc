@@ -220,3 +220,78 @@ it('unlazyRouter', async () => {
     },
   })
 })
+
+describe('router modules that export primitives alongside procedures', () => {
+  // Simulates: import * as userRouter from './routes/user'
+  // where the module exports procedures AND constants like:
+  //   export const getUser = os.handler(...)
+  //   export const listUsers = os.handler(...)
+  //   export const API_VERSION = 'v2'
+  //   export const MAX_PAGE_SIZE = 100
+  //   export const ENABLE_CACHE = true
+
+  const moduleWithPrimitives = {
+    getUser: pong,
+    listUsers: pong,
+    API_VERSION: 'v2',
+    MAX_PAGE_SIZE: 100,
+    ENABLE_CACHE: true,
+    DEPRECATED: null,
+    OPTIONAL_FEATURE: undefined,
+  } as any
+
+  const defaultOptions = {
+    errorMap: {},
+    middlewares: [],
+    prefix: undefined,
+    tags: [],
+    dedupeLeadingMiddlewares: false,
+  } as const
+
+  describe('enhanceRouter', () => {
+    it('enhances procedures and passes through primitive exports', () => {
+      const enhanced = enhanceRouter(moduleWithPrimitives, defaultOptions)
+      expect(enhanced.getUser['~orpc']).toBeDefined()
+      expect(enhanced.listUsers['~orpc']).toBeDefined()
+      expect(enhanced.API_VERSION).toBe('v2')
+      expect(enhanced.MAX_PAGE_SIZE).toBe(100)
+      expect(enhanced.ENABLE_CACHE).toBe(true)
+    })
+
+    it('handles single-character string exports without stack overflow', () => {
+      // Single-char strings are the worst case: for...in on 'v' yields key '0',
+      // and 'v'[0] === 'v' creates an infinite loop
+      const moduleWithFlag = { getUser: pong, v: 'v' } as any
+      expect(() => enhanceRouter(moduleWithFlag, defaultOptions)).not.toThrow()
+    })
+  })
+
+  describe('traverseContractProcedures', () => {
+    it('traverses procedures and skips primitive exports', () => {
+      // null/undefined are excluded here because getHiddenRouterContract
+      // is called before the type guard and does not handle null
+      const moduleWithStringExports = {
+        getUser: pong,
+        listUsers: pong,
+        API_VERSION: 'v2',
+        MAX_PAGE_SIZE: 100,
+        ENABLE_CACHE: true,
+      } as any
+      const callback = vi.fn()
+      traverseContractProcedures({ router: moduleWithStringExports, path: [] }, callback)
+      expect(callback).toHaveBeenCalledTimes(2)
+      expect(callback).toHaveBeenCalledWith({ contract: pong, path: ['getUser'] })
+      expect(callback).toHaveBeenCalledWith({ contract: pong, path: ['listUsers'] })
+    })
+  })
+
+  describe('unlazyRouter', () => {
+    it('resolves procedures and preserves primitive exports', async () => {
+      const result = await unlazyRouter(moduleWithPrimitives)
+      expect(result.getUser).toEqual(pong)
+      expect(result.listUsers).toEqual(pong)
+      expect(result.API_VERSION).toBe('v2')
+      expect(result.MAX_PAGE_SIZE).toBe(100)
+    })
+  })
+})
