@@ -1,3 +1,4 @@
+import type { AnyContractProcedure } from './procedure'
 import { inputSchema, outputSchema, ping, pong, router } from '../tests/shared'
 import { oc } from './builder'
 import { isContractProcedure } from './procedure'
@@ -97,7 +98,13 @@ describe('contract modules that export primitives alongside procedures', () => {
     const options = { errorMap: {}, prefix: '/api', tags: ['api'] } as const
 
     it('enhances procedures and passes through primitive exports', () => {
-      const enhanced = enhanceContractRouter(moduleWithPrimitives, options)
+      const enhanced = enhanceContractRouter(moduleWithPrimitives, options) as {
+        getUser: AnyContractProcedure
+        listUsers: AnyContractProcedure
+        API_VERSION: string
+        MAX_PAGE_SIZE: number
+        ENABLE_CACHE: boolean
+      }
       expect(isContractProcedure(enhanced.getUser)).toBe(true)
       expect(isContractProcedure(enhanced.listUsers)).toBe(true)
       expect(enhanced.API_VERSION).toBe('v2')
@@ -137,7 +144,13 @@ describe('contract modules that export primitives alongside procedures', () => {
         MAX_PAGE_SIZE: 100,
         ENABLE_CACHE: true,
       } as any
-      const populated = populateContractRouterPaths(moduleForPaths)
+      const populated = populateContractRouterPaths(moduleForPaths) as {
+        getUser: AnyContractProcedure
+        listUsers: AnyContractProcedure
+        API_VERSION: string
+        MAX_PAGE_SIZE: number
+        ENABLE_CACHE: boolean
+      }
       expect(isContractProcedure(populated.getUser)).toBe(true)
       expect(populated.getUser['~orpc'].route.path).toBe('/getUser')
       expect(isContractProcedure(populated.listUsers)).toBe(true)
@@ -149,6 +162,22 @@ describe('contract modules that export primitives alongside procedures', () => {
     it('handles single-character string exports without stack overflow', () => {
       const moduleWithFlag = { getUser: oc.input(inputSchema), v: 'v' } as any
       expect(() => populateContractRouterPaths(moduleWithFlag)).not.toThrow()
+    })
+  })
+
+  describe('getContractRouter', () => {
+    it('returns undefined when path traverses past a primitive export', () => {
+      expect(getContractRouter(moduleWithPrimitives, ['API_VERSION', 'length'])).toBeUndefined()
+      expect(getContractRouter(moduleWithPrimitives, ['MAX_PAGE_SIZE', 'toFixed'])).toBeUndefined()
+      expect(getContractRouter(moduleWithPrimitives, ['ENABLE_CACHE', 'valueOf'])).toBeUndefined()
+    })
+
+    it('returns undefined for single-character string exports instead of indexed characters', () => {
+      // Without the typeof guard, getContractRouter(['v', '0']) returns 'v'
+      // because 'v'[0] === 'v', walking character indices instead of bailing out.
+      const moduleWithFlag = { getUser: ping, v: 'v' } as any
+      expect(getContractRouter(moduleWithFlag, ['v', '0'])).toBeUndefined()
+      expect(getContractRouter(moduleWithFlag, ['v', '0', '0', '0'])).toBeUndefined()
     })
   })
 })

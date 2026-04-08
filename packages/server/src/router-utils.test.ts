@@ -1,3 +1,4 @@
+import type { AnyProcedure } from './procedure'
 import { enhanceRoute } from '@orpc/contract'
 import { contract, ping, pingMiddleware, pong, router } from '../tests/shared'
 import { getLazyMeta, isLazy, unlazy } from './lazy'
@@ -250,7 +251,13 @@ describe('router modules that export primitives alongside procedures', () => {
 
   describe('enhanceRouter', () => {
     it('enhances procedures and passes through primitive exports', () => {
-      const enhanced = enhanceRouter(moduleWithPrimitives, defaultOptions)
+      const enhanced = enhanceRouter(moduleWithPrimitives, defaultOptions) as {
+        getUser: AnyProcedure
+        listUsers: AnyProcedure
+        API_VERSION: string
+        MAX_PAGE_SIZE: number
+        ENABLE_CACHE: boolean
+      }
       expect(enhanced.getUser['~orpc']).toBeDefined()
       expect(enhanced.listUsers['~orpc']).toBeDefined()
       expect(enhanced.API_VERSION).toBe('v2')
@@ -263,6 +270,22 @@ describe('router modules that export primitives alongside procedures', () => {
       // and 'v'[0] === 'v' creates an infinite loop
       const moduleWithFlag = { getUser: pong, v: 'v' } as any
       expect(() => enhanceRouter(moduleWithFlag, defaultOptions)).not.toThrow()
+    })
+  })
+
+  describe('getRouter', () => {
+    it('returns undefined when path traverses past a primitive export', () => {
+      expect(getRouter(moduleWithPrimitives, ['API_VERSION', 'length'])).toBeUndefined()
+      expect(getRouter(moduleWithPrimitives, ['MAX_PAGE_SIZE', 'toFixed'])).toBeUndefined()
+      expect(getRouter(moduleWithPrimitives, ['ENABLE_CACHE', 'valueOf'])).toBeUndefined()
+    })
+
+    it('returns undefined for single-character string exports instead of indexed characters', () => {
+      // Without the typeof guard, getRouter(['v', '0']) returns 'v' because
+      // 'v'[0] === 'v', walking character indices instead of bailing out.
+      const moduleWithFlag = { getUser: pong, v: 'v' } as any
+      expect(getRouter(moduleWithFlag, ['v', '0'])).toBeUndefined()
+      expect(getRouter(moduleWithFlag, ['v', '0', '0', '0'])).toBeUndefined()
     })
   })
 

@@ -27,6 +27,10 @@ export function getRouter<T extends Lazyable<AnyRouter | undefined>>(
       return undefined as any
     }
 
+    if (typeof current !== 'object') {
+      return undefined as any
+    }
+
     if (!isLazy(current)) {
       current = current[segment]
 

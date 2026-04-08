@@ -22,6 +22,10 @@ export function getContractRouter(router: AnyContractRouter, path: readonly stri
       return undefined
     }
 
+    if (typeof current !== 'object') {
+      return undefined
+    }
+
     current = current[segment]
   }
 
