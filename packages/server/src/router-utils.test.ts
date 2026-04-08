@@ -290,18 +290,11 @@ describe('router modules that export primitives alongside procedures', () => {
   })
 
   describe('traverseContractProcedures', () => {
-    it('traverses procedures and skips primitive exports', () => {
-      // null/undefined are excluded here because getHiddenRouterContract
-      // is called before the type guard and does not handle null
-      const moduleWithStringExports = {
-        getUser: pong,
-        listUsers: pong,
-        API_VERSION: 'v2',
-        MAX_PAGE_SIZE: 100,
-        ENABLE_CACHE: true,
-      } as any
+    it('traverses procedures and skips primitive, null, and undefined exports', () => {
       const callback = vi.fn()
-      traverseContractProcedures({ router: moduleWithStringExports, path: [] }, callback)
+      expect(() =>
+        traverseContractProcedures({ router: moduleWithPrimitives, path: [] }, callback),
+      ).not.toThrow()
       expect(callback).toHaveBeenCalledTimes(2)
       expect(callback).toHaveBeenCalledWith({ contract: pong, path: ['getUser'] })
       expect(callback).toHaveBeenCalledWith({ contract: pong, path: ['listUsers'] })

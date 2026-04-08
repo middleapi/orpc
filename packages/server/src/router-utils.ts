@@ -192,6 +192,13 @@ export function traverseContractProcedures(
   callback: (options: TraverseContractProcedureCallbackOptions) => void,
   lazyOptions: LazyTraverseContractProceduresOptions[] = [],
 ): LazyTraverseContractProceduresOptions[] {
+  // Guard before reading the hidden-contract symbol so that null/undefined
+  // child exports don't crash in `getHiddenRouterContract`. Primitives like
+  // strings autobox safely; only null/undefined throw on symbol access.
+  if (typeof options.router !== 'object' || options.router === null) {
+    return lazyOptions
+  }
+
   let currentRouter: AnyContractRouter | Lazyable<AnyRouter> = options.router
 
   const hiddenContract = getHiddenRouterContract(options.router)
