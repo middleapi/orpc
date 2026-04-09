@@ -69,6 +69,6 @@
   },
   "devDependencies": {
     "@upstash/redis": "^1.37.0",
-    "ioredis": "^5.10.0"
+    "ioredis": "^5.10.1"
   }
 }
