@@ -98,7 +98,7 @@ describe('contract modules that export primitives alongside procedures', () => {
     const options = { errorMap: {}, prefix: '/api', tags: ['api'] } as const
 
     it('enhances procedures and passes through primitive exports', () => {
-      const enhanced = enhanceContractRouter(moduleWithPrimitives, options) as {
+      const enhanced = enhanceContractRouter(moduleWithPrimitives, options) as unknown as {
         getUser: AnyContractProcedure
         listUsers: AnyContractProcedure
         API_VERSION: string
@@ -144,7 +144,7 @@ describe('contract modules that export primitives alongside procedures', () => {
         MAX_PAGE_SIZE: 100,
         ENABLE_CACHE: true,
       } as any
-      const populated = populateContractRouterPaths(moduleForPaths) as {
+      const populated = populateContractRouterPaths(moduleForPaths) as unknown as {
         getUser: AnyContractProcedure
         listUsers: AnyContractProcedure
         API_VERSION: string

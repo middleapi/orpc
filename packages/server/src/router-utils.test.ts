@@ -251,7 +251,7 @@ describe('router modules that export primitives alongside procedures', () => {
 
   describe('enhanceRouter', () => {
     it('enhances procedures and passes through primitive exports', () => {
-      const enhanced = enhanceRouter(moduleWithPrimitives, defaultOptions) as {
+      const enhanced = enhanceRouter(moduleWithPrimitives, defaultOptions) as unknown as {
         getUser: AnyProcedure
         listUsers: AnyProcedure
         API_VERSION: string
