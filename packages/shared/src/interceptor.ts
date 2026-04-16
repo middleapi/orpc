@@ -16,7 +16,7 @@ export type Interceptor<
 > = (options: InterceptorOptions<TOptions, TResult>) => TResult
 
 /**
- * Can used for interceptors or middlewares
+ * Can be used for interceptors or middlewares
  */
 export function onStart<T, TOptions extends { next(): any }, TRest extends any[]>(
   callback: NoInfer<(options: TOptions, ...rest: TRest) => Promisable<void>>,
@@ -28,7 +28,7 @@ export function onStart<T, TOptions extends { next(): any }, TRest extends any[]
 }
 
 /**
- * Can used for interceptors or middlewares
+ * Can be used for interceptors or middlewares
  */
 export function onSuccess<T, TOptions extends { next(): any }, TRest extends any[]>(
   callback: NoInfer<(result: Awaited<ReturnType<TOptions['next']>>, options: TOptions, ...rest: TRest) => Promisable<void>>,
@@ -41,7 +41,7 @@ export function onSuccess<T, TOptions extends { next(): any }, TRest extends any
 }
 
 /**
- * Can used for interceptors or middlewares
+ * Can be used for interceptors or middlewares
  */
 export function onError<T, TOptions extends { next(): any }, TRest extends any[]>(
   callback: NoInfer<(
@@ -66,7 +66,7 @@ export type OnFinishState<TResult, TError>
     | [error: null, data: TResult, isSuccess: true]
 
 /**
- * Can used for interceptors or middlewares
+ * Can be used for interceptors or middlewares
  */
 export function onFinish<T, TOptions extends { next(): any }, TRest extends any[]>(
   callback: NoInfer<(
