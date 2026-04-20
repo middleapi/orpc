@@ -279,6 +279,8 @@ describe('toFetchBody', () => {
 
   it('readable stream', async () => {
     const headers = new Headers(baseHeaders)
+    headers.set('content-type', 'application/zip')
+    headers.set('content-disposition', 'attachment; filename="archive.zip"')
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(new TextEncoder().encode('hello'))
@@ -290,6 +292,8 @@ describe('toFetchBody', () => {
 
     expect(body).toBe(stream)
     expect([...headers]).toEqual([
+      ['content-disposition', 'attachment; filename="archive.zip"'],
+      ['content-type', 'application/zip'],
       ['x-custom-header', 'custom-value'],
     ])
 

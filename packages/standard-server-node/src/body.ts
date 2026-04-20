@@ -62,6 +62,10 @@ export function toNodeHttpBody(
   headers: StandardHeaders,
   options: ToNodeHttpBodyOptions = {},
 ): Readable | undefined | string {
+  if (body instanceof ReadableStream) {
+    return Readable.fromWeb(body)
+  }
+
   const currentContentDisposition = flattenHeader(headers['content-disposition'])
 
   delete headers['content-type']
@@ -90,10 +94,6 @@ export function toNodeHttpBody(
     headers['content-type'] = 'application/x-www-form-urlencoded'
 
     return body.toString()
-  }
-
-  if (body instanceof ReadableStream) {
-    return Readable.fromWeb(body)
   }
 
   if (isAsyncIteratorObject(body)) {

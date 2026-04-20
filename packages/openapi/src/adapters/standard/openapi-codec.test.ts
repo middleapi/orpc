@@ -182,6 +182,26 @@ describe('standardOpenAPICodec', () => {
       expect(serializer.serialize).toHaveBeenCalledWith('__output__')
     })
 
+    it('with ReadableStream bypasses serialization and respects successStatus', () => {
+      const procedure = new Procedure({
+        ...ping['~orpc'],
+        route: {
+          successStatus: 202,
+        },
+      })
+      const stream = new ReadableStream<Uint8Array>()
+
+      const response = codec.encode(stream, procedure)
+
+      expect(response).toEqual({
+        status: 202,
+        headers: {},
+        body: stream,
+      })
+
+      expect(serializer.serialize).not.toHaveBeenCalled()
+    })
+
     describe('with detailed structure', async () => {
       const procedure = new Procedure({
         ...ping['~orpc'],
@@ -249,6 +269,24 @@ describe('standardOpenAPICodec', () => {
 
         expect(serializer.serialize).toHaveBeenCalledTimes(1)
         expect(serializer.serialize).toHaveBeenCalledWith('__output__')
+      })
+
+      it('works with ReadableStream body', () => {
+        const stream = new ReadableStream<Uint8Array>()
+        const output = {
+          body: stream,
+          headers: { 'content-type': 'application/zip' },
+        }
+
+        const response = codec.encode(output, procedure)
+
+        expect(response).toEqual({
+          status: 298,
+          headers: { 'content-type': 'application/zip' },
+          body: stream,
+        })
+
+        expect(serializer.serialize).not.toHaveBeenCalled()
       })
 
       it.each([
