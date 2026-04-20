@@ -1,7 +1,7 @@
 import type { StandardHeaders, StandardLazyResponse } from './types'
 import { isAsyncIteratorObject, once, replicateAsyncIterator, toArray, tryDecodeURIComponent } from '@orpc/shared'
 
-export function generateContentDisposition(filename: string): string {
+export function generateContentDisposition(filename: string, disposition: 'inline' | 'attachment' = 'inline'): string {
   const encodedFileName = filename.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '\\"')
 
   // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent#encoding_for_content-disposition_and_link_headers
@@ -9,7 +9,7 @@ export function generateContentDisposition(filename: string): string {
     .replace(/['()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
     .replace(/%(7C|60|5E)/g, (str, hex) => String.fromCharCode(Number.parseInt(hex, 16)))
 
-  return `inline; filename="${encodedFileName}"; filename*=utf-8\'\'${encodedFilenameStar}`
+  return `${disposition}; filename="${encodedFileName}"; filename*=utf-8\'\'${encodedFilenameStar}`
 }
 
 export function getFilenameFromContentDisposition(contentDisposition: string): string | undefined {

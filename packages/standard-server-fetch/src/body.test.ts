@@ -277,6 +277,26 @@ describe('toFetchBody', () => {
     expect(generateContentDispositionSpy).toHaveBeenCalledTimes(0)
   })
 
+  it('readable stream', async () => {
+    const headers = new Headers(baseHeaders)
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('hello'))
+        controller.close()
+      },
+    })
+
+    const body = toFetchBody(stream, headers, {})
+
+    expect(body).toBe(stream)
+    expect([...headers]).toEqual([
+      ['x-custom-header', 'custom-value'],
+    ])
+
+    const text = await new Response(body).text()
+    expect(text).toBe('hello')
+  })
+
   it('async generator', async () => {
     async function* gen() {
       yield 123

@@ -405,6 +405,26 @@ describe('toNodeHttpBody', () => {
     expect(await resBlob.text()).toBe('foo')
   })
 
+  it('readable stream', async () => {
+    const headers = { ...baseHeaders }
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('hello'))
+        controller.close()
+      },
+    })
+
+    const body = toNodeHttpBody(stream, headers, {})
+
+    expect(body).toBeInstanceOf(Readable)
+    expect(headers).toEqual({
+      'x-custom-header': 'custom-value',
+    })
+
+    const text = await new Response(body).text()
+    expect(text).toBe('hello')
+  })
+
   it('async generator', async () => {
     async function* gen() {
       yield 123

@@ -92,6 +92,10 @@ export function toNodeHttpBody(
     return body.toString()
   }
 
+  if (body instanceof ReadableStream) {
+    return Readable.fromWeb(body)
+  }
+
   if (isAsyncIteratorObject(body)) {
     headers['content-type'] = 'text/event-stream'
 

@@ -95,6 +95,10 @@ export function toFetchBody(
     return body
   }
 
+  if (body instanceof ReadableStream) {
+    return body
+  }
+
   if (isAsyncIteratorObject(body)) {
     headers.set('content-type', 'text/event-stream')
 
