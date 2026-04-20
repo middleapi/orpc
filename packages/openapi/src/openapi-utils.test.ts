@@ -69,6 +69,19 @@ describe('toOpenAPIContent', () => {
     })
   })
 
+  it('omits application/json when all non-file branches resolve to false (not: {})', () => {
+    expect(toOpenAPIContent({
+      anyOf: [
+        fileSchema,
+        false,
+      ],
+    })).toEqual({
+      'image/png': {
+        schema: fileSchema,
+      },
+    })
+  })
+
   it('body contain file schema', () => {
     const schema: JSONSchema = {
       type: 'object',
