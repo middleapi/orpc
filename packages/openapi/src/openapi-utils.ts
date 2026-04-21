@@ -33,7 +33,10 @@ export function toOpenAPIContent(schema: JSONSchema): Record<string, OpenAPI.Med
     }
   }
 
-  if (restSchema !== undefined && !isAnySchema(restSchema)) {
+  const isUnsupportedRest = restSchema === false
+    || (isObject(restSchema) && 'not' in restSchema && isObject(restSchema.not) && Object.keys(restSchema.not).length === 0)
+
+  if (restSchema !== undefined && !isAnySchema(restSchema) && !(matches.length > 0 && isUnsupportedRest)) {
     content['application/json'] = {
       schema: toOpenAPISchema(restSchema),
     }
