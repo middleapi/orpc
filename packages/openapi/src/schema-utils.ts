@@ -24,6 +24,10 @@ export function isAnySchema(schema: JSONSchema): boolean {
     return true
   }
 
+  if (isObject(schema) && 'not' in schema && isObject(schema.not) && Object.keys(schema.not).length === 0) {
+    return true
+  }
+
   if (
     Object
       .keys(schema)

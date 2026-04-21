@@ -84,6 +84,19 @@ describe('toOpenAPIContent', () => {
     expect(toOpenAPIContent({ properties: undefined })).toEqual({})
   })
 
+  it('omits application/json when non-file remainder is not: {} (e.g. z.instanceof)', () => {
+    expect(toOpenAPIContent({
+      anyOf: [
+        fileSchema,
+        { not: {} },
+      ],
+    })).toEqual({
+      'image/png': {
+        schema: fileSchema,
+      },
+    })
+  })
+
   it('body contain file schema', () => {
     const schema: JSONSchema = {
       type: 'object',

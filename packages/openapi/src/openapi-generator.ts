@@ -349,9 +349,15 @@ export class OpenAPIGenerator {
         ref.parameters.push(...toOpenAPIParameters(schema, 'query'))
       }
       else {
-        ref.requestBody = {
-          required,
-          content: toOpenAPIContent(schema),
+        const isEmptyObject = isObjectSchema(schema)
+          && !schema.properties
+          && !schema.required
+
+        if (!isEmptyObject) {
+          ref.requestBody = {
+            required,
+            content: toOpenAPIContent(schema),
+          }
         }
       }
 
