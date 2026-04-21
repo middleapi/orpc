@@ -74,17 +74,17 @@ export class StandardOpenAPICodec implements StandardCodec {
   encode(output: unknown, procedure: AnyProcedure): StandardResponse {
     const successStatus = fallbackContractConfig('defaultSuccessStatus', procedure['~orpc'].route.successStatus)
 
-    if (output instanceof ReadableStream) {
-      return {
-        status: successStatus,
-        headers: {},
-        body: output,
-      }
-    }
-
     const outputStructure = fallbackContractConfig('defaultOutputStructure', procedure['~orpc'].route.outputStructure)
 
     if (outputStructure === 'compact') {
+      if (output instanceof ReadableStream) {
+        return {
+          status: successStatus,
+          headers: {},
+          body: output,
+        }
+      }
+
       return {
         status: successStatus,
         headers: {},
