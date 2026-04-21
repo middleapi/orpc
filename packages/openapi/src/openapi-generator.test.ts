@@ -1428,7 +1428,6 @@ describe('openAPIGenerator', () => {
                   properties: {
                     parent: { $ref: '#/components/schemas/User' },
                   },
-                  required: [],
                 },
               },
             },
@@ -1707,7 +1706,6 @@ describe('openAPIGenerator', () => {
                 a: { type: 'string' },
                 b: { type: 'number' },
               },
-              required: [],
             },
           },
         },
