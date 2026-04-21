@@ -69,17 +69,19 @@ describe('toOpenAPIContent', () => {
     })
   })
 
-  it('omits application/json when all non-file branches resolve to false (not: {})', () => {
+  it('omits unconstrained non-file branches', () => {
     expect(toOpenAPIContent({
       anyOf: [
         fileSchema,
-        false,
+        {},
       ],
     })).toEqual({
       'image/png': {
         schema: fileSchema,
       },
     })
+
+    expect(toOpenAPIContent({ properties: undefined })).toEqual({})
   })
 
   it('body contain file schema', () => {

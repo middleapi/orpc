@@ -36,6 +36,7 @@ it('isAnySchema', () => {
   expect(isAnySchema({})).toBe(true)
   expect(isAnySchema({ type: 'string' })).toBe(false)
   expect(isAnySchema({ description: 'description' })).toBe(true)
+  expect(isAnySchema({ properties: undefined, required: undefined })).toBe(true)
 })
 
 describe('separateObjectSchema', () => {
@@ -121,7 +122,6 @@ describe('separateObjectSchema', () => {
       properties: {
         b: { type: 'string' },
       },
-      required: [],
       additionalProperties: true,
     })
   })
@@ -152,11 +152,28 @@ describe('separateObjectSchema', () => {
 
     const [matched, rest] = separateObjectSchema(schema, ['a'])
 
-    expect(matched).toEqual({
-      ...schema,
-      properties: {},
-    })
+    expect(matched).toEqual(schema)
     expect(rest).toEqual(schema)
+  })
+
+  it('with empty properties & required', () => {
+    const schema: ObjectSchema = {
+      type: 'object',
+      description: 'description',
+      properties: {},
+      required: [],
+    }
+
+    const [matched, rest] = separateObjectSchema(schema, ['a'])
+
+    expect(matched).toEqual({
+      type: 'object',
+      description: 'description',
+    })
+    expect(rest).toEqual({
+      type: 'object',
+      description: 'description',
+    })
   })
 })
 

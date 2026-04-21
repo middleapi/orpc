@@ -24,7 +24,12 @@ export function isAnySchema(schema: JSONSchema): boolean {
     return true
   }
 
-  if (Object.keys(schema).every(k => !LOGIC_KEYWORDS.includes(k))) {
+  if (
+    Object
+      .keys(schema)
+      .filter(v => schema[v as keyof typeof schema] !== undefined)
+      .every(k => !LOGIC_KEYWORDS.includes(k))
+  ) {
     return true
   }
 
@@ -57,7 +62,15 @@ export function separateObjectSchema(schema: ObjectSchema, separatedProperties: 
       return acc
     }, {})
 
+  if (Object.keys(matched.properties).length === 0) {
+    matched.properties = undefined
+  }
+
   matched.required = schema.required?.filter(key => separatedProperties.includes(key))
+
+  if (matched.required?.length === 0) {
+    matched.required = undefined
+  }
 
   matched.examples = schema.examples?.map((example) => {
     if (!isObject(example)) {
@@ -75,12 +88,16 @@ export function separateObjectSchema(schema: ObjectSchema, separatedProperties: 
 
   rest.properties = schema.properties && Object.entries(schema.properties)
     .filter(([key]) => !separatedProperties.includes(key))
-    .reduce((acc, [key, value]) => {
+    .reduce((acc: Record<string, JSONSchema> = {}, [key, value]) => {
       acc[key] = value
       return acc
-    }, {} as Record<string, JSONSchema>)
+    }, undefined)
 
   rest.required = schema.required?.filter(key => !separatedProperties.includes(key))
+
+  if (rest.required?.length === 0) {
+    rest.required = undefined
+  }
 
   rest.examples = schema.examples?.map((example) => {
     if (!isObject(example)) {
