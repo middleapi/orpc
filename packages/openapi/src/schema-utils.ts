@@ -36,6 +36,27 @@ export function isAnySchema(schema: JSONSchema): boolean {
   return false
 }
 
+export function isNeverSchema(schema: JSONSchema): boolean {
+  // Boolean `false` is the shorthand never-schema
+  if (schema === false) {
+    return true
+  }
+
+  if (typeof schema === 'object' && schema.not !== undefined) {
+    // `{ not: true }` — negation of the boolean catch-all
+    if (schema.not === true) {
+      return true
+    }
+
+    // `{ not: {} }` — negation of the empty object, which accepts everything
+    if (typeof schema.not === 'object' && Object.keys(schema.not).length === 0) {
+      return true
+    }
+  }
+
+  return false
+}
+
 /**
  * @internal
  */

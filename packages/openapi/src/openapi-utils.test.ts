@@ -84,7 +84,7 @@ describe('toOpenAPIContent', () => {
     expect(toOpenAPIContent({ properties: undefined })).toEqual({})
   })
 
-  it('omits application/json when non-file remainder is not: {} (e.g. z.instanceof)', () => {
+  it('omits never non-file branches', () => {
     expect(toOpenAPIContent({
       anyOf: [
         fileSchema,
