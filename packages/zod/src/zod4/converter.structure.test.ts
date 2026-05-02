@@ -43,17 +43,17 @@ testSchemaConverter([
   {
     name: 'tuple([z.enum(["a", "b"])])',
     schema: z.tuple([z.enum(['a', 'b'])]),
-    input: [true, { type: 'array', prefixItems: [{ enum: ['a', 'b'] }] }],
+    input: [true, { type: 'array', prefixItems: [{ type: 'string', enum: ['a', 'b'] }] }],
   },
   {
     name: 'tuple([z.enum(["a", "b"])], z.string())',
     schema: z.tuple([z.enum(['a', 'b'])], z.string()),
-    input: [true, { type: 'array', prefixItems: [{ enum: ['a', 'b'] }], items: { type: 'string' } }],
+    input: [true, { type: 'array', prefixItems: [{ type: 'string', enum: ['a', 'b'] }], items: { type: 'string' } }],
   },
   {
     name: 'zm.tuple([zm.enum(["a", "b"])], zm.string()).check(zm.minLength(4), zm.maxLength(10))',
     schema: zm.tuple([zm.enum(['a', 'b'])], zm.string()).check(zm.minLength(4), zm.maxLength(10)),
-    input: [true, { type: 'array', prefixItems: [{ enum: ['a', 'b'] }], items: { type: 'string' }, minItems: 4, maxItems: 10 }],
+    input: [true, { type: 'array', prefixItems: [{ type: 'string', enum: ['a', 'b'] }], items: { type: 'string' }, minItems: 4, maxItems: 10 }],
   },
   {
     name: 'set(z.string())',

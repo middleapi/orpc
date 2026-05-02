@@ -1,5 +1,5 @@
 /* eslint-disable prefer-regex-literals */
-import { experimental_JsonSchemaCoercer as JsonSchemaCoercer } from './coercer'
+import { JsonSchemaCoercer } from './coercer'
 
 describe('jsonSchemaCoercer', () => {
   const coercer = new JsonSchemaCoercer()

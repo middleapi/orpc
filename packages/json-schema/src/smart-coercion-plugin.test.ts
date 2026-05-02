@@ -1,6 +1,6 @@
 import * as z from 'zod'
 import { ZodToJsonSchemaConverter } from '../../zod/src/zod4'
-import { experimental_SmartCoercionPlugin as SmartCoercionPlugin } from './smart-coercion-plugin'
+import { SmartCoercionPlugin } from './smart-coercion-plugin'
 
 describe('smartCoercionPlugin', () => {
   it('should coerce input based on schema', async () => {

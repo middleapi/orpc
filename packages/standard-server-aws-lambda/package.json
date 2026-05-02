@@ -1,12 +1,12 @@
 {
   "name": "@orpc/standard-server-aws-lambda",
   "type": "module",
-  "version": "1.12.3",
+  "version": "1.14.0",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/unnoq/orpc.git",
+    "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/standard-server-aws-lambda"
   },
   "keywords": [
@@ -39,7 +39,7 @@
     "@orpc/standard-server-node": "workspace:*"
   },
   "devDependencies": {
-    "@types/aws-lambda": "^8.10.159",
-    "@types/node": "^22.15.30"
+    "@types/aws-lambda": "^8.10.161",
+    "@types/node": "^22.19.3"
   }
 }

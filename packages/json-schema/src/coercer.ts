@@ -4,17 +4,17 @@ import { JsonSchemaXNativeType } from './types'
 
 const FLEXIBLE_DATE_FORMAT_REGEX = /^[^-]+-[^-]+-[^-]+$/
 
-export interface experimental_JsonSchemaCoerceOptions {
+export interface JsonSchemaCoerceOptions {
   components?: Record<string, JsonSchema>
 }
 
-export class experimental_JsonSchemaCoercer {
-  coerce(schema: JsonSchema, value: unknown, options: experimental_JsonSchemaCoerceOptions = {}): unknown {
+export class JsonSchemaCoercer {
+  coerce(schema: JsonSchema, value: unknown, options: JsonSchemaCoerceOptions = {}): unknown {
     const [, coerced] = this.#coerce(schema, value, options)
     return coerced
   }
 
-  #coerce(schema: JsonSchema, originalValue: unknown, options: experimental_JsonSchemaCoerceOptions): [satisfied: boolean, coerced: unknown] {
+  #coerce(schema: JsonSchema, originalValue: unknown, options: JsonSchemaCoerceOptions): [satisfied: boolean, coerced: unknown] {
     if (typeof schema === 'boolean') {
       return [schema, originalValue]
     }

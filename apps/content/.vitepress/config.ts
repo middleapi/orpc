@@ -49,23 +49,19 @@ export default withMermaid(defineConfig({
         },
       },
     },
-    carbonAds: {
-      code: 'CW7IE53J',
-      placement: 'orpcunnoqcom',
-    },
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/unnoq/orpc' },
+      { icon: 'github', link: 'https://github.com/middleapi/orpc' },
       { icon: 'discord', link: 'https://discord.gg/TXEbwRBvQn' },
-      { icon: 'x', link: 'https://x.com/unnoqcom' },
-      { icon: 'bluesky', link: 'https://bsky.app/profile/unnoq.com' },
+      { icon: 'x', link: 'https://x.com/middleapi' },
+      { icon: 'bluesky', link: 'https://bsky.app/profile/middleapi.com' },
     ],
     editLink: {
-      pattern: 'https://github.com/unnoq/orpc/blob/main/apps/content/:path',
+      pattern: 'https://github.com/middleapi/orpc/blob/main/apps/content/:path',
       text: 'Edit on GitHub',
     },
     footer: {
       message: 'Released under the MIT License.',
-      copyright: 'Copyright © 2024-present Unnoq & oRPC contributors.',
+      copyright: 'Copyright © 2024-present MiddleAPI & oRPC contributors.',
     },
     nav: [
       { text: 'Docs', link: '/docs/getting-started', activeMatch: '/docs/(?!openapi/)' },
@@ -75,9 +71,9 @@ export default withMermaid(defineConfig({
       {
         text: 'More',
         items: [
-          { text: 'Discussions', link: 'https://github.com/unnoq/orpc/discussions' },
-          { text: 'Sponsor', link: 'https://github.com/sponsors/unnoq' },
-          { text: 'Releases', link: 'https://github.com/unnoq/orpc/releases' },
+          { text: 'Discussions', link: 'https://github.com/middleapi/orpc/discussions' },
+          { text: 'Sponsor', link: 'https://github.com/sponsors/dinwwwh' },
+          { text: 'Releases', link: 'https://github.com/middleapi/orpc/releases' },
           { text: 'LLM Context', link: '/llms.txt' },
           { text: 'LLM Context (Full)', link: '/llms-full.txt' },
         ],
@@ -107,6 +103,7 @@ export default withMermaid(defineConfig({
             { text: 'Define Contract', link: '/docs/contract-first/define-contract' },
             { text: 'Implement Contract', link: '/docs/contract-first/implement-contract' },
             { text: 'Router to Contract', link: '/docs/contract-first/router-to-contract' },
+            { text: 'OpenAPI to Contract', link: '/docs/openapi/openapi-to-contract' },
           ],
         },
         {
@@ -150,6 +147,7 @@ export default withMermaid(defineConfig({
             { text: 'Batch Requests', link: '/docs/plugins/batch-requests' },
             { text: 'Client Retry', link: '/docs/plugins/client-retry' },
             { text: 'Retry After', link: '/docs/plugins/retry-after' },
+            { text: 'Rethrow Handler', link: '/docs/plugins/rethrow-handler' },
             { text: 'Compression', link: '/docs/plugins/compression' },
             { text: 'Body Limit', link: '/docs/plugins/body-limit' },
             { text: 'Simple CSRF Protection', link: '/docs/plugins/simple-csrf-protection' },
@@ -189,7 +187,7 @@ export default withMermaid(defineConfig({
             { text: 'AI SDK', link: '/docs/integrations/ai-sdk' },
             { text: 'Better Auth', link: '/docs/integrations/better-auth' },
             { text: 'Durable Iterator', link: '/docs/integrations/durable-iterator' },
-            { text: 'Hey API', link: '/docs/integrations/hey-api' },
+            { text: 'Hey API', link: '/docs/openapi/integrations/hey-api' },
             { text: 'OpenTelemetry', link: '/docs/integrations/opentelemetry' },
             { text: 'Pinia Colada', link: '/docs/integrations/pinia-colada' },
             { text: 'Pino', link: '/docs/integrations/pino' },
@@ -260,6 +258,7 @@ export default withMermaid(defineConfig({
         { text: 'OpenAPI Handler', link: '/docs/openapi/openapi-handler' },
         { text: 'OpenAPI Specification', link: '/docs/openapi/openapi-specification' },
         { text: 'Scalar (Swagger)', link: '/docs/openapi/scalar' },
+        { text: 'OpenAPI to Contract', link: '/docs/openapi/openapi-to-contract' },
         {
           text: 'Plugins',
           collapsed: true,
@@ -280,6 +279,7 @@ export default withMermaid(defineConfig({
           text: 'Integrations',
           collapsed: true,
           items: [
+            { text: 'Hey API', link: '/docs/openapi/integrations/hey-api' },
             { text: 'Implement Contract in NestJS', link: '/docs/openapi/integrations/implement-contract-in-nest' },
             { text: 'tRPC', link: '/docs/openapi/integrations/trpc' },
           ],

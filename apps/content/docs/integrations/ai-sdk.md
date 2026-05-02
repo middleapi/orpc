@@ -22,11 +22,11 @@ import { google } from '@ai-sdk/google'
 
 export const chat = os
   .input(type<{ chatId: string, messages: UIMessage[] }>())
-  .handler(({ input }) => {
+  .handler(async ({ input }) => {
     const result = streamText({
       model: google('gemini-1.5-flash'),
       system: 'You are a helpful assistant.',
-      messages: convertToModelMessages(input.messages),
+      messages: await convertToModelMessages(input.messages),
     })
 
     return streamToEventIterator(result.toUIMessageStream())
@@ -45,11 +45,11 @@ import { google } from '@ai-sdk/google'
 
 export const chat = os
   .input(type<{ chatId: string, messages: UIMessage[] }>())
-  .handler(({ input }) => {
+  .handler(async ({ input }) => {
     const result = streamText({
       model: google('gemini-1.5-flash'),
       system: 'You are a helpful assistant.',
-      messages: convertToModelMessages(input.messages),
+      messages: await convertToModelMessages(input.messages),
     })
 
     return streamToEventIterator(result.toUIMessageStream())
@@ -141,7 +141,7 @@ const base = oc.$meta<ORPCMeta>({})
 const getWeatherContract = base
   .meta({
     [AI_SDK_TOOL_META_SYMBOL]: {
-      name: 'custom-tool-name', // AI SDK tool name
+      title: 'Get Weather', // AI SDK tool title
     },
   })
   .route({
@@ -191,7 +191,7 @@ const base = os.$meta<ORPCMeta>({})
 const getWeatherProcedure = base
   .meta({
     [AI_SDK_TOOL_META_SYMBOL]: {
-      name: 'custom-tool-name', // AI SDK tool name
+      title: 'Get Weather', // AI SDK tool title
     },
   })
   .route({

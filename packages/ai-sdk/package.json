@@ -1,12 +1,12 @@
 {
   "name": "@orpc/ai-sdk",
   "type": "module",
-  "version": "1.12.3",
+  "version": "1.14.0",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/unnoq/orpc.git",
+    "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/ai-sdk"
   },
   "keywords": [
@@ -43,7 +43,7 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "ai": "6.0.0-beta.85",
-    "zod": "^4.1.12"
+    "ai": "^6.0.116",
+    "zod": "^4.3.6"
   }
 }

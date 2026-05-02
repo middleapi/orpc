@@ -7,6 +7,7 @@ import {
   filterSchemaBranches,
   isAnySchema,
   isFileSchema,
+  isNeverSchema,
   isObjectSchema,
   isPrimitiveSchema,
   separateObjectSchema,
@@ -36,6 +37,59 @@ it('isAnySchema', () => {
   expect(isAnySchema({})).toBe(true)
   expect(isAnySchema({ type: 'string' })).toBe(false)
   expect(isAnySchema({ description: 'description' })).toBe(true)
+  expect(isAnySchema({ properties: undefined, required: undefined })).toBe(true)
+})
+
+describe('isNeverSchema', () => {
+  describe('returns true for never schemas', () => {
+    it('returns true for boolean false', () => {
+      expect(isNeverSchema(false)).toBe(true)
+    })
+
+    it('returns true for { not: true }', () => {
+      expect(isNeverSchema({ not: true })).toBe(true)
+    })
+
+    it('returns true for { not: {} }', () => {
+      expect(isNeverSchema({ not: {} })).toBe(true)
+    })
+  })
+
+  describe('returns false for non-never schemas', () => {
+    it('returns false for boolean true', () => {
+      expect(isNeverSchema(true)).toBe(false)
+    })
+
+    it('returns false for an empty schema {}', () => {
+      expect(isNeverSchema({})).toBe(false)
+    })
+
+    it('returns false for a type constraint', () => {
+      expect(isNeverSchema({ type: 'string' })).toBe(false)
+    })
+
+    it('returns false for { not: false } (double negation = always true)', () => {
+      expect(isNeverSchema({ not: false })).toBe(false)
+    })
+
+    it('returns false for { not: { type: \'string\' } } (only rejects strings)', () => {
+      expect(isNeverSchema({ not: { type: 'string' } })).toBe(false)
+    })
+
+    it('returns false for a schema with only additionalProperties', () => {
+      expect(isNeverSchema({ additionalProperties: false })).toBe(false)
+    })
+
+    it('returns false for a complex schema', () => {
+      expect(
+        isNeverSchema({
+          type: 'object',
+          properties: { id: { type: 'number' } },
+          required: ['id'],
+        }),
+      ).toBe(false)
+    })
+  })
 })
 
 describe('separateObjectSchema', () => {
@@ -121,7 +175,6 @@ describe('separateObjectSchema', () => {
       properties: {
         b: { type: 'string' },
       },
-      required: [],
       additionalProperties: true,
     })
   })
@@ -152,11 +205,28 @@ describe('separateObjectSchema', () => {
 
     const [matched, rest] = separateObjectSchema(schema, ['a'])
 
-    expect(matched).toEqual({
-      ...schema,
-      properties: {},
-    })
+    expect(matched).toEqual(schema)
     expect(rest).toEqual(schema)
+  })
+
+  it('with empty properties & required', () => {
+    const schema: ObjectSchema = {
+      type: 'object',
+      description: 'description',
+      properties: {},
+      required: [],
+    }
+
+    const [matched, rest] = separateObjectSchema(schema, ['a'])
+
+    expect(matched).toEqual({
+      type: 'object',
+      description: 'description',
+    })
+    expect(rest).toEqual({
+      type: 'object',
+      description: 'description',
+    })
   })
 })
 

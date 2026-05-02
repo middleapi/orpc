@@ -1,16 +1,15 @@
 {
   "name": "@orpc/experimental-durable-iterator",
   "type": "module",
-  "version": "1.12.3",
+  "version": "1.14.0",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/unnoq/orpc.git",
+    "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/durable-iterator"
   },
   "keywords": [
-    "unnoq",
     "orpc"
   ],
   "publishConfig": {
@@ -51,12 +50,12 @@
     "@orpc/contract": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "partysocket": "^1.1.6",
+    "partysocket": "^1.1.16",
     "valibot": "^1.2.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20251202.0",
+    "@cloudflare/workers-types": "^4.20260313.1",
     "@orpc/standard-server-peer": "workspace:*",
-    "@types/node": "^22.15.30"
+    "@types/node": "^22.19.3"
   }
 }

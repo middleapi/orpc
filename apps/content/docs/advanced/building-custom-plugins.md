@@ -65,7 +65,7 @@ Handler plugins extend the functionality of your server-side handlers. You can c
 
 When building a handler plugin, you'll work with interceptors from the [Handler Lifecycle](/docs/rpc-handler#lifecycle). These interceptors let you hook into different stages of request processing - from initial request parsing to final response formatting.
 
-Check out the [built-in handler plugins](https://github.com/unnoq/orpc/tree/main/packages/server/src/plugins) to see real-world examples of how different plugins solve common server-side challenges.
+Check out the [built-in handler plugins](https://github.com/middleapi/orpc/tree/main/packages/server/src/plugins) to see real-world examples of how different plugins solve common server-side challenges.
 
 ### Link Plugins
 
@@ -73,13 +73,13 @@ Link plugins enhance your client-side communication. They work with [RPCLink](/d
 
 Link plugins use interceptors from the [Link Lifecycle](/docs/client/rpc-link#lifecycle) to modify requests before they're sent or responses after they're received. This is perfect for adding authentication, logging, retry logic, or request/response transformations.
 
-Browse the [built-in link plugins](https://github.com/unnoq/orpc/tree/main/packages/client/src/plugins) for inspiration on handling common client-side scenarios.
+Browse the [built-in link plugins](https://github.com/middleapi/orpc/tree/main/packages/client/src/plugins) for inspiration on handling common client-side scenarios.
 
 ## Communication Between Interceptors
 
 Sometimes you need interceptors to share data. For example, one interceptor might collect information that another interceptor uses later. You can achieve this by injecting context using a unique symbol.
 
-The [Strict Get Method Plugin](/docs/plugins/strict-get-method) ([Source Code](https://github.com/unnoq/orpc/blob/main/packages/server/src/plugins/strict-get-method.ts)) demonstrates this pattern. It uses `rootInterceptors` to collect HTTP methods and combines this data with procedure information in `clientInterceptors` to determine whether the method is allowed.
+The [Strict Get Method Plugin](/docs/plugins/strict-get-method) ([Source Code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/strict-get-method.ts)) demonstrates this pattern. It uses `rootInterceptors` to collect HTTP methods and combines this data with procedure information in `clientInterceptors` to determine whether the method is allowed.
 
 ## Plugin Order
 

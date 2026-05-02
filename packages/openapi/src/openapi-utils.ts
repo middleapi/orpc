@@ -3,7 +3,7 @@ import type { OpenAPI } from '@orpc/contract'
 import type { FileSchema, JSONSchema, ObjectSchema } from './schema'
 import { standardizeHTTPPath } from '@orpc/openapi-client/standard'
 import { findDeepMatches, isObject, stringifyJSON, toArray } from '@orpc/shared'
-import { expandArrayableSchema, filterSchemaBranches, isFileSchema, isObjectSchema, isPrimitiveSchema } from './schema-utils'
+import { expandArrayableSchema, filterSchemaBranches, isAnySchema, isFileSchema, isNeverSchema, isObjectSchema, isPrimitiveSchema } from './schema-utils'
 
 /**
  * @internal
@@ -33,7 +33,7 @@ export function toOpenAPIContent(schema: JSONSchema): Record<string, OpenAPI.Med
     }
   }
 
-  if (restSchema !== undefined) {
+  if (restSchema !== undefined && !isAnySchema(restSchema) && !isNeverSchema(restSchema)) {
     content['application/json'] = {
       schema: toOpenAPISchema(restSchema),
     }

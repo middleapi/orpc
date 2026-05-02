@@ -78,8 +78,6 @@ export class EventDecoder {
         this.options.onEvent(message)
       }
     }
-
-    this.incomplete = ''
   }
 
   end(): void {

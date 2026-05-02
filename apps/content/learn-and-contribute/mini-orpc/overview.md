@@ -8,7 +8,7 @@ description: A brief introduction to Mini oRPC, a simplified version of oRPC des
 Mini oRPC is a simplified implementation of oRPC that includes essential features to help you understand the core concepts. It's designed to be straightforward and easy to follow, making it an ideal starting point for learning about oRPC.
 
 ::: info
-The complete Mini oRPC implementation is available in our GitHub repository: [Mini oRPC Repository](https://github.com/unnoq/mini-orpc)
+The complete Mini oRPC implementation is available in our GitHub repository: [Mini oRPC Repository](https://github.com/middleapi/mini-orpc)
 :::
 
 ## Prerequisites

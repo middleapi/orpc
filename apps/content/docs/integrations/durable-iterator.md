@@ -79,7 +79,7 @@ export class ChatRoom extends DurableIteratorObject<{ message: string }> {
 ```
 
 ::: info
-How to use `DurableIteratorObject` without extending it: [see here](https://github.com/unnoq/orpc/tree/main/packages/durable-iterator/src/durable-object/object.ts)
+How to use `DurableIteratorObject` without extending it: [see here](https://github.com/middleapi/orpc/tree/main/packages/durable-iterator/src/durable-object/object.ts)
 :::
 
 ### Upgrade Durable Iterator Request

@@ -8,7 +8,7 @@ description: Learn how Mini oRPC's procedure builder provides an excellent devel
 The procedure builder is Mini oRPC's core component that enables you to define type-safe procedures with an intuitive, fluent API.
 
 ::: info
-The complete Mini oRPC implementation is available in our GitHub repository: [Mini oRPC Repository](https://github.com/unnoq/mini-orpc)
+The complete Mini oRPC implementation is available in our GitHub repository: [Mini oRPC Repository](https://github.com/middleapi/mini-orpc)
 :::
 
 ## Implementation

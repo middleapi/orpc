@@ -122,8 +122,8 @@ export const supportedDataTypes: { name: string, value: unknown, expected: unkno
   },
   {
     name: 'URL',
-    value: new URL('https://unnoq.com'),
-    expected: new URL('https://unnoq.com'),
+    value: new URL('https://orpc.dev'),
+    expected: new URL('https://orpc.dev'),
   },
   {
     name: 'object',

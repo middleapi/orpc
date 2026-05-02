@@ -52,4 +52,5 @@ export {
   streamToAsyncIteratorClass as streamToEventIterator,
 } from '@orpc/shared'
 export type { EventPublisherOptions, EventPublisherSubscribeIteratorOptions, Registry, ThrowableError } from '@orpc/shared'
-export { getEventMeta, withEventMeta } from '@orpc/standard-server'
+export { ErrorEvent, getEventMeta, withEventMeta } from '@orpc/standard-server'
+export type { EventMeta } from '@orpc/standard-server'

@@ -149,9 +149,19 @@ const numberCases: SchemaTestCase[] = [
   },
 ]
 
-enum ExampleEnum {
+enum ExampleEnumString {
   A = 'a',
   B = 'b',
+}
+
+enum ExampleEnumNumber {
+  A = 1,
+  B = 2,
+}
+
+enum ExampleEnumMixed {
+  A = 1,
+  B = 'a',
 }
 
 const nativeCases: SchemaTestCase[] = [
@@ -193,11 +203,19 @@ const nativeCases: SchemaTestCase[] = [
   },
   {
     schema: z.enum(['a', 'b']),
-    input: [true, { enum: ['a', 'b'] }],
+    input: [true, { type: 'string', enum: ['a', 'b'] }],
   },
   {
-    schema: z.nativeEnum(ExampleEnum),
-    input: [true, { enum: ['a', 'b'] }],
+    schema: z.nativeEnum(ExampleEnumString),
+    input: [true, { type: 'string', enum: ['a', 'b'] }],
+  },
+  {
+    schema: z.nativeEnum(ExampleEnumNumber),
+    input: [true, { type: 'number', enum: [1, 2] }],
+  },
+  {
+    schema: z.nativeEnum(ExampleEnumMixed),
+    input: [true, { enum: [1, 'a'] }],
   },
 ]
 

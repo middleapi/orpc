@@ -7,7 +7,7 @@ import { ReferenceController } from './reference/reference.controller'
 import { ReferenceService } from './reference/reference.service'
 import { onError, ORPCModule } from '@orpc/nest'
 import { REQUEST } from '@nestjs/core'
-import { experimental_SmartCoercionPlugin as SmartCoercionPlugin } from '@orpc/json-schema'
+import { SmartCoercionPlugin } from '@orpc/json-schema'
 import { ZodToJsonSchemaConverter } from '@orpc/zod/zod4'
 import { Request } from 'express'
 

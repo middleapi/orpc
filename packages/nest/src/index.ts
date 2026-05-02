@@ -8,6 +8,23 @@ export { Implement as Impl } from './implement'
 export * from './module'
 export * from './utils'
 
+export {
+  /**
+   * @deprecated Import from `@orpc/contract` instead for better compatibility.
+   */
+  populateContractRouterPaths,
+} from '@orpc/contract'
+export type {
+  /**
+   * @deprecated Import from `@orpc/contract` instead for better compatibility.
+   */
+  PopulateContractRouterPathsOptions,
+  /**
+   * @deprecated Import from `@orpc/contract` instead for better compatibility.
+   */
+  PopulatedContractRouterPaths,
+} from '@orpc/contract'
+
 export { onError, onFinish, onStart, onSuccess, ORPCError } from '@orpc/server'
 export type {
   ImplementedProcedure,

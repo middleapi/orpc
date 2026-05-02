@@ -20,6 +20,14 @@ export class StandardRPCCodec implements StandardCodec {
   }
 
   encode(output: unknown, _procedure: AnyProcedure): StandardResponse {
+    if (output instanceof ReadableStream) {
+      return {
+        status: 200,
+        headers: {},
+        body: output,
+      }
+    }
+
     return {
       status: 200,
       headers: {},

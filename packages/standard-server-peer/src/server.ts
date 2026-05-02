@@ -125,6 +125,10 @@ export class experimental_ServerPeerWithoutCodec {
       return [id, undefined]
     }
 
+    if (this.clientControllers.has(id)) { // duplicate request message, should be ignored
+      return [id, undefined]
+    }
+
     const clientController = this.open(id)
     const signal = clientController.signal
 

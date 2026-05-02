@@ -16,7 +16,7 @@ export function OrpcServerAction() {
 
   return (
     <form action={(form) => { state.execute(parseFormData(form)) }}>
-      <input type="text" name="name" defaultValue="unnoq" required />
+      <input type="text" name="name" defaultValue="testing" required />
       <p style={{ color: 'red' }}>{getIssueMessage(state.error, 'name')}</p>
       <button type="submit">Test server action</button>
     </form>

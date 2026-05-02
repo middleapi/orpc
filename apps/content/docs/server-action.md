@@ -32,7 +32,7 @@ export const ping = os
 ```
 
 :::tip
-We recommend using [Runtime Context](/docs/context#execution-context) instead of [Initial Context](/docs/context#initial-context) when working with Server Actions.
+We recommend using [Execution Context](/docs/context#execution-context) instead of [Initial Context](/docs/context#initial-context) when working with Server Actions.
 :::
 
 :::warning

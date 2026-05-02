@@ -100,7 +100,7 @@ export class StandardRPCJsonSerializer {
       const json = data.map((v, i) => {
         if (v === undefined) {
           meta.push([STANDARD_RPC_JSON_SERIALIZER_BUILT_IN_TYPES.UNDEFINED, ...segments, i])
-          return v
+          return null
         }
 
         return this.serialize(v, [...segments, i], meta, maps, blobs)[0]
@@ -145,6 +145,10 @@ export class StandardRPCJsonSerializer {
         segments.forEach((segment) => {
           currentRef = currentRef[preSegment]
           preSegment = segment
+
+          if (!Object.hasOwn(currentRef, preSegment)) {
+            throw new Error(`Security error: accessing non-existent path during deserialization. Path segment: ${preSegment}`)
+          }
         })
 
         currentRef[preSegment] = getBlob(i)
@@ -160,6 +164,10 @@ export class StandardRPCJsonSerializer {
       for (let i = 1; i < item.length; i++) {
         currentRef = currentRef[preSegment]
         preSegment = item[i]!
+
+        if (!Object.hasOwn(currentRef, preSegment)) {
+          throw new Error(`Security error: accessing non-existent path during deserialization. Path segment: ${preSegment}`)
+        }
       }
 
       for (const custom of this.customSerializers) {

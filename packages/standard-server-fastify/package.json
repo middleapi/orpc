@@ -1,12 +1,12 @@
 {
   "name": "@orpc/standard-server-fastify",
   "type": "module",
-  "version": "1.12.3",
+  "version": "1.14.0",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/unnoq/orpc.git",
+    "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/standard-server-fastify"
   },
   "keywords": [
@@ -48,9 +48,9 @@
   },
   "devDependencies": {
     "@fastify/cookie": "^11.0.2",
-    "@types/node": "^22.15.30",
+    "@types/node": "^22.19.3",
     "@types/supertest": "^6.0.3",
-    "fastify": "^5.6.2",
-    "supertest": "^7.1.4"
+    "fastify": "^5.8.3",
+    "supertest": "^7.2.2"
   }
 }

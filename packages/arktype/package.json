@@ -1,16 +1,15 @@
 {
   "name": "@orpc/arktype",
   "type": "module",
-  "version": "1.12.3",
+  "version": "1.14.0",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/unnoq/orpc.git",
+    "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/arktype"
   },
   "keywords": [
-    "unnoq",
     "orpc"
   ],
   "publishConfig": {
@@ -42,6 +41,8 @@
     "@orpc/openapi": "workspace:*"
   },
   "devDependencies": {
-    "zod": "^4.1.12"
+    "@ark/schema": "^0.56.0",
+    "arktype": "^2.2.0",
+    "zod": "^4.3.6"
   }
 }

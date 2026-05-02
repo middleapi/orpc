@@ -49,6 +49,8 @@ export interface OpenAPIReferencePluginOptions<T extends Context> extends OpenAP
   /**
    * HTML to inject into the <head> of the docs page.
    *
+   * @warning This is not escaped special characters, so must be used with caution to avoid XSS vulnerabilities.
+   *
    * @default ''
    */
   docsHead?: Value<Promisable<string>, [StandardHandlerInterceptorOptions<T>]>
@@ -121,7 +123,25 @@ export class OpenAPIReferencePlugin<T extends Context> implements StandardHandle
     this.specPath = options.specPath ?? '/spec.json'
     this.generator = new OpenAPIGenerator(options)
 
-    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    /** Escapes a string for safe embedding in an HTML attribute value. */
+    const escapeHtmlEntities = (s: string) => s
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+
+    /**
+     * Serialises a value to JSON safe for HTML embedding (attribute or <script>).
+     * Uses Unicode escapes instead of HTML entities so JSON.parse reconstructs
+     * the original values without corruption. Cannot be merged with `esc` —
+     * HTML entities inside <script> are not decoded by the JS engine.
+     */
+    const escapeJsonForHtml = (obj: object) => stringifyJSON(obj)
+      .replace(/&/g, '\\u0026')
+      .replace(/'/g, '\\u0027')
+      .replace(/</g, '\\u003C')
+      .replace(/>/g, '\\u003E')
+      .replace(/\//g, '\\u002F')
 
     this.renderDocsHtml = options.renderDocsHtml ?? ((specUrl, title, head, scriptUrl, config, spec, docsProvider, cssUrl) => {
       let body: string
@@ -145,11 +165,15 @@ export class OpenAPIReferencePlugin<T extends Context> implements StandardHandle
         <body>
           <div id="app"></div>
 
-          <script src="${esc(scriptUrl)}"></script>
+          <script src="${escapeHtmlEntities(scriptUrl)}"></script>
 
+          <!-- IMPORTANT: assign to a variable first to prevent ), ( in values breaking the call expression. -->
+          <!-- IMPORTANT: escapeJsonForHtml ensures <, > cannot terminate the </script> tag prematurely. -->
           <script>
+            const swaggerConfig = ${escapeJsonForHtml(swaggerConfig).replace(/"(SwaggerUIBundle\.[^"]+)"/g, '$1')}
+
             window.onload = () => {
-              window.ui = SwaggerUIBundle(${stringifyJSON(swaggerConfig).replace(/"(SwaggerUIBundle\.[^"]+)"/g, '$1')})
+              window.ui = SwaggerUIBundle(swaggerConfig)
             }
           </script>
         </body>
@@ -163,12 +187,16 @@ export class OpenAPIReferencePlugin<T extends Context> implements StandardHandle
 
         body = `
         <body>
-          <div id="app" data-config="${esc(stringifyJSON(scalarConfig))}"></div>
-
-          <script src="${esc(scriptUrl)}"></script>
-
+          <div id="app"></div>
+ 
+          <script src="${escapeHtmlEntities(scriptUrl)}"></script>
+ 
+          <!-- IMPORTANT: assign to a variable first to prevent ), ( in values breaking the call expression. -->
+          <!-- IMPORTANT: escapeJsonForHtml ensures <, > cannot terminate the </script> tag prematurely. -->
           <script>
-            Scalar.createApiReference('#app', JSON.parse(document.getElementById('app').dataset.config))
+            const scalarConfig = ${escapeJsonForHtml(scalarConfig)}
+
+            Scalar.createApiReference('#app', scalarConfig)
           </script>
         </body>
         `
@@ -180,8 +208,8 @@ export class OpenAPIReferencePlugin<T extends Context> implements StandardHandle
           <head>
             <meta charset="utf-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1" />
-            <title>${esc(title)}</title>
-            ${cssUrl ? `<link rel="stylesheet" type="text/css" href="${esc(cssUrl)}" />` : ''}
+            <title>${escapeHtmlEntities(title)}</title>
+            ${cssUrl ? `<link rel="stylesheet" type="text/css" href="${escapeHtmlEntities(cssUrl)}" />` : ''}
             ${head}
           </head>
           ${body}

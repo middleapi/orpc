@@ -275,6 +275,32 @@ describe('standardBracketNotationSerializer', () => {
         })(),
       })
     })
+
+    it('safety against prototype pollution', () => {
+      const result = serializer.deserialize([
+        ['__proto__[polluted]', '1'],
+        ['constructor[polluted]', '2'],
+        ['nested[__proto__][polluted]', '3'],
+        ['nested[constructor][polluted]', '4'],
+      ]) as any
+
+      // eslint-disable-next-line no-proto, no-restricted-properties
+      expect(result.__proto__).toEqual({ polluted: '1' })
+      expect(result.constructor).toEqual({ polluted: '2' })
+      // eslint-disable-next-line no-proto, no-restricted-properties
+      expect(result.nested.__proto__).toEqual({ polluted: '3' })
+      expect(result.nested.constructor).toEqual({ polluted: '4' })
+
+      // if `.polluted` is not handled correctly, access may fall back to `.__proto__.polluted` and cause pollution
+      expect(result.polluted).toBeUndefined()
+      expect(result.nested.polluted).toBeUndefined()
+
+      // does not affect the global object prototype
+      // eslint-disable-next-line no-proto, no-restricted-properties
+      expect(({} as any).__proto__.polluted).toBeUndefined()
+      expect(({} as any).constructor.polluted).toBeUndefined()
+      expect(({} as any).polluted).toBeUndefined()
+    })
   })
 
   it.each([

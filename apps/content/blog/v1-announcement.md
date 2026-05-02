@@ -84,7 +84,7 @@ I used tRPC extensively and really liked it. However, I needed OpenAPI support f
 
 Also, setting up tRPC sometimes felt too complicated, especially for smaller projects like Cloudflare Durable Objects where I just needed a simple API. Another point is that tRPC mostly supports React Query. That was okay for me, but less helpful if you want to use Vue, Solid, or Svelte.
 
-I did some **simple** benchmarks between oRPC and tRPC, and results show (full report [here](https://github.com/unnoq/orpc-benchmarks)):
+I did some **simple** benchmarks between oRPC and tRPC, and results show (full report [here](https://github.com/middleapi/orpc-benchmarks)):
 
 - oRPC is **1,6 times typecheck faster** (5.9s vs 9.3s)
 - oRPC is **2,8 times runtime faster** (295k reqs vs 104k reqs / 20 sec)
@@ -125,10 +125,10 @@ In this long journey, I specially thank all my sponsors, they help me to keep go
 - [Robbe95](https://github.com/Robbe95)
 - And my first sponsor (private) to start my story
 
-If you're interesting in sponsoring oRPC, you can do it [here](https://github.com/sponsors/unnoq).
+If you're interested in sponsoring oRPC, you can do it [here](https://github.com/sponsors/dinwwwh).
 
 <p align="center">
-  <a href="https://cdn.jsdelivr.net/gh/unnoq/unnoq/sponsors.svg">
-    <img src='https://cdn.jsdelivr.net/gh/unnoq/unnoq/sponsors.svg'/>
+  <a href="https://cdn.jsdelivr.net/gh/dinwwwh/dinwwwh/sponsors.svg">
+    <img src='https://cdn.jsdelivr.net/gh/dinwwwh/dinwwwh/sponsors.svg'/>
   </a>
 </p>

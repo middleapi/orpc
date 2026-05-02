@@ -32,13 +32,13 @@ class Person2 {
 const customSupportedDataTypes: { name: string, value: unknown, expected: unknown }[] = [
   {
     name: 'person - 1',
-    value: new Person('unnoq', new Date('2023-01-01')),
-    expected: new Person('unnoq', new Date('2023-01-01')),
+    value: new Person('Dinh Le', new Date('2023-01-01')),
+    expected: new Person('Dinh Le', new Date('2023-01-01')),
   },
   {
     name: 'person - 2',
-    value: new Person2('unnoq - 2', [{ nested: new Date('2023-01-02') }, /uic/gi]),
-    expected: new Person2('unnoq - 2', [{ nested: new Date('2023-01-02') }, /uic/gi]),
+    value: new Person2('Dinh Le - 2', [{ nested: new Date('2023-01-02') }, /uic/gi]),
+    expected: new Person2('Dinh Le - 2', [{ nested: new Date('2023-01-02') }, /uic/gi]),
   },
   {
     name: 'should not resolve toJSON',
@@ -113,7 +113,7 @@ describe.each([
     assert({
       'date': new Date('2023-01-01'),
       'regexp': /uic/gi,
-      'url': new URL('https://unnoq.com'),
+      'url': new URL('https://orpc.dev'),
       '!@#$%^^&()[]>?<~_<:"~+!_': value,
       'list': [value],
       'map': new Map([[value, value]]),
@@ -124,7 +124,7 @@ describe.each([
     }, {
       'date': new Date('2023-01-01'),
       'regexp': /uic/gi,
-      'url': new URL('https://unnoq.com'),
+      'url': new URL('https://orpc.dev'),
       '!@#$%^^&()[]>?<~_<:"~+!_': expected,
       'list': [expected],
       'map': new Map([[expected, expected]]),
@@ -133,6 +133,30 @@ describe.each([
         nested: expected,
       },
     })
+  })
+})
+
+describe('standardRPCJsonSerializer: undefined in arrays produces JSON-safe output', () => {
+  const serializer = new StandardRPCJsonSerializer()
+
+  it('serialize uses null as placeholder for undefined array elements', () => {
+    const [json] = serializer.serialize([undefined, 'a', undefined])
+    expect(json).toEqual([null, 'a', null])
+  })
+
+  it('round-trips undefined array elements through JSON.parse(JSON.stringify(...))', () => {
+    const [json, meta, maps, blobs] = serializer.serialize([undefined, 'a', undefined])
+    const result = JSON.parse(JSON.stringify({ json, meta, maps }))
+    const deserialized = serializer.deserialize(result.json, result.meta, result.maps, (i: number) => blobs[i]!)
+    expect(deserialized).toEqual([undefined, 'a', undefined])
+  })
+
+  it('round-trips nested undefined array elements (e.g. TanStack Query pageParams)', () => {
+    const data = { pageParams: [undefined, 'cursor_abc'], pages: [{ items: [1, 2] }] }
+    const [json, meta, maps, blobs] = serializer.serialize(data)
+    const result = JSON.parse(JSON.stringify({ json, meta, maps }))
+    const deserialized = serializer.deserialize(result.json, result.meta, result.maps, (i: number) => blobs[i]!)
+    expect(deserialized).toEqual(data)
   })
 })
 
@@ -156,5 +180,33 @@ describe('standardRPCJsonSerializer: custom serializers', () => {
         ],
       })
     }).toThrow('Custom serializer type must be unique.')
+  })
+
+  it.each(['nonExist', '__proto__', 'constructor'])('should throw when accessing non-existent path during deserialization: %s', (segment) => {
+    const serializer = new StandardRPCJsonSerializer()
+
+    expect(
+      () => serializer.deserialize({ a: 1 }, [[1, segment]]),
+    ).toThrow(`Security error: accessing non-existent path during deserialization. Path segment: ${segment}`)
+
+    expect(
+      () => serializer.deserialize({ a: 1 }, [[1, 'a', segment]]),
+    ).toThrow(`Security error: accessing non-existent path during deserialization. Path segment: ${segment}`)
+
+    expect(
+      () => serializer.deserialize({ a: 1 }, [[1, segment, 'role']]),
+    ).toThrow(`Security error: accessing non-existent path during deserialization. Path segment: ${segment}`)
+
+    expect(
+      () => serializer.deserialize({ a: 1 }, [], [[segment]], () => new Blob([])),
+    ).toThrow(`Security error: accessing non-existent path during deserialization. Path segment: ${segment}`)
+
+    expect(
+      () => serializer.deserialize({ a: 1 }, [], [['a', segment]], () => new Blob([])),
+    ).toThrow(`Security error: accessing non-existent path during deserialization. Path segment: ${segment}`)
+
+    expect(
+      () => serializer.deserialize({ a: 1 }, [], [[segment, 'role']], () => new Blob([])),
+    ).toThrow(`Security error: accessing non-existent path during deserialization. Path segment: ${segment}`)
   })
 })

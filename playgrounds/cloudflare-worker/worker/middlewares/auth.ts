@@ -31,5 +31,5 @@ async function getSession() {
    * However, this works fine in a local environment.
    */
 
-  return { user: { id: 'unique', name: 'unnoq', email: 'contact@unnoq.com' } }
+  return { user: { id: 'unique', name: 'Example', email: 'example@example.com' } }
 }

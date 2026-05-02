@@ -38,7 +38,7 @@ deno add npm:@orpc/openapi@latest
 oRPC supports OpenAPI 3.1.1 and integrates seamlessly with popular schema libraries like [Zod](https://zod.dev/), [Valibot](https://valibot.dev), and [ArkType](https://arktype.io/). You can generate specifications from either a [Router](/docs/router) or a [Contract](/docs/contract-first/define-contract):
 
 :::info
-Interested in support for additional schema libraries? [Let us know](https://github.com/unnoq/orpc/discussions/categories/ideas)!
+Interested in support for additional schema libraries? [Let us know](https://github.com/middleapi/orpc/discussions/categories/ideas)!
 :::
 
 ::: details Want to create your own JSON schema converter?

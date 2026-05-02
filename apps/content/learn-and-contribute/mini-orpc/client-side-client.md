@@ -8,7 +8,7 @@ description: Learn how to implement remote procedure calls (RPC) on the client s
 In Mini oRPC, the client-side client initiates remote procedure calls to the server. Both client and server must follow shared conventions to communicate effectively. While we could use the [RPC Protocol](/docs/advanced/rpc-protocol), we'll implement simpler conventions for clarity.
 
 ::: info
-The complete Mini oRPC implementation is available in our GitHub repository: [Mini oRPC Repository](https://github.com/unnoq/mini-orpc)
+The complete Mini oRPC implementation is available in our GitHub repository: [Mini oRPC Repository](https://github.com/middleapi/mini-orpc)
 :::
 
 ## Implementation

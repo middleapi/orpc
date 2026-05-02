@@ -1,7 +1,7 @@
 import type { StandardBody, StandardHeaders } from '@orpc/standard-server'
-import type { Buffer } from 'node:buffer'
 import type { ToEventIteratorOptions, ToEventStreamOptions } from './event-iterator'
 import type { NodeHttpRequest } from './types'
+import { Buffer } from 'node:buffer'
 import { Readable } from 'node:stream'
 import { isAsyncIteratorObject, parseEmptyableJSON, runWithSpan, stringifyJSON } from '@orpc/shared'
 import { flattenHeader, generateContentDisposition, getFilenameFromContentDisposition } from '@orpc/standard-server'
@@ -62,6 +62,10 @@ export function toNodeHttpBody(
   headers: StandardHeaders,
   options: ToNodeHttpBodyOptions = {},
 ): Readable | undefined | string {
+  if (body instanceof ReadableStream) {
+    return Readable.fromWeb(body)
+  }
+
   const currentContentDisposition = flattenHeader(headers['content-disposition'])
 
   delete headers['content-type']
@@ -114,13 +118,16 @@ function _streamToFormData(stream: Readable, contentType: string): Promise<FormD
 }
 
 async function _streamToString(stream: Readable): Promise<string> {
-  let string = ''
+  const decoder = new TextDecoder()
+  let text = ''
 
   for await (const chunk of stream) {
-    string += chunk.toString()
+    text += decoder.decode(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk), { stream: true })
   }
 
-  return string
+  text += decoder.decode()
+
+  return text
 }
 
 async function _streamToFile(stream: Readable, fileName: string, contentType: string): Promise<File> {

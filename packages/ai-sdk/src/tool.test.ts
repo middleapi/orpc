@@ -54,7 +54,7 @@ describe('implementTool', () => {
     const contract = base
       .meta({
         [AI_SDK_TOOL_META_SYMBOL]: {
-          name: 'custom-tool-name',
+          title: 'title',
           description: 'Meta description',
         },
       })
@@ -65,7 +65,7 @@ describe('implementTool', () => {
       description: 'Override description',
     })
 
-    expect((tool as any).name).toBe('custom-tool-name')
+    expect((tool as any).title).toBe('title')
     expect(tool.description).toBe('Override description')
   })
 })

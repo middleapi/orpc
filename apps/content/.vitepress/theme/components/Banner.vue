@@ -35,11 +35,11 @@ function dismissBanner() {
     <div class="banner">
       <div class="banner-content">
         <div class="banner-text">
-          Serverless API Gateway<span class="banner-helper">, designed for developers</span> -
+          The screenshot API <span class="banner-helper">for developers</span> -
         </div>
 
-        <a class="banner-action" href="https://zuplo.link/orpc" target="_blank" rel="noopener">
-          Try Zuplo
+        <a class="banner-action" href="https://screenshotone.com/?ref=orpc" target="_blank" rel="noopener">
+          Try ScreenshotOne
         </a>
       </div>
 
@@ -62,7 +62,7 @@ function dismissBanner() {
 }
 
 .banner-container {
-  background: rgba(255, 0, 189, 0.8);
+  background: rgb(79, 70, 229);
   color: var(--vp-c-white);
 }
 

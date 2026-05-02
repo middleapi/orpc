@@ -41,6 +41,15 @@ describe('ContractBuilder', () => {
     builder.$route({ method: 'INVALID' })
   })
 
+  it('.$input', () => {
+    expectTypeOf(builder.$input(generalSchema)).toEqualTypeOf<
+      ContractBuilder<typeof generalSchema, typeof outputSchema, typeof baseErrorMap, BaseMeta>
+    >()
+
+    // @ts-expect-error - schema is invalid
+    builder.$input({})
+  })
+
   it('.errors', () => {
     expectTypeOf(builder.errors({ INVALID: { message: 'invalid' }, OVERRIDE: { message: 'override' } })).toEqualTypeOf<
       ContractBuilder<

@@ -14,6 +14,8 @@ jobs:
 
       - uses: pnpm/action-setup@v4
 
+      - run: pnpm env use --global 22
+
       - run: pnpm i
 
       - run: pnpm run lint
@@ -41,6 +43,8 @@ jobs:
 
       - uses: pnpm/action-setup@v4
 
+      - run: pnpm env use --global 22
+
       - run: pnpm i
 
       - run: pnpm run test:coverage
@@ -59,6 +63,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
+
+      - run: pnpm env use --global 22
 
       - run: pnpm i
 

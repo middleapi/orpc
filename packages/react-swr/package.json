@@ -1,16 +1,15 @@
 {
   "name": "@orpc/experimental-react-swr",
   "type": "module",
-  "version": "1.12.3",
+  "version": "1.14.0",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/unnoq/orpc.git",
+    "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/react-swr"
   },
   "keywords": [
-    "unnoq",
     "orpc"
   ],
   "publishConfig": {
@@ -41,6 +40,6 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "swr": "^2.3.7"
+    "swr": "^2.4.1"
   }
 }

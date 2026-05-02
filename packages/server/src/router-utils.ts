@@ -27,6 +27,10 @@ export function getRouter<T extends Lazyable<AnyRouter | undefined>>(
       return undefined as any
     }
 
+    if (typeof current !== 'object') {
+      return undefined as any
+    }
+
     if (!isLazy(current)) {
       current = current[segment]
 
@@ -150,6 +154,10 @@ export function enhanceRouter<
     return enhanced as any
   }
 
+  if (typeof router !== 'object' || router === null) {
+    return router as any
+  }
+
   const enhanced = {} as Record<string, any>
 
   for (const key in router) {
@@ -184,6 +192,13 @@ export function traverseContractProcedures(
   callback: (options: TraverseContractProcedureCallbackOptions) => void,
   lazyOptions: LazyTraverseContractProceduresOptions[] = [],
 ): LazyTraverseContractProceduresOptions[] {
+  // Guard before reading the hidden-contract symbol so that null/undefined
+  // child exports don't crash in `getHiddenRouterContract`. Primitives like
+  // strings autobox safely; only null/undefined throw on symbol access.
+  if (typeof options.router !== 'object' || options.router === null) {
+    return lazyOptions
+  }
+
   let currentRouter: AnyContractRouter | Lazyable<AnyRouter> = options.router
 
   const hiddenContract = getHiddenRouterContract(options.router)
@@ -206,7 +221,7 @@ export function traverseContractProcedures(
     })
   }
 
-  else {
+  else if (typeof currentRouter === 'object' && currentRouter !== null) {
     for (const key in currentRouter) {
       traverseContractProcedures(
         {
@@ -251,6 +266,10 @@ export type UnlaziedRouter<T extends AnyRouter>
 
 export async function unlazyRouter<T extends AnyRouter>(router: T): Promise<UnlaziedRouter<T>> {
   if (isProcedure(router)) {
+    return router as any
+  }
+
+  if (typeof router !== 'object' || router === null) {
     return router as any
   }
 

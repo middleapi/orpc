@@ -69,6 +69,34 @@ describe('toOpenAPIContent', () => {
     })
   })
 
+  it('omits unconstrained non-file branches', () => {
+    expect(toOpenAPIContent({
+      anyOf: [
+        fileSchema,
+        {},
+      ],
+    })).toEqual({
+      'image/png': {
+        schema: fileSchema,
+      },
+    })
+
+    expect(toOpenAPIContent({ properties: undefined })).toEqual({})
+  })
+
+  it('omits never non-file branches', () => {
+    expect(toOpenAPIContent({
+      anyOf: [
+        fileSchema,
+        { not: {} },
+      ],
+    })).toEqual({
+      'image/png': {
+        schema: fileSchema,
+      },
+    })
+  })
+
   it('body contain file schema', () => {
     const schema: JSONSchema = {
       type: 'object',

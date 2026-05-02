@@ -1,9 +1,19 @@
 import * as z from 'zod/v4'
 import { testSchemaConverter } from '../../tests/shared'
 
-enum ExampleEnum {
+enum ExampleEnumString {
   A = 'a',
   B = 'b',
+}
+
+enum ExampleEnumNumber {
+  A = 1,
+  B = 2,
+}
+
+enum ExampleEnumMixed {
+  A = 1,
+  B = 'a',
 }
 
 testSchemaConverter([
@@ -90,12 +100,22 @@ testSchemaConverter([
   {
     name: 'enum(["a", "b"])',
     schema: z.enum(['a', 'b']),
-    input: [true, { enum: ['a', 'b'] }],
+    input: [true, { type: 'string', enum: ['a', 'b'] }],
   },
   {
-    name: 'enum(ExampleEnum)',
-    schema: z.enum(ExampleEnum),
-    input: [true, { enum: ['a', 'b'] }],
+    name: 'enum(ExampleEnumString)',
+    schema: z.enum(ExampleEnumString),
+    input: [true, { type: 'string', enum: ['a', 'b'] }],
+  },
+  {
+    name: 'enum(ExampleEnumNumber)',
+    schema: z.enum(ExampleEnumNumber),
+    input: [true, { type: 'number', enum: [1, 2] }],
+  },
+  {
+    name: 'enum(ExampleEnumMixed)',
+    schema: z.enum(ExampleEnumMixed),
+    input: [true, { enum: [1, 'a'] }],
   },
   {
     name: 'file()',

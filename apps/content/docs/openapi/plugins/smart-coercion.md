@@ -43,9 +43,7 @@ Configure the plugin with [JSON Schema Converters](/docs/openapi/openapi-specifi
 
 ```ts
 import { OpenAPIHandler } from '@orpc/openapi/fetch'
-import {
-  experimental_SmartCoercionPlugin as SmartCoercionPlugin
-} from '@orpc/json-schema'
+import { SmartCoercionPlugin } from '@orpc/json-schema'
 
 const handler = new OpenAPIHandler(router, {
   plugins: [

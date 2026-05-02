@@ -41,5 +41,8 @@ export const me = authed
   })
   .output(UserSchema)
   .handler(async ({ input, context }) => {
-    return context.user
+    return {
+      ...context.user,
+      id: '28aa6286-48e9-4f23-adea-3486c86acd56',
+    }
   })

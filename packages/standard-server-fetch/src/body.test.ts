@@ -277,6 +277,30 @@ describe('toFetchBody', () => {
     expect(generateContentDispositionSpy).toHaveBeenCalledTimes(0)
   })
 
+  it('readable stream', async () => {
+    const headers = new Headers(baseHeaders)
+    headers.set('content-type', 'application/zip')
+    headers.set('content-disposition', 'attachment; filename="archive.zip"')
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('hello'))
+        controller.close()
+      },
+    })
+
+    const body = toFetchBody(stream, headers, {})
+
+    expect(body).toBe(stream)
+    expect([...headers]).toEqual([
+      ['content-disposition', 'attachment; filename="archive.zip"'],
+      ['content-type', 'application/zip'],
+      ['x-custom-header', 'custom-value'],
+    ])
+
+    const text = await new Response(body).text()
+    expect(text).toBe('hello')
+  })
+
   it('async generator', async () => {
     async function* gen() {
       yield 123

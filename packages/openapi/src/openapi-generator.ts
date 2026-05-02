@@ -307,6 +307,8 @@ export class OpenAPIGenerator {
       },
     )
 
+    let omitResponseBody = false
+
     if (isAnySchema(schema) && !dynamicParams?.length) {
       return
     }
@@ -329,6 +331,7 @@ export class OpenAPIGenerator {
 
         schema = rest
         required = rest.required ? rest.required.length !== 0 : false
+        omitResponseBody = !required && !rest.properties
 
         if (!checkParamsSchema(paramsSchema, dynamicParams)) {
           throw error
@@ -348,7 +351,7 @@ export class OpenAPIGenerator {
         ref.parameters ??= []
         ref.parameters.push(...toOpenAPIParameters(schema, 'query'))
       }
-      else {
+      else if (!omitResponseBody) {
         ref.requestBody = {
           required,
           content: toOpenAPIContent(schema),
@@ -482,7 +485,8 @@ export class OpenAPIGenerator {
       if (simplifiedItem.properties?.status !== undefined) {
         const statusSchema = resolveOpenAPIJsonSchemaRef(doc, simplifiedItem.properties.status)
 
-        if (typeof statusSchema !== 'object'
+        if (
+          typeof statusSchema !== 'object'
           || statusSchema.const === undefined
           || typeof statusSchema.const !== 'number'
           || !Number.isInteger(statusSchema.const)

@@ -10,6 +10,6 @@ Please ensure you are running the latest version of the software. The vulnerabil
 
 ### How to Report
 
-To report a security vulnerability, please email us at <a href="mailto:contact@unnoq.com">contact@unnoq.com</a>.
+To report a security vulnerability, please email us at <a href="mailto:hello@middleapi.com">hello@middleapi.com</a>.
 
 We appreciate your efforts to disclose your findings responsibly.

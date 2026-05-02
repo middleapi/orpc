@@ -1,33 +1,26 @@
 <script lang="ts" setup>
-import { useElementVisibility } from '@vueuse/core'
-import { computed, ref } from 'vue'
-import { useSponsors } from '../composables/sponsors.ts'
+import { sponsors } from '../sponsors'
 
-const container = ref<HTMLDivElement>()
-const containerIsVisible = useElementVisibility(container)
-
-const { sponsors } = useSponsors(containerIsVisible)
-
-const normalSponsors = computed(() => sponsors.value.filter(s => s.rideSidebarSize === 'normal'))
-const smallSponsors = computed(() => sponsors.value.filter(s => s.rideSidebarSize === 'small'))
+const normalSponsors = sponsors.filter(s => s.sidebarSize === 'normal')
+const smallSponsors = sponsors.filter(s => s.sidebarSize === 'small')
 </script>
 
 <template>
-  <div ref="container" class="aside-container">
-    <a class="aside-sponsors-title" href="https://github.com/sponsors/unnoq" target="_blank" rel="noopener">SPONSORS</a>
+  <div class="aside-container">
+    <a class="aside-sponsors-title" href="https://github.com/sponsors/dinwwwh" target="_blank" rel="noopener">SPONSORS</a>
 
     <div class="aside-sponsors-list">
-      <a v-for="sponsor in normalSponsors" :key="sponsor.login" class="aside-sponsor" target="_blank" :href="sponsor.rideSidebarLink">
-        <img :src="sponsor.rightSidebarLogo" :alt="sponsor.name">
+      <a v-for="sponsor in normalSponsors" :key="sponsor.login" class="aside-sponsor" target="_blank" rel="noopener" :href="sponsor.link">
+        <img :src="sponsor.sidebarLogo" :alt="sponsor.name || sponsor.login">
       </a>
 
-      <a v-if="normalSponsors.length < 3" class="aside-sponsor" href="https://github.com/sponsors/unnoq" target="_blank" rel="noopener">
+      <a v-if="normalSponsors.length < 3" class="aside-sponsor" href="https://github.com/sponsors/dinwwwh" target="_blank" rel="noopener">
         <span class="aside-sponsor-text">Become a sponsor</span>
       </a>
 
       <div class="aside-sponsors-small">
-        <a v-for="sponsor in smallSponsors" :key="sponsor.login" class="aside-sponsor" target="_blank" :href="sponsor.rideSidebarLink">
-          <img :src="sponsor.rightSidebarLogo" :alt="sponsor.name">
+        <a v-for="sponsor in smallSponsors" :key="sponsor.login" class="aside-sponsor" target="_blank" rel="noopener" :href="sponsor.link">
+          <img :src="sponsor.sidebarLogo" :alt="sponsor.name || sponsor.login">
         </a>
       </div>
     </div>

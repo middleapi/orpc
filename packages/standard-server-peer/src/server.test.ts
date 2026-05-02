@@ -317,6 +317,35 @@ describe('serverPeer', () => {
       expect(handle).toHaveBeenCalledTimes(1)
     })
 
+    it('duplicate request message should be ignored', async () => {
+      handle.mockImplementationOnce(async () => baseResponse)
+
+      const promise = peer.message(
+        await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest),
+        handle,
+      )
+
+      // Send duplicate while first request is still processing
+      const [id, request] = await peer.message(
+        await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, baseRequest),
+        handle,
+      )
+
+      expect(id).toBe(REQUEST_ID)
+      expect(request).toBeUndefined()
+      // handle should only be called once (duplicate ignored)
+      expect(handle).toHaveBeenCalledTimes(1)
+
+      const [id2, request2] = await promise
+      expect(id2).toBe(REQUEST_ID)
+      expect(request2).toEqual({
+        ...baseRequest,
+        signal: expect.any(AbortSignal),
+      })
+
+      expect(send).toHaveBeenCalledTimes(1)
+    })
+
     it('handle throw error', async () => {
       handle.mockImplementationOnce(async () => {
         throw new Error('some error')

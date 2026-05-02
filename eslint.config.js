@@ -4,6 +4,10 @@ import pluginBan from 'eslint-plugin-ban'
 export default antfu({
   formatters: true,
   ignores: ['packages/hey-api/tests/client/**'],
+  rules: {
+    'pnpm/yaml-enforce-settings': 'off',
+    'yaml/sort-keys': 'off',
+  },
 }, {
   plugins: { ban: pluginBan },
   rules: {

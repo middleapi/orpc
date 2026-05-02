@@ -137,6 +137,15 @@ const inputTests: TestCase[] = [
     },
   },
   {
+    name: 'dynamic params only (no body)',
+    contract: oc.route({ method: 'POST', path: '/planets/{id}' }).input(z.object({ id: z.string() })),
+    expected: {
+      '/planets/{id}': {
+        post: expect.toSatisfy((v: any) => v.parameters?.length === 1 && !v.requestBody),
+      },
+    },
+  },
+  {
     name: 'query + params',
     contract: oc.route({ path: '/planets/{id}', method: 'GET' }).input(
       z.object({
@@ -1428,7 +1437,6 @@ describe('openAPIGenerator', () => {
                   properties: {
                     parent: { $ref: '#/components/schemas/User' },
                   },
-                  required: [],
                 },
               },
             },
@@ -1707,7 +1715,6 @@ describe('openAPIGenerator', () => {
                 a: { type: 'string' },
                 b: { type: 'number' },
               },
-              required: [],
             },
           },
         },

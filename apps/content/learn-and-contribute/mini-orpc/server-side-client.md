@@ -8,7 +8,7 @@ description: Learn how to turn a procedure into a callable function in Mini oRPC
 The server-side client in Mini oRPC transforms procedures into callable functions, enabling direct server-side invocation. This is the foundation of Mini oRPC client system - all other client functionality builds upon it.
 
 ::: info
-The complete Mini oRPC implementation is available in our GitHub repository: [Mini oRPC Repository](https://github.com/unnoq/mini-orpc)
+The complete Mini oRPC implementation is available in our GitHub repository: [Mini oRPC Repository](https://github.com/middleapi/mini-orpc)
 :::
 
 ## Implementation

@@ -8,10 +8,22 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-it('generateContentDisposition', () => {
-  expect(generateContentDisposition('')).toEqual('inline; filename=""; filename*=utf-8\'\'')
-  expect(generateContentDisposition('test.txt')).toEqual('inline; filename="test.txt"; filename*=utf-8\'\'test.txt')
-  expect(generateContentDisposition('!@#$%^%^&*()\'".txt')).toEqual('inline; filename="!@#$%^%^&*()\'\\".txt"; filename*=utf-8\'\'!%40%23%24%25^%25^%26%2A%28%29%27%22.txt')
+describe('generateContentDisposition', () => {
+  it('handle normal filename', () => {
+    expect(generateContentDisposition('test.txt')).toEqual('inline; filename="test.txt"; filename*=utf-8\'\'test.txt')
+  })
+
+  it('handle empty filename', () => {
+    expect(generateContentDisposition('')).toEqual('inline; filename=""; filename*=utf-8\'\'')
+  })
+
+  it('escape " special char', () => {
+    expect(generateContentDisposition('!@#$%^%^&*()\'".txt')).toEqual('inline; filename="!@#$%^%^&*()\'\\".txt"; filename*=utf-8\'\'!%40%23%24%25^%25^%26%2A%28%29%27%22.txt')
+  })
+
+  it('escape non-ASCII filenames', () => {
+    expect(generateContentDisposition('テンプレ\'"ート.txt')).toEqual('inline; filename="____\'\\"__.txt"; filename*=utf-8\'\'%E3%83%86%E3%83%B3%E3%83%97%E3%83%AC%27%22%E3%83%BC%E3%83%88.txt')
+  })
 })
 
 it('getFilenameFromContentDisposition', () => {

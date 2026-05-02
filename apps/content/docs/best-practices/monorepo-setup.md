@@ -10,7 +10,7 @@ A monorepo stores multiple related projects in a single repository, a common pra
 This guide shows you how to efficiently set up a monorepo with oRPC while maintaining end-to-end type safety across all projects.
 
 ::: info Playground
-Explore a sample monorepo setup in our [Multiservice Monorepo Playground](https://github.com/unnoq/orpc-multiservice-monorepo-playground).
+Explore a sample monorepo setup in our [Multiservice Monorepo Playground](https://github.com/middleapi/orpc-multiservice-monorepo-playground).
 :::
 
 ## TypeScript Project References

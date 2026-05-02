@@ -2,7 +2,7 @@ import '../../polyfill'
 import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { onError } from '@orpc/server'
 import { ZodToJsonSchemaConverter } from '@orpc/zod/zod4'
-import { experimental_SmartCoercionPlugin as SmartCoercionPlugin } from '@orpc/json-schema'
+import { SmartCoercionPlugin } from '@orpc/json-schema'
 import { OpenAPIReferencePlugin } from '@orpc/openapi/plugins'
 import { router } from '../../routers'
 import type { APIRoute } from 'astro'
@@ -70,7 +70,7 @@ export const ALL: APIRoute = async ({ request }) => {
   const { response } = await handler.handle(request, {
     prefix: '/api',
     context: {
-      session: { user: { id: 'unique', name: 'unnoq', email: 'contact@unnoq.com' } },
+      session: { user: { id: 'unique', name: 'Example', email: 'example@example.com' } },
     },
   })
 

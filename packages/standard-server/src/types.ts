@@ -9,6 +9,7 @@ export type StandardBody
     | URLSearchParams
     | FormData
     | AsyncIterator<unknown | void, unknown | void, undefined>
+    | ReadableStream<Uint8Array>
 
 export interface StandardRequest {
   method: string

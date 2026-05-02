@@ -1,16 +1,15 @@
 {
   "name": "@orpc/hey-api",
   "type": "module",
-  "version": "1.12.3",
+  "version": "1.14.0",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/unnoq/orpc.git",
+    "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/hey-api"
   },
   "keywords": [
-    "unnoq",
     "orpc",
     "Hey API"
   ],
@@ -40,6 +39,6 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "@hey-api/openapi-ts": "^0.80.8"
+    "@hey-api/openapi-ts": "^0.80.18"
   }
 }

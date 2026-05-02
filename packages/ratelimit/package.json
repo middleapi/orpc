@@ -1,12 +1,12 @@
 {
   "name": "@orpc/experimental-ratelimit",
   "type": "module",
-  "version": "1.12.3",
+  "version": "1.14.0",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/unnoq/orpc.git",
+    "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/ratelimit"
   },
   "keywords": [
@@ -72,8 +72,8 @@
     "@orpc/standard-server": "workspace:*"
   },
   "devDependencies": {
-    "@upstash/ratelimit": "^2.0.7",
-    "@upstash/redis": "^1.35.6",
-    "ioredis": "^5.8.2"
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.37.0",
+    "ioredis": "^5.10.0"
   }
 }

@@ -67,6 +67,10 @@ export function toFetchBody(
   headers: Headers,
   options: ToFetchBodyOptions = {},
 ): string | Blob | FormData | URLSearchParams | undefined | ReadableStream<Uint8Array> {
+  if (body instanceof ReadableStream) {
+    return body
+  }
+
   const currentContentDisposition = headers.get('content-disposition')
 
   headers.delete('content-type')

@@ -40,10 +40,10 @@ describe('standardOpenAPIMatcher', () => {
       procedure: ping,
     })
 
-    expect(await rpcMatcher.match('DELETE', '/ping/unnoq')).toEqual({
+    expect(await rpcMatcher.match('DELETE', '/ping/name')).toEqual({
       path: ['nested', 'ping'],
       procedure: routedPing,
-      params: { ping: 'unnoq' },
+      params: { ping: 'name' },
     })
 
     expect(await rpcMatcher.match('GET', '/pong/something')).toEqual({
@@ -213,22 +213,22 @@ describe('standardOpenAPIMatcher', () => {
     const rpcMatcher = new StandardOpenAPIMatcher()
     rpcMatcher.init({ ping1, ping2, ping3 })
 
-    expect(await rpcMatcher.match('GET', '/ping/unnoq%2F')).toEqual({
+    expect(await rpcMatcher.match('GET', '/ping/name%2F')).toEqual({
       path: ['ping2'],
       procedure: ping2,
-      params: { ping: 'unnoq/' },
+      params: { ping: 'name/' },
     })
 
-    expect(await rpcMatcher.match('GET', '/ping/unnoq/')).toEqual({
+    expect(await rpcMatcher.match('GET', '/ping/name/')).toEqual({
       path: ['ping2'],
       procedure: ping2,
-      params: { ping: 'unnoq' },
+      params: { ping: 'name' },
     })
 
-    expect(await rpcMatcher.match('GET', '/ping/unnoq/2/3/4%2F5')).toEqual({
+    expect(await rpcMatcher.match('GET', '/ping/name/2/3/4%2F5')).toEqual({
       path: ['ping1'],
       procedure: ping1,
-      params: { ping: 'unnoq/2/3/4/5' },
+      params: { ping: 'name/2/3/4/5' },
     })
 
     expect(await rpcMatcher.match('GET', '/ping/pong')).toEqual({
@@ -251,7 +251,7 @@ describe('standardOpenAPIMatcher', () => {
     rpcMatcher.init(router)
 
     expect(await rpcMatcher.match('POST', '/base')).toEqual(undefined)
-    expect(await rpcMatcher.match('DELETE', '/ping/unnoq')).toEqual(undefined)
+    expect(await rpcMatcher.match('DELETE', '/ping/name')).toEqual(undefined)
 
     expect(await rpcMatcher.match('GET', '/pong/something')).toEqual({
       path: ['pong'],

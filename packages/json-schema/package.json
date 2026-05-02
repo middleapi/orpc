@@ -1,16 +1,15 @@
 {
   "name": "@orpc/json-schema",
   "type": "module",
-  "version": "1.12.3",
+  "version": "1.14.0",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/unnoq/orpc.git",
+    "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/json-schema"
   },
   "keywords": [
-    "unnoq",
     "orpc"
   ],
   "publishConfig": {
@@ -42,6 +41,6 @@
     "json-schema-typed": "^8.0.2"
   },
   "devDependencies": {
-    "zod": "^4.1.12"
+    "zod": "^4.3.6"
   }
 }

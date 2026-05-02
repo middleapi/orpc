@@ -430,7 +430,17 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
 
           case 'enum': {
             const enum_ = schema as $ZodEnum
-            return [true, { enum: Object.values(enum_._zod.def.entries) }]
+            const values = getEnumValues(enum_._zod.def.entries)
+            const json: any = { enum: values }
+
+            if (values.every(v => typeof v === 'string')) {
+              json.type = 'string'
+            }
+            else if (values.every(v => Number.isFinite(v))) {
+              json.type = 'number'
+            }
+
+            return [true, json]
           }
 
           case 'literal': {
@@ -519,7 +529,15 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
 
           case 'pipe': {
             const pipe = schema as $ZodPipe
-            return this.#convert(options.strategy === 'input' ? pipe._zod.def.in : pipe._zod.def.out, options, lazyDepth, structureDepth)
+            return this.#convert(
+              // prefer out schema when in schema is preprocess/transform
+              options.strategy === 'input' && pipe._zod.def.in._zod.def.type !== 'transform'
+                ? pipe._zod.def.in
+                : pipe._zod.def.out,
+              options,
+              lazyDepth,
+              structureDepth,
+            )
           }
 
           case 'readonly': {
@@ -628,4 +646,17 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
       ? contentEncoding as any
       : undefined
   }
+}
+
+type EnumValue = string | number // | bigint | boolean | symbol;
+type EnumLike = Readonly<Record<string, EnumValue>>
+/**
+ * https://github.com/colinhacks/zod/blob/main/packages/zod/src/v4/core/util.ts#L206C8-L212C2
+ */
+function getEnumValues(entries: EnumLike): EnumValue[] {
+  const numericValues = Object.values(entries).filter(v => typeof v === 'number')
+  const values = Object.entries(entries)
+    .filter(([k, _]) => !numericValues.includes(+k))
+    .map(([_, v]) => v)
+  return values
 }

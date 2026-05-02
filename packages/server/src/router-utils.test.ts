@@ -1,3 +1,4 @@
+import type { AnyProcedure } from './procedure'
 import { enhanceRoute } from '@orpc/contract'
 import { contract, ping, pingMiddleware, pong, router } from '../tests/shared'
 import { getLazyMeta, isLazy, unlazy } from './lazy'
@@ -218,5 +219,95 @@ it('unlazyRouter', async () => {
       ping,
       pong,
     },
+  })
+})
+
+describe('router modules that export primitives alongside procedures', () => {
+  // Simulates: import * as userRouter from './routes/user'
+  // where the module exports procedures AND constants like:
+  //   export const getUser = os.handler(...)
+  //   export const listUsers = os.handler(...)
+  //   export const API_VERSION = 'v2'
+  //   export const MAX_PAGE_SIZE = 100
+  //   export const ENABLE_CACHE = true
+
+  const moduleWithPrimitives = {
+    getUser: pong,
+    listUsers: pong,
+    API_VERSION: 'v2',
+    MAX_PAGE_SIZE: 100,
+    ENABLE_CACHE: true,
+    DEPRECATED: null,
+    OPTIONAL_FEATURE: undefined,
+  } as any
+
+  const defaultOptions = {
+    errorMap: {},
+    middlewares: [],
+    prefix: undefined,
+    tags: [],
+    dedupeLeadingMiddlewares: false,
+  } as const
+
+  describe('enhanceRouter', () => {
+    it('enhances procedures and passes through primitive exports', () => {
+      const enhanced = enhanceRouter(moduleWithPrimitives, defaultOptions) as unknown as {
+        getUser: AnyProcedure
+        listUsers: AnyProcedure
+        API_VERSION: string
+        MAX_PAGE_SIZE: number
+        ENABLE_CACHE: boolean
+      }
+      expect(enhanced.getUser['~orpc']).toBeDefined()
+      expect(enhanced.listUsers['~orpc']).toBeDefined()
+      expect(enhanced.API_VERSION).toBe('v2')
+      expect(enhanced.MAX_PAGE_SIZE).toBe(100)
+      expect(enhanced.ENABLE_CACHE).toBe(true)
+    })
+
+    it('handles single-character string exports without stack overflow', () => {
+      // Single-char strings are the worst case: for...in on 'v' yields key '0',
+      // and 'v'[0] === 'v' creates an infinite loop
+      const moduleWithFlag = { getUser: pong, v: 'v' } as any
+      expect(() => enhanceRouter(moduleWithFlag, defaultOptions)).not.toThrow()
+    })
+  })
+
+  describe('getRouter', () => {
+    it('returns undefined when path traverses past a primitive export', () => {
+      expect(getRouter(moduleWithPrimitives, ['API_VERSION', 'length'])).toBeUndefined()
+      expect(getRouter(moduleWithPrimitives, ['MAX_PAGE_SIZE', 'toFixed'])).toBeUndefined()
+      expect(getRouter(moduleWithPrimitives, ['ENABLE_CACHE', 'valueOf'])).toBeUndefined()
+    })
+
+    it('returns undefined for single-character string exports instead of indexed characters', () => {
+      // Without the typeof guard, getRouter(['v', '0']) returns 'v' because
+      // 'v'[0] === 'v', walking character indices instead of bailing out.
+      const moduleWithFlag = { getUser: pong, v: 'v' } as any
+      expect(getRouter(moduleWithFlag, ['v', '0'])).toBeUndefined()
+      expect(getRouter(moduleWithFlag, ['v', '0', '0', '0'])).toBeUndefined()
+    })
+  })
+
+  describe('traverseContractProcedures', () => {
+    it('traverses procedures and skips primitive, null, and undefined exports', () => {
+      const callback = vi.fn()
+      expect(() =>
+        traverseContractProcedures({ router: moduleWithPrimitives, path: [] }, callback),
+      ).not.toThrow()
+      expect(callback).toHaveBeenCalledTimes(2)
+      expect(callback).toHaveBeenCalledWith({ contract: pong, path: ['getUser'] })
+      expect(callback).toHaveBeenCalledWith({ contract: pong, path: ['listUsers'] })
+    })
+  })
+
+  describe('unlazyRouter', () => {
+    it('resolves procedures and preserves primitive exports', async () => {
+      const result = await unlazyRouter(moduleWithPrimitives)
+      expect(result.getUser).toEqual(pong)
+      expect(result.listUsers).toEqual(pong)
+      expect(result.API_VERSION).toBe('v2')
+      expect(result.MAX_PAGE_SIZE).toBe(100)
+    })
   })
 })

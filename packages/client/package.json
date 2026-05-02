@@ -1,16 +1,15 @@
 {
   "name": "@orpc/client",
   "type": "module",
-  "version": "1.12.3",
+  "version": "1.14.0",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/unnoq/orpc.git",
+    "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/client"
   },
   "keywords": [
-    "unnoq",
     "orpc"
   ],
   "publishConfig": {
@@ -70,6 +69,6 @@
     "@orpc/standard-server-peer": "workspace:*"
   },
   "devDependencies": {
-    "zod": "^4.1.12"
+    "zod": "^4.3.6"
   }
 }

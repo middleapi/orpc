@@ -76,6 +76,20 @@ describe('standardRPCCodec', () => {
     expect(serializer.serialize).toHaveBeenCalledWith('__output__')
   })
 
+  it('.encode with ReadableStream bypasses serialization', () => {
+    const stream = new ReadableStream<Uint8Array>()
+
+    const response = codec.encode(stream, ping)
+
+    expect(response).toEqual({
+      status: 200,
+      headers: {},
+      body: stream,
+    })
+
+    expect(serializer.serialize).not.toHaveBeenCalled()
+  })
+
   it('.encodeError', async () => {
     serializer.serialize.mockReturnValueOnce('__serialized__')
 

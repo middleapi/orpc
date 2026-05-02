@@ -5,14 +5,17 @@ const { $orpc } = useNuxtApp()
 
 const query = useQuery($orpc.sse.experimental_streamedOptions({
   queryFnOptions: { maxChunks: 3 },
+  enabled: import.meta.client,
 }))
 </script>
 
 <template>
   <div>
     <h2>oRPC and Tanstack Query | Event Iterator example</h2>
-    <pre>
+    <ClientOnly>
+      <pre>
 {{ JSON.stringify(query.data.value, null, 2) }}
-    </pre>
+      </pre>
+    </ClientOnly>
   </div>
 </template>

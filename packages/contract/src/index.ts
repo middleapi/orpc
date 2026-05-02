@@ -1,5 +1,3 @@
-/** unnoq */
-
 export * from './builder'
 export * from './builder-variants'
 export * from './config'

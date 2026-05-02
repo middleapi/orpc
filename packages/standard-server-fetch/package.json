@@ -1,12 +1,12 @@
 {
   "name": "@orpc/standard-server-fetch",
   "type": "module",
-  "version": "1.12.3",
+  "version": "1.14.0",
   "license": "MIT",
-  "homepage": "https://unnoq.com",
+  "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/unnoq/orpc.git",
+    "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/standard-server-fetch"
   },
   "keywords": [
@@ -37,6 +37,6 @@
     "@orpc/standard-server": "workspace:*"
   },
   "devDependencies": {
-    "@hono/node-server": "^1.19.6"
+    "@hono/node-server": "^1.19.11"
   }
 }

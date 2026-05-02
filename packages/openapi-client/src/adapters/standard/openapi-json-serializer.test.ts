@@ -66,8 +66,8 @@ const builtInCases: TestCase[] = [
     expected: '/uic/gi',
   },
   {
-    data: new URL('https://unnoq.com'),
-    expected: new URL('https://unnoq.com').href,
+    data: new URL('https://orpc.dev'),
+    expected: new URL('https://orpc.dev').href,
   },
   {
     data: { a: 1, b: 2, c: 3 },
@@ -138,12 +138,12 @@ class Person2 {
 
 const customSupportedDataTypes: TestCase[] = [
   {
-    data: new Person('unnoq', new Date('2023-01-01')),
-    expected: { name: 'unnoq', date: '2023-01-01T00:00:00.000Z' },
+    data: new Person('Dinh Le', new Date('2023-01-01')),
+    expected: { name: 'Dinh Le', date: '2023-01-01T00:00:00.000Z' },
   },
   {
-    data: new Person2('unnoq - 2', [{ nested: new Date('2023-01-02') }, /uic/gi]),
-    expected: { name: 'unnoq - 2', data: [{ nested: '2023-01-02T00:00:00.000Z' }, '/uic/gi'] },
+    data: new Person2('Dinh Le - 2', [{ nested: new Date('2023-01-02') }, /uic/gi]),
+    expected: { name: 'Dinh Le - 2', data: [{ nested: '2023-01-02T00:00:00.000Z' }, '/uic/gi'] },
   },
   {
     data: { value: { toJSON: () => 'hello' } },
@@ -211,7 +211,7 @@ describe.each<TestCase>([
     const [json, hasBlob] = serializer.serialize({
       'date': new Date('2023-01-01'),
       'regexp': /uic/gi,
-      'url': new URL('https://unnoq.com'),
+      'url': new URL('https://orpc.dev'),
       '!@#$%^^&()[]>?<~_<:"~+!_': data,
       'list': [data],
       'map': new Map([[data, data]]),
@@ -224,7 +224,7 @@ describe.each<TestCase>([
     expect(json).toEqual({
       'date': new Date('2023-01-01').toISOString(),
       'regexp': (/uic/gi).toString(),
-      'url': new URL('https://unnoq.com').href,
+      'url': new URL('https://orpc.dev').href,
       '!@#$%^^&()[]>?<~_<:"~+!_': expected,
       'list': [expected],
       'map': [[expected, expected]],

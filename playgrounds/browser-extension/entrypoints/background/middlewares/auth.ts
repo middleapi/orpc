@@ -21,5 +21,5 @@ export const requiredAuthMiddleware = os
   })
 
 async function getSession() {
-  return { user: { id: 'unique', name: 'unnoq', email: 'contact@unnoq.com' } }
+  return { user: { id: 'unique', name: 'Example', email: 'example@example.com' } }
 }

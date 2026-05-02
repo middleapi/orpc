@@ -84,21 +84,24 @@ describe('decodeEventMessage', () => {
 })
 
 describe('eventDecoder', () => {
-  it('on success', () => {
+  it('on success with mixed chunks', () => {
     const onEvent = vi.fn()
 
     const decoder = new EventDecoder({ onEvent })
 
-    decoder.feed('event: message\ndata: hello1\ndata: world\n\n')
-    decoder.feed('event: message\ndata: hello2\ndata: world\nid: 123\nretry: 10000\n\n')
-    decoder.feed('event: message\ndata: hello3\ndata: world\nid: 123\nretry: 10000\n\n')
-
-    decoder.feed('event: done\n')
-    decoder.feed('data: hello4\n')
+    decoder.feed('event: message\n')
+    decoder.feed('data: hello1\n')
     decoder.feed('data: world\n\n')
+
+    decoder.feed('event: message\ndata: hello2\ndata: world\n\n')
+    // NOTE: a chunk contain 1,5 events is important test, carefully when modify
+    decoder.feed('event: message\ndata: hello3\ndata: world\n\nevent: message\ndata: hello4\n')
+    decoder.feed('data: world\nid: 123\nretry: 10000\n\nevent: done\ndata: hello5\ndata: world\nid: 123\nretry: 10000\n')
+    decoder.feed('\n')
+
     decoder.end()
 
-    expect(onEvent).toHaveBeenCalledTimes(4)
+    expect(onEvent).toHaveBeenCalledTimes(5)
     expect(onEvent).toHaveBeenNthCalledWith(1, {
       data: 'hello1\nworld',
       event: 'message',
@@ -109,22 +112,29 @@ describe('eventDecoder', () => {
     expect(onEvent).toHaveBeenNthCalledWith(2, {
       data: 'hello2\nworld',
       event: 'message',
-      id: '123',
-      retry: 10000,
+      id: undefined,
+      retry: undefined,
       comments: [],
     })
     expect(onEvent).toHaveBeenNthCalledWith(3, {
       data: 'hello3\nworld',
       event: 'message',
-      id: '123',
-      retry: 10000,
+      id: undefined,
+      retry: undefined,
       comments: [],
     })
     expect(onEvent).toHaveBeenNthCalledWith(4, {
       data: 'hello4\nworld',
+      event: 'message',
+      id: '123',
+      retry: 10000,
+      comments: [],
+    })
+    expect(onEvent).toHaveBeenNthCalledWith(5, {
+      data: 'hello5\nworld',
       event: 'done',
-      id: undefined,
-      retry: undefined,
+      id: '123',
+      retry: 10000,
       comments: [],
     })
   })

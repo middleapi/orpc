@@ -1,16 +1,15 @@
 {
   "name": "@orpc/vue-query",
   "type": "module",
-  "version": "1.12.3",
+  "version": "1.14.0",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/unnoq/orpc.git",
+    "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/vue-query"
   },
   "keywords": [
-    "unnoq",
     "orpc",
     "vue",
     "vue-query",
@@ -46,6 +45,6 @@
     "@orpc/tanstack-query": "workspace:*"
   },
   "devDependencies": {
-    "@tanstack/vue-query": "^5.91.2"
+    "@tanstack/vue-query": "^5.92.9"
   }
 }

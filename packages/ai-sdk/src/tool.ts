@@ -38,7 +38,7 @@ export class CreateToolError extends Error {}
  * const getWeatherContract = base
  *   .meta({
  *     [AI_SDK_TOOL_META_SYMBOL]: {
- *       name: 'custom-tool-name', // AI SDK tool name
+ *       title: 'Get Weather', // AI SDK tool title
  *     },
  *   })
  *   .route({
@@ -105,7 +105,7 @@ export function implementTool<TOutInput, TInOutput>(
  * const getWeatherProcedure = base
  *   .meta({
  *     [AI_SDK_TOOL_META_SYMBOL]: {
- *       name: 'custom-tool-name', // AI SDK tool name
+ *       title: 'Get Weather', // AI SDK tool title
  *     },
  *   })
  *   .route({

@@ -18,4 +18,10 @@ testSchemaConverter([
     input: [true, { type: 'string' }],
     output: [false, {}],
   },
+  {
+    name: 'preprocess(x => x, z.string())',
+    schema: z.preprocess(x => x, z.string()),
+    input: [true, { type: 'string' }],
+    output: [true, { type: 'string' }],
+  },
 ])
