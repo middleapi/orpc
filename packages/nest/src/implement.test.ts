@@ -2,6 +2,7 @@ import type { NodeHttpRequest } from '@orpc/standard-server-node'
 import type { Request } from 'express'
 import type { FastifyReply } from 'fastify'
 import FastifyCookie from '@fastify/cookie'
+import { HonoAdapter } from '@mnigos/platform-hono'
 import { Controller, Req, Res } from '@nestjs/common'
 import { REQUEST } from '@nestjs/core'
 import { FastifyAdapter } from '@nestjs/platform-fastify'
@@ -671,6 +672,73 @@ describe('@Implement', async () => {
   })
 
   describe('compatibility', () => {
+    it('works with @mnigos/platform-hono', async () => {
+      @Controller()
+      class HonoController {
+        @Implement(contract.ping)
+        ping() {
+          return implement(contract.ping).handler(ping_handler)
+        }
+
+        @Implement(contract.pong)
+        pong() {
+          return implement(contract.pong).handler(pong_handler)
+        }
+      }
+
+      const moduleRef = await Test.createTestingModule({
+        controllers: [HonoController],
+      }).compile()
+
+      const adapter = new HonoAdapter()
+      const app = moduleRef.createNestApplication(adapter, { bodyParser: false })
+      await app.init()
+      await app.listen(0)
+
+      const httpServer = app.getHttpServer()
+
+      try {
+        const pingRes = await supertest(httpServer)
+          .post('/ping?param=value&param2[]=value2&param2[]=value3')
+          .set('x-custom', 'value')
+          .send({ hello: 'world' })
+
+        expect(pingRes.statusCode).toEqual(200)
+        expect(pingRes.body).toEqual('pong')
+        expect(pingRes.headers).toEqual(expect.objectContaining({ 'x-ping': 'pong' }))
+
+        expect(ping_handler).toHaveBeenCalledWith(expect.objectContaining({
+          input: {
+            headers: expect.objectContaining({
+              'x-custom': 'value',
+            }),
+            body: { hello: 'world' },
+            params: {},
+            query: {
+              param: 'value',
+              param2: ['value2', 'value3'],
+            },
+          },
+        }))
+
+        const pongRes = await supertest(httpServer).get('/pong/world')
+
+        expect(pongRes.statusCode).toEqual(408)
+        expect(pongRes.body).toEqual(expect.objectContaining({
+          code: 'TEST',
+          data: 'pong world',
+        }))
+        expect(pong_handler).toHaveBeenCalledWith(expect.objectContaining({
+          input: {
+            name: 'world',
+          },
+        }))
+      }
+      finally {
+        await app.close()
+      }
+    })
+
     it('work with fastify/cookie', async () => {
       @Controller()
       class FastifyController {

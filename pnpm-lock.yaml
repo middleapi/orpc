@@ -430,6 +430,9 @@ importers:
       '@orpc/standard-server-fastify':
         specifier: workspace:*
         version: link:../standard-server-fastify
+      '@orpc/standard-server-fetch':
+        specifier: workspace:*
+        version: link:../standard-server-fetch
       '@orpc/standard-server-node':
         specifier: workspace:*
         version: link:../standard-server-node
@@ -437,6 +440,12 @@ importers:
       '@fastify/cookie':
         specifier: ^11.0.2
         version: 11.0.2
+      '@hono/node-server':
+        specifier: ^1.19.11
+        version: 1.19.11(hono@4.10.7)
+      '@mnigos/platform-hono':
+        specifier: ^0.1.2
+        version: 0.1.2(@hono/node-server@1.19.11(hono@4.10.7))(@nestjs/common@11.1.16(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.16)(hono@4.10.7)
       '@nestjs/common':
         specifier: ^11.1.16
         version: 11.1.16(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -464,6 +473,9 @@ importers:
       fastify:
         specifier: ^5.8.3
         version: 5.8.3
+      hono:
+        specifier: ^4.10.7
+        version: 4.10.7
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
@@ -4016,6 +4028,15 @@ packages:
 
   '@mermaid-js/parser@1.0.1':
     resolution: {integrity: sha512-opmV19kN1JsK0T6HhhokHpcVkqKpF+x2pPDKKM2ThHtZAB5F4PROopk0amuVYK5qMrIA4erzpNm8gmPNJgMDxQ==}
+
+  '@mnigos/platform-hono@0.1.2':
+    resolution: {integrity: sha512-FHor1/ROPxjjewPTTiqvCdyAlV1jQKm1NckFwZjNh4JZewGkoZllk/Kwdd+Gd7GLFnOzGQyZTbrIglkzrrM8CQ==}
+    engines: {bun: '>=1.3.3'}
+    peerDependencies:
+      '@hono/node-server': '>=1.19.11'
+      '@nestjs/common': '>=11.0.0'
+      '@nestjs/core': '>=11.0.0'
+      hono: '>=4.10.7'
 
   '@mswjs/interceptors@0.41.2':
     resolution: {integrity: sha512-7G0Uf0yK3f2bjElBLGHIQzgRgMESczOMyYVasq1XK8P5HaXtlW4eQhz9MBL+TQILZLaruq+ClGId+hH0w4jvWw==}
@@ -18151,6 +18172,13 @@ snapshots:
   '@mermaid-js/parser@1.0.1':
     dependencies:
       langium: 4.2.1
+
+  '@mnigos/platform-hono@0.1.2(@hono/node-server@1.19.11(hono@4.10.7))(@nestjs/common@11.1.16(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.16)(hono@4.10.7)':
+    dependencies:
+      '@hono/node-server': 1.19.11(hono@4.10.7)
+      '@nestjs/common': 11.1.16(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core': 11.1.16(@nestjs/common@11.1.16(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.16)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      hono: 4.10.7
 
   '@mswjs/interceptors@0.41.2':
     dependencies:

@@ -214,6 +214,37 @@ async function bootstrap() {
 oRPC will use NestJS parsed body when it's available, and only use the oRPC parser if the body is not parsed by NestJS.
 :::
 
+## Hono Adapter
+
+`@orpc/nest` supports NestJS applications that use Hono-based HTTP adapters.
+
+For example, install [`@mnigos/platform-hono`](https://www.npmjs.com/package/@mnigos/platform-hono)
+and its Hono peer dependencies:
+
+```sh
+pnpm add @mnigos/platform-hono @hono/node-server hono
+```
+
+Then pass the adapter to `NestFactory.create`:
+
+```ts
+import { HonoAdapter } from '@mnigos/platform-hono'
+import { NestFactory } from '@nestjs/core'
+import { AppModule } from './app.module'
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule, new HonoAdapter(), {
+    bodyParser: false,
+  })
+
+  await app.listen(process.env.PORT ?? 3000)
+}
+```
+
+`@Implement` routes continue to use the same contract paths and route
+parameters. Internally, oRPC reads the Hono `Request` and returns a Hono-native
+`Response` through the adapter response context.
+
 ## Configuration
 
 Configure the `@orpc/nest` module by importing `ORPCModule` in your NestJS application:

@@ -7,7 +7,7 @@ import type { Request, Response } from 'express'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
 import type { ORPCGlobalContext, ORPCModuleConfig } from './module'
-import { applyDecorators, Delete, Get, Head, HttpCode, Inject, Injectable, Optional, Patch, Post, Put, UseInterceptors } from '@nestjs/common'
+import { applyDecorators, Delete, Get, Head, HttpCode, Inject, Injectable, Optional, Options, Patch, Post, Put, UseInterceptors } from '@nestjs/common'
 import { fallbackContractConfig, isContractProcedure } from '@orpc/contract'
 import { StandardBracketNotationSerializer, StandardOpenAPIJsonSerializer, StandardOpenAPISerializer } from '@orpc/openapi-client/standard'
 import { StandardOpenAPICodec } from '@orpc/openapi/standard'
@@ -22,10 +22,10 @@ import { ORPC_MODULE_CONFIG_SYMBOL } from './module'
 import { toNestPattern } from './utils'
 
 interface HonoContext {
-  req: { raw: globalThis.Request }
+  req: { raw: globalThis.Request, params?: NestParams }
   res?: globalThis.Response
   finalized: boolean
-  newResponse: (body: BodyInit | null, init?: ResponseInit) => globalThis.Response
+  newResponse: (...args: any[]) => globalThis.Response
 }
 
 const MethodDecoratorMap = {
@@ -35,6 +35,7 @@ const MethodDecoratorMap = {
   PUT: Put,
   PATCH: Patch,
   DELETE: Delete,
+  OPTIONS: Options,
 }
 
 /**
@@ -133,6 +134,7 @@ export class ImplementInterceptor implements NestInterceptor {
         const req: Request | FastifyRequest | HonoContext['req'] = ctx.switchToHttp().getRequest()
         const res: Response | FastifyReply | HonoContext = ctx.switchToHttp().getResponse()
 
+        // Detect a Hono adapter response context by its Fetch response factory.
         const isHono = 'finalized' in res && typeof (res as HonoContext).newResponse === 'function'
         const isFastify = 'raw' in req && !isHono
 
@@ -148,7 +150,7 @@ export class ImplementInterceptor implements NestInterceptor {
 
         const handler = new StandardHandler(procedure, {
           init: () => {},
-          match: () => Promise.resolve({ path: toArray(this.config.path), procedure, params: flattenParams(req.params as NestParams) }),
+          match: () => Promise.resolve({ path: toArray(this.config.path), procedure, params: flattenParams(req.params as NestParams | undefined) }),
         }, this.codec, {
           // Since plugins can modify options directly, so we need to clone to avoid affecting other handlers/requests
           // TODO: improve plugins system to avoid this cloning
@@ -166,7 +168,8 @@ export class ImplementInterceptor implements NestInterceptor {
             { request: req, response: res, standardResponse: result.response },
             async ({ response, standardResponse }) => {
               if (isHono) {
-                (response as HonoContext).res = StandardServerFetch.toFetchResponse(standardResponse, this.config)
+                const fetchResponse = StandardServerFetch.toFetchResponse(standardResponse, this.config)
+                return (response as HonoContext).newResponse(fetchResponse.body, fetchResponse)
               }
               else if (isFastify) {
                 await StandardServerFastify.sendStandardResponse(response as FastifyReply, standardResponse, this.config)
@@ -182,10 +185,10 @@ export class ImplementInterceptor implements NestInterceptor {
   }
 }
 
-function flattenParams(params: NestParams): StandardParams {
+function flattenParams(params: NestParams | undefined): StandardParams {
   const flatten: StandardParams = {}
 
-  for (const [key, value] of Object.entries(params)) {
+  for (const [key, value] of Object.entries(params ?? {})) {
     if (Array.isArray(value)) {
       flatten[key] = value.join('/')
     }
