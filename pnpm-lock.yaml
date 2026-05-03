@@ -444,8 +444,8 @@ importers:
         specifier: ^1.19.11
         version: 1.19.11(hono@4.10.7)
       '@mnigos/platform-hono':
-        specifier: ^0.1.2
-        version: 0.1.2(@hono/node-server@1.19.11(hono@4.10.7))(@nestjs/common@11.1.16(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.16)(hono@4.10.7)
+        specifier: ^0.1.3
+        version: 0.1.3(@hono/node-server@1.19.11(hono@4.10.7))(@nestjs/common@11.1.16(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.16)(hono@4.10.7)
       '@nestjs/common':
         specifier: ^11.1.16
         version: 11.1.16(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -4029,8 +4029,8 @@ packages:
   '@mermaid-js/parser@1.0.1':
     resolution: {integrity: sha512-opmV19kN1JsK0T6HhhokHpcVkqKpF+x2pPDKKM2ThHtZAB5F4PROopk0amuVYK5qMrIA4erzpNm8gmPNJgMDxQ==}
 
-  '@mnigos/platform-hono@0.1.2':
-    resolution: {integrity: sha512-FHor1/ROPxjjewPTTiqvCdyAlV1jQKm1NckFwZjNh4JZewGkoZllk/Kwdd+Gd7GLFnOzGQyZTbrIglkzrrM8CQ==}
+  '@mnigos/platform-hono@0.1.3':
+    resolution: {integrity: sha512-1z6WyTkyrfLv9H6m/kkGRFLvI0Frd3yaNCOZKVSsRhMXLWktPguUg48tucZ2PRl3BtCxLFjhnl0V4wrxNgtvzQ==}
     engines: {bun: '>=1.3.3'}
     peerDependencies:
       '@hono/node-server': '>=1.19.11'
@@ -18173,7 +18173,7 @@ snapshots:
     dependencies:
       langium: 4.2.1
 
-  '@mnigos/platform-hono@0.1.2(@hono/node-server@1.19.11(hono@4.10.7))(@nestjs/common@11.1.16(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.16)(hono@4.10.7)':
+  '@mnigos/platform-hono@0.1.3(@hono/node-server@1.19.11(hono@4.10.7))(@nestjs/common@11.1.16(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.16)(hono@4.10.7)':
     dependencies:
       '@hono/node-server': 1.19.11(hono@4.10.7)
       '@nestjs/common': 11.1.16(reflect-metadata@0.2.2)(rxjs@7.8.2)

@@ -684,6 +684,11 @@ describe('@Implement', async () => {
         pong() {
           return implement(contract.pong).handler(pong_handler)
         }
+
+        @Implement(contract.nested.peng)
+        peng() {
+          return implement(contract.nested.peng).handler(peng_handler)
+        }
       }
 
       const moduleRef = await Test.createTestingModule({
@@ -731,6 +736,16 @@ describe('@Implement', async () => {
         expect(pong_handler).toHaveBeenCalledWith(expect.objectContaining({
           input: {
             name: 'world',
+          },
+        }))
+
+        const pengRes = await supertest(httpServer).delete('/world/who%3F')
+
+        expect(pengRes.statusCode).toEqual(202)
+        expect(pengRes.body).toEqual('peng world/who?')
+        expect(peng_handler).toHaveBeenCalledWith(expect.objectContaining({
+          input: {
+            path: 'world/who?',
           },
         }))
       }
