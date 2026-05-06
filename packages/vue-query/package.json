@@ -15,6 +15,7 @@
     "vue-query",
     "tanstack"
   ],
+  "sideEffects": false,
   "publishConfig": {
     "exports": {
       ".": {

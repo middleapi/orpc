@@ -15,6 +15,7 @@
     "tanstack query",
     "solid"
   ],
+  "sideEffects": false,
   "publishConfig": {
     "exports": {
       ".": {

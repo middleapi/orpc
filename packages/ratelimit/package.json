@@ -13,6 +13,7 @@
     "orpc",
     "ratelimit"
   ],
+  "sideEffects": false,
   "publishConfig": {
     "exports": {
       ".": {

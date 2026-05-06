@@ -13,6 +13,7 @@
     "orpc",
     "Hey API"
   ],
+  "sideEffects": false,
   "publishConfig": {
     "exports": {
       ".": {

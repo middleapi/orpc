@@ -12,6 +12,7 @@
   "keywords": [
     "orpc"
   ],
+  "sideEffects": false,
   "publishConfig": {
     "exports": {
       "./compression": {

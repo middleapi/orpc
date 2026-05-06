@@ -15,6 +15,7 @@
     "tanstack query",
     "svelte"
   ],
+  "sideEffects": false,
   "publishConfig": {
     "exports": {
       ".": {

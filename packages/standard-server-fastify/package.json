@@ -13,6 +13,7 @@
     "orpc",
     "fastify"
   ],
+  "sideEffects": false,
   "publishConfig": {
     "exports": {
       ".": {

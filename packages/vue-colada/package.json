@@ -16,6 +16,7 @@
     "pinia-colada",
     "tanstack"
   ],
+  "sideEffects": false,
   "publishConfig": {
     "exports": {
       ".": {
