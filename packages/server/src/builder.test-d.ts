@@ -1,4 +1,4 @@
-import type { AnySchema, ContractProcedure, ErrorMap, MergedErrorMap, Schema } from '@orpc/contract'
+import type { AnySchema, ContractProcedure, ErrorMap, MergedErrorMap, MergedMeta, Schema } from '@orpc/contract'
 import type { baseErrorMap, BaseMeta, inputSchema, outputSchema } from '../../contract/tests/shared'
 import type { CurrentContext, InitialContext } from '../tests/shared'
 import type { Builder } from './builder'
@@ -275,12 +275,63 @@ describe('Builder', () => {
         typeof inputSchema,
         typeof outputSchema,
         typeof baseErrorMap,
+        MergedMeta<BaseMeta, { readonly log: true }>,
         BaseMeta
       >
     >()
 
     // @ts-expect-error - invalid meta
     builder.meta({ log: 'INVALID' })
+  })
+
+  it('.meta accumulates new keys without re-specifying already-set fields', () => {
+    expectTypeOf(builder.meta({ log: true }).meta({ mode: 'live' })).toEqualTypeOf<
+      ProcedureBuilder<
+        InitialContext,
+        CurrentContext,
+        typeof inputSchema,
+        typeof outputSchema,
+        typeof baseErrorMap,
+        MergedMeta<MergedMeta<BaseMeta, { readonly log: true }>, { readonly mode: 'live' }>,
+        BaseMeta
+      >
+    >()
+  })
+
+  it('.meta overrides a previously-narrowed key, matching runtime merge', () => {
+    expectTypeOf(builder.meta({ log: true }).meta({ log: false })).toEqualTypeOf<
+      ProcedureBuilder<
+        InitialContext,
+        CurrentContext,
+        typeof inputSchema,
+        typeof outputSchema,
+        typeof baseErrorMap,
+        MergedMeta<MergedMeta<BaseMeta, { readonly log: true }>, { readonly log: false }>,
+        BaseMeta
+      >
+    >()
+  })
+
+  it('.meta enforces declared schema even after narrowing', () => {
+    // @ts-expect-error - 'INVALID' not assignable to log: boolean | undefined
+    builder.meta({ log: true }).meta({ log: 'INVALID' })
+
+    // @ts-expect-error - 'logg' is not in the declared schema
+    builder.meta({ logg: true })
+  })
+
+  it('.meta supports helper composition with variable values via $meta', () => {
+    type TabConfig = { id: string }
+    const cfgA: TabConfig = { id: 'a' }
+    const cfgB: TabConfig = { id: 'b' }
+
+    const base = builder.$meta<{ tab?: TabConfig }>({})
+
+    const result = base.meta({ tab: cfgA }).meta({ tab: cfgB })
+    expectTypeOf(result['~orpc'].meta.tab).toEqualTypeOf<TabConfig>()
+
+    // @ts-expect-error - foreign key rejected by the declared schema
+    base.meta({ unknown: 1 })
   })
 
   it('.route', () => {

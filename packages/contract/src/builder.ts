@@ -1,7 +1,7 @@
 import type { HTTPPath } from '@orpc/client'
 import type { ContractProcedureBuilder, ContractProcedureBuilderWithInput, ContractProcedureBuilderWithOutput, ContractRouterBuilder } from './builder-variants'
 import type { ErrorMap, MergedErrorMap } from './error'
-import type { Meta } from './meta'
+import type { MergedMeta, Meta } from './meta'
 import type { ContractProcedureDef } from './procedure'
 import type { Route } from './route'
 import type { ContractRouter } from './router'
@@ -26,6 +26,7 @@ export class ContractBuilder<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
   TMeta extends Meta,
+  TMetaDef extends Meta = TMeta,
 > extends ContractProcedure<TInputSchema, TOutputSchema, TErrorMap, TMeta> {
   /**
    * This property holds the defined options for the contract.
@@ -46,7 +47,7 @@ export class ContractBuilder<
    */
   $meta<U extends Meta>(
     initialMeta: U,
-  ): ContractBuilder<TInputSchema, TOutputSchema, TErrorMap, U & Record<never, never>> {
+  ): ContractBuilder<TInputSchema, TOutputSchema, TErrorMap, U & Record<never, never>, U> {
     /**
      * We need `& Record<never, never>` to deal with `has no properties in common with type` error
      */
@@ -66,7 +67,7 @@ export class ContractBuilder<
    */
   $route(
     initialRoute: Route,
-  ): ContractBuilder<TInputSchema, TOutputSchema, TErrorMap, TMeta> {
+  ): ContractBuilder<TInputSchema, TOutputSchema, TErrorMap, TMeta, TMetaDef> {
     return new ContractBuilder({
       ...this['~orpc'],
       route: initialRoute,
@@ -80,7 +81,7 @@ export class ContractBuilder<
    */
   $input<U extends AnySchema>(
     initialInputSchema?: U,
-  ): ContractBuilder<U, TOutputSchema, TErrorMap, TMeta> {
+  ): ContractBuilder<U, TOutputSchema, TErrorMap, TMeta, TMetaDef> {
     return new ContractBuilder({
       ...this['~orpc'],
       inputSchema: initialInputSchema,
@@ -95,7 +96,7 @@ export class ContractBuilder<
    */
   errors<U extends ErrorMap>(
     errors: U,
-  ): ContractBuilder<TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, U>, TMeta> {
+  ): ContractBuilder<TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, U>, TMeta, TMetaDef> {
     return new ContractBuilder({
       ...this['~orpc'],
       errorMap: mergeErrorMap(this['~orpc'].errorMap, errors),
@@ -108,9 +109,9 @@ export class ContractBuilder<
    *
    * @see {@link https://orpc.dev/docs/metadata Metadata Docs}
    */
-  meta(
-    meta: TMeta,
-  ): ContractProcedureBuilder<TInputSchema, TOutputSchema, TErrorMap, TMeta> {
+  meta<const U extends Partial<TMetaDef>>(
+    meta: U,
+  ): ContractProcedureBuilder<TInputSchema, TOutputSchema, TErrorMap, MergedMeta<TMeta, U>, TMetaDef> {
     return new ContractBuilder({
       ...this['~orpc'],
       meta: mergeMeta(this['~orpc'].meta, meta),
@@ -127,7 +128,7 @@ export class ContractBuilder<
    */
   route(
     route: Route,
-  ): ContractProcedureBuilder<TInputSchema, TOutputSchema, TErrorMap, TMeta> {
+  ): ContractProcedureBuilder<TInputSchema, TOutputSchema, TErrorMap, TMeta, TMetaDef> {
     return new ContractBuilder({
       ...this['~orpc'],
       route: mergeRoute(this['~orpc'].route, route),
@@ -141,8 +142,8 @@ export class ContractBuilder<
    */
   input<U extends AnySchema>(
     schema: U,
-  ): ContractProcedureBuilderWithInput<U, TOutputSchema, TErrorMap, TMeta> {
-    return new ContractBuilder({
+  ): ContractProcedureBuilderWithInput<U, TOutputSchema, TErrorMap, TMeta, TMetaDef> {
+    return new ContractBuilder<U, TOutputSchema, TErrorMap, TMeta, TMetaDef>({
       ...this['~orpc'],
       inputSchema: schema,
     })
@@ -155,8 +156,8 @@ export class ContractBuilder<
    */
   output<U extends AnySchema>(
     schema: U,
-  ): ContractProcedureBuilderWithOutput<TInputSchema, U, TErrorMap, TMeta> {
-    return new ContractBuilder({
+  ): ContractProcedureBuilderWithOutput<TInputSchema, U, TErrorMap, TMeta, TMetaDef> {
+    return new ContractBuilder<TInputSchema, U, TErrorMap, TMeta, TMetaDef>({
       ...this['~orpc'],
       outputSchema: schema,
     })

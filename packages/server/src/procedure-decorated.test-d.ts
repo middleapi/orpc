@@ -1,5 +1,5 @@
 import type { Client } from '@orpc/client'
-import type { AnySchema, ErrorFromErrorMap, ErrorMap, MergedErrorMap } from '@orpc/contract'
+import type { AnySchema, ErrorFromErrorMap, ErrorMap, MergedErrorMap, MergedMeta } from '@orpc/contract'
 import type { baseErrorMap, BaseMeta, inputSchema, outputSchema } from '../../contract/tests/shared'
 import type { CurrentContext, InitialContext } from '../tests/shared'
 import type { Context } from './context'
@@ -65,6 +65,7 @@ describe('DecoratedProcedure', () => {
         typeof inputSchema,
         typeof outputSchema,
         typeof baseErrorMap,
+        MergedMeta<BaseMeta, { readonly mode: 'dev', readonly log: true }>,
         BaseMeta
       >
     >()

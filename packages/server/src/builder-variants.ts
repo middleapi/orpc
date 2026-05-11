@@ -1,5 +1,5 @@
 import type { HTTPPath } from '@orpc/client'
-import type { AnySchema, ContractRouter, ErrorMap, InferSchemaInput, InferSchemaOutput, MergedErrorMap, Meta, Route, Schema } from '@orpc/contract'
+import type { AnySchema, ContractRouter, ErrorMap, InferSchemaInput, InferSchemaOutput, MergedErrorMap, MergedMeta, Meta, Route, Schema } from '@orpc/contract'
 import type { IntersectPick } from '@orpc/shared'
 import type { BuilderDef } from './builder'
 import type { Context, MergedCurrentContext, MergedInitialContext } from './context'
@@ -18,6 +18,7 @@ export interface BuilderWithMiddlewares<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
   TMeta extends Meta,
+  TMetaDef extends Meta = TMeta,
 > {
   /**
    * This property holds the defined options.
@@ -38,7 +39,8 @@ export interface BuilderWithMiddlewares<
     TInputSchema,
     TOutputSchema,
     MergedErrorMap<TErrorMap, U>,
-    TMeta
+    TMeta,
+    TMetaDef
   >
 
   /**
@@ -63,7 +65,8 @@ export interface BuilderWithMiddlewares<
     TInputSchema,
     TOutputSchema,
     TErrorMap,
-    TMeta
+    TMeta,
+    TMetaDef
   >
 
   /**
@@ -72,9 +75,9 @@ export interface BuilderWithMiddlewares<
    *
    * @see {@link https://orpc.dev/docs/metadata Metadata Docs}
    */
-  'meta'(
-    meta: TMeta,
-  ): BuilderWithMiddlewares<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  'meta'<const U extends Partial<TMetaDef>>(
+    meta: U,
+  ): BuilderWithMiddlewares<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, MergedMeta<TMeta, U>, TMetaDef>
 
   /**
    * Sets or updates the route definition.
@@ -86,7 +89,7 @@ export interface BuilderWithMiddlewares<
    */
   'route'(
     route: Route,
-  ): ProcedureBuilder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  ): ProcedureBuilder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Defines the input validation schema.
@@ -95,7 +98,7 @@ export interface BuilderWithMiddlewares<
    */
   'input'<USchema extends AnySchema>(
     schema: USchema,
-  ): ProcedureBuilderWithInput<TInitialContext, TCurrentContext, USchema, TOutputSchema, TErrorMap, TMeta>
+  ): ProcedureBuilderWithInput<TInitialContext, TCurrentContext, USchema, TOutputSchema, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Defines the output validation schema.
@@ -104,7 +107,7 @@ export interface BuilderWithMiddlewares<
    */
   'output'<USchema extends AnySchema>(
     schema: USchema,
-  ): ProcedureBuilderWithOutput<TInitialContext, TCurrentContext, TInputSchema, USchema, TErrorMap, TMeta>
+  ): ProcedureBuilderWithOutput<TInitialContext, TCurrentContext, TInputSchema, USchema, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Defines the handler of the procedure.
@@ -113,7 +116,7 @@ export interface BuilderWithMiddlewares<
    */
   'handler'<UFuncOutput>(
     handler: ProcedureHandler<TCurrentContext, unknown, UFuncOutput, TErrorMap, TMeta>,
-  ): DecoratedProcedure<TInitialContext, TCurrentContext, TInputSchema, Schema<UFuncOutput, UFuncOutput>, TErrorMap, TMeta>
+  ): DecoratedProcedure<TInitialContext, TCurrentContext, TInputSchema, Schema<UFuncOutput, UFuncOutput>, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Prefixes all procedures in the router.
@@ -123,7 +126,7 @@ export interface BuilderWithMiddlewares<
    *
    * @see {@link https://orpc.dev/docs/openapi/routing#route-prefixes OpenAPI Route Prefixes Docs}
    */
-  'prefix'(prefix: HTTPPath): RouterBuilder<TInitialContext, TCurrentContext, TErrorMap, TMeta>
+  'prefix'(prefix: HTTPPath): RouterBuilder<TInitialContext, TCurrentContext, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Adds tags to all procedures in the router.
@@ -131,7 +134,7 @@ export interface BuilderWithMiddlewares<
    *
    * @see {@link https://orpc.dev/docs/openapi/openapi-specification#operation-metadata OpenAPI Operation Metadata Docs}
    */
-  'tag'(...tags: string[]): RouterBuilder<TInitialContext, TCurrentContext, TErrorMap, TMeta>
+  'tag'(...tags: string[]): RouterBuilder<TInitialContext, TCurrentContext, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Applies all of the previously defined options to the specified router.
@@ -160,6 +163,7 @@ export interface ProcedureBuilder<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
   TMeta extends Meta,
+  TMetaDef extends Meta = TMeta,
 > {
   /**
    * This property holds the defined options.
@@ -180,7 +184,8 @@ export interface ProcedureBuilder<
     TInputSchema,
     TOutputSchema,
     MergedErrorMap<TErrorMap, U>,
-    TMeta
+    TMeta,
+    TMetaDef
   >
 
   /**
@@ -205,7 +210,8 @@ export interface ProcedureBuilder<
     TInputSchema,
     TOutputSchema,
     TErrorMap,
-    TMeta
+    TMeta,
+    TMetaDef
   >
 
   /**
@@ -214,9 +220,9 @@ export interface ProcedureBuilder<
    *
    * @see {@link https://orpc.dev/docs/metadata Metadata Docs}
    */
-  'meta'(
-    meta: TMeta,
-  ): ProcedureBuilder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  'meta'<const U extends Partial<TMetaDef>>(
+    meta: U,
+  ): ProcedureBuilder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, MergedMeta<TMeta, U>, TMetaDef>
 
   /**
    * Sets or updates the route definition.
@@ -228,7 +234,7 @@ export interface ProcedureBuilder<
    */
   'route'(
     route: Route,
-  ): ProcedureBuilder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  ): ProcedureBuilder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Defines the input validation schema.
@@ -237,7 +243,7 @@ export interface ProcedureBuilder<
    */
   'input'<USchema extends AnySchema>(
     schema: USchema,
-  ): ProcedureBuilderWithInput<TInitialContext, TCurrentContext, USchema, TOutputSchema, TErrorMap, TMeta>
+  ): ProcedureBuilderWithInput<TInitialContext, TCurrentContext, USchema, TOutputSchema, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Defines the output validation schema.
@@ -246,7 +252,7 @@ export interface ProcedureBuilder<
    */
   'output'<USchema extends AnySchema>(
     schema: USchema,
-  ): ProcedureBuilderWithOutput<TInitialContext, TCurrentContext, TInputSchema, USchema, TErrorMap, TMeta>
+  ): ProcedureBuilderWithOutput<TInitialContext, TCurrentContext, TInputSchema, USchema, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Defines the handler of the procedure.
@@ -255,7 +261,7 @@ export interface ProcedureBuilder<
    */
   'handler'<UFuncOutput>(
     handler: ProcedureHandler<TCurrentContext, unknown, UFuncOutput, TErrorMap, TMeta>,
-  ): DecoratedProcedure<TInitialContext, TCurrentContext, TInputSchema, Schema<UFuncOutput, UFuncOutput>, TErrorMap, TMeta>
+  ): DecoratedProcedure<TInitialContext, TCurrentContext, TInputSchema, Schema<UFuncOutput, UFuncOutput>, TErrorMap, TMeta, TMetaDef>
 }
 
 export interface ProcedureBuilderWithInput<
@@ -265,6 +271,7 @@ export interface ProcedureBuilderWithInput<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
   TMeta extends Meta,
+  TMetaDef extends Meta = TMeta,
 > {
   /**
    * This property holds the defined options.
@@ -279,7 +286,7 @@ export interface ProcedureBuilderWithInput<
    */
   'errors'<U extends ErrorMap>(
     errors: U,
-  ): ProcedureBuilderWithInput<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, U>, TMeta>
+  ): ProcedureBuilderWithInput<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, U>, TMeta, TMetaDef>
 
   /**
    * Uses a middleware to modify the context or improve the pipeline.
@@ -304,7 +311,8 @@ export interface ProcedureBuilderWithInput<
     TInputSchema,
     TOutputSchema,
     TErrorMap,
-    TMeta
+    TMeta,
+    TMetaDef
   >
 
   /**
@@ -331,7 +339,8 @@ export interface ProcedureBuilderWithInput<
     TInputSchema,
     TOutputSchema,
     TErrorMap,
-    TMeta
+    TMeta,
+    TMetaDef
   >
 
   /**
@@ -340,9 +349,9 @@ export interface ProcedureBuilderWithInput<
    *
    * @see {@link https://orpc.dev/docs/metadata Metadata Docs}
    */
-  'meta'(
-    meta: TMeta,
-  ): ProcedureBuilderWithInput<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  'meta'<const U extends Partial<TMetaDef>>(
+    meta: U,
+  ): ProcedureBuilderWithInput<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, MergedMeta<TMeta, U>, TMetaDef>
 
   /**
    * Sets or updates the route definition.
@@ -354,7 +363,7 @@ export interface ProcedureBuilderWithInput<
    */
   'route'(
     route: Route,
-  ): ProcedureBuilderWithInput<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  ): ProcedureBuilderWithInput<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Defines the output validation schema.
@@ -363,7 +372,7 @@ export interface ProcedureBuilderWithInput<
    */
   'output'<USchema extends AnySchema>(
     schema: USchema,
-  ): ProcedureBuilderWithInputOutput<TInitialContext, TCurrentContext, TInputSchema, USchema, TErrorMap, TMeta>
+  ): ProcedureBuilderWithInputOutput<TInitialContext, TCurrentContext, TInputSchema, USchema, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Defines the handler of the procedure.
@@ -372,7 +381,7 @@ export interface ProcedureBuilderWithInput<
    */
   'handler'<UFuncOutput>(
     handler: ProcedureHandler<TCurrentContext, InferSchemaOutput<TInputSchema>, UFuncOutput, TErrorMap, TMeta>,
-  ): DecoratedProcedure<TInitialContext, TCurrentContext, TInputSchema, Schema<UFuncOutput, UFuncOutput>, TErrorMap, TMeta>
+  ): DecoratedProcedure<TInitialContext, TCurrentContext, TInputSchema, Schema<UFuncOutput, UFuncOutput>, TErrorMap, TMeta, TMetaDef>
 }
 
 export interface ProcedureBuilderWithOutput<
@@ -382,6 +391,7 @@ export interface ProcedureBuilderWithOutput<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
   TMeta extends Meta,
+  TMetaDef extends Meta = TMeta,
 > {
   /**
    * This property holds the defined options.
@@ -402,7 +412,8 @@ export interface ProcedureBuilderWithOutput<
     TInputSchema,
     TOutputSchema,
     MergedErrorMap<TErrorMap, U>,
-    TMeta
+    TMeta,
+    TMetaDef
   >
 
   /**
@@ -427,7 +438,8 @@ export interface ProcedureBuilderWithOutput<
     TInputSchema,
     TOutputSchema,
     TErrorMap,
-    TMeta
+    TMeta,
+    TMetaDef
   >
 
   /**
@@ -436,9 +448,9 @@ export interface ProcedureBuilderWithOutput<
    *
    * @see {@link https://orpc.dev/docs/metadata Metadata Docs}
    */
-  'meta'(
-    meta: TMeta,
-  ): ProcedureBuilderWithOutput<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  'meta'<const U extends Partial<TMetaDef>>(
+    meta: U,
+  ): ProcedureBuilderWithOutput<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, MergedMeta<TMeta, U>, TMetaDef>
 
   /**
    * Sets or updates the route definition.
@@ -450,7 +462,7 @@ export interface ProcedureBuilderWithOutput<
    */
   'route'(
     route: Route,
-  ): ProcedureBuilderWithOutput<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  ): ProcedureBuilderWithOutput<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Defines the input validation schema.
@@ -459,7 +471,7 @@ export interface ProcedureBuilderWithOutput<
    */
   'input'<USchema extends AnySchema>(
     schema: USchema,
-  ): ProcedureBuilderWithInputOutput<TInitialContext, TCurrentContext, USchema, TOutputSchema, TErrorMap, TMeta>
+  ): ProcedureBuilderWithInputOutput<TInitialContext, TCurrentContext, USchema, TOutputSchema, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Defines the handler of the procedure.
@@ -468,7 +480,7 @@ export interface ProcedureBuilderWithOutput<
    */
   'handler'(
     handler: ProcedureHandler<TCurrentContext, unknown, InferSchemaInput<TOutputSchema>, TErrorMap, TMeta>,
-  ): DecoratedProcedure<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  ): DecoratedProcedure<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta, TMetaDef>
 }
 
 export interface ProcedureBuilderWithInputOutput<
@@ -478,6 +490,7 @@ export interface ProcedureBuilderWithInputOutput<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
   TMeta extends Meta,
+  TMetaDef extends Meta = TMeta,
 > {
   /**
    * This property holds the defined options.
@@ -492,7 +505,7 @@ export interface ProcedureBuilderWithInputOutput<
    */
   'errors'<U extends ErrorMap>(
     errors: U,
-  ): ProcedureBuilderWithInputOutput<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, U>, TMeta>
+  ): ProcedureBuilderWithInputOutput<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, U>, TMeta, TMetaDef>
 
   /**
    * Uses a middleware to modify the context or improve the pipeline.
@@ -517,7 +530,8 @@ export interface ProcedureBuilderWithInputOutput<
     TInputSchema,
     TOutputSchema,
     TErrorMap,
-    TMeta
+    TMeta,
+    TMetaDef
   >
 
   /**
@@ -544,7 +558,8 @@ export interface ProcedureBuilderWithInputOutput<
     TInputSchema,
     TOutputSchema,
     TErrorMap,
-    TMeta
+    TMeta,
+    TMetaDef
   >
 
   /**
@@ -553,9 +568,9 @@ export interface ProcedureBuilderWithInputOutput<
    *
    * @see {@link https://orpc.dev/docs/metadata Metadata Docs}
    */
-  'meta'(
-    meta: TMeta,
-  ): ProcedureBuilderWithInputOutput<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  'meta'<const U extends Partial<TMetaDef>>(
+    meta: U,
+  ): ProcedureBuilderWithInputOutput<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, MergedMeta<TMeta, U>, TMetaDef>
 
   /**
    * Sets or updates the route definition.
@@ -567,7 +582,7 @@ export interface ProcedureBuilderWithInputOutput<
    */
   'route'(
     route: Route,
-  ): ProcedureBuilderWithInputOutput<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  ): ProcedureBuilderWithInputOutput<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Defines the handler of the procedure.
@@ -576,7 +591,7 @@ export interface ProcedureBuilderWithInputOutput<
    */
   'handler'(
     handler: ProcedureHandler<TCurrentContext, InferSchemaOutput<TInputSchema>, InferSchemaInput<TOutputSchema>, TErrorMap, TMeta>,
-  ): DecoratedProcedure<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  ): DecoratedProcedure<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta, TMetaDef>
 }
 
 export interface RouterBuilder<
@@ -584,6 +599,7 @@ export interface RouterBuilder<
   TCurrentContext extends Context,
   TErrorMap extends ErrorMap,
   TMeta extends Meta,
+  TMetaDef extends Meta = TMeta,
 > {
   /**
    * This property holds the defined options.
@@ -598,7 +614,7 @@ export interface RouterBuilder<
    */
   'errors'<U extends ErrorMap>(
     errors: U,
-  ): RouterBuilder<TInitialContext, TCurrentContext, MergedErrorMap<TErrorMap, U>, TMeta>
+  ): RouterBuilder<TInitialContext, TCurrentContext, MergedErrorMap<TErrorMap, U>, TMeta, TMetaDef>
 
   /**
    * Uses a middleware to modify the context or improve the pipeline.
@@ -620,7 +636,8 @@ export interface RouterBuilder<
     MergedInitialContext<TInitialContext, UInContext, TCurrentContext>,
     MergedCurrentContext<TCurrentContext, UOutContext>,
     TErrorMap,
-    TMeta
+    TMeta,
+    TMetaDef
   >
 
   /**
@@ -631,7 +648,7 @@ export interface RouterBuilder<
    *
    * @see {@link https://orpc.dev/docs/openapi/routing#route-prefixes OpenAPI Route Prefixes Docs}
    */
-  'prefix'(prefix: HTTPPath): RouterBuilder<TInitialContext, TCurrentContext, TErrorMap, TMeta>
+  'prefix'(prefix: HTTPPath): RouterBuilder<TInitialContext, TCurrentContext, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Adds tags to all procedures in the router.
@@ -639,7 +656,7 @@ export interface RouterBuilder<
    *
    * @see {@link https://orpc.dev/docs/openapi/openapi-specification#operation-metadata OpenAPI Operation Metadata Docs}
    */
-  'tag'(...tags: string[]): RouterBuilder<TInitialContext, TCurrentContext, TErrorMap, TMeta>
+  'tag'(...tags: string[]): RouterBuilder<TInitialContext, TCurrentContext, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Applies all of the previously defined options to the specified router.

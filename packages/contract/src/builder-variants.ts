@@ -1,6 +1,6 @@
 import type { HTTPPath } from '@orpc/client'
 import type { ErrorMap, MergedErrorMap } from './error'
-import type { Meta } from './meta'
+import type { MergedMeta, Meta } from './meta'
 import type { ContractProcedure } from './procedure'
 import type { Route } from './route'
 import type { ContractRouter } from './router'
@@ -12,6 +12,7 @@ export interface ContractProcedureBuilder<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
   TMeta extends Meta,
+  TMetaDef extends Meta = TMeta,
 > extends ContractProcedure<TInputSchema, TOutputSchema, TErrorMap, TMeta> {
   /**
    * Adds type-safe custom errors to the contract.
@@ -21,7 +22,7 @@ export interface ContractProcedureBuilder<
    */
   errors<U extends ErrorMap>(
     errors: U,
-  ): ContractProcedureBuilder<TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, U>, TMeta>
+  ): ContractProcedureBuilder<TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, U>, TMeta, TMetaDef>
 
   /**
    * Sets or updates the metadata for the contract.
@@ -29,9 +30,9 @@ export interface ContractProcedureBuilder<
    *
    * @see {@link https://orpc.dev/docs/metadata Metadata Docs}
    */
-  meta(
-    meta: TMeta,
-  ): ContractProcedureBuilder<TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  meta<const U extends Partial<TMetaDef>>(
+    meta: U,
+  ): ContractProcedureBuilder<TInputSchema, TOutputSchema, TErrorMap, MergedMeta<TMeta, U>, TMetaDef>
 
   /**
    * Sets or updates the route definition for the contract.
@@ -43,7 +44,7 @@ export interface ContractProcedureBuilder<
    */
   route(
     route: Route,
-  ): ContractProcedureBuilder<TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  ): ContractProcedureBuilder<TInputSchema, TOutputSchema, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Defines the input validation schema for the contract.
@@ -52,7 +53,7 @@ export interface ContractProcedureBuilder<
    */
   input<U extends AnySchema>(
     schema: U,
-  ): ContractProcedureBuilderWithInput<U, TOutputSchema, TErrorMap, TMeta>
+  ): ContractProcedureBuilderWithInput<U, TOutputSchema, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Defines the output validation schema for the contract.
@@ -61,7 +62,7 @@ export interface ContractProcedureBuilder<
    */
   output<U extends AnySchema>(
     schema: U,
-  ): ContractProcedureBuilderWithOutput<TInputSchema, U, TErrorMap, TMeta>
+  ): ContractProcedureBuilderWithOutput<TInputSchema, U, TErrorMap, TMeta, TMetaDef>
 }
 
 export interface ContractProcedureBuilderWithInput<
@@ -69,6 +70,7 @@ export interface ContractProcedureBuilderWithInput<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
   TMeta extends Meta,
+  TMetaDef extends Meta = TMeta,
 >extends ContractProcedure<TInputSchema, TOutputSchema, TErrorMap, TMeta> {
   /**
    * Adds type-safe custom errors to the contract.
@@ -78,7 +80,7 @@ export interface ContractProcedureBuilderWithInput<
    */
   errors<U extends ErrorMap>(
     errors: U,
-  ): ContractProcedureBuilderWithInput<TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, U>, TMeta>
+  ): ContractProcedureBuilderWithInput<TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, U>, TMeta, TMetaDef>
 
   /**
    * Sets or updates the metadata for the contract.
@@ -86,9 +88,9 @@ export interface ContractProcedureBuilderWithInput<
    *
    * @see {@link https://orpc.dev/docs/metadata Metadata Docs}
    */
-  meta(
-    meta: TMeta,
-  ): ContractProcedureBuilderWithInput<TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  meta<const U extends Partial<TMetaDef>>(
+    meta: U,
+  ): ContractProcedureBuilderWithInput<TInputSchema, TOutputSchema, TErrorMap, MergedMeta<TMeta, U>, TMetaDef>
 
   /**
    * Sets or updates the route definition for the contract.
@@ -100,7 +102,7 @@ export interface ContractProcedureBuilderWithInput<
    */
   route(
     route: Route,
-  ): ContractProcedureBuilderWithInput<TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  ): ContractProcedureBuilderWithInput<TInputSchema, TOutputSchema, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Defines the output validation schema for the contract.
@@ -109,7 +111,7 @@ export interface ContractProcedureBuilderWithInput<
    */
   output<U extends AnySchema>(
     schema: U,
-  ): ContractProcedureBuilderWithInputOutput<TInputSchema, U, TErrorMap, TMeta>
+  ): ContractProcedureBuilderWithInputOutput<TInputSchema, U, TErrorMap, TMeta, TMetaDef>
 }
 
 export interface ContractProcedureBuilderWithOutput<
@@ -117,6 +119,7 @@ export interface ContractProcedureBuilderWithOutput<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
   TMeta extends Meta,
+  TMetaDef extends Meta = TMeta,
 > extends ContractProcedure<TInputSchema, TOutputSchema, TErrorMap, TMeta> {
   /**
    * Adds type-safe custom errors to the contract.
@@ -126,7 +129,7 @@ export interface ContractProcedureBuilderWithOutput<
    */
   errors<U extends ErrorMap>(
     errors: U,
-  ): ContractProcedureBuilderWithOutput<TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, U>, TMeta>
+  ): ContractProcedureBuilderWithOutput<TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, U>, TMeta, TMetaDef>
 
   /**
    * Sets or updates the metadata for the contract.
@@ -134,9 +137,9 @@ export interface ContractProcedureBuilderWithOutput<
    *
    * @see {@link https://orpc.dev/docs/metadata Metadata Docs}
    */
-  meta(
-    meta: TMeta,
-  ): ContractProcedureBuilderWithOutput<TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  meta<const U extends Partial<TMetaDef>>(
+    meta: U,
+  ): ContractProcedureBuilderWithOutput<TInputSchema, TOutputSchema, TErrorMap, MergedMeta<TMeta, U>, TMetaDef>
 
   /**
    * Sets or updates the route definition for the contract.
@@ -148,7 +151,7 @@ export interface ContractProcedureBuilderWithOutput<
    */
   route(
     route: Route,
-  ): ContractProcedureBuilderWithOutput<TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  ): ContractProcedureBuilderWithOutput<TInputSchema, TOutputSchema, TErrorMap, TMeta, TMetaDef>
 
   /**
    * Defines the input validation schema for the contract.
@@ -157,7 +160,7 @@ export interface ContractProcedureBuilderWithOutput<
    */
   input<U extends AnySchema>(
     schema: U,
-  ): ContractProcedureBuilderWithInputOutput<U, TOutputSchema, TErrorMap, TMeta>
+  ): ContractProcedureBuilderWithInputOutput<U, TOutputSchema, TErrorMap, TMeta, TMetaDef>
 }
 
 export interface ContractProcedureBuilderWithInputOutput<
@@ -165,6 +168,7 @@ export interface ContractProcedureBuilderWithInputOutput<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
   TMeta extends Meta,
+  TMetaDef extends Meta = TMeta,
 > extends ContractProcedure<TInputSchema, TOutputSchema, TErrorMap, TMeta> {
   /**
    * Adds type-safe custom errors to the contract.
@@ -174,7 +178,7 @@ export interface ContractProcedureBuilderWithInputOutput<
    */
   errors<U extends ErrorMap>(
     errors: U,
-  ): ContractProcedureBuilderWithInputOutput<TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, U>, TMeta>
+  ): ContractProcedureBuilderWithInputOutput<TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, U>, TMeta, TMetaDef>
 
   /**
    * Sets or updates the metadata for the contract.
@@ -182,9 +186,9 @@ export interface ContractProcedureBuilderWithInputOutput<
    *
    * @see {@link https://orpc.dev/docs/metadata Metadata Docs}
    */
-  meta(
-    meta: TMeta,
-  ): ContractProcedureBuilderWithInputOutput<TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  meta<const U extends Partial<TMetaDef>>(
+    meta: U,
+  ): ContractProcedureBuilderWithInputOutput<TInputSchema, TOutputSchema, TErrorMap, MergedMeta<TMeta, U>, TMetaDef>
 
   /**
    * Sets or updates the route definition for the contract.
@@ -196,7 +200,7 @@ export interface ContractProcedureBuilderWithInputOutput<
    */
   route(
     route: Route,
-  ): ContractProcedureBuilderWithInputOutput<TInputSchema, TOutputSchema, TErrorMap, TMeta>
+  ): ContractProcedureBuilderWithInputOutput<TInputSchema, TOutputSchema, TErrorMap, TMeta, TMetaDef>
 }
 
 export interface ContractRouterBuilder<

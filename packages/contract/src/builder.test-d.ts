@@ -2,6 +2,7 @@ import type { baseErrorMap, BaseMeta, inputSchema, outputSchema } from '../tests
 import type { ContractBuilder } from './builder'
 import type { ContractProcedureBuilder, ContractProcedureBuilderWithInput, ContractProcedureBuilderWithOutput, ContractRouterBuilder } from './builder-variants'
 import type { MergedErrorMap } from './error'
+import type { MergedMeta } from './meta'
 import type { ContractProcedure } from './procedure'
 import type { EnhancedContractRouter } from './router-utils'
 import type { Schema } from './schema'
@@ -70,6 +71,7 @@ describe('ContractBuilder', () => {
         typeof inputSchema,
         typeof outputSchema,
         typeof baseErrorMap,
+        MergedMeta<BaseMeta, { readonly log: true }>,
         BaseMeta
       >
     >()
