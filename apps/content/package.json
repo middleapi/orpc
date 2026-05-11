@@ -11,7 +11,7 @@
     "@ai-sdk/google": "^3.0.43",
     "@ai-sdk/react": "^3.0.118",
     "@opentelemetry/instrumentation": "^0.213.0",
-    "@opentelemetry/sdk-node": "^0.213.0",
+    "@opentelemetry/sdk-node": "^0.217.0",
     "@opentelemetry/sdk-trace-web": "^2.6.0",
     "@orpc/ai-sdk": "workspace:*",
     "@orpc/arktype": "workspace:*",
