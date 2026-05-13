@@ -35,6 +35,10 @@ export const COMMON_ORPC_ERROR_DEFS = {
     status: 409,
     message: 'Conflict',
   },
+  GONE: {
+    status: 410,
+    message: 'Gone',
+  },
   PRECONDITION_FAILED: {
     status: 412,
     message: 'Precondition Failed',
