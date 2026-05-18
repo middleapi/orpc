@@ -177,8 +177,9 @@ export class ImplementInterceptor implements NestInterceptor {
                 if (sendResponseInterceptors.length === 0) {
                   const headers = { ...standardResponse.headers }
                   const body = StandardServerNode.toNodeHttpBody(standardResponse.body, headers, this.config)
+                  const fastifyReply = response as FastifyReply
 
-                  ;(response as FastifyReply)
+                  fastifyReply
                     .status(standardResponse.status)
                     .headers(StandardServerNode.toNodeHttpHeaders(headers))
 

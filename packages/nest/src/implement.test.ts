@@ -313,7 +313,7 @@ describe('@Implement', async () => {
   })
 
   it('partial working on fastify', async () => {
-    const logs: string[] = []
+    const fastifyLogMessages: string[] = []
 
     @Controller()
     class FastifyController {
@@ -333,7 +333,7 @@ describe('@Implement', async () => {
         level: 'info',
         stream: {
           write: (message: string) => {
-            logs.push(message)
+            fastifyLogMessages.push(message)
           },
         },
       },
@@ -371,7 +371,7 @@ describe('@Implement', async () => {
     expect(req!.method).toEqual('POST')
     expect(req!.url).toEqual('/ping?param=value&param2[]=value2&param2[]=value3')
     expect(sendStandardFastifyResponseSpy).not.toHaveBeenCalled()
-    expect(logs.join('')).not.toContain('Reply was already sent')
+    expect(fastifyLogMessages.join('')).not.toContain('Reply was already sent')
   })
 
   it('should pass correct signal and lastEventId', async () => {
