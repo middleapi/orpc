@@ -1,4 +1,4 @@
-import type { AnySchema, ContractProcedure, ErrorMap, MergedErrorMap, Schema } from '@orpc/contract'
+import type { AnySchema, ContractProcedure, ErrorMap, MergedErrorMap, MergedMeta, Schema } from '@orpc/contract'
 import type { OmitChainMethodDeep } from '@orpc/shared'
 import type { baseErrorMap, BaseMeta, inputSchema, outputSchema } from '../../contract/tests/shared'
 import type { CurrentContext, InitialContext } from '../tests/shared'
@@ -135,6 +135,7 @@ describe('BuilderWithMiddlewares', () => {
         typeof inputSchema,
         typeof outputSchema,
         typeof baseErrorMap,
+        MergedMeta<BaseMeta, { readonly log: true }>,
         BaseMeta
       >
     >()
@@ -396,6 +397,7 @@ describe('ProcedureBuilder', () => {
           typeof inputSchema,
           typeof outputSchema,
           typeof baseErrorMap,
+          MergedMeta<BaseMeta, { readonly log: true }>,
           BaseMeta
       >
     >()
@@ -653,6 +655,7 @@ describe('ProcedureBuilderWithInput', () => {
         typeof inputSchema,
         typeof outputSchema,
         typeof baseErrorMap,
+        MergedMeta<BaseMeta, { readonly log: true }>,
         BaseMeta
       >
     >()
@@ -833,6 +836,7 @@ describe('ProcedureBuilderWithOutput', () => {
         typeof inputSchema,
         typeof outputSchema,
         typeof baseErrorMap,
+        MergedMeta<BaseMeta, { readonly log: true }>,
         BaseMeta
       >
     >()
@@ -1077,6 +1081,7 @@ describe('ProcedureBuilderWithInputOutput', () => {
         typeof inputSchema,
         typeof outputSchema,
         typeof baseErrorMap,
+        MergedMeta<BaseMeta, { readonly log: true }>,
         BaseMeta
       >
     >()

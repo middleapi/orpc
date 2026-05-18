@@ -1,5 +1,5 @@
 import type { HTTPPath } from '@orpc/client'
-import type { AnySchema, ContractProcedureDef, ContractRouter, ErrorMap, MergedErrorMap, Meta, Route, Schema } from '@orpc/contract'
+import type { AnySchema, ContractProcedureDef, ContractRouter, ErrorMap, MergedErrorMap, MergedMeta, Meta, Route, Schema } from '@orpc/contract'
 import type { IntersectPick } from '@orpc/shared'
 import type { BuilderWithMiddlewares, ProcedureBuilder, ProcedureBuilderWithInput, ProcedureBuilderWithOutput, RouterBuilder } from './builder-variants'
 import type { Context, MergedCurrentContext, MergedInitialContext } from './context'
@@ -43,6 +43,7 @@ export class Builder<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
   TMeta extends Meta,
+  TMetaDef extends Meta = TMeta,
 > {
   /**
    * This property holds the defined options.
@@ -59,7 +60,7 @@ export class Builder<
    * @see {@link https://orpc.dev/docs/client/server-side#middlewares-order Middlewares Order Docs}
    * @see {@link https://orpc.dev/docs/best-practices/dedupe-middleware#configuration Dedupe Middleware Docs}
    */
-  $config(config: BuilderConfig): Builder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta> {
+  $config(config: BuilderConfig): Builder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta, TMetaDef> {
     const inputValidationCount = this['~orpc'].inputValidationIndex - fallbackConfig('initialInputValidationIndex', this['~orpc'].config.initialInputValidationIndex)
     const outputValidationCount = this['~orpc'].outputValidationIndex - fallbackConfig('initialOutputValidationIndex', this['~orpc'].config.initialOutputValidationIndex)
 
@@ -77,7 +78,7 @@ export class Builder<
    *
    * @see {@link https://orpc.dev/docs/context Context Docs}
    */
-  $context<U extends Context>(): Builder<U & Record<never, never>, U, TInputSchema, TOutputSchema, TErrorMap, TMeta> {
+  $context<U extends Context>(): Builder<U & Record<never, never>, U, TInputSchema, TOutputSchema, TErrorMap, TMeta, TMetaDef> {
     /**
      * We need `& Record<never, never>` to deal with `has no properties in common with type` error
      */
@@ -97,7 +98,7 @@ export class Builder<
    */
   $meta<U extends Meta>(
     initialMeta: U,
-  ): Builder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, U & Record<never, never>> {
+  ): Builder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, U & Record<never, never>, U & Record<never, never>> {
     /**
      * We need `& Record<never, never>` to deal with `has no properties in common with type` error
      */
@@ -117,7 +118,7 @@ export class Builder<
    */
   $route(
     initialRoute: Route,
-  ): Builder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta> {
+  ): Builder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta, TMetaDef> {
     return new Builder({
       ...this['~orpc'],
       route: initialRoute,
@@ -131,7 +132,7 @@ export class Builder<
    */
   $input<U extends AnySchema>(
     initialInputSchema?: U,
-  ): Builder<TInitialContext, TCurrentContext, U, TOutputSchema, TErrorMap, TMeta> {
+  ): Builder<TInitialContext, TCurrentContext, U, TOutputSchema, TErrorMap, TMeta, TMetaDef> {
     return new Builder({
       ...this['~orpc'],
       inputSchema: initialInputSchema,
@@ -157,7 +158,7 @@ export class Builder<
    */
   errors<U extends ErrorMap>(
     errors: U,
-  ): Builder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, U>, TMeta> {
+  ): Builder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, U>, TMeta, TMetaDef> {
     return new Builder({
       ...this['~orpc'],
       errorMap: mergeErrorMap(this['~orpc'].errorMap, errors),
@@ -186,13 +187,14 @@ export class Builder<
     TInputSchema,
     TOutputSchema,
     TErrorMap,
-    TMeta
+    TMeta,
+    TMetaDef
   >
 
   use(
     middleware: AnyMiddleware,
     mapInput?: MapInputMiddleware<any, any>,
-  ): BuilderWithMiddlewares<any, any, any, any, any, any> {
+  ): BuilderWithMiddlewares<any, any, any, any, any, any, any> {
     const mapped = mapInput
       ? decorateMiddleware(middleware).mapInput(mapInput)
       : middleware
@@ -209,9 +211,9 @@ export class Builder<
    *
    * @see {@link https://orpc.dev/docs/metadata Metadata Docs}
    */
-  meta(
-    meta: TMeta,
-  ): ProcedureBuilder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta> {
+  meta<const U extends Partial<TMetaDef>>(
+    meta: U,
+  ): ProcedureBuilder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, MergedMeta<TMeta, U>, TMetaDef> {
     return new Builder({
       ...this['~orpc'],
       meta: mergeMeta(this['~orpc'].meta, meta),
@@ -228,7 +230,7 @@ export class Builder<
    */
   route(
     route: Route,
-  ): ProcedureBuilder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta> {
+  ): ProcedureBuilder<TInitialContext, TCurrentContext, TInputSchema, TOutputSchema, TErrorMap, TMeta, TMetaDef> {
     return new Builder({
       ...this['~orpc'],
       route: mergeRoute(this['~orpc'].route, route),
@@ -242,7 +244,7 @@ export class Builder<
    */
   input<USchema extends AnySchema>(
     schema: USchema,
-  ): ProcedureBuilderWithInput<TInitialContext, TCurrentContext, USchema, TOutputSchema, TErrorMap, TMeta> {
+  ): ProcedureBuilderWithInput<TInitialContext, TCurrentContext, USchema, TOutputSchema, TErrorMap, TMeta, TMetaDef> {
     return new Builder({
       ...this['~orpc'],
       inputSchema: schema,
@@ -257,7 +259,7 @@ export class Builder<
    */
   output<USchema extends AnySchema>(
     schema: USchema,
-  ): ProcedureBuilderWithOutput<TInitialContext, TCurrentContext, TInputSchema, USchema, TErrorMap, TMeta> {
+  ): ProcedureBuilderWithOutput<TInitialContext, TCurrentContext, TInputSchema, USchema, TErrorMap, TMeta, TMetaDef> {
     return new Builder({
       ...this['~orpc'],
       outputSchema: schema,
@@ -272,7 +274,7 @@ export class Builder<
    */
   handler<UFuncOutput>(
     handler: ProcedureHandler<TCurrentContext, unknown, UFuncOutput, TErrorMap, TMeta>,
-  ): DecoratedProcedure<TInitialContext, TCurrentContext, TInputSchema, Schema<UFuncOutput, UFuncOutput>, TErrorMap, TMeta> {
+  ): DecoratedProcedure<TInitialContext, TCurrentContext, TInputSchema, Schema<UFuncOutput, UFuncOutput>, TErrorMap, TMeta, TMetaDef> {
     return new DecoratedProcedure({
       ...this['~orpc'],
       handler,
@@ -289,7 +291,7 @@ export class Builder<
    */
   prefix(
     prefix: HTTPPath,
-  ): RouterBuilder<TInitialContext, TCurrentContext, TErrorMap, TMeta> {
+  ): RouterBuilder<TInitialContext, TCurrentContext, TErrorMap, TMeta, TMetaDef> {
     return new Builder({
       ...this['~orpc'],
       prefix: mergePrefix(this['~orpc'].prefix, prefix),
@@ -302,7 +304,7 @@ export class Builder<
    *
    * @see {@link https://orpc.dev/docs/openapi/openapi-specification#operation-metadata OpenAPI Operation Metadata Docs}
    */
-  tag(...tags: string[]): RouterBuilder<TInitialContext, TCurrentContext, TErrorMap, TMeta> {
+  tag(...tags: string[]): RouterBuilder<TInitialContext, TCurrentContext, TErrorMap, TMeta, TMetaDef> {
     return new Builder({
       ...this['~orpc'],
       tags: mergeTags(this['~orpc'].tags, tags),
