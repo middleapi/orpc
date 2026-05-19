@@ -9,6 +9,7 @@ import { FastifyAdapter } from '@nestjs/platform-fastify'
 import { Test } from '@nestjs/testing'
 import { oc, ORPCError } from '@orpc/contract'
 import { implement, lazy } from '@orpc/server'
+import * as StandardServerFastify from '@orpc/standard-server-fastify'
 import * as StandardServerNode from '@orpc/standard-server-node'
 import supertest from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -16,6 +17,7 @@ import * as z from 'zod'
 import { Implement } from './implement'
 import { ORPCModule } from './module'
 
+const sendStandardFastifyResponseSpy = vi.spyOn(StandardServerFastify, 'sendStandardResponse')
 const sendStandardResponseSpy = vi.spyOn(StandardServerNode, 'sendStandardResponse')
 
 beforeEach(() => {
@@ -311,6 +313,8 @@ describe('@Implement', async () => {
   })
 
   it('partial working on fastify', async () => {
+    const capturedFastifyLogs: string[] = []
+
     @Controller()
     class FastifyController {
       @Implement(contract.ping)
@@ -324,7 +328,16 @@ describe('@Implement', async () => {
       controllers: [FastifyController],
     }).compile()
 
-    const app = moduleRef.createNestApplication(new FastifyAdapter())
+    const app = moduleRef.createNestApplication(new FastifyAdapter({
+      logger: {
+        level: 'info',
+        stream: {
+          write: (message: string) => {
+            capturedFastifyLogs.push(message)
+          },
+        },
+      },
+    }))
     await app.init()
     await app.getHttpAdapter().getInstance().ready()
 
@@ -357,6 +370,8 @@ describe('@Implement', async () => {
     expect(req).toBeDefined()
     expect(req!.method).toEqual('POST')
     expect(req!.url).toEqual('/ping?param=value&param2[]=value2&param2[]=value3')
+    expect(sendStandardFastifyResponseSpy).not.toHaveBeenCalled()
+    expect(capturedFastifyLogs.join('')).not.toContain('Reply was already sent')
   })
 
   it('should pass correct signal and lastEventId', async () => {

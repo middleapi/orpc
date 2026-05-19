@@ -163,8 +163,10 @@ export class ImplementInterceptor implements NestInterceptor {
         })
 
         if (result.matched) {
+          const sendResponseInterceptors = toArray(this.config.sendResponseInterceptors)
+
           return intercept(
-            toArray(this.config.sendResponseInterceptors),
+            sendResponseInterceptors,
             { request: req, response: res, standardResponse: result.response },
             async ({ response, standardResponse }) => {
               if (isHono) {
@@ -172,6 +174,18 @@ export class ImplementInterceptor implements NestInterceptor {
                 return (response as HonoContext).newResponse(fetchResponse.body, fetchResponse)
               }
               else if (isFastify) {
+                if (sendResponseInterceptors.length === 0) {
+                  const headers = { ...standardResponse.headers }
+                  const body = StandardServerNode.toNodeHttpBody(standardResponse.body, headers, this.config)
+                  const fastifyReply = response as FastifyReply
+
+                  fastifyReply
+                    .status(standardResponse.status)
+                    .headers(StandardServerNode.toNodeHttpHeaders(headers))
+
+                  return body
+                }
+
                 await StandardServerFastify.sendStandardResponse(response as FastifyReply, standardResponse, this.config)
               }
               else {
