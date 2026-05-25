@@ -1,0 +1,47 @@
+# Codex MCP Configuration
+# For more information: https://developers.openai.com/codex/mcp
+
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+
+# Chrome DevTools MCP - connects to a running Chrome instance with persistent profile
+# Start Chrome first with:
+# /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+#   --remote-debugging-port=9222 \
+#   --user-data-dir="$HOME/.chrome-debug-profile"
+
+[mcp_servers.chrome_devtools]
+command = "npx"
+args = [
+  "-y",
+  "chrome-devtools-mcp@latest",
+  "--browserUrl=http://127.0.0.1:9222"
+]
+enabled = true
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+
+[mcp_servers.chrome_devtools.tools.new_page]
+approval_mode = "approve"
+
+[mcp_servers.chrome_devtools.tools.evaluate_script]
+approval_mode = "approve"
+
+[mcp_servers.chrome_devtools.tools.take_snapshot]
+approval_mode = "approve"
+
+[mcp_servers.chrome_devtools.tools.navigate_page]
+approval_mode = "approve"
+
+[mcp_servers.chrome_devtools.tools.take_screenshot]
+approval_mode = "approve"
+
+[mcp_servers.chrome_devtools.tools.hover]
+approval_mode = "approve"
+
+[features]
+ghost_commit = false
+unified_exec = true
+apply_patch_freeform = true
+skills = true
+shell_snapshot = true

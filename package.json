@@ -12,7 +12,8 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "typecheck": "nuxi typecheck"
+    "typecheck": "nuxi typecheck",
+    "worktree:up": "bash ./scripts/worktree-up.sh"
   },
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.108",

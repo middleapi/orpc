@@ -1,0 +1,7 @@
+{
+  "setup": [
+    "pnpm worktree:up --foreground"
+  ],
+  "teardown": [],
+  "run": []
+}

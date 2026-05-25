@@ -33,6 +33,26 @@ pnpm dev
 Open [http://localhost:3000](http://localhost:3000) to view the app.
 Open [http://localhost:3000/api](http://localhost:3000/api) to view the Scalar API client.
 
+## Worktrees
+
+For git worktrees, use the bootstrap helper to set up a worktree-specific
+`.env`, database, and dev port before starting development:
+
+```bash
+pnpm worktree:up
+```
+
+The script reuses the shared local Postgres container, creates a
+worktree-specific database, pushes the schema, seeds the database, and starts
+the app on the worktree's `NUXT_PORT`.
+
+If you want `worktree:up` to keep the Nuxt dev server attached to your terminal
+instead of starting it in the background, run:
+
+```bash
+pnpm worktree:up --foreground
+```
+
 ## Database
 
 The app uses [Drizzle ORM](https://orm.drizzle.team/) with a local Postgres

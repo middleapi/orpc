@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:17-alpine
+    container_name: nuxt-orpc-playground-postgres
     ports:
       - '5433:5432'
     environment:
