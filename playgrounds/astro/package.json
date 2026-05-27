@@ -1,7 +1,7 @@
 {
   "name": "@orpc/astro-playground",
   "type": "module",
-  "version": "1.14.2",
+  "version": "1.14.3",
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",

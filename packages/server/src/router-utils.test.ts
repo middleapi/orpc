@@ -176,6 +176,36 @@ describe('traverseContractProcedures', () => {
       path: ['nested', 'pong'],
     })
   })
+
+  it('with callable procedures', () => {
+    const callablePing = Object.assign(() => {}, {
+      '~orpc': ping['~orpc'],
+    })
+
+    const callablePong = Object.assign(() => {}, {
+      '~orpc': pong['~orpc'],
+    })
+
+    const router = { ping: callablePing, nested: { pong: callablePong } }
+
+    const callback = vi.fn()
+    expect(traverseContractProcedures({
+      router,
+      path: [],
+    }, callback)).toEqual([])
+
+    expect(callback).toHaveBeenCalledTimes(2)
+
+    expect(callback).toHaveBeenNthCalledWith(1, {
+      contract: router.ping,
+      path: ['ping'],
+    })
+
+    expect(callback).toHaveBeenNthCalledWith(2, {
+      contract: router.nested.pong,
+      path: ['nested', 'pong'],
+    })
+  })
 })
 
 it('resolveContractProcedures', async () => {

@@ -5,6 +5,7 @@ import type { AnyMiddleware } from './middleware'
 import type { AnyProcedure } from './procedure'
 import type { AnyRouter } from './router'
 import { enhanceRoute, isContractProcedure, mergeErrorMap, mergePrefix } from '@orpc/contract'
+import { isTypescriptObject } from '@orpc/shared'
 import { getLazyMeta, isLazy, lazy, unlazy } from './lazy'
 import { mergeMiddlewares } from './middleware-utils'
 import { isProcedure, Procedure } from './procedure'
@@ -27,7 +28,7 @@ export function getRouter<T extends Lazyable<AnyRouter | undefined>>(
       return undefined as any
     }
 
-    if (typeof current !== 'object') {
+    if (!isTypescriptObject(current)) {
       return undefined as any
     }
 
@@ -192,16 +193,11 @@ export function traverseContractProcedures(
   callback: (options: TraverseContractProcedureCallbackOptions) => void,
   lazyOptions: LazyTraverseContractProceduresOptions[] = [],
 ): LazyTraverseContractProceduresOptions[] {
-  // Guard before reading the hidden-contract symbol so that null/undefined
-  // child exports don't crash in `getHiddenRouterContract`. Primitives like
-  // strings autobox safely; only null/undefined throw on symbol access.
-  if (typeof options.router !== 'object' || options.router === null) {
-    return lazyOptions
-  }
-
   let currentRouter: AnyContractRouter | Lazyable<AnyRouter> = options.router
 
-  const hiddenContract = getHiddenRouterContract(options.router)
+  const hiddenContract = isTypescriptObject(options.router)
+    ? getHiddenRouterContract(options.router)
+    : undefined
 
   if (hiddenContract !== undefined) {
     currentRouter = hiddenContract
