@@ -852,7 +852,7 @@ describe('ProcedureUtilsDefaults', () => {
     }
   })
 
-  it('experimental_liveOptions should accept Partial<StreamedOptionsIn>', () => {
+  it('experimental_liveOptions should accept Partial<QueryOptionsIn>', () => {
     const defaults: TestDefaults = {
       experimental_liveOptions: {
         input: { search: 'test' },
@@ -865,6 +865,13 @@ describe('ProcedureUtilsDefaults', () => {
       experimental_liveOptions: {
         // @ts-expect-error - invalid input type
         input: { invalid: 'test' },
+      },
+    }
+
+    const _invalidStreamedOption: TestDefaults = {
+      experimental_liveOptions: {
+        // @ts-expect-error - queryFnOptions is only supported by experimental_streamedOptions
+        queryFnOptions: { maxChunks: 10 },
       },
     }
   })
