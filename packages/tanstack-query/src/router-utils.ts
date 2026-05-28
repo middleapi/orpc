@@ -19,12 +19,16 @@ export type experimental_RouterUtilsDefaults<T extends NestedClient<any>>
         [K in keyof T]?: T[K] extends NestedClient<any> ? experimental_RouterUtilsDefaults<T[K]> : never
       }
 
+export type experimental_RouterUtilsDefaultsOption<T extends NestedClient<any>>
+  = | experimental_RouterUtilsDefaults<T>
+    | ((utils: RouterUtils<T>) => experimental_RouterUtilsDefaults<T>)
+
 /**
  * @todo remove default generic types on v2
  */
 export interface CreateRouterUtilsOptions<T extends NestedClient<any> = NestedClient<any>> {
   path?: readonly string[]
-  experimental_defaults?: experimental_RouterUtilsDefaults<T>
+  experimental_defaults?: experimental_RouterUtilsDefaultsOption<T>
 }
 
 /**
@@ -38,11 +42,14 @@ export function createRouterUtils<T extends NestedClient<any>>(
   options: CreateRouterUtilsOptions<T> = {},
 ): RouterUtils<T> {
   const path = toArray(options.path)
+  const experimental_defaults = typeof options.experimental_defaults === 'function'
+    ? options.experimental_defaults(createRouterUtils(client, { path }))
+    : options.experimental_defaults
 
   const generalUtils = createGeneralUtils(path)
   const procedureUtils = createProcedureUtils(client as any, {
     path,
-    experimental_defaults: options.experimental_defaults,
+    experimental_defaults,
   })
 
   const recursive = new Proxy({
@@ -57,9 +64,8 @@ export function createRouterUtils<T extends NestedClient<any>>(
       }
 
       const nextUtils = createRouterUtils((client as any)[prop], {
-        ...options,
         path: [...path, prop],
-        experimental_defaults: get(options.experimental_defaults, [prop]) as any,
+        experimental_defaults: get(experimental_defaults, [prop]) as any,
       })
 
       if (typeof value !== 'function') {

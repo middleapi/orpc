@@ -91,4 +91,34 @@ describe('createRouterUtils', () => {
     })
     expect(pongUtils.queryOptions().staleTime).not.toBeDefined()
   })
+
+  it('with defaults factory', () => {
+    const appClient = vi.fn() as any
+    appClient.planet = vi.fn()
+
+    const defaultsFactory = vi.fn((utils: any) => ({
+      planet: {
+        mutationOptions: {
+          mutationKey: utils.planet.mutationKey(),
+        },
+      },
+    }))
+
+    const utils = createRouterUtils(appClient, {
+      experimental_defaults: defaultsFactory,
+    }) as any
+
+    expect(defaultsFactory).toHaveBeenCalledTimes(1)
+
+    const planetDefaults = defaultsFactory.mock.results[0]!.value.planet
+
+    vi.clearAllMocks()
+    const planetUtils = utils.planet
+
+    expect(procedureUtilsSpy).toHaveBeenCalledWith(appClient.planet, {
+      path: ['planet'],
+      experimental_defaults: planetDefaults,
+    })
+    expect(planetUtils.mutationOptions().mutationKey).toEqual(planetUtils.mutationKey())
+  })
 })

@@ -4,7 +4,7 @@ import type { baseErrorMap } from '../../contract/tests/shared'
 import type { router } from '../../server/tests/shared'
 import type { GeneralUtils } from './general-utils'
 import type { experimental_ProcedureUtilsDefaults, ProcedureUtils } from './procedure-utils'
-import type { experimental_RouterUtilsDefaults, RouterUtils } from './router-utils'
+import type { experimental_RouterUtilsDefaults, experimental_RouterUtilsDefaultsOption, RouterUtils } from './router-utils'
 import { createRouterUtils } from './router-utils'
 
 it('RouterUtils', () => {
@@ -78,6 +78,37 @@ it('createRouterUtils', () => {
         },
       },
     },
+  })
+
+  expectTypeOf(utils).toEqualTypeOf<RouterUtils<RouterClient<typeof router, { batch?: boolean }>>>()
+})
+
+it('createRouterUtils with defaults factory', () => {
+  const defaults = ((utils) => {
+    utils.nested.ping.key({ input: { input: 123 } })
+    // @ts-expect-error - invalid input type
+    utils.nested.ping.key({ input: { input: '123' } })
+
+    return {
+      nested: {
+        ping: {
+          mutationOptions: {
+            onSuccess: (output, input, _, ctx) => {
+              expectTypeOf(output).toEqualTypeOf<{ output: string }>()
+              expectTypeOf(input).toEqualTypeOf<{ input: number }>()
+
+              ctx.client.invalidateQueries({
+                queryKey: utils.nested.ping.key(),
+              })
+            },
+          },
+        },
+      },
+    }
+  }) satisfies experimental_RouterUtilsDefaultsOption<RouterClient<typeof router, { batch?: boolean }>>
+
+  const utils = createRouterUtils({} as RouterClient<typeof router, { batch?: boolean }>, {
+    experimental_defaults: defaults,
   })
 
   expectTypeOf(utils).toEqualTypeOf<RouterUtils<RouterClient<typeof router, { batch?: boolean }>>>()

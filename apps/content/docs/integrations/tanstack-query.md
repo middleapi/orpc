@@ -245,20 +245,12 @@ const orpc = createTanstackQueryUtils(client, {
           staleTime: 30 * 1000,
         },
       },
-      create: {
-        mutationOptions: {
-          onSuccess: (output, input, _, ctx) => {
-            ctx.client.invalidateQueries({ queryKey: orpc.planet.key() })
-          },
-        },
-      },
     },
   },
 })
 
 // These will automatically use the default options
 const query = useQuery(orpc.planet.find.queryOptions({ input: { id: 123 } }))
-const mutation = useMutation(orpc.planet.create.mutationOptions())
 
 // User-provided options override defaults
 const customQuery = useQuery(orpc.planet.find.queryOptions({
@@ -266,6 +258,30 @@ const customQuery = useQuery(orpc.planet.find.queryOptions({
   staleTime: 0, // overrides the default
 }))
 ```
+
+When defaults need to reference generated query or mutation keys, use the function form. The function receives the same typed utils returned by `createTanstackQueryUtils`, avoiding self-references when configuring mutation side effects:
+
+```ts
+const orpc = createTanstackQueryUtils(client, {
+  experimental_defaults: utils => ({
+    planet: {
+      create: {
+        mutationOptions: {
+          onSuccess: (_, __, ___, ctx) => {
+            ctx.client.invalidateQueries({
+              queryKey: utils.planet.key(),
+            })
+          },
+        },
+      },
+    },
+  }),
+})
+```
+
+::: info
+Default options are still shallow spread merged. If a call provides the same lifecycle callback, such as `onSuccess`, it overrides the default callback instead of composing both callbacks.
+:::
 
 ## Client Context
 
