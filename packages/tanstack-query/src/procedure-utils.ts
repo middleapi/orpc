@@ -198,7 +198,7 @@ export interface experimental_ProcedureUtilsDefaults<TClientContext extends Clie
    * @see {@link https://orpc.dev/docs/integrations/tanstack-query#live-query-options Tanstack Live Query Options Utility Docs}
    */
   experimental_liveOptions?: Partial<
-    StreamedOptionsIn<TClientContext, TInput, experimental_LiveQueryOutput<TOutput>, TError, unknown>
+    QueryOptionsIn<TClientContext, TInput, experimental_LiveQueryOutput<TOutput>, TError, unknown>
   >
 
   /**
