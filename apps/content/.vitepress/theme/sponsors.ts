@@ -566,7 +566,7 @@ export const sponsors: JSONSponsor[] = [
   {
     name: 'motopods',
     login: 'motopods',
-    avatar: 'https://avatars.githubusercontent.com/u/58200641?u=18833983d65b481ae90a4adec2373064ec58bcf3&v=4',
+    avatar: 'https://avatars.githubusercontent.com/u/58200641?v=4',
     amount: -1,
     link: 'https://github.com/motopods?ref=orpc',
     org: false,
@@ -574,7 +574,7 @@ export const sponsors: JSONSponsor[] = [
     tierTitle: 'Past Sponsors',
     tierLevel: 0,
     sidebarSize: 'none',
-    sidebarLogo: 'https://avatars.githubusercontent.com/u/58200641?u=18833983d65b481ae90a4adec2373064ec58bcf3&v=4',
+    sidebarLogo: 'https://avatars.githubusercontent.com/u/58200641?v=4',
   },
   {
     name: 'Francisco Hermida',
