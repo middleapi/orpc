@@ -54,8 +54,8 @@ async function seed() {
 
   await db.execute(sql`
     select setval(
-      pg_get_serial_sequence('planets', 'id'),
-      coalesce((select max(id) from planets), 1)
+      pg_get_serial_sequence('lunaria.planets', 'id'),
+      coalesce((select max(id) from lunaria.planets), 1)
     )
   `)
 }

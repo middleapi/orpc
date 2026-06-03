@@ -2,17 +2,17 @@
 import { useInfiniteQuery } from '@tanstack/vue-query'
 
 definePageMeta({
-  layout: 'dashboard',
+  layout: 'app-lunaria',
   middleware: 'auth',
 })
 
 useSeoMeta({
-  title: 'Dashboard',
+  title: 'Lunaria',
 })
 
 const { $orpc } = useNuxtApp()
 
-const query = useInfiniteQuery($orpc.planet.list.infiniteOptions({
+const query = useInfiniteQuery($orpc.apps.lunaria.planets.list.infiniteOptions({
   input: cursor => ({ cursor, limit: 10 }),
   getNextPageParam: lastPage => lastPage.length === 10 ? lastPage.at(-1)?.id : null,
   initialPageParam: 0,
@@ -25,9 +25,9 @@ const withImages = computed(() => planets.value.filter(planet => planet.imageUrl
 </script>
 
 <template>
-  <UDashboardPanel id="overview">
+  <UDashboardPanel id="lunaria-overview">
     <template #header>
-      <UDashboardNavbar title="Overview">
+      <UDashboardNavbar title="Lunaria">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
@@ -51,19 +51,19 @@ const withImages = computed(() => planets.value.filter(planet => planet.imageUrl
           title="Planets"
           :description="`${planets.length} records loaded from oRPC.`"
           icon="i-lucide-orbit"
-          to="/dashboard/planets"
+          to="/apps/lunaria/planets"
         />
         <UPageCard
           title="Images"
           :description="`${withImages} planets currently include an image URL.`"
           icon="i-lucide-image"
-          to="/dashboard/planets"
+          to="/apps/lunaria/planets"
         />
         <UPageCard
           title="Stream"
-          description="Inspect the existing streamed event iterator."
+          description="Server-sent event iterator."
           icon="i-lucide-radio"
-          to="/dashboard/stream"
+          to="/apps/lunaria/stream"
         />
       </UPageGrid>
 

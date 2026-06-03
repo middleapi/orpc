@@ -13,6 +13,11 @@ const trustedOrigins = process.env.BETTER_AUTH_TRUSTED_ORIGINS
       'http://127.0.0.1:3100',
     ]
 
+const githubClientId = process.env.GITHUB_CLIENT_ID ?? ''
+const githubClientSecret = process.env.GITHUB_CLIENT_SECRET ?? ''
+const googleClientId = process.env.GOOGLE_CLIENT_ID ?? ''
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET ?? ''
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: 'pg',
@@ -26,6 +31,18 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 6,
+  },
+  socialProviders: {
+    github: {
+      clientId: githubClientId,
+      clientSecret: githubClientSecret,
+      enabled: Boolean(githubClientId && githubClientSecret),
+    },
+    google: {
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
+      enabled: Boolean(googleClientId && googleClientSecret),
+    },
   },
   plugins: [
     openAPI(),

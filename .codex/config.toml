@@ -39,6 +39,9 @@ approval_mode = "approve"
 [mcp_servers.chrome_devtools.tools.hover]
 approval_mode = "approve"
 
+[mcp_servers.nuxt-ui]
+url = "https://ui.nuxt.com/mcp"
+
 [features]
 ghost_commit = false
 unified_exec = true

@@ -63,7 +63,7 @@ async function onSubmit(payload: FormSubmitEvent<Schema>) {
       return
     }
 
-    await navigateTo('/dashboard')
+    await navigateTo('/apps')
   } finally {
     loading.value = false
   }

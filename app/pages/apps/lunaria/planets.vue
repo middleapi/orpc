@@ -3,7 +3,7 @@ import type { TableColumn } from '@nuxt/ui'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 
 definePageMeta({
-  layout: 'dashboard',
+  layout: 'app-lunaria',
   middleware: 'auth',
 })
 
@@ -24,7 +24,7 @@ const form = reactive({
   image: undefined as File | undefined,
 })
 
-const query = useInfiniteQuery($orpc.planet.list.infiniteOptions({
+const query = useInfiniteQuery($orpc.apps.lunaria.planets.list.infiniteOptions({
   input: cursor => ({ cursor, limit: 10 }),
   getNextPageParam: lastPage => lastPage.length === 10 ? lastPage.at(-1)?.id : null,
   initialPageParam: 0,
@@ -57,10 +57,10 @@ const columns: TableColumn<Planet>[] = [{
   }, () => row.original.imageUrl ? 'Attached' : 'None'),
 }]
 
-const { mutate, isPending } = useMutation($orpc.planet.create.mutationOptions({
+const { mutate, isPending } = useMutation($orpc.apps.lunaria.planets.create.mutationOptions({
   onSuccess() {
     queryClient.invalidateQueries({
-      queryKey: $orpc.planet.list.key(),
+      queryKey: $orpc.apps.lunaria.planets.list.key(),
     })
     form.name = ''
     form.description = ''

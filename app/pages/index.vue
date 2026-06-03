@@ -1,12 +1,16 @@
 <script setup lang="ts">
+import { platformApps } from '~/apps/registry'
+
+const productName = 'Workspace'
+
 useSeoMeta({
-  title: 'Lunaria',
-  description: 'A Nuxt UI platform for managing planets through the existing oRPC API.',
+  title: productName,
+  description: 'A personal workspace for opening and running my applications.',
 })
 
 const heroLinks = [{
-  label: 'Open platform',
-  to: '/dashboard',
+  label: 'Open applications',
+  to: '/apps',
   icon: 'i-lucide-layout-dashboard',
   trailing: true,
 }, {
@@ -18,56 +22,77 @@ const heroLinks = [{
   variant: 'subtle' as const,
 }]
 
-const features = [{
-  title: 'Authenticated workspace',
-  description: 'Users sign in through the existing Better Auth endpoint before entering the platform.',
-  icon: 'i-lucide-shield-check',
-}, {
-  title: 'oRPC-backed data',
-  description: 'Dashboard pages call the current type-safe planet queries, mutations, and streams.',
-  icon: 'i-lucide-route',
-}, {
-  title: 'Operational dashboard',
-  description: 'The product area uses Nuxt UI dashboard primitives for navigation, tables, forms, and actions.',
-  icon: 'i-lucide-panels-top-left',
-}]
+const applications = platformApps.map((app) => {
+  if (app.id === 'lunaria') {
+    return {
+      ...app,
+      headline: 'Records and streams',
+      summary: 'Planet records, creation forms, and live stream endpoint experiments.',
+      metric: 'Planets, forms, stream',
+    }
+  }
+
+  return {
+    ...app,
+    headline: 'Market snapshots',
+    summary: 'Global index snapshots, manual refreshes, and scheduled market-data ingestion.',
+    metric: 'Indexes, refreshes, schedule',
+  }
+})
 </script>
 
 <template>
   <div>
     <UPageHero
-      title="Lunaria"
-      description="Manage the platform through a polished Nuxt UI experience while keeping the current API, auth, and database stack in place."
+      :title="productName"
+      description="My personal place to open, run, and maintain the applications I use."
       :links="heroLinks"
-    >
-      <img
-        src="https://ui.nuxt.com/assets/templates/nuxt/dashboard-light.png"
-        alt="Nuxt UI dashboard preview"
-        class="mx-auto w-full max-w-5xl rounded-lg border border-default shadow-xl"
-      >
-    </UPageHero>
+      :ui="{
+        container: 'py-10 sm:py-12 lg:py-14',
+        title: 'text-4xl sm:text-5xl lg:text-6xl',
+        description: 'text-base sm:text-lg/7',
+        footer: 'mt-6'
+      }"
+    />
 
     <UPageSection
-      title="Built around the app you already have"
-      description="The UI layer changes, but the server routes, Better Auth integration, Drizzle schema, and oRPC contracts stay central."
+      headline="Applications"
+      title="The tools in this workspace"
+      description="Each app has its own pages, data, and API surface, but they all live behind the same sign-in."
+      :ui="{
+        container: 'py-8 sm:py-10 lg:py-10',
+        title: 'text-3xl sm:text-4xl',
+        description: 'text-base',
+        body: 'mt-6 sm:mt-8'
+      }"
     >
       <UPageGrid>
         <UPageCard
-          v-for="feature in features"
-          :key="feature.title"
-          v-bind="feature"
+          v-for="app in applications"
+          :key="app.id"
+          :title="app.label"
+          :description="app.summary"
+          :icon="app.icon"
           spotlight
-        />
+        >
+          <template #header>
+            <UBadge color="neutral" variant="subtle" :label="app.headline" />
+          </template>
+
+          <template #footer>
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-sm text-muted">{{ app.metric }}</span>
+              <UButton
+                label="Open"
+                color="neutral"
+                variant="ghost"
+                trailing-icon="i-lucide-arrow-right"
+                :to="app.to"
+              />
+            </div>
+          </template>
+        </UPageCard>
       </UPageGrid>
     </UPageSection>
-
-    <USeparator />
-
-    <UPageCTA
-      title="Start from the dashboard"
-      description="Sign in and work with the current planet API from dedicated platform pages."
-      :links="[{ label: 'Sign in', to: '/login', icon: 'i-lucide-log-in' }]"
-      variant="naked"
-    />
   </div>
 </template>

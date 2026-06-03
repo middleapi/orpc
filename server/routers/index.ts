@@ -1,10 +1,12 @@
 import { orpc } from '../orpc'
-import { marketTrendRouter } from './market-trend'
-import { planetRouter } from './planet'
-import { sse } from './sse'
+import { lunariaRouter } from '../apps/lunaria/router'
+import { marketTrendsRouter } from '../apps/market-trends/router'
+import { platformRouter } from '../platform/router'
 
 export const router = orpc.router({
-  marketTrend: marketTrendRouter,
-  planet: planetRouter,
-  sse,
+  platform: platformRouter,
+  apps: {
+    lunaria: lunariaRouter,
+    marketTrends: marketTrendsRouter,
+  },
 })

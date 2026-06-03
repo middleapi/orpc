@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/vue-query'
 
 definePageMeta({
-  layout: 'dashboard',
+  layout: 'app-lunaria',
   middleware: 'auth',
 })
 
@@ -12,7 +12,7 @@ useSeoMeta({
 
 const { $orpc } = useNuxtApp()
 
-const query = useQuery($orpc.sse.experimental_streamedOptions({
+const query = useQuery($orpc.apps.lunaria.stream.events.experimental_streamedOptions({
   queryFnOptions: { maxChunks: 3 },
   enabled: false,
 }))
@@ -44,7 +44,7 @@ onMounted(() => {
     </template>
 
     <template #body>
-      <UPageCard title="Event iterator" description="Live output from the existing oRPC stream endpoint." variant="subtle">
+      <UPageCard title="Event iterator" description="Live output from the app stream endpoint." variant="subtle">
         <ClientOnly>
           <pre class="overflow-auto rounded-md bg-muted p-4 text-sm text-highlighted">{{ JSON.stringify(query.data.value, null, 2) }}</pre>
         </ClientOnly>

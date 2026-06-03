@@ -1,5 +1,5 @@
 import * as z from 'zod'
-import { UserSchema } from './user'
+import { UserSchema } from '../../../schemas/user'
 
 export type NewPlanet = z.infer<typeof NewPlanetSchema>
 export type UpdatePlanet = z.infer<typeof UpdatePlanetSchema>

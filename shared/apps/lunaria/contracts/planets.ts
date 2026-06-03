@@ -2,13 +2,13 @@ import { oc } from '@orpc/contract'
 import * as z from 'zod'
 import { NewPlanetSchema, PlanetSchema, UpdatePlanetSchema } from '../schemas/planet'
 
-export const planetContract = {
+export const lunariaPlanetsContract = {
   list: oc
     .route({
       method: 'GET',
-      path: '/planets',
-      summary: 'List all planets',
-      tags: ['Planets'],
+      path: '/apps/lunaria/planets',
+      summary: 'List Lunaria planets',
+      tags: ['Lunaria'],
     })
     .input(
       z.object({
@@ -21,9 +21,9 @@ export const planetContract = {
   create: oc
     .route({
       method: 'POST',
-      path: '/planets',
-      summary: 'Create a planet',
-      tags: ['Planets'],
+      path: '/apps/lunaria/planets',
+      summary: 'Create a Lunaria planet',
+      tags: ['Lunaria'],
     })
     .input(NewPlanetSchema)
     .output(PlanetSchema),
@@ -31,9 +31,9 @@ export const planetContract = {
   find: oc
     .route({
       method: 'GET',
-      path: '/planets/{id}',
-      summary: 'Find a planet',
-      tags: ['Planets'],
+      path: '/apps/lunaria/planets/{id}',
+      summary: 'Find a Lunaria planet',
+      tags: ['Lunaria'],
     })
     .input(
       z.object({
@@ -45,9 +45,9 @@ export const planetContract = {
   update: oc
     .route({
       method: 'PUT',
-      path: '/planets/{id}',
-      summary: 'Update a planet',
-      tags: ['Planets'],
+      path: '/apps/lunaria/planets/{id}',
+      summary: 'Update a Lunaria planet',
+      tags: ['Lunaria'],
     })
     .errors({
       NOT_FOUND: {

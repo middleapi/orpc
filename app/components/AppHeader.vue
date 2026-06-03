@@ -2,12 +2,12 @@
 const route = useRoute()
 
 const items = computed(() => [{
-  label: 'Platform',
+  label: 'Workspace',
   to: '/',
   active: route.path === '/',
 }, {
-  label: 'Pricing',
-  to: '/pricing',
+  label: 'Applications',
+  to: '/apps',
 }])
 </script>
 
@@ -32,20 +32,7 @@ const items = computed(() => [{
         class="lg:hidden"
       />
 
-      <UButton
-        label="Sign in"
-        color="neutral"
-        variant="outline"
-        to="/login"
-        class="hidden lg:inline-flex"
-      />
-
-      <UButton
-        label="Sign up"
-        trailing-icon="i-lucide-arrow-right"
-        to="/signup"
-        class="hidden lg:inline-flex"
-      />
+      <UButton label="Sign in" trailing-icon="i-lucide-log-in" to="/login" class="hidden lg:inline-flex" />
     </template>
 
     <template #body>
@@ -57,8 +44,7 @@ const items = computed(() => [{
 
       <USeparator class="my-6" />
 
-      <UButton label="Sign in" color="neutral" variant="subtle" to="/login" block class="mb-3" />
-      <UButton label="Sign up" to="/signup" block />
+      <UButton label="Sign in" to="/login" block />
     </template>
   </UHeader>
 </template>

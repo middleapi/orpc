@@ -5,7 +5,7 @@ import { SmartCoercionPlugin } from '@orpc/json-schema'
 import { router } from '../../routers'
 import { OpenAPIReferencePlugin } from '@orpc/openapi/plugins'
 import { UserSchema } from '../../schemas/user'
-import { NewPlanetSchema, PlanetSchema, UpdatePlanetSchema } from '../../schemas/planet'
+import { NewPlanetSchema, PlanetSchema, UpdatePlanetSchema } from '#shared/apps/lunaria/schemas/planet'
 import { getUserFromRequest } from '../../auth-context'
 import { getPublicAuthOpenAPI } from '../../openapi/auth'
 
@@ -30,9 +30,29 @@ const openAPIHandler = new OpenAPIHandler(router, {
 
         return {
           info: {
-            title: 'ORPC Playground',
+            title: 'Workspace API',
             version: '1.0.0',
           },
+          tags: [{
+            name: 'Auth',
+            description: 'Shared authentication and session endpoints used by every application.',
+          }, {
+            name: 'Platform',
+            description: 'Shared workspace endpoints that are not owned by a single application.',
+          }, {
+            name: 'Lunaria',
+            description: 'Lunaria application endpoints for planets and streams.',
+          }, {
+            name: 'Market trends',
+            description: 'Market trends application endpoints for index snapshots and refreshes.',
+          }],
+          'x-tagGroups': [{
+            name: 'Shared system',
+            tags: ['Auth', 'Platform'],
+          }, {
+            name: 'Applications',
+            tags: ['Lunaria', 'Market trends'],
+          }],
           commonSchemas: {
             User: { schema: UserSchema },
             NewPlanet: { schema: NewPlanetSchema },

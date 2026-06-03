@@ -1,0 +1,11 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "trigger.config.ts",
+    "trigger/**/*.ts"
+  ],
+  "ignoreDependencies": [
+    "@iconify-json/lucide",
+    "vue-tsc"
+  ]
+}

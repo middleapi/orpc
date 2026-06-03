@@ -1,9 +1,13 @@
-import { authClient } from '~/utils/auth-client'
+type SessionResponse = {
+  user?: unknown
+} | null
 
 export default defineNuxtRouteMiddleware(async (to) => {
-  const session = await authClient.useSession(useFetch)
+  const session = await $fetch<SessionResponse>('/api/auth/get-session', {
+    headers: import.meta.server ? useRequestHeaders(['cookie']) : undefined,
+  }).catch(() => null)
 
-  if (!session.data.value?.user) {
+  if (!session?.user) {
     return navigateTo({
       path: '/login',
       query: {
