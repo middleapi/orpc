@@ -1,5 +1,5 @@
 {
-  "name": "nuxt-orpc-playground",
+  "name": "base",
   "type": "module",
   "private": true,
   "packageManager": "pnpm@10.28.1",

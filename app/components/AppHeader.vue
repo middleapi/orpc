@@ -2,7 +2,7 @@
 const route = useRoute()
 
 const items = computed(() => [{
-  label: 'Workspace',
+  label: 'Base',
   to: '/',
   active: route.path === '/',
 }, {

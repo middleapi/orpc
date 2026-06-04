@@ -3,7 +3,7 @@ import { lunariaNavigation } from '~/apps/lunaria/navigation'
 </script>
 
 <template>
-  <AppWorkspaceLayout
+  <AppBaseLayout
     storage-key="app-lunaria"
     sidebar-id="app-lunaria"
     home-to="/apps/lunaria"
@@ -12,5 +12,5 @@ import { lunariaNavigation } from '~/apps/lunaria/navigation'
     :navigation="lunariaNavigation"
   >
     <slot />
-  </AppWorkspaceLayout>
+  </AppBaseLayout>
 </template>

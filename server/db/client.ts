@@ -3,17 +3,17 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import * as schema from './schema'
 
-const databaseUrl = process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5433/nuxt_orpc_playground'
+const databaseUrl = process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5433/base'
 
 const globalForDatabase = globalThis as typeof globalThis & {
-  __orpcPostgresClient?: postgres.Sql
+  __basePostgresClient?: postgres.Sql
 }
 
-const databaseClient = globalForDatabase.__orpcPostgresClient ?? postgres(databaseUrl, {
+const databaseClient = globalForDatabase.__basePostgresClient ?? postgres(databaseUrl, {
   max: 10,
 })
 
-globalForDatabase.__orpcPostgresClient = databaseClient
+globalForDatabase.__basePostgresClient = databaseClient
 
 export const db = drizzle(databaseClient, { schema })
 

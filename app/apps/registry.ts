@@ -1,7 +1,7 @@
 export const platformApps = [{
   id: 'lunaria',
   label: 'Lunaria',
-  description: 'Planets and stream workspace',
+  description: 'Planets and live stream tools',
   icon: 'i-lucide-orbit',
   to: '/apps/lunaria',
 }, {

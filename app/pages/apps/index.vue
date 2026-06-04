@@ -8,7 +8,7 @@ definePageMeta({
 
 useSeoMeta({
   title: 'Applications',
-  description: 'Personal application workspace.',
+  description: 'Applications available in Base.',
 })
 </script>
 

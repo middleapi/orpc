@@ -1,7 +1,8 @@
-# Nuxt oRPC Playground
+# Base
 
-This repository contains the standalone Nuxt playground example for
-[oRPC](https://orpc.dev).
+Base is a Nuxt 4 application for running the personal applications in this
+repo. It uses oRPC for the API layer, Nuxt UI for the interface, Drizzle ORM
+with Postgres for data, and Better Auth for authentication.
 
 ## Getting Started
 
@@ -59,12 +60,12 @@ The app uses [Drizzle ORM](https://orm.drizzle.team/) with a local Postgres
 database. By default it connects to:
 
 ```text
-postgres://postgres:postgres@localhost:5433/nuxt_orpc_playground
+postgres://postgres:postgres@localhost:5433/base
 ```
 
 Override this with `DATABASE_URL` in `.env`.
 
-Run Drizzle Studio for this oRPC playground on its project-specific port:
+Run Drizzle Studio for Base on its project-specific port:
 
 ```bash
 pnpm db:studio
@@ -78,7 +79,7 @@ Authentication uses [Better Auth](https://better-auth.com/) with email and
 password enabled. Better Auth is mounted at `/api/auth/*` and stores users,
 sessions, accounts, and verification records in the same Postgres database.
 The `/api` reference page serves a single OpenAPI document that includes the
-oRPC API plus the supported Better Auth email/password endpoints.
+Base API plus the supported Better Auth email/password endpoints.
 
 ## Market Trends
 
@@ -86,7 +87,7 @@ read_when: changing market trend indexes, Trigger.dev scheduling, or the market
 trend API.
 
 The platform includes `/apps/market-trends`, backed by the
-`/api/apps/market-trends/indexes` oRPC endpoint and the
+`/api/apps/market-trends/indexes` Base endpoint and the
 `market_trends.market_trend_indexes` table.
 Run `pnpm db:push` after pulling this schema.
 

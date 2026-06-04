@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { platformApps } from '~/apps/registry'
 
-const productName = 'Workspace'
+const productName = 'Base'
 
 useSeoMeta({
   title: productName,
-  description: 'A personal workspace for opening and running my applications.',
+  description: 'A personal platform for opening and running my applications.',
 })
 
 const heroLinks = [{
@@ -45,7 +45,7 @@ const applications = platformApps.map((app) => {
   <div>
     <UPageHero
       :title="productName"
-      description="My personal place to open, run, and maintain the applications I use."
+      description="My base for opening, running, and maintaining the applications I use."
       :links="heroLinks"
       :ui="{
         container: 'py-10 sm:py-12 lg:py-14',
@@ -57,7 +57,7 @@ const applications = platformApps.map((app) => {
 
     <UPageSection
       headline="Applications"
-      title="The tools in this workspace"
+      title="The tools in Base"
       description="Each app has its own pages, data, and API surface, but they all live behind the same sign-in."
       :ui="{
         container: 'py-8 sm:py-10 lg:py-10',

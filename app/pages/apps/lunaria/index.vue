@@ -49,7 +49,7 @@ const withImages = computed(() => planets.value.filter(planet => planet.imageUrl
       <UPageGrid>
         <UPageCard
           title="Planets"
-          :description="`${planets.length} records loaded from oRPC.`"
+          :description="`${planets.length} records loaded from Base.`"
           icon="i-lucide-orbit"
           to="/apps/lunaria/planets"
         />

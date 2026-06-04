@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Bootstrap the current Nuxt oRPC Playground worktree for local development.
+Bootstrap the current Base worktree for local development.
 
 This script will:
   1. Ensure the worktree has dependencies installed
@@ -64,7 +64,7 @@ APP_PID_FILE="$STATE_DIR/app-$WORKTREE_HASH.pid"
 APP_LOG_FILE="$STATE_DIR/app-$WORKTREE_HASH.log"
 ENV_BACKUP_FILE="$STATE_DIR/.env.backup-$WORKTREE_HASH"
 
-POSTGRES_CONTAINER="${WORKTREE_POSTGRES_CONTAINER:-nuxt-orpc-playground-postgres}"
+POSTGRES_CONTAINER="${WORKTREE_POSTGRES_CONTAINER:-base-postgres}"
 POSTGRES_USER="${WORKTREE_DB_USER:-postgres}"
 POSTGRES_PASSWORD="${WORKTREE_DB_PASSWORD:-postgres}"
 POSTGRES_HOST="${WORKTREE_DB_HOST:-localhost}"
@@ -186,7 +186,7 @@ upsert_env_value() {
     return 0
   fi
 
-  tmp_file=$(mktemp "${TMPDIR:-/tmp}/nuxt-orpc-env.XXXXXX")
+  tmp_file=$(mktemp "${TMPDIR:-/tmp}/base-env.XXXXXX")
 
   if [ -f "$ENV_FILE" ]; then
     awk -v key="$key" -v value="$value" '
@@ -352,7 +352,7 @@ select_db_name() {
     return 0
   fi
 
-  printf 'nuxt_orpc_wt_%s\n' "$WORKTREE_HASH"
+  printf 'base_wt_%s\n' "$WORKTREE_HASH"
 }
 
 ensure_dependencies() {

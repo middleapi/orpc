@@ -3,7 +3,7 @@ import { marketTrendsNavigation } from '~/apps/market-trends/navigation'
 </script>
 
 <template>
-  <AppWorkspaceLayout
+  <AppBaseLayout
     storage-key="app-market-trends"
     sidebar-id="app-market-trends"
     home-to="/apps/market-trends"
@@ -12,5 +12,5 @@ import { marketTrendsNavigation } from '~/apps/market-trends/navigation'
     :navigation="marketTrendsNavigation"
   >
     <slot />
-  </AppWorkspaceLayout>
+  </AppBaseLayout>
 </template>

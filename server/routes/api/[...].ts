@@ -30,7 +30,7 @@ const openAPIHandler = new OpenAPIHandler(router, {
 
         return {
           info: {
-            title: 'Workspace API',
+            title: 'Base API',
             version: '1.0.0',
           },
           tags: [{
@@ -38,7 +38,7 @@ const openAPIHandler = new OpenAPIHandler(router, {
             description: 'Shared authentication and session endpoints used by every application.',
           }, {
             name: 'Platform',
-            description: 'Shared workspace endpoints that are not owned by a single application.',
+            description: 'Shared Base endpoints that are not owned by a single application.',
           }, {
             name: 'Lunaria',
             description: 'Lunaria application endpoints for planets and streams.',
