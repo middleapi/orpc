@@ -60,6 +60,7 @@ mkdir -p "$STATE_DIR"
 
 WORKTREE_PATH="$ROOT_DIR"
 WORKTREE_HASH=$(hash_value "$WORKTREE_PATH")
+MAIN_BRANCH_REF="${WORKTREE_MAIN_BRANCH_REF:-refs/heads/main}"
 APP_PID_FILE="$STATE_DIR/app-$WORKTREE_HASH.pid"
 APP_LOG_FILE="$STATE_DIR/app-$WORKTREE_HASH.log"
 ENV_BACKUP_FILE="$STATE_DIR/.env.backup-$WORKTREE_HASH"
@@ -217,15 +218,25 @@ upsert_env_value() {
 }
 
 find_env_seed() {
-  local worktree_path
+  local main_worktree_path=''
 
-  while IFS= read -r worktree_path; do
-    [ "$worktree_path" = "$WORKTREE_PATH" ] && continue
-    if [ -f "$worktree_path/.env" ]; then
-      printf '%s\n' "$worktree_path/.env"
-      return 0
-    fi
-  done < <(git worktree list --porcelain | awk '/^worktree / { print substr($0, 10) }')
+  main_worktree_path=$(
+    git worktree list --porcelain | awk -v main_branch_ref="$MAIN_BRANCH_REF" '
+      /^worktree / {
+        worktree = substr($0, 10)
+        next
+      }
+      /^branch / && substr($0, 8) == main_branch_ref {
+        print worktree
+        exit
+      }
+    '
+  )
+
+  if [ -n "$main_worktree_path" ] && [ "$main_worktree_path" != "$WORKTREE_PATH" ] && [ -f "$main_worktree_path/.env" ]; then
+    printf '%s\n' "$main_worktree_path/.env"
+    return 0
+  fi
 
   if [ -f "$ROOT_DIR/.env.example" ]; then
     printf '%s\n' "$ROOT_DIR/.env.example"
