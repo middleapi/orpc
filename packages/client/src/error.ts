@@ -99,21 +99,42 @@ export type ORPCErrorOptions<TData>
     & { defined?: boolean, status?: number, message?: string }
     & (undefined extends TData ? { data?: TData } : { data: TData })
 
-/**
- * Store all ORPCError constructors
- * for workaround of instanceof check in case multiple dependency graphs exist
- *
- * @info `Symbol.for` is global symbol registry and shared across different dependency graphs
- */
-const GLOBAL_ORPC_ERROR_CONSTRUCTORS_SYMBOL = Symbol.for(`__${ORPC_CLIENT_PACKAGE_NAME}@${ORPC_CLIENT_PACKAGE_VERSION}/error/ORPC_ERROR_CONSTRUCTORS__`)
-void ((globalThis as any)[GLOBAL_ORPC_ERROR_CONSTRUCTORS_SYMBOL] ??= new WeakSet())
-const globalORPCErrorConstructors: WeakSet<object> = (globalThis as any)[GLOBAL_ORPC_ERROR_CONSTRUCTORS_SYMBOL]
+let globalORPCErrorConstructors: WeakSet<object>
 
 export class ORPCError<TCode extends ORPCErrorCode, TData> extends Error {
   readonly defined: boolean
   readonly code: TCode
   readonly status: number
   readonly data: TData
+
+  /**
+   * Placed inside a static block (rather than at module level) to ensure this
+   * registration is treated as part of the class definition by bundlers.
+   *
+   * With `"sideEffects": false` in package.json, bundlers like webpack/Rollup
+   * are allowed to tree-shake any module-level statements that appear to have
+   * no consumers. A free-floating `globalORPCErrorConstructors.add(ORPCError)`
+   * at module level could be dropped entirely if the bundler decides the module
+   * is only partially used.
+   *
+   * By placing this inside `static {}`, the registration becomes inseparable
+   * from the class body itself — a bundler cannot include `ORPCError` without
+   * executing this block.
+   *
+   * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes/Static_initialization_blocks
+   */
+  static {
+    /**
+     * Store all ORPCError constructors
+     * for workaround of instanceof check in case multiple dependency graphs exist
+     *
+     * @info `Symbol.for` is global symbol registry and shared across different dependency graphs
+     */
+    const GLOBAL_ORPC_ERROR_CONSTRUCTORS_SYMBOL = Symbol.for(`__${ORPC_CLIENT_PACKAGE_NAME}@${ORPC_CLIENT_PACKAGE_VERSION}/error/ORPC_ERROR_CONSTRUCTORS__`)
+    void ((globalThis as any)[GLOBAL_ORPC_ERROR_CONSTRUCTORS_SYMBOL] ??= new WeakSet())
+    globalORPCErrorConstructors = (globalThis as any)[GLOBAL_ORPC_ERROR_CONSTRUCTORS_SYMBOL]
+    globalORPCErrorConstructors.add(ORPCError)
+  }
 
   constructor(code: TCode, ...rest: MaybeOptionalOptions<ORPCErrorOptions<TData>>) {
     const options = resolveMaybeOptionalOptions(rest)
@@ -167,11 +188,6 @@ export class ORPCError<TCode extends ORPCErrorCode, TData> extends Error {
     return super[Symbol.hasInstance](instance)
   }
 }
-/**
- * Store ORPCError constructor
- * for workaround of instanceof check in case multiple dependency graphs exist
- */
-globalORPCErrorConstructors.add(ORPCError)
 
 export type ORPCErrorJSON<TCode extends string, TData> = Pick<ORPCError<TCode, TData>, 'defined' | 'code' | 'status' | 'message' | 'data'>
 
