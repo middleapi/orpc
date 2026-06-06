@@ -9,14 +9,14 @@ export const fetchMarketTrendsTask = schedules.task({
 
     if (result.failed.length > 0) {
       logger.warn('Some market trend indexes failed to refresh', {
-        failed: result.failed,
+        failed: result.failed
       })
     }
 
     logger.info('Market trend indexes refreshed', {
       scheduledAt: payload.timestamp,
       updated: result.updated.length,
-      fetchedAt: result.fetchedAt,
+      fetchedAt: result.fetchedAt
     })
 
     if (result.updated.length === 0 && result.failed.length > 0) {
@@ -24,5 +24,5 @@ export const fetchMarketTrendsTask = schedules.task({
     }
 
     return result
-  },
+  }
 })

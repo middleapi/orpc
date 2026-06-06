@@ -10,7 +10,7 @@ const globalForDatabase = globalThis as typeof globalThis & {
 }
 
 const databaseClient = globalForDatabase.__basePostgresClient ?? postgres(databaseUrl, {
-  max: 10,
+  max: 10
 })
 
 globalForDatabase.__basePostgresClient = databaseClient

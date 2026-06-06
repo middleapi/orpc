@@ -7,8 +7,8 @@ const rpcHandler = new RPCHandler(router, {
   interceptors: [
     onError((error) => {
       console.error(error)
-    }),
-  ],
+    })
+  ]
 })
 
 export default defineEventHandler(async (event) => {
@@ -19,8 +19,8 @@ export default defineEventHandler(async (event) => {
     prefix: '/rpc',
     context: {
       headers: request.headers,
-      ...(user ? { user } : {}),
-    },
+      ...(user ? { user } : {})
+    }
   })
 
   if (response) {

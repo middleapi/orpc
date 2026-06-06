@@ -51,5 +51,5 @@ export const lunariaPlanetsRouter = {
       }
 
       return context.db.apps.lunaria.planets.update(input)
-    }),
+    })
 }

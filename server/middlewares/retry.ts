@@ -19,11 +19,10 @@ export function retry(options: { times: number }) {
         try {
           return next({
             context: {
-              canRetry: false,
-            },
+              canRetry: false
+            }
           })
-        }
-        catch (e) {
+        } catch (e) {
           if (times >= options.times) {
             throw e
           }

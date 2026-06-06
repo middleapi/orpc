@@ -7,7 +7,7 @@ export const platformContract = {
       method: 'GET',
       path: '/platform/me',
       summary: 'Get the current platform user',
-      tags: ['Platform'],
+      tags: ['Platform']
     })
-    .output(UserSchema),
+    .output(UserSchema)
 }

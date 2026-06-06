@@ -3,12 +3,12 @@ import { platformApps } from '~/apps/registry'
 
 definePageMeta({
   layout: 'platform',
-  middleware: 'auth',
+  middleware: 'auth'
 })
 
 useSeoMeta({
   title: 'Applications',
-  description: 'Applications available in Base.',
+  description: 'Applications available in Base.'
 })
 </script>
 

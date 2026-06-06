@@ -7,7 +7,7 @@ export const marketTrendIndexesContract = {
       method: 'GET',
       path: '/apps/market-trends/indexes',
       summary: 'List market trend indexes',
-      tags: ['Market trends'],
+      tags: ['Market trends']
     })
     .output(MarketTrendIndexSchema.array()),
 
@@ -16,7 +16,7 @@ export const marketTrendIndexesContract = {
       method: 'POST',
       path: '/apps/market-trends/indexes/refresh',
       summary: 'Refresh market trend index data',
-      tags: ['Market trends'],
+      tags: ['Market trends']
     })
-    .output(MarketTrendRefreshResultSchema),
+    .output(MarketTrendRefreshResultSchema)
 }

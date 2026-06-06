@@ -41,7 +41,7 @@ const MARKET_TREND_DEFINITIONS: MarketTrendDefinition[] = [{
   currency: 'USD',
   provider: 'yahoo-chart',
   source: 'Yahoo Finance',
-  sourceUrl: 'https://finance.yahoo.com/quote/%5EGSPC',
+  sourceUrl: 'https://finance.yahoo.com/quote/%5EGSPC'
 }, {
   displayOrder: 2,
   symbol: 'IXIC',
@@ -51,7 +51,7 @@ const MARKET_TREND_DEFINITIONS: MarketTrendDefinition[] = [{
   currency: 'USD',
   provider: 'yahoo-chart',
   source: 'Yahoo Finance',
-  sourceUrl: 'https://finance.yahoo.com/quote/%5EIXIC',
+  sourceUrl: 'https://finance.yahoo.com/quote/%5EIXIC'
 }, {
   displayOrder: 3,
   symbol: 'N225',
@@ -61,7 +61,7 @@ const MARKET_TREND_DEFINITIONS: MarketTrendDefinition[] = [{
   currency: 'JPY',
   provider: 'yahoo-chart',
   source: 'Yahoo Finance',
-  sourceUrl: 'https://finance.yahoo.com/quote/%5EN225',
+  sourceUrl: 'https://finance.yahoo.com/quote/%5EN225'
 }, {
   displayOrder: 4,
   symbol: 'KS11',
@@ -71,7 +71,7 @@ const MARKET_TREND_DEFINITIONS: MarketTrendDefinition[] = [{
   currency: 'KRW',
   provider: 'yahoo-chart',
   source: 'Yahoo Finance',
-  sourceUrl: 'https://finance.yahoo.com/quote/%5EKS11',
+  sourceUrl: 'https://finance.yahoo.com/quote/%5EKS11'
 }, {
   displayOrder: 5,
   symbol: 'TA125',
@@ -81,12 +81,12 @@ const MARKET_TREND_DEFINITIONS: MarketTrendDefinition[] = [{
   currency: 'ILS',
   provider: 'google-finance',
   source: 'Google Finance',
-  sourceUrl: 'https://www.google.com/finance/quote/137:TLV?hl=en',
+  sourceUrl: 'https://www.google.com/finance/quote/137:TLV?hl=en'
 }]
 
 const fetchHeaders = {
-  accept: 'application/json,text/html;q=0.9,*/*;q=0.8',
-  'user-agent': 'Mozilla/5.0 (compatible; LunariaMarketTrends/1.0)',
+  'accept': 'application/json,text/html;q=0.9,*/*;q=0.8',
+  'user-agent': 'Mozilla/5.0 (compatible; LunariaMarketTrends/1.0)'
 }
 
 export async function listMarketTrendIndexes(): Promise<MarketTrendIndex[]> {
@@ -101,7 +101,7 @@ export async function listMarketTrendIndexes(): Promise<MarketTrendIndex[]> {
 export async function refreshMarketTrends(): Promise<MarketTrendRefreshResult> {
   const fetchedAt = new Date().toISOString()
   const results = await Promise.allSettled(
-    MARKET_TREND_DEFINITIONS.map(definition => fetchMarketTrendQuote(definition, fetchedAt)),
+    MARKET_TREND_DEFINITIONS.map(definition => fetchMarketTrendQuote(definition, fetchedAt))
   )
 
   const quotes: MarketTrendQuote[] = []
@@ -112,11 +112,10 @@ export async function refreshMarketTrends(): Promise<MarketTrendRefreshResult> {
 
     if (result.status === 'fulfilled') {
       quotes.push(result.value)
-    }
-    else {
+    } else {
       failed.push({
         symbol: definition.symbol,
-        message: getErrorMessage(result.reason),
+        message: getErrorMessage(result.reason)
       })
     }
   }
@@ -126,7 +125,7 @@ export async function refreshMarketTrends(): Promise<MarketTrendRefreshResult> {
   return {
     fetchedAt,
     updated,
-    failed,
+    failed
   }
 }
 
@@ -157,7 +156,7 @@ async function upsertMarketTrendQuotes(quotes: MarketTrendQuote[]): Promise<Mark
       fetchedAt: new Date(quote.fetchedAt),
       source: quote.source,
       sourceUrl: quote.sourceUrl,
-      updatedAt: now,
+      updatedAt: now
     })))
     .onConflictDoUpdate({
       target: marketTrendIndexes.symbol,
@@ -179,8 +178,8 @@ async function upsertMarketTrendQuotes(quotes: MarketTrendQuote[]): Promise<Mark
         fetchedAt: sql`excluded.fetched_at`,
         source: sql`excluded.source`,
         sourceUrl: sql`excluded.source_url`,
-        updatedAt: now,
-      },
+        updatedAt: now
+      }
     })
     .returning()
 
@@ -191,7 +190,7 @@ async function upsertMarketTrendQuotes(quotes: MarketTrendQuote[]): Promise<Mark
 
 async function fetchMarketTrendQuote(
   definition: MarketTrendDefinition,
-  fetchedAt: string,
+  fetchedAt: string
 ): Promise<MarketTrendQuote> {
   if (definition.provider === 'yahoo-chart') {
     return fetchYahooChartQuote(definition, fetchedAt)
@@ -202,7 +201,7 @@ async function fetchMarketTrendQuote(
 
 async function fetchYahooChartQuote(
   definition: MarketTrendDefinition,
-  fetchedAt: string,
+  fetchedAt: string
 ): Promise<MarketTrendQuote> {
   const url = new URL(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(definition.providerSymbol)}`)
   url.searchParams.set('range', '1d')
@@ -251,13 +250,13 @@ async function fetchYahooChartQuote(
     dayLow: getOptionalNumber(meta.regularMarketDayLow),
     volume: getOptionalNumber(meta.regularMarketVolume),
     marketTime,
-    fetchedAt,
+    fetchedAt
   }
 }
 
 async function fetchGoogleFinanceQuote(
   definition: MarketTrendDefinition,
-  fetchedAt: string,
+  fetchedAt: string
 ): Promise<MarketTrendQuote> {
   const response = await fetch(definition.sourceUrl, { headers: fetchHeaders })
   const html = await response.text()
@@ -274,7 +273,7 @@ async function fetchGoogleFinanceQuote(
 
   const quotePattern = new RegExp(
     String.raw`\["[^"]+",\["${escapeRegExp(symbol)}","${escapeRegExp(exchange)}"\],"[^"]+",\d+,null,\[(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),[^\]]*\],null,(-?\d+(?:\.\d+)?).*?\[(\d+)\],"[^"]+",-?\d+`,
-    's',
+    's'
   )
   const match = html.match(quotePattern)
 
@@ -295,7 +294,7 @@ async function fetchGoogleFinanceQuote(
     changePercent,
     previousClose,
     marketTime: new Date(marketTimestamp * 1000).toISOString(),
-    fetchedAt,
+    fetchedAt
   }
 }
 
@@ -322,7 +321,7 @@ function toMarketTrendIndex(row: typeof marketTrendIndexes.$inferSelect): Market
     source: row.source,
     sourceUrl: row.sourceUrl,
     createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString()
   }
 }
 

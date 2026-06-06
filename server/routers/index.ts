@@ -7,6 +7,6 @@ export const router = orpc.router({
   platform: platformRouter,
   apps: {
     lunaria: lunariaRouter,
-    marketTrends: marketTrendsRouter,
-  },
+    marketTrends: marketTrendsRouter
+  }
 })

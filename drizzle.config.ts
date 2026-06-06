@@ -7,6 +7,6 @@ export default defineConfig({
   dialect: 'postgresql',
   schemaFilter: ['shared', 'lunaria', 'market_trends'],
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5433/base',
-  },
+    url: process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5433/base'
+  }
 })

@@ -11,12 +11,12 @@ export const planets = lunariaSchema.table('planets', {
   imageUrl: text('image_url'),
   creatorId: text('creator_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 })
 
 export const planetsRelations = relations(planets, ({ one }) => ({
   creator: one(users, {
     fields: [planets.creatorId],
-    references: [users.id],
-  }),
+    references: [users.id]
+  })
 }))

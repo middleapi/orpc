@@ -22,7 +22,7 @@ export const authed = pub.use(({ context, next }) => {
 
   return next({
     context: {
-      user: context.user,
-    },
+      user: context.user
+    }
   })
 })

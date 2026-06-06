@@ -1,0 +1,14 @@
+{
+  "extends": "./.nuxt/tsconfig.server.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": [
+    "drizzle.config.ts",
+    "trigger.config.ts",
+    "trigger/**/*.ts",
+    "server/db/seed.ts",
+    "scripts/**/*.ts"
+  ]
+}

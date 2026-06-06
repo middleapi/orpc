@@ -22,7 +22,7 @@ import { orpcContract } from '#shared/orpc-contract'
 export default defineNuxtPlugin(() => {
   const link = new OpenAPILink(orpcContract, {
     url: `${window.location.origin}/api`,
-    headers: () => ({}),
+    headers: () => ({})
   })
 
   const client = createORPCClient<JsonifiedClient<ContractRouterClient<typeof orpcContract>>>(link)
@@ -31,7 +31,7 @@ export default defineNuxtPlugin(() => {
 
   return {
     provide: {
-      orpc,
-    },
+      orpc
+    }
   }
 })

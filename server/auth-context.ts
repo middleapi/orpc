@@ -7,14 +7,14 @@ import { sessions, users } from './db/schema'
 const defaultPlaygroundUser: User = {
   id: 'default-playground-user',
   name: 'John Doe',
-  email: 'john@doe.com',
+  email: 'john@doe.com'
 }
 
 function toUser(user: Pick<typeof users.$inferSelect, 'id' | 'name' | 'email'>): User {
   return {
     id: user.id,
     name: user.name,
-    email: user.email,
+    email: user.email
   }
 }
 
@@ -34,7 +34,7 @@ async function getUserFromAuthorization(authorization?: string | null): Promise<
       .select({
         id: users.id,
         name: users.name,
-        email: users.email,
+        email: users.email
       })
       .from(users)
       .where(eq(users.email, defaultPlaygroundUser.email))
@@ -48,14 +48,14 @@ async function getUserFromAuthorization(authorization?: string | null): Promise<
       user: {
         id: users.id,
         name: users.name,
-        email: users.email,
-      },
+        email: users.email
+      }
     })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
     .where(and(
       eq(sessions.token, token),
-      gt(sessions.expiresAt, new Date()),
+      gt(sessions.expiresAt, new Date())
     ))
     .limit(1)
 
@@ -69,7 +69,7 @@ export async function getUserFromRequest(headers: Headers): Promise<User | undef
     return {
       id: session.user.id,
       name: session.user.name,
-      email: session.user.email,
+      email: session.user.email
     }
   }
 

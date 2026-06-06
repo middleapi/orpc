@@ -8,13 +8,13 @@ export const lunariaPlanetsContract = {
       method: 'GET',
       path: '/apps/lunaria/planets',
       summary: 'List Lunaria planets',
-      tags: ['Lunaria'],
+      tags: ['Lunaria']
     })
     .input(
       z.object({
         limit: z.number().int().min(1).max(100).default(10),
-        cursor: z.number().int().min(0).default(0),
-      }),
+        cursor: z.number().int().min(0).default(0)
+      })
     )
     .output(z.array(PlanetSchema)),
 
@@ -23,7 +23,7 @@ export const lunariaPlanetsContract = {
       method: 'POST',
       path: '/apps/lunaria/planets',
       summary: 'Create a Lunaria planet',
-      tags: ['Lunaria'],
+      tags: ['Lunaria']
     })
     .input(NewPlanetSchema)
     .output(PlanetSchema),
@@ -33,12 +33,12 @@ export const lunariaPlanetsContract = {
       method: 'GET',
       path: '/apps/lunaria/planets/{id}',
       summary: 'Find a Lunaria planet',
-      tags: ['Lunaria'],
+      tags: ['Lunaria']
     })
     .input(
       z.object({
-        id: z.number().int().min(1),
-      }),
+        id: z.number().int().min(1)
+      })
     )
     .output(PlanetSchema),
 
@@ -47,14 +47,14 @@ export const lunariaPlanetsContract = {
       method: 'PUT',
       path: '/apps/lunaria/planets/{id}',
       summary: 'Update a Lunaria planet',
-      tags: ['Lunaria'],
+      tags: ['Lunaria']
     })
     .errors({
       NOT_FOUND: {
         message: 'Planet not found',
-        data: z.object({ id: UpdatePlanetSchema.shape.id }),
-      },
+        data: z.object({ id: UpdatePlanetSchema.shape.id })
+      }
     })
     .input(UpdatePlanetSchema)
-    .output(PlanetSchema),
+    .output(PlanetSchema)
 }

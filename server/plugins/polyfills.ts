@@ -17,7 +17,7 @@ import { File } from 'node:buffer'
  * If you're not using `oz.file()`, you can safely remove this polyfill.
  */
 if (typeof globalThis.File === 'undefined') {
-  globalThis.File = File as any
+  globalThis.File = File as typeof globalThis.File
 }
 
 export default defineNitroPlugin(() => {})

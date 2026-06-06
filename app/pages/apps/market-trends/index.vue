@@ -4,11 +4,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 
 definePageMeta({
   layout: 'app-market-trends',
-  middleware: 'auth',
+  middleware: 'auth'
 })
 
 useSeoMeta({
-  title: 'Market trends',
+  title: 'Market trends'
 })
 
 const UBadge = resolveComponent('UBadge')
@@ -33,15 +33,15 @@ const columns: TableColumn<MarketTrend>[] = [{
   header: 'Index',
   cell: ({ row }) => h('div', { class: 'min-w-56' }, [
     h('p', { class: 'font-medium text-highlighted' }, row.original.name),
-    h('p', { class: 'text-xs text-muted' }, `${row.original.region} - ${row.original.providerSymbol}`),
-  ]),
+    h('p', { class: 'text-xs text-muted' }, `${row.original.region} - ${row.original.providerSymbol}`)
+  ])
 }, {
   accessorKey: 'price',
   header: 'Last',
   cell: ({ row }) => h('div', { class: 'tabular-nums' }, [
     h('p', { class: 'font-medium text-highlighted' }, formatNumber(row.original.price)),
-    h('p', { class: 'text-xs text-muted' }, row.original.currency),
-  ]),
+    h('p', { class: 'text-xs text-muted' }, row.original.currency)
+  ])
 }, {
   accessorKey: 'changePercent',
   header: 'Move',
@@ -49,41 +49,41 @@ const columns: TableColumn<MarketTrend>[] = [{
     color: getMoveColor(row.original.direction),
     icon: getMoveIcon(row.original.direction),
     label: formatSignedPercent(row.original.changePercent),
-    variant: 'subtle',
-  }),
+    variant: 'subtle'
+  })
 }, {
   accessorKey: 'previousClose',
   header: 'Prev. close',
-  cell: ({ row }) => h('span', { class: 'tabular-nums text-muted' }, formatNumber(row.original.previousClose)),
+  cell: ({ row }) => h('span', { class: 'tabular-nums text-muted' }, formatNumber(row.original.previousClose))
 }, {
   accessorKey: 'marketTime',
   header: 'Market time',
-  cell: ({ row }) => h('span', { class: 'whitespace-nowrap text-muted' }, formatDateTime(row.original.marketTime)),
+  cell: ({ row }) => h('span', { class: 'whitespace-nowrap text-muted' }, formatDateTime(row.original.marketTime))
 }, {
   accessorKey: 'fetchedAt',
   header: 'Fetched',
-  cell: ({ row }) => h('span', { class: 'whitespace-nowrap text-muted' }, formatDateTime(row.original.fetchedAt)),
+  cell: ({ row }) => h('span', { class: 'whitespace-nowrap text-muted' }, formatDateTime(row.original.fetchedAt))
 }]
 
 const refreshMutation = useMutation($orpc.apps.marketTrends.indexes.refresh.mutationOptions({
   async onSuccess(result) {
     await queryClient.invalidateQueries({
-      queryKey: $orpc.apps.marketTrends.indexes.list.key(),
+      queryKey: $orpc.apps.marketTrends.indexes.list.key()
     })
 
     toast.add({
       title: 'Market trends refreshed',
       description: `${result.updated.length} index(es) updated${result.failed.length ? `, ${result.failed.length} failed` : ''}.`,
-      color: result.failed.length ? 'warning' : 'success',
+      color: result.failed.length ? 'warning' : 'success'
     })
   },
   onError(error) {
     toast.add({
       title: 'Could not refresh market trends',
       description: error.message,
-      color: 'error',
+      color: 'error'
     })
-  },
+  }
 }))
 
 const isRefreshing = computed(() => query.isFetching.value || refreshMutation.isPending.value)
@@ -118,7 +118,7 @@ function getMoveIcon(direction: MarketTrend['direction']) {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('en-US', {
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 2
   }).format(value)
 }
 
@@ -126,7 +126,7 @@ function formatSignedPercent(value: number) {
   const formatted = new Intl.NumberFormat('en-US', {
     maximumFractionDigits: 2,
     signDisplay: 'always',
-    style: 'percent',
+    style: 'percent'
   }).format(value / 100)
 
   return formatted === '+0%' ? '0%' : formatted
@@ -135,7 +135,7 @@ function formatSignedPercent(value: number) {
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat('en-US', {
     dateStyle: 'medium',
-    timeStyle: 'short',
+    timeStyle: 'short'
   }).format(new Date(value))
 }
 

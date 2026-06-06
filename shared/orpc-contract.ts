@@ -6,6 +6,6 @@ export const orpcContract = {
   platform: platformContract,
   apps: {
     lunaria: lunariaContract,
-    marketTrends: marketTrendsContract,
-  },
+    marketTrends: marketTrendsContract
+  }
 }

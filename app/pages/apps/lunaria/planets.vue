@@ -4,11 +4,11 @@ import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/vue-que
 
 definePageMeta({
   layout: 'app-lunaria',
-  middleware: 'auth',
+  middleware: 'auth'
 })
 
 useSeoMeta({
-  title: 'Planets',
+  title: 'Planets'
 })
 
 const UBadge = resolveComponent('UBadge')
@@ -21,13 +21,13 @@ const createOpen = ref(false)
 const form = reactive({
   name: '',
   description: '',
-  image: undefined as File | undefined,
+  image: undefined as File | undefined
 })
 
 const query = useInfiniteQuery($orpc.apps.lunaria.planets.list.infiniteOptions({
   input: cursor => ({ cursor, limit: 10 }),
   getNextPageParam: lastPage => lastPage.length === 10 ? lastPage.at(-1)?.id : null,
-  initialPageParam: 0,
+  initialPageParam: 0
 }))
 
 await query.suspense()
@@ -39,28 +39,28 @@ const planets = computed(() => query.data.value?.pages.flatMap(page => page) ?? 
 const columns: TableColumn<Planet>[] = [{
   accessorKey: 'id',
   header: 'ID',
-  cell: ({ row }) => `#${row.original.id}`,
+  cell: ({ row }) => `#${row.original.id}`
 }, {
   accessorKey: 'name',
   header: 'Name',
-  cell: ({ row }) => h('span', { class: 'font-medium text-highlighted' }, row.original.name),
+  cell: ({ row }) => h('span', { class: 'font-medium text-highlighted' }, row.original.name)
 }, {
   accessorKey: 'description',
   header: 'Description',
-  cell: ({ row }) => row.original.description ?? 'No description',
+  cell: ({ row }) => row.original.description ?? 'No description'
 }, {
   accessorKey: 'imageUrl',
   header: 'Image',
   cell: ({ row }) => h(UBadge, {
     color: row.original.imageUrl ? 'success' : 'neutral',
-    variant: 'subtle',
-  }, () => row.original.imageUrl ? 'Attached' : 'None'),
+    variant: 'subtle'
+  }, () => row.original.imageUrl ? 'Attached' : 'None')
 }]
 
 const { mutate, isPending } = useMutation($orpc.apps.lunaria.planets.create.mutationOptions({
   onSuccess() {
     queryClient.invalidateQueries({
-      queryKey: $orpc.apps.lunaria.planets.list.key(),
+      queryKey: $orpc.apps.lunaria.planets.list.key()
     })
     form.name = ''
     form.description = ''
@@ -69,16 +69,16 @@ const { mutate, isPending } = useMutation($orpc.apps.lunaria.planets.create.muta
     toast.add({
       title: 'Planet created',
       description: 'The list will refresh with the new record.',
-      color: 'success',
+      color: 'success'
     })
   },
   onError(error) {
     toast.add({
       title: 'Could not create planet',
       description: error.message,
-      color: 'error',
+      color: 'error'
     })
-  },
+  }
 }))
 
 function onFileChange(event: Event) {
@@ -90,7 +90,7 @@ function onSubmit() {
   mutate({
     name: form.name,
     description: form.description || undefined,
-    image: form.image,
+    image: form.image
   })
 }
 </script>
@@ -119,7 +119,12 @@ function onSubmit() {
             <template #body>
               <UForm :state="form" class="space-y-4" @submit="onSubmit">
                 <UFormField label="Name" name="name" required>
-                  <UInput v-model="form.name" class="w-full" placeholder="Earth" required />
+                  <UInput
+                    v-model="form.name"
+                    class="w-full"
+                    placeholder="Earth"
+                    required
+                  />
                 </UFormField>
 
                 <UFormField label="Description" name="description">
@@ -127,11 +132,21 @@ function onSubmit() {
                 </UFormField>
 
                 <UFormField label="Image" name="image">
-                  <UInput type="file" accept="image/*" class="w-full" @change="onFileChange" />
+                  <UInput
+                    type="file"
+                    accept="image/*"
+                    class="w-full"
+                    @change="onFileChange"
+                  />
                 </UFormField>
 
                 <div class="flex justify-end gap-2">
-                  <UButton label="Cancel" color="neutral" variant="ghost" @click="createOpen = false" />
+                  <UButton
+                    label="Cancel"
+                    color="neutral"
+                    variant="ghost"
+                    @click="createOpen = false"
+                  />
                   <UButton label="Create planet" type="submit" :loading="isPending" />
                 </div>
               </UForm>

@@ -3,11 +3,11 @@ import { useInfiniteQuery } from '@tanstack/vue-query'
 
 definePageMeta({
   layout: 'app-lunaria',
-  middleware: 'auth',
+  middleware: 'auth'
 })
 
 useSeoMeta({
-  title: 'Lunaria',
+  title: 'Lunaria'
 })
 
 const { $orpc } = useNuxtApp()
@@ -15,7 +15,7 @@ const { $orpc } = useNuxtApp()
 const query = useInfiniteQuery($orpc.apps.lunaria.planets.list.infiniteOptions({
   input: cursor => ({ cursor, limit: 10 }),
   getNextPageParam: lastPage => lastPage.length === 10 ? lastPage.at(-1)?.id : null,
-  initialPageParam: 0,
+  initialPageParam: 0
 }))
 
 await query.suspense()

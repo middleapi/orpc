@@ -11,7 +11,7 @@ export const users = sharedSchema.table('users', {
   emailVerified: boolean('email_verified').default(false).notNull(),
   image: text('image'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 })
 
 export const sessions = sharedSchema.table('sessions', {
@@ -22,7 +22,7 @@ export const sessions = sharedSchema.table('sessions', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   ipAddress: text('ip_address'),
   userAgent: text('user_agent'),
-  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' })
 })
 
 export const accounts = sharedSchema.table('accounts', {
@@ -38,7 +38,7 @@ export const accounts = sharedSchema.table('accounts', {
   scope: text('scope'),
   password: text('password'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 })
 
 export const verifications = sharedSchema.table('verifications', {
@@ -47,24 +47,24 @@ export const verifications = sharedSchema.table('verifications', {
   value: text('value').notNull(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 })
 
 export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
-  accounts: many(accounts),
+  accounts: many(accounts)
 }))
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
   user: one(users, {
     fields: [sessions.userId],
-    references: [users.id],
-  }),
+    references: [users.id]
+  })
 }))
 
 export const accountsRelations = relations(accounts, ({ one }) => ({
   user: one(users, {
     fields: [accounts.userId],
-    references: [users.id],
-  }),
+    references: [users.id]
+  })
 }))

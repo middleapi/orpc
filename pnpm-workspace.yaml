@@ -1,0 +1,14 @@
+allowBuilds:
+  '@depot/cli': false
+  '@parcel/watcher': false
+  '@tailwindcss/oxide': false
+  esbuild: false
+  maplibre-gl: false
+  protobufjs: false
+  unrs-resolver: false
+  vue-demi: false
+minimumReleaseAgeExclude:
+  - '@nuxt/ui@4.8.2'
+peerDependencyRules:
+  allowedVersions:
+    typescript: 6.0.3

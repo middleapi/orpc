@@ -3,5 +3,5 @@ import { lunariaStreamContract } from './stream'
 
 export const lunariaContract = {
   planets: lunariaPlanetsContract,
-  stream: lunariaStreamContract,
+  stream: lunariaStreamContract
 }

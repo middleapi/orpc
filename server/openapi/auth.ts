@@ -11,7 +11,7 @@ const PUBLIC_AUTH_PATHS = new Set([
   '/sign-up/email',
   '/sign-in/email',
   '/get-session',
-  '/sign-out',
+  '/sign-out'
 ])
 
 const AUTH_OPERATION_IDS: Record<string, string> = {
@@ -19,18 +19,18 @@ const AUTH_OPERATION_IDS: Record<string, string> = {
   'POST /sign-in/email': 'auth.signInEmail',
   'GET /get-session': 'auth.getSession',
   'POST /get-session': 'auth.getSessionPost',
-  'POST /sign-out': 'auth.signOut',
+  'POST /sign-out': 'auth.signOut'
 }
 
 const AUTHENTICATED_OPERATIONS = new Set([
   'GET /get-session',
   'POST /get-session',
-  'POST /sign-out',
+  'POST /sign-out'
 ])
 
 const SCHEMA_REF_RENAMES: Record<string, string> = {
   '#/components/schemas/User': '#/components/schemas/BetterAuthUser',
-  '#/components/schemas/Session': '#/components/schemas/BetterAuthSession',
+  '#/components/schemas/Session': '#/components/schemas/BetterAuthSession'
 }
 
 function cloneOpenAPIValue<T>(value: T): T {
@@ -39,7 +39,7 @@ function cloneOpenAPIValue<T>(value: T): T {
 
 function rewriteSchemaRefs<T>(value: T): T {
   if (Array.isArray(value)) {
-    return value.map((item) => rewriteSchemaRefs(item)) as T
+    return value.map(item => rewriteSchemaRefs(item)) as T
   }
 
   if (!value || typeof value !== 'object') {
@@ -90,10 +90,9 @@ function normalizeAuthPathItem(path: string, pathItem: unknown): PathItem {
     if (AUTHENTICATED_OPERATIONS.has(operationKey)) {
       operation.security = [
         { bearerAuth: [] },
-        { betterAuthCookie: [] },
+        { betterAuthCookie: [] }
       ]
-    }
-    else {
+    } else {
       delete operation.security
     }
   }
@@ -119,13 +118,13 @@ export async function getPublicAuthOpenAPI(): Promise<{
 
   if (authSpec.components?.schemas?.User) {
     schemas.BetterAuthUser = rewriteSchemaRefs(
-      cloneOpenAPIValue(authSpec.components.schemas.User),
+      cloneOpenAPIValue(authSpec.components.schemas.User)
     ) as NonNullable<Components['schemas']>[string]
   }
 
   if (authSpec.components?.schemas?.Session) {
     schemas.BetterAuthSession = rewriteSchemaRefs(
-      cloneOpenAPIValue(authSpec.components.schemas.Session),
+      cloneOpenAPIValue(authSpec.components.schemas.Session)
     ) as NonNullable<Components['schemas']>[string]
   }
 
@@ -138,9 +137,9 @@ export async function getPublicAuthOpenAPI(): Promise<{
           type: 'apiKey',
           in: 'cookie',
           name: 'better-auth.session_token',
-          description: 'Better Auth session cookie',
-        },
-      },
-    },
+          description: 'Better Auth session cookie'
+        }
+      }
+    }
   }
 }

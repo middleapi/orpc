@@ -23,5 +23,5 @@ export const marketTrendIndexes = marketTrendsSchema.table('market_trend_indexes
   source: text('source').notNull(),
   sourceUrl: text('source_url').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 })

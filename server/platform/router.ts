@@ -6,5 +6,5 @@ export const platformRouter = {
     .me
     .handler(({ context }) => {
       return context.user
-    }),
+    })
 }

@@ -11,7 +11,7 @@ export const MarketTrendRegionSchema = z.enum([
   'United States',
   'Japan',
   'South Korea',
-  'Israel',
+  'Israel'
 ])
 
 export const MarketTrendIndexSchema = z.object({
@@ -36,16 +36,16 @@ export const MarketTrendIndexSchema = z.object({
   source: z.string().min(1),
   sourceUrl: z.url(),
   createdAt: IsoDateTimeSchema,
-  updatedAt: IsoDateTimeSchema,
+  updatedAt: IsoDateTimeSchema
 })
 
 const MarketTrendRefreshFailureSchema = z.object({
   symbol: z.string().min(1),
-  message: z.string().min(1),
+  message: z.string().min(1)
 })
 
 export const MarketTrendRefreshResultSchema = z.object({
   fetchedAt: IsoDateTimeSchema,
   updated: z.array(MarketTrendIndexSchema),
-  failed: z.array(MarketTrendRefreshFailureSchema),
+  failed: z.array(MarketTrendRefreshFailureSchema)
 })

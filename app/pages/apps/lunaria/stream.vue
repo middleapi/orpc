@@ -3,18 +3,18 @@ import { useQuery } from '@tanstack/vue-query'
 
 definePageMeta({
   layout: 'app-lunaria',
-  middleware: 'auth',
+  middleware: 'auth'
 })
 
 useSeoMeta({
-  title: 'Stream',
+  title: 'Stream'
 })
 
 const { $orpc } = useNuxtApp()
 
 const query = useQuery($orpc.apps.lunaria.stream.events.experimental_streamedOptions({
   queryFnOptions: { maxChunks: 3 },
-  enabled: false,
+  enabled: false
 }))
 
 onMounted(() => {

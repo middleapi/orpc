@@ -4,10 +4,10 @@ const route = useRoute()
 const items = computed(() => [{
   label: 'Base',
   to: '/',
-  active: route.path === '/',
+  active: route.path === '/'
 }, {
   label: 'Applications',
-  to: '/apps',
+  to: '/apps'
 }])
 </script>
 
@@ -32,7 +32,12 @@ const items = computed(() => [{
         class="lg:hidden"
       />
 
-      <UButton label="Sign in" trailing-icon="i-lucide-log-in" to="/login" class="hidden lg:inline-flex" />
+      <UButton
+        label="Sign in"
+        trailing-icon="i-lucide-log-in"
+        to="/login"
+        class="hidden lg:inline-flex"
+      />
     </template>
 
     <template #body>

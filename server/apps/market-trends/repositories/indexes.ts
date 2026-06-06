@@ -9,6 +9,6 @@ export interface MarketTrendIndexRepository {
 export function createMarketTrendIndexRepository(): MarketTrendIndexRepository {
   return {
     list: listMarketTrendIndexes,
-    refresh: refreshMarketTrends,
+    refresh: refreshMarketTrends
   }
 }

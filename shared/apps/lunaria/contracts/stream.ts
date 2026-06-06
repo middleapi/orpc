@@ -7,7 +7,7 @@ export const lunariaStreamContract = {
       method: 'GET',
       path: '/apps/lunaria/stream',
       tags: ['Lunaria'],
-      summary: 'Lunaria stream events',
+      summary: 'Lunaria stream events'
     })
-    .output(eventIterator(z.object({ time: z.date() }))),
+    .output(eventIterator(z.object({ time: z.date() })))
 }

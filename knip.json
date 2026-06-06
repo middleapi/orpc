@@ -4,6 +4,13 @@
     "trigger.config.ts",
     "trigger/**/*.ts"
   ],
+  "project": [
+    "*.{js,mjs,cjs,ts,mts,cts}",
+    "app/**/*.{ts,vue}",
+    "server/**/*.ts",
+    "shared/**/*.ts",
+    "trigger/**/*.ts"
+  ],
   "ignoreDependencies": [
     "@iconify-json/lucide",
     "vue-tsc"

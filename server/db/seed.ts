@@ -7,8 +7,8 @@ async function seed() {
   let user = await auth.api.signInEmail({
     body: {
       email: 'john@doe.com',
-      password: '123456',
-    },
+      password: '123456'
+    }
   }).then(result => result.user).catch(() => undefined)
 
   if (!user) {
@@ -18,8 +18,8 @@ async function seed() {
       body: {
         name: 'John Doe',
         email: 'john@doe.com',
-        password: '123456',
-      },
+        password: '123456'
+      }
     })
 
     user = result.user
@@ -33,22 +33,22 @@ async function seed() {
         name: 'Earth',
         description: 'The planet Earth',
         imageUrl: 'https://picsum.photos/200/300',
-        creatorId: user.id,
+        creatorId: user.id
       },
       {
         id: 2,
         name: 'Mars',
         description: 'The planet Mars',
         imageUrl: 'https://picsum.photos/200/300',
-        creatorId: user.id,
+        creatorId: user.id
       },
       {
         id: 3,
         name: 'Jupiter',
         description: 'The planet Jupiter',
         imageUrl: 'https://picsum.photos/200/300',
-        creatorId: user.id,
-      },
+        creatorId: user.id
+      }
     ])
     .onConflictDoNothing()
 

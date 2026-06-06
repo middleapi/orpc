@@ -9,7 +9,7 @@ JSON_SCHEMA_REGISTRY.add(UserSchema, {
     {
       id: '1',
       name: 'John Doe',
-      email: 'john@doe.com',
-    },
-  ],
+      email: 'john@doe.com'
+    }
+  ]
 })

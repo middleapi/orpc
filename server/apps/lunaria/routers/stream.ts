@@ -16,5 +16,5 @@ export const lunariaStreamRouter = {
         yield { time: new Date() }
         await new Promise(resolve => setTimeout(resolve, 1000))
       }
-    }),
+    })
 }

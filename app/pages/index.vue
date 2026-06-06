@@ -5,21 +5,21 @@ const productName = 'Base'
 
 useSeoMeta({
   title: productName,
-  description: 'A personal platform for opening and running my applications.',
+  description: 'A personal platform for opening and running my applications.'
 })
 
 const heroLinks = [{
   label: 'Open applications',
   to: '/apps',
   icon: 'i-lucide-layout-dashboard',
-  trailing: true,
+  trailing: true
 }, {
   label: 'API reference',
   to: '/api',
   target: '_blank',
   icon: 'i-lucide-book-open',
   color: 'neutral' as const,
-  variant: 'subtle' as const,
+  variant: 'subtle' as const
 }]
 
 const applications = platformApps.map((app) => {
@@ -28,7 +28,7 @@ const applications = platformApps.map((app) => {
       ...app,
       headline: 'Records and streams',
       summary: 'Planet records, creation forms, and live stream endpoint experiments.',
-      metric: 'Planets, forms, stream',
+      metric: 'Planets, forms, stream'
     }
   }
 
@@ -36,7 +36,7 @@ const applications = platformApps.map((app) => {
     ...app,
     headline: 'Market snapshots',
     summary: 'Global index snapshots, manual refreshes, and scheduled market-data ingestion.',
-    metric: 'Indexes, refreshes, schedule',
+    metric: 'Indexes, refreshes, schedule'
   }
 })
 </script>

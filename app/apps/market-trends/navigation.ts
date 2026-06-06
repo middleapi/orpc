@@ -4,5 +4,5 @@ export const marketTrendsNavigation = [{
   label: 'Overview',
   icon: 'i-lucide-trending-up',
   to: '/apps/market-trends',
-  exact: true,
+  exact: true
 }] satisfies NavigationMenuItem[]

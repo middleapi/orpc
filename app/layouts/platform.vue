@@ -15,7 +15,7 @@ const primaryLinks = computed<NavigationMenuItem[]>(() => [{
   exact: true,
   onSelect: () => {
     open.value = false
-  },
+  }
 }])
 
 const appLinks = computed<NavigationMenuItem[]>(() => platformApps.map(app => ({
@@ -24,14 +24,14 @@ const appLinks = computed<NavigationMenuItem[]>(() => platformApps.map(app => ({
   to: app.to,
   onSelect: () => {
     open.value = false
-  },
+  }
 })))
 
 const resourceLinks = computed<NavigationMenuItem[]>(() => [{
   label: 'API reference',
   icon: 'i-lucide-book-open',
   to: '/api',
-  target: '_blank',
+  target: '_blank'
 }])
 
 function toSearchItems(items: NavigationMenuItem[]): CommandPaletteItem[] {
@@ -39,22 +39,22 @@ function toSearchItems(items: NavigationMenuItem[]): CommandPaletteItem[] {
     label: String(item.label ?? ''),
     icon: item.icon,
     to: item.to,
-    target: item.target,
+    target: item.target
   }))
 }
 
 const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [{
   id: 'platform',
   label: 'Platform',
-  items: toSearchItems(primaryLinks.value),
+  items: toSearchItems(primaryLinks.value)
 }, {
   id: 'applications',
   label: 'Applications',
-  items: toSearchItems(appLinks.value),
+  items: toSearchItems(appLinks.value)
 }, {
   id: 'resources',
   label: 'Resources',
-  items: toSearchItems(resourceLinks.value),
+  items: toSearchItems(resourceLinks.value)
 }])
 
 const userMenuItems = computed<DropdownMenuItem[][]>(() => [[{
@@ -62,24 +62,24 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [[{
   label: user.value?.name ?? 'Account',
   avatar: {
     src: user.value?.image ?? undefined,
-    alt: user.value?.name ?? 'Account',
-  },
+    alt: user.value?.name ?? 'Account'
+  }
 }], [{
   label: 'Applications',
   icon: 'i-lucide-grid-3x3',
-  to: '/apps',
+  to: '/apps'
 }, {
   label: 'API reference',
   icon: 'i-lucide-book-open',
   to: '/api',
-  target: '_blank',
+  target: '_blank'
 }], [{
   label: 'Log out',
   icon: 'i-lucide-log-out',
   onSelect: async () => {
     await authClient.signOut()
     await navigateTo('/login')
-  },
+  }
 }]])
 </script>
 

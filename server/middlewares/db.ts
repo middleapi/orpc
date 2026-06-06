@@ -22,8 +22,8 @@ export const dbProviderMiddleware = os
 
     return next({
       context: {
-        db: providedDb,
-      },
+        db: providedDb
+      }
     })
   })
 
@@ -31,11 +31,11 @@ function createDrizzleDB(): DB {
   return {
     apps: {
       lunaria: {
-        planets: createPlanetRepository(),
+        planets: createPlanetRepository()
       },
       marketTrends: {
-        indexes: createMarketTrendIndexRepository(),
-      },
-    },
+        indexes: createMarketTrendIndexRepository()
+      }
+    }
   }
 }

@@ -19,5 +19,5 @@ export const marketTrendIndexesRouter = {
     .refresh
     .handler(async ({ context }) => {
       return context.db.apps.marketTrends.indexes.refresh()
-    }),
+    })
 }

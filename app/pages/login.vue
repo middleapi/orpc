@@ -5,12 +5,12 @@ import { authClient } from '~/utils/auth-client'
 
 definePageMeta({
   layout: 'auth',
-  middleware: 'guest',
+  middleware: 'guest'
 })
 
 useSeoMeta({
   title: 'Login',
-  description: 'Login to your account to continue.',
+  description: 'Login to your account to continue.'
 })
 
 const route = useRoute()
@@ -32,17 +32,17 @@ const fields = [{
   type: 'email' as const,
   label: 'Email',
   placeholder: 'Enter your email',
-  required: true,
+  required: true
 }, {
   name: 'password',
   label: 'Password',
   type: 'password' as const,
   placeholder: 'Enter your password',
-  required: true,
+  required: true
 }, {
   name: 'remember',
   label: 'Remember me',
-  type: 'checkbox' as const,
+  type: 'checkbox' as const
 }]
 
 const providers = computed(() => {
@@ -54,7 +54,7 @@ const providers = computed(() => {
       icon: 'i-lucide-github',
       loading: socialLoading.value === 'github',
       disabled: loading.value || Boolean(socialLoading.value),
-      onClick: () => signInWithSocial('github'),
+      onClick: () => signInWithSocial('github')
     })
   }
 
@@ -64,7 +64,7 @@ const providers = computed(() => {
       icon: 'i-lucide-mail',
       loading: socialLoading.value === 'google',
       disabled: loading.value || Boolean(socialLoading.value),
-      onClick: () => signInWithSocial('google'),
+      onClick: () => signInWithSocial('google')
     })
   }
 
@@ -74,7 +74,7 @@ const providers = computed(() => {
 const schema = z.object({
   email: z.email('Invalid email'),
   password: z.string().min(6, 'Must be at least 6 characters'),
-  remember: z.boolean().optional(),
+  remember: z.boolean().optional()
 })
 
 type Schema = z.output<typeof schema>
@@ -96,14 +96,14 @@ async function onSubmit(payload: FormSubmitEvent<Schema>) {
     const { error } = await authClient.signIn.email({
       email: payload.data.email,
       password: payload.data.password,
-      rememberMe: payload.data.remember ?? true,
+      rememberMe: payload.data.remember ?? true
     })
 
     if (error) {
       toast.add({
         title: 'Sign in failed',
         description: error.message ?? 'Check your email and password.',
-        color: 'error',
+        color: 'error'
       })
       return
     }
@@ -121,14 +121,14 @@ async function signInWithSocial(provider: 'github' | 'google') {
     const { error } = await authClient.signIn.social({
       provider,
       callbackURL: getRedirectURL(),
-      errorCallbackURL: '/login',
+      errorCallbackURL: '/login'
     })
 
     if (error) {
       toast.add({
         title: 'Social sign in failed',
         description: error.message ?? 'Could not start the sign in flow.',
-        color: 'error',
+        color: 'error'
       })
     }
   } finally {

@@ -20,7 +20,7 @@ function toUser(user: typeof users.$inferSelect): User {
   return {
     id: user.id,
     name: user.name,
-    email: user.email,
+    email: user.email
   }
 }
 
@@ -30,7 +30,7 @@ function toPlanet(row: PlanetWithCreator): Planet {
     name: row.planet.name,
     description: row.planet.description ?? undefined,
     imageUrl: row.planet.imageUrl ?? undefined,
-    creator: toUser(row.creator),
+    creator: toUser(row.creator)
   }
 }
 
@@ -45,7 +45,7 @@ function selectPlanetWithCreator() {
   return db
     .select({
       planet: planets,
-      creator: users,
+      creator: users
     })
     .from(planets)
     .innerJoin(users, eq(planets.creatorId, users.id))
@@ -81,7 +81,7 @@ export function createPlanetRepository(): PlanetRepository {
           name: newPlanet.name,
           description: newPlanet.description,
           imageUrl,
-          creatorId: creator.id,
+          creatorId: creator.id
         })
         .returning()
 
@@ -95,8 +95,8 @@ export function createPlanetRepository(): PlanetRepository {
           emailVerified: false,
           image: null,
           createdAt: new Date(),
-          updatedAt: new Date(),
-        },
+          updatedAt: new Date()
+        }
       })
     },
     update: async (planet) => {
@@ -108,7 +108,7 @@ export function createPlanetRepository(): PlanetRepository {
           ...(planet.image
             ? { imageUrl: `https://example.com/cdn/${planet.image.name}` }
             : {}),
-          updatedAt: new Date(),
+          updatedAt: new Date()
         })
         .where(eq(planets.id, planet.id))
 
@@ -119,6 +119,6 @@ export function createPlanetRepository(): PlanetRepository {
       }
 
       return updated
-    },
+    }
   }
 }
