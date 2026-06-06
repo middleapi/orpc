@@ -168,7 +168,6 @@ If you find oRPC valuable and would like to support its development, you can do 
    <td align="center"><a href="https://github.com/peter-adam-dy?ref=orpc" target="_blank" rel="noopener" title="Peter Adam"><img src="https://avatars.githubusercontent.com/u/132129459?u=4f3dbbb3b443990b56acb7d6a5d11ed2c555f6db&amp;v=4" width="119" alt="Peter Adam"/><br />Peter Adam</a></td>
   </tr>
   <tr>
-   <td align="center"><a href="https://github.com/yukimotochern?ref=orpc" target="_blank" rel="noopener" title="Chen, Zhi-Yuan"><img src="https://avatars.githubusercontent.com/u/20896173?u=945c33fc21725e4d566a0d02afc54b136ca1d67a&amp;v=4" width="119" alt="Chen, Zhi-Yuan"/><br />Chen, Zhi-Yuan</a></td>
    <td align="center"><a href="https://github.com/Ryanjso?ref=orpc" target="_blank" rel="noopener" title="Ryan Soderberg"><img src="https://avatars.githubusercontent.com/u/39172778?u=5ed913c31d57e7221b75784abcad48c7ebddde27&amp;v=4" width="119" alt="Ryan Soderberg"/><br />Ryan Soderberg</a></td>
    <td align="center"><a href="https://github.com/itigoore01?ref=orpc" target="_blank" rel="noopener" title="shota"><img src="https://avatars.githubusercontent.com/u/11831107?u=c976a6dc7e055eb026304c46c99100ed22b0c8e0&amp;v=4" width="119" alt="shota"/><br />shota</a></td>
   </tr>
@@ -232,6 +231,7 @@ If you find oRPC valuable and would like to support its development, you can do 
   <a href="https://github.com/FabworksHQ?ref=orpc" target="_blank" rel="noopener" title="Fabworks"><img src="https://avatars.githubusercontent.com/u/160179500?v=4" width="32" height="32" alt="Fabworks" /></a>
   <a href="https://github.com/NovakAnton?ref=orpc" target="_blank" rel="noopener" title="Novak Antonijevic"><img src="https://avatars.githubusercontent.com/u/157126729?u=ae49fa22292d55c0434ff0ca008206155b18663b&amp;v=4" width="32" height="32" alt="Novak Antonijevic" /></a>
   <a href="https://github.com/laduniestu?ref=orpc" target="_blank" rel="noopener" title="Laduni Estu Syalwa"><img src="https://avatars.githubusercontent.com/u/44757637?u=a2fc1ea8f7d827a96721176f79d30592d1c48059&amp;v=4" width="32" height="32" alt="Laduni Estu Syalwa" /></a>
+  <a href="https://github.com/yukimotochern?ref=orpc" target="_blank" rel="noopener" title="Chen, Zhi-Yuan"><img src="https://avatars.githubusercontent.com/u/20896173?u=945c33fc21725e4d566a0d02afc54b136ca1d67a&amp;v=4" width="32" height="32" alt="Chen, Zhi-Yuan" /></a>
   <a href="https://github.com/illarionvk?ref=orpc" target="_blank" rel="noopener" title="Illarion Koperski"><img src="https://avatars.githubusercontent.com/u/5012724?u=7cfa13652f7ac5fb3c56d880e3eb3fbe40c3ea34&amp;v=4" width="32" height="32" alt="Illarion Koperski" /></a>
   <a href="https://github.com/Scrumplex?ref=orpc" target="_blank" rel="noopener" title="Sefa Eyeoglu"><img src="https://avatars.githubusercontent.com/u/11587657?u=ab503582165c0bbff0cca47ce31c9450bb1553c9&amp;v=4" width="32" height="32" alt="Sefa Eyeoglu" /></a>
 </p>
