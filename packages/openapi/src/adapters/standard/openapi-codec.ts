@@ -7,6 +7,7 @@ import { isORPCErrorStatus } from '@orpc/client'
 import { fallbackContractConfig } from '@orpc/contract'
 import { isObject, stringifyJSON } from '@orpc/shared'
 import { flattenHeader } from '@orpc/standard-server'
+import { parse as parseCookie } from 'cookie'
 
 export interface StandardOpenAPICodecOptions {
   /**
@@ -19,19 +20,6 @@ export interface StandardOpenAPICodecOptions {
    * @default ((e) => e.toJSON())
    */
   customErrorResponseBodyEncoder?: (error: ORPCError<any, any>) => unknown
-}
-
-function parseCookieHeader(cookieHeader: string | undefined): Record<string, string> {
-  if (!cookieHeader)
-    return {}
-  return Object.fromEntries(
-    cookieHeader.split(';').filter(Boolean).flatMap((pair) => {
-      const idx = pair.indexOf('=')
-      if (idx === -1)
-        return []
-      return [[pair.slice(0, idx).trim(), pair.slice(idx + 1).trim()]]
-    }),
-  )
 }
 
 export class StandardOpenAPICodec implements StandardCodec {
@@ -82,7 +70,7 @@ export class StandardOpenAPICodec implements StandardCodec {
       },
       headers: request.headers,
       get cookies() {
-        const value = parseCookieHeader(flattenHeader(request.headers.cookie))
+        const value = parseCookie(flattenHeader(request.headers.cookie) ?? '')
         Object.defineProperty(this, 'cookies', { value, writable: true })
         return value
       },

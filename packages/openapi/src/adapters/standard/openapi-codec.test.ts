@@ -244,6 +244,32 @@ describe('standardOpenAPICodec', () => {
         }, undefined, procedure) as any
         expect(input.cookies).toEqual({ token: 'abc=def' })
       })
+
+      it('cookies: URL-encoded values are decoded', async () => {
+        serializer.deserialize.mockReturnValue(undefined)
+        const url = new URL('http://localhost/api/v1')
+        const input = await codec.decode({
+          method: 'POST',
+          url,
+          body: vi.fn(async () => undefined),
+          headers: { cookie: 'name=hello%20world; tag=%40user' },
+          signal: undefined,
+        }, undefined, procedure) as any
+        expect(input.cookies).toEqual({ name: 'hello world', tag: '@user' })
+      })
+
+      it('cookies: base64 values with = padding are handled correctly', async () => {
+        serializer.deserialize.mockReturnValue(undefined)
+        const url = new URL('http://localhost/api/v1')
+        const input = await codec.decode({
+          method: 'POST',
+          url,
+          body: vi.fn(async () => undefined),
+          headers: { cookie: 'token=eyJhbGc=; session=base64data==' },
+          signal: undefined,
+        }, undefined, procedure) as any
+        expect(input.cookies).toEqual({ token: 'eyJhbGc=', session: 'base64data==' })
+      })
     })
   })
 
