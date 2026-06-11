@@ -6,6 +6,7 @@ import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@or
 import { isORPCErrorStatus } from '@orpc/client'
 import { fallbackContractConfig } from '@orpc/contract'
 import { isObject, stringifyJSON } from '@orpc/shared'
+import { flattenHeader } from '@orpc/standard-server'
 
 export interface StandardOpenAPICodecOptions {
   /**
@@ -24,9 +25,11 @@ function parseCookieHeader(cookieHeader: string | undefined): Record<string, str
   if (!cookieHeader)
     return {}
   return Object.fromEntries(
-    cookieHeader.split(';').map((pair) => {
+    cookieHeader.split(';').filter(Boolean).flatMap((pair) => {
       const idx = pair.indexOf('=')
-      return [pair.slice(0, idx).trim(), pair.slice(idx + 1).trim()]
+      if (idx === -1)
+        return []
+      return [[pair.slice(0, idx).trim(), pair.slice(idx + 1).trim()]]
     }),
   )
 }
@@ -79,7 +82,7 @@ export class StandardOpenAPICodec implements StandardCodec {
       },
       headers: request.headers,
       get cookies() {
-        const value = parseCookieHeader(request.headers.cookie as string | undefined)
+        const value = parseCookieHeader(flattenHeader(request.headers.cookie))
         Object.defineProperty(this, 'cookies', { value, writable: true })
         return value
       },

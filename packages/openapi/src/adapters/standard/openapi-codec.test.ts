@@ -218,6 +218,32 @@ describe('standardOpenAPICodec', () => {
         input.cookies = { session_id: 'override' }
         expect(input.cookies).toEqual({ session_id: 'override' })
       })
+
+      it('cookies: pair without = is skipped', async () => {
+        serializer.deserialize.mockReturnValue(undefined)
+        const url = new URL('http://localhost/api/v1')
+        const input = await codec.decode({
+          method: 'POST',
+          url,
+          body: vi.fn(async () => undefined),
+          headers: { cookie: 'sessionid; valid=yes' },
+          signal: undefined,
+        }, undefined, procedure) as any
+        expect(input.cookies).toEqual({ valid: 'yes' })
+      })
+
+      it('cookies: value containing = is handled correctly', async () => {
+        serializer.deserialize.mockReturnValue(undefined)
+        const url = new URL('http://localhost/api/v1')
+        const input = await codec.decode({
+          method: 'POST',
+          url,
+          body: vi.fn(async () => undefined),
+          headers: { cookie: 'token=abc=def' },
+          signal: undefined,
+        }, undefined, procedure) as any
+        expect(input.cookies).toEqual({ token: 'abc=def' })
+      })
     })
   })
 
