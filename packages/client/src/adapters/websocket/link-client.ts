@@ -8,6 +8,7 @@ import { ClientPeer } from '@orpc/standard-server-peer'
  * Some env maybe not available WebSocket global
  */
 const WEBSOCKET_CONNECTING = 0 satisfies WebSocket['CONNECTING']
+const WEBSOCKET_OPEN = 1 satisfies WebSocket['OPEN']
 
 export interface LinkWebsocketClientOptions {
   websocket: Pick<WebSocket, 'addEventListener' | 'send' | 'readyState'>
@@ -30,6 +31,11 @@ export class LinkWebsocketClient<T extends ClientContext> implements StandardLin
 
     this.peer = new ClientPeer(async (message) => {
       await untilOpen
+
+      if (options.websocket.readyState !== WEBSOCKET_OPEN) {
+        throw new Error('Cannot send message, WebSocket is not open.')
+      }
+
       return options.websocket.send(message)
     })
 

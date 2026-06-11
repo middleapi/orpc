@@ -99,6 +99,7 @@ describe('rpcLink', () => {
     await new Promise(resolve => setTimeout(resolve, 10))
     expect(websocket.send).toHaveBeenCalledTimes(0)
 
+    websocket.readyState = 1
     onOpen()
     await vi.waitFor(() => expect(websocket.send).toHaveBeenCalledTimes(1))
 
@@ -106,5 +107,44 @@ describe('rpcLink', () => {
     onMessage({ data: await encodeResponseMessage(id, MessageType.RESPONSE, { body: { json: 'pong' }, status: 200, headers: {} }) })
 
     await promise
+  })
+
+  it('rejects instead of sending when socket is not open', async () => {
+    const websocket = {
+      readyState: 3,
+      addEventListener: vi.fn(),
+      send: vi.fn(),
+    }
+    const orpc = createORPCClient(new RPCLink({
+      websocket,
+    })) as any
+
+    await expect(orpc.ping('input')).rejects.toThrow('WebSocket is not open')
+    expect(websocket.send).toHaveBeenCalledTimes(0)
+  })
+
+  it('rejects instead of sending when socket closes between requests (reconnecting wrappers)', async () => {
+    const websocket = {
+      readyState: 1,
+      addEventListener: vi.fn((event, callback) => {
+        if (event === 'message')
+          onMessage = callback
+      }),
+      send: vi.fn(),
+    }
+    const orpc = createORPCClient(new RPCLink({
+      websocket,
+    })) as any
+
+    const promise = expect(orpc.ping('input')).resolves.toEqual('pong')
+    await vi.waitFor(() => expect(websocket.send).toHaveBeenCalledTimes(1))
+    const [id] = (await decodeRequestMessage(websocket.send.mock.calls[0]![0]))
+    onMessage({ data: await encodeResponseMessage(id, MessageType.RESPONSE, { body: { json: 'pong' }, status: 200, headers: {} }) })
+    await promise
+
+    websocket.readyState = 3
+
+    await expect(orpc.ping('input')).rejects.toThrow('WebSocket is not open')
+    expect(websocket.send).toHaveBeenCalledTimes(1)
   })
 })
