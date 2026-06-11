@@ -20,6 +20,17 @@ export interface StandardOpenAPICodecOptions {
   customErrorResponseBodyEncoder?: (error: ORPCError<any, any>) => unknown
 }
 
+function parseCookieHeader(cookieHeader: string | undefined): Record<string, string> {
+  if (!cookieHeader)
+    return {}
+  return Object.fromEntries(
+    cookieHeader.split(';').map((pair) => {
+      const idx = pair.indexOf('=')
+      return [pair.slice(0, idx).trim(), pair.slice(idx + 1).trim()]
+    }),
+  )
+}
+
 export class StandardOpenAPICodec implements StandardCodec {
   private readonly customErrorResponseBodyEncoder: StandardOpenAPICodecOptions['customErrorResponseBodyEncoder']
 
@@ -67,6 +78,14 @@ export class StandardOpenAPICodec implements StandardCodec {
         Object.defineProperty(this, 'query', { value, writable: true })
       },
       headers: request.headers,
+      get cookies() {
+        const value = parseCookieHeader(request.headers.cookie as string | undefined)
+        Object.defineProperty(this, 'cookies', { value, writable: true })
+        return value
+      },
+      set cookies(value) {
+        Object.defineProperty(this, 'cookies', { value, writable: true })
+      },
       body: this.serializer.deserialize(await request.body()),
     }
   }

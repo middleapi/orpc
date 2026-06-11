@@ -106,6 +106,7 @@ describe('standardOpenAPICodec', () => {
           headers: {
             'content-type': 'application/json',
           },
+          cookies: {},
           body: '__deserialized__',
         })
 
@@ -136,6 +137,7 @@ describe('standardOpenAPICodec', () => {
           headers: {
             'content-type': 'application/json',
           },
+          cookies: {},
           body: '__deserialized__',
         })
 
@@ -162,6 +164,59 @@ describe('standardOpenAPICodec', () => {
 
         input.query = { name: 'John Doe' }
         expect(input.query).toEqual({ name: 'John Doe' })
+      })
+
+      it('cookies are parsed from Cookie header', async () => {
+        serializer.deserialize.mockReturnValue(undefined)
+
+        const url = new URL('http://localhost/api/v1')
+
+        const input = await codec.decode({
+          method: 'POST',
+          url,
+          body: vi.fn(async () => undefined),
+          headers: {
+            cookie: 'session_id=abc123; theme=dark',
+          },
+          signal: undefined,
+        }, undefined, procedure) as any
+
+        expect(input.cookies).toEqual({ session_id: 'abc123', theme: 'dark' })
+      })
+
+      it('cookies is empty object when no Cookie header', async () => {
+        serializer.deserialize.mockReturnValue(undefined)
+
+        const url = new URL('http://localhost/api/v1')
+
+        const input = await codec.decode({
+          method: 'POST',
+          url,
+          body: vi.fn(async () => undefined),
+          headers: {},
+          signal: undefined,
+        }, undefined, procedure) as any
+
+        expect(input.cookies).toEqual({})
+      })
+
+      it('can set cookies', async () => {
+        serializer.deserialize.mockReturnValue(undefined)
+
+        const url = new URL('http://localhost/api/v1')
+
+        const input = await codec.decode({
+          method: 'POST',
+          url,
+          body: vi.fn(async () => undefined),
+          headers: {
+            cookie: 'session_id=abc123',
+          },
+          signal: undefined,
+        }, undefined, procedure) as any
+
+        input.cookies = { session_id: 'override' }
+        expect(input.cookies).toEqual({ session_id: 'override' })
       })
     })
   })
