@@ -363,7 +363,7 @@ export class OpenAPIGenerator {
 
     const error = new OpenAPIGeneratorError(
       'When input structure is "detailed", input schema must satisfy: '
-      + '{ params?: Record<string, unknown>, query?: Record<string, unknown>, headers?: Record<string, unknown>, body?: unknown }',
+      + '{ params?: Record<string, unknown>, query?: Record<string, unknown>, headers?: Record<string, unknown>, cookies?: Record<string, unknown>, body?: unknown }',
     )
 
     if (!isObjectSchema(schema)) {
@@ -386,7 +386,7 @@ export class OpenAPIGenerator {
       )
     }
 
-    for (const from of ['params', 'query', 'headers']) {
+    for (const from of ['params', 'query', 'headers', 'cookies']) {
       const fromSchema = schema.properties?.[from]
       if (fromSchema !== undefined) {
         const resolvedSchema = simplifyComposedObjectJsonSchemasAndRefs(fromSchema, doc)
@@ -395,11 +395,13 @@ export class OpenAPIGenerator {
           throw error
         }
 
-        const parameterIn: 'path' | 'query' | 'header' = from === 'params'
+        const parameterIn: 'path' | 'query' | 'header' | 'cookie' = from === 'params'
           ? 'path'
           : from === 'headers'
             ? 'header'
-            : 'query'
+            : from === 'cookies'
+              ? 'cookie'
+              : 'query'
 
         ref.parameters ??= []
         ref.parameters.push(...toOpenAPIParameters(resolvedSchema, parameterIn))

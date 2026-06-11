@@ -423,6 +423,64 @@ const inputTests: TestCase[] = [
     contract: oc.route({ inputStructure: 'detailed', path: '/{id}' }).input(z.object({ params: z.object({ id: z.string().optional() }) })),
     error: 'When input structure is "detailed" and path has dynamic params, the "params" schema must be an object with all dynamic params as required.',
   },
+  {
+    name: 'inputStructure=detailed with cookies',
+    contract: oc.route({ inputStructure: 'detailed' }).input(z.object({
+      cookies: z.object({ session_id: z.string(), theme: z.string().optional() }),
+    })),
+    expected: {
+      '/': {
+        post: expect.objectContaining({
+          parameters: [
+            {
+              name: 'session_id',
+              in: 'cookie',
+              required: true,
+              schema: { type: 'string' },
+            },
+            {
+              name: 'theme',
+              in: 'cookie',
+              required: false,
+              schema: { type: 'string' },
+            },
+          ],
+        }),
+      },
+    },
+  },
+  {
+    name: 'inputStructure=detailed with cookies + headers + query + body',
+    contract: oc.route({ inputStructure: 'detailed' }).input(z.object({
+      cookies: z.object({ session_id: z.string() }),
+      headers: z.object({ 'x-request-id': z.string() }),
+      query: z.object({ page: z.number().optional() }),
+      body: z.string(),
+    })),
+    expected: {
+      '/': {
+        post: expect.objectContaining({
+          parameters: expect.arrayContaining([
+            expect.objectContaining({ name: 'session_id', in: 'cookie' }),
+            expect.objectContaining({ name: 'x-request-id', in: 'header' }),
+            expect.objectContaining({ name: 'page', in: 'query' }),
+          ]),
+          requestBody: expect.objectContaining({
+            content: expect.objectContaining({
+              'application/json': expect.objectContaining({
+                schema: { type: 'string' },
+              }),
+            }),
+          }),
+        }),
+      },
+    },
+  },
+  {
+    name: 'inputStructure=detailed + invalid cookies (not an object)',
+    contract: oc.route({ inputStructure: 'detailed' }).input(z.object({ cookies: z.string() })),
+    error: 'When input structure is "detailed", input schema must satisfy',
+  },
 ]
 
 const successResponseTests: TestCase[] = [
