@@ -299,6 +299,39 @@ describe('toOpenAPIParameters', () => {
       allowReserved: true,
     }])
   })
+
+  it('cookie', () => {
+    expect(toOpenAPIParameters(schema, 'cookie')).toEqual([{
+      name: 'a',
+      in: 'cookie',
+      required: true,
+      schema: {
+        type: 'string',
+      },
+    }, {
+      name: 'b',
+      in: 'cookie',
+      required: false,
+      schema: {
+        type: 'object',
+        properties: {
+          b1: { type: 'number' },
+          b2: { type: 'string' },
+        },
+        required: ['b1'],
+      },
+    }, {
+      name: 'c',
+      in: 'cookie',
+      required: true,
+      schema: {
+        oneOf: [
+          { type: 'string' },
+          { type: 'array', items: { type: 'string' } },
+        ],
+      },
+    }])
+  })
 })
 
 describe('checkParamsSchema', () => {
