@@ -8,28 +8,34 @@ import { ClientPeer } from '@orpc/standard-server-peer'
  * Some env maybe not available WebSocket global
  */
 const WEBSOCKET_CONNECTING = 0 satisfies WebSocket['CONNECTING']
+const WEBSOCKET_OPEN = 1 satisfies WebSocket['OPEN']
 
 export interface LinkWebsocketClientOptions {
-  websocket: Pick<WebSocket, 'addEventListener' | 'send' | 'readyState'>
+  websocket: Pick<WebSocket, 'addEventListener' | 'removeEventListener' | 'send' | 'readyState'>
 }
 
 export class LinkWebsocketClient<T extends ClientContext> implements StandardLinkClient<T> {
   private readonly peer: ClientPeer
 
   constructor(options: LinkWebsocketClientOptions) {
-    const untilOpen = new Promise<void>((resolve) => {
-      if (options.websocket.readyState === WEBSOCKET_CONNECTING) {
-        options.websocket.addEventListener('open', () => {
-          resolve()
-        }, { once: true })
-      }
-      else {
-        resolve()
-      }
-    })
-
     this.peer = new ClientPeer(async (message) => {
-      await untilOpen
+      if (options.websocket.readyState === WEBSOCKET_CONNECTING) {
+        await new Promise<void>((resolve) => {
+          const settle = () => {
+            options.websocket.removeEventListener('open', settle)
+            options.websocket.removeEventListener('close', settle)
+            resolve()
+          }
+
+          options.websocket.addEventListener('open', settle, { once: true })
+          options.websocket.addEventListener('close', settle, { once: true })
+        })
+      }
+
+      if (options.websocket.readyState !== WEBSOCKET_OPEN) {
+        throw new Error('Cannot send message, WebSocket is not open.')
+      }
+
       return options.websocket.send(message)
     })
 
