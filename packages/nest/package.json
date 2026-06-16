@@ -68,7 +68,7 @@
     "@nestjs/common": "^11.1.16",
     "@nestjs/core": "^11.1.16",
     "@nestjs/platform-express": "^11.1.16",
-    "@nestjs/platform-fastify": "^11.1.16",
+    "@nestjs/platform-fastify": "^11.1.24",
     "@nestjs/testing": "^11.1.16",
     "@ts-rest/core": "^3.52.1",
     "@types/express": "^5.0.6",
