@@ -1,73 +1,70 @@
----
-title: Dedupe Middleware
-description: Enhance oRPC middleware performance by avoiding redundant executions.
----
-
 # Dedupe Middleware
 
-This guide explains how to optimize your [middleware](/docs/middleware) for fast and efficient repeated execution.
+Use [context](/docs/context) to prevent the same [middleware](/docs/middleware) from repeating expensive work.
 
 ## Problem
 
-When a procedure [calls](/docs/client/server-side#using-the-call-utility) another procedure, overlapping middleware might be applied in both.
+The same middleware can run more than once during a single call. This often happens when:
 
-Similarly, when using `.use(auth).router(router)`, some procedures inside `router` might already include the `auth` middleware.
+- a procedure [calls](/docs/client/server-side#one-off-calls) another procedure that both use the same middleware
+- you use `.use(authProvider).router(router)`, and some procedures in `router` already use `authProvider`
 
 :::warning
-Redundant middleware execution can hurt performance, especially if the middleware is resource-intensive.
+Repeated middleware work can hurt performance, especially for expensive operations such as opening a database connection.
 :::
 
 ## Solution
 
-Use the `context` to track middleware execution and prevent duplication. For example:
+Store the computed value in `context` and reuse it when the middleware runs again.
+
+For example, this middleware loads auth at most once per call:
 
 ```ts twoslash
 import { os } from '@orpc/server'
 
-declare function connectDb(): Promise<'a_fake_db'>
+declare function loadAuth(headers: Headers): Promise<{ id: string } | undefined>
 // ---cut---
-const dbProvider = os
-  .$context<{ db?: Awaited<ReturnType<typeof connectDb>> }>()
+const authProvider = os
+  .$context<{ headers: Headers, auth?: { id: string } | undefined, authLoaded?: boolean | undefined }>()
   .middleware(async ({ context, next }) => {
-    /**
-     * If db already exists, skip the connection.
-     */
-    const db = context.db ?? await connectDb() // [!code highlight]
+    // reuse the loaded auth value if it was already loaded
+    const auth = context.authLoaded
+      ? context.auth
+      : await loadAuth(context.headers)
 
-    return next({ context: { db } })
+    return next({ context: { auth, authLoaded: true } })
   })
 ```
 
-Now `dbProvider` middleware can be safely applied multiple times without duplicating the database connection:
+You can now apply `authProvider` multiple times without loading auth again:
 
 ```ts twoslash
 import { call, os } from '@orpc/server'
 
-declare function connectDb(): Promise<'a_fake_db'>
-const dbProvider = os
-  .$context<{ db?: Awaited<ReturnType<typeof connectDb>> }>()
+declare function loadAuth(headers: Headers): Promise<{ id: string } | undefined>
+const authProvider = os
+  .$context<{ headers: Headers, auth?: { id: string } | undefined, authLoaded?: boolean | undefined }>()
   .middleware(async ({ context, next }) => {
-    const db = context.db ?? await connectDb()
+    // reuse the loaded auth value if it was already loaded
+    const auth = context.authLoaded
+      ? context.auth
+      : await loadAuth(context.headers)
 
-    return next({ context: { db } })
+    return next({ context: { auth, authLoaded: true } })
   })
 // ---cut---
-const foo = os.use(dbProvider).handler(({ context }) => 'Hello World')
+const base = os.$context<{ headers: Headers }>()
 
-const bar = os.use(dbProvider).handler(({ context }) => {
-  /**
-   * Now when you call foo, the dbProvider middleware no need to connect to the database again.
-   */
-  const result = call(foo, 'input', { context }) // [!code highlight]
+const foo = base.use(authProvider).handler(({ context }) => 'Hello World')
 
-  return 'Hello World'
+const bar = base.use(authProvider).handler(({ context }) => {
+  // Reuse the auth value that is already stored in context.
+  return call(foo, undefined, { context }) // [!code highlight]
 })
 
-/**
- * Now even when `dbProvider` is applied multiple times, it still only connects to the database once.
- */
-const router = os
-  .use(dbProvider) // [!code highlight]
+// Applying authProvider again does not load auth a second time.
+const router = base
+  .use(authProvider) // [!code highlight]
   .use(({ next }) => {
     // Additional middleware logic
     return next()
@@ -77,49 +74,3 @@ const router = os
     bar,
   })
 ```
-
-## Built-in Dedupe Middleware
-
-oRPC can automatically dedupe some middleware under specific conditions.
-
-::: info
-Deduplication occurs only if the router middlewares is a **subset** of the **leading** procedure middlewares and appears in the **same order**.
-:::
-
-```ts
-const router = os.use(logging).use(dbProvider).router({
-  // ✅ Deduplication occurs:
-  ping: os.use(logging).use(dbProvider).use(auth).handler(({ context }) => 'ping'),
-  pong: os.use(logging).use(dbProvider).handler(({ context }) => 'pong'),
-
-  // ⛔ Deduplication does not occur:
-  diff_subset: os.use(logging).handler(({ context }) => 'ping'),
-  diff_order: os.use(dbProvider).use(logging).handler(({ context }) => 'pong'),
-  diff_leading: os.use(monitor).use(logging).use(dbProvider).handler(({ context }) => 'bar'),
-})
-
-// --- equivalent to ---
-
-const router = {
-  // ✅ Deduplication occurs:
-  ping: os.use(logging).use(dbProvider).use(auth).handler(({ context }) => 'ping'),
-  pong: os.use(logging).use(dbProvider).handler(({ context }) => 'pong'),
-
-  // ⛔ Deduplication does not occur:
-  diff_subset: os.use(logging).use(dbProvider).use(logging).handler(({ context }) => 'ping'),
-  diff_order: os.use(logging).use(dbProvider).use(dbProvider).use(logging).handler(({ context }) => 'pong'),
-  diff_leading: os.use(logging).use(dbProvider).use(monitor).use(logging).use(dbProvider).handler(({ context }) => 'bar'),
-}
-```
-
-### Configuration
-
-Disable middleware deduplication by setting `dedupeLeadingMiddlewares` to `false` in `.$config`:
-
-```ts
-const base = os.$config({ dedupeLeadingMiddlewares: false })
-```
-
-:::warning
-The deduplication behavior is safe unless you want to apply middleware multiple times.
-:::

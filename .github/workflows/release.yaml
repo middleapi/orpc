@@ -39,13 +39,11 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
-
-      - run: pnpm env use --global 22
+      - uses: pnpm/action-setup@v6
 
       - run: pnpm i
 
@@ -53,16 +51,16 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - run: pnpm run packages:bump ${{ github.event.inputs.version }} --yes
+      - run: pnpm exec bumpp -r ${{ github.event.inputs.version }} --yes
 
       - run: pnpm config set '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - run: pnpm run packages:publish --tag=${{ steps.version.outputs.preid || 'latest' }}
+      - run: pnpm --filter='./packages/*' run -r build && pnpm --filter='./packages/*' publish -r --access=public --tag=${{ steps.version.outputs.preid || 'latest' }}
         env:
           NPM_CONFIG_PROVENANCE: true
 
-      - run: pnpm run packages:changelog:github
+      - run: pnpm exec changelogithub --draft
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,64 +1,66 @@
+import type { BatchLinkPluginMode } from '@orpc/client/plugins'
 import type { Promisable, Value } from '@orpc/shared'
-import type { StandardHeaders, StandardRequest } from '@orpc/standard-server'
-import type { BatchResponseBodyItem } from '@orpc/standard-server/batch'
-import type { StandardHandlerInterceptorOptions, StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard'
+import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@standardserver/core'
+import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standardserver/peer'
+import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
-import { AsyncIteratorClass, isAsyncIteratorObject, runWithSpan, setSpanError, value } from '@orpc/shared'
-import { flattenHeader } from '@orpc/standard-server'
-import { parseBatchRequest, toBatchResponse } from '@orpc/standard-server/batch'
+import { toArray, value } from '@orpc/shared'
+import { flattenStandardHeader, parseStandardUrl } from '@standardserver/core'
+import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standardserver/peer'
 
-export interface BatchHandlerOptions<T extends Context> {
+export interface BatchHandlerPluginOptions<T extends Context> {
   /**
    * The max size of the batch allowed.
    *
    * @default 10
    */
-  maxSize?: Value<Promisable<number>, [StandardHandlerInterceptorOptions<T>]>
+  maxSize?: Value<Promisable<number>, [options: StandardHandlerRoutingInterceptorOptions<T>]>
 
   /**
-   * Map the request before processing it.
+   * Map each subrequest in the batch before it is processed.
    *
-   * @default merged back batch request headers into the request
+   * @default merges the batch request headers into the subrequest and remove `orpc-batch` header to prevent nested batching
    */
-  mapRequestItem?(request: StandardRequest, batchOptions: StandardHandlerInterceptorOptions<T>): StandardRequest
+  mapSubrequest?: (subrequest: StandardLazyRequest, batchOptions: StandardHandlerRoutingInterceptorOptions<T>) => StandardLazyRequest
 
   /**
    * Success batch response status code.
    *
    * @default 207
    */
-  successStatus?: Value<Promisable<number>, [responses: Promise<BatchResponseBodyItem>[], batchOptions: StandardHandlerInterceptorOptions<T>]>
+  successStatus?: Value<Promisable<number>, [batchOptions: StandardHandlerRoutingInterceptorOptions<T>]>
 
   /**
-   * success batch response headers.
+   * Success batch response headers.
    *
    * @default {}
    */
-  headers?: Value<Promisable<StandardHeaders>, [responses: Promise<BatchResponseBodyItem>[], batchOptions: StandardHandlerInterceptorOptions<T>]>
+  headers?: Value<Promisable<StandardHeaders>, [batchOptions: StandardHandlerRoutingInterceptorOptions<T>]>
 }
 
-/**
- * The Batch Requests Plugin allows you to combine multiple requests and responses into a single batch,
- * reducing the overhead of sending each one separately.
- *
- * @see {@link https://orpc.dev/docs/plugins/batch-requests Batch Requests Plugin Docs}
- */
 export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  private readonly maxSize: Exclude<BatchHandlerOptions<T>['maxSize'], undefined>
-  private readonly mapRequestItem: Exclude<BatchHandlerOptions<T>['mapRequestItem'], undefined>
-  private readonly successStatus: Exclude<BatchHandlerOptions<T>['successStatus'], undefined>
-  private readonly headers: Exclude<BatchHandlerOptions<T>['headers'], undefined>
+  name = '~batch'
 
-  order = 5_000_000
+  /**
+   * Run batch interceptors before OpenTelemetry interceptors
+   * so each subrequest gets its own span instead of sharing one batch-level span.
+   */
+  after = ['~opentelemetry']
 
-  constructor(options: BatchHandlerOptions<T> = {}) {
+  private readonly maxSize: Exclude<BatchHandlerPluginOptions<T>['maxSize'], undefined>
+  private readonly mapSubrequest: Exclude<BatchHandlerPluginOptions<T>['mapSubrequest'], undefined>
+  private readonly successStatus: Exclude<BatchHandlerPluginOptions<T>['successStatus'], undefined>
+  private readonly headers: Exclude<BatchHandlerPluginOptions<T>['headers'], undefined>
+
+  constructor(options: BatchHandlerPluginOptions<T> = {}) {
     this.maxSize = options.maxSize ?? 10
 
-    this.mapRequestItem = options.mapRequestItem ?? ((request, { request: batchRequest }) => ({
-      ...request,
+    this.mapSubrequest = options.mapSubrequest ?? ((subRequest, { request: batchRequest }) => ({
+      ...subRequest,
       headers: {
         ...batchRequest.headers,
-        ...request.headers,
+        ...subRequest.headers,
+        'orpc-batch': undefined, // useful in case batch plugin is used multiple times
       },
     }))
 
@@ -66,129 +68,175 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
     this.headers = options.headers ?? {}
   }
 
-  init(options: StandardHandlerOptions<T>): void {
-    options.rootInterceptors ??= []
+  init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
+    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async (interceptorOptions) => {
+      const batchHeader = flattenStandardHeader(interceptorOptions.request.headers['orpc-batch'])
 
-    options.rootInterceptors.unshift(async (options) => {
-      const xHeader = flattenHeader(options.request.headers['x-orpc-batch'])
-
-      if (xHeader === undefined) {
-        return options.next()
+      if (batchHeader === undefined) {
+        return interceptorOptions.next()
       }
 
-      let isParsing = false
+      const mode: BatchLinkPluginMode = batchHeader === 'buffered' ? 'buffered' : 'streaming'
+
+      let messages: ClientPeerSendMessage[]
 
       try {
-        return await runWithSpan({ name: 'handle_batch_request' }, async (span) => {
-          const mode = xHeader === 'buffered' ? 'buffered' : 'streaming'
+        if (interceptorOptions.request.method === 'GET') {
+          const [, search] = parseStandardUrl(interceptorOptions.request.url)
+          const params = new URLSearchParams(search)
+          const data = params.getAll('data').at(-1)
 
-          isParsing = true
-          const parsed = parseBatchRequest({ ...options.request, body: await options.request.body() })
-          isParsing = false
-
-          span?.setAttribute('batch.mode', mode)
-          span?.setAttribute('batch.size', parsed.length)
-
-          const maxSize = await value(this.maxSize, options)
-
-          if (parsed.length > maxSize) {
-            const message = 'Batch request size exceeds the maximum allowed size'
-            setSpanError(span, message)
-
+          if (!data) {
             return {
               matched: true,
-              response: {
-                status: 413,
-                headers: {},
-                body: message,
-              },
+              response: { status: 400, headers: {}, body: 'Missing data parameter for batch request' },
             }
           }
 
-          const responses: Promise<BatchResponseBodyItem>[] = parsed
-            .map((request, index) => {
-              const mapped = this.mapRequestItem(request, options)
+          const mightBeMessages = JSON.parse(data)
 
-              return options
-                .next({ ...options, request: { ...mapped, body: () => Promise.resolve(mapped.body) } })
-                .then(({ response, matched }) => {
-                  span?.addEvent(`response.${index}.${matched ? 'success' : 'not_matched'}`)
-
-                  if (matched) {
-                    if (
-                      response.body instanceof Blob
-                      || response.body instanceof FormData
-                      || isAsyncIteratorObject(response.body)
-                    ) {
-                      return {
-                        index,
-                        status: 500,
-                        headers: {},
-                        body: 'Batch responses do not support file/blob, or event-iterator. Please call this procedure separately outside of the batch request.',
-                      }
-                    }
-
-                    return { ...response, index }
-                  }
-
-                  return { index, status: 404, headers: {}, body: 'No procedure matched' }
-                })
-                .catch((err) => {
-                  /**
-                   * send error into `unhandledRejection` handler
-                   * so it can be logged or handled globally
-                   */
-                  Promise.reject(err)
-                  return { index, status: 500, headers: {}, body: 'Internal server error' }
-                })
-            },
-            )
-
-          // wait until at least one request is resolved
-          await Promise.race(responses)
-
-          const status = await value(this.successStatus, responses, options)
-          const headers = await value(this.headers, responses, options)
-          const promises: (Promise<BatchResponseBodyItem> | undefined)[] = [...responses]
-
-          const response = await toBatchResponse({
-            status,
-            headers,
-            mode,
-            body: new AsyncIteratorClass<BatchResponseBodyItem>(
-              async () => {
-                const handling = promises.filter(p => p !== undefined)
-
-                if (handling.length <= 0) {
-                  return { done: true, value: undefined }
-                }
-
-                const value = await Promise.race(handling)
-                promises[value.index] = undefined
-                return { done: false, value }
-              },
-              async () => {
-                // do nothing on cleanup
-              },
-            ),
-          })
-
-          return {
-            matched: true,
-            response,
+          if (!Array.isArray(mightBeMessages) || mightBeMessages.some(m => !isClientPeerSendMessage(m))) {
+            return {
+              matched: true,
+              response: { status: 400, headers: {}, body: 'Invalid batch request data parameter' },
+            }
           }
-        })
+
+          messages = mightBeMessages
+        }
+        else {
+          const mightBeMessages = await interceptorOptions.request.resolveBody()
+
+          if (!Array.isArray(mightBeMessages)) {
+            return {
+              matched: true,
+              response: { status: 400, headers: {}, body: 'Invalid batch request body' },
+            }
+          }
+
+          messages = mightBeMessages
+        }
       }
-      catch (cause) {
-        if (isParsing) {
+      catch {
+        return {
+          matched: true,
+          response: { status: 400, headers: {}, body: 'Invalid batch request' },
+        }
+      }
+
+      const maxSize = await value(this.maxSize, interceptorOptions)
+
+      if (messages.length > maxSize) {
+        return {
+          matched: true,
+          response: { status: 413, headers: {}, body: 'Batch request size exceeds the maximum allowed size' },
+        }
+      }
+
+      const handleIndividualRequest = async (request: StandardLazyRequest): Promise<StandardResponse> => {
+        try {
+          request = this.mapSubrequest(request, interceptorOptions)
+          const { matched, response } = await interceptorOptions.next({ ...interceptorOptions, request })
+
+          if (!matched) {
+            return { status: 404, headers: {}, body: 'No procedure matched' }
+          }
+
+          return response
+        }
+        catch (err) {
+          /**
+           * Errors should not occur at the routing interceptor level.
+           * Reject the promise so it can be handled by the unhandledRejection handler
+           * for global logging or error handling.
+           */
+          Promise.reject(err)
+
+          return { status: 500, headers: {}, body: 'Internal server error' }
+        }
+      }
+
+      const status = await value(this.successStatus, interceptorOptions)
+      const headers = await value(this.headers, interceptorOptions)
+
+      if (mode === 'buffered') {
+        const responseMessages: ServerPeerSendMessage[] = []
+        const peer = new ServerPeer(async (message) => {
+          responseMessages.push(message)
+        })
+
+        await Promise.all(messages.map(msg => peer.message(msg, handleIndividualRequest)))
+        await peer.close()
+
+        if (responseMessages.some(msg => msg.binary !== undefined)) {
+          const chunks: Uint8Array<ArrayBuffer>[] = []
+
+          for (const message of responseMessages) {
+            const encoded = await encodePeerMessage(message)
+            const bytes = typeof encoded === 'string'
+              ? new TextEncoder().encode(encoded)
+              : encoded
+
+            const lengthBuffer = new ArrayBuffer(4)
+            new DataView(lengthBuffer).setUint32(0, bytes.byteLength, false)
+            chunks.push(new Uint8Array(lengthBuffer))
+            chunks.push(bytes)
+          }
+
           return {
             matched: true,
-            response: { status: 400, headers: {}, body: 'Invalid batch request, this could be caused by a malformed request body or a missing header' },
+            response: {
+              status,
+              headers,
+              body: new Blob(chunks, { type: 'application/octet-stream' }),
+            },
           }
         }
 
-        throw cause
+        return {
+          matched: true,
+          response: { status, headers, body: responseMessages },
+        }
       }
-    })
+
+      // streaming mode — binary length-prefixed ReadableStream
+      let streamController: ReadableStreamDefaultController<Uint8Array>
+      const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
+        start(controller) {
+          streamController = controller
+        },
+      })
+
+      const peer = new ServerPeer(async (message) => {
+        const encoded = await encodePeerMessage(message)
+        const bytes = typeof encoded === 'string' ? new TextEncoder().encode(encoded) : encoded
+
+        const lengthBuffer = new ArrayBuffer(4)
+        new DataView(lengthBuffer).setUint32(0, bytes.byteLength, false)
+        streamController.enqueue(new Uint8Array(lengthBuffer))
+        streamController.enqueue(bytes)
+      })
+
+      // DO NOT await here to block streaming response
+      Promise.all(messages.map(msg => peer.message(msg, handleIndividualRequest)))
+        .then(async () => {
+          streamController.close()
+          await peer.close()
+        })
+        .catch(async (error) => {
+          streamController.error(error)
+          await peer.close(error)
+        })
+
+      return {
+        matched: true,
+        response: { status, headers, body: stream },
+      }
+    }
+
+    return {
+      ...options,
+      routingInterceptors: [routingInterceptor, ...toArray(options.routingInterceptors)],
+    }
   }
 }

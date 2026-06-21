@@ -1,40 +1,20 @@
-import type { EncodedMessage, ServerPeer, ServerPeerHandleRequestFn } from '@orpc/standard-server-peer'
+import type { Promisable, Value } from '@orpc/shared'
+import type { StandardLazyRequest, StandardResponse } from '@standardserver/core'
 import type { Context } from '../../context'
-import type { FriendlyStandardHandleOptions, StandardHandler } from '../standard'
-import { resolveFriendlyStandardHandleOptions } from '../standard'
+import type { StandardHandler, StandardHandlerHandleOptions } from '../standard'
+import { value } from '@orpc/shared'
 
-export type HandleStandardServerPeerMessageOptions<T extends Context>
-  = Omit<FriendlyStandardHandleOptions<T>, 'prefix'>
+export type StandardPeerRequestHandlerOptions<T extends Context>
+  = & Omit<StandardHandlerHandleOptions<T>, 'context'>
+    & (Record<never, never> extends T ? { context?: Value<Promisable<T>, [request: StandardLazyRequest]> } : { context: Value<Promisable<T>, [request: StandardLazyRequest]> })
 
-/**
- * @deprecated Use `createServerPeerRequestHandleFn` instead.
- */
-export async function handleStandardServerPeerMessage<T extends Context>(
+export function createStandardPeerRequestHandler<T extends Context>(
   handler: StandardHandler<T>,
-  peer: ServerPeer,
-  message: EncodedMessage,
-  options: HandleStandardServerPeerMessageOptions<T>,
-): Promise<void> {
-  const [id, request] = await peer.message(message)
-
-  if (!request) {
-    return
-  }
-
-  const handle = createServerPeerHandleRequestFn(handler, options)
-  await peer.response(id, await handle(request))
-}
-
-export function createServerPeerHandleRequestFn<T extends Context>(
-  handler: StandardHandler<T>,
-  options: HandleStandardServerPeerMessageOptions<T>,
-): ServerPeerHandleRequestFn {
+  options: StandardPeerRequestHandlerOptions<T>,
+): (request: StandardLazyRequest) => Promise<StandardResponse> {
   return async (request) => {
-    const { response } = await handler.handle(
-      { ...request, body: () => Promise.resolve(request.body) },
-      resolveFriendlyStandardHandleOptions(options),
-    )
-
+    const context = await value(options.context ?? {} as T, request) as T
+    const { response } = await handler.handle(request, { ...options, context })
     return response ?? { status: 404, headers: {}, body: 'No procedure matched' }
   }
 }

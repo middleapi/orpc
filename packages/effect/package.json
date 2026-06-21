@@ -1,0 +1,64 @@
+{
+  "name": "@orpc/experimental-effect",
+  "type": "module",
+  "version": "1.13.4",
+  "license": "MIT",
+  "homepage": "https://orpc.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/middleapi/orpc.git",
+    "directory": "packages/effect"
+  },
+  "keywords": [
+    "orpc",
+    "effect"
+  ],
+  "sideEffects": [
+    "./dist/extensions/effect.mjs",
+    "./dist/extensions/input-output.mjs"
+  ],
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "./extensions/effect": {
+        "types": "./dist/extensions/effect.d.mts",
+        "import": "./dist/extensions/effect.mjs",
+        "default": "./dist/extensions/effect.mjs"
+      },
+      "./extensions/input-output": {
+        "types": "./dist/extensions/input-output.d.mts",
+        "import": "./dist/extensions/input-output.mjs",
+        "default": "./dist/extensions/input-output.mjs"
+      }
+    }
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./extensions/effect": "./src/extensions/effect.ts",
+    "./extensions/input-output": "./src/extensions/input-output.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "unbuild",
+    "type:check": "tsc -b"
+  },
+  "peerDependencies": {
+    "effect": ">=3.21.2"
+  },
+  "dependencies": {
+    "@orpc/contract": "workspace:*",
+    "@orpc/json-schema": "workspace:*",
+    "@orpc/server": "workspace:*"
+  },
+  "devDependencies": {
+    "effect": "^3.21.3"
+  }
+}

@@ -1,67 +1,26 @@
-import type { Ratelimiter, RatelimiterLimitResult } from '../types'
-import { fallback } from '@orpc/shared'
+import type { RedisClientType } from 'redis'
+import type { RateLimiter, RateLimitOptions, RateLimitResult } from '../types'
+import { sleep } from '@orpc/shared'
 
-/**
- * Sliding window log Lua script for Redis.
- *
- * This script implements atomic sliding window log rate limiting using Redis sorted sets.
- * It removes expired entries, checks the current count, and adds new requests atomically.
- *
- * @returns A tuple with [success, limit, remaining, reset] where:
- * - success: 1 if request is allowed, 0 if rate limited
- * - limit: The maximum number of requests allowed
- * - remaining: Number of requests remaining in the window
- * - reset: Unix timestamp (in milliseconds) when the window resets
- */
-const SLIDING_WINDOW_LOG_LUA_SCRIPT = `
+const FIXED_WINDOW_RATELIMIT_SCRIPT = `
 local key = KEYS[1]
-local now_ms = tonumber(ARGV[1])
-local window_ms = tonumber(ARGV[2])
-local limit = tonumber(ARGV[3])
+local weight = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
 
-local window_start_ms = now_ms - window_ms
+local current = redis.call('INCRBY', key, weight)
 
--- Remove old entries outside the current window
-redis.call('ZREMRANGEBYSCORE', key, '-inf', window_start_ms)
-
--- Count requests in the current window
-local current_count = redis.call('ZCARD', key)
-
--- Calculate reset time (end of current window)
-local oldest_entry = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
-local reset_at
-if #oldest_entry > 0 then
-  reset_at = tonumber(oldest_entry[2]) + window_ms
-else
-  reset_at = now_ms + window_ms
+if current == weight then
+  redis.call('PEXPIRE', key, window)
 end
 
-if current_count < limit then
-  -- Add current request
-  redis.call('ZADD', key, now_ms, now_ms .. ':' .. math.random())
-  redis.call('PEXPIRE', key, window_ms)
+local ttl = redis.call('PTTL', key)
 
-  return {1, limit, limit - current_count - 1, reset_at}
-else
-  return {0, limit, 0, reset_at}
-end
+return { current, ttl }
 `
 
-export interface RedisRatelimiterOptions {
-  eval: (script: string, numKeys: number, ...rest: string[]) => Promise<unknown>
-
-  /**
-   * Block until the request may pass or timeout is reached.
-   */
-  blockingUntilReady?: {
-    enabled: boolean
-    timeout: number
-  }
-
+export interface RedisRateLimiterOptions {
   /**
    * The prefix to use for Redis keys.
-   *
-   * @default orpc:ratelimit:
    */
   prefix?: string
 
@@ -71,81 +30,112 @@ export interface RedisRatelimiterOptions {
   maxRequests: number
 
   /**
-   * The duration of the sliding window in milliseconds.
+   * The duration of the fixed window in milliseconds.
    */
   window: number
+
+  /**
+   * Block until the request may pass or timeout is reached.
+   */
+  blockingUntilReady?: {
+    enabled: boolean
+    timeout: number
+  }
 }
 
-export class RedisRatelimiter implements Ratelimiter {
-  private readonly eval: RedisRatelimiterOptions['eval']
+export class RedisRateLimiter implements RateLimiter {
+  private readonly redis: RedisClientType<any, any, any, any, any>
   private readonly prefix: string
   private readonly maxRequests: number
   private readonly window: number
-  private readonly blockingUntilReady: RedisRatelimiterOptions['blockingUntilReady']
+  private readonly blockingUntilReady: RedisRateLimiterOptions['blockingUntilReady']
+
+  private scriptSha: undefined | Awaited<ReturnType<typeof this.redis.scriptLoad>>
 
   constructor(
-    options: RedisRatelimiterOptions,
+    redis: RedisClientType<any, any, any, any, any>,
+    options: RedisRateLimiterOptions,
   ) {
-    this.eval = options.eval
-    this.prefix = fallback(options.prefix, 'orpc:ratelimit:')
+    this.redis = redis
+    this.prefix = options.prefix ?? ''
     this.maxRequests = options.maxRequests
     this.window = options.window
     this.blockingUntilReady = options.blockingUntilReady
   }
 
-  async limit(key: string): Promise<Required<RatelimiterLimitResult>> {
-    const prefixedKey = `${this.prefix}${key}`
+  async limit(key: string, options?: RateLimitOptions): Promise<Required<RateLimitResult>> {
+    key = `${this.prefix}${key}`
+    const weight = this.resolveWeight(options)
 
-    if (this.blockingUntilReady?.enabled) {
-      return await this.blockUntilReady(prefixedKey, this.blockingUntilReady.timeout)
+    if (!this.redis.isOpen) {
+      await this.redis.connect()
     }
 
-    return await this.checkLimit(prefixedKey)
+    return this.blockingUntilReady?.enabled
+      ? this.blockUntilReady(key, this.blockingUntilReady.timeout, weight)
+      : this.checkLimit(key, weight)
   }
 
-  private async checkLimit(key: string) {
-    const result = await this.eval(
-      SLIDING_WINDOW_LOG_LUA_SCRIPT,
-      1,
-      key,
-      Date.now().toString(),
-      this.window.toString(),
-      this.maxRequests.toString(),
-    )
-
-    if (!Array.isArray(result) || result.length !== 4) {
-      throw new TypeError('Invalid response from rate limit script')
-    }
-
-    const numbers = result.map((item) => {
-      const num = Number(item)
-      if (!Number.isInteger(num)) {
-        throw new TypeError('Invalid response from rate limit script')
-      }
-      return num
-    })
-
-    const [success, limit, remaining, reset] = numbers as [number, number, number, number]
+  private async checkLimit(key: string, weight: number): Promise<Required<RateLimitResult>> {
+    const [used, ttl] = await this.executeScript(key, weight)
 
     return {
-      success: success === 1,
-      limit,
-      remaining,
-      reset,
+      success: used <= this.maxRequests,
+      limit: this.maxRequests,
+      remaining: Math.max(0, this.maxRequests - used),
+      reset: Date.now() + ttl,
     }
   }
 
-  private async blockUntilReady(key: string, timeoutMs: number) {
+  private async blockUntilReady(key: string, timeoutMs: number, weight: number): Promise<Required<RateLimitResult>> {
     const deadlineAtMs = Date.now() + timeoutMs
 
     while (true) {
-      const result = await this.checkLimit(key)
+      const result = await this.checkLimit(key, weight)
 
       if (result.success || result.reset > deadlineAtMs) {
         return result
       }
 
-      await new Promise(resolve => setTimeout(resolve, result.reset - Date.now()))
+      await sleep(result.reset - Date.now())
     }
+  }
+
+  private async executeScript(key: string, weight: number): Promise<[used: number, ttl: number]> {
+    try {
+      return await this.evalSha(key, weight)
+    }
+    catch (error) {
+      if (error instanceof Error && error.message.startsWith('NOSCRIPT')) {
+        this.scriptSha = undefined
+        return await this.evalSha(key, weight)
+      }
+
+      throw error
+    }
+  }
+
+  private async evalSha(key: string, weight: number): Promise<[used: number, ttl: number]> {
+    this.scriptSha ??= await this.redis.scriptLoad(FIXED_WINDOW_RATELIMIT_SCRIPT)
+
+    return await this.redis.evalSha(this.scriptSha, {
+      keys: [key],
+      arguments: [
+        String(weight),
+        String(this.window),
+      ],
+    }) as [number, number]
+  }
+
+  private resolveWeight(options?: RateLimitOptions): number {
+    const weight = options?.weight ?? 1
+
+    if (!Number.isInteger(weight) || weight <= 0) {
+      throw new TypeError(
+        'Rate limit weight must be an integer greater than 0',
+      )
+    }
+
+    return weight
   }
 }

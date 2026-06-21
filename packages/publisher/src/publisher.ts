@@ -112,72 +112,80 @@ export abstract class Publisher<T extends Record<string, object>> {
     signal?.throwIfAborted()
 
     const bufferedEvents: T[K][] = []
-    const pullResolvers: [(result: IteratorResult<T[K]>) => void, (error: Error) => void][] = []
-    let subscriptionError: { error: ThrowableError } | undefined
+    const pullResolvers: { resolve: (result: IteratorResult<T[K]>) => void, reject: (error: Error) => void }[] = []
 
-    const unsubscribePromise = this.subscribe(event, (payload) => {
-      const resolver = pullResolvers.shift()
+    const unsubscribePromise = this
+      .subscribeListener(event, (payload) => {
+        if (signal?.aborted) {
+          return
+        }
 
-      if (resolver) {
-        resolver[0]({ done: false, value: payload })
+        const resolver = pullResolvers.shift()
+
+        if (resolver) {
+          resolver.resolve({ done: false, value: payload })
+        }
+        else {
+          bufferedEvents.push(payload)
+
+          if (bufferedEvents.length > maxBufferedEvents) {
+            bufferedEvents.shift()
+          }
+        }
+      }, {
+        lastEventId: listenerOrOptions?.lastEventId,
+        onError: error => terminate({ kind: 'error', error }),
+      })
+      .catch(error => terminate({ kind: 'error', error }))
+
+    const abortListener = () => terminate({ kind: 'error', error: signal!.reason })
+    signal?.addEventListener('abort', abortListener)
+
+    let terminalState: { kind: 'error', error: ThrowableError } | { kind: 'cancelled' } | undefined
+    async function terminate(state: Exclude<typeof terminalState, undefined>) {
+      if (terminalState) {
+        return
+      }
+
+      terminalState = state
+      signal?.removeEventListener('abort', abortListener)
+
+      if (state.kind === 'error') {
+        pullResolvers.forEach(resolver => resolver.reject(state.error))
       }
       else {
-        bufferedEvents.push(payload)
-
-        if (bufferedEvents.length > maxBufferedEvents) {
-          bufferedEvents.shift()
-        }
-      }
-    }, {
-      lastEventId: listenerOrOptions?.lastEventId,
-      onError: (error) => {
-        subscriptionError = { error }
-        pullResolvers.forEach(resolver => resolver[1](error))
-        signal?.removeEventListener('abort', abortListener)
-        pullResolvers.length = 0
-        bufferedEvents.length = 0
-        unsubscribePromise.then(unsubscribe => unsubscribe()).catch(() => {
-          // TODO: log error
-        })
-      },
-    })
-
-    function abortListener(event: any) {
-      pullResolvers.forEach(resolver => resolver[1](event.target.reason))
-      pullResolvers.length = 0
-      bufferedEvents.length = 0
-      unsubscribePromise.then(unsubscribe => unsubscribe()).catch(() => {
-        // TODO: log error
-      })
-    }
-
-    signal?.addEventListener('abort', abortListener, { once: true })
-
-    return new AsyncIteratorClass(async () => {
-      if (subscriptionError) {
-        throw subscriptionError.error
+        pullResolvers.forEach(resolver => resolver.resolve({ done: true, value: undefined }))
       }
 
       if (signal?.aborted) {
-        throw signal.reason
+        pullResolvers.length = 0
+        bufferedEvents.length = 0
       }
 
-      await unsubscribePromise // make sure subscription is ready
+      // Keep this async call at the end to avoid race conditions.
+      await unsubscribePromise.then(unsubscribe => unsubscribe?.())
+    }
 
-      if (bufferedEvents.length > 0) {
-        return { done: false, value: bufferedEvents.shift()! }
-      }
+    return new AsyncIteratorClass(
+      async () => {
+        /* v8 ignore next 3 - AsyncIteratorClass already covers this, but we keep this check for safety. */
+        if (terminalState?.kind === 'cancelled') {
+          return { done: true, value: undefined }
+        }
 
-      return new Promise((resolve, reject) => {
-        pullResolvers.push([resolve, reject])
-      })
-    }, async () => {
-      pullResolvers.forEach(resolver => resolver[0]({ done: true, value: undefined }))
-      signal?.removeEventListener('abort', abortListener)
-      pullResolvers.length = 0
-      bufferedEvents.length = 0
+        if (bufferedEvents.length > 0) {
+          return { done: false, value: bufferedEvents.shift()! }
+        }
 
-      await unsubscribePromise.then(unsubscribe => unsubscribe())
-    })
+        if (terminalState?.kind === 'error') {
+          throw terminalState.error
+        }
+
+        return new Promise((resolve, reject) => {
+          pullResolvers.push({ resolve, reject })
+        })
+      },
+      () => terminate({ kind: 'cancelled' }),
+    )
   }
 }

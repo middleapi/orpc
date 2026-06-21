@@ -1,7 +1,7 @@
 {
   "name": "@orpc/tanstack-query",
   "type": "module",
-  "version": "1.14.6",
+  "version": "1.13.4",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
@@ -16,6 +16,7 @@
   "sideEffects": false,
   "publishConfig": {
     "exports": {
+      "./package.json": "./package.json",
       ".": {
         "types": "./dist/index.d.mts",
         "import": "./dist/index.mjs",
@@ -24,6 +25,7 @@
     }
   },
   "exports": {
+    "./package.json": "./package.json",
     ".": "./src/index.ts"
   },
   "files": [
@@ -31,26 +33,27 @@
   ],
   "scripts": {
     "build": "unbuild",
-    "build:watch": "pnpm run build --watch",
     "type:check": "tsc -b"
   },
   "peerDependencies": {
-    "@orpc/client": "workspace:*",
     "@tanstack/query-core": ">=5.80.2"
   },
   "dependencies": {
+    "@orpc/client": "workspace:*",
+    "@orpc/contract": "workspace:*",
+    "@orpc/openapi": "workspace:*",
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "@angular/core": "^21.2.4",
-    "@tanstack/angular-query-experimental": "^5.90.25",
-    "@tanstack/query-core": "^5.90.20",
-    "@tanstack/react-query": "^5.90.21",
-    "@tanstack/solid-query": "^5.90.26",
-    "@tanstack/svelte-query": "^6.1.0",
-    "@tanstack/vue-query": "^5.92.9",
-    "svelte": "^5.53.11",
-    "vue": "^3.5.30",
-    "zod": "^4.3.6"
+    "@angular/core": "^22.0.1",
+    "@tanstack/angular-query-experimental": "^5.101.0",
+    "@tanstack/query-core": "^5.101.0",
+    "@tanstack/react-query": "^5.101.0",
+    "@tanstack/solid-query": "^5.101.0",
+    "@tanstack/svelte-query": "^6.1.34",
+    "@tanstack/vue-query": "^5.101.0",
+    "svelte": "^5.56.3",
+    "vue": "^3.5.38",
+    "zod": "^4.4.3"
   }
 }

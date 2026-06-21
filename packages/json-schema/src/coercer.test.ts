@@ -1,112 +1,132 @@
-/* eslint-disable prefer-regex-literals */
+import type { JsonSchema } from './types'
 import { JsonSchemaCoercer } from './coercer'
 
 describe('jsonSchemaCoercer', () => {
   const coercer = new JsonSchemaCoercer()
 
   it('do no thing with boolean/any schema', () => {
-    expect(coercer.coerce(true, '123')).toEqual('123')
-    expect(coercer.coerce(false, '123')).toEqual('123')
-    expect(coercer.coerce({}, '123')).toEqual('123')
-    expect(coercer.coerce({ not: {} }, '123')).toEqual('123')
+    expect(coercer.coerce([true, false], '123')).toEqual('123')
+    expect(coercer.coerce([false, false], '123')).toEqual('123')
+    expect(coercer.coerce([{}, false], '123')).toEqual('123')
+    expect(coercer.coerce([{ not: {} }, false], '123')).toEqual('123')
+  })
+
+  it('do no thing with optional schema and undefined value', () => {
+    expect(coercer.coerce([{ type: 'number' }, true], undefined)).toEqual(undefined)
+    expect(coercer.coerce([{ type: 'array' }, true], undefined)).toEqual(undefined)
+    expect(coercer.coerce([{ type: 'object' }, true], undefined)).toEqual(undefined)
   })
 
   it('can coerce primitive types', () => {
-    expect(coercer.coerce({ type: 'boolean' }, 'true')).toEqual(true)
-    expect(coercer.coerce({ type: 'boolean' }, 'false')).toEqual(false)
-    expect(coercer.coerce({ type: 'boolean' }, 'invalid')).toEqual('invalid')
+    expect(coercer.coerce([{ type: 'boolean' }, false], 'true')).toEqual(true)
+    expect(coercer.coerce([{ type: 'boolean' }, false], 'false')).toEqual(false)
+    expect(coercer.coerce([{ type: 'boolean' }, false], 'invalid')).toEqual('invalid')
 
-    expect(coercer.coerce({ type: 'number' }, '123.4')).toEqual(123.4)
-    expect(coercer.coerce({ type: 'number' }, 'invalid')).toEqual('invalid')
+    expect(coercer.coerce([{ type: 'number' }, false], '123.4')).toEqual(123.4)
+    expect(coercer.coerce([{ type: 'number' }, false], 'invalid')).toEqual('invalid')
 
-    expect(coercer.coerce({ type: 'integer' }, '123')).toEqual(123)
-    expect(coercer.coerce({ type: 'integer' }, '123.4')).toEqual('123.4')
-    expect(coercer.coerce({ type: 'integer' }, 'invalid')).toEqual('invalid')
+    expect(coercer.coerce([{ type: 'integer' }, false], '123')).toEqual(123)
+    expect(coercer.coerce([{ type: 'integer' }, false], '123.4')).toEqual('123.4')
+    expect(coercer.coerce([{ type: 'integer' }, false], 'invalid')).toEqual('invalid')
+    expect(coercer.coerce([{ type: 'integer' }, false], [])).toEqual([])
 
     // -- no coercion
-    expect(coercer.coerce({ type: 'null' }, null)).toEqual(null)
-    expect(coercer.coerce({ type: 'null' }, undefined)).toEqual(undefined)
-    expect(coercer.coerce({ type: 'number' }, undefined)).toEqual(undefined)
-    expect(coercer.coerce({ type: 'boolean' }, undefined)).toEqual(undefined)
+    expect(coercer.coerce([{ type: 'null' }, false], null)).toEqual(null)
+    expect(coercer.coerce([{ type: 'null' }, false], undefined)).toEqual(undefined)
+    expect(coercer.coerce([{ type: 'number' }, false], undefined)).toEqual(undefined)
+    expect(coercer.coerce([{ type: 'boolean' }, false], undefined)).toEqual(undefined)
   })
 
   it('can coerce multiple types', () => {
-    // TODO
-    // expect(coercer.coerce({ type: ['boolean', 'null'] }, 'true')).toEqual(true)
-    expect(coercer.coerce({ type: ['number', 'boolean'] }, '123')).toEqual(123)
+    expect(coercer.coerce([{ type: ['boolean', 'null'] }, false], 'true')).toEqual(true)
+    expect(coercer.coerce([{ type: ['number', 'boolean'] }, false], '123')).toEqual(123)
   })
 
   it('can coerce native types', () => {
     const date = new Date()
-    expect(coercer.coerce({ 'type': 'string', 'x-native-type': 'date' } as any, date.toISOString())).toEqual(date)
-    expect(coercer.coerce({ 'type': 'string', 'x-native-type': 'date' } as any, '1972-01-01')).toEqual(new Date('1972-01-01'))
-    expect(coercer.coerce({ 'type': 'string', 'x-native-type': 'date' } as any, '2018-06-12T19:30')).toEqual(new Date('2018-06-12T19:30'))
-    expect(coercer.coerce({ 'type': 'string', 'x-native-type': 'date' } as any, '2018-06-')).toEqual('2018-06-')
-    expect(coercer.coerce({ 'type': 'string', 'x-native-type': 'date' } as any, 'Invalid Date')).toEqual('Invalid Date')
+    expect(coercer.coerce([{ 'type': 'string', 'x-native-type': 'date' } as any, false], date.toISOString())).toEqual(date)
+    expect(coercer.coerce([{ 'type': 'string', 'x-native-type': 'date' } as any, false], '1972-01-01')).toEqual(new Date('1972-01-01'))
+    expect(coercer.coerce([{ 'type': 'string', 'x-native-type': 'date' } as any, false], '2018-06-12T19:30')).toEqual(new Date('2018-06-12T19:30'))
+    expect(coercer.coerce([{ 'type': 'string', 'x-native-type': 'date' } as any, false], '2018-06-')).toEqual('2018-06-')
+    expect(coercer.coerce([{ 'type': 'string', 'x-native-type': 'date' } as any, false], 'Invalid Date')).toEqual('Invalid Date')
+    expect(coercer.coerce([{ 'type': 'string', 'x-native-type': 'date' } as any, false], [])).toEqual([])
 
-    expect(coercer.coerce({ 'type': 'string', 'x-native-type': 'bigint' } as any, '123')).toEqual(123n)
-    expect(coercer.coerce({ 'type': 'string', 'x-native-type': 'bigint' } as any, 123)).toEqual(123n)
-    expect(coercer.coerce({ 'type': 'string', 'x-native-type': 'bigint' } as any, Infinity)).toEqual(Infinity)
-    expect(coercer.coerce({ 'type': 'string', 'x-native-type': 'bigint' } as any, 'invalid')).toEqual('invalid')
+    expect(coercer.coerce([{ 'type': 'string', 'x-native-type': 'bigint' } as any, false], '123')).toEqual(123n)
+    expect(coercer.coerce([{ 'type': 'string', 'x-native-type': 'bigint' } as any, false], 123)).toEqual(123n)
+    expect(coercer.coerce([{ 'type': 'string', 'x-native-type': 'bigint' } as any, false], Infinity)).toEqual(Infinity)
+    expect(coercer.coerce([{ 'type': 'string', 'x-native-type': 'bigint' } as any, false], 'invalid')).toEqual('invalid')
+    expect(coercer.coerce([{ 'type': 'string', 'x-native-type': 'bigint' } as any, false], [])).toEqual([])
 
-    expect(coercer.coerce({ 'type': 'string', 'x-native-type': 'url' } as any, 'https://example.com')).toEqual(new URL('https://example.com'))
-    expect(coercer.coerce({ 'type': 'string', 'x-native-type': 'url' } as any, 'invalid')).toEqual('invalid')
+    expect(coercer.coerce([{ 'type': 'string', 'x-native-type': 'url' } as any, false], 'https://example.com')).toEqual(new URL('https://example.com'))
+    expect(coercer.coerce([{ 'type': 'string', 'x-native-type': 'url' } as any, false], 'invalid')).toEqual('invalid')
+    expect(coercer.coerce([{ 'type': 'string', 'x-native-type': 'url' } as any, false], [])).toEqual([])
 
-    expect(coercer.coerce({ 'type': 'string', 'x-native-type': 'regexp' } as any, '/abc/i')).toEqual(new RegExp('abc', 'i'))
-    expect(coercer.coerce({ 'type': 'string', 'x-native-type': 'regexp' } as any, '/abc/invalid')).toEqual('/abc/invalid')
-    expect(coercer.coerce({ 'type': 'string', 'x-native-type': 'regexp' } as any, 'invalid')).toEqual('invalid')
+    expect(coercer.coerce([{ 'type': 'string', 'x-native-type': 'regexp' } as any, false], '/abc/i')).toEqual(/abc/i)
+    expect(coercer.coerce([{ 'type': 'string', 'x-native-type': 'regexp' } as any, false], '/abc/invalid')).toEqual('/abc/invalid')
+    expect(coercer.coerce([{ 'type': 'string', 'x-native-type': 'regexp' } as any, false], 'invalid')).toEqual('invalid')
+    expect(coercer.coerce([{ 'type': 'string', 'x-native-type': 'regexp' } as any, false], [])).toEqual([])
 
     expect(coercer.coerce(
-      { 'type': 'array', 'items': { type: 'number' }, 'x-native-type': 'set' } as any,
+      [{ 'type': 'array', 'items': { type: 'number' }, 'x-native-type': 'set' } as any, false],
       ['1', '2', '3', '4'],
     )).toEqual(new Set([1, 2, 3, 4]))
 
     expect(coercer.coerce(
-      { 'type': 'array', 'items': { type: 'number' }, 'x-native-type': 'set' } as any,
+      [{ 'type': 'array', 'items': { type: 'number' }, 'x-native-type': 'set' } as any, false],
       ['1', '2', '3', '4', '4'],
     )).toEqual([1, 2, 3, 4, 4])
 
     expect(coercer.coerce(
-      { 'type': 'array', 'items': { type: 'array', prefixItems: [{ type: 'number' }, { type: 'boolean' }] }, 'x-native-type': 'map' } as any,
+      [{ 'type': 'array', 'items': { type: 'number' }, 'x-native-type': 'set' } as any, false],
+      {},
+    )).toEqual({})
+
+    expect(coercer.coerce(
+      [{ 'type': 'array', 'items': { type: 'array', prefixItems: [{ type: 'number' }, { type: 'boolean' }] }, 'x-native-type': 'map' } as any, false],
       [['1', 'true'], ['2', 'false'], ['invalid', 'invalid']],
     )).toEqual(new Map([[1, true], [2, false], ['invalid', 'invalid']] as any))
 
     expect(coercer.coerce(
-      { 'type': 'array', 'items': { type: 'array', prefixItems: [{ type: 'number' }, { type: 'boolean' }] }, 'x-native-type': 'map' } as any,
+      [{ 'type': 'array', 'items': { type: 'array', prefixItems: [{ type: 'number' }, { type: 'boolean' }] }, 'x-native-type': 'map' } as any, false],
       ['1'],
     )).toEqual(['1'])
 
     expect(coercer.coerce(
-      { 'type': 'array', 'items': { type: 'array', prefixItems: [{ type: 'number' }, { type: 'boolean' }] }, 'x-native-type': 'map' } as any,
+      [{ 'type': 'array', 'items': { type: 'array', prefixItems: [{ type: 'number' }, { type: 'boolean' }] }, 'x-native-type': 'map' } as any, false],
+      {},
+    )).toEqual({})
+
+    expect(coercer.coerce(
+      [{ 'type': 'array', 'items': { type: 'array', prefixItems: [{ type: 'number' }, { type: 'boolean' }] }, 'x-native-type': 'map' } as any, false],
       [['1', 'true'], ['2', 'false'], ['1', 'false']],
     )).toEqual([[1, true], [2, false], [1, false]])
   })
 
   it('can coerce enum/const values', () => {
-    expect(coercer.coerce({ enum: [123, '234', true] }, 123)).toEqual(123)
-    expect(coercer.coerce({ enum: [123, '234', true] }, '234')).toEqual('234')
-    expect(coercer.coerce({ enum: [123, '234', true] }, '123')).toEqual(123)
-    expect(coercer.coerce({ enum: [123, '234', true] }, 'off')).toEqual('off')
-    expect(coercer.coerce({ enum: [123, '234', true] }, 'on')).toEqual(true)
-    expect(coercer.coerce({ enum: [123, '234', true] }, ['on'])).toEqual(['on'])
+    expect(coercer.coerce([{ enum: [123, '234', true] }, false], 123)).toEqual(123)
+    expect(coercer.coerce([{ enum: [123, '234', true] }, false], '234')).toEqual('234')
+    expect(coercer.coerce([{ enum: [123, '234', true] }, false], '123')).toEqual(123)
+    expect(coercer.coerce([{ enum: [123, '234', true] }, false], 'off')).toEqual('off')
+    expect(coercer.coerce([{ enum: [123, '234', true] }, false], 'on')).toEqual(true)
+    expect(coercer.coerce([{ enum: [123, '234', true] }, false], ['on'])).toEqual(['on'])
 
-    expect(coercer.coerce({ const: true }, 'off')).toEqual('off')
-    expect(coercer.coerce({ const: true }, 'on')).toEqual(true)
-    expect(coercer.coerce({ const: true }, ['on'])).toEqual(['on'])
+    expect(coercer.coerce([{ const: true }, false], 'off')).toEqual('off')
+    expect(coercer.coerce([{ const: true }, false], 'on')).toEqual(true)
+    expect(coercer.coerce([{ const: true }, false], ['on'])).toEqual(['on'])
   })
 
   it('can coerce arrays/tuples', () => {
     expect(
-      coercer.coerce({ type: 'array', items: { type: 'number' } }, ['1', '2', '3']),
+      coercer.coerce([{ type: 'array', items: { type: 'number' } }, false], ['1', '2', '3']),
     ).toEqual([1, 2, 3])
     expect(
-      coercer.coerce({ type: 'array', items: { type: 'string' } }, ['1', '2', '3']),
+      coercer.coerce([{ type: 'array', items: { type: 'string' } }, false], ['1', '2', '3']),
     ).toEqual(['1', '2', '3'])
 
     // draft-07
     expect(
       coercer.coerce(
-        { type: 'array', items: [{ type: 'number' }, { type: 'boolean' }], additionalItems: { type: 'number' } },
+        [{ type: 'array', items: [{ type: 'number' }, { type: 'boolean' }], additionalItems: { type: 'number' } } as any, false],
         ['1', 'true', '2', 'false'],
       ),
     ).toEqual([1, true, 2, 'false'])
@@ -114,14 +134,14 @@ describe('jsonSchemaCoercer', () => {
     // draft-2020
     expect(
       coercer.coerce(
-        { type: 'array', prefixItems: [{ type: 'number' }, { type: 'boolean' }], items: { type: 'number' } },
+        [{ type: 'array', prefixItems: [{ type: 'number' }, { type: 'boolean' }], items: { type: 'number' } }, false],
         ['1', 'true', '2', 'false'],
       ),
     ).toEqual([1, true, 2, 'false'])
 
     expect(
       coercer.coerce(
-        { type: 'array', prefixItems: [{ type: 'number' }, { type: 'boolean' }] },
+        [{ type: 'array', prefixItems: [{ type: 'number' }, { type: 'boolean' }] }, false],
         ['1', 'true', '2', 'false'],
       ),
     ).toEqual([1, true, '2', 'false'])
@@ -130,33 +150,33 @@ describe('jsonSchemaCoercer', () => {
   it('can coerce objects', () => {
     expect(
       coercer.coerce(
-        { type: 'object', properties: { a: { type: 'number' }, b: { type: 'boolean' } } },
+        [{ type: 'object', properties: { a: { type: 'number' }, b: { type: 'boolean' } } }, false],
         { a: '123', b: 'true' },
       ),
     ).toEqual({ a: 123, b: true })
 
     expect(
       coercer.coerce(
-        { type: 'object', properties: { a: { type: 'number' }, b: { type: 'boolean' } }, required: ['a'] },
+        [{ type: 'object', properties: { a: { type: 'number' }, b: { type: 'boolean' } }, required: ['a'] }, false],
         { a: undefined, b: 'true' },
       ),
     ).toEqual({ a: undefined, b: true })
 
     expect(
       coercer.coerce(
-        {
+        [{
           type: 'object',
           properties: { a: { type: 'number' } },
           patternProperties: { '^b': { 'type': 'string', 'x-native-type': 'bigint' } as any },
           additionalProperties: { type: 'boolean' },
-        },
+        }, false],
         { a: '123', b: '123', b1: '123', c: 'false' },
       ),
     ).toEqual({ a: 123, b: 123n, b1: 123n, c: false })
 
     expect(
       coercer.coerce(
-        { type: 'object', properties: { 0: { type: 'number' }, 1: { type: 'boolean' } } },
+        [{ type: 'object', properties: { 0: { type: 'number' }, 1: { type: 'boolean' } } }, false],
         ['123', 'true'],
       ),
     ).toEqual({ 0: 123, 1: true })
@@ -172,14 +192,14 @@ describe('jsonSchemaCoercer', () => {
       ],
     } as any
 
-    expect(coercer.coerce(schema, 123)).toEqual(123)
-    expect(coercer.coerce(schema, '123')).toEqual(123)
-    expect(coercer.coerce(schema, true)).toEqual(true)
-    expect(coercer.coerce(schema, 'true')).toEqual(true)
-    expect(coercer.coerce(schema, { a: '123' })).toEqual({ a: 123 })
-    expect(coercer.coerce(schema, { a: '123', b: undefined })).toEqual({ a: 123, b: undefined })
-    expect(coercer.coerce(schema, { a: '123', b: '456' })).toEqual({ a: 123, b: 456 })
-    expect(coercer.coerce(schema, 'invalid')).toEqual('invalid')
+    expect(coercer.coerce([schema, false], 123)).toEqual(123)
+    expect(coercer.coerce([schema, false], '123')).toEqual(123)
+    expect(coercer.coerce([schema, false], true)).toEqual(true)
+    expect(coercer.coerce([schema, false], 'true')).toEqual(true)
+    expect(coercer.coerce([schema, false], { a: '123' })).toEqual({ a: 123 })
+    expect(coercer.coerce([schema, false], { a: '123', b: undefined })).toEqual({ a: 123, b: undefined })
+    expect(coercer.coerce([schema, false], { a: '123', b: '456' })).toEqual({ a: 123, b: 456 })
+    expect(coercer.coerce([schema, false], 'invalid')).toEqual('invalid')
 
     const schema2 = {
       anyOf: [
@@ -188,8 +208,8 @@ describe('jsonSchemaCoercer', () => {
       ],
     } as any
 
-    expect(coercer.coerce(schema2, { a: 'true', b: '123' })).toEqual({ a: true, b: 123 })
-    expect(coercer.coerce(schema2, { a: '123' })).toEqual({ a: 123 })
+    expect(coercer.coerce([schema2, false], { a: 'true', b: '123' })).toEqual({ a: true, b: 123 })
+    expect(coercer.coerce([schema2, false], { a: '123' })).toEqual({ a: 123 })
 
     const schema3 = {
       anyOf: [
@@ -198,8 +218,19 @@ describe('jsonSchemaCoercer', () => {
       ],
     } as any
 
-    expect(coercer.coerce(schema3, ['1', 'true', 'true', '2'])).toEqual([1, true, true, 2])
-    expect(coercer.coerce(schema3, ['1', '2'])).toEqual([1, 2])
+    expect(coercer.coerce([schema3, false], ['1', 'true', 'true', '2'])).toEqual([1, true, true, 2])
+    expect(coercer.coerce([schema3, false], ['1', '2'])).toEqual([1, 2])
+
+    const schema4 = {
+      oneOf: [
+        { type: 'number', not: { const: 1 } },
+        { 'type': 'number', 'x-native-type': 'bigint', 'not': { const: 2n } },
+      ],
+    }
+
+    expect(coercer.coerce([schema4, false], '1')).toEqual(1n)
+    expect(coercer.coerce([schema4, false], '2')).toEqual(2)
+    expect(coercer.coerce([schema4, false], '3')).toEqual(3)
   })
 
   it('can handle discriminated union types', () => {
@@ -210,8 +241,8 @@ describe('jsonSchemaCoercer', () => {
       ],
     } as any
 
-    expect(coercer.coerce(schema, { t: '1', v: '123' })).toEqual({ t: 1, v: 123 })
-    expect(coercer.coerce(schema, { t: '2', v: '123' })).toEqual({ t: 2, v: 123n })
+    expect(coercer.coerce([schema, false], { t: '1', v: '123' })).toEqual({ t: 1, v: 123 })
+    expect(coercer.coerce([schema, false], { t: '2', v: '123' })).toEqual({ t: 2, v: 123n })
   })
 
   it('can coerce intersection types', () => {
@@ -222,56 +253,26 @@ describe('jsonSchemaCoercer', () => {
       ],
     } as any
 
-    expect(coercer.coerce(schema, { a: '123', b: '456', c: '789' })).toEqual({ a: 123, b: 456, c: '789' })
-    expect(coercer.coerce(schema, { a: '123' })).toEqual({ a: 123 })
-    expect(coercer.coerce(schema, { b: '456' })).toEqual({ b: 456 })
-    expect(coercer.coerce(schema, 'invalid')).toEqual('invalid')
-  })
-
-  it('can coerce recursive types', () => {
-    const schema = {
-      type: 'object',
-      properties: {
-        a: { type: 'boolean' },
-        b: { $ref: '#/components/schema/Test' },
-      },
-      required: ['a'],
-    } as any
-
-    expect(coercer.coerce(schema, {
-      a: 'true',
-      b: {
-        a: 'off',
-        b: {
-          a: 'invalid',
-          b: 'invalid',
-        },
-      },
-    }, {
-      components: {
-        '#/components/schema/Test': schema,
-      },
-    })).toEqual({
-      a: true,
-      b: {
-        a: false,
-        b: {
-          a: 'invalid',
-          b: 'invalid',
-        },
-      },
-    })
+    expect(coercer.coerce([schema, false], { a: '123', b: '456', c: '789' })).toEqual({ a: 123, b: 456, c: '789' })
+    expect(coercer.coerce([schema, false], { a: '123' })).toEqual({ a: 123 })
+    expect(coercer.coerce([schema, false], { b: '456' })).toEqual({ b: 456 })
+    expect(coercer.coerce([schema, false], 'invalid')).toEqual('invalid')
   })
 
   it('can coerce complex structures', () => {
     const schema = {
+      $defs: {
+        ArrayOfDate: {
+          type: 'array',
+          items: { 'type': 'string', 'x-native-type': 'date' },
+        },
+      },
       type: 'object',
       properties: {
         a: { type: 'boolean' },
         b: { type: 'number' },
         c: {
-          type: 'array',
-          items: { 'type': 'string', 'x-native-type': 'date' },
+          $ref: '#/$defs/ArrayOfDate',
         },
         d: {
           type: 'object',
@@ -287,7 +288,7 @@ describe('jsonSchemaCoercer', () => {
       required: ['a'],
     }
 
-    expect(coercer.coerce(schema, {
+    expect(coercer.coerce([schema, false], {
       a: 'true',
       b: '123',
       c: ['2020-01-01', '2020-01-02'],
@@ -301,6 +302,100 @@ describe('jsonSchemaCoercer', () => {
       d: {
         e: new Set([new URL('https://example.com'), new URL('https://example.org')]),
       },
+    })
+  })
+
+  it('can coerce recursive types', () => {
+    const schema: JsonSchema = {
+      $defs: {
+        get Test() {
+          return schema
+        },
+      },
+      type: 'object',
+      properties: {
+        a: { type: 'boolean' },
+        b: { $ref: '#/$defs/Test' },
+      },
+      required: ['a'],
+    }
+
+    expect(coercer.coerce([schema, false], {
+      a: 'true',
+      b: {
+        a: 'off',
+        b: {
+          a: 'invalid',
+          b: {
+            a: 'true',
+            b: 'invalid',
+          },
+        },
+      },
+    })).toEqual({
+      a: true,
+      b: {
+        a: false,
+        b: {
+          a: 'invalid',
+          b: {
+            a: true,
+            b: 'invalid',
+          },
+        },
+      },
+    })
+
+    const schema2: JsonSchema = {
+      type: 'object',
+      properties: {
+        a: { type: 'boolean' },
+        b: { $ref: '#' },
+      },
+      required: ['a'],
+    }
+
+    expect(coercer.coerce([schema2, false], {
+      a: 'true',
+      b: {
+        a: 'off',
+        b: {
+          a: 'invalid',
+          b: {
+            a: 'true',
+            b: 'invalid',
+          },
+        },
+      },
+    })).toEqual({
+      a: true,
+      b: {
+        a: false,
+        b: {
+          a: 'invalid',
+          b: {
+            a: true,
+            b: 'invalid',
+          },
+        },
+      },
+    })
+  })
+
+  it('ignore unresolvable $ref', () => {
+    const schema: JsonSchema = {
+      $ref: '#/$defs/unExisted',
+    }
+
+    expect(coercer.coerce([schema, false], { a: true })).toEqual({
+      a: true,
+    })
+
+    const schema2: JsonSchema = {
+      $ref: 'canNotResolve',
+    }
+    expect(coercer.coerce([schema2, false], { a: true })).toEqual({
+      a: true,
     })
   })
 })

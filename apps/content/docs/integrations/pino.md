@@ -1,11 +1,6 @@
----
-title: Pino Integration
-description: Integrate oRPC with Pino for structured logging and request tracking.
----
-
 # Pino Integration
 
-[Pino](https://getpino.io/) is a fast and lightweight JSON logger. This guide explains how to integrate oRPC with Pino to add structured logging, request tracking, and error monitoring to your applications.
+[Pino](https://getpino.io/) integration for oRPC provides structured logging capabilities, allowing you to easily track requests, monitor errors, and gain insights into your application's behavior.
 
 ::: warning
 This guide assumes familiarity with [Pino](https://getpino.io/). Review the official documentation if needed.
@@ -16,52 +11,53 @@ This guide assumes familiarity with [Pino](https://getpino.io/). Review the offi
 ::: code-group
 
 ```sh [npm]
-npm install @orpc/experimental-pino@latest pino@latest
+npm install @orpc/pino@latest pino@latest
 ```
 
 ```sh [yarn]
-yarn add @orpc/experimental-pino@latest pino@latest
+yarn add @orpc/pino@latest pino@latest
 ```
 
 ```sh [pnpm]
-pnpm add @orpc/experimental-pino@latest pino@latest
+pnpm add @orpc/pino@latest pino@latest
 ```
 
 ```sh [bun]
-bun add @orpc/experimental-pino@latest pino@latest
+bun add @orpc/pino@latest pino@latest
 ```
 
 ```sh [deno]
-deno add npm:@orpc/experimental-pino@latest npm:pino@latest
+deno add npm:@orpc/pino@latest npm:pino@latest
 ```
 
 :::
 
 ## Setup
 
-To set up Pino with oRPC, use the `LoggingHandlerPlugin` class. This plugin automatically instruments your handler with structured logging, request tracking, and error monitoring.
+To set up Pino with oRPC, use the `PinoHandlerPlugin` class. This plugin automatically instruments your handler with structured logging, request tracking, and error monitoring.
 
-```ts
-import { LoggingHandlerPlugin } from '@orpc/experimental-pino'
+```ts twoslash
+import { RPCHandler } from '@orpc/server/fetch'
+import { router } from './shared/planet'
+// ---cut---
+import { PinoHandlerPlugin } from '@orpc/pino'
 import pino from 'pino'
 
 const logger = pino()
 
 const handler = new RPCHandler(router, {
   plugins: [
-    new LoggingHandlerPlugin({
-      logger, // Custom logger instance
-      generateId: ({ request }) => crypto.randomUUID(), // Custom ID generator
-      logRequestResponse: true, // Log request start/end (disabled by default)
-      logRequestAbort: true, // Log when requests are aborted (disabled by default)
+    new PinoHandlerPlugin({
+      logger, // <- custom logger instance
+      generateRequestId: ({ request }) => crypto.randomUUID(), // <- custom request id generator
+      logLifecycle: true, // <- log information about request lifecycle (disabled by default)
+      logAbort: true, // <- log information when requests are aborted (disabled by default)
     }),
   ],
 })
 ```
 
-::: info
-The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc-handler), [OpenAPIHandler](/docs/openapi/openapi-handler), or another custom handler.
-:::
+<!--@include: @/shared/common-plugin-handler-compatibility.md -->
 
 ::: tip
 For improved log readability during development, consider using [pino-pretty](https://github.com/pinojs/pino-pretty) to format your logs in a human-friendly way.
@@ -77,12 +73,12 @@ npm run dev | npx pino-pretty
 You can access the logger from the context object using the `getLogger` function:
 
 ```ts
-import { getLogger, LoggerContext } from '@orpc/experimental-pino'
+import { getLogger, LoggerContext } from '@orpc/pino'
 
-interface ORPCContext extends LoggerContext {} // [!code highlight]
+interface ServerContext extends LoggerContext {} // [!code highlight]
 
 const procedure = os
-  .$context<ORPCContext>()
+  .$context<ServerContext>()
   .handler(({ context }) => {
     const logger = getLogger(context) // [!code highlight]
 
@@ -99,23 +95,23 @@ You can provide a custom logger instance for specific requests by passing it thr
 
 ```ts
 import {
-  CONTEXT_LOGGER_SYMBOL,
+  LOGGER_CONTEXT_SYMBOL,
   LoggerContext,
-  LoggingHandlerPlugin
-} from '@orpc/experimental-pino'
+  PinoHandlerPlugin
+} from '@orpc/pino'
 
 const logger = pino()
 const httpLogger = pinoHttp({ logger })
 
-interface ORPCContext extends LoggerContext {} // [!code highlight]
+interface ServerContext extends LoggerContext {} // [!code highlight]
 
 const router = {
-  ping: os.$context<ORPCContext>().handler(() => 'pong')
+  ping: os.$context<ServerContext>().handler(() => 'pong')
 }
 
 const handler = new RPCHandler(router, {
   plugins: [
-    new LoggingHandlerPlugin({ logger }), // [!code highlight]
+    new PinoHandlerPlugin({ logger }), // [!code highlight]
   ],
 })
 
@@ -125,7 +121,7 @@ const server = createServer(async (req, res) => {
   const { matched } = await handler.handle(req, res, {
     prefix: '/api',
     context: {
-      [CONTEXT_LOGGER_SYMBOL]: req.log, // [!code highlight]
+      [LOGGER_CONTEXT_SYMBOL]: req.log, // [!code highlight]
     },
   })
 

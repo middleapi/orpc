@@ -1,69 +1,64 @@
 import type { ClientContext } from '@orpc/client'
-import type { ErrorMap, Meta, Schema } from '@orpc/contract'
+import type { ErrorMap, Schema } from '@orpc/contract'
 import type { MaybeOptionalOptions } from '@orpc/shared'
 import type { Lazyable } from './lazy'
-import type { Procedure } from './procedure'
-import type { CreateProcedureClientOptions, ProcedureClient } from './procedure-client'
+import type { ProcedureClient, ProcedureClientOptions } from './procedure-client'
 import type { AnyRouter, InferRouterInitialContext } from './router'
-import { resolveMaybeOptionalOptions } from '@orpc/shared'
-import { isLazy } from './lazy'
-import { isProcedure } from './procedure'
+import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
+import { getOrBind, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
+import { Lazy } from './lazy'
+import { Procedure } from './procedure'
 import { createProcedureClient } from './procedure-client'
-import { createAssertedLazyProcedure } from './procedure-utils'
+import { createGuardedProcedureLazy } from './procedure-utils'
 import { getRouter } from './router-utils'
 
-export type RouterClient<TRouter extends AnyRouter, TClientContext extends ClientContext = Record<never, never>>
-  = TRouter extends Procedure<any, any, infer UInputSchema, infer UOutputSchema, infer UErrorMap, any>
-    ? ProcedureClient<TClientContext, UInputSchema, UOutputSchema, UErrorMap>
+export type RouterClient<TRouter extends AnyRouter, TClientContext extends ClientContext = object>
+  = TRouter extends Procedure<any, any, infer $InputSchema, infer $OutputSchema, infer $ErrorMap, infer $ReturnedError>
+    ? ProcedureClient<TClientContext, $InputSchema, $OutputSchema, $ErrorMap, $ReturnedError>
     : {
         [K in keyof TRouter]: TRouter[K] extends Lazyable<infer U extends AnyRouter> ? RouterClient<U, TClientContext> : never
       }
 
-/**
- * Create Server-side client from a router.
- *
- * @see {@link https://orpc.dev/docs/client/server-side Server-side Client Docs}
- */
-export function createRouterClient<T extends AnyRouter, TClientContext extends ClientContext>(
+export function createRouterClient<T extends AnyRouter, TClientContext extends ClientContext = object>(
   router: Lazyable<T | undefined>,
   ...rest: MaybeOptionalOptions<
-    CreateProcedureClientOptions<
+    ProcedureClientOptions<
       InferRouterInitialContext<T>,
-      Schema<unknown, unknown>,
+      Schema<unknown>,
       ErrorMap,
-      Meta,
+      any,
       TClientContext
     >
   >
 ): RouterClient<T, TClientContext> {
   const options = resolveMaybeOptionalOptions(rest)
 
-  if (isProcedure(router)) {
-    const caller = createProcedureClient(router, options)
-
-    return caller as any
+  if (router instanceof Procedure) {
+    return createProcedureClient(router, options) as any
   }
 
-  const procedureCaller = isLazy(router)
-    ? createProcedureClient(createAssertedLazyProcedure(router), options)
+  const procedureCaller = router instanceof Lazy
+    ? createProcedureClient(createGuardedProcedureLazy(router), options)
     : {}
 
   const recursive = new Proxy(procedureCaller, {
     get(target, key) {
-      if (typeof key !== 'string') {
-        return Reflect.get(target, key)
+      if (typeof key !== 'string' || (router instanceof Lazy && RECURSIVE_CLIENT_UNWRAP_KEYS.has(key))) {
+        return getOrBind(target, key)
       }
 
       const next = getRouter(router, [key])
 
       if (!next) {
-        return Reflect.get(target, key)
+        return getOrBind(target, key)
       }
 
-      return createRouterClient(next, {
-        ...rest[0],
-        path: [...(rest[0]?.path ?? []), key],
-      } as any)
+      const nextClient = createRouterClient(next as any, {
+        ...options,
+        path: [...toArray(options.path), key],
+      })
+
+      return nextClient
     },
   })
 

@@ -1,5 +1,4 @@
 export * from './batch'
-export * from './dedupe-requests'
+export * from './dedupe'
 export * from './retry'
 export * from './retry-after'
-export * from './simple-csrf-protection'

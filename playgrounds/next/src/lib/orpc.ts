@@ -3,30 +3,33 @@ import type { RouterClient } from '@orpc/server'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { createRouterUtils } from '@orpc/tanstack-query'
-import { BatchLinkPlugin } from '@orpc/client/plugins'
+import type { RetryLinkPluginContext } from '@orpc/client/plugins'
+import { BatchLinkPlugin, RetryLinkPlugin } from '@orpc/client/plugins'
 
-/**
- * This is part of the Optimize SSR setup.
- *
- * @see {@link https://orpc.dev/docs/adapters/next#optimize-ssr}
- */
-declare global {
-  var $client: RouterClient<typeof router> | undefined
-}
+export interface ClientContext extends RetryLinkPluginContext {}
 
 const link = new RPCLink({
-  url: `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/rpc`,
+  origin: typeof window !== 'undefined' ? undefined : 'http://localhost:3000',
+  url: '/rpc',
   plugins: [
     new BatchLinkPlugin({
-      exclude: ({ path }) => path[0] === 'sse',
       groups: [{
         condition: () => true,
         context: {},
       }],
     }),
+    new RetryLinkPlugin(),
   ],
+  headers: async () => {
+    if (typeof window !== 'undefined') {
+      return {}
+    }
+
+    const { headers } = await import('next/headers')
+    return await headers()
+  },
 })
 
-export const client: RouterClient<typeof router> = globalThis.$client ?? createORPCClient(link)
+export const client: RouterClient<typeof router, ClientContext> = createORPCClient(link)
 
 export const orpc = createRouterUtils(client)

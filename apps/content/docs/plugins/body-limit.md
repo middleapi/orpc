@@ -1,35 +1,32 @@
----
-title: Body Limit Plugin
-description: A plugin for oRPC to limit the request body size.
----
-
 # Body Limit Plugin
 
-The **Body Limit Plugin** restricts the size of the request body.
+**Body Limit Plugin** helps restrict the size of the request body.
 
 ## Import
 
 Depending on your adapter, import the corresponding plugin:
 
 ```ts
-import { BodyLimitPlugin } from '@orpc/server/fetch'
-import { BodyLimitPlugin } from '@orpc/server/node'
+import { BodyLimitHandlerPlugin } from '@orpc/server/fetch'
+import { BodyLimitHandlerPlugin } from '@orpc/server/node'
 ```
 
 ## Setup
 
-Configure the plugin with your desired maximum body size:
+Set `maxBodySize` to the maximum number of bytes allowed:
 
 ```ts
 const handler = new RPCHandler(router, {
   plugins: [
-    new BodyLimitPlugin({
+    new BodyLimitHandlerPlugin({
       maxBodySize: 1024 * 1024, // 1MB
     }),
   ],
 })
 ```
 
-::: info
-The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc-handler), [OpenAPIHandler](/docs/openapi/openapi-handler), or another custom handler.
-:::
+<!--@include: @/shared/common-plugin-handler-compatibility.md -->
+
+## Learn More
+
+For implementation details, see the [fetch adapter source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/adapters/fetch/body-limit-plugin.ts) and the [node adapter source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/adapters/node/body-limit-plugin.ts).

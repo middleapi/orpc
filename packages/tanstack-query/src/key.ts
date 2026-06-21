@@ -1,7 +1,7 @@
 import type { OperationKey, OperationKeyOptions, OperationType } from './types'
 
 export function generateOperationKey<TType extends OperationType, TInput>(
-  path: readonly string[],
+  path: string[],
   state: OperationKeyOptions<TType, TInput> = {},
 ): OperationKey<TType, TInput> {
   return [path, {

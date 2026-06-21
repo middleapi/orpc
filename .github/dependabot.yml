@@ -12,16 +12,12 @@ updates:
           - eslint
           - '@antfu/eslint-config'
           - 'eslint-plugin-*'
-      hey-api:
-        patterns:
-          - '@hey-api/*'
       dev-dependencies-minor-patch:
         dependency-type: development
         exclude-patterns:
           - eslint
           - '@antfu/eslint-config'
           - 'eslint-plugin-*'
-          - '@hey-api/*'
           - compression # inline
         update-types:
           - minor

@@ -1,11 +1,6 @@
----
-title: OpenTelemetry Integration
-description: Seamlessly integrate oRPC with OpenTelemetry for distributed tracing
----
-
 # OpenTelemetry Integration
 
-[OpenTelemetry](https://opentelemetry.io/) provides observability APIs and instrumentation for applications. oRPC integrates seamlessly with OpenTelemetry to instrument your APIs for distributed tracing.
+[OpenTelemetry](https://opentelemetry.io/) integration adds automatic instrumentation to oRPC applications, enabling distributed tracing and performance monitoring with minimal setup.
 
 ::: warning
 This guide assumes familiarity with [OpenTelemetry](https://opentelemetry.io/). Review the official documentation if needed.
@@ -22,36 +17,36 @@ See the complete example in our [Bun WebSocket + OpenTelemetry Playground](/docs
 ::: code-group
 
 ```sh [npm]
-npm install @orpc/otel@latest
+npm install @orpc/opentelemetry@latest
 ```
 
 ```sh [yarn]
-yarn add @orpc/otel@latest
+yarn add @orpc/opentelemetry@latest
 ```
 
 ```sh [pnpm]
-pnpm add @orpc/otel@latest
+pnpm add @orpc/opentelemetry@latest
 ```
 
 ```sh [bun]
-bun add @orpc/otel@latest
+bun add @orpc/opentelemetry@latest
 ```
 
 ```sh [deno]
-deno add npm:@orpc/otel@latest
+deno add npm:@orpc/opentelemetry@latest
 ```
 
 :::
 
 ## Setup
 
-To set up OpenTelemetry with oRPC, use the `ORPCInstrumentation` class. This class automatically instruments your oRPC client and server for distributed tracing.
+To integrate OpenTelemetry with oRPC, use `ORPCInstrumentation`. It automatically instruments both client and server for distributed tracing.
 
 ::: code-group
 
 ```ts twoslash [server]
 import { NodeSDK } from '@opentelemetry/sdk-node'
-import { ORPCInstrumentation } from '@orpc/otel'
+import { ORPCInstrumentation } from '@orpc/opentelemetry'
 
 const sdk = new NodeSDK({
   instrumentations: [
@@ -65,7 +60,7 @@ sdk.start()
 ```ts twoslash [client]
 import { WebTracerProvider } from '@opentelemetry/sdk-trace-web'
 import { registerInstrumentations } from '@opentelemetry/instrumentation'
-import { ORPCInstrumentation } from '@orpc/otel'
+import { ORPCInstrumentation } from '@orpc/opentelemetry'
 
 const provider = new WebTracerProvider()
 
@@ -81,7 +76,21 @@ registerInstrumentations({
 :::
 
 ::: info
-While OpenTelemetry can be used on both server and client sides, using it on the server only is sufficient in most cases.
+You can configure OpenTelemetry for your server, client, or both, depending on your needs.
+:::
+
+## Context Propagation
+
+By default, `ORPCInstrumentation` enables [context propagation](https://opentelemetry.io/docs/concepts/context-propagation/) between the client and server. You can disable it by setting `propagationEnabled` to `false` if you do not need it or if another instrumentation already handles it.
+
+```ts
+const instrumentation = new ORPCInstrumentation({
+  propagationEnabled: false,
+})
+```
+
+::: warning
+Popular instrumentations that already handle context propagation include [@hono/otel](https://www.npmjs.com/package/@hono/otel), [@opentelemetry/instrumentation-http](https://www.npmjs.com/package/@opentelemetry/instrumentation-http), and [@opentelemetry/instrumentation-fetch](https://www.npmjs.com/package/@opentelemetry/instrumentation-fetch).
 :::
 
 ## Middleware Span
@@ -109,41 +118,6 @@ Object.defineProperty(someMiddleware, 'name', {
 Define the `name` property on your middleware to improve span naming and make traces easier to read.
 :::
 
-## Handling Uncaught Exceptions
-
-oRPC may throw errors before they reach the error handling layer, such as invalid WebSocket messages or adapter interceptor errors. We recommend capturing these errors:
-
-```ts
-import { SpanStatusCode, trace } from '@opentelemetry/api'
-
-const tracer = trace.getTracer('uncaught-errors')
-
-function recordError(eventName: string, reason: unknown) {
-  const span = tracer.startSpan(eventName)
-  const message = String(reason)
-
-  if (reason instanceof Error) {
-    span.recordException(reason)
-  }
-  else {
-    span.recordException({ message })
-  }
-
-  span.setStatus({ code: SpanStatusCode.ERROR, message })
-  span.end()
-}
-
-process.on('uncaughtException', (reason) => {
-  recordError('uncaughtException', reason)
-  // process.exit(1) // uncomment to restore default Node.js behavior
-})
-
-process.on('unhandledRejection', (reason) => {
-  recordError('unhandledRejection', reason)
-  // process.exit(1) // uncomment to restore default Node.js behavior
-})
-```
-
 ## Capture Abort Signals
 
 If your application heavily uses [Event Iterator](/docs/event-iterator) or similar streaming patterns, we recommend capturing an event when the `signal` is aborted to properly track and detach unexpected long-running operations:
@@ -165,11 +139,3 @@ const handler = new RPCHandler(router, {
   ],
 })
 ```
-
-## Context Propagation
-
-When using oRPC with HTTP/fetch adapters, you should set up proper HTTP instrumentation for [context propagation](https://opentelemetry.io/docs/concepts/context-propagation/) on both client and server. This ensures trace context propagates between services, maintaining distributed tracing integrity.
-
-::: info
-Common libraries for HTTP instrumentation include [@hono/otel](https://www.npmjs.com/package/@hono/otel), [@opentelemetry/instrumentation-http](https://www.npmjs.com/package/@opentelemetry/instrumentation-http), [@opentelemetry/instrumentation-fetch](https://www.npmjs.com/package/@opentelemetry/instrumentation-fetch), etc.
-:::

@@ -244,4 +244,31 @@ describe('signing', () => {
       expect(results.every(r => r.unsigned === value)).toBe(true)
     })
   })
+
+  describe('compatibility fixtures', () => {
+    it('should preserve existing signed values across releases', async () => {
+      const fixtures = [
+        {
+          value: 'compatibility-value',
+          secret: 'compatibility-signing-secret',
+          signed: 'compatibility-value.9FauF6a16X8xuMNDd6C6RWDkFQ6qUrAv_7nmeipkmN4',
+        },
+        {
+          value: '',
+          secret: 'compatibility-signing-secret',
+          signed: '.NH49AU2pii6l1BfOq7Qb9Bbf2FhV9D5cTZfwThTusNw',
+        },
+        {
+          value: 'value.with.dots-🚀-中文',
+          secret: 'compatibility-signing-secret',
+          signed: 'value.with.dots-🚀-中文.kMRSELRa3ULkbxo9gB-FOcNVdYmT_7Dv64b7hyhQOPA',
+        },
+      ] as const
+
+      for (const fixture of fixtures) {
+        expect(await sign(fixture.value, fixture.secret)).toBe(fixture.signed)
+        expect(await unsign(fixture.signed, fixture.secret)).toBe(fixture.value)
+      }
+    })
+  })
 })

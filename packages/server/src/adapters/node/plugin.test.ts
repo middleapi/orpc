@@ -2,36 +2,41 @@ import type { NodeHttpHandlerPlugin } from './plugin'
 import { CompositeNodeHttpHandlerPlugin } from './plugin'
 
 describe('compositeNodeHttpHandlerPlugin', () => {
-  it('forward initRuntimeAdapter and sort plugins', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('forwards initNodeHttpHandlerOptions and sorts plugins by dependencies', () => {
     const plugin1 = {
-      initRuntimeAdapter: vi.fn(),
-      order: 1,
+      name: 'plugin-1',
+      initNodeHttpHandlerOptions: vi.fn((options: any) => options),
+      after: ['plugin-2'],
     } satisfies NodeHttpHandlerPlugin<any>
+
     const plugin2 = {
-      initRuntimeAdapter: vi.fn(),
+      name: 'plugin-2',
+      initNodeHttpHandlerOptions: vi.fn((options: any) => options),
+      before: ['plugin-1'],
     } satisfies NodeHttpHandlerPlugin<any>
+
     const plugin3 = {
-      initRuntimeAdapter: vi.fn(),
-      order: -1,
+      name: 'plugin-3',
+      initNodeHttpHandlerOptions: vi.fn((options: any) => options),
+      after: ['plugin-1'],
     } satisfies NodeHttpHandlerPlugin<any>
 
-    const compositePlugin = new CompositeNodeHttpHandlerPlugin([plugin1, plugin2, plugin3])
+    const composite = new CompositeNodeHttpHandlerPlugin([plugin1, plugin2, plugin3])
+    const options = { nodeHttpInterceptors: [vi.fn()] }
 
-    const interceptor = vi.fn()
+    const result = composite.initNodeHttpHandlerOptions(options)
 
-    const options = { adapterInterceptors: [interceptor] }
+    expect(result).toBe(options)
 
-    compositePlugin.initRuntimeAdapter(options)
+    expect(plugin1.initNodeHttpHandlerOptions).toHaveBeenCalledOnce()
+    expect(plugin2.initNodeHttpHandlerOptions).toHaveBeenCalledOnce()
+    expect(plugin3.initNodeHttpHandlerOptions).toHaveBeenCalledOnce()
 
-    expect(plugin1.initRuntimeAdapter).toHaveBeenCalledOnce()
-    expect(plugin2.initRuntimeAdapter).toHaveBeenCalledOnce()
-    expect(plugin3.initRuntimeAdapter).toHaveBeenCalledOnce()
-
-    expect(plugin1.initRuntimeAdapter.mock.calls[0]![0]).toBe(options)
-    expect(plugin2.initRuntimeAdapter.mock.calls[0]![0]).toBe(options)
-    expect(plugin3.initRuntimeAdapter.mock.calls[0]![0]).toBe(options)
-
-    expect(plugin3.initRuntimeAdapter).toHaveBeenCalledBefore(plugin2.initRuntimeAdapter)
-    expect(plugin2.initRuntimeAdapter).toHaveBeenCalledBefore(plugin1.initRuntimeAdapter)
+    expect(plugin2.initNodeHttpHandlerOptions).toHaveBeenCalledBefore(plugin1.initNodeHttpHandlerOptions)
+    expect(plugin1.initNodeHttpHandlerOptions).toHaveBeenCalledBefore(plugin3.initNodeHttpHandlerOptions)
   })
 })

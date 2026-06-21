@@ -1,39 +1,38 @@
----
-title: Event Iterator (SSE)
-description: Learn how to streaming responses, real-time updates, and server-sent events using oRPC.
----
-
 # Event Iterator (SSE)
 
-oRPC provides built‑in support for streaming responses, real‑time updates, and server-sent events (SSE) without any extra configuration. This functionality is ideal for applications that require live updates, such as AI chat responses, live sports scores, or stock market data.
+Event Iterator enables **typesafe**, **realtime data streaming**. It is the recommended approach for building features like live notifications, chat messages, progress updates, and data feeds.
 
 ## Overview
 
-The event iterator is defined by an asynchronous generator function. In the example below, the handler continuously yields a new event every second:
+An event iterator is implemented as an [asynchronous generator function](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function*) (or a compatible implementation). In the example below, the handler emits a new event every second:
 
 ```ts
 const example = os
-  .handler(async function* ({ input, lastEventId }) {
+  .handler(async function* ({ input, signal, lastEventId }) {
     while (true) {
+      signal?.throwIfAborted()
       yield { message: 'Hello, world!' }
       await new Promise(resolve => setTimeout(resolve, 1000))
     }
   })
 ```
 
-Learn how to consume the event iterator on the client [here](/docs/client/event-iterator)
+::: info
+Learn how to consume event iterators from the client in the [client guide](/docs/client/event-iterator).
+:::
 
-## Validate Event Iterator
+## Validating Events
 
-oRPC includes a built‑in `eventIterator` helper that works with any [Standard Schema](https://github.com/standard-schema/standard-schema?tab=readme-ov-file#what-schema-libraries-implement-the-spec) library to validate events.
+Use the built‑in `eventIterator` helper that works with any [Standard Schema](https://standardschema.dev/schema#what-schema-libraries-implement-the-spec) library to validate events.
 
 ```ts
 import { eventIterator } from '@orpc/server'
 
 const example = os
   .output(eventIterator(z.object({ message: z.string() })))
-  .handler(async function* ({ input, lastEventId }) {
+  .handler(async function* ({ input, signal, lastEventId }) {
     while (true) {
+      signal?.throwIfAborted()
       yield { message: 'Hello, world!' }
       await new Promise(resolve => setTimeout(resolve, 1000))
     }
@@ -42,23 +41,27 @@ const example = os
 
 ## Last Event ID & Event Metadata
 
-Using the `withEventMeta` helper, you can attach [additional event meta](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format) (such as an event ID or a retry interval) to each event.
+Using the `withEventMeta` helper, you can attach [additional event metadata](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format) (such as an event ID or retry interval) to each event. When the client reconnects properly, the last received event ID is sent back to the server in `lastEventId`, allowing the stream to resume from where it left off.
 
 ::: info
-When used with [Client Retry Plugin](/docs/plugins/client-retry) or [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource), the client will reconnect with the last event ID. This value is made available to your handler as `lastEventId`, allowing you to resume the stream seamlessly.
+When used with the [Retry Plugin](/docs/plugins/retry) or [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource), reconnection with the last event ID is handled automatically.
 :::
 
 ```ts
 import { withEventMeta } from '@orpc/server'
 
 const example = os
-  .handler(async function* ({ input, lastEventId }) {
+  .handler(async function* ({ input, signal, lastEventId }) {
     if (lastEventId) {
       // Resume streaming from lastEventId
     }
     else {
       while (true) {
-        yield withEventMeta({ message: 'Hello, world!' }, { id: 'some-id', retry: 10_000 })
+        signal?.throwIfAborted()
+        yield withEventMeta(
+          { message: 'Hello, world!' },
+          { id: 'some-id', retry: 10_000 }
+        )
         await new Promise(resolve => setTimeout(resolve, 1000))
       }
     }
@@ -67,16 +70,18 @@ const example = os
 
 ## Stop Event Iterator
 
-To signal the end of the stream, simply use a `return` statement. When the handler returns, oRPC marks the stream as successfully completed.
+To end the stream, use either a `return` or `throw` statement. oRPC marks the stream as completed when the handler returns.
 
 :::warning
-This behavior is exclusive to oRPC. Standard [SSE](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events) clients, such as those using [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource) will automatically reconnect when the connection closes.
+This behavior is specific to oRPC. Standard [SSE](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events) clients, such as [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource), do not recognize this completion signal and will automatically attempt to reconnect. For details, see the [Standard Server documentation](https://github.com/middleapi/standardserver#event-stream-body).
 :::
 
 ```ts
 const example = os
-  .handler(async function* ({ input, lastEventId }) {
+  .handler(async function* ({ input, signal, lastEventId }) {
     while (true) {
+      signal?.throwIfAborted()
+
       if (done) {
         return
       }
@@ -87,15 +92,16 @@ const example = os
   })
 ```
 
-## Cleanup Side-Effects
+## Signal and Side-Effects
 
-If the client closes the connection or an unexpected error occurs, you can use a `finally` block to clean up any side effects (for example, closing database connections or stopping background tasks):
+When the client closes the connection or an unexpected error occurs, oRPC aborts the provided `signal`. Use it to exit loops and avoid resource leaks. Put cleanup logic in a `finally` block so it runs whether the stream ends normally, errors, or is cancelled.
 
 ```ts
 const example = os
-  .handler(async function* ({ input, lastEventId }) {
+  .handler(async function* ({ input, signal, lastEventId }) {
     try {
       while (true) {
+        signal?.throwIfAborted()
         yield { message: 'Hello, world!' }
         await new Promise(resolve => setTimeout(resolve, 1000))
       }
@@ -118,8 +124,8 @@ const publisher = new MemoryPublisher<{
 }>()
 
 const live = os
-  .handler(async function* ({ input, signal }) {
-    const iterator = publisher.subscribe('something-updated', { signal })
+  .handler(async function* ({ input, signal, lastEventId }) {
+    const iterator = publisher.subscribe('something-updated', { signal, lastEventId })
     for await (const payload of iterator) {
       // Handle payload here or yield directly to client
       yield payload
@@ -132,54 +138,3 @@ const publish = os
     await publisher.publish('something-updated', { id: input.id })
   })
 ```
-
-## Event Publisher
-
-Unlike the [Publisher Helper](/docs/helpers/publisher), the `EventPublisher` is more lightweight with synchronous publishing and no resume support.
-
-::: code-group
-
-```ts [Static Events]
-import { EventPublisher } from '@orpc/server'
-
-const publisher = new EventPublisher<{
-  'something-updated': {
-    id: string
-  }
-}>()
-
-const livePlanet = os
-  .handler(async function* ({ input, signal }) {
-    for await (const payload of publisher.subscribe('something-updated', { signal })) { // [!code highlight]
-      // handle payload here and yield something to client
-    }
-  })
-
-const update = os
-  .input(z.object({ id: z.string() }))
-  .handler(({ input }) => {
-    publisher.publish('something-updated', { id: input.id }) // [!code highlight]
-  })
-```
-
-```ts [Dynamic Events]
-import { EventPublisher } from '@orpc/server'
-
-const publisher = new EventPublisher<Record<string, { message: string }>>()
-
-const onMessage = os
-  .input(z.object({ channel: z.string() }))
-  .handler(async function* ({ input, signal }) {
-    for await (const payload of publisher.subscribe(input.channel, { signal })) { // [!code highlight]
-      yield payload.message
-    }
-  })
-
-const sendMessage = os
-  .input(z.object({ channel: z.string(), message: z.string() }))
-  .handler(({ input }) => {
-    publisher.publish(input.channel, { message: input.message }) // [!code highlight]
-  })
-```
-
-:::

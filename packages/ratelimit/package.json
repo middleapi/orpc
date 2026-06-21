@@ -1,7 +1,7 @@
 {
-  "name": "@orpc/experimental-ratelimit",
+  "name": "@orpc/ratelimit",
   "type": "module",
-  "version": "1.14.6",
+  "version": "1.13.4",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
@@ -16,6 +16,7 @@
   "sideEffects": false,
   "publishConfig": {
     "exports": {
+      "./package.json": "./package.json",
       ".": {
         "types": "./dist/index.d.mts",
         "import": "./dist/index.mjs",
@@ -31,50 +32,48 @@
         "import": "./dist/adapters/redis.mjs",
         "default": "./dist/adapters/redis.mjs"
       },
-      "./upstash-ratelimit": {
-        "types": "./dist/adapters/upstash-ratelimit.d.mts",
-        "import": "./dist/adapters/upstash-ratelimit.mjs",
-        "default": "./dist/adapters/upstash-ratelimit.mjs"
-      },
-      "./cloudflare-ratelimit": {
-        "types": "./dist/adapters/cloudflare-ratelimit.d.mts",
-        "import": "./dist/adapters/cloudflare-ratelimit.mjs",
-        "default": "./dist/adapters/cloudflare-ratelimit.mjs"
+      "./upstash": {
+        "types": "./dist/adapters/upstash.d.mts",
+        "import": "./dist/adapters/upstash.mjs",
+        "default": "./dist/adapters/upstash.mjs"
       }
     }
   },
   "exports": {
+    "./package.json": "./package.json",
     ".": "./src/index.ts",
     "./memory": "./src/adapters/memory.ts",
     "./redis": "./src/adapters/redis.ts",
-    "./upstash-ratelimit": "./src/adapters/upstash-ratelimit.ts",
-    "./cloudflare-ratelimit": "./src/adapters/cloudflare-ratelimit.ts"
+    "./upstash": "./src/adapters/upstash.ts"
   },
   "files": [
     "dist"
   ],
   "scripts": {
     "build": "unbuild",
-    "build:watch": "pnpm run build --watch",
     "type:check": "tsc -b"
   },
   "peerDependencies": {
-    "@upstash/ratelimit": ">=2.0.7"
+    "@upstash/ratelimit": ">=2.0.8",
+    "redis": ">=6.0.0"
   },
   "peerDependenciesMeta": {
     "@upstash/ratelimit": {
       "optional": true
+    },
+    "redis": {
+      "optional": true
     }
   },
   "dependencies": {
-    "@orpc/client": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@orpc/standard-server": "workspace:*"
+    "@standardserver/core": "^0.0.24"
   },
   "devDependencies": {
     "@upstash/ratelimit": "^2.0.8",
-    "@upstash/redis": "^1.37.0",
-    "ioredis": "^5.10.0"
+    "@upstash/redis": "^1.38.0",
+    "ioredis": "^5.9.1",
+    "redis": "^6.0.0"
   }
 }

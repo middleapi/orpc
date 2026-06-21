@@ -1,21 +1,31 @@
----
-title: Error Handling in oRPC Clients
-description: Learn how to handle errors in a type-safe way in oRPC clients.
----
+# Client Error Handling
 
-# Error Handling in oRPC Clients
+oRPC supports several ways to handle client-side errors. In most cases, `try/catch` is enough. If you use [Typesafe Errors](/docs/error-handling#typesafe-errors), `safe` and `createSafeClient` let you handle them with full type inference.
 
-This guide explains how to handle type-safe errors in oRPC clients using [type-safe error handling](/docs/error-handling#type‐safe-error-handling). Both [server-side](/docs/client/server-side) and [client-side](/docs/client/client-side) clients are supported.
+## Using `try/catch`
 
-## Using `safe` and `isDefinedError`
+For most calls, use regular `try/catch`.
+
+```ts
+try {
+  const data = await client.doSomething({ id: '123' })
+}
+catch (error) {
+  // handle error
+}
+```
+
+## Using `safe` and `isInferableError`
+
+When working with [Typesafe Errors](/docs/error-handling#typesafe-errors), use `safe` to preserve error type inference. It behaves like `try/catch`, but returns the typesafe result instead of throwing.
 
 ```ts twoslash
-import { os } from '@orpc/server'
+import { call, os } from '@orpc/server'
 import * as z from 'zod'
 // ---cut---
-import { isDefinedError, safe } from '@orpc/client'
+import { isInferableError, safe } from '@orpc/client'
 
-const doSomething = os
+const exampleProcedure = os
   .input(z.object({ id: z.string() }))
   .errors({
     RATE_LIMIT_EXCEEDED: {
@@ -24,16 +34,17 @@ const doSomething = os
   })
   .handler(async ({ input, errors }) => {
     throw errors.RATE_LIMIT_EXCEEDED({ data: { retryAfter: 1000 } })
-
-    return { id: input.id }
   })
-  .callable()
 
-const [error, data, isDefined] = await safe(doSomething({ id: '123' }))
-// or const { error, data, isDefined } = await safe(doSomething({ id: '123' }))
+// or { error, data, inferableError }
+const [error, data, inferableError] = await safe(
+  call(exampleProcedure, { id: '123' })
+)
 
-if (isDefinedError(error)) { // or isDefined
-  // handle known error
+if (isInferableError(error)) { // or inferableError
+  // handle inferable error
+
+  // or inferableError.data.retryAfter
   console.log(error.data.retryAfter)
 }
 else if (error) {
@@ -45,18 +56,18 @@ else {
 }
 ```
 
-:::info
+::: info
+`safe` supports both tuple and object forms:
 
-- `safe` works like `try/catch`, but can infer error types.
-- `safe` supports both tuple `[error, data, isDefined]` and object `{ error, data, isDefined }` styles.
-- `isDefinedError` checks if an error originates from `.errors`.
-- `isDefined` can replace `isDefinedError`
+- `[error, data, inferableError]`
+- `{ error, data, inferableError }`
 
+`inferableError` is the same value as `error` when `isInferableError(error)` returns `true`; otherwise it is `null`.
 :::
 
 ## Safe Client
 
-If you often use `safe` for error handling, `createSafeClient` can simplify your code by automatically wrapping all procedure calls with `safe`. It works with both [server-side](/docs/client/server-side) and [client-side](/docs/client/client-side) clients.
+If you use `safe` often, `createSafeClient` can reduce repetition by wrapping entire client calls with `safe`.
 
 ```ts
 import { createSafeClient } from '@orpc/client'

@@ -1,8 +1,4 @@
-<div align="center">
-  <image align="center" src="https://orpc.dev/logo.webp" width=280 alt="oRPC logo" />
-</div>
-
-<h1></h1>
+<h1 align="center">oRPC - Typesafe APIs Made Simple 🪄</h1>
 
 <div align="center">
   <a href="https://codecov.io/gh/middleapi/orpc">
@@ -22,119 +18,46 @@
   </a>
 </div>
 
-<h3 align="center">Typesafe APIs Made Simple 🪄</h3>
-
-**oRPC is a powerful combination of RPC and OpenAPI**, makes it easy to build APIs that are end-to-end type-safe and adhere to OpenAPI standards
-
----
-
-## Highlights
-
-- **🔗 End-to-End Type Safety**: Ensure type-safe inputs, outputs, and errors from client to server.
-- **📘 First-Class OpenAPI**: Built-in support that fully adheres to the OpenAPI standard.
-- **📝 Contract-First Development**: Optionally define your API contract before implementation.
-- **🔍 First-Class OpenTelemetry**: Seamlessly integrate with OpenTelemetry for observability.
-- **⚙️ Framework Integrations**: Seamlessly integrate with TanStack Query (React, Vue, Solid, Svelte, Angular), SWR, Pinia Colada, and more.
-- **🚀 Server Actions**: Fully compatible with React Server Actions on Next.js, TanStack Start, and other platforms.
-- **🔠 Standard Schema Support**: Works out of the box with Zod, Valibot, ArkType, and other schema validators.
-- **🗃️ Native Types**: Supports native types like Date, File, Blob, BigInt, URL, and more.
-- **⏱️ Lazy Router**: Enhance cold start times with our lazy routing feature.
-- **📡 SSE & Streaming**: Enjoy full type-safe support for SSE and streaming.
-- **🌍 Multi-Runtime Support**: Fast and lightweight on Cloudflare, Deno, Bun, Node.js, and beyond.
-- **🔌 Extendability**: Easily extend functionality with plugins, middleware, and interceptors.
-
 ## Documentation
 
-You can find the full documentation [here](https://orpc.dev).
+You can read the documentation [here](https://orpc.dev).
 
 ## Packages
 
-- [@orpc/contract](https://www.npmjs.com/package/@orpc/contract): Build your API contract.
-- [@orpc/server](https://www.npmjs.com/package/@orpc/server): Build your API or implement API contract.
-- [@orpc/client](https://www.npmjs.com/package/@orpc/client): Consume your API on the client with type-safety.
-- [@orpc/openapi](https://www.npmjs.com/package/@orpc/openapi): Generate OpenAPI specs and handle OpenAPI requests.
-- [@orpc/otel](https://www.npmjs.com/package/@orpc/otel): [OpenTelemetry](https://opentelemetry.io/) integration for observability.
-- [@orpc/nest](https://www.npmjs.com/package/@orpc/nest): Deeply integrate oRPC with [NestJS](https://nestjs.com/).
-- [@orpc/react](https://www.npmjs.com/package/@orpc/react): Utilities for integrating oRPC with React and React Server Actions.
-- [@orpc/tanstack-query](https://www.npmjs.com/package/@orpc/tanstack-query): [TanStack Query](https://tanstack.com/query/latest) integration.
-- [@orpc/experimental-react-swr](https://www.npmjs.com/package/@orpc/experimental-react-swr): [SWR](https://swr.vercel.app/) integration.
-- [@orpc/vue-colada](https://www.npmjs.com/package/@orpc/vue-colada): Integration with [Pinia Colada](https://pinia-colada.esm.dev/).
-- [@orpc/hey-api](https://www.npmjs.com/package/@orpc/hey-api): [Hey API](https://heyapi.dev/) integration.
-- [@orpc/zod](https://www.npmjs.com/package/@orpc/zod): More schemas that [Zod](https://zod.dev/) doesn't support yet.
-- [@orpc/valibot](https://www.npmjs.com/package/@orpc/valibot): OpenAPI spec generation from [Valibot](https://valibot.dev/).
-- [@orpc/arktype](https://www.npmjs.com/package/@orpc/arktype): OpenAPI spec generation from [ArkType](https://arktype.io/).
+**Core**
 
-## `@orpc/zod`
+- [@orpc/contract](https://www.npmjs.com/package/@orpc/contract): Define type-safe contracts for your API.
+- [@orpc/server](https://www.npmjs.com/package/@orpc/server): Implement your API or contract on the server.
+- [@orpc/client](https://www.npmjs.com/package/@orpc/client): Consume your API from the client with full type safety.
+- [@orpc/openapi](https://www.npmjs.com/package/@orpc/openapi): Bring OpenAPI compatibility to your APIs.
 
-More schemas that [Zod](https://zod.dev/) doesn't support yet, and provides `ZodToJsonSchemaConverter` for generating OpenAPI specs.
+**Schema validation**
 
-### More Schemas
+- [@orpc/zod](https://www.npmjs.com/package/@orpc/zod): Integrate with [Zod](https://zod.dev/).
+- [@orpc/valibot](https://www.npmjs.com/package/@orpc/valibot): Integrate with [Valibot](https://valibot.dev/).
+- [@orpc/arktype](https://www.npmjs.com/package/@orpc/arktype): Integrate with [ArkType](https://arktype.io/).
 
-- `oz.url`: Zod schema for [URL](https://developer.mozilla.org/en-US/docs/Web/API/URL) instance.
-- `oz.blob`: Zod schema for [Blob](https://developer.mozilla.org/en-US/docs/Web/API/Blob) instance.
-- `oz.file`: Zod schema for [File](https://developer.mozilla.org/en-US/docs/Web/API/File) instance.
-- `oz.regexp`: Zod schema for [RegExp](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp) instance.
+**Framework & ecosystem integrations**
 
-```ts
-import { oz } from '@orpc/zod'
-import { z } from 'zod/v3'
+- [@orpc/next](https://www.npmjs.com/package/@orpc/react): Use oRPC with [Next.js Server Functions](https://nextjs.org/docs/app/getting-started/mutating-data).
+- [@orpc/tanstack-query](https://www.npmjs.com/package/@orpc/tanstack-query): Integrate with [TanStack Query](https://tanstack.com/query/latest).
+- [@orpc/experimental-effect](https://www.npmjs.com/package/@orpc/experimental-effect): Integrate with [Effect](https://effect.website/).
 
-const Example = z.object({
-  url: oz.url(),
-  blob: oz.blob(),
-  file: oz.file().type('image/png'),
-  regexp: oz.regexp(),
-})
-```
+**Built-in features**
 
-### Generate OpenAPI Spec
+- [@orpc/publisher](https://www.npmjs.com/package/@orpc/publisher): Pub/Sub.
+- [@orpc/ratelimit](https://www.npmjs.com/package/@orpc/ratelimit): Rate limiting.
+- [@orpc/json-schema](https://www.npmjs.com/package/@orpc/json-schema): Smart coercion for OpenAPI requests.
 
-```ts
-import { OpenAPIGenerator } from '@orpc/openapi'
-import { ZodToJsonSchemaConverter } from '@orpc/zod/zod4'
+**Observability**
 
-const openAPIGenerator = new OpenAPIGenerator({
-  schemaConverters: [new ZodToJsonSchemaConverter()],
-})
-
-const specFromContract = await openAPIGenerator.generate(contract, {
-  info: {
-    title: 'My App',
-    version: '0.0.0',
-  },
-})
-
-const specFromRouter = await openAPIGenerator.generate(router, {
-  info: {
-    title: 'My App',
-    version: '0.0.0',
-  },
-})
-```
-
-### Extending the Specification
-
-```ts
-import { oz } from '@orpc/zod'
-import * as z from 'zod'
-
-const InputSchema = oz.openapi(
-  z.object({
-    name: z.string(),
-  }),
-  {
-    examples: [
-      { name: 'Earth' },
-      { name: 'Mars' },
-    ],
-    // additional options...
-  }
-)
-```
+- [@orpc/opentelemetry](https://www.npmjs.com/package/@orpc/opentelemetry): Instrument your API with [OpenTelemetry](https://opentelemetry.io/).
+- [@orpc/pino](https://www.npmjs.com/package/@orpc/pino): Log with [Pino](https://getpino.io/).
+- [@orpc/evlog](https://www.npmjs.com/package/@orpc/evlog): Log with [Evlog](https://evlog.dev/).
 
 ## Sponsors
 
-If you find oRPC valuable and would like to support its development, you can do so here: [GitHub Sponsors](https://github.com/sponsors/dinwwwh).
+Like what we build over at [middleapi](https://github.com/middleapi)? You can help keep it going here: [GitHub Sponsors](https://github.com/sponsors/dinwwwh). Every bit helps! 🚀
 
 ### 🏆 Platinum Sponsor
 
@@ -252,6 +175,13 @@ If you find oRPC valuable and would like to support its development, you can do 
   <a href="https://github.com/ChromeGG?ref=orpc" target="_blank" rel="noopener" title="Adam Tkaczyk"><img src="https://avatars.githubusercontent.com/u/39050595?u=a58ca6042a6950e94e6e92442db76ef584279bc0&amp;v=4" width="32" height="32" alt="Adam Tkaczyk" /></a>
   <a href="https://github.com/plancraft?ref=orpc" target="_blank" rel="noopener" title="plancraft"><img src="https://avatars.githubusercontent.com/u/46482287?v=4" width="32" height="32" alt="plancraft" /></a>
 </p>
+
+## References
+
+oRPC is inspired by existing solutions that prioritize type safety and developer experience. Special acknowledgments to:
+
+- [tRPC](https://trpc.io): For pioneering the concept of end-to-end type-safe RPC and influencing the development of type-safe APIs.
+- [ts-rest](https://ts-rest.com): For its emphasis on contract-first development and OpenAPI integration, which have greatly inspired oRPC's feature set.
 
 ## License
 

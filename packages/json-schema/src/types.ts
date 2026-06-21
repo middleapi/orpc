@@ -1,14 +1,8 @@
 // eslint-disable-next-line no-restricted-imports
-import type * as Draft07 from 'json-schema-typed/draft-07'
-// eslint-disable-next-line no-restricted-imports
-import type * as Draft2019 from 'json-schema-typed/draft-2019-09'
-// eslint-disable-next-line no-restricted-imports
 import type * as Draft2020 from 'json-schema-typed/draft-2020-12'
 
-export type JsonSchema
-  = | Draft2020.JSONSchema
-    | Draft2019.JSONSchema
-    | Draft07.JSONSchema
+export type JsonSchema = Draft2020.JSONSchema
+export type JsonSchemaKeywords = typeof Draft2020.keywords[number]
 
 export enum JsonSchemaXNativeType {
   BigInt = 'bigint',
@@ -18,3 +12,6 @@ export enum JsonSchemaXNativeType {
   Set = 'set',
   Map = 'map',
 }
+
+// eslint-disable-next-line no-restricted-imports
+export { Format as JsonSchemaFormat, TypeName as JsonSchemaType } from 'json-schema-typed/draft-2020-12'

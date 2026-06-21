@@ -1,156 +1,122 @@
----
-title: Context
-description: Understanding context in oRPC
----
+# Context
 
-# Context in oRPC
-
-oRPC's context mechanism provides a type-safe dependency injection pattern. It lets you supply required dependencies either explicitly or dynamically through middleware. There are two types:
-
-- **Initial Context:** Provided explicitly when invoking a procedure.
-- **Execution Context:** Generated during procedure execution, typically by middleware.
+The context mechanism provides a type-safe dependency injection pattern. It lets you provide required dependencies explicitly or inject them dynamically through middleware.
 
 ## Initial Context
 
-Initial context is used to define required dependencies (usually environment-specific) that must be passed when calling a procedure.
+Use initial context for values that come from the environment. Declare it with `.$context`, then provide it when executing the procedure:
 
 ```ts twoslash
 import { os } from '@orpc/server'
 // ---cut---
-const base = os.$context<{ headers: Headers, env: { DB_URL: string } }>()
+const base = os.$context<{ env: { DB_URL: string } }>()
 
-const getting = base
+export const getting = base
   .handler(async ({ context }) => {
     console.log(context.env)
   })
-
-export const router = { getting }
 ```
 
-When calling that requires initial context, pass it explicitly:
+::: info
+When a procedure requires initial context when calling, you must manually pass it:
 
 ```ts twoslash
-import { os } from '@orpc/server'
+import { call, os } from '@orpc/server'
 
-const base = os.$context<{ headers: Headers, env: { DB_URL: string } }>()
-
-const getting = base
-  .handler(async ({ context }) => {
-
-  })
-
-export const router = { getting }
+const base = os.$context<{ env: { DB_URL: string } }>()
+const getting = base.handler(async ({ context }) => {})
 // ---cut---
-import { RPCHandler } from '@orpc/server/fetch'
+const output = await call(getting, undefined, {
+  context: { // <- initial context must be passed when calling
+    env: { DB_URL: 'postgres://...' },
+  },
+})
+```
 
-const handler = new RPCHandler(router)
+:::
 
-export default function fetch(request: Request) {
-  handler.handle(request, {
-    context: { // <-- you must pass initial context here
-      headers: request.headers,
-      env: {
-        DB_URL: '***'
-      }
-    }
-  })
+### Default Initial Context
+
+To avoid repeating `.$context` declarations, you can define a default initial context type globally.
+
+```ts
+declare module '@orpc/server' {
+  export interface DefaultInitialContext {
+    env: { DB_URL: string }
+  }
 }
 ```
 
-## Execution context
+## Injected Context
 
-Execution context is computed during the process lifecycle, usually via [middleware](/docs/middleware). It can be used independently or combined with initial context.
-
-```ts twoslash
-import { os } from '@orpc/server'
-// ---cut---
-import { cookies, headers } from 'next/headers'
-
-const base = os.use(async ({ next }) => next({
-  context: {
-    headers: await headers(),
-    cookies: await cookies(),
-  },
-}))
-
-const getting = base.handler(async ({ context }) => {
-  context.cookies.set('key', 'value')
-})
-
-export const router = { getting }
-```
-
-When using execution context, you don't need to pass any context manually:
+Injected context is injected at runtime through [middleware](/docs/middleware#middleware-context):
 
 ```ts twoslash
 import { os } from '@orpc/server'
-import { cookies, headers } from 'next/headers'
 
+declare const env: { DB_URL: string }
+// ---cut---
 const base = os.use(async ({ next }) => next({
   context: {
-    headers: await headers(),
-    cookies: await cookies(),
+    env: { DB_URL: env.DB_URL },
   },
 }))
 
-const getting = base.handler(async ({ context }) => {
-  context.cookies.set('key', 'value')
+export const getting = base.handler(async ({ context }) => {
+  console.log(context.env)
 })
-
-export const router = { getting }
-// ---cut---
-import { RPCHandler } from '@orpc/server/fetch'
-
-const handler = new RPCHandler(router)
-
-export default function fetch(request: Request) {
-  handler.handle(request) // <-- no need to pass anything more
-}
 ```
 
-## Combining Initial and Execution Context
+::: info
+When you use middleware context, you do not need to pass context manually when calling:
 
-Often you need both static and dynamic dependencies. Use initial context for environment-specific values (e.g., database URLs) and middleware (execution context) for runtime data (e.g., user authentication).
+```ts twoslash
+import { call, os } from '@orpc/server'
+
+declare const env: { DB_URL: string }
+
+const base = os.use(async ({ next }) => next({
+  context: {
+    env: { DB_URL: env.DB_URL },
+  },
+}))
+
+const getting = base.handler(async ({ context }) => {})
+// ---cut---
+// no need to pass context manually when calling
+const output = await call(getting)
+```
+
+:::
+
+## Combining Initial and Injected Context
+
+In many cases, you will use both. Use initial context for environment-specific values, such as database URLs, and injected context for runtime data, such as authenticated users.
 
 ```ts twoslash
 import { ORPCError, os } from '@orpc/server'
+
+declare function parseJWT(token: string | undefined, secret: string): { userId: number } | null
 // ---cut---
-const base = os.$context<{ headers: Headers, env: { DB_URL: string } }>()
+const base = os.$context<{ headers: Headers, env: { JWT_SECRET: string } }>()
 
 const requireAuth = base.middleware(async ({ context, next }) => {
-  const user = parseJWT(context.headers.get('authorization')?.split(' ')[1])
+  const user = parseJWT(
+    context.headers.get('authorization')?.split(' ')[1],
+    context.env.JWT_SECRET
+  )
 
-  if (user) {
-    return next({ context: { user } })
+  if (!user) {
+    throw new ORPCError('UNAUTHORIZED')
   }
 
-  throw new ORPCError('UNAUTHORIZED')
-})
-
-const dbProvider = base.middleware(async ({ context, next }) => {
-  const client = new Client(context.env.DB_URL)
-
-  try {
-    await client.connect()
-    return next({ context: { db: client } })
-  }
-  finally {
-    await client.disconnect()
-  }
+  return next({ context: { user } })
 })
 
 const getting = base
-  .use(dbProvider)
   .use(requireAuth)
   .handler(async ({ context }) => {
-    console.log(context.db)
+    console.log(context.env)
     console.log(context.user)
   })
-// ---cut-after---
-declare function parseJWT(token: string | undefined): { userId: number } | null
-declare class Client {
-  constructor(url: string)
-  connect(): Promise<void>
-  disconnect(): Promise<void>
-}
 ```
