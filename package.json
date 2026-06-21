@@ -18,7 +18,7 @@
     "@antfu/eslint-config": "^9.0.0",
     "@hono/node-server": "^2.0.4",
     "@testing-library/react": "^16.3.2",
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.0.0",
     "@types/supertest": "^7.2.0",
     "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^4.1.9",

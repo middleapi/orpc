@@ -27,7 +27,7 @@
     "@orpc/tanstack-query": "latest",
     "@orpc/zod": "latest",
     "@tanstack/react-query": "^5.101.0",
-    "@types/node": "^25",
+    "@types/node": "^26",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vercel/otel": "^2.1.3",
