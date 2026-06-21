@@ -7,7 +7,7 @@ import { AbortError, promiseWithResolvers, runWithSignal, sleep, toStringOrBytes
 import { ClientPeer, decodePeerMessage, encodePeerMessage, isServerPeerSendMessage } from '@standardserver/peer'
 
 /**
- * Some env maybe not available WebSocket global
+ * Some env maybe not available WebSocket global, like node 20
  */
 const WEBSOCKET_CONNECTING = 0 satisfies WebSocket['CONNECTING']
 const WEBSOCKET_OPEN = 1 satisfies WebSocket['OPEN']

@@ -7,8 +7,16 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+/**
+ * Some env maybe not available WebSocket global, like node 20
+ */
+const WEBSOCKET_CONNECTING = 0 satisfies WebSocket['CONNECTING']
+const WEBSOCKET_OPEN = 1 satisfies WebSocket['OPEN']
+const WEBSOCKET_CLOSING = 2 satisfies WebSocket['CLOSING']
+const WEBSOCKET_CLOSED = 3 satisfies WebSocket['CLOSED']
+
 describe('rpcLink', () => {
-  const createWs = (readyState: number = WebSocket.OPEN) => {
+  const createWs = (readyState: 0 | 1 | 2 | 3 = WEBSOCKET_OPEN) => {
     const openListeners = new Set<() => void | Promise<void>>()
     const messageListeners = new Set<(event: { data: unknown }) => void | Promise<void>>()
     const closeListeners = new Set<(event: { code: number, reason: string }) => void | Promise<void>>()
@@ -53,14 +61,14 @@ describe('rpcLink', () => {
       }),
       send: vi.fn(),
       async open() {
-        websocket.readyState = WebSocket.OPEN
+        websocket.readyState = WEBSOCKET_OPEN
         await Promise.all([...openListeners].map(listener => listener()))
       },
       async receive(data: unknown) {
         await Promise.all([...messageListeners].map(listener => listener({ data })))
       },
       async close(event: Partial<{ code: number, reason: string }> = {}) {
-        websocket.readyState = WebSocket.CLOSED
+        websocket.readyState = WEBSOCKET_CLOSED
 
         await Promise.all([...closeListeners].map(listener => listener({
           code: event.code ?? 1006,
@@ -126,7 +134,7 @@ describe('rpcLink', () => {
   })
 
   it('connects eagerly on init and reuses that websocket for the first call', async () => {
-    const ws = createWs(WebSocket.CONNECTING)
+    const ws = createWs(WEBSOCKET_CONNECTING)
     const connect = vi.fn(() => ws)
     const orpc = createORPCClient(new RPCLink({ connect, connectOnInit: true })) as any
 
@@ -164,7 +172,7 @@ describe('rpcLink', () => {
   })
 
   it('shares a single lazy websocket connection across concurrent requests', async () => {
-    const ws = createWs(WebSocket.CONNECTING)
+    const ws = createWs(WEBSOCKET_CONNECTING)
     const connect = vi.fn(() => ws)
     const orpc = createORPCClient(new RPCLink({ connect })) as any
 
