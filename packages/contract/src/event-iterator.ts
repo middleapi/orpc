@@ -1,14 +1,14 @@
 import type { AsyncIteratorClass } from '@orpc/shared'
 import type { AnySchema, Schema } from './schema'
-import { mapEventIterator, ORPCError } from '@orpc/client'
-import { isAsyncIteratorObject } from '@orpc/shared'
+import { ORPCError, wrapEventIteratorPreservingMeta } from '@orpc/client'
+import { isAsyncIteratorObject, ORPC_NAME } from '@orpc/shared'
 import { ValidationError } from './error'
 
-const EVENT_ITERATOR_DETAILS_SYMBOL = Symbol('ORPC_EVENT_ITERATOR_DETAILS')
+const EVENT_ITERATOR_SCHEMA_DETAILS_SYMBOL = Symbol.for('ORPC_EVENT_ITERATOR_SCHEMA_DETAILS')
 
 export interface EventIteratorSchemaDetails {
-  yields: AnySchema
-  returns?: AnySchema
+  yieldSchema: AnySchema
+  returnSchema?: AnySchema
 }
 
 /**
@@ -17,43 +17,42 @@ export interface EventIteratorSchemaDetails {
  * @see {@link https://orpc.dev/docs/event-iterator#validate-event-iterator Validate Event Iterator Docs}
  */
 export function eventIterator<TYieldIn, TYieldOut, TReturnIn = unknown, TReturnOut = unknown>(
-  yields: Schema<TYieldIn, TYieldOut>,
-  returns?: Schema<TReturnIn, TReturnOut>,
+  yieldSchema: Schema<TYieldIn, TYieldOut>,
+  returnSchema?: Schema<TReturnIn, TReturnOut>,
 ): Schema<AsyncIteratorObject<TYieldIn, TReturnIn, void>, AsyncIteratorClass<TYieldOut, TReturnOut, void>> {
   return {
     '~standard': {
-      [EVENT_ITERATOR_DETAILS_SYMBOL as any]: { yields, returns } satisfies EventIteratorSchemaDetails,
-      vendor: 'orpc',
+      [EVENT_ITERATOR_SCHEMA_DETAILS_SYMBOL as any]: { yieldSchema, returnSchema } satisfies EventIteratorSchemaDetails,
+      vendor: ORPC_NAME,
       version: 1,
       validate(iterator) {
         if (!isAsyncIteratorObject(iterator)) {
           return { issues: [{ message: 'Expect event iterator', path: [] }] }
         }
 
-        const mapped = mapEventIterator(iterator, {
-          async value(value, done) {
-            const schema = done ? returns : yields
+        const mapped = wrapEventIteratorPreservingMeta(iterator, {
+          async mapResult(result) {
+            const schema = result.done ? returnSchema : yieldSchema
 
             if (!schema) {
-              return value
+              return result
             }
 
-            const result = await schema['~standard'].validate(value)
+            const validated = await schema['~standard'].validate(result.value)
 
-            if (result.issues) {
+            if (validated.issues) {
               throw new ORPCError('EVENT_ITERATOR_VALIDATION_FAILED', {
                 message: 'Event iterator validation failed',
                 cause: new ValidationError({
-                  issues: result.issues,
+                  issues: validated.issues,
                   message: 'Event iterator validation failed',
-                  data: value,
+                  invalidData: result.value,
                 }),
               })
             }
 
-            return result.value
+            return { done: result.done, value: validated.value }
           },
-          error: async error => error,
         })
 
         return { value: mapped }
@@ -67,5 +66,5 @@ export function getEventIteratorSchemaDetails(schema: AnySchema | undefined): un
     return undefined
   }
 
-  return (schema['~standard'] as any)[EVENT_ITERATOR_DETAILS_SYMBOL]
+  return (schema['~standard'] as any)[EVENT_ITERATOR_SCHEMA_DETAILS_SYMBOL]
 }

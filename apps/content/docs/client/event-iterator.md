@@ -1,18 +1,12 @@
----
-title: Event Iterator in oRPC Clients
-description: Learn how to use event iterators in oRPC clients.
----
+# Event Iterator in Client
 
-# Event Iterator in oRPC Clients
-
-An [Event Iterator](/docs/event-iterator) in oRPC behaves like an [AsyncGenerator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncGenerator).
-Simply iterate over it and await each event.
+Consume an [Event Iterator](/docs/event-iterator) like an [AsyncGenerator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncGenerator). Await the call, then iterate over events as they arrive.
 
 ## Basic Usage
 
 ```ts twoslash
 import { ContractRouterClient, eventIterator, oc } from '@orpc/contract'
-import * as z from 'zod'
+import { z } from 'zod'
 
 const contract = {
   streaming: oc.output(eventIterator(z.object({ message: z.string() })))
@@ -27,9 +21,9 @@ for await (const event of iterator) {
 }
 ```
 
-## Stopping the Stream Manually
+## Stopping the Stream
 
-You can rely on `signal` or `.return` to stop the iterator.
+Use an `AbortSignal` or call `.return` to stop the iterator.
 
 ```ts
 const controller = new AbortController()
@@ -38,8 +32,8 @@ const iterator = await client.streaming(undefined, { signal: controller.signal }
 // Stop the stream after 1 second
 setTimeout(async () => {
   controller.abort()
-  // or
-  await iterator.return()
+
+  // Or call `await iterator.return()` if you already have the iterator instance.
 }, 1000)
 
 for await (const event of iterator) {
@@ -50,7 +44,7 @@ for await (const event of iterator) {
 ## Error Handling
 
 ::: info
-Unlike traditional SSE, the Event Iterator does not automatically retry on error. To enable automatic retries, refer to the [Client Retry Plugin](/docs/plugins/client-retry).
+Unlike traditional SSE, Event Iterators do not retry automatically after an error. To add retries, use the [Retry Plugin](/docs/plugins/retry#event-source-simulation).
 :::
 
 ```ts
@@ -68,13 +62,24 @@ catch (error) {
 }
 ```
 
-::: info
-Errors thrown by the server can be instances of `ORPCError`.
-:::
+## Event Metadata
+
+Use `getEventMeta` to read [event metadata](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format) for each item, such as the event ID and retry interval.
+
+```ts
+import { getEventMeta } from '@orpc/client'
+
+const iterator = await client.streaming()
+
+for await (const event of iterator) {
+  const meta = getEventMeta(event)
+  console.log(event.message, meta?.id, meta?.retry)
+}
+```
 
 ## Using `consumeEventIterator`
 
-oRPC provides a utility function `consumeEventIterator` to consume an event iterator with lifecycle callbacks.
+Use `consumeEventIterator` to consume an event iterator with lifecycle callbacks. It accepts either an event iterator or a promise that resolves to one.
 
 ```ts
 import { consumeEventIterator } from '@orpc/client'
@@ -99,7 +104,3 @@ setTimeout(async () => {
   await cancel()
 }, 1000)
 ```
-
-:::info
-This utility accepts both promises and event iterators. Passing a promise directly lets it infer correct error type.
-:::

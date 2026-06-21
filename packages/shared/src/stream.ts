@@ -1,5 +1,125 @@
-import { AsyncIteratorClass } from './iterator'
-import { isObject } from './object'
+import type { Promisable } from 'type-fest'
+import type { StartSpanOptions } from './opentelemetry'
+import { AsyncIteratorClass } from '@standardserver/shared'
+import { once } from './function'
+import { isPlainObject } from './object'
+import { recordSpanError, runInSpanContext, startSpan } from './opentelemetry'
+
+export function replicateReadableStream<T>(
+  stream: ReadableStream<T>,
+  count: number,
+): ReadableStream<T>[] {
+  if (count <= 0) {
+    return []
+  }
+
+  const replicated: ReadableStream<T>[] = []
+  let pending = stream
+
+  for (let index = 0; index < count - 1; index++) {
+    const [replica, remainder] = pending.tee()
+    replicated.push(replica)
+    pending = remainder
+  }
+
+  replicated.push(pending)
+
+  return replicated
+}
+
+export type ReadableStreamReadResult<T> = { done: false, value: T } | { done: true, value: undefined | T }
+
+export interface WrapReadableStreamOptions<T, TMapped> {
+  /**
+   * Any call to the original stream reader will be executed inside this function.
+   * Useful when you want execution to happen within a specific context,
+   * such as AsyncLocalStorage.
+   */
+  runWith?: <T>(run: () => Promise<T>) => Promise<T>
+  mapResult?: (result: ReadableStreamReadResult<T>) => Promisable<ReadableStreamReadResult<TMapped>>
+  mapError?: (error: unknown) => Promisable<unknown>
+  onError?: (error: unknown) => Promisable<void>
+
+  /**
+   * Guaranteed to execute exactly once after the stream finishes or is cancelled.
+   */
+  onFinish?: () => Promisable<void>
+}
+
+export function wrapReadableStream<T, TMapped = T>(
+  stream: ReadableStream<T>,
+  { runWith, mapResult, mapError, onError, onFinish }: WrapReadableStreamOptions<T, TMapped>,
+): NoInfer<ReadableStream<TMapped>> {
+  runWith ??= run => run()
+
+  const reader = once(() => stream.getReader())
+  const finish = once(async () => onFinish?.())
+
+  // TODO:
+  return new ReadableStream<TMapped>({
+    async pull(controller) {
+      let result: ReadableStreamReadResult<TMapped>
+
+      try {
+        const readResult = await runWith(() => reader().read())
+        result = mapResult ? await mapResult(readResult) : readResult as ReadableStreamReadResult<TMapped>
+      }
+      catch (error) {
+        try {
+          await onError?.(error)
+          controller.error(mapError ? await mapError(error) : error)
+        }
+        finally {
+          await finish()
+        }
+
+        return
+      }
+
+      if (result.done) {
+        controller.close()
+        await finish()
+      }
+      else {
+        controller.enqueue(result.value)
+      }
+    },
+    async cancel(reason) {
+      try {
+        try {
+          await runWith(() => reader().cancel(reason))
+        }
+        catch (error) {
+          await onError?.(error)
+          throw error
+        }
+      }
+      finally {
+        await finish()
+      }
+    },
+  })
+}
+
+export function traceReadableStream<T>(
+  options: StartSpanOptions | string,
+  stream: ReadableStream<T>,
+): ReadableStream<T> {
+  const getSpan = once(() => startSpan(options))
+  return wrapReadableStream(stream, {
+    runWith: run => runInSpanContext(getSpan(), run),
+    mapResult(result) {
+      getSpan()?.addEvent(result.done ? 'closed' : 'enqueued')
+      return result
+    },
+    onError(error) {
+      recordSpanError(getSpan(), error)
+    },
+    onFinish() {
+      getSpan()?.end()
+    },
+  })
+}
 
 /**
  * Converts a `ReadableStream` into an `AsyncIteratorClass`.
@@ -13,8 +133,10 @@ export function streamToAsyncIteratorClass<T>(
     async () => {
       return reader.read() as Promise<IteratorResult<T>>
     },
-    async () => {
-      await reader.cancel()
+    async ({ kind, error }) => {
+      if (kind === 'cancelled') {
+        await reader.cancel(error)
+      }
     },
   )
 }
@@ -57,7 +179,7 @@ export function asyncIteratorToUnproxiedDataStream<T>(
         controller.close()
       }
       else {
-        const unproxied = isObject(value)
+        const unproxied = isPlainObject(value)
           ? { ...value }
           : Array.isArray(value)
             ? value.map(i => i) as T // use .map instead of ... to deal with sparse arrays

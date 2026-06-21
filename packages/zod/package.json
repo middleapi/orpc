@@ -1,7 +1,7 @@
 {
   "name": "@orpc/zod",
   "type": "module",
-  "version": "1.14.6",
+  "version": "1.13.4",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
@@ -10,48 +10,38 @@
     "directory": "packages/zod"
   },
   "keywords": [
-    "orpc"
+    "orpc",
+    "zod"
   ],
   "sideEffects": false,
   "publishConfig": {
     "exports": {
+      "./package.json": "./package.json",
       ".": {
         "types": "./dist/index.d.mts",
         "import": "./dist/index.mjs",
         "default": "./dist/index.mjs"
-      },
-      "./zod4": {
-        "types": "./dist/zod4/index.d.mts",
-        "import": "./dist/zod4/index.mjs",
-        "default": "./dist/zod4/index.mjs"
       }
     }
   },
   "exports": {
-    ".": "./src/index.ts",
-    "./zod4": "./src/zod4/index.ts"
+    "./package.json": "./package.json",
+    ".": "./src/index.ts"
   },
   "files": [
     "dist"
   ],
   "scripts": {
     "build": "unbuild",
-    "build:watch": "pnpm run build --watch",
     "type:check": "tsc -b"
   },
   "peerDependencies": {
-    "@orpc/contract": "workspace:*",
-    "@orpc/server": "workspace:*",
-    "zod": ">=3.25.0"
+    "zod": ">=4.3.5"
   },
   "dependencies": {
-    "@orpc/json-schema": "workspace:*",
-    "@orpc/openapi": "workspace:*",
-    "@orpc/shared": "workspace:*",
-    "escape-string-regexp": "^5.0.0",
-    "wildcard-match": "^5.1.4"
+    "@orpc/json-schema": "workspace:*"
   },
   "devDependencies": {
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   }
 }

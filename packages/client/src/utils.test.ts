@@ -1,31 +1,43 @@
 import { ORPCError } from './error'
-import { consumeEventIterator, resolveFriendlyClientOptions, safe } from './utils'
+import { consumeEventIterator, resolveClientRest, resolveFriendlyClientOptions, safe } from './utils'
+
+describe('resolveFriendlyClientOptions', () => {
+  it('works', () => {
+    expect(resolveFriendlyClientOptions({})).toEqual({ context: {} })
+    expect(resolveFriendlyClientOptions({ context: { a: 1 } })).toEqual({ context: { a: 1 } })
+    expect(resolveFriendlyClientOptions({ lastEventId: '123' })).toEqual({ context: {}, lastEventId: '123' })
+  })
+})
+
+describe('resolveClientRest', () => {
+  it('works', () => {
+    expect(resolveClientRest(['123'])).toEqual(['123', { context: {} }])
+    expect(resolveClientRest(['123', { context: { a: 1 } }])).toEqual(['123', { context: { a: 1 } }])
+    expect(resolveClientRest(['123', { lastEventId: '123' }])).toEqual(['123', { context: {}, lastEventId: '123' }])
+    expect(resolveClientRest([])).toEqual([undefined, { context: {} }])
+  })
+})
 
 it('safe', async () => {
   const r1 = await safe(Promise.resolve(1))
-  expect([...r1]).toEqual([null, 1, false, true])
-  expect({ ...r1 }).toEqual(expect.objectContaining({ error: null, data: 1, isDefined: false, isSuccess: true }))
+  expect([...r1]).toEqual([null, 1, null, true])
+  expect({ ...r1 }).toEqual(expect.objectContaining({ error: null, data: 1, inferableError: null, isSuccess: true }))
 
   const e2 = new Error('error')
   const r2 = await safe(Promise.reject(e2))
-  expect([...r2]).toEqual([e2, undefined, false, false])
-  expect({ ...r2 }).toEqual(expect.objectContaining({ error: e2, data: undefined, isDefined: false, isSuccess: false }))
+  expect([...r2]).toEqual([e2, undefined, null, false])
+  expect({ ...r2 }).toEqual(expect.objectContaining({ error: e2, data: undefined, inferableError: null, isSuccess: false }))
 
-  const e3 = new ORPCError('BAD_GATEWAY', { defined: true })
+  const e3 = new ORPCError('BAD_GATEWAY')
+  ;(e3 as any).inferable = true // simulate inferable error
   const r3 = await safe(Promise.reject(e3))
-  expect([...r3]).toEqual([e3, undefined, true, false])
-  expect({ ...r3 }).toEqual(expect.objectContaining({ error: e3, data: undefined, isDefined: true, isSuccess: false }))
+  expect([...r3]).toEqual([e3, undefined, e3, false])
+  expect({ ...r3 }).toEqual(expect.objectContaining({ error: e3, data: undefined, inferableError: e3, isSuccess: false }))
 
   const e4 = new ORPCError('BAD_GATEWAY')
   const r4 = await safe(Promise.reject(e4))
-  expect([...r4]).toEqual([e4, undefined, false, false])
-  expect({ ...r4 }).toEqual(expect.objectContaining({ error: e4, data: undefined, isDefined: false, isSuccess: false }))
-})
-
-it('resolveFriendlyClientOptions', () => {
-  expect(resolveFriendlyClientOptions({})).toEqual({ context: {} })
-  expect(resolveFriendlyClientOptions({ context: { a: 1 } })).toEqual({ context: { a: 1 } })
-  expect(resolveFriendlyClientOptions({ lastEventId: '123' })).toEqual({ context: {}, lastEventId: '123' })
+  expect([...r4]).toEqual([e4, undefined, null, false])
+  expect({ ...r4 }).toEqual(expect.objectContaining({ error: e4, data: undefined, inferableError: null, isSuccess: false }))
 })
 
 describe('consumeEventIterator', () => {
@@ -41,7 +53,7 @@ describe('consumeEventIterator', () => {
     const onSuccess = vi.fn()
     const onFinish = vi.fn()
 
-    const unsubscribe = consumeEventIterator(iterator, {
+    void consumeEventIterator(iterator, {
       onEvent,
       onError,
       onSuccess,
@@ -75,7 +87,7 @@ describe('consumeEventIterator', () => {
     const onSuccess = vi.fn()
     const onFinish = vi.fn()
 
-    const unsubscribe = consumeEventIterator(iterator, {
+    void consumeEventIterator(iterator, {
       onEvent,
       onError,
       onSuccess,
@@ -97,11 +109,10 @@ describe('consumeEventIterator', () => {
     })
   })
 
-  it('on error without onError and onFinish', async () => {
+  it('on error without onError and onFinish', async ({ onTestFinished }) => {
     const unhandledRejectionHandler = vi.fn()
     process.on('unhandledRejection', unhandledRejectionHandler)
-
-    afterEach(() => {
+    onTestFinished(() => {
       process.off('unhandledRejection', unhandledRejectionHandler)
     })
 
@@ -114,7 +125,7 @@ describe('consumeEventIterator', () => {
 
     const onEvent = vi.fn()
 
-    const unsubscribe = consumeEventIterator(iterator, {
+    void consumeEventIterator(iterator, {
       onEvent,
     })
 
@@ -132,7 +143,7 @@ describe('consumeEventIterator', () => {
     let cleanup = false
     const iterator = (async function* () {
       try {
-        await new Promise(resolve => setTimeout(resolve, 25))
+        await new Promise(resolve => setTimeout(resolve, 10))
         yield 1
         yield 2
         return 3
@@ -174,7 +185,7 @@ describe('consumeEventIterator', () => {
     let cleanup = false
     const iterator = (async function* () {
       try {
-        await new Promise(resolve => setTimeout(resolve, 25))
+        await new Promise(resolve => setTimeout(resolve, 10))
         yield 1
         yield 2
         return 3

@@ -11,13 +11,13 @@ export class DynamicLink<TClientContext extends ClientContext> implements Client
   constructor(
     private readonly linkResolver: (
       options: ClientOptions<TClientContext>,
-      path: readonly string[],
+      path: string[],
       input: unknown,
     ) => Promisable<ClientLink<TClientContext>>,
   ) {
   }
 
-  async call(path: readonly string[], input: unknown, options: ClientOptions<TClientContext>): Promise<unknown> {
+  async call(path: string[], input: unknown, options: ClientOptions<TClientContext>): Promise<unknown> {
     const resolvedLink = await this.linkResolver(options, path, input)
 
     const output = await resolvedLink.call(path, input, options)

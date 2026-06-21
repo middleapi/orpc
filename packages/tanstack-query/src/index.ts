@@ -1,4 +1,4 @@
-export * from './general-utils'
+export * from './contract-utils'
 export * from './key'
 export * from './procedure-utils'
 export * from './router-utils'

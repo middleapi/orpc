@@ -16,9 +16,9 @@ export type Interceptor<
 > = (options: InterceptorOptions<TOptions, TResult>) => TResult
 
 /**
- * Can be used for interceptors or middlewares
+ * Can used for interceptors or middlewares
  */
-export function onStart<T, TOptions extends { next(): any }, TRest extends any[]>(
+export function onStart<T, TOptions extends { next: () => any }, TRest extends any[]>(
   callback: NoInfer<(options: TOptions, ...rest: TRest) => Promisable<void>>,
 ): (options: TOptions, ...rest: TRest) => T | Promise<Awaited<ReturnType<TOptions['next']>>> {
   return async (options, ...rest) => {
@@ -28,9 +28,9 @@ export function onStart<T, TOptions extends { next(): any }, TRest extends any[]
 }
 
 /**
- * Can be used for interceptors or middlewares
+ * Can used for interceptors or middlewares
  */
-export function onSuccess<T, TOptions extends { next(): any }, TRest extends any[]>(
+export function onSuccess<T, TOptions extends { next: () => any }, TRest extends any[]>(
   callback: NoInfer<(result: Awaited<ReturnType<TOptions['next']>>, options: TOptions, ...rest: TRest) => Promisable<void>>,
 ): (options: TOptions, ...rest: TRest) => T | Promise<Awaited<ReturnType<TOptions['next']>>> {
   return async (options, ...rest) => {
@@ -41,9 +41,9 @@ export function onSuccess<T, TOptions extends { next(): any }, TRest extends any
 }
 
 /**
- * Can be used for interceptors or middlewares
+ * Can used for interceptors or middlewares
  */
-export function onError<T, TOptions extends { next(): any }, TRest extends any[]>(
+export function onError<T, TOptions extends { next: () => any }, TRest extends any[]>(
   callback: NoInfer<(
     error: ReturnType<TOptions['next']> extends PromiseWithError<any, infer E> ? E : ThrowableError,
     options: TOptions,
@@ -66,9 +66,9 @@ export type OnFinishState<TResult, TError>
     | [error: null, data: TResult, isSuccess: true]
 
 /**
- * Can be used for interceptors or middlewares
+ * Can used for interceptors or middlewares
  */
-export function onFinish<T, TOptions extends { next(): any }, TRest extends any[]>(
+export function onFinish<T, TOptions extends { next: () => any }, TRest extends any[]>(
   callback: NoInfer<(
     state: OnFinishState<
       Awaited<ReturnType<TOptions['next']>>,
@@ -97,10 +97,14 @@ export function onFinish<T, TOptions extends { next(): any }, TRest extends any[
 }
 
 export function intercept<TOptions extends InterceptableOptions, TResult>(
-  interceptors: Interceptor<TOptions, TResult>[],
+  interceptors: undefined | Interceptor<TOptions, TResult>[],
   options: NoInfer<TOptions>,
   main: NoInfer<(options: TOptions) => TResult>,
 ): TResult {
+  if (!interceptors?.length) {
+    return main(options)
+  }
+
   const next = (options: TOptions, index: number): TResult => {
     const interceptor = interceptors[index]
 

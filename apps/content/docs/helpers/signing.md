@@ -1,8 +1,3 @@
----
-title: Signing Helpers
-description: Functions to cryptographically sign and verify data using HMAC-SHA256.
----
-
 # Signing Helpers
 
 Signing helpers provide functions to cryptographically sign and verify data using HMAC-SHA256.
@@ -10,6 +5,8 @@ Signing helpers provide functions to cryptographically sign and verify data usin
 ::: info
 Signing is faster than [encryption](/docs/helpers/encryption) but users can view the original data.
 :::
+
+## Basic Usage
 
 ```ts twoslash
 import { getSignedValue, sign, unsign } from '@orpc/server/helpers'

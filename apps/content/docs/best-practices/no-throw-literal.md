@@ -1,8 +1,3 @@
----
-title: No Throw Literal
-description: Always throw `Error` instances instead of literal values.
----
-
 # No Throw Literal
 
 In JavaScript, you can throw any value, but it's best to throw only `Error` instances.
@@ -19,30 +14,31 @@ oRPC treats thrown `Error` instances as best practice by default, as recommended
 
 ## Configuration
 
-Customize oRPC's behavior by setting `throwableError` in the `Registry`:
+Customize oRPC's behavior by setting `ThrowableError` in the `Registry`:
 
 ```ts
 declare module '@orpc/server' { // or '@orpc/contract', or '@orpc/client'
   interface Registry {
-    throwableError: Error // [!code highlight]
+    ThrowableError: Error // [!code highlight]
   }
 }
 ```
 
 :::info
-Avoid using `any` or `unknown` for `throwableError` because doing so prevents the client from inferring [type-safe errors](/docs/client/error-handling#using-safe-and-isdefinederror). Instead, use `null | undefined | {}` (equivalent to `unknown`) for stricter error type inference.
+Avoid using `any` or `unknown` for `ThrowableError` because doing so prevents the client from inferring [typesafe errors](/docs/client/error-handling#using-safe-and-isinferableerror). Instead, use `null | undefined | {}` (equivalent to `unknown`) for stricter error type inference.
 :::
 
-:::tip
-If you configure `throwableError` as `null | undefined | {}`, adjust your code to check the `isSuccess` property instead of `error`:
+::: warning
+If `ThrowableError` is configured as `null | undefined | {}`, check `isSuccess` instead of relying on `error`:
 
 ```ts
 const { error, data, isSuccess } = await safe(client('input'))
 
 if (!isSuccess) {
-  if (isDefinedError(error)) {
-    // handle type-safe error
+  if (isInferableError(error)) {
+    // handle typesafe errors
   }
+
   // handle other errors
 }
 else {

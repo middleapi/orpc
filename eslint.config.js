@@ -7,6 +7,7 @@ export default antfu({
   rules: {
     'pnpm/yaml-enforce-settings': 'off',
     'yaml/sort-keys': 'off',
+    'jsdoc/no-defaults': 'off',
   },
 }, {
   plugins: { ban: pluginBan },
@@ -27,6 +28,10 @@ export default antfu({
         name: 'decodeURIComponent',
         message: 'decodeURIComponent can throw an error, use tryDecodeURIComponent instead',
       },
+      {
+        name: ['Reflect', 'get'],
+        message: 'Use getOrBind instead',
+      },
     ],
     'no-restricted-imports': ['error', {
       patterns: [{
@@ -34,6 +39,7 @@ export default antfu({
           '/json-schema-typed',
           '/openapi-types',
           '/@standard-schema/spec',
+          '/@hey-api/spec-types',
           '/compression',
         ],
         message: 'Please import from @orpc/* instead',
@@ -88,6 +94,7 @@ export default antfu({
     'unicorn/prefer-type-error': 'off',
     'antfu/no-import-node-modules-by-path': 'off',
     'no-restricted-globals': 'off',
+    'import/no-duplicates': 'off',
   },
 }, {
   files: ['apps/content/examples/**'],

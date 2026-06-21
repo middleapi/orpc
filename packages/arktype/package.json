@@ -1,7 +1,7 @@
 {
   "name": "@orpc/arktype",
   "type": "module",
-  "version": "1.14.6",
+  "version": "1.13.4",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
@@ -15,6 +15,7 @@
   "sideEffects": false,
   "publishConfig": {
     "exports": {
+      "./package.json": "./package.json",
       ".": {
         "types": "./dist/index.d.mts",
         "import": "./dist/index.mjs",
@@ -23,6 +24,7 @@
     }
   },
   "exports": {
+    "./package.json": "./package.json",
     ".": "./src/index.ts"
   },
   "files": [
@@ -30,20 +32,18 @@
   ],
   "scripts": {
     "build": "unbuild",
-    "build:watch": "pnpm run build --watch",
     "type:check": "tsc -b"
   },
   "peerDependencies": {
     "@ark/schema": "*",
-    "@orpc/contract": "workspace:*",
     "arktype": "*"
   },
   "dependencies": {
-    "@orpc/openapi": "workspace:*"
+    "@orpc/json-schema": "workspace:*"
   },
   "devDependencies": {
     "@ark/schema": "^0.56.0",
-    "arktype": "^2.2.0",
-    "zod": "^4.3.6"
+    "arktype": "^2.1.29",
+    "zod": "^4.4.3"
   }
 }

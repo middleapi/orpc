@@ -1,37 +1,39 @@
-import type { LinkFetchPlugin } from './plugin'
-import { CompositeLinkFetchPlugin } from './plugin'
+import type { FetchLinkTransportPlugin } from './plugin'
+import { CompositeFetchLinkTransportPlugin } from './plugin'
 
-describe('compositeLinkFetchPlugin', () => {
-  it('forward initRuntimeAdapter and sort plugins', () => {
+describe('compositeFetchLinkTransportPlugin', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('forwards initFetchLinkTransportOptions and sorts plugins by dependencies', () => {
     const plugin1 = {
-      initRuntimeAdapter: vi.fn(),
-      order: 1,
-    } satisfies LinkFetchPlugin<any>
+      name: 'plugin-1',
+      initFetchLinkTransportOptions: vi.fn((options: any) => options),
+      after: ['plugin-2'],
+    } satisfies FetchLinkTransportPlugin<any>
+
     const plugin2 = {
-      initRuntimeAdapter: vi.fn(),
-    } satisfies LinkFetchPlugin<any>
+      name: 'plugin-2',
+      initFetchLinkTransportOptions: vi.fn((options: any) => options),
+      before: ['plugin-1'],
+    } satisfies FetchLinkTransportPlugin<any>
+
     const plugin3 = {
-      initRuntimeAdapter: vi.fn(),
-      order: -1,
-    } satisfies LinkFetchPlugin<any>
+      name: 'plugin-3',
+      after: ['plugin-1'],
+    } satisfies FetchLinkTransportPlugin<any>
 
-    const compositePlugin = new CompositeLinkFetchPlugin([plugin1, plugin2, plugin3])
+    const compositePlugin = new CompositeFetchLinkTransportPlugin([plugin1, plugin2, plugin3])
+    const options = { fetchInterceptors: [vi.fn()] }
 
-    const interceptor = vi.fn()
+    const result = compositePlugin.initFetchLinkTransportOptions(options)
 
-    const options = { adapterInterceptors: [interceptor] }
+    expect(result).toBe(options)
 
-    compositePlugin.initRuntimeAdapter(options)
+    expect(plugin1.initFetchLinkTransportOptions).toHaveBeenCalledOnce()
+    expect(plugin2.initFetchLinkTransportOptions).toHaveBeenCalledOnce()
 
-    expect(plugin1.initRuntimeAdapter).toHaveBeenCalledOnce()
-    expect(plugin2.initRuntimeAdapter).toHaveBeenCalledOnce()
-    expect(plugin3.initRuntimeAdapter).toHaveBeenCalledOnce()
-
-    expect(plugin1.initRuntimeAdapter.mock.calls[0]![0]).toBe(options)
-    expect(plugin2.initRuntimeAdapter.mock.calls[0]![0]).toBe(options)
-    expect(plugin3.initRuntimeAdapter.mock.calls[0]![0]).toBe(options)
-
-    expect(plugin3.initRuntimeAdapter).toHaveBeenCalledBefore(plugin2.initRuntimeAdapter)
-    expect(plugin2.initRuntimeAdapter).toHaveBeenCalledBefore(plugin1.initRuntimeAdapter)
+    expect(plugin2.initFetchLinkTransportOptions).toHaveBeenCalledBefore(plugin1.initFetchLinkTransportOptions)
   })
 })

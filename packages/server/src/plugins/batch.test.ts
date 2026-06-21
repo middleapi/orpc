@@ -1,658 +1,322 @@
-import type { StandardLazyRequest, StandardRequest } from '@orpc/standard-server'
-import { isAsyncIteratorObject } from '@orpc/shared'
-import { parseBatchResponse, toBatchRequest } from '@orpc/standard-server/batch'
-import { StandardHandler, StandardRPCMatcher } from '../adapters/standard'
+import type { AnyRouter } from '../router'
+import { RPCHandler } from '../adapters/fetch/rpc-handler'
+import { os } from '../builder'
 import { BatchHandlerPlugin } from './batch'
 
 beforeEach(() => {
   vi.clearAllMocks()
 })
 
-describe('batchHandlerPlugin', () => {
-  const interceptor = vi.fn(async ({ request, ...rest }) => {
-    return {
-      matched: true,
-      response: { status: 200, headers: {}, body: await request.body() },
-    } as any
-  })
+function makePeerRequestMessage(id: number, url: string, method = 'POST', body?: unknown) {
+  return {
+    kind: 'request',
+    id,
+    json: { method, url, headers: {}, body },
+    binary: undefined,
+  }
+}
 
-  const handler = new StandardHandler({}, new StandardRPCMatcher(), {} as any, {
-    rootInterceptors: [interceptor],
-    plugins: [new BatchHandlerPlugin()],
-  })
+function createBatchRequest(options: {
+  mode: 'buffered' | 'streaming'
+  messages?: unknown
+  method?: 'POST' | 'GET'
+  data?: string
+}) {
+  if (options.method === 'GET') {
+    const search = options.data === undefined ? '' : `?data=${options.data}`
 
-  const request1: StandardRequest = { method: 'GET', url: new URL('http://localhost/prefix/foo'), headers: { 'x-request': '1' }, body: 'request1', signal: undefined }
-  const request2: StandardRequest = { method: 'POST', url: new URL('http://localhost/prefix/foo2'), headers: { 'x-request': '2' }, body: 'request2', signal: AbortSignal.timeout(50) }
-  const request3: StandardRequest = { method: 'DELETE', url: new URL('http://localhost/prefix/foo3'), headers: { 'x-request': '2' }, body: 'request3', signal: AbortSignal.timeout(100) }
-
-  const lazyRequest1: StandardLazyRequest = { ...request1, body: () => Promise.resolve(request1.body) }
-  const lazyRequest2: StandardLazyRequest = { ...request2, body: () => Promise.resolve(request2.body) }
-  const lazyRequest3: StandardLazyRequest = { ...request3, body: () => Promise.resolve(request3.body) }
-
-  it('works (mode=streaming)', async () => {
-    interceptor.mockImplementation(async ({ request, ...rest }) => {
-      return {
-        matched: true as const,
-        response: { status: 200, headers: {}, body: await request.body() },
-      }
-    })
-
-    const request = toBatchRequest({
-      url: new URL('http://localhost/prefix/__batch__'),
-      headers: {
-        'x-orpc-batch': 'streaming',
-      },
-      method: 'POST',
-      requests: [
-        request1,
-        request2,
-        request3,
-        request1,
-      ],
-    })
-
-    const sleeps = [0, 100, 50, 120]
-
-    interceptor.mockImplementation(async ({ request }) => {
-      await new Promise(resolve => setTimeout(resolve, sleeps.shift()!))
-
-      return {
-        matched: true as const,
-        response: { status: 200, headers: {}, body: await request.body() },
-      }
-    })
-
-    const result = await handler.handle({ ...request, body: () => Promise.resolve(request.body) }, { prefix: '/prefix', context: { context: true } })
-
-    expect(interceptor).toHaveBeenCalledTimes(4)
-    expect(interceptor).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      request: {
-        ...lazyRequest1,
-        headers: {
-          ...lazyRequest1.headers,
-          'x-orpc-batch': 'streaming',
-        },
-        body: expect.any(Function),
-        signal: request.signal,
-      },
-      prefix: '/prefix',
-      context: { context: true },
-    }))
-    expect(interceptor).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      request: {
-        ...lazyRequest2,
-        headers: {
-          ...lazyRequest2.headers,
-          'x-orpc-batch': 'streaming',
-        },
-        body: expect.any(Function),
-        signal: request.signal,
-      },
-      prefix: '/prefix',
-      context: { context: true },
-    }))
-    expect(interceptor).toHaveBeenNthCalledWith(3, expect.objectContaining({
-      request: {
-        ...lazyRequest3,
-        headers: {
-          ...lazyRequest3.headers,
-          'x-orpc-batch': 'streaming',
-        },
-        body: expect.any(Function),
-        signal: request.signal,
-      },
-      prefix: '/prefix',
-      context: { context: true },
-    }))
-    expect(interceptor).toHaveBeenNthCalledWith(4, expect.objectContaining({
-      request: {
-        ...lazyRequest1,
-        headers: {
-          ...lazyRequest1.headers,
-          'x-orpc-batch': 'streaming',
-        },
-        body: expect.any(Function),
-        signal: request.signal,
-      },
-      prefix: '/prefix',
-      context: { context: true },
-    }))
-
-    expect(result.response?.status).toBe(207)
-    expect(result.response?.headers).toEqual({})
-
-    expect(result.response!.body).toSatisfy(isAsyncIteratorObject)
-    const parsed = parseBatchResponse(result.response!)
-
-    await expect(parsed.next()).resolves.toEqual({
-      done: false,
-      value: {
-        index: 0,
-        status: 200,
-        headers: {},
-        body: request1.body,
-      },
-    })
-
-    await expect(parsed.next()).resolves.toEqual({
-      done: false,
-      value: {
-        index: 2,
-        status: 200,
-        headers: {},
-        body: request3.body,
-      },
-    })
-
-    await expect(parsed.next()).resolves.toEqual({
-      done: false,
-      value: {
-        index: 1,
-        status: 200,
-        headers: {},
-        body: request2.body,
-      },
-    })
-
-    await expect(parsed.next()).resolves.toEqual({
-      done: false,
-      value: {
-        index: 3,
-        status: 200,
-        headers: {},
-        body: request1.body,
-      },
-    })
-
-    await expect(parsed.next()).resolves.toEqual({ done: true })
-  })
-
-  it('works (mode=buffered)', async () => {
-    interceptor.mockImplementation(async ({ request, ...rest }) => {
-      return {
-        matched: true as const,
-        response: { status: 200, headers: {}, body: await request.body() },
-      }
-    })
-
-    const request = toBatchRequest({
-      url: new URL('http://localhost/prefix/__batch__'),
-      headers: {
-        'x-orpc-batch': 'buffered',
-      },
-      method: 'POST',
-      requests: [
-        request1,
-        request2,
-        request3,
-        request1,
-      ],
-    })
-
-    const sleeps = [0, 100, 50, 120]
-
-    interceptor.mockImplementation(async ({ request }) => {
-      await new Promise(resolve => setTimeout(resolve, sleeps.shift()!))
-
-      return {
-        matched: true as const,
-        response: { status: 200, headers: {}, body: await request.body() },
-      }
-    })
-
-    const result = await handler.handle({ ...request, body: () => Promise.resolve(request.body) }, { prefix: '/prefix', context: { context: true } })
-
-    expect(interceptor).toHaveBeenCalledTimes(4)
-    expect(interceptor).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      request: {
-        ...lazyRequest1,
-        headers: {
-          ...lazyRequest1.headers,
-          'x-orpc-batch': 'buffered',
-        },
-        body: expect.any(Function),
-        signal: request.signal,
-      },
-      prefix: '/prefix',
-      context: { context: true },
-    }))
-    expect(interceptor).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      request: {
-        ...lazyRequest2,
-        headers: {
-          ...lazyRequest2.headers,
-          'x-orpc-batch': 'buffered',
-        },
-        body: expect.any(Function),
-        signal: request.signal,
-      },
-      prefix: '/prefix',
-      context: { context: true },
-    }))
-    expect(interceptor).toHaveBeenNthCalledWith(3, expect.objectContaining({
-      request: {
-        ...lazyRequest3,
-        headers: {
-          ...lazyRequest3.headers,
-          'x-orpc-batch': 'buffered',
-        },
-        body: expect.any(Function),
-        signal: request.signal,
-      },
-      prefix: '/prefix',
-      context: { context: true },
-    }))
-    expect(interceptor).toHaveBeenNthCalledWith(4, expect.objectContaining({
-      request: {
-        ...lazyRequest1,
-        headers: {
-          ...lazyRequest1.headers,
-          'x-orpc-batch': 'buffered',
-        },
-        body: expect.any(Function),
-        signal: request.signal,
-      },
-      prefix: '/prefix',
-      context: { context: true },
-    }))
-
-    expect(result.response?.status).toBe(207)
-    expect(result.response?.headers).toEqual({})
-
-    expect(result.response!.body).toSatisfy(Array.isArray)
-    const parsed = parseBatchResponse(result.response!)
-
-    await expect(parsed.next()).resolves.toEqual({
-      done: false,
-      value: {
-        index: 0,
-        status: 200,
-        headers: {},
-        body: request1.body,
-      },
-    })
-
-    await expect(parsed.next()).resolves.toEqual({
-      done: false,
-      value: {
-        index: 2,
-        status: 200,
-        headers: {},
-        body: request3.body,
-      },
-    })
-
-    await expect(parsed.next()).resolves.toEqual({
-      done: false,
-      value: {
-        index: 1,
-        status: 200,
-        headers: {},
-        body: request2.body,
-      },
-    })
-
-    await expect(parsed.next()).resolves.toEqual({
-      done: false,
-      value: {
-        index: 3,
-        status: 200,
-        headers: {},
-        body: request1.body,
-      },
-    })
-
-    await expect(parsed.next()).resolves.toEqual({ done: true })
-  })
-
-  it('can custom success status, headers, mapRequest', async () => {
-    const successStatus = vi.fn(() => 201)
-    const headers = vi.fn(() => ({ 'x-custom': '1' }))
-    const mapRequestItem = vi.fn(request => request)
-
-    const handler = new StandardHandler({}, new StandardRPCMatcher(), {} as any, {
-      rootInterceptors: [interceptor],
-      plugins: [
-        new BatchHandlerPlugin({
-          successStatus,
-          headers,
-          mapRequestItem,
-        }),
-      ],
-    })
-
-    const request = toBatchRequest({
-      url: new URL('http://localhost/prefix/__batch__'),
-      headers: {
-        'x-orpc-batch': 'streaming',
-      },
-      method: 'POST',
-      requests: [
-        request1,
-        request2,
-        request3,
-        request1,
-      ],
-    })
-
-    const response = await handler.handle({ ...request, body: () => Promise.resolve(request.body) }, { prefix: '/prefix', context: { context: true } })
-
-    expect(response.response?.status).toBe(201)
-    expect(response.response?.headers).toEqual({ 'x-custom': '1' })
-
-    expect(successStatus).toHaveBeenCalledTimes(1)
-    expect(successStatus).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({
-      prefix: '/prefix',
-      context: { context: true },
-    }))
-
-    expect(headers).toHaveBeenCalledTimes(1)
-    expect(headers).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({
-      prefix: '/prefix',
-      context: { context: true },
-    }))
-
-    expect(mapRequestItem).toHaveBeenCalledTimes(4)
-    expect(mapRequestItem).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({
-      prefix: '/prefix',
-      context: { context: true },
-    }))
-  })
-
-  it('should ignore non batch requests', async () => {
-    const result = await handler.handle(lazyRequest1, { prefix: '/prefix', context: { context: true } })
-
-    expect(interceptor).toHaveBeenCalledTimes(1)
-    expect(result).toBe(await interceptor.mock.results[0]!.value)
-    expect(interceptor).toHaveBeenCalledWith(expect.objectContaining({
-      request: lazyRequest1,
-      prefix: '/prefix',
-      context: { context: true },
-    }))
-  })
-
-  it('should response error instead of throw on invalid batch', async () => {
-    const request: StandardLazyRequest = {
+    return new Request(`https://example.com/__batch__${search}`, {
       method: 'GET',
-      url: new URL('http://localhost/prefix/foo'),
-      headers: {
-        'x-orpc-batch': 'streaming',
-      },
-      body: () => Promise.resolve(''),
-      signal: undefined,
-    }
-
-    const result = await handler.handle(request, { prefix: '/prefix', context: { context: true } })
-
-    expect(interceptor).toHaveBeenCalledTimes(0)
-    expect(result).toEqual({
-      matched: true,
-      response: {
-        body: 'Invalid batch request, this could be caused by a malformed request body or a missing header',
-        headers: {},
-        status: 400,
-      },
+      headers: { 'orpc-batch': options.mode },
     })
+  }
+
+  return new Request('https://example.com/__batch__', {
+    method: 'POST',
+    headers: { 'orpc-batch': options.mode, 'content-type': 'application/json' },
+    body: JSON.stringify(options.messages),
+  })
+}
+
+function readLengthPrefixedChunk(buffer: Uint8Array) {
+  const view = new DataView(buffer.buffer, buffer.byteOffset, 4)
+  const messageLength = view.getUint32(0, false)
+
+  return {
+    messageLength,
+    payload: buffer.slice(4, 4 + messageLength),
+  }
+}
+
+describe('batchHandlerPlugin', () => {
+  const handlerFn = vi.fn(() => 'pong')
+  const router = {
+    ping: os.handler(handlerFn),
+  }
+
+  const createHandler = (
+    plugin = new BatchHandlerPlugin(),
+    handlerRouter: AnyRouter = router,
+  ) => new RPCHandler(handlerRouter, {
+    plugins: [plugin],
   })
 
-  it('should throw on unknown error', async () => {
-    const handler = new StandardHandler({}, new StandardRPCMatcher(), {} as any, {
-      interceptors: [interceptor],
-      plugins: [new BatchHandlerPlugin({ mapRequestItem: (request) => {
-        throw new Error('Unknown error')
-      } })],
-    })
+  it('passes through non-batch requests', async () => {
+    const handler = createHandler()
 
-    const request = toBatchRequest({
-      url: new URL('http://localhost/prefix/__batch__'),
-      headers: {
-        'x-orpc-batch': 'streaming',
-      },
+    const { matched, response } = await handler.handle(new Request('https://example.com/ping', {
       method: 'POST',
-      requests: [
-        request1,
-        request2,
-      ],
-    })
+    }))
 
-    await expect(
-      handler.handle({ ...request, body: () => Promise.resolve(request.body) }, { prefix: '/prefix', context: { context: true } }),
-    ).rejects.toThrow('Unknown error')
-
-    expect(interceptor).toHaveBeenCalledTimes(0)
+    expect(matched).toBe(true)
+    expect(response!.status).toBe(200)
+    expect(handlerFn).toHaveBeenCalledTimes(1)
   })
 
-  it('should response error instead of throw on request error and matched=false', async () => {
-    const unhandledRejectionHandler = vi.fn()
-    process.on('unhandledRejection', unhandledRejectionHandler)
+  describe('buffered mode', () => {
+    it('handles buffered batch POST requests', async () => {
+      const handler = createHandler()
+      const peerMessages = [
+        makePeerRequestMessage(0, '/ping'),
+        makePeerRequestMessage(1, '/ping'),
+      ]
 
-    afterEach(() => {
-      process.off('unhandledRejection', unhandledRejectionHandler)
+      const { matched, response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: peerMessages,
+      }))
+
+      expect(matched).toBe(true)
+      expect(response!.status).toBe(207)
+
+      const body = await response!.json() as any
+      expect(Array.isArray(body)).toBe(true)
+      expect(body).toHaveLength(2)
+      expect(handlerFn).toHaveBeenCalledTimes(2)
     })
 
-    const request = toBatchRequest({
-      url: new URL('http://localhost/prefix/__batch__'),
-      headers: {
-        'x-orpc-batch': 'streaming',
-      },
-      method: 'POST',
-      requests: [
-        request1,
-        request2,
-        request3,
-        request1,
-      ],
-    })
-
-    const sleeps = [0, 100, 50, 120]
-
-    interceptor.mockImplementation(async ({ request }) => {
-      const length = sleeps.length
-
-      await new Promise(resolve => setTimeout(resolve, sleeps.shift()!))
-
-      if (length % 2 === 0) {
-        throw new Error('Unknown error')
+    it('returns binary payload in buffered mode when sub-response contains binary', async () => {
+      const binaryRouter = {
+        file: os.handler(() => new Blob([new Uint8Array([1, 2, 3])], {
+          type: 'application/octet-stream',
+        })),
+        ping: os.handler(() => 'pong'),
       }
 
-      return {
-        matched: false,
-        response: undefined,
-      }
+      const handler = createHandler(new BatchHandlerPlugin(), binaryRouter)
+
+      const peerMessages = [
+        makePeerRequestMessage(0, '/file'),
+        makePeerRequestMessage(1, '/ping'),
+      ]
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: peerMessages,
+      }))
+
+      expect(response!.status).toBe(207)
+      expect(response!.headers.get('standard-server')).toEqual('file')
+
+      const buffer = new Uint8Array(await response!.arrayBuffer())
+      expect(buffer.length).toBeGreaterThan(4)
+
+      const { messageLength, payload } = readLengthPrefixedChunk(buffer)
+      expect(messageLength).toBe(payload.length)
     })
 
-    const result = await handler.handle({ ...request, body: () => Promise.resolve(request.body) }, { prefix: '/prefix', context: { context: true } })
+    it('handles unmatched sub-requests as 404', async () => {
+      const handler = createHandler()
 
-    expect(interceptor).toHaveBeenCalledTimes(4)
-    expect(interceptor).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      request: {
-        ...lazyRequest1,
-        headers: {
-          ...lazyRequest1.headers,
-          'x-orpc-batch': 'streaming',
+      const { matched, response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: [makePeerRequestMessage(0, '/nonexistent')],
+      }))
+
+      expect(matched).toBe(true)
+      expect(response!.status).toBe(207)
+
+      const body = await response!.json() as any
+      expect(body).toHaveLength(1)
+      expect(body[0]).toMatchObject({ kind: 'response', id: 0 })
+      expect(body[0].json.status).toBe(404)
+    })
+
+    it('returns 400 for invalid batch body', async () => {
+      const handler = createHandler()
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: 'not-an-array',
+      }))
+
+      expect(response!.status).toBe(400)
+      expect(handlerFn).toHaveBeenCalledTimes(0)
+    })
+
+    it('returns 413 when batch size exceeds maxSize', async () => {
+      const handler = createHandler(new BatchHandlerPlugin({ maxSize: 1 }))
+      const peerMessages = [
+        makePeerRequestMessage(0, '/ping'),
+        makePeerRequestMessage(1, '/ping'),
+      ]
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: peerMessages,
+      }))
+
+      expect(response!.status).toBe(413)
+      expect(handlerFn).toHaveBeenCalledTimes(0)
+    })
+
+    it('returns 500 sub-response when mapSubrequest throws', async ({ onTestFinished }) => {
+      const rejectSpy = vi.spyOn(Promise, 'reject')
+        .mockImplementation(() => new Promise(() => {}) as Promise<never>)
+
+      onTestFinished(() => {
+        rejectSpy.mockRestore()
+      })
+
+      const handler = createHandler(new BatchHandlerPlugin({
+        mapSubrequest: () => {
+          throw new Error('boom')
         },
-        body: expect.any(Function),
-        signal: request.signal,
-      },
-      prefix: '/prefix',
-      context: { context: true },
-    }))
-    expect(interceptor).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      request: {
-        ...lazyRequest2,
-        headers: {
-          ...lazyRequest2.headers,
-          'x-orpc-batch': 'streaming',
-        },
-        body: expect.any(Function),
-        signal: request.signal,
-      },
-      prefix: '/prefix',
-      context: { context: true },
-    }))
-    expect(interceptor).toHaveBeenNthCalledWith(3, expect.objectContaining({
-      request: {
-        ...lazyRequest3,
-        headers: {
-          ...lazyRequest3.headers,
-          'x-orpc-batch': 'streaming',
-        },
-        body: expect.any(Function),
-        signal: request.signal,
-      },
-      prefix: '/prefix',
-      context: { context: true },
-    }))
-    expect(interceptor).toHaveBeenNthCalledWith(4, expect.objectContaining({
-      request: {
-        ...lazyRequest1,
-        headers: {
-          ...lazyRequest1.headers,
-          'x-orpc-batch': 'streaming',
-        },
-        body: expect.any(Function),
-        signal: request.signal,
-      },
-      prefix: '/prefix',
-      context: { context: true },
-    }))
+      }))
 
-    const parsed = parseBatchResponse(result.response!)
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: [makePeerRequestMessage(0, '/ping')],
+      }))
 
-    await expect(parsed.next()).resolves.toEqual({
-      done: false,
-      value: {
-        index: 0,
-        status: 500,
-        headers: {},
-        body: 'Internal server error',
-      },
-    })
+      expect(response!.status).toBe(207)
 
-    await expect(parsed.next()).resolves.toEqual({
-      done: false,
-      value: {
-        index: 2,
-        status: 500,
-        headers: {},
-        body: 'Internal server error',
-      },
-    })
-
-    await expect(parsed.next()).resolves.toEqual({
-      done: false,
-      value: {
-        index: 1,
-        status: 404,
-        headers: {},
-        body: 'No procedure matched',
-      },
-    })
-
-    await expect(parsed.next()).resolves.toEqual({
-      done: false,
-      value: {
-        index: 3,
-        status: 404,
-        headers: {},
-        body: 'No procedure matched',
-      },
-    })
-
-    await expect(parsed.next()).resolves.toEqual({ done: true })
-
-    expect(unhandledRejectionHandler).toHaveBeenCalledTimes(2)
-  })
-
-  it('should response error on exceed max size', async () => {
-    const handler = new StandardHandler({}, new StandardRPCMatcher(), {} as any, {
-      rootInterceptors: [interceptor],
-      plugins: [new BatchHandlerPlugin({ maxSize: 2 })],
-    })
-
-    const request = toBatchRequest({
-      url: new URL('http://localhost/prefix/__batch__'),
-      headers: {
-        'x-orpc-batch': 'streaming',
-      },
-      method: 'POST',
-      requests: [
-        request1,
-        request2,
-        request3,
-      ],
-    })
-
-    const result = await handler.handle({ ...request, body: () => Promise.resolve(request.body) }, { prefix: '/prefix', context: { context: true } })
-
-    expect(interceptor).toHaveBeenCalledTimes(0)
-    expect(result).toEqual({
-      matched: true,
-      response: {
-        body: 'Batch request size exceeds the maximum allowed size',
-        headers: {},
-        status: 413,
-      },
+      const body = await response!.json() as any
+      expect(body[0].json.status).toBe(500)
+      expect(body[0].json.body).toBe('Internal server error')
+      expect(rejectSpy).toHaveBeenCalledTimes(1)
     })
   })
 
-  it('should response error on unsupported response', async () => {
-    interceptor.mockImplementation(async ({ request }) => {
-      const body = await request.body()
+  describe('streaming mode', () => {
+    it('handles streaming batch POST requests returning readable stream', async () => {
+      const handler = createHandler()
+      const peerMessages = [makePeerRequestMessage(0, '/ping')]
 
-      return {
-        matched: true,
-        response: { status: 200, headers: {}, body: body === 'blob' ? new Blob(['hello']) : body === 'formdata' ? new FormData() : body },
+      const { matched, response } = await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: peerMessages,
+      }))
+
+      expect(matched).toBe(true)
+      expect(response!.status).toBe(207)
+      expect(response!.headers.get('standard-server')).toEqual('octet-stream')
+
+      expect(handlerFn).toHaveBeenCalledTimes(0)
+
+      // Verify the binary format: 4-byte length prefix + encoded peer message.
+      const buffer = new Uint8Array(await response!.arrayBuffer())
+      expect(buffer.length).toBeGreaterThan(4)
+
+      // Streaming batch is non-blocking; handler resolves while stream is consumed.
+      expect(handlerFn).toHaveBeenCalledTimes(1)
+
+      const { messageLength } = readLengthPrefixedChunk(buffer)
+      expect(buffer.length).toBe(4 + messageLength)
+    })
+
+    it('encodes streaming batch response as binary when sub-response is a blob', async () => {
+      const binaryRouter = {
+        file: os.handler(() => new Blob(['__TEST__'], {
+          type: 'application/octet-stream',
+        })),
       }
+
+      const handler = createHandler(new BatchHandlerPlugin(), binaryRouter)
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [makePeerRequestMessage(0, '/file')],
+      }))
+
+      expect(response!.status).toBe(207)
+
+      const buffer = new Uint8Array(await response!.arrayBuffer())
+      expect(buffer.length).toBeGreaterThan(4)
+
+      const { messageLength, payload } = readLengthPrefixedChunk(buffer)
+      expect(messageLength).toBe(payload.length)
+      expect(new TextDecoder().decode(payload)).toContain('__TEST__')
+    })
+  })
+
+  describe('get batches', () => {
+    it('handles batch GET requests via query param', async () => {
+      const handler = createHandler()
+      const data = encodeURIComponent(JSON.stringify([
+        makePeerRequestMessage(0, '/ping', 'GET'),
+      ]))
+
+      const { matched, response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        method: 'GET',
+        data,
+      }))
+
+      expect(matched).toBe(true)
+      expect(response!.status).toBe(207)
     })
 
-    const request = toBatchRequest({
-      url: new URL('http://localhost/prefix/__batch__'),
-      headers: {
-        'x-orpc-batch': 'streaming',
-      },
-      method: 'POST',
-      requests: [
-        { ...request1, body: 'blob' },
-        { ...request2, body: 'formdata' },
-        { ...request3, body: 'string' },
-      ],
+    it('returns 400 for invalid GET data param', async () => {
+      const handler = createHandler()
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        method: 'GET',
+        data: 'invalid-json',
+      }))
+
+      expect(response!.status).toBe(400)
     })
 
-    const result = await handler.handle({ ...request, body: () => Promise.resolve(request.body) }, { prefix: '/prefix', context: { context: true } })
+    it('returns 400 when GET batch request misses data param', async () => {
+      const handler = createHandler()
 
-    const parsed = parseBatchResponse(result.response!)
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        method: 'GET',
+      }))
 
-    await expect(parsed.next()).resolves.toEqual({
-      done: false,
-      value: {
-        index: 0,
-        status: 500,
-        headers: {},
-        body: 'Batch responses do not support file/blob, or event-iterator. Please call this procedure separately outside of the batch request.',
-      },
+      expect(response!.status).toBe(400)
+      expect(await response!.text()).toContain('Missing data parameter')
     })
 
-    await expect(parsed.next()).resolves.toEqual({
-      done: false,
-      value: {
-        index: 1,
-        status: 500,
-        headers: {},
-        body: 'Batch responses do not support file/blob, or event-iterator. Please call this procedure separately outside of the batch request.',
-      },
-    })
+    it('returns 400 for GET batch data that is valid JSON but not an array', async () => {
+      const handler = createHandler()
+      const data = encodeURIComponent(JSON.stringify({ not: 'an-array' }))
 
-    await expect(parsed.next()).resolves.toEqual({
-      done: false,
-      value: {
-        body: 'string',
-        headers: {},
-        index: 2,
-        status: 200,
-      },
-    })
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        method: 'GET',
+        data,
+      }))
 
-    await expect(parsed.next()).resolves.toEqual({ done: true })
+      expect(response!.status).toBe(400)
+      expect(await response!.text()).toContain('Invalid batch request data parameter')
+    })
+  })
+
+  describe('configuration options', () => {
+    it('supports custom successStatus', async () => {
+      const handler = createHandler(new BatchHandlerPlugin({ successStatus: 200 }))
+      const peerMessages = [makePeerRequestMessage(0, '/ping')]
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: peerMessages,
+      }))
+
+      expect(response!.status).toBe(200)
+    })
   })
 })

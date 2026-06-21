@@ -38,7 +38,7 @@ export function encodeBase64url(data: Uint8Array): string {
  * expect(new TextDecoder().decode(decoded)).toEqual(text)
  * ```
  */
-export function decodeBase64url(base64url: string | undefined | null): Uint8Array | undefined {
+export function decodeBase64url(base64url: string | undefined | null): Uint8Array<ArrayBuffer> | undefined {
   try {
     if (typeof base64url !== 'string') {
       return undefined

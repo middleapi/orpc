@@ -1,118 +1,168 @@
-import type { HTTPPath } from '@orpc/client'
-import type { AnyContractProcedure } from '@orpc/contract'
+import type { AnyProcedureContract } from '@orpc/contract'
 import type { Value } from '@orpc/shared'
+import type { StandardMethod } from '@standardserver/core'
 import type { AnyProcedure } from '../../procedure'
 import type { AnyRouter } from '../../router'
-import type { LazyTraverseContractProceduresOptions, TraverseContractProcedureCallbackOptions } from '../../router-utils'
-import type { StandardMatcher, StandardMatchResult } from './types'
-import { toHttpPath } from '@orpc/client/standard'
-import { NullProtoObj, value } from '@orpc/shared'
+import type { WalkProcedureContractsLazyResult } from '../../router-utils'
+import { normalizeHttpPath, pathToHttpPath, value } from '@orpc/shared'
 import { unlazy } from '../../lazy'
-import { isProcedure } from '../../procedure'
-import { createContractedProcedure } from '../../procedure-utils'
-import { getRouter, traverseContractProcedures } from '../../router-utils'
+import { Procedure } from '../../procedure'
+import { createContractProcedure } from '../../procedure-utils'
+import { getRouter, walkProcedureContractsSync } from '../../router-utils'
 
-export interface StandardRPCMatcherOptions {
+export interface RPCMatcherOptions {
   /**
-   * Filter procedures. Return `false` to exclude a procedure from matching.
+   * Filter which procedures are exposed for matching. Return `false` to exclude.
    *
    * @default true
    */
-  filter?: Value<boolean, [options: TraverseContractProcedureCallbackOptions]>
+  filter?: Value<boolean, [procedure: AnyProcedureContract | AnyProcedure, path: string[]]>
 }
 
-export class StandardRPCMatcher implements StandardMatcher {
-  private readonly filter: Exclude<StandardRPCMatcherOptions['filter'], undefined>
+interface TreeEntry {
+  path: string[]
+  contract: AnyProcedureContract
+  procedure?: AnyProcedure | undefined
+}
 
-  private readonly tree: Record<
-    HTTPPath,
-    {
-      path: readonly string[]
-      contract: AnyContractProcedure
-      procedure: AnyProcedure | undefined
-      router: AnyRouter
-    }
-  > = new NullProtoObj()
+export class RPCMatcher {
+  private readonly filter: Exclude<RPCMatcherOptions['filter'], undefined>
+  private readonly rootRouter: AnyRouter
 
-  private pendingRouters: (LazyTraverseContractProceduresOptions & { httpPathPrefix: HTTPPath }) [] = []
+  private readonly tree: Map<`/${string}`, TreeEntry> = new Map()
 
-  constructor(options: StandardRPCMatcherOptions = {}) {
+  private pendingLazyRouters: (WalkProcedureContractsLazyResult & { httpPathPrefix: string })[] = []
+
+  constructor(router: AnyRouter, options: RPCMatcherOptions = {}) {
     this.filter = options.filter ?? true
+    this.rootRouter = router
+    this.index(router)
   }
 
-  init(router: AnyRouter, path: readonly string[] = []): void {
-    const laziedOptions = traverseContractProcedures({ router, path }, (traverseOptions) => {
-      if (!value(this.filter, traverseOptions)) {
+  private index(router: AnyRouter, path: string[] = []): void {
+    const lazyResults = walkProcedureContractsSync(router, (procedure, procedurePath) => {
+      if (!value(this.filter, procedure, procedurePath)) {
         return
       }
 
-      const { path, contract } = traverseOptions
+      const httpPath = pathToHttpPath(procedurePath)
 
-      const httpPath = toHttpPath(path)
-
-      if (isProcedure(contract)) {
-        this.tree[httpPath] = {
-          path,
-          contract,
-          procedure: contract, // this mean dev not used contract-first so we can used contract as procedure directly
-          router,
-        }
+      if (procedure instanceof Procedure) {
+        this.tree.set(httpPath, {
+          path: procedurePath,
+          contract: procedure,
+          procedure,
+        })
       }
       else {
-        this.tree[httpPath] = {
-          path,
-          contract,
-          procedure: undefined,
-          router,
-        }
+        // contract-first approach
+        this.tree.set(httpPath, {
+          path: procedurePath,
+          contract: procedure,
+        })
       }
-    })
+    }, path)
 
-    this.pendingRouters.push(...laziedOptions.map(option => ({
-      ...option,
-      httpPathPrefix: toHttpPath(option.path),
-    })))
+    this.pendingLazyRouters.push(
+      ...lazyResults.map(result => ({
+        ...result,
+        httpPathPrefix: pathToHttpPath(result.path),
+      })),
+    )
   }
 
-  async match(_method: string, pathname: HTTPPath): Promise<StandardMatchResult> {
-    if (this.pendingRouters.length) {
-      const newPendingRouters: typeof this.pendingRouters = []
-
-      for (const pendingRouter of this.pendingRouters) {
-        if (pathname.startsWith(pendingRouter.httpPathPrefix)) {
-          const { default: router } = await unlazy(pendingRouter.router)
-          this.init(router, pendingRouter.path)
-        }
-        else {
-          newPendingRouters.push(pendingRouter)
-        }
-      }
-
-      this.pendingRouters = newPendingRouters
+  async match(_method: StandardMethod, pathname: `/${string}`, prefix: `/${string}` | undefined): Promise<{ path: string[], procedure: AnyProcedure } | undefined> {
+    if (pathname.length > 1 && pathname.endsWith('/')) {
+      // Remove trailing slash for matching
+      pathname = pathname.slice(0, -1) as `/${string}`
     }
 
-    const match = this.tree[pathname]
+    if (prefix) {
+      if (!pathname.startsWith(prefix)) {
+        return undefined
+      }
 
-    if (!match) {
+      const charAfterPrefix = pathname[prefix.length]
+
+      if (charAfterPrefix === '/') {
+        pathname = pathname.slice(prefix.length) as `/${string}`
+      }
+      else if (charAfterPrefix === undefined) {
+        pathname = '/'
+      }
+      else if (prefix[prefix.length - 1] === '/') {
+        pathname = pathname.slice(prefix.length - 1) as `/${string}`
+      }
+      else {
+        return undefined
+      }
+    }
+
+    const result = await this.matchPathname(pathname)
+
+    if (!result && pathname.includes('%')) {
+      // Retry with a normalized path: users may percent-encode characters that
+      // we store unencoded (e.g. "a%62c" vs "abc"), so normalization lets us
+      // handle those requests without storing duplicate entries.
+
+      return this.matchPathname(normalizeHttpPath(pathname))
+    }
+
+    return result
+  }
+
+  private async matchPathname(pathname: `/${string}`): Promise<{ path: string[], procedure: AnyProcedure } | undefined> {
+    await this.resolvePendingLazyRouters(pathname)
+
+    const entry = this.tree.get(pathname)
+
+    if (!entry) {
       return undefined
     }
 
-    if (!match.procedure) {
-      const { default: maybeProcedure } = await unlazy(getRouter(match.router, match.path))
+    const procedure = await this.resolveProcedure(entry)
 
-      if (!isProcedure(maybeProcedure)) {
-        throw new Error(`
-          [Contract-First] Missing or invalid implementation for procedure at path: ${toHttpPath(match.path)}.
-          Ensure that the procedure is correctly defined and matches the expected contract.
-        `)
+    return { path: entry.path, procedure }
+  }
+
+  private async resolvePendingLazyRouters(pathname: `/${string}`): Promise<void> {
+    if (!this.pendingLazyRouters.length) {
+      return
+    }
+
+    const stillPending: typeof this.pendingLazyRouters = []
+
+    // We need to loop over this.pendingLazyRouters because this.index can still append new lazy routers
+    // that might need to be resolved
+    for (const pending of this.pendingLazyRouters) {
+      if (pathname.startsWith(pending.httpPathPrefix)) {
+        const { default: router } = await unlazy(pending.router)
+        this.index(router, pending.path)
       }
-
-      match.procedure = createContractedProcedure(maybeProcedure, match.contract)
+      else {
+        stillPending.push(pending)
+      }
     }
 
-    return {
-      path: match.path,
-      procedure: match.procedure,
+    this.pendingLazyRouters = stillPending
+  }
+
+  private async resolveProcedure(entry: TreeEntry): Promise<AnyProcedure> {
+    if (entry.procedure) {
+      return entry.procedure
     }
+
+    const { default: maybeProcedure } = await unlazy(getRouter(this.rootRouter, entry.path))
+
+    if (!(maybeProcedure instanceof Procedure)) {
+      throw new TypeError(
+        `[Contract-First] Missing or invalid implementation for procedure at path: "${entry.path.join('.')}". `
+        + `Ensure the procedure is correctly implemented and matches its contract.`,
+      )
+    }
+
+    entry.procedure = createContractProcedure(maybeProcedure, entry.contract)
+
+    return entry.procedure
   }
 }

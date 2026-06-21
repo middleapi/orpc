@@ -1,35 +1,36 @@
----
-title: Router
-description: Understanding routers in oRPC
----
+# Router
 
-# Router in oRPC
+A router is a plain, nestable object made up of procedures. Routers can also modify those procedures, which makes it easy to organize and extend your API.
 
-Routers in oRPC are simple, nestable objects composed of procedures. They can also modify their own procedures, offering flexibility and modularity when designing your API.
+::: info
+A standalone [procedure](/docs/procedure) is also a router, so you can use all router features on individual procedures too.
+:::
 
 ## Overview
 
-Routers are defined as plain JavaScript objects where each key corresponds to a procedure. For example:
+Define a router as a plain JavaScript object where each key maps to a procedure:
 
-```ts
+```ts twoslash
 import { os } from '@orpc/server'
 
 const ping = os.handler(async () => 'ping')
 const pong = os.handler(async () => 'pong')
 
-const router = {
+export const router = {
   ping,
   pong,
   nested: { ping, pong }
 }
 ```
 
+<!--@include: @/shared/router-keys-compatibility-warning.md -->
+
 ## Extending Router
 
-Routers can be modified to include additional features. For example, to require authentication on all procedures:
+You can extend a router with shared behavior. For example, by applying authentication middleware or attaching metadata to every procedure:
 
 ```ts
-const router = os.use(requiredAuth).router({
+const router = os.use(requiredAuth).meta(requireAuthMeta).router({
   ping,
   pong,
   nested: {
@@ -39,13 +40,13 @@ const router = os.use(requiredAuth).router({
 })
 ```
 
-::: warning
-If you apply middleware using `.use` at both the router and procedure levels, it may execute multiple times. This duplication can lead to performance issues. For guidance on avoiding redundant middleware execution, please see our [best practices for middleware deduplication](/docs/best-practices/dedupe-middleware).
+::: danger
+If you apply middleware with `.use` at both the router and procedure levels, it may run more than once. That duplication can hurt performance. To avoid redundant middleware execution, see our [best practices for middleware deduplication](/docs/best-practices/dedupe-middleware).
 :::
 
 ## Lazy Router
 
-In oRPC, routers can be lazy-loaded, making them ideal for code splitting and enhancing cold start performance. Lazy loading allows you to defer the initialization of routes until they are actually needed, which reduces the initial load time and improves resource management.
+Routers can also be lazy-loaded. This is useful for code splitting and can improve cold start performance by deferring route initialization until it is needed.
 
 ::: code-group
 
@@ -84,28 +85,15 @@ export default {
 
 :::
 
-::: tip
-Alternatively, you can use the standalone `lazy` helper from `@orpc/server`. This helper is faster for type inference, and doesn't require matching the [Initial Context](/docs/context#initial-context).
-
-```ts [router.ts]
-import { lazy } from '@orpc/server'
-
-const router = {
-  ping,
-  pong,
-  planet: lazy(() => import('./planet'))
-}
-```
-
-:::
-
 ## Utilities
 
 ::: info
-Every [procedure](/docs/procedure) is also a router, so you can apply these utilities to procedures as well.
+A standalone [procedure](/docs/procedure) is also a router, so these utilities work with procedures too.
 :::
 
 ### Infer Router Inputs
+
+Infers the input type for each procedure in the router.
 
 ```ts twoslash
 import type { router } from './shared/planet'
@@ -117,9 +105,9 @@ export type Inputs = InferRouterInputs<typeof router>
 type FindPlanetInput = Inputs['planet']['find']
 ```
 
-Infers the expected input types for each procedure in the router.
-
 ### Infer Router Outputs
+
+Infers the output type for each procedure in the router.
 
 ```ts twoslash
 import type { router } from './shared/planet'
@@ -131,9 +119,9 @@ export type Outputs = InferRouterOutputs<typeof router>
 type FindPlanetOutput = Outputs['planet']['find']
 ```
 
-Infers the expected output types for each procedure in the router.
-
 ### Infer Router Initial Contexts
+
+Infers the [initial context](/docs/context#initial-context) for each procedure in the router.
 
 ```ts twoslash
 import type { router } from './shared/planet'
@@ -145,18 +133,42 @@ export type InitialContexts = InferRouterInitialContexts<typeof router>
 type FindPlanetInitialContext = InitialContexts['planet']['find']
 ```
 
-Infers the [initial context](/docs/context#initial-context) types defined for each procedure.
+### Infer Router Final Contexts
 
-### Infer Router Current Contexts
+Infers the final context for each procedure in the router by combining the [initial and injected context](/docs/context#combining-initial-and-injected-context). This is the closest match to the context the procedure's handler receives.
 
 ```ts twoslash
 import type { router } from './shared/planet'
 // ---cut---
-import type { InferRouterCurrentContexts } from '@orpc/server'
+import type { InferRouterFinalContexts } from '@orpc/server'
 
-export type CurrentContexts = InferRouterCurrentContexts<typeof router>
+export type FinalContexts = InferRouterFinalContexts<typeof router>
 
-type FindPlanetCurrentContext = CurrentContexts['planet']['find']
+type FindPlanetFinalContext = FinalContexts['planet']['find']
 ```
 
-Infers the [current context](/docs/context#combining-initial-and-execution-context) types, which combine the initial context with the execution context and pass it to the handler.
+### Infer Router Errors
+
+Infers the throwable errors each procedure in a router can produce.
+
+```ts twoslash
+import type { router } from './shared/planet'
+// ---cut---
+import type { InferRouterErrors } from '@orpc/server'
+
+export type Errors = InferRouterErrors<typeof router>
+
+type FindPlanetError = Errors['planet']['find']
+```
+
+### Infer Router Error
+
+Infers all possible throwable errors the entire router can produce. This is useful when you want a single type for router-wide error handling.
+
+```ts twoslash
+import type { router } from './shared/planet'
+// ---cut---
+import type { InferRouterError } from '@orpc/server'
+
+export type RouterError = InferRouterError<typeof router>
+```

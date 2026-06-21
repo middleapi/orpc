@@ -1,32 +1,38 @@
 import { os } from '../../builder'
-import { BodyLimitPlugin } from './body-limit-plugin'
+import { BodyLimitHandlerPlugin } from './body-limit-plugin'
 import { RPCHandler } from './rpc-handler'
 
-describe('bodyLimitPlugin', () => {
+describe('bodyLimitHandlerPlugin', () => {
   const size22Json = { json: { foo: 'bar' } }
 
-  it('should ignore for non-body request', async () => {
-    const handler = new RPCHandler(os.handler(() => 'ping'), {
-      strictGetMethodPluginEnabled: false,
-      plugins: [
-        new BodyLimitPlugin({ maxBodySize: 22 }),
-      ],
-    })
+  it('ignores requests without a body', async () => {
+    const handler = new RPCHandler(
+      {
+        ping: os.handler(() => 'ping'),
+      },
+      {
+        plugins: [new BodyLimitHandlerPlugin({ maxBodySize: 22 })],
+      },
+    )
 
-    const { response } = await handler.handle(new Request('https://example.com/?data=%7B%7D'))
+    const { matched, response } = await handler.handle(new Request('https://example.com/ping?data=%7B%7D'))
 
-    await expect(response?.text()).resolves.toContain('ping')
-    expect(response?.status).toBe(200)
+    expect(matched).toBe(true)
+    await expect(response!.text()).resolves.toContain('ping')
+    expect(response!.status).toBe(200)
   })
 
-  it('should work if body size is not exceeded', async () => {
-    const handler = new RPCHandler(os.handler(() => 'ping'), {
-      plugins: [
-        new BodyLimitPlugin({ maxBodySize: 22 }),
-      ],
-    })
+  it('allows bodies within the limit', async () => {
+    const handler = new RPCHandler(
+      {
+        ping: os.handler(() => 'ping'),
+      },
+      {
+        plugins: [new BodyLimitHandlerPlugin({ maxBodySize: 22 })],
+      },
+    )
 
-    const { response } = await handler.handle(new Request('https://example.com/', {
+    const { matched, response } = await handler.handle(new Request('https://example.com/ping', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -34,17 +40,22 @@ describe('bodyLimitPlugin', () => {
       body: JSON.stringify(size22Json),
     }))
 
-    await expect(response?.text()).resolves.toContain('ping')
-    expect(response?.status).toBe(200)
+    expect(matched).toBe(true)
+    await expect(response!.text()).resolves.toContain('ping')
+    expect(response!.status).toBe(200)
   })
 
-  it('check the content-length', async () => {
-    const handler = new RPCHandler(os.handler(() => 'ping'), {
-      plugins: [
-        new BodyLimitPlugin({ maxBodySize: 21 }),
-      ],
-    })
-    const { response } = await handler.handle(new Request('https://example.com', {
+  it('checks the content-length header', async () => {
+    const handler = new RPCHandler(
+      {
+        ping: os.handler(() => 'ping'),
+      },
+      {
+        plugins: [new BodyLimitHandlerPlugin({ maxBodySize: 21 })],
+      },
+    )
+
+    const { matched, response } = await handler.handle(new Request('https://example.com/ping', {
       method: 'POST',
       headers: {
         'content-length': '22',
@@ -52,18 +63,22 @@ describe('bodyLimitPlugin', () => {
       body: JSON.stringify({}),
     }))
 
-    await expect(response?.text()).resolves.toContain('PAYLOAD_TOO_LARGE')
-    expect(response?.status).toBe(413)
+    expect(matched).toBe(true)
+    await expect(response!.text()).resolves.toContain('PAYLOAD_TOO_LARGE')
+    expect(response!.status).toBe(413)
   })
 
-  it('check the body-size', async () => {
-    const handler = new RPCHandler(os.handler(() => 'ping'), {
-      plugins: [
-        new BodyLimitPlugin({ maxBodySize: 21 }),
-      ],
-    })
+  it('checks the streamed body size', async () => {
+    const handler = new RPCHandler(
+      {
+        ping: os.handler(() => 'ping'),
+      },
+      {
+        plugins: [new BodyLimitHandlerPlugin({ maxBodySize: 21 })],
+      },
+    )
 
-    const { response } = await handler.handle(new Request('https://example.com/', {
+    const { matched, response } = await handler.handle(new Request('https://example.com/ping', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -71,7 +86,8 @@ describe('bodyLimitPlugin', () => {
       body: JSON.stringify(size22Json),
     }))
 
-    await expect(response?.text()).resolves.toContain('PAYLOAD_TOO_LARGE')
-    expect(response?.status).toBe(413)
+    expect(matched).toBe(true)
+    await expect(response!.text()).resolves.toContain('PAYLOAD_TOO_LARGE')
+    expect(response!.status).toBe(413)
   })
 })

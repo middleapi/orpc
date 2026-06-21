@@ -1,16 +1,17 @@
 import type { Context } from '@orpc/server'
-import type { StandardHandlerOptions, StandardHandlerPlugin } from '@orpc/server/standard'
-import type { RatelimiterLimitResult } from './types'
-import { COMMON_ORPC_ERROR_DEFS } from '@orpc/client'
+import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '@orpc/server/standard'
+import type { StandardHeaders } from '@standardserver/core'
+import type { RateLimitResult } from './types'
+import { toArray } from '@orpc/shared'
 
-export const RATELIMIT_HANDLER_CONTEXT_SYMBOL: unique symbol = Symbol('ORPC_RATE_LIMIT_HANDLER_CONTEXT')
+export const RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_RATELIMIT_HANDLER_PLUGIN_CONTEXT')
 
-export interface RatelimitHandlerPluginContext {
-  [RATELIMIT_HANDLER_CONTEXT_SYMBOL]?: {
+export interface RateLimitHandlerPluginContext {
+  [RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL]?: {
     /**
      * The result of the ratelimiter after applying limits
      */
-    ratelimitResult?: RatelimiterLimitResult
+    results: RateLimitResult[]
   }
 }
 
@@ -20,44 +21,59 @@ export interface RatelimitHandlerPluginContext {
  *
  * @see {@link https://orpc.dev/docs/helpers/ratelimit#handler-plugin Ratelimit handler plugin}
  */
-export class RatelimitHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  init(options: StandardHandlerOptions<T>): void {
-    options.rootInterceptors ??= []
+export class RateLimitHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
+  name = '~ratelimit'
 
-    /**
-     * This plugin should set headers before "response headers" plugin or user defined interceptors
-     * In case user wants to override ratelimit headers
-     */
-    options.rootInterceptors.unshift(async (interceptorOptions) => {
-      const handlerContext: Exclude<RatelimitHandlerPluginContext[typeof RATELIMIT_HANDLER_CONTEXT_SYMBOL], undefined> = {}
+  init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
+    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async (interceptorOptions) => {
+      const pluginContext: Exclude<RateLimitHandlerPluginContext[typeof RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL], undefined> = { results: [] }
 
       const result = await interceptorOptions.next({
         ...interceptorOptions,
         context: {
           ...interceptorOptions.context,
-          [RATELIMIT_HANDLER_CONTEXT_SYMBOL]: handlerContext,
-        },
+          [RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext,
+        } satisfies RateLimitHandlerPluginContext,
       })
 
-      if (result.matched && handlerContext.ratelimitResult) {
+      if (result.matched && pluginContext.results.length) {
+        const exceededResults = pluginContext.results.filter(r => !r.success)
+
+        // Pick the most constrained result: prefer exceeded limits, fall back to all results.
+        // Treat undefined remaining as 0 — unknown capacity is assumed fully exhausted.
+        const mostConstrained = (exceededResults.length ? exceededResults : pluginContext.results).reduce(
+          (a, b) => (a.remaining ?? Infinity) <= (b.remaining ?? Infinity) ? a : b,
+        )
+
+        const headers: StandardHeaders = {
+          ...result.response.headers,
+          'ratelimit-limit': mostConstrained.limit?.toString(),
+          'ratelimit-remaining': mostConstrained.remaining?.toString(),
+          'ratelimit-reset': mostConstrained.reset?.toString(),
+        }
+
+        if (result.response.status >= 400 && !mostConstrained.success && mostConstrained.reset !== undefined) {
+          headers['retry-after'] = Math.max(0, Math.ceil((mostConstrained.reset - Date.now()) / 1000)).toString()
+        }
+
         return {
           ...result,
           response: {
             ...result.response,
-            headers: {
-              ...result.response.headers,
-              'ratelimit-limit': handlerContext.ratelimitResult.limit?.toString(),
-              'ratelimit-remaining': handlerContext.ratelimitResult.remaining?.toString(),
-              'ratelimit-reset': handlerContext.ratelimitResult.reset?.toString(),
-              'retry-after': !handlerContext.ratelimitResult.success && result.response.status === COMMON_ORPC_ERROR_DEFS.TOO_MANY_REQUESTS.status && handlerContext.ratelimitResult.reset !== undefined
-                ? Math.max(0, Math.ceil((handlerContext.ratelimitResult.reset - Date.now()) / 1000)).toString()
-                : undefined,
-            },
+            headers,
           },
         }
       }
 
       return result
-    })
+    }
+
+    return {
+      ...options,
+      routingInterceptors: [
+        ...toArray(options.routingInterceptors),
+        routingInterceptor,
+      ],
+    }
   }
 }

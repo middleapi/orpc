@@ -2,7 +2,7 @@ import type { Promisable } from '@orpc/shared'
 import type { QueryFunction, QueryFunctionContext, QueryKey } from '@tanstack/query-core'
 import { stringifyJSON } from '@orpc/shared'
 
-export function experimental_liveQuery<
+export function liveQuery<
   TQueryFnData = unknown,
   TQueryKey extends QueryKey = QueryKey,
 >(
@@ -15,16 +15,14 @@ export function experimental_liveQuery<
     let last: { chunk: TQueryFnData } | undefined
 
     for await (const chunk of stream) {
-      if (context.signal.aborted) {
-        throw context.signal.reason
-      }
+      context.signal?.throwIfAborted()
 
       last = { chunk }
       context.client.setQueryData<TQueryFnData>(context.queryKey, chunk)
     }
 
     if (!last) {
-      throw new Error(
+      throw new TypeError(
         `Live query for ${stringifyJSON(context.queryKey)} did not yield any data. Ensure the query function returns an AsyncIterable with at least one chunk.`,
       )
     }

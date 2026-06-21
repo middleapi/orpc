@@ -1,183 +1,204 @@
-import type { HTTPPath } from '@orpc/client'
-import type { Meta } from '@orpc/contract'
+import type { ErrorMap, Schema } from '@orpc/contract'
 import type { Interceptor } from '@orpc/shared'
-import type { StandardLazyRequest, StandardResponse } from '@orpc/standard-server'
+import type { StandardLazyRequest, StandardResponse } from '@standardserver/core'
 import type { Context } from '../../context'
-import type { ProcedureClientInterceptorOptions } from '../../procedure-client'
-import type { Router } from '../../router'
+import type { ProcedureClientInterceptor } from '../../procedure-client'
+import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from './codec'
 import type { StandardHandlerPlugin } from './plugin'
-import type { StandardCodec, StandardMatcher } from './types'
 import { ORPCError, toORPCError } from '@orpc/client'
-import { asyncIteratorWithSpan, intercept, isAsyncIteratorObject, ORPC_NAME, runWithSpan, setSpanError, toArray } from '@orpc/shared'
-import { flattenHeader } from '@orpc/standard-server'
+import { getOpenTelemetryConfig, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, ORPC_NAME, override, recordSpanError, runWithSpan, toArray, traceAsyncIterator } from '@orpc/shared'
+import { flattenStandardHeader } from '@standardserver/core'
 import { createProcedureClient } from '../../procedure-client'
 import { CompositeStandardHandlerPlugin } from './plugin'
 
-export interface StandardHandleOptions<T extends Context> {
-  prefix?: HTTPPath
+export interface StandardHandlerHandleOptions<T extends Context> {
+  prefix?: `/${string}` | undefined
   context: T
 }
 
-export type StandardHandleResult = { matched: true, response: StandardResponse } | { matched: false, response: undefined }
+export type StandardHandlerHandleResult = { matched: true, response: StandardResponse } | { matched: false, response?: undefined }
 
-export interface StandardHandlerInterceptorOptions<T extends Context> extends StandardHandleOptions<T> {
+export interface StandardHandlerInterceptorOptions<T extends Context> extends StandardHandlerCodecResolvedProcedure, StandardHandlerHandleOptions<T> {
   request: StandardLazyRequest
 }
+export type StandardHandlerInterceptor<T extends Context> = Interceptor<StandardHandlerInterceptorOptions<T>, Promise<StandardResponse>>
+
+export interface StandardHandlerRoutingInterceptorOptions<T extends Context> extends StandardHandlerHandleOptions<T> {
+  request: StandardLazyRequest
+}
+export type StandardHandlerRoutingInterceptor<T extends Context> = Interceptor<StandardHandlerRoutingInterceptorOptions<T>, Promise<StandardHandlerHandleResult>>
 
 export interface StandardHandlerOptions<TContext extends Context> {
-  plugins?: StandardHandlerPlugin<TContext>[]
+  /**
+   * Fired on every request before routing, useful when you want
+   * to intercept all requests regardless of whether they match a procedure or not.
+   *
+   * @examples
+   * - batch plugins - separate one request into multiple and call multiple next
+   * - openapi spec plugin - to intercept a request and early response
+   */
+  routingInterceptors?: StandardHandlerRoutingInterceptor<TContext>[]
 
   /**
-   * Interceptors at the request level, helpful when you want catch errors
+   * interceptor run after routing and before error handler,
+   * useful for error handling, logging, metrics, etc.
    */
-  interceptors?: Interceptor<StandardHandlerInterceptorOptions<TContext>, Promise<StandardHandleResult>>[]
-
-  /**
-   * Interceptors at the root level, helpful when you want override the request/response
-   */
-  rootInterceptors?: Interceptor<StandardHandlerInterceptorOptions<TContext>, Promise<StandardHandleResult>>[]
+  interceptors?: StandardHandlerInterceptor<TContext>[]
 
   /**
    *
-   * Interceptors for procedure client.
+   * ClientInterceptor equivalent with createRouterClient.interceptors / createProcedure.interceptors
+   * useful for error handling, logging, metrics, etc. (not counting encoding/decoding)
    */
-  clientInterceptors?: Interceptor<
-    ProcedureClientInterceptorOptions<TContext, Record<never, never>, Meta>,
-    Promise<unknown>
-  >[]
+  clientInterceptors?: ProcedureClientInterceptor<TContext, Schema<unknown>, ErrorMap, any>[]
+
+  plugins?: StandardHandlerPlugin<TContext>[]
 }
 
 export class StandardHandler<T extends Context> {
-  private readonly interceptors: Exclude<StandardHandlerOptions<T>['interceptors'], undefined>
-  private readonly clientInterceptors: Exclude<StandardHandlerOptions<T>['clientInterceptors'], undefined>
-  private readonly rootInterceptors: Exclude<StandardHandlerOptions<T>['rootInterceptors'], undefined>
+  private readonly routingInterceptors: StandardHandlerOptions<T>['routingInterceptors']
+  private readonly interceptors: StandardHandlerOptions<T>['interceptors']
+  private readonly clientInterceptors: StandardHandlerOptions<T>['clientInterceptors']
 
   constructor(
-    router: Router<any, T>,
-    private readonly matcher: StandardMatcher,
-    private readonly codec: StandardCodec,
-    options: NoInfer<StandardHandlerOptions<T>>,
+    private readonly codec: StandardHandlerCodec<T>,
+    options: StandardHandlerOptions<T>,
   ) {
-    const plugins = new CompositeStandardHandlerPlugin(options.plugins)
+    options = new CompositeStandardHandlerPlugin([
+      new OtelHandlerPlugin(),
+      ...toArray(options.plugins),
+    ]).init(options)
 
-    plugins.init(options, router)
-
-    this.interceptors = toArray(options.interceptors)
-    this.clientInterceptors = toArray(options.clientInterceptors)
-    this.rootInterceptors = toArray(options.rootInterceptors)
-
-    this.matcher.init(router)
+    this.routingInterceptors = options.routingInterceptors
+    this.interceptors = options.interceptors
+    this.clientInterceptors = options.clientInterceptors
   }
 
-  async handle(request: StandardLazyRequest, options: StandardHandleOptions<T>): Promise<StandardHandleResult> {
-    const prefix = (options.prefix?.replace(/\/$/, '') || undefined) as HTTPPath | undefined
-
-    if (prefix && !request.url.pathname.startsWith(`${prefix}/`) && request.url.pathname !== prefix) {
+  async handle(request: StandardLazyRequest, { context, prefix }: StandardHandlerHandleOptions<T>): Promise<StandardHandlerHandleResult> {
+    if (prefix && !matchesHttpPathPrefix(request.url, prefix)) {
       return { matched: false, response: undefined }
     }
 
     return intercept(
-      this.rootInterceptors,
-      { ...options, request, prefix },
-      async (interceptorOptions) => {
-        return runWithSpan(
-          { name: `${request.method} ${request.url.pathname}` },
-          async (span) => {
-            let step: 'decode_input' | 'call_procedure' | undefined
+      this.routingInterceptors,
+      { context, prefix, request },
+      async ({ context, prefix, request }) => {
+        const span = getOpenTelemetryConfig()?.trace.getActiveSpan()
 
-            try {
-              return await intercept(
-                this.interceptors,
-                interceptorOptions,
-                async ({ request, context, prefix }) => {
-                  const method = request.method
-                  const url = request.url
+        let step: 'decode_input' | 'call_procedure' | undefined
 
-                  const pathname = prefix
-                    ? url.pathname.replace(prefix, '')
-                    : url.pathname
+        const matchedOrNot = await runWithSpan('find_procedure', () => this.codec.resolveProcedure(request, { context, prefix }))
 
-                  const match = await runWithSpan(
-                    { name: 'find_procedure' },
-                    () => this.matcher.match(method, `/${pathname.replace(/^\/|\/$/g, '')}`),
-                  )
+        if (!matchedOrNot) {
+          /**
+           * [Semantic conventions for HTTP spans](https://opentelemetry.io/docs/specs/semconv/http/http-spans/)
+           */
+          span?.updateName(`${ORPC_NAME}_no_match`)
+          span?.setAttribute('http.request.method', request.method)
+          span?.setAttribute('url.path', request.url)
 
-                  if (!match) {
-                    return { matched: false as const, response: undefined }
-                  }
+          return { matched: false }
+        }
 
-                  /**
-                   * [Semantic conventions for RPC spans](https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/)
-                   */
-                  span?.updateName(`${ORPC_NAME}.${match.path.join('/')}`)
-                  span?.setAttribute('rpc.system', ORPC_NAME)
-                  span?.setAttribute('rpc.method', match.path.join('.'))
+        const { path, procedure, decodeInput } = matchedOrNot
 
-                  step = 'decode_input'
-                  let input = await runWithSpan(
-                    { name: 'decode_input' },
-                    () => this.codec.decode(request, match.params, match.procedure),
-                  )
-                  step = undefined
+        /**
+         * [Semantic conventions for RPC spans](https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/)
+         */
+        span?.updateName(`${ORPC_NAME}.${path.join('/')}`)
+        span?.setAttribute('rpc.system', ORPC_NAME)
+        span?.setAttribute('rpc.method', path.join('.'))
 
-                  if (isAsyncIteratorObject(input)) {
-                    input = asyncIteratorWithSpan(
-                      { name: 'consume_event_iterator_input', signal: request.signal },
-                      input,
-                    )
-                  }
+        try {
+          const response = await intercept(
+            this.interceptors,
+            { context, prefix, request, path, procedure, decodeInput },
 
-                  const client = createProcedureClient(match.procedure, {
-                    context,
-                    path: match.path,
-                    interceptors: this.clientInterceptors,
-                  })
+            async ({ context, prefix, request, path, procedure, decodeInput }) => {
+              step = 'decode_input'
+              let input = await runWithSpan('decode_input', decodeInput)
+              step = undefined
 
-                  /**
-                   * No need to use runWithSpan here, because the client already has its own span.
-                   */
-                  step = 'call_procedure'
-                  const output = await client(input, {
-                    signal: request.signal,
-                    lastEventId: flattenHeader(request.headers['last-event-id']),
-                  })
-                  step = undefined
-
-                  const response = this.codec.encode(output, match.procedure)
-
-                  return {
-                    matched: true,
-                    response,
-                  }
-                },
-              )
-            }
-            catch (e) {
-            /**
-             * Only errors that happen outside of the `call_procedure` step should be set as an error.
-             * Because a business logic error should not be considered as a protocol-level error.
-             */
-              if (step !== 'call_procedure') {
-                setSpanError(span, e)
+              if (isAsyncIteratorObject(input)) {
+                /**
+                 * @warning
+                 * Remember use `override` for event iterator to remain other special properties
+                 */
+                input = override(input, traceAsyncIterator('consume_event_iterator_input', input))
               }
 
-              const error = step === 'decode_input' && !(e instanceof ORPCError)
-                ? new ORPCError('BAD_REQUEST', {
-                    message: `Malformed request. Ensure the request body is properly formatted and the 'Content-Type' header is set correctly.`,
-                    cause: e,
-                  })
-                : toORPCError(e)
+              const client = createProcedureClient(procedure, {
+                context,
+                path,
+                interceptors: this.clientInterceptors,
+              })
 
-              const response = this.codec.encodeError(error)
+              /**
+               * No need to use `runWithSpan` here, because the client already has its own span.
+               */
+              step = 'call_procedure'
+              const output = await client(input, {
+                signal: request.signal,
+                lastEventId: flattenStandardHeader(request.headers['last-event-id']),
+              })
+              step = undefined
 
-              return {
-                matched: true,
-                response,
-              }
-            }
-          },
-        )
+              const response = await this.codec.encodeOutput(output, procedure, path, { context, prefix })
+
+              return response
+            },
+          )
+
+          return { matched: true, response }
+        }
+        catch (e) {
+          /**
+           * Only errors that happen outside of the `call_procedure` step should be set as an error.
+           * Because a business logic error should not be considered as a protocol-level error.
+           */
+          if (step !== 'call_procedure') {
+            recordSpanError(span, e)
+          }
+
+          const error = step === 'decode_input' && !(e instanceof ORPCError)
+            ? new ORPCError('BAD_REQUEST', {
+                message: `Malformed request. Ensure the request body is properly formatted and the 'Content-Type' header is set correctly.`,
+                cause: e,
+              })
+            : toORPCError(e)
+
+          const response = await this.codec.encodeError(error, procedure, path, { context, prefix })
+
+          return { matched: true, response }
+        }
       },
     )
+  }
+}
+
+export class OtelHandlerPlugin implements StandardHandlerPlugin<any> {
+  name = '~opentelemetry'
+
+  init(options: StandardHandlerOptions<any>): StandardHandlerOptions<any> {
+    return {
+      ...options,
+      routingInterceptors: [
+        // Should be placed before user-provided interceptors to help them access the current active context.
+        async ({ next, request }) => {
+          const otelConfig = getOpenTelemetryConfig()
+
+          let propagationContext
+          if (otelConfig?.propagation) {
+            propagationContext = otelConfig.propagation.extract(otelConfig.context.active(), request.headers)
+          }
+
+          return runWithSpan(
+            { name: `${request.method} ${request.url}`, context: propagationContext },
+            () => next(),
+          )
+        },
+        ...toArray(options.routingInterceptors),
+      ],
+    }
   }
 }

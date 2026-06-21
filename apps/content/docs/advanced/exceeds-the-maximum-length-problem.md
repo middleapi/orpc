@@ -1,9 +1,6 @@
----
-title: Exceeds the Maximum Length Problem
-description: How to address the Exceeds the Maximum Length Problem in oRPC.
----
-
 # Exceeds the Maximum Length Problem
+
+TypeScript may report this error when you export a large or complex [router](/docs/router). This is a known TypeScript limitation, not an oRPC bug. TypeScript enforces it to maintain reasonable editor and type-checking performance for large types.
 
 ```ts twoslash
 // @error: The inferred type of this node exceeds the maximum length the compiler will serialize. An explicit type annotation is needed.
@@ -12,11 +9,9 @@ export const router = {
 }
 ```
 
-Are you seeing this error? If so, congratulations! your project is now complex enough to encounter it!
+## When It Happens
 
-## Why It Happens
-
-This error is expected, not a bug. Typescript enforces this to keep your IDE suggestions fast. It appears when all three of these conditions are met:
+You usually see this error when all of the following are true:
 
 1. Your project uses `"declaration": true` in `tsconfig.json`.
 2. Your project is large or your types are very complex.
@@ -24,21 +19,30 @@ This error is expected, not a bug. Typescript enforces this to keep your IDE sug
 
 ## How to Fix It
 
-### 1. Disable `"declaration": true` in `tsconfig.json`
+### 1. Disable `"declaration": true`
 
-This is the simplest option, though it may not be ideal for your project.
+If you don't need this feature, disable this option in your `tsconfig.json`:
 
-### 2. Define the `.output` Type for Your Procedures
+```diff [tsconfig.json]
+  {
+    "compilerOptions": {
+--    "declaration": true,
+++    "declaration": false
+    }
+  }
+```
 
-By explicitly specifying the `.output` or your `handler's return type`, you enable TypeScript to infer the output without parsing the handler's code. This approach can dramatically enhance both type-checking and IDE-suggestion speed.
+### 2. Add Explicit Output Types
+
+Add `.output` or an explicit handler return type to your procedures. This lets TypeScript use the declared output shape instead of fully expanding the handler implementation, which often improves both type-checking and editor performance.
 
 :::tip
 Use the [type](/docs/procedure#type-utility) utility if you just want to specify the output type without validating the output.
 :::
 
-### 3. Export the Router in Parts
+### 3. Split the Router into Smaller Exports
 
-Instead of exporting one large object on the server (with `"declaration": true`), export each router segment individually and merge them on the client (where `"declaration": false`):
+If you need `"declaration": true`, avoid exporting a single massive router object from the server. Instead, export smaller router segments and combine them on the client side, where `"declaration": false`:
 
 ```ts
 export const userRouter = { /** ... */ }
@@ -46,7 +50,7 @@ export const planetRouter = { /** ... */ }
 export const publicRouter = { /** ... */ }
 ```
 
-Then, on the client side:
+Then define the client type from those smaller exports:
 
 ```ts
 interface Router {

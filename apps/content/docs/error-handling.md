@@ -1,128 +1,175 @@
----
-title: Error Handling
-description: Manage errors in oRPC using both traditional and type‑safe strategies.
----
+# Error Handling
 
-# Error Handling in oRPC
+Error handling in oRPC is flexible and consistent. You can use the `ORPCError` class, define typesafe errors, and adapt custom error classes while still returning meaningful feedback to clients.
 
-oRPC offers a robust error handling system. You can either throw standard JavaScript errors or, preferably, use the specialized `ORPCError` class to utilize oRPC features.
+## `ORPCError` Class
 
-There are two primary approaches:
+`ORPCError` is the standard error type in oRPC. It includes a `code`, plus optional `message` and `data` fields.
 
-- **Normal Approach:** Throw errors directly (using `ORPCError` is recommended for clarity).
-- **Type‑Safe Approach:** Predefine error types so that clients can infer and handle errors in a type‑safe manner.
-
-:::warning
-The `ORPCError.data` property is sent to the client. Avoid including sensitive information.
+::: danger
+`message` and `data` are sent to the client. Do not include sensitive information in either field.
 :::
 
-## Normal Approach
+```ts twoslash
+declare const notFound: boolean
+// ---cut---
+import { ORPCError, os } from '@orpc/server'
 
-In the traditional approach you may throw any JavaScript error. However, using the `ORPCError` class improves consistency and ensures that error codes and optional data are handled appropriately.
-
-**Key Points:**
-
-- The first argument is the error code.
-- You may optionally include a message, additional error data, or any standard error options.
-
-```ts
-const rateLimit = os.middleware(async ({ next }) => {
+const rateLimitMiddleware = os.middleware(async ({ next }) => {
   throw new ORPCError('RATE_LIMITED', {
     message: 'You are being rate limited',
     data: { retryAfter: 60 }
   })
+
   return next()
 })
 
 const example = os
-  .use(rateLimit)
+  .use(rateLimitMiddleware)
   .handler(async ({ input }) => {
-    throw new ORPCError('NOT_FOUND')
-    throw new Error('Something went wrong') // <-- will be converted to INTERNAL_SERVER_ERROR
+    if (notFound) {
+      throw new ORPCError('NOT_FOUND')
+    }
   })
 ```
 
+## Typesafe Errors
+
+For end-to-end type safety, define your errors with `.errors` or [return `ORPCError`](#returning-an-orpcerror). This lets the client infer each error's shape and handle it safely. You can use any [Standard Schema](https://standardschema.dev/schema#what-schema-libraries-implement-the-spec) library to validate error data.
+
 ::: danger
-Do not pass sensitive data in the `ORPCError.data` field.
+`message` and `data` are sent to the client. Do not include sensitive information in either field.
 :::
-
-## Type‑Safe Error Handling
-
-For a fully type‑safe error management experience, define your error types using the `.errors` method. This lets the client infer the error's structure and handle it accordingly. You can use any [Standard Schema](https://github.com/standard-schema/standard-schema?tab=readme-ov-file#what-schema-libraries-implement-the-spec) library to validate error data.
 
 ```ts twoslash
 import { os } from '@orpc/server'
 import * as z from 'zod'
+
+declare const notFound: boolean
 // ---cut---
-const base = os.errors({ // <-- common errors
-  RATE_LIMITED: {
-    data: z.object({
-      retryAfter: z.number(),
-    }),
-  },
-  UNAUTHORIZED: {},
-})
-
-const rateLimit = base.middleware(async ({ next, errors }) => {
-  throw errors.RATE_LIMITED({
-    message: 'You are being rate limited',
-    data: { retryAfter: 60 }
+const rateLimitMiddleware = os
+  .errors({
+    RATE_LIMITED: {
+      data: z.object({
+        retryAfter: z.number(),
+      }),
+    },
   })
-  return next()
-})
+  .middleware(async ({ next, errors }) => {
+    throw errors.RATE_LIMITED({
+      message: 'You are being rate limited',
+      data: { retryAfter: 60 }
+    })
 
-const example = base
-  .use(rateLimit)
+    return next()
+  })
+
+const exampleProcedure = os
+  .use(rateLimitMiddleware)
   .errors({
     NOT_FOUND: {
-      message: 'The resource was not found', // <-- default message
+      message: 'The resource was not found', // <- default message
     },
   })
   .handler(async ({ input, errors }) => {
-    throw errors.NOT_FOUND()
+    if (notFound) {
+      throw errors.NOT_FOUND()
+    }
   })
 ```
 
-:::danger
-Again, avoid including any sensitive data in the error data since it will be exposed to the client.
+::: tip
+You can use typesafe errors across your entire project, but we recommend reserving them for application-specific cases. For common errors like `UNAUTHORIZED` or `RATE_LIMITED`, the client usually already understands the meaning. Skipping explicit schemas for those errors can also reduce type complexity and improve TypeScript performance.
 :::
 
-Learn more about [Client Error Handling](/docs/client/error-handling).
+### ORPCError Compatibility
 
-## Combining Both Approaches
-
-You can combine both strategies seamlessly. When you throw an `ORPCError` instance, if the `code`, `status` and `data` match with the errors defined in the `.errors` method, oRPC will treat it exactly as if you had thrown `errors.[code]` using the type‑safe approach.
+If you cannot access the `errors` object, for example in a utility function or another module, you can still throw `ORPCError`. oRPC will try to convert it to the matching typesafe error when its `code` and `data` match a defined error. If no match is found, it is treated as an unknown error.
 
 ```ts
-const base = os.errors({ // <-- common errors
-  RATE_LIMITED: {
-    data: z.object({
-      retryAfter: z.number().int().min(1).default(1),
-    }),
-  },
-  UNAUTHORIZED: {},
-})
-
-const rateLimit = base.middleware(async ({ next, errors }) => {
-  throw errors.RATE_LIMITED({
-    message: 'You are being rate limited',
-    data: { retryAfter: 60 }
+const exampleProcedure = os
+  .errors({
+    NOT_FOUND: {
+      message: 'The resource was not found',
+    },
   })
-  // OR --- both are equivalent
-  throw new ORPCError('RATE_LIMITED', {
-    message: 'You are being rate limited',
-    data: { retryAfter: 60 }
-  })
-  return next()
-})
+  .handler(async ({ errors }) => {
+    throw errors.NOT_FOUND()
 
-const example = base
-  .use(rateLimit)
-  .handler(async ({ input }) => {
-    throw new ORPCError('BAD_REQUEST') // <-- unknown error
+    // Treated as errors.NOT_FOUND because the code and data match
+    throw new ORPCError('NOT_FOUND')
+
+    // Treated as an unknown error because it does not match any defined error
+    throw new ORPCError('BAD_REQUEST')
   })
 ```
 
-:::danger
-Remember: Since `ORPCError.data` is transmitted to the client, do not include any sensitive information.
+### Returning an `ORPCError`
+
+As an alternative to `.errors`, you can return an `ORPCError` directly from your handler or middleware to achieve end-to-end type safety.
+
+::: warning
+The [Contract First Approach](/docs/contract-first/define-contract) does not support this pattern. When implementing a contract, returning an `ORPCError` is treated the same as throwing it.
 :::
+
+```ts
+const exampleProcedure = os
+  .handler(async ({ errors }) => {
+    if (reachRateLimit) {
+      return new ORPCError('RATE_LIMITED', {
+        message: 'You are being rate limited',
+        data: { retryAfter: 60 }
+      })
+    }
+
+    return 'Success'
+  })
+```
+
+::: danger
+`message` and `data` are sent to the client. Do not include sensitive information in either field.
+:::
+
+## ORPC Error Codes
+
+By default, oRPC allows any string as an error code and suggests common HTTP codes like `NOT_FOUND` and `UNAUTHORIZED`. You can override this with your own set of allowed error codes for better type safety and consistency.
+
+```ts
+declare module '@orpc/server' { // or '@orpc/client'
+  interface Registry {
+    ORPCErrorCode: 'NOT_FOUND' | 'UNAUTHORIZED' | 'RATE_LIMITED' | 'MY_CUSTOM_ERROR' | (string & {})
+  }
+}
+```
+
+With this configuration, only `NOT_FOUND`, `UNAUTHORIZED`, `RATE_LIMITED`, and `MY_CUSTOM_ERROR` will be suggested as error codes. The `(string & {})` fallback ensures you can still use any string value when needed.
+
+## Using Custom Error Classes
+
+You do not have to use `ORPCError` directly in your business logic. You can throw your own error classes and convert them to `ORPCError` in middleware or interceptors.
+
+::: info
+By default, oRPC can convert non-`ORPCError` into an `ORPCError` with code `INTERNAL_SERVER_ERROR`, or leave them unchanged depending on the client you are using.
+:::
+
+```ts
+class MyCustomError extends Error {
+}
+
+const customErrorConverterMiddleware = os.middleware(async ({ next }) => {
+  try {
+    return await next()
+  }
+  catch (err) {
+    if (err instanceof MyCustomError) {
+      throw new ORPCError('MY_CUSTOM_ERROR', { message: err.message, cause: err })
+    }
+
+    throw err
+  }
+})
+```
+
+## Client Error Handling
+
+To learn how to handle errors on the client side, see the [Client Error Handling documentation](/docs/client/error-handling).

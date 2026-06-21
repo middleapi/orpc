@@ -1,27 +1,21 @@
----
-title: Response Headers Plugin
-description: Response Headers Plugin for oRPC
----
-
 # Response Headers Plugin
 
-The Response Headers Plugin allows you to set response headers in oRPC. It injects a `resHeaders` instance into the `context`, enabling you to modify response headers easily.
+Use `ResponseHeadersHandlerPlugin` to accumulate response headers in `context.resHeaders` and merge them into the final response.
 
-## Context Setup
+## Context Access
 
 ```ts twoslash
 import { os } from '@orpc/server'
 // ---cut---
-import { setCookie } from '@orpc/server/helpers'
-import { ResponseHeadersPluginContext } from '@orpc/server/plugins'
+import type { ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
 
-interface ORPCContext extends ResponseHeadersPluginContext {}
+interface ServerContext extends ResponseHeadersHandlerPluginContext {}
 
-const base = os.$context<ORPCContext>()
+const base = os.$context<ServerContext>()
 
-const example = base
+const procedure = base
   .use(({ context, next }) => {
-    context.resHeaders?.set('x-custom-header', 'value')
+    context.resHeaders?.set('x-request-id', 'req_123')
     return next()
   })
   .handler(({ context }) => {
@@ -32,9 +26,8 @@ const example = base
   })
 ```
 
-::: info
-**Why can `resHeaders` be `undefined`?**
-This allows procedures to run safely even when `ResponseHeadersPlugin` is not used, such as in direct calls.
+::: info Why can `resHeaders` be undefined?
+This allows procedures to run safely even without `ResponseHeadersHandlerPlugin`, such as in direct calls.
 :::
 
 ::: tip
@@ -44,15 +37,17 @@ Combine with [Cookie Helpers](/docs/helpers/cookie) for streamlined cookie manag
 ## Handler Setup
 
 ```ts
-import { ResponseHeadersPlugin } from '@orpc/server/plugins'
+import { ResponseHeadersHandlerPlugin } from '@orpc/server/plugins'
 
 const handler = new RPCHandler(router, {
   plugins: [
-    new ResponseHeadersPlugin()
+    new ResponseHeadersHandlerPlugin(),
   ],
 })
 ```
 
-::: info
-The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc-handler), [OpenAPIHandler](/docs/openapi/openapi-handler), or another custom handler.
-:::
+<!--@include: @/shared/common-plugin-handler-compatibility.md -->
+
+## Learn More
+
+For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/response-headers.ts).

@@ -1,222 +1,115 @@
-import { getEventMeta, withEventMeta } from '@orpc/standard-server'
-import { mapEventIterator } from './event-iterator'
+import { getEventMeta, withEventMeta } from '@standardserver/core'
+import { wrapEventIteratorPreservingMeta } from './event-iterator'
 
-describe('mapEventIterator', () => {
-  it('on success', async () => {
-    let finished = false
+describe('wrapEventIteratorPreservingMeta', () => {
+  it('preserves metadata when mapping yielded and returned values', async () => {
+    const event = withEventMeta({ order: 2 }, { id: 'id-2' })
+    const returned = withEventMeta({ order: 3 }, { retry: 4000 })
 
     const iterator = (async function* () {
-      try {
-        yield 1
-        yield { order: 2 }
-        yield withEventMeta({ order: 3 }, { id: 'id-3' })
-        return withEventMeta({ order: 4 }, { retry: 4000 })
-      }
-      finally {
-        finished = true
-      }
+      yield 1
+      yield event
+      return returned
     })()
 
-    const map = vi.fn(async v => ({ mapped: v }))
-
-    const mapped = mapEventIterator(iterator, {
-      error: map,
-      value: map,
+    const mapResult = vi.fn(async (result) => {
+      return {
+        ...result,
+        value: { mapped: result.value },
+      }
     })
 
-    await expect(mapped.next()).resolves.toSatisfy(({ done, value }) => {
-      expect(done).toBe(false)
-      expect(value).toEqual({ mapped: 1 })
-      expect(getEventMeta(value)).toEqual(undefined)
-
-      return true
+    const mapped = wrapEventIteratorPreservingMeta(iterator, {
+      mapResult,
     })
 
-    expect(map).toHaveBeenCalledTimes(1)
-    expect(map).toHaveBeenLastCalledWith(1, false)
+    const first = await mapped.next()
+    expect(first).toEqual({ done: false, value: { mapped: 1 } })
+    expect(getEventMeta(first.value)).toEqual(undefined)
 
-    await expect(mapped.next()).resolves.toSatisfy(({ done, value }) => {
-      expect(done).toBe(false)
-      expect(value).toEqual({ mapped: { order: 2 } })
-      expect(getEventMeta(value)).toEqual(undefined)
+    const second = await mapped.next()
+    expect(second).toEqual({ done: false, value: { mapped: { order: 2 } } })
+    expect(getEventMeta(second.value)).toEqual({ id: 'id-2' })
 
-      return true
-    })
+    const third = await mapped.next()
+    expect(third).toEqual({ done: true, value: { mapped: { order: 3 } } })
+    expect(getEventMeta(third.value)).toEqual({ retry: 4000 })
 
-    expect(map).toHaveBeenCalledTimes(2)
-    expect(map).toHaveBeenLastCalledWith({ order: 2 }, false)
-
-    await expect(mapped.next()).resolves.toSatisfy(({ done, value }) => {
-      expect(done).toBe(false)
-      expect(value).toEqual({ mapped: { order: 3 } })
-      expect(getEventMeta(value)).toEqual({ id: 'id-3' })
-
-      return true
-    })
-
-    expect(map).toHaveBeenCalledTimes(3)
-    expect(map).toHaveBeenLastCalledWith({ order: 3 }, false)
-
-    await expect(mapped.next()).resolves.toSatisfy(({ done, value }) => {
-      expect(done).toBe(true)
-      expect(value).toEqual({ mapped: { order: 4 } })
-      expect(getEventMeta(value)).toEqual({ retry: 4000 })
-
-      return true
-    })
-
-    expect(map).toHaveBeenCalledTimes(4)
-    expect(map).toHaveBeenLastCalledWith({ order: 4 }, true)
-
-    expect(finished).toBe(true)
+    expect(mapResult).toHaveBeenNthCalledWith(1, { done: false, value: 1 })
+    expect(mapResult).toHaveBeenNthCalledWith(2, { done: false, value: event })
+    expect(mapResult).toHaveBeenNthCalledWith(3, { done: true, value: returned })
   })
 
-  it('on error', async () => {
-    let finished = false
+  it('returns original results unchanged when the mapper keeps the same value', async () => {
+    const event = withEventMeta({ order: 1 }, { id: 'id-1' })
+    const returned = withEventMeta({ order: 2 }, { retry: 2000 })
+
+    const iterator = (async function* () {
+      yield event
+      return returned
+    })()
+
+    const mapResult = vi.fn(async result => result)
+
+    const mapped = wrapEventIteratorPreservingMeta(iterator, {
+      mapResult,
+    })
+
+    const first = await mapped.next()
+    expect(first).toEqual({ done: false, value: event })
+    expect(first.value).toBe(event)
+    expect(getEventMeta(first.value)).toEqual({ id: 'id-1' })
+
+    const second = await mapped.next()
+    expect(second).toEqual({ done: true, value: returned })
+    expect(second.value).toBe(returned)
+    expect(getEventMeta(second.value)).toEqual({ retry: 2000 })
+  })
+
+  it('preserves metadata when mapping errors', async () => {
+    const error = withEventMeta(new Error('TEST'), { id: 'error-1' })
+    const onError = vi.fn()
+    const mapError = vi.fn(async cause => ({ mapped: cause }))
+
+    const iterator = (async function* () {
+      throw error
+    })()
+
+    const mapped = wrapEventIteratorPreservingMeta(iterator, {
+      onError,
+      mapError,
+    })
+
+    await expect(mapped.next()).rejects.toSatisfy((cause) => {
+      expect(cause).toEqual({ mapped: error })
+      expect(getEventMeta(cause)).toEqual({ id: 'error-1' })
+
+      return true
+    })
+
+    expect(mapError).toHaveBeenCalledTimes(1)
+    expect(mapError).toHaveBeenCalledWith(error)
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(onError).toHaveBeenCalledWith(error)
+  })
+
+  it('does not reattach metadata when mapped errors stay the same or become non-objects', async () => {
     const error = withEventMeta(new Error('TEST'), { id: 'error-1' })
 
-    const iterator = (async function* () {
-      try {
-        throw error
-      }
-      finally {
-        finished = true
-      }
-    })()
-
-    const map = vi.fn(async v => ({ mapped: v }))
-
-    const mapped = mapEventIterator(iterator, {
-      error: map,
-      value: map,
+    const sameError = wrapEventIteratorPreservingMeta((async function* () {
+      throw error
+    })(), {
+      mapError: async cause => cause,
     })
 
-    await expect(mapped.next()).rejects.toSatisfy((e) => {
-      expect(e).toEqual({ mapped: error })
-      expect(getEventMeta(e)).toEqual({ id: 'error-1' })
+    await expect(sameError.next()).rejects.toBe(error)
 
-      return true
+    const primitiveError = wrapEventIteratorPreservingMeta((async function* () {
+      throw error
+    })(), {
+      mapError: async () => 'mapped-error',
     })
 
-    expect(map).toHaveBeenCalledTimes(1)
-    expect(map).toHaveBeenLastCalledWith(error)
-
-    expect(finished).toBe(true)
-  })
-
-  it('cancel original when .return is called', async () => {
-    let finished = false
-
-    const iterator = (async function* () {
-      try {
-        yield 1
-        yield 2
-      }
-      finally {
-        finished = true
-      }
-    })()
-
-    const map = vi.fn(async v => ({ mapped: v }))
-
-    const mapped = mapEventIterator(iterator, {
-      error: map,
-      value: map,
-    })
-
-    await mapped.next()
-    await mapped.return({} as any)
-
-    expect(map).toHaveBeenCalledTimes(1)
-    expect(finished).toBe(true)
-  })
-
-  it('cancel original when .throw is called', async () => {
-    let finished = false
-
-    const iterator = (async function* () {
-      try {
-        yield 1
-        yield 2
-      }
-      finally {
-        finished = true
-      }
-    })()
-
-    const map = vi.fn(async v => ({ mapped: v }))
-
-    const mapped = mapEventIterator(iterator, {
-      error: map,
-      value: map,
-    })
-
-    await mapped.next()
-    await expect(mapped.throw(new Error('TEST'))).rejects.toThrow()
-    expect(finished).toBe(true)
-  })
-
-  it('cancel original when error is thrown in value map', async () => {
-    let finished = false
-
-    const iterator = (async function* () {
-      try {
-        yield 1
-        yield 2
-      }
-      finally {
-        finished = true
-      }
-    })()
-
-    const map = vi.fn(async (v) => {
-      if (v === 2) {
-        throw new Error('TEST')
-      }
-      return { mapped: v }
-    })
-
-    const mapped = mapEventIterator(iterator, {
-      value: map,
-      error: async error => error,
-    })
-
-    await expect(mapped.next()).resolves.toEqual({ done: false, value: { mapped: 1 } })
-    await expect(mapped.next()).rejects.toThrow('TEST')
-
-    expect(finished).toBe(true)
-  })
-
-  it('cancel original + throw on cleanup', async () => {
-    const error = new Error('TEST')
-
-    const iterator = (async function* () {
-      try {
-        yield 1
-        yield 2
-      }
-      finally {
-        // eslint-disable-next-line no-unsafe-finally
-        throw error
-      }
-    })()
-
-    const map = vi.fn(async v => ({ mapped: v }))
-
-    const mapped = mapEventIterator(iterator, {
-      error: map,
-      value: map,
-    })
-
-    await expect(mapped.next()).resolves.toEqual({ done: false, value: { mapped: 1 } })
-    await expect(mapped.return()).rejects.toSatisfy((e) => {
-      expect(e).toEqual({ mapped: error })
-
-      return true
-    })
-
-    expect(map).toHaveBeenCalledTimes(2)
-    expect(map).toHaveBeenNthCalledWith(1, 1, false)
-    expect(map).toHaveBeenNthCalledWith(2, error)
+    await expect(primitiveError.next()).rejects.toBe('mapped-error')
   })
 })

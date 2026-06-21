@@ -1,11 +1,8 @@
----
-title: Cookie Helpers
-description: Functions for managing HTTP cookies in web applications.
----
-
 # Cookie Helpers
 
-The Cookie helpers provide functions to set and get HTTP cookies.
+Cookie helpers provide utilities for setting and reading HTTP cookies from fetch headers.
+
+## Basic Usage
 
 ```ts twoslash
 import { deleteCookie, getCookie, setCookie } from '@orpc/server/helpers'

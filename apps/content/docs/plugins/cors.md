@@ -1,20 +1,17 @@
----
-title: CORS Plugin
-description: CORS Plugin for oRPC
----
+# CORS Handler Plugin
 
-# CORS Plugin
-
-`CORSPlugin` is a plugin for oRPC that allows you to configure CORS for your API.
+Use `CORSHandlerPlugin` to configure [CORS Policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) for your API.
 
 ## Basic
 
-```ts
-import { CORSPlugin } from '@orpc/server/plugins'
+```ts twoslash
+import { RPCHandler } from '@orpc/server/fetch'
+// ---cut---
+import { CORSHandlerPlugin } from '@orpc/server/plugins'
 
 const handler = new RPCHandler(router, {
   plugins: [
-    new CORSPlugin({
+    new CORSHandlerPlugin({
       origin: (origin, options) => origin,
       allowMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH'],
       // ...
@@ -23,6 +20,10 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-::: info
-The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc-handler), [OpenAPIHandler](/docs/openapi/openapi-handler), or another custom handler.
-:::
+<!--@include: @/shared/common-plugin-handler-compatibility.md -->
+
+<!--@include: @/shared/standard-server-cors-warning.md -->
+
+## Learn More
+
+For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/cors.ts).

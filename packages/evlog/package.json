@@ -1,0 +1,56 @@
+{
+  "name": "@orpc/evlog",
+  "type": "module",
+  "version": "1.13.4",
+  "license": "MIT",
+  "homepage": "https://orpc.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/middleapi/orpc.git",
+    "directory": "packages/evlog"
+  },
+  "keywords": [
+    "orpc",
+    "evlog"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "./node": {
+        "types": "./dist/adapters/node.d.mts",
+        "import": "./dist/adapters/node.mjs",
+        "default": "./dist/adapters/node.mjs"
+      }
+    }
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./node": "./src/adapters/node.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "unbuild",
+    "type:check": "tsc -b"
+  },
+  "peerDependencies": {
+    "evlog": ">=2.18.1"
+  },
+  "dependencies": {
+    "@orpc/client": "workspace:*",
+    "@orpc/server": "workspace:*",
+    "@orpc/shared": "workspace:*",
+    "@standardserver/core": "^0.0.24"
+  },
+  "devDependencies": {
+    "evlog": "^2.18.1"
+  }
+}

@@ -1,52 +1,78 @@
----
-title: Response Validation Plugin
-description: A plugin that validates server responses against the contract schema to ensure that the data returned from your server matches the expected types defined in your contract.
----
-
 # Response Validation Plugin
 
-The **Response Validation Plugin** validates server responses against your contract schema, ensuring that data returned from your server matches the expected types defined in your contract.
-
-::: info
-This plugin is best suited for [Contract-First Development](/docs/contract-first/define-contract). [Minified Contract](/docs/contract-first/router-to-contract#minify-export-the-contract-router-for-the-client) is **not supported** because it removes the schema from the contract.
-:::
+**Response Validation Plugin** validates server responses against your contract before your application uses them. This helps ensure the data returned by the server matches the types defined in your contract.
 
 ## Setup
 
-```ts twoslash
-import { contract } from './shared/planet'
-import { createORPCClient } from '@orpc/client'
-import type { ContractRouterClient } from '@orpc/contract'
-// ---cut---
-import { RPCLink } from '@orpc/client/fetch'
-import { ResponseValidationPlugin } from '@orpc/contract/plugins'
+```ts
+import { ResponseValidationLinkPlugin } from '@orpc/contract/plugins'
 
 const link = new RPCLink({
-  url: 'http://localhost:3000/rpc',
   plugins: [
-    new ResponseValidationPlugin(contract),
+    new ResponseValidationLinkPlugin(contract),
   ],
 })
-
-const client: ContractRouterClient<typeof contract> = createORPCClient(link)
 ```
 
 ::: info
-The `link` can be any supported oRPC link, such as [RPCLink](/docs/client/rpc-link), [OpenAPILink](/docs/openapi/client/openapi-link), or custom implementations.
+If you do not have a [contract](/docs/contract-first/define-contract), you can use a [unlazied router](/docs/contract-first/router-to-contract#unlazy) instead.
 :::
+
+<!--@include: @/shared/common-plugin-link-compatibility.md -->
 
 ## Limitations
 
-Schemas that transform data into different types than the expected schema types are not supported.
+Schemas that transform values into a different type are not supported.
 
-**Why?** Consider this example schema that accepts a `number` and transforms it into a `string` after validation:
+**Why?** Consider this schema, which accepts a `number` and transforms it into a `string`:
 
 ```ts
 const unsupported = z.number().transform(value => value.toString())
 ```
 
-When the server validates output, it transforms the `number` into a `string`. The client receives a `string`, but the `string` no longer matches the original schema, causing validation to fail.
+When the server validates the output, it transforms the `number` into a `string`. The client then receives that `string`, but the schema still expects a `number` as input, so validation fails.
+
+## Typesafe Errors Compatibility
+
+This plugin reconciles ORPC errors from other interceptors and plugins, allowing you to use `ORPCError` for [typesafe errors](/docs/error-handling#orpcerror-compatibility).
+
+## Custom Validation Errors
+
+If you have already [customized validation errors on the server](/docs/advanced/validation-errors), you can use interceptors to catch and map the validation errors thrown by this plugin so they match your server-side errors.
+
+```ts
+import { ORPCError } from '@orpc/client'
+import { ValidationError } from '@orpc/contract'
+
+const link = new RPCLink({
+  plugins: [
+    new ResponseValidationLinkPlugin(contract),
+  ],
+  interceptors: [
+    async ({ next }) => {
+      try {
+        return await next()
+      }
+      catch (error) {
+        if (
+          error instanceof ORPCError
+          && error.code === 'INTERNAL_SERVER_ERROR'
+          && error.cause instanceof ValidationError
+        ) {
+          throw new CustomOutputValidationError(error.cause.issues)
+        }
+
+        throw error
+      }
+    }
+  ]
+})
+```
 
 ## Advanced Usage
 
-Beyond response validation, this plugin also serves special purposes such as [Expanding Type Support for OpenAPI Link](/docs/openapi/advanced/expanding-type-support-for-openapi-link).
+You can also use this plugin in guides such as [Expanding Type Support for OpenAPI Link](/docs/advanced/expanding-type-support-for-openapi-link).
+
+## Learn More
+
+For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/contract/src/plugins/response-validation.ts).

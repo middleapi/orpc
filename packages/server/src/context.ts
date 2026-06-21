@@ -1,16 +1,18 @@
-export type Context = Record<PropertyKey, any>
+export interface Context {
+  [key: PropertyKey]: any
+}
 
 export type MergedInitialContext<
   TInitial extends Context,
-  TAdditional extends Context,
+  TOutContext extends Context,
+  TInContext extends Context,
+> = Exclude<keyof TInContext, keyof TInitial | keyof TOutContext> extends never
+  ? TInitial
+  : TInitial & Omit<TInContext, keyof TInitial | keyof TOutContext>
+
+export type MergedContext<
   TCurrent extends Context,
-> = TInitial & Omit<TAdditional, keyof TCurrent>
-
-export type MergedCurrentContext<T extends Context, U extends Context> = Omit<T, keyof U> & U
-
-export function mergeCurrentContext<T extends Context, U extends Context>(
-  context: T,
-  other: U,
-): MergedCurrentContext<T, U> {
-  return { ...context, ...other }
-}
+  TOutContext extends Context,
+> = keyof TOutContext extends never
+  ? TCurrent
+  : Omit<TCurrent, keyof TOutContext> & TOutContext
