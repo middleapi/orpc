@@ -3,7 +3,8 @@
   "references": [
     { "path": "../contract" },
     { "path": "../server" },
-    { "path": "../json-schema" }
+    { "path": "../json-schema" },
+    { "path": "../shared" }
   ],
   "include": ["package.json", "src"],
   "exclude": [

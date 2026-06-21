@@ -56,7 +56,8 @@
   "dependencies": {
     "@orpc/contract": "workspace:*",
     "@orpc/json-schema": "workspace:*",
-    "@orpc/server": "workspace:*"
+    "@orpc/server": "workspace:*",
+    "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
     "effect": "^3.21.3"

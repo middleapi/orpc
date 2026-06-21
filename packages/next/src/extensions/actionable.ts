@@ -1,5 +1,4 @@
-import type { AnySchema, ErrorMap } from '@orpc/contract'
-import type { AnyORPCError, Context, Procedure, ProcedureClientOptions } from '@orpc/server'
+import type { AnyORPCError, AnySchema, Context, ErrorMap, Procedure, ProcedureClientOptions } from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
 import type { ProcedureServerFunction } from '../server-function'
 import { DecoratedProcedure } from '@orpc/server'

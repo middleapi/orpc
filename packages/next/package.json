@@ -50,7 +50,8 @@
     "type:check": "tsc -b"
   },
   "peerDependencies": {
-    "next": ">=16.2.7"
+    "next": ">=16.2.7",
+    "react": ">=19.2.7"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",

@@ -1,4 +1,4 @@
-import { AbortError } from '@standardserver/shared'
+import { AbortError } from '@orpc/shared'
 import { Cause, Effect, Exit, FiberId } from 'effect'
 
 /**
