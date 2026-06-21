@@ -1,33 +1,41 @@
 import type { Context } from '../../context'
 import type { Router } from '../../router'
-import type { StandardRPCHandlerOptions } from '../standard'
+import type { RPCHandlerCodecOptions, StandardHandlerOptions } from '../standard'
 import type { FetchHandlerOptions } from './handler'
-import { StrictGetMethodPlugin } from '../../plugins'
-import { StandardRPCHandler } from '../standard'
+import { toArray } from '@orpc/shared'
+import { CSRFGuardHandlerPlugin } from '../../plugins'
+import { RPCHandlerCodec, StandardHandler } from '../standard'
 import { FetchHandler } from './handler'
 
-export interface RPCHandlerOptions<T extends Context> extends FetchHandlerOptions<T>, Omit<StandardRPCHandlerOptions<T>, 'plugins'> {
+export interface RPCHandlerOptions<T extends Context>
+  extends FetchHandlerOptions<T>, Omit<StandardHandlerOptions<T>, 'plugins'>, RPCHandlerCodecOptions<T> {
   /**
-   * Enables or disables the StrictGetMethodPlugin.
-   *
-   * @default true
+   * Configuration for {@link CSRFGuardHandlerPlugin}, which is enabled by default for `RPCHandler` over HTTP.
    */
-  strictGetMethodPluginEnabled?: boolean
+  csrfGuardHandlerPlugin?: {
+    /**
+     * If `false`, this plugin is disabled.
+     *
+     * @default true
+     */
+    enabled?: boolean
+  }
 }
 
-/**
- * RPC Handler for Fetch Server
- *
- * @see {@link https://orpc.dev/docs/rpc-handler RPC Handler Docs}
- * @see {@link https://orpc.dev/docs/adapters/http HTTP Adapter Docs}
- */
 export class RPCHandler<T extends Context> extends FetchHandler<T> {
-  constructor(router: Router<any, T>, options: NoInfer<RPCHandlerOptions<T>> = {}) {
-    if (options.strictGetMethodPluginEnabled ?? true) {
-      options.plugins ??= []
-      options.plugins.push(new StrictGetMethodPlugin())
+  constructor(
+    router: Router<T>,
+    options: NoInfer<RPCHandlerOptions<T>> = {},
+  ) {
+    if (options.csrfGuardHandlerPlugin?.enabled !== false) {
+      options = {
+        ...options,
+        plugins: [...toArray(options.plugins), new CSRFGuardHandlerPlugin()],
+      }
     }
 
-    super(new StandardRPCHandler(router, options), options)
+    const codec = new RPCHandlerCodec(router, options)
+    const handler = new StandardHandler(codec, options)
+    super(handler, options)
   }
 }

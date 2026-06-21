@@ -4,7 +4,6 @@ packages:
   - 'playgrounds/*'
 overrides:
   '@wxt-dev/storage': 1.2.0
-  typescript: ~5.8.3
 onlyBuiltDependencies:
   - better-sqlite3
   - electron
@@ -13,3 +12,34 @@ onlyBuiltDependencies:
 preferWorkspacePackages: true
 linkWorkspacePackages: true
 shamefullyHoist: true
+minimumReleaseAgeExclude:
+  - '@vitest/coverage-v8@4.1.9'
+  - '@vitest/expect@4.1.9'
+  - '@vitest/mocker@4.1.9'
+  - '@vitest/pretty-format@4.1.9'
+  - '@vitest/runner@4.1.9'
+  - '@vitest/snapshot@4.1.9'
+  - '@vitest/spy@4.1.9'
+  - '@vitest/utils@4.1.9'
+  - vitest@4.1.9
+  - '@standardserver/core@0.0.24'
+  - '@standardserver/fetch@0.0.24'
+  - '@standardserver/node@0.0.24'
+  - '@standardserver/peer@0.0.24'
+  - '@standardserver/shared@0.0.24'
+allowBuilds:
+  '@parcel/watcher': false
+  '@scarf/scarf': false
+  '@swc/core': false
+  '@tree-sitter-grammars/tree-sitter-yaml': false
+  core-js-pure: false
+  esbuild: false
+  msw: true
+  protobufjs: false
+  sharp: false
+  simple-git-hooks: false
+  spawn-sync: false
+  tree-sitter: false
+  tree-sitter-json: false
+  vue-demi: true
+  workerd: false

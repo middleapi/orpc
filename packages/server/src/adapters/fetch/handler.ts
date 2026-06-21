@@ -1,51 +1,58 @@
 import type { Interceptor, MaybeOptionalOptions } from '@orpc/shared'
-import type { ToFetchResponseOptions } from '@orpc/standard-server-fetch'
+import type { ToFetchResponseOptions } from '@standardserver/fetch'
 import type { Context } from '../../context'
-import type { StandardHandleOptions, StandardHandler } from '../standard'
-import type { FriendlyStandardHandleOptions } from '../standard/utils'
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler, StandardHandlerHandleOptions } from '../standard'
 import type { FetchHandlerPlugin } from './plugin'
-import { intercept, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
-import { toFetchResponse, toStandardLazyRequest } from '@orpc/standard-server-fetch'
-import { resolveFriendlyStandardHandleOptions } from '../standard/utils'
+import { intercept, resolveMaybeOptionalOptions } from '@orpc/shared'
+import { toFetchResponse, toStandardLazyRequest } from '@standardserver/fetch'
+import { resolveFriendlyStandardHandlerHandleOptions } from '../standard'
 import { CompositeFetchHandlerPlugin } from './plugin'
 
-export type FetchHandleResult = { matched: true, response: Response } | { matched: false, response: undefined }
+export type FetchHandlerHandleResult = { matched: true, response: Response } | { matched: false, response?: undefined }
 
-export interface FetchHandlerInterceptorOptions<T extends Context> extends StandardHandleOptions<T> {
+export interface FetchHandlerFetchInterceptorOptions<T extends Context> extends StandardHandlerHandleOptions<T> {
   request: Request
-  toFetchResponseOptions: ToFetchResponseOptions
+  toFetchResponseOptions: ToFetchResponseOptions | undefined
 }
+export type FetchHandlerFetchInterceptor<T extends Context> = Interceptor<FetchHandlerFetchInterceptorOptions<T>, Promise<FetchHandlerHandleResult>>
 
-export interface FetchHandlerOptions<T extends Context> extends ToFetchResponseOptions {
-  adapterInterceptors?: Interceptor<FetchHandlerInterceptorOptions<T>, Promise<FetchHandleResult>>[]
+export interface FetchHandlerOptions<T extends Context> {
+  /**
+   * Custom options for `toFetchResponse`, used to map a `Standard Response` to a `Fetch Response`.
+   */
+  toFetchResponse?: ToFetchResponseOptions
 
-  plugins?: FetchHandlerPlugin<T>[]
+  /**
+   * Interceptors that run before the mapping between the Standard API and Fetch API,
+   * useful for customizing the mapping behavior (e.g. extending the body parser).
+   */
+  fetchInterceptors?: FetchHandlerFetchInterceptor<T>[] | undefined
+
+  plugins?: FetchHandlerPlugin<T>[] | undefined
 }
 
 export class FetchHandler<T extends Context> {
-  private readonly toFetchResponseOptions: ToFetchResponseOptions
-  private readonly adapterInterceptors: Exclude<FetchHandlerOptions<T>['adapterInterceptors'], undefined>
+  private readonly toFetchResponseOptions: FetchHandlerOptions<T>['toFetchResponse']
+  private readonly fetchInterceptors: FetchHandlerOptions<T>['fetchInterceptors']
 
   constructor(
     private readonly standardHandler: StandardHandler<T>,
     options: NoInfer<FetchHandlerOptions<T>> = {},
   ) {
-    const plugin = new CompositeFetchHandlerPlugin(options.plugins)
+    options = new CompositeFetchHandlerPlugin(options.plugins).initFetchHandlerOptions(options)
 
-    plugin.initRuntimeAdapter(options)
-
-    this.adapterInterceptors = toArray(options.adapterInterceptors)
-    this.toFetchResponseOptions = options
+    this.fetchInterceptors = options.fetchInterceptors
+    this.toFetchResponseOptions = options.toFetchResponse
   }
 
   async handle(
     request: Request,
-    ...rest: MaybeOptionalOptions<FriendlyStandardHandleOptions<T>>
-  ): Promise<FetchHandleResult> {
+    ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
+  ): Promise<FetchHandlerHandleResult> {
     return intercept(
-      this.adapterInterceptors,
+      this.fetchInterceptors,
       {
-        ...resolveFriendlyStandardHandleOptions(resolveMaybeOptionalOptions(rest)),
+        ...resolveFriendlyStandardHandlerHandleOptions(resolveMaybeOptionalOptions(rest)),
         request,
         toFetchResponseOptions: this.toFetchResponseOptions,
       },

@@ -1,26 +1,24 @@
-import type { AnyContractRouter, ContractProcedure, InferSchemaInput, InferSchemaOutput } from '@orpc/contract'
-import type { Context } from './context'
+import type { InferSchemaInput, InferSchemaOutput, ORPCErrorFromErrorMap, ProcedureContract, RouterContract, ThrowableError } from '@orpc/contract'
+import type { Context, MergedContext } from './context'
 import type { Lazyable } from './lazy'
 import type { Procedure } from './procedure'
 
-/**
- * Represents a router, which defines a hierarchical structure of procedures.
- *
- * @info A procedure is a router too.
- * @see {@link https://orpc.dev/docs/contract-first/define-contract#contract-router Contract Router Docs}
- */
-export type Router<T extends AnyContractRouter, TInitialContext extends Context>
-  = T extends ContractProcedure<infer UInputSchema, infer UOutputSchema, infer UErrorMap, infer UMeta>
-    ? Procedure<TInitialContext, any, UInputSchema, UOutputSchema, UErrorMap, UMeta>
+export type Router<TInitialContext extends Context>
+  = | Procedure<TInitialContext, any, any, any, any, any>
+    | {
+      [k: string]: Lazyable<Router<TInitialContext>>
+    }
+
+export type ContractedRouter<T extends RouterContract, TInitialContext extends Context>
+  = T extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $ErrorMap>
+    ? Procedure<TInitialContext, any, $InputSchema, $OutputSchema, $ErrorMap, never>
     : {
-        [K in keyof T]: T[K] extends AnyContractRouter ? Lazyable<Router<T[K], TInitialContext>> : never
+        [K in keyof T]: T[K] extends RouterContract ? Lazyable<ContractedRouter<T[K], TInitialContext>> : never
       }
 
-export type AnyRouter = Router<any, any>
+export type AnyRouter = Router<any>
 
-export type InferRouterInitialContext<T extends AnyRouter> = T extends Router<any, infer UInitialContext>
-  ? UInitialContext
-  : never
+export type InferRouterInitialContext<T extends AnyRouter> = T extends Router<infer $> ? $ : never
 
 /**
  * Infer all initial context of the router.
@@ -41,11 +39,11 @@ export type InferRouterInitialContexts<T extends AnyRouter>
  * @info A procedure is a router too.
  * @see {@link https://orpc.dev/docs/router#utilities Router Utilities Docs}
  */
-export type InferRouterCurrentContexts<T extends AnyRouter>
-  = T extends Procedure<any, infer UCurrentContext, any, any, any, any>
-    ? UCurrentContext
+export type InferRouterFinalContexts<T extends AnyRouter>
+  = T extends Procedure<infer UInitialContext, infer UInjectedContext, any, any, any, any>
+    ? MergedContext<UInitialContext, UInjectedContext>
     : {
-        [K in keyof T]: T[K] extends Lazyable<infer U extends AnyRouter> ? InferRouterCurrentContexts<U> : never
+        [K in keyof T]: T[K] extends Lazyable<infer U extends AnyRouter> ? InferRouterFinalContexts<U> : never
       }
 
 /**
@@ -72,4 +70,24 @@ export type InferRouterOutputs<T extends AnyRouter>
     ? InferSchemaOutput<UOutputSchema>
     : {
         [K in keyof T]: T[K] extends Lazyable<infer U extends AnyRouter> ? InferRouterOutputs<U> : never
+      }
+
+/**
+ * Infer the union of throwable errors for entire router.
+ */
+export type InferRouterError<T extends AnyRouter>
+  = T extends Procedure<any, any, any, any, infer UErrorMap, infer UReturnedError>
+    ? ORPCErrorFromErrorMap<UErrorMap> | UReturnedError | ThrowableError
+    : {
+        [K in keyof T]: T[K] extends Lazyable<infer U extends AnyRouter> ? InferRouterError<U> : never
+      }[keyof T]
+
+/**
+ * Infer throwable errors for each procedure, preserving the router shape.
+ */
+export type InferRouterErrors<T extends AnyRouter>
+  = T extends Procedure<any, any, any, any, infer UErrorMap, infer UReturnedError>
+    ? ORPCErrorFromErrorMap<UErrorMap> | UReturnedError | ThrowableError
+    : {
+        [K in keyof T]: T[K] extends Lazyable<infer U extends AnyRouter> ? InferRouterErrors<U> : never
       }

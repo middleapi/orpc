@@ -1,11 +1,11 @@
 import type { Logger } from 'pino'
 
-export const CONTEXT_LOGGER_SYMBOL: unique symbol = Symbol('ORPC_PINO_CONTEXT_LOGGER_SYMBOL')
+export const LOGGER_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_PINO_LOGGER_CONTEXT')
 
 export interface LoggerContext {
-  [CONTEXT_LOGGER_SYMBOL]?: Logger
+  [LOGGER_CONTEXT_SYMBOL]?: undefined | Logger
 }
 
 export function getLogger(context: LoggerContext): Logger | undefined {
-  return context[CONTEXT_LOGGER_SYMBOL]
+  return context[LOGGER_CONTEXT_SYMBOL]
 }

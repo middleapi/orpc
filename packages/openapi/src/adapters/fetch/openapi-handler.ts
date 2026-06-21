@@ -1,20 +1,21 @@
 import type { Context, Router } from '@orpc/server'
 import type { FetchHandlerOptions } from '@orpc/server/fetch'
-import type { StandardOpenAPIHandlerOptions } from '../standard'
+import type { StandardHandlerOptions } from '@orpc/server/standard'
+import type { OpenAPIHandlerCodecOptions } from '../standard'
 import { FetchHandler } from '@orpc/server/fetch'
-import { StandardOpenAPIHandler } from '../standard'
+import { StandardHandler } from '@orpc/server/standard'
+import { OpenAPIHandlerCodec } from '../standard'
 
-export interface OpenAPIHandlerOptions<T extends Context> extends FetchHandlerOptions<T>, Omit<StandardOpenAPIHandlerOptions<T>, 'plugins'> {
-}
+export interface OpenAPIHandlerOptions<T extends Context>
+  extends FetchHandlerOptions<T>, Omit<StandardHandlerOptions<T>, 'plugins'>, OpenAPIHandlerCodecOptions<T> {}
 
-/**
- * OpenAPI Handler for Fetch Server
- *
- * @see {@link https://orpc.dev/docs/openapi/openapi-handler OpenAPI Handler Docs}
- * @see {@link https://orpc.dev/docs/adapters/http HTTP Adapter Docs}
- */
 export class OpenAPIHandler<T extends Context> extends FetchHandler<T> {
-  constructor(router: Router<any, T>, options: NoInfer<OpenAPIHandlerOptions<T>> = {}) {
-    super(new StandardOpenAPIHandler(router, options), options)
+  constructor(
+    router: Router<T>,
+    options: NoInfer<OpenAPIHandlerOptions<T>> = {},
+  ) {
+    const codec = new OpenAPIHandlerCodec(router, options)
+    const handler = new StandardHandler(codec, options)
+    super(handler, options)
   }
 }

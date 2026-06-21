@@ -1,54 +1,95 @@
----
-title: Procedure
-description: Understanding procedures in oRPC
----
+# Procedure
 
-# Procedure in oRPC
-
-In oRPC, a procedure is like a standard function but comes with built-in support for:
-
-- Input/output validation
-- Middleware
-- Dependency injection
-- Other extensibility features
+Procedures are the core building blocks of oRPC. They define the logic for handling specific operations, including input validation, output validation, and middleware application. Each procedure is created using a builder pattern that allows for flexible composition and reuse.
 
 ## Overview
 
-Here's an example of defining a procedure in oRPC:
+```ts twoslash
+import { z } from 'zod'
+import type { AnyMetaPlugin } from '@orpc/server'
 
-```ts
+declare const someMeta: AnyMetaPlugin
+
+const requireAuth = os
+  .middleware(({ context, next }) => {
+    return next({
+      context: {
+        user: { id: 1 }
+      }
+    })
+  })
+
+const canEdit = os
+  .$context<{ user: { id: number } }>()
+  .middleware(async ({ next }, id: number) => {
+    return next()
+  })
+// ---cut---
 import { os } from '@orpc/server'
 
 const example = os
-  .use(aMiddleware) // Apply middleware
-  .input(z.object({ name: z.string() })) // Define input validation
-  .use(aMiddlewareWithInput, input => input.name) // Use middleware with typed input
-  .output(z.object({ id: z.number() })) // Define output validation
-  .handler(async ({ input, context }) => { // Define execution logic
-    return { id: 1 }
+  .$context<{ something?: string }>() // <- define initial context
+  .meta(someMeta) // <- attach metadata
+  .errors({ NOT_FOUND: {} }) // <- define errors
+  .use(requireAuth) // <- apply middleware
+  .input(z.object({ id: z.number(), name: z.string() })) // <- input validation
+  .use(canEdit.adaptInput(input => input.id)) // <- middleware with typed input
+  .output(z.object({ id: z.number(), name: z.string() })) // <- output validation
+  .handler(async ({ input, context, errors }) => { // <- handler logic
+    return { id: 1, name: 'example' }
   })
-  .callable() // Make the procedure callable like a regular function
-  .actionable() // Server Action compatibility
 ```
 
 :::info
 The `.handler` method is the only required step. All other chains are optional.
 :::
 
+## Initial Context
+
+Use `.$context` to declare the initial context required for a procedure to execute.
+Learn more in the [Context Documentation](/docs/context).
+
+## Metadata
+
+Use `.meta` to attach metadata to a procedure. You can access this metadata later in middleware or plugins. Learn more in the [Metadata Documentation](/docs/metadata).
+
+## Typesafe Errors
+
+Use `.errors` to define error definitions for a procedure. These errors can be thrown in the handler or middleware and will be properly typed on the client. Learn more in the [Typesafe Error Handling documentation](/docs/error-handling#typesafe-errors).
+
 ## Input/Output Validation
 
-oRPC supports [Zod](https://github.com/colinhacks/zod), [Valibot](https://github.com/fabian-hiller/valibot), [Arktype](https://github.com/arktypeio/arktype), and any other [Standard Schema](https://github.com/standard-schema/standard-schema?tab=readme-ov-file#what-schema-libraries-implement-the-spec) library for input and output validation.
+oRPC supports [Zod](https://zod.dev/), [Valibot](https://valibot.dev/), [Arktype](https://arktype.io/), and any other [Standard Schema](https://standardschema.dev/schema#what-schema-libraries-implement-the-spec) library for validation.
 
 ::: tip
-By explicitly specifying the `.output` or your `handler's return type`, you enable TypeScript to infer the output without parsing the handler's code. This approach can dramatically enhance both type-checking and IDE-suggestion speed.
+By specifying `.output` or the handler's return type, TypeScript can infer the output without analyzing the handler body. This can significantly improve type-checking and IDE suggestion performance for complex handlers.
+:::
+
+### Multiple Schemas
+
+`.input` and `.output` can be called multiple times. Each call adds another schema instead of replacing an earlier one.
+
+```ts
+const example = os
+  .input(z.looseObject({ name: z.string() }))
+  .input(z.looseObject({ id: z.number() }))
+  .output(z.looseObject({ name: z.string() }))
+  .output(z.looseObject({ id: z.number() }))
+  .handler(async ({ input }) => {
+    return { id: 1, name: 'example' }
+  })
+```
+
+::: warning
+When you stack schemas, the input or output must satisfy all of them, so the schemas need to be compatible. For example, with Zod, prefer `z.looseObject` over `z.object` to allow unknown properties.
 :::
 
 ### `type` Utility
 
-For simple use-case without external libraries, use oRPC's built-in `type` utility. It takes a mapping function as its first argument:
+For simple use cases without external libraries, use oRPC's built-in `type` utility. It takes a mapping function as its first argument:
 
-```ts twoslash
-import { os, type } from '@orpc/server'
+```ts
+import { type } from '@orpc/server'
 
 const example = os
   .input(type<{ value: number }>())
@@ -69,20 +110,29 @@ const example = os
   .handler(async ({ context }) => { /* logic */ })
 ```
 
-::: info
-[Middleware](/docs/middleware) can be applied if the [current context](/docs/context#combining-initial-and-execution-context) meets the [middleware dependent context](/docs/middleware#dependent-context) requirements and does not conflict with the [current context](/docs/context#combining-initial-and-execution-context).
+::: warning
+[Middleware](/docs/middleware) can only be applied when the [current context](/docs/context#combining-initial-and-middleware-context) satisfies the [middleware's initial context](/docs/middleware#initial-context) and does not conflict with the context the middleware adds.
 :::
 
-## Initial Configuration
-
-Customize the initial input schema using `.$input`:
+::: info
+You can use [`.adaptInput`](/docs/middleware#middleware-input) when applying middleware to adapt the input to a different shape that the middleware expects.
 
 ```ts
-const base = os.$input(z.void())
-const base = os.$input<Schema<void, unknown>>()
+const canEdit = os.middleware(async ({ next }, id: string) => {
+  if (!canUserEdit(id)) {
+    throw new ORPCError('UNAUTHORIZED')
+  }
+
+  return next()
+})
+
+const example = os
+  .input(z.object({ id: z.string(), name: z.string() }))
+  .use(canEdit.adaptInput(input => input.id)) // Adapt input to match middleware's expected shape
+  .handler(async ({ context }) => { /* logic */ })
 ```
 
-Unlike `.input`, the `.$input` method lets you redefine the input schema after its initial configuration. This is useful when you need to enforce a `void` input when no `.input` is specified.
+:::
 
 ## Reusability
 
@@ -90,11 +140,13 @@ Each modification to a builder creates a completely new instance, avoiding refer
 
 ```ts
 const pub = os.use(logMiddleware) // Base setup for procedures that publish
-const authed = pub.use(authMiddleware) // Extends 'pub' with authentication
+const authed = pub.use(requireAuth) // Extends 'pub' with authentication
 
-const pubExample = pub.handler(async ({ context }) => { /* logic */ })
+const pubExample = pub
+  .handler(async ({ context }) => { /* logic */ })
 
-const authedExample = pubExample.use(authMiddleware)
+const authedExample = authed
+  .handler(async ({ context }) => { /* logic */ })
 ```
 
 This pattern helps prevent duplication while maintaining flexibility.

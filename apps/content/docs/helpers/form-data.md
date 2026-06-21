@@ -1,8 +1,3 @@
----
-title: Form Data Helpers
-description: Utilities for parsing form data and handling validation errors with bracket notation support.
----
-
 # Form Data Helpers
 
 Form data helpers provide utilities for parsing HTML form data and extracting validation error messages, with full support for [bracket notation](/docs/openapi/bracket-notation) to handle complex nested structures.
@@ -12,7 +7,7 @@ Form data helpers provide utilities for parsing HTML form data and extracting va
 Parses HTML form data using [bracket notation](/docs/openapi/bracket-notation) to deserialize complex nested objects and arrays.
 
 ```ts twoslash
-import { parseFormData } from '@orpc/openapi-client/helpers'
+import { parseFormData } from '@orpc/openapi/helpers'
 
 const form = new FormData()
 form.append('name', 'John')
@@ -33,10 +28,10 @@ const parsed = parseFormData(form)
 
 ## `getIssueMessage`
 
-Extracts validation error messages from [standard schema](https://github.com/standard-schema/standard-schema) issues using [bracket notation](/docs/openapi/bracket-notation) paths.
+Extracts validation error messages from [standard schema](https://standardschema.dev/) issues using [bracket notation](/docs/openapi/bracket-notation) paths.
 
 ```ts twoslash
-import { getIssueMessage } from '@orpc/openapi-client/helpers'
+import { getIssueMessage } from '@orpc/openapi/helpers'
 
 const error = {
   data: {
@@ -60,13 +55,13 @@ const anyError = getIssueMessage('anything', 'path')
 ```
 
 ::: warning
-The `getIssueMessage` utility works with any data type but requires validation errors to follow the [standard schema issue format](https://github.com/standard-schema/standard-schema?tab=readme-ov-file#the-interface). It looks for issues in the `data.issues` property. If you use custom [validation errors](/docs/advanced/validation-errors), store them elsewhere, or modify the issue format, `getIssueMessage` may not work as expected.
+The `getIssueMessage` utility works with any data type but requires validation errors to follow the [standard schema issue format](https://standardschema.dev/#the-specifications). It looks for issues in the `data.issues` property. If you use custom [validation errors](/docs/advanced/validation-errors), store them elsewhere, or modify the issue format, `getIssueMessage` may not work as expected.
 :::
 
 ## Usage Example
 
 ```tsx
-import { getIssueMessage, parseFormData } from '@orpc/openapi-client/helpers'
+import { getIssueMessage, parseFormData } from '@orpc/openapi/helpers'
 
 export function ContactForm() {
   const [error, setError] = useState()

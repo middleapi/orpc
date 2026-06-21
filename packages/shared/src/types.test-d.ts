@@ -1,10 +1,4 @@
-import type { AsyncIteratorClass } from './iterator'
-import type { InferAsyncIterableYield, IntersectPick, PromiseWithError, SetOptional } from './types'
-
-it('SetOptional', () => {
-  expectTypeOf<SetOptional<{ a: number }, 'a'>>().toMatchTypeOf<{ a?: number }>()
-  expectTypeOf<SetOptional<{ a?: number }, 'a'>>().toMatchTypeOf<{ a?: number }>()
-})
+import type { IntersectPick, PromiseWithError, Public } from './types'
 
 interface Empty {}
 
@@ -21,11 +15,12 @@ it('PromiseWithError', () => {
   expectTypeOf<C extends PromiseWithError<infer T, infer E> ? [T, E] : never>().toEqualTypeOf<[number | undefined | null, Error | undefined | null]>()
 })
 
-it('InferAsyncIterableYield', () => {
-  expectTypeOf<InferAsyncIterableYield<AsyncIterable<number>>>().toEqualTypeOf<number>()
-  expectTypeOf<InferAsyncIterableYield<AsyncIteratorObject<string>>>().toEqualTypeOf<string>()
-  expectTypeOf<InferAsyncIterableYield<AsyncIteratorClass<string>>>().toEqualTypeOf<string>()
+it('Public', () => {
+  class A {
+    public a = 1
+    protected b = 2
+    private c = 3
+  }
 
-  expectTypeOf<InferAsyncIterableYield<Promise<number>>>().toEqualTypeOf<never>()
-  expectTypeOf<InferAsyncIterableYield<number>>().toEqualTypeOf<never>()
+  expectTypeOf<Public<A>>().toEqualTypeOf<{ a: number }>()
 })

@@ -1,279 +1,1254 @@
-import type { AnyContractProcedure } from '@orpc/contract'
+import type { JsonSchemaConverter } from '@orpc/json-schema'
 import { eventIterator, oc } from '@orpc/contract'
-import * as z from 'zod'
-import { ZodToJsonSchemaConverter } from '../../zod/src/zod4'
-import { customOpenAPIOperation } from './openapi-custom'
+import * as arktype from 'arktype'
+import z from 'zod'
+import { openapi } from './meta'
 import { OpenAPIGenerator } from './openapi-generator'
 
-type TestCase = {
-  name: string
-  contract: AnyContractProcedure
-  expected: any
-  error?: undefined
-} | {
-  name: string
-  contract: AnyContractProcedure
-  expected?: undefined
-  error: string
-}
+describe('openAPIGenerator', () => {
+  const zodJsonSchemaConverter: JsonSchemaConverter = {
+    condition: schema => schema?.['~standard'].vendor === 'zod',
+    async convert(schema, direction) {
+      const jsonSchema = z.toJSONSchema(schema as any, { io: direction })
+      const output = await schema?.['~standard'].validate(undefined)
+      return [jsonSchema as any, !output?.issues]
+    },
+  }
 
-const routeTests: TestCase[] = [
-  {
-    name: 'default',
-    contract: oc,
-    expected: {
-      '/': {
-        post: expect.any(Object),
-      },
-    },
-  },
-  {
-    name: 'path + method',
-    contract: oc.route({ path: '/planets', method: 'GET' }),
-    expected: {
-      '/planets': {
-        get: expect.any(Object),
-      },
-    },
-  },
-  {
-    name: 'dynamic params + method',
-    contract: oc.route({ path: '/planets/{id}', method: 'DELETE' }).input(z.object({ id: z.string() })),
-    expected: {
-      '/planets/{id}': {
-        delete: expect.any(Object),
-      },
-    },
-  },
-  {
-    name: 'rest params + method',
-    contract: oc.route({ path: '/planets/{+path}', method: 'DELETE' }).input(z.object({ path: z.string() })),
-    expected: {
-      '/planets/{path}': {
-        delete: expect.any(Object),
-      },
-    },
-  },
-  {
-    name: 'metadata',
-    contract: oc.route({
-      operationId: 'customOperationId',
-      tags: ['planets'],
-      summary: 'the summary',
-      description: 'the description',
-      successStatus: 203,
-      successDescription: 'the success description',
-      deprecated: true,
-    }),
-    expected: {
-      '/': {
-        post: expect.objectContaining({
-          operationId: 'customOperationId',
-          tags: ['planets'],
-          summary: 'the summary',
-          description: 'the description',
-          deprecated: true,
-          responses: {
-            203: expect.objectContaining({
-              description: 'the success description',
-            }),
+  const generator = new OpenAPIGenerator({ converters: [zodJsonSchemaConverter] })
+
+  describe('basic & options', () => {
+    it('starts from the default base document', async () => {
+      await expect(generator.generate({})).resolves.toEqual({
+        openapi: '3.1.2',
+        info: {
+          title: 'API Reference',
+          version: '0.0.0',
+        },
+      })
+    })
+
+    it('merges the provided base document and serialize the result', async () => {
+      const serializer = {
+        serialize: vi.fn(document => document),
+        deserialize: vi.fn(document => document),
+      }
+
+      const generator = new OpenAPIGenerator({ serializer, converters: [zodJsonSchemaConverter] })
+
+      const doc = await generator.generate({}, {
+        base: {
+          info: {
+            title: 'Planet API',
+            version: '1.2.3',
           },
-        }),
-      },
-    },
-  },
-]
+          servers: [{ url: 'https://api.example.com' }],
+        },
+      })
 
-const inputTests: TestCase[] = [
-  {
-    name: 'invalid input',
-    contract: oc.route({ path: '/planets/{id}' }),
-    error: 'When input structure is "compact", and path has dynamic params, input schema must be an object with all dynamic params as required.',
-  },
-  {
-    name: 'invalid input',
-    contract: oc.route({ path: '/planets/{id}' }).input(z.string()),
-    error: 'When input structure is "compact", and path has dynamic params, input schema must be an object with all dynamic params as required.',
-  },
-  {
-    name: 'params must be required',
-    contract: oc.route({ path: '/planets/{id}' }).input(z.object({ id: z.string().optional(), value: z.string().optional() })),
-    error: 'When input structure is "compact", and path has dynamic params, input schema must be an object with all dynamic params as required.',
-  },
-  {
-    name: 'dynamic params + body',
-    contract: oc.route({ path: '/planets/{id}' }).input(z.object({ id: z.string(), value: z.string() })),
-    expected: {
-      '/planets/{id}': {
+      expect(serializer.serialize).toHaveBeenCalledWith({
+        openapi: '3.1.2',
+        info: {
+          title: 'Planet API',
+          version: '1.2.3',
+        },
+        servers: [{ url: 'https://api.example.com' }],
+      }, {
+        asFormData: false,
+        useFormDataForBlobFields: false,
+      })
+
+      expect(doc).toEqual({
+        openapi: '3.1.2',
+        info: {
+          title: 'Planet API',
+          version: '1.2.3',
+        },
+        servers: [{ url: 'https://api.example.com' }],
+      })
+    })
+
+    it('invokes filter with the walked path and excludes filtered procedures', async () => {
+      const publicProcedure = oc.meta(openapi({ method: 'GET' }))
+      const privateProcedure = oc.meta(openapi({ method: 'GET' }))
+
+      const filter = vi.fn((procedure, path) => procedure !== privateProcedure && path.join('.') !== 'admin.private')
+
+      const doc = await generator.generate({
+        public: publicProcedure,
+        admin: {
+          private: privateProcedure,
+        },
+      }, {
+        filter,
+      })
+
+      expect(filter).toHaveBeenCalledTimes(2)
+      expect(filter).toHaveBeenNthCalledWith(1, publicProcedure, ['public'])
+      expect(filter).toHaveBeenNthCalledWith(2, privateProcedure, ['admin', 'private'])
+
+      expect(doc.paths).toEqual({
+        '/public': {
+          get: expect.any(Object),
+        },
+      })
+    })
+
+    it('fallback to StandardJsonSchemaConverter', async () => {
+      const condition = vi.fn(() => false)
+      const generator = new OpenAPIGenerator({ converters: [{ condition, convert: vi.fn() }] })
+
+      const procedure = oc.input(arktype.type({ name: 'string' }))
+
+      const spec = await generator.generate(procedure)
+
+      // ensure it prioritizes the provided converters
+      expect(condition).toHaveBeenCalledTimes(2)
+      expect(spec.paths?.['/']).toEqual({
         post: expect.objectContaining({
-          parameters: [
-            {
-              name: 'id',
-              in: 'path',
-              required: true,
-              schema: {
-                type: 'string',
-              },
-            },
-          ],
-          requestBody: {
+          requestBody: expect.objectContaining({
             content: {
-              'application/json': {
+              'application/json': expect.objectContaining({
                 schema: {
-                  type: 'object',
                   properties: {
-                    value: {
+                    name: {
                       type: 'string',
                     },
                   },
-                  required: ['value'],
+                  required: ['name'],
+                  type: 'object',
                 },
-              },
+              }),
             },
-            required: true,
+          }),
+        }),
+      })
+    })
+  })
+
+  describe('route', () => {
+    it('derives the default path, method, and operationId from router segments', async () => {
+      const doc = await generator.generate({
+        admin: {
+          listUsers: oc
+            .input(z.object({ page: z.number().optional() }))
+            .output(z.object({ users: z.array(z.string()) })),
+        },
+      })
+
+      expect(doc.paths).toEqual({
+        '/admin/listUsers': {
+          post: expect.objectContaining({
+            operationId: 'admin.listUsers',
+            responses: {
+              200: expect.any(Object),
+            },
+          }),
+        },
+      })
+    })
+
+    it('applies explicit metadata and prefixes', async () => {
+      const doc = await generator.generate({
+        getPlanet: oc
+          .meta(openapi({
+            method: 'GET',
+            prefix: '/api/v2',
+            path: '/planets/{id}',
+            operationId: 'getPlanetById',
+            tags: ['planets'],
+            summary: 'Get a planet',
+            description: 'Returns a single planet.',
+            deprecated: true,
+            successStatus: 206,
+            successDescription: 'Planet payload',
+          }))
+          .input(z.object({ id: z.string() })),
+      })
+
+      expect(doc.paths?.['/api/v2/planets/{id}']).toEqual({
+        get: expect.objectContaining({
+          operationId: 'getPlanetById',
+          tags: ['planets'],
+          summary: 'Get a planet',
+          description: 'Returns a single planet.',
+          deprecated: true,
+          parameters: [
+            expect.objectContaining({
+              name: 'id',
+              in: 'path',
+              required: true,
+            }),
+          ],
+          responses: {
+            206: expect.objectContaining({
+              description: 'Planet payload',
+            }),
           },
         }),
-      },
-    },
-  },
-  {
-    name: 'dynamic params only (no body)',
-    contract: oc.route({ method: 'POST', path: '/planets/{id}' }).input(z.object({ id: z.string() })),
-    expected: {
-      '/planets/{id}': {
-        post: expect.toSatisfy((v: any) => v.parameters?.length === 1 && !v.requestBody),
-      },
-    },
-  },
-  {
-    name: 'query + params',
-    contract: oc.route({ path: '/planets/{id}', method: 'GET' }).input(
-      z.object({
-        id: z.string(),
-        query1: z.string(),
-        query2: z.number().optional(),
-        query3: z.object({
-          a: z.string(),
-        }).optional(),
-        query4: z.array(z.number()).or(z.number()),
-      }),
-    ),
-    expected: {
-      '/planets/{id}': {
+      })
+    })
+
+    it('can extends spec with openapi.spec function', async () => {
+      const doc = await generator.generate({
+        getPlanet: oc
+          .meta(openapi({
+            method: 'GET',
+            path: '/planets/{id}',
+            spec: current => ({
+              ...current,
+              'security': [{ bearerAuth: [] }],
+              'x-orpc-kind': 'planet-read',
+            }),
+          }))
+          .input(z.object({ id: z.string() })),
+      })
+
+      expect(doc.paths?.['/planets/{id}']).toEqual({
         get: expect.objectContaining({
-          parameters: [
+          'operationId': 'getPlanet',
+          'security': [{ bearerAuth: [] }],
+          'x-orpc-kind': 'planet-read',
+          'parameters': [
+            expect.objectContaining({
+              name: 'id',
+              in: 'path',
+              required: true,
+            }),
+          ],
+          'responses': {
+            200: expect.any(Object),
+          },
+        }),
+      })
+    })
+
+    it('can override spec with openapi.spec object', async () => {
+      const doc = await generator.generate({
+        getPlanet: oc
+          .meta(openapi({
+            method: 'GET',
+            path: '/planets/{id}',
+            operationId: 'getPlanetById',
+            spec: {
+              'operationId': 'custom.getPlanet',
+              'security': [{ bearerAuth: [] }],
+              'x-orpc-kind': 'planet-read',
+            },
+          }))
+          .input(z.object({ id: z.string() })),
+      })
+
+      expect(doc.paths?.['/planets/{id}']).toEqual({
+        get: {
+          'operationId': 'custom.getPlanet',
+          'security': [{ bearerAuth: [] }],
+          'x-orpc-kind': 'planet-read',
+        },
+      })
+    })
+  })
+
+  describe('request params', () => {
+    it('maps compact path params', async () => {
+      const doc = await generator.generate({
+        search: oc
+          .meta(openapi({ method: 'GET', path: '/planets/{id}/{+rest}', prefix: '/{workspaceId}' }))
+          .input(z.object({
+            workspaceId: z.string(),
+            id: z.string(),
+            rest: z.string(),
+            filter: z.string(),
+          })),
+      })
+
+      expect(doc.paths?.['/{workspaceId}/planets/{id}/{rest}']).toEqual({
+        get: expect.objectContaining({
+          parameters: expect.arrayContaining([
+            {
+              name: 'workspaceId',
+              in: 'path',
+              required: true,
+              schema: expect.objectContaining({ type: 'string' }),
+            },
             {
               name: 'id',
               in: 'path',
               required: true,
-              schema: {
-                type: 'string',
-              },
+              schema: expect.objectContaining({ type: 'string' }),
             },
             {
-              name: 'query1',
+              name: 'rest',
+              in: 'path',
+              required: true,
+              schema: expect.objectContaining({ type: 'string' }),
+            },
+          ]),
+        }),
+      })
+    })
+
+    it('maps detailed path params', async () => {
+      const doc = await generator.generate({
+        createPlanet: oc
+          .meta(openapi({
+            method: 'POST',
+            path: '/planets/{id}/{+rest}',
+            inputStructure: 'detailed',
+            prefix: '/{workspaceId}',
+          }))
+          .input(z.object({
+            params: z.object({ workspaceId: z.string(), id: z.string(), rest: z.string() }),
+          })),
+      })
+
+      expect(doc.paths?.['/{workspaceId}/planets/{id}/{rest}']).toEqual({
+        post: expect.objectContaining({
+          parameters: expect.arrayContaining([
+            {
+              name: 'workspaceId',
+              in: 'path',
+              required: true,
+              schema: expect.objectContaining({ type: 'string' }),
+            },
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: expect.objectContaining({ type: 'string' }),
+            },
+            {
+              name: 'rest',
+              in: 'path',
+              required: true,
+              schema: expect.objectContaining({ type: 'string' }),
+            },
+          ]),
+        }),
+      })
+    })
+
+    it('maps all supported params styles in compact input structure mode', async () => {
+      const doc = await generator.generate({
+        readPlanet: oc
+          .meta(openapi({
+            method: 'GET',
+            path: '/planets/{id}/{tags}/{filters}',
+            paramsStyles: {
+              id: 'primitive',
+              tags: 'comma-delimited-array',
+              filters: 'comma-delimited-object',
+            },
+          }))
+          .input(z.object({
+            id: z.string(),
+            tags: z.array(z.string()),
+            filters: z.object({ brand: z.string(), size: z.string() }),
+          }))
+          .output(z.object({ ok: z.boolean() })),
+      })
+
+      expect(doc.paths?.['/planets/{id}/{tags}/{filters}']).toEqual({
+        get: expect.objectContaining({
+          parameters: expect.arrayContaining([
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: expect.objectContaining({ type: 'string' }),
+            },
+            {
+              name: 'tags',
+              in: 'path',
+              required: true,
+              schema: expect.objectContaining({ type: 'array' }),
+            },
+            {
+              name: 'filters',
+              in: 'path',
+              required: true,
+              schema: expect.objectContaining({ type: 'object' }),
+            },
+          ]),
+        }),
+      })
+    })
+
+    it('maps all supported params styles in detailed input structure mode', async () => {
+      const doc = await generator.generate({
+        readPlanet: oc
+          .meta(openapi({
+            method: 'GET',
+            path: '/planets/{id}/{tags}/{filters}',
+            inputStructure: 'detailed',
+            paramsStyles: {
+              id: 'primitive',
+              tags: 'comma-delimited-array',
+              filters: 'comma-delimited-object',
+            },
+          }))
+          .input(z.object({
+            params: z.object({
+              id: z.string(),
+              tags: z.array(z.string()),
+              filters: z.object({ brand: z.string(), size: z.string() }),
+            }),
+          })),
+      })
+
+      expect(doc.paths?.['/planets/{id}/{tags}/{filters}']).toEqual({
+        get: expect.objectContaining({
+          parameters: expect.arrayContaining([
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: expect.objectContaining({ type: 'string' }),
+            },
+            {
+              name: 'tags',
+              in: 'path',
+              required: true,
+              schema: expect.objectContaining({ type: 'array' }),
+            },
+            {
+              name: 'filters',
+              in: 'path',
+              required: true,
+              schema: expect.objectContaining({ type: 'object' }),
+            },
+          ]),
+        }),
+      })
+    })
+
+    it.each([
+      {
+        name: 'compact input with dynamic params but no input schema',
+        procedure: oc.meta(openapi({ path: '/planets/{id}' })),
+        message: 'Procedure at path "test" has dynamic path params (id) but its input schema is not an object.',
+      },
+      {
+        name: 'compact input with dynamic params but non-object input schema',
+        procedure: oc.meta(openapi({ path: '/planets/{id}' })).input(z.string()),
+        message: 'Procedure at path "test" has dynamic path params (id) but its input schema is not an object.',
+      },
+      {
+        name: 'compact input with optional dynamic params',
+        procedure: oc.meta(openapi({ path: '/planets/{id}' })).input(z.object({
+          id: z.string().optional(),
+          value: z.string().optional(),
+        })),
+        message: 'Procedure at path "test" has dynamic param "id" marked as optional in its input schema, but path params must always be required in OpenAPI',
+      },
+      {
+        name: 'detailed input with optional dynamic params',
+        procedure: oc.meta(openapi({ inputStructure: 'detailed', path: '/{id}' })).input(z.object({
+          params: z.object({ id: z.string().optional() }),
+        })),
+        message: 'Procedure at path "test" has dynamic param "id" marked as optional in its input schema, but path params must always be required in OpenAPI',
+      },
+    ])('throws when $name', async ({ procedure, message }) => {
+      await expect(generator.generate({ test: procedure })).rejects.toThrow(message)
+    })
+  })
+
+  describe('request query', () => {
+    it('maps compact GET query parameters', async () => {
+      const doc = await generator.generate({
+        search: oc
+          .meta(openapi({
+            method: 'GET',
+            path: '/planets/{id}',
+            queryStyles: {
+              filter: 'primitive',
+              tags: 'array',
+            },
+          }))
+          .input(z.object({
+            id: z.string(),
+            filter: z.string(),
+            tags: z.array(z.string()),
+            meta: z.object({ published: z.boolean() }).optional(),
+          })),
+      })
+
+      expect(doc.paths?.['/planets/{id}']).toEqual({
+        get: expect.objectContaining({
+          parameters: expect.arrayContaining([
+            {
+              name: 'filter',
               in: 'query',
               required: true,
-              schema: {
-                type: 'string',
-              },
               allowEmptyValue: true,
               allowReserved: true,
+              schema: expect.objectContaining({ type: 'string' }),
             },
             {
-              name: 'query2',
+              name: 'tags',
               in: 'query',
-              required: false,
-              schema: {
-                type: 'number',
-              },
+              required: true,
               allowEmptyValue: true,
               allowReserved: true,
+              schema: expect.objectContaining({ type: 'array' }),
             },
             {
-              name: 'query3',
+              name: 'meta',
               in: 'query',
-              required: false,
-              schema: {
-                type: 'object',
-                properties: {
-                  a: {
-                    type: 'string',
-                  },
-                },
-                required: ['a'],
-              },
               style: 'deepObject',
               explode: true,
               allowEmptyValue: true,
               allowReserved: true,
+              schema: expect.objectContaining({ type: 'object' }),
             },
+          ]),
+        }),
+      })
+    })
+
+    it('maps detailed query parameters', async () => {
+      const doc = await generator.generate({
+        createPlanet: oc
+          .meta(openapi({
+            method: 'POST',
+            path: '/planets/{id}',
+            inputStructure: 'detailed',
+          }))
+          .input(z.object({
+            params: z.object({ id: z.string() }),
+            query: z.object({ expand: z.boolean().optional() }),
+          }))
+          .output(z.object({ ok: z.boolean() })),
+      })
+
+      expect(doc.paths?.['/planets/{id}']).toEqual({
+        post: expect.objectContaining({
+          parameters: expect.arrayContaining([
             {
-              name: 'query4',
+              name: 'expand',
               in: 'query',
-              required: true,
-              schema: {
-                anyOf: [
-                  {
-                    type: 'array',
-                    items: {
-                      type: 'number',
-                    },
-                  },
-                  {
-                    type: 'number',
-                  },
-                ],
-              },
               allowEmptyValue: true,
               allowReserved: true,
+              schema: expect.objectContaining({ type: 'boolean' }),
             },
-          ],
+          ]),
         }),
-      },
-    },
-  },
-  {
-    name: 'not throw in GET + any input',
-    contract: oc.route({ method: 'GET' }).input(z.any()),
-    expected: {
-      '/': {
+      })
+    })
+
+    it('maps default query styles as primitive/array and fallback to deepObject in compact input structure mode', async () => {
+      const doc = await generator.generate({
+        search: oc
+          .meta(openapi({
+            method: 'GET',
+          }))
+          .input(z.object({
+            primitive: z.string(),
+            arrayable: z.array(z.string()).or(z.string()),
+            array: z.array(z.string()),
+            object: z.object({ nested: z.string() }),
+          }))
+          .output(z.object({ ok: z.boolean() })),
+      })
+
+      expect(doc.paths?.['/search']).toEqual({
         get: expect.objectContaining({
+          parameters: expect.arrayContaining([
+            {
+              name: 'primitive',
+              in: 'query',
+              required: true,
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'string' }),
+            },
+            {
+              name: 'arrayable',
+              in: 'query',
+              required: true,
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ anyOf: expect.any(Array) }),
+            },
+            {
+              name: 'array',
+              in: 'query',
+              required: true,
+              style: 'deepObject',
+              explode: true,
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'array' }),
+            },
+            {
+              name: 'object',
+              in: 'query',
+              required: true,
+              style: 'deepObject',
+              explode: true,
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'object' }),
+            },
+          ]),
         }),
-      },
-    },
-  },
-  {
-    name: 'GET + non-object input',
-    contract: oc.route({ method: 'GET' }).input(z.string()),
-    error: 'When method is "GET", input schema must satisfy: object | any | unknown',
-  },
-  {
-    name: 'file',
-    contract: oc.input(z.file().mime(['image/png'])),
-    expected: {
-      '/': {
-        post: expect.objectContaining({
-          requestBody: {
-            content: {
-              'image/png': {
-                schema: {
-                  type: 'string',
-                  contentMediaType: 'image/png',
+      })
+    })
+
+    it('maps default query styles as primitive and fallback to deepObject in detailed input structure mode', async () => {
+      const doc = await generator.generate({
+        search: oc
+          .meta(openapi({
+            method: 'GET',
+            inputStructure: 'detailed',
+          }))
+          .input(z.object({
+            query: z.object({
+              primitive: z.string(),
+              array: z.array(z.string()),
+              object: z.object({ nested: z.string() }),
+            }),
+          }))
+          .output(z.object({ ok: z.boolean() })),
+      })
+
+      expect(doc.paths?.['/search']).toEqual({
+        get: expect.objectContaining({
+          parameters: expect.arrayContaining([
+            {
+              name: 'primitive',
+              in: 'query',
+              required: true,
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'string' }),
+            },
+            {
+              name: 'array',
+              in: 'query',
+              required: true,
+              style: 'deepObject',
+              explode: true,
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'array' }),
+            },
+            {
+              name: 'object',
+              in: 'query',
+              required: true,
+              style: 'deepObject',
+              explode: true,
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'object' }),
+            },
+          ]),
+        }),
+      })
+    })
+
+    it('maps all supported query styles in compact input structure mode', async () => {
+      const doc = await generator.generate({
+        search: oc
+          .meta(openapi({
+            method: 'GET',
+            queryStyles: {
+              primitive: 'primitive',
+              array: 'array',
+              commaArray: 'comma-delimited-array',
+              commaObject: 'comma-delimited-object',
+              spaceArray: 'space-delimited-array',
+              spaceObject: 'space-delimited-object',
+              pipeArray: 'pipe-delimited-array',
+              pipeObject: 'pipe-delimited-object',
+              json: 'json',
+              bracketObject: undefined,
+            },
+          }))
+          .input(z.object({
+            primitive: z.string(),
+            array: z.array(z.string()),
+            commaArray: z.array(z.string()),
+            commaObject: z.object({ a: z.string(), b: z.string() }),
+            spaceArray: z.array(z.string()),
+            spaceObject: z.object({ a: z.string(), b: z.string() }),
+            pipeArray: z.array(z.string()),
+            pipeObject: z.object({ a: z.string(), b: z.string() }),
+            json: z.object({ enabled: z.boolean() }),
+            bracketObject: z.object({ nested: z.string() }),
+          }))
+          .output(z.object({ ok: z.boolean() })),
+      })
+
+      expect(doc.paths?.['/search']).toEqual({
+        get: expect.objectContaining({
+          parameters: expect.arrayContaining([
+            {
+              name: 'primitive',
+              in: 'query',
+              required: true,
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'string' }),
+            },
+            {
+              name: 'array',
+              in: 'query',
+              required: true,
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'array' }),
+            },
+            {
+              name: 'commaArray',
+              in: 'query',
+              required: true,
+              explode: false,
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'array' }),
+            },
+            {
+              name: 'commaObject',
+              in: 'query',
+              required: true,
+              explode: false,
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'object' }),
+            },
+            {
+              name: 'spaceArray',
+              in: 'query',
+              required: true,
+              style: 'spaceDelimited',
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'array' }),
+            },
+            {
+              name: 'spaceObject',
+              in: 'query',
+              required: true,
+              style: 'spaceDelimited',
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'object' }),
+            },
+            {
+              name: 'pipeArray',
+              in: 'query',
+              required: true,
+              style: 'pipeDelimited',
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'array' }),
+            },
+            {
+              name: 'pipeObject',
+              in: 'query',
+              required: true,
+              style: 'pipeDelimited',
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'object' }),
+            },
+            {
+              name: 'json',
+              in: 'query',
+              required: true,
+              allowEmptyValue: true,
+              allowReserved: true,
+              content: {
+                'application/json': {
+                  schema: expect.objectContaining({ type: 'object' }),
                 },
               },
             },
+            {
+              name: 'bracketObject',
+              in: 'query',
+              required: true,
+              style: 'deepObject',
+              explode: true,
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'object' }),
+            },
+          ]),
+        }),
+      })
+    })
+
+    it('maps all supported query styles in detailed input structure mode', async () => {
+      const doc = await generator.generate({
+        search: oc
+          .meta(openapi({
+            method: 'GET',
+            inputStructure: 'detailed',
+            queryStyles: {
+              primitive: 'primitive',
+              array: 'array',
+              commaArray: 'comma-delimited-array',
+              commaObject: 'comma-delimited-object',
+              spaceArray: 'space-delimited-array',
+              spaceObject: 'space-delimited-object',
+              pipeArray: 'pipe-delimited-array',
+              pipeObject: 'pipe-delimited-object',
+              json: 'json',
+              bracketObject: undefined,
+            },
+          }))
+          .input(z.object({
+            query: z.object({
+              primitive: z.string(),
+              array: z.array(z.string()),
+              commaArray: z.array(z.string()),
+              commaObject: z.object({ a: z.string(), b: z.string() }),
+              spaceArray: z.array(z.string()),
+              spaceObject: z.object({ a: z.string(), b: z.string() }),
+              pipeArray: z.array(z.string()),
+              pipeObject: z.object({ a: z.string(), b: z.string() }),
+              json: z.object({ enabled: z.boolean() }),
+              bracketObject: z.object({ nested: z.string() }),
+            }),
+          }))
+          .output(z.object({ ok: z.boolean() })),
+      })
+
+      expect(doc.paths?.['/search']).toEqual({
+        get: expect.objectContaining({
+          parameters: expect.arrayContaining([
+            {
+              name: 'primitive',
+              in: 'query',
+              required: true,
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'string' }),
+            },
+            {
+              name: 'array',
+              in: 'query',
+              required: true,
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'array' }),
+            },
+            {
+              name: 'commaArray',
+              in: 'query',
+              required: true,
+              explode: false,
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'array' }),
+            },
+            {
+              name: 'commaObject',
+              in: 'query',
+              required: true,
+              explode: false,
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'object' }),
+            },
+            {
+              name: 'spaceArray',
+              in: 'query',
+              required: true,
+              style: 'spaceDelimited',
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'array' }),
+            },
+            {
+              name: 'spaceObject',
+              in: 'query',
+              required: true,
+              style: 'spaceDelimited',
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'object' }),
+            },
+            {
+              name: 'pipeArray',
+              in: 'query',
+              required: true,
+              style: 'pipeDelimited',
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'array' }),
+            },
+            {
+              name: 'pipeObject',
+              in: 'query',
+              required: true,
+              style: 'pipeDelimited',
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'object' }),
+            },
+            {
+              name: 'json',
+              in: 'query',
+              required: true,
+              allowEmptyValue: true,
+              allowReserved: true,
+              content: {
+                'application/json': {
+                  schema: expect.objectContaining({ type: 'object' }),
+                },
+              },
+            },
+            {
+              name: 'bracketObject',
+              in: 'query',
+              required: true,
+              style: 'deepObject',
+              explode: true,
+              allowEmptyValue: true,
+              allowReserved: true,
+              schema: expect.objectContaining({ type: 'object' }),
+            },
+          ]),
+        }),
+      })
+    })
+
+    it.each([
+      {
+        name: 'GET input with a non-object schema',
+        procedure: oc.meta(openapi({ method: 'GET' })).input(z.string()),
+        message: 'Procedure at path "test" uses method "GET" but its input schema is not an object.',
+      },
+    ])('throws when $name', async ({ procedure, message }) => {
+      await expect(generator.generate({ test: procedure })).rejects.toThrow(message)
+    })
+  })
+
+  describe('request headers', () => {
+    it('maps detailed request headers', async () => {
+      const doc = await generator.generate({
+        createPlanet: oc
+          .meta(openapi({
+            method: 'POST',
+            path: '/planets/{id}',
+            inputStructure: 'detailed',
+          }))
+          .input(z.object({
+            params: z.object({ id: z.string() }),
+            headers: z.object({ 'x-trace-id': z.string() }),
+          }))
+          .output(z.object({ ok: z.boolean() })),
+      })
+
+      expect(doc.paths?.['/planets/{id}']).toEqual({
+        post: expect.objectContaining({
+          parameters: expect.arrayContaining([
+            {
+              name: 'x-trace-id',
+              in: 'header',
+              required: true,
+              schema: expect.objectContaining({ type: 'string' }),
+            },
+          ]),
+        }),
+      })
+    })
+  })
+
+  describe('request body', () => {
+    it('maps compacted request bodies', async () => {
+      const doc = await generator.generate({
+        createPlanet: oc
+          .meta(openapi({
+            method: 'POST',
+            path: '/planets',
+          }))
+          .input(z.object({ name: z.string() })),
+      })
+
+      expect(doc.paths?.['/planets']).toEqual({
+        post: expect.objectContaining({
+          requestBody: {
             required: true,
+            content: {
+              'application/json': {
+                schema: expect.objectContaining({
+                  type: 'object',
+                }),
+              },
+            },
           },
         }),
-      },
-    },
-  },
-  {
-    name: 'event iterator',
-    contract: oc.input(eventIterator(z.string(), z.boolean())),
-    expected: {
-      '/': {
+      })
+    })
+
+    it('maps detailed request bodies', async () => {
+      const doc = await generator.generate({
+        createPlanet: oc
+          .meta(openapi({
+            method: 'POST',
+            path: '/planets/{id}',
+            inputStructure: 'detailed',
+          }))
+          .input(z.object({
+            params: z.object({ id: z.string() }),
+            body: z.object({ name: z.string() }),
+          })),
+      })
+
+      expect(doc.paths?.['/planets/{id}']).toEqual({
+        post: expect.objectContaining({
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: expect.objectContaining({
+                  type: 'object',
+                }),
+              },
+            },
+          },
+        }),
+      })
+    })
+
+    it('maps compacted optional request bodies', async () => {
+      const doc = await generator.generate({
+        createPlanet: oc
+          .meta(openapi({
+            method: 'POST',
+            path: '/planets',
+          }))
+          .input(z.object({ name: z.string() }).optional()),
+      })
+
+      expect(doc.paths?.['/planets']).toEqual({
+        post: expect.objectContaining({
+          requestBody: {
+            content: {
+              'application/json': {
+                schema: expect.objectContaining({
+                  type: 'object',
+                }),
+              },
+            },
+          },
+        }),
+      })
+    })
+
+    it('maps detailed optional request bodies', async () => {
+      const doc = await generator.generate({
+        createPlanet: oc
+          .meta(openapi({
+            method: 'POST',
+            path: '/planets/{id}',
+            inputStructure: 'detailed',
+          }))
+          .input(z.object({
+            params: z.object({ id: z.string() }),
+            body: z.object({ name: z.string() }).optional(),
+          })),
+      })
+
+      expect(doc.paths?.['/planets/{id}']).toEqual({
+        post: expect.objectContaining({
+          requestBody: {
+            content: {
+              'application/json': {
+                schema: expect.objectContaining({
+                  type: 'object',
+                }),
+              },
+            },
+          },
+        }),
+      })
+    })
+
+    describe('with files', () => {
+      it('maps compacted request bodies as files', async () => {
+        const doc = await generator.generate({
+          createPlanet: oc
+            .meta(openapi({
+              method: 'POST',
+              path: '/planets',
+            }))
+            .input(z.file().mime(['application/pdf', 'application/xml'])),
+        })
+
+        expect(doc.paths?.['/planets']).toEqual({
+          post: expect.objectContaining({
+            requestBody: {
+              required: true,
+              content: {
+                'application/pdf': {
+                  schema: expect.objectContaining({
+                    contentEncoding: 'binary',
+                  }),
+                },
+                'application/xml': {
+                  schema: expect.objectContaining({
+                    contentEncoding: 'binary',
+                  }),
+                },
+              },
+            },
+          }),
+        })
+      })
+
+      it('maps detailed request bodies as files', async () => {
+        const doc = await generator.generate({
+          createPlanet: oc
+            .meta(openapi({
+              method: 'POST',
+              path: '/planets',
+              inputStructure: 'detailed',
+            }))
+            .input(z.object({ body: z.file().mime(['application/pdf', 'application/xml']) })),
+        })
+
+        expect(doc.paths?.['/planets']).toEqual({
+          post: expect.objectContaining({
+            requestBody: {
+              required: true,
+              content: {
+                'application/pdf': {
+                  schema: expect.objectContaining({
+                    contentEncoding: 'binary',
+                  }),
+                },
+                'application/xml': {
+                  schema: expect.objectContaining({
+                    contentEncoding: 'binary',
+                  }),
+                },
+              },
+            },
+          }),
+        })
+      })
+
+      it('maps compacted request bodies as files without mine', async () => {
+        const doc = await generator.generate({
+          createPlanet: oc
+            .meta(openapi({
+              method: 'POST',
+              path: '/planets',
+            }))
+            .input(z.file()),
+        })
+
+        expect(doc.paths?.['/planets']).toEqual({
+          post: expect.objectContaining({
+            requestBody: {
+              required: true,
+              content: {
+                '*/*': {
+                  schema: expect.objectContaining({
+                    contentEncoding: 'binary',
+                  }),
+                },
+              },
+            },
+          }),
+        })
+      })
+
+      it('maps detailed request bodies as files without mine', async () => {
+        const doc = await generator.generate({
+          createPlanet: oc
+            .meta(openapi({
+              method: 'POST',
+              path: '/planets',
+              inputStructure: 'detailed',
+            }))
+            .input(z.object({ body: z.file() })),
+        })
+
+        expect(doc.paths?.['/planets']).toEqual({
+          post: expect.objectContaining({
+            requestBody: {
+              required: true,
+              content: {
+                '*/*': {
+                  schema: expect.objectContaining({
+                    contentEncoding: 'binary',
+                  }),
+                },
+              },
+            },
+          }),
+        })
+      })
+
+      it('maps compacted request bodies with nested files', async () => {
+        const doc = await generator.generate({
+          createPlanet: oc
+            .meta(openapi({
+              method: 'POST',
+              path: '/planets',
+            }))
+            .input(z.object({ file: z.file().mime(['application/pdf', 'application/xml']) })),
+        })
+
+        expect(doc.paths?.['/planets']).toEqual({
+          post: expect.objectContaining({
+            requestBody: {
+              required: true,
+              content: {
+                'multipart/form-data': {
+                  schema: expect.objectContaining({
+                    type: 'object',
+                  }),
+                },
+              },
+            },
+          }),
+        })
+      })
+
+      it('maps detailed request bodies with nested files', async () => {
+        const doc = await generator.generate({
+          createPlanet: oc
+            .meta(openapi({
+              method: 'POST',
+              path: '/planets',
+              inputStructure: 'detailed',
+            }))
+            .input(z.object({ body: z.object({ file: z.file().mime(['application/pdf', 'application/xml']) }) })),
+        })
+
+        expect(doc.paths?.['/planets']).toEqual({
+          post: expect.objectContaining({
+            requestBody: {
+              required: true,
+              content: {
+                'multipart/form-data': {
+                  schema: expect.objectContaining({
+                    type: 'object',
+                  }),
+                },
+              },
+            },
+          }),
+        })
+      })
+    })
+
+    it('maps event iterator inputs to an SSE request body', async () => {
+      const doc = await generator.generate({
+        subscribe: oc
+          .meta(openapi({}))
+          .input(eventIterator(z.string(), z.boolean())),
+      })
+
+      expect(doc.paths?.['/subscribe']).toEqual({
         post: expect.objectContaining({
           requestBody: {
             content: {
@@ -293,7 +1268,7 @@ const inputTests: TestCase[] = [
                     {
                       type: 'object',
                       properties: {
-                        event: { const: 'done' },
+                        event: { const: 'close' },
                         data: { type: 'boolean' },
                         id: { type: 'string' },
                         retry: { type: 'number' },
@@ -317,142 +1292,277 @@ const inputTests: TestCase[] = [
             required: true,
           },
         }),
-      },
-    },
-  },
-  {
-    name: 'inputStructure=detailed',
-    contract: oc.route({ path: '/planets/{id}', inputStructure: 'detailed' }).input(z.object({
-      params: z.object({ id: z.string() }),
-      query: z.object({ query1: z.string(), query2: z.number().optional() }),
-      headers: z.object({ header1: z.string(), header2: z.string().optional() }),
-      body: z.string(),
-    })),
-    expected: {
-      '/planets/{id}': {
-        post: expect.objectContaining({
-          parameters: [
-            {
-              name: 'id',
-              in: 'path',
-              required: true,
-              schema: {
-                type: 'string',
-              },
-            },
-            {
-              name: 'query1',
-              in: 'query',
-              required: true,
-              schema: {
-                type: 'string',
-              },
-              allowEmptyValue: true,
-              allowReserved: true,
-            },
-            {
-              name: 'query2',
-              in: 'query',
-              required: false,
-              schema: {
-                type: 'number',
-              },
-              allowEmptyValue: true,
-              allowReserved: true,
-            },
-            {
-              name: 'header1',
-              in: 'header',
-              required: true,
-              schema: {
-                type: 'string',
-              },
-            },
-            {
-              name: 'header2',
-              in: 'header',
-              required: false,
-              schema: {
-                type: 'string',
-              },
-            },
-          ],
-          requestBody: {
-            content: {
-              'application/json': {
-                schema: { type: 'string' },
-              },
-            },
-            required: true,
-          },
-        }),
-      },
-    },
-  },
-  {
-    name: 'inputStructure=detailed all field is optional',
-    contract: oc.route({ inputStructure: 'detailed' }).input(z.object({})),
-    expected: {
-      '/': {
-        post: expect.toSatisfy(v => !v.parameters && !v.requestBody),
-      },
-    },
-  },
-  {
-    name: 'inputStructure=detailed + invalid input',
-    contract: oc.route({ inputStructure: 'detailed' }).input(z.string()),
-    error: 'When input structure is "detailed", input schema must satisfy',
-  },
-  {
-    name: 'inputStructure=detailed + invalid input',
-    contract: oc.route({ inputStructure: 'detailed', path: '/{id}' }),
-    error: 'When input structure is "detailed", input schema must satisfy',
-  },
-  {
-    name: 'inputStructure=detailed + invalid input',
-    contract: oc.route({ inputStructure: 'detailed' }).input(z.object({ })),
-    expected: expect.any(Object),
-  },
-  {
-    name: 'inputStructure=detailed + invalid input',
-    contract: oc.route({ inputStructure: 'detailed' }).input(z.object({ query: z.string() })),
-    error: 'When input structure is "detailed", input schema must satisfy',
-  },
-  {
-    name: 'inputStructure=detailed + invalid input',
-    contract: oc.route({ inputStructure: 'detailed', path: '/{id}' }).input(z.object({ params: z.object({ id: z.string().optional() }) })),
-    error: 'When input structure is "detailed" and path has dynamic params, the "params" schema must be an object with all dynamic params as required.',
-  },
-]
+      })
+    })
 
-const successResponseTests: TestCase[] = [
-  {
-    name: 'compact mode',
-    contract: oc.output(z.string()),
-    expected: {
-      '/': {
+    it('throws when detailed input has a non-object schema', async () => {
+      await expect(
+        generator.generate({
+          test: oc.meta(openapi({ inputStructure: 'detailed' })).input(z.string()),
+        }),
+      ).rejects.toThrow('Procedure at path "test" has inputStructure "detailed" but its input schema is not an object.')
+    })
+  })
+
+  describe('response headers', () => {
+    it('maps detailed response headers', async () => {
+      const doc = await generator.generate({
+        createPlanet: oc
+          .meta(openapi({ outputStructure: 'detailed' }))
+          .output(z.object({
+            headers: z.object({ 'x-request-id': z.string() }),
+          })),
+      })
+
+      expect(doc.paths?.['/createPlanet']).toEqual({
         post: expect.objectContaining({
           responses: {
             200: {
               description: 'OK',
-              content: {
-                'application/json': {
-                  schema: {
-                    type: 'string',
-                  },
+              headers: {
+                'x-request-id': {
+                  required: true,
+                  schema: expect.objectContaining({ type: 'string' }),
                 },
               },
             },
           },
         }),
-      },
-    },
-  },
-  {
-    name: 'event iterator',
-    contract: oc.output(eventIterator(z.string(), z.boolean())),
-    expected: {
-      '/': {
+      })
+    })
+  })
+
+  describe('response body', () => {
+    it('maps compact outputs to a success response body', async () => {
+      const doc = await generator.generate({
+        ping: oc
+          .meta(openapi({ responseBodyHint: 'json' }))
+          .output(z.object({ message: z.string() })),
+      })
+
+      expect(doc.paths?.['/ping']).toEqual({
+        post: expect.objectContaining({
+          operationId: 'ping',
+          responses: {
+            200: {
+              description: 'OK',
+              content: {
+                'application/json': {
+                  schema: expect.objectContaining({
+                    type: 'object',
+                    properties: {
+                      message: expect.objectContaining({ type: 'string' }),
+                    },
+                    required: ['message'],
+                  }),
+                },
+              },
+            },
+          },
+        }),
+      })
+    })
+
+    it('maps detailed outputs to a success response body', async () => {
+      const doc = await generator.generate({
+        ping: oc
+          .meta(openapi({ outputStructure: 'detailed' }))
+          .output(z.object({ body: z.object({ message: z.string() }) })),
+      })
+
+      expect(doc.paths?.['/ping']).toEqual({
+        post: expect.objectContaining({
+          operationId: 'ping',
+          responses: {
+            200: {
+              description: 'OK',
+              content: {
+                'application/json': {
+                  schema: expect.objectContaining({
+                    type: 'object',
+                    properties: {
+                      message: expect.objectContaining({ type: 'string' }),
+                    },
+                    required: ['message'],
+                  }),
+                },
+              },
+            },
+          },
+        }),
+      })
+    })
+
+    describe('with files', () => {
+      it('maps compact response bodies as files', async () => {
+        const doc = await generator.generate({
+          createPlanet: oc
+            .meta(openapi({}))
+            .output(z.file().mime(['application/pdf', 'application/xml'])),
+        })
+
+        expect(doc.paths?.['/createPlanet']).toEqual({
+          post: expect.objectContaining({
+            responses: {
+              200: {
+                description: 'OK',
+                content: {
+                  'application/pdf': {
+                    schema: expect.objectContaining({
+                      contentEncoding: 'binary',
+                    }),
+                  },
+                  'application/xml': {
+                    schema: expect.objectContaining({
+                      contentEncoding: 'binary',
+                    }),
+                  },
+                },
+              },
+            },
+          }),
+        })
+      })
+
+      it('maps detailed response bodies as files', async () => {
+        const doc = await generator.generate({
+          createPlanet: oc
+            .meta(openapi({ outputStructure: 'detailed' }))
+            .output(z.object({ body: z.file().mime(['application/pdf', 'application/xml']) })),
+        })
+
+        expect(doc.paths?.['/createPlanet']).toEqual({
+          post: expect.objectContaining({
+            responses: {
+              200: {
+                description: 'OK',
+                content: {
+                  'application/pdf': {
+                    schema: expect.objectContaining({
+                      contentEncoding: 'binary',
+                    }),
+                  },
+                  'application/xml': {
+                    schema: expect.objectContaining({
+                      contentEncoding: 'binary',
+                    }),
+                  },
+                },
+              },
+            },
+          }),
+        })
+      })
+
+      it('maps compact response bodies as files without mime', async () => {
+        const doc = await generator.generate({
+          createPlanet: oc
+            .meta(openapi({}))
+            .output(z.file()),
+        })
+
+        expect(doc.paths?.['/createPlanet']).toEqual({
+          post: expect.objectContaining({
+            responses: {
+              200: {
+                description: 'OK',
+                content: {
+                  '*/*': {
+                    schema: expect.objectContaining({
+                      contentEncoding: 'binary',
+                    }),
+                  },
+                },
+              },
+            },
+          }),
+        })
+      })
+
+      it('maps detailed response bodies as files without mime', async () => {
+        const doc = await generator.generate({
+          createPlanet: oc
+            .meta(openapi({ outputStructure: 'detailed' }))
+            .output(z.object({ body: z.file() })),
+        })
+
+        expect(doc.paths?.['/createPlanet']).toEqual({
+          post: expect.objectContaining({
+            responses: {
+              200: {
+                description: 'OK',
+                content: {
+                  '*/*': {
+                    schema: expect.objectContaining({
+                      contentEncoding: 'binary',
+                    }),
+                  },
+                },
+              },
+            },
+          }),
+        })
+      })
+
+      it('maps compact response bodies with nested files', async () => {
+        const doc = await generator.generate({
+          createPlanet: oc
+            .meta(openapi({}))
+            .output(z.object({ file: z.file().mime(['application/pdf', 'application/xml']) })),
+        })
+
+        expect(doc.paths?.['/createPlanet']).toEqual({
+          post: expect.objectContaining({
+            responses: {
+              200: {
+                description: 'OK',
+                content: {
+                  'multipart/form-data': {
+                    schema: expect.objectContaining({
+                      type: 'object',
+                    }),
+                  },
+                },
+              },
+            },
+          }),
+        })
+      })
+
+      it('maps detailed response bodies with nested files', async () => {
+        const doc = await generator.generate({
+          createPlanet: oc
+            .meta(openapi({ outputStructure: 'detailed' }))
+            .output(z.object({ body: z.object({ file: z.file().mime(['application/pdf', 'application/xml']) }) })),
+        })
+
+        expect(doc.paths?.['/createPlanet']).toEqual({
+          post: expect.objectContaining({
+            responses: {
+              200: {
+                description: 'OK',
+                content: {
+                  'multipart/form-data': {
+                    schema: expect.objectContaining({
+                      type: 'object',
+                    }),
+                  },
+                },
+              },
+            },
+          }),
+        })
+      })
+    })
+
+    it('maps event iterator outputs to an SSE success response', async () => {
+      const doc = await generator.generate({
+        subscribe: oc
+          .meta(openapi({}))
+          .output(eventIterator(z.string(), z.boolean())),
+      })
+
+      expect(doc.paths?.['/subscribe']).toEqual({
         post: expect.objectContaining({
           responses: {
             200: {
@@ -474,7 +1584,7 @@ const successResponseTests: TestCase[] = [
                       {
                         type: 'object',
                         properties: {
-                          event: { const: 'done' },
+                          event: { const: 'close' },
                           data: { type: 'boolean' },
                           id: { type: 'string' },
                           retry: { type: 'number' },
@@ -498,832 +1608,293 @@ const successResponseTests: TestCase[] = [
             },
           },
         }),
-      },
-    },
-  },
-  {
-    name: 'outputStructure=detailed',
-    contract: oc.route({ outputStructure: 'detailed' }).output(z.object({
-      headers: z.object({ header1: z.string(), header2: z.string().optional() }),
-      body: z.string(),
-    })),
-    expected: {
-      '/': {
+      })
+    })
+
+    it('throws when detailed output has a non-object schema', async () => {
+      await expect(
+        generator.generate({
+          test: oc.meta(openapi({ outputStructure: 'detailed' })).output(z.string()),
+        }),
+      ).rejects.toThrow('Procedure at path "test" has outputStructure "detailed" but its output schema is not an object.')
+    })
+  })
+
+  describe('multiple status response', () => {
+    it('maps detailed outputs to per-status responses with headers', async () => {
+      const doc = await generator.generate({
+        createPlanet: oc
+          .meta(openapi({ outputStructure: 'detailed' }))
+          .output(z.union([
+            z.object({
+              status: z.literal(201),
+              headers: z.object({ 'x-request-id': z.string() }),
+              body: z.object({ id: z.string() }),
+            }),
+            z.object({
+              status: z.literal(202).describe('202 success1'),
+              body: z.object({ accepted: z.boolean() }),
+            }),
+            z.object({
+              status: z.literal(202).describe('202 success2'),
+              body: z.object({ accepted: z.string() }),
+            }),
+          ])),
+      })
+
+      expect(doc.paths?.['/createPlanet']).toEqual({
         post: expect.objectContaining({
+          operationId: 'createPlanet',
           responses: {
-            200: {
+            201: {
               description: 'OK',
-              content: {
-                'application/json': {
-                  schema: { type: 'string' },
-                },
-              },
               headers: {
-                header1: {
+                'x-request-id': {
                   required: true,
-                  schema: {
-                    type: 'string',
-                  },
+                  schema: expect.objectContaining({ type: 'string' }),
                 },
-                header2: {
-                  required: false,
-                  schema: {
-                    type: 'string',
-                  },
+              },
+              content: {
+                'application/json': {
+                  schema: expect.objectContaining({
+                    type: 'object',
+                    properties: {
+                      id: expect.objectContaining({ type: 'string' }),
+                    },
+                    required: ['id'],
+                  }),
+                },
+              },
+            },
+            202: {
+              description: '202 success1, 202 success2',
+              content: {
+                'application/json': {
+                  schema: expect.objectContaining({
+                    anyOf: [
+                      expect.objectContaining({
+                        type: 'object',
+                        properties: {
+                          accepted: expect.objectContaining({ type: 'boolean' }),
+                        },
+                        required: ['accepted'],
+                      }),
+                      expect.objectContaining({
+                        type: 'object',
+                        properties: {
+                          accepted: expect.objectContaining({ type: 'string' }),
+                        },
+                        required: ['accepted'],
+                      }),
+                    ],
+                  }),
                 },
               },
             },
           },
         }),
+      })
+    })
+
+    it.each([
+      {
+        name: 'detailed output with a non-literal status',
+        procedure: oc.meta(openapi({ outputStructure: 'detailed' })).output(z.union([
+          z.object({ status: z.number(), body: z.string() }),
+          z.object({ status: z.literal(201), body: z.string() }),
+        ])),
+        message: 'Procedure at path "test" has an invalid "status" field in its outputStructure "detailed" schema.',
       },
-    },
-  },
-  {
-    name: 'outputStructure=detailed all fields is optional',
-    contract: oc.route({ outputStructure: 'detailed' }).output(z.object({})),
-    expected: {
-      '/': {
-        post: {
-          operationId: '',
-          responses: {
-            200: expect.toSatisfy(v => !v.content && !v.headers),
-          },
+      {
+        name: 'detailed output with a non-success status code',
+        procedure: oc.meta(openapi({ outputStructure: 'detailed' })).output(z.union([
+          z.object({ status: z.literal(400), body: z.string() }),
+          z.object({ status: z.literal(201), body: z.string() }),
+        ])),
+        message: 'Procedure at path "test" has an invalid "status" field in its outputStructure "detailed" schema.',
+      },
+    ])('throws when $name', async ({ procedure, message }) => {
+      await expect(generator.generate({ test: procedure })).rejects.toThrow(message)
+    })
+  })
+
+  describe('error response', () => {
+    it('groups defined errors by status and allows overriding the error body schema', async () => {
+      const generator = new OpenAPIGenerator({
+        converters: [zodJsonSchemaConverter],
+      })
+
+      const customErrorResponseBodySchema = vi.fn((definedErrors, status) => {
+        if (status === 400) {
+          return {
+            type: 'object' as const,
+            description: 'custom-400',
+          }
+        }
+
+        return undefined
+      })
+
+      const doc = await generator.generate({
+        ping: oc
+          .meta(openapi({}))
+          .errors({
+            BAD_REQUEST: {
+              data: z.object({ field: z.string() }),
+            },
+            BAD_REQUEST_2: {
+              message: 'Second bad request',
+            },
+            NOT_FOUND: {},
+          })
+          .output(z.object({ ok: z.boolean() })),
+      }, {
+        errorStatusMap: {
+          BAD_REQUEST: 400,
+          BAD_REQUEST_2: 400,
+          NOT_FOUND: 404,
         },
-      },
-    },
-  },
-  {
-    name: 'outputStructure=detailed',
-    contract: oc.route({ outputStructure: 'detailed' }).output(z.string()),
-    error: 'When output structure is "detailed", output schema must satisfy',
-  },
-  {
-    name: 'outputStructure=detailed',
-    contract: oc.route({ outputStructure: 'detailed' }).output(z.object({ headers: z.string() })),
-    error: 'When output structure is "detailed", output schema must satisfy',
-  },
-  {
-    name: 'outputStructure=compact + output is optional',
-    contract: oc.route({ outputStructure: 'compact' }).output(z.object({ name: z.string() }).optional()),
-    expected: {
-      '/': {
+        customErrorResponseBodySchema,
+      })
+
+      expect(customErrorResponseBodySchema).toHaveBeenCalledTimes(2)
+      expect(customErrorResponseBodySchema).toHaveBeenNthCalledWith(1, [
+        {
+          code: 'BAD_REQUEST',
+          dataOptional: false,
+          dataJsonSchema: expect.any(Object),
+        },
+        {
+          code: 'BAD_REQUEST_2',
+          defaultMessage: 'Second bad request',
+          dataOptional: true,
+          dataJsonSchema: expect.any(Object),
+        },
+      ], 400)
+      expect(customErrorResponseBodySchema).toHaveBeenNthCalledWith(2, [
+        {
+          code: 'NOT_FOUND',
+          dataOptional: true,
+          dataJsonSchema: expect.any(Object),
+        },
+      ], 404)
+
+      expect(doc.paths?.['/ping']).toEqual({
         post: expect.objectContaining({
           responses: {
-            200: {
-              description: 'OK',
+            200: expect.any(Object),
+            400: {
+              description: 'Second bad request',
               content: {
                 'application/json': {
                   schema: {
-                    anyOf: [
-                      {
-                        type: 'object',
-                        properties: {
-                          name: { type: 'string' },
-                        },
-                        required: ['name'],
-                      },
-                      {
-                        not: {},
-                      },
-                    ],
+                    type: 'object',
+                    description: 'custom-400',
                   },
                 },
               },
             },
-          },
-        }),
-      },
-    },
-  },
-  {
-    name: 'outputStructure=detailed + body is optional',
-    contract: oc.route({ outputStructure: 'detailed' }).output(z.object({ body: z.object({ name: z.string() }).optional() })),
-    expected: {
-      '/': {
-        post: expect.objectContaining({
-          responses: {
-            200: {
-              description: 'OK',
+            404: expect.objectContaining({
+              description: '404',
               content: {
                 'application/json': {
-                  schema: {
-                    anyOf: [
-                      {
-                        type: 'object',
-                        properties: {
-                          name: { type: 'string' },
-                        },
-                        required: ['name'],
-                      },
-                      {
-                        not: {},
-                      },
-                    ],
-                  },
-                },
-              },
-            },
-          },
-        }),
-      },
-    },
-  },
-  {
-    name: 'outputStructure=detailed + headers is optional',
-    contract: oc.route({ outputStructure: 'detailed' }).output(z.object({ headers: z.object({ 'x-custom': z.string() }).optional() })),
-    expected: {
-      '/': {
-        post: expect.objectContaining({
-          responses: {
-            200: expect.objectContaining({
-              headers: {
-                'x-custom': {
-                  required: undefined,
-                  schema: {
-                    type: 'string',
-                  },
+                  schema: expect.objectContaining({
+                    oneOf: expect.arrayContaining([
+                      { $ref: '#/components/schemas/UndefinedError' },
+                    ]),
+                  }),
                 },
               },
             }),
           },
         }),
-      },
-    },
-  },
-  {
-    name: 'outputStructure=detailed + multiple status',
-    contract: oc.route({ outputStructure: 'detailed' }).output(z.union([
-      z.object({ body: z.string() }),
-      z.object({ status: z.literal(201).describe('201 description'), body: z.object({ name: z.string() }), headers: z.object({ 'x-custom-header': z.string() }) }),
-    ])),
-    expected: {
-      '/': {
-        post: expect.objectContaining({
-          responses: {
-            200: {
-              description: 'OK',
-              content: {
-                'application/json': {
-                  schema: {
-                    type: 'string',
-                  },
-                },
-              },
-            },
-            201: {
-              description: '201 description',
-              content: {
-                'application/json': {
-                  schema: {
-                    type: 'object',
-                    properties: {
-                      name: { type: 'string' },
-                    },
-                    required: ['name'],
-                  },
-                },
-              },
-              headers: {
-                'x-custom-header': {
-                  required: true,
-                  schema: {
-                    type: 'string',
-                  },
-                },
-              },
-            },
-          },
-        }),
-      },
-    },
-  },
-  {
-    name: 'outputStructure=detailed + duplicate method',
-    contract: oc.route({ outputStructure: 'detailed' }).output(z.union([
-      z.object({ status: z.literal(201), body: z.string() }),
-      z.object({ status: z.literal(201).describe('201 description') }),
-    ])),
-    error: 'When output structure is "detailed", each success status must be unique.',
-  },
-  {
-    name: 'outputStructure=detailed + invalid status - 1',
-    contract: oc.route({ outputStructure: 'detailed' }).output(z.union([
-      z.object({ status: z.number(), body: z.string() }),
-      z.object({ status: z.literal(201).describe('201 description') }),
-    ])),
-    error: ' When output structure is "detailed", output schema must satisfy:',
-  },
-  {
-    name: 'outputStructure=detailed + invalid status - 2',
-    contract: oc.route({ outputStructure: 'detailed' }).output(z.union([
-      z.object({ status: z.literal('200'), body: z.string() }),
-      z.object({ status: z.literal(201).describe('201 description') }),
-    ])),
-    error: ' When output structure is "detailed", output schema must satisfy:',
-  },
-  {
-    name: 'outputStructure=detailed + invalid status - 3',
-    contract: oc.route({ outputStructure: 'detailed' }).output(z.union([
-      z.object({ status: z.literal(201.1), body: z.string() }),
-      z.object({ status: z.literal(201).describe('201 description') }),
-    ])),
-    error: ' When output structure is "detailed", output schema must satisfy:',
-  },
-  {
-    name: 'outputStructure=detailed + invalid status - 4',
-    contract: oc.route({ outputStructure: 'detailed' }).output(z.union([
-      z.object({ status: z.literal(400), body: z.string() }),
-      z.object({ status: z.literal(201).describe('201 description') }),
-    ])),
-    error: ' When output structure is "detailed", output schema must satisfy:',
-  },
-]
+      })
 
-const errorResponseTests: TestCase[] = [
-  {
-    name: 'without errors',
-    contract: oc,
-    expected: {
-      '/': {
-        post: expect.objectContaining({
-          responses: {
-            200: expect.objectContaining({}),
+      expect(doc.components?.schemas).toEqual({
+        UndefinedError: {
+          type: 'object',
+          properties: {
+            defined: { const: false },
+            inferable: { type: 'boolean' },
+            code: { type: 'string' },
+            status: { type: 'number' },
+            message: { type: 'string' },
+            data: {},
           },
-        }),
-      },
-    },
-  },
-  {
-    name: 'with errors',
-    contract: oc.errors({
-      UNAUTHORIZED: {
-        data: z.object({ token: z.string() }),
-      },
-      UNAUTHORIZED_TEST: {
-        status: 401,
-        message: 'Unauthorized test',
-        data: z.object({ token: z.string() }).optional(),
-      },
-      FORBIDDEN: undefined,
-      TEST: {},
-    }),
-    expected: {
-      '/': {
-        post: expect.objectContaining({
-          responses: expect.objectContaining({
-            401: {
-              description: '401',
-              content: {
-                'application/json': {
-                  schema: {
-                    oneOf: [
-                      {
-                        type: 'object',
-                        properties: {
-                          defined: { const: true },
-                          code: { const: 'UNAUTHORIZED' },
-                          status: { const: 401 },
-                          message: { type: 'string', default: 'Unauthorized' },
-                          data: {
-                            type: 'object',
-                            properties: {
-                              token: { type: 'string' },
-                            },
-                            required: ['token'],
-                          },
-                        },
-                        required: ['defined', 'code', 'status', 'message', 'data'],
-                      },
-                      {
-                        type: 'object',
-                        properties: {
-                          defined: { const: true },
-                          code: { const: 'UNAUTHORIZED_TEST' },
-                          status: { const: 401 },
-                          message: { type: 'string', default: 'Unauthorized test' },
-                          data: {
-                            type: 'object',
-                            properties: {
-                              token: { type: 'string' },
-                            },
-                            required: ['token'],
-                          },
-                        },
-                        required: ['defined', 'code', 'status', 'message'],
-                      },
-                      {
-                        type: 'object',
-                        properties: {
-                          defined: { const: false },
-                          code: { type: 'string' },
-                          status: { type: 'number' },
-                          message: { type: 'string' },
-                          data: {},
-                        },
-                        required: ['defined', 'code', 'status', 'message'],
-                      },
-                    ],
-                  },
-                },
+          required: ['defined', 'inferable', 'code', 'status', 'message'],
+        },
+      })
+    })
+  })
+
+  describe('complex schema', () => {
+    describe('repeated schemas', () => {
+      it('merges repeated compact GET input objects before extracting path and query parameters', async () => {
+        const doc = await generator.generate({
+          listPlanets: oc
+            .meta(openapi({
+              method: 'GET',
+              path: '/systems/{systemId}/planets',
+            }))
+            .input(z.looseObject({ systemId: z.string() }))
+            .input(z.looseObject({
+              search: z.string(),
+              page: z.number().optional(),
+              tags: z.array(z.string()).optional(),
+            }))
+            .output(z.object({ ok: z.boolean() })),
+        })
+
+        expect(doc.paths?.['/systems/{systemId}/planets']).toEqual({
+          get: expect.objectContaining({
+            operationId: 'listPlanets',
+            parameters: expect.arrayContaining([
+              {
+                name: 'systemId',
+                in: 'path',
+                required: true,
+                schema: expect.objectContaining({ type: 'string' }),
               },
-            },
-            500: {
-              description: '500',
-              content: {
-                'application/json': {
-                  schema: {
-                    oneOf: [
-                      {
-                        type: 'object',
-                        properties: {
-                          defined: { const: true },
-                          code: { const: 'TEST' },
-                          status: { const: 500 },
-                          message: { type: 'string', default: 'TEST' },
-                          data: {},
-                        },
-                        required: ['defined', 'code', 'status', 'message'],
-                      },
-                      {
-                        type: 'object',
-                        properties: {
-                          defined: { const: false },
-                          code: { type: 'string' },
-                          status: { type: 'number' },
-                          message: { type: 'string' },
-                          data: {},
-                        },
-                        required: ['defined', 'code', 'status', 'message'],
-                      },
-                    ],
-                  },
-                },
+              {
+                name: 'search',
+                in: 'query',
+                required: true,
+                allowEmptyValue: true,
+                allowReserved: true,
+                schema: expect.objectContaining({ type: 'string' }),
               },
-            },
+              {
+                name: 'page',
+                in: 'query',
+                allowEmptyValue: true,
+                allowReserved: true,
+                schema: expect.objectContaining({ type: 'number' }),
+              },
+              {
+                name: 'tags',
+                in: 'query',
+                style: 'deepObject',
+                explode: true,
+                allowEmptyValue: true,
+                allowReserved: true,
+                schema: expect.objectContaining({ type: 'array' }),
+              },
+            ]),
           }),
-        }),
-      },
-    },
-  },
-]
-
-const customOperationTests: TestCase[] = [
-  {
-    name: 'with security custom',
-    contract: oc.errors({
-      TEST: customOpenAPIOperation({ }, () => ({ security: [{ bearerAuth: [] }] })),
-    }).input(z.object({ id: z.string() })).output(z.object({ name: z.string() })),
-    expected: {
-      '/': {
-        post: {
-          security: [{ bearerAuth: [] }],
-        },
-      },
-    },
-  },
-  {
-    name: 'override entire operation object',
-    contract: oc
-      .route({
-        spec: {
-          operationId: 'customOperationId',
-          tags: ['tag'],
-          summary: '__OVERRIDE__',
-        },
+        })
       })
-      .errors({
-        TEST: customOpenAPIOperation({}, { security: [{ bearerAuth: [] }] }),
-      })
-      .input(z.object({ id: z.string() }))
-      .output(z.object({ name: z.string() })),
-    expected: {
-      '/': {
-        post: {
-          operationId: 'customOperationId',
-          tags: ['tag'],
-          summary: '__OVERRIDE__',
-          security: [{ bearerAuth: [] }],
-        },
-      },
-    },
-  },
-  {
-    name: 'extend operation object',
-    contract: oc
-      .route({
-        spec: spec => ({
-          ...spec,
-          operationId: 'customOperationId',
-          summary: '__OVERRIDE__',
-        }),
-      })
-      .errors({
-        TEST: customOpenAPIOperation({}, { security: [{ bearerAuth: [] }] }),
-      })
-      .input(z.object({ id: z.string() }))
-      .output(z.object({ name: z.string() })),
-    expected: {
-      '/': {
-        post: {
-          operationId: 'customOperationId',
-          summary: '__OVERRIDE__',
-          security: [{ bearerAuth: [] }],
-          requestBody: expect.any(Object),
-          responses: expect.any(Object),
-        },
-      },
-    },
-  },
-]
 
-it.each([
-  ...routeTests,
-  ...inputTests,
-  ...successResponseTests,
-  ...errorResponseTests,
-  ...customOperationTests,
-])('openAPIGenerator.generate: %# - $name', async ({ contract, expected, error }) => {
-  const openAPIGenerator = new OpenAPIGenerator({
-    schemaConverters: [
-      new ZodToJsonSchemaConverter(),
-    ],
-  })
+      it('merges repeated event iterator schemas', async () => {
+        const doc = await generator.generate({
+          procedure: oc
+            .input(eventIterator(z.looseObject({ yield1: z.string() }), z.looseObject({ return1: z.string() })))
+            .input(eventIterator(z.looseObject({ yield2: z.string() }), z.looseObject({ return2: z.string() })))
+            .output(eventIterator(z.looseObject({ yield3: z.string() }), z.looseObject({ return3: z.string() })))
+            .output(eventIterator(z.looseObject({ yield4: z.string() }), z.looseObject({ return4: z.string() }))),
+        })
 
-  const promise = openAPIGenerator.generate(contract, {
-    info: {
-      title: 'test',
-      version: '1.0.0',
-    },
-  })
-
-  if (error) {
-    await expect(promise).rejects.toThrow(error)
-  }
-  else {
-    await expect(promise).resolves.toEqual({
-      openapi: '3.1.1',
-      info: {
-        title: 'test',
-        version: '1.0.0',
-      },
-      paths: expected,
-    })
-  }
-})
-
-describe('openAPIGenerator', () => {
-  it('can generate without base docs', async () => {
-    const openAPIGenerator = new OpenAPIGenerator()
-    const spec = await openAPIGenerator.generate({})
-
-    expect(spec).toEqual({
-      openapi: '3.1.1',
-      info: {
-        title: 'API Reference',
-        version: '0.0.0',
-      },
-    })
-  })
-
-  it('openAPIGenerator.generate throw right away if unknown error', async () => {
-    const openAPIGenerator = new OpenAPIGenerator({
-      schemaConverters: [
-        {
-          condition: () => true,
-          convert: () => {
-            throw new Error('unknown error')
-          },
-        },
-      ],
-    })
-
-    await expect(openAPIGenerator.generate(oc, {
-      info: {
-        title: 'test',
-        version: '1.0.0',
-      },
-    })).rejects.toThrow('unknown error')
-  })
-
-  it('respect exclude option', async () => {
-    const openAPIGenerator = new OpenAPIGenerator({
-    })
-
-    const exclude = vi.fn(procedure => !!procedure['~orpc'].route.tags?.includes('admin'))
-
-    const ping = oc.route({
-      path: '/ping',
-      tags: ['admin'],
-    })
-
-    const pong = oc.route({
-      path: '/pong',
-      tags: ['user'],
-    })
-
-    await expect(openAPIGenerator.generate({ ping, pong }, { exclude })).resolves.toEqual({
-      openapi: '3.1.1',
-      info: { title: 'API Reference', version: '0.0.0' },
-      paths: {
-        '/pong': expect.any(Object),
-      },
-    })
-
-    expect(exclude).toHaveBeenCalledTimes(2)
-    expect(exclude).toHaveBeenNthCalledWith(1, ping, ['ping'])
-    expect(exclude).toHaveBeenNthCalledWith(2, pong, ['pong'])
-  })
-
-  describe('generator - commonSchemas', async () => {
-    const generator = new OpenAPIGenerator({
-      schemaConverters: [
-        new ZodToJsonSchemaConverter(),
-      ],
-    })
-
-    const User = z.object({
-      id: z.string(),
-      get parent() {
-        return User.optional()
-      },
-    })
-
-    const Pet = z.object({
-      id: z.string().transform(v => Number(v)).pipe(z.number().min(0).max(100)),
-    })
-
-    const Params = z.object({
-      pet: Pet,
-    })
-
-    const Query = z.object({
-      user: User,
-    })
-
-    const Headers = z.object({
-      user: User,
-    })
-
-    const InputDetailedStructure = z.object({
-      params: Params,
-      query: Query,
-      headers: Headers,
-      body: User,
-    })
-
-    const OutputDetailedStructure = z.union([
-      z.object({
-        status: z.literal(200),
-        headers: Headers,
-        body: User,
-      }),
-      z.object({
-        status: z.literal(201),
-        body: User,
-      }),
-    ])
-
-    const spec = await generator.generate({
-      user: oc.input(User).errors({ TEST: { data: User } }).output(User),
-      pet: oc.input(Pet).errors({ TEST: { data: Pet } }).output(Pet),
-      iterator: oc.input(eventIterator(User, Pet)).output(eventIterator(User, Pet)),
-      dynamicParams: oc.route({ path: '/user/{id}', method: 'POST' }).input(User),
-      detailedStructure: oc.route({ path: '/detailed/{pet}', inputStructure: 'detailed', outputStructure: 'detailed' })
-        .input(InputDetailedStructure)
-        .output(OutputDetailedStructure),
-      getWithoutParams: oc.route({ method: 'GET' }).input(Query),
-    }, {
-      commonSchemas: {
-        User: {
-          schema: User,
-        },
-        Pet: {
-          strategy: 'output',
-          schema: Pet,
-        },
-        DetailedStructure: {
-          strategy: 'output',
-          schema: InputDetailedStructure,
-        },
-        Params: {
-          strategy: 'output',
-          schema: Params,
-        },
-        Query: {
-          schema: Query,
-        },
-        Headers: {
-          strategy: 'output',
-          schema: Headers,
-        },
-        OutputDetailedStructure: {
-          schema: OutputDetailedStructure,
-        },
-        UndefinedError2: {
-          error: 'UndefinedError',
-        },
-      },
-    })
-
-    it('fill correct components.schemas', async () => {
-      expect(spec.components).toEqual({
-        schemas: {
-          User: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              parent: { $ref: '#/components/schemas/User' },
-            },
-            required: ['id'],
-          },
-          Pet: {
-            type: 'object',
-            properties: {
-              id: { type: 'number', minimum: 0, maximum: 100 },
-            },
-            required: ['id'],
-          },
-          Params: {
-            type: 'object',
-            properties: {
-              pet: { $ref: '#/components/schemas/Pet' },
-            },
-            required: ['pet'],
-          },
-          Query: {
-            type: 'object',
-            properties: {
-              user: { $ref: '#/components/schemas/User' },
-            },
-            required: ['user'],
-          },
-          Headers: {
-            type: 'object',
-            properties: {
-              user: { $ref: '#/components/schemas/User' },
-            },
-            required: ['user'],
-          },
-          DetailedStructure: {
-            type: 'object',
-            properties: {
-              params: { $ref: '#/components/schemas/Params' },
-              query: { $ref: '#/components/schemas/Query' },
-              headers: { $ref: '#/components/schemas/Headers' },
-              body: { $ref: '#/components/schemas/User' },
-            },
-            required: ['params', 'query', 'headers', 'body'],
-          },
-          OutputDetailedStructure: {
-            anyOf: [
-              {
-                type: 'object',
-                properties: {
-                  status: { const: 200 },
-                  headers: { $ref: '#/components/schemas/Headers' },
-                  body: { $ref: '#/components/schemas/User' },
-                },
-                required: ['status', 'headers', 'body'],
-              },
-              {
-                type: 'object',
-                properties: {
-                  status: { const: 201 },
-                  body: { $ref: '#/components/schemas/User' },
-                },
-                required: ['status', 'body'],
-              },
-            ],
-          },
-          UndefinedError2: {
-            type: 'object',
-            properties: {
-              defined: { const: false },
-              code: { type: 'string' },
-              status: { type: 'number' },
-              message: { type: 'string' },
-              data: {},
-            },
-            required: ['defined', 'code', 'status', 'message'],
-          },
-        },
-      })
-    })
-
-    it('works with schema that input & output is same + error', async () => {
-      expect(spec.paths!['/user']).toEqual({
-        post: {
+        expect(doc.paths?.['/procedure']?.post).toMatchObject({
           requestBody: {
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/User' },
-              },
-            },
-            required: true,
-          },
-          responses: {
-            200: {
-              description: 'OK',
-              content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/User' },
-                },
-              },
-            },
-            500: {
-              description: '500',
-              content: {
-                'application/json': {
-                  schema: {
-                    oneOf: [
-                      {
-                        type: 'object',
-                        properties: {
-                          defined: { const: true },
-                          code: { const: 'TEST' },
-                          status: { const: 500 },
-                          message: { type: 'string', default: 'TEST' },
-                          data: { $ref: '#/components/schemas/User' },
-                        },
-                        required: ['defined', 'code', 'status', 'message', 'data'],
-                      },
-                      {
-                        $ref: '#/components/schemas/UndefinedError2',
-                      },
-                    ],
-                  },
-                },
-              },
-            },
-          },
-          operationId: 'user',
-        },
-      })
-    })
-
-    it('works with schema that input & output is different + error', async () => {
-      expect(spec.paths!['/pet']).toEqual({
-        post: {
-          operationId: 'pet',
-          requestBody: {
-            required: true,
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string' },
-                  },
-                  required: ['id'],
-                },
-              },
-            },
-          },
-          responses: {
-            200: {
-              description: 'OK',
-              content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/Pet' },
-                },
-              },
-            },
-            500: {
-              description: '500',
-              content: {
-                'application/json': {
-                  schema: {
-                    oneOf: [
-                      {
-                        type: 'object',
-                        properties: {
-                          defined: { const: true },
-                          code: { const: 'TEST' },
-                          status: { const: 500 },
-                          message: { type: 'string', default: 'TEST' },
-                          data: { $ref: '#/components/schemas/Pet' },
-                        },
-                        required: ['defined', 'code', 'status', 'message', 'data'],
-                      },
-                      {
-                        $ref: '#/components/schemas/UndefinedError2',
-                      },
-                    ],
-                  },
-                },
-              },
-            },
-          },
-        },
-      })
-    })
-
-    it('works with event iterator', async () => {
-      expect(spec.paths!['/iterator']).toEqual({
-        post: {
-          operationId: 'iterator',
-          requestBody: {
-            required: true,
             content: {
               'text/event-stream': {
                 schema: {
@@ -1332,7 +1903,10 @@ describe('openAPIGenerator', () => {
                       type: 'object',
                       properties: {
                         event: { const: 'message' },
-                        data: { $ref: '#/components/schemas/User' },
+                        data: { allOf: [
+                          expect.objectContaining({ type: 'object', properties: { yield1: { type: 'string' } } }),
+                          expect.objectContaining({ type: 'object', properties: { yield2: { type: 'string' } } }),
+                        ] },
                         id: { type: 'string' },
                         retry: { type: 'number' },
                       },
@@ -1341,14 +1915,11 @@ describe('openAPIGenerator', () => {
                     {
                       type: 'object',
                       properties: {
-                        event: { const: 'done' },
-                        data: {
-                          type: 'object',
-                          properties: {
-                            id: { type: 'string' },
-                          },
-                          required: ['id'],
-                        },
+                        event: { const: 'close' },
+                        data: { allOf: [
+                          expect.objectContaining({ type: 'object', properties: { return1: { type: 'string' } } }),
+                          expect.objectContaining({ type: 'object', properties: { return2: { type: 'string' } } }),
+                        ] },
                         id: { type: 'string' },
                         retry: { type: 'number' },
                       },
@@ -1368,6 +1939,7 @@ describe('openAPIGenerator', () => {
                 },
               },
             },
+            required: true,
           },
           responses: {
             200: {
@@ -1380,7 +1952,10 @@ describe('openAPIGenerator', () => {
                         type: 'object',
                         properties: {
                           event: { const: 'message' },
-                          data: { $ref: '#/components/schemas/User' },
+                          data: { allOf: [
+                            expect.objectContaining({ type: 'object', properties: { yield3: { type: 'string' } } }),
+                            expect.objectContaining({ type: 'object', properties: { yield4: { type: 'string' } } }),
+                          ] },
                           id: { type: 'string' },
                           retry: { type: 'number' },
                         },
@@ -1389,8 +1964,11 @@ describe('openAPIGenerator', () => {
                       {
                         type: 'object',
                         properties: {
-                          event: { const: 'done' },
-                          data: { $ref: '#/components/schemas/Pet' },
+                          event: { const: 'close' },
+                          data: { allOf: [
+                            expect.objectContaining({ type: 'object', properties: { return3: { type: 'string' } } }),
+                            expect.objectContaining({ type: 'object', properties: { return4: { type: 'string' } } }),
+                          ] },
                           id: { type: 'string' },
                           retry: { type: 'number' },
                         },
@@ -1406,90 +1984,1338 @@ describe('openAPIGenerator', () => {
                         },
                         required: ['event'],
                       },
-
                     ],
                   },
                 },
               },
             },
           },
-        },
+        })
+      })
+
+      it('merges repeated detailed sections before mapping params, headers, bodies, and success responses', async () => {
+        const doc = await generator.generate({
+          updatePlanet: oc
+            .meta(openapi({
+              method: 'POST',
+              path: '/planets/{id}',
+              inputStructure: 'detailed',
+              outputStructure: 'detailed',
+            }))
+            .input(z.looseObject({
+              params: z.object({ id: z.string() }),
+              query: z.object({ expand: z.boolean() }),
+            }))
+            .input(z.looseObject({
+              headers: z.object({ 'x-trace-id': z.string() }),
+              body: z.object({ name: z.string() }),
+            }))
+            .output(z.looseObject({
+              headers: z.object({ 'x-request-id': z.string() }),
+            }))
+            .output(z.looseObject({
+              body: z.object({ updated: z.boolean() }),
+            })),
+        })
+
+        expect(doc.paths?.['/planets/{id}']).toEqual({
+          post: expect.objectContaining({
+            operationId: 'updatePlanet',
+            parameters: expect.arrayContaining([
+              {
+                name: 'id',
+                in: 'path',
+                required: true,
+                schema: expect.objectContaining({ type: 'string' }),
+              },
+              {
+                name: 'expand',
+                in: 'query',
+                required: true,
+                allowEmptyValue: true,
+                allowReserved: true,
+                schema: expect.objectContaining({ type: 'boolean' }),
+              },
+              {
+                name: 'x-trace-id',
+                in: 'header',
+                required: true,
+                schema: expect.objectContaining({ type: 'string' }),
+              },
+            ]),
+            requestBody: {
+              required: true,
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      name: { type: 'string' },
+                    },
+                    required: ['name'],
+                  },
+                },
+              },
+            },
+            responses: {
+              200: {
+                description: 'OK',
+                headers: {
+                  'x-request-id': {
+                    required: true,
+                    schema: { type: 'string' },
+                  },
+                },
+                content: {
+                  'application/json': {
+                    schema: expect.objectContaining({
+                      type: 'object',
+                      properties: {
+                        updated: { type: 'boolean' },
+                      },
+                      required: ['updated'],
+                    }),
+                  },
+                },
+              },
+            },
+          }),
+        })
+      })
+
+      it('merges repeated detailed output objects when assembling a status-specific response', async () => {
+        const doc = await generator.generate({
+          createPlanet: oc
+            .meta(openapi({
+              method: 'POST',
+              outputStructure: 'detailed',
+            }))
+            .output(z.looseObject({
+              status: z.literal(201),
+            }))
+            .output(z.looseObject({
+              headers: z.object({ 'x-request-id': z.string() }),
+              body: z.object({ id: z.string(), slug: z.string() }),
+            })),
+        })
+
+        expect(doc.paths?.['/createPlanet']).toEqual({
+          post: expect.objectContaining({
+            operationId: 'createPlanet',
+            responses: {
+              201: {
+                description: 'OK',
+                headers: {
+                  'x-request-id': {
+                    required: true,
+                    schema: { type: 'string' },
+                  },
+                },
+                content: {
+                  'application/json': {
+                    schema: expect.objectContaining({
+                      type: 'object',
+                      properties: {
+                        id: { type: 'string' },
+                        slug: { type: 'string' },
+                      },
+                      required: ['id', 'slug'],
+                    }),
+                  },
+                },
+              },
+            },
+          }),
+        })
       })
     })
 
-    it('works with compact + dynamic params', async () => {
-      expect(spec.paths!['/user/{id}']).toEqual({
-        post: {
-          operationId: 'dynamicParams',
-          parameters: [
-            {
-              name: 'id',
-              in: 'path',
+    describe('union schemas', () => {
+      it('extracts compact POST path params from a union and keeps the remaining request body object-shaped', async () => {
+        const doc = await generator.generate({
+          createEvent: oc
+            .meta(openapi({
+              method: 'POST',
+              path: '/events/{type}',
+            }))
+            .input(z.discriminatedUnion('type', [
+              z.object({
+                type: z.literal('a'),
+                a: z.string(),
+              }),
+              z.object({
+                type: z.literal('b'),
+                b: z.number(),
+              }),
+            ])),
+        })
+
+        expect(doc.paths?.['/events/{type}']).toEqual({
+          post: expect.objectContaining({
+            operationId: 'createEvent',
+            parameters: [
+              {
+                name: 'type',
+                in: 'path',
+                required: true,
+                schema: {
+                  anyOf: [
+                    { const: 'a', type: 'string' },
+                    { const: 'b', type: 'string' },
+                  ],
+                },
+              },
+            ],
+            requestBody: {
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      a: { type: 'string' },
+                      b: { type: 'number' },
+                    },
+                  },
+                },
+              },
+            },
+          }),
+        })
+      })
+
+      it('extracts compact GET query parameters from a union but preserves the response body union', async () => {
+        const doc = await generator.generate({
+          searchPlanets: oc
+            .meta(openapi({
+              method: 'GET',
+            }))
+            .input(z.discriminatedUnion('type', [
+              z.object({
+                type: z.literal('a'),
+                a: z.string(),
+              }),
+              z.object({
+                type: z.literal('b'),
+                b: z.number(),
+              }),
+            ]))
+            .output(z.discriminatedUnion('type', [
+              z.object({
+                type: z.literal('a'),
+                a: z.string(),
+              }),
+              z.object({
+                type: z.literal('b'),
+                b: z.number(),
+              }),
+            ])),
+        })
+
+        expect(doc.paths?.['/searchPlanets']).toEqual({
+          get: expect.objectContaining({
+            operationId: 'searchPlanets',
+            parameters: [
+              {
+                name: 'type',
+                in: 'query',
+                required: true,
+                allowEmptyValue: true,
+                allowReserved: true,
+                schema: {
+                  anyOf: [
+                    { const: 'a', type: 'string' },
+                    { const: 'b', type: 'string' },
+                  ],
+                },
+              },
+              {
+                name: 'a',
+                in: 'query',
+                allowEmptyValue: true,
+                allowReserved: true,
+                schema: { type: 'string' },
+              },
+              {
+                name: 'b',
+                in: 'query',
+                allowEmptyValue: true,
+                allowReserved: true,
+                schema: { type: 'number' },
+              },
+            ],
+            responses: {
+              200: {
+                description: 'OK',
+                content: {
+                  'application/json': {
+                    schema: {
+                      oneOf: [
+                        expect.objectContaining({
+                          type: 'object',
+                          properties: {
+                            type: { const: 'a', type: 'string' },
+                            a: { type: 'string' },
+                          },
+                          required: ['type', 'a'],
+                        }),
+                        expect.objectContaining({
+                          type: 'object',
+                          properties: {
+                            type: { const: 'b', type: 'string' },
+                            b: { type: 'number' },
+                          },
+                          required: ['type', 'b'],
+                        }),
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          }),
+        })
+      })
+
+      it('extracts compact body as files from a union', async () => {
+        const doc = await generator.generate({
+          searchPlanets: oc
+            .input(z.union([
+              z.file().mime('application/zip'),
+              z.file().mime('application/pdf'),
+              z.file(),
+            ]))
+            .output(z.union([
+              z.file().mime('image/gif'),
+              z.file().mime('image/png'),
+              z.file(),
+            ])),
+        })
+
+        expect(doc.paths?.['/searchPlanets']).toEqual({
+          post: expect.objectContaining({
+            operationId: 'searchPlanets',
+            requestBody: expect.objectContaining({
               required: true,
-              schema: { type: 'string' },
+              content: {
+                'application/zip': {
+                  schema: expect.objectContaining({
+                    contentEncoding: 'binary',
+                  }),
+                },
+                'application/pdf': {
+                  schema: expect.objectContaining({
+                    contentEncoding: 'binary',
+                  }),
+                },
+                '*/*': {
+                  schema: expect.objectContaining({
+                    contentEncoding: 'binary',
+                  }),
+                },
+              },
+            }),
+            responses: {
+              200: {
+                description: 'OK',
+                content: {
+                  'image/gif': {
+                    schema: expect.objectContaining({
+                      contentEncoding: 'binary',
+                    }),
+                  },
+                  'image/png': {
+                    schema: expect.objectContaining({
+                      contentEncoding: 'binary',
+                    }),
+                  },
+                  '*/*': {
+                    schema: expect.objectContaining({
+                      contentEncoding: 'binary',
+                    }),
+                  },
+                },
+              },
+            },
+          }),
+        })
+      })
+
+      it('extracts top-level detailed .input and .output unions', async () => {
+        const doc = await generator.generate({
+          syncPlanet: oc
+            .meta(openapi({
+              method: 'POST',
+              path: '/planets/{id}',
+              inputStructure: 'detailed',
+              outputStructure: 'detailed',
+            }))
+            .input(z.union([
+              z.object({
+                params: z.object({ id: z.string() }),
+                query: z.object({ search: z.string() }),
+                body: z.object({
+                  type: z.literal('a'),
+                  a: z.string(),
+                }),
+              }),
+              z.object({
+                params: z.object({ id: z.number() }),
+                headers: z.object({ 'x-mode': z.literal('sync') }),
+                body: z.object({
+                  type: z.literal('b'),
+                  b: z.number(),
+                }),
+              }),
+            ]))
+            .output(z.union([
+              z.object({
+                status: z.literal(201),
+                headers: z.object({ 'x-mode': z.literal('sync') }),
+                body: z.object({
+                  created: z.string(),
+                }),
+              }),
+              z.object({
+                status: z.literal(202),
+                body: z.object({
+                  queued: z.boolean(),
+                }),
+              }),
+            ])),
+        })
+
+        expect(doc.paths?.['/planets/{id}']).toEqual({
+          post: expect.objectContaining({
+            operationId: 'syncPlanet',
+            parameters: expect.arrayContaining([
+              {
+                name: 'id',
+                in: 'path',
+                required: true,
+                schema: {
+                  anyOf: [
+                    { type: 'string' },
+                    { type: 'number' },
+                  ],
+                },
+              },
+              {
+                name: 'search',
+                in: 'query',
+                required: true,
+                allowEmptyValue: true,
+                allowReserved: true,
+                schema: { type: 'string' },
+              },
+              {
+                name: 'x-mode',
+                in: 'header',
+                required: true,
+                schema: { const: 'sync', type: 'string' },
+              },
+            ]),
+            requestBody: {
+              required: true,
+              content: {
+                'application/json': {
+                  schema: expect.objectContaining({
+                    anyOf: expect.any(Array),
+                  }),
+                },
+              },
+            },
+            responses: {
+              201: {
+                description: 'OK',
+                headers: {
+                  'x-mode': {
+                    required: true,
+                    schema: { const: 'sync', type: 'string' },
+                  },
+                },
+                content: {
+                  'application/json': {
+                    schema: expect.objectContaining({
+                      type: 'object',
+                      properties: {
+                        created: { type: 'string' },
+                      },
+                      required: ['created'],
+                    }),
+                  },
+                },
+              },
+              202: {
+                description: 'OK',
+                content: {
+                  'application/json': {
+                    schema: expect.objectContaining({
+                      type: 'object',
+                      properties: {
+                        queued: { type: 'boolean' },
+                      },
+                      required: ['queued'],
+                    }),
+                  },
+                },
+              },
+            },
+          }),
+        })
+      })
+
+      it('extracts unions from .input.params, .input.query, .input.headers, and .output.headers in detailed mode', async () => {
+        const doc = await generator.generate({
+          syncPlanet: oc
+            .meta(openapi({
+              method: 'POST',
+              path: '/planets/{id}',
+              inputStructure: 'detailed',
+              outputStructure: 'detailed',
+            }))
+            .input(z.object({
+              params: z.union([
+                z.object({ id: z.string() }),
+                z.object({ id: z.number() }),
+              ]),
+              query: z.discriminatedUnion('type', [
+                z.object({
+                  type: z.literal('a'),
+                  a: z.string(),
+                }),
+                z.object({
+                  type: z.literal('b'),
+                  b: z.number(),
+                }),
+              ]),
+              headers: z.discriminatedUnion('type', [
+                z.object({
+                  type: z.literal('a'),
+                  a: z.string(),
+                }),
+                z.object({
+                  type: z.literal('b'),
+                  b: z.number(),
+                }),
+              ]),
+              body: z.discriminatedUnion('type', [
+                z.object({
+                  type: z.literal('a'),
+                  a: z.string(),
+                }),
+                z.object({
+                  type: z.literal('b'),
+                  b: z.number(),
+                }),
+              ]),
+            }))
+            .output(z.object({
+              headers: z.discriminatedUnion('type', [
+                z.object({
+                  type: z.literal('a'),
+                  a: z.string(),
+                }),
+                z.object({
+                  type: z.literal('b'),
+                  b: z.number(),
+                }),
+              ]),
+              body: z.discriminatedUnion('type', [
+                z.object({
+                  type: z.literal('a'),
+                  a: z.string(),
+                }),
+                z.object({
+                  type: z.literal('b'),
+                  b: z.number(),
+                }),
+              ]),
+            })),
+        })
+
+        expect(doc.paths?.['/planets/{id}']).toEqual({
+          post: expect.objectContaining({
+            operationId: 'syncPlanet',
+            parameters: expect.arrayContaining([
+              {
+                name: 'id',
+                in: 'path',
+                required: true,
+                schema: {
+                  anyOf: [
+                    { type: 'string' },
+                    { type: 'number' },
+                  ],
+                },
+              },
+              {
+                name: 'type',
+                in: 'query',
+                required: true,
+                allowEmptyValue: true,
+                allowReserved: true,
+                schema: {
+                  anyOf: [
+                    { const: 'a', type: 'string' },
+                    { const: 'b', type: 'string' },
+                  ],
+                },
+              },
+              {
+                name: 'a',
+                in: 'query',
+                allowEmptyValue: true,
+                allowReserved: true,
+                schema: { type: 'string' },
+              },
+              {
+                name: 'b',
+                in: 'query',
+                allowEmptyValue: true,
+                allowReserved: true,
+                schema: { type: 'number' },
+              },
+              {
+                name: 'type',
+                in: 'header',
+                required: true,
+                schema: {
+                  anyOf: [
+                    { const: 'a', type: 'string' },
+                    { const: 'b', type: 'string' },
+                  ],
+                },
+              },
+              {
+                name: 'a',
+                in: 'header',
+                schema: { type: 'string' },
+              },
+              {
+                name: 'b',
+                in: 'header',
+                schema: { type: 'number' },
+              },
+            ]),
+            requestBody: {
+              required: true,
+              content: {
+                'application/json': {
+                  schema: {
+                    oneOf: [
+                      {
+                        type: 'object',
+                        properties: {
+                          type: { const: 'a', type: 'string' },
+                          a: { type: 'string' },
+                        },
+                        required: ['type', 'a'],
+                      },
+                      {
+                        type: 'object',
+                        properties: {
+                          type: { const: 'b', type: 'string' },
+                          b: { type: 'number' },
+                        },
+                        required: ['type', 'b'],
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+            responses: {
+              200: {
+                description: 'OK',
+                headers: {
+                  type: {
+                    required: true,
+                    schema: {
+                      anyOf: [
+                        { const: 'a', type: 'string' },
+                        { const: 'b', type: 'string' },
+                      ],
+                    },
+                  },
+                  a: {
+                    schema: { type: 'string' },
+                  },
+                  b: {
+                    schema: { type: 'number' },
+                  },
+                },
+                content: {
+                  'application/json': {
+                    schema: {
+                      oneOf: [
+                        expect.objectContaining({
+                          type: 'object',
+                          properties: {
+                            type: { const: 'a', type: 'string' },
+                            a: { type: 'string' },
+                          },
+                          required: ['type', 'a'],
+                        }),
+                        expect.objectContaining({
+                          type: 'object',
+                          properties: {
+                            type: { const: 'b', type: 'string' },
+                            b: { type: 'number' },
+                          },
+                          required: ['type', 'b'],
+                        }),
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          }),
+        })
+      })
+    })
+
+    describe('intersection schemas', () => {
+      it('extracts compact GET query parameters from an intersection but preserves the response body intersection', async () => {
+        const doc = await generator.generate({
+          listPlanets: oc
+            .meta(openapi({
+              method: 'GET',
+            }))
+            .input(z.intersection(
+              z.looseObject({ search: z.string() }),
+              z.looseObject({ page: z.number() }),
+            ))
+            .output(z.intersection(
+              z.looseObject({ search: z.string() }),
+              z.looseObject({ page: z.number() }),
+            )),
+        })
+
+        expect(doc.paths?.['/listPlanets']).toEqual({
+          get: expect.objectContaining({
+            operationId: 'listPlanets',
+            parameters: [
+              {
+                name: 'search',
+                in: 'query',
+                required: true,
+                allowEmptyValue: true,
+                allowReserved: true,
+                schema: { type: 'string' },
+              },
+              {
+                name: 'page',
+                in: 'query',
+                required: true,
+                allowEmptyValue: true,
+                allowReserved: true,
+                schema: { type: 'number' },
+              },
+            ],
+            responses: {
+              200: {
+                description: 'OK',
+                content: {
+                  'application/json': {
+                    schema: {
+                      allOf: [
+                        expect.objectContaining({
+                          type: 'object',
+                          properties: {
+                            search: { type: 'string' },
+                          },
+                          required: ['search'],
+                        }),
+                        expect.objectContaining({
+                          type: 'object',
+                          properties: {
+                            page: { type: 'number' },
+                          },
+                          required: ['page'],
+                        }),
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          }),
+        })
+      })
+
+      it('extracts top-level detailed .input and .output intersections', async () => {
+        const doc = await generator.generate({
+          syncPlanet: oc
+            .meta(openapi({
+              method: 'POST',
+              path: '/planets/{id}',
+              inputStructure: 'detailed',
+              outputStructure: 'detailed',
+            }))
+            .input(z.intersection(
+              z.object({
+                params: z.object({ id: z.string() }),
+                query: z.object({ search: z.string() }),
+                body: z.object({
+                  type: z.literal('a'),
+                  a: z.string(),
+                }),
+              }),
+              z.object({
+                headers: z.object({ 'x-mode': z.literal('sync') }),
+                body: z.object({
+                  archived: z.boolean(),
+                }),
+              }),
+            ))
+            .output(z.intersection(
+              z.object({
+                status: z.literal(201),
+                headers: z.object({ 'x-mode': z.literal('sync') }),
+              }),
+              z.object({
+                body: z.object({
+                  created: z.string(),
+                }),
+              }),
+            )),
+        })
+
+        expect(doc.paths?.['/planets/{id}']).toEqual({
+          post: expect.objectContaining({
+            operationId: 'syncPlanet',
+            parameters: expect.arrayContaining([
+              {
+                name: 'id',
+                in: 'path',
+                required: true,
+                schema: { type: 'string' },
+              },
+              {
+                name: 'search',
+                in: 'query',
+                required: true,
+                allowEmptyValue: true,
+                allowReserved: true,
+                schema: { type: 'string' },
+              },
+              {
+                name: 'x-mode',
+                in: 'header',
+                required: true,
+                schema: { const: 'sync', type: 'string' },
+              },
+            ]),
+            requestBody: {
+              required: true,
+              content: {
+                'application/json': {
+                  schema: {
+                    allOf: [
+                      expect.objectContaining({
+                        type: 'object',
+                        properties: {
+                          type: { const: 'a', type: 'string' },
+                          a: { type: 'string' },
+                        },
+                        required: ['type', 'a'],
+                      }),
+                      expect.objectContaining({
+                        type: 'object',
+                        properties: {
+                          archived: { type: 'boolean' },
+                        },
+                        required: ['archived'],
+                      }),
+                    ],
+                  },
+                },
+              },
+            },
+            responses: {
+              201: {
+                description: 'OK',
+                headers: {
+                  'x-mode': {
+                    required: true,
+                    schema: { const: 'sync', type: 'string' },
+                  },
+                },
+                content: {
+                  'application/json': {
+                    schema: expect.objectContaining({
+                      type: 'object',
+                      properties: {
+                        created: { type: 'string' },
+                      },
+                      required: ['created'],
+                    }),
+                  },
+                },
+              },
+            },
+          }),
+        })
+      })
+
+      it('extracts intersections from .input.params, .input.query, .input.headers, and .output.headers in detailed mode', async () => {
+        const doc = await generator.generate({
+          syncPlanet: oc
+            .meta(openapi({
+              method: 'POST',
+              path: '/planets/{id}/{slug}',
+              inputStructure: 'detailed',
+              outputStructure: 'detailed',
+            }))
+            .input(z.object({
+              params: z.intersection(
+                z.looseObject({ id: z.string() }),
+                z.looseObject({ slug: z.string() }),
+              ),
+              query: z.intersection(
+                z.looseObject({ search: z.string() }),
+                z.looseObject({ page: z.number() }),
+              ),
+              headers: z.intersection(
+                z.looseObject({ 'x-trace-id': z.string() }),
+                z.looseObject({ 'x-tenant-id': z.string() }),
+              ),
+              body: z.intersection(
+                z.looseObject({ name: z.string() }),
+                z.looseObject({ archived: z.boolean() }),
+              ),
+            }))
+            .output(z.object({
+              headers: z.intersection(
+                z.looseObject({ 'x-request-id': z.string() }),
+                z.looseObject({ 'x-region': z.string() }),
+              ),
+              body: z.intersection(
+                z.looseObject({ ok: z.boolean() }),
+                z.looseObject({ version: z.number() }),
+              ),
+            })),
+        })
+
+        expect(doc.paths?.['/planets/{id}/{slug}']).toEqual({
+          post: expect.objectContaining({
+            operationId: 'syncPlanet',
+            parameters: expect.arrayContaining([
+              {
+                name: 'id',
+                in: 'path',
+                required: true,
+                schema: { type: 'string' },
+              },
+              {
+                name: 'slug',
+                in: 'path',
+                required: true,
+                schema: { type: 'string' },
+              },
+              {
+                name: 'search',
+                in: 'query',
+                required: true,
+                allowEmptyValue: true,
+                allowReserved: true,
+                schema: { type: 'string' },
+              },
+              {
+                name: 'page',
+                in: 'query',
+                required: true,
+                allowEmptyValue: true,
+                allowReserved: true,
+                schema: { type: 'number' },
+              },
+              {
+                name: 'x-trace-id',
+                in: 'header',
+                required: true,
+                schema: { type: 'string' },
+              },
+              {
+                name: 'x-tenant-id',
+                in: 'header',
+                required: true,
+                schema: { type: 'string' },
+              },
+            ]),
+            requestBody: {
+              required: true,
+              content: {
+                'application/json': {
+                  schema: {
+                    allOf: [
+                      expect.objectContaining({
+                        type: 'object',
+                        properties: {
+                          name: { type: 'string' },
+                        },
+                        required: ['name'],
+                      }),
+                      expect.objectContaining({
+                        type: 'object',
+                        properties: {
+                          archived: { type: 'boolean' },
+                        },
+                        required: ['archived'],
+                      }),
+                    ],
+                  },
+                },
+              },
+            },
+            responses: {
+              200: {
+                description: 'OK',
+                headers: {
+                  'x-request-id': {
+                    required: true,
+                    schema: { type: 'string' },
+                  },
+                  'x-region': {
+                    required: true,
+                    schema: { type: 'string' },
+                  },
+                },
+                content: {
+                  'application/json': {
+                    schema: {
+                      allOf: [
+                        expect.objectContaining({
+                          type: 'object',
+                          properties: {
+                            ok: { type: 'boolean' },
+                          },
+                          required: ['ok'],
+                        }),
+                        expect.objectContaining({
+                          type: 'object',
+                          properties: {
+                            version: { type: 'number' },
+                          },
+                          required: ['version'],
+                        }),
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          }),
+        })
+      })
+    })
+  })
+
+  describe('component schemas', () => {
+    describe('hoisting', () => {
+      it('hoists $defs components, rewrites wrapper refs, and collapses local aliases', async () => {
+        const Category: z.ZodTypeAny = z.lazy(() => z.looseObject({
+          name: z.string(),
+          children: z.array(Category).optional(),
+        })).meta({ id: 'Category' })
+
+        const doc = await generator.generate({
+          category: oc
+            .input(z.object({ category: Category }))
+            .output(z.object({ category2: Category })),
+        })
+
+        expect(doc.paths?.['/category']?.post).toEqual(expect.objectContaining({
+          operationId: 'category',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: expect.objectContaining({
+                  type: 'object',
+                  properties: {
+                    category: { $ref: '#/components/schemas/Category' },
+                  },
+                }),
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'OK',
+              content: {
+                'application/json': {
+                  schema: expect.objectContaining({
+                    type: 'object',
+                    properties: {
+                      category2: { $ref: '#/components/schemas/Category' },
+                    },
+                  }),
+                },
+              },
+            },
+          },
+        }))
+
+        expect(doc.components?.schemas).toEqual({
+          Category: {
+            type: 'object',
+            additionalProperties: {},
+            properties: {
+              children: {
+                items: {
+                  $ref: '#/components/schemas/Category',
+                },
+                type: 'array',
+              },
+              name: {
+                type: 'string',
+              },
+            },
+            required: [
+              'name',
+            ],
+          },
+        })
+      })
+
+      it('hoists a component referenced by a JSON Pointer encoded', async () => {
+        const planetSchema = z.object({})
+
+        const generator = new OpenAPIGenerator({
+          converters: [
+            {
+              condition: schema => schema === planetSchema,
+              async convert(_schema, _direction) {
+                return [{
+                  type: 'object',
+                  properties: {
+                    planet: { $ref: '#/$defs/domain~1Planet' },
+                  },
+                  required: ['planet'],
+                  $defs: {
+                    'domain/Planet': {
+                      type: 'object',
+                      properties: {
+                        id: { type: 'string' },
+                      },
+                      required: ['id'],
+                    },
+                  },
+                }, false]
+              },
             },
           ],
+        })
+
+        const doc = await generator.generate({
+          planet: oc.input(planetSchema),
+        })
+
+        expect(doc.paths?.['/planet']?.post).toEqual(expect.objectContaining({
           requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: expect.objectContaining({
+                  type: 'object',
+                  properties: {
+                    planet: { $ref: '#/components/schemas/domain~1Planet' },
+                  },
+                }),
+              },
+            },
+          },
+        }))
+
+        expect(doc.components?.schemas).toEqual({
+          'domain/Planet': {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+            },
+            required: ['id'],
+          },
+        })
+      })
+
+      it('uses shouldHoistDef to select defs and related', async () => {
+        const planetSchema = z.object({})
+
+        const shouldHoistDef = vi.fn((defName: string, _schema) => {
+          return defName !== '_PlanetAlias'
+        })
+
+        const generator = new OpenAPIGenerator({
+          converters: [
+            {
+              condition: schema => schema === planetSchema,
+              async convert(_schema, _direction) {
+                return [{
+                  type: 'object',
+                  properties: {
+                    planet: { $ref: '#/$defs/_PlanetAlias' },
+                  },
+                  required: ['planet'],
+                  $defs: {
+                    Planet: {
+                      type: 'object',
+                      properties: {
+                        id: { $ref: '#/$defs/_PlanetId' },
+                      },
+                      required: ['id'],
+                    },
+                    _PlanetId: { type: 'string' },
+                    _PlanetAlias: {
+                      $ref: '#/$defs/Planet',
+                    },
+                  },
+                }, false]
+              },
+            },
+          ],
+        })
+
+        const doc = await generator.generate({
+          planet: oc
+            .input(planetSchema)
+            .output(planetSchema),
+        }, {
+          shouldHoistDef,
+        })
+
+        expect(doc.paths?.['/planet']?.post).toEqual(expect.objectContaining({
+          requestBody: {
+            required: true,
             content: {
               'application/json': {
                 schema: {
                   type: 'object',
                   properties: {
-                    parent: { $ref: '#/components/schemas/User' },
+                    planet: { $ref: '#/$defs/_PlanetAlias' },
+                  },
+                  required: ['planet'],
+                  $defs: {
+                    _PlanetAlias: {
+                      $ref: '#/components/schemas/Planet',
+                    },
                   },
                 },
               },
             },
-            required: false,
           },
-          responses: expect.any(Object),
-        },
-      })
-    })
-
-    it('works with complex detailed structure', async () => {
-      expect(spec.paths!['/detailed/{pet}']).toEqual({
-        post: {
-          operationId: 'detailedStructure',
-          parameters: [
-            {
-              name: 'pet',
-              in: 'path',
-              required: true,
-              schema: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string' },
+          responses: {
+            200: {
+              description: 'OK',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      planet: { $ref: '#/$defs/_PlanetAlias' },
+                    },
+                    required: ['planet'],
+                    $defs: {
+                      _PlanetAlias: {
+                        $ref: '#/components/schemas/Planet',
+                      },
+                    },
+                  },
                 },
-                required: ['id'],
               },
             },
-            {
-              name: 'user',
-              in: 'query',
-              required: true,
-              schema: { $ref: '#/components/schemas/User' },
-              style: 'deepObject',
-              allowEmptyValue: true,
-              allowReserved: true,
-              explode: true,
+          },
+        }))
+
+        expect(doc.components?.schemas).toEqual({
+          Planet: {
+            type: 'object',
+            properties: {
+              id: { $ref: '#/components/schemas/_PlanetId' },
             },
-            {
-              name: 'user',
-              in: 'header',
-              required: true,
-              schema: { $ref: '#/components/schemas/User' },
-            },
-          ],
+            required: ['id'],
+          },
+          _PlanetId: { type: 'string' },
+        })
+
+        expect(shouldHoistDef).toHaveBeenCalledWith('Planet', {
+          type: 'object',
+          properties: {
+            id: { $ref: '#/$defs/_PlanetId' },
+          },
+          required: ['id'],
+        })
+        expect(shouldHoistDef).toHaveBeenCalledWith('_PlanetId', {
+          type: 'string',
+        })
+        expect(shouldHoistDef).toHaveBeenCalledWith('_PlanetAlias', {
+          $ref: '#/$defs/Planet',
+        })
+        expect(shouldHoistDef).toHaveBeenCalledWith('Planet', {
+          type: 'object',
+          properties: {
+            id: { $ref: '#/$defs/_PlanetId' },
+          },
+          required: ['id'],
+        })
+        expect(shouldHoistDef).toHaveBeenCalledWith('_PlanetId', {
+          type: 'string',
+        })
+        expect(shouldHoistDef).toHaveBeenCalledWith('_PlanetAlias', {
+          $ref: '#/$defs/Planet',
+        })
+      })
+
+      it('hoists $defs from each allOf branch when multiple zod inputs and outputs are combined', async () => {
+        const inputSharedLeft = z.object({ source: z.literal('input-left') }).meta({ id: 'InputLeft' })
+        const inputSharedRight = z.object({ source: z.literal('input-right') }).meta({ id: 'Right' })
+        const outputSharedLeft = z.object({ source: z.literal('output-left') }).meta({ id: 'OutputLeft' })
+        const outputSharedRight = z.object({ source: z.literal('output-right') }).meta({ id: 'Right' })
+
+        const doc = await generator.generate({
+          planet: oc
+            .input(z.looseObject({ left: inputSharedLeft }))
+            .input(z.looseObject({ right: inputSharedRight }))
+            .output(z.looseObject({ left: outputSharedLeft }))
+            .output(z.looseObject({ right: outputSharedRight })),
+        }, {
+          shouldHoistDef: name => name !== 'InputLeft',
+        })
+
+        expect(doc.paths?.['/planet']?.post).toEqual(expect.objectContaining({
           requestBody: {
+            required: true,
             content: {
               'application/json': {
                 schema: {
-                  $ref: '#/components/schemas/User',
+                  $defs: {
+                    InputLeft: expect.objectContaining({
+                      type: 'object',
+                      properties: {
+                        source: { const: 'input-left', type: 'string' },
+                      },
+                      required: ['source'],
+                    }),
+                  },
+                  allOf: [
+                    expect.objectContaining({
+                      type: 'object',
+                      properties: {
+                        left: { $ref: '#/$defs/InputLeft' },
+                      },
+                      required: ['left'],
+                    }),
+                    expect.objectContaining({
+                      type: 'object',
+                      properties: {
+                        right: { $ref: '#/components/schemas/Right' },
+                      },
+                      required: ['right'],
+                    }),
+                  ],
                 },
               },
             },
-            required: true,
           },
           responses: {
             200: {
@@ -1497,389 +3323,569 @@ describe('openAPIGenerator', () => {
               content: {
                 'application/json': {
                   schema: {
-                    $ref: '#/components/schemas/User',
-                  },
-                },
-              },
-              headers: {
-                user: {
-                  required: true,
-                  schema: {
-                    $ref: '#/components/schemas/User',
-                  },
-                },
-              },
-            },
-            201: {
-              description: 'OK',
-              content: {
-                'application/json': {
-                  schema: {
-                    $ref: '#/components/schemas/User',
-                  },
-                },
-              },
-            },
-          },
-        },
-      })
-    })
-
-    it('work with method=GET, inputStructure=compact, and without params', async () => {
-      expect(spec.paths!['/getWithoutParams']).toEqual({
-        get: {
-          operationId: 'getWithoutParams',
-          parameters: [
-            {
-              allowEmptyValue: true,
-              allowReserved: true,
-              name: 'user',
-              in: 'query',
-              explode: true,
-              required: true,
-              schema: {
-                $ref: '#/components/schemas/User',
-              },
-              style: 'deepObject',
-            },
-          ],
-          responses: {
-            200: {
-              description: 'OK',
-              content: {
-                'application/json': {
-                  schema: {
-                    anyOf: [
-                      {},
-                      { not: {} },
+                    allOf: [
+                      expect.objectContaining({
+                        type: 'object',
+                        properties: {
+                          left: { $ref: '#/components/schemas/OutputLeft' },
+                        },
+                        required: ['left'],
+                      }),
+                      expect.objectContaining({
+                        type: 'object',
+                        properties: {
+                          right: { $ref: '#/components/schemas/Right2' },
+                        },
+                        required: ['right'],
+                      }),
                     ],
                   },
                 },
               },
             },
           },
-        },
+        }))
+
+        expect(doc.components?.schemas).toEqual(expect.objectContaining({
+          Right: expect.objectContaining({
+            type: 'object',
+            properties: {
+              source: { const: 'input-right', type: 'string' },
+            },
+            required: ['source'],
+          }),
+          OutputLeft: expect.objectContaining({
+            type: 'object',
+            properties: {
+              source: { const: 'output-left', type: 'string' },
+            },
+            required: ['source'],
+          }),
+          Right2: expect.objectContaining({
+            type: 'object',
+            properties: {
+              source: { const: 'output-right', type: 'string' },
+            },
+            required: ['source'],
+          }),
+        }))
+      })
+
+      it('keeps direct recursive roots inline when they are not inside $defs', async () => {
+        const Planet: z.ZodTypeAny = z.lazy(() => z.object({
+          id: z.string(),
+          children: z.array(Planet).optional(),
+        })).meta({ id: 'Planet' })
+
+        const doc = await generator.generate({
+          planet: oc.input(Planet),
+        })
+
+        expect(doc.paths?.['/planet']?.post).toEqual(expect.objectContaining({
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    children: {
+                      type: 'array',
+                      items: { $ref: '#' },
+                    },
+                  },
+                  required: ['id'],
+                },
+              },
+            },
+          },
+        }))
+
+        expect(doc.components?.schemas).toBeUndefined()
+      })
+
+      it('can maps params, query, headers, body as $ref in detailed mode', async () => {
+        const Planet: z.ZodTypeAny = z.lazy(() => z.object({
+          id: z.string(),
+          children: z.array(Planet).optional(),
+        })).meta({ id: 'Planet' })
+
+        const doc = await generator.generate({
+          planet: oc
+            .meta(openapi({ path: '/{id}', inputStructure: 'detailed', outputStructure: 'detailed' }))
+            .input(z.object({
+              params: z.object({ id: z.string() }).meta({ id: 'InputParams' }),
+              query: z.object({ filter: z.string() }).meta({ id: 'InputQuery' }),
+              headers: z.object({ 'x-token-1': z.string() }).meta({ id: 'InputHeaders' }),
+              body: z.object({ name1: z.string() }).meta({ id: 'InputBody' }),
+            }))
+            .output(z.object({
+              headers: z.object({ 'x-token-2': z.string() }).meta({ id: 'OutputHeaders' }),
+              body: z.object({ name2: z.string() }).meta({ id: 'OutputBody' }),
+            })),
+        })
+
+        expect(doc.paths?.['/{id}']?.post).toEqual(expect.objectContaining({
+          parameters: expect.arrayContaining([
+            expect.objectContaining({
+              name: 'id',
+              in: 'path',
+            }),
+            expect.objectContaining({
+              name: 'filter',
+              in: 'query',
+            }),
+            expect.objectContaining({
+              name: 'x-token-1',
+              in: 'header',
+            }),
+          ]),
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/InputBody' },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'OK',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/OutputBody' },
+                },
+              },
+              headers: {
+                'x-token-2': expect.objectContaining({}),
+              },
+            },
+          },
+        }))
+
+        expect(doc.components?.schemas).toEqual(expect.objectContaining({
+          InputBody: expect.objectContaining({
+            type: 'object',
+            properties: {
+              name1: { type: 'string' },
+            },
+          }),
+          OutputBody: expect.objectContaining({
+            type: 'object',
+            properties: {
+              name2: { type: 'string' },
+            },
+          }),
+        }))
       })
     })
-  })
 
-  it('customErrorResponseBodySchema', async () => {
-    const openAPIGenerator = new OpenAPIGenerator({
-      schemaConverters: [
-        new ZodToJsonSchemaConverter(),
-      ],
-    })
+    describe('name reuse', () => {
+      it('reuses the same component name when input and output json schemas are equal', async () => {
+        const doc = await generator.generate({
+          planet: oc
+            .input(z.object({ left: z.looseObject({ id: z.string() }).meta({ id: 'Planet' }) }))
+            .output(z.object({ right: z.looseObject({ id: z.string() }).meta({ id: 'Planet' }) })),
+        })
 
-    const router = {
-      ping: oc.errors({
-        BAD_REQUEST: {
-          data: z.string().describe('data_BAD_REQUEST'),
-        },
-        BAD_REQUEST_2: {
-          status: 400,
-          message: 'message_BAD_REQUEST_2',
-        },
-        NOT_FOUND: {},
-      }),
-      pong: oc.route({ method: 'GET', path: '/pong' }).errors({
-        INTERNAL_SERVER_ERROR: {
-          message: 'message_INTERNAL_SERVER_ERROR',
-          data: z.string().describe('data_BAD_REQUEST_2'),
-        },
-      }),
-    }
-
-    let time = 1
-    const customErrorResponseBodySchema = vi.fn(() => {
-      if (time++ === 3) {
-        return null // fallback to default
-      }
-
-      return ({ type: 'object', description: 'custom' })
-    })
-    const spec = await openAPIGenerator.generate(router, {
-      customErrorResponseBodySchema,
-    })
-
-    expect(customErrorResponseBodySchema).toHaveBeenCalledTimes(3)
-    expect(customErrorResponseBodySchema).toHaveBeenNthCalledWith(1, [
-      ['BAD_REQUEST', 'Bad Request', true, { description: 'data_BAD_REQUEST', type: 'string' }],
-      ['BAD_REQUEST_2', 'message_BAD_REQUEST_2', false, { }],
-    ], 400)
-    expect(customErrorResponseBodySchema).toHaveBeenNthCalledWith(2, [
-      ['NOT_FOUND', 'Not Found', false, { }],
-    ], 404)
-    expect(customErrorResponseBodySchema).toHaveBeenNthCalledWith(3, [
-      ['INTERNAL_SERVER_ERROR', 'message_INTERNAL_SERVER_ERROR', true, { description: 'data_BAD_REQUEST_2', type: 'string' }],
-    ], 500)
-
-    expect(spec).toEqual({
-      openapi: '3.1.1',
-      info: {
-        title: 'API Reference',
-        version: '0.0.0',
-      },
-      paths: {
-        '/ping': {
-          post: {
-            operationId: 'ping',
-            responses: {
-              200: expect.any(Object),
-              400: { description: '400', content: { 'application/json': { schema: customErrorResponseBodySchema.mock.results[0]!.value } } },
-              404: { description: '404', content: { 'application/json': { schema: customErrorResponseBodySchema.mock.results[1]!.value } } },
-            },
-          },
-        },
-        '/pong': {
-          get: {
-            operationId: 'pong',
-            responses: {
-              200: expect.any(Object),
-              500: { description: '500', content: { 'application/json': {
-                schema: expect.toSatisfy((schema) => { // default behavior
-                  expect(schema).not.toEqual(customErrorResponseBodySchema.mock.results[2]!.value)
-
-                  expect(schema).toEqual({ oneOf: expect.any(Array) })
-
-                  return true
+        expect(doc.paths?.['/planet']?.post).toEqual(expect.objectContaining({
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: expect.objectContaining({
+                  type: 'object',
+                  properties: {
+                    left: { $ref: '#/components/schemas/Planet' },
+                  },
                 }),
-              } } },
+              },
             },
           },
-        },
-      },
-    })
-  })
-
-  it('expand support for union/interaction of object schemas in some cases', async () => {
-    const openAPIGenerator = new OpenAPIGenerator({
-      schemaConverters: [
-        new ZodToJsonSchemaConverter(),
-      ],
-    })
-
-    const schema = z.discriminatedUnion('type', [
-      z.object({
-        type: z.literal('a'),
-        a: z.string(),
-      }),
-      z.object({
-        type: z.literal('b'),
-        b: z.number(),
-      }),
-    ])
-
-    const router = {
-      ping: oc
-        .route({ path: '/{type}' })
-        .input(schema),
-      pong: oc.route({ method: 'GET' })
-        .input(schema),
-      peng: oc
-        .route({ path: '/{id}', inputStructure: 'detailed', outputStructure: 'detailed' })
-        .input(z.object({
-          params: z.union([z.object({ id: z.string() }), z.object({ id: z.number() })]),
-          query: schema,
-          headers: schema,
-          body: schema,
+          responses: {
+            200: {
+              description: 'OK',
+              content: {
+                'application/json': {
+                  schema: expect.objectContaining({
+                    type: 'object',
+                    properties: {
+                      right: { $ref: '#/components/schemas/Planet' },
+                    },
+                  }),
+                },
+              },
+            },
+          },
         }))
-        .output(z.object({
-          headers: schema,
-          body: schema,
-        })),
-    }
 
-    const spec = await openAPIGenerator.generate(router)
+        expect(doc.components?.schemas).toEqual({
+          Planet: expect.objectContaining({
+            type: 'object',
+          }),
+        })
+      })
 
-    expect(spec.paths!['/{type}']!.post).toEqual({
-      operationId: 'ping',
-      parameters: [
-        {
-          name: 'type',
-          in: 'path',
-          required: true,
-          schema: {
-            anyOf: [
-              { const: 'a' },
-              { const: 'b' },
-            ],
-          },
-        },
-      ],
-      requestBody: {
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                a: { type: 'string' },
-                b: { type: 'number' },
+      it('reuses an equal base component without adding a postfix', async () => {
+        const Planet = z.object({ id: z.string() }).meta({ id: 'Planet' })
+
+        const doc = await generator.generate({
+          planet: oc.input(z.object({ planet: Planet })),
+        }, {
+          base: {
+            components: {
+              schemas: {
+                Planet: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                  },
+                  required: ['id'],
+                } as any,
               },
             },
           },
-        },
-        required: false,
-      },
-      responses: expect.any(Object),
+        })
+
+        expect(doc.paths?.['/planet']?.post).toEqual(expect.objectContaining({
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: expect.objectContaining({
+                  type: 'object',
+                  properties: {
+                    planet: { $ref: '#/components/schemas/Planet' },
+                  },
+                }),
+              },
+            },
+          },
+        }))
+
+        expect(doc.components?.schemas).toEqual({
+          Planet: expect.objectContaining({
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+            },
+            required: ['id'],
+          }),
+        })
+      })
+
+      it('can reuses schemas reference each others recursively', async () => {
+        const Schema1: z._ZodType = z.object({
+          // eslint-disable-next-line ts/no-use-before-define
+          schema2: z.lazy(() => Schema2).optional(),
+        }).meta({ id: 'Schema1' })
+
+        const Schema2: z.ZodTypeAny = z.object({
+          schema1: z.lazy(() => Schema1).optional(),
+        }).meta({ id: 'Schema2' })
+
+        const doc = await generator.generate({
+          planet1: oc
+            .input(z.object({ Schema1 }))
+            .output(z.object({ Schema1 })),
+          planet2: oc
+            .input(z.object({ Schema2 }))
+            .output(z.object({ Schema2 })),
+        })
+
+        expect(doc.paths?.['/planet1']?.post).toEqual(expect.objectContaining({
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: expect.objectContaining({
+                  type: 'object',
+                  properties: {
+                    Schema1: { $ref: '#/components/schemas/Schema1' },
+                  },
+                }),
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'OK',
+              content: {
+                'application/json': {
+                  schema: expect.objectContaining({
+                    type: 'object',
+                    properties: {
+                      Schema1: { $ref: '#/components/schemas/Schema1' },
+                    },
+                  }),
+                },
+              },
+            },
+          },
+        }))
+
+        expect(doc.paths?.['/planet2']?.post).toEqual(expect.objectContaining({
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: expect.objectContaining({
+                  type: 'object',
+                  properties: {
+                    Schema2: { $ref: '#/components/schemas/Schema2' },
+                  },
+                }),
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'OK',
+              content: {
+                'application/json': {
+                  schema: expect.objectContaining({
+                    type: 'object',
+                    properties: {
+                      Schema2: { $ref: '#/components/schemas/Schema2' },
+                    },
+                  }),
+                },
+              },
+            },
+          },
+        }))
+
+        expect(doc.components?.schemas).toEqual({
+          Schema1: expect.objectContaining({
+            type: 'object',
+            properties: {
+              schema2: { $ref: '#/components/schemas/Schema2' },
+            },
+          }),
+          Schema2: expect.objectContaining({
+            type: 'object',
+            properties: {
+              schema1: { $ref: '#/components/schemas/Schema1' },
+            },
+          }),
+        })
+      })
     })
 
-    expect(spec.paths!['/pong']!.get).toEqual({
-      operationId: 'pong',
-      parameters: [
-        {
-          allowEmptyValue: true,
-          allowReserved: true,
-          name: 'type',
-          in: 'query',
-          required: true,
-          schema: {
-            anyOf: [
-              { const: 'a' },
-              { const: 'b' },
-            ],
-          },
-        },
-        {
-          allowEmptyValue: true,
-          allowReserved: true,
-          name: 'a',
-          in: 'query',
-          schema: { type: 'string' },
-          required: false,
-        },
-        {
-          allowEmptyValue: true,
-          allowReserved: true,
-          name: 'b',
-          in: 'query',
-          schema: { type: 'number' },
-          required: false,
-        },
-      ],
-      responses: expect.any(Object),
-    })
+    describe('name conflicts', () => {
+      it('adds a numbered postfix when equal refs map to different schema', async () => {
+        const PlanetInput = z.object({ id: z.string() }).meta({ id: 'Planet', description: 'PlanetInput' })
+        const PlanetOutput = z.object({ id: z.number() }).meta({ id: 'Planet', description: 'PlanetOutput' })
 
-    expect(spec.paths!['/{id}']!.post).toEqual({
-      operationId: 'peng',
-      parameters: [
-        {
-          name: 'id',
-          in: 'path',
-          required: true,
-          schema: {
-            anyOf: [
-              {
-                type: 'string',
-              },
-              {
-                type: 'number',
-              },
-            ],
-          },
-        },
-        {
-          name: 'type',
-          in: 'query',
-          required: true,
-          schema: {
-            anyOf: [
-              {
-                const: 'a',
-              },
-              {
-                const: 'b',
-              },
-            ],
-          },
-          allowEmptyValue: true,
-          allowReserved: true,
-        },
-        {
-          name: 'a',
-          in: 'query',
-          required: false,
-          schema: {
-            type: 'string',
-          },
-          allowEmptyValue: true,
-          allowReserved: true,
-        },
-        {
-          name: 'b',
-          in: 'query',
-          required: false,
-          schema: {
-            type: 'number',
-          },
-          allowEmptyValue: true,
-          allowReserved: true,
-        },
-        {
-          name: 'type',
-          in: 'header',
-          required: true,
-          schema: {
-            anyOf: [
-              {
-                const: 'a',
-              },
-              {
-                const: 'b',
-              },
-            ],
-          },
-        },
-        {
-          name: 'a',
-          in: 'header',
-          required: false,
-          schema: {
-            type: 'string',
-          },
-        },
-        {
-          name: 'b',
-          in: 'header',
-          required: false,
-          schema: {
-            type: 'number',
-          },
-        },
-      ],
-      requestBody: expect.any(Object),
-      responses: {
-        200: {
-          description: 'OK',
-          headers: {
-            type: {
-              schema: {
-                anyOf: [
-                  {
-                    const: 'a',
+        const doc = await generator.generate({
+          planet: oc
+            .input(z.object({ left: PlanetInput, right: PlanetInput }))
+            .output(z.object({ left: PlanetOutput, right: PlanetOutput })),
+        })
+
+        expect(doc.paths?.['/planet']?.post).toEqual(expect.objectContaining({
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: expect.objectContaining({
+                  type: 'object',
+                  properties: {
+                    left: { $ref: '#/components/schemas/Planet' },
+                    right: { $ref: '#/components/schemas/Planet' },
                   },
-                  {
-                    const: 'b',
-                  },
-                ],
+                }),
               },
-              required: true,
-            },
-            a: {
-              schema: {
-                type: 'string',
-              },
-              required: false,
-            },
-            b: {
-              schema: {
-                type: 'number',
-              },
-              required: false,
             },
           },
-          content: expect.any(Object),
-        },
-      },
+          responses: {
+            200: {
+              description: 'OK',
+              content: {
+                'application/json': {
+                  schema: expect.objectContaining({
+                    type: 'object',
+                    properties: {
+                      left: { $ref: '#/components/schemas/Planet2' },
+                      right: { $ref: '#/components/schemas/Planet2' },
+                    },
+                  }),
+                },
+              },
+            },
+          },
+        }))
+
+        expect(doc.components?.schemas).toEqual({
+          Planet: expect.objectContaining({
+            description: 'PlanetInput',
+          }),
+          Planet2: expect.objectContaining({
+            description: 'PlanetOutput',
+          }),
+        })
+      })
+
+      it('adds a postfix when an existing base component has a different json schema', async () => {
+        const Planet: z.ZodTypeAny = z.lazy(() => z.object({
+          id: z.string(),
+          children: z.array(Planet).optional(),
+        })).meta({ id: 'Planet' })
+
+        const doc = await generator.generate({
+          planet: oc.input(z.object({ Planet })),
+        }, {
+          base: {
+            components: {
+              schemas: {
+                Planet: {
+                  type: 'object',
+                  properties: {
+                    legacy: { type: 'boolean' },
+                  },
+                },
+              },
+            },
+          },
+        })
+
+        expect(doc.paths?.['/planet']?.post).toEqual(expect.objectContaining({
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: expect.objectContaining({
+                  type: 'object',
+                  properties: {
+                    Planet: { $ref: '#/components/schemas/Planet2' },
+                  },
+                }),
+              },
+            },
+          },
+        }))
+
+        expect(doc.components?.schemas).toEqual({
+          Planet: expect.objectContaining({
+            type: 'object',
+            properties: {
+              legacy: { type: 'boolean' },
+            },
+          }),
+          Planet2: expect.objectContaining({
+            properties: expect.objectContaining({
+              id: { type: 'string' },
+            }),
+          }),
+        })
+      })
+
+      it('adds numbered postfixes for recursive reference schemas when base component names conflict', async () => {
+        const Schema1: z._ZodType = z.object({
+          // eslint-disable-next-line ts/no-use-before-define
+          schema2: z.lazy(() => Schema2).optional(),
+        }).meta({ id: 'Schema1' })
+
+        const Schema2: z.ZodTypeAny = z.object({
+          schema1: z.lazy(() => Schema1).optional(),
+        }).meta({ id: 'Schema2' })
+
+        const doc = await generator.generate({
+          planet1: oc
+            .input(z.object({ Schema1 }))
+            .output(z.object({ Schema1 })),
+          planet2: oc
+            .input(z.object({ Schema2 }))
+            .output(z.object({ Schema2 })),
+        }, {
+          base: {
+            components: {
+              schemas: {
+                Schema1: { type: 'string' },
+              },
+            },
+          },
+        })
+
+        expect(doc.paths?.['/planet1']?.post).toEqual(expect.objectContaining({
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: expect.objectContaining({
+                  type: 'object',
+                  properties: {
+                    Schema1: { $ref: '#/components/schemas/Schema12' },
+                  },
+                }),
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'OK',
+              content: {
+                'application/json': {
+                  schema: expect.objectContaining({
+                    type: 'object',
+                    properties: {
+                      Schema1: { $ref: '#/components/schemas/Schema12' },
+                    },
+                  }),
+                },
+              },
+            },
+          },
+        }))
+
+        expect(doc.paths?.['/planet2']?.post).toEqual(expect.objectContaining({
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: expect.objectContaining({
+                  type: 'object',
+                  properties: {
+                    Schema2: { $ref: '#/components/schemas/Schema2' },
+                  },
+                }),
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'OK',
+              content: {
+                'application/json': {
+                  schema: expect.objectContaining({
+                    type: 'object',
+                    properties: {
+                      Schema2: { $ref: '#/components/schemas/Schema2' },
+                    },
+                  }),
+                },
+              },
+            },
+          },
+        }))
+
+        expect(doc.components?.schemas).toEqual({
+          Schema1: expect.objectContaining({ type: 'string' }),
+          Schema12: expect.objectContaining({
+            type: 'object',
+            properties: {
+              schema2: { $ref: '#/components/schemas/Schema2' },
+            },
+          }),
+          Schema2: expect.objectContaining({
+            type: 'object',
+            properties: {
+              schema1: { $ref: '#/components/schemas/Schema12' },
+            },
+          }),
+        })
+      })
     })
   })
 })

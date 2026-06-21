@@ -1,21 +1,31 @@
-# ORPC Playground
+# oRPC Playground
 
-This is a playground for [oRPC](https://orpc.dev) and [Next.js](https://nextjs.org).
+A playground for exploring [oRPC](https://orpc.dev) with [Next.js](https://nextjs.org).
 
 ## Getting Started
 
-First, run the development server:
+Start the development server:
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-Open [http://localhost:3000/api](http://localhost:3000/api) to see the Scalar API Client.
+- Visit [http://localhost:3000](http://localhost:3000) to view the app.
+- Visit [http://localhost:3000/api](http://localhost:3000/api) to explore the OpenAPI client.
+
+## OpenTelemetry
+
+Collect OpenTelemetry traces with [Jaeger](https://www.jaegertracing.io/) by running this in a separate terminal:
+
+```bash
+npm run jaeger:run
+```
+
+Then play with your app and open [http://localhost:16686](http://localhost:16686) to see the traces in the Jaeger dashboard.
 
 ## Sponsors
 
-If you find oRPC valuable and would like to support its development, you can do so here: [GitHub Sponsors](https://github.com/sponsors/dinwwwh).
+Like what we build over at [middleapi](https://github.com/middleapi)? You can help keep it going here: [GitHub Sponsors](https://github.com/sponsors/dinwwwh). Every bit helps! 🚀
 
 ### 🏆 Platinum Sponsor
 

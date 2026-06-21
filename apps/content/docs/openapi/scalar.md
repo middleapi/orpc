@@ -1,29 +1,25 @@
----
-title: Scalar (Swagger)
-description: Create a beautiful API client for your oRPC effortlessly.
----
-
 # Scalar (Swagger)
 
-Leverage the [OpenAPI Specification](/docs/openapi/openapi-specification) to generate a stunning API client for your oRPC using [Scalar](https://github.com/scalar/scalar).
+Use [Scalar](https://github.com/scalar/scalar) to serve an interactive API reference for your oRPC API from an [OpenAPI specification](/docs/openapi/specification).
 
 ::: info
-This guide covers the basics. For a simpler setup, consider using the [OpenAPI Reference Plugin](/docs/openapi/plugins/openapi-reference), which serves both the API reference UI and the OpenAPI specification.
+This guide shows a manual setup. If you want a simpler option, use the [OpenAPI Reference Plugin](/docs/plugins/openapi-reference), which serves both the API reference UI and the OpenAPI specification for you.
 :::
 
 ## Basic Example
+
+This example serves the OpenAPI document at `/spec.json` and renders Scalar at `/`.
 
 ```ts
 import { createServer } from 'node:http'
 import { OpenAPIGenerator } from '@orpc/openapi'
 import { OpenAPIHandler } from '@orpc/openapi/node'
 import { CORSPlugin } from '@orpc/server/plugins'
-import { ZodSmartCoercionPlugin, ZodToJsonSchemaConverter } from '@orpc/zod'
+import { ZodToJsonSchemaConverter } from '@orpc/zod'
 
 const openAPIHandler = new OpenAPIHandler(router, {
   plugins: [
-    new CORSPlugin(),
-    new ZodSmartCoercionPlugin(),
+    new CORSHandlerPlugin(),
   ],
 })
 
@@ -49,7 +45,7 @@ const server = createServer(async (req, res) => {
         version: '1.0.0',
       },
       servers: [
-        { url: '/api' }, /** Should use absolute URLs in production */
+        { url: '/api' }, /** Use an absolute URL in production. */
       ],
       security: [{ bearerAuth: [] }],
       components: {
@@ -105,4 +101,4 @@ server.listen(3000, () => {
 })
 ```
 
-Access the playground at `http://localhost:3000` to view your API client.
+Open `http://localhost:3000` to view the API reference UI.

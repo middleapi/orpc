@@ -37,7 +37,7 @@ You can implement these features in any order. Pick the ones you find interestin
   - [ ] Node HTTP Adapter ([reference](https://github.com/middleapi/orpc/tree/main/packages/standard-server-node))
   - [ ] Peer Adapter (WebSocket, MessagePort, etc.) ([reference](https://github.com/middleapi/orpc/tree/main/packages/standard-server-peer))
 
-- [ ] [Contract First](/docs/contract-first/define-contract) Support
+- [ ] [Contract First](/docs/contract/procedure) Support
   - [ ] Contract Builder ([reference](https://github.com/middleapi/orpc/blob/main/packages/contract/src/builder.ts))
   - [ ] Contract Implementer ([reference](https://github.com/middleapi/orpc/blob/main/packages/server/src/implementer.ts))
 

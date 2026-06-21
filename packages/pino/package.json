@@ -1,7 +1,7 @@
 {
-  "name": "@orpc/experimental-pino",
+  "name": "@orpc/pino",
   "type": "module",
-  "version": "1.14.6",
+  "version": "1.13.4",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
@@ -16,6 +16,7 @@
   "sideEffects": false,
   "publishConfig": {
     "exports": {
+      "./package.json": "./package.json",
       ".": {
         "types": "./dist/index.d.mts",
         "import": "./dist/index.mjs",
@@ -24,6 +25,7 @@
     }
   },
   "exports": {
+    "./package.json": "./package.json",
     ".": "./src/index.ts"
   },
   "files": [
@@ -31,7 +33,6 @@
   ],
   "scripts": {
     "build": "unbuild",
-    "build:watch": "pnpm run build --watch",
     "type:check": "tsc -b"
   },
   "peerDependencies": {
@@ -40,9 +41,10 @@
   "dependencies": {
     "@orpc/client": "workspace:*",
     "@orpc/server": "workspace:*",
-    "@orpc/shared": "workspace:*"
+    "@orpc/shared": "workspace:*",
+    "@standardserver/core": "^0.0.24"
   },
   "devDependencies": {
-    "pino": "^10.3.1"
+    "pino": "^10.1.0"
   }
 }

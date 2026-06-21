@@ -1,8 +1,3 @@
----
-title: Monorepo Setup
-description: The most efficient way to set up a monorepo with oRPC
----
-
 # Monorepo Setup
 
 A monorepo stores multiple related projects in a single repository, a common practice for managing interconnected projects like web applications and their APIs.
@@ -102,6 +97,7 @@ packages/
 This is just a suggestion. You can structure your monorepo however you like.
 :::
 
-## Related
+## Learn More
 
+- [Scaling Large Projects](/docs/advanced/scaling-large-projects)
 - [Publish Client to NPM](/docs/advanced/publish-client-to-npm)

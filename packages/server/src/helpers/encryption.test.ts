@@ -69,4 +69,28 @@ describe('encrypt/decrypt', () => {
     expect(await decrypt(undefined, 'secret')).toBeUndefined()
     expect(await decrypt(null, 'secret')).toBeUndefined()
   })
+
+  it('should decrypt compatibility fixtures from previous releases', async () => {
+    const fixtures = [
+      {
+        value: 'compatibility-value',
+        secret: 'compatibility-encryption-secret',
+        encrypted: 'hbSNaYOIGOVnapa2UgZgzHgNr6ARf1zWk-3cNWhDBwsFOnQ9S4IZR5uUdqIM-WbTRAfryalkWnHJD8voMh5y',
+      },
+      {
+        value: '',
+        secret: 'compatibility-encryption-secret',
+        encrypted: '5IXfizzzaGLhausAUKPlg4JBoyYnbKqa5qdVnLFVPMY8YWZfh0ouEFrZGQw',
+      },
+      {
+        value: 'value.with.dots-🚀-中文',
+        secret: 'compatibility-encryption-secret',
+        encrypted: 'xLe6faWGA5J3MUy-Cue5_mZXiJVlrzqKho8ywwhlCHbO4koT4XT3MxzesdTMLxZIAS6pPJLfU4qKKcZHwOwAAU5RHP-sMp8',
+      },
+    ] as const
+
+    for (const fixture of fixtures) {
+      expect(await decrypt(fixture.encrypted, fixture.secret)).toBe(fixture.value)
+    }
+  })
 })

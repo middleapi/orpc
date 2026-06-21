@@ -1,52 +1,36 @@
-import { AsyncIteratorClass, isTypescriptObject } from '@orpc/shared'
-import { getEventMeta, withEventMeta } from '@orpc/standard-server'
+import type { AsyncIteratorClass, WrapAsyncIteratorOptions } from '@orpc/shared'
+import { isTypescriptObject, wrapAsyncIterator } from '@orpc/shared'
+import { getEventMeta, withEventMeta } from '@standardserver/core'
 
-export function mapEventIterator<TYield, TReturn, TNext, TMap = TYield | TReturn>(
-  iterator: AsyncIterator<TYield, TReturn, TNext>,
-  maps: {
-    value: (value: NoInfer<TYield | TReturn>, done: boolean | undefined) => Promise<TMap>
-    error: (error: unknown) => Promise<unknown>
-  },
-): AsyncIteratorClass<TMap, TMap, TNext> {
-  const mapError = async (error: unknown) => {
-    let mappedError = await maps.error(error)
+export function wrapEventIteratorPreservingMeta<TYield, TReturn, TMappedYield = TYield, TMappedReturn = TReturn>(
+  iterator: AsyncIterator<TYield, TReturn>,
+  { mapResult, mapError, ...rest }: WrapAsyncIteratorOptions<TYield, TReturn, TMappedYield, TMappedReturn>,
+): AsyncIteratorClass<TMappedYield, TMappedReturn> {
+  return wrapAsyncIterator<TYield, TReturn, TMappedYield, TMappedReturn>(iterator, {
+    ...rest,
+    mapResult: mapResult && (async (result) => {
+      const mapped = await mapResult(result)
 
-    if (mappedError !== error) {
-      const meta = getEventMeta(error)
-      if (meta && isTypescriptObject(mappedError)) {
-        mappedError = withEventMeta(mappedError, meta)
+      if (mapped.value !== result.value) {
+        const meta = getEventMeta(result.value)
+        if (meta && isTypescriptObject(mapped.value)) {
+          return { done: mapped.done, value: withEventMeta(mapped.value, meta) } as any
+        }
       }
-    }
 
-    return mappedError
-  }
+      return mapped
+    }),
+    mapError: mapError && (async (error) => {
+      const mapped = await mapError(error)
 
-  return new AsyncIteratorClass(async () => {
-    const { done, value } = await (async () => {
-      try {
-        return await iterator.next()
+      if (mapped !== error) {
+        const meta = getEventMeta(error)
+        if (meta && isTypescriptObject(mapped)) {
+          return withEventMeta(mapped, meta)
+        }
       }
-      catch (error) {
-        throw await mapError(error)
-      }
-    })()
 
-    let mappedValue = await maps.value(value, done)
-
-    if (mappedValue !== value) {
-      const meta = getEventMeta(value)
-      if (meta && isTypescriptObject(mappedValue)) {
-        mappedValue = withEventMeta(mappedValue, meta)
-      }
-    }
-
-    return { done, value: mappedValue }
-  }, async () => {
-    try {
-      await iterator.return?.()
-    }
-    catch (error) {
-      throw await mapError(error)
-    }
+      return mapped
+    }),
   })
 }

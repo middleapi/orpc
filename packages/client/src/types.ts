@@ -1,40 +1,39 @@
 import type { PromiseWithError } from '@orpc/shared'
 
-export type HTTPPath = `/${string}`
-export type HTTPMethod = 'HEAD' | 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
-
-export type ClientContext = Record<PropertyKey, any>
+export interface ClientContext {
+  [key: PropertyKey]: any
+}
 
 export interface ClientOptions<T extends ClientContext> {
-  signal?: AbortSignal
+  signal?: AbortSignal | undefined
   lastEventId?: string | undefined
   context: T
 }
 
 export type FriendlyClientOptions<T extends ClientContext>
   = & Omit<ClientOptions<T>, 'context'>
-    & (Record<never, never> extends T ? { context?: T } : { context: T })
+    & (object extends T ? { context?: T } : { context: T })
 
-export type ClientRest<TClientContext extends ClientContext, TInput> = Record<never, never> extends TClientContext
+export type ClientRest<TClientContext extends ClientContext, TInput> = object extends TClientContext
   ? undefined extends TInput
     ? [input?: TInput, options?: FriendlyClientOptions<TClientContext>]
     : [input: TInput, options?: FriendlyClientOptions<TClientContext>]
   : [input: TInput, options: FriendlyClientOptions<TClientContext>]
 
-export type ClientPromiseResult<TOutput, TError> = PromiseWithError<TOutput, TError>
-
 export interface Client<TClientContext extends ClientContext, TInput, TOutput, TError> {
-  (...rest: ClientRest<TClientContext, TInput>): ClientPromiseResult<TOutput, TError>
+  (...rest: ClientRest<TClientContext, TInput>): PromiseWithError<TOutput, TError>
 }
 
 export type NestedClient<TClientContext extends ClientContext> = Client<TClientContext, any, any, any> | {
   [k: string]: NestedClient<TClientContext>
 }
 
-export type InferClientContext<T extends NestedClient<any>> = T extends NestedClient<infer U> ? U : never
+export type AnyNestedClient = NestedClient<any>
+
+export type InferClientContext<T extends AnyNestedClient> = T extends NestedClient<infer U> ? U : never
 
 export interface ClientLink<TClientContext extends ClientContext> {
-  call: (path: readonly string[], input: unknown, options: ClientOptions<TClientContext>) => Promise<unknown>
+  call: (path: string[], input: unknown, options: ClientOptions<TClientContext>) => Promise<unknown>
 }
 
 /**
@@ -42,11 +41,11 @@ export interface ClientLink<TClientContext extends ClientContext> {
  *
  * Produces a nested map where each endpoint's input type is preserved.
  */
-export type InferClientInputs<T extends NestedClient<any>>
+export type InferClientInputs<T extends AnyNestedClient>
   = T extends Client<any, infer U, any, any>
     ? U
     : {
-        [K in keyof T]: T[K] extends NestedClient<any> ? InferClientInputs<T[K]> : never
+        [K in keyof T]: T[K] extends AnyNestedClient ? InferClientInputs<T[K]> : never
       }
 
 /**
@@ -55,11 +54,11 @@ export type InferClientInputs<T extends NestedClient<any>>
  * If an endpoint's input includes `{ body: ... }`, only the `body` portion is extracted.
  * Produces a nested map of body input types.
  */
-export type InferClientBodyInputs<T extends NestedClient<any>>
+export type InferClientBodyInputs<T extends AnyNestedClient>
   = T extends Client<any, infer U, any, any>
     ? U extends { body: infer UBody } ? UBody : U
     : {
-        [K in keyof T]: T[K] extends NestedClient<any> ? InferClientBodyInputs<T[K]> : never
+        [K in keyof T]: T[K] extends AnyNestedClient ? InferClientBodyInputs<T[K]> : never
       }
 
 /**
@@ -67,11 +66,11 @@ export type InferClientBodyInputs<T extends NestedClient<any>>
  *
  * Produces a nested map where each endpoint's output type is preserved.
  */
-export type InferClientOutputs<T extends NestedClient<any>>
+export type InferClientOutputs<T extends AnyNestedClient>
   = T extends Client<any, any, infer U, any>
     ? U
     : {
-        [K in keyof T]: T[K] extends NestedClient<any> ? InferClientOutputs<T[K]> : never
+        [K in keyof T]: T[K] extends AnyNestedClient ? InferClientOutputs<T[K]> : never
       }
 
 /**
@@ -80,11 +79,11 @@ export type InferClientOutputs<T extends NestedClient<any>>
  * If an endpoint's output includes `{ body: ... }`, only the `body` portion is extracted.
  * Produces a nested map of body output types.
  */
-export type InferClientBodyOutputs<T extends NestedClient<any>>
+export type InferClientBodyOutputs<T extends AnyNestedClient>
   = T extends Client<any, any, infer U, any>
     ? U extends { body: infer UBody } ? UBody : U
     : {
-        [K in keyof T]: T[K] extends NestedClient<any> ? InferClientBodyOutputs<T[K]> : never
+        [K in keyof T]: T[K] extends AnyNestedClient ? InferClientBodyOutputs<T[K]> : never
       }
 
 /**
@@ -92,11 +91,11 @@ export type InferClientBodyOutputs<T extends NestedClient<any>>
  *
  * Produces a nested map where each endpoint's error type is preserved.
  */
-export type InferClientErrors<T extends NestedClient<any>>
+export type InferClientErrors<T extends AnyNestedClient>
   = T extends Client<any, any, any, infer U>
     ? U
     : {
-        [K in keyof T]: T[K] extends NestedClient<any> ? InferClientErrors<T[K]> : never
+        [K in keyof T]: T[K] extends AnyNestedClient ? InferClientErrors<T[K]> : never
       }
 
 /**
@@ -104,9 +103,9 @@ export type InferClientErrors<T extends NestedClient<any>>
  *
  * Useful when you want to handle all possible errors from any endpoint at once.
  */
-export type InferClientErrorUnion<T extends NestedClient<any>>
+export type InferClientError<T extends AnyNestedClient>
   = T extends Client<any, any, any, infer U>
     ? U
     : {
-        [K in keyof T]: T[K] extends NestedClient<any> ? InferClientErrorUnion<T[K]> : never
+        [K in keyof T]: T[K] extends AnyNestedClient ? InferClientError<T[K]> : never
       }[keyof T]

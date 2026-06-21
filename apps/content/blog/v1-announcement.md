@@ -125,10 +125,10 @@ In this long journey, I specially thank all my sponsors, they help me to keep go
 - [Robbe95](https://github.com/Robbe95)
 - And my first sponsor (private) to start my story
 
-If you're interested in sponsoring oRPC, you can do it [here](https://github.com/sponsors/dinwwwh).
+If you're interesting in sponsoring oRPC, you can do it [here](https://github.com/sponsors/unnoq).
 
 <p align="center">
-  <a href="https://cdn.jsdelivr.net/gh/dinwwwh/dinwwwh/sponsors.svg">
-    <img src='https://cdn.jsdelivr.net/gh/dinwwwh/dinwwwh/sponsors.svg'/>
+  <a href="https://cdn.jsdelivr.net/gh/middleapi/static/sponsors.svg">
+    <img alt='Sponsors' src='https://cdn.jsdelivr.net/gh/middleapi/static/sponsors.svg'/>
   </a>
 </p>

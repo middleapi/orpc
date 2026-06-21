@@ -1,53 +1,151 @@
----
-title: Middleware
-description: Understanding middleware in oRPC
----
+# Middleware
 
-# Middleware in oRPC
-
-Middleware is a powerful feature in oRPC that enables reusable and extensible procedures. It allows you to:
-
-- Intercept, hook into, or listen to a handler's execution.
-- Inject or guard the execution context.
+Middleware is a powerful mechanism in oRPC that allows you to execute code before and after your procedure handlers, enabling features like authentication, logging, caching, and more. It provides a way to modify the context, input, and output of procedures in a flexible and composable manner.
 
 ## Overview
 
-Middleware is a function that takes a `next` function as a parameter and either returns the result
-of `next` or modifies the result before returning it.
-
 ```ts twoslash
-import { os } from '@orpc/server'
+import type { AnyMetaPlugin } from '@orpc/server'
+
+declare const someMeta: AnyMetaPlugin
 // ---cut---
-const authMiddleware = os
-  .$context<{ something?: string }>() // <-- define dependent-context
-  .middleware(async ({ context, next }) => {
-    // Execute logic before the handler
-
-    const result = await next({
-      context: { // Pass additional context
-        user: { id: 1, name: 'John' }
-      }
-    })
-
-    // Execute logic after the handler
-
-    return result
-  })
+import { os } from '@orpc/server'
 
 const example = os
-  .use(authMiddleware)
-  .handler(async ({ context }) => {
-    const user = context.user
+  .$context<{ something?: string }>() // <- define initial context
+  .meta(someMeta) // <- attach metadata
+  .errors({ RATE_LIMITED: {} }) // <- attach errors
+  .middleware(async ({ context, next, errors }) => { // <- middleware logic
+    try {
+      // `await` is required to catch async errors
+      return await next({
+        context: { // <- Inject additional context
+          user: { id: 1, name: 'John' }
+        }
+      })
+    }
+    catch (error) {
+      console.error(error)
+      throw error
+    }
+    finally {
+      // Cleanup logic after execution
+    }
   })
 ```
 
-## Dependent context
+## Initial Context
 
-Before `.middleware`, you can `.$context` to specify the dependent context, which must be satisfied when the middleware is used.
+Use `.$context` to declare the initial context required when middleware is applied.
+Learn more in the [Context Documentation](/docs/context).
+
+## Metadata
+
+Use `.meta` to attach metadata to middleware. This metadata is applied to any procedures that use the middleware. Learn more in the [Metadata documentation](/docs/metadata).
+
+## Typesafe Errors
+
+Use `.errors` to attach error definitions to middleware. These errors are available in the middleware and any procedures that use it. Learn more in the [Typesafe Error Handling documentation](/docs/error-handling#typesafe-errors).
+
+## Middleware Context
+
+Middleware can be used to inject or guard the [context](/docs/context).
+
+```ts twoslash
+import { ORPCError, os } from '@orpc/server'
+
+declare function auth(): { userId: number } | null
+// ---cut---
+const setting = os
+  .use(async ({ context, next }) => {
+    return next({
+      context: {
+        auth: await auth() // <- inject auth
+      }
+    })
+  })
+  .use(async ({ context, next }) => {
+    if (!context.auth) { // <- guard auth
+      throw new ORPCError('UNAUTHORIZED')
+    }
+
+    return next({
+      context: {
+        auth: context.auth // <- override auth (now guaranteed to be non-null)
+      }
+    })
+  })
+  .handler(async ({ context }) => {
+    console.log(context.auth) // <- auth is guaranteed to be non-null here
+  })
+```
+
+::: warning
+Context passed to `next` must not conflict with the existing context; it is merged at runtime.
+:::
+
+## Middleware Input
+
+Middleware can access input in type-safe manner, enabling use cases like permission checks.
+
+```ts
+const canUpdate = os.middleware(async ({ context, next }, input: number) => {
+  // Perform permission check
+  return next()
+})
+
+const ping = os
+  .input(z.number())
+  .use(canUpdate) // <- input already matches middleware's expected shape
+  .handler(async ({ input }) => {
+    // Handler logic
+  })
+
+const pong = os
+  .input(z.object({ id: z.number() }))
+  .use(canUpdate.adaptInput(input => input.id)) // <- adapt input to match middleware's expected shape
+  .handler(async ({ input }) => {
+    // Handler logic
+  })
+```
+
+::: info
+You can adapt a middleware to accept a different input shape by using `.adaptInput`.
+
+```ts
+const canUpdate = os.middleware(async ({ context, next }, input: number) => {
+  return next()
+})
+
+// Transform middleware to accept a new input shape
+const adaptedCanUpdate = canUpdate.adaptInput((input: { id: number }) => input.id)
+```
+
+:::
+
+## Middleware Output
+
+Middleware can also modify the output of a handler, such as implementing caching mechanisms.
+
+```ts
+const cache = os.middleware(async ({ context, next, path }, input, done) => {
+  const cacheKey = path.join('/') + JSON.stringify(input)
+
+  if (db.has(cacheKey)) {
+    return done({ output: db.get(cacheKey) })
+  }
+
+  const result = await next({})
+
+  db.set(cacheKey, result.output)
+
+  return result
+})
+```
 
 ## Inline Middleware
 
-Middleware can be defined inline within `.use`, which is useful for simple middleware functions.
+Middleware is simply a function that can be defined inline with `.use`, which is useful for simple middleware cases.
 
 ```ts
 const example = os
@@ -60,138 +158,16 @@ const example = os
   })
 ```
 
-## Middleware Context
+## Combining Middleware
 
-Middleware can be used to inject or guard the [context](/docs/context).
+Multiple middleware functions can be combined using `.use`.
 
-```ts twoslash
-import { ORPCError, os } from '@orpc/server'
-// ---cut---
-const setting = os
-  .use(async ({ context, next }) => {
-    return next({
-      context: {
-        auth: await auth() // <-- inject auth payload
-      }
-    })
-  })
-  .use(async ({ context, next }) => {
-    if (!context.auth) { // <-- guard auth
-      throw new ORPCError('UNAUTHORIZED')
-    }
-
-    return next({
-      context: {
-        auth: context.auth // <-- override auth
-      }
-    })
-  })
-  .handler(async ({ context }) => {
-    console.log(context.auth) // <-- access auth
-  })
-// ---cut-after---
-declare function auth(): { userId: number } | null
+```ts
+const mergedMiddleware = aMiddleware
+  .use(async ({ next }) => next())
+  .use(anotherMiddleware)
 ```
 
 ::: info
-When you pass additional context to `next`, it will be merged with the existing context.
+To concatenate two middlewares with different input types, use `.adaptInput` to align their inputs first.
 :::
-
-## Middleware Input
-
-Middleware can access input, enabling use cases like permission checks.
-
-```ts
-const canUpdate = os.middleware(async ({ context, next }, input: number) => {
-  // Perform permission check
-  return next()
-})
-
-const ping = os
-  .input(z.number())
-  .use(canUpdate)
-  .handler(async ({ input }) => {
-    // Handler logic
-  })
-
-// Mapping input if necessary
-const pong = os
-  .input(z.object({ id: z.number() }))
-  .use(canUpdate, input => input.id)
-  .handler(async ({ input }) => {
-    // Handler logic
-  })
-```
-
-::: info
-You can adapt a middleware to accept a different input shape by using `.mapInput`.
-
-```ts
-const canUpdate = os.middleware(async ({ context, next }, input: number) => {
-  return next()
-})
-
-// Transform middleware to accept a new input shape
-const mappedCanUpdate = canUpdate.mapInput((input: { id: number }) => input.id)
-```
-
-:::
-
-## Middleware Output
-
-Middleware can also modify the output of a handler, such as implementing caching mechanisms.
-
-```ts
-const cacheMid = os.middleware(async ({ context, next, path }, input, output) => {
-  const cacheKey = path.join('/') + JSON.stringify(input)
-
-  if (db.has(cacheKey)) {
-    return output(db.get(cacheKey))
-  }
-
-  const result = await next({})
-
-  db.set(cacheKey, result.output)
-
-  return result
-})
-```
-
-## Concatenation
-
-Multiple middleware functions can be combined using `.concat`.
-
-```ts
-const concatMiddleware = aMiddleware
-  .concat(os.middleware(async ({ next }) => next()))
-  .concat(anotherMiddleware)
-```
-
-::: info
-If you want to concatenate two middlewares with different input types, you can use `.mapInput` to align their input types before concatenation.
-:::
-
-## Built-in Middlewares
-
-oRPC provides some built-in middlewares that can be used to simplify common use cases.
-
-```ts
-import { onError, onFinish, onStart, onSuccess } from '@orpc/server'
-
-const ping = os
-  .use(onStart(() => {
-    // Execute logic before the handler
-  }))
-  .use(onSuccess(() => {
-    // Execute when the handler succeeds
-  }))
-  .use(onError(() => {
-    // Execute when the handler fails
-  }))
-  .use(onFinish(() => {
-    // Execute logic after the handler
-  }))
-  .handler(async ({ context }) => {
-    // Handler logic
-  })
-```

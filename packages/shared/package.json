@@ -1,7 +1,7 @@
 {
   "name": "@orpc/shared",
   "type": "module",
-  "version": "1.14.6",
+  "version": "1.13.4",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
@@ -15,6 +15,7 @@
   "sideEffects": false,
   "publishConfig": {
     "exports": {
+      "./package.json": "./package.json",
       ".": {
         "types": "./dist/index.d.mts",
         "import": "./dist/index.mjs",
@@ -23,6 +24,7 @@
     }
   },
   "exports": {
+    "./package.json": "./package.json",
     ".": "./src/index.ts"
   },
   "files": [
@@ -30,7 +32,6 @@
   ],
   "scripts": {
     "build": "unbuild",
-    "build:watch": "pnpm run build --watch",
     "type:check": "tsc -b"
   },
   "peerDependencies": {
@@ -42,13 +43,14 @@
     }
   },
   "dependencies": {
+    "@standardserver/shared": "^0.0.24",
     "radash": "^12.1.1",
-    "type-fest": "^5.4.4"
+    "type-fest": "^5.3.1"
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.0",
-    "arktype": "2.2.0",
+    "arktype": "^2.1.29",
     "valibot": "^1.2.0",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   }
 }

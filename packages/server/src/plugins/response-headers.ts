@@ -1,8 +1,14 @@
 import type { StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard'
-import { clone } from '@orpc/shared'
+import { toArray } from '@orpc/shared'
+import { mergeStandardHeaders } from '@standardserver/core'
+import { toStandardHeaders } from '@standardserver/fetch'
 
-export interface ResponseHeadersPluginContext {
-  resHeaders?: Headers
+export interface ResponseHeadersHandlerPluginContext {
+  /**
+   * Response headers as a Headers instance. This is injected by the Response Headers Plugin.
+   * When set before the response is sent, these headers will be included in the response. If not set, no additional headers will be added.
+   */
+  resHeaders?: Headers | undefined
 }
 
 /**
@@ -11,46 +17,42 @@ export interface ResponseHeadersPluginContext {
  *
  * @see {@link https://orpc.dev/docs/plugins/response-headers Response Headers Plugin Docs}
  */
-export class ResponseHeadersPlugin<T extends ResponseHeadersPluginContext> implements StandardHandlerPlugin<T> {
-  init(options: StandardHandlerOptions<T>): void {
-    options.rootInterceptors ??= []
+export class ResponseHeadersHandlerPlugin<T extends ResponseHeadersHandlerPluginContext> implements StandardHandlerPlugin<T> {
+  name = '~response-headers'
+  /**
+   * Interceptors should run after batch interceptors so headers are applied to each sub-response.
+   */
+  before = ['~batch']
 
-    options.rootInterceptors.push(async (interceptorOptions) => {
-      const resHeaders = interceptorOptions.context.resHeaders ?? new Headers()
+  init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
+    return {
+      ...options,
+      routingInterceptors: [
+        async (interceptorOptions) => {
+          const resHeaders = new Headers(interceptorOptions.context.resHeaders)
 
-      const result = await interceptorOptions.next({
-        ...interceptorOptions,
-        context: {
-          ...interceptorOptions.context,
-          resHeaders,
+          const result = await interceptorOptions.next({
+            ...interceptorOptions,
+            context: {
+              ...interceptorOptions.context,
+              resHeaders,
+            },
+          })
+
+          if (!result.response) {
+            return result
+          }
+
+          return {
+            ...result,
+            response: {
+              ...result.response,
+              headers: mergeStandardHeaders(result.response.headers, toStandardHeaders(resHeaders)),
+            },
+          }
         },
-      })
-
-      if (!result.matched) {
-        return result
-      }
-
-      const responseHeaders = clone(result.response.headers)
-
-      for (const [key, value] of resHeaders) {
-        if (Array.isArray(responseHeaders[key])) {
-          responseHeaders[key].push(value)
-        }
-        else if (responseHeaders[key] !== undefined) {
-          responseHeaders[key] = [responseHeaders[key], value]
-        }
-        else {
-          responseHeaders[key] = value
-        }
-      }
-
-      return {
-        ...result,
-        response: {
-          ...result.response,
-          headers: responseHeaders,
-        },
-      }
-    })
+        ...toArray(options.routingInterceptors),
+      ],
+    }
   }
 }

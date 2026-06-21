@@ -1,7 +1,7 @@
 {
-  "name": "@orpc/experimental-publisher",
+  "name": "@orpc/publisher",
   "type": "module",
-  "version": "1.14.6",
+  "version": "1.13.4",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
@@ -15,6 +15,7 @@
   "sideEffects": false,
   "publishConfig": {
     "exports": {
+      "./package.json": "./package.json",
       ".": {
         "types": "./dist/index.d.mts",
         "import": "./dist/index.mjs",
@@ -25,51 +26,51 @@
         "import": "./dist/adapters/memory.mjs",
         "default": "./dist/adapters/memory.mjs"
       },
-      "./ioredis": {
-        "types": "./dist/adapters/ioredis.d.mts",
-        "import": "./dist/adapters/ioredis.mjs",
-        "default": "./dist/adapters/ioredis.mjs"
+      "./redis": {
+        "types": "./dist/adapters/redis.d.mts",
+        "import": "./dist/adapters/redis.mjs",
+        "default": "./dist/adapters/redis.mjs"
       },
-      "./upstash-redis": {
-        "types": "./dist/adapters/upstash-redis.d.mts",
-        "import": "./dist/adapters/upstash-redis.mjs",
-        "default": "./dist/adapters/upstash-redis.mjs"
+      "./upstash": {
+        "types": "./dist/adapters/upstash.d.mts",
+        "import": "./dist/adapters/upstash.mjs",
+        "default": "./dist/adapters/upstash.mjs"
       }
     }
   },
   "exports": {
+    "./package.json": "./package.json",
     ".": "./src/index.ts",
     "./memory": "./src/adapters/memory.ts",
-    "./ioredis": "./src/adapters/ioredis.ts",
-    "./upstash-redis": "./src/adapters/upstash-redis.ts"
+    "./redis": "./src/adapters/redis.ts",
+    "./upstash": "./src/adapters/upstash.ts"
   },
   "files": [
     "dist"
   ],
   "scripts": {
     "build": "unbuild",
-    "build:watch": "pnpm run build --watch",
     "type:check": "tsc -b"
   },
   "peerDependencies": {
     "@upstash/redis": ">=1.35.6",
-    "ioredis": ">=5.8.1"
+    "redis": ">=6.0.0"
   },
   "peerDependenciesMeta": {
     "@upstash/redis": {
       "optional": true
     },
-    "ioredis": {
+    "redis": {
       "optional": true
     }
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@orpc/standard-server": "workspace:*"
+    "@standardserver/core": "^0.0.24"
   },
   "devDependencies": {
-    "@upstash/redis": "^1.37.0",
-    "ioredis": "^5.10.0"
+    "@upstash/redis": "^1.38.0",
+    "redis": "^6.0.0"
   }
 }

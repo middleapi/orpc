@@ -1,9 +1,9 @@
 export type AnyFunction = (...args: any[]) => any
 
-export function once<T extends () => any>(fn: T): () => ReturnType<T> {
-  let cached: { result: ReturnType<T> } | undefined
+export function once<T>(fn: () => T): () => T {
+  let cached: { result: T } | undefined
 
-  return (): ReturnType<T> => {
+  return (): T => {
     if (cached) {
       return cached.result
     }
@@ -12,18 +12,6 @@ export function once<T extends () => any>(fn: T): () => ReturnType<T> {
     cached = { result }
 
     return result
-  }
-}
-
-export function sequential<A extends any[], R>(
-  fn: (...args: A) => Promise<R>,
-): (...args: A) => Promise<R> {
-  let lastOperationPromise: Promise<any> = Promise.resolve()
-
-  return (...args: A): Promise<R> => {
-    return lastOperationPromise = lastOperationPromise.catch(() => { }).then(() => {
-      return fn(...args)
-    })
   }
 }
 
@@ -39,5 +27,14 @@ export function defer(callback: () => void): void {
       .then(() => Promise.resolve()
         .then(() => Promise.resolve()
           .then(callback)))
+  }
+}
+
+export function tryOrUndefined<T>(fn: () => T): undefined | T {
+  try {
+    return fn()
+  }
+  catch {
+    return undefined
   }
 }

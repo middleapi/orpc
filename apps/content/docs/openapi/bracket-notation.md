@@ -1,53 +1,66 @@
----
-title: Bracket Notation
-description: Represent structured data in limited formats such as URL queries and form data.
----
-
 # Bracket Notation
 
-Bracket Notation encodes structured data in formats with limited syntax, like URL queries and form data. It is used by [OpenAPIHandler](/docs/openapi/openapi-handler) and [OpenAPILink](/docs/openapi/client/openapi-link).
+Bracket notation encodes structured data in flat key-value formats such as query strings and form data. [OpenAPI Serializer](/docs/openapi/serializer), [OpenAPI Handler](/docs/openapi/handler), and [OpenAPI Link](/docs/openapi/link) use it whenever nested data must be represented outside plain JSON.
 
-## Usage
+## Rules
 
-1. **Same name (>=2 elements) are represented as an array.**
-
-   ```
-   color=red&color=blue → { color: ["red", "blue"] }
-   ```
-
-2. **Append `[]` at the end to denote an array.**
+1. **Repeated keys become arrays.**
 
    ```
-   color[]=red&color[]=blue → { color: ["red", "blue"] }
+   color=red&color=blue -> { color: ['red', 'blue'] }
    ```
 
-3. **Append `[number]` to specify an array index (missing indexes create sparse arrays).**
+2. **Append `[]` to push into an array.**
 
    ```
-   color[0]=red&color[2]=blue → { color: ["red", <empty>, "blue"] }
+   color[]=red&color[]=blue -> { color: ['red', 'blue'] }
+   ```
+
+3. **Append `[number]` to target an explicit array index.**
+
+   ```
+   color[0]=red&color[2]=blue -> { color: ['red', <empty>, 'blue'] }
    ```
 
    ::: info
-   Array indexes must be less than 10,000 by default to prevent memory exhaustion attacks from large indices. Configure with `maxBracketNotationArrayIndex` in `OpenAPIHandler`.
+   Missing indexes create sparse arrays.
+
+   Explicit indexes greater than `999` are treated as object keys by default to avoid huge sparse arrays during deserialization. To change that limit, configure `maxExplicitDeserializingArrayIndex`:
+
+   ```ts
+   const serializer = new OpenAPISerializer({
+     bracketNotation: {
+       maxExplicitDeserializingArrayIndex: 1999,
+     }
+   })
+   ```
+
    :::
 
-4. **Append `[key]` to denote an object property.**
+4. **Append `[key]` to target an object property.**
 
    ```
-   color[red]=true&color[blue]=false → { color: { red: true, blue: false } }
+   color[red]=true&color[blue]=false -> { color: { red: 'true', blue: 'false' } }
    ```
 
 ## Limitations
 
-- **Empty Arrays:** Cannot be represented; arrays must have at least one element.
-- **Empty Objects:** Cannot be represented. Objects with empty or numeric keys may be interpreted as arrays, so ensure objects include at least one non-empty, non-numeric key.
+Bracket notation is designed to express structured data in constrained environments, so it has a few unavoidable limitations:
+
+- Cannot represent empty structures like empty objects `{}` or empty arrays `[]`.
+- Cannot represent an array at the root level. For example, `0=red&1=blue` becomes `{ 0: 'red', 1: 'blue' }`, not `['red', 'blue']`.
+- Cannot represent objects whose keys are all numbers, because they can be mistaken for array indexes.
+
+::: info
+If bracket notation is used in query strings or form data, it also inherits the limitations of those formats. For example, values are always strings or files, and `null` or `undefined` cannot be represented.
+:::
 
 ## Examples
 
 ### URL Query
 
 ```bash
-curl http://example.com/api/example?name[first]=John&name[last]=Doe
+curl 'http://example.com/api/example?name[first]=John&name[last]=Doe'
 ```
 
 This query is parsed as:
@@ -108,3 +121,8 @@ This form data is parsed as:
   }
 }
 ```
+
+## Learn More
+
+The bracket notation is a small, self-contained module, making it easy to understand.
+To explore its behavior in detail, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/openapi/src/bracket-notation.ts).

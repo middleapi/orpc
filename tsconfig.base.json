@@ -13,6 +13,7 @@
     "types": [],
 
     "strict": true,
+    // "exactOptionalPropertyTypes": true, TODO: enable this flag
     "noImplicitOverride": true,
     "noUncheckedIndexedAccess": true,
     "noEmit": true,

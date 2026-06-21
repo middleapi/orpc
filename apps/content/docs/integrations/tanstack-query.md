@@ -1,14 +1,9 @@
----
-title: Tanstack Query Integration
-description: Seamlessly integrate oRPC with Tanstack Query
----
+# TanStack Query Integration
 
-# Tanstack Query Integration
-
-[Tanstack Query](https://tanstack.com/query/latest) is a robust solution for asynchronous state management. oRPC Tanstack Query integration is very lightweight and straightforward - supporting all libraries that Tanstack Query supports (React, Vue, Angular, Solid, Svelte, etc.).
+[TanStack Query](https://tanstack.com/query/latest) integration provides utilities for using oRPC clients with TanStack Query. It includes helper methods for building query and mutation options, as well as query and mutation keys.
 
 ::: warning
-This documentation assumes you are already familiar with [Tanstack Query](https://tanstack.com/query/latest). If you need a refresher, please review the official Tanstack Query documentation before proceeding.
+This guide assumes you are already familiar with [TanStack Query](https://tanstack.com/query/latest). If you need a refresher, review the official TanStack Query documentation before continuing.
 :::
 
 ## Installation
@@ -39,17 +34,14 @@ deno add npm:@orpc/tanstack-query@latest
 
 ## Setup
 
-Before you begin, ensure you have already configured a [server-side client](/docs/client/server-side) or a [client-side client](/docs/client/client-side).
+Before you begin, set up either a [server-side client](/docs/client/server-side) or a [client-side client](/docs/client/client-side).
 
 ```ts twoslash
-import { router } from './shared/planet'
-import { RouterClient } from '@orpc/server'
-
-declare const client: RouterClient<typeof router>
+import { client } from './shared/planet'
 // ---cut---
 import { createTanstackQueryUtils } from '@orpc/tanstack-query'
 
-export const orpc = createTanstackQueryUtils(client)
+const orpc = createTanstackQueryUtils(client)
 
 orpc.planet.find.queryOptions({ input: { id: 123 } })
 //               ^|
@@ -67,9 +59,9 @@ orpc.planet.find.queryOptions({ input: { id: 123 } })
 //
 ```
 
-::: details Avoiding Query/Mutation Key Conflicts?
+::: details Avoiding Query and Mutation Key Conflicts?
 
-You can easily avoid key conflicts by passing a unique base key when creating your utils:
+To avoid key conflicts, pass a unique base path when creating each set of utils:
 
 ```ts
 const userORPC = createTanstackQueryUtils(userClient, {
@@ -85,7 +77,7 @@ const postORPC = createTanstackQueryUtils(postClient, {
 
 ## Query Options
 
-Use `.queryOptions` to configure queries. Use it with hooks like `useQuery`, `useSuspenseQuery`, or `prefetchQuery`.
+Use `.queryOptions` to build query options. It works with `useQuery`, `useSuspenseQuery`, and `prefetchQuery`, and any other API that accepts query options.
 
 ```ts
 const query = useQuery(orpc.planet.find.queryOptions({
@@ -97,15 +89,15 @@ const query = useQuery(orpc.planet.find.queryOptions({
 
 ## Streamed Query Options
 
-Use `.streamedOptions` to configure queries for [Event Iterator](/docs/event-iterator). Data is an array of events, and each new event is appended to the end of the array as it arrives.
+Use `.streamedOptions` to build streamed query options for [Event Iterator](/docs/event-iterator). The resulting data is an array of events, and each new event is appended as it arrives.
 
-Works with hooks like `useQuery`, `useSuspenseQuery`, or `prefetchQuery`.
+It works with `useQuery`, `useSuspenseQuery`, and `prefetchQuery`, and any other API that accepts query options.
 
 ```ts
-const query = useQuery(orpc.streamed.experimental_streamedOptions({
+const query = useQuery(orpc.streamed.streamedOptions({
   input: { id: 123 }, // Specify input if needed
   context: { cache: true }, // Provide client context if needed
-  queryFnOptions: { // Configure streamedQuery behavior
+  queryFnOptions: { // Configure streamed query behavior
     refetchMode: 'reset',
     maxChunks: 3,
   },
@@ -114,14 +106,23 @@ const query = useQuery(orpc.streamed.experimental_streamedOptions({
 }))
 ```
 
+::: info
+`refetchMode` determines how data is handled when the query is fetched again:
+
+- `'reset'` _(default)_: Clears existing data and returns the query to a pending state.
+- `'append'`: Adds new streamed chunks to the existing data.
+- `'replace'`: Buffers streamed data and replaces the cache after the stream completes.
+
+:::
+
 ## Live Query Options
 
-Use `.liveOptions` to configure live queries for [Event Iterator](/docs/event-iterator). Data is always the latest event, replacing the previous value whenever a new one arrives.
+Use `.liveOptions` to build live query options for [Event Iterator](/docs/event-iterator). The data always reflects the latest event, replacing the previous value whenever a new one arrives.
 
-Works with hooks like `useQuery`, `useSuspenseQuery`, or `prefetchQuery`.
+It works with `useQuery`, `useSuspenseQuery`, and `prefetchQuery`, and any other API that accepts query options.
 
 ```ts
-const query = useQuery(orpc.live.experimental_liveOptions({
+const query = useQuery(orpc.live.liveOptions({
   input: { id: 123 }, // Specify input if needed
   context: { cache: true }, // Provide client context if needed
   retry: true, // Infinite retry for more reliable streaming
@@ -131,10 +132,10 @@ const query = useQuery(orpc.live.experimental_liveOptions({
 
 ## Infinite Query Options
 
-Use `.infiniteOptions` to configure infinite queries. Use it with hooks like `useInfiniteQuery`, `useSuspenseInfiniteQuery`, or `prefetchInfiniteQuery`.
+Use `.infiniteOptions` to build infinite query options. It works with `useInfiniteQuery`, `useSuspenseInfiniteQuery`, and `prefetchInfiniteQuery`, and any other API that accepts infinite query options.
 
 ::: info
-The `input` parameter must be a function that accepts the page parameter and returns the query input. Be sure to define the type for `pageParam` if it can be `null` or `undefined`.
+The `input` option must be a function that receives the page parameter and returns the query input. Define the `pageParam` type explicitly if it can be `null` or `undefined`.
 :::
 
 ```ts
@@ -149,7 +150,7 @@ const query = useInfiniteQuery(orpc.planet.list.infiniteOptions({
 
 ## Mutation Options
 
-Use `.mutationOptions` to create options for mutations. Use it with hooks like `useMutation`.
+Use `.mutationOptions` to build mutation options. It works with `useMutation` and any other API that accepts mutation options.
 
 ```ts
 const mutation = useMutation(orpc.planet.create.mutationOptions({
@@ -160,15 +161,16 @@ const mutation = useMutation(orpc.planet.create.mutationOptions({
 mutation.mutate({ name: 'Earth' })
 ```
 
-## Query/Mutation Key
+## Query and Mutation Keys
 
-oRPC provides a set of helper methods to generate keys for queries and mutations:
+oRPC provides helper methods for generating query and mutation keys:
 
-- `.key`: Generate a **partial matching** key for actions like revalidating queries, checking mutation status, etc.
-- `.queryKey`: Generate a **full matching** key for [Query Options](#query-options).
-- `.streamedKey`: Generate a **full matching** key for [Streamed Query Options](#streamed-query-options).
-- `.infiniteKey`: Generate a **full matching** key for [Infinite Query Options](#infinite-query-options).
-- `.mutationKey`: Generate a **full matching** key for [Mutation Options](#mutation-options).
+- `.key`: Generates a **partial-match** key for actions such as invalidating queries or checking mutation status.
+- `.queryKey`: Generates a **full-match** key for [Query Options](#query-options).
+- `.streamedKey`: Generates a **full-match** key for [Streamed Query Options](#streamed-query-options).
+- `.liveKey`: Generates a **full-match** key for [Live Query Options](#live-query-options).
+- `.infiniteKey`: Generates a **full-match** key for [Infinite Query Options](#infinite-query-options).
+- `.mutationKey`: Generates a **full-match** key for [Mutation Options](#mutation-options).
 
 ```ts
 const queryClient = useQueryClient()
@@ -196,7 +198,7 @@ queryClient.setQueryData(orpc.planet.find.queryKey({ input: { id: 123 } }), (old
 
 ## Calling Clients
 
-Use `.call` to call a procedure client directly. It's an alias for corresponding procedure client.
+The `.call` method provides direct access to the underlying procedure client when needed.
 
 ```ts
 const planet = await orpc.planet.find.call({ id: 123 })
@@ -204,7 +206,7 @@ const planet = await orpc.planet.find.call({ id: 123 })
 
 ## Reactive Options
 
-In reactive libraries like Vue or Solid, **TanStack Query** supports passing computed values as options. The exact usage varies by framework, so refer to the documentation for [Vue](https://tanstack.com/query/latest/docs/framework/vue/reactivity) or [Solid](https://tanstack.com/query/latest/docs/framework/solid/reference/useQuery#reactive-options) for details.
+In reactive libraries like Vue or Solid, TanStack Query supports passing computed values as options. The exact API varies by framework, so refer to the TanStack Query documentation for [Vue](https://tanstack.com/query/latest/docs/framework/vue/reactivity) or [Solid](https://tanstack.com/query/latest/docs/framework/solid/reference/useQuery#reactive-options).
 
 ::: code-group
 
@@ -228,22 +230,27 @@ const query = useQuery(computed(
 
 ## Default Options
 
-You can configure default options for all query/mutation utilities using `experimental_defaults`. These options are [spread merged](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_syntax) with user-provided options, allowing you to set defaults while still enabling customization on a per-call basis.
+Use `scoped` to configure default options for scoped query and mutation utilities. Each value can be either a partial options object, which is spread-merged with lower priority than per-call options, or a function that receives the per-call options and returns the merged result.
 
 ```ts
 const orpc = createTanstackQueryUtils(client, {
-  experimental_defaults: {
+  scoped: {
     planet: {
       find: {
+        queryKey: options => ({
+          // Override the auto-generated query key for .queryKey and .queryOptions
+          queryKey: options.queryKey ?? ['planet', 'find', options.input]
+        }),
         queryOptions: {
           staleTime: 60 * 1000, // 1 minute
           retry: 3,
         },
       },
       list: {
-        infiniteOptions: {
-          staleTime: 30 * 1000,
-        },
+        infiniteOptions: options => ({
+          ...options,
+          staleTime: 30 * 1000, // override takes priority
+        }),
       },
       create: {
         mutationOptions: {
@@ -256,62 +263,147 @@ const orpc = createTanstackQueryUtils(client, {
   },
 })
 
-// These will automatically use the default options
+// These calls automatically use the default options
 const query = useQuery(orpc.planet.find.queryOptions({ input: { id: 123 } }))
 const mutation = useMutation(orpc.planet.create.mutationOptions())
 
-// User-provided options override defaults
+// User-provided options take precedence
 const customQuery = useQuery(orpc.planet.find.queryOptions({
   input: { id: 123 },
-  staleTime: 0, // overrides the default
+  staleTime: 0, // overrides the default staleTime
 }))
+```
+
+::: info
+When you configure `queryKey`, it also affects `.queryOptions` because it is used internally to generate query keys. The same applies to live, streamed, infinite, and mutation options when you configure their keys.
+:::
+
+## Interceptors
+
+Interceptors let you wrap `queryFn` and `mutationFn` calls. Unlike [default options](#default-options), which can be overridden by per-call options, interceptors always run for every query and mutation.
+
+```ts
+import { isInferableError, safe } from '@orpc/client'
+
+const orpc = createTanstackQueryUtils(client, {
+  queryInterceptors: [],
+  liveInterceptors: [],
+  streamedInterceptors: [],
+  infiniteInterceptors: [],
+  mutationInterceptors: [
+    async ({ context, path, next }) => {
+      const [error, data] = await safe(next())
+
+      if (error) {
+        if (isInferableError(error)) {
+          // handle typesafe errors
+        }
+
+        throw error
+      }
+
+      return data
+    }
+  ],
+  scoped: {
+    planet: {
+      create: {
+        mutationInterceptors: [
+          async ({ next, fnContext }) => {
+            const result = await next()
+            fnContext.client.invalidateQueries({ queryKey: orpc.planet.key() })
+            return result
+          },
+        ],
+      },
+    },
+  },
+})
+```
+
+::: info
+You can use [`safe` and `isInferableError`](/docs/client/error-handling#using-safe-and-isinferableerror) together for typesafe error handling in interceptors.
+:::
+
+## Plugins
+
+Plugins package reusable defaults and interceptors for queries and mutations.
+
+```ts
+const orpc = createTanstackQueryUtils(client, {
+  plugins: []
+})
 ```
 
 ## Client Context
 
 ::: warning
-oRPC excludes [client context](/docs/client/rpc-link#using-client-context) from query keys. Manually override query keys if needed to prevent unwanted query deduplication. Use built-in `retry` option instead of the [oRPC Client Retry Plugin](/docs/plugins/client-retry).
+oRPC excludes [client context](/docs/client/client-side#client-context) from query keys. Override the query key manually when you need to prevent unintended query deduplication.
 
 ```ts
 const query = useQuery(orpc.planet.find.queryOptions({
   context: { cache: true },
+  // manually include context in the query key
   queryKey: [['planet', 'find'], { context: { cache: true } }],
-  retry: true, // Prefer using built-in retry option
   // additional options...
 }))
 ```
 
 :::
 
-## Error Handling
+When a client is invoked through the TanStack Query integration, an **operation context** is automatically added to the [client context](/docs/client/client-side#client-context). You can use this context to configure request behavior, such as selecting the HTTP method for [RPC Link](/docs/rpc/link#request-method).
 
-Easily manage type-safe errors using our built-in `isDefinedError` helper.
+```ts twoslash
+import { RPCLink } from '@orpc/client/fetch'
+// ---cut---
+import {
+  TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL,
+  TanstackQueryOperationContext,
+} from '@orpc/tanstack-query'
+
+interface ClientContext extends TanstackQueryOperationContext {
+}
+
+const GET_OPERATION_TYPE = new Set(['query', 'streamed', 'live', 'infinite'])
+
+const link = new RPCLink<ClientContext>({
+  method: ({ context }) => {
+    const operationType = context[TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]?.type
+
+    if (operationType && GET_OPERATION_TYPE.has(operationType)) {
+      return 'GET'
+    }
+
+    return 'POST'
+  },
+})
+```
+
+## Typesafe Error Handling
+
+Use the built-in `isInferableError` helper to handle [typesafe errors](/docs/error-handling#typesafe-errors) in queries and mutations.
 
 ```ts
-import { isDefinedError } from '@orpc/client'
+import { isInferableError } from '@orpc/client'
 
 const mutation = useMutation(orpc.planet.create.mutationOptions({
   onError: (error) => {
-    if (isDefinedError(error)) {
-      // Handle type-safe error here
+    if (isInferableError(error)) {
+      // Handle typesafe errors here
     }
   }
 }))
 
 mutation.mutate({ name: 'Earth' })
 
-if (mutation.error && isDefinedError(mutation.error)) {
-  // Handle the error here
+if (mutation.error && isInferableError(mutation.error)) {
+  // Handle the typesafe errors here
 }
 ```
 
-::: info
-For more details, see our [type-safe error handling guide](/docs/error-handling#type‐safe-error-handling).
-:::
-
 ## `skipToken` for Disabling Queries
 
-The `skipToken` symbol offers a type-safe alternative to the `disabled` option when you need to conditionally disable a query by omitting its `input`.
+The [skipToken symbol](https://tanstack.com/query/latest/docs/framework/react/guides/disabling-queries#typesafe-disabling-of-queries-using-skiptoken) provides a typesafe alternative to setting `enabled: false` when you want to disable a query by omitting its `input`.
 
 ```ts
 const query = useQuery(
@@ -331,198 +423,38 @@ const query = useInfiniteQuery(
 )
 ```
 
-## Operation Context
+## Custom Serializers
 
-When clients are invoked through the TanStack Query integration, an **operation context** is automatically added to the [client context](/docs/client/rpc-link#using-client-context). This context can be used to config the request behavior, like setting the HTTP method.
-
-```ts
-import {
-  TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL,
-  TanstackQueryOperationContext,
-} from '@orpc/tanstack-query'
-
-interface ClientContext extends TanstackQueryOperationContext {
-}
-
-const GET_OPERATION_TYPE = new Set(['query', 'streamed', 'live', 'infinite'])
-
-const link = new RPCLink<ClientContext>({
-  url: 'http://localhost:3000/rpc',
-  method: ({ context }, path) => {
-    const operationType = context[TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]?.type
-
-    if (operationType && GET_OPERATION_TYPE.has(operationType)) {
-      return 'GET'
-    }
-
-    return 'POST'
-  },
-})
-```
-
-## Hydration
-
-To avoid issues like refetching on mount or waterfall issues, your app may need to use [TanStack Query Hydration](https://tanstack.com/query/latest/docs/framework/react/guides/ssr). For seamless integration with oRPC, extend the default serializer using the [RPC JSON Serializer](/docs/advanced/rpc-json-serializer) to support all oRPC types.
-
-::: info
-You can use any custom serializers, but if you're using oRPC, you should use its built-in serializers.
-:::
+If needed, you can extend the default TanStack Query serializer to support additional types supported by oRPC. Learn more about [RPC Serializers](/docs/rpc/serializer) and [TanStack Query Server Rendering & Hydration](https://tanstack.com/query/latest/docs/framework/react/guides/ssr).
 
 ```ts
-import { StandardRPCJsonSerializer } from '@orpc/client/standard'
+import { RPCSerializer } from '@orpc/client'
 
-const serializer = new StandardRPCJsonSerializer({
-  customJsonSerializers: [
+const serializer = new RPCSerializer({
+  handlers: {
     // put custom serializers here
-  ]
+  },
 })
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       queryKeyHashFn(queryKey) {
-        const [json, meta] = serializer.serialize(queryKey)
-        return JSON.stringify({ json, meta })
+        const serialized = serializer.serialize(queryKey, { useFormDataForBlobFields: false })
+        return JSON.stringify(serialized)
       },
       staleTime: 60 * 1000, // > 0 to prevent immediate refetching on mount
     },
     dehydrate: {
       serializeData(data) {
-        const [json, meta] = serializer.serialize(data)
-        return { json, meta }
+        return serializer.serialize(data, { useFormDataForBlobFields: false })
       }
     },
     hydrate: {
       deserializeData(data) {
-        return serializer.deserialize(data.json, data.meta)
+        return serializer.deserialize(data)
       }
     },
   }
 })
 ```
-
-::: details Next.js Example?
-
-This feature is not limited to React or Next.js. You can use it with any library that supports TanStack Query hydration.
-
-::: code-group
-
-```ts [lib/serializer.ts]
-import { StandardRPCJsonSerializer } from '@orpc/client/standard'
-
-export const serializer = new StandardRPCJsonSerializer({
-  customJsonSerializers: [
-    // put custom serializers here
-  ]
-})
-```
-
-```ts [lib/query/client.ts]
-import { defaultShouldDehydrateQuery, QueryClient } from '@tanstack/react-query'
-import { serializer } from '../serializer'
-
-export function createQueryClient() {
-  return new QueryClient({
-    defaultOptions: {
-      queries: {
-        queryKeyHashFn(queryKey) {
-          const [json, meta] = serializer.serialize(queryKey)
-          return JSON.stringify({ json, meta })
-        },
-        staleTime: 60 * 1000, // > 0 to prevent immediate refetching on mount
-      },
-      dehydrate: {
-        shouldDehydrateQuery: query => defaultShouldDehydrateQuery(query) || query.state.status === 'pending',
-        serializeData(data) {
-          const [json, meta] = serializer.serialize(data)
-          return { json, meta }
-        },
-      },
-      hydrate: {
-        deserializeData(data) {
-          return serializer.deserialize(data.json, data.meta)
-        }
-      },
-    }
-  })
-}
-```
-
-```tsx [lib/query/hydration.tsx]
-import { createQueryClient } from './client'
-import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query'
-import { cache } from 'react'
-
-export const getQueryClient = cache(createQueryClient)
-
-export function HydrateClient(props: { children: React.ReactNode, client: QueryClient }) {
-  return (
-    <HydrationBoundary state={dehydrate(props.client)}>
-      {props.children}
-    </HydrationBoundary>
-  )
-}
-```
-
-```tsx [app/providers.tsx]
-'use client'
-
-import { useState } from 'react'
-import { createQueryClient } from '../lib/query/client'
-import { QueryClientProvider } from '@tanstack/react-query'
-
-export function Providers(props: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => createQueryClient())
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      {props.children}
-    </QueryClientProvider>
-  )
-}
-```
-
-```tsx [app/page.tsx]
-import { getQueryClient, HydrateClient } from '../lib/query/hydration'
-import { ListPlanets } from '../components/list-planets'
-
-export default function Page() {
-  const queryClient = getQueryClient()
-
-  queryClient.prefetchQuery(
-    orpc.planet.list.queryOptions(),
-  )
-
-  return (
-    <HydrateClient client={queryClient}>
-      <ListPlanets />
-    </HydrateClient>
-  )
-}
-```
-
-```tsx [components/list-planets.tsx]
-'use client'
-
-import { useSuspenseQuery } from '@tanstack/react-query'
-
-export function ListPlanets() {
-  const { data, isError } = useSuspenseQuery(orpc.planet.list.queryOptions())
-
-  if (isError) {
-    return (
-      <p>Something went wrong</p>
-    )
-  }
-
-  return (
-    <ul>
-      {data.map(planet => (
-        <li key={planet.id}>{planet.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-:::

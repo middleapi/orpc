@@ -1,53 +1,60 @@
 import type { Interceptor, MaybeOptionalOptions } from '@orpc/shared'
-import type { NodeHttpRequest, NodeHttpResponse, SendStandardResponseOptions } from '@orpc/standard-server-node'
+import type { NodeHttpRequest, NodeHttpResponse, SendStandardResponseOptions } from '@standardserver/node'
 import type { Context } from '../../context'
-import type { StandardHandleOptions, StandardHandler } from '../standard'
-import type { FriendlyStandardHandleOptions } from '../standard/utils'
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler, StandardHandlerHandleOptions } from '../standard'
 import type { NodeHttpHandlerPlugin } from './plugin'
-import { intercept, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
-import { sendStandardResponse, toStandardLazyRequest } from '@orpc/standard-server-node'
-import { resolveFriendlyStandardHandleOptions } from '../standard/utils'
+import { intercept, resolveMaybeOptionalOptions } from '@orpc/shared'
+import { sendStandardResponse, toStandardLazyRequest } from '@standardserver/node'
+import { resolveFriendlyStandardHandlerHandleOptions } from '../standard'
 import { CompositeNodeHttpHandlerPlugin } from './plugin'
 
-export type NodeHttpHandleResult = { matched: true } | { matched: false }
+export type NodeHttpHandlerHandleResult = { matched: true } | { matched: false }
 
-export interface NodeHttpHandlerInterceptorOptions<T extends Context> extends StandardHandleOptions<T> {
+export interface NodeHttpHandlerNodeHttpInterceptorOptions<T extends Context> extends StandardHandlerHandleOptions<T> {
   request: NodeHttpRequest
   response: NodeHttpResponse
-  sendStandardResponseOptions: SendStandardResponseOptions
+  sendStandardResponseOptions: SendStandardResponseOptions | undefined
 }
+export type NodeHttpHandlerNodeHttpInterceptor<T extends Context> = Interceptor<NodeHttpHandlerNodeHttpInterceptorOptions<T>, Promise<NodeHttpHandlerHandleResult>>
 
-export interface NodeHttpHandlerOptions<T extends Context> extends SendStandardResponseOptions {
-  adapterInterceptors?: Interceptor<NodeHttpHandlerInterceptorOptions<T>, Promise<NodeHttpHandleResult>>[]
+export interface NodeHttpHandlerOptions<T extends Context> {
+  /**
+   * Custom options for `sendStandardResponse`, used to send a `Standard Response`
+   */
+  sendStandardResponse?: SendStandardResponseOptions | undefined
 
-  plugins?: NodeHttpHandlerPlugin<T>[]
+  /**
+   * Interceptors that run before the mapping between the Standard API and Node HTTP API,
+   * useful for extending Node HTTP request/response before handling, ...
+   */
+  nodeHttpInterceptors?: NodeHttpHandlerNodeHttpInterceptor<T>[] | undefined
+
+  plugins?: NodeHttpHandlerPlugin<T>[] | undefined
 }
 
 export class NodeHttpHandler<T extends Context> {
-  private readonly sendStandardResponseOptions: SendStandardResponseOptions
-  private readonly adapterInterceptors: Exclude<NodeHttpHandlerOptions<T>['adapterInterceptors'], undefined>
+  private readonly sendStandardResponseOptions: NodeHttpHandlerOptions<T>['sendStandardResponse']
+  private readonly nodeHttpInterceptors: NodeHttpHandlerOptions<T>['nodeHttpInterceptors']
 
   constructor(
     private readonly standardHandler: StandardHandler<T>,
     options: NoInfer<NodeHttpHandlerOptions<T>> = {},
   ) {
-    const plugin = new CompositeNodeHttpHandlerPlugin(options.plugins)
+    options = new CompositeNodeHttpHandlerPlugin(options.plugins).initNodeHttpHandlerOptions(options)
 
-    plugin.initRuntimeAdapter(options)
-
-    this.adapterInterceptors = toArray(options.adapterInterceptors)
-    this.sendStandardResponseOptions = options
+    this.nodeHttpInterceptors = options.nodeHttpInterceptors
+    this.sendStandardResponseOptions = options.sendStandardResponse
   }
 
   async handle(
     request: NodeHttpRequest,
     response: NodeHttpResponse,
-    ...rest: MaybeOptionalOptions<FriendlyStandardHandleOptions<T>>
-  ): Promise<NodeHttpHandleResult> {
+    ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
+  ): Promise<NodeHttpHandlerHandleResult> {
     return intercept(
-      this.adapterInterceptors,
+      this.nodeHttpInterceptors,
       {
-        ...resolveFriendlyStandardHandleOptions(resolveMaybeOptionalOptions(rest)),
+        ...resolveFriendlyStandardHandlerHandleOptions(resolveMaybeOptionalOptions(rest)),
         request,
         response,
         sendStandardResponseOptions: this.sendStandardResponseOptions,
@@ -58,12 +65,12 @@ export class NodeHttpHandler<T extends Context> {
         const result = await this.standardHandler.handle(standardRequest, options)
 
         if (!result.matched) {
-          return { matched: false }
+          return result
         }
 
         await sendStandardResponse(response, result.response, sendStandardResponseOptions)
 
-        return { matched: true }
+        return result
       },
     )
   }

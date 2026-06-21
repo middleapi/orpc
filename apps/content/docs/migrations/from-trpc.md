@@ -1,21 +1,16 @@
----
-title: Migrating from tRPC
-description: A comprehensive guide to migrate your tRPC application to oRPC
----
-
 # Migrating from tRPC
 
-This guide will help you migrate your existing tRPC application to oRPC. Since oRPC draws significant inspiration from tRPC, the migration process should feel familiar and straightforward.
+This guide shows how to migrate an existing tRPC app to oRPC. Because oRPC is heavily inspired by tRPC, most concepts map directly, so the migration should feel familiar.
 
 ::: info
-For a quick way to enhance your existing tRPC app with oRPC features without fully migrating, refer to the [tRPC Integration](/docs/openapi/integrations/trpc).
+If you want to add oRPC features to an existing tRPC app without a full migration, see [tRPC Integration](/docs/openapi/integrations/trpc).
 :::
 
 ## Core Concepts Comparison
 
 | Concept               | tRPC                         | oRPC                |
 | --------------------- | ---------------------------- | ------------------- |
-| **Router**            | `t.router()`                 | an object           |
+| **Router**            | `t.router()`                 | plain object        |
 | **Procedure**         | `t.procedure`                | `os`                |
 | **Context**           | `t.context()`                | `os.$context()`     |
 | **Create Middleware** | `t.middleware()`             | `os.middleware()`   |
@@ -26,14 +21,14 @@ For a quick way to enhance your existing tRPC app with oRPC features without ful
 | **Serializer**        | `superjson`                  | built-in            |
 
 ::: info
-Learn more about [oRPC vs tRPC Comparison](/docs/comparison)
+See [oRPC vs tRPC Comparison](/docs/comparison) for a broader comparison.
 :::
 
 ## Step-by-Step Migration
 
 ### 1. Installation
 
-First, install oRPC and remove tRPC dependencies:
+Remove the tRPC packages and install the oRPC replacements:
 
 ::: code-group
 
@@ -66,14 +61,14 @@ deno add npm:@orpc/server@latest npm:@orpc/client@latest npm:@orpc/tanstack-quer
 
 ### 2. Initialize
 
-Initialization is an optional step in oRPC. You can use `os` directly without initialization, but for reusability and better code organization, it's recommended to initialize your base procedures.
+Initialization is optional in oRPC. You can use `os` directly, but creating shared base procedures makes context and middleware easier to reuse.
 
 ::: code-group
 
 ```ts [orpc/base.ts]
 import { ORPCError, os } from '@orpc/server'
 
-export async function createRPCContext(opts: { headers: Headers }) {
+export async function createORPCContext(opts: { headers: Headers }) {
   const session = await auth()
 
   return {
@@ -82,7 +77,7 @@ export async function createRPCContext(opts: { headers: Headers }) {
   }
 }
 
-const o = os.$context<Awaited<ReturnType<typeof createRPCContext>>>()
+const o = os.$context<Awaited<ReturnType<typeof createORPCContext>>>()
 
 const timingMiddleware = o.middleware(async ({ next, path }) => {
   const start = Date.now()
@@ -114,7 +109,7 @@ export const protectedProcedure = publicProcedure.use(({ context, next }) => {
 import { initTRPC, TRPCError } from '@trpc/server'
 import superjson from 'superjson'
 
-export async function createRPCContext(opts: { headers: Headers }) {
+export async function createTRPCContext(opts: { headers: Headers }) {
   const session = await auth()
 
   return {
@@ -123,7 +118,7 @@ export async function createRPCContext(opts: { headers: Headers }) {
   }
 }
 
-const t = initTRPC.context<typeof createRPCContext>().create({
+const t = initTRPC.context<typeof createTRPCContext>().create({
   transformer: superjson,
 })
 
@@ -160,12 +155,12 @@ export const protectedProcedure = t.procedure
 :::
 
 ::: info
-Learn more about oRPC [Context](/docs/context), and [Middleware](/docs/middleware).
+Learn more about oRPC [Context](/docs/context) and [Middleware](/docs/middleware).
 :::
 
 ### 3. Procedures
 
-In oRPC, there are no separate `.query`, `.mutation`, or `.subscription` methods. Instead, use `.handler` for all procedure types.
+oRPC does not split procedures into `.query`, `.mutation`, and `.subscription`. Use `.handler` for all procedure types.
 
 ::: code-group
 
@@ -235,7 +230,7 @@ Learn more about oRPC [Procedures](/docs/procedure).
 
 ### 4. App Router
 
-The main router structure is similar between tRPC and oRPC, except in oRPC you don't need to wrap routers in a `.router` call - plain objects is enough.
+The overall router structure stays similar. In oRPC, you do not wrap routers in a `.router` call. A plain object is enough.
 
 ::: code-group
 
@@ -262,6 +257,8 @@ Learn more about oRPC [Router](/docs/router).
 :::
 
 ### 5. Error Handling
+
+Error handling is similar, but `ORPCError` takes the error code as its first argument.
 
 ::: code-group
 
@@ -290,7 +287,7 @@ Learn more about oRPC [Error Handling](/docs/error-handling).
 
 ### 6. Server Setup
 
-This example assumes you're using [Next.js](https://nextjs.org/). If you're using a different framework, check the [oRPC HTTP Adapters](/docs/adapters/http) documentation.
+This example uses [Next.js](https://nextjs.org/). If you use another framework, see [oRPC HTTP Adapters](/docs/adapters/fetch-api).
 
 ::: code-group
 
@@ -299,12 +296,12 @@ import { RPCHandler } from '@orpc/server/fetch'
 
 const handler = new RPCHandler(appRouter, {
   interceptors: [
-    async ({ next }) => {
+    async ({ next, path }) => {
       try {
         return await next()
       }
       catch (error) {
-        console.error(error)
+        console.error(`❌ oRPC failed on ${path.join('.')}: `, error)
         throw error
       }
     }
@@ -314,7 +311,7 @@ const handler = new RPCHandler(appRouter, {
 async function handleRequest(request: Request) {
   const { response } = await handler.handle(request, {
     prefix: '/api/orpc',
-    context: await createORPCContext(request)
+    context: await createORPCContext({ headers: request.headers })
   })
 
   return response ?? new Response('Not found', { status: 404 })
@@ -332,7 +329,7 @@ function handler(req: Request) {
     endpoint: '/api/trpc',
     req,
     router: appRouter,
-    createContext: () => createTRPCContext(req),
+    createContext: () => createTRPCContext({ headers: req.headers }),
     onError: ({ path, error }) => {
       console.error(
         `❌ tRPC failed on ${path ?? '<no-path>'}: ${error.message}`
@@ -348,6 +345,8 @@ export { handler as GET, handler as POST }
 
 ### 7. Client Setup
 
+Create a transport link, then use it to build a typed client.
+
 ::: code-group
 
 ```ts [orpc/client.ts]
@@ -356,7 +355,8 @@ import { RPCLink } from '@orpc/client/fetch'
 import { RouterClient } from '@orpc/server'
 
 const link = new RPCLink({
-  url: 'http://localhost:3000/api/orpc',
+  origin: 'http://localhost:3000',
+  url: '/api/orpc',
   interceptors: [
     onError((error) => {
       console.error(error)
@@ -390,12 +390,12 @@ const { planets } = await client.planet.list.query({ cursor: 0 })
 :::
 
 ::: info
-Learn more about oRPC [Client-Side Clients](/docs/client/client-side), [Batch Requests Plugin](/docs/plugins/batch-requests), and [Dedupe Requests Plugin](/docs/plugins/dedupe-requests).
+Learn more about oRPC [Client-Side Clients](/docs/client/client-side), [Batch Plugin](/docs/plugins/batch), and [Dedupe Plugin](/docs/plugins/dedupe).
 :::
 
 ### 8. TanStack Query (React) Integration
 
-The oRPC TanStack Query integration is similar to tRPC, but simpler - you can use the `orpc` utilities directly without React providers or special hooks.
+The TanStack Query integration feels similar to tRPC, but it is lighter. You can use the generated `orpc` utilities directly without a React provider or custom hooks.
 
 ::: code-group
 

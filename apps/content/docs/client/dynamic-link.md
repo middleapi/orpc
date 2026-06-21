@@ -1,20 +1,17 @@
----
-title: DynamicLink
-description: Dynamically switch between multiple oRPC's links.
----
-
 # DynamicLink
 
-`DynamicLink` lets you dynamically choose between different oRPC's links based on your client context. This capability enables flexible routing of RPC requests.
+`DynamicLink` lets you choose a link at runtime. Use it when different requests should be routed through different links.
 
 ## Example
 
-This example shows how the client dynamically selects between two [RPCLink](/docs/client/rpc-link) instances based on the client context: one dedicated to cached requests and another for non-cached requests.
-
 ```ts twoslash
-import { router } from './shared/planet'
-import { RouterClient } from '@orpc/server'
+import { os, RouterClient } from '@orpc/server'
 import { RPCLink } from '@orpc/client/fetch'
+
+const router = {
+  ping: os.handler(() => 'pong'),
+  pong: os.handler(() => 'ping'),
+}
 // ---cut---
 import { createORPCClient, DynamicLink } from '@orpc/client'
 
@@ -23,11 +20,11 @@ interface ClientContext {
 }
 
 const cacheLink = new RPCLink({
-  url: 'https://cache.example.com/rpc',
+  origin: 'https://cache.example.com',
 })
 
 const noCacheLink = new RPCLink({
-  url: 'https://example.com/rpc',
+  origin: 'https://example.com',
 })
 
 const link = new DynamicLink<ClientContext>((options, path, input) => {
@@ -41,6 +38,6 @@ const link = new DynamicLink<ClientContext>((options, path, input) => {
 const client: RouterClient<typeof router, ClientContext> = createORPCClient(link)
 ```
 
-:::info
-Any oRPC's link is supported, not strictly limited to `RPCLink`.
+::: info
+This example uses two [RPC Link](/docs/rpc/link) instances, but `DynamicLink` works with any other link.
 :::

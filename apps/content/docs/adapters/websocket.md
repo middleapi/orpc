@@ -1,24 +1,18 @@
----
-title: Websocket
-description: How to use oRPC over WebSocket?
----
+# WebSocket Adapters
 
-# Websocket
-
-oRPC provides built-in WebSocket support for low-latency, bidirectional RPC.
+oRPC supports WebSockets for low-latency, full-duplex communication between clients and servers.
 
 ## Server Adapters
 
-| Adapter     | Target                                                                                                                   |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `websocket` | [MDN WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket) (Browser, Deno, Cloudflare Worker, etc.) |
-| `crossws`   | [Crossws](https://github.com/h3js/crossws) library (Node, Bun, Deno, SSE, etc.)                                          |
-| `ws`        | [ws](https://github.com/websockets/ws) library (Node.js)                                                                 |
-| `bun-ws`    | [Bun Websocket Server](https://bun.sh/docs/api/websockets)                                                               |
+| Adapter     | Target                                                                                                                  |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `websocket` | [MDN WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket), [ws](https://github.com/websockets/ws) |
+| `crossws`   | [crossws](https://github.com/h3js/crossws)                                                                              |
 
 ::: code-group
 
-```ts [Websocket]
+```ts [ws]
+import { WebSocketServer } from 'ws'
 import { RPCHandler } from '@orpc/server/websocket'
 import { onError } from '@orpc/server'
 
@@ -30,22 +24,21 @@ const handler = new RPCHandler(router, {
   ],
 })
 
-Deno.serve((req) => {
-  if (req.headers.get('upgrade') !== 'websocket') {
-    return new Response(null, { status: 501 })
-  }
+const wss = new WebSocketServer({ port: 8080 })
 
-  const { socket, response } = Deno.upgradeWebSocket(req)
-
-  handler.upgrade(socket, {
-    context: {}, // Provide initial context if needed
+wss.on('connection', (ws) => {
+  handler.upgrade(ws, {
+    /**
+     * Provide initial context if needed. The context can be an async function
+     * that receives the per-call request as its first argument, and is **not**
+     * related to the initial WebSocket upgrade request.
+     */
+    context: request => ({}),
   })
-
-  return response
 })
 ```
 
-```ts [CrossWS]
+```ts [crossws]
 import { createServer } from 'node:http'
 import { experimental_RPCHandler as RPCHandler } from '@orpc/server/crossws'
 import { onError } from '@orpc/server'
@@ -65,7 +58,12 @@ const ws = crossws({
   hooks: {
     message: (peer, message) => {
       handler.message(peer, message, {
-        context: {}, // Provide initial context if needed
+        /**
+         * Provide initial context if needed. The context can be an async function
+         * that receives the per-call request as its first argument, and is **not**
+         * related to the initial WebSocket upgrade request.
+         */
+        context: request => ({}),
       })
     },
     close: (peer) => {
@@ -85,9 +83,8 @@ server.on('upgrade', (req, socket, head) => {
 })
 ```
 
-```ts [WS]
-import { WebSocketServer } from 'ws'
-import { RPCHandler } from '@orpc/server/ws'
+```ts [Deno]
+import { RPCHandler } from '@orpc/server/websocket'
 import { onError } from '@orpc/server'
 
 const handler = new RPCHandler(router, {
@@ -98,49 +95,27 @@ const handler = new RPCHandler(router, {
   ],
 })
 
-const wss = new WebSocketServer({ port: 8080 })
+Deno.serve((req) => {
+  if (req.headers.get('upgrade') !== 'websocket') {
+    return new Response(null, { status: 501 })
+  }
 
-wss.on('connection', (ws) => {
-  handler.upgrade(ws, {
-    context: {}, // Provide initial context if needed
+  const { socket, response } = Deno.upgradeWebSocket(req)
+
+  handler.upgrade(socket, {
+    /**
+     * Provide initial context if needed. The context can be an async function
+     * that receives the per-call request as its first argument, and is **not**
+     * related to the initial WebSocket upgrade request.
+     */
+    context: request => ({}),
   })
+
+  return response
 })
 ```
 
-```ts [Bun WebSocket]
-import { RPCHandler } from '@orpc/server/bun-ws'
-import { onError } from '@orpc/server'
-
-const handler = new RPCHandler(router, {
-  interceptors: [
-    onError((error) => {
-      console.error(error)
-    }),
-  ],
-})
-
-Bun.serve({
-  fetch(req, server) {
-    if (server.upgrade(req)) {
-      return
-    }
-
-    return new Response('Upgrade failed', { status: 500 })
-  },
-  websocket: {
-    message(ws, message) {
-      handler.message(ws, message, {
-        context: {}, // Provide initial context if needed
-      })
-    },
-    close(ws) {
-      handler.close(ws)
-    },
-  },
-})
-```
-
-```ts [Websocket Hibernation]
+```ts [Cloudflare Websocket Hibernation]
 import { RPCHandler } from '@orpc/server/websocket'
 import { onError } from '@orpc/server'
 
@@ -166,7 +141,12 @@ export class ChatRoom extends DurableObject {
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     await handler.message(ws, message, {
-      context: {}, // Provide initial context if needed
+      /**
+       * Provide initial context if needed. The context can be an async function
+       * that receives the per-call request as its first argument, and is **not**
+       * related to the initial WebSocket upgrade request.
+       */
+      context: request => ({}),
     })
   }
 
@@ -178,30 +158,84 @@ export class ChatRoom extends DurableObject {
 
 :::
 
-::: info
-[Hibernation Plugin](/docs/plugins/hibernation) helps you fully leverage Hibernation APIs, making it especially useful for adapters like [Cloudflare Websocket Hibernation](https://developers.cloudflare.com/durable-objects/examples/websocket-hibernation-server/).
-:::
-
 ## Client Adapters
 
-| Adapter     | Target                                                                                                           |
-| ----------- | ---------------------------------------------------------------------------------------------------------------- |
-| `websocket` | [MDN WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket) (Browser, Node, Bun, Deno, etc.) |
+| Adapter     | Target                                                                          |
+| ----------- | ------------------------------------------------------------------------------- |
+| `websocket` | [MDN WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket) |
 
 ```ts
 import { RPCLink } from '@orpc/client/websocket'
 
-const websocket = new WebSocket('ws://localhost:3000')
-
 const link = new RPCLink({
-  websocket
+  connect: info => new WebSocket('ws://localhost:3000'),
+  /**
+   * Whether to connect immediately on initialization, instead of waiting
+   * for the first call. Reduces latency for the first request.
+   *
+   * @default false
+   */
+  connectOnInit: true,
+
+  /**
+   * Optional headers to attach to each per-call request.
+   * These can be accessed in the server context or via the Request Headers Plugin.
+   */
+  headers: () => ({})
 })
 ```
 
-::: tip
-Use [partysocket](https://www.npmjs.com/package/partysocket) library for manually/automatically reconnect logic.
+::: info
+The examples above only show how to configure the link. For examples of creating a typesafe client, see [RPC Link](/docs/rpc/link#typesafe-clients).
 :::
 
-:::info
-This only shows how to configure the WebSocket link. For full client examples, see [Client-Side Clients](/docs/client/client-side).
-:::
+### Auto Reconnect
+
+The client adapter has built-in support for reconnecting when the connection is lost. You can configure reconnect behavior with the `reconnect` option when creating the link.
+
+```ts
+const link = new RPCLink({
+  reconnect: {
+    /**
+     * Whether to automatically reconnect when the connection is lost.
+     *
+     * @default false
+     */
+    enabled: true,
+
+    /**
+     * Delay before a (re)connect attempt, in milliseconds.
+     *
+     * @default info => info.attempt === 1 ? 0 : 2_000
+     */
+    delay: info => info.attempt === 1 ? 0 : 2_000,
+
+    /**
+     * Maximum number of consecutive failed attempts before giving up.
+     * When exceeded, `getConnectedPeer` throws instead of retrying.
+     * Should greater than 1
+     *
+     * @default Infinity
+     */
+    maxAttempt: Infinity,
+
+    onClose: {
+      /**
+       * Whether to proactively reconnect right after the socket closes,
+       * rather than waiting for the next call to trigger reconnection.
+       * Reduces latency for the next request.
+       *
+       * @default false
+       */
+      enabled: false,
+
+      /**
+       * Delay before reconnecting after the socket closes, in milliseconds.
+       *
+       * @default 0
+       */
+      delay: 0
+    }
+  }
+})
+```

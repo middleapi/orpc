@@ -2,75 +2,77 @@ import type { Context } from '../../context'
 import type { FetchHandlerOptions } from './handler'
 import type { FetchHandlerPlugin } from './plugin'
 import { ORPCError } from '@orpc/client'
+import { toArray } from '@orpc/shared'
 
-export interface BodyLimitPluginOptions {
+export interface BodyLimitHandlerPluginOptions {
   /**
    * The maximum size of the body in bytes.
    */
   maxBodySize: number
 }
 
-/**
- * The Body Limit Plugin restricts the size of the request body for the Fetch Server.
- *
- * @see {@link https://orpc.dev/docs/plugins/body-limit Body Limit Plugin Docs}
- */
-export class BodyLimitPlugin<T extends Context> implements FetchHandlerPlugin<T> {
+export class BodyLimitHandlerPlugin<T extends Context> implements FetchHandlerPlugin<T> {
+  name = '~body-limit'
+
   private readonly maxBodySize: number
 
-  constructor(options: BodyLimitPluginOptions) {
+  constructor(options: BodyLimitHandlerPluginOptions) {
     this.maxBodySize = options.maxBodySize
   }
 
-  initRuntimeAdapter(options: FetchHandlerOptions<T>): void {
-    options.adapterInterceptors ??= []
+  initFetchHandlerOptions(options: FetchHandlerOptions<T>): FetchHandlerOptions<T> {
+    return {
+      ...options,
+      fetchInterceptors: [
+        async (interceptorOptions) => {
+          if (!interceptorOptions.request.body) {
+            return interceptorOptions.next()
+          }
 
-    options.adapterInterceptors.push(async (options) => {
-      if (!options.request.body) {
-        return options.next()
-      }
+          let currentBodySize = 0
+          const rawReader = interceptorOptions.request.body.getReader()
 
-      let currentBodySize = 0
-
-      const rawReader = options.request.body.getReader()
-
-      const reader = new ReadableStream({
-        start: async (controller) => {
-          try {
-            if (Number(options.request.headers.get('content-length')) > this.maxBodySize) {
-              controller.error(new ORPCError('PAYLOAD_TOO_LARGE'))
-              return
-            }
-
-            while (true) {
-              const { done, value } = await rawReader.read()
-
-              if (done) {
-                break
+          const body = new ReadableStream<Uint8Array>({
+            start: async (controller) => {
+              const reject = async (error: unknown) => {
+                controller.error(error)
+                await rawReader.cancel(error)
               }
 
-              currentBodySize += value.length
-
-              if (currentBodySize > this.maxBodySize) {
-                controller.error(new ORPCError('PAYLOAD_TOO_LARGE'))
-                break
+              const contentLength = interceptorOptions.request.headers.get('content-length')
+              if (contentLength && Number(contentLength) > this.maxBodySize) {
+                await reject(new ORPCError('PAYLOAD_TOO_LARGE'))
+                return
               }
 
-              controller.enqueue(value)
-            }
-          }
-          finally {
-            controller.close()
-          }
+              while (true) {
+                const { done, value } = await rawReader.read()
+
+                if (done) {
+                  controller.close()
+                  return
+                }
+
+                currentBodySize += value.length
+                if (currentBodySize > this.maxBodySize) {
+                  await reject(new ORPCError('PAYLOAD_TOO_LARGE'))
+                  return
+                }
+
+                controller.enqueue(value)
+              }
+            },
+          })
+
+          const requestInit: RequestInit & { duplex: 'half' } = { body, duplex: 'half' }
+
+          return interceptorOptions.next({
+            ...interceptorOptions,
+            request: new Request(interceptorOptions.request, requestInit),
+          })
         },
-      })
-
-      const requestInit: RequestInit & { duplex: 'half' } = { body: reader, duplex: 'half' }
-
-      return options.next({
-        ...options,
-        request: new Request(options.request, requestInit),
-      })
-    })
+        ...toArray(options.fetchInterceptors),
+      ],
+    }
   }
 }

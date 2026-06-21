@@ -1,153 +1,48 @@
----
-title: Rate Limit
-description: Rate limiting features for oRPC with multiple adapters support.
----
+# Rate Limit Helpers
 
-# Rate Limit
-
-The Rate Limit package provides flexible rate limiting for oRPC with multiple storage backend support. It includes adapters for in-memory, Redis, and Upstash, along with middleware and plugin helpers for seamless integration.
+Rate Limit helpers provide a unified set of adapters, middleware, and handler plugins for adding rate limiting to oRPC applications. They are flexible and composable, so you can use different rate-limiting strategies and storage backends without changing your procedure code.
 
 ## Installation
 
 ::: code-group
 
 ```sh [npm]
-npm install @orpc/experimental-ratelimit@latest
+npm install @orpc/ratelimit@latest
 ```
 
 ```sh [yarn]
-yarn add @orpc/experimental-ratelimit@latest
+yarn add @orpc/ratelimit@latest
 ```
 
 ```sh [pnpm]
-pnpm add @orpc/experimental-ratelimit@latest
+pnpm add @orpc/ratelimit@latest
 ```
 
 ```sh [bun]
-bun add @orpc/experimental-ratelimit@latest
+bun add @orpc/ratelimit@latest
 ```
 
 ```sh [deno]
-deno add npm:@orpc/experimental-ratelimit@latest
+deno add npm:@orpc/ratelimit@latest
 ```
 
 :::
 
-## Available Adapters
+## Basic Usage
 
-### Memory Adapter
-
-A simple in-memory rate limiter using a sliding window log algorithm. Ideal for single-instance applications or development.
-
-```ts
-import { MemoryRatelimiter } from '@orpc/experimental-ratelimit/memory'
-
-const limiter = new MemoryRatelimiter({
-  maxRequests: 10, // Maximum requests allowed
-  window: 60000, // Time window in milliseconds (60 seconds)
-})
-```
-
-### Redis Adapter
-
-Redis-based rate limiter using atomic Lua scripts for distributed rate limiting.
-
-```ts
-import { RedisRatelimiter } from '@orpc/experimental-ratelimit/redis'
-import { Redis } from 'ioredis'
-
-const redis = new Redis('redis://localhost:6379')
-
-const limiter = new RedisRatelimiter({
-  eval: async (script, numKeys, ...rest) => {
-    return redis.eval(script, numKeys, ...rest)
-  },
-  maxRequests: 100,
-  window: 60000,
-  prefix: 'orpc:ratelimit:', // Optional key prefix
-})
-```
-
-::: info
-You can use any Redis client that supports Lua script evaluation by providing an `eval` function.
-:::
-
-### Upstash Ratelimit Adapter
-
-Adapter for [@upstash/ratelimit](https://www.npmjs.com/package/@upstash/ratelimit), optimized for serverless environments like Vercel Edge and Cloudflare Workers.
-
-```ts
-import { Ratelimit } from '@upstash/ratelimit'
-import { Redis } from '@upstash/redis'
-import { UpstashRatelimiter } from '@orpc/experimental-ratelimit/upstash-ratelimit'
-
-const redis = Redis.fromEnv()
-
-const ratelimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(10, '60 s'),
-  prefix: 'my-app:',
-})
-
-const limiter = new UpstashRatelimiter(ratelimit)
-```
-
-::: tip Edge Runtime Support
-For Edge runtime like Vercel Edge or Cloudflare Workers, pass the `waitUntil` function to better handle background tasks:
-
-```ts
-const limiter = new UpstashRatelimiter(ratelimit, {
-  waitUntil: ctx.waitUntil.bind(ctx),
-})
-```
-
-:::
-
-### Cloudflare Ratelimit Adapter
-
-Adapter for [Cloudflare Workers Ratelimit](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/).
-
-```ts
-import { CloudflareRatelimiter } from '@orpc/experimental-ratelimit/cloudflare-ratelimit'
-
-export default {
-  async fetch(request, env) {
-    const limiter = new CloudflareRatelimiter(env.MY_RATE_LIMITER)
-
-    return new Response(`Hello World!`)
-  }
-}
-```
-
-## Blocking Mode
-
-Some adapters support blocking mode, which waits for the rate limit to reset instead of immediately rejecting requests.
-
-```ts
-const limiter = new MemoryRatelimiter({
-  maxRequests: 10,
-  window: 60000,
-  blockingUntilReady: {
-    enabled: true,
-    timeout: 5000, // Wait up to 5 seconds
-  },
-})
-```
-
-## Manual Usage
-
-You can use adapters directly without middleware for custom rate limiting logic:
+The core concept is the `RateLimiter` interface, which defines a standard way to check and enforce rate limits. You can create your own custom limiter or use one of the provided adapters for popular storage backends. The `limit` method accepts a key and an optional `weight` value, which defaults to `1`, so a single request can consume multiple points.
 
 ```ts twoslash
-import { MemoryRatelimiter } from '@orpc/experimental-ratelimit/memory'
+import { MemoryRateLimiter } from '@orpc/ratelimit/memory'
+// ---cut---
 import { ORPCError } from '@orpc/server'
 
-const limiter = new MemoryRatelimiter({
+const limiter = new MemoryRateLimiter({
   maxRequests: 5,
   window: 60000,
 })
 
-const result = await limiter.limit('user:123')
+const result = await limiter.limit('user:123', { weight: 2 })
 
 if (!result.success) {
   throw new ORPCError('TOO_MANY_REQUESTS', {
@@ -160,61 +55,148 @@ if (!result.success) {
 }
 ```
 
-## `createRatelimitMiddleware`
+## Adapters
 
-The `createRatelimitMiddleware` helper creates middleware for oRPC procedures to enforce rate limits.
+The package includes adapters for multiple storage backends and runtimes.
+Each adapter might require `maxRequests` and `window` to configure the limit, along with adapter specific options.
 
-```ts twoslash
-import { call, os } from '@orpc/server'
-import { MemoryRatelimiter } from '@orpc/experimental-ratelimit/memory'
-import { createRatelimitMiddleware, Ratelimiter } from '@orpc/experimental-ratelimit'
-import { z } from 'zod'
+| Name                    | Blocking Mode | Adapter for                                                                                                 |
+| ----------------------- | ------------- | ----------------------------------------------------------------------------------------------------------- |
+| `MemoryRateLimiter`     | ✅            | In-memory storage                                                                                           |
+| `RedisRateLimiter`      | ✅            | [Redis](https://github.com/redis/redis)                                                                     |
+| `UpstashRateLimiter`    | ✅            | [Upstash Rate Limit](https://www.npmjs.com/package/@upstash/ratelimit)                                      |
+| `CloudflareRateLimiter` |               | [Cloudflare RateLimit Binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) |
 
-const loginProcedure = os
-  .$context<{ ratelimiter: Ratelimiter }>()
+::: code-group
+
+```ts [memory]
+import { MemoryRateLimiter } from '@orpc/ratelimit/memory'
+
+const limiter = new MemoryRateLimiter({
+  maxRequests: 10, // Maximum requests allowed
+  window: 60000, // Time window in milliseconds (60 seconds)
+})
+```
+
+```ts [redis]
+import { RedisRateLimiter } from '@orpc/ratelimit/redis'
+import { createClient } from 'redis'
+
+const client = createClient({ url: 'redis://localhost:6379' })
+
+// RedisRateLimiter lazily connects to Redis when needed.
+// You can still call `client.connect()` manually, but it is optional.
+await client.connect()
+
+const limiter = new RedisRateLimiter(client, {
+  prefix: 'orpc:', // Optional Redis key prefix
+  maxRequests: 10, // Maximum requests allowed
+  window: 60000, // Time window in milliseconds (60 seconds)
+})
+```
+
+```ts [cloudflare]
+import { CloudflareRateLimiter } from '@orpc/ratelimit/cloudflare'
+
+export default {
+  async fetch(request, env) {
+    // env.MY_RATE_LIMITER is a Cloudflare Workers Rate Limiting binding
+    // https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/
+
+    const limiter = new CloudflareRateLimiter(env.MY_RATE_LIMITER, {
+      prefix: 'orpc:', // Optional key prefix
+    })
+  }
+}
+```
+
+```ts [upstash]
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis } from '@upstash/redis'
+import { UpstashRateLimiter } from '@orpc/ratelimit/upstash'
+
+const redis = Redis.fromEnv()
+const ratelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(10, '60 s'),
+  prefix: 'orpc:', // Optional key prefix
+})
+
+const limiter = new UpstashRateLimiter(ratelimit, {
+  waitUntil: ctx.waitUntil.bind(ctx), // Pass waitUntil for Edge runtime support
+})
+```
+
+:::
+
+### Blocking Mode
+
+Some adapters support blocking mode, which waits until capacity becomes available instead of rejecting requests immediately.
+
+```ts
+const limiter = new MemoryRateLimiter({
+  maxRequests: 10,
+  window: 60000,
+  blockingUntilReady: {
+    enabled: true, // Disabled by default
+    timeout: 5000, // Wait up to 5 seconds
+  },
+})
+```
+
+## Ratelimit Middleware
+
+The `ratelimit` helper creates middleware that enforces rate limits for [procedures](/docs/procedure).
+
+```ts
+import { ratelimit, RateLimiter } from '@orpc/ratelimit'
+
+const procedure = os
+  .$context<{ ratelimiter: RateLimiter }>()
   .input(z.object({ email: z.email() }))
   .use(
-    createRatelimitMiddleware({
+    ratelimit({
       limiter: ({ context }) => context.ratelimiter,
       key: ({ context }, input) => `login:${input.email}`,
+      weight: 1, // Optional weight for each request, default is 1
     }),
   )
   .handler(({ input }) => {
     return { success: true }
   })
 
-const ratelimiter = new MemoryRatelimiter({
+const ratelimiter = new MemoryRateLimiter({
   maxRequests: 10,
   window: 60000,
 })
 
 const result = await call(
-  loginProcedure,
+  procedure,
   { email: 'user@example.com' },
   { context: { ratelimiter } }
 )
 ```
 
 ::: info Automatic Deduplication
-The `createRatelimitMiddleware` automatically deduplicates rate limit checks when the same `limiter` and `key` combination is used multiple times in a request chain. This behavior follows the [Dedupe Middleware Best Practice](/docs/best-practices/dedupe-middleware). To disable deduplication, set the `dedupe: false` option.
+When the same `limiter` and `key` combination is used multiple times in a single request chain, the `ratelimit` middleware performs the rate limit check only once. This behavior follows the [Dedupe Middleware Best Practice](/docs/best-practices/dedupe-middleware). To disable deduplication, set `dedupe: false`.
 :::
 
 ::: tip Conditional Limiter
-You can dynamically choose different limiters based on context:
+You can choose different limiters dynamically based on the request context:
 
 ```ts
-const premiumLimiter = new MemoryRatelimiter({
+const premiumLimiter = new MemoryRateLimiter({
   maxRequests: 100,
   window: 60000,
 })
 
-const standardLimiter = new MemoryRatelimiter({
+const standardLimiter = new MemoryRateLimiter({
   maxRequests: 10,
   window: 60000,
 })
 
 const result = await call(
-  loginProcedure,
+  procedure,
   { email: 'user@example.com' },
   {
     context: {
@@ -228,22 +210,20 @@ const result = await call(
 
 ## Handler Plugin
 
-The `RatelimitHandlerPlugin` automatically adds HTTP rate-limiting headers (`RateLimit-*` and `Retry-After`) to responses when used with middleware created by [`createRatelimitMiddleware`](#createratelimitmiddleware).
+The `RateLimitHandlerPlugin` automatically adds HTTP rate limiting headers (`RateLimit-*` and `Retry-After`) to responses when used with [Ratelimit Middleware](#ratelimit-middleware). This lets clients inspect the current limit state and know when they can retry after hitting a limit.
 
 ```ts
-import { RatelimitHandlerPlugin } from '@orpc/experimental-ratelimit'
+import { RateLimitHandlerPlugin } from '@orpc/ratelimit'
 
 const handler = new RPCHandler(router, {
   plugins: [
-    new RatelimitHandlerPlugin(),
+    new RateLimitHandlerPlugin(),
   ],
 })
 ```
 
 ::: info
-You can combine this plugin with [Retry After Plugin](/docs/plugins/retry-after) to enable automatic client-side retries based on server rate-limiting headers.
+You can combine this plugin with [Retry After Plugin](/docs/plugins/retry-after) to enable automatic client-side retries based on server rate limiting headers.
 :::
 
-::: info
-The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc-handler), [OpenAPIHandler](/docs/openapi/openapi-handler), or other custom handlers.
-:::
+<!--@include: @/shared/common-plugin-handler-compatibility.md -->

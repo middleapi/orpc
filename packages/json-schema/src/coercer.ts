@@ -1,38 +1,46 @@
 import type { JsonSchema } from './types'
-import { guard, isObject, toArray } from '@orpc/shared'
+import { get, isPlainObject, toArray, tryOrUndefined } from '@orpc/shared'
+import { decodeJsonPointerSegment } from './ref-utils'
 import { JsonSchemaXNativeType } from './types'
 
 const FLEXIBLE_DATE_FORMAT_REGEX = /^[^-]+-[^-]+-[^-]+$/
 
-export interface JsonSchemaCoerceOptions {
-  components?: Record<string, JsonSchema>
-}
-
 export class JsonSchemaCoercer {
-  coerce(schema: JsonSchema, value: unknown, options: JsonSchemaCoerceOptions = {}): unknown {
-    const [, coerced] = this.#coerce(schema, value, options)
+  coerce([schema, optional]: [schema: JsonSchema, optional: boolean], value: unknown): unknown {
+    if (optional && value === undefined) {
+      return value
+    }
+
+    const [, coerced] = this.coerceInternal(schema, schema, value)
     return coerced
   }
 
-  #coerce(schema: JsonSchema, originalValue: unknown, options: JsonSchemaCoerceOptions): [satisfied: boolean, coerced: unknown] {
+  private coerceInternal(rootSchema: JsonSchema, schema: JsonSchema, value: unknown): [satisfied: boolean, coerced: unknown] {
     if (typeof schema === 'boolean') {
-      return [schema, originalValue]
+      return [schema, value]
     }
 
     if (Array.isArray(schema.type)) {
-      return this.#coerce({
-        anyOf: schema.type.map(type => ({ ...schema, type })),
-      }, originalValue, options)
+      return this.coerceInternal(
+        rootSchema,
+        { anyOf: schema.type.map(type => ({ ...schema, type })) },
+        value,
+      )
     }
 
-    let coerced = originalValue
+    let coerced = value
     let satisfied = true
 
     if (typeof schema.$ref === 'string') {
-      const refSchema = options?.components?.[schema.$ref]
+      const resolved
+        = schema.$ref.startsWith('#/')
+          ? get(rootSchema, schema.$ref.slice('#/'.length).split('/').map(decodeJsonPointerSegment)) as JsonSchema | undefined
+          : schema.$ref === '#'
+            ? rootSchema
+            : undefined
 
-      if (refSchema !== undefined) {
-        const [subSatisfied, subCoerced] = this.#coerce(refSchema, coerced, options)
+      if (resolved !== undefined) {
+        const [subSatisfied, subCoerced] = this.coerceInternal(rootSchema, resolved, coerced)
 
         coerced = subCoerced
         satisfied = subSatisfied
@@ -42,13 +50,13 @@ export class JsonSchemaCoercer {
     const enumValues = schema.const !== undefined ? [schema.const] : schema.enum
     if (enumValues !== undefined && !enumValues.includes(coerced)) {
       if (typeof coerced === 'string') {
-        const numberValue = this.#stringToNumber(coerced)
+        const numberValue = stringToNumber(coerced)
 
         if (enumValues.includes(numberValue)) {
           coerced = numberValue
         }
         else {
-          const booleanValue = this.#stringToBoolean(coerced)
+          const booleanValue = stringToBoolean(coerced)
 
           if (enumValues.includes(booleanValue)) {
             coerced = booleanValue
@@ -63,7 +71,7 @@ export class JsonSchemaCoercer {
       }
     }
 
-    if (typeof schema.type === 'string') {
+    if (schema.type) {
       switch (schema.type) {
         case 'null': {
           if (coerced !== null) {
@@ -81,7 +89,7 @@ export class JsonSchemaCoercer {
         }
         case 'number': {
           if (typeof coerced === 'string') {
-            coerced = this.#stringToNumber(coerced)
+            coerced = stringToNumber(coerced)
           }
 
           if (typeof coerced !== 'number') {
@@ -92,7 +100,7 @@ export class JsonSchemaCoercer {
         }
         case 'integer': {
           if (typeof coerced === 'string') {
-            coerced = this.#stringToInteger(coerced)
+            coerced = stringToInteger(coerced)
           }
 
           if (typeof coerced !== 'number' || !Number.isInteger(coerced)) {
@@ -103,7 +111,7 @@ export class JsonSchemaCoercer {
         }
         case 'boolean': {
           if (typeof coerced === 'string') {
-            coerced = this.#stringToBoolean(coerced)
+            coerced = stringToBoolean(coerced)
           }
 
           if (typeof coerced !== 'boolean') {
@@ -133,7 +141,7 @@ export class JsonSchemaCoercer {
                 return item
               }
 
-              const [subSatisfied, subCoerced] = this.#coerce(subSchema, item, options)
+              const [subSatisfied, subCoerced] = this.coerceInternal(rootSchema, subSchema, item)
 
               if (!subSatisfied) {
                 satisfied = false
@@ -164,7 +172,7 @@ export class JsonSchemaCoercer {
             coerced = { ...coerced }
           }
 
-          if (isObject(coerced)) {
+          if (isPlainObject(coerced)) {
             let shouldUseCoercedItems = false
             const coercedItems: Record<string, unknown> = {}
 
@@ -185,7 +193,7 @@ export class JsonSchemaCoercer {
                 satisfied = false
               }
               else {
-                const [subSatisfied, subCoerced] = this.#coerce(subSchema, value, options)
+                const [subSatisfied, subCoerced] = this.coerceInternal(rootSchema, subSchema, value)
                 coercedItems[key] = subCoerced
 
                 if (!subSatisfied) {
@@ -219,7 +227,7 @@ export class JsonSchemaCoercer {
       switch (schema['x-native-type']) {
         case JsonSchemaXNativeType.Date: {
           if (typeof coerced === 'string') {
-            coerced = this.#stringToDate(coerced)
+            coerced = stringToDate(coerced)
           }
 
           if (!(coerced instanceof Date)) {
@@ -231,10 +239,10 @@ export class JsonSchemaCoercer {
         case JsonSchemaXNativeType.BigInt: {
           switch (typeof coerced) {
             case 'string':
-              coerced = this.#stringToBigInt(coerced)
+              coerced = stringToBigInt(coerced)
               break
             case 'number':
-              coerced = this.#numberToBigInt(coerced)
+              coerced = numberToBigInt(coerced)
               break
           }
 
@@ -246,7 +254,7 @@ export class JsonSchemaCoercer {
         }
         case JsonSchemaXNativeType.RegExp: {
           if (typeof coerced === 'string') {
-            coerced = this.#stringToRegExp(coerced)
+            coerced = stringToRegExp(coerced)
           }
 
           if (!(coerced instanceof RegExp)) {
@@ -257,7 +265,7 @@ export class JsonSchemaCoercer {
         }
         case JsonSchemaXNativeType.Url: {
           if (typeof coerced === 'string') {
-            coerced = this.#stringToURL(coerced)
+            coerced = stringToURL(coerced)
           }
 
           if (!(coerced instanceof URL)) {
@@ -268,7 +276,7 @@ export class JsonSchemaCoercer {
         }
         case JsonSchemaXNativeType.Set: {
           if (Array.isArray(coerced)) {
-            coerced = this.#arrayToSet(coerced)
+            coerced = arrayToSet(coerced)
           }
 
           if (!(coerced instanceof Set)) {
@@ -279,7 +287,7 @@ export class JsonSchemaCoercer {
         }
         case JsonSchemaXNativeType.Map: {
           if (Array.isArray(coerced)) {
-            coerced = this.#arrayToMap(coerced)
+            coerced = arrayToMap(coerced)
           }
 
           if (!(coerced instanceof Map)) {
@@ -293,7 +301,7 @@ export class JsonSchemaCoercer {
 
     if (schema.allOf) {
       for (const subSchema of schema.allOf) {
-        const [subSatisfied, subCoerced] = this.#coerce(subSchema, coerced, options)
+        const [subSatisfied, subCoerced] = this.coerceInternal(rootSchema, subSchema, coerced)
 
         coerced = subCoerced
 
@@ -308,7 +316,7 @@ export class JsonSchemaCoercer {
         let bestOptions: { coerced: unknown, satisfied: boolean } | undefined
 
         for (const subSchema of schema[key]) {
-          const [subSatisfied, subCoerced] = this.#coerce(subSchema, coerced, options)
+          const [subSatisfied, subCoerced] = this.coerceInternal(rootSchema, subSchema, coerced)
 
           if (subSatisfied) {
             if (!bestOptions || subCoerced === coerced) {
@@ -327,7 +335,7 @@ export class JsonSchemaCoercer {
     }
 
     if (typeof schema.not !== 'undefined') {
-      const [notSatisfied] = this.#coerce(schema.not, coerced, options)
+      const [notSatisfied] = this.coerceInternal(rootSchema, schema.not, coerced)
 
       if (notSatisfied) {
         satisfied = false
@@ -336,95 +344,95 @@ export class JsonSchemaCoercer {
 
     return [satisfied, coerced]
   }
+}
 
-  #stringToNumber(value: string): number | string {
-    const num = Number.parseFloat(value)
+function stringToNumber(value: string): number | string {
+  const num = Number.parseFloat(value)
 
-    if (Number.isNaN(num) || num !== Number(value)) {
-      return value
-    }
-
-    return num
-  }
-
-  #stringToInteger(value: string): number | string {
-    const num = Number.parseInt(value)
-
-    if (Number.isNaN(num) || num !== Number(value)) {
-      return value
-    }
-
-    return num
-  }
-
-  #stringToBoolean(value: string): boolean | string {
-    const lower = value.toLowerCase()
-
-    if (lower === 'false' || lower === 'off') {
-      return false
-    }
-
-    if (lower === 'true' || lower === 'on') {
-      return true
-    }
-
+  if (Number.isNaN(num) || num !== Number(value)) {
     return value
   }
 
-  #stringToBigInt(value: string): bigint | string {
-    return guard(() => BigInt(value)) ?? value
-  }
+  return num
+}
 
-  #numberToBigInt(value: number): bigint | number {
-    return guard(() => BigInt(value)) ?? value
-  }
+function stringToInteger(value: string): number | string {
+  const num = Number.parseInt(value)
 
-  #stringToDate(value: string): Date | string {
-    const date = new Date(value)
-
-    if (Number.isNaN(date.getTime()) || !FLEXIBLE_DATE_FORMAT_REGEX.test(value)) {
-      return value
-    }
-
-    return date
-  }
-
-  #stringToRegExp(value: string): RegExp | string {
-    const match = value.match(/^\/(.*)\/([a-z]*)$/)
-
-    if (match) {
-      const [, pattern, flags] = match
-      return guard(() => new RegExp(pattern!, flags)) ?? value
-    }
-
+  if (Number.isNaN(num) || num !== Number(value)) {
     return value
   }
 
-  #stringToURL(value: string): URL | string {
-    return guard(() => new URL(value)) ?? value
+  return num
+}
+
+function stringToBoolean(value: string): boolean | string {
+  const lower = value.toLowerCase()
+
+  if (lower === 'false' || lower === 'off') {
+    return false
   }
 
-  #arrayToSet(value: unknown[]): Set<unknown> | unknown[] {
-    const set = new Set(value)
-
-    if (set.size !== value.length) {
-      return value
-    }
-
-    return set
+  if (lower === 'true' || lower === 'on') {
+    return true
   }
 
-  #arrayToMap(value: unknown[]): Map<unknown, unknown> | unknown[] {
-    if (value.some(item => !Array.isArray(item) || item.length !== 2)) {
-      return value
-    }
+  return value
+}
 
-    const result = new Map(value as [unknown, unknown][])
+function stringToBigInt(value: string): bigint | string {
+  return tryOrUndefined(() => BigInt(value)) ?? value
+}
 
-    if (result.size !== value.length) {
-      return value
-    }
+function numberToBigInt(value: number): bigint | number {
+  return tryOrUndefined(() => BigInt(value)) ?? value
+}
 
-    return result
+function stringToDate(value: string): Date | string {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime()) || !FLEXIBLE_DATE_FORMAT_REGEX.test(value)) {
+    return value
   }
+
+  return date
+}
+
+function stringToRegExp(value: string): RegExp | string {
+  const match = value.match(/^\/(.*)\/([a-z]*)$/)
+
+  if (match) {
+    const [, pattern, flags] = match
+    return tryOrUndefined(() => new RegExp(pattern!, flags)) ?? value
+  }
+
+  return value
+}
+
+function stringToURL(value: string): URL | string {
+  return tryOrUndefined(() => new URL(value)) ?? value
+}
+
+function arrayToSet(value: unknown[]): Set<unknown> | unknown[] {
+  const set = new Set(value)
+
+  if (set.size !== value.length) {
+    return value
+  }
+
+  return set
+}
+
+function arrayToMap(value: unknown[]): Map<unknown, unknown> | unknown[] {
+  if (value.some(item => !Array.isArray(item) || item.length !== 2)) {
+    return value
+  }
+
+  const result = new Map(value as [unknown, unknown][])
+
+  if (result.size !== value.length) {
+    return value
+  }
+
+  return result
 }

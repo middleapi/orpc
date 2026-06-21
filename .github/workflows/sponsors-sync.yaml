@@ -11,19 +11,15 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
-
-      - run: pnpm env use --global 22
+      - uses: pnpm/action-setup@v6
 
       - run: pnpm i
 
-      - run: pnpm sponsors:sync
+      - run: pnpm run sponsors:sync
 
-      - uses: EndBug/add-and-commit@v9
+      - uses: EndBug/add-and-commit@v10
         with:
           author_name: GitHub Actions
           author_email: 41898282+github-actions[bot]@users.noreply.github.com

@@ -1,46 +1,78 @@
----
-title: Request Validation Plugin
-description: A plugin that blocks invalid requests before they reach your server. Especially useful for applications that rely heavily on server-side validation.
----
-
 # Request Validation Plugin
 
-The **Request Validation Plugin** ensures that only valid requests are sent to your server. This is especially valuable for applications that depend on server-side validation.
-
-::: info
-This plugin is best suited for [Contract-First Development](/docs/contract-first/define-contract). [Minified Contract](/docs/contract-first/router-to-contract#minify-export-the-contract-router-for-the-client) is **not supported** because it removes the schema from the contract.
-:::
+**Request Validation Plugin** validates requests against your contract before they are sent to the server. This is useful when your application relies on server-side validation.
 
 ## Setup
 
-```ts twoslash
-import { contract } from './shared/planet'
-import { createORPCClient } from '@orpc/client'
-import type { ContractRouterClient } from '@orpc/contract'
-// ---cut---
-import { RPCLink } from '@orpc/client/fetch'
-import { RequestValidationPlugin } from '@orpc/contract/plugins'
+```ts
+import { RequestValidationLinkPlugin } from '@orpc/contract/plugins'
 
 const link = new RPCLink({
-  url: 'http://localhost:3000/rpc',
   plugins: [
-    new RequestValidationPlugin(contract),
+    new RequestValidationLinkPlugin(contract),
   ],
 })
-
-const client: ContractRouterClient<typeof contract> = createORPCClient(link)
 ```
 
 ::: info
-The `link` can be any supported oRPC link, such as [RPCLink](/docs/client/rpc-link), [OpenAPILink](/docs/openapi/client/openapi-link), or custom implementations.
+If you do not have a [contract](/docs/contract/router), you can use a [unlazied router](/docs/contract/router#router-to-contract) instead.
 :::
+
+<!--@include: @/shared/common-plugin-link-compatibility.md -->
+
+## Forward Validated Input
+
+By default, the plugin does not reuse validated input for the rest of the request. Some schemas transform input in ways that can cause server-side validation to fail. If your schemas do not do that, set `forwardValidatedInput` to `true`.
+
+```ts
+const link = new RPCLink({
+  plugins: [
+    new RequestValidationLinkPlugin(contract, {
+      forwardValidatedInput: true,
+    }),
+  ],
+})
+```
+
+## Custom Validation Errors
+
+If you have already [customized validation errors on the server](/docs/advanced/validation-errors), you can use interceptors to catch and map the validation errors thrown by this plugin so they match your server-side errors.
+
+```ts
+import { ORPCError } from '@orpc/client'
+import { ValidationError } from '@orpc/contract'
+
+const link = new RPCLink({
+  plugins: [
+    new RequestValidationLinkPlugin(contract),
+  ],
+  interceptors: [
+    async ({ next }) => {
+      try {
+        return await next()
+      }
+      catch (error) {
+        if (
+          error instanceof ORPCError
+          && error.code === 'BAD_REQUEST'
+          && error.cause instanceof ValidationError
+        ) {
+          throw new CustomInputValidationError(error.cause.issues)
+        }
+
+        throw error
+      }
+    }
+  ]
+})
+```
 
 ## Form Validation
 
-You can simplify your frontend by removing heavy form validation libraries and relying on oRPC's validation errors instead, since input validation runs directly in the browser and is highly performant.
+You can pair this plugin with [Form Data Helpers](/docs/helpers/form-data) to avoid heavier form validation libraries and keep your contract as the single source of truth on both the client and server.
 
 ```tsx
-import { getIssueMessage, parseFormData } from '@orpc/openapi-client/helpers'
+import { getIssueMessage, parseFormData } from '@orpc/openapi/helpers'
 
 export function ContactForm() {
   const [error, setError] = useState()
@@ -69,6 +101,6 @@ export function ContactForm() {
 }
 ```
 
-::: info
-This example uses [Form Data Helpers](/docs/helpers/form-data).
-:::
+## Learn More
+
+For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/contract/src/plugins/request-validation.ts).

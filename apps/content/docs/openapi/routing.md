@@ -1,79 +1,190 @@
----
-title: OpenAPI Routing
-description: Configure procedure routing with oRPC.
----
+# OpenAPI Routing
 
-# Routing
-
-Define how procedures map to HTTP methods, paths, and response statuses.
-
-:::warning
-This feature applies only when using [OpenAPIHandler](/docs/openapi/openapi-handler).
-:::
+Use `openapi` metadata to control how a procedure is exposed over HTTP.
 
 ## Basic Routing
 
-By default, oRPC uses the `POST` method, constructs paths from router keys with `/`, and returns a 200 status on success. Override these defaults with `.route`:
+If you do not set OpenAPI routing metadata, a procedure is exposed as a `POST` endpoint whose path is derived from the router structure. For example:
 
-```ts
-os.route({ method: 'GET', path: '/example', successStatus: 200 })
-os.route({ method: 'POST', path: '/example', successStatus: 201 })
-```
+```ts twoslash
+import { os } from '@orpc/server'
+// ---cut---
+import { openapi } from '@orpc/openapi'
 
-:::info
-The `.route` can be called multiple times; each call [spread merges](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_syntax) the new route with the existing route.
-:::
-
-## Path Parameters
-
-By default, path parameters merge with query/body into a single input object. You can modify this behavior as described in the [Input/Output structure docs](/docs/openapi/input-output-structure).
-
-```ts
-os.route({ path: '/example/{id}' })
-  .input(z.object({ id: z.string() }))
-
-os.route({ path: '/example/{+path}' }) // Matches slashes (/)
-  .input(z.object({ path: z.string() }))
-```
-
-## Route Prefixes
-
-Use `.prefix` to prepend a common path to all procedures in a router that have an explicitly defined `path`:
-
-```ts
-const router = os.prefix('/planets').router({
-  list: listPlanet,
-  find: findPlanet,
-  create: createPlanet,
-})
-```
-
-::: warning
-The prefix only applies to procedures that specify a `path`.
-:::
-
-## Lazy Router
-
-When combining a [Lazy Router](/docs/router#lazy-router) with [OpenAPIHandler](/docs/openapi/openapi-handler), a prefix is required for lazy loading. Without it, the router behaves like a regular router.
-
-:::info
-If you follow the [contract-first approach](/docs/contract-first/define-contract), you can ignore this requirement - oRPC knows the full contract and loads the router lazily properly.
-:::
-
-```ts
 const router = {
-  planet: os.prefix('/planets').lazy(() => import('./planet'))
+  planet: {
+    list: os
+      .meta(openapi({ method: 'GET', path: '/planets' }))
+      .handler(async () => [{ id: 'earth', name: 'Earth' }]),
+    create: os
+      .handler(async () => ({})),
+  }
 }
 ```
 
-:::warning
-Do not use the `lazy` helper from `@orpc/server` here, as it cannot apply route prefixes.
-:::
+In this example, `list` is exposed as `GET /planets` because it overrides the default method and path. `create` keeps the default behavior, so it is exposed as `POST /planet/create`.
 
-## Initial Configuration
+## Path Parameters
 
-Customize the initial oRPC routing settings using `.$route`:
+To define a path parameter, use `{name}` in the `path` and add the same field as a required key in the input schema:
 
 ```ts
-const base = os.$route({ method: 'GET' })
+import { z } from 'zod'
+
+const getPlanet = os
+  .meta(openapi({ method: 'GET', path: '/planets/{id}' }))
+  .input(z.object({ id: z.string() }))
 ```
+
+For catch-all path segments that may include `/`, use `{+name}`:
+
+```ts
+const getFile = os
+  .meta(openapi({ method: 'GET', path: '/files/{+path}' }))
+  .input(z.object({ path: z.string() }))
+```
+
+::: info
+To customize path parameter encoding and decoding, see [Path Parameter Styles](/docs/openapi/input-and-output-mapping#path-parameter-styles).
+:::
+
+## Prefixes
+
+Define `prefix` to prepend a path to a procedure, or an entire router:
+
+```ts
+const planetBuilder = os.meta(openapi({ prefix: '/planets' }))
+
+const listPlanets = planetBuilder
+  .meta(openapi({ method: 'GET', path: '/' }))
+  .handler(async () => [{ id: 'earth', name: 'Earth' }])
+
+const createPlanet = planetBuilder
+  .handler(async () => ({}))
+
+const router = os.meta(openapi({ prefix: '/api/v2' })).router({
+  planet: {
+    list: listPlanets,
+    create: createPlanet,
+  },
+})
+```
+
+In this example, `listPlanets` is exposed as `GET /api/v2/planets/`. `createPlanet` is exposed as `POST /api/v2/planets/planet/create`.
+
+### Path Parameters in Prefixes
+
+Prefixes can also include path parameters, but they must be defined as required fields in the input schema.
+
+```ts
+const base = os
+  .meta(openapi({ prefix: '/{workspaceId}' }))
+  .input(z.looseObject({ workspaceId: z.string() }))
+  .use(({ next }, { workspaceId }) => {
+    console.log('Workspace ID:', workspaceId)
+    return next()
+  })
+
+const procedure = base
+  .meta(openapi({ method: 'GET', path: '/planets/{id}' }))
+  .input(z.looseObject({ id: z.string() }))
+  .handler(async ({ input }) => {
+    console.log('Workspace ID:', input.workspaceId)
+    console.log('Planet ID:', input.id)
+  })
+```
+
+## Lazy Router
+
+When using a [lazy router](/docs/router#lazy-router), define a `prefix` so lazy loading is triggered only for relevant requests:
+
+```ts
+const router = {
+  project: os
+    .meta(openapi({ prefix: '/projects' }))
+    .lazy(() => import('./project')),
+}
+```
+
+## Metadata Merging
+
+When `openapi` is applied multiple times, `prefix` values are concatenated. `method`, `path`, and `successStatus` are overridden by the most recent call. For full merge behavior, see the [source code](https://github.com/orpc/orpc/blob/main/packages/openapi/src/meta.ts).
+
+```ts
+const router = os
+  .meta(openapi({ prefix: '/api/v2' }))
+  .router({
+    get: os
+      .meta(openapi({ prefix: '/planets' }))
+      .meta(openapi({ method: 'GET', path: '/planets/{id}' }))
+      .meta(openapi({ path: '/{id}' }))
+      .input(z.object({ id: z.string() }))
+      .handler(async () => ({})),
+  })
+```
+
+These calls are equivalent to:
+
+```ts
+const router = {
+  get: os
+    .meta(openapi({
+      prefix: '/api/v2/planets',
+      method: 'GET',
+      path: '/{id}',
+    }))
+    .handler(async () => ({})),
+}
+```
+
+::: info
+Metadata resets to its default behavior when set to `undefined` in subsequent calls:
+
+```ts
+const example = os
+  .meta(openapi({ prefix: '/api/v2' }))
+  .meta(openapi({ prefix: undefined }))
+```
+
+In this example, the final `prefix` is `undefined`, so no prefix is applied to `example`.
+
+:::
+
+## Shorthands
+
+For common cases, use the shorthand helpers:
+
+```ts
+const listPlanets = os
+  .meta(openapi.prefix('/planets'))
+  .meta(openapi.method('GET'))
+  .meta(openapi.path('/'))
+```
+
+## `.route` extension
+
+Import `@orpc/openapi/extensions/route` from a module that always runs during initialization, such as the file where you define your base builder or create your server. This adds a `.route` method to the builder, allowing you to define OpenAPI metadata directly without wrapping it in `.meta(openapi(...))`.
+
+::: code-group
+
+```ts [usage]
+const ping = base
+  .route({
+    method: 'GET',
+    path: '/ping',
+  })
+  .input(z.object({ name: z.string(), }))
+  .handler(async ({ input }) => {
+    return `Hello ${input.name}!`
+  })
+```
+
+```ts [setup]
+import '@orpc/openapi/extensions/route'
+
+import { os } from '@orpc/server'
+
+export const base = os
+```
+
+:::

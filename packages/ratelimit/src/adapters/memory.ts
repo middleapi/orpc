@@ -1,8 +1,10 @@
-import type { Ratelimiter, RatelimiterLimitResult } from '../types'
+import type { RateLimiter, RateLimitOptions, RateLimitResult } from '../types'
+import { sleep } from '@orpc/shared'
 
-export interface MemoryRatelimiterOptions {
+export interface MemoryRateLimiterOptions {
   /**
-   * Block until the request may pass or timeout is reached.
+   * Enable this if you don't want to reject a request immediately
+   * and prefer to wait until it can be retried.
    */
   blockingUntilReady?: {
     enabled: boolean
@@ -15,107 +17,89 @@ export interface MemoryRatelimiterOptions {
   maxRequests: number
 
   /**
-   * The duration of the sliding window in milliseconds.
+   * The duration of the fixed window in milliseconds.
    */
   window: number
-
 }
 
-export class MemoryRatelimiter implements Ratelimiter {
+export class MemoryRateLimiter implements RateLimiter {
   private readonly maxRequests: number
   private readonly window: number
-  private readonly blockingUntilReady: MemoryRatelimiterOptions['blockingUntilReady']
-  private readonly store: Map<string, number[]>
-  private lastCleanupTime: number | null = null
+  private readonly blockingUntilReady: MemoryRateLimiterOptions['blockingUntilReady']
 
-  constructor(options: MemoryRatelimiterOptions) {
+  private current: Map<string, { used: number }> = new Map()
+  private currentEpochStart: number = Date.now()
+
+  constructor(options: MemoryRateLimiterOptions) {
     this.maxRequests = options.maxRequests
     this.window = options.window
     this.blockingUntilReady = options.blockingUntilReady
-    this.store = new Map()
   }
 
-  limit(key: string): Promise<Required<RatelimiterLimitResult>> {
-    this.cleanup()
+  async limit(key: string, options?: RateLimitOptions): Promise<Required<RateLimitResult>> {
+    const weight = this.resolveWeight(options)
 
-    if (this.blockingUntilReady?.enabled) {
-      return this.blockUntilReady(key, this.blockingUntilReady.timeout)
-    }
-
-    return this.checkLimit(key)
+    return this.blockingUntilReady?.enabled
+      ? this.blockUntilReady(key, this.blockingUntilReady.timeout, weight)
+      : this.checkLimit(key, weight)
   }
 
-  private cleanup(): void {
-    const now = Date.now()
-
-    // Only clean up once per window to avoid excessive processing
-    if (this.lastCleanupTime !== null && this.lastCleanupTime + this.window > now) {
+  private rotateIfNeeded(now: number): void {
+    if (now < this.currentEpochStart + this.window) {
       return
     }
 
-    this.lastCleanupTime = now
-    const windowStart = now - this.window
-
-    for (const [key, timestamps] of this.store) {
-      // remove expired timestamps
-      const idx = timestamps.findIndex(timestamp => timestamp >= windowStart)
-      timestamps.splice(0, idx === -1 ? timestamps.length : idx)
-
-      if (timestamps.length === 0) {
-        this.store.delete(key)
-      }
-    }
+    this.current = new Map()
+    this.currentEpochStart = now
   }
 
-  private async checkLimit(key: string): Promise<Required<RatelimiterLimitResult>> {
+  private checkLimit(key: string, weight: number): Required<RateLimitResult> {
     const now = Date.now()
-    const windowStart = now - this.window
+    this.rotateIfNeeded(now)
 
-    let timestamps = this.store.get(key)
-    if (timestamps) {
-      // Remove expired timestamps
-      const idx = timestamps.findIndex(timestamp => timestamp >= windowStart)
-      timestamps.splice(0, idx === -1 ? timestamps.length : idx)
-    }
-    else {
-      this.store.set(key, timestamps = [])
+    let entry = this.current.get(key)
+
+    if (!entry) {
+      entry = { used: 0 }
+      this.current.set(key, entry)
     }
 
-    // Calculate reset time based on oldest timestamp or current time if no timestamps
-    const reset = timestamps[0] !== undefined
-      ? timestamps[0] + this.window
-      : now + this.window
+    const reset = this.currentEpochStart + this.window
+    const success = entry.used + weight <= this.maxRequests
 
-    if (timestamps.length >= this.maxRequests) {
-      return {
-        success: false,
-        limit: this.maxRequests,
-        remaining: 0,
-        reset,
-      }
+    if (success) {
+      entry.used += weight
     }
-
-    timestamps.push(now)
 
     return {
-      success: true,
+      success,
       limit: this.maxRequests,
-      remaining: this.maxRequests - timestamps.length,
+      remaining: Math.max(0, this.maxRequests - entry.used),
       reset,
     }
   }
 
-  private async blockUntilReady(key: string, timeoutMs: number): Promise<Required<RatelimiterLimitResult>> {
+  private async blockUntilReady(key: string, timeoutMs: number, weight: number): Promise<Required<RateLimitResult>> {
     const deadlineAtMs = Date.now() + timeoutMs
 
     while (true) {
-      const result = await this.checkLimit(key)
+      const result = this.checkLimit(key, weight)
 
       if (result.success || result.reset > deadlineAtMs) {
         return result
       }
 
-      await new Promise(resolve => setTimeout(resolve, result.reset - Date.now()))
+      await sleep(result.reset - Date.now())
     }
+  }
+
+  private resolveWeight(options?: RateLimitOptions): number {
+    const weight = options?.weight ?? 1
+
+    if (!Number.isInteger(weight) || weight <= 0) {
+      throw new TypeError('Rate limit weight must be an integer greater than 0')
+    }
+
+    return weight
   }
 }
