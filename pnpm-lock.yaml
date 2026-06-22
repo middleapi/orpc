@@ -51,14 +51,14 @@ importers:
         specifier: ^29.1.1
         version: 29.1.1(@noble/hashes@1.8.0)
       lint-staged:
-        specifier: ^17.0.7
-        version: 17.0.7
+        specifier: ^17.0.8
+        version: 17.0.8
       pkg-pr-new:
         specifier: ^0.0.75
         version: 0.0.75
       sherif:
-        specifier: ^1.11.1
-        version: 1.11.1
+        specifier: ^1.12.0
+        version: 1.12.0
       simple-git-hooks:
         specifier: ^2.13.1
         version: 2.13.1
@@ -168,8 +168,8 @@ importers:
         specifier: ^1.7.5
         version: 1.7.5(vite@5.4.21(@types/node@26.0.0)(lightningcss@1.32.0))
       vitepress-plugin-llms:
-        specifier: ^1.13.1
-        version: 1.13.1
+        specifier: ^1.13.2
+        version: 1.13.2
       vitepress-plugin-mermaid:
         specifier: ^2.0.17
         version: 2.0.17(mermaid@11.15.0)(vitepress@1.6.4(@algolia/client-search@5.55.0)(@types/node@26.0.0)(@types/react@19.2.17)(axios@1.18.0)(change-case@5.4.4)(fuse.js@7.4.2)(lightningcss@1.32.0)(postcss@8.5.15)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(search-insights@2.17.3)(typescript@6.0.3))
@@ -4596,8 +4596,8 @@ packages:
     resolution: {integrity: sha512-Ap6G0WQwcU/LHsvLwON1fAQX9Zp0A2Y6Y/cJBl9r/JbW90Zyg4/zbG6zzKa2OTALELarYHmKu0GhpM5EO+7T0g==}
     engines: {node: '>=0.10'}
 
-  esrap@2.2.11:
-    resolution: {integrity: sha512-gPdx+I+BjYEinNMQaBXFjbaJVyoPMU4ZODg5mE+M4DqVG9VusAVHHjcBX+zqyITlI0DIARwDMMzZwAWj36dRoQ==}
+  esrap@2.2.12:
+    resolution: {integrity: sha512-On0QbLyaiAkVC4eXtgnXK9Kh2opit+3rcUSOc45DqJ2s/X2eXAHsGOKRSJ6IDagQEW5vPyivANfXUiqgXC67Rw==}
     peerDependencies:
       '@typescript-eslint/types': ^8.2.0
     peerDependenciesMeta:
@@ -5439,8 +5439,8 @@ packages:
   linkify-it@5.0.1:
     resolution: {integrity: sha512-wVoTjP4Q6R0NW5hiZkVJaFZPWgtXfoGF+6LucL3/FtiNjmcHhYjEr5f1Kqjirc1nBW07J/ZuRFumqr2oqccEWg==}
 
-  lint-staged@17.0.7:
-    resolution: {integrity: sha512-JrSobt+tW3rH8IOMi8tDZd3foorM5yPEkLD/V2NxobgHrFfHWGee4MOLVuZeScgxftEwbHrPHIFA/ZL+nUJeuA==}
+  lint-staged@17.0.8:
+    resolution: {integrity: sha512-B2P/d+jVW0UXOQ0MVMLrB/9ydA1P+zz6jYfdrbbEd9ur3S2rcbduFWKiUCC02Sm5hbC8nrm7y24WuYMG54HfxA==}
     engines: {node: '>=22.22.1'}
     hasBin: true
 
@@ -5798,8 +5798,8 @@ packages:
   muggle-string@0.4.1:
     resolution: {integrity: sha512-VNTrAak/KhO2i8dqqnqnAHOa3cYBwXEZe9h+D5h/1ZqFSTEFHdM65lR7RoIqq3tBBYavsOXV84NoHXZ0AkPyqQ==}
 
-  nanoid@3.3.13:
-    resolution: {integrity: sha512-sPdqC6ByMVVGvF1ynvvMo0/o+oD1VX7DaHhijt1bFgjvBkHBib4t49GoNDhf2NDta4oeUNlaGbSt5K7qjZ955Q==}
+  nanoid@3.3.14:
+    resolution: {integrity: sha512-U9kYi5bpVMEI31yC8iw4bJJp0avcHXA0W8/wNfLfnvJYzihQo2ZRPYPvpAAd570HAcCBjCTN7vnr+v4StKl1IQ==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
@@ -6698,6 +6698,11 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
+  semver@7.8.5:
+    resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
+    engines: {node: '>=10'}
+    hasBin: true
+
   serialize-error@8.1.0:
     resolution: {integrity: sha512-3NnuWfM6vBYoy5gZFvHiYsVbafvI9vZv/+jlIigFn4oP4zjNPK3LhcY0xSCgeb1a5L8jO71Mit9LlNoi2UfDDQ==}
     engines: {node: '>=10'}
@@ -6742,48 +6747,48 @@ packages:
     resolution: {integrity: sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==}
     engines: {node: '>=8'}
 
-  sherif-darwin-arm64@1.11.1:
-    resolution: {integrity: sha512-VoMrUv5QY6hQ2rByNa3AAhr/KGQsCb6pvAUNKa1iCh1jvnY836hQr6zNBw9hYCDkVv6t9sITFGJljwdTCQD4xw==}
+  sherif-darwin-arm64@1.12.0:
+    resolution: {integrity: sha512-qihvPmHoWqUkXRc+VIdRcmPcUbA3CNh2W3NuwCWiR7drJisgD1l8Uw0RjdOkVID249CH+K3AIA4pxRlj+lgqBQ==}
     cpu: [arm64]
     os: [darwin]
 
-  sherif-darwin-x64@1.11.1:
-    resolution: {integrity: sha512-7j3yOCBkvVbltVT3lXoiazGfG2nb36FteYT5VZPEBSf8sTn1pPTScukAQ1Fdl+MphadGyici7XlRbDrtZ/wnvA==}
+  sherif-darwin-x64@1.12.0:
+    resolution: {integrity: sha512-Otwdsg+YrGs121wiGvyiivR81QsmFHKaMkziURnYodbZf4V8LTQ2zrHOxlBUJlAVoy5NwuHBX4k9EWaJ/wfbVA==}
     cpu: [x64]
     os: [darwin]
 
-  sherif-linux-arm64-musl@1.11.1:
-    resolution: {integrity: sha512-DCf87RFqBh8ZrYgu3y+fv0x4kFn/np84m2jAEgygznwozH/VCfrXbHFVdhxW7762JCYkXbHO9dUj/ff5fkvkvw==}
+  sherif-linux-arm64-musl@1.12.0:
+    resolution: {integrity: sha512-NRVambAd7aA0q2YrtBXstH5BzDr0hDXqq+xnkIRvXW57CHQ1BlY7K0QDYiy3zCLRKeZsMwKFQHILRKekUsh4ng==}
     cpu: [arm64]
     os: [linux]
 
-  sherif-linux-arm64@1.11.1:
-    resolution: {integrity: sha512-vCZFS7RxhZ/8g9bdj3UPNVPTcZiKiWigW+FIlVQEUKEKfG0MfSOMBJqEWPVVUniyJa3rdIxtmZKSdWkG0e1x3w==}
+  sherif-linux-arm64@1.12.0:
+    resolution: {integrity: sha512-obcIYS6dRbt9LQHr+RUD2L1VwhKt18dI28yCWFCQfXLyz8Zq6gHpr9P5PjXJcB+BByPEpyfj96oZBoBekHajTw==}
     cpu: [arm64]
     os: [linux]
 
-  sherif-linux-x64-musl@1.11.1:
-    resolution: {integrity: sha512-f8xitqXdHObUFPZo4QVbz3o30Y4+gHA3B5ZobsOWocnSfJBaUGutBzJsUsjG6w2tccSRn6+mugiMUGKIbIPZmQ==}
+  sherif-linux-x64-musl@1.12.0:
+    resolution: {integrity: sha512-/lkogUDVhGM+WbFhIthUGBBDKAvNQsV1CxR1RG40wUguxyyBM+uEVM/5ibIJsaYwn7NUZxgf8OwqpbwCFRcedQ==}
     cpu: [x64]
     os: [linux]
 
-  sherif-linux-x64@1.11.1:
-    resolution: {integrity: sha512-9t+p1X3SyhU75BrJNHBbj9i/aQxHC/sF+Mdkf17V5AlokCznFgYKQUXq5EVmcmRDDhDl69RMzCTLD95EBqUSYA==}
+  sherif-linux-x64@1.12.0:
+    resolution: {integrity: sha512-wG1gH6XDh/lQ3s+neAF6O5/VFaORN7nDjd/9RmnLa4c0axnjPKwFAAH60Sine/P7gMzET7EYfygJll4k3zVpjQ==}
     cpu: [x64]
     os: [linux]
 
-  sherif-windows-arm64@1.11.1:
-    resolution: {integrity: sha512-Dnffgcyz9zLq/8UTY2REchJzRJWcWAuMWo5Vl5O17IZGkhl71dwa7/Vi2wC3EQd8WAVK/O82yArOYggWA0dj5w==}
+  sherif-windows-arm64@1.12.0:
+    resolution: {integrity: sha512-UYkR14H/PaBv/Aqy4JclswRCyPnl5vKr2wVfcJa6UutzJ7ee/qKtr+sBn0H9+sFBZJWop1yv7ZI+IZVmVFRgfA==}
     cpu: [arm64]
     os: [win32]
 
-  sherif-windows-x64@1.11.1:
-    resolution: {integrity: sha512-xjfYUL/IQ65DwHkRsWIxiZWtglKtL5/E3UHpnLwOui3jqW1V2K88SMct415dnlBQiL3U9VEIVUo1i+KmToOBgQ==}
+  sherif-windows-x64@1.12.0:
+    resolution: {integrity: sha512-GUnTT54M4XN7C3GCl5nd0FSZzGoN8Edcd+i1jELqD5n/utshoRe+ohdHUob6GaZV6kXih27BhWLO3d6Ix+9Xmw==}
     cpu: [x64]
     os: [win32]
 
-  sherif@1.11.1:
-    resolution: {integrity: sha512-HBFce8NGaPuWPg5NXb6+aI7hJQFjTilhtbrgo+Y/BvtGlkuJAzLnkmC8nyD+p3v7oIAq4KQeA8qySKGga28xZg==}
+  sherif@1.12.0:
+    resolution: {integrity: sha512-fNJ5oWOsiMEAniYhhXTlRYfzZmWT5xQnzrp0c/oJ01L4ecvq4PczGrhb28JDt0Mq/t1gipM2Eo/6/BZH756yxg==}
     hasBin: true
 
   shiki-twoslash@3.1.2:
@@ -7410,8 +7415,8 @@ packages:
       vite:
         optional: true
 
-  vitepress-plugin-llms@1.13.1:
-    resolution: {integrity: sha512-m+rxyghF5INi8hBw0huFPx6+VvaX1tDGvw1H7FdXowaZJ3dcRY5ShgbmK1AQlmeOFMdd16H8WarhSHLPXF/2OA==}
+  vitepress-plugin-llms@1.13.2:
+    resolution: {integrity: sha512-2O4s0I5pjEZzgnoWgBPCZCyhah9FH5uQB6lGADazMoyF1URJshtG04ZnmX+cbmQmniN3T5JzdJO9B4q8JHDKOQ==}
     engines: {node: '>=18'}
 
   vitepress-plugin-mermaid@2.0.17:
@@ -10536,7 +10541,7 @@ snapshots:
       eslint: 10.5.0(jiti@2.7.0)
       json-stable-stringify-without-jsonify: 1.0.1
       lodash.merge: 4.6.2
-      semver: 7.8.4
+      semver: 7.8.5
       typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
@@ -10572,7 +10577,7 @@ snapshots:
       '@typescript-eslint/visitor-keys': 8.61.1
       debug: 4.4.3
       minimatch: 10.2.5
-      semver: 7.8.4
+      semver: 7.8.5
       tinyglobby: 0.2.17
       ts-api-utils: 2.5.0(typescript@6.0.3)
       typescript: 6.0.3
@@ -12164,7 +12169,7 @@ snapshots:
     dependencies:
       estraverse: 5.3.0
 
-  esrap@2.2.11(@typescript-eslint/types@8.61.1):
+  esrap@2.2.12(@typescript-eslint/types@8.61.1):
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
     optionalDependencies:
@@ -12281,7 +12286,7 @@ snapshots:
       process-warning: 5.0.0
       rfdc: 1.4.1
       secure-json-parse: 4.1.0
-      semver: 7.8.4
+      semver: 7.8.5
       toad-cache: 3.7.1
 
   fastq@1.20.1:
@@ -12967,7 +12972,7 @@ snapshots:
     dependencies:
       uc.micro: 2.1.0
 
-  lint-staged@17.0.7:
+  lint-staged@17.0.8:
     dependencies:
       listr2: 10.2.1
       picomatch: 4.0.4
@@ -13540,7 +13545,7 @@ snapshots:
 
   muggle-string@0.4.1: {}
 
-  nanoid@3.3.13: {}
+  nanoid@3.3.14: {}
 
   nanoid@5.1.14: {}
 
@@ -13997,13 +14002,13 @@ snapshots:
 
   postcss@8.4.31:
     dependencies:
-      nanoid: 3.3.13
+      nanoid: 3.3.14
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
   postcss@8.5.15:
     dependencies:
-      nanoid: 3.3.13
+      nanoid: 3.3.14
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
@@ -14518,6 +14523,8 @@ snapshots:
 
   semver@7.8.4: {}
 
+  semver@7.8.5: {}
+
   serialize-error@8.1.0:
     dependencies:
       type-fest: 0.20.2
@@ -14553,7 +14560,7 @@ snapshots:
     dependencies:
       '@img/colour': 1.1.0
       detect-libc: 2.1.2
-      semver: 7.8.4
+      semver: 7.8.5
     optionalDependencies:
       '@img/sharp-darwin-arm64': 0.34.5
       '@img/sharp-darwin-x64': 0.34.5
@@ -14587,40 +14594,40 @@ snapshots:
 
   shebang-regex@3.0.0: {}
 
-  sherif-darwin-arm64@1.11.1:
+  sherif-darwin-arm64@1.12.0:
     optional: true
 
-  sherif-darwin-x64@1.11.1:
+  sherif-darwin-x64@1.12.0:
     optional: true
 
-  sherif-linux-arm64-musl@1.11.1:
+  sherif-linux-arm64-musl@1.12.0:
     optional: true
 
-  sherif-linux-arm64@1.11.1:
+  sherif-linux-arm64@1.12.0:
     optional: true
 
-  sherif-linux-x64-musl@1.11.1:
+  sherif-linux-x64-musl@1.12.0:
     optional: true
 
-  sherif-linux-x64@1.11.1:
+  sherif-linux-x64@1.12.0:
     optional: true
 
-  sherif-windows-arm64@1.11.1:
+  sherif-windows-arm64@1.12.0:
     optional: true
 
-  sherif-windows-x64@1.11.1:
+  sherif-windows-x64@1.12.0:
     optional: true
 
-  sherif@1.11.1:
+  sherif@1.12.0:
     optionalDependencies:
-      sherif-darwin-arm64: 1.11.1
-      sherif-darwin-x64: 1.11.1
-      sherif-linux-arm64: 1.11.1
-      sherif-linux-arm64-musl: 1.11.1
-      sherif-linux-x64: 1.11.1
-      sherif-linux-x64-musl: 1.11.1
-      sherif-windows-arm64: 1.11.1
-      sherif-windows-x64: 1.11.1
+      sherif-darwin-arm64: 1.12.0
+      sherif-darwin-x64: 1.12.0
+      sherif-linux-arm64: 1.12.0
+      sherif-linux-arm64-musl: 1.12.0
+      sherif-linux-x64: 1.12.0
+      sherif-linux-x64-musl: 1.12.0
+      sherif-windows-arm64: 1.12.0
+      sherif-windows-x64: 1.12.0
 
   shiki-twoslash@3.1.2(typescript@6.0.3):
     dependencies:
@@ -14860,7 +14867,7 @@ snapshots:
       clsx: 2.1.1
       devalue: 5.8.1
       esm-env: 1.2.2
-      esrap: 2.2.11(@typescript-eslint/types@8.61.1)
+      esrap: 2.2.12(@typescript-eslint/types@8.61.1)
       is-reference: 3.0.3
       locate-character: 3.0.0
       magic-string: 0.30.21
@@ -15337,7 +15344,7 @@ snapshots:
     optionalDependencies:
       vite: 5.4.21(@types/node@26.0.0)(lightningcss@1.32.0)
 
-  vitepress-plugin-llms@1.13.1:
+  vitepress-plugin-llms@1.13.2:
     dependencies:
       gray-matter: 4.0.3
       markdown-it: 14.2.0
