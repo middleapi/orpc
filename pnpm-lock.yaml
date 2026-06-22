@@ -205,14 +205,14 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standardserver/core':
-        specifier: ^0.0.24
-        version: 0.0.24
+        specifier: ^0.0.25
+        version: 0.0.25
       '@standardserver/fetch':
-        specifier: ^0.0.24
-        version: 0.0.24
+        specifier: ^0.0.25
+        version: 0.0.25
       '@standardserver/peer':
-        specifier: ^0.0.24
-        version: 0.0.24
+        specifier: ^0.0.25
+        version: 0.0.25
     devDependencies:
       zod:
         specifier: ^4.4.3
@@ -271,8 +271,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standardserver/core':
-        specifier: ^0.0.24
-        version: 0.0.24
+        specifier: ^0.0.25
+        version: 0.0.25
     devDependencies:
       evlog:
         specifier: ^2.18.1
@@ -358,11 +358,11 @@ importers:
         specifier: ^1.57.2
         version: 1.60.0(axios@1.18.0)(change-case@5.4.4)(tailwindcss@4.3.1)(typescript@6.0.3)(zod@4.4.3)
       '@standardserver/core':
-        specifier: ^0.0.24
-        version: 0.0.24
+        specifier: ^0.0.25
+        version: 0.0.25
       '@standardserver/fetch':
-        specifier: ^0.0.24
-        version: 0.0.24
+        specifier: ^0.0.25
+        version: 0.0.25
       '@types/swagger-ui':
         specifier: ^5.32.0
         version: 5.32.0
@@ -405,8 +405,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standardserver/core':
-        specifier: ^0.0.24
-        version: 0.0.24
+        specifier: ^0.0.25
+        version: 0.0.25
     devDependencies:
       pino:
         specifier: ^10.1.0
@@ -421,8 +421,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standardserver/core':
-        specifier: ^0.0.24
-        version: 0.0.24
+        specifier: ^0.0.25
+        version: 0.0.25
     devDependencies:
       '@upstash/redis':
         specifier: ^1.38.0
@@ -440,8 +440,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standardserver/core':
-        specifier: ^0.0.24
-        version: 0.0.24
+        specifier: ^0.0.25
+        version: 0.0.25
     devDependencies:
       '@upstash/ratelimit':
         specifier: ^2.0.8
@@ -471,17 +471,17 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standardserver/core':
-        specifier: ^0.0.24
-        version: 0.0.24
+        specifier: ^0.0.25
+        version: 0.0.25
       '@standardserver/fetch':
-        specifier: ^0.0.24
-        version: 0.0.24
+        specifier: ^0.0.25
+        version: 0.0.25
       '@standardserver/node':
-        specifier: ^0.0.24
-        version: 0.0.24
+        specifier: ^0.0.25
+        version: 0.0.25
       '@standardserver/peer':
-        specifier: ^0.0.24
-        version: 0.0.24
+        specifier: ^0.0.25
+        version: 0.0.25
       cookie:
         specifier: ^1.1.1
         version: 1.1.1
@@ -499,8 +499,8 @@ importers:
   packages/shared:
     dependencies:
       '@standardserver/shared':
-        specifier: ^0.0.24
-        version: 0.0.24
+        specifier: ^0.0.25
+        version: 0.0.25
       radash:
         specifier: ^12.1.1
         version: 12.1.1
@@ -2672,20 +2672,20 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@standardserver/core@0.0.24':
-    resolution: {integrity: sha512-zgsc6FajnaDCndxhdiNg01Lt49nc520NucD+fZ6Kzf7beZXFJduskOa+vxa75UBPSts1CWYOCYLwSzI3Ei4fJg==}
+  '@standardserver/core@0.0.25':
+    resolution: {integrity: sha512-WIp2orfBhFIMfIqejN8O0UEP+dzcD1485J9nIURapD3tSo7jZ+ElgYhaLVc7Ilfmf6N9qIMrzSdLOTD7qjeL8w==}
 
-  '@standardserver/fetch@0.0.24':
-    resolution: {integrity: sha512-iz+IHrhGQaXiKqrOkhOsIWrcyjork+xRGZkSdgt5ufndng2aCzcNT9WwXQA1RkRBEbHRvBv5z7CIXj0Uimtubg==}
+  '@standardserver/fetch@0.0.25':
+    resolution: {integrity: sha512-8VpXDUTdhoqngX/pE6vv60rqtvds6N+KdQgo7JlKTYULgJOYToxuU6Imc2tp6nl+QHierhoP0pxRlbrpwL6ATg==}
 
-  '@standardserver/node@0.0.24':
-    resolution: {integrity: sha512-rzjxKcuRc3QAhGOfuZLb9hvPNPSz7H1bYIsFgl9xhvfcLShDEjXlhi9p/i17oQey3DxUtfTXgwDVOg9+XNr2VA==}
+  '@standardserver/node@0.0.25':
+    resolution: {integrity: sha512-pSgTBPw6eKzsHwYOXwjt5jZmWzd7ePiNCnfMS0jUZci5QLWyUvL951dDF+6ERuxqE11BKXX5HjPcw9aaKTH3ig==}
 
-  '@standardserver/peer@0.0.24':
-    resolution: {integrity: sha512-D9j4cm7Jf2Zqj0XHZ9DLXRR6rXMrxHXnptJ1C1YdpPFx9/RqsiRV5QtzUktpTXMy+apfDdCyLNRjfcsHxsZI4w==}
+  '@standardserver/peer@0.0.25':
+    resolution: {integrity: sha512-tTe9ZSdFTYdhMH5T7UlujWFCU033jL5e6OJ3CgwSyhJp4iOWGaxNtYPq6CDXD0cQRJJpdOcKfoQ8PkmOwxWU8Q==}
 
-  '@standardserver/shared@0.0.24':
-    resolution: {integrity: sha512-rTinXNMUs9XcfTfbH34KAdybLNiqRWdBAcIdZ7r9xbiZ8zUF+EQDshUUMuJHz5JHjrKWIk/9mFYZi/OZa20FrA==}
+  '@standardserver/shared@0.0.25':
+    resolution: {integrity: sha512-w7c+dXX9Si2Gi5OJFqe0Yh+hhn2EC2MV3q7AUtTQTUadOb7vZ4Yb/4jgz9O8aTiwjK1UPAk/xWINLC/Ip2j7TA==}
 
   '@stylistic/eslint-plugin@5.10.0':
     resolution: {integrity: sha512-nPK52ZHvot8Ju/0A4ucSX1dcPV2/1clx0kLcH5wDmrE4naKso7TUC/voUyU1O9OTKTrR6MYip6LP0ogEMQ9jPQ==}
@@ -4596,8 +4596,8 @@ packages:
     resolution: {integrity: sha512-Ap6G0WQwcU/LHsvLwON1fAQX9Zp0A2Y6Y/cJBl9r/JbW90Zyg4/zbG6zzKa2OTALELarYHmKu0GhpM5EO+7T0g==}
     engines: {node: '>=0.10'}
 
-  esrap@2.2.11:
-    resolution: {integrity: sha512-gPdx+I+BjYEinNMQaBXFjbaJVyoPMU4ZODg5mE+M4DqVG9VusAVHHjcBX+zqyITlI0DIARwDMMzZwAWj36dRoQ==}
+  esrap@2.2.12:
+    resolution: {integrity: sha512-On0QbLyaiAkVC4eXtgnXK9Kh2opit+3rcUSOc45DqJ2s/X2eXAHsGOKRSJ6IDagQEW5vPyivANfXUiqgXC67Rw==}
     peerDependencies:
       '@typescript-eslint/types': ^8.2.0
     peerDependenciesMeta:
@@ -5798,8 +5798,8 @@ packages:
   muggle-string@0.4.1:
     resolution: {integrity: sha512-VNTrAak/KhO2i8dqqnqnAHOa3cYBwXEZe9h+D5h/1ZqFSTEFHdM65lR7RoIqq3tBBYavsOXV84NoHXZ0AkPyqQ==}
 
-  nanoid@3.3.13:
-    resolution: {integrity: sha512-sPdqC6ByMVVGvF1ynvvMo0/o+oD1VX7DaHhijt1bFgjvBkHBib4t49GoNDhf2NDta4oeUNlaGbSt5K7qjZ955Q==}
+  nanoid@3.3.14:
+    resolution: {integrity: sha512-U9kYi5bpVMEI31yC8iw4bJJp0avcHXA0W8/wNfLfnvJYzihQo2ZRPYPvpAAd570HAcCBjCTN7vnr+v4StKl1IQ==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
@@ -6695,6 +6695,11 @@ packages:
 
   semver@7.8.4:
     resolution: {integrity: sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA==}
+    engines: {node: '>=10'}
+    hasBin: true
+
+  semver@7.8.5:
+    resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
     engines: {node: '>=10'}
     hasBin: true
 
@@ -9671,27 +9676,27 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@standardserver/core@0.0.24':
+  '@standardserver/core@0.0.25':
     dependencies:
-      '@standardserver/shared': 0.0.24
+      '@standardserver/shared': 0.0.25
 
-  '@standardserver/fetch@0.0.24':
+  '@standardserver/fetch@0.0.25':
     dependencies:
-      '@standardserver/core': 0.0.24
-      '@standardserver/shared': 0.0.24
+      '@standardserver/core': 0.0.25
+      '@standardserver/shared': 0.0.25
 
-  '@standardserver/node@0.0.24':
+  '@standardserver/node@0.0.25':
     dependencies:
-      '@standardserver/core': 0.0.24
-      '@standardserver/fetch': 0.0.24
-      '@standardserver/shared': 0.0.24
+      '@standardserver/core': 0.0.25
+      '@standardserver/fetch': 0.0.25
+      '@standardserver/shared': 0.0.25
 
-  '@standardserver/peer@0.0.24':
+  '@standardserver/peer@0.0.25':
     dependencies:
-      '@standardserver/core': 0.0.24
-      '@standardserver/shared': 0.0.24
+      '@standardserver/core': 0.0.25
+      '@standardserver/shared': 0.0.25
 
-  '@standardserver/shared@0.0.24': {}
+  '@standardserver/shared@0.0.25': {}
 
   '@stylistic/eslint-plugin@5.10.0(eslint@10.5.0(jiti@2.7.0))':
     dependencies:
@@ -10536,7 +10541,7 @@ snapshots:
       eslint: 10.5.0(jiti@2.7.0)
       json-stable-stringify-without-jsonify: 1.0.1
       lodash.merge: 4.6.2
-      semver: 7.8.4
+      semver: 7.8.5
       typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
@@ -10572,7 +10577,7 @@ snapshots:
       '@typescript-eslint/visitor-keys': 8.61.1
       debug: 4.4.3
       minimatch: 10.2.5
-      semver: 7.8.4
+      semver: 7.8.5
       tinyglobby: 0.2.17
       ts-api-utils: 2.5.0(typescript@6.0.3)
       typescript: 6.0.3
@@ -12164,7 +12169,7 @@ snapshots:
     dependencies:
       estraverse: 5.3.0
 
-  esrap@2.2.11(@typescript-eslint/types@8.61.1):
+  esrap@2.2.12(@typescript-eslint/types@8.61.1):
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
     optionalDependencies:
@@ -12281,7 +12286,7 @@ snapshots:
       process-warning: 5.0.0
       rfdc: 1.4.1
       secure-json-parse: 4.1.0
-      semver: 7.8.4
+      semver: 7.8.5
       toad-cache: 3.7.1
 
   fastq@1.20.1:
@@ -13540,7 +13545,7 @@ snapshots:
 
   muggle-string@0.4.1: {}
 
-  nanoid@3.3.13: {}
+  nanoid@3.3.14: {}
 
   nanoid@5.1.14: {}
 
@@ -13997,13 +14002,13 @@ snapshots:
 
   postcss@8.4.31:
     dependencies:
-      nanoid: 3.3.13
+      nanoid: 3.3.14
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
   postcss@8.5.15:
     dependencies:
-      nanoid: 3.3.13
+      nanoid: 3.3.14
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
@@ -14518,6 +14523,8 @@ snapshots:
 
   semver@7.8.4: {}
 
+  semver@7.8.5: {}
+
   serialize-error@8.1.0:
     dependencies:
       type-fest: 0.20.2
@@ -14553,7 +14560,7 @@ snapshots:
     dependencies:
       '@img/colour': 1.1.0
       detect-libc: 2.1.2
-      semver: 7.8.4
+      semver: 7.8.5
     optionalDependencies:
       '@img/sharp-darwin-arm64': 0.34.5
       '@img/sharp-darwin-x64': 0.34.5
@@ -14860,7 +14867,7 @@ snapshots:
       clsx: 2.1.1
       devalue: 5.8.1
       esm-env: 1.2.2
-      esrap: 2.2.11(@typescript-eslint/types@8.61.1)
+      esrap: 2.2.12(@typescript-eslint/types@8.61.1)
       is-reference: 3.0.3
       locate-character: 3.0.0
       magic-string: 0.30.21

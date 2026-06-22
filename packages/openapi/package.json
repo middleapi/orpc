@@ -81,8 +81,8 @@
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
     "@scalar/api-reference": "^1.57.2",
-    "@standardserver/core": "^0.0.24",
-    "@standardserver/fetch": "^0.0.24",
+    "@standardserver/core": "^0.0.25",
+    "@standardserver/fetch": "^0.0.25",
     "@types/swagger-ui": "^5.32.0",
     "rou3": "^0.8.1",
     "swagger-ui": "^5.32.6"

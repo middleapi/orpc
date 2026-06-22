@@ -66,9 +66,9 @@
   },
   "dependencies": {
     "@orpc/shared": "workspace:*",
-    "@standardserver/core": "^0.0.24",
-    "@standardserver/fetch": "^0.0.24",
-    "@standardserver/peer": "^0.0.24"
+    "@standardserver/core": "^0.0.25",
+    "@standardserver/fetch": "^0.0.25",
+    "@standardserver/peer": "^0.0.25"
   },
   "devDependencies": {
     "zod": "^4.4.3"
