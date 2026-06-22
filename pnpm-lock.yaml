@@ -611,34 +611,34 @@ importers:
         specifier: ^2.8.0
         version: 2.8.0(@opentelemetry/api@1.9.1)
       '@orpc/client':
-        specifier: latest
+        specifier: beta
         version: link:../../packages/client
       '@orpc/evlog':
-        specifier: latest
+        specifier: beta
         version: link:../../packages/evlog
       '@orpc/json-schema':
-        specifier: latest
+        specifier: beta
         version: link:../../packages/json-schema
       '@orpc/next':
-        specifier: latest
+        specifier: beta
         version: link:../../packages/next
       '@orpc/openapi':
-        specifier: latest
+        specifier: beta
         version: link:../../packages/openapi
       '@orpc/opentelemetry':
-        specifier: latest
+        specifier: beta
         version: link:../../packages/opentelemetry
       '@orpc/publisher':
-        specifier: latest
+        specifier: beta
         version: link:../../packages/publisher
       '@orpc/server':
-        specifier: latest
+        specifier: beta
         version: link:../../packages/server
       '@orpc/tanstack-query':
-        specifier: latest
+        specifier: beta
         version: link:../../packages/tanstack-query
       '@orpc/zod':
-        specifier: latest
+        specifier: beta
         version: link:../../packages/zod
       '@tanstack/react-query':
         specifier: ^5.101.0
