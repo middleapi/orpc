@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { AsyncIteratorClass } from '@standardserver/shared'
+import { AsyncIteratorClass, sleep } from '@standardserver/shared'
 import * as OpenTelemetry from './opentelemetry'
+import { promiseWithResolvers } from './promise'
 import { asyncIteratorToStream, asyncIteratorToUnproxiedDataStream, replicateReadableStream, streamToAsyncIteratorClass, traceReadableStream, wrapReadableStream } from './stream'
 
 const runInSpanContextSpy = vi.spyOn(OpenTelemetry, 'runInSpanContext')
@@ -412,6 +413,102 @@ describe('streamToAsyncIteratorClass', () => {
     await iterator.return()
 
     expect(cleanupCalled).toBe(true)
+  })
+
+  describe('with signal', () => {
+    it('should abort if signal is already aborted', async () => {
+      const controller = new AbortController()
+      controller.abort()
+      const cancel = vi.fn()
+
+      const stream = new ReadableStream<number>({
+        start(c) {
+          c.enqueue(1)
+          c.enqueue(2)
+          c.close()
+        },
+        cancel,
+      })
+
+      const iterator = streamToAsyncIteratorClass(stream, { signal: controller.signal })
+
+      await expect(iterator.next()).rejects.toBe(controller.signal.reason)
+      expect(cancel).toHaveBeenCalledTimes(1)
+      expect(cancel).toHaveBeenCalledWith(controller.signal.reason)
+    })
+
+    it('should abort mid-stream and cancel reader', async () => {
+      const controller = new AbortController()
+      const cancel = vi.fn()
+
+      const stream = new ReadableStream<number>({
+        start(c) {
+          c.enqueue(1)
+          c.enqueue(2)
+          c.enqueue(3)
+          c.close()
+        },
+        cancel,
+      })
+
+      const iterator = streamToAsyncIteratorClass(stream, { signal: controller.signal })
+
+      await iterator.next()
+      controller.abort()
+      await expect(iterator.next()).rejects.toBe(controller.signal.reason)
+
+      expect(cancel).toHaveBeenCalledTimes(1)
+      expect(cancel).toHaveBeenCalledWith(controller.signal.reason)
+    })
+
+    it('should abort during slow stream', async () => {
+      const controller = new AbortController()
+      const cancel = vi.fn()
+      const { promise, resolve } = promiseWithResolvers<void>()
+
+      const stream = new ReadableStream<number>({
+        async pull(c) {
+          await promise
+          c.enqueue(1)
+        },
+        cancel,
+      })
+
+      const iterator = streamToAsyncIteratorClass(stream, { signal: controller.signal })
+
+      const nextPromise = iterator.next()
+      await sleep(0)
+      controller.abort()
+      await expect(nextPromise).rejects.toBe(controller.signal.reason)
+      resolve()
+
+      expect(cancel).toHaveBeenCalledTimes(1)
+      expect(cancel).toHaveBeenCalledWith(controller.signal.reason)
+    })
+
+    it('should complete normally if not aborted', async () => {
+      const controller = new AbortController()
+      const values = [1, 2, 3]
+      const cancel = vi.fn()
+
+      const stream = new ReadableStream<number>({
+        start(c) {
+          values.forEach(v => c.enqueue(v))
+          c.close()
+        },
+        cancel,
+      })
+
+      const iterator = streamToAsyncIteratorClass(stream, { signal: controller.signal })
+      const results: number[] = []
+
+      for await (const value of iterator) {
+        results.push(value)
+      }
+
+      expect(results).toEqual(values)
+      expect(cancel).toHaveResolvedTimes(0)
+    })
   })
 })
 

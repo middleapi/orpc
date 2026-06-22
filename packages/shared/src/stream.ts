@@ -4,6 +4,7 @@ import { AsyncIteratorClass } from '@standardserver/shared'
 import { once } from './function'
 import { isPlainObject } from './object'
 import { recordSpanError, runInSpanContext, startSpan } from './opentelemetry'
+import { promiseWithResolvers } from './promise'
 
 export function replicateReadableStream<T>(
   stream: ReadableStream<T>,
@@ -126,15 +127,41 @@ export function traceReadableStream<T>(
  */
 export function streamToAsyncIteratorClass<T>(
   stream: ReadableStream<T>,
+  { signal }: { signal?: undefined | AbortSignal } = {},
 ): AsyncIteratorClass<T> {
   const reader = stream.getReader()
+  let cancelledBySignal = false
 
   return new AsyncIteratorClass<T>(
     async () => {
-      return reader.read() as Promise<IteratorResult<T>>
+      if (signal?.aborted) {
+        cancelledBySignal = true
+        throw signal.reason
+      }
+
+      if (!signal) {
+        return reader.read() as Promise<IteratorResult<T>>
+      }
+
+      const { promise, reject } = promiseWithResolvers<never>()
+      const onAbort = () => reject(signal.reason)
+      signal.addEventListener('abort', onAbort, { once: true })
+
+      try {
+        return await Promise.race([
+          reader.read() as Promise<IteratorResult<T>>,
+          promise.catch(async (reason) => {
+            cancelledBySignal = true
+            throw reason
+          }),
+        ])
+      }
+      finally {
+        signal.removeEventListener('abort', onAbort)
+      }
     },
     async ({ kind, error }) => {
-      if (kind === 'cancelled') {
+      if (kind === 'cancelled' || (kind === 'error' && cancelledBySignal)) {
         await reader.cancel(error)
       }
     },
