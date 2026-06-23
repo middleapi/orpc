@@ -15,4 +15,4 @@ export * from './router-utils'
 export * from './schema'
 export * from './schema-utils'
 
-export type { Registry, ThrowableError } from '@orpc/shared'
+export type { PromiseWithError, Registry, ThrowableError } from '@orpc/shared'

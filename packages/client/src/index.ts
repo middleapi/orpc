@@ -12,7 +12,7 @@ export * from './rpc-serializer'
 export * from './types'
 export * from './utils'
 
-export type { Registry, ThrowableError } from '@orpc/shared'
+export type { PromiseWithError, Registry, ThrowableError } from '@orpc/shared'
 export {
   AsyncIteratorClass,
   asyncIteratorToStream as eventIteratorToStream,

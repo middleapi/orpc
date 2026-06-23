@@ -60,7 +60,7 @@ export type {
   Schema,
 } from '@orpc/contract'
 export { defineMeta, eventIterator, reconcileORPCError, type, ValidationError } from '@orpc/contract'
-export type { Registry, ThrowableError } from '@orpc/shared'
+export type { PromiseWithError, Registry, ThrowableError } from '@orpc/shared'
 export {
   AsyncIteratorClass,
   asyncIteratorToStream as eventIteratorToStream,
