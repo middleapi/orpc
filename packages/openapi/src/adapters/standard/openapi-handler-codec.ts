@@ -57,8 +57,48 @@ export class OpenAPIHandlerCodec<T extends Context> implements StandardHandlerCo
     this.customErrorResponseBodySerializer = options.customErrorResponseBodyEncoder
   }
 
+  async decodeInput(matched: { procedure: AnyProcedure, params?: undefined | Record<string, string> }, request: StandardLazyRequest): Promise<unknown> {
+    const [_, search] = parseStandardUrl(request.url)
+
+    const meta = getOpenAPIMeta(matched.procedure)
+    const inputStructure = meta?.inputStructure ?? DEFAULT_OPENAPI_INPUT_STRUCTURE
+    const params = this.deserializeParams(matched.params, meta?.paramsStyles)
+    const query = this.deserializeQuery(search, meta?.queryStyles)
+
+    if (inputStructure === 'compact') {
+      const data = request.method === 'GET'
+        ? query
+        : this.serializer.deserialize(await request.resolveBody(meta?.requestBodyHint))
+
+      if (data === undefined) {
+        return params
+      }
+
+      if (!params || Object.keys(params).length < 1) {
+        return data
+      }
+
+      if (isPlainObject(data)) {
+        return {
+          ...params,
+          ...data,
+        }
+      }
+
+      // data can be Blob, Event Iterator, ReadableStream, ...
+      return data
+    }
+
+    return {
+      params,
+      query,
+      headers: request.headers,
+      body: this.serializer.deserialize(await request.resolveBody(meta?.requestBodyHint)),
+    }
+  }
+
   async resolveProcedure(request: StandardLazyRequest, options: StandardHandlerHandleOptions<T>): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
-    const [pathname, search] = parseStandardUrl(request.url)
+    const [pathname] = parseStandardUrl(request.url)
 
     const matched = await this.matcher.match(request.method, pathname, options.prefix)
 
@@ -69,43 +109,7 @@ export class OpenAPIHandlerCodec<T extends Context> implements StandardHandlerCo
     return {
       procedure: matched.procedure,
       path: matched.path,
-      decodeInput: async () => {
-        const meta = getOpenAPIMeta(matched.procedure)
-        const inputStructure = meta?.inputStructure ?? DEFAULT_OPENAPI_INPUT_STRUCTURE
-        const params = this.deserializeParams(matched.params, meta?.paramsStyles)
-        const query = this.deserializeQuery(search, meta?.queryStyles)
-
-        if (inputStructure === 'compact') {
-          const data = request.method === 'GET'
-            ? query
-            : this.serializer.deserialize(await request.resolveBody(meta?.requestBodyHint))
-
-          if (data === undefined) {
-            return params
-          }
-
-          if (!params || Object.keys(params).length < 1) {
-            return data
-          }
-
-          if (isPlainObject(data)) {
-            return {
-              ...params,
-              ...data,
-            }
-          }
-
-          // data can be Blob, Event Iterator, ReadableStream, ...
-          return data
-        }
-
-        return {
-          params,
-          query,
-          headers: request.headers,
-          body: this.serializer.deserialize(await request.resolveBody(meta?.requestBodyHint)),
-        }
-      },
+      decodeInput: () => this.decodeInput(matched, request),
     }
   }
 
