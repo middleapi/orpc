@@ -1,7 +1,6 @@
 import type { AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, InitialInputSchema, Schema } from '@orpc/contract'
 import type { AnyORPCError, Context, DecoratedProcedure, ImplementedProcedure, MergedContext, ORPCErrorConstructorMap } from '@orpc/server'
 import type { Effect } from 'effect'
-import type { YieldWrap } from 'effect/Utils'
 import type { WithEffectContext } from '../context'
 import type { HandlerGen, InferYieldError } from '../handler'
 import { Builder, ProcedureImplementer } from '@orpc/server'
@@ -13,11 +12,11 @@ declare module '@orpc/server' {
     TErrorMap extends ErrorMap,
   > {
     effect<
-      TYield extends YieldWrap<Effect.Effect<
+      TYield extends Effect.Effect<
         any,
         any,
         TInitialContext extends WithEffectContext<infer S> ? S : never
-      >>,
+      >,
       TReturn,
     >(
       handler: HandlerGen<
@@ -43,11 +42,11 @@ declare module '@orpc/server' {
     TErrorMap extends ErrorMap,
   > {
     effect<
-      TYield extends YieldWrap<Effect.Effect<
+      TYield extends Effect.Effect<
         any,
         any,
         MergedContext<TInitialContext, TInjectedContext> extends WithEffectContext<infer S> ? S : never
-      >>,
+      >,
       TReturn,
     >(
       handler: HandlerGen<
@@ -74,11 +73,11 @@ declare module '@orpc/server' {
     TErrorMap extends ErrorMap,
   > {
     effect<
-      TYield extends YieldWrap<Effect.Effect<
+      TYield extends Effect.Effect<
         any,
         any,
         MergedContext<TInitialContext, TInjectedContext> extends WithEffectContext<infer S> ? S : never
-      >>,
+      >,
       TReturn,
     >(
       handler: HandlerGen<
@@ -105,11 +104,11 @@ declare module '@orpc/server' {
     TErrorMap extends ErrorMap,
   > {
     effect<
-      TYield extends YieldWrap<Effect.Effect<
+      TYield extends Effect.Effect<
         any,
         any,
         MergedContext<TInitialContext, TInjectedContext> extends WithEffectContext<infer S> ? S : never
-      >>,
+      >,
       TReturn extends InferSchemaInput<TOutputSchema> | AnyORPCError,
     >(
       handler: HandlerGen<
@@ -137,11 +136,11 @@ declare module '@orpc/server' {
     TErrorMap extends ErrorMap,
   > {
     effect<
-      TYield extends YieldWrap<Effect.Effect<
+      TYield extends Effect.Effect<
         any,
         any,
         MergedContext<TInitialContext, TInjectedContext> extends WithEffectContext<infer S> ? S : never
-      >>,
+      >,
       TReturn extends InferSchemaInput<TOutputSchema> | AnyORPCError,
     >(
       handler: HandlerGen<
@@ -172,11 +171,11 @@ declare module '@orpc/server' {
       handler: HandlerGen<
         MergedContext<TInitialContext, TInjectedContext>,
         InferSchemaOutput<TInputSchema>,
-        YieldWrap<Effect.Effect<
+        Effect.Effect<
           any,
           any,
           MergedContext<TInitialContext, TInjectedContext> extends WithEffectContext<infer S> ? S : never
-        >>,
+        >,
         AnyORPCError | InferSchemaInput<TOutputSchema>,
         ORPCErrorConstructorMap<TErrorMap>
       >,

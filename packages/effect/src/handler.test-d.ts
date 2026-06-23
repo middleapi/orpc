@@ -6,19 +6,19 @@ import { Context, Effect } from 'effect'
 import { z } from 'zod'
 import { handlerGen } from './handler'
 
-class Service1 extends Context.Tag('Service1')<
+class Service1 extends Context.Service<
   Service1,
   {
     readonly id: 'Service1'
   }
->() {}
+>()('Service1') {}
 
-class Service2 extends Context.Tag('Service2')<
+class Service2 extends Context.Service<
   Service2,
   {
     readonly id: 'Service2'
   }
->() {}
+>()('Service2') {}
 
 const errorMap = {
   BASE: {

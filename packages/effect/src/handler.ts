@@ -1,20 +1,19 @@
 import type { AnyORPCError, Context, ORPCErrorConstructorMap, ProcedureHandler, ProcedureHandlerOptions } from '@orpc/server'
-import type { YieldWrap } from 'effect/Utils'
 import type { WithEffectContext } from './context'
 import { ORPCError } from '@orpc/server'
 import { Effect, Context as EffectContext } from 'effect'
 import { runPromise } from './runtime'
 
-export type InferYieldError<Eff> = [Eff] extends [never] ? never : [Eff] extends [YieldWrap<Effect.Effect<infer _A, infer E, infer _R>>] ? E : never
+export type InferYieldError<Eff> = [Eff] extends [never] ? never : [Eff] extends [Effect.Effect<infer _A, infer E, infer _R>] ? E : never
 
 export interface HandlerGen<
   TCurrentContext extends Context,
   TInput,
-  TYield extends YieldWrap<Effect.Effect<
+  TYield extends Effect.Effect<
     any,
     any,
     TCurrentContext extends WithEffectContext<infer S> ? S : never
-  >>,
+  >,
   TReturn,
   TErrorConstructorMap extends ORPCErrorConstructorMap<any>,
 > {
@@ -28,17 +27,17 @@ export interface HandlerGen<
   >
 }
 
-const succeedOnORPCError = Effect.catchAll(error => error instanceof ORPCError ? Effect.succeed(error) : Effect.fail(error))
+const succeedOnORPCError = Effect.catch(error => error instanceof ORPCError ? Effect.succeed(error) : Effect.fail(error))
 
 export function handlerGen<
   TCurrentContext extends Context,
   TInput,
   TErrorConstructorMap extends ORPCErrorConstructorMap<any>,
-  TYield extends YieldWrap<Effect.Effect<
+  TYield extends Effect.Effect<
     any,
     any,
     TCurrentContext extends WithEffectContext<infer S> ? S : never
-  >>,
+  >,
   TReturn,
 >(
   handler: HandlerGen<TCurrentContext, TInput, TYield, TReturn, TErrorConstructorMap>,

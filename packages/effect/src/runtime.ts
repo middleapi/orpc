@@ -1,22 +1,21 @@
 import { AbortError } from '@orpc/shared'
-import { Cause, Effect, Exit, FiberId } from 'effect'
+import { Cause, Effect, Exit } from 'effect'
 
 /**
  * Extracts the most meaningful original error from an Effect Cause,
  * preserving the original error instance wherever possible.
  */
 export function extractErrorFromCause(cause: Cause.Cause<unknown>): unknown {
-  return Cause.match(cause, {
-    onFail: error => error,
-    onDie: defect => defect,
-    onInterrupt: fiberId => new AbortError(`Fiber interrupted: ${FiberId.threadName(fiberId)}`),
-    onEmpty: new Error('Effect failed with no error information'),
+  if (cause.reasons.length === 0) {
+    return new Error('Effect failed with no error information')
+  }
 
-    // Mirrors native try/finally: if the finalizer (right) also throws,
-    // it overwrites the original (left) — same behaviour as JS would produce
-    onSequential: (_left, right) => right,
-    onParallel: (left, _right) => left,
-  })
+  if (Cause.hasInterruptsOnly(cause)) {
+    const [fiberId] = Cause.interruptors(cause)
+    return new AbortError(`Fiber interrupted: ${fiberId === undefined ? 'unknown' : `#${fiberId}`}`)
+  }
+
+  return Cause.squash(cause)
 }
 
 export interface RunPromiseOptions {

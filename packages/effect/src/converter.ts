@@ -1,7 +1,6 @@
 import type { AnySchema } from '@orpc/contract'
 import type { JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
-import type { Schema as EffectSchema } from 'effect'
-import { JSONSchema } from 'effect'
+import { Schema as EffectSchema } from 'effect'
 
 export class EffectSchemaToJsonSchemaConverter implements JsonSchemaConverter {
   condition(schema: AnySchema | undefined, _direction: JsonSchemaConverterDirection): boolean {
@@ -9,8 +8,11 @@ export class EffectSchemaToJsonSchemaConverter implements JsonSchemaConverter {
   }
 
   convert(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): [jsonSchema: JsonSchema, optional: boolean] {
-    const effectSchema = schema as unknown as EffectSchema.Schema<any, any> & AnySchema
-    const jsonSchema = JSONSchema.make(effectSchema, { target: 'jsonSchema2020-12' })
+    const effectSchema = schema as EffectSchema.Unknown & AnySchema
+    const standardSchema = EffectSchema.toStandardJSONSchemaV1(effectSchema)
+    const jsonSchema = direction === 'input'
+      ? standardSchema['~standard'].jsonSchema.input({ target: 'draft-2020-12' })
+      : standardSchema['~standard'].jsonSchema.output({ target: 'draft-2020-12' })
 
     let optional = false
     try {
