@@ -60,4 +60,6 @@ jobs:
 
       - run: pnpm i
 
-      - run: pnpm --filter='./packages/*' run -r build && pnpm exec pkg-pr-new publish './packages/*' --pnpm --compact --template './playgrounds/*'
+      - run: pnpm --filter='./packages/*' run -r build
+
+      - run: pnpm exec pkg-pr-new publish './packages/*' --pnpm --compact --template './playgrounds/*'

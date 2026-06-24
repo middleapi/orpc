@@ -53,11 +53,13 @@ jobs:
 
       - run: pnpm exec bumpp -r ${{ github.event.inputs.version }} --yes
 
+      - run: pnpm --filter='./packages/*' run -r build
+
       - run: pnpm config set '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - run: pnpm --filter='./packages/*' run -r build && pnpm --filter='./packages/*' publish -r --access=public --tag=${{ steps.version.outputs.preid || 'latest' }}
+      - run: pnpm --filter='./packages/*' publish -r --access=public --tag=${{ steps.version.outputs.preid || 'latest' }}
         env:
           NPM_CONFIG_PROVENANCE: true
 
