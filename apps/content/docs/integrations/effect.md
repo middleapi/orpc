@@ -83,12 +83,12 @@ import { call, os } from '@orpc/server'
 import { handlerGen, WithEffectContext } from '@orpc/experimental-effect'
 import { Context, Effect } from 'effect'
 
-class Random extends Context.Tag('MyRandomService')<
+class Random extends Context.Service<
   Random,
   {
     readonly next: Effect.Effect<number>
   }
->() {}
+>()('MyRandomService') {}
 
 interface ServerContext extends WithEffectContext<Random> {}
 
@@ -149,7 +149,7 @@ export async function fetch(request: Request) {
     context: {
       '~effect/context': Context.empty(),
       '~effect/wrap': (effect, opts) => effect.pipe(
-        Effect.catchAllCause((cause) => {
+        Effect.catchCause((cause) => {
 
         })
       ),
@@ -192,13 +192,13 @@ if (isInferableError(error)) {
 
 ## Effect Schema
 
-oRPC natively supports [Standard Schema](https://standardschema.dev/schema#what-schema-libraries-implement-the-spec), and [Effect Schema](https://effect.website/docs/schema/introduction/) implements that spec through [Schema.standardSchemaV1](https://effect.website/docs/schema/standard-schema/):
+oRPC natively supports [Standard Schema](https://standardschema.dev/schema#what-schema-libraries-implement-the-spec), and [Effect Schema](https://effect.website/docs/schema/introduction/) implements that spec through [Schema.toStandardSchemaV1](https://effect.website/docs/schema/standard-schema/):
 
 ```ts
 import { Schema } from 'effect'
 
 const procedure = os
-  .input(Schema.standardSchemaV1(Schema.Struct({ name: Schema.String })))
+  .input(Schema.toStandardSchemaV1(Schema.Struct({ name: Schema.String })))
   .handler(handlerGen(function* ({ input, context }) {
     return `Hello ${input.name}!`
   }))

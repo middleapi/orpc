@@ -1,3 +1,4 @@
+import { AbortError } from '@orpc/shared'
 import { Cause, Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { runPromise } from './runtime'
@@ -17,21 +18,28 @@ describe('runPromise & extractErrorFromCause', () => {
   })
 
   describe('failure - throws original error without FiberFailure wrapper', () => {
-    it('interrupts the effect when the provided signal aborts', async () => {
+    it('throws signal reason when interrupted with signal', async () => {
+      const signal = AbortSignal.timeout(0)
       await expect(
-        runPromise(Effect.never, { signal: AbortSignal.timeout(0) }),
-      ).rejects.toThrow(/Fiber interrupted/)
+        runPromise(Effect.never, { signal }),
+      ).rejects.toSatisfy(e => e === signal.reason)
+    })
+
+    it('throws a generic AbortError when interrupted without signal', async () => {
+      const effect = Effect.gen(function* () {
+        yield* Effect.interrupt
+      })
+
+      await expect(runPromise(effect)).rejects.toThrow(new AbortError('All fibers interrupted without error'))
     })
 
     it('throws the original Error instance from Effect.fail', async () => {
       const original = new TypeError('typed domain error')
-
       await expect(runPromise(Effect.fail(original))).rejects.toThrow(original)
     })
 
     it('throws the original defect from Effect.die', async () => {
       const defect = new RangeError('unexpected defect')
-
       await expect(runPromise(Effect.die(defect))).rejects.toThrow(defect)
     })
 
@@ -42,14 +50,6 @@ describe('runPromise & extractErrorFromCause', () => {
       })
 
       await expect(runPromise(effect)).rejects.toThrow(defect)
-    })
-
-    it('throws a synthesized Error on interrupt', async () => {
-      const effect = Effect.gen(function* () {
-        yield* Effect.interrupt
-      })
-
-      await expect(runPromise(effect)).rejects.toThrow(/Fiber interrupted/)
     })
 
     it('throws the finalizer error on sequential cause (mirrors try/finally)', async () => {
@@ -81,12 +81,12 @@ describe('runPromise & extractErrorFromCause', () => {
       await expect(runPromise(Effect.fail(original))).rejects.toBe(original)
     })
 
-    it('throws a sentinel Error when cause is empty', async () => {
+    it('throws a empty Error when cause is empty', async () => {
       const effect = Effect.failCause(Cause.empty)
 
       await expect(
         runPromise(effect),
-      ).rejects.toThrow(new Error('Effect failed with no error information'))
+      ).rejects.toThrow(new Error('Empty cause'))
     })
   })
 })

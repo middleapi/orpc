@@ -51,7 +51,7 @@
     "type:check": "tsc -b"
   },
   "peerDependencies": {
-    "effect": ">=3.21.2"
+    "effect": ">=4.0.0-beta.90"
   },
   "dependencies": {
     "@orpc/contract": "workspace:*",
@@ -60,6 +60,6 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "effect": "^3.21.3"
+    "effect": "4.0.0-beta.90"
   }
 }

@@ -33,6 +33,22 @@ describe('effectSchemaToJsonSchemaConverter', () => {
       expect(optional).toBe(false)
     })
 
+    it('uses standard json schema input and output generators', () => {
+      const schema = toStandardSchema(Effect.Schema.NumberFromString)
+      expect(converter.convert(schema, 'input')).toEqual([
+        expect.objectContaining({ type: 'string' }),
+        false,
+      ])
+      expect(converter.convert(schema, 'output')).toEqual([
+        expect.objectContaining({
+          anyOf: expect.arrayContaining([
+            expect.objectContaining({ type: 'number' }),
+          ]),
+        }),
+        false,
+      ])
+    })
+
     it('marks as optional if direction is input and schema accept undefined', () => {
       const [, optional1] = converter.convert(toStandardSchema(Effect.Schema.Unknown), 'input')
       expect(optional1).toBe(true)
@@ -43,12 +59,13 @@ describe('effectSchemaToJsonSchemaConverter', () => {
       expect(optional1).toBe(true)
     })
 
-    it('marks as required if validation throw', () => {
+    it('keeps converting and marks as required if standard validation throws', () => {
       const schema = toStandardSchema(Effect.Schema.Unknown)
       ;(schema as any)['~standard'].validate = () => {
         throw new Error('test')
       }
-      const [, optional] = converter.convert(schema, 'input')
+      const [jsonSchema, optional] = converter.convert(schema, 'input')
+      expect(jsonSchema).toEqual(expect.any(Object))
       expect(optional).toBe(false)
     })
   })

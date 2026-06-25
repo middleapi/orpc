@@ -14,15 +14,7 @@ const errorMap = {
 const schema1 = z.object({ schema1: z.number().transform(n => `${n}`) })
 const schema2 = z.object({ schema2: z.number().transform(n => `${n}`) })
 
-const NumberFromString = EffectSchema.transform(
-  EffectSchema.String,
-  EffectSchema.JsonNumber,
-  {
-    strict: true,
-    decode: literal => Number(literal),
-    encode: number => number.toString(),
-  },
-)
+const NumberFromString = EffectSchema.NumberFromString
 
 it('adds .input<EffectSchema> .output<EffectSchema> into ContractBuilder', async () => {
   const builder = {} as ContractBuilder<typeof errorMap>

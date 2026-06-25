@@ -27,6 +27,7 @@ minimumReleaseAgeExclude:
   - '@standardserver/node@0.0.24'
   - '@standardserver/peer@0.0.24'
   - '@standardserver/shared@0.0.24'
+  - effect@4.0.0-beta.90
 allowBuilds:
   '@parcel/watcher': false
   '@scarf/scarf': false
@@ -34,6 +35,7 @@ allowBuilds:
   '@tree-sitter-grammars/tree-sitter-yaml': false
   core-js-pure: false
   esbuild: false
+  msgpackr-extract: false
   msw: true
   protobufjs: false
   sharp: false
