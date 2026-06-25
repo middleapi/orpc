@@ -2,7 +2,7 @@ import type { Schema } from '@orpc/contract'
 import { getHiddenMetaPlugins, setHiddenMetaPlugins } from '@orpc/contract'
 import { Schema as EffectSchema } from 'effect'
 
-export function toStandardSchema<S extends EffectSchema.ConstraintDecoder<any, never>>(
+export function toStandardSchema<S extends EffectSchema.ConstraintDecoder<any>>(
   schema: S,
 ): Schema<S['Encoded'], S['Type']> {
   const converted = EffectSchema.toStandardSchemaV1(schema)
