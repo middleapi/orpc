@@ -27,7 +27,7 @@ minimumReleaseAgeExclude:
   - '@standardserver/node@0.0.24'
   - '@standardserver/peer@0.0.24'
   - '@standardserver/shared@0.0.24'
-  - effect@4.0.0-beta.88
+  - effect@4.0.0-beta.90
 allowBuilds:
   '@parcel/watcher': false
   '@scarf/scarf': false

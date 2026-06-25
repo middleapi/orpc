@@ -147,8 +147,8 @@ importers:
         specifier: ^26.0.0
         version: 26.0.0
       effect:
-        specifier: 4.0.0-beta.88
-        version: 4.0.0-beta.88
+        specifier: 4.0.0-beta.90
+        version: 4.0.0-beta.90
       markdown-it-task-lists:
         specifier: ^2.1.1
         version: 2.1.1
@@ -256,8 +256,8 @@ importers:
         version: link:../shared
     devDependencies:
       effect:
-        specifier: 4.0.0-beta.88
-        version: 4.0.0-beta.88
+        specifier: 4.0.0-beta.90
+        version: 4.0.0-beta.90
 
   packages/evlog:
     dependencies:
@@ -4324,8 +4324,8 @@ packages:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
     engines: {node: '>= 0.4'}
 
-  effect@4.0.0-beta.88:
-    resolution: {integrity: sha512-ml7Xr2BhU12RnNk5xX0lPqHv5pIXg7E161ooGlYncFd17Z5NKXL26DnfvwZsNBxYLS0ToGVMhb4Em7Z0A4dTDA==}
+  effect@4.0.0-beta.90:
+    resolution: {integrity: sha512-A0U3OE+2oyK/iFG6VYbFj9gwjJ7rFXjgP7qV+m7n/4lOREp9Lfk1///SlGCpX7HRueOCZO1l7aW0KByXuJeiPA==}
 
   electron-to-chromium@1.5.376:
     resolution: {integrity: sha512-cUVA7/RvbFTEuw/i3obUwDTRIXojaxkResf+ibByPFxjc6XK3VNtcQXV0NSbAlJ0FMjcJGgftVVB4Qo184EXvA==}
@@ -11842,7 +11842,7 @@ snapshots:
       es-errors: 1.3.0
       gopd: 1.2.0
 
-  effect@4.0.0-beta.88:
+  effect@4.0.0-beta.90:
     dependencies:
       '@standard-schema/spec': 1.1.0
       fast-check: 4.8.0
