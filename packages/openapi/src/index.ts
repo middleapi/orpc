@@ -5,6 +5,7 @@ export * from './meta'
 export * from './openapi-generator'
 export * from './openapi-json-serializer'
 export * from './openapi-serializer'
+export * from './router-utils'
 export * from './types'
 export * from './utils'
 
