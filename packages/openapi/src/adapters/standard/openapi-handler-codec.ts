@@ -53,7 +53,10 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
     this.customErrorResponseBodySerializer = options.customErrorResponseBodyEncoder
   }
 
-  async decodeInput(matched: { procedure: AnyProcedure, params?: undefined | Record<string, string> }, request: StandardLazyRequest): Promise<unknown> {
+  async decodeInput(
+    matched: { procedure: AnyProcedure, params?: undefined | Record<string, string> },
+    request: StandardLazyRequest,
+  ): Promise<unknown> {
     const [_, search] = parseStandardUrl(request.url)
 
     const meta = getOpenAPIMeta(matched.procedure)
@@ -96,7 +99,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
   /**
    * @throws {TypeError} If `outputStructure` is "detailed" and the output doesn't match the expected structure.
    */
-  encodeOutput(output: unknown, procedure: AnyProcedure, path: string[], _options: StandardHandlerHandleOptions<T>): Promisable<StandardResponse> {
+  encodeOutput(output: unknown, procedure: AnyProcedure, path: string[]): Promisable<StandardResponse> {
     const meta = getOpenAPIMeta(procedure)
     const successStatus = meta?.successStatus ?? DEFAULT_SUCCESS_STATUS
     const outputStructure = meta?.outputStructure ?? DEFAULT_OPENAPI_OUTPUT_STRUCTURE
@@ -130,7 +133,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
     }
   }
 
-  encodeError(error: AnyORPCError, _procedure: AnyProcedure, _path: string[], _options: StandardHandlerHandleOptions<T>): Promisable<StandardResponse> {
+  encodeError(error: AnyORPCError): Promisable<StandardResponse> {
     const status = this.errorStatusMap[error.code] ?? DEFAULT_ERROR_STATUS
 
     return {

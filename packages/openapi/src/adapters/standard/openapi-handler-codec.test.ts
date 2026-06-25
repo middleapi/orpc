@@ -587,7 +587,7 @@ describe('openAPIHandlerCodec', () => {
         const procedure = os.handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure, { serializer })
 
-        const response = codec.encodeOutput('__output__', procedure, [], options)
+        const response = codec.encodeOutput('__output__', procedure, [])
 
         expect(response).toEqual({
           status: 200,
@@ -608,7 +608,7 @@ describe('openAPIHandlerCodec', () => {
         const procedure = os.meta(openapi({ successStatus: 201 })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure, { serializer })
 
-        const response = codec.encodeOutput('__output__', procedure, [], options)
+        const response = codec.encodeOutput('__output__', procedure, [])
 
         expect(response).toEqual({
           status: 201,
@@ -633,7 +633,7 @@ describe('openAPIHandlerCodec', () => {
 
         const response = codec.encodeOutput({
           body: { ok: true },
-        }, procedure, ['detailed'], options as any)
+        }, procedure, ['detailed'] as any)
 
         expect(response).toEqual({
           status: 200,
@@ -656,7 +656,7 @@ describe('openAPIHandlerCodec', () => {
 
         const response = codec.encodeOutput({
           body: { ok: true },
-        }, procedure, ['detailed'], options as any)
+        }, procedure, ['detailed'] as any)
 
         expect(response).toEqual({
           status: 201,
@@ -681,7 +681,7 @@ describe('openAPIHandlerCodec', () => {
           status: 202,
           headers: { 'x-custom': 'value' },
           body: { ok: true },
-        }, procedure, [], options as any)
+        }, procedure, [])
 
         expect(response).toEqual({
           status: 202,
@@ -699,7 +699,7 @@ describe('openAPIHandlerCodec', () => {
         const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
 
-        expect(() => codec.encodeOutput(output, procedure, [], options as any)).toThrow('Invalid "detailed" output structure')
+        expect(() => codec.encodeOutput(output, procedure, [])).toThrow('Invalid "detailed" output structure')
       })
     })
   })
@@ -715,7 +715,7 @@ describe('openAPIHandlerCodec', () => {
       const codec = new OpenAPIHandlerCodec(procedure, { serializer })
       const error = new ORPCError('BAD_GATEWAY')
 
-      const response = codec.encodeError(error, procedure, [], options as any)
+      const response = codec.encodeError(error)
 
       expect(response).toEqual({
         status: 502,
@@ -753,7 +753,7 @@ describe('openAPIHandlerCodec', () => {
       })
 
       const firstError = new ORPCError('BAD_GATEWAY', { data: '__data1__' })
-      const firstResponse = codec.encodeError(firstError, procedure, [], options as any)
+      const firstResponse = codec.encodeError(firstError)
 
       expect(firstResponse).toEqual({
         status: 502,
@@ -762,7 +762,7 @@ describe('openAPIHandlerCodec', () => {
       })
 
       const secondError = new ORPCError('UNKNOWN_CODE' as any, { data: '__data2__' })
-      const secondResponse = codec.encodeError(secondError, procedure, [], options as any)
+      const secondResponse = codec.encodeError(secondError)
 
       expect(secondResponse).toEqual({
         status: DEFAULT_ERROR_STATUS,
@@ -792,7 +792,7 @@ describe('openAPIHandlerCodec', () => {
       })
 
       const error = new ORPCError('BAD_GATEWAY')
-      const response = codec.encodeError(error, procedure, ['procedure'], options as any)
+      const response = codec.encodeError(error)
 
       expect(response).toEqual({
         status: 599,
@@ -815,7 +815,7 @@ describe('openAPIHandlerCodec', () => {
       })
 
       const unknownError = new ORPCError('UNKNOWN_CODE' as any)
-      const unknownResponse = codec.encodeError(unknownError, procedure, [], options as any)
+      const unknownResponse = codec.encodeError(unknownError)
 
       expect(unknownResponse).toEqual({
         status: DEFAULT_ERROR_STATUS,
