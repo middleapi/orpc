@@ -10,12 +10,12 @@
     "postinstall": "nuxt prepare"
   },
   "devDependencies": {
-    "@orpc/client": "next",
-    "@orpc/json-schema": "next",
-    "@orpc/openapi": "next",
-    "@orpc/server": "next",
-    "@orpc/tanstack-query": "next",
-    "@orpc/zod": "next",
+    "@orpc/client": "^1",
+    "@orpc/json-schema": "^1",
+    "@orpc/openapi": "^1",
+    "@orpc/server": "^1",
+    "@orpc/tanstack-query": "^1",
+    "@orpc/zod": "^1",
     "@tanstack/vue-query": "^5.92.9",
     "nuxt": "^4.4.2",
     "vue": "latest",
