@@ -1,5 +1,5 @@
 /**
- * This plugin is heavily inspired by the [Hono Compression Plugin](https://github.com/honojs/hono/blob/main/src/middleware/compress/index.ts)
+ * This plugin is heavily inspired by the [Hono Compression Plugin](https://github.com/honojs/hono/blob/1.x/src/middleware/compress/index.ts)
  */
 
 import type { Context } from '../../context'
@@ -129,7 +129,7 @@ export class CompressionPlugin<T extends Context> implements FetchHandlerPlugin<
 }
 
 /**
- * https://github.com/honojs/hono/blob/main/src/utils/compress.ts#L9
+ * https://github.com/honojs/hono/blob/1.x/src/utils/compress.ts#L9
  */
 const COMPRESSIBLE_CONTENT_TYPE_REGEX = /^\s*(?:text\/(?!event-stream(?:[;\s]|$))[^;\s]+|application\/(?:javascript|json|xml|xml-dtd|ecmascript|dart|postscript|rtf|tar|toml|vnd\.dart|vnd\.ms-fontobject|vnd\.ms-opentype|wasm|x-httpd-php|x-javascript|x-ns-proxy-autoconfig|x-sh|x-tar|x-virtualbox-hdd|x-virtualbox-ova|x-virtualbox-ovf|x-virtualbox-vbox|x-virtualbox-vdi|x-virtualbox-vhd|x-virtualbox-vmdk|x-www-form-urlencoded)|font\/(?:otf|ttf)|image\/(?:bmp|vnd\.adobe\.photoshop|vnd\.microsoft\.icon|vnd\.ms-dds|x-icon|x-ms-bmp)|message\/rfc822|model\/gltf-binary|x-shader\/x-fragment|x-shader\/x-vertex|[^;\s]+?\+(?:json|text|xml|yaml))(?:[;\s]|$)/i
 function isCompressibleContentType(contentType: string | null): boolean {
@@ -140,7 +140,7 @@ function isCompressibleContentType(contentType: string | null): boolean {
 }
 
 /**
- * https://github.com/honojs/hono/blob/main/src/middleware/compress/index.ts#L10
+ * https://github.com/honojs/hono/blob/1.x/src/middleware/compress/index.ts#L10
  */
 const CACHE_CONTROL_NO_TRANSFORM_REGEX = /(?:^|,)\s*no-transform\s*(?:,|$)/i
 function isNoTransformCacheControl(cacheControl: string | null): boolean {

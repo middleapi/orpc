@@ -6,12 +6,12 @@
 
 <div align="center">
   <a href="https://codecov.io/gh/middleapi/orpc">
-    <img alt="codecov" src="https://codecov.io/gh/middleapi/orpc/branch/main/graph/badge.svg">
+    <img alt="codecov" src="https://codecov.io/gh/middleapi/orpc/branch/1.x/graph/badge.svg">
   </a>
   <a href="https://www.npmjs.com/package/@orpc/openapi-client">
     <img alt="weekly downloads" src="https://img.shields.io/npm/dw/%40orpc%2Fopenapi-client?logo=npm" />
   </a>
-  <a href="https://github.com/middleapi/orpc/blob/main/LICENSE">
+  <a href="https://github.com/middleapi/orpc/blob/1.x/LICENSE">
     <img alt="MIT License" src="https://img.shields.io/github/license/middleapi/orpc?logo=open-source-initiative" />
   </a>
   <a href="https://discord.gg/TXEbwRBvQn">
@@ -191,4 +191,4 @@ If you find oRPC valuable and would like to support its development, you can do 
 
 ## License
 
-Distributed under the MIT License. See [LICENSE](https://github.com/middleapi/orpc/blob/main/LICENSE) for more information.
+Distributed under the MIT License. See [LICENSE](https://github.com/middleapi/orpc/blob/1.x/LICENSE) for more information.

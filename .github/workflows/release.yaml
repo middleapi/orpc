@@ -59,7 +59,8 @@ jobs:
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - run: pnpm run packages:publish --tag=${{ steps.version.outputs.preid || 'latest' }}
+      # TODO: remove `--no-git-checks` and `latest` -> `v1` when v2 stable
+      - run: pnpm run packages:publish --tag=${{ steps.version.outputs.preid || 'latest' }} --no-git-checks
         env:
           NPM_CONFIG_PROVENANCE: true
 

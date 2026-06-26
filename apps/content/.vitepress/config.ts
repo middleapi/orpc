@@ -56,7 +56,7 @@ export default withMermaid(defineConfig({
       { icon: 'bluesky', link: 'https://bsky.app/profile/middleapi.com' },
     ],
     editLink: {
-      pattern: 'https://github.com/middleapi/orpc/blob/main/apps/content/:path',
+      pattern: 'https://github.com/middleapi/orpc/blob/1.x/apps/content/:path',
       text: 'Edit on GitHub',
     },
     footer: {

@@ -6,7 +6,7 @@ description: oRPC ecosystem & community resources
 # Ecosystem
 
 :::info
-If your project is missing here, please [open a PR](https://github.com/middleapi/orpc/edit/main/apps/content/docs/ecosystem.md) to add it.
+If your project is missing here, please [open a PR](https://github.com/middleapi/orpc/edit/1.x/apps/content/docs/ecosystem.md) to add it.
 :::
 
 ## Starter Kits
