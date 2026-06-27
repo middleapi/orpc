@@ -15,7 +15,7 @@ function isContentBlock(value: unknown): value is ContentBlock {
  * - Pre-formed content blocks (or arrays of them) pass through unchanged.
  * - `string` → a single text block.
  * - `undefined`/`null` → empty content.
- * - plain objects → a pretty-printed text block, plus `structuredContent`
+ * - plain objects → a JSON text block, plus `structuredContent`
  *   when the tool declares an `outputSchema`.
  * - other values (numbers, arrays, …) → a JSON text block.
  */
