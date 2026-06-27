@@ -10,7 +10,7 @@ describe('encodeToolResult', () => {
   it('adds structuredContent for a plain object when an output schema is declared', () => {
     const result = encodeToolResult({ a: 1 }, true)
     expect(result.structuredContent).toEqual({ a: 1 })
-    expect(result.content[0].type).toBe('text')
+    expect(result.content[0]!.type).toBe('text')
     expect(result.content[0]).toMatchObject({ type: 'text', text: '{"a":1}' })
   })
 
@@ -42,9 +42,9 @@ describe('encodeResourceContents', () => {
   it('encodes a plain object as an application/json resource', () => {
     const result = encodeResourceContents({ a: 1 }, 'u://1')
     expect(result).toHaveLength(1)
-    expect(result[0].uri).toBe('u://1')
-    expect(result[0].mimeType).toBe('application/json')
-    expect(JSON.parse(result[0].text!)).toEqual({ a: 1 })
+    expect(result[0]!.uri).toBe('u://1')
+    expect(result[0]!.mimeType).toBe('application/json')
+    expect(JSON.parse(result[0]!.text!)).toEqual({ a: 1 })
   })
 
   it('respects an explicit mimeType for a string', () => {

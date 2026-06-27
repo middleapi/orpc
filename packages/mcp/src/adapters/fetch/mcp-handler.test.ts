@@ -38,7 +38,7 @@ describe('mCPHandler (fetch)', () => {
 
     expect(response.status).toBe(200)
 
-    const body = await response.json()
+    const body: any = await response.json()
     expect(typeof body.result.protocolVersion).toBe('string')
     expect(body.result.protocolVersion).toBe('2025-11-25')
     expect(body.result.serverInfo).toEqual({ name: 'test', version: '0.1.0' })
@@ -50,7 +50,7 @@ describe('mCPHandler (fetch)', () => {
 
     expect(response.status).toBe(200)
 
-    const body = await response.json()
+    const body: any = await response.json()
     expect(Array.isArray(body.result.content)).toBe(true)
     expect(body.result.content[0]).toMatchObject({ type: 'text' })
     expect(body.result.content[0].text).toContain('Hello, World!')
@@ -71,7 +71,7 @@ describe('mCPHandler (fetch)', () => {
 
     expect(response.status).toBe(400)
 
-    const body = await response.json()
+    const body: any = await response.json()
     expect(body.error.code).toBe(-32700)
     expect(body.id).toBeNull()
   })
@@ -93,7 +93,7 @@ describe('mCPHandler (fetch)', () => {
 
     expect(response.status).toBe(200)
 
-    const body = await response.json()
+    const body: any = await response.json()
     expect(Array.isArray(body)).toBe(true)
     expect(body).toHaveLength(2)
     expect(body.map((r: any) => r.id)).toEqual([1, 2])
