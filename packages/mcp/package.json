@@ -68,6 +68,7 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@orpc/zod": "workspace:*",
     "zod": "^4.4.3"
   }
