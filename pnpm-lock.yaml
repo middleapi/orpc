@@ -644,6 +644,9 @@ importers:
       '@orpc/json-schema':
         specifier: beta
         version: link:../../packages/json-schema
+      '@orpc/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
       '@orpc/next':
         specifier: beta
         version: link:../../packages/next

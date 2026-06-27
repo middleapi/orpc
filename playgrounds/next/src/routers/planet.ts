@@ -2,6 +2,7 @@ import { protectedOS, publicOS } from '@/orpc'
 import { CreatingPlanetSchema, PlanetSchema } from '@/schemas/planet'
 import type { Planet } from '@/schemas/planet'
 import z from 'zod'
+import { mcp } from '@orpc/mcp'
 import { openapi } from '@orpc/openapi'
 import { call } from '@orpc/server'
 import { deleteFile, uploadFile } from './file'
@@ -26,6 +27,7 @@ export const listPlanets = publicOS
     summary: 'List all planets',
     tags: ['Planet'],
   }))
+  .meta(mcp.tool({ description: 'List all planets', annotations: { readOnlyHint: true } }))
   .input(z.object({
     keyword: z.string().optional(),
     limit: z.number().int().min(1).max(100).default(10),
@@ -47,6 +49,7 @@ export const findPlanet = publicOS
     summary: 'Find a planet',
     tags: ['Planet'],
   }))
+  .meta(mcp.tool({ description: 'Find a planet by id', annotations: { readOnlyHint: true } }))
   .input(z.object({
     id: PlanetSchema.shape.id,
   }))
@@ -69,6 +72,7 @@ export const createPlanet = protectedOS
     summary: 'Create a new planet',
     tags: ['Planet'],
   }))
+  .meta(mcp.tool({ description: 'Create a new planet' }))
   .input(CreatingPlanetSchema)
   .output(PlanetSchema)
   .handler(async ({ input, context }) => {
