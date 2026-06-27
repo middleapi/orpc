@@ -1,0 +1,74 @@
+{
+  "name": "@orpc/mcp",
+  "type": "module",
+  "version": "2.0.0-beta.5",
+  "license": "MIT",
+  "homepage": "https://orpc.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/middleapi/orpc.git",
+    "directory": "packages/mcp"
+  },
+  "keywords": [
+    "orpc",
+    "mcp",
+    "model-context-protocol"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "./standard": {
+        "types": "./dist/adapters/standard/index.d.mts",
+        "import": "./dist/adapters/standard/index.mjs",
+        "default": "./dist/adapters/standard/index.mjs"
+      },
+      "./fetch": {
+        "types": "./dist/adapters/fetch/index.d.mts",
+        "import": "./dist/adapters/fetch/index.mjs",
+        "default": "./dist/adapters/fetch/index.mjs"
+      },
+      "./node": {
+        "types": "./dist/adapters/node/index.d.mts",
+        "import": "./dist/adapters/node/index.mjs",
+        "default": "./dist/adapters/node/index.mjs"
+      },
+      "./stdio": {
+        "types": "./dist/adapters/stdio/index.d.mts",
+        "import": "./dist/adapters/stdio/index.mjs",
+        "default": "./dist/adapters/stdio/index.mjs"
+      }
+    }
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./standard": "./src/adapters/standard/index.ts",
+    "./fetch": "./src/adapters/fetch/index.ts",
+    "./node": "./src/adapters/node/index.ts",
+    "./stdio": "./src/adapters/stdio/index.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "unbuild",
+    "type:check": "tsc -b"
+  },
+  "dependencies": {
+    "@orpc/client": "workspace:*",
+    "@orpc/contract": "workspace:*",
+    "@orpc/json-schema": "workspace:*",
+    "@orpc/server": "workspace:*",
+    "@orpc/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@orpc/zod": "workspace:*",
+    "zod": "^4.4.3"
+  }
+}

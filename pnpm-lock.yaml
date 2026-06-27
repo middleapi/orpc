@@ -312,6 +312,31 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
+  packages/mcp:
+    dependencies:
+      '@orpc/client':
+        specifier: workspace:*
+        version: link:../client
+      '@orpc/contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@orpc/json-schema':
+        specifier: workspace:*
+        version: link:../json-schema
+      '@orpc/server':
+        specifier: workspace:*
+        version: link:../server
+      '@orpc/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@orpc/zod':
+        specifier: workspace:*
+        version: link:../zod
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+
   packages/next:
     dependencies:
       '@orpc/client':
