@@ -28,6 +28,18 @@ const failing = os
     throw errors.FORBIDDEN()
   })
 
+// Regression: a tool that DECLARES an output schema and then errors. The SDK
+// validates `structuredContent` against the outputSchema, so the in-band error
+// result must omit it — otherwise the client rejects with -32602.
+const failingTyped = os
+  .meta(mcp.tool({ description: 'errors but declares an output schema' }))
+  .input(z.object({}))
+  .output(z.object({ ok: z.boolean() }))
+  .errors({ CONFLICT: { message: 'boom' } })
+  .handler(({ errors }) => {
+    throw errors.CONFLICT()
+  })
+
 const config = os
   .meta(mcp({ type: 'resource', uri: 'config://app', mimeType: 'text/plain' }))
   .output(z.string())
@@ -52,7 +64,7 @@ const planTrip = os
     messages: [{ role: 'user' as const, content: { type: 'text' as const, text: `Plan a trip to ${input.destination}` } }],
   }))
 
-const router = { greet, failing, config, planet, planTrip }
+const router = { greet, failing, failingTyped, config, planet, planTrip }
 
 describe('official MCP SDK client <-> @orpc/mcp node handler (e2e over HTTP)', () => {
   let server: Server
@@ -113,6 +125,12 @@ describe('official MCP SDK client <-> @orpc/mcp node handler (e2e over HTTP)', (
     const result = await client.callTool({ name: 'failing', arguments: {} })
     expect(result.isError).toBe(true)
     expect((result.content as Array<{ type: string, text: string }>)[0]!.text).toBe('nope')
+  })
+
+  it('errors a schema-typed tool without violating its outputSchema (regression)', async () => {
+    const result = await client.callTool({ name: 'failingTyped', arguments: {} })
+    expect(result.isError).toBe(true)
+    expect((result.content as Array<{ type: string, text: string }>)[0]!.text).toBe('boom')
   })
 
   it('lists and reads a static resource', async () => {

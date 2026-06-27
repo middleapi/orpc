@@ -101,7 +101,9 @@ describe('standardMCPHandler', () => {
     const res = await send(createHandler(), 'tools/call', { name: 'failing', arguments: {} })
     expect(res.result.isError).toBe(true)
     expect(res.result.content[0].text).toBe('nope')
-    expect(res.result.structuredContent.code).toBe('FORBIDDEN')
+    // No structuredContent on errors — MCP clients validate it against the
+    // tool's success outputSchema, which an error payload would violate.
+    expect(res.result.structuredContent).toBeUndefined()
   })
 
   it('rejects an unknown tool with a JSON-RPC error', async () => {

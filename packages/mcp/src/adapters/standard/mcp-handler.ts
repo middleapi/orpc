@@ -192,10 +192,12 @@ export class StandardMCPHandler<T extends Context> {
     }
     catch (error) {
       if (error instanceof ORPCError) {
+        // Report as an in-band tool error so the model can react. We deliberately
+        // do NOT set `structuredContent` here: MCP clients validate it against the
+        // tool's `outputSchema` (the success shape), which an error would violate.
         return {
           content: [{ type: 'text', text: error.message }],
           isError: true,
-          structuredContent: error.toJSON(),
         }
       }
       throw error
