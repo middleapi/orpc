@@ -82,7 +82,6 @@ describe('mcp meta plugin', () => {
   })
 
   it('exposes a plugin named ~mcp from each factory', () => {
-    expect(mcp({}).name).toBe('~mcp')
     expect(mcp.tool().name).toBe('~mcp')
     expect(mcp.resource({ uri: 'x://1' }).name).toBe('~mcp')
     expect(mcp.prompt().name).toBe('~mcp')

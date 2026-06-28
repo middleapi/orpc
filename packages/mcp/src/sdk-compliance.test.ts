@@ -41,18 +41,18 @@ const failingTyped = os
   })
 
 const config = os
-  .meta(mcp({ type: 'resource', uri: 'config://app', mimeType: 'text/plain' }))
+  .meta(mcp.resource({ uri: 'config://app', mimeType: 'text/plain' }))
   .output(z.string())
   .handler(() => 'debug=true')
 
 const planet = os
-  .meta(mcp({ type: 'resource', uriTemplate: 'planet://{id}', mimeType: 'application/json' }))
+  .meta(mcp.resource({ uriTemplate: 'planet://{id}', mimeType: 'application/json' }))
   .input(z.object({ id: z.string() }))
   .output(z.object({ id: z.string(), name: z.string() }))
   .handler(({ input }) => ({ id: input.id, name: `Planet ${input.id}` }))
 
 const planTrip = os
-  .meta(mcp({ type: 'prompt', description: 'Plan a vacation' }))
+  .meta(mcp.prompt({ description: 'Plan a vacation' }))
   .input(z.object({ destination: z.string() }))
   .output(z.object({
     messages: z.array(z.object({

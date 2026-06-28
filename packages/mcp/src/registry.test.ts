@@ -20,20 +20,20 @@ const listPlanets = os
 
 // static resource (fixed uri)
 const config = os
-  .meta(mcp({ type: 'resource', uri: 'config://app', mimeType: 'text/plain' }))
+  .meta(mcp.resource({ uri: 'config://app', mimeType: 'text/plain' }))
   .output(z.string())
   .handler(() => 'debug=true')
 
 // templated resource (uriTemplate)
 const planetResource = os
-  .meta(mcp({ type: 'resource', uriTemplate: 'planet://{id}', mimeType: 'application/json' }))
+  .meta(mcp.resource({ uriTemplate: 'planet://{id}', mimeType: 'application/json' }))
   .input(z.object({ id: z.string() }))
   .output(z.object({ id: z.string(), name: z.string() }))
   .handler(({ input }) => ({ id: input.id, name: `Planet ${input.id}` }))
 
 // prompt (arguments derived from input)
 const planTrip = os
-  .meta(mcp({ type: 'prompt', description: 'Plan a trip' }))
+  .meta(mcp.prompt({ description: 'Plan a trip' }))
   .input(z.object({ destination: z.string(), days: z.number(), note: z.string().optional() }))
   .handler(() => ({ messages: [] }))
 
@@ -138,7 +138,8 @@ describe('buildMCPRegistry', () => {
 
   it('rejects a resource that defines neither uri nor uriTemplate', async () => {
     const broken = os
-      .meta(mcp({ type: 'resource' }))
+      // typed API requires uri|uriTemplate; cast to exercise the runtime guard
+      .meta((mcp.resource as (meta: any) => any)({}))
       .output(z.string())
       .handler(() => 'x')
 

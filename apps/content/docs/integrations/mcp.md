@@ -33,7 +33,7 @@ bun add @orpc/mcp@latest
 
 ## Annotate procedures
 
-Use `mcp()` (or the `mcp.tool` / `mcp.resource` / `mcp.prompt` shorthands). MCP metadata is independent of `openapi()` — a procedure can carry both.
+Annotate a procedure with `mcp.tool`, `mcp.resource`, or `mcp.prompt`. MCP metadata is independent of `openapi()` — a procedure can carry both.
 
 ```ts twoslash
 import { os } from '@orpc/server'
@@ -52,14 +52,14 @@ export const createPlanet = os
 
 // Resource — read-only data, addressed by a URI template (vars map to input)
 export const planet = os
-  .meta(mcp({ type: 'resource', uriTemplate: 'planet://{id}', mimeType: 'application/json' }))
+  .meta(mcp.resource({ uriTemplate: 'planet://{id}', mimeType: 'application/json' }))
   .input(z.object({ id: z.string() }))
   .output(z.object({ id: z.string(), name: z.string() }))
   .handler(({ input }) => ({ id: input.id, name: `Planet ${input.id}` }))
 
 // Prompt — arguments come from .input(), messages from the handler's return
 export const planTrip = os
-  .meta(mcp({ type: 'prompt', description: 'Plan a vacation' }))
+  .meta(mcp.prompt({ description: 'Plan a vacation' }))
   .input(z.object({ destination: z.string(), days: z.number() }))
   .output(z.object({
     messages: z.array(z.object({
@@ -74,11 +74,13 @@ export const planTrip = os
 export const router = { createPlanet, planet, planTrip }
 ```
 
-### `mcp()` meta options
+### Meta options
+
+The primitive is chosen by which factory you call (`mcp.tool` / `mcp.resource` /
+`mcp.prompt`); the remaining fields are:
 
 | Field          | Applies to | Description                                                                            |
 | -------------- | ---------- | -------------------------------------------------------------------------------------- |
-| `type`         | all        | `'tool'` (default), `'resource'`, or `'prompt'`.                                       |
 | `name`         | all        | Identifier in the server. Defaults to the router path joined by `_`.                   |
 | `title`        | all        | Human-readable display name.                                                           |
 | `description`  | all        | Explanation used by the model to decide when/how to use it.                            |

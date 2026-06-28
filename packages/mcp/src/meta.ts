@@ -80,23 +80,60 @@ export interface MCPMetaPlugin<
   name: '~mcp'
 }
 
-export interface MCPFunction {
-  /** Expose a procedure over MCP with explicit meta. */
-  (meta: MCPMeta): MCPMetaPlugin<any, any, any>
-  /** Expose a procedure as an MCP tool (the default primitive). */
-  tool: (meta?: Omit<MCPMeta, 'type' | 'uri' | 'uriTemplate' | 'mimeType'>) => MCPMetaPlugin<any, any, any>
+/** Author-facing meta for {@link mcp.tool}. */
+export type MCPToolMetaInput = Omit<MCPMeta, 'type' | 'uri' | 'uriTemplate' | 'mimeType'>
+
+/** Author-facing meta for {@link mcp.prompt}. */
+export type MCPPromptMetaInput = Omit<MCPMeta, 'type' | 'uri' | 'uriTemplate' | 'mimeType' | 'annotations' | 'outputSchema'>
+
+/** Author-facing meta for {@link mcp.resource} — requires exactly one of `uri` / `uriTemplate`. */
+export type MCPResourceMetaInput
+  = & Omit<MCPMeta, 'type' | 'annotations' | 'outputSchema' | 'uri' | 'uriTemplate'>
+    & (
+      | { uri: `${string}://${string}`, uriTemplate?: never }
+      | { uriTemplate: string, uri?: never }
+  )
+
+export interface MCPNamespace {
+  /** Expose a procedure as an MCP tool (the most common primitive). */
+  tool: (meta?: MCPToolMetaInput) => MCPMetaPlugin<any, any, any>
   /** Expose a (read-only) procedure as an MCP resource. Requires `uri` or `uriTemplate`. */
-  resource: (meta: Omit<MCPMeta, 'type' | 'annotations' | 'outputSchema'>) => MCPMetaPlugin<any, any, any>
+  resource: (meta: MCPResourceMetaInput) => MCPMetaPlugin<any, any, any>
   /** Expose a procedure as an MCP prompt. Arguments are derived from `.input()`. */
-  prompt: (meta?: Omit<MCPMeta, 'type' | 'uri' | 'uriTemplate' | 'mimeType' | 'annotations' | 'outputSchema'>) => MCPMetaPlugin<any, any, any>
+  prompt: (meta?: MCPPromptMetaInput) => MCPMetaPlugin<any, any, any>
+}
+
+function createMCPMetaPlugin(incoming: MCPMeta): MCPMetaPlugin<any, any, any> {
+  return {
+    name: '~mcp',
+    init(meta: Meta): Meta {
+      const existing = meta['~mcp'] as MCPMeta | undefined
+
+      const annotations = existing?.annotations && incoming.annotations
+        ? { ...existing.annotations, ...incoming.annotations }
+        : 'annotations' in incoming ? incoming.annotations : existing?.annotations
+
+      const merged: MCPMeta = {
+        ...existing,
+        ...incoming,
+        ...(annotations !== undefined ? { annotations } : {}),
+      }
+
+      return {
+        ...meta,
+        '~mcp': merged,
+      }
+    },
+  }
 }
 
 /**
- * Meta plugin that exposes a procedure over MCP (opt-in).
+ * Expose a procedure over MCP (opt-in). Use one of `mcp.tool` / `mcp.resource` /
+ * `mcp.prompt` — there is no bare `mcp()` form.
  *
- * Mirrors `openapi()`: it writes a single `~mcp` key. Calling it multiple times
- * merges (annotations shallow-merge, other fields overwrite). Independent of any
- * `openapi()` meta on the same procedure.
+ * Each writes a single `~mcp` meta key (independent of any `openapi()` meta on the
+ * same procedure); calling more than once merges (annotations shallow-merge,
+ * other fields overwrite).
  *
  * @example
  * ```ts
@@ -107,31 +144,11 @@ export interface MCPFunction {
  *   .handler(...)
  * ```
  */
-export const mcp: MCPFunction = ((incoming: MCPMeta): MCPMetaPlugin<any, any, any> => ({
-  name: '~mcp',
-  init(meta: Meta): Meta {
-    const existing = meta['~mcp'] as MCPMeta | undefined
-
-    const annotations = existing?.annotations && incoming.annotations
-      ? { ...existing.annotations, ...incoming.annotations }
-      : 'annotations' in incoming ? incoming.annotations : existing?.annotations
-
-    const merged: MCPMeta = {
-      ...existing,
-      ...incoming,
-      ...(annotations !== undefined ? { annotations } : {}),
-    }
-
-    return {
-      ...meta,
-      '~mcp': merged,
-    }
-  },
-})) as MCPFunction
-
-mcp.tool = (meta = {}) => mcp({ ...meta, type: 'tool' })
-mcp.resource = meta => mcp({ ...meta, type: 'resource' })
-mcp.prompt = (meta = {}) => mcp({ ...meta, type: 'prompt' })
+export const mcp: MCPNamespace = {
+  tool: (meta = {}) => createMCPMetaPlugin({ ...meta, type: 'tool' }),
+  resource: meta => createMCPMetaPlugin({ ...meta, type: 'resource' }),
+  prompt: (meta = {}) => createMCPMetaPlugin({ ...meta, type: 'prompt' }),
+}
 
 /**
  * Read the MCP meta a procedure (or lazy router) was annotated with, if any.
