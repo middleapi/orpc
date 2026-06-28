@@ -101,9 +101,4 @@ export default antfu({
     'eslint-comments/no-unlimited-disable': 'off',
     'node/prefer-global/process': 'off',
   },
-}, {
-  files: ['playgrounds/nest/**'],
-  rules: {
-    '@typescript-eslint/consistent-type-imports': 'off',
-  },
 })

@@ -19,7 +19,7 @@ featuring pre-configured examples accessible instantly via StackBlitz or local s
 | Svelte Kit Playground            | [Open in StackBlitz](https://stackblitz.com/github/middleapi/orpc/tree/1.x/playgrounds/svelte-kit)        | [View Source](https://github.com/middleapi/orpc/tree/1.x/playgrounds/svelte-kit)           |
 | Astro Playground                 | [Open in StackBlitz](https://stackblitz.com/github/middleapi/orpc/tree/1.x/playgrounds/astro)             | [View Source](https://github.com/middleapi/orpc/tree/1.x/playgrounds/astro)                |
 | Contract-First Playground        | [Open in StackBlitz](https://stackblitz.com/github/middleapi/orpc/tree/1.x/playgrounds/contract-first)    | [View Source](https://github.com/middleapi/orpc/tree/1.x/playgrounds/contract-first)       |
-| NestJS Playground                | [Open in StackBlitz](https://stackblitz.com/github/middleapi/orpc/tree/1.x/playgrounds/nest)              | [View Source](https://github.com/middleapi/orpc/tree/1.x/playgrounds/nest)                 |
+| NestJS Playground                | [Open in StackBlitz](https://stackblitz.com/github/middleapi/orpc-nest/tree/1.x/playgrounds/nest)         | [View Source](https://github.com/middleapi/orpc-nest/tree/1.x/playgrounds/nest)            |
 | Cloudflare Worker                | [Open in StackBlitz](https://stackblitz.com/github/middleapi/orpc/tree/1.x/playgrounds/cloudflare-worker) | [View Source](https://github.com/middleapi/orpc/tree/1.x/playgrounds/cloudflare-worker)    |
 | Bun WebSocket + OpenTelemetry    |                                                                                                           | [View Source](https://github.com/middleapi/orpc/tree/1.x/playgrounds/bun-websocket-otel)   |
 | Electron Playground              |                                                                                                           | [View Source](https://github.com/middleapi/orpc/tree/1.x/playgrounds/electron)             |
@@ -42,7 +42,7 @@ npx giget gh:middleapi/orpc/playgrounds/solid-start#1.x orpc-solid-start-playgro
 npx giget gh:middleapi/orpc/playgrounds/svelte-kit#1.x orpc-svelte-kit-playground
 npx giget gh:middleapi/orpc/playgrounds/astro#1.x orpc-astro-playground
 npx giget gh:middleapi/orpc/playgrounds/contract-first#1.x orpc-contract-first-playground
-npx giget gh:middleapi/orpc/playgrounds/nest#1.x orpc-nest-playground
+npx giget gh:middleapi/orpc-nest/playgrounds/nest#1.x orpc-nest-playground
 npx giget gh:middleapi/orpc/playgrounds/cloudflare-worker#1.x orpc-cloudflare-worker-playground
 npx giget gh:middleapi/orpc/playgrounds/bun-websocket-otel#1.x orpc-bun-websocket-otel-playground
 npx giget gh:middleapi/orpc/playgrounds/electron#1.x orpc-electron-playground
