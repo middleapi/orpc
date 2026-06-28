@@ -80,10 +80,9 @@ describe('mCPHandler (node adapter, real server)', () => {
 
   it('rejects a GET request with HTTP 405', async () => {
     const res = await fetch(baseUrl, { method: 'GET' })
+    await res.body?.cancel()
     expect(res.status).toBe(405)
-
-    const json = await res.json() as any
-    expect(json.error.message).toBe('Method Not Allowed')
+    expect(res.headers.get('allow')).toBe('POST')
   })
 
   it('returns a JSON-RPC parse error for invalid JSON with HTTP 400', async () => {

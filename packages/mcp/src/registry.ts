@@ -150,6 +150,21 @@ export async function buildMCPRegistry(
   return registry
 }
 
+/** A lazily-built, memoized MCP registry shared between the codec and the plugin. */
+export interface MCPRegistryProvider {
+  get: () => Promise<MCPRegistry>
+}
+
+export function createMCPRegistryProvider(
+  router: AnyRouter,
+  options: BuildMCPRegistryOptions = {},
+): MCPRegistryProvider {
+  let promise: Promise<MCPRegistry> | undefined
+  return {
+    get: () => (promise ??= buildMCPRegistry(router, options)),
+  }
+}
+
 function defaultName(path: string[]): string {
   const joined = path.join('_').replace(/[^\w-]/g, '_')
   return joined.length > 0 ? joined.slice(0, 128) : 'unnamed'

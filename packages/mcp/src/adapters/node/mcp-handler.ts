@@ -1,23 +1,25 @@
-import type { AnyRouter, Context } from '@orpc/server'
-import type { Buffer } from 'node:buffer'
-import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { StandardMCPHandlerOptions } from '../standard/mcp-handler'
-import { stringifyJSON } from '@orpc/shared'
-import { JSONRPC_VERSION, METHOD_NOT_FOUND, PARSE_ERROR } from '../../constants'
-import { StandardMCPHandler } from '../standard/mcp-handler'
+import type { JsonSchemaConverter } from '@orpc/json-schema'
+import type { Context, Router } from '@orpc/server'
+import type { NodeHttpHandlerOptions } from '@orpc/server/node'
+import type { StandardHandlerOptions } from '@orpc/server/standard'
+import type { MCPHandlerPluginOptions } from '../standard/mcp-handler-plugin'
+import { NodeHttpHandler } from '@orpc/server/node'
+import { StandardHandler } from '@orpc/server/standard'
+import { toArray } from '@orpc/shared'
+import { createMCPRegistryProvider } from '../../registry'
+import { MCPHandlerCodec } from '../standard/mcp-handler-codec'
+import { MCPHandlerPlugin } from '../standard/mcp-handler-plugin'
 
-export interface MCPHandlerHandleOptions<T extends Context> {
-  context: T
-  signal?: AbortSignal
-}
-
-export interface MCPHandlerHandleResult {
-  matched: true
+export interface MCPHandlerOptions<T extends Context>
+  extends NodeHttpHandlerOptions<T>, Omit<StandardHandlerOptions<T>, 'plugins'>, MCPHandlerPluginOptions {
+  /** Schema → JSON Schema converters (e.g. `new ZodToJsonSchemaConverter()`). */
+  converters?: JsonSchemaConverter[]
 }
 
 /**
- * Serves an oRPC router as an MCP server over the Streamable HTTP transport
- * on a Node.js `http`/`https` server.
+ * Serves an oRPC router as an MCP server over the Streamable HTTP transport on a
+ * Node.js `http`/`https` server. The Node adapter reads/limits the request body
+ * (`BodyLimitHandlerPlugin`) — no hand-rolled body parsing.
  *
  * @example
  * ```ts
@@ -25,69 +27,14 @@ export interface MCPHandlerHandleResult {
  * createServer((req, res) => handler.handle(req, res, { context: {} }))
  * ```
  */
-export class MCPHandler<T extends Context> {
-  private readonly standardHandler: StandardMCPHandler<T>
-
-  constructor(router: AnyRouter, options: StandardMCPHandlerOptions = {}) {
-    this.standardHandler = new StandardMCPHandler<T>(router, options)
-  }
-
-  async handle(
-    request: IncomingMessage,
-    response: ServerResponse,
-    options: MCPHandlerHandleOptions<T>,
-  ): Promise<MCPHandlerHandleResult> {
-    if (request.method === 'GET') {
-      sendJson(response, 405, {
-        jsonrpc: JSONRPC_VERSION,
-        id: null,
-        error: { code: METHOD_NOT_FOUND, message: 'Method Not Allowed' },
-      })
-      return { matched: true }
-    }
-
-    let payload: unknown
-    try {
-      payload = JSON.parse(await readBody(request))
-    }
-    catch {
-      sendJson(response, 400, {
-        jsonrpc: JSONRPC_VERSION,
-        id: null,
-        error: { code: PARSE_ERROR, message: 'Parse error' },
-      })
-      return { matched: true }
-    }
-
-    const { responses, isBatch } = await this.standardHandler.handlePayload(payload, {
-      context: options.context,
-      signal: options.signal,
+export class MCPHandler<T extends Context> extends NodeHttpHandler<T> {
+  constructor(router: Router<T>, options: NoInfer<MCPHandlerOptions<T>> = {}) {
+    const registry = createMCPRegistryProvider(router, { converters: options.converters })
+    const codec = new MCPHandlerCodec<T>(registry)
+    const handler = new StandardHandler<T>(codec, {
+      ...options,
+      plugins: [new MCPHandlerPlugin<T>(registry, options), ...toArray(options.plugins)],
     })
-
-    if (responses.length === 0) {
-      response.statusCode = 202
-      response.end()
-      return { matched: true }
-    }
-
-    sendJson(response, 200, isBatch ? responses : responses[0])
-    return { matched: true }
+    super(handler, options)
   }
-}
-
-function readBody(request: IncomingMessage): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let data = ''
-    request.on('data', (chunk: Buffer | string) => {
-      data += chunk
-    })
-    request.on('end', () => resolve(data))
-    request.on('error', reject)
-  })
-}
-
-function sendJson(response: ServerResponse, status: number, body: unknown): void {
-  response.statusCode = status
-  response.setHeader('content-type', 'application/json')
-  response.end(stringifyJSON(body) ?? '')
 }

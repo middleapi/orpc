@@ -1,74 +1,45 @@
-import type { AnyRouter, Context } from '@orpc/server'
-import type { JSONRPCResponse } from '../../types'
-import type { StandardMCPHandlerOptions } from '../standard/mcp-handler'
-import { stringifyJSON } from '@orpc/shared'
-import { JSONRPC_VERSION, PARSE_ERROR } from '../../constants'
-import { StandardMCPHandler } from '../standard/mcp-handler'
+import type { JsonSchemaConverter } from '@orpc/json-schema'
+import type { Context, Router } from '@orpc/server'
+import type { FetchHandlerOptions } from '@orpc/server/fetch'
+import type { StandardHandlerOptions } from '@orpc/server/standard'
+import type { MCPHandlerPluginOptions } from '../standard/mcp-handler-plugin'
+import { FetchHandler } from '@orpc/server/fetch'
+import { StandardHandler } from '@orpc/server/standard'
+import { toArray } from '@orpc/shared'
+import { createMCPRegistryProvider } from '../../registry'
+import { MCPHandlerCodec } from '../standard/mcp-handler-codec'
+import { MCPHandlerPlugin } from '../standard/mcp-handler-plugin'
 
-export interface MCPHandlerHandleOptions<T extends Context> {
-  context: T
-  signal?: AbortSignal
-}
-
-export interface MCPHandlerHandleResult {
-  response: Response
+export interface MCPHandlerOptions<T extends Context>
+  extends FetchHandlerOptions<T>, Omit<StandardHandlerOptions<T>, 'plugins'>, MCPHandlerPluginOptions {
+  /** Schema → JSON Schema converters (e.g. `new ZodToJsonSchemaConverter()`). */
+  converters?: JsonSchemaConverter[]
 }
 
 /**
  * Serves an oRPC router as an MCP server over the Streamable HTTP transport
  * (POST JSON-RPC) on a Fetch-compatible runtime (Bun, Deno, Workers, Next.js…).
  *
+ * Built on oRPC's {@link StandardHandler}: `tools/call` / `resources/read` /
+ * `prompts/get` run through the standard procedure pipeline (middleware,
+ * validation, context, plugins), while {@link MCPHandlerPlugin} answers the
+ * MCP protocol routes (`initialize`, the `list` methods, …).
+ *
  * @example
  * ```ts
  * const handler = new MCPHandler(router, { converters: [new ZodToJsonSchemaConverter()] })
  * const { response } = await handler.handle(request, { context: {} })
- * return response
+ * return response ?? new Response('Not found', { status: 404 })
  * ```
  */
-export class MCPHandler<T extends Context> {
-  private readonly standardHandler: StandardMCPHandler<T>
-
-  constructor(router: AnyRouter, options: StandardMCPHandlerOptions = {}) {
-    this.standardHandler = new StandardMCPHandler<T>(router, options)
-  }
-
-  async handle(request: Request, options: MCPHandlerHandleOptions<T>): Promise<MCPHandlerHandleResult> {
-    if (request.method === 'GET') {
-      // Server -> client SSE stream is not implemented yet.
-      return { response: new Response('Method Not Allowed', { status: 405 }) }
-    }
-
-    let payload: unknown
-    try {
-      payload = await request.json()
-    }
-    catch {
-      return {
-        response: jsonResponse(
-          { jsonrpc: JSONRPC_VERSION, id: null, error: { code: PARSE_ERROR, message: 'Parse error' } },
-          400,
-        ),
-      }
-    }
-
-    const { responses, isBatch } = await this.standardHandler.handlePayload(payload, {
-      context: options.context,
-      signal: options.signal ?? request.signal,
+export class MCPHandler<T extends Context> extends FetchHandler<T> {
+  constructor(router: Router<T>, options: NoInfer<MCPHandlerOptions<T>> = {}) {
+    const registry = createMCPRegistryProvider(router, { converters: options.converters })
+    const codec = new MCPHandlerCodec<T>(registry)
+    const handler = new StandardHandler<T>(codec, {
+      ...options,
+      plugins: [new MCPHandlerPlugin<T>(registry, options), ...toArray(options.plugins)],
     })
-
-    if (responses.length === 0) {
-      // Only notifications/responses were sent — acknowledge with 202.
-      return { response: new Response(null, { status: 202 }) }
-    }
-
-    const body: JSONRPCResponse | JSONRPCResponse[] = isBatch ? responses : responses[0]!
-    return { response: jsonResponse(body, 200) }
+    super(handler, options)
   }
-}
-
-function jsonResponse(body: unknown, status: number): Response {
-  return new Response(stringifyJSON(body) ?? '', {
-    status,
-    headers: { 'content-type': 'application/json' },
-  })
 }

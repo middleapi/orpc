@@ -105,9 +105,32 @@ const handler = new MCPHandler(router, {
 
 export async function POST(request: Request) {
   const { response } = await handler.handle(request, { context: {} })
-  return response
+  return response ?? new Response('Not found', { status: 404 })
 }
 ```
+
+`MCPHandler` is built on oRPC's `StandardHandler`: `tools/call` / `resources/read`
+/ `prompts/get` run through the normal procedure pipeline (middleware, validation,
+context) and accept any `StandardHandler` plugin (CORS, body-limit, OpenTelemetry),
+while the MCP protocol routes (`initialize`, the `list` methods, …) are answered
+by an auto-registered plugin.
+
+### Security (DNS-rebinding / Origin)
+
+For browser-facing HTTP servers, enable Origin/Host validation (a missing `Origin`
+still passes, for non-browser clients):
+
+```ts
+export const handler = new MCPHandler(router, {
+  converters: [new ZodToJsonSchemaConverter()],
+  enableDnsRebindingProtection: true,
+  allowedOrigins: ['https://your-app.example'],
+  allowedHosts: ['your-app.example'],
+})
+```
+
+Request body size is bounded via oRPC's `BodyLimitHandlerPlugin` (node) — pass it
+in `plugins`.
 
 ### Streamable HTTP (Node.js)
 
@@ -160,5 +183,6 @@ export const handlers = {
 ## Notes & limitations
 
 - Targets MCP protocol revision `2025-11-25` (negotiated at `initialize`; older revisions are accepted).
-- Server → client streaming (`GET` SSE), `listChanged`/`subscribe` notifications, sessions, and pagination cursors are not implemented yet.
+- One JSON-RPC message per request — **JSON-RPC batching is not supported** (incompatible with the standard one-request/one-procedure flow, and deprecated in the MCP spec direction).
+- Server → client streaming (`GET` SSE), `listChanged`/`subscribe` notifications, sessions (`Mcp-Session-Id`), pagination cursors, and built-in OAuth are not implemented yet. (Auth can be added today via a `StandardHandler` interceptor that reads the request and enriches `context`.)
 - Resource handlers should be side-effect free; only annotate read-only procedures as resources.

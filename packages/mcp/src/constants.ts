@@ -23,3 +23,5 @@ export const INVALID_PARAMS = -32602
 export const INTERNAL_ERROR = -32603
 /** MCP-specific: resource (or prompt) not found. */
 export const RESOURCE_NOT_FOUND = -32002
+/** Implementation-defined server error range (-32000 to -32099); used for rejected Origins. */
+export const FORBIDDEN_ERROR = -32000
