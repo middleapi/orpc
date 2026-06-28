@@ -1,66 +1,105 @@
----
-title: MCP
-description: Expose your oRPC router as a Model Context Protocol (MCP) server — tools, resources, and prompts — alongside RPC and OpenAPI.
----
+# MCP Integration
 
-# Model Context Protocol (MCP)
+[Model Context Protocol (MCP)](https://modelcontextprotocol.io) is an open standard for connecting AI applications to external tools and data. This integration exposes your oRPC router as an MCP server, so the **same** procedures you already serve over RPC and OpenAPI become MCP **tools**, **resources**, and **prompts** — usable by clients like Claude, ChatGPT, and IDEs, with the same types, validation, and middleware.
 
-[`@orpc/mcp`](https://www.npmjs.com/package/@orpc/mcp) turns an oRPC router into an [MCP](https://modelcontextprotocol.io) server, so the **same** procedures you already serve over RPC and OpenAPI can be called by MCP clients (Claude, ChatGPT, IDEs, agents).
-
-Exposure is **opt-in**: only procedures annotated with `mcp.tool` / `mcp.resource` / `mcp.prompt` are visible to MCP clients. The procedure's `.input()` schema becomes the tool's JSON Schema `inputSchema`, and `.output()` becomes its `outputSchema` — reusing the same converters as [`@orpc/openapi`](/docs/openapi/openapi-specification).
+::: warning
+This guide assumes you are familiar with [MCP](https://modelcontextprotocol.io). The integration targets protocol revision `2025-11-25`.
+:::
 
 ## Installation
 
 ::: code-group
 
 ```sh [npm]
-npm install @orpc/mcp@latest
-```
-
-```sh [pnpm]
-pnpm add @orpc/mcp@latest
+npm install @orpc/mcp@beta
 ```
 
 ```sh [yarn]
-yarn add @orpc/mcp@latest
+yarn add @orpc/mcp@beta
+```
+
+```sh [pnpm]
+pnpm add @orpc/mcp@beta
 ```
 
 ```sh [bun]
-bun add @orpc/mcp@latest
+bun add @orpc/mcp@beta
+```
+
+```sh [deno]
+deno add npm:@orpc/mcp@beta
 ```
 
 :::
 
-## Annotate procedures
+## Setup
 
-Annotate a procedure with `mcp.tool`, `mcp.resource`, or `mcp.prompt`. MCP metadata is independent of `openapi()` — a procedure can carry both.
+Exposing a procedure to MCP is **opt-in**: annotate it with `mcp.tool`, `mcp.resource`, or `mcp.prompt`. MCP metadata is independent of any [`openapi`](/docs/openapi/routing) meta, so a single procedure can be served over REST and MCP at the same time.
 
 ```ts twoslash
-import { os } from '@orpc/server'
 import { mcp } from '@orpc/mcp'
+import { os } from '@orpc/server'
 import * as z from 'zod'
 
-// Tool (the default) — the model can call it
+export const createPlanet = os
+  .meta(mcp.tool({ description: 'Create a new planet' }))
+  .input(z.object({ name: z.string() }))
+  .output(z.object({ id: z.string(), name: z.string() }))
+  .handler(({ input }) => ({ id: crypto.randomUUID(), name: input.name }))
+
+export const router = { createPlanet }
+```
+
+Then [serve the router](#serving) with one of the `MCPHandler` adapters.
+
+## Tools
+
+Tools are functions the model can call. A procedure's `.input()` becomes the tool's JSON Schema, its return value becomes the result, and its `.output()` adds an output schema plus structured content. Thrown [typed errors](/docs/error-handling) are reported back to the model as in-band tool errors, so it can react to them.
+
+```ts
 export const createPlanet = os
   .meta(mcp.tool({
     description: 'Create a new planet',
     annotations: { destructiveHint: false },
   }))
-  .input(z.object({ name: z.string(), description: z.string().optional() }))
-  .output(z.object({ id: z.string(), name: z.string() }))
-  .handler(({ input }) => ({ id: crypto.randomUUID(), name: input.name }))
+  .input(CreatingPlanetSchema)
+  .output(PlanetSchema)
+  .handler(({ input }) => create(input))
+```
 
-// Resource — read-only data, addressed by a URI template (vars map to input)
+Behavior hints — `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` — go in `annotations`.
+
+## Resources
+
+Resources expose read-only data addressed by a URI. Use a fixed `uri` for a single resource, or a `uriTemplate` whose variables map to the procedure's input.
+
+```ts
+// Static resource
+export const appConfig = os
+  .meta(mcp.resource({ uri: 'config://app', mimeType: 'application/json' }))
+  .output(ConfigSchema)
+  .handler(() => getConfig())
+
+// Templated resource — `{id}` is read from the input
 export const planet = os
   .meta(mcp.resource({ uriTemplate: 'planet://{id}', mimeType: 'application/json' }))
   .input(z.object({ id: z.string() }))
-  .output(z.object({ id: z.string(), name: z.string() }))
-  .handler(({ input }) => ({ id: input.id, name: `Planet ${input.id}` }))
+  .output(PlanetSchema)
+  .handler(({ input }) => findPlanet(input.id))
+```
 
-// Prompt — arguments come from .input(), messages from the handler's return
+::: tip
+Only annotate read-only, side-effect-free procedures as resources.
+:::
+
+## Prompts
+
+Prompts are reusable templates a user can invoke. The arguments are derived from the procedure's `.input()`, and the handler returns the prompt messages.
+
+```ts
 export const planTrip = os
   .meta(mcp.prompt({ description: 'Plan a vacation' }))
-  .input(z.object({ destination: z.string(), days: z.number() }))
+  .input(z.object({ destination: z.string() }))
   .output(z.object({
     messages: z.array(z.object({
       role: z.enum(['user', 'assistant']),
@@ -68,33 +107,17 @@ export const planTrip = os
     })),
   }))
   .handler(({ input }) => ({
-    messages: [{ role: 'user' as const, content: { type: 'text' as const, text: `Plan ${input.days} days in ${input.destination}` } }],
+    messages: [{ role: 'user', content: { type: 'text', text: `Plan a trip to ${input.destination}` } }],
   }))
-
-export const router = { createPlanet, planet, planTrip }
 ```
 
-### Meta options
+## Serving
 
-The primitive is chosen by which factory you call (`mcp.tool` / `mcp.resource` /
-`mcp.prompt`); the remaining fields are:
+`MCPHandler` speaks the MCP protocol over the [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) transport (Fetch or Node.js) or over stdio. Pass the schema converter for your validation library — the same converters used by [`@orpc/openapi`](/docs/openapi/specification).
 
-| Field          | Applies to | Description                                                                            |
-| -------------- | ---------- | -------------------------------------------------------------------------------------- |
-| `name`         | all        | Identifier in the server. Defaults to the router path joined by `_`.                   |
-| `title`        | all        | Human-readable display name.                                                           |
-| `description`  | all        | Explanation used by the model to decide when/how to use it.                            |
-| `annotations`  | tool       | `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`.                  |
-| `outputSchema` | tool       | Emit an MCP `outputSchema` from `.output()` (default: `true` when `.output()` is set). |
-| `uri`          | resource   | Fixed URI of a static resource (e.g. `config://app`).                                  |
-| `uriTemplate`  | resource   | Templated URI (e.g. `planet://{id}`); variables bind to the procedure input.           |
-| `mimeType`     | resource   | MIME type of the resource contents.                                                    |
+It is built on oRPC's standard request/response flow, so tool, resource, and prompt calls run through your [middleware](/docs/middleware), validation, and context, and any handler plugin (CORS, body limit, OpenTelemetry) composes as usual.
 
-## Serve it
-
-`MCPHandler` speaks the MCP protocol (`initialize`, `tools/list`, `tools/call`, `resources/*`, `prompts/*`) over the [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) transport (fetch/node) or stdio. Pass the schema converters for your validation library.
-
-### Streamable HTTP (fetch)
+### Fetch
 
 ```ts
 import { MCPHandler } from '@orpc/mcp/fetch'
@@ -111,16 +134,52 @@ export async function POST(request: Request) {
 }
 ```
 
-`MCPHandler` is built on oRPC's `StandardHandler`: `tools/call` / `resources/read`
-/ `prompts/get` run through the normal procedure pipeline (middleware, validation,
-context) and accept any `StandardHandler` plugin (CORS, body-limit, OpenTelemetry),
-while the MCP protocol routes (`initialize`, the `list` methods, …) are answered
-by an auto-registered plugin.
+### Node.js
 
-### Security (DNS-rebinding / Origin)
+```ts
+import { createServer } from 'node:http'
+import { MCPHandler } from '@orpc/mcp/node'
+import { ZodToJsonSchemaConverter } from '@orpc/zod'
 
-For browser-facing HTTP servers, enable Origin/Host validation (a missing `Origin`
-still passes, for non-browser clients):
+const handler = new MCPHandler(router, { converters: [new ZodToJsonSchemaConverter()] })
+
+createServer((req, res) => handler.handle(req, res, { context: {} })).listen(3000)
+```
+
+### stdio
+
+For clients that launch your server as a subprocess (Claude Desktop, IDEs):
+
+```ts
+import { MCPHandler } from '@orpc/mcp/stdio'
+import { ZodToJsonSchemaConverter } from '@orpc/zod'
+
+await new MCPHandler(router, { converters: [new ZodToJsonSchemaConverter()] })
+  .listen({ context: {} })
+```
+
+## Authorization
+
+Authentication and authorization are your application's responsibility — the integration stays unopinionated about tokens, scopes, and OAuth. Supply request-derived values as `context` when calling the handler, then enforce them with ordinary [middleware](/docs/middleware), which runs for every tool, resource, and prompt call.
+
+```ts
+export const authed = os.use(({ context, next, errors }) => {
+  const user = verifyToken(context.authToken)
+  if (!user)
+    throw errors.UNAUTHORIZED()
+  return next({ context: { user } })
+})
+
+export const deletePlanet = authed
+  .meta(mcp.tool({ description: 'Delete a planet' }))
+  .handler(({ context }) => remove(context.user))
+```
+
+A thrown `UNAUTHORIZED` reaches the model as an in-band tool error, or a resource/prompt request as a protocol error.
+
+## Security
+
+For HTTP servers reachable by browsers, enable Origin and Host validation to guard against DNS-rebinding attacks. A missing `Origin` header still passes, so non-browser clients are unaffected.
 
 ```ts
 export const handler = new MCPHandler(router, {
@@ -131,102 +190,20 @@ export const handler = new MCPHandler(router, {
 })
 ```
 
-Request body size is bounded via oRPC's `BodyLimitHandlerPlugin` (node) — pass it
-in `plugins`.
+## One Router, Every Surface
 
-### Streamable HTTP (Node.js)
-
-```ts
-import { createServer } from 'node:http'
-import { MCPHandler } from '@orpc/mcp/node'
-import { ZodToJsonSchemaConverter } from '@orpc/zod'
-
-const handler = new MCPHandler(router, { converters: [new ZodToJsonSchemaConverter()] })
-
-createServer((req, res) => {
-  handler.handle(req, res, { context: {} })
-}).listen(3000)
-```
-
-### stdio (local servers)
-
-For MCP clients that launch your server as a subprocess (Claude Desktop, IDEs):
-
-```ts
-import { MCPHandler } from '@orpc/mcp/stdio'
-import { ZodToJsonSchemaConverter } from '@orpc/zod'
-
-await new MCPHandler(router, { converters: [new ZodToJsonSchemaConverter()] })
-  .listen({ context: {} })
-```
-
-## One router, every surface
-
-Because MCP exposure lives in procedure meta, a single router can be mounted on multiple handlers — RPC, OpenAPI, and MCP — at different paths over the same instance:
+Because MCP exposure lives in procedure metadata, a single router can be mounted on multiple handlers at once — RPC, OpenAPI, and MCP — over the same instance:
 
 ```ts
 export const handlers = {
-  rpc: new RPCHandler(router), // /rpc  — typed oRPC clients
-  openapi: new OpenAPIHandler(router), // /api  — REST + OpenAPI spec
-  mcp: new MCPHandler(router), // /mcp  — MCP tools / resources / prompts
+  rpc: new RPCHandler(router), // typed oRPC clients
+  openapi: new OpenAPIHandler(router), // REST + OpenAPI
+  mcp: new MCPHandler(router), // MCP tools / resources / prompts
 }
 ```
 
-## How it maps
+## Limitations
 
-| oRPC                             | MCP                                                                                     |
-| -------------------------------- | --------------------------------------------------------------------------------------- |
-| `.input()` schema                | tool `inputSchema` / prompt `arguments` / resource template variables                   |
-| `.output()` schema               | tool `outputSchema` (+ `structuredContent`) / prompt `messages` / resource `contents`   |
-| handler return value             | tool `content[]` (+ `structuredContent`), resource `contents[]`, or prompt `messages[]` |
-| thrown `errors.*()` (typed)      | in-band tool result with `isError: true` (so the model can react)                       |
-| `ORPCError` in a resource/prompt | JSON-RPC protocol error                                                                 |
-
-## Authorization
-
-Authentication and authorization are the **application's** responsibility — `@orpc/mcp` is unopinionated about tokens, scopes, or OAuth servers. Use oRPC's normal context + middleware; the MCP handler runs it for every `tools/call` / `resources/read` / `prompts/get`. Supply request-derived values as `context` at the transport boundary (`handler.handle(request, { context: { authToken: request.headers.get('authorization') } })`), then enforce with middleware:
-
-```ts
-export const authed = os.use(({ context, next, errors }) => {
-  const user = verifyToken(context.authToken) // your token format / scopes
-  if (!user)
-    throw errors.UNAUTHORIZED()
-  return next({ context: { user } })
-})
-
-export const deletePlanet = authed
-  .meta(mcp.tool({ description: 'Delete a planet' }))
-  .handler(({ context }) => context.user.id)
-```
-
-A thrown `UNAUTHORIZED` surfaces as an in-band tool error (tools) or a JSON-RPC error (resources/prompts). The OAuth _discovery_ handshake (HTTP `401` + `WWW-Authenticate` + RFC 9728 metadata) belongs at your HTTP layer in front of the handler.
-
-## Pagination
-
-Two distinct kinds:
-
-- **Catalog pagination** (the cursor on `tools/list` / `resources/list` / `prompts/list`) is **built in**. Set `pageSize` to page the server's catalog; catalogs at or under the page size return a single page. Cursors are opaque and an invalid one returns `-32602`.
-
-  ```ts
-  export const handler = new MCPHandler(router, {
-    converters: [new ZodToJsonSchemaConverter()],
-    pageSize: 50,
-  })
-  ```
-
-- **Result pagination** (a tool that returns many rows) is the **developer's** job — model it in the tool's own `.input()`/`.output()`, like any API:
-
-  ```ts
-  export const listPlanets = os
-    .meta(mcp.tool({ description: 'List planets' }))
-    .input(z.object({ cursor: z.number().int().min(0).default(0), limit: z.number().int().max(100).default(20) }))
-    .output(z.object({ items: z.array(PlanetSchema), nextCursor: z.number().optional() }))
-    .handler(({ input }) => paginatePlanets(input.cursor, input.limit))
-  ```
-
-## Notes & limitations
-
-- Targets MCP protocol revision `2025-11-25` (negotiated at `initialize`; older revisions are accepted).
-- One JSON-RPC message per request — **JSON-RPC batching is not supported** (incompatible with the standard one-request/one-procedure flow, and deprecated in the MCP spec direction).
-- Server → client streaming (`GET` SSE), `listChanged`/`subscribe` notifications, and sessions (`Mcp-Session-Id`) are not implemented — and are being **removed/replaced in the next MCP revision**, so the stateless POST→response design is intentional.
-- Resource handlers should be side-effect free; only annotate read-only procedures as resources.
+- Targets MCP revision `2025-11-25`; older revisions are accepted during negotiation.
+- One JSON-RPC message per request — batching is not supported.
+- Server-initiated streaming (the `GET` SSE channel), `listChanged`/`subscribe` notifications, and sessions are not implemented. These are being removed or replaced in the next MCP revision, so the stateless request/response design is intentional.
