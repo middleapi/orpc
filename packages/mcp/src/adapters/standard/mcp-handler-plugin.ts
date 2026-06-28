@@ -17,6 +17,7 @@ import type {
 import type { MCPCodecBody } from './mcp-handler-codec'
 import { flattenStandardHeader } from '@standardserver/core'
 import {
+  DEFAULT_LIST_PAGE_SIZE,
   DEFAULT_SERVER_NAME,
   DEFAULT_SERVER_VERSION,
   FORBIDDEN_ERROR,
@@ -53,6 +54,14 @@ export interface MCPHandlerPluginOptions {
   allowedOrigins?: string[]
   /** Allowed `Host` header values (exact match) when protection is enabled. */
   allowedHosts?: string[]
+  /**
+   * Page size for catalog pagination of the `list` methods (`tools/list`,
+   * `resources/list`, `resources/templates/list`, `prompts/list`). Catalogs at
+   * or under this size return a single page.
+   *
+   * @default 100
+   */
+  pageSize?: number
 }
 
 /**
@@ -74,6 +83,7 @@ export class MCPHandlerPlugin<T extends Context> implements StandardHandlerPlugi
   private readonly enableDnsRebindingProtection: boolean
   private readonly allowedOrigins: string[] | undefined
   private readonly allowedHosts: string[] | undefined
+  private readonly pageSize: number
 
   constructor(
     private readonly registry: MCPRegistryProvider,
@@ -88,6 +98,7 @@ export class MCPHandlerPlugin<T extends Context> implements StandardHandlerPlugi
     this.enableDnsRebindingProtection = options.enableDnsRebindingProtection ?? false
     this.allowedOrigins = options.allowedOrigins
     this.allowedHosts = options.allowedHosts
+    this.pageSize = options.pageSize !== undefined && options.pageSize > 0 ? options.pageSize : DEFAULT_LIST_PAGE_SIZE
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
@@ -224,6 +235,17 @@ export class MCPHandlerPlugin<T extends Context> implements StandardHandlerPlugi
     return { code: INVALID_PARAMS, message: `Unknown ${kind}: ${String(params.name)}` }
   }
 
+  /** Apply opaque-cursor catalog pagination to a list result. */
+  private paginate(items: unknown[], key: string, cursor: unknown): Record<string, unknown> {
+    const offset = decodeCursor(cursor)
+    const page = items.slice(offset, offset + this.pageSize)
+    const result: Record<string, unknown> = { [key]: page }
+    if (offset + this.pageSize < items.length) {
+      result.nextCursor = encodeCursor(offset + this.pageSize)
+    }
+    return result
+  }
+
   private async handleProtocol(message: JSONRPCIncoming): Promise<unknown> {
     const params = isObject(message.params) ? message.params : {}
     switch (message.method) {
@@ -232,13 +254,13 @@ export class MCPHandlerPlugin<T extends Context> implements StandardHandlerPlugi
       case 'ping':
         return {}
       case 'tools/list':
-        return { tools: [...(await this.registry.get()).tools.values()].map(entry => entry.definition) }
+        return this.paginate([...(await this.registry.get()).tools.values()].map(entry => entry.definition), 'tools', params.cursor)
       case 'resources/list':
-        return { resources: [...(await this.registry.get()).resources.values()].map(entry => entry.definition) }
+        return this.paginate([...(await this.registry.get()).resources.values()].map(entry => entry.definition), 'resources', params.cursor)
       case 'resources/templates/list':
-        return { resourceTemplates: (await this.registry.get()).resourceTemplates.map(entry => entry.definition) }
+        return this.paginate((await this.registry.get()).resourceTemplates.map(entry => entry.definition), 'resourceTemplates', params.cursor)
       case 'prompts/list':
-        return { prompts: [...(await this.registry.get()).prompts.values()].map(entry => entry.definition) }
+        return this.paginate([...(await this.registry.get()).prompts.values()].map(entry => entry.definition), 'prompts', params.cursor)
       case 'completion/complete':
         return { completion: { values: [], total: 0, hasMore: false } }
       default:
@@ -289,6 +311,31 @@ export class MCPHandlerPlugin<T extends Context> implements StandardHandlerPlugi
 
     return true
   }
+}
+
+/** Opaque, offset-based pagination cursor (the registry order is deterministic). */
+function encodeCursor(offset: number): string {
+  return btoa(String(offset))
+}
+
+function decodeCursor(cursor: unknown): number {
+  if (cursor === undefined) {
+    return 0
+  }
+  if (typeof cursor !== 'string') {
+    throw new JSONRPCError(INVALID_PARAMS, 'Invalid cursor')
+  }
+  let offset: number
+  try {
+    offset = Number(atob(cursor))
+  }
+  catch {
+    throw new JSONRPCError(INVALID_PARAMS, 'Invalid cursor')
+  }
+  if (!Number.isInteger(offset) || offset < 0) {
+    throw new JSONRPCError(INVALID_PARAMS, 'Invalid cursor')
+  }
+  return offset
 }
 
 function jsonRpc(

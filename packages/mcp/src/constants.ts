@@ -15,6 +15,13 @@ export const JSONRPC_VERSION = '2.0'
 export const DEFAULT_SERVER_NAME = 'orpc-mcp-server'
 export const DEFAULT_SERVER_VERSION = '1.0.0'
 
+/**
+ * Default page size for catalog pagination (the `list` methods). Catalogs at or
+ * under this size return a single page (no `nextCursor`), so small servers are
+ * unaffected.
+ */
+export const DEFAULT_LIST_PAGE_SIZE = 100
+
 // --- JSON-RPC 2.0 + MCP error codes ---
 export const PARSE_ERROR = -32700
 export const INVALID_REQUEST = -32600

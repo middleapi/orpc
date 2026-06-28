@@ -7,7 +7,7 @@ description: Expose your oRPC router as a Model Context Protocol (MCP) server �
 
 [`@orpc/mcp`](https://www.npmjs.com/package/@orpc/mcp) turns an oRPC router into an [MCP](https://modelcontextprotocol.io) server, so the **same** procedures you already serve over RPC and OpenAPI can be called by MCP clients (Claude, ChatGPT, IDEs, agents).
 
-Exposure is **opt-in**: only procedures annotated with the `mcp()` meta are visible to MCP clients. The procedure's `.input()` schema becomes the tool's JSON Schema `inputSchema`, and `.output()` becomes its `outputSchema` — reusing the same converters as [`@orpc/openapi`](/docs/openapi/openapi-specification).
+Exposure is **opt-in**: only procedures annotated with `mcp.tool` / `mcp.resource` / `mcp.prompt` are visible to MCP clients. The procedure's `.input()` schema becomes the tool's JSON Schema `inputSchema`, and `.output()` becomes its `outputSchema` — reusing the same converters as [`@orpc/openapi`](/docs/openapi/openapi-specification).
 
 ## Installation
 
@@ -182,9 +182,51 @@ export const handlers = {
 | thrown `errors.*()` (typed)      | in-band tool result with `isError: true` (so the model can react)                       |
 | `ORPCError` in a resource/prompt | JSON-RPC protocol error                                                                 |
 
+## Authorization
+
+Authentication and authorization are the **application's** responsibility — `@orpc/mcp` is unopinionated about tokens, scopes, or OAuth servers. Use oRPC's normal context + middleware; the MCP handler runs it for every `tools/call` / `resources/read` / `prompts/get`. Supply request-derived values as `context` at the transport boundary (`handler.handle(request, { context: { authToken: request.headers.get('authorization') } })`), then enforce with middleware:
+
+```ts
+export const authed = os.use(({ context, next, errors }) => {
+  const user = verifyToken(context.authToken) // your token format / scopes
+  if (!user)
+    throw errors.UNAUTHORIZED()
+  return next({ context: { user } })
+})
+
+export const deletePlanet = authed
+  .meta(mcp.tool({ description: 'Delete a planet' }))
+  .handler(({ context }) => context.user.id)
+```
+
+A thrown `UNAUTHORIZED` surfaces as an in-band tool error (tools) or a JSON-RPC error (resources/prompts). The OAuth _discovery_ handshake (HTTP `401` + `WWW-Authenticate` + RFC 9728 metadata) belongs at your HTTP layer in front of the handler.
+
+## Pagination
+
+Two distinct kinds:
+
+- **Catalog pagination** (the cursor on `tools/list` / `resources/list` / `prompts/list`) is **built in**. Set `pageSize` to page the server's catalog; catalogs at or under the page size return a single page. Cursors are opaque and an invalid one returns `-32602`.
+
+  ```ts
+  export const handler = new MCPHandler(router, {
+    converters: [new ZodToJsonSchemaConverter()],
+    pageSize: 50,
+  })
+  ```
+
+- **Result pagination** (a tool that returns many rows) is the **developer's** job — model it in the tool's own `.input()`/`.output()`, like any API:
+
+  ```ts
+  export const listPlanets = os
+    .meta(mcp.tool({ description: 'List planets' }))
+    .input(z.object({ cursor: z.number().int().min(0).default(0), limit: z.number().int().max(100).default(20) }))
+    .output(z.object({ items: z.array(PlanetSchema), nextCursor: z.number().optional() }))
+    .handler(({ input }) => paginatePlanets(input.cursor, input.limit))
+  ```
+
 ## Notes & limitations
 
 - Targets MCP protocol revision `2025-11-25` (negotiated at `initialize`; older revisions are accepted).
 - One JSON-RPC message per request — **JSON-RPC batching is not supported** (incompatible with the standard one-request/one-procedure flow, and deprecated in the MCP spec direction).
-- Server → client streaming (`GET` SSE), `listChanged`/`subscribe` notifications, sessions (`Mcp-Session-Id`), pagination cursors, and built-in OAuth are not implemented yet. (Auth can be added today via a `StandardHandler` interceptor that reads the request and enriches `context`.)
+- Server → client streaming (`GET` SSE), `listChanged`/`subscribe` notifications, and sessions (`Mcp-Session-Id`) are not implemented — and are being **removed/replaced in the next MCP revision**, so the stateless POST→response design is intentional.
 - Resource handlers should be side-effect free; only annotate read-only procedures as resources.
