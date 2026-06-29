@@ -1,0 +1,48 @@
+{
+  "name": "@orpc/bun",
+  "type": "module",
+  "version": "0.0.0",
+  "license": "MIT",
+  "homepage": "https://orpc.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/middleapi/orpc.git",
+    "directory": "packages/bun"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
+      }
+    }
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "unbuild",
+    "type:check": "tsc -b",
+    "test": "bun --env-file=../../.env test",
+    "test:coverage": "bun --env-file=../../.env test --coverage"
+  },
+  "dependencies": {
+    "@orpc/client": "workspace:*",
+    "@orpc/publisher": "workspace:*",
+    "@orpc/ratelimit": "workspace:*",
+    "@orpc/server": "workspace:*",
+    "@orpc/shared": "workspace:*",
+    "@standardserver/core": "^0.0.25"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "redis": "^6.0.1"
+  }
+}

@@ -11,14 +11,33 @@ describe.each([
   ['node-http', createNodeHttpClientServerTest],
   ['message-port', createMessagePortClientServerTest],
   ['node-ws', createNodeWsClientServerTest],
-])('stream: %s', async (_name, createClientServer) => {
+])('cancel and abort: %s', async (_name, createClientServer) => {
   const handler = vi.fn()
   const router = {
     ping: os.input(z.any()).handler(handler),
   }
   const client = createClientServer(router)
 
-  it('server should cancel event iterator response when client cancels', async () => {
+  it('server signal should abort when client signal is aborted', async () => {
+    handler.mockImplementationOnce(async ({ signal }) => {
+      await sleep(200)
+    })
+
+    const controller = new AbortController()
+
+    const promise = expect(client.ping(null, { signal: controller.signal })).rejects.toThrowError('abort')
+
+    await sleep(100)
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(handler.mock.calls[0]![0].signal.aborted).toBe(false)
+
+    controller.abort()
+    await promise
+    await sleep(100)
+    expect(handler.mock.calls[0]![0].signal.aborted).toBe(true)
+  })
+
+  it('server should cancel event iterator response and abort request when client cancels', async () => {
     const cancel = vi.fn()
     handler.mockResolvedValueOnce(new AsyncIteratorClass(
       async () => {
@@ -36,11 +55,12 @@ describe.each([
     await iterator.return?.()
     await sleep(100) // lag between client and server
     expect(cancel).toHaveBeenCalledTimes(1)
+    expect(handler.mock.calls[0]![0].signal.aborted).toBe(true)
 
     await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true })
   })
 
-  it('server should cancel octet stream response when client cancels', async () => {
+  it('server should cancel octet stream response and abort request when client cancels', async () => {
     const cancel = vi.fn()
     handler.mockResolvedValueOnce(new ReadableStream({
       async pull(controller) {
@@ -62,6 +82,7 @@ describe.each([
     await reader.cancel()
     await sleep(100) // lag between client and server
     expect(cancel).toHaveBeenCalledTimes(1)
+    expect(handler.mock.calls[0]![0].signal.aborted).toBe(true)
 
     await expect(reader.read()).resolves.toEqual({ value: undefined, done: true })
   })

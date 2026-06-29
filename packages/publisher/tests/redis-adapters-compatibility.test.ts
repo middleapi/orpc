@@ -5,24 +5,23 @@ import { createClient } from 'redis'
 import { RedisPublisher } from '../src/adapters/redis'
 import { UpstashPublisher } from '../src/adapters/upstash'
 
-const REDIS_URL = process.env.REDIS_URL
 const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL
 const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
 
 /**
  * These tests require a real Redis/Upstash Redis server.
- * Set `REDIS_URL`, `UPSTASH_REDIS_REST_URL`, and `UPSTASH_REDIS_REST_TOKEN` before running them.
+ * Set  `UPSTASH_REDIS_REST_URL`, and `UPSTASH_REDIS_REST_TOKEN` before running them.
  *
  * When adding new tests, always use unique keys to avoid conflicts with other cases.
  *
- * Point REDIS_URL and Upstash variables to the same server, as some cross-adapter tests rely on this.
+ * all adapters must connect to the same server.
  */
-describe('redis adapters', { timeout: 20_000 }, () => {
+describe('publisher redis adapters compatibility', { timeout: 20_000 }, () => {
   const publishers: Array<{ name: string, publisher: Publisher<any> }> = []
   const prefix = `redis-adapters:${crypto.randomUUID()}`
 
-  if (REDIS_URL) {
-    const redis = createClient({ url: REDIS_URL })
+  if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
+    const redis = createClient({ url: `rediss://default:${UPSTASH_REDIS_REST_TOKEN}@${new URL(UPSTASH_REDIS_REST_URL).host}:6379` })
     const publisher = new RedisPublisher(redis, {
       prefix,
       replay: { enabled: true, seconds: 10 },
@@ -32,12 +31,15 @@ describe('redis adapters', { timeout: 20_000 }, () => {
 
   // TODO: Upstash is not compatible with Node 26 yet — temporarily disable these tests and revisit in the future.
   if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN && !process.versions.node.startsWith('26.')) {
-    const redis = new Redis({ url: UPSTASH_REDIS_REST_URL, token: UPSTASH_REDIS_REST_TOKEN })
-    const publisher = new UpstashPublisher(redis, {
+    const upstashRedis = new Redis({ url: UPSTASH_REDIS_REST_URL, token: UPSTASH_REDIS_REST_TOKEN })
+    const publisher = new UpstashPublisher(upstashRedis, {
       prefix,
       replay: { enabled: true, seconds: 10 },
     })
-    publishers.push({ name: 'upstash', publisher })
+    publishers.push({ name: 'upstash', publisher: new UpstashPublisher(upstashRedis, {
+      prefix,
+      replay: { enabled: true, seconds: 10 },
+    }) })
   }
 
   describe.skipIf(publishers.length < 2)('cross-adapter compatibility', () => {

@@ -1,7 +1,7 @@
 {
   "name": "@orpc/publisher",
   "type": "module",
-  "version": "2.0.0-beta.5",
+  "version": "2.0.0-beta.7",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
@@ -71,6 +71,6 @@
   },
   "devDependencies": {
     "@upstash/redis": "^1.38.0",
-    "redis": "^6.0.0"
+    "redis": "^6.0.1"
   }
 }

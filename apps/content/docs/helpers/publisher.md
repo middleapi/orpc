@@ -70,11 +70,12 @@ const publisher = new MemoryPublisher<Record<string, { message: string }>>()
 
 ## Adapters
 
-| Name               | Replay Support | Adapter for                                          |
-| ------------------ | -------------- | ---------------------------------------------------- |
-| `MemoryPublisher`  | ✅             | In-memory storage                                    |
-| `RedisPublisher`   | ✅             | [Redis](https://github.com/redis/redis)              |
-| `UpstashPublisher` | ✅             | [Upstash Redis](https://github.com/upstash/redis-js) |
+| Name                | Replay Support | Adapter for                                          |
+| ------------------- | -------------- | ---------------------------------------------------- |
+| `MemoryPublisher`   | ✅             | In-memory storage                                    |
+| `RedisPublisher`    | ✅             | [Redis](https://github.com/redis/redis)              |
+| `UpstashPublisher`  | ✅             | [Upstash Redis](https://github.com/upstash/redis-js) |
+| `BunRedisPublisher` | ✅             | [Bun's Redis](https://bun.com/docs/runtime/redis)    |
 
 ::: code-group
 
@@ -106,6 +107,17 @@ import { UpstashPublisher } from '@orpc/publisher/upstash'
 const redis = Redis.fromEnv()
 
 const publisher = new UpstashPublisher(redis, {
+  prefix: 'orpc:', // Optional Redis key prefix
+  serializer: undefined, // Optional custom serializer
+})
+```
+
+```ts [bun-redis]
+import { BunRedisPublisher } from '@orpc/bun'
+import { redis } from 'bun'
+
+const publisher = new BunRedisPublisher(redis, {
+  subscriber: redis.duplicate(), // Redis client for subscribing to pub/sub (default: redis.duplicate())
   prefix: 'orpc:', // Optional Redis key prefix
   serializer: undefined, // Optional custom serializer
 })

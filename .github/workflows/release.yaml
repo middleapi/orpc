@@ -55,13 +55,7 @@ jobs:
 
       - run: pnpm --filter='./packages/*' run -r build
 
-      - run: pnpm config set '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - run: pnpm --filter='./packages/*' publish -r --access=public --tag=${{ steps.version.outputs.preid || 'latest' }}
-        env:
-          NPM_CONFIG_PROVENANCE: true
+      - run: pnpm --filter='./packages/*' publish -r --provenance --access=public --tag=${{ steps.version.outputs.preid || 'latest' }}
 
       - run: pnpm exec changelogithub --draft
         env:

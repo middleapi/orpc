@@ -7,7 +7,11 @@ import { resolveMaybeOptionalOptions, toStringOrBytes } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standardserver/peer'
 import { createStandardPeerRequestHandler } from '../standard-peer'
 
-export type WebsocketLike = Pick<WebSocket, 'addEventListener' | 'removeEventListener' | 'send'>
+/**
+ * Supports standard WebSocket instances, Bun ServerWebSocket, "ws" ServerWebSocket,
+ * Cloudflare WebSocket Hibernation, and similar implementations.
+ */
+export type WebsocketLike = Pick<WebSocket, 'send'>
 
 export interface WebsocketHandlerOptions<_T extends Context> {
   /**
@@ -32,17 +36,6 @@ export class WebsocketHandler<T extends Context> {
   ) {
     this.encodePeerMessageOptions = options.encodePeerMessage
     this.decodePeerMessageOptions = options.decodePeerMessage
-  }
-
-  /**
-   * Attaches necessary event listeners to a WebSocket to handle incoming messages and peer management.
-   */
-  upgrade(
-    ws: WebsocketLike,
-    ...rest: MaybeOptionalOptions<StandardPeerRequestHandlerOptions<T>>
-  ): void {
-    ws.addEventListener('message', event => this.message(ws, event.data, ...rest))
-    ws.addEventListener('close', () => this.close(ws))
   }
 
   /**
@@ -94,5 +87,19 @@ export class WebsocketHandler<T extends Context> {
       await peer.close()
       this.peers.delete(ws)
     }
+  }
+
+  /**
+   * Attaches websocket event listeners for message and close handling.
+   *
+   * Use this instead of calling `.message()` and `.close()` manually.
+   * Requires a websocket-like object that supports `addEventListener` and `removeEventListener`.
+   */
+  upgrade(
+    ws: Pick<WebSocket, 'send' | 'addEventListener' | 'removeEventListener'>,
+    ...rest: MaybeOptionalOptions<StandardPeerRequestHandlerOptions<T>>
+  ): void {
+    ws.addEventListener('message', event => this.message(ws, event.data, ...rest))
+    ws.addEventListener('close', () => this.close(ws))
   }
 }

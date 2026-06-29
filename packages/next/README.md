@@ -26,10 +26,10 @@ You can read the documentation [here](https://orpc.dev).
 
 **Core**
 
-- [@orpc/contract](https://www.npmjs.com/package/@orpc/contract): Define type-safe contracts for your API.
-- [@orpc/server](https://www.npmjs.com/package/@orpc/server): Implement your API or contract on the server.
-- [@orpc/client](https://www.npmjs.com/package/@orpc/client): Consume your API from the client with full type safety.
-- [@orpc/openapi](https://www.npmjs.com/package/@orpc/openapi): Bring OpenAPI compatibility to your APIs.
+- [@orpc/contract](https://www.npmjs.com/package/@orpc/contract): Define API contract as the single source of truth.
+- [@orpc/server](https://www.npmjs.com/package/@orpc/server): Build APIs or implement contracts.
+- [@orpc/client](https://www.npmjs.com/package/@orpc/client): Consume APIs with end-to-end type safety.
+- [@orpc/openapi](https://www.npmjs.com/package/@orpc/openapi): Add OpenAPI compatibility to APIs.
 
 **Schema validation**
 
@@ -39,22 +39,23 @@ You can read the documentation [here](https://orpc.dev).
 
 **Built-in features**
 
-- [@orpc/publisher](https://www.npmjs.com/package/@orpc/publisher): Pub/Sub.
-- [@orpc/ratelimit](https://www.npmjs.com/package/@orpc/ratelimit): Rate limiting.
+- [@orpc/publisher](https://www.npmjs.com/package/@orpc/publisher): Pub/Sub with memory, Redis, and Upstash adapters.
+- [@orpc/ratelimit](https://www.npmjs.com/package/@orpc/ratelimit): Rate limiting with memory, Redis, and Upstash adapters.
 - [@orpc/json-schema](https://www.npmjs.com/package/@orpc/json-schema): Smart coercion for OpenAPI requests.
 
 **Framework & ecosystem integrations**
 
-- [@orpc/next](https://www.npmjs.com/package/@orpc/react): Use oRPC with [Next.js Server Functions](https://nextjs.org/docs/app/getting-started/mutating-data).
+- [@orpc/next](https://www.npmjs.com/package/@orpc/next): Integrate with [Next.js Server Functions](https://nextjs.org/docs/app/getting-started/mutating-data).
 - [@orpc/tanstack-query](https://www.npmjs.com/package/@orpc/tanstack-query): Integrate with [TanStack Query](https://tanstack.com/query/latest).
 - [@orpc/experimental-effect](https://www.npmjs.com/package/@orpc/experimental-effect): Integrate with [Effect](https://effect.website/).
 - [@orpc/nest](https://www.npmjs.com/package/@orpc/nest): Implement your contract with [NestJS](https://nestjs.com/).
+- [@orpc/bun](https://www.npmjs.com/package/@orpc/bun): Adapters for [Bun's Redis](https://bun.sh/).
 
 **Observability**
 
-- [@orpc/opentelemetry](https://www.npmjs.com/package/@orpc/opentelemetry): Instrument your API with [OpenTelemetry](https://opentelemetry.io/).
-- [@orpc/pino](https://www.npmjs.com/package/@orpc/pino): Log with [Pino](https://getpino.io/).
-- [@orpc/evlog](https://www.npmjs.com/package/@orpc/evlog): Log with [Evlog](https://evlog.dev/).
+- [@orpc/opentelemetry](https://www.npmjs.com/package/@orpc/opentelemetry): Integrate with [OpenTelemetry](https://opentelemetry.io/) for distributed tracing.
+- [@orpc/pino](https://www.npmjs.com/package/@orpc/pino): Integrate with [Pino](https://getpino.io/) for logging.
+- [@orpc/evlog](https://www.npmjs.com/package/@orpc/evlog): Integrate with [Evlog](https://evlog.dev/) for logging.
 
 ## Sponsors
 
@@ -116,25 +117,25 @@ Like what we build over at [middleapi](https://github.com/middleapi)? You can he
 <table>
   <tr>
    <td align="center"><a href="https://github.com/rhinodavid?ref=orpc" target="_blank" rel="noopener" title="David Walsh"><img src="https://avatars.githubusercontent.com/u/5778036?u=b5521f07d2f88c3db2a0dae62b5f2f8357214af0&amp;v=4" width="119" alt="David Walsh"/><br />David Walsh</a></td>
+   <td align="center"><a href="https://github.com/Nic13Gamer?ref=orpc" target="_blank" rel="noopener" title="Nicholas"><img src="https://avatars.githubusercontent.com/u/54724556?u=56a7ab430ce7a80d648ab6eba051d454a818ed0b&amp;v=4" width="119" alt="Nicholas"/><br />Nicholas</a></td>
    <td align="center"><a href="https://github.com/Robbe95?ref=orpc" target="_blank" rel="noopener" title="Robbe Vaes"><img src="https://avatars.githubusercontent.com/u/44748019?u=e0232402c045ad4eac7cbd217f1f47e083103b89&amp;v=4" width="119" alt="Robbe Vaes"/><br />Robbe Vaes</a></td>
    <td align="center"><a href="https://github.com/aidansunbury?ref=orpc" target="_blank" rel="noopener" title="Aidan Sunbury"><img src="https://avatars.githubusercontent.com/u/64103161?v=4" width="119" alt="Aidan Sunbury"/><br />Aidan Sunbury</a></td>
    <td align="center"><a href="https://github.com/soonoo?ref=orpc" target="_blank" rel="noopener" title="soonoo"><img src="https://avatars.githubusercontent.com/u/5436405?u=5d0b4aa955c87e30e6bda7f0cccae5402da99528&amp;v=4" width="119" alt="soonoo"/><br />soonoo</a></td>
    <td align="center"><a href="https://github.com/kporten?ref=orpc" target="_blank" rel="noopener" title="Kevin Porten"><img src="https://avatars.githubusercontent.com/u/1839345?u=dc2263d5cfe0d927ce1a0be04a1d55dd6b55405c&amp;v=4" width="119" alt="Kevin Porten"/><br />Kevin Porten</a></td>
    <td align="center"><a href="https://github.com/pumpkinlink?ref=orpc" target="_blank" rel="noopener" title="Denis"><img src="https://avatars.githubusercontent.com/u/11864620?u=5f47bbe6c65d0f6f5cf011021490238e4b0593d0&amp;v=4" width="119" alt="Denis"/><br />Denis</a></td>
-   <td align="center"><a href="https://github.com/christopher-kapic?ref=orpc" target="_blank" rel="noopener" title="Christopher Kapic"><img src="https://avatars.githubusercontent.com/u/59740769?u=e7ad4b72b5bf6c9eb1644c26dbf3332a8f987377&amp;v=4" width="119" alt="Christopher Kapic"/><br />Christopher Kapic</a></td>
   </tr>
   <tr>
+   <td align="center"><a href="https://github.com/christopher-kapic?ref=orpc" target="_blank" rel="noopener" title="Christopher Kapic"><img src="https://avatars.githubusercontent.com/u/59740769?u=e7ad4b72b5bf6c9eb1644c26dbf3332a8f987377&amp;v=4" width="119" alt="Christopher Kapic"/><br />Christopher Kapic</a></td>
    <td align="center"><a href="https://github.com/thomasballinger?ref=orpc" target="_blank" rel="noopener" title="Tom Ballinger"><img src="https://avatars.githubusercontent.com/u/458879?u=4b045ac75d721b6ac2b42a74d7d37f61f0414031&amp;v=4" width="119" alt="Tom Ballinger"/><br />Tom Ballinger</a></td>
    <td align="center"><a href="https://github.com/SSam0419?ref=orpc" target="_blank" rel="noopener" title="Sam"><img src="https://avatars.githubusercontent.com/u/102863520?u=3c89611f549d5070be232eb4532f690c8f2e7a65&amp;v=4" width="119" alt="Sam"/><br />Sam</a></td>
    <td align="center"><a href="https://github.com/Titoine?ref=orpc" target="_blank" rel="noopener" title="Titoine"><img src="https://avatars.githubusercontent.com/u/3514286?u=1bb1e86b0c99c8a1121372e56d51a177eea12191&amp;v=4" width="119" alt="Titoine"/><br />Titoine</a></td>
    <td align="center"><a href="https://github.com/Mnigos?ref=orpc" target="_blank" rel="noopener" title="Igor Makowski"><img src="https://avatars.githubusercontent.com/u/56691628?u=ee8c879478f7c151b9156aef6c74243fa3e247a8&amp;v=4" width="119" alt="Igor Makowski"/><br />Igor Makowski</a></td>
    <td align="center"><a href="https://github.com/hanayashiki?ref=orpc" target="_blank" rel="noopener" title="hanayashiki"><img src="https://avatars.githubusercontent.com/u/26056783?u=06c3b9205a16fd41a871e82da1cc2a09306d53f5&amp;v=4" width="119" alt="hanayashiki"/><br />hanayashiki</a></td>
    <td align="center"><a href="https://github.com/ldub?ref=orpc" target="_blank" rel="noopener" title="Lev Dubinets"><img src="https://avatars.githubusercontent.com/u/3114081?u=f547f5d5012cab54851f1b1ad72d10e537f78fc2&amp;v=4" width="119" alt="Lev Dubinets"/><br />Lev Dubinets</a></td>
-   <td align="center"><a href="https://github.com/mr-kelly?ref=orpc" target="_blank" rel="noopener" title="Kelly Peilin Chan"><img src="https://avatars.githubusercontent.com/u/520852?u=6b0f7105f694e7b5cacf410a3f04c7044b469dc8&amp;v=4" width="119" alt="Kelly Peilin Chan"/><br />Kelly Peilin Chan</a></td>
   </tr>
   <tr>
+   <td align="center"><a href="https://github.com/mr-kelly?ref=orpc" target="_blank" rel="noopener" title="Kelly Peilin Chan"><img src="https://avatars.githubusercontent.com/u/520852?u=6b0f7105f694e7b5cacf410a3f04c7044b469dc8&amp;v=4" width="119" alt="Kelly Peilin Chan"/><br />Kelly Peilin Chan</a></td>
    <td align="center"><a href="https://github.com/piscis?ref=orpc" target="_blank" rel="noopener" title="Alex"><img src="https://avatars.githubusercontent.com/u/326163?u=b245f368bd940cf51d08c0b6bf55f8257f359437&amp;v=4" width="119" alt="Alex"/><br />Alex</a></td>
-   <td align="center"><a href="https://github.com/nattstack?ref=orpc" target="_blank" rel="noopener" title="nattstack"><img src="https://avatars.githubusercontent.com/u/31426677?u=fa9dbb8b3e66eb0ea3c88db5dc07f31c8c5418fe&amp;v=4" width="119" alt="nattstack"/><br />nattstack</a></td>
    <td align="center"><a href="https://github.com/finom?ref=orpc" target="_blank" rel="noopener" title="Andrey Gubanov"><img src="https://avatars.githubusercontent.com/u/1082083?u=29e91400dbd4a9c217048a8f59562c4f740498e6&amp;v=4" width="119" alt="Andrey Gubanov"/><br />Andrey Gubanov</a></td>
   </tr>
 </table>
@@ -173,6 +174,7 @@ Like what we build over at [middleapi](https://github.com/middleapi)? You can he
   <a href="https://github.com/illarionvk?ref=orpc" target="_blank" rel="noopener" title="Illarion Koperski"><img src="https://avatars.githubusercontent.com/u/5012724?u=7cfa13652f7ac5fb3c56d880e3eb3fbe40c3ea34&amp;v=4" width="32" height="32" alt="Illarion Koperski" /></a>
   <a href="https://github.com/steelbrain?ref=orpc" target="_blank" rel="noopener" title="Anees Iqbal"><img src="https://avatars.githubusercontent.com/u/4278113?u=22b80b5399eed68ac76cd58b02961b0481f1db11&amp;v=4" width="32" height="32" alt="Anees Iqbal" /></a>
   <a href="https://github.com/Scrumplex?ref=orpc" target="_blank" rel="noopener" title="Sefa Eyeoglu"><img src="https://avatars.githubusercontent.com/u/11587657?u=ab503582165c0bbff0cca47ce31c9450bb1553c9&amp;v=4" width="32" height="32" alt="Sefa Eyeoglu" /></a>
+  <a href="https://github.com/nattstack?ref=orpc" target="_blank" rel="noopener" title="nattstack"><img src="https://avatars.githubusercontent.com/u/31426677?u=fa9dbb8b3e66eb0ea3c88db5dc07f31c8c5418fe&amp;v=4" width="32" height="32" alt="nattstack" /></a>
   <a href="https://github.com/ChromeGG?ref=orpc" target="_blank" rel="noopener" title="Adam Tkaczyk"><img src="https://avatars.githubusercontent.com/u/39050595?u=a58ca6042a6950e94e6e92442db76ef584279bc0&amp;v=4" width="32" height="32" alt="Adam Tkaczyk" /></a>
   <a href="https://github.com/plancraft?ref=orpc" target="_blank" rel="noopener" title="plancraft"><img src="https://avatars.githubusercontent.com/u/46482287?v=4" width="32" height="32" alt="plancraft" /></a>
 </p>

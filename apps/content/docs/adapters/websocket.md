@@ -4,10 +4,10 @@ oRPC supports WebSockets for low-latency, full-duplex communication between clie
 
 ## Server Adapters
 
-| Adapter     | Target                                                                                                                  |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `websocket` | [MDN WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket), [ws](https://github.com/websockets/ws) |
-| `crossws`   | [crossws](https://github.com/h3js/crossws)                                                                              |
+| Adapter     | Target                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `websocket` | [MDN WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket), [ws](https://github.com/websockets/ws), [Bun's WebSocket](https://bun.com/docs/runtime/http/websockets), [Deno's WebSocket](https://docs.deno.com/examples/http_server_websocket/), [Cloudflare Hibernation WebSocket](https://developers.cloudflare.com/durable-objects/best-practices/websockets/) |
+| `crossws`   | [crossws](https://github.com/h3js/crossws)                                                                                                                                                                                                                                                                                                                                            |
 
 ::: code-group
 
@@ -56,8 +56,8 @@ const handler = new RPCHandler(router, {
 
 const ws = crossws({
   hooks: {
-    message: (peer, message) => {
-      handler.message(peer, message, {
+    message: async (peer, message) => {
+      await handler.message(peer, message, {
         /**
          * Provide initial context if needed. The context can be an async function
          * that receives the per-call request as its first argument, and is **not**
@@ -66,8 +66,8 @@ const ws = crossws({
         context: request => ({}),
       })
     },
-    close: (peer) => {
-      handler.close(peer)
+    close: async (peer) => {
+      await handler.close(peer)
     },
   },
 })
@@ -79,6 +79,43 @@ const server = createServer((req, res) => {
 server.on('upgrade', (req, socket, head) => {
   if (req.headers.upgrade === 'websocket') {
     ws.handleUpgrade(req, socket, head)
+  }
+})
+```
+
+```ts [Bun]
+import { RPCHandler } from '@orpc/server/websocket'
+import { onError } from '@orpc/server'
+
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
+
+Bun.serve({
+  fetch(req, server) {
+    if (server.upgrade(req)) {
+      return
+    }
+    return new Response('Upgrade failed', { status: 500 })
+  },
+  websocket: {
+    async message(ws, message) {
+      await handler.message(ws, message, {
+        /**
+         * Provide initial context if needed. The context can be an async function
+         * that receives the per-call request as its first argument, and is **not**
+         * related to the initial WebSocket upgrade request.
+         */
+        context: request => ({}),
+      })
+    },
+    async close(ws) {
+      await handler.close(ws)
+    },
   }
 })
 ```
@@ -115,7 +152,7 @@ Deno.serve((req) => {
 })
 ```
 
-```ts [Cloudflare Websocket Hibernation]
+```ts [Cloudflare]
 import { RPCHandler } from '@orpc/server/websocket'
 import { onError } from '@orpc/server'
 
@@ -151,7 +188,7 @@ export class ChatRoom extends DurableObject {
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
-    handler.close(ws)
+    await handler.close(ws)
   }
 }
 ```

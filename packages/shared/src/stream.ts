@@ -28,7 +28,7 @@ export function replicateReadableStream<T>(
   return replicated
 }
 
-export type ReadableStreamReadResult<T> = { done: false, value: T } | { done: true, value: undefined | T }
+export type ReadableStreamReadResult<T> = { done: false, value: T } | { done: true, value?: undefined | T }
 
 export interface WrapReadableStreamOptions<T, TMapped> {
   /**

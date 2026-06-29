@@ -121,7 +121,7 @@ export class RPCSerializer {
     const serialized = JSON.parse(data.get('data') as string)
 
     const blobs: Blob[] = []
-    for (const [key, value] of data.entries()) {
+    for (const [key, value] of data) {
       if (value instanceof Blob) {
         blobs[Number(key)] = value
       }

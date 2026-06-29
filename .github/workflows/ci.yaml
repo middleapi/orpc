@@ -23,11 +23,21 @@ jobs:
 
       - run: pnpm run type:check
 
-  test_node_matrix:
+  test_matrix:
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
     strategy:
       matrix:
-        node-version: [26, 24, 22, 20]
+        node-version: [26, 24, 22]
       fail-fast: false
     steps:
       - uses: actions/checkout@v7
@@ -35,12 +45,13 @@ jobs:
       - uses: pnpm/action-setup@v6
 
       - run: pnpm runtime set node ${{ matrix.node-version }}
+      - run: pnpm runtime set bun 1
 
       - run: pnpm i
 
       - run: pnpm run test:coverage
         env:
-          REDIS_URL: ${{ secrets.REDIS_URL }}
+          REDIS_URL: redis://localhost:6379
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
