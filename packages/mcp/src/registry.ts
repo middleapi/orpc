@@ -101,20 +101,27 @@ export async function buildMCPRegistry(
       const wantsOutput = meta.outputSchema ?? true
       if (wantsOutput && toArray(def.outputSchemas).length > 0) {
         const [outputSchema] = await convertSchemas(converter, def.outputSchemas, 'output')
-        if (isObjectJsonSchema(outputSchema)) {
-          definition.outputSchema = outputSchema
+        const objectSchema = asObjectJsonSchema(outputSchema)
+        if (objectSchema !== undefined) {
+          definition.outputSchema = objectSchema
         }
       }
       if (meta.annotations !== undefined) {
         definition.annotations = { ...meta.annotations }
       }
 
+      if (registry.tools.has(name)) {
+        throw new Error(`Duplicate MCP tool name "${name}" (from ${path.join('.')}). Names must be unique — set a distinct \`name\` in mcp.tool().`)
+      }
       registry.tools.set(name, { definition, procedure, meta })
     }
     else if (type === 'resource') {
       if (meta.uriTemplate !== undefined) {
         const definition: ResourceTemplateDefinition = { uriTemplate: meta.uriTemplate, name }
         applyResourceMeta(definition, meta)
+        if (registry.resourceTemplates.some(entry => entry.definition.uriTemplate === meta.uriTemplate)) {
+          throw new Error(`Duplicate MCP resource template "${meta.uriTemplate}" (from ${path.join('.')}). Resource templates must be unique.`)
+        }
         registry.resourceTemplates.push({
           definition,
           template: compileUriTemplate(meta.uriTemplate),
@@ -125,6 +132,9 @@ export async function buildMCPRegistry(
       else if (meta.uri !== undefined) {
         const definition: ResourceDefinition = { uri: meta.uri, name }
         applyResourceMeta(definition, meta)
+        if (registry.resources.has(meta.uri)) {
+          throw new Error(`Duplicate MCP resource URI "${meta.uri}" (from ${path.join('.')}). Resource URIs must be unique.`)
+        }
         registry.resources.set(meta.uri, { definition, procedure, meta })
       }
       else {
@@ -142,6 +152,9 @@ export async function buildMCPRegistry(
       const args = await toPromptArguments(converter, def.inputSchemas)
       if (args.length > 0) {
         definition.arguments = args
+      }
+      if (registry.prompts.has(name)) {
+        throw new Error(`Duplicate MCP prompt name "${name}" (from ${path.join('.')}). Names must be unique — set a distinct \`name\` in mcp.prompt().`)
       }
       registry.prompts.set(name, { definition, procedure, meta })
     }
@@ -193,6 +206,43 @@ function isObjectJsonSchema(schema: unknown): schema is JsonSchemaObject {
   return isPlainRecord(schema) && schema.type === 'object'
 }
 
+/**
+ * Coerce a converted schema to a single object JSON Schema. Handles the `allOf`
+ * wrapper {@link convertSchemas} produces when a procedure has multiple input or
+ * output schemas, by merging the object members' properties/required.
+ */
+function asObjectJsonSchema(schema: unknown): JsonSchemaObject | undefined {
+  if (isObjectJsonSchema(schema)) {
+    return schema
+  }
+  if (!isPlainRecord(schema) || !Array.isArray(schema.allOf)) {
+    return undefined
+  }
+  const members = schema.allOf.filter(isObjectJsonSchema)
+  if (members.length === 0) {
+    return undefined
+  }
+  const properties: Record<string, unknown> = {}
+  const required = new Set<string>()
+  for (const member of members) {
+    if (isPlainRecord(member.properties)) {
+      Object.assign(properties, member.properties)
+    }
+    if (Array.isArray(member.required)) {
+      for (const key of member.required) {
+        if (typeof key === 'string') {
+          required.add(key)
+        }
+      }
+    }
+  }
+  const merged = { type: 'object', properties } as JsonSchemaObject
+  if (required.size > 0) {
+    merged.required = [...required]
+  }
+  return merged
+}
+
 async function convertSchemas(
   converter: Pick<JsonSchemaConverter, 'convert'>,
   schemas: unknown,
@@ -214,12 +264,9 @@ async function toInputObjectSchema(
   schemas: unknown,
 ): Promise<JsonSchemaObject> {
   const [schema] = await convertSchemas(converter, schemas, 'input')
-  if (isObjectJsonSchema(schema)) {
-    return schema
-  }
   // MCP requires inputSchema to be a JSON Schema object; fall back to an empty
   // object schema when the procedure has no (object) input.
-  return { type: 'object' }
+  return asObjectJsonSchema(schema) ?? { type: 'object' }
 }
 
 async function toPromptArguments(
@@ -227,12 +274,13 @@ async function toPromptArguments(
   schemas: unknown,
 ): Promise<PromptArgument[]> {
   const [schema] = await convertSchemas(converter, schemas, 'input')
-  if (!isObjectJsonSchema(schema) || !isPlainRecord(schema.properties)) {
+  const object = asObjectJsonSchema(schema)
+  if (object === undefined || !isPlainRecord(object.properties)) {
     return []
   }
 
-  const required = new Set(Array.isArray(schema.required) ? schema.required : [])
-  return Object.entries(schema.properties).map(([argName, prop]) => {
+  const required = new Set(Array.isArray(object.required) ? object.required : [])
+  return Object.entries(object.properties).map(([argName, prop]) => {
     const argument: PromptArgument = { name: argName, required: required.has(argName) }
     if (isPlainRecord(prop) && typeof prop.description === 'string') {
       argument.description = prop.description

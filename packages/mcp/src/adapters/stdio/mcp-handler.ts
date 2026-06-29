@@ -8,7 +8,7 @@ import process from 'node:process'
 import { createInterface } from 'node:readline'
 import { StandardHandler } from '@orpc/server/standard'
 import { stringifyJSON, toArray } from '@orpc/shared'
-import { INVALID_REQUEST, JSONRPC_VERSION } from '../../constants'
+import { INTERNAL_ERROR, INVALID_REQUEST, JSONRPC_VERSION } from '../../constants'
 import { createMCPRegistryProvider } from '../../registry'
 import { MCPHandlerCodec } from '../standard/mcp-handler-codec'
 import { MCPHandlerPlugin } from '../standard/mcp-handler-plugin'
@@ -65,18 +65,27 @@ export class MCPHandler<T extends Context> {
 
     try {
       for await (const line of rl) {
+        // Check the raw line length BEFORE trimming, so a whitespace-padded
+        // oversized message can't slip under the limit.
+        if (line.length > this.maxMessageLength) {
+          writeMessage(output, { jsonrpc: JSONRPC_VERSION, id: null, error: { code: INVALID_REQUEST, message: 'Message too large' } })
+          continue
+        }
         const trimmed = line.trim()
         if (trimmed.length === 0) {
           continue
         }
-        if (trimmed.length > this.maxMessageLength) {
-          writeMessage(output, { jsonrpc: JSONRPC_VERSION, id: null, error: { code: INVALID_REQUEST, message: 'Message too large' } })
-          continue
-        }
 
-        const result = await this.handler.handle(synthesizeRequest(trimmed, options.signal), { context: options.context })
-        if (result.matched && result.response.body !== undefined) {
-          writeMessage(output, result.response.body)
+        try {
+          const result = await this.handler.handle(synthesizeRequest(trimmed, options.signal), { context: options.context })
+          if (result.matched && result.response.body !== undefined) {
+            writeMessage(output, result.response.body)
+          }
+        }
+        catch {
+          // An unexpected failure must not tear down the stdio reader; report it
+          // and keep processing subsequent messages.
+          writeMessage(output, { jsonrpc: JSONRPC_VERSION, id: null, error: { code: INTERNAL_ERROR, message: 'Internal error' } })
         }
       }
     }

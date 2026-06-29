@@ -7,7 +7,12 @@ export function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 export function isValidIncoming(value: unknown): value is JSONRPCIncoming {
-  return isObject(value) && value.jsonrpc === JSONRPC_VERSION && typeof value.method === 'string'
+  if (!isObject(value) || value.jsonrpc !== JSONRPC_VERSION || typeof value.method !== 'string') {
+    return false
+  }
+  // A JSON-RPC id, when present, must be a string or number (null/object/array
+  // are invalid). A missing id marks a notification.
+  return !('id' in value) || typeof value.id === 'string' || typeof value.id === 'number'
 }
 
 export function getMessageId(value: unknown): string | number | null {

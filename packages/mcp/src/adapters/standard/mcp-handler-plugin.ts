@@ -98,7 +98,14 @@ export class MCPHandlerPlugin<T extends Context> implements StandardHandlerPlugi
     this.enableDnsRebindingProtection = options.enableDnsRebindingProtection ?? false
     this.allowedOrigins = options.allowedOrigins
     this.allowedHosts = options.allowedHosts
-    this.pageSize = options.pageSize !== undefined && options.pageSize > 0 ? options.pageSize : DEFAULT_LIST_PAGE_SIZE
+    // Fail loud on a no-op security config: enabling protection without any
+    // allowlist would otherwise silently allow every Origin/Host.
+    if (this.enableDnsRebindingProtection && this.allowedOrigins === undefined && this.allowedHosts === undefined) {
+      throw new TypeError('`enableDnsRebindingProtection` requires `allowedOrigins` and/or `allowedHosts` to be set.')
+    }
+    this.pageSize = options.pageSize !== undefined && Number.isInteger(options.pageSize) && options.pageSize > 0
+      ? options.pageSize
+      : DEFAULT_LIST_PAGE_SIZE
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
@@ -229,7 +236,12 @@ export class MCPHandlerPlugin<T extends Context> implements StandardHandlerPlugi
 
   private notFound(method: string, params: Record<string, unknown>): JSONRPCErrorObject {
     if (method === 'resources/read') {
-      return { code: RESOURCE_NOT_FOUND, message: `Resource not found: ${String(params.uri)}`, data: { uri: params.uri } }
+      // A malformed request (missing/non-string uri) is invalid params, not a
+      // "resource not found"; reserve -32002 for syntactically valid URIs.
+      if (typeof params.uri !== 'string') {
+        return { code: INVALID_PARAMS, message: 'resources/read requires a string "uri"' }
+      }
+      return { code: RESOURCE_NOT_FOUND, message: `Resource not found: ${params.uri}`, data: { uri: params.uri } }
     }
     const kind = method === 'prompts/get' ? 'prompt' : 'tool'
     return { code: INVALID_PARAMS, message: `Unknown ${kind}: ${String(params.name)}` }
@@ -238,6 +250,11 @@ export class MCPHandlerPlugin<T extends Context> implements StandardHandlerPlugi
   /** Apply opaque-cursor catalog pagination to a list result. */
   private paginate(items: unknown[], key: string, cursor: unknown): Record<string, unknown> {
     const offset = decodeCursor(cursor)
+    // A valid cursor always points within the catalog (nextCursor is only emitted
+    // when more items remain), so an out-of-range offset is a stale/invalid cursor.
+    if (offset > 0 && offset >= items.length) {
+      throw new JSONRPCError(INVALID_PARAMS, 'Invalid cursor')
+    }
     const page = items.slice(offset, offset + this.pageSize)
     const result: Record<string, unknown> = { [key]: page }
     if (offset + this.pageSize < items.length) {
@@ -261,8 +278,6 @@ export class MCPHandlerPlugin<T extends Context> implements StandardHandlerPlugi
         return this.paginate((await this.registry.get()).resourceTemplates.map(entry => entry.definition), 'resourceTemplates', params.cursor)
       case 'prompts/list':
         return this.paginate([...(await this.registry.get()).prompts.values()].map(entry => entry.definition), 'prompts', params.cursor)
-      case 'completion/complete':
-        return { completion: { values: [], total: 0, hasMore: false } }
       default:
         throw new JSONRPCError(METHOD_NOT_FOUND, `Method not found: ${message.method}`)
     }

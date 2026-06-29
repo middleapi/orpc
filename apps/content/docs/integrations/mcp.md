@@ -198,7 +198,7 @@ Because MCP exposure lives in procedure metadata, a single router can be mounted
 export const handlers = {
   rpc: new RPCHandler(router), // typed oRPC clients
   openapi: new OpenAPIHandler(router), // REST + OpenAPI
-  mcp: new MCPHandler(router), // MCP tools / resources / prompts
+  mcp: new MCPHandler(router, { converters: [new ZodToJsonSchemaConverter()] }), // MCP tools / resources / prompts
 }
 ```
 

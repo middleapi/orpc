@@ -87,6 +87,18 @@ describe('mCPHandler (stdio)', () => {
     expect(responses[0].error.message).toBe('Parse error')
   })
 
+  it('rejects an over-limit line by its raw length, even when whitespace-padded', async () => {
+    const handler = new MCPHandler(router, { converters: [new ZodToJsonSchemaConverter()], maxMessageLength: 64 })
+    // The message trims to well under 64 chars, but the padded raw line exceeds it.
+    const padded = `${' '.repeat(100)}${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' })}\n`
+    const responses = await drive(handler, padded)
+
+    expect(responses).toHaveLength(1)
+    expect(responses[0].id).toBe(null)
+    expect(responses[0].error.code).toBe(-32600)
+    expect(responses[0].error.message).toBe('Message too large')
+  })
+
   it('recovers after an invalid JSON line and keeps processing valid lines', async () => {
     const payload
       = `not json at all\n`
