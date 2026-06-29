@@ -15,10 +15,6 @@ export function isValidIncoming(value: unknown): value is JSONRPCIncoming {
   return !('id' in value) || typeof value.id === 'string' || typeof value.id === 'number'
 }
 
-export function getMessageId(value: unknown): string | number | null {
-  return isObject(value) && (typeof value.id === 'string' || typeof value.id === 'number') ? value.id : null
-}
-
 /**
  * The body stream can only be consumed once, but both the plugin and the codec
  * need the parsed JSON-RPC envelope. Memoize the parse per request so they share
