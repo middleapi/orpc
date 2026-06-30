@@ -37,6 +37,7 @@
     "*/*/*"
   ],
   "exclude": [
+    "packages/nest/**",
     "packages/durable-iterator/**",
     "packages/publisher-durable-object/**",
     "playgrounds/**"
