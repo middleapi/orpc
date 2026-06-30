@@ -5,10 +5,10 @@ featuring pre-configured examples accessible instantly via StackBlitz or local s
 
 ## Available Playgrounds
 
-| Environment        | StackBlitz                                                                                         | GitHub Source                                                                    |
-| ------------------ | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Next.js Playground | [Open in StackBlitz](https://stackblitz.com/github/middleapi/orpc/tree/main/playgrounds/next)      | [View Source](https://github.com/middleapi/orpc/tree/main/playgrounds/next)      |
-| NestJS Playground  | [Open in StackBlitz](https://stackblitz.com/github/middleapi/orpc-nest/tree/main/playgrounds/nest) | [View Source](https://github.com/middleapi/orpc-nest/tree/main/playgrounds/nest) |
+| Environment        | StackBlitz                                                                                    | GitHub Source                                                               |
+| ------------------ | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Next.js Playground | [Open in StackBlitz](https://stackblitz.com/github/middleapi/orpc/tree/main/playgrounds/next) | [View Source](https://github.com/middleapi/orpc/tree/main/playgrounds/next) |
+| NestJS Playground  | [Open in StackBlitz](https://stackblitz.com/github/middleapi/orpc/tree/main/playgrounds/nest) | [View Source](https://github.com/middleapi/orpc/tree/main/playgrounds/nest) |
 
 :::warning
 StackBlitz has its own limitations, so some features may not work as expected.
@@ -20,7 +20,7 @@ Prefer working locally? Clone the playground with:
 
 ```bash
 npx giget gh:middleapi/orpc/playgrounds/next orpc-next-playground
-npx giget gh:middleapi/orpc-nest/playgrounds/nest orpc-nest-playground
+npx giget gh:middleapi/orpc/playgrounds/nest orpc-nest-playground
 ```
 
 Then install dependencies and start the dev server:

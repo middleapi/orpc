@@ -23,6 +23,7 @@
   ],
   "exclude": [
     "packages/bun/**",
+    "packages/nest/**",
     "playgrounds/**"
   ]
 }

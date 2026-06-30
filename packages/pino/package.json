@@ -45,6 +45,6 @@
     "@standardserver/core": "^0.0.25"
   },
   "devDependencies": {
-    "pino": "^10.1.0"
+    "pino": "^10.3.1"
   }
 }

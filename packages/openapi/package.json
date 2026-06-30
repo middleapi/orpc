@@ -88,7 +88,7 @@
     "swagger-ui": "^5.32.6"
   },
   "devDependencies": {
-    "fastify": "^5.6.2",
+    "fastify": "^5.8.5",
     "zod": "^4.4.3"
   }
 }
