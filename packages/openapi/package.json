@@ -84,7 +84,7 @@
     "swagger-ui": { "optional": true }
   },
   "dependencies": {
-    "@hey-api/spec-types": "0.0.0-next-20260408030107",
+    "@hey-api/spec-types": "0.2.0",
     "@orpc/client": "workspace:*",
     "@orpc/contract": "workspace:*",
     "@orpc/json-schema": "workspace:*",
