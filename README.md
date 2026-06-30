@@ -45,6 +45,7 @@ You can read the documentation [here](https://orpc.dev).
 
 **Framework & ecosystem integrations**
 
+- [@orpc/mcp](https://www.npmjs.com/package/@orpc/mcp): Serve your router as a [Model Context Protocol](https://modelcontextprotocol.io) server.
 - [@orpc/next](https://www.npmjs.com/package/@orpc/next): Integrate with [Next.js Server Functions](https://nextjs.org/docs/app/getting-started/mutating-data).
 - [@orpc/tanstack-query](https://www.npmjs.com/package/@orpc/tanstack-query): Integrate with [TanStack Query](https://tanstack.com/query/latest).
 - [@orpc/experimental-effect](https://www.npmjs.com/package/@orpc/experimental-effect): Integrate with [Effect](https://effect.website/).

@@ -185,6 +185,7 @@ export default withMermaid(defineConfig({
           items: [
             { text: 'Effect', link: '/docs/integrations/effect' },
             { text: 'Evlog', link: '/docs/integrations/evlog' },
+            { text: 'MCP', link: '/docs/integrations/mcp' },
             { text: 'NestJS', link: '/docs/integrations/nest' },
             { text: 'Next.js', link: '/docs/integrations/next' },
             { text: 'OpenTelemetry', link: '/docs/integrations/opentelemetry' },
