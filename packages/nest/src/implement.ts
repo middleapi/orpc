@@ -3,7 +3,7 @@ import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
 import type { ContractedRouter, DefaultInitialContext } from '@orpc/server'
 import type { Promisable } from '@orpc/shared'
 import type { StandardBodyHint } from '@standardserver/core'
-import type { Request, Response } from 'express'
+import type { Request as ExpressRequest, Response as ExpressResponse } from 'express'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
 import type { ORPCModuleConfig } from './module'
@@ -106,7 +106,7 @@ export class ImplementInterceptor implements NestInterceptor {
     this.httpAdapterHost = httpAdapterHost
 
     this.codec = new OpenAPIHandlerCodecCore(this.config)
-    this.toStandardLazyRequest = this.config.toStandardLazyRequest ?? ((req: Request | FastifyRequest, res: Response | FastifyReply) => {
+    this.toStandardLazyRequest = this.config.toStandardLazyRequest ?? ((req: ExpressRequest | FastifyRequest, res: ExpressResponse | FastifyReply) => {
       const standardRequest = toStandardLazyRequest(
         'raw' in req ? req.raw : req,
         'raw' in res ? res.raw : res,
@@ -132,8 +132,8 @@ export class ImplementInterceptor implements NestInterceptor {
           `)
         }
 
-        const req: Request | FastifyRequest = ctx.switchToHttp().getRequest()
-        const res: Response | FastifyReply = ctx.switchToHttp().getResponse()
+        const req: ExpressRequest | FastifyRequest = ctx.switchToHttp().getRequest()
+        const res: ExpressResponse | FastifyReply = ctx.switchToHttp().getResponse()
 
         const standardRequest = this.toStandardLazyRequest(req, res)
 
