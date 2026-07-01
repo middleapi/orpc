@@ -1,7 +1,7 @@
 import type { CallHandler, ExecutionContext, NestInterceptor } from '@nestjs/common'
-import type { StandardLazyRequest } from '@standardserver/core'
 import type { Request as ExpressRequest } from 'express'
 import type { FastifyReply } from 'fastify'
+import type { NestStandardLazyRequest } from './module'
 import { Buffer } from 'node:buffer'
 import FastifyCookie from '@fastify/cookie'
 import { Controller, HttpException, Req, Res, StreamableFile } from '@nestjs/common'
@@ -907,9 +907,10 @@ describe('compatibility', () => {
     expect(res.status).toBe(200)
   })
 
-  it('can custom request parser with toStandardLazyRequest option', async () => {
+  it('can custom request parser with toNestStandardLazyRequest option', async () => {
     const contract = oc.meta(openapi({
-      path: '/parser',
+      path: '/parser/{param}',
+      inputStructure: 'detailed',
     }))
 
     const handler = vi.fn(({ input }) => input)
@@ -922,18 +923,19 @@ describe('compatibility', () => {
       }
     }
 
-    const toStandardLazyRequest = vi.fn(() => ({
+    const toNestStandardLazyRequest = vi.fn(() => ({
       url: '/test',
       method: 'POST',
       headers: {},
       resolveBody: async () => '__OVERRIDED__',
-    } satisfies StandardLazyRequest))
+      params: { param: '__PARAM__' },
+    } satisfies NestStandardLazyRequest))
 
     const moduleRef = await Test.createTestingModule({
       controllers: [ImplController],
       imports: [
         ORPCModule.forRoot({
-          toStandardLazyRequest,
+          toNestStandardLazyRequest,
         }),
       ],
     }).compile()
@@ -941,14 +943,19 @@ describe('compatibility', () => {
     const app = moduleRef.createNestApplication()
     await app.init()
 
-    const res = await supertest(app.getHttpServer()).post('/parser')
+    const res = await supertest(app.getHttpServer()).post('/parser/value')
 
     expect(res.statusCode).toEqual(200)
-    expect(res.body).toEqual('__OVERRIDED__')
+    expect(res.body).toMatchObject({
+      body: '__OVERRIDED__',
+      params: {
+        param: '__PARAM__',
+      },
+    })
 
-    expect(toStandardLazyRequest).toHaveBeenCalledTimes(1)
-    expect(toStandardLazyRequest).toHaveBeenCalledWith(
-      expect.objectContaining({ url: '/parser' }),
+    expect(toNestStandardLazyRequest).toHaveBeenCalledTimes(1)
+    expect(toNestStandardLazyRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ url: '/parser/value' }),
       expect.objectContaining({ end: expect.any(Function) }),
     )
   })

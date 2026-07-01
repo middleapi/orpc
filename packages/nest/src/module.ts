@@ -9,16 +9,23 @@ import { ImplementInterceptor } from './implement'
 
 export const ORPC_MODULE_CONFIG_SYMBOL = Symbol.for('ORPC_NEST_MODULE_CONFIG')
 
+export interface NestStandardLazyRequest extends StandardLazyRequest {
+  /**
+   * Route parameters extracted from the request path.
+   */
+  params?: undefined | Record<string, string | string[]>
+}
+
 export type ORPCModuleConfig
   = & OpenAPIHandlerCodecCoreOptions<DefaultInitialContext>
     & StandardHandlerOptions<DefaultInitialContext>
     & (object extends DefaultInitialContext ? { context?: DefaultInitialContext } : { context: DefaultInitialContext })
     & {
       /**
-       * Customize how convert next.js req and res to StandardLazyRequest,
+       * Customize how convert nestjs req and res to StandardLazyRequest,
        * You might need define this if you not using express or fastify adapters
        */
-      toStandardLazyRequest?: undefined | ((req: any, res: any) => StandardLazyRequest)
+      toNestStandardLazyRequest?: undefined | ((req: any, res: any) => NestStandardLazyRequest)
 
       /**
        * Options for how to convert the Standard Response to a Nest Response (returning value), like event iterator options, etc.

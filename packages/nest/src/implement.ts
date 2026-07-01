@@ -6,7 +6,7 @@ import type { StandardBodyHint } from '@standardserver/core'
 import type { Request as ExpressRequest, Response as ExpressResponse } from 'express'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
-import type { ORPCModuleConfig } from './module'
+import type { NestStandardLazyRequest, ORPCModuleConfig } from './module'
 import { Readable } from 'node:stream'
 import { applyDecorators, Delete, Get, Head, HttpCode, HttpException, Inject, Injectable, Optional, Options, Patch, Post, Put, StreamableFile, UseInterceptors } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
@@ -94,7 +94,7 @@ export function Implement<T extends RouterContract>(
 export class ImplementInterceptor implements NestInterceptor {
   private readonly config: ORPCModuleConfig
   private readonly codec: OpenAPIHandlerCodecCore<DefaultInitialContext>
-  private readonly toStandardLazyRequest: Exclude<ORPCModuleConfig['toStandardLazyRequest'], undefined>
+  private readonly toNestStandardLazyRequest: Exclude<ORPCModuleConfig['toNestStandardLazyRequest'], undefined>
   private readonly httpAdapterHost: HttpAdapterHost
 
   constructor(
@@ -106,8 +106,8 @@ export class ImplementInterceptor implements NestInterceptor {
     this.httpAdapterHost = httpAdapterHost
 
     this.codec = new OpenAPIHandlerCodecCore(this.config)
-    this.toStandardLazyRequest = this.config.toStandardLazyRequest ?? ((req: ExpressRequest | FastifyRequest, res: ExpressResponse | FastifyReply) => {
-      const standardRequest = toStandardLazyRequest(
+    this.toNestStandardLazyRequest = this.config.toNestStandardLazyRequest ?? ((req: ExpressRequest | FastifyRequest, res: ExpressResponse | FastifyReply) => {
+      const standardRequest: NestStandardLazyRequest = toStandardLazyRequest(
         'raw' in req ? req.raw : req,
         'raw' in res ? res.raw : res,
       )
@@ -116,6 +116,8 @@ export class ImplementInterceptor implements NestInterceptor {
       if (req.body !== undefined) {
         standardRequest.resolveBody = () => Promise.resolve(req.body)
       }
+
+      standardRequest.params = req.params as NestStandardLazyRequest['params']
 
       return standardRequest
     })
@@ -135,7 +137,7 @@ export class ImplementInterceptor implements NestInterceptor {
         const req: ExpressRequest | FastifyRequest = ctx.switchToHttp().getRequest()
         const res: ExpressResponse | FastifyReply = ctx.switchToHttp().getResponse()
 
-        const standardRequest = this.toStandardLazyRequest(req, res)
+        const standardRequest = this.toNestStandardLazyRequest(req, res)
 
         const handler = new StandardHandler({
           resolveProcedure: () => Promise.resolve({
@@ -143,7 +145,7 @@ export class ImplementInterceptor implements NestInterceptor {
             procedure,
             decodeInput: () => this.codec.decodeInput({
               procedure,
-              params: toORPCOpenAPIParams(procedure, req.params as NestParams),
+              params: toORPCOpenAPIParams(procedure, standardRequest.params),
             }, standardRequest),
           }),
           encodeError: this.codec.encodeError.bind(this.codec),
@@ -248,9 +250,7 @@ function flattenParamValue(value: undefined | string | string[]): undefined | st
   return Array.isArray(value) ? value.join('/') : value
 }
 
-type NestParams = Record<string, string | string[]>
-
-function toORPCOpenAPIParams(contract: AnyProcedureContract, params: NestParams | undefined): undefined | Record<string, string> {
+function toORPCOpenAPIParams(contract: AnyProcedureContract, params: NestStandardLazyRequest['params']): undefined | Record<string, string> {
   const meta = getOpenAPIMeta(contract)
 
   /* c8 ignore start - there cases almost never happen only for type guard purpose */
