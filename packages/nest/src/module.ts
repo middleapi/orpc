@@ -22,8 +22,8 @@ export type ORPCModuleConfig
     & (object extends DefaultInitialContext ? { context?: DefaultInitialContext } : { context: DefaultInitialContext })
     & {
       /**
-       * Customize how convert nestjs req and res to StandardLazyRequest,
-       * You might need define this if you not using express or fastify adapters
+       * Customize how to convert NestJS `req` and `res` to {@link NestStandardLazyRequest}.
+       * You might need to define this if you are not using express or fastify adapters.
        */
       toNestStandardLazyRequest?: undefined | ((req: any, res: any) => NestStandardLazyRequest)
 
