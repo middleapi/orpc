@@ -50,6 +50,7 @@ You can read the documentation [here](https://orpc.dev).
 - [@orpc/experimental-effect](https://www.npmjs.com/package/@orpc/experimental-effect): Integrate with [Effect](https://effect.website/).
 - [@orpc/nest](https://www.npmjs.com/package/@orpc/nest): Implement your contract with [NestJS](https://nestjs.com/).
 - [@orpc/bun](https://www.npmjs.com/package/@orpc/bun): Adapters for [Bun's Redis](https://bun.sh/).
+- [@orpc/cloudflare](https://www.npmjs.com/package/@orpc/cloudflare): Adapters for [Cloudflare's RateLimit and Durable Objects](https://developers.cloudflare.com/workers/).
 
 **Observability**
 

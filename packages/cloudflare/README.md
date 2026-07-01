@@ -4,8 +4,8 @@
   <a href="https://codecov.io/gh/middleapi/orpc">
     <img alt="codecov" src="https://codecov.io/gh/middleapi/orpc/branch/main/graph/badge.svg">
   </a>
-  <a href="https://www.npmjs.com/package/@orpc/experimental-effect">
-    <img alt="weekly downloads" src="https://img.shields.io/npm/dw/%40orpc%2Fexperimental-effect?logo=npm" />
+  <a href="https://www.npmjs.com/package/@orpc/cloudflare">
+    <img alt="weekly downloads" src="https://img.shields.io/npm/dw/%40orpc%2Fcloudflare?logo=npm" />
   </a>
   <a href="https://github.com/middleapi/orpc/blob/main/LICENSE">
     <img alt="MIT License" src="https://img.shields.io/github/license/middleapi/orpc?logo=open-source-initiative" />
