@@ -355,6 +355,13 @@ importers:
         version: 4.4.3
 
   packages/cloudflare:
+    dependencies:
+      '@orpc/publisher':
+        specifier: workspace:*
+        version: link:../publisher
+      '@orpc/ratelimit':
+        specifier: workspace:*
+        version: link:../ratelimit
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.16.20

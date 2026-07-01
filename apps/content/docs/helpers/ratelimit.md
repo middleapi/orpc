@@ -60,12 +60,13 @@ if (!result.success) {
 The package includes adapters for multiple storage backends and runtimes.
 Each adapter might require `maxRequests` and `window` to configure the limit, along with adapter specific options.
 
-| Name                  | Blocking Mode | Adapter for                                                            |
-| --------------------- | ------------- | ---------------------------------------------------------------------- |
-| `MemoryRateLimiter`   | ✅            | In-memory storage                                                      |
-| `RedisRateLimiter`    | ✅            | [Redis](https://github.com/redis/redis)                                |
-| `UpstashRateLimiter`  | ✅            | [Upstash Rate Limit](https://www.npmjs.com/package/@upstash/ratelimit) |
-| `BunRedisRateLimiter` | ✅            | [Bun's Redis](https://bun.com/docs/runtime/redis)                      |
+| Name                    | Blocking Mode | Adapter for                                                                                               |
+| ----------------------- | ------------- | --------------------------------------------------------------------------------------------------------- |
+| `MemoryRateLimiter`     | ✅            | In-memory storage                                                                                         |
+| `RedisRateLimiter`      | ✅            | [Redis](https://github.com/redis/redis)                                                                   |
+| `UpstashRateLimiter`    | ✅            | [Upstash Rate Limit](https://www.npmjs.com/package/@upstash/ratelimit)                                    |
+| `BunRedisRateLimiter`   | ✅            | [Bun's Redis](https://bun.com/docs/runtime/redis)                                                         |
+| `CloudflareRateLimiter` | ✅            | [Cloudflare's Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) |
 
 ::: code-group
 
@@ -112,7 +113,7 @@ const limiter = new UpstashRateLimiter(ratelimit, {
 })
 ```
 
-```ts [bun-redis]
+```ts [bun]
 import { BunRedisRateLimiter } from '@orpc/bun'
 import { redis } from 'bun'
 
@@ -121,6 +122,18 @@ const limiter = new BunRedisRateLimiter(redis, {
   maxRequests: 10, // Maximum requests allowed
   window: 60000, // Time window in milliseconds (60 seconds)
 })
+```
+
+```ts [cloudflare]
+import { CloudflareRateLimiter } from '@orpc/cloudflare'
+
+export default {
+  async fetch(request, env) {
+    const limiter = new CloudflareRateLimiter(env.MY_RATE_LIMITER, {
+      prefix: 'orpc:', // Optional key prefix
+    })
+  }
+}
 ```
 
 :::

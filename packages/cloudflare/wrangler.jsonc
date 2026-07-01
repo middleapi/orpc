@@ -1,4 +1,11 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "compatibility_date": "2026-07-01"
+  "compatibility_date": "2026-07-01",
+  "ratelimits": [
+    {
+      "name": "RATELIMIT_3_10S",
+      "namespace_id": "1001",
+      "simple": { "limit": 3, "period": 10 }
+    }
+  ]
 }
