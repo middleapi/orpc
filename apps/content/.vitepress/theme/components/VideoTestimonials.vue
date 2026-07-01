@@ -16,10 +16,10 @@ const videos = [
 </script>
 
 <template>
-  <div class="container">
-    <div class="items">
-      <div v-for="video in videos" :key="video.id" class="item">
-        <div class="video-wrapper">
+  <div :class="$style['container']">
+    <div :class="$style['items']">
+      <div v-for="video in videos" :key="video.id" :class="$style['item']">
+        <div :class="$style['video-wrapper']">
           <iframe
             :src="`https://www.youtube.com/embed/${video.id}?rel=0&modestbranding=1`"
             :title="video.title"
@@ -34,7 +34,7 @@ const videos = [
   </div>
 </template>
 
-<style scoped>
+<style module>
 .container {
   margin-top: 16px;
 }
