@@ -31,19 +31,19 @@ function dismissBanner() {
 </script>
 
 <template>
-  <div v-show="show" ref="container" class="banner-container">
-    <div class="banner">
-      <div class="banner-content">
-        <div class="banner-text">
-          The screenshot API <span class="banner-helper">for developers</span> -
+  <div v-show="show" ref="container" :class="$style['banner-container']">
+    <div :class="$style['banner']">
+      <div :class="$style['banner-content']">
+        <div :class="$style['banner-text']">
+          The screenshot API <span :class="$style['banner-helper']">for developers</span> -
         </div>
 
-        <a class="banner-action" href="https://screenshotone.com/?ref=orpc" target="_blank" rel="noopener">
+        <a :class="$style['banner-action']" href="https://screenshotone.com/?ref=orpc" target="_blank" rel="noopener">
           Try ScreenshotOne
         </a>
       </div>
 
-      <button type="button" class="banner-close" @click="dismissBanner">
+      <button type="button" :class="$style['banner-close']" @click="dismissBanner">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
           <path
             d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"
@@ -60,7 +60,9 @@ function dismissBanner() {
     --vp-layout-top-height: 26px;
   }
 }
+</style>
 
+<style module>
 .banner-container {
   background: rgb(79, 70, 229);
   color: var(--vp-c-white);
