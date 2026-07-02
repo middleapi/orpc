@@ -30,7 +30,7 @@ export const createBunWebSocketClientServerTest: CreateClientServerTest = (
         })
       },
       async close(ws) {
-        handler.close(ws)
+        await handler.close(ws)
       },
     },
     port: 0,

@@ -1,7 +1,7 @@
 import { os } from '@orpc/server'
 import { AsyncIteratorClass, sleep } from '@standardserver/shared'
 import { z } from 'zod'
-import { createCrosswsClientServerTest } from './__shared__/client-server.corssws'
+import { createCrosswsClientServerTest } from './__shared__/client-server.crossws'
 import { createHonoFetchClientServerTest } from './__shared__/client-server.hono-fetch'
 import { createMessagePortClientServerTest } from './__shared__/client-server.message-port'
 import { createNodeHttpClientServerTest } from './__shared__/client-server.node-http'
