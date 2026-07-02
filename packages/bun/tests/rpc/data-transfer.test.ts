@@ -1,20 +1,15 @@
 import { os } from '@orpc/server'
-import { sleep } from '@standardserver/shared'
+import { sleep } from 'bun'
+import { describe, expect, it } from 'bun:test'
 import { z } from 'zod'
 import { builtInRPCSupportDataTypes } from './__shared__/built-in-support-data-types'
 import { Person } from './__shared__/client-server'
-import { createCrosswsClientServerTest } from './__shared__/client-server.corssws'
-import { createHonoFetchClientServerTest } from './__shared__/client-server.hono-fetch'
-import { createMessagePortClientServerTest } from './__shared__/client-server.message-port'
-import { createNodeHttpClientServerTest } from './__shared__/client-server.node-http'
-import { createNodeWsClientServerTest } from './__shared__/client-server.node-ws'
+import { createBunFetchClientServerTest } from './__shared__/client-server.bun-fetch'
+import { createBunWebSocketClientServerTest } from './__shared__/client-server.bun-websocket'
 
 describe.each([
-  ['crossws', createCrosswsClientServerTest],
-  ['hono-fetch', createHonoFetchClientServerTest],
-  ['node-http', createNodeHttpClientServerTest],
-  ['message-port', createMessagePortClientServerTest],
-  ['node-ws', createNodeWsClientServerTest],
+  ['bun-fetch', createBunFetchClientServerTest],
+  ['bun-websocket', createBunWebSocketClientServerTest],
 ] as const)('data transfer: %s', async (adapter, createClientServer) => {
   const router = {
     ping: os.input(z.any()).handler((_, input) => input),
@@ -23,7 +18,14 @@ describe.each([
   const client = createClientServer(router)
 
   it.each(builtInRPCSupportDataTypes)('should support $name', async ({ value, expected }) => {
-    await expect(client.ping(value)).resolves.toEqual(expected)
+    const actual = await client.ping(value)
+
+    if (typeof expected === 'function') {
+      expect(expected(actual)).toBe(true)
+    }
+    else {
+      expect(actual).toEqual(expected)
+    }
   })
 
   it('support custom serializer', async () => {
@@ -38,8 +40,9 @@ describe.each([
     return expect(client.lastEventId(null, { lastEventId })).resolves.toEqual(lastEventId)
   })
 
-  // TODO: https://github.com/h3js/crossws/issues/198
-  it.skipIf(adapter === 'crossws')('support octet stream and transfer octet in parallel', async () => {
+  // TODO: There an issues with Bun Websocket Server, when multiple messages sent simultaneously
+  // We might need to report this issue
+  it.skipIf(adapter === 'bun-websocket')('support octet stream and transfer octet in parallel', async () => {
     const stream = new ReadableStream<string>({
       async start(controller) {
         controller.enqueue('order 1')
@@ -83,7 +86,9 @@ describe.each([
     expect(Date.now() - startTime).toBeLessThan(100)
   })
 
-  it('support event iterator and transfer event iterator in parallel', async () => {
+  // TODO: There an issues with Bun Websocket Server, when multiple messages sent simultaneously
+  // We might need to report this issue
+  it.skipIf(adapter === 'bun-websocket')('support event iterator and transfer event iterator in parallel', async () => {
     const stream = (async function* () {
       yield 'order 1'
       await sleep(200)
@@ -100,7 +105,7 @@ describe.each([
 
     startTime = Date.now()
     await expect(result.next()).resolves.toEqual({ value: 'order 1', done: false })
-    expect(Date.now() - startTime).toBeLessThan(100)
+    expect(Date.now() - startTime).toBeLessThan(50)
 
     startTime = Date.now()
     await expect(result.next()).resolves.toEqual({ value: { order: 2 }, done: false })

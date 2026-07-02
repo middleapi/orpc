@@ -1,19 +1,14 @@
-import { os } from '@orpc/server'
-import { AsyncIteratorClass, sleep } from '@standardserver/shared'
+import { AsyncIteratorClass, os } from '@orpc/server'
+import { sleep } from 'bun'
+import { describe, expect, it, vi } from 'bun:test'
 import { z } from 'zod'
-import { createCrosswsClientServerTest } from './__shared__/client-server.corssws'
-import { createHonoFetchClientServerTest } from './__shared__/client-server.hono-fetch'
-import { createMessagePortClientServerTest } from './__shared__/client-server.message-port'
-import { createNodeHttpClientServerTest } from './__shared__/client-server.node-http'
-import { createNodeWsClientServerTest } from './__shared__/client-server.node-ws'
+import { createBunFetchClientServerTest } from './__shared__/client-server.bun-fetch'
+import { createBunWebSocketClientServerTest } from './__shared__/client-server.bun-websocket'
 
 describe.each([
-  ['crossws', createCrosswsClientServerTest],
-  ['hono-fetch', createHonoFetchClientServerTest],
-  ['node-http', createNodeHttpClientServerTest],
-  ['message-port', createMessagePortClientServerTest],
-  ['node-ws', createNodeWsClientServerTest],
-])('cancel and abort: %s', async (_name, createClientServer) => {
+  ['bun-fetch', createBunFetchClientServerTest],
+  ['bun-websocket', createBunWebSocketClientServerTest],
+] as const)('cancel and abort: %s', async (adapter, createClientServer) => {
   const handler = vi.fn()
   const router = {
     ping: os.input(z.any()).handler(handler),
@@ -27,19 +22,20 @@ describe.each([
 
     const controller = new AbortController()
 
-    const promise = expect(client.ping(null, { signal: controller.signal })).rejects.toThrowError('abort')
+    const promise = client.ping(null, { signal: controller.signal })
 
     await sleep(100)
     expect(handler).toHaveBeenCalledTimes(1)
     expect(handler.mock.calls[0]![0].signal.aborted).toBe(false)
 
     controller.abort()
-    await promise
+    await expect(promise).rejects.toThrowError('abort')
     await sleep(100)
     expect(handler.mock.calls[0]![0].signal.aborted).toBe(true)
   })
 
-  it('server should cancel event iterator response and abort request when client cancels', async () => {
+  // TODO: https://github.com/oven-sh/bun/issues/33227
+  it.skipIf(adapter === 'bun-fetch')('server should cancel event iterator response and abort request when client cancels', async () => {
     const cancel = vi.fn()
     handler.mockResolvedValueOnce(new AsyncIteratorClass(
       async () => {
@@ -57,12 +53,13 @@ describe.each([
     await iterator.return?.()
     await sleep(100) // lag between client and server
     expect(cancel).toHaveBeenCalledTimes(1)
-    expect(handler.mock.calls[0]![0].signal.aborted).toBe(true)
+    expect(handler.mock.calls[0]![0].signal.aborted).toEqual(true)
 
     await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true })
   })
 
-  it('server should cancel octet stream response and abort request when client cancels', async () => {
+  // TODO: https://github.com/oven-sh/bun/issues/33227
+  it.skipIf(adapter === 'bun-fetch')('server should cancel octet stream response and abort request when client cancels', async () => {
     const cancel = vi.fn()
     handler.mockResolvedValueOnce(new ReadableStream({
       async pull(controller) {
@@ -84,7 +81,7 @@ describe.each([
     await reader.cancel()
     await sleep(100) // lag between client and server
     expect(cancel).toHaveBeenCalledTimes(1)
-    expect(handler.mock.calls[0]![0].signal.aborted).toBe(true)
+    expect(handler.mock.calls[0]![0].signal.aborted).toEqual(true)
 
     await expect(reader.read()).resolves.toEqual({ value: undefined, done: true })
   })
