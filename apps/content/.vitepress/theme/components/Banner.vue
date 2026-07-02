@@ -55,8 +55,8 @@ function dismissBanner(key: BannerKey) {
 
 <template>
   <div v-show="hasVisibleBanners" ref="container" :class="$style['banner-container']">
-    <div v-show="showBeta" :class="`${$style['banner-row']} ${$style['banner-beta']}`">
-      <div :class="$style['banner']">
+    <div v-show="showBeta" :class="[$style['banner-row'], $style['banner-beta']]">
+      <div :class="$style.banner">
         <div :class="$style['banner-content']">
           <div :class="$style['banner-text']">
             oRPC v2 is now public beta -
@@ -77,8 +77,8 @@ function dismissBanner(key: BannerKey) {
       </div>
     </div>
 
-    <div v-show="showSponsor" :class="`${$style['banner-row']} ${$style['banner-sponsor']}`">
-      <div :class="$style['banner']">
+    <div v-show="showSponsor" :class="[$style['banner-row'], $style['banner-sponsor']]">
+      <div :class="$style.banner">
         <div :class="$style['banner-content']">
           <div :class="$style['banner-text']">
             The screenshot API <span :class="$style['banner-helper']">for developers</span> -

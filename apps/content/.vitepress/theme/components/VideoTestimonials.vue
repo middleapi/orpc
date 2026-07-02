@@ -16,9 +16,9 @@ const videos = [
 </script>
 
 <template>
-  <div :class="$style['container']">
-    <div :class="$style['items']">
-      <div v-for="video in videos" :key="video.id" :class="$style['item']">
+  <div :class="$style.container">
+    <div :class="$style.items">
+      <div v-for="video in videos" :key="video.id" :class="$style.item">
         <div :class="$style['video-wrapper']">
           <iframe
             :src="`https://www.youtube.com/embed/${video.id}?rel=0&modestbranding=1`"
