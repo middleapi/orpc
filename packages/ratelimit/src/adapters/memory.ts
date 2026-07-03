@@ -3,15 +3,6 @@ import { sleep } from '@orpc/shared'
 
 export interface MemoryRateLimiterOptions {
   /**
-   * Enable this if you don't want to reject a request immediately
-   * and prefer to wait until it can be retried.
-   */
-  blockingUntilReady?: {
-    enabled: boolean
-    timeout: number
-  }
-
-  /**
    * Maximum number of requests allowed within the window.
    */
   maxRequests: number
@@ -20,6 +11,25 @@ export interface MemoryRateLimiterOptions {
    * The duration of the fixed window in milliseconds.
    */
   window: number
+
+  /**
+   * Block until the request may pass or timeout is reached.
+   *
+   * @default { enabled: false }
+   */
+  blockingUntilReady?: {
+    /**
+     * Block until the request may pass or timeout is reached.
+     *
+     * @default false
+     */
+    enabled: boolean
+
+    /**
+     * milliseconds
+     */
+    timeout: number
+  }
 }
 
 export class MemoryRateLimiter implements RateLimiter {

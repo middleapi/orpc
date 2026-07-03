@@ -74,8 +74,29 @@ Each adapter might require `maxRequests` and `window` to configure the limit, al
 import { MemoryRateLimiter } from '@orpc/ratelimit/memory'
 
 const limiter = new MemoryRateLimiter({
-  maxRequests: 10, // Maximum requests allowed
-  window: 60000, // Time window in milliseconds (60 seconds)
+  /**
+   * Maximum number of requests allowed within the window.
+   */
+  maxRequests: 10,
+
+  /**
+   * The duration of the fixed window in milliseconds.
+   */
+  window: 60000,
+
+  blockingUntilReady: {
+    /**
+     * Block until the request may pass or timeout is reached.
+     *
+     * @default false
+     */
+    enabled: false,
+
+    /**
+     * milliseconds
+     */
+    timeout: 5000
+  },
 })
 ```
 
@@ -90,13 +111,40 @@ const client = createClient({ url: 'redis://localhost:6379' })
 await client.connect()
 
 const limiter = new RedisRateLimiter(client, {
-  prefix: 'orpc:', // Optional Redis key prefix
-  maxRequests: 10, // Maximum requests allowed
-  window: 60000, // Time window in milliseconds (60 seconds)
+  /**
+   * The prefix to use for Redis keys.
+   *
+   * @default ''
+   */
+  prefix: '',
+
+  /**
+   * Maximum number of requests allowed within the window.
+   */
+  maxRequests: 10,
+
+  /**
+   * The duration of the fixed window in milliseconds.
+   */
+  window: 60000,
+
+  blockingUntilReady: {
+    /**
+     * Block until the request may pass or timeout is reached.
+     *
+     * @default false
+     */
+    enabled: false,
+
+    /**
+     * milliseconds
+     */
+    timeout: 5000
+  },
 })
 ```
 
-```ts [upstash]
+````ts [upstash]
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 import { UpstashRateLimiter } from '@orpc/ratelimit/upstash'
@@ -109,18 +157,71 @@ const ratelimit = new Ratelimit({
 })
 
 const limiter = new UpstashRateLimiter(ratelimit, {
-  waitUntil: ctx.waitUntil.bind(ctx), // Pass waitUntil for Edge runtime support
+  blockingUntilReady: {
+    /**
+     * Block until the request may pass or timeout is reached.
+     *
+     * @default false
+     */
+    enabled: false,
+
+    /**
+     * milliseconds
+     */
+    timeout: 5000
+  },
+
+  /**
+   * For the MultiRegion setup we do some synchronizing in the background, after returning the current limit.
+   * Or when analytics is enabled, we send the analytics asynchronously after returning the limit.
+   * In most case you can simply ignore this.
+   *
+   * On Vercel Edge or Cloudflare workers, you might need `.bind` before assign:
+   * ```ts
+   * const ratelimiter = new UpstashRateLimiter(ratelimit, {
+   *   waitUntil: ctx.waitUntil.bind(ctx),
+   * })
+   * ```
+   */
+  waitUntil: undefined
 })
-```
+````
 
 ```ts [bun]
 import { BunRedisRateLimiter } from '@orpc/bun'
 import { redis } from 'bun'
 
 const limiter = new BunRedisRateLimiter(redis, {
-  prefix: 'orpc:', // Optional Redis key prefix
-  maxRequests: 10, // Maximum requests allowed
-  window: 60000, // Time window in milliseconds (60 seconds)
+  /**
+   * The prefix to use for Redis keys.
+   *
+   * @default ''
+   */
+  prefix: '',
+
+  /**
+   * Maximum number of requests allowed within the window.
+   */
+  maxRequests: 10,
+
+  /**
+   * The duration of the fixed window in milliseconds.
+   */
+  window: 60000,
+
+  blockingUntilReady: {
+    /**
+     * Block until the request may pass or timeout is reached.
+     *
+     * @default false
+     */
+    enabled: false,
+
+    /**
+     * milliseconds
+     */
+    timeout: 5000
+  },
 })
 ```
 
@@ -130,7 +231,12 @@ import { CloudflareRateLimiter } from '@orpc/cloudflare'
 export default {
   async fetch(request, env) {
     const limiter = new CloudflareRateLimiter(env.MY_RATE_LIMITER, {
-      prefix: 'orpc:', // Optional key prefix
+      /**
+       * The prefix to use for cloudflare ratelimit.
+       *
+       * @default ''
+       */
+      prefix: ''
     })
   }
 }
