@@ -847,9 +847,6 @@ importers:
       '@orpc/json-schema':
         specifier: beta
         version: link:../../packages/json-schema
-      '@orpc/next':
-        specifier: beta
-        version: link:../../packages/next
       '@orpc/openapi':
         specifier: beta
         version: link:../../packages/openapi
@@ -916,9 +913,6 @@ importers:
       '@orpc/json-schema':
         specifier: beta
         version: link:../../packages/json-schema
-      '@orpc/next':
-        specifier: beta
-        version: link:../../packages/next
       '@orpc/openapi':
         specifier: beta
         version: link:../../packages/openapi

@@ -20,7 +20,6 @@
     "@orpc/client": "beta",
     "@orpc/evlog": "beta",
     "@orpc/json-schema": "beta",
-    "@orpc/next": "beta",
     "@orpc/openapi": "beta",
     "@orpc/opentelemetry": "beta",
     "@orpc/publisher": "beta",

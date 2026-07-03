@@ -1,5 +1,3 @@
-'use client'
-
 import { orpc } from '../lib/orpc'
 import { useMutation, useQueryClient, useSuspenseInfiniteQuery } from '@tanstack/react-query'
 

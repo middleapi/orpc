@@ -1,7 +1,5 @@
-'use client'
-
 import { orpc } from '../lib/orpc'
-import { getIssueMessage } from '@orpc/next'
+import { getIssueMessage } from '@orpc/openapi/helpers'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 

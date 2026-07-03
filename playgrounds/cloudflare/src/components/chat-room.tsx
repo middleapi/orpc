@@ -1,5 +1,3 @@
-'use client'
-
 import { orpc } from '../lib/orpc'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { match } from 'ts-pattern'
