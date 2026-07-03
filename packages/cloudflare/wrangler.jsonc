@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "compatibility_date": "2026-07-01",
+  "main": "./tests/__shared__/main.ts",
+  "ratelimits": [
+    {
+      "name": "RATELIMIT_3_10S",
+      "namespace_id": "1001",
+      "simple": { "limit": 3, "period": 10 }
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PUBLISHER_DON",
+        "class_name": "PublisherDO"
+      },
+      {
+        "name": "PUBLISHER_REPLAY3S_DON",
+        "class_name": "PublisherReplay3sDO"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "PublisherDO",
+        "PublisherReplay3sDO"
+      ]
+    }
+  ]
+}

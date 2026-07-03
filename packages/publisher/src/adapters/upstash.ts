@@ -10,6 +10,8 @@ import { Publisher } from '../publisher'
 export interface UpstashPublisherOptions extends PublisherOptions {
   /**
    * The prefix to use for Redis keys.
+   *
+   * @default ''
    */
   prefix?: string
 

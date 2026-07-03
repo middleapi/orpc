@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => ({
     env: loadEnv(mode, process.cwd(), ''),
     coverage: {
       include: ['packages/*/src/**'],
-      exclude: ['**.test-d.*', '**.test.*', './packages/bun/**'],
+      exclude: ['**.test-d.*', '**.test.*', './packages/bun/**', './packages/cloudflare/**'],
     },
     projects: [
       {
@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => ({
           globals: true,
           setupFiles: ['./vitest.javascript.ts'],
           include: ['**/*.test.ts'],
-          exclude: [...defaultExclude, './packages/bun/**'],
+          exclude: [...defaultExclude, './packages/bun/**', './packages/cloudflare/**'],
         },
       },
       {

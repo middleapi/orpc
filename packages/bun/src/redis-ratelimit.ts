@@ -21,6 +21,8 @@ return { current, ttl }
 export interface BunRedisRateLimiterOptions {
   /**
    * The prefix to use for Redis keys.
+   *
+   * @default ''
    */
   prefix?: string
 

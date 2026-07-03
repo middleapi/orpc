@@ -70,17 +70,42 @@ const publisher = new MemoryPublisher<Record<string, { message: string }>>()
 
 ## Adapters
 
-| Name                | Replay Support | Adapter for                                          |
-| ------------------- | -------------- | ---------------------------------------------------- |
-| `MemoryPublisher`   | ✅             | In-memory storage                                    |
-| `RedisPublisher`    | ✅             | [Redis](https://github.com/redis/redis)              |
-| `UpstashPublisher`  | ✅             | [Upstash Redis](https://github.com/upstash/redis-js) |
-| `BunRedisPublisher` | ✅             | [Bun's Redis](https://bun.com/docs/runtime/redis)    |
+| Name                | Replay Support | Adapter for                                                                      |
+| ------------------- | -------------- | -------------------------------------------------------------------------------- |
+| `MemoryPublisher`   | ✅             | In-memory storage                                                                |
+| `RedisPublisher`    | ✅             | [Redis](https://github.com/redis/redis)                                          |
+| `UpstashPublisher`  | ✅             | [Upstash Redis](https://github.com/upstash/redis-js)                             |
+| `BunRedisPublisher` | ✅             | [Bun's Redis](https://bun.com/docs/runtime/redis)                                |
+| `DurablePublisher`  | ✅             | [Cloudflare Durable Objects](https://developers.cloudflare.com/durable-objects/) |
 
 ::: code-group
 
 ```ts [memory]
 import { MemoryPublisher } from '@orpc/publisher/memory'
+
+const publisher = new MemoryPublisher<Events>({
+  replay: {
+    /**
+     * Whether event replay support is enabled.
+     *
+     * When enabled, published events are temporarily stored so new
+     * subscribers can resume from a previous position using `lastEventId`.
+     *
+     * @default false
+     */
+    enabled: false,
+
+    /**
+     * How long (in seconds) to retain events for replay.
+     *
+     * Expired events are cleaned up lazily for performance reasons, so
+     * some events may remain available slightly longer than this period.
+     *
+     * @default 300 (5 min)
+     */
+    seconds: 300
+  }
+})
 ```
 
 ```ts [redis]
@@ -93,10 +118,51 @@ const client = createClient({ url: 'redis://localhost:6379' })
 // You can still call `client.connect()` manually, but it is optional.
 await client.connect()
 
-const publisher = new RedisPublisher(client, {
-  subscriber: client.duplicate(), // Redis client for subscribing to pub/sub (default: client.duplicate())
-  prefix: 'orpc:', // Optional Redis key prefix
-  serializer: undefined, // Optional custom serializer
+const publisher = new RedisPublisher<Events>(client, {
+  /**
+   * Redis subscriber instance.
+   * Pub/Sub takes over the connection, so a client with subscriptions
+   * cannot execute commands and must use a dedicated connection.
+   *
+   * @default redis.duplicate()
+   */
+  subscriber: redis.duplicate(),
+
+  /**
+   * The prefix to use for Redis keys.
+   *
+   * @default ''
+   */
+  prefix: '',
+
+  /**
+   * Serializer for serialize and deserialize payloads.
+   *
+   * @default RPCSerializer
+   */
+  serializer: undefined,
+
+  replay: {
+    /**
+     * Whether event replay support is enabled.
+     *
+     * When enabled, published events are temporarily stored so new
+     * subscribers can resume from a previous position using `lastEventId`.
+     *
+     * @default false
+     */
+    enabled: false,
+
+    /**
+     * How long (in seconds) to retain events for replay.
+     *
+     * Expired events are cleaned up lazily for performance reasons, so
+     * some events may remain available slightly longer than this period.
+     *
+     * @default 300 (5 min)
+     */
+    seconds: 300
+  }
 })
 ```
 
@@ -106,21 +172,173 @@ import { UpstashPublisher } from '@orpc/publisher/upstash'
 
 const redis = Redis.fromEnv()
 
-const publisher = new UpstashPublisher(redis, {
-  prefix: 'orpc:', // Optional Redis key prefix
-  serializer: undefined, // Optional custom serializer
+const publisher = new UpstashPublisher<Events>(redis, {
+  /**
+   * The prefix to use for Redis keys.
+   *
+   * @default ''
+   */
+  prefix: '',
+
+  /**
+   * Serializer for serialize and deserialize payloads.
+   *
+   * @default RPCSerializer
+   */
+  serializer: undefined,
+
+  replay: {
+    /**
+     * Whether event replay support is enabled.
+     *
+     * When enabled, published events are temporarily stored so new
+     * subscribers can resume from a previous position using `lastEventId`.
+     *
+     * @default false
+     */
+    enabled: false,
+
+    /**
+     * How long (in seconds) to retain events for replay.
+     *
+     * Expired events are cleaned up lazily for performance reasons, so
+     * some events may remain available slightly longer than this period.
+     *
+     * @default 300 (5 min)
+     */
+    seconds: 300
+  }
 })
 ```
 
-```ts [bun-redis]
+```ts [bun]
 import { BunRedisPublisher } from '@orpc/bun'
 import { redis } from 'bun'
 
-const publisher = new BunRedisPublisher(redis, {
-  subscriber: redis.duplicate(), // Redis client for subscribing to pub/sub (default: redis.duplicate())
-  prefix: 'orpc:', // Optional Redis key prefix
-  serializer: undefined, // Optional custom serializer
+const publisher = new BunRedisPublisher<Events>(redis, {
+  /**
+   * Redis subscriber instance.
+   * Pub/Sub takes over the connection, so a client with subscriptions
+   * cannot execute commands and must use a dedicated connection.
+   *
+   * @default redis.duplicate() (lazily created on first listen)
+   */
+  subscriber: redis.duplicate(),
+
+  /**
+   * The prefix to use for Redis keys.
+   *
+   * @default ''
+   */
+  prefix: '',
+
+  /**
+   * Serializer for serialize and deserialize payloads.
+   *
+   * @default RPCSerializer
+   */
+  serializer: undefined,
+
+  replay: {
+    /**
+     * Whether event replay support is enabled.
+     *
+     * When enabled, published events are temporarily stored so new
+     * subscribers can resume from a previous position using `lastEventId`.
+     *
+     * @default false
+     */
+    enabled: false,
+
+    /**
+     * How long (in seconds) to retain events for replay.
+     *
+     * Expired events are cleaned up lazily for performance reasons, so
+     * some events may remain available slightly longer than this period.
+     *
+     * @default 300 (5 min)
+     */
+    seconds: 300
+  }
 })
+```
+
+```ts [cloudflare]
+import { DurablePublisher, DurablePublisherObject } from '@orpc/cloudflare'
+
+export class PublisherDO extends DurablePublisherObject {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env, {
+      replay: {
+        /**
+         * Whether event replay support is enabled.
+         *
+         * When enabled, published events are temporarily stored so new
+         * subscribers can resume from a previous position using `lastEventId`.
+         *
+         * @default false
+         */
+        enabled: false,
+
+        /**
+         * How long (in seconds) to retain events for replay.
+         *
+         * Expired events are cleaned up lazily for performance reasons, so
+         * some events may remain available slightly longer than this period.
+         *
+         * @default 300 (5 min)
+         */
+        seconds: 300,
+
+        /**
+         * Interval (in seconds) between cleanup checks for the Durable Object.
+         *
+         * At each interval, verify whether the Durable Object is inactive
+         * (no active WebSocket connections and no stored events). If inactive, all
+         * data is deleted to free resources; otherwise, another check is scheduled.
+         *
+         * @default 6 * 60 * 60 (6 hours)
+         */
+        cleanupIntervalSeconds: 6 * 60 * 60,
+
+        /**
+         * Prefix for the resume storage table schema.
+         * Used to avoid naming conflicts with other tables in the same Durable Object.
+         *
+         * @default 'orpc:'
+         */
+        schemaPrefix: 'orpc:'
+      }
+    })
+  }
+}
+
+export default {
+  async fetch(request, env) {
+    const publisher = new DurablePublisher<Events>(env.PUBLISHER_DON, {
+      /**
+       * Prefix for events, to avoid naming conflicts with other publishers in the same Durable Object Namespace.
+       *
+       * @default ''
+       */
+      prefix: '',
+
+      /**
+       * Serializer for serialize and deserialize payloads.
+       *
+       * @default RPCSerializer
+       */
+      serializer: undefined,
+
+      /**
+       * Custom function to get the Durable Object stub for publishing.
+       *
+       * @default ((namespace, event) => namespace.getByName(event))
+       */
+      getStubByName: (namespace, event) => namespace.getByName(event)
+    })
+  },
+}
 ```
 
 :::
