@@ -110,6 +110,9 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
     return new Response(null, { status: 101, webSocket: client })
   }
 
+  override webSocketClose(_ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): void | Promise<void> {
+  }
+
   override async alarm(): Promise<void> {
     await this.replayStorage.alarm()
   }
