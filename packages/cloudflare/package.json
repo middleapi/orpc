@@ -34,8 +34,8 @@
   "scripts": {
     "build": "unbuild",
     "type:check": "wrangler types && tsc -b",
-    "test": "pnpm run -r test && vitest run",
-    "test:coverage": "pnpm run -r test:coverage && vitest run --coverage"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
