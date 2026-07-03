@@ -189,5 +189,37 @@ describe('rpcHandler', () => {
     })
 
     expect(ws.send).not.toHaveBeenCalled()
+
+    onClose?.() // safely call again to ensure no error is thrown
+  })
+
+  it('handles Blob messages via upgrade', async () => {
+    let onMessage: ((event: { data: Blob }) => void) | undefined
+
+    const handler = createHandler()
+
+    const ws = {
+      addEventListener: vi.fn((event: string, callback: any) => {
+        if (event === 'message') {
+          onMessage = callback
+        }
+      }),
+      send: vi.fn(() => undefined),
+    }
+
+    handler.upgrade(ws as any)
+
+    const request = await createRequestMessage()
+    onMessage?.({ data: new Blob([request as string]) })
+
+    await vi.waitFor(() => {
+      expect(ws.send).toHaveBeenCalledTimes(1)
+    })
+
+    const decoded = decodePeerMessage((ws as any).send.mock.calls[0][0]) as any
+
+    expect(decoded.matched).toBe(true)
+    expect(decoded.message.kind).toBe('response')
+    expect(decoded.message.json.status).toBe(200)
   })
 })

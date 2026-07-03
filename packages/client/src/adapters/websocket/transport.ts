@@ -205,6 +205,8 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
         const message = event.data instanceof Blob ? await loadBytes(event.data) : toStringOrBytes(event.data)
         const result = decodePeerMessage(message, this.decodePeerMessageOptions)
         if (result.matched && isServerPeerSendMessage(result.message)) {
+          // Not awaited: `peer.message` runs handling message may be slow,
+          // and awaiting it would block decoding of subsequent messages.
           peer.message(result.message)
         }
       }))

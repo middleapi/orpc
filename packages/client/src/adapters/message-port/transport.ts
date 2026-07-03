@@ -80,8 +80,8 @@ export class MessagePortLinkTransport<T extends ClientContext> implements Standa
       return { matched: true }
     })
 
-    onMessagePortClose(port, () => {
-      this.peer.close()
+    onMessagePortClose(port, async () => {
+      await this.peer.close()
     })
   }
 

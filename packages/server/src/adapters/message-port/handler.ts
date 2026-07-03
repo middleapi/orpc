@@ -130,8 +130,9 @@ export class MessagePortHandler<T extends Context> {
     const peer = this.peers.get(port)
 
     if (peer) {
-      await peer.close()
+      // delete before close to avoid potential race conditions
       this.peers.delete(port)
+      await peer.close()
     }
   }
 }

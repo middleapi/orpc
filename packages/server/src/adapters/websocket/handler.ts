@@ -91,8 +91,9 @@ export class WebSocketHandler<T extends Context> {
     const peer = this.peers.get(ws)
 
     if (peer) {
-      await peer.close()
+      // delete before close to avoid potential race conditions
       this.peers.delete(ws)
+      await peer.close()
     }
   }
 
@@ -111,7 +112,7 @@ export class WebSocketHandler<T extends Context> {
      */
     ws.addEventListener('message', sequential(async (event) => {
       // For better compatibility avoid control or depend on websocket.binaryType
-      const data = event.data instanceof Blob ? loadBytes(event.data) : event.data
+      const data = event.data instanceof Blob ? await loadBytes(event.data) : event.data
 
       // Not awaited: `this.message` runs business logic that may be slow,
       // and awaiting it would block decoding of subsequent messages.
