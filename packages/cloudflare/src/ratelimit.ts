@@ -3,6 +3,8 @@ import type { RateLimiter, RateLimitOptions, RateLimitResult } from '@orpc/ratel
 export interface CloudflareRateLimiterOptions {
   /**
    * The prefix to use for cloudflare ratelimit.
+   *
+   * @default ''
    */
   prefix?: string
 }

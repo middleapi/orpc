@@ -66,7 +66,7 @@ Each adapter might require `maxRequests` and `window` to configure the limit, al
 | `RedisRateLimiter`      | ✅            | [Redis](https://github.com/redis/redis)                                                                   |
 | `UpstashRateLimiter`    | ✅            | [Upstash Rate Limit](https://www.npmjs.com/package/@upstash/ratelimit)                                    |
 | `BunRedisRateLimiter`   | ✅            | [Bun's Redis](https://bun.com/docs/runtime/redis)                                                         |
-| `CloudflareRateLimiter` | ✅            | [Cloudflare's Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) |
+| `CloudflareRateLimiter` | ❌            | [Cloudflare's Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) |
 
 ::: code-group
 
