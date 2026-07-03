@@ -3,7 +3,7 @@
  *
  * Prefers the newer `.bytes` method when available as it more efficient but not widely supported yet.
  */
-export async function loadBytes(source: Pick<Blob, 'arrayBuffer' | 'bytes'>): Promise<Uint8Array<ArrayBuffer>> {
+export async function loadBytes(source: Pick<Blob, 'arrayBuffer' | 'bytes'>): ReturnType<Blob['bytes']> {
   if (typeof source.bytes === 'function') {
     // eslint-disable-next-line ban/ban
     return source.bytes()
@@ -17,7 +17,7 @@ export async function loadBytes(source: Pick<Blob, 'arrayBuffer' | 'bytes'>): Pr
  * - the original string value, or
  * - a Uint8Array view over the source bytes.
  */
-export async function toStringOrBytes(source: string | ArrayBuffer | Blob | Exclude<ConstructorParameters<typeof Blob>[0], undefined>[0][] | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>): Promise<string | Uint8Array<ArrayBuffer>> {
+export async function toStringOrBytes(source: string | ArrayBuffer | Blob | Exclude<ConstructorParameters<typeof Blob>[0], undefined>[0][] | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>): Promise<string | Awaited<ReturnType<Blob['bytes']>>> {
   if (typeof source === 'string') {
     return source
   }
