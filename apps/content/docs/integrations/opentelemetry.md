@@ -9,7 +9,7 @@ This guide assumes familiarity with [OpenTelemetry](https://opentelemetry.io/). 
 ![oRPC OpenTelemetry Integration Preview](/images/opentelemetry-integration-preview.png)
 
 ::: info
-See the complete example in our [Bun WebSocket + OpenTelemetry Playground](/docs/playgrounds).
+See the complete example in our [playgrounds](/docs/playgrounds).
 :::
 
 ## Installation

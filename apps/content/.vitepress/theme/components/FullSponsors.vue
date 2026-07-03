@@ -42,48 +42,48 @@ const tierGroups = computed(() => {
 </script>
 
 <template>
-  <div class="full-sponsors-container">
-    <h2 class="sponsored-by">
+  <div :class="$style['full-sponsors-container']">
+    <h2 :class="$style['sponsored-by']">
       Sponsored by
     </h2>
-    <p class="sponsor-cta">
+    <p :class="$style['sponsor-cta']">
       If you find oRPC valuable and would like to support its development:
       <a href="https://github.com/sponsors/dinwwwh" target="_blank" rel="noopener">GitHub Sponsors</a>
     </p>
 
-    <div v-for="tier in tierGroups" :key="tier.level" class="tier-section">
-      <h3 class="tier-title">
+    <div v-for="tier in tierGroups" :key="tier.level" :class="$style['tier-section']">
+      <h3 :class="$style['tier-title']">
         {{ tier.title }}
       </h3>
-      <div class="tier-grid" :style="{ '--cols': tier.cols }">
+      <div :class="$style['tier-grid']" :style="{ '--cols': tier.cols }">
         <div
           v-for="sponsor in tier.sponsors"
           :key="sponsor.login"
-          class="tier-grid-item"
+          :class="$style['tier-grid-item']"
         >
           <a
             :href="sponsor.link"
             target="_blank"
             rel="noopener"
             :title="sponsor.name || sponsor.login"
-            class="sponsor-link"
+            :class="$style['sponsor-link']"
           >
             <img
               :src="sponsor.avatar"
               :alt="sponsor.name || sponsor.login"
               loading="lazy"
             >
-            <span class="sponsor-name">{{ sponsor.name || sponsor.login }}</span>
+            <span :class="$style['sponsor-name']">{{ sponsor.name || sponsor.login }}</span>
           </a>
         </div>
       </div>
     </div>
 
-    <div v-if="pastSponsors.length > 0" class="tier-section">
-      <h3 class="tier-title">
+    <div v-if="pastSponsors.length > 0" :class="$style['tier-section']">
+      <h3 :class="$style['tier-title']">
         Past Sponsors
       </h3>
-      <div class="past-sponsors">
+      <div :class="$style['past-sponsors']">
         <a
           v-for="sponsor in pastSponsors"
           :key="sponsor.login"
@@ -91,12 +91,12 @@ const tierGroups = computed(() => {
           target="_blank"
           rel="noopener"
           :title="sponsor.name || sponsor.login"
-          class="past-sponsor-link"
+          :class="$style['past-sponsor-link']"
         >
           <img
             :src="sponsor.avatar"
             :alt="sponsor.name || sponsor.login"
-            class="past-sponsor-avatar"
+            :class="$style['past-sponsor-avatar']"
             loading="lazy"
           >
         </a>
@@ -105,7 +105,7 @@ const tierGroups = computed(() => {
   </div>
 </template>
 
-<style scoped>
+<style module>
 .full-sponsors-container {
   margin-top: 40px;
   display: flex;
