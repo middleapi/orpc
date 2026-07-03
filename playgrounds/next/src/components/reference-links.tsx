@@ -7,7 +7,7 @@ const referenceLinks = [
   {
     href: 'http://localhost:16686',
     label: 'Jaeger Dashboard',
-    description: 'Trace requests as they flow through the oRPC pipeline - "npm run jaeger:run"',
+    description: 'Trace requests as they flow through the oRPC pipeline - "npm run jaeger"',
   },
 ]
 
