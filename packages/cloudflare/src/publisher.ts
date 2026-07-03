@@ -51,7 +51,7 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
     const response = await stub.fetch('http://localhost/publish', {
       method: 'POST',
       body: stringifyJSON({
-        data: this.serializer.serialize(data),
+        data: this.serializer.serialize(data, { useFormDataForBlobFields: false }),
         meta,
       }),
       headers: {
