@@ -378,9 +378,6 @@ importers:
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.16.20
         version: 0.16.20(@cloudflare/workers-types@4.20260701.1)(@vitest/runner@4.1.9)(@vitest/snapshot@4.1.9)(vitest@4.1.9)
-      '@cloudflare/workers-types':
-        specifier: ^4.20260630.1
-        version: 4.20260701.1
       '@vitest/coverage-istanbul':
         specifier: ^4.1.9
         version: 4.1.9(vitest@4.1.9)
@@ -10554,7 +10551,8 @@ snapshots:
   '@cloudflare/workerd-windows-64@1.20260630.1':
     optional: true
 
-  '@cloudflare/workers-types@4.20260701.1': {}
+  '@cloudflare/workers-types@4.20260701.1':
+    optional: true
 
   '@codemirror/autocomplete@6.20.3':
     dependencies:

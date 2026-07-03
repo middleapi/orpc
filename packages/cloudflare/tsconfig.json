@@ -4,7 +4,6 @@
     "lib": ["ES2022"],
     "types": [
       "node",
-      "@cloudflare/workers-types",
       "@cloudflare/vitest-pool-workers/types"
     ]
   },
