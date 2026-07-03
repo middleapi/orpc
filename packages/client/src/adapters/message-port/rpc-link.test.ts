@@ -161,4 +161,24 @@ describe('rpcLink', () => {
 
     await promise
   })
+
+  it('ignore invalid messages', async () => {
+    const port = createPort()
+    const orpc = createORPCClient(new RPCLink({ port })) as any
+
+    const promise = expect(orpc.ping('input')).resolves.toEqual('pong')
+
+    await vi.waitFor(() => expect(port.postMessage).toHaveBeenCalledTimes(1))
+
+    const decoded = decodeRequest(port.postMessage.mock.calls[0]![0])
+    const id = decoded.message.id
+
+    // Invalid message — should be ignored
+    onMessage({ data: { invalid: true } })
+
+    // Correct message — should be processed
+    onMessage({ data: await createResponseMessage({ id }) })
+
+    await promise
+  })
 })

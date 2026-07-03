@@ -1,11 +1,11 @@
 import type { Promisable, Value } from '@orpc/shared'
 import type { StandardLazyResponse, StandardRequest } from '@standardserver/core'
-import type { DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standardserver/peer'
+import type { DecodePeerMessageOptions, EncodePeerMessageOptions, ServerPeerSendMessage } from '@standardserver/peer'
 import type { ClientContext, ClientOptions } from '../../types'
 import type { StandardLinkTransport } from '../standard'
 import type { SupportedMessagePort } from './message-port'
-import { isPlainObject, toStringOrBytes, value } from '@orpc/shared'
-import { ClientPeer, decodePeerMessage, encodePeerMessage, isServerPeerSendMessage } from '@standardserver/peer'
+import { value } from '@orpc/shared'
+import { ClientPeer, decodePeerMessage, encodePeerMessage, isPeerMessage, isServerPeerSendMessage } from '@standardserver/peer'
 import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from './message-port'
 
 type DecodedRequestMessage = ConstructorParameters<typeof ClientPeer>[0] extends (message: infer TMessage) => unknown
@@ -53,19 +53,31 @@ export class MessagePortLinkTransport<T extends ClientContext> implements Standa
       }
     })
 
-    onMessagePortMessage(port, async (message) => {
-      if (isPlainObject(message)) {
-        await this.peer.message(message as any)
-        return
+    onMessagePortMessage(port, async (data) => {
+      let peerMessage: ServerPeerSendMessage | undefined
+
+      if (typeof data === 'string' || data instanceof Uint8Array) {
+        // MessagePort receives the exact payload sent, and `encodePeerMessage` only returns string or Uint8Array.
+        const result = decodePeerMessage(data as string | Uint8Array<ArrayBuffer>, decodePeerMessageOptions)
+        if (result.matched && isServerPeerSendMessage(result.message)) {
+          peerMessage = result.message
+        }
       }
 
-      const encodedMessage = await toStringOrBytes(message)
-
-      const result = decodePeerMessage(encodedMessage, decodePeerMessageOptions)
-
-      if (result.matched && isServerPeerSendMessage(result.message)) {
-        await this.peer.message(result.message)
+      else if (isPeerMessage(data) && isServerPeerSendMessage(data)) {
+        peerMessage = data
       }
+
+      if (peerMessage === undefined) {
+        return { matched: false }
+      }
+
+      /**
+       * Message order is important: loading -> decode -> .message.
+       * This flow must stay synchronous, or we need to use `sequential` helper
+       */
+      await this.peer.message(peerMessage)
+      return { matched: true }
     })
 
     onMessagePortClose(port, () => {

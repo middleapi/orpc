@@ -75,13 +75,9 @@ describe('rpcHandler', () => {
       const message = await createRequestMessage()
       return new TextEncoder().encode(message as string).buffer
     }],
-    ['blob', async () => {
+    ['arrayBuffer parts', async () => {
       const message = await createRequestMessage()
-      return new Blob([message])
-    }],
-    ['blob parts', async () => {
-      const message = await createRequestMessage()
-      return [message]
+      return [new TextEncoder().encode(message as string).buffer]
     }],
   ])('handles %s request', async (_type, createMessage) => {
     const handler = createHandler()

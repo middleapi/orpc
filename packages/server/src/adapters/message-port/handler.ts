@@ -1,12 +1,12 @@
 import type { SupportedMessagePort } from '@orpc/client/message-port'
 import type { MaybeOptionalOptions, Promisable, Value } from '@orpc/shared'
-import type { DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standardserver/peer'
+import type { ClientPeerSendMessage, DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standardserver/peer'
 import type { Context } from '../../context'
 import type { StandardHandler } from '../standard'
 import type { StandardPeerRequestHandlerOptions } from '../standard-peer'
 import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from '@orpc/client/message-port'
-import { isPlainObject, resolveMaybeOptionalOptions, toStringOrBytes, value } from '@orpc/shared'
-import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standardserver/peer'
+import { resolveMaybeOptionalOptions, value } from '@orpc/shared'
+import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, isPeerMessage, ServerPeer } from '@standardserver/peer'
 import { createStandardPeerRequestHandler } from '../standard-peer'
 
 type DecodedResponseMessage = ConstructorParameters<typeof ServerPeer>[0] extends (message: infer TMessage) => unknown
@@ -54,12 +54,18 @@ export class MessagePortHandler<T extends Context> {
   }
 
   /**
-   * Attaches necessary event listeners to a message port to handle incoming messages and peer management.
+   * Attaches message and close listeners to a message port.
+   *
+   * Prefer this over calling `.message()` and `.close()` manually.
    */
   upgrade(
     port: SupportedMessagePort,
     ...rest: MaybeOptionalOptions<StandardPeerRequestHandlerOptions<T>>
   ): void {
+    /**
+     * Message order is important: loading -> decode -> .message.
+     * This flow must stay synchronous, or we need to use `sequential` helper
+     */
     onMessagePortMessage(port, message => this.message(port, message, ...rest))
     onMessagePortClose(port, () => this.close(port))
   }
@@ -67,13 +73,11 @@ export class MessagePortHandler<T extends Context> {
   /**
    * Handles a single message received from a message port.
    *
-   * @warning AVOID calling this method directly if `.upgrade()` is used, as `.upgrade()` already sets up necessary event listeners to call this method for incoming messages and manage peer lifecycle.
-   *
-   * @param port The message port instance, require consistent instance across messages for proper peer management
+   * @param port The message port instance. Use the same instance for all messages.
    */
   async message(
     port: SupportedMessagePort,
-    data: any,
+    data: unknown,
     ...rest: MaybeOptionalOptions<StandardPeerRequestHandlerOptions<T>>
   ): Promise<{ matched: boolean }> {
     let peer = this.peers.get(port)
@@ -91,35 +95,36 @@ export class MessagePortHandler<T extends Context> {
       }))
     }
 
-    if (isPlainObject(data)) {
-      await peer.message(
-        data as any,
-        createStandardPeerRequestHandler(this.handler, resolveMaybeOptionalOptions(rest)),
-      )
+    let peerMessage: ClientPeerSendMessage | undefined
 
-      return { matched: true }
+    if (typeof data === 'string' || data instanceof Uint8Array) {
+      // MessagePort receives the exact payload sent, and `encodePeerMessage` only returns string or Uint8Array.
+      const result = decodePeerMessage(data as string | Uint8Array<ArrayBuffer>, this.decodePeerMessageOptions)
+      if (result.matched && isClientPeerSendMessage(result.message)) {
+        peerMessage = result.message
+      }
     }
 
-    const message = await toStringOrBytes(data)
-
-    const result = decodePeerMessage(message, this.decodePeerMessageOptions)
-
-    if (result.matched && isClientPeerSendMessage(result.message)) {
-      await peer.message(
-        result.message,
-        createStandardPeerRequestHandler(this.handler, resolveMaybeOptionalOptions(rest)),
-      )
+    else if (isPeerMessage(data) && isClientPeerSendMessage(data)) {
+      peerMessage = data
     }
 
-    return result
+    if (peerMessage === undefined) {
+      return { matched: false }
+    }
+
+    /**
+     * Message order is important: loading -> decode -> .message.
+     * This flow must stay synchronous, or we need to use `sequential` helper
+     */
+    await peer.message(peerMessage, createStandardPeerRequestHandler(this.handler, resolveMaybeOptionalOptions(rest)))
+    return { matched: true }
   }
 
   /**
-   * Called when a message port is closed, to clean up any associated peer state.
+   * Cleans up peer state for a closed message port.
    *
-   * @warning AVOID calling this method directly if `.upgrade()` is used, as `.upgrade()` already sets up necessary event listeners to call this method for incoming messages and manage peer lifecycle.
-   *
-   * @param port The message port instance to clean up, must be the same instance used in `.message()` calls to properly clean up
+   * @param port The same message port instance passed to `.message()`.
    */
   async close(port: SupportedMessagePort): Promise<void> {
     const peer = this.peers.get(port)

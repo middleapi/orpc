@@ -38,8 +38,7 @@ describe.each([
     return expect(client.lastEventId(null, { lastEventId })).resolves.toEqual(lastEventId)
   })
 
-  // TODO: https://github.com/h3js/crossws/issues/198
-  it.skipIf(adapter === 'crossws')('support octet stream and transfer octet in parallel', async () => {
+  it('support octet stream and transfer octet in parallel', async () => {
     const stream = new ReadableStream<string>({
       async start(controller) {
         controller.enqueue('order 1')
