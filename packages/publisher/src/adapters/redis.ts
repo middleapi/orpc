@@ -19,6 +19,8 @@ export interface RedisPublisherOptions extends PublisherOptions {
 
   /**
    * The prefix to use for Redis keys.
+   *
+   * @default ''
    */
   prefix?: string
 

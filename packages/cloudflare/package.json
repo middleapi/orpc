@@ -38,8 +38,11 @@
     "test:coverage": "pnpm run -r test:coverage && vitest run --coverage"
   },
   "dependencies": {
+    "@orpc/client": "workspace:*",
     "@orpc/publisher": "workspace:*",
-    "@orpc/ratelimit": "workspace:*"
+    "@orpc/ratelimit": "workspace:*",
+    "@orpc/shared": "workspace:*",
+    "@standardserver/core": "^0.0.25"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.16.20",
