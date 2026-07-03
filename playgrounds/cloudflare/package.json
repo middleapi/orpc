@@ -1,7 +1,7 @@
 {
   "name": "@orpc/cloudflare-playground",
   "type": "module",
-  "version": "2.0.0-beta.13",
+  "version": "2.0.0-beta.14",
   "private": true,
   "scripts": {
     "dev": "vite --port 3000",
