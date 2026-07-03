@@ -3,7 +3,7 @@ import type { StandardLazyResponse, StandardRequest } from '@standardserver/core
 import type { DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standardserver/peer'
 import type { ClientContext, ClientOptions } from '../../types'
 import type { StandardLinkTransport } from '../standard'
-import { AbortError, promiseWithResolvers, runWithSignal, sleep, toStringOrBytes } from '@orpc/shared'
+import { AbortError, loadBytes, promiseWithResolvers, runWithSignal, sequential, sleep, toStringOrBytes } from '@orpc/shared'
 import { ClientPeer, decodePeerMessage, encodePeerMessage, isServerPeerSendMessage } from '@standardserver/peer'
 
 /**
@@ -196,13 +196,20 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
         })
       }
 
-      websocket.addEventListener('message', async (event: MessageEvent) => {
-        const message = await toStringOrBytes(event.data)
+      /**
+       * Message order is important: loading -> decode -> .message.
+       * This flow must stay synchronous, or we need to use `sequential` helper
+       */
+      websocket.addEventListener('message', sequential(async (event: MessageEvent) => {
+        // For better compatibility avoid control or depend on websocket.binaryType
+        const message = event.data instanceof Blob ? await loadBytes(event.data) : toStringOrBytes(event.data)
         const result = decodePeerMessage(message, this.decodePeerMessageOptions)
         if (result.matched && isServerPeerSendMessage(result.message)) {
-          await peer.message(result.message)
+          // Not awaited: `peer.message` runs handling message may be slow,
+          // and awaiting it would block decoding of subsequent messages.
+          peer.message(result.message)
         }
-      })
+      }))
 
       websocket.addEventListener('close', async (event) => {
         connectingResolvers?.resolve()

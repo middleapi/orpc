@@ -196,6 +196,8 @@ describe('rpcHandler', () => {
     })
 
     expect(postMessage).not.toHaveBeenCalled()
+
+    await handler.close(serverPort as any) // safe to invoke multiple times
   })
 
   it('can receive and send un-encoded messages with transfer option (structured clone)', async () => {
@@ -284,5 +286,12 @@ describe('rpcHandler', () => {
     })
 
     expect(ws.send).not.toHaveBeenCalled()
+  })
+
+  it('ignore invalid message format', async () => {
+    const handler = createHandler()
+    const { serverPort } = createPort()
+    const result = await handler.message(serverPort as any, { invalid: true })
+    expect(result.matched).toBe(false)
   })
 })

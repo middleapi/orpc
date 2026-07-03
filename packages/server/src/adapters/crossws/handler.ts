@@ -37,9 +37,12 @@ export class experimental_CrosswsHandler<T extends Context> {
   }
 
   /**
-   * Handles a single message received from a crossws Peer.
+   * Handles a single WebSocket message.
    *
-   * @param ws The crossws Peer instance, require consistent instance across messages for proper peer management
+   * Message order matters. Call this immediately after receiving a message,
+   * before any other async work, to preserve ordering.
+   *
+   * @param ws The crossws peer instance. Use the same instance for all messages.
    */
   async message(
     ws: CrosswsPeerLike,
@@ -54,10 +57,12 @@ export class experimental_CrosswsHandler<T extends Context> {
       }))
     }
 
+    /**
+     * Message order is important: loading -> decode -> .message.
+     * This flow must stay synchronous, or we need to use `sequential` helper
+     */
     const encodedMessage = typeof message.rawData === 'string' ? message.rawData : message.uint8Array() as Uint8Array<ArrayBuffer>
-
     const result = decodePeerMessage(encodedMessage, this.decodePeerMessageOptions)
-
     if (result.matched && isClientPeerSendMessage(result.message)) {
       await peer.message(
         result.message,
@@ -69,9 +74,9 @@ export class experimental_CrosswsHandler<T extends Context> {
   }
 
   /**
-   * Closes the peer connection and cleans up associated resources.
+   * Cleans up peer state for a closed WebSocket.
    *
-   * @param ws The crossws Peer instance to close, require consistent instance for proper peer management
+   * @param ws The same crossws peer instance passed to `.message()`.
    */
   async close(ws: CrosswsPeerLike): Promise<void> {
     const server = this.peers.get(ws)
