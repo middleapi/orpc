@@ -1,4 +1,4 @@
-import { orpc } from '@/lib/orpc'
+import { orpc } from '../lib/orpc'
 import { useMutation, useQueryClient, useSuspenseInfiniteQuery } from '@tanstack/react-query'
 
 export function PlanetTable() {

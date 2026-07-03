@@ -19,7 +19,7 @@ export const deleteFile = oc
   .meta(openapi({
     method: 'DELETE',
     path: '/files/{id}',
-    summary: 'Upload a file',
+    summary: 'Delete a file',
     tags: ['File'],
   }))
   .input(z.object({ id: z.uuid() }))
