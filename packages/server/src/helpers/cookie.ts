@@ -1,7 +1,7 @@
-import type { ParseOptions, SerializeOptions } from 'cookie'
-import { parse, serialize } from 'cookie'
+import type { ParseOptions, SetCookie, StringifyOptions } from 'cookie'
+import { parseCookie, stringifySetCookie } from 'cookie'
 
-export interface SetCookieOptions extends SerializeOptions {
+export interface SetCookieOptions extends Omit<SetCookie, 'name' | 'value'>, StringifyOptions {
   /**
    * Specifies the value for the [`Path` `Set-Cookie` attribute](https://tools.ietf.org/html/rfc6265#section-5.2.4).
    *
@@ -21,7 +21,7 @@ export interface SetCookieOptions extends SerializeOptions {
  *
  * setCookie(headers, 'sessionId', 'abc123', { httpOnly: true, maxAge: 3600 })
  *
- * expect(headers.get('Set-Cookie')).toBe('sessionId=abc123; HttpOnly; Max-Age=3600')
+ * expect(headers.get('Set-Cookie')).toBe('sessionId=abc123; Max-Age=3600; Path=/; HttpOnly')
  * ```
  *
  */
@@ -35,10 +35,15 @@ export function setCookie(
     return
   }
 
-  const cookieString = serialize(name, value, {
+  const cookieString = stringifySetCookie({
+    // Force path to '/' by default so the cookie is available across the
+    // entire app, not just under the directory of the request that set it
+    // (which is what browsers do per RFC 6265 §5.1.4 when Path is omitted).
     path: '/',
     ...options,
-  })
+    name, // prioritize
+    value, // prioritize
+  }, options)
 
   headers.append('Set-Cookie', cookieString)
 }
@@ -74,7 +79,7 @@ export function getCookie(
     return undefined
   }
 
-  return parse(cookieHeader, options)[name]
+  return parseCookie(cookieHeader, options)[name]
 }
 
 /**
@@ -87,6 +92,6 @@ export function deleteCookie(
 ): void {
   return setCookie(headers, name, '', {
     ...options,
-    maxAge: 0,
+    maxAge: 0, // prioritize
   })
 }
