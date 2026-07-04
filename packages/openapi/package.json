@@ -95,7 +95,7 @@
     "rou3": "^0.8.1"
   },
   "devDependencies": {
-    "@scalar/api-reference": "^1.57.2",
+    "@scalar/api-reference": "^1.62.3",
     "@types/swagger-ui": "^5.32.0",
     "fastify": "^5.8.5",
     "swagger-ui": "^5.32.6",

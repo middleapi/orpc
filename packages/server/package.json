@@ -116,7 +116,7 @@
     "cookie": "^2.0.1"
   },
   "devDependencies": {
-    "crossws": "^0.4.6",
+    "crossws": "^0.4.8",
     "supertest": "^7.2.2",
     "zod": "^4.4.3"
   }

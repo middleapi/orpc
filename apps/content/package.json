@@ -9,9 +9,9 @@
   },
   "devDependencies": {
     "@braintree/sanitize-url": "^7.1.2",
-    "@opentelemetry/instrumentation": "^0.219.0",
-    "@opentelemetry/sdk-node": "^0.219.0",
-    "@opentelemetry/sdk-trace-web": "^2.8.0",
+    "@opentelemetry/instrumentation": "^0.220.0",
+    "@opentelemetry/sdk-node": "^0.220.0",
+    "@opentelemetry/sdk-trace-web": "^2.9.0",
     "@orpc/arktype": "workspace:*",
     "@orpc/client": "workspace:*",
     "@orpc/contract": "workspace:*",
