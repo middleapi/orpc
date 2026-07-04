@@ -39,7 +39,7 @@
     "@orpc/ratelimit": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standardserver/core": "^0.0.25"
+    "@standardserver/core": "^0.0.31"
   },
   "devDependencies": {
     "@types/bun": "^1.3.14",
