@@ -742,5 +742,39 @@ describe('openAPILinkCodec', () => {
         'Expected a procedure or contract at path (not-exists)',
       )
     })
+
+    it.each([100, 199, 200, 204, 301, 302, 399])('treats status %i as success', async (status) => {
+      const codec = new OpenAPILinkCodec({
+        ping: oc.meta(openapi({ outputStructure: 'compact', responseBodyHint: 'json' })),
+      }, { serializer })
+
+      const resolveBody = vi.fn(async () => ({ ok: true }))
+      const result = await codec.decodeResponse({
+        status,
+        headers: {},
+        resolveBody,
+      }, ['ping'], { context: {} })
+
+      expect(result).toEqual({
+        kind: 'output',
+        output: { ok: true },
+      })
+    })
+
+    it.each([400, 401, 403, 404, 500, 599, 600])('treats status %i as error', async (status) => {
+      const codec = new OpenAPILinkCodec({
+        ping: oc.meta(openapi({})),
+      }, { serializer })
+
+      const error = new ORPCError('BAD_REQUEST')
+
+      const result = await codec.decodeResponse({
+        status,
+        headers: {},
+        resolveBody: async () => error.toJSON(),
+      }, ['ping'], { context: {} })
+
+      expect(result.kind).toBe('error')
+    })
   })
 })
