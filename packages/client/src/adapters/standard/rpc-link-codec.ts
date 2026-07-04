@@ -123,7 +123,7 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
   }
 
   async decodeResponse(response: StandardLazyResponse): Promise<StandardLinkCodecDecodedResponse> {
-    const isOk = response.status >= 200 && response.status < 400
+    const isOk = response.status < 400
 
     const body = await response.resolveBody()
 

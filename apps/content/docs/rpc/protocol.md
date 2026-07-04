@@ -103,7 +103,7 @@ Content-Type: application/json
 }
 ```
 
-A successful response uses an HTTP status code in the `200-299` range and returns the procedure output.
+A successful response should use an HTTP status code in the `2xx` range (must be less than `400`) and return the procedure output.
 
 ::: info
 Response bodies depend on the serializer and are not plain JSON. Learn more in [RPC Serializer Format](/docs/rpc/serializer#serialization-format).
@@ -129,7 +129,7 @@ Content-Type: application/json
 }
 ```
 
-An error response uses an HTTP status code in the `400-599` range and returns an `ORPCError` object.
+An error response should use an HTTP status code in the `4xx` or `5xx` range (must be greater than or equal to `400`) and return an [ORPCError](/docs/rpc/error) object.
 
 ::: info
 Response bodies depend on the serializer and are not plain JSON. Learn more in [RPC Serializer Format](/docs/rpc/serializer#serialization-format).

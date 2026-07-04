@@ -25,6 +25,7 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
 
   /**
    * Mapping ORPCError Code -> HTTP Status Code
+   * The status code should be in the `4xx` or `5xx` range (must be greater than or equal to `400`).
    *
    * @default COMMON_ERROR_STATUS_MAP, DEFAULT_ERROR_STATUS
    */

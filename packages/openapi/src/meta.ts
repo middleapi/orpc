@@ -51,7 +51,8 @@ export interface OpenAPIMeta {
   tags?: string[] | undefined
 
   /**
-   * HTTP status code returned on success. Must be in the 200–399 range.
+   * HTTP status code returned on success.
+   * Should be in the `2xx` range and must be less than `400`.
    *
    * @default 200
    */

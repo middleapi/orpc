@@ -424,16 +424,16 @@ export class OpenAPIGenerator {
       if (!objectSchemaEntries) {
         throw new OpenAPIGeneratorError(
           `Procedure at path "${path.join('.')}" has outputStructure "detailed" but its output schema is not an object.\n`
-          + `  Expected shape: { status: number (200-299), headers?: Record<string, unknown>, body?: unknown }`,
+          + `  Expected shape: { status?: number (less than 400), headers?: Record<string, string | string[]>, body?: unknown }`,
         )
       }
 
       const statusSchema = objectSchemaEntries?.find(([name]) => name === 'status')?.[1]
 
-      if (statusSchema !== undefined && (typeof statusSchema !== 'object' || !Number.isInteger(statusSchema.const) || statusSchema.const < 200 || statusSchema.const >= 300)) {
+      if (statusSchema !== undefined && (typeof statusSchema !== 'object' || !Number.isInteger(statusSchema.const) || statusSchema.const >= 400)) {
         throw new OpenAPIGeneratorError(
           `Procedure at path "${path.join('.')}" has an invalid "status" field in its outputStructure "detailed" schema.\n`
-          + `  Expected: a const integer in the 200-299 range\n`
+          + `  Expected: a const integer less than 400\n`
           + `  Received: ${stringifyJSON(statusSchema)}`,
 
         )
