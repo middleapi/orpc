@@ -23,7 +23,7 @@ RPC Serializers handle the serialization and deserialization of data sent betwee
 | **Set**                                  | `set`       |                               |
 | **Map**                                  | `map`       |                               |
 | **Blob**                                 |             | Unsupported in Event Iterator |
-| **File**                                 | None        | Unsupported in Event Iterator |
+| **File**                                 |             | Unsupported in Event Iterator |
 | **Event Iterator (AsyncIteratorObject)** |             | Only at the root level        |
 | **ReadableStream\<Uint8Array\>**         |             | Only at the root level        |
 
