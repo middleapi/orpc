@@ -203,6 +203,9 @@ By default, `RPCHandler` uses `COMMON_ERROR_STATUS_MAP` to determine response st
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/server'
 
 const handler = new RPCHandler(router, {
+  /**
+   * The status code should be in the `4xx` or `5xx` range (must be greater than or equal to `400`).
+   */
   errorStatusMap: {
     ...COMMON_ERROR_STATUS_MAP,
     CUSTOM_ERROR: 599,

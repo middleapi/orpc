@@ -21,15 +21,16 @@ export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOpt
   /**
    * Resolve HTTP status for encoded successful outputs.
    *
-   * Value should be in range `200-299`
+   * Value should be in the `2xx` range and must be less than `400`.
    * Return `undefined` or `null` to fallback to default
    *
-   * @default DEFAULT_ERROR_STATUS, DEFAULT_ERROR_STATUS
+   * @default DEFAULT_SUCCESS_STATUS (200)
    */
   outputStatus?: Value<number | undefined | null, [output: unknown, procedure: AnyProcedure, path: string[], options: StandardHandlerHandleOptions<T>]>
 
   /**
    * Mapping ORPCError Code -> HTTP Status Code
+   * The status code should be in the `4xx` or `5xx` range (must be greater than or equal to `400`).
    *
    * @default COMMON_ERROR_STATUS_MAP
    */

@@ -190,6 +190,9 @@ By default, `OpenAPIHandler` determines response status codes using `COMMON_ERRO
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/openapi'
 
 const handler = new OpenAPIHandler(router, {
+  /**
+   * The status code should be in the `4xx` or `5xx` range (must be greater than or equal to `400`).
+   */
   errorStatusMap: {
     ...COMMON_ERROR_STATUS_MAP,
     CUSTOM_ERROR: 599,
