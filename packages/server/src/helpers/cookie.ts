@@ -21,7 +21,7 @@ export interface SetCookieOptions extends Omit<SetCookie, 'name' | 'value'>, Str
  *
  * setCookie(headers, 'sessionId', 'abc123', { httpOnly: true, maxAge: 3600 })
  *
- * expect(headers.get('Set-Cookie')).toBe('sessionId=abc123; HttpOnly; Max-Age=3600')
+ * expect(headers.get('Set-Cookie')).toBe('sessionId=abc123; Max-Age=3600; Path=/; HttpOnly')
  * ```
  *
  */
