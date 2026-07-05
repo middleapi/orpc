@@ -271,7 +271,7 @@ describe('openAPISerializer', () => {
         await expect(result.next()).rejects.toBe(error)
       })
 
-      it('passes through non-ErrorEvent iterator errors', async () => {
+      it('passes through non-ErrorEvent errors', async () => {
         const error = new Error('unexpected')
         const result = serializer.deserialize((async function* () {
           throw error

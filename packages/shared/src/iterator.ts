@@ -189,10 +189,16 @@ export interface ConsumeAsyncIteratorOptions<T, TReturn, TError> {
  */
 export function consumeAsyncIterator<T, TReturn, TError = ThrowableError>(
   iterator: AsyncIterator<T, TReturn> | PromiseWithError<AsyncIterator<T, TReturn>, TError>,
-  options: ConsumeAsyncIteratorOptions<T, TReturn, TError>,
+  options: ConsumeAsyncIteratorOptions<T, TReturn, TError | ThrowableError>,
 ): () => Promise<void> {
+  // The typed error should always be combined with `ThrowableError`
+  // because an AsyncIterator can throw any error during iteration,
+  // while TError only represents errors from the initial promise.
+  // In oRPC client/server usage, initial and iteration errors are usually the same,
+  // but this utility is shared, so it needs to support the general case.
+
   void (async () => {
-    let onFinishState: [error: TError, data: undefined, isSuccess: false] | [error: null, data: TReturn | undefined, isSuccess: true]
+    let onFinishState: [error: TError | ThrowableError, data: undefined, isSuccess: false] | [error: null, data: TReturn | undefined, isSuccess: true]
 
     try {
       const resolvedIterator = await iterator
@@ -212,7 +218,7 @@ export function consumeAsyncIterator<T, TReturn, TError = ThrowableError>(
       }
     }
     catch (error) {
-      onFinishState = [error as TError, undefined, false]
+      onFinishState = [error as ThrowableError, undefined, false]
 
       /**
        * If no `onError` or `onFinish` is provided, unhandled rejections will be thrown
@@ -222,7 +228,7 @@ export function consumeAsyncIterator<T, TReturn, TError = ThrowableError>(
         throw error
       }
 
-      options.onError?.(error as TError)
+      options.onError?.(error as ThrowableError)
     }
     finally {
       options.onFinish?.(onFinishState!)

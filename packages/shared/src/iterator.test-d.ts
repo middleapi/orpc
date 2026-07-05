@@ -8,7 +8,7 @@ describe('consumeAsyncIterator', () => {
         expectTypeOf(message).toEqualTypeOf<'message-value'>()
       },
       onError: (error) => {
-        expectTypeOf(error).toEqualTypeOf<'error-value'>()
+        expectTypeOf(error).toEqualTypeOf<'error-value' | Error>()
       },
       onSuccess: (value) => {
         expectTypeOf(value).toEqualTypeOf<'done-value' | undefined>()
@@ -19,7 +19,7 @@ describe('consumeAsyncIterator', () => {
           expectTypeOf(data).toEqualTypeOf<'done-value' | undefined>()
         }
         else {
-          expectTypeOf(error).toEqualTypeOf<'error-value'>()
+          expectTypeOf(error).toEqualTypeOf<'error-value' | Error>()
           expectTypeOf(data).toEqualTypeOf<undefined>()
         }
       },
