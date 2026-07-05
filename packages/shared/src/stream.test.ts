@@ -537,7 +537,7 @@ describe('asyncIteratorToStream', () => {
     expect(results).toEqual([1, 2, 3])
   })
 
-  it('should handle empty async iterator', async () => {
+  it('should handle empty AsyncIteratorObject', async () => {
     async function* emptyGenerator() {
       // Empty generator
     }
@@ -552,7 +552,7 @@ describe('asyncIteratorToStream', () => {
     expect(result.value).toBeUndefined()
   })
 
-  it('should handle async iterator errors', async () => {
+  it('should handle AsyncIteratorObject errors', async () => {
     const error = new Error('Iterator error')
     async function* errorGenerator() {
       yield 1
@@ -677,7 +677,7 @@ describe('asyncIteratorToUnproxiedDataStream', () => {
     expect(results.some(isProxied)).toBe(false)
   })
 
-  it('should handle empty async iterator', async () => {
+  it('should handle empty AsyncIteratorObject', async () => {
     async function* emptyGenerator() {
       // Empty generator
     }
@@ -692,7 +692,7 @@ describe('asyncIteratorToUnproxiedDataStream', () => {
     expect(result.value).toBeUndefined()
   })
 
-  it('should handle async iterator errors', async () => {
+  it('should handle AsyncIteratorObject errors', async () => {
     const error = new Error('Iterator error')
     async function* errorGenerator() {
       yield 1

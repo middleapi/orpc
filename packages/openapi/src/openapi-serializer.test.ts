@@ -92,7 +92,7 @@ describe('openAPISerializer', () => {
         for (const v of values) yield v
       }
 
-      it('returns an async iterator and serializes yielded values', async () => {
+      it('returns an AsyncIteratorObject and serializes yielded values', async () => {
         const result = serializer.serialize(toAsyncIter([new Date('2023-01-01'), 42n])) as AsyncIteratorObject<unknown>
         expect(result).toSatisfy(isAsyncIteratorObject)
 
@@ -226,7 +226,7 @@ describe('openAPISerializer', () => {
         for (const v of values) yield v
       }
 
-      it('returns an async iterator and passes through yielded values', async () => {
+      it('returns an AsyncIteratorObject and passes through yielded values', async () => {
         const result = serializer.deserialize(toAsyncIter([{ a: 1 }, { b: 2 }])) as AsyncIterable<unknown>
         expect(result).toSatisfy(isAsyncIteratorObject)
 

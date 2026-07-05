@@ -216,7 +216,7 @@ describe('batchLinkPlugin', () => {
       expect(transport.send).toHaveBeenCalledTimes(2)
     })
 
-    it('skips batching for requests with async iterator body', async () => {
+    it('skips batching for requests with AsyncIteratorObject body', async () => {
       const codec = makeCodec()
       const transport = makeTransport()
 

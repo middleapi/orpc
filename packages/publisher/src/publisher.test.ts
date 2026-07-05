@@ -76,7 +76,7 @@ describe('publisher', () => {
     await iterator.return()
   })
 
-  describe('async iterator subscriptions', () => {
+  describe('asyncIteratorObject subscriptions', () => {
     it('streams messages in the order they are published', async () => {
       const events: string[] = []
       const iterator = publisher.subscribe('message')
