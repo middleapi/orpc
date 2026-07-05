@@ -3,7 +3,7 @@ import type { StandardHandlerInterceptor, StandardHandlerOptions, StandardHandle
 import type { StandardRequest } from '@standardserver/core'
 import type { RequestLogger } from 'evlog'
 import type { BaseEvlogOptions, FrameworkIntegrationHelpers, FrameworkIntegrationSpec } from 'evlog/toolkit'
-import { wrapEventIteratorPreservingMeta } from '@orpc/client'
+import { wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import { isAbortError, isAsyncIteratorObject, ORPC_NAME, override, sleep, toArray, wrapReadableStream } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standardserver/core'
 import { defineFrameworkIntegration } from 'evlog/toolkit'
@@ -87,9 +87,9 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
                 ...result.response,
                 /**
                  * @warning
-                 * Remember use `override` for event iterator to remain other special properties
+                 * Remember use `override` for AsyncIteratorObject to remain other special properties
                  */
-                body: override(result.response.body, wrapEventIteratorPreservingMeta(result.response.body, {
+                body: override(result.response.body, wrapAsyncIteratorPreservingEventMeta(result.response.body, {
                   runWith,
                   onError: (error) => {
                     /**
@@ -114,7 +114,7 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
                 ...result.response,
                 /**
                  * @warning
-                 * Remember use `override` for event iterator to remain other special properties
+                 * Remember use `override` for ReadableStream to remain other special properties
                  */
                 body: override(result.response.body, wrapReadableStream(result.response.body, {
                   runWith,
@@ -196,9 +196,9 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
       if (isAsyncIteratorObject(output)) {
         /**
          * @warning
-         * Remember use `override` for event iterator to remain other special properties
+         * Remember use `override` for AsyncIteratorObject to remain other special properties
          */
-        return override(output, wrapEventIteratorPreservingMeta(output, {
+        return override(output, wrapAsyncIteratorPreservingEventMeta(output, {
           onError: (error) => {
             logBusinessLogicError(logger, error)
           },
@@ -208,7 +208,7 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
       if (output instanceof ReadableStream) {
         /**
          * @warning
-         * Remember use `override` for event iterator to remain other special properties
+         * Remember use `override` for ReadableStream to remain other special properties
          */
         return override(output, wrapReadableStream(output, {
           onError: (error) => {

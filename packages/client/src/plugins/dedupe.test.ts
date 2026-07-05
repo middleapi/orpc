@@ -180,7 +180,7 @@ describe('dedupeLinkPlugin', () => {
     expect((callOptions as any).next).toEqual(expect.any(Function))
   })
 
-  it('replicates async iterator response bodies for deduped requests', async () => {
+  it('replicates AsyncIteratorObject response bodies for deduped requests', async () => {
     const codec = makeCodec()
     const iteratorFactory = vi.fn(async function* () {
       yield 'first'

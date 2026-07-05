@@ -88,7 +88,7 @@ describe.each([
 
   // TODO: There an issues with Bun Websocket Server, when multiple messages sent simultaneously
   // We might need to report this issue
-  it.skipIf(adapter === 'bun-websocket')('support event iterator and transfer event iterator in parallel', async () => {
+  it.skipIf(adapter === 'bun-websocket')('support AsyncIteratorObject and transfer AsyncIteratorObject in parallel', async () => {
     const stream = (async function* () {
       yield 'order 1'
       await sleep(200)

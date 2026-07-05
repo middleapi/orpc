@@ -96,7 +96,7 @@ describe('rpcLinkCodec', () => {
       }],
       ['Blob', () => new Blob(['data'])],
       ['ReadableStream', () => new ReadableStream()],
-      ['async iterator', () => (async function* () { yield 1 })()],
+      ['AsyncIteratorObject', () => (async function* () { yield 1 })()],
     ] as const)('falls back to POST when GET with %s', async (_, factory) => {
       const codec = new RPCLinkCodec({ url: '/api', method: 'GET', serializer })
       const value = factory()

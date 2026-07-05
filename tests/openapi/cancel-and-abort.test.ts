@@ -42,7 +42,7 @@ describe.each([
     expect(handler.mock.calls[0]![0].signal.aborted).toBe(true)
   })
 
-  it('server should cancel event iterator response and abort request when client cancels', async () => {
+  it('server should cancel AsyncIteratorObject response and abort request when client cancels', async () => {
     const cancel = vi.fn()
     handler.mockResolvedValueOnce(new AsyncIteratorClass(
       async () => {

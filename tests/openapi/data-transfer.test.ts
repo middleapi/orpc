@@ -172,7 +172,7 @@ describe.each([
     })
   })
 
-  it('supports event iterator and transfers events in parallel', async () => {
+  it('supports AsyncIteratorObject and transfers events in parallel', async () => {
     const stream = (async function* () {
       yield 'order 1'
       await sleep(200)

@@ -89,7 +89,7 @@ const query = useQuery(orpc.planet.find.queryOptions({
 
 ## Streamed Query Options
 
-Use `.streamedOptions` to build streamed query options for [Event Iterator](/docs/event-iterator). The resulting data is an array of events, and each new event is appended as it arrives.
+Use `.streamedOptions` to build streamed query options for an [AsyncIteratorObject](/docs/async-iterator-object). The resulting data is an array of events, and each new event is appended as it arrives.
 
 It works with `useQuery`, `useSuspenseQuery`, and `prefetchQuery`, and any other API that accepts query options.
 
@@ -117,7 +117,7 @@ const query = useQuery(orpc.streamed.streamedOptions({
 
 ## Live Query Options
 
-Use `.liveOptions` to build live query options for [Event Iterator](/docs/event-iterator). The data always reflects the latest event, replacing the previous value whenever a new one arrives.
+Use `.liveOptions` to build live query options for an [AsyncIteratorObject](/docs/async-iterator-object). The data always reflects the latest event, replacing the previous value whenever a new one arrives.
 
 It works with `useQuery`, `useSuspenseQuery`, and `prefetchQuery`, and any other API that accepts query options.
 

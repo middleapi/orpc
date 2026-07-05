@@ -64,9 +64,9 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
       if (isAsyncIteratorObject(input)) {
         /**
          * @warning
-         * Remember use `override` for event iterator to remain other special properties
+         * Remember use `override` for AsyncIteratorObject to remain other special properties
          */
-        input = override(input, traceAsyncIterator('consume_event_iterator_input', input))
+        input = override(input, traceAsyncIterator('consume_async_iterator_object_input', input))
       }
 
       return intercept(this.interceptors, { ...options, path, input }, async ({ path, input, ...options }) => {
@@ -129,9 +129,9 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
            * Do not use otelContext here, as it is a lazy span.
            *
            * @warning
-           * Remember use `override` for event iterator to remain other special properties
+           * Remember use `override` for AsyncIteratorObject to remain other special properties
            */
-          return override(output, traceAsyncIterator('consume_event_iterator_output', output))
+          return override(output, traceAsyncIterator('consume_async_iterator_object_output', output))
         }
 
         return output

@@ -218,15 +218,15 @@ const uploadLargeFile = os
 
 Supported body hints:
 
-| Hint                | Parsed Result                                                                     |
-| ------------------- | --------------------------------------------------------------------------------- |
-| `json`              | JSON value                                                                        |
-| `form-data`         | `FormData` decoded with [bracket notation](/docs/openapi/bracket-notation)        |
-| `url-search-params` | `URLSearchParams` decoded with [bracket notation](/docs/openapi/bracket-notation) |
-| `event-stream`      | [Event Iterator](/docs/event-iterator)                                            |
-| `octet-stream`      | `ReadableStream<Uint8Array>` for streamed binary data                             |
-| `file`              | `File` for binary data                                                            |
-| `none`              | `undefined`                                                                       |
+| Hint                | Parsed Result                                                                                       |
+| ------------------- | --------------------------------------------------------------------------------------------------- |
+| `json`              | JSON value                                                                                          |
+| `form-data`         | `FormData` decoded with [bracket notation](/docs/openapi/bracket-notation)                          |
+| `url-search-params` | `URLSearchParams` decoded with [bracket notation](/docs/openapi/bracket-notation)                   |
+| `event-stream`      | [AsyncIteratorObject](/docs/async-iterator-object)                                                  |
+| `octet-stream`      | [ReadableStream\<Uint8Array\>](/docs/binary-data#readablestreamuint8array) for streamed binary data |
+| `file`              | `File` for binary data                                                                              |
+| `none`              | `undefined`                                                                                         |
 
 ::: info
 Learn more about body hints in the [Standard Server documentation](https://github.com/middleapi/standardserver#standard-body)

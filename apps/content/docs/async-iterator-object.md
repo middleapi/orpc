@@ -1,10 +1,10 @@
-# Event Iterator (SSE)
+# AsyncIteratorObject (SSE)
 
-Event Iterator enables **typesafe**, **realtime data streaming**. It is the recommended approach for building features like live notifications, chat messages, progress updates, and data feeds.
+AsyncIteratorObject enables **typesafe**, **realtime data streaming**. It is the recommended approach for building features like live notifications, chat messages, progress updates, and data feeds.
 
 ## Overview
 
-An event iterator is implemented as an [asynchronous generator function](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function*) (or a compatible implementation). In the example below, the handler emits a new event every second:
+An `AsyncIteratorObject` is implemented as an [asynchronous generator function](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function*) (or a compatible implementation). In the example below, the handler emits a new event every second:
 
 ```ts
 const example = os
@@ -18,18 +18,18 @@ const example = os
 ```
 
 ::: info
-Learn how to consume event iterators from the client in the [client guide](/docs/client/event-iterator).
+Learn how to consume an `AsyncIteratorObject` from the client in the [client guide](/docs/client/async-iterator-object).
 :::
 
 ## Validating Events
 
-Use the built‑in `eventIterator` helper that works with any [Standard Schema](https://standardschema.dev/schema#what-schema-libraries-implement-the-spec) library to validate events.
+Use the built‑in `asyncIteratorObject` schema that works with any [Standard Schema](https://standardschema.dev/schema#what-schema-libraries-implement-the-spec) library to validate events.
 
 ```ts
-import { eventIterator } from '@orpc/server'
+import { asyncIteratorObject } from '@orpc/server'
 
 const example = os
-  .output(eventIterator(z.object({ message: z.string() })))
+  .output(asyncIteratorObject(z.object({ message: z.string() })))
   .handler(async function* ({ input, signal, lastEventId }) {
     while (true) {
       signal?.throwIfAborted()
@@ -68,7 +68,7 @@ const example = os
   })
 ```
 
-## Stop Event Iterator
+## Stop AsyncIteratorObject
 
 To end the stream, use either a `return` or `throw` statement. oRPC marks the stream as completed when the handler returns.
 
@@ -114,7 +114,7 @@ const example = os
 
 ## Publisher Helper
 
-You can combine the event iterator with the [Publisher Helper](/docs/helpers/publisher) to build real-time features like chat, notifications, or live updates with resume support.
+You can combine the [AsyncIteratorObject](/docs/async-iterator-object) with the [Publisher Helper](/docs/helpers/publisher) to build real-time features like chat, notifications, or live updates with resume support.
 
 ```ts
 const publisher = new MemoryPublisher<{

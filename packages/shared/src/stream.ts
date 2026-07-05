@@ -123,9 +123,9 @@ export function traceReadableStream<T>(
 }
 
 /**
- * Converts a `ReadableStream` into an `AsyncIteratorClass`.
+ * Converts a {@link ReadableStream} into an {@link AsyncIteratorClass}.
  */
-export function streamToAsyncIteratorClass<T>(
+export function streamToAsyncIteratorObject<T>(
   stream: ReadableStream<T>,
   { signal }: { signal?: undefined | AbortSignal } = {},
 ): AsyncIteratorClass<T> {

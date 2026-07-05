@@ -1,12 +1,16 @@
-import { isInferableError } from './error-utils'
-
+export * from './async-iterator-object'
 export * from './client'
 export * from './client-safe'
 export * from './consts'
 export * from './dynamic-link'
 export * from './error'
+export {
+  /**
+   * @deprecated Use `isInferableError` instead.
+   */
+  isInferableError as isDefinedError,
+} from './error-utils'
 export * from './error-utils'
-export * from './event-iterator'
 export * from './rpc-json-serializer'
 export * from './rpc-serializer'
 export * from './types'
@@ -23,13 +27,30 @@ export type {
 
 export {
   AsyncIteratorClass,
+  asyncIteratorToStream,
+  asyncIteratorToUnproxiedDataStream,
+  consumeAsyncIterator,
+  /**
+   * @deprecated Use `consumeAsyncIterator` instead.
+   */
+  consumeAsyncIterator as consumeEventIterator,
+  /**
+   * @deprecated Use `asyncIteratorToStream` instead.
+   */
   asyncIteratorToStream as eventIteratorToStream,
+  /**
+   * @deprecated Use `asyncIteratorToUnproxiedDataStream` instead.
+   */
   asyncIteratorToUnproxiedDataStream as eventIteratorToUnproxiedDataStream,
   onError,
   onFinish,
   onStart,
   onSuccess,
-  streamToAsyncIteratorClass as streamToEventIterator,
+  streamToAsyncIteratorObject,
+  /**
+   * @deprecated Use `streamToAsyncIteratorObject` instead.
+   */
+  streamToAsyncIteratorObject as streamToEventIterator,
 } from '@orpc/shared'
 
 export type {
@@ -42,8 +63,3 @@ export {
   unwrapEvent,
   withEventMeta,
 } from '@standardserver/core'
-
-/**
- * @deprecated Use `isInferableError` instead.
- */
-export const isDefinedError = isInferableError

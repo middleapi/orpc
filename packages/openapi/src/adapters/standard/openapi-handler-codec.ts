@@ -85,7 +85,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
         }
       }
 
-      // data can be Blob, Event Iterator, ReadableStream, ...
+      // data can be Blob, AsyncIteratorObject, ReadableStream, ...
       return data
     }
 

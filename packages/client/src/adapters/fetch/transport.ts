@@ -25,7 +25,7 @@ export interface FetchLinkTransportOptions<T extends ClientContext> {
   origin?: Value<Promisable<`https://${string}` | `http://${string}` | ({} & string) | undefined>, [options: ClientOptions<T>, path: string[]]>
 
   /**
-   * Options for how to convert the Standard Request to a Fetch Request, like event iterator options, etc.
+   * Options for how to convert the Standard Request to a Fetch Request, like event stream options, etc.
    */
   toFetchRequest?: undefined | ToFetchBodyOptions
 

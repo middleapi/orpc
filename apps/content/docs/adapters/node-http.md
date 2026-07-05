@@ -80,7 +80,7 @@ server.listen(3000, '127.0.0.1', () => console.log('Listening on 127.0.0.1:3000'
 
 ## Event Stream Options
 
-You can configure how [event iterators](/docs/event-iterator) are streamed to the client using the `sendStandardResponse.eventStream` options when creating the handler.
+You can configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed to the client using the `sendStandardResponse.eventStream` options when creating the handler.
 
 ```ts
 const handler = new OpenAPIHandler(router, {

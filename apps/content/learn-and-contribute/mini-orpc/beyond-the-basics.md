@@ -29,7 +29,7 @@ You can implement these features in any order. Pick the ones you find interestin
 - [ ] [RPC Protocol](/docs/advanced/rpc-protocol) Implementation ([reference](https://github.com/middleapi/orpc/blob/main/packages/client/src/adapters/standard/rpc-serializer.ts))
   - [ ] Support native types like `Date`, `Map`, `Set`, etc.
   - [ ] Support `File`/`Blob` types
-  - [ ] Support [Event Iterator](/docs/event-iterator) types
+  - [ ] Support [AsyncIteratorObject](/docs/async-iterator-object) types
 
 - [ ] Multi-runtime support
   - [ ] Standard Server Concept ([reference](https://github.com/middleapi/orpc/tree/main/packages/standard-server))

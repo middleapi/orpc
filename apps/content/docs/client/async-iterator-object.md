@@ -1,15 +1,15 @@
-# Event Iterator in Client
+# AsyncIteratorObject in Client
 
-Consume an [Event Iterator](/docs/event-iterator) like an [AsyncGenerator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncGenerator). Await the call, then iterate over events as they arrive.
+Consume an [AsyncIteratorObject](/docs/async-iterator-object) like an [AsyncGenerator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncGenerator). Await the call, then iterate over events as they arrive.
 
 ## Basic Usage
 
 ```ts twoslash
-import { eventIterator, oc, RouterContractClient } from '@orpc/contract'
+import { asyncIteratorObject, oc, RouterContractClient } from '@orpc/contract'
 import { z } from 'zod'
 
 const contract = {
-  streaming: oc.output(eventIterator(z.object({ message: z.string() })))
+  streaming: oc.output(asyncIteratorObject(z.object({ message: z.string() })))
 }
 
 declare const client: RouterContractClient<typeof contract>
@@ -44,7 +44,7 @@ for await (const event of iterator) {
 ## Error Handling
 
 ::: info
-Unlike traditional SSE, Event Iterators do not retry automatically after an error. To add retries, use the [Retry Plugin](/docs/plugins/retry#event-source-simulation).
+Unlike traditional SSE, AsyncIteratorObjects do not retry automatically after an error. To add retries, use the [Retry Plugin](/docs/plugins/retry#event-source-simulation).
 :::
 
 ```ts
@@ -77,14 +77,14 @@ for await (const event of iterator) {
 }
 ```
 
-## Using `consumeEventIterator`
+## Using `consumeAsyncIterator`
 
-Use `consumeEventIterator` to consume an event iterator with lifecycle callbacks. It accepts either an event iterator or a promise that resolves to one.
+Use `consumeAsyncIterator` to consume an `AsyncIterator` with lifecycle callbacks. It accepts either an iterator or a promise that resolves to one.
 
 ```ts
-import { consumeEventIterator } from '@orpc/client'
+import { consumeAsyncIterator } from '@orpc/client'
 
-const cancel = consumeEventIterator(client.streaming(), {
+const cancel = consumeAsyncIterator(client.streaming(), {
   onEvent: (event) => {
     console.log(event.message)
   },

@@ -76,7 +76,7 @@ const link = new RPCLink<ClientContext>({
 
 ## Event Source Simulation
 
-To replicate the behavior of [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource) for [Event Iterator](/docs/event-iterator), use the following configuration:
+To replicate the behavior of [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource) for an [AsyncIteratorObject](/docs/async-iterator-object), use the following configuration:
 
 ```ts
 const streaming = await client.streaming('the input', {
