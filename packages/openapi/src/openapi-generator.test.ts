@@ -1,5 +1,5 @@
 import type { JsonSchemaConverter } from '@orpc/json-schema'
-import { eventIterator, oc } from '@orpc/contract'
+import { asyncIteratorObject, oc } from '@orpc/contract'
 import * as arktype from 'arktype'
 import z from 'zod'
 import { openapi } from './meta'
@@ -1245,7 +1245,7 @@ describe('openAPIGenerator', () => {
       const doc = await generator.generate({
         subscribe: oc
           .meta(openapi({}))
-          .input(eventIterator(z.string(), z.boolean())),
+          .input(asyncIteratorObject(z.string(), z.boolean())),
       })
 
       expect(doc.paths?.['/subscribe']).toEqual({
@@ -1559,7 +1559,7 @@ describe('openAPIGenerator', () => {
       const doc = await generator.generate({
         subscribe: oc
           .meta(openapi({}))
-          .output(eventIterator(z.string(), z.boolean())),
+          .output(asyncIteratorObject(z.string(), z.boolean())),
       })
 
       expect(doc.paths?.['/subscribe']).toEqual({
@@ -1887,10 +1887,10 @@ describe('openAPIGenerator', () => {
       it('merges repeated event iterator schemas', async () => {
         const doc = await generator.generate({
           procedure: oc
-            .input(eventIterator(z.looseObject({ yield1: z.string() }), z.looseObject({ return1: z.string() })))
-            .input(eventIterator(z.looseObject({ yield2: z.string() }), z.looseObject({ return2: z.string() })))
-            .output(eventIterator(z.looseObject({ yield3: z.string() }), z.looseObject({ return3: z.string() })))
-            .output(eventIterator(z.looseObject({ yield4: z.string() }), z.looseObject({ return4: z.string() }))),
+            .input(asyncIteratorObject(z.looseObject({ yield1: z.string() }), z.looseObject({ return1: z.string() })))
+            .input(asyncIteratorObject(z.looseObject({ yield2: z.string() }), z.looseObject({ return2: z.string() })))
+            .output(asyncIteratorObject(z.looseObject({ yield3: z.string() }), z.looseObject({ return3: z.string() })))
+            .output(asyncIteratorObject(z.looseObject({ yield4: z.string() }), z.looseObject({ return4: z.string() }))),
         })
 
         expect(doc.paths?.['/procedure']?.post).toMatchObject({

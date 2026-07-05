@@ -1,7 +1,7 @@
 import type { RouterClient } from '@orpc/server'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
-import { eventIterator, os } from '@orpc/server'
+import { asyncIteratorObject, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { QueryClient } from '@tanstack/react-query'
 import z from 'zod'
@@ -16,7 +16,7 @@ export const router = {
   stream: os
     .errors({ STREAM_ERROR: { data: z.object({ stream: z.string() }) } })
     .input(z.object({ input: z.number() }).optional())
-    .output(eventIterator(z.object({ output: z.string() })))
+    .output(asyncIteratorObject(z.object({ output: z.string() })))
     .handler(vi.fn(async function* ({ input }) {
       for (let i = 0; i < (input?.input ?? 0); i++) {
         yield { output: i.toString() }

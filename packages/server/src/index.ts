@@ -69,6 +69,7 @@ export type {
 } from '@orpc/contract'
 
 export {
+  asyncIteratorObject,
   defineMeta,
   eventIterator,
   reconcileORPCError,

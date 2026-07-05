@@ -4,30 +4,28 @@ import { ORPCError, wrapEventIteratorPreservingMeta } from '@orpc/client'
 import { isAsyncIteratorObject, ORPC_NAME } from '@orpc/shared'
 import { ValidationError } from './error'
 
-const EVENT_ITERATOR_SCHEMA_DETAILS_SYMBOL = Symbol.for('ORPC_EVENT_ITERATOR_SCHEMA_DETAILS')
+const ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS_SYMBOL = Symbol.for('ORPC_ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS')
 
-export interface EventIteratorSchemaDetails {
+export interface AsyncIteratorObjectSchemaDetails {
   yieldSchema: AnySchema
   returnSchema?: AnySchema
 }
 
 /**
- * Define schema for an event iterator.
- *
- * @see {@link https://orpc.dev/docs/event-iterator#validate-event-iterator Validate Event Iterator Docs}
+ * Define schema for an async iterator object.
  */
-export function eventIterator<TYieldIn, TYieldOut, TReturnIn = unknown, TReturnOut = unknown>(
+export function asyncIteratorObject<TYieldIn, TYieldOut, TReturnIn = unknown, TReturnOut = unknown>(
   yieldSchema: Schema<TYieldIn, TYieldOut>,
   returnSchema?: Schema<TReturnIn, TReturnOut>,
 ): Schema<AsyncIteratorObject<TYieldIn, TReturnIn, void>, AsyncIteratorClass<TYieldOut, TReturnOut, void>> {
   return {
     '~standard': {
-      [EVENT_ITERATOR_SCHEMA_DETAILS_SYMBOL as any]: { yieldSchema, returnSchema } satisfies EventIteratorSchemaDetails,
+      [ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS_SYMBOL as any]: { yieldSchema, returnSchema } satisfies AsyncIteratorObjectSchemaDetails,
       vendor: ORPC_NAME,
       version: 1,
       validate(iterator) {
         if (!isAsyncIteratorObject(iterator)) {
-          return { issues: [{ message: 'Expect event iterator', path: [] }] }
+          return { issues: [{ message: 'Expect async iterator object', path: [] }] }
         }
 
         const mapped = wrapEventIteratorPreservingMeta(iterator, {
@@ -61,10 +59,10 @@ export function eventIterator<TYieldIn, TYieldOut, TReturnIn = unknown, TReturnO
   }
 }
 
-export function getEventIteratorSchemaDetails(schema: AnySchema | undefined): undefined | EventIteratorSchemaDetails {
+export function getAsyncIteratorObjectSchemaDetails(schema: AnySchema | undefined): undefined | AsyncIteratorObjectSchemaDetails {
   if (schema === undefined) {
     return undefined
   }
 
-  return (schema['~standard'] as any)[EVENT_ITERATOR_SCHEMA_DETAILS_SYMBOL]
+  return (schema['~standard'] as any)[ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS_SYMBOL]
 }

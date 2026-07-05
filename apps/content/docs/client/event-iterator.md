@@ -5,11 +5,11 @@ Consume an [Event Iterator](/docs/event-iterator) like an [AsyncGenerator](https
 ## Basic Usage
 
 ```ts twoslash
-import { eventIterator, oc, RouterContractClient } from '@orpc/contract'
+import { asyncIteratorObject, oc, RouterContractClient } from '@orpc/contract'
 import { z } from 'zod'
 
 const contract = {
-  streaming: oc.output(eventIterator(z.object({ message: z.string() })))
+  streaming: oc.output(asyncIteratorObject(z.object({ message: z.string() })))
 }
 
 declare const client: RouterContractClient<typeof contract>

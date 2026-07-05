@@ -23,13 +23,13 @@ Learn how to consume event iterators from the client in the [client guide](/docs
 
 ## Validating Events
 
-Use the built‑in `eventIterator` helper that works with any [Standard Schema](https://standardschema.dev/schema#what-schema-libraries-implement-the-spec) library to validate events.
+Use the built‑in `asyncIteratorObject` schema that works with any [Standard Schema](https://standardschema.dev/schema#what-schema-libraries-implement-the-spec) library to validate events.
 
 ```ts
-import { eventIterator } from '@orpc/server'
+import { asyncIteratorObject } from '@orpc/server'
 
 const example = os
-  .output(eventIterator(z.object({ message: z.string() })))
+  .output(asyncIteratorObject(z.object({ message: z.string() })))
   .handler(async function* ({ input, signal, lastEventId }) {
     while (true) {
       signal?.throwIfAborted()

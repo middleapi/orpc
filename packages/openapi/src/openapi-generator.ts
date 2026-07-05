@@ -7,7 +7,7 @@ import type { Value } from '@orpc/shared'
 import type { OpenAPIMeta } from './meta'
 import type { OpenAPIDocument, OpenAPIOperationObject } from './types'
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
-import { getEventIteratorSchemaDetails } from '@orpc/contract'
+import { getAsyncIteratorObjectSchemaDetails } from '@orpc/contract'
 import {
   combineJsonObjectSchemaEntries,
   combineJsonSchemasWithComposition,
@@ -613,7 +613,7 @@ function getEventIteratorDetails(schemas: AnySchema[] | undefined): [yieldSchema
   const returnSchemas: AnySchema[] = []
 
   for (const s of schemas) {
-    const details = getEventIteratorSchemaDetails(s)
+    const details = getAsyncIteratorObjectSchemaDetails(s)
     if (!details) {
       return undefined
     }

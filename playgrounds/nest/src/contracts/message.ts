@@ -1,6 +1,6 @@
 import { oc } from '@orpc/contract'
 import { openapi } from '@orpc/openapi'
-import { eventIterator } from '@orpc/server'
+import { asyncIteratorObject } from '@orpc/server'
 import { z } from 'zod'
 
 export const publishMessage = oc
@@ -25,6 +25,6 @@ export const subscribeMessages = oc
   .input(z.object({
     channel: z.string().describe('Channel name, use an unguessable unique value for security'),
   }))
-  .output(eventIterator(z.object({
+  .output(asyncIteratorObject(z.object({
     message: z.string(),
   })))

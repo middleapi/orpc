@@ -1,6 +1,6 @@
 import { publicOS } from '@/orpc'
 import { openapi } from '@orpc/openapi'
-import { eventIterator } from '@orpc/server'
+import { asyncIteratorObject } from '@orpc/server'
 import { z } from 'zod'
 
 export const publishMessage = publicOS
@@ -28,7 +28,7 @@ export const subscribeMessages = publicOS
   .input(z.object({
     channel: z.string().describe('Channel name, use an unguessable unique value for security'),
   }))
-  .output(eventIterator(z.object({
+  .output(asyncIteratorObject(z.object({
     message: z.string(),
   })))
   .handler(async ({ context, signal, lastEventId }, { channel }) => {
