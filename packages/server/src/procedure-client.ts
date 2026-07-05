@@ -6,7 +6,7 @@ import type { ORPCErrorConstructorMap } from './error'
 import type { Lazyable } from './lazy'
 import type { MiddlewareDone } from './middleware'
 import type { AnyProcedure, Procedure, ProcedureHandlerOptions } from './procedure'
-import { cloneORPCError, ORPCError, wrapEventIteratorPreservingMeta } from '@orpc/client'
+import { cloneORPCError, ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import { reconcileORPCError, ValidationError } from '@orpc/contract'
 import { intercept, isAsyncIteratorObject, override, resolveMaybeOptionalOptions, runWithSpan, toArray, traceAsyncIterator, traceReadableStream, value } from '@orpc/shared'
 import { createORPCErrorConstructorMap } from './error'
@@ -110,8 +110,8 @@ export function createProcedureClient<
 
       if (isAsyncIteratorObject(output)) {
         /**
-         * traceAsyncIterator/wrapEventIteratorPreservingMeta return AsyncIteratorClass
-         * which is backwards compatible with Event Iterator & almost async iterator.
+         * traceAsyncIterator/wrapAsyncIteratorPreservingEventMeta return AsyncIteratorClass
+         * which is backwards compatible with async iterator object.
          *
          * @warning
          * If remove this return, can be breaking change
@@ -120,7 +120,7 @@ export function createProcedureClient<
          * @warning
          * Remember use `override` for event iterator to remain other special properties
          */
-        return override(output, wrapEventIteratorPreservingMeta(
+        return override(output, wrapAsyncIteratorPreservingEventMeta(
           traceAsyncIterator('consume_event_iterator_output', output),
           { mapError: reconcileError },
         )) as typeof output

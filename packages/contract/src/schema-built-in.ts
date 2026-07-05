@@ -1,6 +1,6 @@
 import type { AsyncIteratorClass } from '@orpc/shared'
 import type { AnySchema, Schema } from './schema'
-import { ORPCError, wrapEventIteratorPreservingMeta } from '@orpc/client'
+import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import { isAsyncIteratorObject, ORPC_NAME } from '@orpc/shared'
 import { ValidationError } from './error'
 
@@ -28,7 +28,7 @@ export function asyncIteratorObject<TYieldIn, TYieldOut, TReturnIn = unknown, TR
           return { issues: [{ message: 'Expect async iterator object', path: [] }] }
         }
 
-        const mapped = wrapEventIteratorPreservingMeta(iterator, {
+        const mapped = wrapAsyncIteratorPreservingEventMeta(iterator, {
           async mapResult(result) {
             const schema = result.done ? returnSchema : yieldSchema
 

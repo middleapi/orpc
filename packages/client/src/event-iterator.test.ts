@@ -1,7 +1,7 @@
 import { getEventMeta, withEventMeta } from '@standardserver/core'
-import { wrapEventIteratorPreservingMeta } from './event-iterator'
+import { wrapAsyncIteratorPreservingEventMeta } from './event-iterator'
 
-describe('wrapEventIteratorPreservingMeta', () => {
+describe('wrapAsyncIteratorPreservingEventMeta', () => {
   it('preserves metadata when mapping yielded and returned values', async () => {
     const event = withEventMeta({ order: 2 }, { id: 'id-2' })
     const returned = withEventMeta({ order: 3 }, { retry: 4000 })
@@ -19,7 +19,7 @@ describe('wrapEventIteratorPreservingMeta', () => {
       }
     })
 
-    const mapped = wrapEventIteratorPreservingMeta(iterator, {
+    const mapped = wrapAsyncIteratorPreservingEventMeta(iterator, {
       mapResult,
     })
 
@@ -51,7 +51,7 @@ describe('wrapEventIteratorPreservingMeta', () => {
 
     const mapResult = vi.fn(async result => result)
 
-    const mapped = wrapEventIteratorPreservingMeta(iterator, {
+    const mapped = wrapAsyncIteratorPreservingEventMeta(iterator, {
       mapResult,
     })
 
@@ -75,7 +75,7 @@ describe('wrapEventIteratorPreservingMeta', () => {
       throw error
     })()
 
-    const mapped = wrapEventIteratorPreservingMeta(iterator, {
+    const mapped = wrapAsyncIteratorPreservingEventMeta(iterator, {
       onError,
       mapError,
     })
@@ -96,7 +96,7 @@ describe('wrapEventIteratorPreservingMeta', () => {
   it('does not reattach metadata when mapped errors stay the same or become non-objects', async () => {
     const error = withEventMeta(new Error('TEST'), { id: 'error-1' })
 
-    const sameError = wrapEventIteratorPreservingMeta((async function* () {
+    const sameError = wrapAsyncIteratorPreservingEventMeta((async function* () {
       throw error
     })(), {
       mapError: async cause => cause,
@@ -104,7 +104,7 @@ describe('wrapEventIteratorPreservingMeta', () => {
 
     await expect(sameError.next()).rejects.toBe(error)
 
-    const primitiveError = wrapEventIteratorPreservingMeta((async function* () {
+    const primitiveError = wrapAsyncIteratorPreservingEventMeta((async function* () {
       throw error
     })(), {
       mapError: async () => 'mapped-error',
