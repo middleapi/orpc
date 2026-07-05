@@ -210,16 +210,16 @@ export class OpenAPIGenerator {
     const inputSchemas = def.inputSchemas
 
     if (inputStructure === 'compact') {
-      const eventIteratorDetails = getEventIteratorDetails(inputSchemas)
+      const asyncIteratorObjectDetails = getAsyncIteratorObjectDetails(inputSchemas)
 
-      if (eventIteratorDetails) {
-        const [yieldSchemas, returnSchemas] = eventIteratorDetails
+      if (asyncIteratorObjectDetails) {
+        const [yieldSchemas, returnSchemas] = asyncIteratorObjectDetails
         const yieldResult = await this.convertSchemas(yieldSchemas, 'input')
         const returnResult = await this.convertSchemas(returnSchemas, 'input')
 
         ref.requestBody = {
           required: true,
-          content: toEventIteratorContent(yieldResult, returnResult, doc, options),
+          content: toAsyncIteratorObjectContent(yieldResult, returnResult, doc, options),
         }
 
         return
@@ -388,17 +388,17 @@ export class OpenAPIGenerator {
     const outputStructure = meta?.outputStructure ?? DEFAULT_OPENAPI_OUTPUT_STRUCTURE
 
     if (outputStructure === 'compact') {
-      const eventDetails = getEventIteratorDetails(outputSchemas)
+      const iteratorDetails = getAsyncIteratorObjectDetails(outputSchemas)
 
-      if (eventDetails) {
-        const [yieldSchemas, returnSchemas] = eventDetails
+      if (iteratorDetails) {
+        const [yieldSchemas, returnSchemas] = iteratorDetails
         const yieldResult = await this.convertSchemas(yieldSchemas, 'output')
         const returnResult = await this.convertSchemas(returnSchemas, 'output')
 
         ref.responses ??= {}
         ref.responses[status] = {
           description,
-          content: toEventIteratorContent(yieldResult, returnResult, doc, options),
+          content: toAsyncIteratorObjectContent(yieldResult, returnResult, doc, options),
         }
 
         return
@@ -604,7 +604,7 @@ function strip$schemaField(schema: JsonSchema): JsonSchema {
   return rest
 }
 
-function getEventIteratorDetails(schemas: AnySchema[] | undefined): [yieldSchemas: AnySchema[], returnSchemas: AnySchema[]] | undefined {
+function getAsyncIteratorObjectDetails(schemas: AnySchema[] | undefined): [yieldSchemas: AnySchema[], returnSchemas: AnySchema[]] | undefined {
   if (!schemas || schemas.length === 0) {
     return undefined
   }
@@ -627,7 +627,7 @@ function getEventIteratorDetails(schemas: AnySchema[] | undefined): [yieldSchema
   return yieldSchemas.length || returnSchemas.length ? [yieldSchemas, returnSchemas] : undefined
 }
 
-function toEventIteratorContent(
+function toAsyncIteratorObjectContent(
   [yieldSchema, yieldOptional]: [JsonSchema, optional: boolean],
   [returnSchema, returnOptional]: [JsonSchema, optional: boolean],
   doc: OpenAPIDocument,

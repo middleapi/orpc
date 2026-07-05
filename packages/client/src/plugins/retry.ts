@@ -58,8 +58,6 @@ export interface RetryLinkPluginOptions<_T extends RetryLinkPluginContext> {
   default?: RetryLinkPluginContext | undefined
 }
 
-export class RetryLinkPluginInvalidEventIteratorRetryResponse extends Error { }
-
 export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> implements StandardLinkPlugin<T> {
   private readonly defaultRetry: Exclude<RetryLinkPluginContext['retry'], undefined>
   private readonly defaultRetryDelay: Exclude<RetryLinkPluginContext['retryDelay'], undefined>
@@ -185,14 +183,14 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
               lastEventId = meta?.id ?? lastEventId
               lastEventRetry = meta?.retry ?? lastEventRetry
 
-              const maybeEventIterator = await callNext({ error })
-              if (!isAsyncIteratorObject(maybeEventIterator)) {
-                throw new RetryLinkPluginInvalidEventIteratorRetryResponse(
+              const asyncIteratorObject = await callNext({ error })
+              if (!isAsyncIteratorObject(asyncIteratorObject)) {
+                throw new TypeError(
                   'RetryLinkPlugin: Expected an Event Iterator, got a non-Event Iterator',
                 )
               }
 
-              current = maybeEventIterator
+              current = asyncIteratorObject
 
               if (isIteratorAborted) {
                 await current.return?.()

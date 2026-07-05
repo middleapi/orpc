@@ -88,13 +88,25 @@ export type {
 
 export {
   AsyncIteratorClass,
+  asyncIteratorToStream,
+  asyncIteratorToUnproxiedDataStream,
+  /**
+   * @deprecated Use `asyncIteratorToStream` instead.
+   */
   asyncIteratorToStream as eventIteratorToStream,
+  /**
+   * @deprecated Use `asyncIteratorToUnproxiedDataStream` instead.
+   */
   asyncIteratorToUnproxiedDataStream as eventIteratorToUnproxiedDataStream,
   onError,
   onFinish,
   onStart,
   onSuccess,
-  streamToAsyncIteratorClass as streamToEventIterator,
+  streamToAsyncIteratorObject,
+  /**
+   * @deprecated Use `streamToAsyncIteratorObject` instead.
+   */
+  streamToAsyncIteratorObject as streamToEventIterator,
 } from '@orpc/shared'
 
 export type {

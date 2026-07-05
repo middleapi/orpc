@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { AsyncIteratorClass, sleep } from '@standardserver/shared'
 import * as OpenTelemetry from './opentelemetry'
 import { promiseWithResolvers } from './promise'
-import { asyncIteratorToStream, asyncIteratorToUnproxiedDataStream, replicateReadableStream, streamToAsyncIteratorClass, traceReadableStream, wrapReadableStream } from './stream'
+import { asyncIteratorToStream, asyncIteratorToUnproxiedDataStream, replicateReadableStream, streamToAsyncIteratorObject, traceReadableStream, wrapReadableStream } from './stream'
 
 const runInSpanContextSpy = vi.spyOn(OpenTelemetry, 'runInSpanContext')
 const startSpanSpy = vi.spyOn(OpenTelemetry, 'startSpan')
@@ -334,7 +334,7 @@ function createSpan() {
   } as any
 }
 
-describe('streamToAsyncIteratorClass', () => {
+describe('streamToAsyncIteratorObject', () => {
   it('should convert a ReadableStream to AsyncIteratorClass', async () => {
     const values = [1, 2, 3, 4, 5]
     const stream = new ReadableStream<number>({
@@ -344,7 +344,7 @@ describe('streamToAsyncIteratorClass', () => {
       },
     })
 
-    const iterator = streamToAsyncIteratorClass(stream)
+    const iterator = streamToAsyncIteratorObject(stream)
     expect(iterator).toBeInstanceOf(AsyncIteratorClass)
 
     const results: number[] = []
@@ -362,7 +362,7 @@ describe('streamToAsyncIteratorClass', () => {
       },
     })
 
-    const iterator = streamToAsyncIteratorClass(stream)
+    const iterator = streamToAsyncIteratorObject(stream)
     const results: number[] = []
 
     for await (const value of iterator) {
@@ -380,7 +380,7 @@ describe('streamToAsyncIteratorClass', () => {
       },
     })
 
-    const iterator = streamToAsyncIteratorClass(stream)
+    const iterator = streamToAsyncIteratorObject(stream)
 
     try {
       for await (const value of iterator) {
@@ -407,7 +407,7 @@ describe('streamToAsyncIteratorClass', () => {
       },
     })
 
-    const iterator = streamToAsyncIteratorClass(stream)
+    const iterator = streamToAsyncIteratorObject(stream)
 
     await iterator.next()
     await iterator.return()
@@ -430,7 +430,7 @@ describe('streamToAsyncIteratorClass', () => {
         cancel,
       })
 
-      const iterator = streamToAsyncIteratorClass(stream, { signal: controller.signal })
+      const iterator = streamToAsyncIteratorObject(stream, { signal: controller.signal })
 
       await expect(iterator.next()).rejects.toBe(controller.signal.reason)
       expect(cancel).toHaveBeenCalledTimes(1)
@@ -451,7 +451,7 @@ describe('streamToAsyncIteratorClass', () => {
         cancel,
       })
 
-      const iterator = streamToAsyncIteratorClass(stream, { signal: controller.signal })
+      const iterator = streamToAsyncIteratorObject(stream, { signal: controller.signal })
 
       await iterator.next()
       controller.abort()
@@ -474,7 +474,7 @@ describe('streamToAsyncIteratorClass', () => {
         cancel,
       })
 
-      const iterator = streamToAsyncIteratorClass(stream, { signal: controller.signal })
+      const iterator = streamToAsyncIteratorObject(stream, { signal: controller.signal })
 
       const nextPromise = iterator.next()
       await sleep(0)
@@ -499,7 +499,7 @@ describe('streamToAsyncIteratorClass', () => {
         cancel,
       })
 
-      const iterator = streamToAsyncIteratorClass(stream, { signal: controller.signal })
+      const iterator = streamToAsyncIteratorObject(stream, { signal: controller.signal })
       const results: number[] = []
 
       for await (const value of iterator) {
@@ -605,9 +605,9 @@ it('streamToAsyncIteratorClass + asyncIteratorToStream', async () => {
     },
   })
 
-  const iterator = streamToAsyncIteratorClass(stream)
+  const iterator = streamToAsyncIteratorObject(stream)
   const newStream = asyncIteratorToStream(iterator)
-  const newIterator = streamToAsyncIteratorClass(newStream)
+  const newIterator = streamToAsyncIteratorObject(newStream)
 
   const results: number[] = []
   for await (const value of newIterator) {

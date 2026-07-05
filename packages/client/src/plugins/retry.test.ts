@@ -3,7 +3,7 @@ import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/stand
 import type { RetryLinkPluginContext } from './retry'
 import { withEventMeta } from '@standardserver/core'
 import { StandardLink } from '../adapters/standard'
-import { RetryLinkPlugin, RetryLinkPluginInvalidEventIteratorRetryResponse } from './retry'
+import { RetryLinkPlugin } from './retry'
 
 interface TestContext extends RetryLinkPluginContext {
   tag?: string
@@ -281,7 +281,7 @@ describe('retryLinkPlugin', () => {
 
       const iterator = await link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 1, retryDelay: 0 } }) as AsyncIterator<any>
 
-      await expect(iterator.next()).rejects.toBeInstanceOf(RetryLinkPluginInvalidEventIteratorRetryResponse)
+      await expect(iterator.next()).rejects.toBeInstanceOf(TypeError)
     })
 
     it('support manually cleanup', async () => {
