@@ -1,3 +1,4 @@
+export * from './async-iterator-object'
 export * from './client'
 export * from './client-safe'
 export * from './consts'
@@ -10,7 +11,6 @@ export {
   isInferableError as isDefinedError,
 } from './error-utils'
 export * from './error-utils'
-export * from './event-iterator'
 export * from './rpc-json-serializer'
 export * from './rpc-serializer'
 export * from './types'

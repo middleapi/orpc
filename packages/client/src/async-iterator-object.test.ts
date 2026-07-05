@@ -1,5 +1,5 @@
 import { getEventMeta, withEventMeta } from '@standardserver/core'
-import { wrapAsyncIteratorPreservingEventMeta } from './event-iterator'
+import { wrapAsyncIteratorPreservingEventMeta } from './async-iterator-object'
 
 describe('wrapAsyncIteratorPreservingEventMeta', () => {
   it('preserves metadata when mapping yielded and returned values', async () => {

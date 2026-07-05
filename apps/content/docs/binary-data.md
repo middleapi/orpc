@@ -30,7 +30,7 @@ const example = os
   })
 ```
 
-## `ReadableStream<Uint8Array>`
+## ReadableStream\<Uint8Array\>
 
 Procedures can return `ReadableStream<Uint8Array>` to stream binary responses. The example below uses the [Response Headers Plugin](/docs/plugins/response-headers) to set the appropriate `Content-Type` header.
 

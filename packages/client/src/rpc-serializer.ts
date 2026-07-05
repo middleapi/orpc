@@ -2,8 +2,8 @@ import type { StandardBody } from '@standardserver/core'
 import type { RPCJsonSerializerOptions } from './rpc-json-serializer'
 import { isAsyncIteratorObject, stringifyJSON } from '@orpc/shared'
 import { ErrorEvent } from '@standardserver/core'
+import { wrapAsyncIteratorPreservingEventMeta } from './async-iterator-object'
 import { createORPCErrorFromJson, isORPCErrorJson, toORPCError } from './error-utils'
-import { wrapAsyncIteratorPreservingEventMeta } from './event-iterator'
 import { RPCJsonSerializer } from './rpc-json-serializer'
 
 export interface RPCSerializerSerializeOptions {
