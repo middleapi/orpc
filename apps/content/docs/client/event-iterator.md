@@ -77,14 +77,14 @@ for await (const event of iterator) {
 }
 ```
 
-## Using `consumeEventIterator`
+## Using `consumeAsyncIterator`
 
-Use `consumeEventIterator` to consume an event iterator with lifecycle callbacks. It accepts either an event iterator or a promise that resolves to one.
+Use `consumeAsyncIterator` to consume an event iterator with lifecycle callbacks. It accepts either an event iterator or a promise that resolves to one.
 
 ```ts
-import { consumeEventIterator } from '@orpc/client'
+import { consumeAsyncIterator } from '@orpc/client'
 
-const cancel = consumeEventIterator(client.streaming(), {
+const cancel = consumeAsyncIterator(client.streaming(), {
   onEvent: (event) => {
     console.log(event.message)
   },

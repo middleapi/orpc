@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { AsyncIteratorClass, sleep } from '@standardserver/shared'
-import { replicateAsyncIterator, traceAsyncIterator, wrapAsyncIterator } from './iterator'
+import { consumeAsyncIterator, replicateAsyncIterator, traceAsyncIterator, wrapAsyncIterator } from './iterator'
 import * as OpenTelemetry from './opentelemetry'
 
 const runInSpanContextSpy = vi.spyOn(OpenTelemetry, 'runInSpanContext')
@@ -393,5 +393,219 @@ describe('replicateAsyncIterator', async () => {
     expect(cleanup).toBe(false)
     expect(await iterators[2]!.return()).toEqual({ done: true, value: undefined })
     expect(cleanup).toBe(true)
+  })
+})
+
+describe('consumeAsyncIterator', () => {
+  it('on success', async () => {
+    const iterator = (async function* () {
+      yield 1
+      yield 2
+      return 3
+    }())
+
+    const onEvent = vi.fn()
+    const onError = vi.fn()
+    const onSuccess = vi.fn()
+    const onFinish = vi.fn()
+
+    void consumeAsyncIterator(iterator, {
+      onEvent,
+      onError,
+      onSuccess,
+      onFinish,
+    })
+
+    await vi.waitFor(() => {
+      expect(onEvent).toHaveBeenCalledTimes(2)
+      expect(onEvent).toHaveBeenNthCalledWith(1, 1)
+      expect(onEvent).toHaveBeenNthCalledWith(2, 2)
+
+      expect(onSuccess).toHaveBeenCalledTimes(1)
+      expect(onSuccess).toHaveBeenNthCalledWith(1, 3)
+      expect(onFinish).toHaveBeenCalledTimes(1)
+      expect(onFinish).toHaveBeenNthCalledWith(1, [null, 3, true])
+
+      expect(onError).toHaveBeenCalledTimes(0)
+    })
+  })
+
+  it('on error', async () => {
+    const error = new Error('TEST')
+    const iterator = (async function* () {
+      yield 1
+      yield 2
+      throw error
+    }())
+
+    const onEvent = vi.fn()
+    const onError = vi.fn()
+    const onSuccess = vi.fn()
+    const onFinish = vi.fn()
+
+    void consumeAsyncIterator(iterator, {
+      onEvent,
+      onError,
+      onSuccess,
+      onFinish,
+    })
+
+    await vi.waitFor(() => {
+      expect(onEvent).toHaveBeenCalledTimes(2)
+      expect(onEvent).toHaveBeenNthCalledWith(1, 1)
+      expect(onEvent).toHaveBeenNthCalledWith(2, 2)
+
+      expect(onError).toHaveBeenCalledTimes(1)
+      expect(onError).toHaveBeenNthCalledWith(1, error)
+
+      expect(onFinish).toHaveBeenCalledTimes(1)
+      expect(onFinish).toHaveBeenNthCalledWith(1, [error, undefined, false])
+
+      expect(onSuccess).toHaveBeenCalledTimes(0)
+    })
+  })
+
+  it('on error without onError and onFinish', async ({ onTestFinished }) => {
+    const unhandledRejectionHandler = vi.fn()
+    process.on('unhandledRejection', unhandledRejectionHandler)
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejectionHandler)
+    })
+
+    const error = new Error('TEST')
+    const iterator = (async function* () {
+      yield 1
+      yield 2
+      throw error
+    }())
+
+    const onEvent = vi.fn()
+
+    void consumeAsyncIterator(iterator, {
+      onEvent,
+    })
+
+    await vi.waitFor(() => {
+      expect(onEvent).toHaveBeenCalledTimes(2)
+      expect(onEvent).toHaveBeenNthCalledWith(1, 1)
+      expect(onEvent).toHaveBeenNthCalledWith(2, 2)
+    })
+
+    expect(unhandledRejectionHandler).toHaveBeenCalledTimes(1)
+    expect(unhandledRejectionHandler).toHaveBeenNthCalledWith(1, error, expect.anything())
+  })
+
+  it('unsubscribe', async () => {
+    let cleanup = false
+    const iterator = (async function* () {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 10))
+        yield 1
+        yield 2
+        return 3
+      }
+      finally {
+        cleanup = true
+      }
+    }())
+
+    const onEvent = vi.fn()
+    const onSuccess = vi.fn()
+    const onFinish = vi.fn()
+    const onError = vi.fn()
+
+    const unsubscribe = consumeAsyncIterator(iterator, {
+      onEvent,
+      onError,
+      onSuccess,
+      onFinish,
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 1))
+    await unsubscribe()
+    expect(cleanup).toBe(true)
+    // side-effect of async generator - waiting for .next resolve before .return effect
+    expect(onEvent).toHaveBeenCalledTimes(1)
+    expect(onEvent).toHaveBeenNthCalledWith(1, 1)
+
+    expect(onError).toHaveBeenCalledTimes(0)
+    expect(onSuccess).toHaveBeenCalledTimes(1)
+    expect(onFinish).toHaveBeenCalledTimes(1)
+    // undefined can be passed on success because iterator can be canceled
+    expect(onSuccess).toHaveBeenNthCalledWith(1, undefined)
+    expect(onFinish).toHaveBeenNthCalledWith(1, [null, undefined, true])
+  })
+
+  it('error on unsubscribe', async () => {
+    const error = new Error('TEST')
+    let cleanup = false
+    const iterator = (async function* () {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 10))
+        yield 1
+        yield 2
+        return 3
+      }
+      finally {
+        cleanup = true
+        // eslint-disable-next-line no-unsafe-finally
+        throw error
+      }
+    }())
+
+    const onEvent = vi.fn()
+    const onError = vi.fn()
+    const onSuccess = vi.fn()
+    const onFinish = vi.fn()
+
+    const unsubscribe = consumeAsyncIterator(iterator, {
+      onEvent,
+      onError,
+      onSuccess,
+      onFinish,
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 1))
+    await expect(unsubscribe()).rejects.toThrow(error)
+    expect(cleanup).toBe(true)
+    // side-effect of async generator - waiting for .next resolve before .return effect
+    expect(onEvent).toHaveBeenCalledTimes(1)
+    expect(onEvent).toHaveBeenNthCalledWith(1, 1)
+
+    expect(onError).toHaveBeenCalledTimes(0)
+    expect(onSuccess).toHaveBeenCalledTimes(1)
+    expect(onFinish).toHaveBeenCalledTimes(1)
+    // undefined can be passed on success because iterator can be canceled
+    expect(onSuccess).toHaveBeenNthCalledWith(1, undefined)
+    expect(onFinish).toHaveBeenNthCalledWith(1, [null, undefined, true])
+  })
+
+  it('on iterator promise rejection', async () => {
+    const error = new Error('TEST')
+    const iterator = Promise.reject(error)
+
+    const onEvent = vi.fn()
+    const onError = vi.fn()
+    const onSuccess = vi.fn()
+    const onFinish = vi.fn()
+
+    void consumeAsyncIterator(iterator, {
+      onEvent,
+      onError,
+      onSuccess,
+      onFinish,
+    })
+
+    await vi.waitFor(() => {
+      expect(onEvent).toHaveBeenCalledTimes(0)
+
+      expect(onError).toHaveBeenCalledTimes(1)
+      expect(onError).toHaveBeenNthCalledWith(1, error)
+
+      expect(onFinish).toHaveBeenCalledTimes(1)
+      expect(onFinish).toHaveBeenNthCalledWith(1, [error, undefined, false])
+
+      expect(onSuccess).toHaveBeenCalledTimes(0)
+    })
   })
 })
