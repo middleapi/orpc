@@ -164,7 +164,7 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
       if (isAsyncIteratorObject(output)) {
         /**
          * @warning
-         * Remember use `override` for event iterator to remain other special properties
+         * Remember use `override` for AsyncIteratorObject to remain other special properties
          */
         return override(output, wrapAsyncIteratorPreservingEventMeta(output, {
           onError: (error) => {
@@ -176,7 +176,7 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
       if (output instanceof ReadableStream) {
         /**
          * @warning
-         * Remember use `override` for event iterator to remain other special properties
+         * Remember use `override` for ReadableStream to remain other special properties
          */
         return override(output, wrapReadableStream(output, {
           onError: (error) => {

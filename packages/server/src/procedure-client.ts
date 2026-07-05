@@ -111,17 +111,17 @@ export function createProcedureClient<
       if (isAsyncIteratorObject(output)) {
         /**
          * traceAsyncIterator/wrapAsyncIteratorPreservingEventMeta return AsyncIteratorClass
-         * which is backwards compatible with async iterator object.
+         * which is backwards compatible with AsyncIteratorObject.
          *
          * @warning
          * If remove this return, can be breaking change
          * because AsyncIteratorClass convert `.throw` to `.return` (rarely used)
          *
          * @warning
-         * Remember use `override` for event iterator to remain other special properties
+         * Remember use `override` for AsyncIteratorObject to remain other special properties
          */
         return override(output, wrapAsyncIteratorPreservingEventMeta(
-          traceAsyncIterator('consume_event_iterator_output', output),
+          traceAsyncIterator('consume_async_iterator_object_output', output),
           { mapError: reconcileError },
         )) as typeof output
       }
@@ -129,7 +129,7 @@ export function createProcedureClient<
       if ((output as any) instanceof ReadableStream) {
         /**
          * @warning
-         * Remember use `override` for event iterator to remain other special properties
+         * Remember use `override` for ReadableStream to remain other special properties
          */
         return override(output, traceReadableStream('consume_octet_stream_output', output)) as typeof output
       }

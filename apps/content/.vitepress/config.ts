@@ -88,7 +88,7 @@ export default withMermaid(defineConfig({
         { text: 'Context', link: '/docs/context' },
         { text: 'Error Handling', link: '/docs/error-handling' },
         { text: 'Binary Data', link: '/docs/binary-data' },
-        { text: 'Event Iterator (SSE)', link: '/docs/event-iterator' },
+        { text: 'AsyncIteratorObject (SSE)', link: '/docs/async-iterator-object' },
         { text: 'Metadata', link: '/docs/metadata' },
         { text: 'Playgrounds', link: '/docs/playgrounds' },
         {
@@ -131,7 +131,7 @@ export default withMermaid(defineConfig({
             { text: 'Server-Side', link: '/docs/client/server-side' },
             { text: 'Client-Side', link: '/docs/client/client-side' },
             { text: 'Error Handling', link: '/docs/client/error-handling' },
-            { text: 'Event Iterator', link: '/docs/client/event-iterator' },
+            { text: 'AsyncIteratorObject (SSE)', link: '/docs/client/async-iterator-object' },
             { text: 'Dynamic Link', link: '/docs/client/dynamic-link' },
           ],
         },

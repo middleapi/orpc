@@ -6,26 +6,26 @@ OpenAPI Serializers handle one-way serialization to JSON-friendly formats. They 
 
 `OpenAPISerializer` supports the following types by default:
 
-| Type                                     | Handler key | Serialized         | Notes                         |
-| ---------------------------------------- | ----------- | ------------------ | ----------------------------- |
-| **string**                               |             |                    |                               |
-| **number**                               |             |                    |                               |
-| **NaN**                                  | `nan`       | `null`             |                               |
-| **boolean**                              |             |                    |                               |
-| **null**                                 |             |                    |                               |
-| **undefined**                            | `undefined` | `null`             | Ignore `undefined` properties |
-| **Date**                                 | `date`      | ISO String, `null` |                               |
-| **BigInt**                               | `bigint`    | string             |                               |
-| **RegExp**                               | `regexp`    | string             |                               |
-| **URL**                                  | `url`       | string             |                               |
-| **Record (object)**                      |             |                    | `toJSON` methods are ignored  |
-| **Array**                                |             |                    |                               |
-| **Set**                                  | `set`       | array              |                               |
-| **Map**                                  | `map`       | array              |                               |
-| **Blob**                                 |             |                    | Unsupported in Event Iterator |
-| **File**                                 |             |                    | Unsupported in Event Iterator |
-| **Event Iterator (AsyncIteratorObject)** |             |                    | Only at the root level        |
-| **ReadableStream\<Uint8Array\>**         |             |                    | Only at the root level        |
+| Type                             | Handler key | Serialized         | Notes                                |
+| -------------------------------- | ----------- | ------------------ | ------------------------------------ |
+| **string**                       |             |                    |                                      |
+| **number**                       |             |                    |                                      |
+| **NaN**                          | `nan`       | `null`             |                                      |
+| **boolean**                      |             |                    |                                      |
+| **null**                         |             |                    |                                      |
+| **undefined**                    | `undefined` | `null`             | Ignore `undefined` properties        |
+| **Date**                         | `date`      | ISO String, `null` |                                      |
+| **BigInt**                       | `bigint`    | string             |                                      |
+| **RegExp**                       | `regexp`    | string             |                                      |
+| **URL**                          | `url`       | string             |                                      |
+| **Record (object)**              |             |                    | `toJSON` methods are ignored         |
+| **Array**                        |             |                    |                                      |
+| **Set**                          | `set`       | array              |                                      |
+| **Map**                          | `map`       | array              |                                      |
+| **Blob**                         |             |                    | Unsupported in `AsyncIteratorObject` |
+| **File**                         |             |                    | Unsupported in `AsyncIteratorObject` |
+| **AsyncIteratorObject**          |             |                    | Only at the root level               |
+| **ReadableStream\<Uint8Array\>** |             |                    | Only at the root level               |
 
 <!--@include: @/shared/standard-server-cors-warning.md -->
 
@@ -128,9 +128,9 @@ Standard-Server: file
 If the receiver mistakenly handles this payload as a regular (non-file) body, set the `standard-server` header to help the receiver detect the actual data type and handle it correctly. Learn more about this header in the [Standard Server Documentation](https://github.com/middleapi/standardserver#resolving-body).
 :::
 
-### Event Iterator (AsyncIteratorObject)
+### AsyncIteratorObject
 
-When the output is an event iterator (`AsyncIteratorObject`), it is sent as a [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) stream. Each event contains one serialized chunk of data.
+When the output is an `AsyncIteratorObject`, it is sent as a [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) stream. Each event contains one serialized chunk of data.
 
 ```http
 HTTP/1.1 200 OK

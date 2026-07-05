@@ -14,7 +14,7 @@ function assertValidationSuccess<T extends { issues?: unknown }>(result: T): ass
 }
 
 describe('asyncIteratorObject', () => {
-  it('expect a async iterator object', async () => {
+  it('expect a AsyncIteratorObject', async () => {
     const schema = asyncIteratorObject(ORDER_SCHEMA)
     const result = await schema['~standard'].validate(123)
     expect(result.issues).toHaveLength(1)
@@ -43,11 +43,11 @@ describe('asyncIteratorObject', () => {
 
     try {
       await result.value.next()
-      throw new Error('Expected event iterator validation to fail')
+      throw new Error('Expected AsyncIteratorObject validation to fail')
     }
     catch (error) {
       expect(error).toBeInstanceOf(ORPCError)
-      expect((error as AnyORPCError).code).toEqual('EVENT_ITERATOR_VALIDATION_FAILED')
+      expect((error as AnyORPCError).code).toEqual('ASYNC_ITERATOR_OBJECT_VALIDATION_FAILED')
       expect((error as AnyORPCError).cause).toBeInstanceOf(ValidationError)
       expect(((error as AnyORPCError).cause as ValidationError).issues).toHaveLength(1)
       expect(((error as AnyORPCError).cause as ValidationError).invalidData).toEqual({ order: '3' })
@@ -99,7 +99,7 @@ describe('asyncIteratorObject', () => {
     assertValidationSuccess(result)
 
     await expect(result.value.next()).resolves.toEqual({ done: false, value: { order: 1 } })
-    await expect(result.value.next()).rejects.toThrow('Event iterator validation failed')
+    await expect(result.value.next()).rejects.toThrow('AsyncIteratorObject validation failed')
     expect(cleanupCalled).toBe(true)
   })
 })

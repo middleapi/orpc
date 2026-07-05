@@ -281,7 +281,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
   }
 
   /**
-   * Configure queries for [Event Iterator](https://orpc.dev/docs/event-iterator).
+   * Configure queries for [AsyncIteratorObject](https://orpc.dev/docs/async-iterator-object).
    * This is built on [TanStack Query streamedQuery](https://tanstack.com/query/latest/docs/reference/streamedQuery)
    * and works with hooks like `useQuery`, `useSuspenseQuery`, or `prefetchQuery`.
    */
@@ -333,7 +333,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
                 const output = await this.call(input, { signal: queryContext.signal, context })
 
                 if (!isAsyncIteratorObject(output)) {
-                  throw new Error('streamedQuery requires an event iterator output')
+                  throw new Error('streamedQuery requires an AsyncIteratorObject output')
                 }
 
                 return output
@@ -369,7 +369,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
   }
 
   /**
-   * Configure live queries for [Event Iterator](https://orpc.dev/docs/event-iterator).
+   * Configure live queries for [AsyncIteratorObject](https://orpc.dev/docs/async-iterator-object).
    * Unlike `.streamedOptions` which accumulates chunks, live queries replace the entire result with each new chunk received.
    * Works with hooks like `useQuery`, `useSuspenseQuery`, or `prefetchQuery`.
    */
@@ -423,7 +423,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
               })
 
               if (!isAsyncIteratorObject(output)) {
-                throw new Error('liveQuery requires an event iterator output')
+                throw new Error('liveQuery requires an AsyncIteratorObject output')
               }
 
               return output

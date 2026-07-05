@@ -1241,7 +1241,7 @@ describe('openAPIGenerator', () => {
       })
     })
 
-    it('maps event iterator inputs to an SSE request body', async () => {
+    it('maps AsyncIteratorObject inputs to an SSE request body', async () => {
       const doc = await generator.generate({
         subscribe: oc
           .meta(openapi({}))
@@ -1555,7 +1555,7 @@ describe('openAPIGenerator', () => {
       })
     })
 
-    it('maps event iterator outputs to an SSE success response', async () => {
+    it('maps AsyncIteratorObject outputs to an SSE success response', async () => {
       const doc = await generator.generate({
         subscribe: oc
           .meta(openapi({}))
@@ -1884,7 +1884,7 @@ describe('openAPIGenerator', () => {
         })
       })
 
-      it('merges repeated event iterator schemas', async () => {
+      it('merges repeated AsyncIteratorObject schemas', async () => {
         const doc = await generator.generate({
           procedure: oc
             .input(asyncIteratorObject(z.looseObject({ yield1: z.string() }), z.looseObject({ return1: z.string() })))

@@ -120,7 +120,7 @@ Define the `name` property on your middleware to improve span naming and make tr
 
 ## Capture Abort Signals
 
-If your application heavily uses [Event Iterator](/docs/event-iterator) or similar streaming patterns, we recommend capturing an event when the `signal` is aborted to properly track and detach unexpected long-running operations:
+If your application heavily uses [AsyncIteratorObject](/docs/async-iterator-object) or similar streaming patterns, we recommend capturing an event when the `signal` is aborted to properly track and detach unexpected long-running operations:
 
 ```ts
 import { trace } from '@opentelemetry/api'

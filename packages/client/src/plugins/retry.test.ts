@@ -210,8 +210,8 @@ describe('retryLinkPlugin', () => {
     expect(clean).toHaveBeenCalledWith(false)
   })
 
-  describe('event iterator', () => {
-    it('retries event iterator and forwards lastEventId from metadata', async () => {
+  describe('asyncIteratorObject', () => {
+    it('retries AsyncIteratorObject and forwards lastEventId from metadata', async () => {
       const codec = makeCodec()
       const transport = makeTransport()
 
@@ -255,7 +255,7 @@ describe('retryLinkPlugin', () => {
       expect(shouldRetry).toHaveBeenCalledWith(expect.objectContaining({ lastEventRetry: 0 }))
     })
 
-    it('throws when retry response is not an event iterator', async () => {
+    it('throws when retry response is not an AsyncIteratorObject', async () => {
       const codec = makeCodec()
       const transport = makeTransport()
 
@@ -379,7 +379,7 @@ describe('retryLinkPlugin', () => {
       expect(retriedReturn).toHaveBeenCalledTimes(1)
     })
 
-    it('reset special event iterator properties after retry', async () => {
+    it('reset special AsyncIteratorObject properties after retry', async () => {
       const codec = makeCodec()
       const transport = makeTransport()
 

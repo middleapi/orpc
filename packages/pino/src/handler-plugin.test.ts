@@ -205,7 +205,7 @@ describe('pinoHandlerPlugin', () => {
     expect(capturedBindings.rpc.method).toBe('ping')
   })
 
-  it('logs event iterator errors as error and aborted stream errors as info', async () => {
+  it('logs AsyncIteratorObject errors as error and aborted stream errors as info', async () => {
     const baseLogger = new FakeLogger({ rpc: {} })
     const streamError = new Error('stream-error')
     const handler1 = new StandardHandler(createCodec(os.handler(async function* () {

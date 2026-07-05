@@ -12,7 +12,7 @@ export interface AsyncIteratorObjectSchemaDetails {
 }
 
 /**
- * Define schema for an async iterator object.
+ * Define schema for an AsyncIteratorObject.
  */
 export function asyncIteratorObject<TYieldIn, TYieldOut, TReturnIn = unknown, TReturnOut = unknown>(
   yieldSchema: Schema<TYieldIn, TYieldOut>,
@@ -25,7 +25,7 @@ export function asyncIteratorObject<TYieldIn, TYieldOut, TReturnIn = unknown, TR
       version: 1,
       validate(iterator) {
         if (!isAsyncIteratorObject(iterator)) {
-          return { issues: [{ message: 'Expect async iterator object', path: [] }] }
+          return { issues: [{ message: 'Expect AsyncIteratorObject', path: [] }] }
         }
 
         const mapped = wrapAsyncIteratorPreservingEventMeta(iterator, {
@@ -39,11 +39,11 @@ export function asyncIteratorObject<TYieldIn, TYieldOut, TReturnIn = unknown, TR
             const validated = await schema['~standard'].validate(result.value)
 
             if (validated.issues) {
-              throw new ORPCError('EVENT_ITERATOR_VALIDATION_FAILED', {
-                message: 'Event iterator validation failed',
+              throw new ORPCError('ASYNC_ITERATOR_OBJECT_VALIDATION_FAILED', {
+                message: 'AsyncIteratorObject validation failed',
                 cause: new ValidationError({
                   issues: validated.issues,
-                  message: 'Event iterator validation failed',
+                  message: 'AsyncIteratorObject validation failed',
                   invalidData: result.value,
                 }),
               })

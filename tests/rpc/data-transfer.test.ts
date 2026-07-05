@@ -82,7 +82,7 @@ describe.each([
     expect(Date.now() - startTime).toBeLessThan(100)
   })
 
-  it('support event iterator and transfer event iterator in parallel', async () => {
+  it('support AsyncIteratorObject and transfer AsyncIteratorObject in parallel', async () => {
     const stream = (async function* () {
       yield 'order 1'
       await sleep(200)

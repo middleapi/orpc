@@ -87,7 +87,7 @@ describe('openAPISerializer', () => {
       expect(s.serialize({ file: blob }, { asFormData: false, useFormDataForBlobFields: true })).toBeInstanceOf(FormData)
     })
 
-    describe('async iterator object', () => {
+    describe('asyncIteratorObject', () => {
       async function* toAsyncIter<T>(values: T[]) {
         for (const v of values) yield v
       }
@@ -221,7 +221,7 @@ describe('openAPISerializer', () => {
       expect(serializer.deserialize(stream)).toBe(stream)
     })
 
-    describe('async iterator object', () => {
+    describe('asyncIteratorObject', () => {
       async function* toAsyncIter<T>(values: T[]) {
         for (const v of values) yield v
       }

@@ -223,7 +223,7 @@ If you use `OpenAPILink` with a custom server-side error format, make sure to co
 
 ## Event Stream Options
 
-Configure how [event iterators](/docs/event-iterator) are streamed to the client. Available options depend on the adapter. For example, the fetch adapter supports:
+Configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed to the client. Available options depend on the adapter. For example, the fetch adapter supports:
 
 ```ts
 const handler = new OpenAPIHandler(router, {

@@ -41,7 +41,7 @@ describe.each([
     expect(fetchSpy).toHaveBeenCalledTimes(1) // ensure batch was used
   })
 
-  it('support readable stream, blob, json, and event iterator responses in buffered mode', async () => {
+  it('support readable stream, blob, json, and AsyncIteratorObject responses in buffered mode', async () => {
     const streamProcedure = vi.fn(async () => new ReadableStream<Uint8Array>({
       async start(controller) {
         controller.enqueue(new TextEncoder().encode('part 1'))
@@ -110,7 +110,7 @@ describe.each([
     expect(fetchSpy).toHaveBeenCalledTimes(1) // ensure batch was used
   })
 
-  it('supports readable stream, blob, json, and event iterator responses in streaming mode', async () => {
+  it('supports readable stream, blob, json, and AsyncIteratorObject responses in streaming mode', async () => {
     const streamProcedure = vi.fn(async () => new ReadableStream<Uint8Array>({
       async start(controller) {
         controller.enqueue(new TextEncoder().encode('part 1'))

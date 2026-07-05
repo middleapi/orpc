@@ -80,7 +80,7 @@ describe('bodyCompressionHandlerPlugin', () => {
     expect(res.headers['content-encoding']).toBe('gzip')
   })
 
-  it('does not compress event iterator responses', async () => {
+  it('does not compress AsyncIteratorObject responses', async () => {
     const handler = new RPCHandler(
       {
         ping: os.handler(async function* () {

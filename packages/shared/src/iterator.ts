@@ -168,7 +168,7 @@ export interface ConsumeAsyncIteratorOptions<T, TReturn, TError> {
    */
   onError?: (error: TError) => void
   /**
-   * Called once event iterator is done
+   * Called once AsyncIteratorObject is done
    *
    * @info If iterator is canceled, `undefined` can be passed on success
    */
@@ -182,7 +182,7 @@ export interface ConsumeAsyncIteratorOptions<T, TReturn, TError> {
 }
 
 /**
- * Consumes an event iterator with lifecycle callbacks
+ * Consumes an AsyncIteratorObject with lifecycle callbacks
  *
  * @warning If no `onError` or `onFinish` is provided, error will be thrown into unhandled rejection channel.
  * @return unsubscribe callback

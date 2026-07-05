@@ -221,7 +221,7 @@ Procedures run only when a matching NestJS controller method is called. If no ro
 
 ### Event Stream Options
 
-Configure how [event iterators](/docs/event-iterator) are streamed to the client using the `toNestResponse.eventStream` options.
+Configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed to the client using the `toNestResponse.eventStream` options.
 
 ```ts
 @Module({

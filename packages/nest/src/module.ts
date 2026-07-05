@@ -28,7 +28,7 @@ export type ORPCModuleConfig
       toNestStandardLazyRequest?: undefined | ((req: any, res: any) => NestStandardLazyRequest)
 
       /**
-       * Options for how to convert the Standard Response to a Nest Response (returning value), like event iterator options, etc.
+       * Options for how to convert the Standard Response to a Nest Response (returning value), like event stream options, etc.
        */
       toNestResponse?: undefined | {
         /**
