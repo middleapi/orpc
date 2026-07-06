@@ -184,7 +184,7 @@ describe('durable publisher object', () => {
 
     // Expired, and enough time has passed since the last cleanup that
     // throttling no longer applies: cleanup runs and removes the row.
-    await sleep(500)
+    await sleep(1_500) // 3000ms since last cleanup + 1000ms lag
     const subscriber3 = await openSocket(stub, '0')
     await runInDurableObject(stub, async (_, state) => {
       const rows = state.storage.sql.exec('SELECT payload FROM "prefix:events"').toArray()
@@ -235,11 +235,11 @@ describe('durable publisher object', () => {
 
     // Expired, and enough time has passed since the last cleanup that
     // throttling no longer applies: cleanup runs and removes the row.
-    await sleep(500)
+    await sleep(1_500) // 3000ms since last cleanup + 1000ms lag
     expect((await publish(stub, { data: { text: 'event 4' } })).status).toBe(204)
     await runInDurableObject(stub, async (_, state) => {
       const rows = state.storage.sql.exec('SELECT payload FROM "prefix:events"').toArray()
-      expect(rows).toHaveLength(3) // event 1 is dropped
+      expect(rows).toHaveLength(2) // event 1, event 2 are dropped
     })
 
     expect((await publish(stub, { data: { text: 'event 5' } })).status).toBe(204)
