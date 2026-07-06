@@ -1,6 +1,6 @@
 import { router } from '@/routers'
 import { messagePublisher } from '@/context'
-import { MCPHandler } from '@orpc/mcp/fetch'
+import { MCPHandler } from '@orpc/experimental-mcp/fetch'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 
 const handler = new MCPHandler(router, {

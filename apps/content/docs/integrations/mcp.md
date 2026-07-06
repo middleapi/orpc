@@ -11,23 +11,23 @@ This guide assumes you are familiar with [MCP](https://modelcontextprotocol.io).
 ::: code-group
 
 ```sh [npm]
-npm install @orpc/mcp@beta
+npm install @orpc/experimental-mcp@beta
 ```
 
 ```sh [yarn]
-yarn add @orpc/mcp@beta
+yarn add @orpc/experimental-mcp@beta
 ```
 
 ```sh [pnpm]
-pnpm add @orpc/mcp@beta
+pnpm add @orpc/experimental-mcp@beta
 ```
 
 ```sh [bun]
-bun add @orpc/mcp@beta
+bun add @orpc/experimental-mcp@beta
 ```
 
 ```sh [deno]
-deno add npm:@orpc/mcp@beta
+deno add npm:@orpc/experimental-mcp@beta
 ```
 
 :::
@@ -37,7 +37,7 @@ deno add npm:@orpc/mcp@beta
 Exposing a procedure to MCP is **opt-in**: annotate it with `mcp.tool`, `mcp.resource`, or `mcp.prompt`. MCP metadata is independent of any [`openapi`](/docs/openapi/routing) meta, so a single procedure can be served over REST and MCP at the same time.
 
 ```ts twoslash
-import { mcp } from '@orpc/mcp'
+import { mcp } from '@orpc/experimental-mcp'
 import { os } from '@orpc/server'
 import * as z from 'zod'
 
@@ -120,7 +120,7 @@ It is built on oRPC's standard request/response flow, so tool, resource, and pro
 ### Fetch
 
 ```ts
-import { MCPHandler } from '@orpc/mcp/fetch'
+import { MCPHandler } from '@orpc/experimental-mcp/fetch'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 
 const handler = new MCPHandler(router, {
@@ -138,7 +138,7 @@ export async function POST(request: Request) {
 
 ```ts
 import { createServer } from 'node:http'
-import { MCPHandler } from '@orpc/mcp/node'
+import { MCPHandler } from '@orpc/experimental-mcp/node'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 
 const handler = new MCPHandler(router, { converters: [new ZodToJsonSchemaConverter()] })
@@ -151,7 +151,7 @@ createServer((req, res) => handler.handle(req, res, { context: {} })).listen(300
 For clients that launch your server as a subprocess (Claude Desktop, IDEs):
 
 ```ts
-import { MCPHandler } from '@orpc/mcp/stdio'
+import { MCPHandler } from '@orpc/experimental-mcp/stdio'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 
 await new MCPHandler(router, { converters: [new ZodToJsonSchemaConverter()] })

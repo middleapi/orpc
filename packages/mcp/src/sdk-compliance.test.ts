@@ -66,7 +66,7 @@ const planTrip = os
 
 const router = { greet, failing, failingTyped, config, planet, planTrip }
 
-describe('official MCP SDK client <-> @orpc/mcp node handler (e2e over HTTP)', () => {
+describe('official MCP SDK client <-> @orpc/experimental-mcp node handler (e2e over HTTP)', () => {
   let server: Server
   let client: Client
 
