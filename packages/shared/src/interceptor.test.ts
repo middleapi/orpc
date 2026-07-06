@@ -1,4 +1,4 @@
-import { intercept, onError, onFinish, onStart, onSuccess } from './interceptor'
+import { intercept, onAsyncIteratorObjectError, onError, onFinish, onReadableStreamError, onStart, onSuccess } from './interceptor'
 
 describe('intercept', () => {
   const interceptor1 = vi.fn(({ next }) => next())
@@ -379,5 +379,135 @@ describe('lifecycle interceptors', () => {
     )
 
     expect(onSuccessFn).toHaveBeenCalledTimes(0)
+  })
+})
+
+describe('stream interceptors', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  describe('onAsyncIteratorObjectError', () => {
+    it('does not invoke callback for non-iterator output', async () => {
+      const callback = vi.fn()
+
+      const result = await intercept(
+        [onAsyncIteratorObjectError(callback)],
+        { foo: 'bar' },
+        () => '__OUTPUT__',
+      )
+
+      expect(result).toBe('__OUTPUT__')
+      expect(callback).not.toHaveBeenCalled()
+    })
+
+    it('invokes callback when the returned async iterator errors while being consumed', async () => {
+      const error = new Error('__ITERATOR_ERROR__')
+      const iterator = (async function* () {
+        yield 'event'
+        throw error
+      })()
+
+      const callback = vi.fn()
+
+      const wrapped = await intercept(
+        [onAsyncIteratorObjectError(callback)],
+        { foo: 'bar' },
+        () => iterator,
+      ) as AsyncIterableIterator<string>
+
+      await expect(wrapped.next()).resolves.toEqual({ value: 'event', done: false })
+      await expect(wrapped.next()).rejects.toThrow(error)
+
+      expect(callback).toHaveBeenCalledTimes(1)
+      expect(callback).toHaveBeenCalledWith(
+        error,
+        expect.objectContaining({ foo: 'bar', next: expect.any(Function) }),
+      )
+    })
+
+    it('does not invoke callback when the async iterator completes successfully', async () => {
+      const iterator = (async function* () {
+        yield 'event'
+        return 'done'
+      })()
+
+      const callback = vi.fn()
+
+      const wrapped = await intercept(
+        [onAsyncIteratorObjectError(callback)],
+        { foo: 'bar' },
+        () => iterator,
+      ) as AsyncIterableIterator<string>
+
+      await expect(wrapped.next()).resolves.toEqual({ value: 'event', done: false })
+      await expect(wrapped.next()).resolves.toEqual({ value: 'done', done: true })
+
+      expect(callback).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('onReadableStreamError', () => {
+    it('does not invoke callback for non-stream output', async () => {
+      const callback = vi.fn()
+
+      const result = await intercept(
+        [onReadableStreamError(callback)],
+        { foo: 'bar' },
+        () => '__OUTPUT__',
+      )
+
+      expect(result).toBe('__OUTPUT__')
+      expect(callback).not.toHaveBeenCalled()
+    })
+
+    it('invokes callback when the returned readable stream errors while being consumed', async () => {
+      const error = new Error('__STREAM_ERROR__')
+      const stream = new ReadableStream({
+        pull(controller) {
+          controller.error(error)
+        },
+      })
+
+      const callback = vi.fn()
+
+      const wrapped = await intercept(
+        [onReadableStreamError(callback)],
+        { foo: 'bar' },
+        () => stream,
+      ) as ReadableStream<string>
+
+      const reader = wrapped.getReader()
+      await expect(reader.read()).rejects.toThrow(error)
+
+      expect(callback).toHaveBeenCalledTimes(1)
+      expect(callback).toHaveBeenCalledWith(
+        error,
+        expect.objectContaining({ foo: 'bar', next: expect.any(Function) }),
+      )
+    })
+
+    it('does not invoke callback when the readable stream completes successfully', async () => {
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue('event')
+          controller.close()
+        },
+      })
+
+      const callback = vi.fn()
+
+      const wrapped = await intercept(
+        [onReadableStreamError(callback)],
+        { foo: 'bar' },
+        () => stream,
+      ) as ReadableStream<string>
+
+      const reader = wrapped.getReader()
+      await expect(reader.read()).resolves.toEqual({ value: 'event', done: false })
+      await expect(reader.read()).resolves.toEqual({ value: undefined, done: true })
+
+      expect(callback).not.toHaveBeenCalled()
+    })
   })
 })

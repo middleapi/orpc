@@ -14,8 +14,8 @@ export interface WrapAsyncIteratorOptions<TYield, TReturn, TMappedYield, TMapped
    */
   runWith?: <T>(run: () => Promise<T>) => Promise<T>
   mapResult?: (result: IteratorResult<TYield, TReturn>) => Promisable<IteratorResult<TMappedYield, TMappedReturn>>
-  mapError?: (error: unknown) => Promisable<unknown>
-  onError?: (error: unknown) => Promisable<void>
+  mapError?: (error: ThrowableError) => Promisable<ThrowableError>
+  onError?: (error: ThrowableError) => Promisable<void>
 
   /**
    * Execute after the stream finishes or is cancelled.
@@ -46,8 +46,8 @@ export function wrapAsyncIterator<TYield, TReturn, TMappedYield = TYield, TMappe
       return mapResult ? await mapResult(result) : result as any
     }
     catch (error) {
-      await onError?.(error)
-      throw mapError ? await mapError(error) : error
+      await onError?.(error as ThrowableError)
+      throw mapError ? await mapError(error as ThrowableError) : error
     }
   }, async (_state) => {
     try {
@@ -58,7 +58,7 @@ export function wrapAsyncIterator<TYield, TReturn, TMappedYield = TYield, TMappe
           await runWith(async () => iterator.return?.())
         }
         catch (error) {
-          await onError?.(error)
+          await onError?.(error as ThrowableError)
           throw error
         }
       }

@@ -69,7 +69,7 @@ describe('wrapAsyncIteratorPreservingEventMeta', () => {
   it('preserves metadata when mapping errors', async () => {
     const error = withEventMeta(new Error('TEST'), { id: 'error-1' })
     const onError = vi.fn()
-    const mapError = vi.fn(async cause => ({ mapped: cause }))
+    const mapError = vi.fn(async cause => ({ mapped: cause } as any))
 
     const iterator = (async function* () {
       throw error
@@ -107,9 +107,9 @@ describe('wrapAsyncIteratorPreservingEventMeta', () => {
     const primitiveError = wrapAsyncIteratorPreservingEventMeta((async function* () {
       throw error
     })(), {
-      mapError: async () => 'mapped-error',
+      mapError: async () => 'mapped error' as any,
     })
 
-    await expect(primitiveError.next()).rejects.toBe('mapped-error')
+    await expect(primitiveError.next()).rejects.toBe('mapped error')
   })
 })
