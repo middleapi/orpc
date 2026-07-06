@@ -17,24 +17,23 @@ import type {
   ServerCapabilities,
 } from '../../types'
 import type { MCPCodecBody } from './mcp-handler-codec'
+import { ORPCError } from '@orpc/client'
 import { flattenStandardHeader } from '@standardserver/core'
 import {
   DEFAULT_LIST_PAGE_SIZE,
   DEFAULT_SERVER_NAME,
   DEFAULT_SERVER_VERSION,
   FORBIDDEN_ERROR,
-  INTERNAL_ERROR,
   INVALID_PARAMS,
   INVALID_REQUEST,
   JSONRPC_VERSION,
   LATEST_PROTOCOL_VERSION,
-  METHOD_NOT_FOUND,
   PARSE_ERROR,
   RESOURCE_NOT_FOUND,
   SUPPORTED_PROTOCOL_VERSIONS,
 } from '../../constants'
 import { encodePromptMessages, encodeResourceContents, encodeToolResult } from '../../content'
-import { JSONRPCError, orpcErrorToJSONRPCError } from '../../error'
+import { toJSONRPCError } from '../../error'
 import { isObject, isValidIncoming, withResolvedBody } from './utils'
 
 const PROCEDURE_METHODS = new Set(['tools/call', 'resources/read', 'prompts/get'])
@@ -161,27 +160,27 @@ export class MCPHandlerPlugin<T extends Context> implements StandardHandlerPlugi
       return { matched: true, response: { status: 202, headers: {}, body: undefined } }
     }
 
-    try {
-      // 6. Procedure methods → standard pipeline via the codec, then frame. The
-      //    codec re-reads the body to resolve its procedure; hand it a request
-      //    with the parse already baked in so it shares this single read.
-      if (PROCEDURE_METHODS.has(payload.method)) {
-        return await this.frameProcedure(
-          payload,
-          id,
-          () => next({ ...options, request: withResolvedBody(request, payload) }),
-        )
-      }
+    // 6. Procedure methods → standard pipeline via the codec, then frame. The
+    //    codec re-reads the body to resolve its procedure; hand it a request
+    //    with the parse already baked in so it shares this single read.
+    //    Procedure errors are resolved by the codec (as an `MCPCodecBody`), not
+    //    thrown, so this path needs no try/catch.
+    if (PROCEDURE_METHODS.has(payload.method)) {
+      return this.frameProcedure(
+        payload,
+        id,
+        () => next({ ...options, request: withResolvedBody(request, payload) }),
+      )
+    }
 
-      // 7. Protocol methods → early response.
+    // 7. Protocol methods → early response. These throw `ORPCError` on failure
+    //    (unknown method, bad cursor); map to a JSON-RPC error at this boundary.
+    try {
       const result = await this.handleProtocol(payload)
       return jsonRpc(200, id, { result })
     }
     catch (error) {
-      const jsonRpcError = error instanceof JSONRPCError
-        ? error
-        : new JSONRPCError(INTERNAL_ERROR, error instanceof Error ? error.message : 'Internal error')
-      return jsonRpc(200, id, { error: jsonRpcError.toJSON() })
+      return jsonRpc(200, id, { error: toJSONRPCError(error) })
     }
   }
 
@@ -207,7 +206,7 @@ export class MCPHandlerPlugin<T extends Context> implements StandardHandlerPlugi
       if (message.method === 'tools/call') {
         return jsonRpc(200, id, { result: { content: [{ type: 'text', text: error.message }], isError: true } })
       }
-      return jsonRpc(200, id, { error: orpcErrorToJSONRPCError(error).toJSON() })
+      return jsonRpc(200, id, { error: toJSONRPCError(error) })
     }
 
     return jsonRpc(200, id, { result: this.shapeProcedureResult(message.method, params, codecBody.output, registry) })
@@ -262,7 +261,7 @@ export class MCPHandlerPlugin<T extends Context> implements StandardHandlerPlugi
     // A valid cursor always points within the catalog (nextCursor is only emitted
     // when more items remain), so an out-of-range offset is a stale/invalid cursor.
     if (offset > 0 && offset >= items.length) {
-      throw new JSONRPCError(INVALID_PARAMS, 'Invalid cursor')
+      throw new ORPCError('INVALID_PARAMS', { message: 'Invalid cursor' })
     }
     const page = items.slice(offset, offset + this.pageSize)
     const result: Record<string, unknown> = { [key]: page }
@@ -288,7 +287,7 @@ export class MCPHandlerPlugin<T extends Context> implements StandardHandlerPlugi
       case 'prompts/list':
         return this.paginate([...(await this.registry.get()).prompts.values()].map(entry => entry.definition), 'prompts', params.cursor)
       default:
-        throw new JSONRPCError(METHOD_NOT_FOUND, `Method not found: ${message.method}`)
+        throw new ORPCError('METHOD_NOT_FOUND', { message: `Method not found: ${message.method}` })
     }
   }
 
@@ -347,17 +346,17 @@ function decodeCursor(cursor: unknown): number {
     return 0
   }
   if (typeof cursor !== 'string') {
-    throw new JSONRPCError(INVALID_PARAMS, 'Invalid cursor')
+    throw new ORPCError('INVALID_PARAMS', { message: 'Invalid cursor' })
   }
   let offset: number
   try {
     offset = Number(atob(cursor))
   }
   catch {
-    throw new JSONRPCError(INVALID_PARAMS, 'Invalid cursor')
+    throw new ORPCError('INVALID_PARAMS', { message: 'Invalid cursor' })
   }
   if (!Number.isInteger(offset) || offset < 0) {
-    throw new JSONRPCError(INVALID_PARAMS, 'Invalid cursor')
+    throw new ORPCError('INVALID_PARAMS', { message: 'Invalid cursor' })
   }
   return offset
 }
