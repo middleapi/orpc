@@ -101,7 +101,7 @@ export function onFinish<T, TOptions extends { next: () => any }, TRest extends 
 }
 
 /**
- * Creates an middleware or interceptor that invokes a callback when the returned async
+ * Creates a middleware or interceptor that invokes a callback when the returned async
  * iterator object throws an error while being consumed.
  *
  * This does not replace the `onError`. `onError` only fires on the
@@ -164,7 +164,7 @@ export function onReadableStreamError<
   ) => Promisable<void>>,
 ): (options: TOptions, ...rest: TRest) => T | Promise<Awaited<ReturnType<TOptions['next']>>> {
   // The typed error should always be combined with `ThrowableError`
-  // because an AsyncIterator can throw any error during iteration,
+  // because a ReadableStream can throw any error during iteration,
   // while TError only represents errors from the initial promise.
   // In oRPC client/server usage, initial and iteration errors are usually the same,
   // but this utility is shared, so it needs to support the general case.

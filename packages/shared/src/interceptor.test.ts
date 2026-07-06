@@ -387,7 +387,7 @@ describe('stream interceptors', () => {
     vi.clearAllMocks()
   })
 
-  describe('onAsyncIteratorError', () => {
+  describe('onAsyncIteratorObjectError', () => {
     it('does not invoke callback for non-iterator output', async () => {
       const callback = vi.fn()
 
