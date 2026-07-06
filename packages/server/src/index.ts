@@ -98,8 +98,10 @@ export {
    * @deprecated Use `asyncIteratorToUnproxiedDataStream` instead.
    */
   asyncIteratorToUnproxiedDataStream as eventIteratorToUnproxiedDataStream,
+  onAsyncIteratorObjectError,
   onError,
   onFinish,
+  onReadableStreamError,
   onStart,
   onSuccess,
   streamToAsyncIteratorObject,

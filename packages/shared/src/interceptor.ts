@@ -1,5 +1,9 @@
 import type { Promisable } from 'type-fest'
 import type { PromiseWithError, ThrowableError } from './types'
+import { isAsyncIteratorObject } from '@standardserver/shared'
+import { wrapAsyncIterator } from './iterator'
+import { override } from './proxy'
+import { wrapReadableStream } from './stream'
 
 export type InterceptableOptions = Record<string, any>
 
@@ -93,6 +97,92 @@ export function onFinish<T, TOptions extends { next: () => any }, TRest extends 
     finally {
       await callback(state, options, ...rest)
     }
+  }
+}
+
+/**
+ * Creates an middleware or interceptor that invokes a callback when the returned async
+ * iterator object throws an error while being consumed.
+ *
+ * This does not replace the `onError`. `onError` only fires on the
+ * initial call (before the interceptor returns the iterator), whereas this
+ * callback only fires while consuming the iterator. Use both together to
+ * catch all possible errors.
+ */
+export function onAsyncIteratorObjectError<
+  T,
+  TOptions extends { next: () => any },
+  TRest extends any[],
+>(
+  callback: NoInfer<(
+    error: ThrowableError | (ReturnType<TOptions['next']> extends PromiseWithError<any, infer E> ? E : ThrowableError),
+    options: TOptions,
+    ...rest: TRest
+  ) => Promisable<void>>,
+): (options: TOptions, ...rest: TRest) => T | Promise<Awaited<ReturnType<TOptions['next']>>> {
+  // The typed error should always be combined with `ThrowableError`
+  // because an AsyncIterator can throw any error during iteration,
+  // while TError only represents errors from the initial promise.
+  // In oRPC client/server usage, initial and iteration errors are usually the same,
+  // but this utility is shared, so it needs to support the general case.
+
+  return async (options, ...rest) => {
+    const output = await options.next()
+
+    if (!isAsyncIteratorObject(output)) {
+      return output
+    }
+
+    /**
+     * @warning
+     * Remember use `override` for AsyncIteratorObject to remain other special properties
+     */
+    return override(output, wrapAsyncIterator(output, {
+      onError: error => callback(error, options, ...rest),
+    }))
+  }
+}
+
+/**
+ * Creates an interceptor that invokes a callback when the returned readable
+ * stream errors while being consumed.
+ *
+ * This does not replace the `onError`. `onError` only fires on the
+ * initial call (before the interceptor returns the stream), whereas this
+ * callback only fires while consuming the stream. Use both together to catch
+ * all possible errors.
+ */
+export function onReadableStreamError<
+  T,
+  TOptions extends { next: () => any },
+  TRest extends any[],
+>(
+  callback: NoInfer<(
+    error: ThrowableError | (ReturnType<TOptions['next']> extends PromiseWithError<any, infer E> ? E : ThrowableError),
+    options: TOptions,
+    ...rest: TRest
+  ) => Promisable<void>>,
+): (options: TOptions, ...rest: TRest) => T | Promise<Awaited<ReturnType<TOptions['next']>>> {
+  // The typed error should always be combined with `ThrowableError`
+  // because an AsyncIterator can throw any error during iteration,
+  // while TError only represents errors from the initial promise.
+  // In oRPC client/server usage, initial and iteration errors are usually the same,
+  // but this utility is shared, so it needs to support the general case.
+
+  return async (options, ...rest) => {
+    const output = await options.next()
+
+    if (!(output instanceof ReadableStream)) {
+      return output
+    }
+
+    /**
+     * @warning
+     * Remember use `override` for ReadableStream to remain other special properties
+     */
+    return override(output, wrapReadableStream(output, {
+      onError: error => callback(error, options, ...rest),
+    }))
   }
 }
 

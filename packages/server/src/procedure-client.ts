@@ -80,7 +80,7 @@ export function createProcedureClient<
     const context = await value(options.context, clientContext) as TInitialContext | undefined ?? {} as TInitialContext
     const errors = createORPCErrorConstructorMap(procedure['~orpc'].errorMap)
 
-    const reconcileError = async (e: unknown) => {
+    const reconcileError = async (e: ThrowableError) => {
       if (e instanceof ORPCError) {
         return await reconcileORPCError(procedure['~orpc'].errorMap, e)
       }
@@ -142,7 +142,7 @@ export function createProcedureClient<
        * Defined errors take priority over inferable errors.
        * `reconcileError` attempts to mark the error as defined, or keeps it inferable if that's not possible.
        */
-      throw await reconcileError(e)
+      throw await reconcileError(e as ThrowableError)
     }
   }
 }
