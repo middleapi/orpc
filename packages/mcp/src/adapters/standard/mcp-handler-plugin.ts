@@ -4,7 +4,9 @@ import type {
   StandardHandlerHandleResult,
   StandardHandlerOptions,
   StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptorOptions,
 } from '@orpc/server/standard'
+import type { InterceptorOptions } from '@orpc/shared'
 import type { StandardBody, StandardLazyRequest } from '@standardserver/core'
 import type { MCPRegistry, MCPRegistryProvider } from '../../registry'
 import type {
@@ -33,7 +35,7 @@ import {
 } from '../../constants'
 import { encodePromptMessages, encodeResourceContents, encodeToolResult } from '../../content'
 import { JSONRPCError, orpcErrorToJSONRPCError } from '../../error'
-import { isObject, isValidIncoming, readMCPPayload } from './utils'
+import { isObject, isValidIncoming, withResolvedBody } from './utils'
 
 const PROCEDURE_METHODS = new Set(['tools/call', 'resources/read', 'prompts/get'])
 
@@ -113,15 +115,16 @@ export class MCPHandlerPlugin<T extends Context> implements StandardHandlerPlugi
       ...options,
       routingInterceptors: [
         ...(options.routingInterceptors ?? []),
-        ({ request, next }) => this.route(request, next),
+        interceptorOptions => this.route(interceptorOptions),
       ],
     }
   }
 
   private async route(
-    request: StandardLazyRequest,
-    next: () => Promise<StandardHandlerHandleResult>,
+    options: InterceptorOptions<StandardHandlerRoutingInterceptorOptions<T>, Promise<StandardHandlerHandleResult>>,
   ): Promise<StandardHandlerHandleResult> {
+    const { request, next } = options
+
     // 1. DNS-rebinding / Origin protection (no-op for stdio / non-browser clients).
     if (!this.checkSecurity(request)) {
       return jsonRpc(403, null, { error: { code: FORBIDDEN_ERROR, message: 'Origin not allowed' } })
@@ -132,10 +135,10 @@ export class MCPHandlerPlugin<T extends Context> implements StandardHandlerPlugi
       return { matched: true, response: { status: 405, headers: { allow: 'POST' }, body: undefined } }
     }
 
-    // 3. Parse the JSON-RPC envelope.
+    // 3. Parse the JSON-RPC envelope (single body read for the whole pipeline).
     let payload: unknown
     try {
-      payload = await readMCPPayload(request)
+      payload = await request.resolveBody('json')
     }
     catch {
       return jsonRpc(400, null, { error: { code: PARSE_ERROR, message: 'Parse error' } })
@@ -159,9 +162,15 @@ export class MCPHandlerPlugin<T extends Context> implements StandardHandlerPlugi
     }
 
     try {
-      // 6. Procedure methods → standard pipeline via the codec, then frame.
+      // 6. Procedure methods → standard pipeline via the codec, then frame. The
+      //    codec re-reads the body to resolve its procedure; hand it a request
+      //    with the parse already baked in so it shares this single read.
       if (PROCEDURE_METHODS.has(payload.method)) {
-        return await this.frameProcedure(payload, id, next)
+        return await this.frameProcedure(
+          payload,
+          id,
+          () => next({ ...options, request: withResolvedBody(request, payload) }),
+        )
       }
 
       // 7. Protocol methods → early response.

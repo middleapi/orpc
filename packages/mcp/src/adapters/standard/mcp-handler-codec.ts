@@ -4,7 +4,7 @@ import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure, Stand
 import type { Promisable } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standardserver/core'
 import type { MCPRegistryProvider } from '../../registry'
-import { isObject, isValidIncoming, readMCPPayload } from './utils'
+import { isObject, isValidIncoming } from './utils'
 
 /**
  * Internal `StandardResponse.body` produced by the codec. The
@@ -32,7 +32,10 @@ export class MCPHandlerCodec<T extends Context> implements StandardHandlerCodec<
     request: StandardLazyRequest,
     _options: StandardHandlerHandleOptions<T>,
   ): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
-    const message = await readMCPPayload(request)
+    // The plugin already parsed + validated the envelope and handed us a
+    // request with the body resolved (see `withResolvedBody`), so this is the
+    // same single read, not a second consume of the stream.
+    const message = await request.resolveBody('json')
     if (!isValidIncoming(message) || !('id' in message) || message.id === undefined) {
       return undefined
     }
