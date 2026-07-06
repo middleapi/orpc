@@ -1,7 +1,7 @@
 {
   "name": "@orpc/bun-websocket-otel-playground",
   "type": "module",
-  "version": "1.14.6",
+  "version": "1.14.7",
   "private": true,
   "scripts": {
     "dev": "bun --hot src/index.tsx",

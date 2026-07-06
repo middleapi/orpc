@@ -1,7 +1,7 @@
 {
   "name": "@orpc/svelte-kit-playground",
   "type": "module",
-  "version": "1.14.6",
+  "version": "1.14.7",
   "private": true,
   "scripts": {
     "dev": "vite dev --port 3000",
