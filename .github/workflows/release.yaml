@@ -1,5 +1,5 @@
 name: Release
-
+run-name: ${{ github.workflow }} v${{ inputs.version }}
 on:
   workflow_dispatch:
     inputs:
@@ -7,6 +7,25 @@ on:
         description: 'Bump version (e.g., 4.0.0, 4.1.0-alpha.1, 5.0.0-beta.2)'
         required: true
         type: string
+      tag:
+        description: 'npm dist-tag to publish under (leave empty to fallback to preid, or "latest" for stable)'
+        required: false
+        type: string
+      skip_git_check:
+        description: Skip git checks when publishing (--no-git-checks)
+        required: false
+        type: boolean
+        default: false
+      skip_bump:
+        description: Skip version bump (bumpp) step
+        required: false
+        type: boolean
+        default: false
+      skip_changelog:
+        description: Skip changelog generation (changelogithub) step
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -54,16 +73,13 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - run: pnpm run packages:bump ${{ github.event.inputs.version }} --yes
-
-      - run: pnpm config set '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      # TODO: remove `--no-git-checks` and `latest` -> `v1` when v2 stable
-      - run: pnpm run packages:publish --tag=${{ steps.version.outputs.preid || 'latest' }} --no-git-checks
-        env:
-          NPM_CONFIG_PROVENANCE: true
+        if: ${{ github.event.inputs.skip_bump != 'true' }}
 
       - run: pnpm run packages:changelog:github
+        if: ${{ github.event.inputs.skip_changelog != 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: pnpm run packages:publish --tag=${{ github.event.inputs.tag || steps.version.outputs.preid || 'latest' }} ${{ github.event.inputs.skip_git_check == 'true' && '--no-git-checks' || '' }}
+        env:
+          NPM_CONFIG_PROVENANCE: true
