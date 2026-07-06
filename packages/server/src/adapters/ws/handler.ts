@@ -5,7 +5,7 @@ import type { StandardHandler } from '../standard'
 import type {
   HandleStandardServerPeerMessageOptions,
 } from '../standard-peer'
-import { readAsBuffer, resolveMaybeOptionalOptions } from '@orpc/shared'
+import { logError, readAsBuffer, resolveMaybeOptionalOptions } from '@orpc/shared'
 import { ServerPeer } from '@orpc/standard-server-peer'
 import { createServerPeerHandleRequestFn } from '../standard-peer'
 
@@ -26,10 +26,19 @@ export class WsHandler<T extends Context> {
         ? await readAsBuffer(new Blob(event.data))
         : event.data
 
-      await peer.message(
-        message,
-        createServerPeerHandleRequestFn(this.standardHandler, resolveMaybeOptionalOptions(rest)),
-      )
+      try {
+        await peer.message(
+          message,
+          createServerPeerHandleRequestFn(this.standardHandler, resolveMaybeOptionalOptions(rest)),
+        )
+      }
+      catch (error) {
+        /**
+         * Users cannot catch errors thrown by this `peer.message`, and node.js may
+         * crash on unhandled rejections, so we log the error here to prevent that.
+         */
+        logError(error)
+      }
     })
 
     ws.addEventListener('close', () => {

@@ -1,6 +1,9 @@
+import * as Shared from '@orpc/shared'
 import { encodeRequestMessage, MessageType } from '@orpc/standard-server-peer'
 import { os } from '../../builder'
 import { RPCHandler } from './rpc-handler'
+
+const logErrorSpy = vi.spyOn(Shared, 'logError').mockImplementation(() => {})
 
 describe('rpcHandler', async () => {
   let signal: AbortSignal
@@ -69,5 +72,15 @@ describe('rpcHandler', async () => {
     onClose()
     await vi.waitFor(() => expect(signal.aborted).toBe(true))
     expect(wss.send).not.toHaveBeenCalled()
+  })
+
+  it('logs error on message handler error instead of throwing', async () => {
+    onMessage({
+      data: 'invalid message that will cause an error',
+    })
+
+    await vi.waitFor(() => {
+      expect(logErrorSpy).toHaveBeenCalledWith(expect.any(Error))
+    })
   })
 })
