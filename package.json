@@ -3,7 +3,7 @@
   "type": "module",
   "version": "1.14.7",
   "private": true,
-  "packageManager": "pnpm@10.28.1",
+  "packageManager": "pnpm@11.10.0",
   "scripts": {
     "prepare": "simple-git-hooks",
     "build": "pnpm run -r build",
@@ -21,10 +21,7 @@
     "knip": "knip --production",
     "knip:fix": "pnpm run knip --fix --allow-remove-files",
     "sponsors:sync": "node scripts/sync-sponsor.ts && eslint --max-warnings=0 --fix **/README.md apps/content/.vitepress/theme/sponsors.ts",
-    "packages:bump": "bumpp -r",
-    "packages:publish": "pnpm run build:packages && pnpm --filter='./packages/*' publish -r --access=public",
-    "packages:publish:commit": "pnpm run build:packages && pkg-pr-new publish './packages/*' --pnpm --compact --template './playgrounds/*'",
-    "packages:changelog:github": "changelogithub --draft"
+    "packages:publish:commit": "pnpm run build:packages && pkg-pr-new publish './packages/*' --pnpm --compact --template './playgrounds/*'"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^7.4.3",

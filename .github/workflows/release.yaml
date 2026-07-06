@@ -58,13 +58,11 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
-
-      - run: pnpm env use --global 22
+      - uses: pnpm/action-setup@v6
 
       - run: pnpm i
 
@@ -72,14 +70,14 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - run: pnpm run packages:bump ${{ github.event.inputs.version }} --yes
+      - run: pnpm exec bumpp -r ${{ github.event.inputs.version }} --yes
         if: ${{ github.event.inputs.skip_bump != 'true' }}
 
-      - run: pnpm run packages:changelog:github
+      - run: pnpm exec changelogithub --draft
         if: ${{ github.event.inputs.skip_changelog != 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - run: pnpm run packages:publish --tag=${{ github.event.inputs.tag || steps.version.outputs.preid || 'latest' }} ${{ github.event.inputs.skip_git_check == 'true' && '--no-git-checks' || '' }}
-        env:
-          NPM_CONFIG_PROVENANCE: true
+      - run: pnpm --filter='./packages/*' run -r build
+
+      - run: pnpm --filter='./packages/*' publish -r --provenance --access=public --tag=${{ github.event.inputs.tag || steps.version.outputs.preid || 'latest' }} ${{ github.event.inputs.skip_git_check == 'true' && '--no-git-checks' || '' }}

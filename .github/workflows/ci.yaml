@@ -10,11 +10,9 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
-
-      - run: pnpm env use --global 22
+      - uses: pnpm/action-setup@v6
 
       - run: pnpm i
 
@@ -39,13 +37,13 @@ jobs:
         ports:
           - 6379:6379
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
-
-      - run: pnpm env use --global 22
+      - uses: pnpm/action-setup@v6
 
       - run: pnpm i
+
+      - run: pnpm runtime set node 22
 
       - run: pnpm run test:coverage
         env:
@@ -60,11 +58,9 @@ jobs:
   publish-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
-
-      - run: pnpm env use --global 22
+      - uses: pnpm/action-setup@v6
 
       - run: pnpm i
 
