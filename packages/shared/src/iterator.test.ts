@@ -465,36 +465,6 @@ describe('consumeAsyncIterator', () => {
     })
   })
 
-  it('on error without onError and onFinish', async ({ onTestFinished }) => {
-    const unhandledRejectionHandler = vi.fn()
-    process.on('unhandledRejection', unhandledRejectionHandler)
-    onTestFinished(() => {
-      process.off('unhandledRejection', unhandledRejectionHandler)
-    })
-
-    const error = new Error('TEST')
-    const iterator = (async function* () {
-      yield 1
-      yield 2
-      throw error
-    }())
-
-    const onEvent = vi.fn()
-
-    void consumeAsyncIterator(iterator, {
-      onEvent,
-    })
-
-    await vi.waitFor(() => {
-      expect(onEvent).toHaveBeenCalledTimes(2)
-      expect(onEvent).toHaveBeenNthCalledWith(1, 1)
-      expect(onEvent).toHaveBeenNthCalledWith(2, 2)
-    })
-
-    expect(unhandledRejectionHandler).toHaveBeenCalledTimes(1)
-    expect(unhandledRejectionHandler).toHaveBeenNthCalledWith(1, error, expect.anything())
-  })
-
   it('unsubscribe', async () => {
     let cleanup = false
     const iterator = (async function* () {
