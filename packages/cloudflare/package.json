@@ -45,9 +45,9 @@
     "@standardserver/core": "^0.0.32"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.16.20",
-    "@vitest/coverage-istanbul": "^4.1.9",
-    "vitest": "^4.1.9",
-    "wrangler": "^4.106.0"
+    "@cloudflare/vitest-pool-workers": "^0.18.0",
+    "@vitest/coverage-istanbul": "^4.1.10",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.107.0"
   }
 }
