@@ -109,10 +109,10 @@
     "@orpc/contract": "workspace:*",
     "@orpc/interop": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standardserver/core": "^0.0.32",
-    "@standardserver/fetch": "^0.0.32",
-    "@standardserver/node": "^0.0.32",
-    "@standardserver/peer": "^0.0.32",
+    "@standardserver/core": "^0.2.0",
+    "@standardserver/fetch": "^0.2.0",
+    "@standardserver/node": "^0.2.0",
+    "@standardserver/peer": "^0.2.0",
     "cookie": "^2.0.1"
   },
   "devDependencies": {

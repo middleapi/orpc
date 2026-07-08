@@ -1,4 +1,5 @@
 import {
+  isCompressibleContentType,
   matchesHttpPath,
   matchesHttpPathPrefix,
   mergeHttpPath,
@@ -127,5 +128,53 @@ describe('matchesHttpPath', () => {
     ['/other/api', '/api', false, 'rejects non-prefix paths'],
   ] as const)('returns %s for url=%s path=%s (%s)', (url, path, expected, _description) => {
     expect(matchesHttpPath(url, path)).toBe(expected)
+  })
+})
+
+describe('isCompressibleContentType', () => {
+  it('returns false for null/undefined/empty/whitespace', () => {
+    expect(isCompressibleContentType(null)).toBe(false)
+    expect(isCompressibleContentType(undefined)).toBe(false)
+    expect(isCompressibleContentType('')).toBe(false)
+    expect(isCompressibleContentType('   ')).toBe(false)
+  })
+
+  it.each([
+    'text/plain',
+    'text/html; charset=utf-8',
+    'application/json',
+    'application/javascript',
+    'application/xml-dtd',
+    'application/x-www-form-urlencoded',
+    'font/otf',
+    'image/bmp',
+    'image/x-icon',
+    'message/rfc822',
+    'model/gltf-binary',
+    'x-shader/x-fragment',
+    'application/vnd.api+json', // generic +suffix rule
+    'image/svg+xml',
+    '  text/plain', // leading whitespace
+    'APPLICATION/JSON', // case-insensitive
+  ])('returns true for %s', (contentType) => {
+    expect(isCompressibleContentType(contentType)).toBe(true)
+  })
+
+  it.each([
+    'text/event-stream', // explicitly excluded
+    'font/woff', // not in allow-list
+    'image/png',
+    'application/octet-stream',
+    'application/pdf',
+    'application/zip',
+    'application/vnd.api+zip', // +suffix not json/text/xml/yaml
+    'application/jsonline', // prefix match should not count
+    'video/mp4',
+  ])('returns false for %s', (contentType) => {
+    expect(isCompressibleContentType(contentType)).toBe(false)
+  })
+
+  it('treats "event-stream" exclusion as exact subtype only', () => {
+    expect(isCompressibleContentType('text/event-streaming')).toBe(true)
   })
 })

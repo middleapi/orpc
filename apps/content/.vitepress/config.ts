@@ -156,6 +156,7 @@ export default withMermaid(defineConfig({
             { text: 'CSRF Guard', link: '/docs/plugins/csrf-guard' },
             { text: 'Dedupe', link: '/docs/plugins/dedupe' },
             { text: 'OpenAPI Reference', link: '/docs/plugins/openapi-reference' },
+            { text: 'Request Compression', link: '/docs/plugins/request-compression' },
             { text: 'Request Headers', link: '/docs/plugins/request-headers' },
             { text: 'Request Validation', link: '/docs/plugins/request-validation' },
             { text: 'Response Headers', link: '/docs/plugins/response-headers' },

@@ -90,8 +90,8 @@
     "@orpc/json-schema": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standardserver/core": "^0.0.32",
-    "@standardserver/fetch": "^0.0.32",
+    "@standardserver/core": "^0.2.0",
+    "@standardserver/fetch": "^0.2.0",
     "rou3": "^0.8.1"
   },
   "devDependencies": {

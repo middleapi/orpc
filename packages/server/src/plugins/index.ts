@@ -1,6 +1,7 @@
 export * from './batch'
 export * from './cors'
 export * from './csrf-guard'
+export * from './request-compression'
 export * from './request-headers'
 export * from './response-headers'
 export * from './rethrow'
