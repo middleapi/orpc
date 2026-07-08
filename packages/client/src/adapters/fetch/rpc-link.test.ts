@@ -2,6 +2,15 @@ import { toFetchBody } from '@standardserver/fetch'
 import { createORPCClient } from '../../client'
 import { RPCLink } from './rpc-link'
 
+vi.mock('@orpc/shared', async (loadOrigin) => {
+  const origin = await loadOrigin() as any
+
+  return {
+    ...origin,
+    once: (fn: any) => fn,
+  }
+})
+
 vi.mock('@standardserver/fetch', async (loadOrigin) => {
   const origin = await loadOrigin() as any
 
@@ -11,11 +20,11 @@ vi.mock('@standardserver/fetch', async (loadOrigin) => {
   }
 })
 
-describe('rpcLink', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
+describe('rpcLink', () => {
   it('calls endpoint with fetch transport', async () => {
     const fetch = vi.fn(async () => {
       return new Response(JSON.stringify({ json: 'pong' }), {
@@ -185,5 +194,75 @@ describe('rpcLink', () => {
       }),
       ['ping'],
     )
+  })
+
+  it('sets duplex mode for ReadableStream body when supported', async () => {
+    const fetch = vi.fn(async () => {
+      return new Response(JSON.stringify({ json: 'pong' }), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+        },
+      })
+    })
+
+    const orpc = createORPCClient(new RPCLink({
+      fetch,
+      origin: 'http://api.example.com',
+      toFetchRequest: { eventStream: { keepAlive: { enabled: true, comment: 'ok' } } },
+    })) as any
+
+    await expect(orpc.ping(new ReadableStream())).resolves.toEqual('pong')
+
+    expect(fetch).toHaveBeenCalledOnce()
+    expect(fetch).toHaveBeenCalledWith(
+      'http://api.example.com/ping',
+      expect.objectContaining({
+        method: 'POST',
+        redirect: 'manual',
+        duplex: 'half',
+      }),
+      expect.objectContaining({
+        context: {},
+      }),
+      ['ping'],
+    )
+  })
+
+  it('does not set duplex mode for ReadableStream body when not supported', async ({ onTestFinished }) => {
+    const OriginalRequest = globalThis.Request
+    ;(globalThis as any).Request = class ThrowsDuplex extends OriginalRequest {
+      constructor(input: any, init?: any) {
+        if (init?.duplex !== undefined) {
+          throw new Error('duplex not supported')
+        }
+        super(input, init)
+      }
+    }
+
+    onTestFinished(() => {
+      (globalThis as any).Request = OriginalRequest
+    })
+
+    const fetch = vi.fn(async () => {
+      return new Response(JSON.stringify({ json: 'pong' }), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+        },
+      })
+    })
+
+    const orpc = createORPCClient(new RPCLink({
+      fetch,
+      origin: 'http://api.example.com',
+      toFetchRequest: { eventStream: { keepAlive: { enabled: true, comment: 'ok' } } },
+    })) as any
+
+    await expect(orpc.ping(new ReadableStream())).resolves.toEqual('pong')
+
+    expect(fetch).toHaveBeenCalledOnce()
+    const init = (fetch as any).mock.calls[0][1]
+    expect(init).not.toHaveProperty('duplex')
   })
 })
