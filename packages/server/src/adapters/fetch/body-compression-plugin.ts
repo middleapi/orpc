@@ -109,7 +109,7 @@ export class BodyCompressionHandlerPlugin<T extends Context> implements FetchHan
            * `CompressionStream` cannot flush between chunks, so early messages of a
            * streaming batch response would sit in the compressor buffer until the
            * stream ends, defeating streaming semantics. Batch responses therefore
-           * use a flush-per-chunk zlib stream instead (the filter guarantees it is
+           * use a flush-per-message zlib stream instead (the filter guarantees it is
            * available whenever a batch response passes through).
            */
           const compression = isFlushCompressibleBatchResponse(interceptorOptions.request, response)
@@ -177,27 +177,37 @@ interface NodeCompressionCompat {
   stream: typeof import('node:stream')
 }
 
-function getNodeCompressionCompat(): NodeCompressionCompat | undefined {
-  try {
-    /**
-     * Deliberately accessed via `globalThis` (not imported) so this cross-runtime
-     * file never hard-depends on node builtins — runtimes without them fall back
-     * to the uncompressed behavior.
-     */
-    // eslint-disable-next-line node/prefer-global/process
-    const zlib = globalThis.process?.getBuiltinModule?.('node:zlib')
-    // eslint-disable-next-line node/prefer-global/process
-    const stream = globalThis.process?.getBuiltinModule?.('node:stream')
+/**
+ * `false` = probed and unavailable. Runtime builtins cannot appear later,
+ * so the probe runs at most once per process.
+ */
+let cachedNodeCompressionCompat: NodeCompressionCompat | false | undefined
 
-    if (zlib !== undefined && typeof stream?.Duplex?.toWeb === 'function') {
-      return { zlib, stream }
+function getNodeCompressionCompat(): NodeCompressionCompat | undefined {
+  if (cachedNodeCompressionCompat === undefined) {
+    cachedNodeCompressionCompat = false
+
+    try {
+      /**
+       * Deliberately accessed via `globalThis` (not imported) so this cross-runtime
+       * file never hard-depends on node builtins — runtimes without them fall back
+       * to the uncompressed behavior.
+       */
+      // eslint-disable-next-line node/prefer-global/process
+      const zlib = globalThis.process?.getBuiltinModule?.('node:zlib')
+      // eslint-disable-next-line node/prefer-global/process
+      const stream = globalThis.process?.getBuiltinModule?.('node:stream')
+
+      if (zlib !== undefined && typeof stream?.Duplex?.toWeb === 'function') {
+        cachedNodeCompressionCompat = { zlib, stream }
+      }
+    }
+    catch {
+      // runtimes without node builtins keep the `false` sentinel
     }
   }
-  catch {
-    // runtimes without node builtins fall through to undefined
-  }
 
-  return undefined
+  return cachedNodeCompressionCompat === false ? undefined : cachedNodeCompressionCompat
 }
 
 function createFlushableCompressionStream(

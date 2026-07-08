@@ -281,7 +281,10 @@ describe('bodyCompressionHandlerPlugin', () => {
        */
       let received = ''
       while (!received.includes(largeValue)) {
-        const { value } = await reader.read()
+        const { done, value } = await reader.read()
+        if (done) {
+          expect.unreachable('stream ended before the fast message was delivered')
+        }
         received += decoder.decode(value, { stream: true })
       }
 
@@ -357,7 +360,41 @@ describe('bodyCompressionHandlerPlugin', () => {
       expect(text).toContain(largeValue)
     })
 
-    it('supports cancelling a compressed streaming batch response', async () => {
+    it('propagates cancellation through the compressed stream to the source', async () => {
+      let sourceCancelled = false
+      const source = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(largeValue))
+        },
+        cancel() {
+          sourceCancelled = true
+        },
+      })
+
+      const handler = createHandler(new Response(source, {
+        headers: {
+          'content-type': 'application/octet-stream',
+        },
+      }))
+
+      const { response } = await handler.handle(new Request('https://example.com/__batch__', {
+        headers: {
+          'accept-encoding': 'gzip',
+          'orpc-batch': 'streaming',
+        },
+      }))
+
+      expect(response!.headers.get('content-encoding')).toBe('gzip')
+
+      const reader = response!.body!.getReader()
+      const { value } = await reader.read()
+      expect(value!.byteLength).toBeGreaterThan(0)
+
+      await reader.cancel()
+      await vi.waitFor(() => expect(sourceCancelled).toBe(true))
+    })
+
+    it('supports cancelling a compressed streaming batch response mid-batch', async () => {
       const handler = createBatchHandler({
         fast: os.handler(() => largeValue),
         never: os.handler(() => new Promise(() => {})),
