@@ -177,4 +177,8 @@ describe('isCompressibleContentType', () => {
   it('treats "event-stream" exclusion as exact subtype only', () => {
     expect(isCompressibleContentType('text/event-streaming')).toBe(true)
   })
+
+  it('returns false for excessively long content-type values without running the regex', () => {
+    expect(isCompressibleContentType(`text/plain; ${'a'.repeat(1024)}`)).toBe(false)
+  })
 })
