@@ -40,7 +40,7 @@ export const createCompressionNodeHttpClientServerTest: CreateClientServerTest =
     origin: `http://localhost:${addressInfo.port}`,
     serializer,
     fetch(url, init) {
-      return fetch(url, { ...init, duplex: 'half' } as any)
+      return fetch(url, init)
     },
     plugins: [
       new RequestCompressionLinkPlugin({
