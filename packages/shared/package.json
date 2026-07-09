@@ -45,7 +45,7 @@
   "dependencies": {
     "@standardserver/shared": "^0.2.0",
     "radash": "^12.1.1",
-    "type-fest": "^5.3.1"
+    "type-fest": "^5.8.0"
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.1",

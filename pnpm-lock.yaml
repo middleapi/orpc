@@ -730,8 +730,8 @@ importers:
         specifier: ^12.1.1
         version: 12.1.1
       type-fest:
-        specifier: ^5.3.1
-        version: 5.7.0
+        specifier: ^5.8.0
+        version: 5.8.0
     devDependencies:
       '@opentelemetry/api':
         specifier: ^1.9.1
@@ -9753,8 +9753,8 @@ packages:
     resolution: {integrity: sha512-TeTSQ6H5YHvpqVwBRcnLDCBnDOHWYu7IvGbHT6N8AOymcr9PJGjc1GTtiWZTYg0NCgYwvnYWEkVChQAr9bjfwA==}
     engines: {node: '>=16'}
 
-  type-fest@5.7.0:
-    resolution: {integrity: sha512-1URUxUqfHFM1c+zfSPsa3gnkO7Aq21qyH75SIduNYz4SzY964rn1X2vCMQaHSHhktiw+0kPa2iyb6PUpXqB6Vg==}
+  type-fest@5.8.0:
+    resolution: {integrity: sha512-YGYEVz3Fm5iy/AybuA0oyNFq7H4CgQNfRp/qfe8nurE1kuCeNm3/vfm9X4Mtl+qLyaKJUh5xrFZwogr41SMjYA==}
     engines: {node: '>=20'}
 
   type-is@1.6.18:
@@ -13422,7 +13422,7 @@ snapshots:
     dependencies:
       '@scalar/helpers': 0.9.0
       nanoid: 5.1.16
-      type-fest: 5.7.0
+      type-fest: 5.8.0
       zod: 4.4.3
 
   '@scalar/use-codemirror@0.14.12(typescript@6.0.3)':
@@ -13477,7 +13477,7 @@ snapshots:
       '@scalar/types': 0.16.0
       '@scalar/validation': 0.6.0
       js-base64: 3.8.0
-      type-fest: 5.7.0
+      type-fest: 5.8.0
       vue: 3.5.39(typescript@6.0.3)
       yaml: 2.9.0
     transitivePeerDependencies:
@@ -20115,7 +20115,7 @@ snapshots:
 
   type-fest@4.41.0: {}
 
-  type-fest@5.7.0:
+  type-fest@5.8.0:
     dependencies:
       tagged-tag: 1.0.0
 
