@@ -24,7 +24,7 @@ export interface OpenAPISerializerSerializeOptions {
   asFormData?: boolean | undefined
 }
 
-export interface OpenAPISerializerOptions extends OpenAPIJsonSerializerOptions, OpenAPISerializerSerializeOptions {
+export interface OpenAPISerializerOptions extends OpenAPIJsonSerializerOptions {
   /**
    * Options for bracket notation serializer, like maxExplicitDeserializingArrayIndex
    */
