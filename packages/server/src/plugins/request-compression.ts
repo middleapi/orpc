@@ -24,6 +24,7 @@ export class RequestCompressionHandlerPlugin<T extends Context> implements Stand
 
       const decompressedHeaders = {
         ...interceptorOptions.request.headers,
+        'content-length': undefined,
         'content-encoding': undefined,
       }
 

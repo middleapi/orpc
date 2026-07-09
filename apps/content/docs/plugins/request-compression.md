@@ -49,4 +49,4 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-<!--@include: @/shared/common-plugin-link-compatibility.md -->
+<!--@include: @/shared/common-plugin-handler-compatibility.md -->
