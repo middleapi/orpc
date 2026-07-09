@@ -66,13 +66,34 @@ describe('zodToJsonSchemaConverter', () => {
   })
 
   it('supports $ref & $defs at root level', () => {
-    const schema = z.string().meta({ id: 'root' })
+    const schema = z.object({
+      a: z.string().meta({ id: 'a' }),
+      b: z.number().meta({ id: 'b' }),
+    }).meta({ id: 'root' })
 
     expect(converter.convert(schema, 'input')).toEqual([{
       $ref: '#/$defs/root',
       $defs: {
-        root: {
+        a: {
           type: 'string',
+        },
+        b: {
+          type: 'number',
+        },
+        root: {
+          type: 'object',
+          properties: {
+            a: {
+              $ref: '#/$defs/a',
+            },
+            b: {
+              $ref: '#/$defs/b',
+            },
+          },
+          required: [
+            'a',
+            'b',
+          ],
         },
       },
     }, false],

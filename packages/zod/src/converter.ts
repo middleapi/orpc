@@ -1,8 +1,7 @@
 import type { AnySchema, JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
-import type { ZodType } from 'zod/v4'
 import type { $ZodType, ToJSONSchemaParams, JSONSchema as ZodJsonSchema } from 'zod/v4/core'
 import { JsonSchemaFormat, JsonSchemaXNativeType } from '@orpc/json-schema'
-import { toJSONSchema } from 'zod/v4/core'
+import { globalRegistry, toJSONSchema } from 'zod/v4/core'
 
 export interface ZodToJsonSchemaConverterOptions extends Omit<ToJSONSchemaParams, 'target' | 'io'> {}
 
@@ -79,12 +78,15 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
 
     try {
       // workaround until https://github.com/colinhacks/zod/issues/6026 is merged
-      const { id } = (schema as ZodType).meta() || {}
-      if (id) {
+      const registry = this.options.metadata ?? globalRegistry
+      const { id } = registry.get(schema) || {}
+      const { $defs = {}, ...restWithoutDefs } = rest
+      if (id && !(id in $defs)) {
         return {
           $ref: `#/$defs/${id}`,
           $defs: {
-            [id]: rest,
+            ...$defs,
+            [id]: restWithoutDefs,
           },
         }
       }
