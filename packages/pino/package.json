@@ -42,7 +42,7 @@
     "@orpc/client": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standardserver/core": "^0.0.32"
+    "@standardserver/core": "^0.2.0"
   },
   "devDependencies": {
     "pino": "^10.3.1"

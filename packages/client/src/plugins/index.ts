@@ -1,4 +1,5 @@
 export * from './batch'
 export * from './dedupe'
+export * from './request-compression'
 export * from './retry'
 export * from './retry-after'

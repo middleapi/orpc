@@ -52,8 +52,8 @@
     "@orpc/openapi": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standardserver/core": "^0.0.32",
-    "@standardserver/node": "^0.0.32"
+    "@standardserver/core": "^0.2.0",
+    "@standardserver/node": "^0.2.0"
   },
   "devDependencies": {
     "@fastify/cookie": "^11.0.2",

@@ -209,5 +209,5 @@ const handler = new OpenAPIHandler(router, {
 ```
 
 ::: info
-You can also configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed from client to server using `toFetchRequest.eventStream` options when creating the link. However, this is rarely used because streaming requests are not widely supported in browsers and may require manually overriding the `fetch` function with `duplex`.
+You can also configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed from client to server using `toFetchRequest.eventStream` options when creating the link.
 :::

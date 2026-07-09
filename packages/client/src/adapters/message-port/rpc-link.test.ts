@@ -64,6 +64,7 @@ describe('rpcLink', () => {
     expect(decoded.message.json).toEqual({
       url: '/ping',
       body: { json: 'input' },
+      bodyHint: 'json',
       headers: {},
       method: 'POST',
     })
