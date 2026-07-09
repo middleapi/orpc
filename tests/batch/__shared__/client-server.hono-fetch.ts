@@ -38,7 +38,7 @@ export const createHonoFetchBatchClientServerTest: CreateBatchClientServerTest =
   })
 
   const addressInfo = server.address() as AddressInfo
-  const fetchSpy = vi.fn((url: string, init: RequestInit) => fetch(url, { ...init, duplex: 'half' } as RequestInit))
+  const fetchSpy = vi.fn((url: string, init: RequestInit) => fetch(url, init))
 
   const link = new RPCLink({
     url: '/rpc',
