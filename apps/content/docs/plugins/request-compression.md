@@ -50,3 +50,11 @@ const handler = new RPCHandler(router, {
 ```
 
 <!--@include: @/shared/common-plugin-handler-compatibility.md -->
+
+::: tip
+Combine with the [Request Limit Plugin](/docs/plugins/request-limit) to limit the decompressed payload size.
+:::
+
+## Learn More
+
+For implementation details, see the [RequestCompressionLinkPlugin source code](https://github.com/middleapi/orpc/blob/main/packages/client/src/plugins/request-compression.ts) or the [RequestCompressionHandlerPlugin source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/request-compression.ts).

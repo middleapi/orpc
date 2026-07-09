@@ -7,5 +7,6 @@ it('exports plugins', async () => {
     CSRFGuardHandlerPlugin: expect.any(Function),
     RethrowHandlerPlugin: expect.any(Function),
     RequestCompressionHandlerPlugin: expect.any(Function),
+    RequestLimitHandlerPlugin: expect.any(Function),
   })
 })
