@@ -219,15 +219,6 @@ export function consumeAsyncIterator<T, TReturn, TError = ThrowableError>(
     }
     catch (error) {
       onFinishState = [error as ThrowableError, undefined, false]
-
-      /**
-       * If no `onError` or `onFinish` is provided, unhandled rejections will be thrown
-       * This is best practice for error handling - error should not be silently ignored
-       */
-      if (!options.onError && !options.onFinish) {
-        throw error
-      }
-
       options.onError?.(error as ThrowableError)
     }
     finally {

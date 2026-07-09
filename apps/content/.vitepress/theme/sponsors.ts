@@ -889,7 +889,7 @@ export const sponsors: JSONSponsor[] = [
     sidebarLogo: 'https://avatars.githubusercontent.com/u/11587657?u=ab503582165c0bbff0cca47ce31c9450bb1553c9&v=4',
   },
   {
-    name: 'Natt',
+    name: 'NΛTT',
     login: 'nattstack',
     avatar: 'https://avatars.githubusercontent.com/u/31426677?u=fa9dbb8b3e66eb0ea3c88db5dc07f31c8c5418fe&v=4',
     amount: -1,
