@@ -55,8 +55,7 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
         const contentLength = Number(flattenStandardHeader(request.headers['content-length']))
 
         if (
-          !Number.isNaN(contentLength)
-          && contentLength >= this.threshold
+          (Number.isNaN(contentLength) || contentLength >= this.threshold)
           && isCompressibleContentType(flattenStandardHeader(request.headers['content-type']))
         ) {
           const compressedStream = request.body.pipeThrough(new CompressionStream(this.encoding))
@@ -79,8 +78,7 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
 
       else if (request.body instanceof Blob) {
         if (
-          !Number.isNaN(request.body.size) // Bun-s3 can use NaN for size
-          && request.body.size >= this.threshold
+          (Number.isNaN(request.body.size) || request.body.size >= this.threshold)
           && isCompressibleContentType(request.body.type)
         ) {
           const compressedStream = request.body.stream().pipeThrough(new CompressionStream(this.encoding))
@@ -116,8 +114,12 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
           if (value instanceof Blob) {
             if (Number.isNaN(value.size)) { // Bun-s3 can use NaN for size
               if (!isCompressibleContentType(value.type)) {
+                // Unknown non-compressible part size makes the estimate unreliable
                 break
               }
+
+              // Unknown size for compressible content - still apply compression
+              contentLength = this.threshold
             }
             else {
               contentLength += isCompressibleContentType(value.type)

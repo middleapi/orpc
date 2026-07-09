@@ -207,6 +207,42 @@ describe('requestCompressionLinkPlugin', () => {
       expect(init.headers?.get('content-disposition')).toContain('my-file.txt')
       expect(init.headers?.get('content-encoding')).toBe('gzip')
     })
+
+    it('should compress blob body when size is unknown', async () => {
+      class NaNSizeBlob extends Blob {
+        override get size() {
+          return Number.NaN
+        }
+      }
+
+      const { link, fetch } = createLink({ pluginOptions: { threshold: 1000 } })
+      const blob = new NaNSizeBlob(['small'], { type: 'text/plain' })
+
+      await expect(link.call(['test'], blob, { context: {} })).resolves.toEqual('OK')
+
+      expect(fetch).toHaveBeenCalledTimes(1)
+      const [, init] = fetch.mock.calls[0]!
+      expect(init.body).toBeInstanceOf(ReadableStream)
+      expect(init.headers?.get('content-encoding')).toBe('gzip')
+    })
+
+    it('should not compress blob body when size is unknown and content-type is non-compressible', async () => {
+      class NaNSizeBlob extends Blob {
+        override get size() {
+          return Number.NaN
+        }
+      }
+
+      const { link, fetch } = createLink({ pluginOptions: { threshold: 1000 } })
+      const blob = new NaNSizeBlob(['small'], { type: 'image/png' })
+
+      await expect(link.call(['test'], blob, { context: {} })).resolves.toEqual('OK')
+
+      expect(fetch).toHaveBeenCalledTimes(1)
+      const [, init] = fetch.mock.calls[0]!
+      // toFetchBody converts NaN-size blobs to streams; plugin must not add content-encoding
+      expect(init.headers?.get('content-encoding')).toBeNull()
+    })
   })
 
   describe('readable stream body', () => {
@@ -313,7 +349,7 @@ describe('requestCompressionLinkPlugin', () => {
       expect(init.headers?.get('content-encoding')).toBeNull()
     })
 
-    it('should not compress ReadableStream body when content-length is unknown', async () => {
+    it('should compress ReadableStream body when content-length is unknown with compressible content-type', async () => {
       const transportInterceptor = vi.fn<StandardLinkTransportInterceptor<any>>(async ({ next, ...interceptorOptions }) => {
         const request = interceptorOptions.request
 
@@ -341,7 +377,14 @@ describe('requestCompressionLinkPlugin', () => {
       expect(fetch).toHaveBeenCalledTimes(1)
       const [, init] = fetch.mock.calls[0]!
       expect(init.body).toBeInstanceOf(ReadableStream)
-      expect(init.headers?.get('content-encoding')).toBeNull()
+      expect(init.headers?.get('standard-server')).toBe('octet-stream')
+      expect(init.headers?.get('content-type')).toBe('text/plain')
+      expect(init.headers?.get('content-length')).toBeNull()
+      expect(init.headers?.get('content-encoding')).toBe('gzip')
+
+      await expect(
+        decompressStream(init.body as ReadableStream, 'gzip'),
+      ).resolves.toEqual('large content'.repeat(100))
     })
   })
 
@@ -443,7 +486,7 @@ describe('requestCompressionLinkPlugin', () => {
       expect(init.headers?.get('content-encoding')).toBe('gzip')
     })
 
-    it('should not compress FormData when only NaN-size compressible blob is present', async () => {
+    it('should compress FormData when only NaN-size compressible blob is present', async () => {
       class NaNSizeBlob extends Blob {
         override get size() {
           return Number.NaN
@@ -457,8 +500,8 @@ describe('requestCompressionLinkPlugin', () => {
 
       expect(fetch).toHaveBeenCalledTimes(1)
       const [, init] = fetch.mock.calls[0]!
-      expect(init.body).toBeInstanceOf(FormData)
-      expect(init.headers?.get('content-encoding')).toBeNull()
+      expect(init.body).toBeInstanceOf(ReadableStream)
+      expect(init.headers?.get('content-encoding')).toBe('gzip')
     })
 
     it('should not compress FormData when a NaN-size non-compressible blob is present', async () => {
