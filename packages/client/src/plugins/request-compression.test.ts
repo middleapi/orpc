@@ -385,7 +385,7 @@ describe('requestCompressionLinkPlugin', () => {
       expect(init.headers?.get('content-encoding')).toBeNull()
     })
 
-    it('should not compress FormData body containing non-compressible blob', async () => {
+    it('should not compress FormData body when non-compressible blob keeps score below threshold', async () => {
       const { link, fetch } = createLink({ pluginOptions: { threshold: 500 } })
       const blob = new Blob(['large content'.repeat(100)], { type: 'image/png' })
 
@@ -397,15 +397,79 @@ describe('requestCompressionLinkPlugin', () => {
       expect(init.headers?.get('content-encoding')).toBeNull()
     })
 
-    it('should handle FormData blob field with NaN size', async () => {
+    it('should compress FormData when compressible data outweighs non-compressible blob', async () => {
+      const { link, fetch } = createLink({ pluginOptions: { threshold: 100 } })
+      const text = new Blob(['a'.repeat(500)], { type: 'text/plain' }) // compressiable
+      const image = new Blob(['x'.repeat(50)], { type: 'image/png' }) // non-compressible
+
+      await expect(link.call(['test'], { text, image }, { context: {} })).resolves.toEqual('OK')
+
+      expect(fetch).toHaveBeenCalledTimes(1)
+      const [, init] = fetch.mock.calls[0]!
+      expect(init.body).toBeInstanceOf(ReadableStream)
+      expect(init.headers?.get('content-type')).toMatch(/^multipart\/form-data/)
+      expect(init.headers?.get('content-encoding')).toBe('gzip')
+    })
+
+    it('should not compress FormData when non-compressible blob outweighs compressible data', async () => {
+      const { link, fetch } = createLink({ pluginOptions: { threshold: 500 } })
+      const text = new Blob(['hi'], { type: 'text/plain' }) // compressible
+      const image = new Blob(['x'.repeat(2000)], { type: 'image/png' }) // non-compressible
+
+      await expect(link.call(['test'], { text, image }, { context: {} })).resolves.toEqual('OK')
+
+      expect(fetch).toHaveBeenCalledTimes(1)
+      const [, init] = fetch.mock.calls[0]!
+      expect(init.body).toBeInstanceOf(FormData)
+      expect(init.headers?.get('content-encoding')).toBeNull()
+    })
+
+    it('should ignore NaN-size compressible blob size and still compress when other fields exceed threshold', async () => {
       class NaNSizeBlob extends Blob {
         override get size() {
-          return NaN
+          return Number.NaN
+        }
+      }
+
+      const { link, fetch } = createLink({ pluginOptions: { threshold: 100 } })
+      const nanBlob = new NaNSizeBlob(['ignored'], { type: 'text/plain' })
+      const largeBlob = new Blob(['large content'.repeat(100)], { type: 'text/plain' })
+
+      await expect(link.call(['test'], { nanBlob, largeBlob }, { context: {} })).resolves.toEqual('OK')
+
+      expect(fetch).toHaveBeenCalledTimes(1)
+      const [, init] = fetch.mock.calls[0]!
+      expect(init.body).toBeInstanceOf(ReadableStream)
+      expect(init.headers?.get('content-encoding')).toBe('gzip')
+    })
+
+    it('should not compress FormData when only NaN-size compressible blob is present', async () => {
+      class NaNSizeBlob extends Blob {
+        override get size() {
+          return Number.NaN
         }
       }
 
       const { link, fetch } = createLink({ pluginOptions: { threshold: 1000 } })
       const blob = new NaNSizeBlob(['content'], { type: 'text/plain' })
+
+      await expect(link.call(['test'], { file: blob }, { context: {} })).resolves.toEqual('OK')
+
+      expect(fetch).toHaveBeenCalledTimes(1)
+      const [, init] = fetch.mock.calls[0]!
+      expect(init.body).toBeInstanceOf(FormData)
+      expect(init.headers?.get('content-encoding')).toBeNull()
+    })
+
+    it('should not compress FormData when a NaN-size non-compressible blob is present', async () => {
+      class NaNSizeBlob extends Blob {
+        override get size() {
+          return Number.NaN
+        }
+      }
+
+      const { link, fetch } = createLink({ pluginOptions: { threshold: 1000 } })
+      const blob = new NaNSizeBlob(['content'.repeat(100)], { type: 'image/png' })
 
       await expect(link.call(['test'], { file: blob }, { context: {} })).resolves.toEqual('OK')
 

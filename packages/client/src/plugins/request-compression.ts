@@ -114,13 +114,15 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
           contentLength += PART_OVERHEAD + key.length
 
           if (value instanceof Blob) {
-            if (!isCompressibleContentType(value.type)) {
-              break
+            if (Number.isNaN(value.size)) { // Bun-s3 can use NaN for size
+              if (!isCompressibleContentType(value.type)) {
+                break
+              }
             }
-
-            // Bun-s3 can use NaN for size
-            if (!Number.isNaN(value.size)) {
-              contentLength += value.size
+            else {
+              contentLength += isCompressibleContentType(value.type)
+                ? value.size
+                : -value.size
             }
           }
           else {
