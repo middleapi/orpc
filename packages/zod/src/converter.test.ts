@@ -65,6 +65,20 @@ describe('zodToJsonSchemaConverter', () => {
     expect(converter.convert(schema, 'input')).toEqual([{ type: 'string' }, false])
   })
 
+  it('supports $ref & $defs at root level', () => {
+    const schema = z.string().meta({ id: 'root' })
+
+    expect(converter.convert(schema, 'input')).toEqual([{
+      $ref: '#/$defs/root',
+      $defs: {
+        root: {
+          type: 'string',
+        },
+      },
+    }, false],
+    )
+  })
+
   describe('optionality', () => {
     it.each([
       ['defaulted input schema', z.string().default('fallback'), 'input', {

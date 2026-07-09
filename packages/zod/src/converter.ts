@@ -1,4 +1,5 @@
 import type { AnySchema, JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
+import type { ZodType } from 'zod/v4'
 import type { $ZodType, ToJSONSchemaParams, JSONSchema as ZodJsonSchema } from 'zod/v4/core'
 import { JsonSchemaFormat, JsonSchemaXNativeType } from '@orpc/json-schema'
 import { toJSONSchema } from 'zod/v4/core'
@@ -72,9 +73,22 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
       },
     })
 
-    // Since the default oRPC format is always draft/2020-12,
-    // `$schema` can be safely omitted here.
     const { $schema, ...rest } = jsonSchema
+
+    try {
+      // workaround until https://github.com/colinhacks/zod/issues/6026 is merged
+      const { id } = (schema as ZodType).meta() || {}
+      if (id) {
+        return {
+          $ref: `#/$defs/${id}`,
+          $defs: {
+            [id]: rest,
+          },
+        }
+      }
+    }
+    catch {}
+
     return rest
   }
 }
