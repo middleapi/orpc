@@ -4,20 +4,21 @@ import { toArray } from '@orpc/shared'
 import { flattenStandardHeader } from '@standardserver/core'
 import { toFetchHeaders, toStandardBody } from '@standardserver/fetch'
 
-const SUPPORTED_ENCODINGS = ['gzip', 'deflate', 'deflate-raw'] as const
-
 export class RequestCompressionHandlerPlugin<T extends Context> implements StandardHandlerPlugin <T> {
   name = '~request-compression'
 
+  /**
+   * Should decompress the original batch request body instead of sub-requests.
+   */
   after = ['~batch']
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({ next, ...interceptorOptions }) => {
-      const encoding = flattenStandardHeader(
-        interceptorOptions.request.headers['content-encoding'],
-      )?.trim()?.toLowerCase() as typeof SUPPORTED_ENCODINGS[number] | undefined
+      const encodings = parseContentEncodings(
+        flattenStandardHeader(interceptorOptions.request.headers['content-encoding']),
+      )
 
-      if (encoding === undefined || !SUPPORTED_ENCODINGS.includes(encoding)) {
+      if (encodings.length === 0 || !encodings.every(isSupportedEncoding)) {
         return next()
       }
 
@@ -39,7 +40,12 @@ export class RequestCompressionHandlerPlugin<T extends Context> implements Stand
               return stream
             }
 
-            const decompressedStream = stream.pipeThrough(new DecompressionStream(encoding))
+            let decompressedStream = stream
+            for (let i = encodings.length - 1; i >= 0; i--) {
+              decompressedStream = decompressedStream.pipeThrough(
+                new DecompressionStream(encodings[i]!),
+              )
+            }
 
             const response = new Response(decompressedStream, {
               headers: toFetchHeaders(decompressedHeaders),
@@ -59,4 +65,25 @@ export class RequestCompressionHandlerPlugin<T extends Context> implements Stand
       ],
     }
   }
+}
+
+const SUPPORTED_ENCODINGS = ['gzip', 'deflate', 'deflate-raw'] as const
+type SupportedEncoding = (typeof SUPPORTED_ENCODINGS)[number]
+function isSupportedEncoding(encoding: string): encoding is SupportedEncoding {
+  return (SUPPORTED_ENCODINGS as readonly string[]).includes(encoding)
+}
+
+/**
+ * Parse Content-Encoding into ordered codings (order applied).
+ *
+ * @see https://www.rfc-editor.org/rfc/rfc9110.html#name-content-encoding
+ */
+function parseContentEncodings(header: string | undefined): string[] {
+  if (header === undefined) {
+    return []
+  }
+
+  return header
+    .split(',')
+    .map(part => part.trim().toLowerCase())
 }
