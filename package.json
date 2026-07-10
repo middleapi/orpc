@@ -23,7 +23,6 @@
     "@orpc/contract": "workspace:*",
     "@orpc/evlog": "workspace:*",
     "@orpc/experimental-effect": "workspace:*",
-    "@orpc/interop": "workspace:*",
     "@orpc/json-schema": "workspace:*",
     "@orpc/next": "workspace:*",
     "@orpc/openapi": "workspace:*",

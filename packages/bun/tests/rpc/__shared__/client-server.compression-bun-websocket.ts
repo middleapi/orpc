@@ -1,14 +1,13 @@
-import type { AddressInfo } from 'node:net'
 import type { CreateClientServerTest } from './client-server'
 import { createORPCClient } from '@orpc/client'
 import { RequestCompressionLinkPlugin, ResponseCompressionLinkPlugin } from '@orpc/client/plugins'
 import { RPCLink } from '@orpc/client/websocket'
 import { RequestCompressionHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 import { RPCHandler } from '@orpc/server/websocket'
-import WebSocket, { WebSocketServer } from 'ws'
+import { afterAll } from 'bun:test'
 import { defaultSerializer } from './client-server'
 
-export const createCompressionNodeWsClientServerTest: CreateClientServerTest = (
+export const createCompressionBunWebSocketClientServerTest: CreateClientServerTest = (
   router,
   { context = {}, serializer = defaultSerializer } = {},
 ) => {
@@ -19,30 +18,40 @@ export const createCompressionNodeWsClientServerTest: CreateClientServerTest = (
     plugins: [
       new RequestCompressionHandlerPlugin(),
       new ResponseCompressionHandlerPlugin({
-        // always compress for testing
+        // always compress responses for testing
         threshold: 0,
       }),
     ],
   })
 
-  const wss = new WebSocketServer({ port: 0 })
-
-  wss.on('connection', (ws) => {
-    handler.upgrade(ws, {
-      context,
-      prefix: '/rpc',
-    })
+  const server = Bun.serve({
+    fetch(req, server) {
+      if (server.upgrade(req)) {
+        return
+      }
+      return new Response('Upgrade failed', { status: 500 })
+    },
+    websocket: {
+      async message(ws, message) {
+        await handler.message(ws, message, {
+          context,
+          prefix: '/rpc',
+        })
+      },
+      async close(ws) {
+        await handler.close(ws)
+      },
+    },
+    port: 0,
   })
 
   afterAll(() => {
-    wss.close()
+    server.stop(true)
   })
-
-  const addressInfo = wss.address() as AddressInfo
 
   const link = new RPCLink({
     url: '/rpc',
-    connect: () => new WebSocket(`ws://localhost:${addressInfo.port}`),
+    connect: () => new WebSocket(`ws://localhost:${server.port}`),
     serializer,
     encodePeerMessage: { prefix: '__PREFIX__' },
     decodePeerMessage: { prefix: '__PREFIX__' },
@@ -50,11 +59,8 @@ export const createCompressionNodeWsClientServerTest: CreateClientServerTest = (
       new RequestCompressionLinkPlugin({
         // for testing purpose, we set threshold to 0 to ensure compression is always applied
         threshold: 0,
-        encoding: 'deflate-raw',
       }),
-      new ResponseCompressionLinkPlugin({
-        encodings: ['deflate-raw', 'gzip'],
-      }),
+      new ResponseCompressionLinkPlugin(),
     ],
   })
 

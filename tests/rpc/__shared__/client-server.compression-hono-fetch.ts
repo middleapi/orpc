@@ -5,7 +5,7 @@ import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { RequestCompressionLinkPlugin } from '@orpc/client/plugins'
 import { RPCHandler } from '@orpc/server/fetch'
-import { RequestCompressionHandlerPlugin } from '@orpc/server/plugins'
+import { RequestCompressionHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 import { defaultSerializer } from './client-server'
 
 export const createCompressionHonoFetchClientServerTest: CreateClientServerTest = (
@@ -16,6 +16,10 @@ export const createCompressionHonoFetchClientServerTest: CreateClientServerTest 
     serializer,
     plugins: [
       new RequestCompressionHandlerPlugin(),
+      new ResponseCompressionHandlerPlugin({
+        // always compress for testing
+        threshold: 0,
+      }),
     ],
   })
 
@@ -49,6 +53,8 @@ export const createCompressionHonoFetchClientServerTest: CreateClientServerTest 
         // for testing purpose, we set threshold to 0 to ensure compression is always applied
         threshold: 0,
       }),
+      // fetch already automatically decompresses response
+      // new ResponseCompressionLinkPlugin(),
     ],
   })
 

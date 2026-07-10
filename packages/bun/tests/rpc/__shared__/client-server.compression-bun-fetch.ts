@@ -1,14 +1,13 @@
-import type { AddressInfo } from 'node:net'
 import type { CreateClientServerTest } from './client-server'
-import * as http from 'node:http'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { RequestCompressionLinkPlugin } from '@orpc/client/plugins'
-import { RPCHandler } from '@orpc/server/node'
+import { RPCHandler } from '@orpc/server/fetch'
 import { RequestCompressionHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
+import { afterAll } from 'bun:test'
 import { defaultSerializer } from './client-server'
 
-export const createCompressionNodeHttpClientServerTest: CreateClientServerTest = (
+export const createCompressionBunFetchClientServerTest: CreateClientServerTest = (
   router,
   { context = {}, serializer = defaultSerializer } = {},
 ) => {
@@ -17,31 +16,31 @@ export const createCompressionNodeHttpClientServerTest: CreateClientServerTest =
     plugins: [
       new RequestCompressionHandlerPlugin(),
       new ResponseCompressionHandlerPlugin({
-        // always compress for testing
+        // always compress responses for testing
         threshold: 0,
       }),
     ],
   })
 
-  const server = http.createServer(async (req, res) => {
-    await handler.handle(req, res, {
-      context,
-      prefix: '/rpc',
-    })
-  })
+  const server = Bun.serve({
+    fetch: async (request: Request) => {
+      const { response } = await handler.handle(request, {
+        context,
+        prefix: '/rpc',
+      })
 
-  server.listen(0)
+      return response ?? new Response('Not Found', { status: 404 })
+    },
+    port: 0,
+  })
 
   afterAll(() => {
-    server.close()
+    server.stop()
   })
-
-  const addressInfo = server.address() as AddressInfo
 
   const link = new RPCLink({
     url: '/rpc',
-    method: 'GET', // node-http use GET while hono-fetch use POST for better coverage
-    origin: `http://localhost:${addressInfo.port}`,
+    origin: `http://localhost:${server.port}`,
     serializer,
     fetch(url, init) {
       return fetch(url, init)
