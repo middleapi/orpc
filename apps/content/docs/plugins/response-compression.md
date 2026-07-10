@@ -61,6 +61,10 @@ const link = new RPCLink({
 
 <!--@include: @/shared/common-plugin-link-compatibility.md -->
 
+::: warning
+When using the fetch adapter, this plugin is usually unnecessary because most fetch implementations automatically decompress responses based on the `Content-Encoding` header.
+:::
+
 ## Learn More
 
 For implementation details, see the [ResponseCompressionLinkPlugin source code](https://github.com/middleapi/orpc/blob/main/packages/client/src/plugins/response-compression.ts) or the [ResponseCompressionHandlerPlugin source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/response-compression.ts).
