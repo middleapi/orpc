@@ -24,7 +24,7 @@ export interface OpenAPISerializerSerializeOptions {
   asFormData?: boolean | undefined
 }
 
-export interface OpenAPISerializerOptions extends OpenAPIJsonSerializerOptions, OpenAPISerializerSerializeOptions {
+export interface OpenAPISerializerOptions extends OpenAPIJsonSerializerOptions {
   /**
    * Options for bracket notation serializer, like maxExplicitDeserializingArrayIndex
    */
@@ -49,7 +49,7 @@ export class OpenAPISerializer {
     this.defaultSerializeOptions = serialize
   }
 
-  serialize(data: unknown, options: OpenAPISerializerSerializeOptions = {}): StandardBody {
+  async serialize(data: unknown, options: OpenAPISerializerSerializeOptions = {}): Promise<StandardBody> {
     const useFormDataForBlobFields = options.useFormDataForBlobFields ?? this.defaultSerializeOptions?.useFormDataForBlobFields ?? true
     const asFormData = options.asFormData ?? this.defaultSerializeOptions?.asFormData ?? false
 
@@ -61,17 +61,17 @@ export class OpenAPISerializer {
 
       if (isAsyncIteratorObject(data)) {
         return wrapAsyncIteratorPreservingEventMeta(data, {
-          mapResult: (result) => {
+          mapResult: async (result) => {
             // standard event stream data already supports these types without additional serialization.
             if (result.value === undefined) {
               return result
             }
 
-            return { done: result.done, value: this.serializeValue(result.value, { asFormData: false, useFormDataForBlobFields: false }) }
+            return { done: result.done, value: await this.serializeValue(result.value, { asFormData: false, useFormDataForBlobFields: false }) }
           },
-          mapError: (e) => {
+          mapError: async (e) => {
             return new ErrorEvent({
-              data: this.serializeValue(toORPCError(e).toJSON(), { asFormData: false, useFormDataForBlobFields: false }),
+              data: await this.serializeValue(toORPCError(e).toJSON(), { asFormData: false, useFormDataForBlobFields: false }),
               cause: e,
             })
           },
@@ -82,8 +82,8 @@ export class OpenAPISerializer {
     return this.serializeValue(data, { useFormDataForBlobFields, asFormData })
   }
 
-  private serializeValue(value: unknown, options: Required<OpenAPISerializerSerializeOptions>): unknown {
-    const { json, blobs } = this.jsonSerializer.serialize(value)
+  private async serializeValue(value: unknown, options: Required<OpenAPISerializerSerializeOptions>): Promise<unknown> {
+    const { json, blobs } = await this.jsonSerializer.serialize(value)
 
     if (!options.asFormData && (json instanceof Blob || json === undefined || !blobs?.length || !options.useFormDataForBlobFields)) {
       return json
@@ -110,14 +110,14 @@ export class OpenAPISerializer {
 
     if (isAsyncIteratorObject(data)) {
       return wrapAsyncIteratorPreservingEventMeta(data, {
-        mapResult: (result) => {
+        mapResult: async (result) => {
           if (result.value === undefined) {
             return result
           }
 
           return { done: result.done, value: this.jsonSerializer.deserialize({ json: result.value }) }
         },
-        mapError: (e) => {
+        mapError: async (e) => {
           if (e instanceof ErrorEvent) {
             const deserialized = this.jsonSerializer.deserialize({ json: e.data })
 

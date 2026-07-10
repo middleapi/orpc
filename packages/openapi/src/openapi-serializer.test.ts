@@ -7,23 +7,23 @@ describe('openAPISerializer', () => {
   const serializer = new OpenAPISerializer()
 
   describe('serialize', () => {
-    it('uses OpenAPIJsonSerializer for serialization', () => {
-      expect(serializer.serialize({ date: new Date('2023-01-01'), count: 1n })).toEqual({
+    it('uses OpenAPIJsonSerializer for serialization', async () => {
+      expect(await serializer.serialize({ date: new Date('2023-01-01'), count: 1n })).toEqual({
         date: '2023-01-01T00:00:00.000Z',
         count: '1',
       })
     })
 
-    it('returns a root-level undefined as-is', () => {
-      expect(serializer.serialize(undefined)).toBe(undefined)
+    it('returns a root-level undefined as-is', async () => {
+      expect(await serializer.serialize(undefined)).toBe(undefined)
     })
 
-    it('returns a root-level Blob as-is without wrapping in FormData', () => {
+    it('returns a root-level Blob as-is without wrapping in FormData', async () => {
       const blob = new Blob(['hello'])
-      expect(serializer.serialize(blob)).toBe(blob)
+      expect(await serializer.serialize(blob)).toBe(blob)
     })
 
-    it('returns a root-level ReadableStream as-is', () => {
+    it('returns a root-level ReadableStream as-is', async () => {
       const stream = new ReadableStream<Uint8Array>({
         start(controller) {
           controller.enqueue(new TextEncoder().encode('hello'))
@@ -31,12 +31,12 @@ describe('openAPISerializer', () => {
         },
       })
 
-      expect(serializer.serialize(stream)).toBe(stream)
+      expect(await serializer.serialize(stream)).toBe(stream)
     })
 
-    it('converts object with blob fields to FormData', () => {
+    it('converts object with blob fields to FormData', async () => {
       const blob = new Blob(['hello'], { type: 'text/plain' })
-      const result = serializer.serialize({ file: blob, date: new Date('2023-01-01') }) as FormData
+      const result = (await serializer.serialize({ file: blob, date: new Date('2023-01-01') })) as FormData
 
       expect(result).toBeInstanceOf(FormData)
       const file = result.get('file') as Blob
@@ -46,21 +46,21 @@ describe('openAPISerializer', () => {
       expect(result.get('date')).toBe('2023-01-01T00:00:00.000Z')
     })
 
-    it('omits null and undefined fields from FormData', () => {
-      const result = serializer.serialize({ file: new Blob(['data']), empty: null }) as FormData
+    it('omits null and undefined fields from FormData', async () => {
+      const result = (await serializer.serialize({ file: new Blob(['data']), empty: null })) as FormData
       expect(result.has('empty')).toBe(false)
     })
 
-    it('skips useFormDataForBlobFields when false', () => {
+    it('skips useFormDataForBlobFields when false', async () => {
       const blob = new Blob(['hello'])
-      expect(serializer.serialize({ file: blob }, { useFormDataForBlobFields: false })).not.toBeInstanceOf(FormData)
+      expect(await serializer.serialize({ file: blob }, { useFormDataForBlobFields: false })).not.toBeInstanceOf(FormData)
     })
 
-    it('always returns FormData when asFormData is true, using bracket notation', () => {
-      const result = serializer.serialize(
+    it('always returns FormData when asFormData is true, using bracket notation', async () => {
+      const result = (await serializer.serialize(
         { user: { name: 'test' }, tags: ['a', 'b'] },
         { asFormData: true },
-      ) as FormData
+      )) as FormData
 
       expect(result).toBeInstanceOf(FormData)
       expect(result.get('user[name]')).toBe('test')
@@ -68,23 +68,23 @@ describe('openAPISerializer', () => {
       expect(result.get('tags[1]')).toBe('b')
     })
 
-    it('serializes root-level arrays to numeric FormData keys', () => {
-      const result = serializer.serialize(['a', 'b'], { asFormData: true }) as FormData
+    it('serializes root-level arrays to numeric FormData keys', async () => {
+      const result = (await serializer.serialize(['a', 'b'], { asFormData: true })) as FormData
 
       expect(result).toBeInstanceOf(FormData)
       expect(result.get('0')).toBe('a')
       expect(result.get('1')).toBe('b')
     })
 
-    it('call-site options override constructor defaults', () => {
+    it('call-site options override constructor defaults', async () => {
       const s = new OpenAPISerializer({ serialize: { asFormData: true, useFormDataForBlobFields: false } })
 
-      expect(s.serialize({ name: 'test' })).toBeInstanceOf(FormData)
-      expect(s.serialize({ name: 'test' }, { asFormData: false })).not.toBeInstanceOf(FormData)
+      expect(await s.serialize({ name: 'test' })).toBeInstanceOf(FormData)
+      expect(await s.serialize({ name: 'test' }, { asFormData: false })).not.toBeInstanceOf(FormData)
 
       const blob = new Blob(['hello'])
-      expect(s.serialize({ file: blob }, { asFormData: false })).not.toBeInstanceOf(FormData)
-      expect(s.serialize({ file: blob }, { asFormData: false, useFormDataForBlobFields: true })).toBeInstanceOf(FormData)
+      expect(await s.serialize({ file: blob }, { asFormData: false })).not.toBeInstanceOf(FormData)
+      expect(await s.serialize({ file: blob }, { asFormData: false, useFormDataForBlobFields: true })).toBeInstanceOf(FormData)
     })
 
     describe('asyncIteratorObject', () => {
@@ -93,7 +93,7 @@ describe('openAPISerializer', () => {
       }
 
       it('returns an AsyncIteratorObject and serializes yielded values', async () => {
-        const result = serializer.serialize(toAsyncIter([new Date('2023-01-01'), 42n])) as AsyncIteratorObject<unknown>
+        const result = (await serializer.serialize(toAsyncIter([new Date('2023-01-01'), 42n]))) as AsyncIteratorObject<unknown>
         expect(result).toSatisfy(isAsyncIteratorObject)
 
         const collected: unknown[] = []
@@ -102,7 +102,7 @@ describe('openAPISerializer', () => {
       })
 
       it('passes through undefined yielded values as-is', async () => {
-        const result = serializer.serialize(toAsyncIter([undefined, 'value'])) as AsyncIteratorObject<unknown>
+        const result = (await serializer.serialize(toAsyncIter([undefined, 'value']))) as AsyncIteratorObject<unknown>
         expect(result).toSatisfy(isAsyncIteratorObject)
 
         const collected: unknown[] = []
@@ -112,7 +112,7 @@ describe('openAPISerializer', () => {
 
       it('ignores asFormData default option and never wraps yielded values', async () => {
         const s = new OpenAPISerializer({ serialize: { asFormData: true } })
-        const result = s.serialize(toAsyncIter([{ name: 'test' }])) as AsyncIteratorObject<unknown>
+        const result = (await s.serialize(toAsyncIter([{ name: 'test' }]))) as AsyncIteratorObject<unknown>
         expect(result).toSatisfy(isAsyncIteratorObject)
 
         const collected: unknown[] = []
@@ -122,9 +122,9 @@ describe('openAPISerializer', () => {
 
       it('converts thrown ORPC errors into ErrorEvent payloads', async () => {
         const error = new ORPCError('BAD_GATEWAY', { data: { reason: 'upstream' } })
-        const result = serializer.serialize((async function* () {
+        const result = (await serializer.serialize((async function* () {
           throw error
-        })()) as AsyncIteratorObject<unknown>
+        })())) as AsyncIteratorObject<unknown>
 
         await expect(result.next()).rejects.toSatisfy((e: any) => {
           expect(e).toBeInstanceOf(ErrorEvent)
@@ -139,9 +139,9 @@ describe('openAPISerializer', () => {
 
       it('maps unknown iterator errors into INTERNAL_SERVER_ERROR payloads', async () => {
         const error = new Error('unexpected')
-        const result = serializer.serialize((async function* () {
+        const result = (await serializer.serialize((async function* () {
           throw error
-        })()) as AsyncIteratorObject<unknown>
+        })())) as AsyncIteratorObject<unknown>
 
         await expect(result.next()).rejects.toSatisfy((e: any) => {
           expect(e).toBeInstanceOf(ErrorEvent)
@@ -227,7 +227,7 @@ describe('openAPISerializer', () => {
       }
 
       it('returns an AsyncIteratorObject and passes through yielded values', async () => {
-        const result = serializer.deserialize(toAsyncIter([{ a: 1 }, { b: 2 }])) as AsyncIterable<unknown>
+        const result = (await serializer.deserialize(toAsyncIter([{ a: 1 }, { b: 2 }]))) as AsyncIterable<unknown>
         expect(result).toSatisfy(isAsyncIteratorObject)
 
         const collected: unknown[] = []
@@ -236,7 +236,7 @@ describe('openAPISerializer', () => {
       })
 
       it('passes through undefined yielded values as-is', async () => {
-        const result = serializer.deserialize(toAsyncIter([undefined, { a: 1 }])) as AsyncIterable<unknown>
+        const result = (await serializer.deserialize(toAsyncIter([undefined, { a: 1 }]))) as AsyncIterable<unknown>
         expect(result).toSatisfy(isAsyncIteratorObject)
 
         const collected: unknown[] = []
@@ -248,9 +248,9 @@ describe('openAPISerializer', () => {
         const error = new ErrorEvent(
           new ORPCError('BAD_GATEWAY', { data: { reason: 'upstream' } }).toJSON(),
         )
-        const result = serializer.deserialize((async function* () {
+        const result = (await serializer.deserialize((async function* () {
           throw error
-        })()) as AsyncIteratorObject<unknown>
+        })())) as AsyncIteratorObject<unknown>
 
         await expect(result.next()).rejects.toSatisfy((e: any) => {
           expect(e).toBeInstanceOf(ORPCError)
@@ -264,18 +264,18 @@ describe('openAPISerializer', () => {
 
       it('passes through ErrorEvent instances with non-ORPC payloads', async () => {
         const error = new ErrorEvent({ reason: 'upstream' })
-        const result = serializer.deserialize((async function* () {
+        const result = (await serializer.deserialize((async function* () {
           throw error
-        })()) as AsyncIteratorObject<unknown>
+        })())) as AsyncIteratorObject<unknown>
 
         await expect(result.next()).rejects.toBe(error)
       })
 
       it('passes through non-ErrorEvent errors', async () => {
         const error = new Error('unexpected')
-        const result = serializer.deserialize((async function* () {
+        const result = (await serializer.deserialize((async function* () {
           throw error
-        })()) as AsyncIteratorObject<unknown>
+        })())) as AsyncIteratorObject<unknown>
 
         await expect(result.next()).rejects.toBe(error)
       })
@@ -283,33 +283,52 @@ describe('openAPISerializer', () => {
   })
 
   describe('options', () => {
-    it('passes OpenAPIJsonSerializerOptions to OpenAPIJsonSerializer', () => {
+    it('passes OpenAPIJsonSerializerOptions to OpenAPIJsonSerializer', async () => {
       const s = new OpenAPISerializer({
         handlers: {
           date: {
             condition: v => v instanceof Date,
             serialize: (v: Date) => `___TEST___${v.getTime()}`,
           },
+          cryptoKey: {
+            condition: v => v instanceof CryptoKey,
+            serialize: async (v: CryptoKey) => {
+              return await crypto.subtle.exportKey('jwk', v)
+            },
+          },
         },
       })
 
       const date = new Date('2023-01-01')
-      expect(s.serialize({ value: date })).toEqual({ value: `___TEST___${date.getTime()}` })
+      expect((await s.serialize({ value: date }))).toEqual({ value: `___TEST___${date.getTime()}` })
+
+      const keyPair = await crypto.subtle.generateKey(
+        {
+          name: 'RSA-OAEP',
+          modulusLength: 4096,
+          publicExponent: new Uint8Array([1, 0, 1]),
+          hash: 'SHA-256',
+        },
+        true,
+        ['encrypt', 'decrypt'],
+      )
+      const serialized = await crypto.subtle.exportKey('jwk', keyPair.publicKey)
+      expect((await s.serialize({ value: keyPair.publicKey }))).toEqual({ value: serialized })
     })
 
-    it('passes omitUndefinedProperties to OpenAPIJsonSerializer', () => {
+    it('passes omitUndefinedProperties to OpenAPIJsonSerializer', async () => {
       const s = new OpenAPISerializer({ omitUndefinedProperties: false })
-      expect(s.serialize({ a: 1, b: undefined })).toEqual({ a: 1, b: null })
+      expect((await s.serialize({ a: 1, b: undefined }))).toEqual({ a: 1, b: null })
     })
 
-    it('passes BracketNotationSerializerOptions to BracketNotationSerializer', () => {
+    it('passes BracketNotationSerializerOptions to BracketNotationSerializer', async () => {
       const s = new OpenAPISerializer({ bracketNotation: { maxExplicitDeserializingArrayIndex: 0 } })
 
       // index 1 exceeds the limit of 0, so the array should be deserialized as an object
       const form = new FormData()
       form.append('tags[0]', 'a')
       form.append('tags[1]', 'b')
-      const result = s.deserialize(form) as any
+      const result = await s.deserialize(form) as any
       expect(Array.isArray(result.tags)).toBe(false)
       expect(result.tags['0']).toBe('a')
       expect(result.tags['1']).toBe('b')

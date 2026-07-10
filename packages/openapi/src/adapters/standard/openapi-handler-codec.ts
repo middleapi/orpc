@@ -1,7 +1,6 @@
 import type { AnyORPCError } from '@orpc/client'
 import type { AnyProcedure, AnyRouter, Context } from '@orpc/server'
 import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure, StandardHandlerHandleOptions } from '@orpc/server/standard'
-import type { Promisable } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@standardserver/core'
 import type { OpenAPIMeta } from '../../meta'
 import type { OpenAPIMatcherOptions } from './openapi-matcher'
@@ -100,7 +99,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
   /**
    * @throws {TypeError} If `outputStructure` is "detailed" and the output doesn't match the expected structure.
    */
-  encodeOutput(output: unknown, procedure: AnyProcedure, path: string[]): Promisable<StandardResponse> {
+  async encodeOutput(output: unknown, procedure: AnyProcedure, path: string[]): Promise<StandardResponse> {
     const meta = getOpenAPIMeta(procedure)
     const successStatus = meta?.successStatus ?? DEFAULT_SUCCESS_STATUS
     const outputStructure = meta?.outputStructure ?? DEFAULT_OPENAPI_OUTPUT_STRUCTURE
@@ -109,7 +108,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
       return {
         status: successStatus,
         headers: {},
-        body: this.serializer.serialize(output),
+        body: await this.serializer.serialize(output),
       }
     }
 
@@ -130,17 +129,17 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
     return {
       status: output.status ?? successStatus,
       headers: output.headers ?? {},
-      body: this.serializer.serialize(output.body),
+      body: await this.serializer.serialize(output.body),
     }
   }
 
-  encodeError(error: AnyORPCError): Promisable<StandardResponse> {
+  async encodeError(error: AnyORPCError): Promise<StandardResponse> {
     const status = this.errorStatusMap[error.code] ?? DEFAULT_ERROR_STATUS
 
     return {
       status,
       headers: {},
-      body: this.serializer.serialize(this.customErrorResponseBodySerializer?.(error) ?? error.toJSON()),
+      body: await this.serializer.serialize(this.customErrorResponseBodySerializer?.(error) ?? error.toJSON()),
     }
   }
 

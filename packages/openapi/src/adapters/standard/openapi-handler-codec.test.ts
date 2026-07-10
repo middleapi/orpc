@@ -578,7 +578,7 @@ describe('openAPIHandlerCodec', () => {
 
   describe('.encodeOutput', () => {
     describe('outputStructure=compact', () => {
-      it('uses default 200 success status if successStatus is not defined', () => {
+      it('uses default 200 success status if successStatus is not defined', async () => {
         const serializer = {
           serialize: vi.fn().mockReturnValueOnce('__serialized__'),
           deserialize: vi.fn(),
@@ -587,7 +587,7 @@ describe('openAPIHandlerCodec', () => {
         const procedure = os.handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure, { serializer })
 
-        const response = codec.encodeOutput('__output__', procedure, [])
+        const response = await codec.encodeOutput('__output__', procedure, [])
 
         expect(response).toEqual({
           status: 200,
@@ -599,7 +599,7 @@ describe('openAPIHandlerCodec', () => {
         expect(serializer.serialize).toHaveBeenCalledWith('__output__')
       })
 
-      it('uses successStatus if defined', () => {
+      it('uses successStatus if defined', async () => {
         const serializer = {
           serialize: vi.fn().mockReturnValueOnce('__serialized__'),
           deserialize: vi.fn(),
@@ -608,7 +608,7 @@ describe('openAPIHandlerCodec', () => {
         const procedure = os.meta(openapi({ successStatus: 201 })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure, { serializer })
 
-        const response = codec.encodeOutput('__output__', procedure, [])
+        const response = await codec.encodeOutput('__output__', procedure, [])
 
         expect(response).toEqual({
           status: 201,
@@ -622,7 +622,7 @@ describe('openAPIHandlerCodec', () => {
     })
 
     describe('outputStructure=detailed', () => {
-      it('uses default 200 success status meta when output not contain status', () => {
+      it('uses default 200 success status meta when output not contain status', async () => {
         const serializer = {
           serialize: vi.fn().mockReturnValueOnce('__serialized_body__'),
           deserialize: vi.fn(),
@@ -631,7 +631,7 @@ describe('openAPIHandlerCodec', () => {
         const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure, { serializer })
 
-        const response = codec.encodeOutput({
+        const response = await codec.encodeOutput({
           body: { ok: true },
         }, procedure, ['detailed'] as any)
 
@@ -645,7 +645,7 @@ describe('openAPIHandlerCodec', () => {
         expect(serializer.serialize).toHaveBeenCalledWith({ ok: true })
       })
 
-      it('uses the successStatus meta when output not contain status', () => {
+      it('uses the successStatus meta when output not contain status', async () => {
         const serializer = {
           serialize: vi.fn().mockReturnValueOnce('__serialized_body__'),
           deserialize: vi.fn(),
@@ -654,7 +654,7 @@ describe('openAPIHandlerCodec', () => {
         const procedure = os.meta(openapi({ outputStructure: 'detailed', successStatus: 201 })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure, { serializer })
 
-        const response = codec.encodeOutput({
+        const response = await codec.encodeOutput({
           body: { ok: true },
         }, procedure, ['detailed'] as any)
 
@@ -668,7 +668,7 @@ describe('openAPIHandlerCodec', () => {
         expect(serializer.serialize).toHaveBeenCalledWith({ ok: true })
       })
 
-      it('uses explicit status and headers from output', () => {
+      it('uses explicit status and headers from output', async () => {
         const serializer = {
           serialize: vi.fn().mockReturnValueOnce('__serialized_body__'),
           deserialize: vi.fn(),
@@ -677,7 +677,7 @@ describe('openAPIHandlerCodec', () => {
         const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure, { serializer })
 
-        const response = codec.encodeOutput({
+        const response = await codec.encodeOutput({
           status: 202,
           headers: { 'x-custom': 'value' },
           body: { ok: true },
@@ -695,17 +695,17 @@ describe('openAPIHandlerCodec', () => {
         ['status outside the allowed range', { status: 500 }],
         ['extra keys', { body: 'ok', extra: true }],
         ['invalid headers', { headers: { 'x-invalid': 123 } }],
-      ])('throws for invalid output: %s', (_, output) => {
+      ])('throws for invalid output: %s', async (_, output) => {
         const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
 
-        expect(() => codec.encodeOutput(output, procedure, [])).toThrow('Invalid "detailed" output structure')
+        expect(() => codec.encodeOutput(output, procedure, [])).rejects.toThrow('Invalid "detailed" output structure')
       })
     })
   })
 
   describe('.encodeError', () => {
-    it('maps known error codes to HTTP status via COMMON_ERROR_STATUS_MAP', () => {
+    it('maps known error codes to HTTP status via COMMON_ERROR_STATUS_MAP', async () => {
       const serializer = {
         serialize: vi.fn().mockReturnValueOnce('__serialized_error__'),
         deserialize: vi.fn(),
@@ -715,7 +715,7 @@ describe('openAPIHandlerCodec', () => {
       const codec = new OpenAPIHandlerCodec(procedure, { serializer })
       const error = new ORPCError('BAD_GATEWAY')
 
-      const response = codec.encodeError(error)
+      const response = await codec.encodeError(error)
 
       expect(response).toEqual({
         status: 502,
@@ -727,7 +727,7 @@ describe('openAPIHandlerCodec', () => {
       expect(serializer.serialize).toHaveBeenCalledWith(error.toJSON())
     })
 
-    it('uses customErrorResponseBodyEncoder and falls back on null', () => {
+    it('uses customErrorResponseBodyEncoder and falls back on null', async () => {
       let attempt = 1
       const customErrorResponseBodyEncoder = vi.fn(() => {
         if (attempt++ === 2) {
@@ -753,7 +753,7 @@ describe('openAPIHandlerCodec', () => {
       })
 
       const firstError = new ORPCError('BAD_GATEWAY', { data: '__data1__' })
-      const firstResponse = codec.encodeError(firstError)
+      const firstResponse = await codec.encodeError(firstError)
 
       expect(firstResponse).toEqual({
         status: 502,
@@ -762,7 +762,7 @@ describe('openAPIHandlerCodec', () => {
       })
 
       const secondError = new ORPCError('UNKNOWN_CODE' as any, { data: '__data2__' })
-      const secondResponse = codec.encodeError(secondError)
+      const secondResponse = await codec.encodeError(secondError)
 
       expect(secondResponse).toEqual({
         status: DEFAULT_ERROR_STATUS,
@@ -779,7 +779,7 @@ describe('openAPIHandlerCodec', () => {
       expect(serializer.serialize).toHaveBeenNthCalledWith(2, secondError.toJSON())
     })
 
-    it('can custom error status via errorStatuses option', () => {
+    it('can custom error status via errorStatuses option', async () => {
       const serializer = {
         serialize: vi.fn().mockReturnValueOnce('__serialized_override__'),
         deserialize: vi.fn(),
@@ -792,7 +792,7 @@ describe('openAPIHandlerCodec', () => {
       })
 
       const error = new ORPCError('BAD_GATEWAY')
-      const response = codec.encodeError(error)
+      const response = await codec.encodeError(error)
 
       expect(response).toEqual({
         status: 599,
@@ -801,7 +801,7 @@ describe('openAPIHandlerCodec', () => {
       })
     })
 
-    it('fallback unknown error code to DEFAULT_ERROR_STATUS', () => {
+    it('fallback unknown error code to DEFAULT_ERROR_STATUS', async () => {
       const serializer = {
         serialize: vi.fn()
           .mockReturnValueOnce('__serialized_unknown__'),
@@ -815,7 +815,7 @@ describe('openAPIHandlerCodec', () => {
       })
 
       const unknownError = new ORPCError('UNKNOWN_CODE' as any)
-      const unknownResponse = codec.encodeError(unknownError)
+      const unknownResponse = await codec.encodeError(unknownError)
 
       expect(unknownResponse).toEqual({
         status: DEFAULT_ERROR_STATUS,

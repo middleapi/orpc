@@ -1,4 +1,4 @@
-import type { Segment } from '@orpc/shared'
+import type { Promisable, Segment } from '@orpc/shared'
 import { isPlainObject } from '@orpc/shared'
 
 export type OpenAPIJsonSerialization
@@ -6,8 +6,16 @@ export type OpenAPIJsonSerialization
     | { json: unknown, maps: Segment[][], blobs: Blob[] }
 
 export interface OpenAPIJsonSerializerHandler {
-  condition(value: unknown): boolean
-  serialize(value: any): unknown
+  /**
+   * The condition which has to be satisfied for the `serialize` function to run.
+   * @param value The value to be serialized.
+   */
+  condition(value: unknown): Promisable<boolean>
+  /**
+   * Function which serializes the given value.
+   * @param value The value to be serialized.
+   */
+  serialize(value: any): Promisable<unknown>
   /**
    * If false, the result of this serializer will not be further processed by other serializers,
    * even if it matches their conditions and treat it as final serialized value.
@@ -155,24 +163,24 @@ export class OpenAPIJsonSerializer {
     this.omitUndefinedProperties = options.omitUndefinedProperties !== false
   }
 
-  serialize(data: unknown): OpenAPIJsonSerialization {
-    const [json, maps, blobs] = this.serializeValue(data, [], [], [])
+  async serialize(data: unknown): Promise<OpenAPIJsonSerialization> {
+    const [json, maps, blobs] = await this.serializeValue(data, [], [], [])
 
     return { json, maps, blobs }
   }
 
-  private serializeValue(data: unknown, segments: Segment[], maps: Segment[][], blobs: Blob[]): [unknown, Segment[][], Blob[]] {
+  private async serializeValue(data: unknown, segments: Segment[], maps: Segment[][], blobs: Blob[]): Promise<[unknown, Segment[][], Blob[]]> {
     for (const key in this.handlers) {
       const handler = this.handlers[key]
 
-      if (handler && handler.condition(data)) {
-        const serialized = handler.serialize(data)
+      if (handler && (await handler.condition(data))) {
+        const serialized = await handler.serialize(data)
 
         if (handler.isTerminal) {
           return [serialized, maps, blobs]
         }
 
-        const result = this.serializeValue(serialized, segments, maps, blobs)
+        const result = await this.serializeValue(serialized, segments, maps, blobs)
         return result
       }
     }
@@ -184,9 +192,9 @@ export class OpenAPIJsonSerializer {
     }
 
     if (Array.isArray(data)) {
-      const json = data.map((v, i) => {
-        return this.serializeValue(v, [...segments, i], maps, blobs)[0]
-      })
+      const json = await Promise.all(data.map((v, i) => {
+        return this.serializeValue(v, [...segments, i], maps, blobs).then(result => result[0])
+      }))
 
       return [json, maps, blobs]
     }
@@ -209,7 +217,7 @@ export class OpenAPIJsonSerializer {
           continue
         }
 
-        json[k] = this.serializeValue(v, [...segments, k], maps, blobs)[0]
+        json[k] = (await this.serializeValue(v, [...segments, k], maps, blobs))[0]
       }
 
       return [json, maps, blobs]

@@ -169,7 +169,7 @@ export class OpenAPIGenerator {
       )
     }
 
-    return this.serializer.serialize(doc, { asFormData: false, useFormDataForBlobFields: false }) as OpenAPIDocument
+    return await this.serializer.serialize(doc, { asFormData: false, useFormDataForBlobFields: false }) as OpenAPIDocument
   }
 
   private async convertSchema(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): Promise<[JsonSchema, boolean]> {
