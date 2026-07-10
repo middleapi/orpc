@@ -39,8 +39,9 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
 
   /**
    * Compression should be done after batching, to compress the final response.
+   * Compression should also be done after response headers are set, to access final headers like Content-Type and Cache-Control.
    */
-  after = ['~batch']
+  after = ['~batch', '~response-headers']
 
   private readonly encodings: Exclude<ResponseCompressionHandlerPluginOptions<T>['encodings'], undefined>
   private readonly threshold: Exclude<ResponseCompressionHandlerPluginOptions<T>['threshold'], undefined>
@@ -62,6 +63,11 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
 
       const contentEncoding = flattenStandardHeader(response.headers['content-encoding'])?.trim()?.toLowerCase()
       if (contentEncoding !== undefined) { // already compressed, do not compress again
+        return result
+      }
+
+      // Cache-Control: no-transform forbids intermediaries (and this plugin) from transforming the body
+      if (isNoTransformCacheControl(flattenStandardHeader(response.headers['cache-control']))) {
         return result
       }
 
@@ -244,4 +250,18 @@ function parseAcceptEncodings(header: string | undefined): string[] {
     .split(',')
     .map(part => part.trim().split(';')[0]!.trim().toLowerCase())
     .filter(Boolean)
+}
+
+/**
+ * Whether Cache-Control includes the no-transform directive.
+ *
+ * @see https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform
+ */
+const CACHE_CONTROL_NO_TRANSFORM_REGEX = /(?:^|,)\s*no-transform\s*(?:,|$)/i
+function isNoTransformCacheControl(cacheControl: string | undefined): boolean {
+  if (cacheControl === undefined) {
+    return false
+  }
+
+  return CACHE_CONTROL_NO_TRANSFORM_REGEX.test(cacheControl)
 }

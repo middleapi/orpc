@@ -187,6 +187,57 @@ describe('responseCompressionHandlerPlugin', () => {
     })
   })
 
+  describe('cache-control header', () => {
+    it('does not compress when cache-control includes no-transform', async () => {
+      const largeText = 'x'.repeat(2000)
+      const handler = new RPCHandler(os.handler(() => largeText), {
+        plugins: [
+          {
+            name: 'set-cache-control',
+            init(options) {
+              return {
+                ...options,
+                routingInterceptors: [
+                  async ({ next, ...interceptorOptions }) => {
+                    const result = await next(interceptorOptions)
+                    if (!result.matched) {
+                      return result
+                    }
+                    return {
+                      ...result,
+                      response: {
+                        ...result.response,
+                        headers: {
+                          ...result.response.headers,
+                          'cache-control': 'public, no-transform',
+                        },
+                      },
+                    }
+                  },
+                  ...options.routingInterceptors ?? [],
+                ],
+              }
+            },
+          },
+          new ResponseCompressionHandlerPlugin({ threshold: 100 }),
+        ],
+      })
+
+      const { matched, response } = await handler.handle(new Request('http://localhost', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'accept-encoding': 'gzip',
+        },
+        body: JSON.stringify({ json: null }),
+      }))
+
+      expect(matched).toBe(true)
+      expect(response!.headers.has('content-encoding')).toBe(false)
+      await expect(response!.json()).resolves.toEqual({ json: largeText })
+    })
+  })
+
   describe('json body', () => {
     it.each(
       ['gzip', 'deflate', 'deflate-raw'] as const,
