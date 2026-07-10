@@ -150,7 +150,6 @@ export default withMermaid(defineConfig({
           collapsed: true,
           items: [
             { text: 'Batch', link: '/docs/plugins/batch' },
-            { text: 'Body Compression', link: '/docs/plugins/body-compression' },
             { text: 'CORS', link: '/docs/plugins/cors' },
             { text: 'CSRF Guard', link: '/docs/plugins/csrf-guard' },
             { text: 'Dedupe', link: '/docs/plugins/dedupe' },
@@ -159,6 +158,7 @@ export default withMermaid(defineConfig({
             { text: 'Request Headers', link: '/docs/plugins/request-headers' },
             { text: 'Request Limit', link: '/docs/plugins/request-limit' },
             { text: 'Request Validation', link: '/docs/plugins/request-validation' },
+            { text: 'Response Compression', link: '/docs/plugins/response-compression' },
             { text: 'Response Headers', link: '/docs/plugins/response-headers' },
             { text: 'Response Validation', link: '/docs/plugins/response-validation' },
             { text: 'Rethrow', link: '/docs/plugins/rethrow' },

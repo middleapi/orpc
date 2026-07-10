@@ -1,9 +1,9 @@
 import type { CreateClientServerTest } from './client-server'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/message-port'
-import { RequestCompressionLinkPlugin } from '@orpc/client/plugins'
+import { RequestCompressionLinkPlugin, ResponseCompressionLinkPlugin } from '@orpc/client/plugins'
 import { RPCHandler } from '@orpc/server/message-port'
-import { RequestCompressionHandlerPlugin } from '@orpc/server/plugins'
+import { RequestCompressionHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 import { defaultSerializer } from './client-server'
 
 export const createCompressionMessagePortClientServerTest: CreateClientServerTest = (
@@ -18,6 +18,10 @@ export const createCompressionMessagePortClientServerTest: CreateClientServerTes
     serializer,
     plugins: [
       new RequestCompressionHandlerPlugin(),
+      new ResponseCompressionHandlerPlugin({
+        // always compress for testing
+        threshold: 0,
+      }),
     ],
   })
 
@@ -34,6 +38,7 @@ export const createCompressionMessagePortClientServerTest: CreateClientServerTes
         // for testing purpose, we set threshold to 0 to ensure compression is always applied
         threshold: 0,
       }),
+      new ResponseCompressionLinkPlugin(),
     ],
   })
 

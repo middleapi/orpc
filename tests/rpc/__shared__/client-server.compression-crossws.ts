@@ -2,10 +2,10 @@ import type { AddressInfo } from 'node:net'
 import type { CreateClientServerTest } from './client-server'
 import { createServer } from 'node:http'
 import { createORPCClient } from '@orpc/client'
-import { RequestCompressionLinkPlugin } from '@orpc/client/plugins'
+import { RequestCompressionLinkPlugin, ResponseCompressionLinkPlugin } from '@orpc/client/plugins'
 import { RPCLink } from '@orpc/client/websocket'
 import { experimental_RPCHandler as RPCHandler } from '@orpc/server/crossws'
-import { RequestCompressionHandlerPlugin } from '@orpc/server/plugins'
+import { RequestCompressionHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 import crossws from 'crossws/adapters/node'
 import { defaultSerializer } from './client-server'
 
@@ -19,6 +19,10 @@ export const createCompressionCrosswsClientServerTest: CreateClientServerTest = 
     decodePeerMessage: { prefix: '__PREFIX__' },
     plugins: [
       new RequestCompressionHandlerPlugin(),
+      new ResponseCompressionHandlerPlugin({
+        // always compress for testing
+        threshold: 0,
+      }),
     ],
   })
 
@@ -63,6 +67,9 @@ export const createCompressionCrosswsClientServerTest: CreateClientServerTest = 
       new RequestCompressionLinkPlugin({
         // for testing purpose, we set threshold to 0 to ensure compression is always applied
         threshold: 0,
+      }),
+      new ResponseCompressionLinkPlugin({
+        encodings: ['gzip'],
       }),
     ],
   })

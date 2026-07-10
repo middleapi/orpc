@@ -55,7 +55,7 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
         const contentLength = Number(flattenStandardHeader(request.headers['content-length']))
 
         if (
-          (Number.isNaN(contentLength) || contentLength >= this.threshold)
+          (!Number.isFinite(contentLength) || contentLength >= this.threshold)
           && isCompressibleContentType(flattenStandardHeader(request.headers['content-type']))
         ) {
           const compressedStream = request.body.pipeThrough(new CompressionStream(this.encoding))
@@ -78,7 +78,7 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
 
       else if (request.body instanceof Blob) {
         if (
-          (Number.isNaN(request.body.size) || request.body.size >= this.threshold)
+          (!Number.isFinite(request.body.size) || request.body.size >= this.threshold)
           && isCompressibleContentType(request.body.type)
         ) {
           const compressedStream = request.body.stream().pipeThrough(new CompressionStream(this.encoding))
@@ -112,14 +112,15 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
           contentLength += PART_OVERHEAD + key.length
 
           if (value instanceof Blob) {
-            if (Number.isNaN(value.size)) { // Bun-s3 can use NaN for size
+            if (!Number.isFinite(value.size)) { // Bun-s3 can use NaN for size
               if (!isCompressibleContentType(value.type)) {
                 // Unknown non-compressible part size makes the estimate unreliable
+                contentLength = -Infinity
                 break
               }
 
               // Unknown size for compressible content - still apply compression
-              contentLength = this.threshold
+              contentLength = Infinity
             }
             else {
               contentLength += isCompressibleContentType(value.type)
@@ -130,26 +131,26 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
           else {
             contentLength += value.length * AVG_BYTES_PER_CHAR
           }
+        }
 
-          if (contentLength >= this.threshold) {
-            const res = new Response(request.body)
-            const compressedStream = res.body!.pipeThrough(new CompressionStream(this.encoding))
+        if (contentLength >= this.threshold) {
+          const res = new Response(request.body)
+          const compressedStream = res.body!.pipeThrough(new CompressionStream(this.encoding))
 
-            return next({
-              ...interceptorOptions,
-              request: {
-                ...interceptorOptions.request,
-                body: compressedStream,
-                headers: {
-                  ...request.headers,
-                  'standard-server': [],
-                  'content-type': res.headers.get('content-type')!,
-                  'content-length': [],
-                  'content-encoding': this.encoding,
-                },
+          return next({
+            ...interceptorOptions,
+            request: {
+              ...interceptorOptions.request,
+              body: compressedStream,
+              headers: {
+                ...request.headers,
+                'standard-server': [],
+                'content-type': res.headers.get('content-type')!,
+                'content-length': [],
+                'content-encoding': this.encoding,
               },
-            })
-          }
+            },
+          })
         }
       }
 

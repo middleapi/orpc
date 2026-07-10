@@ -689,9 +689,6 @@ importers:
       '@orpc/contract':
         specifier: workspace:*
         version: link:../contract
-      '@orpc/interop':
-        specifier: workspace:*
-        version: link:../interop
       '@orpc/shared':
         specifier: workspace:*
         version: link:../shared

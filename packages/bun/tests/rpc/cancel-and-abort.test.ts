@@ -4,10 +4,14 @@ import { describe, expect, it, vi } from 'bun:test'
 import { z } from 'zod'
 import { createBunFetchClientServerTest } from './__shared__/client-server.bun-fetch'
 import { createBunWebSocketClientServerTest } from './__shared__/client-server.bun-websocket'
+import { createCompressionBunFetchClientServerTest } from './__shared__/client-server.compression-bun-fetch'
+import { createCompressionBunWebSocketClientServerTest } from './__shared__/client-server.compression-bun-websocket'
 
 describe.each([
   ['bun-fetch', createBunFetchClientServerTest],
   ['bun-websocket', createBunWebSocketClientServerTest],
+  ['compression-bun-fetch', createCompressionBunFetchClientServerTest],
+  ['compression-bun-websocket', createCompressionBunWebSocketClientServerTest],
 ] as const)('cancel and abort: %s', async (adapter, createClientServer) => {
   const handler = vi.fn()
   const router = {
@@ -35,7 +39,7 @@ describe.each([
   })
 
   // TODO: https://github.com/oven-sh/bun/issues/33227
-  it.skipIf(adapter === 'bun-fetch')('server should cancel AsyncIteratorObject response and abort request when client cancels', async () => {
+  it.skipIf(adapter === 'bun-fetch' || adapter === 'compression-bun-fetch')('server should cancel AsyncIteratorObject response and abort request when client cancels', async () => {
     const cancel = vi.fn()
     handler.mockResolvedValueOnce(new AsyncIteratorClass(
       async () => {
@@ -59,7 +63,7 @@ describe.each([
   })
 
   // TODO: https://github.com/oven-sh/bun/issues/33227
-  it.skipIf(adapter === 'bun-fetch')('server should cancel octet stream response and abort request when client cancels', async () => {
+  it.skipIf(adapter === 'bun-fetch' || adapter === 'compression-bun-fetch')('server should cancel octet stream response and abort request when client cancels', async () => {
     const cancel = vi.fn()
     handler.mockResolvedValueOnce(new ReadableStream({
       async pull(controller) {
