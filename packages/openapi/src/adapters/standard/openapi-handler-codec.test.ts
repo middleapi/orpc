@@ -699,7 +699,7 @@ describe('openAPIHandlerCodec', () => {
         const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
 
-        expect(() => codec.encodeOutput(output, procedure, [])).rejects.toThrow('Invalid "detailed" output structure')
+        expect(async () => await codec.encodeOutput(output, procedure, [])).rejects.toThrow('Invalid "detailed" output structure')
       })
     })
   })
