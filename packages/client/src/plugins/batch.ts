@@ -363,11 +363,6 @@ async function decodeLengthPrefixedBlob(blob: Blob, peer: ClientPeer): Promise<v
     const length = view.getUint32(0, false)
     offset += 4
 
-    // Zero-length frame is a keep-alive ping; skip it.
-    if (length === 0) {
-      continue
-    }
-
     if (offset + length > buffer.length) {
       throw new BatchLinkPluginError('Invalid batch response: incomplete message.')
     }
