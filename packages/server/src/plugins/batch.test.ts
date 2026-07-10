@@ -1,4 +1,5 @@
 import type { AnyRouter } from '../router'
+import { promiseWithResolvers } from '@orpc/shared'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { os } from '../builder'
 import { BatchHandlerPlugin } from './batch'
@@ -317,6 +318,194 @@ describe('batchHandlerPlugin', () => {
       }))
 
       expect(response!.status).toBe(200)
+    })
+  })
+
+  describe('keepAlive', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('sends zero-length keep-alive frames while the stream is idle', async () => {
+      const { promise: gate, resolve } = promiseWithResolvers<void>()
+
+      const slowRouter = {
+        ping: os.handler(async () => {
+          await gate
+          return 'pong'
+        }),
+      }
+
+      const handler = createHandler(new BatchHandlerPlugin({
+        keepAlive: { enabled: true, interval: 100 },
+      }), slowRouter)
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [makePeerRequestMessage(0, '/ping')],
+      }))
+
+      expect(response!.body).toBeInstanceOf(ReadableStream)
+
+      const reader = (response!.body as ReadableStream<Uint8Array>).getReader()
+      const frames: Uint8Array[] = []
+
+      const readNext = async () => {
+        const { done, value } = await reader.read()
+        if (!done && value) {
+          frames.push(value)
+        }
+        return done
+      }
+
+      // First keep-alive after interval with no real message yet.
+      const firstKeepAlive = readNext()
+      await vi.advanceTimersByTimeAsync(100)
+      await firstKeepAlive
+
+      expect(frames).toHaveLength(1)
+      expect(frames[0]).toEqual(new Uint8Array([0, 0, 0, 0]))
+
+      // Another keep-alive while still idle.
+      const secondKeepAlive = readNext()
+      await vi.advanceTimersByTimeAsync(100)
+      await secondKeepAlive
+
+      expect(frames).toHaveLength(2)
+      expect(frames[1]).toEqual(new Uint8Array([0, 0, 0, 0]))
+
+      resolve()
+      while (!(await readNext())) {
+        // keep reading until closed
+      }
+
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('does not schedule a keep-alive timer when disabled', async () => {
+      const handler = createHandler(new BatchHandlerPlugin({
+        keepAlive: { enabled: false },
+      }))
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [makePeerRequestMessage(0, '/ping')],
+      }))
+
+      expect(response!.body).toBeInstanceOf(ReadableStream)
+      expect(vi.getTimerCount()).toBe(0)
+
+      // Drain so the stream can complete cleanly.
+      await response!.arrayBuffer()
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('stops keep-alive after the stream is cancelled', async () => {
+      const gate = new Promise<void>(() => {})
+
+      const slowRouter = {
+        ping: os.handler(async () => {
+          await gate
+          return 'pong'
+        }),
+      }
+
+      const handler = createHandler(new BatchHandlerPlugin({
+        keepAlive: { enabled: true, interval: 50 },
+      }), slowRouter)
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [makePeerRequestMessage(0, '/ping')],
+      }))
+
+      expect(vi.getTimerCount()).toBeGreaterThan(0)
+
+      const reader = (response!.body as ReadableStream<Uint8Array>).getReader()
+
+      const first = reader.read()
+      await vi.advanceTimersByTimeAsync(50)
+      await first
+
+      await reader.cancel()
+
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('clears keep-alive timer when keep-alive enqueue fails', async ({ onTestFinished }) => {
+      const gate = new Promise<void>(() => {})
+
+      const slowRouter = {
+        ping: os.handler(async () => {
+          await gate
+          return 'pong'
+        }),
+      }
+
+      const originalEnqueue = ReadableStreamDefaultController.prototype.enqueue
+      const enqueueSpy = vi.spyOn(ReadableStreamDefaultController.prototype, 'enqueue')
+        .mockImplementation(function (this: ReadableStreamDefaultController<Uint8Array>, chunk: Uint8Array) {
+          // Keep-alive frame is a zero-length length prefix: [0, 0, 0, 0]
+          if (
+            chunk instanceof Uint8Array
+            && chunk.byteLength === 4
+            && chunk[0] === 0
+            && chunk[1] === 0
+            && chunk[2] === 0
+            && chunk[3] === 0
+          ) {
+            throw new Error('keep-alive enqueue failed')
+          }
+
+          return originalEnqueue.call(this, chunk)
+        })
+
+      onTestFinished(() => {
+        enqueueSpy.mockRestore()
+      })
+
+      const handler = createHandler(new BatchHandlerPlugin({
+        keepAlive: { enabled: true, interval: 50 },
+      }), slowRouter)
+
+      await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [makePeerRequestMessage(0, '/ping')],
+      }))
+
+      // One keep-alive setInterval is scheduled while the stream is idle.
+      expect(vi.getTimerCount()).toBe(1)
+
+      await vi.advanceTimersByTimeAsync(50)
+
+      // catch path should clear the interval after enqueue throws
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('clears keep-alive timer when peer-message enqueue throws', async ({ onTestFinished }) => {
+      const enqueueSpy = vi.spyOn(ReadableStreamDefaultController.prototype, 'enqueue')
+        .mockThrow(new Error('enqueue failed'))
+
+      onTestFinished(() => {
+        enqueueSpy.mockRestore()
+      })
+
+      const handler = createHandler(new BatchHandlerPlugin({
+        keepAlive: { enabled: false },
+      }))
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [makePeerRequestMessage(0, '/ping')],
+      }))
+
+      const reader = (response!.body as ReadableStream<Uint8Array>).getReader()
+      await expect(reader.read()).rejects.toThrow('enqueue failed')
+      expect(vi.getTimerCount()).toBe(0)
     })
   })
 })

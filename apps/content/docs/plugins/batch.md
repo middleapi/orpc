@@ -76,6 +76,54 @@ const link = new RPCLink({
 })
 ```
 
+### Keep-Alive Timer
+
+In **streaming** mode, long-running batch responses may remain idle for extended periods. The server plugin can send keep-alive frames to keep the connection alive.
+
+```ts
+const handler = new RPCHandler(router, {
+  plugins: [
+    new BatchHandlerPlugin({
+      keepAlive: {
+        /**
+         * If true, a keep-alive frame is sent periodically while the stream is idle.
+         *
+         * @default true
+         */
+        enabled: true,
+        /**
+         * Interval (in milliseconds) between keep-alive frames after the last message.
+         *
+         * @default 15000
+         */
+        interval: 15000,
+      },
+    }),
+  ],
+})
+```
+
+## Filtering Requests
+
+Use `filter` to skip batching for specific requests before group matching runs. Requests for which `filter` returns `false` continue through the link chain individually.
+
+```ts
+const link = new RPCLink({
+  url: '/rpc',
+  plugins: [
+    new BatchLinkPlugin({
+      filter: ({ path }) => !path.includes('upload'),
+      groups: [
+        {
+          condition: () => true,
+          context: {},
+        },
+      ],
+    }),
+  ],
+})
+```
+
 ## Groups
 
 Only requests in the same group are batched together. Each group also defines a context, as described in [client context](/docs/rpc/link#client-context).
@@ -119,27 +167,6 @@ const link = new RPCLink<ClientContext>({
 ```
 
 Now, calls made with `cache = 'force-cache'` use that cache setting whether they are batched or sent individually.
-
-## Filtering Requests
-
-Use `filter` to skip batching for specific requests before group matching runs. Requests for which `filter` returns `false` continue through the link chain individually.
-
-```ts
-const link = new RPCLink({
-  url: '/rpc',
-  plugins: [
-    new BatchLinkPlugin({
-      filter: ({ path }) => !path.includes('upload'),
-      groups: [
-        {
-          condition: () => true,
-          context: {},
-        },
-      ],
-    }),
-  ],
-})
-```
 
 ## Learn More
 

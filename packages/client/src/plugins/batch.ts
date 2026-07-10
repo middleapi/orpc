@@ -363,6 +363,11 @@ async function decodeLengthPrefixedBlob(blob: Blob, peer: ClientPeer): Promise<v
     const length = view.getUint32(0, false)
     offset += 4
 
+    // Zero-length frame is a keep-alive ping; skip it.
+    if (length === 0) {
+      continue
+    }
+
     if (offset + length > buffer.length) {
       throw new BatchLinkPluginError('Invalid batch response: incomplete message.')
     }
@@ -397,6 +402,12 @@ async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array>, pe
       while (buffer.length >= 4) {
         const view = new DataView(buffer.buffer, buffer.byteOffset, 4)
         const length = view.getUint32(0, false)
+
+        // Zero-length frame is a keep-alive ping; skip it.
+        if (length === 0) {
+          buffer = buffer.subarray(4)
+          continue
+        }
 
         if (buffer.length < 4 + length) {
           break
