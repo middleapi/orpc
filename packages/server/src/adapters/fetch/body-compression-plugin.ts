@@ -28,7 +28,10 @@ export interface BodyCompressionHandlerPluginOptions {
    * Override the default content-type filter used to determine which responses should be compressed.
    *
    * @warning Event stream responses are never compressed, regardless of this filter's return value.
-   * @default only responses with compressible content types are compressed.
+   * @default only responses with compressible content types are compressed. Batch responses
+   * (`orpc-batch` request header) with an `application/octet-stream` body are also compressed
+   * when the runtime exposes Node.js `zlib`/`stream` builtins — a flush-per-message compressor
+   * keeps streaming batch semantics intact.
    */
   filter?: (request: Request, response: Response) => boolean
 }
@@ -49,6 +52,10 @@ export class BodyCompressionHandlerPlugin<T extends Context> implements FetchHan
 
       if (!hasContentDisposition && contentType?.startsWith('text/event-stream')) {
         return false
+      }
+
+      if (isFlushCompressibleBatchResponse(request, response)) {
+        return options.filter ? options.filter(request, response) : true
       }
 
       return options.filter
@@ -98,7 +105,22 @@ export class BodyCompressionHandlerPlugin<T extends Context> implements FetchHan
             return result
           }
 
-          const compressedBody = response.body.pipeThrough(new CompressionStream(encoding))
+          /**
+           * `CompressionStream` cannot flush between chunks, so early messages of a
+           * streaming batch response would sit in the compressor buffer until the
+           * stream ends, defeating streaming semantics. Batch responses therefore
+           * use a flush-per-message zlib stream instead (the filter guarantees it is
+           * available whenever a batch response passes through).
+           */
+          const compression = isFlushCompressibleBatchResponse(interceptorOptions.request, response)
+            ? createFlushableCompressionStream(encoding)
+            : new CompressionStream(encoding)
+
+          if (compression === undefined) {
+            return result
+          }
+
+          const compressedBody = response.body.pipeThrough(compression)
           const compressedHeaders = new Headers(response.headers)
 
           compressedHeaders.delete('content-length')
@@ -126,4 +148,72 @@ function isNoTransformCacheControl(cacheControl: string | null): boolean {
   }
 
   return CACHE_CONTROL_NO_TRANSFORM_REGEX.test(cacheControl)
+}
+
+/**
+ * Batch responses carry a `application/octet-stream` body (length-prefixed peer messages),
+ * which the default content-type filter would never compress even though the payload is
+ * mostly JSON. They are only compressible when a flush-capable compressor is available,
+ * otherwise streaming batch responses would lose their streaming semantics.
+ */
+function isFlushCompressibleBatchResponse(request: Request, response: Response): boolean {
+  return request.headers.has('orpc-batch')
+    && !response.headers.has('content-disposition')
+    && (response.headers.get('content-type')?.startsWith('application/octet-stream') ?? false)
+    && getNodeCompressionCompat() !== undefined
+}
+
+interface NodeCompressionCompat {
+  zlib: typeof import('node:zlib')
+  stream: typeof import('node:stream')
+}
+
+/**
+ * `false` = probed and unavailable. Runtime builtins cannot appear later,
+ * so the probe runs at most once per process.
+ */
+let cachedNodeCompressionCompat: NodeCompressionCompat | false | undefined
+
+function getNodeCompressionCompat(): NodeCompressionCompat | undefined {
+  if (cachedNodeCompressionCompat === undefined) {
+    cachedNodeCompressionCompat = false
+
+    try {
+      /**
+       * Deliberately accessed via `globalThis` (not imported) so this cross-runtime
+       * file never hard-depends on node builtins — runtimes without them fall back
+       * to the uncompressed behavior.
+       */
+      // eslint-disable-next-line node/prefer-global/process
+      const zlib = globalThis.process?.getBuiltinModule?.('node:zlib')
+      // eslint-disable-next-line node/prefer-global/process
+      const stream = globalThis.process?.getBuiltinModule?.('node:stream')
+
+      if (zlib !== undefined && typeof stream?.Duplex?.toWeb === 'function') {
+        cachedNodeCompressionCompat = { zlib, stream }
+      }
+    }
+    catch {
+      // runtimes without node builtins keep the `false` sentinel
+    }
+  }
+
+  return cachedNodeCompressionCompat === false ? undefined : cachedNodeCompressionCompat
+}
+
+function createFlushableCompressionStream(
+  encoding: (typeof ORDERED_SUPPORTED_ENCODINGS)[number],
+): ReadableWritablePair<Uint8Array, Uint8Array> | undefined {
+  const compat = getNodeCompressionCompat()
+
+  if (compat === undefined) {
+    return undefined
+  }
+
+  const zlibOptions = { flush: compat.zlib.constants.Z_SYNC_FLUSH }
+  const compressor = encoding === 'gzip'
+    ? compat.zlib.createGzip(zlibOptions)
+    : compat.zlib.createDeflate(zlibOptions)
+
+  return compat.stream.Duplex.toWeb(compressor) as ReadableWritablePair<Uint8Array, Uint8Array>
 }
