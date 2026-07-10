@@ -62,7 +62,7 @@ const link = new RPCLink({
 <!--@include: @/shared/common-plugin-link-compatibility.md -->
 
 ::: warning
-When using the fetch adapter, this plugin is usually unnecessary because most fetch implementations automatically decompress responses based on the `Content-Encoding` header.
+When using the fetch adapter, this plugin is usually unnecessary because most fetch implementations automatically set the `Accept-Encoding` header and decompress response bodies.
 :::
 
 ## Learn More
