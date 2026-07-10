@@ -103,27 +103,6 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-## Filtering Requests
-
-Use `filter` to skip batching for specific requests before group matching runs. Requests for which `filter` returns `false` continue through the link chain individually.
-
-```ts
-const link = new RPCLink({
-  url: '/rpc',
-  plugins: [
-    new BatchLinkPlugin({
-      filter: ({ path }) => !path.includes('upload'),
-      groups: [
-        {
-          condition: () => true,
-          context: {},
-        },
-      ],
-    }),
-  ],
-})
-```
-
 ## Groups
 
 Only requests in the same group are batched together. Each group also defines a context, as described in [client context](/docs/rpc/link#client-context).
@@ -167,6 +146,27 @@ const link = new RPCLink<ClientContext>({
 ```
 
 Now, calls made with `cache = 'force-cache'` use that cache setting whether they are batched or sent individually.
+
+## Filtering Requests
+
+Use `filter` to skip batching for specific requests before group matching runs. Requests for which `filter` returns `false` continue through the link chain individually.
+
+```ts
+const link = new RPCLink({
+  url: '/rpc',
+  plugins: [
+    new BatchLinkPlugin({
+      filter: ({ path }) => !path.includes('upload'),
+      groups: [
+        {
+          condition: () => true,
+          context: {},
+        },
+      ],
+    }),
+  ],
+})
+```
 
 ## Learn More
 
