@@ -252,7 +252,7 @@ const handler = new RPCHandler(router, {
         /**
          * Interval (in milliseconds) between ping comments sent after the last event.
          *
-         * @default 5000
+         * @default 15000
          */
         interval: 5000,
         /**

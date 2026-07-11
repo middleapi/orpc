@@ -254,9 +254,9 @@ Configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed 
             /**
              * Interval (in milliseconds) between ping comments sent after the last event.
              *
-             * @default 5000
+             * @default 15000
              */
-            interval: 5000,
+            interval: 15000,
             /**
              * The content of the ping comment. Must not include newline characters.
              *
