@@ -36,7 +36,7 @@ export const createHonoFetchClientServerTest: CreateOpenAPIClientServerTest = (
     origin: `http://localhost:${addressInfo.port}`,
     serializer,
     fetch(url, init) {
-      return fetch(url, { ...init, duplex: 'half' } as never)
+      return fetch(url, init)
     },
   })
 

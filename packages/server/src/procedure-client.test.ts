@@ -682,7 +682,7 @@ describe('createProcedureClient', () => {
     expect(handler).toHaveBeenCalledWith(expect.objectContaining({ context: { auth: true } }), undefined)
   })
 
-  it('trace output event iterator and use override for proxy', async () => {
+  it('trace output AsyncIteratorObject and use override for proxy', async () => {
     const handlerIterator = (async function* () {
       yield 'event'
       return 'result'
@@ -842,7 +842,7 @@ describe('createProcedureClient', () => {
       expect(reconcileErrorSpy).toHaveBeenCalledWith(errorMap, error)
     })
 
-    describe('event iterator', () => {
+    describe('asyncIteratorObject', () => {
       it('reconcile error event before throw', async () => {
         const error = new ORPCError('BAD_REQUEST', { data: 'data' })
         handler.mockResolvedValueOnce((async function* () {

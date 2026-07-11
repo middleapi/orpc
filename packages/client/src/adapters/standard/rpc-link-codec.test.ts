@@ -96,7 +96,7 @@ describe('rpcLinkCodec', () => {
       }],
       ['Blob', () => new Blob(['data'])],
       ['ReadableStream', () => new ReadableStream()],
-      ['async iterator', () => (async function* () { yield 1 })()],
+      ['AsyncIteratorObject', () => (async function* () { yield 1 })()],
     ] as const)('falls back to POST when GET with %s', async (_, factory) => {
       const codec = new RPCLinkCodec({ url: '/api', method: 'GET', serializer })
       const value = factory()
@@ -231,7 +231,7 @@ describe('rpcLinkCodec', () => {
   describe('.decodeResponse', () => {
     const codec = new RPCLinkCodec({ url: '/api', serializer })
 
-    it.each([200, 201, 399])('decodes successful output (status %i)', async (status) => {
+    it.each([100, 199, 200, 204, 301, 302, 399])('treats status %i as success', async (status) => {
       const serialized = serializer.serialize({ data: 'hello' })
 
       const result = await codec.decodeResponse({
@@ -241,6 +241,19 @@ describe('rpcLinkCodec', () => {
       })
 
       expect(result).toEqual({ kind: 'output', output: deserializeSpy.mock.results[0]!.value })
+    })
+
+    it.each([400, 401, 403, 404, 500, 599, 600])('treats status %i as error', async (status) => {
+      const error = new ORPCError('BAD_REQUEST')
+      const serialized = serializer.serialize(error.toJSON())
+
+      const result = await codec.decodeResponse({
+        status,
+        headers: {},
+        resolveBody: () => Promise.resolve(serialized),
+      })
+
+      expect(result.kind).toBe('error')
     })
 
     it('decodes ORPCError JSON from error response', async () => {
@@ -278,19 +291,6 @@ describe('rpcLinkCodec', () => {
           body: { something: 'unexpected' },
         }))
       }
-    })
-
-    it.each([400, 500, 100])('treats status %i as error', async (status) => {
-      const error = new ORPCError('BAD_REQUEST')
-      const serialized = serializer.serialize(error.toJSON())
-
-      const result = await codec.decodeResponse({
-        status,
-        headers: {},
-        resolveBody: () => Promise.resolve(serialized),
-      })
-
-      expect(result.kind).toBe('error')
     })
 
     it('throws on invalid RPC response format', async () => {

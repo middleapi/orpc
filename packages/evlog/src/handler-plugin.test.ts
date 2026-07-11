@@ -240,7 +240,7 @@ describe('evlogHandlerPlugin', () => {
     expect(finish).toHaveBeenCalledWith()
   })
 
-  it('wraps matched async iterators and finishes after successful consumption', async () => {
+  it('wraps matched AsyncIteratorObject and finishes after successful consumption', async () => {
     const plugin = new EvlogHandlerPlugin()
     const { routing } = getPluginHooks(plugin)
     const { finish } = mockIntegration()
@@ -270,7 +270,7 @@ describe('evlogHandlerPlugin', () => {
     expect(finish).toHaveBeenCalledWith({ status: 200 })
   })
 
-  it('logs async iterator wrapper errors as internal failures', async () => {
+  it('logs AsyncIteratorObject wrapper errors as internal failures', async () => {
     const plugin = new EvlogHandlerPlugin()
     const { routing } = getPluginHooks(plugin)
     const { finish, logger } = mockIntegration()
@@ -449,7 +449,7 @@ describe('evlogHandlerPlugin', () => {
     })).resolves.toBe('pong')
   })
 
-  it('logs client async iterator errors', async () => {
+  it('logs client AsyncIteratorObject errors', async () => {
     const logger = createLogger()
     const plugin = new EvlogHandlerPlugin()
     const { client } = getPluginHooks(plugin)

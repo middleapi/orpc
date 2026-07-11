@@ -1,7 +1,7 @@
 {
   "name": "@orpc/client",
   "type": "module",
-  "version": "2.0.0-beta.7",
+  "version": "2.0.0-beta.16",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
@@ -66,9 +66,9 @@
   },
   "dependencies": {
     "@orpc/shared": "workspace:*",
-    "@standardserver/core": "^0.0.25",
-    "@standardserver/fetch": "^0.0.25",
-    "@standardserver/peer": "^0.0.25"
+    "@standardserver/core": "^0.2.0",
+    "@standardserver/fetch": "^0.2.0",
+    "@standardserver/peer": "^0.2.0"
   },
   "devDependencies": {
     "zod": "^4.4.3"

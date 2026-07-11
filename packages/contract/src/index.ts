@@ -3,7 +3,6 @@ export * from './builder-variants'
 export * from './caller'
 export * from './error'
 export * from './error-utils'
-export * from './event-iterator'
 export * from './meta'
 export * from './meta-built-in'
 export * from './meta-utils'
@@ -13,6 +12,13 @@ export * from './router'
 export * from './router-client'
 export * from './router-utils'
 export * from './schema'
+export * from './schema-built-in'
+export {
+  /**
+   * @deprecated Use `asyncIteratorObject` instead.
+   */
+  asyncIteratorObject as eventIterator,
+} from './schema-built-in'
 export * from './schema-utils'
 
 export type {

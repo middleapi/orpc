@@ -2,8 +2,8 @@ import type { StandardBody } from '@standardserver/core'
 import type { RPCJsonSerializerOptions } from './rpc-json-serializer'
 import { isAsyncIteratorObject, stringifyJSON } from '@orpc/shared'
 import { ErrorEvent } from '@standardserver/core'
+import { wrapAsyncIteratorPreservingEventMeta } from './async-iterator-object'
 import { createORPCErrorFromJson, isORPCErrorJson, toORPCError } from './error-utils'
-import { wrapEventIteratorPreservingMeta } from './event-iterator'
 import { RPCJsonSerializer } from './rpc-json-serializer'
 
 export interface RPCSerializerSerializeOptions {
@@ -41,7 +41,7 @@ export class RPCSerializer {
     }
 
     if (isAsyncIteratorObject(data)) {
-      return wrapEventIteratorPreservingMeta(data, {
+      return wrapAsyncIteratorPreservingEventMeta(data, {
         mapResult: (result) => {
           // standard event stream data already supports these types without additional serialization.
           if (result.value === undefined) {
@@ -86,7 +86,7 @@ export class RPCSerializer {
     }
 
     if (isAsyncIteratorObject(data)) {
-      return wrapEventIteratorPreservingMeta(data, {
+      return wrapAsyncIteratorPreservingEventMeta(data, {
         mapResult: (result) => {
           if (result.value === undefined) {
             return result

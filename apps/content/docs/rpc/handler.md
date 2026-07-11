@@ -203,6 +203,9 @@ By default, `RPCHandler` uses `COMMON_ERROR_STATUS_MAP` to determine response st
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/server'
 
 const handler = new RPCHandler(router, {
+  /**
+   * The status code should be in the `4xx` or `5xx` range (must be greater than or equal to `400`).
+   */
   errorStatusMap: {
     ...COMMON_ERROR_STATUS_MAP,
     CUSTOM_ERROR: 599,
@@ -218,7 +221,7 @@ const handler = new RPCHandler(router, {
 
 ## Event Stream Options
 
-Configure how [event iterators](/docs/event-iterator) are streamed to the client. Available options depend on the adapter. For example, the fetch adapter supports:
+Configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed to the client. Available options depend on the adapter. For example, the fetch adapter supports:
 
 ```ts
 const handler = new RPCHandler(router, {

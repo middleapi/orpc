@@ -221,7 +221,7 @@ Procedures run only when a matching NestJS controller method is called. If no ro
 
 ### Event Stream Options
 
-Configure how [event iterators](/docs/event-iterator) are streamed to the client using the `toNestResponse.eventStream` options.
+Configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed to the client using the `toNestResponse.eventStream` options.
 
 ```ts
 @Module({
@@ -279,16 +279,22 @@ Configure how [event iterators](/docs/event-iterator) are streamed to the client
 export class AppModule {}
 ```
 
-### `toStandardLazyRequest` option
+### `toNestStandardLazyRequest` option
 
-By default, `@orpc/nest` supports the Express and Fastify adapters. If you use another adapter, you may need to customize how a NestJS request is converted into a standard request. For details, see [Standard Server](http://standardserver.dev/).
+By default, `@orpc/nest` supports the Express and Fastify adapters. If you use another adapter, you may need to customize how a NestJS request is converted into a standard request (including additional params). For details, see [Standard Server](http://standardserver.dev/).
 
 ```ts
+import { NestStandardLazyRequest } from '@orpc/nest'
+import { toStandardLazyRequest } from '@standardserver/fetch'
+
 @Module({
   imports: [
     ORPCModule.forRoot({
-      toStandardLazyRequest: (req, res) => {
-        // your custom implementation
+      toNestStandardLazyRequest: (req, res) => {
+        // example Hono platform support
+        const standardRequest: NestStandardLazyRequest = toStandardLazyRequest(req.raw)
+        standardRequest.params = req.params
+        return standardRequest
       },
     }),
   ],

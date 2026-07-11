@@ -6,26 +6,26 @@ RPC Serializers handle the serialization and deserialization of data sent betwee
 
 `RPCSerializer` supports the following types by default:
 
-| Type                                     | Handler key | Notes                         |
-| ---------------------------------------- | ----------- | ----------------------------- |
-| **string**                               |             |                               |
-| **number**                               |             |                               |
-| **NaN**                                  | `nan`       |                               |
-| **boolean**                              |             |                               |
-| **null**                                 |             |                               |
-| **undefined**                            | `undefined` | Ignore `undefined` properties |
-| **Date**                                 | `date`      | Includes `Invalid Date`.      |
-| **BigInt**                               | `bigint`    |                               |
-| **RegExp**                               | `regexp`    |                               |
-| **URL**                                  | `url`       |                               |
-| **Record (object)**                      |             | `toJSON` methods are ignored  |
-| **Array**                                |             |                               |
-| **Set**                                  | `set`       |                               |
-| **Map**                                  | `map`       |                               |
-| **Blob**                                 |             | Unsupported in Event Iterator |
-| **File**                                 | None        | Unsupported in Event Iterator |
-| **Event Iterator (AsyncIteratorObject)** |             | Only at the root level        |
-| **ReadableStream\<Uint8Array\>**         |             | Only at the root level        |
+| Type                             | Handler key | Notes                                |
+| -------------------------------- | ----------- | ------------------------------------ |
+| **string**                       |             |                                      |
+| **number**                       |             |                                      |
+| **NaN**                          | `nan`       |                                      |
+| **boolean**                      |             |                                      |
+| **null**                         |             |                                      |
+| **undefined**                    | `undefined` | Ignore `undefined` properties        |
+| **Date**                         | `date`      | Includes `Invalid Date`.             |
+| **BigInt**                       | `bigint`    |                                      |
+| **RegExp**                       | `regexp`    |                                      |
+| **URL**                          | `url`       |                                      |
+| **Record (object)**              |             | `toJSON` methods are ignored         |
+| **Array**                        |             |                                      |
+| **Set**                          | `set`       |                                      |
+| **Map**                          | `map`       |                                      |
+| **Blob**                         |             | Unsupported in `AsyncIteratorObject` |
+| **File**                         |             | Unsupported in `AsyncIteratorObject` |
+| **AsyncIteratorObject**          |             | Only at the root level               |
+| **ReadableStream\<Uint8Array\>** |             | Only at the root level               |
 
 <!--@include: @/shared/standard-server-cors-warning.md -->
 
@@ -144,9 +144,9 @@ Standard-Server: file
 If the receiver mistakenly handles this payload as a regular (non-file) body, set the `standard-server` header to help the receiver detect the actual data type and handle it correctly. Learn more about this header in the [Standard Server Documentation](https://github.com/middleapi/standardserver#resolving-body).
 :::
 
-### Event Iterator (AsyncIteratorObject)
+### AsyncIteratorObject
 
-When the output is an event iterator (`AsyncIteratorObject`), it is sent as a [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) stream. Each event contains one serialized chunk of data.
+When the output is an `AsyncIteratorObject`, it is sent as a [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) stream. Each event contains one serialized chunk of data.
 
 ```http
 HTTP/1.1 200 OK

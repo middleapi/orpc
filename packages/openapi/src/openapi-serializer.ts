@@ -1,7 +1,7 @@
 import type { StandardBody } from '@standardserver/core'
 import type { BracketNotationSerializerOptions } from './bracket-notation'
 import type { OpenAPIJsonSerializerOptions } from './openapi-json-serializer'
-import { createORPCErrorFromJson, isORPCErrorJson, toORPCError, wrapEventIteratorPreservingMeta } from '@orpc/client'
+import { createORPCErrorFromJson, isORPCErrorJson, toORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import { isAsyncIteratorObject } from '@orpc/shared'
 import { ErrorEvent } from '@standardserver/core'
 import { BracketNotationSerializer } from './bracket-notation'
@@ -24,7 +24,7 @@ export interface OpenAPISerializerSerializeOptions {
   asFormData?: boolean | undefined
 }
 
-export interface OpenAPISerializerOptions extends OpenAPIJsonSerializerOptions, OpenAPISerializerSerializeOptions {
+export interface OpenAPISerializerOptions extends OpenAPIJsonSerializerOptions {
   /**
    * Options for bracket notation serializer, like maxExplicitDeserializingArrayIndex
    */
@@ -60,7 +60,7 @@ export class OpenAPISerializer {
       }
 
       if (isAsyncIteratorObject(data)) {
-        return wrapEventIteratorPreservingMeta(data, {
+        return wrapAsyncIteratorPreservingEventMeta(data, {
           mapResult: (result) => {
             // standard event stream data already supports these types without additional serialization.
             if (result.value === undefined) {
@@ -109,7 +109,7 @@ export class OpenAPISerializer {
     }
 
     if (isAsyncIteratorObject(data)) {
-      return wrapEventIteratorPreservingMeta(data, {
+      return wrapAsyncIteratorPreservingEventMeta(data, {
         mapResult: (result) => {
           if (result.value === undefined) {
             return result

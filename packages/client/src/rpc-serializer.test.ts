@@ -61,7 +61,7 @@ describe('rpcSerializer', () => {
     })
   })
 
-  describe('event iterator', async () => {
+  describe('asyncIteratorObject', async () => {
     const serializer = new RPCSerializer()
 
     function serializeAndDeserialize(value: unknown): unknown {

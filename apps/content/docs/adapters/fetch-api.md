@@ -155,7 +155,7 @@ The examples above only show how to configure the link. For examples of creating
 
 ## Event Stream Options
 
-You can configure how [event iterators](/docs/event-iterator) are streamed to the client using the `toFetchResponse.eventStream` options when creating the handler.
+You can configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed to the client using the `toFetchResponse.eventStream` options when creating the handler.
 
 ```ts
 const handler = new OpenAPIHandler(router, {
@@ -209,5 +209,5 @@ const handler = new OpenAPIHandler(router, {
 ```
 
 ::: info
-You can also configure how [event iterators](/docs/event-iterator) are streamed from client to server using `toFetchRequest.eventStream` options when creating the link. However, this is rarely used because streaming requests are not widely supported in browsers and may require manually overriding the `fetch` function with `duplex`.
+You can also configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed from client to server using `toFetchRequest.eventStream` options when creating the link.
 :::

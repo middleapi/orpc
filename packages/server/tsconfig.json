@@ -3,8 +3,7 @@
   "references": [
     { "path": "../client" },
     { "path": "../contract" },
-    { "path": "../shared" },
-    { "path": "../interop" }
+    { "path": "../shared" }
   ],
   "include": ["package.json", "src"],
   "exclude": [

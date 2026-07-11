@@ -58,6 +58,21 @@ const handler = new OpenAPIHandler(router, {
 })
 ```
 
+::: tip
+To make `providerConfig` typesafe, install the type definitions for your chosen provider:
+
+::: code-group
+
+```sh [scalar]
+npm install @scalar/api-reference
+```
+
+```sh [swagger]
+npm install swagger-ui @types/swagger-ui
+```
+
+:::
+
 ::: info
 You can also load custom assets for the docs UI by setting `providerScriptUrl` and `providerCssUrl`.
 :::

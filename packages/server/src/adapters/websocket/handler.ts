@@ -1,9 +1,9 @@
-import type { MaybeOptionalOptions } from '@orpc/shared'
+import type { Arrayable, MaybeOptionalOptions } from '@orpc/shared'
 import type { DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standardserver/peer'
 import type { Context } from '../../context'
 import type { StandardHandler } from '../standard'
 import type { StandardPeerRequestHandlerOptions } from '../standard-peer'
-import { resolveMaybeOptionalOptions, toStringOrBytes } from '@orpc/shared'
+import { loadBytes, resolveMaybeOptionalOptions, sequential, toStringOrBytes } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standardserver/peer'
 import { createStandardPeerRequestHandler } from '../standard-peer'
 
@@ -11,9 +11,11 @@ import { createStandardPeerRequestHandler } from '../standard-peer'
  * Supports standard WebSocket instances, Bun ServerWebSocket, "ws" ServerWebSocket,
  * Cloudflare WebSocket Hibernation, and similar implementations.
  */
-export type WebsocketLike = Pick<WebSocket, 'send'>
+export type WebSocketLike = {
+  send: (data: string | Uint8Array<ArrayBuffer>) => unknown
+}
 
-export interface WebsocketHandlerOptions<_T extends Context> {
+export interface WebSocketHandlerOptions<_T extends Context> {
   /**
    * Options for encoding peer messages. such as `prefix` for distinguishing messages on the same channel..
    */
@@ -25,44 +27,51 @@ export interface WebsocketHandlerOptions<_T extends Context> {
   decodePeerMessage?: DecodePeerMessageOptions | undefined
 }
 
-export class WebsocketHandler<T extends Context> {
-  private readonly peers = new WeakMap<WebsocketLike, ServerPeer>()
-  private readonly encodePeerMessageOptions: WebsocketHandlerOptions<T>['encodePeerMessage']
-  private readonly decodePeerMessageOptions: WebsocketHandlerOptions<T>['decodePeerMessage']
+export class WebSocketHandler<T extends Context> {
+  private readonly peers = new WeakMap<WebSocketLike, ServerPeer>()
+  private readonly encodePeerMessageOptions: WebSocketHandlerOptions<T>['encodePeerMessage']
+  private readonly decodePeerMessageOptions: WebSocketHandlerOptions<T>['decodePeerMessage']
 
   constructor(
     private readonly handler: StandardHandler<T>,
-    options: NoInfer<WebsocketHandlerOptions<T>> = {},
+    options: NoInfer<WebSocketHandlerOptions<T>> = {},
   ) {
     this.encodePeerMessageOptions = options.encodePeerMessage
     this.decodePeerMessageOptions = options.decodePeerMessage
   }
 
   /**
-   * Handles a single message received from a WebSocket.
+   * Handles a single WebSocket message.
    *
-   * @warning AVOID calling this method, if `.upgrade()` is used, as `.upgrade()` already sets up necessary event listeners to call this method for incoming messages and manage peer lifecycle.
+   * Message order matters. Call this immediately after receiving a message,
+   * before any other async work, to preserve ordering.
    *
-   * @param ws The WebSocket instance, require consistent instance across messages for proper peer management
-   * @param data The message data received from the WebSocket, can be string, ArrayBuffer, Blob, ...
+   * To avoid async Blob reads, configure `ws.binaryType` to return binary data
+   * directly (for example, `arraybuffer`).
+   *
+   * @param ws The WebSocket instance. Use the same instance for all messages.
+   * @param data The received message. Binary data should already be loaded (not a `Blob`).
    */
   async message(
-    ws: WebsocketLike,
-    data: string | ArrayBuffer | Blob | Exclude<ConstructorParameters<typeof Blob>[0], undefined>[0][] | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>,
+    ws: WebSocketLike,
+    data: Arrayable<string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>>,
     ...rest: MaybeOptionalOptions<StandardPeerRequestHandlerOptions<T>>
   ): Promise<{ matched: boolean }> {
     let peer = this.peers.get(ws)
 
     if (!peer) {
       this.peers.set(ws, peer = new ServerPeer(async (message) => {
-        return ws.send(await encodePeerMessage(message, this.encodePeerMessageOptions))
+        const encoded = await encodePeerMessage(message, this.encodePeerMessageOptions)
+        await ws.send(encoded)
       }))
     }
 
-    const encoded = await toStringOrBytes(data)
-
+    /**
+     * Message order is important: loading -> decode -> .message.
+     * This flow must stay synchronous, or we need to use `sequential` helper
+     */
+    const encoded = toStringOrBytes(data)
     const result = decodePeerMessage(encoded, this.decodePeerMessageOptions)
-
     if (result.matched && isClientPeerSendMessage(result.message)) {
       await peer.message(
         result.message,
@@ -74,32 +83,41 @@ export class WebsocketHandler<T extends Context> {
   }
 
   /**
-   * Called when a websocket is closed, to clean up any associated peer state.
+   * Cleans up peer state for a closed WebSocket.
    *
-   * @warning AVOID calling this method, if `.upgrade()` is used, as `.upgrade()` already sets up necessary event listeners to call this method for incoming messages and manage peer lifecycle.
-   *
-   * @param ws The WebSocket instance to clean up, must be the same instance used in `.message()` calls to properly clean up
+   * @param ws The same WebSocket instance passed to `.message()`.
    */
-  async close(ws: WebsocketLike): Promise<void> {
+  async close(ws: WebSocketLike): Promise<void> {
     const peer = this.peers.get(ws)
 
     if (peer) {
-      await peer.close()
+      // delete before close to avoid potential race conditions
       this.peers.delete(ws)
+      await peer.close()
     }
   }
 
   /**
-   * Attaches websocket event listeners for message and close handling.
+   * Attaches message and close event listeners to a WebSocket.
    *
-   * Use this instead of calling `.message()` and `.close()` manually.
-   * Requires a websocket-like object that supports `addEventListener` and `removeEventListener`.
+   * Prefer this over calling `.message()` and `.close()` manually.
    */
   upgrade(
     ws: Pick<WebSocket, 'send' | 'addEventListener' | 'removeEventListener'>,
     ...rest: MaybeOptionalOptions<StandardPeerRequestHandlerOptions<T>>
   ): void {
-    ws.addEventListener('message', event => this.message(ws, event.data, ...rest))
+    /**
+     * Message order is important: loading -> decode -> .message.
+     * This flow must stay synchronous, or we need to use `sequential` helper
+     */
+    ws.addEventListener('message', sequential(async (event) => {
+      // For better compatibility avoid control or depend on websocket.binaryType
+      const data = event.data instanceof Blob ? await loadBytes(event.data) : event.data
+
+      // Not awaited: `this.message` runs business logic that may be slow,
+      // and awaiting it would block decoding of subsequent messages.
+      this.message(ws, data, ...rest)
+    }))
     ws.addEventListener('close', () => this.close(ws))
   }
 }

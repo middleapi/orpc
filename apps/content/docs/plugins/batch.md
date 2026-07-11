@@ -76,6 +76,33 @@ const link = new RPCLink({
 })
 ```
 
+### Keep-Alive Timer
+
+In **streaming** mode, long-running batch responses may remain idle for extended periods. The server plugin can send keep-alive frames to keep the connection alive.
+
+```ts
+const handler = new RPCHandler(router, {
+  plugins: [
+    new BatchHandlerPlugin({
+      keepAlive: {
+        /**
+         * If true, a keep-alive frame is sent periodically while the stream is idle.
+         *
+         * @default true
+         */
+        enabled: true,
+        /**
+         * Interval (in milliseconds) between keep-alive frames after the last message.
+         *
+         * @default 15000
+         */
+        interval: 15000,
+      },
+    }),
+  ],
+})
+```
+
 ## Groups
 
 Only requests in the same group are batched together. Each group also defines a context, as described in [client context](/docs/rpc/link#client-context).

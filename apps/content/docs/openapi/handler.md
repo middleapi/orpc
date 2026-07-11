@@ -190,6 +190,9 @@ By default, `OpenAPIHandler` determines response status codes using `COMMON_ERRO
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/openapi'
 
 const handler = new OpenAPIHandler(router, {
+  /**
+   * The status code should be in the `4xx` or `5xx` range (must be greater than or equal to `400`).
+   */
   errorStatusMap: {
     ...COMMON_ERROR_STATUS_MAP,
     CUSTOM_ERROR: 599,
@@ -220,7 +223,7 @@ If you use `OpenAPILink` with a custom server-side error format, make sure to co
 
 ## Event Stream Options
 
-Configure how [event iterators](/docs/event-iterator) are streamed to the client. Available options depend on the adapter. For example, the fetch adapter supports:
+Configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed to the client. Available options depend on the adapter. For example, the fetch adapter supports:
 
 ```ts
 const handler = new OpenAPIHandler(router, {

@@ -144,7 +144,7 @@ When using delimited styles, do not use delimiter characters like `,`, ` `, or `
 
 ## Output Mapping
 
-By default, oRPC uses `compact` mode. The procedure's return value becomes the response body, and the status code comes from `successStatus`, which defaults to `200`.
+By default, oRPC uses `compact` mode. The procedure's return value becomes the response body, and the status code comes from `successStatus`, which defaults to `200` (should be in the `2xx` range and must be less than `400`).
 
 ```ts
 const getPlanet = os
@@ -158,7 +158,7 @@ const getPlanet = os
 
 In `detailed` mode, return an object with the following fields:
 
-- `status`: optional success status code _(defaults to `successStatus`)_
+- `status`: optional success status code _(defaults to `successStatus`, should be in the `2xx` range and must be less than `400`)_
 - `headers`: optional response headers in lower-case keys
 - `body`: optional response body
 
@@ -218,15 +218,15 @@ const uploadLargeFile = os
 
 Supported body hints:
 
-| Hint                | Parsed Result                                                                     |
-| ------------------- | --------------------------------------------------------------------------------- |
-| `json`              | JSON value                                                                        |
-| `form-data`         | `FormData` decoded with [bracket notation](/docs/openapi/bracket-notation)        |
-| `url-search-params` | `URLSearchParams` decoded with [bracket notation](/docs/openapi/bracket-notation) |
-| `event-stream`      | [Event Iterator](/docs/event-iterator)                                            |
-| `octet-stream`      | `ReadableStream<Uint8Array>` for streamed binary data                             |
-| `file`              | `File` for binary data                                                            |
-| `none`              | `undefined`                                                                       |
+| Hint                | Parsed Result                                                                                       |
+| ------------------- | --------------------------------------------------------------------------------------------------- |
+| `json`              | JSON value                                                                                          |
+| `form-data`         | `FormData` decoded with [bracket notation](/docs/openapi/bracket-notation)                          |
+| `url-search-params` | `URLSearchParams` decoded with [bracket notation](/docs/openapi/bracket-notation)                   |
+| `event-stream`      | [AsyncIteratorObject](/docs/async-iterator-object)                                                  |
+| `octet-stream`      | [ReadableStream\<Uint8Array\>](/docs/binary-data#readablestreamuint8array) for streamed binary data |
+| `file`              | `File` for binary data                                                                              |
+| `none`              | `undefined`                                                                                         |
 
 ::: info
 Learn more about body hints in the [Standard Server documentation](https://github.com/middleapi/standardserver#standard-body)

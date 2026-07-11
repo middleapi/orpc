@@ -6,20 +6,20 @@ const smallSponsors = sponsors.filter(s => s.sidebarSize === 'small')
 </script>
 
 <template>
-  <div class="aside-container">
-    <a class="aside-sponsors-title" href="https://github.com/sponsors/dinwwwh" target="_blank" rel="noopener">SPONSORS</a>
+  <div :class="$style['aside-container']">
+    <a :class="$style['aside-sponsors-title']" href="https://github.com/sponsors/dinwwwh" target="_blank" rel="noopener">SPONSORS</a>
 
-    <div class="aside-sponsors-list">
-      <a v-for="sponsor in normalSponsors" :key="sponsor.login" class="aside-sponsor" target="_blank" rel="noopener" :href="sponsor.link">
+    <div :class="$style['aside-sponsors-list']">
+      <a v-for="sponsor in normalSponsors" :key="sponsor.login" :class="$style['aside-sponsor']" target="_blank" rel="noopener" :href="sponsor.link">
         <img :src="sponsor.sidebarLogo" :alt="sponsor.name || sponsor.login">
       </a>
 
-      <a v-if="normalSponsors.length < 3" class="aside-sponsor" href="https://github.com/sponsors/dinwwwh" target="_blank" rel="noopener">
-        <span class="aside-sponsor-text">Become a sponsor</span>
+      <a v-if="normalSponsors.length < 3" :class="$style['aside-sponsor']" href="https://github.com/sponsors/dinwwwh" target="_blank" rel="noopener">
+        <span :class="$style['aside-sponsor-text']">Become a sponsor</span>
       </a>
 
-      <div class="aside-sponsors-small">
-        <a v-for="sponsor in smallSponsors" :key="sponsor.login" class="aside-sponsor" target="_blank" rel="noopener" :href="sponsor.link">
+      <div :class="$style['aside-sponsors-small']">
+        <a v-for="sponsor in smallSponsors" :key="sponsor.login" :class="$style['aside-sponsor']" target="_blank" rel="noopener" :href="sponsor.link">
           <img :src="sponsor.sidebarLogo" :alt="sponsor.name || sponsor.login">
         </a>
       </div>
@@ -27,7 +27,7 @@ const smallSponsors = sponsors.filter(s => s.sidebarSize === 'small')
   </div>
 </template>
 
-<style scoped>
+<style module>
 .aside-container {
   margin-top: 33px;
 }
@@ -68,12 +68,12 @@ const smallSponsors = sponsors.filter(s => s.sidebarSize === 'small')
   opacity: 100%;
 }
 
-.dark .aside-sponsor {
+:global(.dark) .aside-sponsor {
   filter: grayscale(1) invert(1);
   background-color: var(--vp-c-text-1);
 }
 
-.dark .aside-sponsor:hover {
+:global(.dark) .aside-sponsor:hover {
   filter: brightness(1.1);
 }
 

@@ -21,6 +21,8 @@ return { current, ttl }
 export interface RedisRateLimiterOptions {
   /**
    * The prefix to use for Redis keys.
+   *
+   * @default ''
    */
   prefix?: string
 
@@ -36,9 +38,20 @@ export interface RedisRateLimiterOptions {
 
   /**
    * Block until the request may pass or timeout is reached.
+   *
+   * @default { enabled: false }
    */
   blockingUntilReady?: {
+    /**
+     * Block until the request may pass or timeout is reached.
+     *
+     * @default false
+     */
     enabled: boolean
+
+    /**
+     * milliseconds
+     */
     timeout: number
   }
 }

@@ -2,30 +2,22 @@ packages:
   - 'apps/*'
   - 'packages/*'
   - 'playgrounds/*'
-onlyBuiltDependencies:
-  - better-sqlite3
-  - electron
-  - esbuild
 
-preferWorkspacePackages: true
+# Hoist everything (default) except @types/bun. When @types/node and @types/bun are
+# installed in different packages, hoisting both into the same env causes a
+# conflict and breaks type checking when working on Node.js types alongside
+# a package that imports from 'bun'. Excluding @types/bun from hoisting
+# avoids this while keeping hoisting enabled for everything else.
+hoistPattern:
+  - '*'
+  - '!@types/bun'
+
+# Lets playgrounds/* resolve local packages without the 'workspace:' protocol
+# during development. When a playground is cloned standalone, the same
+# dependencies resolve to registry versions instead.
 linkWorkspacePackages: true
-shamefullyHoist: true
-minimumReleaseAgeExclude:
-  - '@vitest/coverage-v8@4.1.9'
-  - '@vitest/expect@4.1.9'
-  - '@vitest/mocker@4.1.9'
-  - '@vitest/pretty-format@4.1.9'
-  - '@vitest/runner@4.1.9'
-  - '@vitest/snapshot@4.1.9'
-  - '@vitest/spy@4.1.9'
-  - '@vitest/utils@4.1.9'
-  - vitest@4.1.9
-  - '@standardserver/core@0.0.24'
-  - '@standardserver/fetch@0.0.24'
-  - '@standardserver/node@0.0.24'
-  - '@standardserver/peer@0.0.24'
-  - '@standardserver/shared@0.0.24'
-  - effect@4.0.0-beta.90
+preferWorkspacePackages: true
+
 allowBuilds:
   '@parcel/watcher': false
   '@scarf/scarf': false
@@ -34,12 +26,19 @@ allowBuilds:
   core-js-pure: false
   esbuild: false
   msgpackr-extract: false
-  msw: true
+  msw: false
   protobufjs: false
   sharp: false
   simple-git-hooks: false
   spawn-sync: false
   tree-sitter: false
   tree-sitter-json: false
-  vue-demi: true
+  vue-demi: false
   workerd: false
+
+minimumReleaseAgeExclude:
+  - '@standardserver/core@0.2.0'
+  - '@standardserver/fetch@0.2.0'
+  - '@standardserver/node@0.2.0'
+  - '@standardserver/peer@0.2.0'
+  - '@standardserver/shared@0.2.0'

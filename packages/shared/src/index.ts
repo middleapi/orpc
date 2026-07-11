@@ -28,6 +28,7 @@ export {
   isAsyncIteratorObject,
   isTypescriptObject,
   parseEmptyableJSON,
+  sequential,
   SequentialIdGenerator,
   sleep,
   stringifyJSON,
@@ -40,6 +41,7 @@ export type {
 } from '@standardserver/shared'
 
 export type {
+  Arrayable,
   IsEqual,
   PartialDeep,
   Promisable,

@@ -3,13 +3,5 @@
   "compilerOptions": {
     "types": ["bun"]
   },
-  "include": ["./package.json", "src"],
-  "exclude": [
-    "**/*.test.*",
-    "**/*.test-d.ts",
-    "**/*.bench.*",
-    "**/__tests__/**",
-    "**/__mocks__/**",
-    "**/__snapshots__/**"
-  ]
+  "include": ["./package.json", "src", "tests"]
 }

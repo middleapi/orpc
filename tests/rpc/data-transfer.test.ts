@@ -3,17 +3,33 @@ import { sleep } from '@standardserver/shared'
 import { z } from 'zod'
 import { builtInRPCSupportDataTypes } from './__shared__/built-in-support-data-types'
 import { Person } from './__shared__/client-server'
+import { createCompressionCrosswsClientServerTest } from './__shared__/client-server.compression-crossws'
+import { createCompressionHonoFetchClientServerTest } from './__shared__/client-server.compression-hono-fetch'
+import { createCompressionMessagePortClientServerTest } from './__shared__/client-server.compression-message-port'
+import { createCompressionMessagePortTransferClientServerTest } from './__shared__/client-server.compression-message-port-transfer'
+import { createCompressionNodeHttpClientServerTest } from './__shared__/client-server.compression-node-http'
+import { createCompressionNodeWsClientServerTest } from './__shared__/client-server.compression-node-ws'
+import { createCrosswsClientServerTest } from './__shared__/client-server.crossws'
 import { createHonoFetchClientServerTest } from './__shared__/client-server.hono-fetch'
 import { createMessagePortClientServerTest } from './__shared__/client-server.message-port'
+import { createMessagePortTransferClientServerTest } from './__shared__/client-server.message-port-transfer'
 import { createNodeHttpClientServerTest } from './__shared__/client-server.node-http'
 import { createNodeWsClientServerTest } from './__shared__/client-server.node-ws'
 
 describe.each([
+  ['crossws', createCrosswsClientServerTest],
   ['hono-fetch', createHonoFetchClientServerTest],
   ['node-http', createNodeHttpClientServerTest],
   ['message-port', createMessagePortClientServerTest],
+  ['message-port-transfer', createMessagePortTransferClientServerTest],
   ['node-ws', createNodeWsClientServerTest],
-])('data transfer: %s', async (_name, createClientServer) => {
+  ['compression-crossws', createCompressionCrosswsClientServerTest],
+  ['compression-hono-fetch', createCompressionHonoFetchClientServerTest],
+  ['compression-message-port-transfer', createCompressionMessagePortTransferClientServerTest],
+  ['compression-message-port', createCompressionMessagePortClientServerTest],
+  ['compression-node-http', createCompressionNodeHttpClientServerTest],
+  ['compression-node-ws', createCompressionNodeWsClientServerTest],
+] as const)('data transfer: %s', async (adapter, createClientServer) => {
   const router = {
     ping: os.input(z.any()).handler((_, input) => input),
     lastEventId: os.input(z.any()).handler(({ lastEventId }) => lastEventId),
@@ -22,6 +38,31 @@ describe.each([
 
   it.each(builtInRPCSupportDataTypes)('should support $name', async ({ value, expected }) => {
     await expect(client.ping(value)).resolves.toEqual(expected)
+  })
+
+  it('supports transferring nested File and Blob values', async () => {
+    const value = {
+      string: 'test',
+      file: new File(['file content'], 'test.txt', { type: 'text/plain' }),
+      nested: {
+        number: 123,
+        blob: new Blob(['blob content'], { type: 'text/plain' }),
+      },
+    }
+
+    const output = await client.ping(value)
+
+    expect(output.string).toBe(value.string)
+    expect(output.nested.number).toBe(value.nested.number)
+
+    expect(output.file).toBeInstanceOf(File)
+    expect(output.file.name).toBe(value.file.name)
+    expect(output.file.type).toBe(value.file.type)
+    expect(await output.file.text()).toBe(await value.file.text())
+
+    expect(output.nested.blob).toBeInstanceOf(Blob)
+    expect(output.nested.blob.type).toBe(value.nested.blob.type)
+    expect(await output.nested.blob.text()).toBe(await value.nested.blob.text())
   })
 
   it('support custom serializer', async () => {
@@ -80,7 +121,7 @@ describe.each([
     expect(Date.now() - startTime).toBeLessThan(100)
   })
 
-  it('support event iterator and transfer event iterator in parallel', async () => {
+  it('support AsyncIteratorObject and transfer AsyncIteratorObject in parallel', async () => {
     const stream = (async function* () {
       yield 'order 1'
       await sleep(200)

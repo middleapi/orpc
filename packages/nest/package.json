@@ -1,0 +1,70 @@
+{
+  "name": "@orpc/nest",
+  "type": "module",
+  "version": "2.0.0-beta.16",
+  "license": "MIT",
+  "homepage": "https://orpc.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/middleapi/orpc.git",
+    "directory": "packages/nest"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
+      }
+    }
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "unbuild",
+    "type:check": "tsc -b"
+  },
+  "peerDependencies": {
+    "@nestjs/common": ">=11.1.27",
+    "@nestjs/core": ">=11.1.27",
+    "express": ">=5.2.1",
+    "fastify": ">=5.8.5",
+    "rxjs": ">=7.8.2"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    },
+    "fastify": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@orpc/client": "workspace:*",
+    "@orpc/contract": "workspace:*",
+    "@orpc/openapi": "workspace:*",
+    "@orpc/server": "workspace:*",
+    "@orpc/shared": "workspace:*",
+    "@standardserver/core": "^0.2.0",
+    "@standardserver/node": "^0.2.0"
+  },
+  "devDependencies": {
+    "@fastify/cookie": "^11.0.2",
+    "@nestjs/common": "^11.1.27",
+    "@nestjs/core": "^11.1.27",
+    "@nestjs/platform-express": "^11.1.27",
+    "@nestjs/platform-fastify": "^11.1.27",
+    "@nestjs/testing": "^11.1.27",
+    "@types/express": "^5.0.6",
+    "express": "^5.2.1",
+    "fastify": "^5.8.5",
+    "rxjs": "^7.8.2"
+  }
+}

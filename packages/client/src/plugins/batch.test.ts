@@ -216,7 +216,7 @@ describe('batchLinkPlugin', () => {
       expect(transport.send).toHaveBeenCalledTimes(2)
     })
 
-    it('skips batching for requests with async iterator body', async () => {
+    it('skips batching for requests with AsyncIteratorObject body', async () => {
       const codec = makeCodec()
       const transport = makeTransport()
 
@@ -576,6 +576,53 @@ describe('batchLinkPlugin', () => {
       await Promise.all([
         expect(link.call(['a'], {}, { context: {} })).resolves.toBe('stream-0'),
         expect(link.call(['b'], {}, { context: {} })).resolves.toBe('stream-1'),
+      ])
+    })
+
+    it('ignores zero-length keep-alive frames in stream batch responses', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(transport.send).mockImplementation(async (request) => {
+        if (!request.headers['orpc-batch']) {
+          return { status: 200, headers: {}, resolveBody: async () => 'direct' }
+        }
+
+        const rawMessages = Array.isArray(request.body) ? request.body : []
+        const responseMessages = rawMessages.map((msg: any, i: number) => ({
+          kind: 'response',
+          id: msg.id,
+          json: { status: 200, headers: {}, body: `keepalive-${i}` },
+        }))
+
+        const bytes = await toLengthPrefixedBytes(responseMessages)
+        const keepAlive = new Uint8Array([0, 0, 0, 0])
+
+        // Keep-alive frames only appear between complete length-prefixed messages
+        // (never between a length header and its payload).
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(keepAlive)
+            controller.enqueue(bytes)
+            controller.enqueue(keepAlive)
+            controller.close()
+          },
+        })
+
+        return {
+          status: 207,
+          headers: {},
+          resolveBody: async () => stream,
+        }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'streaming' })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {} })).resolves.toBe('keepalive-0'),
+        expect(link.call(['b'], {}, { context: {} })).resolves.toBe('keepalive-1'),
       ])
     })
 

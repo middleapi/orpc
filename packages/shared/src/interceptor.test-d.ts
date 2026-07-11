@@ -1,8 +1,8 @@
 import type { Interceptor } from './interceptor'
 import type { PromiseWithError } from './types'
-import { onError, onFinish, onStart, onSuccess } from './interceptor'
+import { onAsyncIteratorObjectError, onError, onFinish, onReadableStreamError, onStart, onSuccess } from './interceptor'
 
-it('onStart, onSuccess, onError, onFinish can be used as an interceptor', () => {
+it('onStart, onSuccess, onError, onFinish, onAsyncIteratorObjectError, onReadableStreamError can be used as an interceptor', () => {
   const interceptors: Interceptor<{ foo: string }, PromiseWithError<'success', 'error'>>[] = []
 
   interceptors.push(onStart((options) => {
@@ -36,6 +36,22 @@ it('onStart, onSuccess, onError, onFinish can be used as an interceptor', () => 
       expectTypeOf(error).toEqualTypeOf<null>()
       expectTypeOf(data).toEqualTypeOf<'success'>()
     }
+
+    expectTypeOf(options.foo).toEqualTypeOf<string>()
+    expectTypeOf(options.next).toBeCallableWith<[options?: { foo: string }]>()
+    expectTypeOf(options.next()).toEqualTypeOf<PromiseWithError<'success', 'error'>>()
+  }))
+
+  interceptors.push(onAsyncIteratorObjectError((error, options) => {
+    expectTypeOf(error).toEqualTypeOf<'error' | Error>()
+
+    expectTypeOf(options.foo).toEqualTypeOf<string>()
+    expectTypeOf(options.next).toBeCallableWith<[options?: { foo: string }]>()
+    expectTypeOf(options.next()).toEqualTypeOf<PromiseWithError<'success', 'error'>>()
+  }))
+
+  interceptors.push(onReadableStreamError((error, options) => {
+    expectTypeOf(error).toEqualTypeOf<'error' | Error>()
 
     expectTypeOf(options.foo).toEqualTypeOf<string>()
     expectTypeOf(options.next).toBeCallableWith<[options?: { foo: string }]>()

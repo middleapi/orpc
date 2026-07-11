@@ -1,5 +1,6 @@
 import type { Promisable } from 'type-fest'
 import type { StartSpanOptions } from './opentelemetry'
+import type { ThrowableError } from './types'
 import { AsyncIteratorClass } from '@standardserver/shared'
 import { once } from './function'
 import { isPlainObject } from './object'
@@ -38,8 +39,8 @@ export interface WrapReadableStreamOptions<T, TMapped> {
    */
   runWith?: <T>(run: () => Promise<T>) => Promise<T>
   mapResult?: (result: ReadableStreamReadResult<T>) => Promisable<ReadableStreamReadResult<TMapped>>
-  mapError?: (error: unknown) => Promisable<unknown>
-  onError?: (error: unknown) => Promisable<void>
+  mapError?: (error: ThrowableError) => Promisable<ThrowableError>
+  onError?: (error: ThrowableError) => Promisable<void>
 
   /**
    * Guaranteed to execute exactly once after the stream finishes or is cancelled.
@@ -67,8 +68,8 @@ export function wrapReadableStream<T, TMapped = T>(
       }
       catch (error) {
         try {
-          await onError?.(error)
-          controller.error(mapError ? await mapError(error) : error)
+          await onError?.(error as ThrowableError)
+          controller.error(mapError ? await mapError(error as ThrowableError) : error)
         }
         finally {
           await finish()
@@ -91,7 +92,7 @@ export function wrapReadableStream<T, TMapped = T>(
           await runWith(() => reader().cancel(reason))
         }
         catch (error) {
-          await onError?.(error)
+          await onError?.(error as ThrowableError)
           throw error
         }
       }
@@ -123,9 +124,9 @@ export function traceReadableStream<T>(
 }
 
 /**
- * Converts a `ReadableStream` into an `AsyncIteratorClass`.
+ * Converts a {@link ReadableStream} into an {@link AsyncIteratorClass}.
  */
-export function streamToAsyncIteratorClass<T>(
+export function streamToAsyncIteratorObject<T>(
   stream: ReadableStream<T>,
   { signal }: { signal?: undefined | AbortSignal } = {},
 ): AsyncIteratorClass<T> {

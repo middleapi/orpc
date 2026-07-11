@@ -87,12 +87,12 @@ describe('openAPISerializer', () => {
       expect(s.serialize({ file: blob }, { asFormData: false, useFormDataForBlobFields: true })).toBeInstanceOf(FormData)
     })
 
-    describe('async iterator object', () => {
+    describe('asyncIteratorObject', () => {
       async function* toAsyncIter<T>(values: T[]) {
         for (const v of values) yield v
       }
 
-      it('returns an async iterator and serializes yielded values', async () => {
+      it('returns an AsyncIteratorObject and serializes yielded values', async () => {
         const result = serializer.serialize(toAsyncIter([new Date('2023-01-01'), 42n])) as AsyncIteratorObject<unknown>
         expect(result).toSatisfy(isAsyncIteratorObject)
 
@@ -221,12 +221,12 @@ describe('openAPISerializer', () => {
       expect(serializer.deserialize(stream)).toBe(stream)
     })
 
-    describe('async iterator object', () => {
+    describe('asyncIteratorObject', () => {
       async function* toAsyncIter<T>(values: T[]) {
         for (const v of values) yield v
       }
 
-      it('returns an async iterator and passes through yielded values', async () => {
+      it('returns an AsyncIteratorObject and passes through yielded values', async () => {
         const result = serializer.deserialize(toAsyncIter([{ a: 1 }, { b: 2 }])) as AsyncIterable<unknown>
         expect(result).toSatisfy(isAsyncIteratorObject)
 
@@ -271,7 +271,7 @@ describe('openAPISerializer', () => {
         await expect(result.next()).rejects.toBe(error)
       })
 
-      it('passes through non-ErrorEvent iterator errors', async () => {
+      it('passes through non-ErrorEvent errors', async () => {
         const error = new Error('unexpected')
         const result = serializer.deserialize((async function* () {
           throw error

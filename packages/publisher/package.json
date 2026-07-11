@@ -1,7 +1,7 @@
 {
   "name": "@orpc/publisher",
   "type": "module",
-  "version": "2.0.0-beta.7",
+  "version": "2.0.0-beta.16",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
@@ -67,7 +67,7 @@
   "dependencies": {
     "@orpc/client": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standardserver/core": "^0.0.25"
+    "@standardserver/core": "^0.2.0"
   },
   "devDependencies": {
     "@upstash/redis": "^1.38.0",

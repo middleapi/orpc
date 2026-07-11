@@ -369,7 +369,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     path: string[],
     _options: ClientOptions<T>,
   ): Promise<StandardLinkCodecDecodedResponse> {
-    const isOk = response.status >= 200 && response.status < 400
+    const isOk = response.status < 400
     const procedure = await this.resolveProcedure(path)
     const meta = getOpenAPIMeta(procedure)
 

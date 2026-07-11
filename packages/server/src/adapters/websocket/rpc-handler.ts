@@ -1,14 +1,14 @@
 import type { Context } from '../../context'
 import type { Router } from '../../router'
 import type { RPCHandlerCodecOptions, StandardHandlerOptions } from '../standard'
-import type { WebsocketHandlerOptions } from './handler'
+import type { WebSocketHandlerOptions } from './handler'
 import { RPCHandlerCodec, StandardHandler } from '../standard'
-import { WebsocketHandler } from './handler'
+import { WebSocketHandler } from './handler'
 
 export interface RPCHandlerOptions<T extends Context>
-  extends StandardHandlerOptions<T>, RPCHandlerCodecOptions<T>, WebsocketHandlerOptions<T> {}
+  extends StandardHandlerOptions<T>, RPCHandlerCodecOptions<T>, WebSocketHandlerOptions<T> {}
 
-export class RPCHandler<T extends Context> extends WebsocketHandler<T> {
+export class RPCHandler<T extends Context> extends WebSocketHandler<T> {
   constructor(
     router: Router<T>,
     options: NoInfer<RPCHandlerOptions<T>> = {},

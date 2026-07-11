@@ -110,7 +110,7 @@ describe('memoryPublisher', () => {
       await unsubscribeAfterTail()
     })
 
-    it('expires old events lazily for async iterator subscribers', async () => {
+    it('expires old events lazily for AsyncIteratorObject subscribers', async () => {
       const publisher = new MemoryPublisher<TestEvents>({
         replay: {
           enabled: true,

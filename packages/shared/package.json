@@ -1,7 +1,7 @@
 {
   "name": "@orpc/shared",
   "type": "module",
-  "version": "2.0.0-beta.7",
+  "version": "2.0.0-beta.16",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
@@ -43,14 +43,14 @@
     }
   },
   "dependencies": {
-    "@standardserver/shared": "^0.0.25",
+    "@standardserver/shared": "^0.2.0",
     "radash": "^12.1.1",
     "type-fest": "^5.3.1"
   },
   "devDependencies": {
-    "@opentelemetry/api": "^1.9.0",
-    "arktype": "^2.1.29",
-    "valibot": "^1.2.0",
+    "@opentelemetry/api": "^1.9.1",
+    "arktype": "^2.2.1",
+    "valibot": "^1.4.1",
     "zod": "^4.4.3"
   }
 }

@@ -3,7 +3,7 @@ import { AsyncIteratorClass } from '@orpc/shared'
 
 export interface PublisherOptions {
   /**
-   * Maximum number of events to buffer for async iterator subscribers.
+   * Maximum number of events to buffer for AsyncIteratorObject subscribers.
    *
    * If the buffer exceeds this limit, the oldest event is dropped.
    * This prevents unbounded memory growth if consumers process events slowly.
@@ -86,7 +86,7 @@ export abstract class Publisher<T extends Record<string, object>> {
    */
   subscribe<K extends keyof T & string>(event: K, listener: (payload: T[K]) => void, options?: PublisherSubscribeListenerOptions): Promise<() => Promise<void>>
   /**
-   * Subscribes to a specific event using an async iterator.
+   * Subscribes to a specific event using an AsyncIteratorObject.
    * Useful for `for await...of` loops with optional buffering and abort support.
    *
    * @example

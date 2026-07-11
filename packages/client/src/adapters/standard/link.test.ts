@@ -128,7 +128,7 @@ describe('standardLink', () => {
     await expect(link.call(['test'], 'input', { context: {} })).rejects.toThrow(error)
   })
 
-  it('traces input & output event iterator', async () => {
+  it('traces input & output AsyncIteratorObject', async () => {
     const codec = makeCodec()
     const transport = makeTransport()
     const link = new StandardLink(codec, transport)

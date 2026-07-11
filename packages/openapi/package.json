@@ -1,7 +1,7 @@
 {
   "name": "@orpc/openapi",
   "type": "module",
-  "version": "2.0.0-beta.7",
+  "version": "2.0.0-beta.16",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
@@ -73,6 +73,16 @@
     "build": "unbuild",
     "type:check": "tsc -b"
   },
+  "peerDependencies": {
+    "@scalar/api-reference": ">=1.57.2",
+    "@types/swagger-ui": ">=5.32.0",
+    "swagger-ui": ">=5.32.6"
+  },
+  "peerDependenciesMeta": {
+    "@scalar/api-reference": { "optional": true },
+    "@types/swagger-ui": { "optional": true },
+    "swagger-ui": { "optional": true }
+  },
   "dependencies": {
     "@hey-api/spec-types": "0.0.0-next-20260408030107",
     "@orpc/client": "workspace:*",
@@ -80,15 +90,15 @@
     "@orpc/json-schema": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@scalar/api-reference": "^1.57.2",
-    "@standardserver/core": "^0.0.25",
-    "@standardserver/fetch": "^0.0.25",
-    "@types/swagger-ui": "^5.32.0",
-    "rou3": "^0.8.1",
-    "swagger-ui": "^5.32.6"
+    "@standardserver/core": "^0.2.0",
+    "@standardserver/fetch": "^0.2.0",
+    "rou3": "^0.9.1"
   },
   "devDependencies": {
-    "fastify": "^5.6.2",
+    "@scalar/api-reference": "^1.57.2",
+    "@types/swagger-ui": "^5.32.0",
+    "fastify": "^5.8.5",
+    "swagger-ui": "^5.32.6",
     "zod": "^4.4.3"
   }
 }

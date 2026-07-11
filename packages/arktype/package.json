@@ -1,7 +1,7 @@
 {
   "name": "@orpc/arktype",
   "type": "module",
-  "version": "2.0.0-beta.7",
+  "version": "2.0.0-beta.16",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
@@ -43,7 +43,7 @@
   },
   "devDependencies": {
     "@ark/schema": "^0.56.0",
-    "arktype": "^2.1.29",
+    "arktype": "^2.2.1",
     "zod": "^4.4.3"
   }
 }

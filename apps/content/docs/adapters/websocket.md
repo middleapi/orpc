@@ -4,10 +4,10 @@ oRPC supports WebSockets for low-latency, full-duplex communication between clie
 
 ## Server Adapters
 
-| Adapter     | Target                                                                                                                                                                                                                                                                                                                                                                                |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `websocket` | [MDN WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket), [ws](https://github.com/websockets/ws), [Bun's WebSocket](https://bun.com/docs/runtime/http/websockets), [Deno's WebSocket](https://docs.deno.com/examples/http_server_websocket/), [Cloudflare Hibernation WebSocket](https://developers.cloudflare.com/durable-objects/best-practices/websockets/) |
-| `crossws`   | [crossws](https://github.com/h3js/crossws)                                                                                                                                                                                                                                                                                                                                            |
+| Adapter     | Target                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `websocket` | [MDN WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket), [ws](https://github.com/websockets/ws), [Bun's WebSocket](https://bun.com/docs/runtime/http/websockets), [Deno's WebSocket](https://docs.deno.com/examples/http_server_websocket/), [Cloudflare Hibernation WebSocket](https://developers.cloudflare.com/durable-objects/best-practices/websockets/), [uWebSockets](https://github.com/uNetworking/uWebSockets.js/) |
+| `crossws`   | [crossws](https://github.com/h3js/crossws)                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ::: code-group
 
@@ -191,6 +191,42 @@ export class ChatRoom extends DurableObject {
     await handler.close(ws)
   }
 }
+```
+
+```ts [uWebSockets]
+import { App } from 'uWebSockets.js'
+import { RPCHandler } from '@orpc/server/websocket'
+import { onError } from '@orpc/server'
+
+const handler = new RPCHandler(router, {
+  interceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
+
+const app = App()
+  .ws('/*', {
+    async message(ws, message, isBinary) {
+      await handler.message(ws, message, {
+        /**
+         * Provide initial context if needed. The context can be an async function
+         * that receives the per-call request as its first argument, and is **not**
+         * related to the initial WebSocket upgrade request.
+         */
+        context: request => ({}),
+      })
+    },
+    async close(ws, code, message) {
+      await handler.close(ws)
+    },
+  })
+  .listen(3000, (token) => {
+    if (token) {
+      console.log('Listening to port 3000')
+    }
+  })
 ```
 
 :::

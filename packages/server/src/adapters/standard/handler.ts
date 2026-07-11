@@ -122,9 +122,9 @@ export class StandardHandler<T extends Context> {
               if (isAsyncIteratorObject(input)) {
                 /**
                  * @warning
-                 * Remember use `override` for event iterator to remain other special properties
+                 * Remember use `override` for AsyncIteratorObject to remain other special properties
                  */
-                input = override(input, traceAsyncIterator('consume_event_iterator_input', input))
+                input = override(input, traceAsyncIterator('consume_async_iterator_object_input', input))
               }
 
               const client = createProcedureClient(procedure, {

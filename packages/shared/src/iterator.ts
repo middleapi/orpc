@@ -1,5 +1,6 @@
 import type { Promisable } from 'type-fest'
 import type { StartSpanOptions } from './opentelemetry'
+import type { PromiseWithError, ThrowableError } from './types'
 import { AsyncIteratorClass } from '@standardserver/shared'
 import { once } from './function'
 import { recordSpanError, runInSpanContext, startSpan } from './opentelemetry'
@@ -13,8 +14,8 @@ export interface WrapAsyncIteratorOptions<TYield, TReturn, TMappedYield, TMapped
    */
   runWith?: <T>(run: () => Promise<T>) => Promise<T>
   mapResult?: (result: IteratorResult<TYield, TReturn>) => Promisable<IteratorResult<TMappedYield, TMappedReturn>>
-  mapError?: (error: unknown) => Promisable<unknown>
-  onError?: (error: unknown) => Promisable<void>
+  mapError?: (error: ThrowableError) => Promisable<ThrowableError>
+  onError?: (error: ThrowableError) => Promisable<void>
 
   /**
    * Execute after the stream finishes or is cancelled.
@@ -45,8 +46,8 @@ export function wrapAsyncIterator<TYield, TReturn, TMappedYield = TYield, TMappe
       return mapResult ? await mapResult(result) : result as any
     }
     catch (error) {
-      await onError?.(error)
-      throw mapError ? await mapError(error) : error
+      await onError?.(error as ThrowableError)
+      throw mapError ? await mapError(error as ThrowableError) : error
     }
   }, async (_state) => {
     try {
@@ -57,7 +58,7 @@ export function wrapAsyncIterator<TYield, TReturn, TMappedYield = TYield, TMappe
           await runWith(async () => iterator.return?.())
         }
         catch (error) {
-          await onError?.(error)
+          await onError?.(error as ThrowableError)
           throw error
         }
       }
@@ -155,4 +156,77 @@ export function replicateAsyncIterator<T, TReturn, TNext>(
   })
 
   return replicated
+}
+
+export interface ConsumeAsyncIteratorOptions<T, TReturn, TError> {
+  /**
+   * Called on each event
+   */
+  onEvent: (event: T) => void
+  /**
+   * Called once error happens
+   */
+  onError?: (error: TError) => void
+  /**
+   * Called once AsyncIteratorObject is done
+   *
+   * @info If iterator is canceled, `undefined` can be passed on success
+   */
+  onSuccess?: (value: TReturn | undefined) => void
+  /**
+   * Called once after onError or onSuccess
+   *
+   * @info If iterator is canceled, `undefined` can be passed on success
+   */
+  onFinish?: (state: [error: TError, data: undefined, isSuccess: false] | [error: null, data: TReturn | undefined, isSuccess: true]) => void
+}
+
+/**
+ * Consumes an AsyncIteratorObject with lifecycle callbacks
+ *
+ * @warning If no `onError` or `onFinish` is provided, error will be thrown into unhandled rejection channel.
+ * @return unsubscribe callback
+ */
+export function consumeAsyncIterator<T, TReturn, TError = ThrowableError>(
+  iterator: AsyncIterator<T, TReturn> | PromiseWithError<AsyncIterator<T, TReturn>, TError>,
+  options: ConsumeAsyncIteratorOptions<T, TReturn, TError | ThrowableError>,
+): () => Promise<void> {
+  // The typed error should always be combined with `ThrowableError`
+  // because an AsyncIterator can throw any error during iteration,
+  // while TError only represents errors from the initial promise.
+  // In oRPC client/server usage, initial and iteration errors are usually the same,
+  // but this utility is shared, so it needs to support the general case.
+
+  void (async () => {
+    let onFinishState: [error: TError | ThrowableError, data: undefined, isSuccess: false] | [error: null, data: TReturn | undefined, isSuccess: true]
+
+    try {
+      const resolvedIterator = await iterator
+
+      while (true) {
+        const { done, value } = await resolvedIterator.next()
+
+        if (done) {
+          // if iterator is canceled, value can be undefined
+          const realValue = value as typeof value | undefined
+          onFinishState = [null, realValue, true]
+          options.onSuccess?.(realValue)
+          break
+        }
+
+        options.onEvent(value)
+      }
+    }
+    catch (error) {
+      onFinishState = [error as ThrowableError, undefined, false]
+      options.onError?.(error as ThrowableError)
+    }
+    finally {
+      options.onFinish?.(onFinishState!)
+    }
+  })()
+
+  return async () => {
+    await (await iterator)?.return?.()
+  }
 }

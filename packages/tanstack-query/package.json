@@ -1,7 +1,7 @@
 {
   "name": "@orpc/tanstack-query",
   "type": "module",
-  "version": "2.0.0-beta.7",
+  "version": "2.0.0-beta.16",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
@@ -48,7 +48,7 @@
     "@angular/core": "^22.0.1",
     "@tanstack/angular-query-experimental": "^5.101.0",
     "@tanstack/query-core": "^5.101.0",
-    "@tanstack/react-query": "^5.101.0",
+    "@tanstack/react-query": "^5.101.2",
     "@tanstack/solid-query": "^5.101.0",
     "@tanstack/svelte-query": "^6.1.34",
     "@tanstack/vue-query": "^5.101.0",

@@ -24,7 +24,7 @@ export interface RetryLinkPluginAttemptOptions<T extends RetryLinkPluginContext>
 export interface RetryLinkPluginContext {
   /**
    * Maximum retry attempts before throwing.
-   * Use `Number.POSITIVE_INFINITY` for infinite retries (e.g. for event iterators).
+   * Use `Number.POSITIVE_INFINITY` for infinite retries (e.g. for AsyncIteratorObject).
    *
    * @default 0
    */
@@ -57,8 +57,6 @@ export interface RetryLinkPluginOptions<_T extends RetryLinkPluginContext> {
    */
   default?: RetryLinkPluginContext | undefined
 }
-
-export class RetryLinkPluginInvalidEventIteratorRetryResponse extends Error { }
 
 export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> implements StandardLinkPlugin<T> {
   private readonly defaultRetry: Exclude<RetryLinkPluginContext['retry'], undefined>
@@ -185,14 +183,14 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
               lastEventId = meta?.id ?? lastEventId
               lastEventRetry = meta?.retry ?? lastEventRetry
 
-              const maybeEventIterator = await callNext({ error })
-              if (!isAsyncIteratorObject(maybeEventIterator)) {
-                throw new RetryLinkPluginInvalidEventIteratorRetryResponse(
-                  'RetryLinkPlugin: Expected an Event Iterator, got a non-Event Iterator',
+              const asyncIteratorObject = await callNext({ error })
+              if (!isAsyncIteratorObject(asyncIteratorObject)) {
+                throw new TypeError(
+                  'RetryLinkPlugin: Expected an AsyncIteratorObject, got a different type.',
                 )
               }
 
-              current = maybeEventIterator
+              current = asyncIteratorObject
 
               if (isIteratorAborted) {
                 await current.return?.()

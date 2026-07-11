@@ -4,9 +4,33 @@ import type { ToFetchBodyOptions } from '@standardserver/fetch'
 import type { ClientContext, ClientOptions } from '../../types'
 import type { StandardLinkTransport } from '../standard'
 import type { FetchLinkTransportPlugin } from './plugin'
-import { intercept, value } from '@orpc/shared'
+import { intercept, once, value } from '@orpc/shared'
 import { toFetchBody, toFetchHeaders, toStandardLazyResponse } from '@standardserver/fetch'
 import { CompositeFetchLinkTransportPlugin } from './plugin'
+
+const GET_SUPPORTED_DUPLEX_MODE = once(() => {
+  // TODO: Try `duplex: 'full'` when it is widely supported.
+  try {
+    let duplex: 'half' | undefined
+
+    void new Request(
+      'https://example.com',
+      {
+        method: 'POST',
+        body: new ReadableStream(),
+        get duplex() {
+          duplex = 'half'
+          return 'half'
+        },
+      } as any,
+    )
+
+    return duplex
+  }
+  catch {
+    return undefined
+  }
+})
 
 export interface FetchLinkTransportFetchInterceptorOptions<T extends ClientContext> extends ClientOptions<T> {
   path: string[]
@@ -25,7 +49,7 @@ export interface FetchLinkTransportOptions<T extends ClientContext> {
   origin?: Value<Promisable<`https://${string}` | `http://${string}` | ({} & string) | undefined>, [options: ClientOptions<T>, path: string[]]>
 
   /**
-   * Options for how to convert the Standard Request to a Fetch Request, like event iterator options, etc.
+   * Options for how to convert the Standard Request to a Fetch Request, like event stream options, etc.
    */
   toFetchRequest?: undefined | ToFetchBodyOptions
 
@@ -68,12 +92,19 @@ export class FetchLinkTransport<T extends ClientContext> implements StandardLink
     const url = `${origin ?? ''}${standardRequest.url}`
     const [body, standardHeaders] = toFetchBody(standardRequest.body, standardRequest.headers, this.toFetchRequestOptions)
 
-    const init: RequestInit = {
+    const init: RequestInit & { duplex?: ReturnType<typeof GET_SUPPORTED_DUPLEX_MODE> } = {
       body,
       headers: toFetchHeaders(standardHeaders),
       method: standardRequest.method,
       signal: options.signal,
       redirect: 'manual',
+    }
+
+    if (body instanceof ReadableStream) {
+      const duplex = GET_SUPPORTED_DUPLEX_MODE()
+      if (duplex !== undefined) {
+        init.duplex = duplex
+      }
     }
 
     const response = await intercept(

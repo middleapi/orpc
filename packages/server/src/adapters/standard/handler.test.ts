@@ -223,7 +223,7 @@ describe('standardHandler', () => {
       expect(client.mock.calls[0]?.[1]?.lastEventId).toBeUndefined()
     })
 
-    it('safely traces async iterator input', async () => {
+    it('safely traces AsyncIteratorObject input', async () => {
       async function* input() {
         yield 'e1'
         yield 'e2'

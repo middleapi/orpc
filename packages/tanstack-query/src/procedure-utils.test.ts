@@ -161,7 +161,7 @@ describe('procedureUtils', () => {
       const options = utils.streamedOptions({ input: { search: '__search__' }, context: { batch: '__batch__' } })
 
       client.mockResolvedValueOnce('INVALID')
-      await expect(options.queryFn!({ signal, client: queryClient } as any)).rejects.toThrow('streamedQuery requires an event iterator output')
+      await expect(options.queryFn!({ signal, client: queryClient } as any)).rejects.toThrow('streamedQuery requires an AsyncIteratorObject output')
       expect(client).toHaveBeenCalledTimes(1)
       expect(client).toHaveBeenCalledWith({ search: '__search__' }, { signal, context: {
         batch: '__batch__',
@@ -255,7 +255,7 @@ describe('procedureUtils', () => {
       const options = utils.liveOptions({ input: { search: '__search__' }, context: { batch: '__batch__' } })
 
       client.mockResolvedValueOnce('INVALID')
-      await expect(options.queryFn!({ signal, client: queryClient } as any)).rejects.toThrow('liveQuery requires an event iterator output')
+      await expect(options.queryFn!({ signal, client: queryClient } as any)).rejects.toThrow('liveQuery requires an AsyncIteratorObject output')
       expect(client).toHaveBeenCalledTimes(1)
       expect(client).toHaveBeenCalledWith({ search: '__search__' }, {
         signal,

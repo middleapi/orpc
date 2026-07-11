@@ -3,7 +3,7 @@ import type { StandardLazyResponse, StandardRequest } from '@standardserver/core
 import type { DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standardserver/peer'
 import type { ClientContext, ClientOptions } from '../../types'
 import type { StandardLinkTransport } from '../standard'
-import { AbortError, promiseWithResolvers, runWithSignal, sleep, toStringOrBytes } from '@orpc/shared'
+import { AbortError, loadBytes, promiseWithResolvers, runWithSignal, sequential, sleep, toStringOrBytes } from '@orpc/shared'
 import { ClientPeer, decodePeerMessage, encodePeerMessage, isServerPeerSendMessage } from '@standardserver/peer'
 
 /**
@@ -14,7 +14,7 @@ const WEBSOCKET_OPEN = 1 satisfies WebSocket['OPEN']
 
 export type WebSocketLike = Pick<WebSocket, 'addEventListener' | 'removeEventListener' | 'send' | 'readyState'>
 
-export interface WebsocketLinkTransportAttemptInfo {
+export interface WebSocketLinkTransportAttemptInfo {
   /**
    * Total number of connection attempts for this transport's lifetime.
    * Starts at 1 on the first attempt, increments on every subsequent
@@ -30,7 +30,7 @@ export interface WebsocketLinkTransportAttemptInfo {
   attempt: number
 }
 
-export interface WebsocketLinkTransportReconnectOptions {
+export interface WebSocketLinkTransportReconnectOptions {
   /**
    * Whether to automatically reconnect when the connection is lost.
    *
@@ -43,7 +43,7 @@ export interface WebsocketLinkTransportReconnectOptions {
    *
    * @default info => info.attempt === 1 ? 0 : 2_000
    */
-  delay?: undefined | ((info: WebsocketLinkTransportAttemptInfo) => number)
+  delay?: undefined | ((info: WebSocketLinkTransportAttemptInfo) => number)
 
   /**
    * Maximum number of consecutive failed attempts before giving up.
@@ -80,12 +80,12 @@ export interface WebsocketLinkTransportReconnectOptions {
   }
 }
 
-export interface WebsocketLinkTransportOptions<_T extends ClientContext> {
+export interface WebSocketLinkTransportOptions<_T extends ClientContext> {
   /**
    * Returns a WebSocket instance for peer communication.
    * Can be async for lazy resolution.
    */
-  connect: (info: WebsocketLinkTransportAttemptInfo) => Promisable<WebSocketLike>
+  connect: (info: WebSocketLinkTransportAttemptInfo) => Promisable<WebSocketLike>
 
   /**
    * Whether to connect immediately on initialization, instead of waiting
@@ -100,7 +100,7 @@ export interface WebsocketLinkTransportOptions<_T extends ClientContext> {
    *
    * @default { enabled: false }
    */
-  reconnect?: undefined | WebsocketLinkTransportReconnectOptions
+  reconnect?: undefined | WebSocketLinkTransportReconnectOptions
 
   /**
    * Options for encoding peer messages. such as `prefix` for distinguishing messages on the same channel..
@@ -113,17 +113,17 @@ export interface WebsocketLinkTransportOptions<_T extends ClientContext> {
   decodePeerMessage?: DecodePeerMessageOptions | undefined
 }
 
-export class WebsocketLinkTransport<T extends ClientContext> implements StandardLinkTransport<T> {
-  private readonly connect: WebsocketLinkTransportOptions<T>['connect']
+export class WebSocketLinkTransport<T extends ClientContext> implements StandardLinkTransport<T> {
+  private readonly connect: WebSocketLinkTransportOptions<T>['connect']
   private readonly reconnectEnabled: boolean
-  private readonly reconnectDelay: (info: WebsocketLinkTransportAttemptInfo) => number
+  private readonly reconnectDelay: (info: WebSocketLinkTransportAttemptInfo) => number
   private readonly reconnectMaxAttempt: number
   private readonly reconnectOnCloseEnabled: boolean
   private readonly reconnectOnCloseDelay: number
-  private readonly encodePeerMessageOptions: WebsocketLinkTransportOptions<T>['encodePeerMessage']
-  private readonly decodePeerMessageOptions: WebsocketLinkTransportOptions<T>['decodePeerMessage']
+  private readonly encodePeerMessageOptions: WebSocketLinkTransportOptions<T>['encodePeerMessage']
+  private readonly decodePeerMessageOptions: WebSocketLinkTransportOptions<T>['decodePeerMessage']
 
-  constructor(options: WebsocketLinkTransportOptions<T>) {
+  constructor(options: WebSocketLinkTransportOptions<T>) {
     this.connect = options.connect
     this.reconnectEnabled = options.reconnect?.enabled ?? false
     this.reconnectDelay = options.reconnect?.delay ?? (info => info.attempt === 1 ? 0 : 2_000)
@@ -177,7 +177,7 @@ export class WebsocketLinkTransport<T extends ClientContext> implements Standard
       this.totalAttempt += 1
       this.attempt += 1
 
-      const info: WebsocketLinkTransportAttemptInfo = { totalAttempt: this.totalAttempt, attempt: this.attempt }
+      const info: WebSocketLinkTransportAttemptInfo = { totalAttempt: this.totalAttempt, attempt: this.attempt }
 
       await sleep(this.reconnectDelay(info))
       const websocket = await this.connect(info)
@@ -196,13 +196,20 @@ export class WebsocketLinkTransport<T extends ClientContext> implements Standard
         })
       }
 
-      websocket.addEventListener('message', async (event: MessageEvent) => {
-        const message = await toStringOrBytes(event.data)
+      /**
+       * Message order is important: loading -> decode -> .message.
+       * This flow must stay synchronous, or we need to use `sequential` helper
+       */
+      websocket.addEventListener('message', sequential(async (event: MessageEvent) => {
+        // For better compatibility avoid control or depend on websocket.binaryType
+        const message = event.data instanceof Blob ? await loadBytes(event.data) : toStringOrBytes(event.data)
         const result = decodePeerMessage(message, this.decodePeerMessageOptions)
         if (result.matched && isServerPeerSendMessage(result.message)) {
-          await peer.message(result.message)
+          // Not awaited: `peer.message` runs handling message may be slow,
+          // and awaiting it would block decoding of subsequent messages.
+          peer.message(result.message)
         }
-      })
+      }))
 
       websocket.addEventListener('close', async (event) => {
         connectingResolvers?.resolve()

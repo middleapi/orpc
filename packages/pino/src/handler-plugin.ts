@@ -2,7 +2,7 @@ import type { Context, ErrorMap, ProcedureClientInterceptor, Schema } from '@orp
 import type { StandardHandlerInterceptor, StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '@orpc/server/standard'
 import type { Logger } from 'pino'
 import type { LoggerContext } from './context'
-import { wrapEventIteratorPreservingMeta } from '@orpc/client'
+import { wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import { isAbortError, isAsyncIteratorObject, ORPC_NAME, override, toArray, wrapReadableStream } from '@orpc/shared'
 import { flattenStandardHeader } from '@standardserver/core'
 import pino from 'pino'
@@ -164,9 +164,9 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
       if (isAsyncIteratorObject(output)) {
         /**
          * @warning
-         * Remember use `override` for event iterator to remain other special properties
+         * Remember use `override` for AsyncIteratorObject to remain other special properties
          */
-        return override(output, wrapEventIteratorPreservingMeta(output, {
+        return override(output, wrapAsyncIteratorPreservingEventMeta(output, {
           onError: (error) => {
             logBusinessLogicError(getLogger(context), error)
           },
@@ -176,7 +176,7 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
       if (output instanceof ReadableStream) {
         /**
          * @warning
-         * Remember use `override` for event iterator to remain other special properties
+         * Remember use `override` for ReadableStream to remain other special properties
          */
         return override(output, wrapReadableStream(output, {
           onError: (error) => {

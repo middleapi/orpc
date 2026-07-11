@@ -7,7 +7,7 @@ import type { Value } from '@orpc/shared'
 import type { OpenAPIMeta } from './meta'
 import type { OpenAPIDocument, OpenAPIOperationObject } from './types'
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
-import { getEventIteratorSchemaDetails } from '@orpc/contract'
+import { getAsyncIteratorObjectSchemaDetails } from '@orpc/contract'
 import {
   combineJsonObjectSchemaEntries,
   combineJsonSchemasWithComposition,
@@ -210,16 +210,16 @@ export class OpenAPIGenerator {
     const inputSchemas = def.inputSchemas
 
     if (inputStructure === 'compact') {
-      const eventIteratorDetails = getEventIteratorDetails(inputSchemas)
+      const asyncIteratorObjectDetails = getAsyncIteratorObjectDetails(inputSchemas)
 
-      if (eventIteratorDetails) {
-        const [yieldSchemas, returnSchemas] = eventIteratorDetails
+      if (asyncIteratorObjectDetails) {
+        const [yieldSchemas, returnSchemas] = asyncIteratorObjectDetails
         const yieldResult = await this.convertSchemas(yieldSchemas, 'input')
         const returnResult = await this.convertSchemas(returnSchemas, 'input')
 
         ref.requestBody = {
           required: true,
-          content: toEventIteratorContent(yieldResult, returnResult, doc, options),
+          content: toAsyncIteratorObjectContent(yieldResult, returnResult, doc, options),
         }
 
         return
@@ -388,17 +388,17 @@ export class OpenAPIGenerator {
     const outputStructure = meta?.outputStructure ?? DEFAULT_OPENAPI_OUTPUT_STRUCTURE
 
     if (outputStructure === 'compact') {
-      const eventDetails = getEventIteratorDetails(outputSchemas)
+      const iteratorDetails = getAsyncIteratorObjectDetails(outputSchemas)
 
-      if (eventDetails) {
-        const [yieldSchemas, returnSchemas] = eventDetails
+      if (iteratorDetails) {
+        const [yieldSchemas, returnSchemas] = iteratorDetails
         const yieldResult = await this.convertSchemas(yieldSchemas, 'output')
         const returnResult = await this.convertSchemas(returnSchemas, 'output')
 
         ref.responses ??= {}
         ref.responses[status] = {
           description,
-          content: toEventIteratorContent(yieldResult, returnResult, doc, options),
+          content: toAsyncIteratorObjectContent(yieldResult, returnResult, doc, options),
         }
 
         return
@@ -424,16 +424,16 @@ export class OpenAPIGenerator {
       if (!objectSchemaEntries) {
         throw new OpenAPIGeneratorError(
           `Procedure at path "${path.join('.')}" has outputStructure "detailed" but its output schema is not an object.\n`
-          + `  Expected shape: { status: number (200-299), headers?: Record<string, unknown>, body?: unknown }`,
+          + `  Expected shape: { status?: number (less than 400), headers?: Record<string, string | string[]>, body?: unknown }`,
         )
       }
 
       const statusSchema = objectSchemaEntries?.find(([name]) => name === 'status')?.[1]
 
-      if (statusSchema !== undefined && (typeof statusSchema !== 'object' || !Number.isInteger(statusSchema.const) || statusSchema.const < 200 || statusSchema.const >= 300)) {
+      if (statusSchema !== undefined && (typeof statusSchema !== 'object' || !Number.isInteger(statusSchema.const) || statusSchema.const >= 400)) {
         throw new OpenAPIGeneratorError(
           `Procedure at path "${path.join('.')}" has an invalid "status" field in its outputStructure "detailed" schema.\n`
-          + `  Expected: a const integer in the 200-299 range\n`
+          + `  Expected: a const integer less than 400\n`
           + `  Received: ${stringifyJSON(statusSchema)}`,
 
         )
@@ -604,7 +604,7 @@ function strip$schemaField(schema: JsonSchema): JsonSchema {
   return rest
 }
 
-function getEventIteratorDetails(schemas: AnySchema[] | undefined): [yieldSchemas: AnySchema[], returnSchemas: AnySchema[]] | undefined {
+function getAsyncIteratorObjectDetails(schemas: AnySchema[] | undefined): [yieldSchemas: AnySchema[], returnSchemas: AnySchema[]] | undefined {
   if (!schemas || schemas.length === 0) {
     return undefined
   }
@@ -613,7 +613,7 @@ function getEventIteratorDetails(schemas: AnySchema[] | undefined): [yieldSchema
   const returnSchemas: AnySchema[] = []
 
   for (const s of schemas) {
-    const details = getEventIteratorSchemaDetails(s)
+    const details = getAsyncIteratorObjectSchemaDetails(s)
     if (!details) {
       return undefined
     }
@@ -627,7 +627,7 @@ function getEventIteratorDetails(schemas: AnySchema[] | undefined): [yieldSchema
   return yieldSchemas.length || returnSchemas.length ? [yieldSchemas, returnSchemas] : undefined
 }
 
-function toEventIteratorContent(
+function toAsyncIteratorObjectContent(
   [yieldSchema, yieldOptional]: [JsonSchema, optional: boolean],
   [returnSchema, returnOptional]: [JsonSchema, optional: boolean],
   doc: OpenAPIDocument,

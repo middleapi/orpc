@@ -1,7 +1,7 @@
 {
   "name": "@orpc/ratelimit",
   "type": "module",
-  "version": "2.0.0-beta.7",
+  "version": "2.0.0-beta.16",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
@@ -68,7 +68,7 @@
   "dependencies": {
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standardserver/core": "^0.0.25"
+    "@standardserver/core": "^0.2.0"
   },
   "devDependencies": {
     "@upstash/ratelimit": "^2.0.8",
