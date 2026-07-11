@@ -254,7 +254,7 @@ const handler = new RPCHandler(router, {
          *
          * @default 15000
          */
-        interval: 5000,
+        interval: 15000,
         /**
          * The content of the ping comment. Must not include newline characters.
          *
