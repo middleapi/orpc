@@ -46,7 +46,7 @@
     "@standard-schema/spec": "^1.1.0"
   },
   "devDependencies": {
-    "arktype": "^2.2.1",
+    "arktype": "^2.2.3",
     "valibot": "^1.4.1",
     "zod": "^4.4.3"
   }
