@@ -398,6 +398,12 @@ async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array>, pe
         const view = new DataView(buffer.buffer, buffer.byteOffset, 4)
         const length = view.getUint32(0, false)
 
+        // Zero-length frame is a keep-alive ping; skip it.
+        if (length === 0) {
+          buffer = buffer.subarray(4)
+          continue
+        }
+
         if (buffer.length < 4 + length) {
           break
         }

@@ -36,6 +36,30 @@ export interface BatchHandlerPluginOptions<T extends Context> {
    * @default {}
    */
   headers?: Value<Promisable<StandardHeaders>, [batchOptions: StandardHandlerRoutingInterceptorOptions<T>]>
+
+  /**
+   * Keep-alive settings for streaming batch responses.
+   *
+   * When enabled, a zero-length length-prefixed frame is sent periodically while the
+   * stream is idle (no message sent for `interval` ms). Clients ignore these frames.
+   * Only applies to streaming mode.
+   *
+   * @default { enabled: true, interval: 15000 }
+   */
+  keepAlive?: undefined | {
+    /**
+     * If true, a keep-alive frame is sent periodically while the stream is idle.
+     *
+     * @default true
+     */
+    enabled: boolean
+    /**
+     * Interval (in milliseconds) between keep-alive frames after the last message.
+     *
+     * @default 15000
+     */
+    interval?: number
+  }
 }
 
 export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
@@ -51,6 +75,8 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
   private readonly mapSubrequest: Exclude<BatchHandlerPluginOptions<T>['mapSubrequest'], undefined>
   private readonly successStatus: Exclude<BatchHandlerPluginOptions<T>['successStatus'], undefined>
   private readonly headers: Exclude<BatchHandlerPluginOptions<T>['headers'], undefined>
+  private readonly keepAliveEnabled: boolean
+  private readonly keepAliveInterval: number
 
   constructor(options: BatchHandlerPluginOptions<T> = {}) {
     this.maxSize = options.maxSize ?? 10
@@ -66,6 +92,8 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
     this.successStatus = options.successStatus ?? 207
     this.headers = options.headers ?? {}
+    this.keepAliveEnabled = options.keepAlive?.enabled ?? true
+    this.keepAliveInterval = options.keepAlive?.interval ?? 15_000
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
@@ -201,9 +229,42 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
       // streaming mode — binary length-prefixed ReadableStream
       let streamController: ReadableStreamDefaultController<Uint8Array>
+      let keepAliveTimer: ReturnType<typeof setInterval> | undefined
+
+      const clearKeepAlive = () => {
+        if (keepAliveTimer !== undefined) {
+          clearInterval(keepAliveTimer)
+          keepAliveTimer = undefined
+        }
+      }
+
+      const scheduleKeepAlive = () => {
+        if (!this.keepAliveEnabled) {
+          return
+        }
+
+        clearKeepAlive()
+        keepAliveTimer = setInterval(() => {
+          try {
+            // Zero-length length-prefixed frame = keep-alive (ignored by clients)
+            const lengthBuffer = new ArrayBuffer(4)
+            new DataView(lengthBuffer).setUint32(0, 0, false)
+            streamController.enqueue(new Uint8Array(lengthBuffer))
+          }
+          catch {
+            // Stream may already be closed or errored.
+            clearKeepAlive()
+          }
+        }, this.keepAliveInterval)
+      }
+
       const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
         start(controller) {
           streamController = controller
+          scheduleKeepAlive()
+        },
+        cancel() {
+          clearKeepAlive()
         },
       })
 
@@ -215,15 +276,18 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         new DataView(lengthBuffer).setUint32(0, bytes.byteLength, false)
         streamController.enqueue(new Uint8Array(lengthBuffer))
         streamController.enqueue(bytes)
+        scheduleKeepAlive() // reset idle timer
       })
 
       // DO NOT await here to block streaming response
       Promise.all(messages.map(msg => peer.message(msg, handleIndividualRequest)))
         .then(async () => {
+          clearKeepAlive()
           streamController.close()
           await peer.close()
         })
         .catch(async (error) => {
+          clearKeepAlive()
           streamController.error(error)
           await peer.close(error)
         })
