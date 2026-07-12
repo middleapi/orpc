@@ -74,7 +74,7 @@ const procedure = os
   .handler(async () => {
     const logger = useLogger() // [!code highlight]
 
-    logger?.set({ user: { id: 123, name: 'John Doe' } }) // [!code highlight]
+    logger?.set({ user: { id: 123, name: 'John Doe' } })
 
     await logger.fork('child-procedure', () => {
       const logger = useLogger() // [!code highlight]
