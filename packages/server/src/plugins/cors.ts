@@ -110,7 +110,10 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
           resHeaders['access-control-allow-origin'] = origin
         }
 
-        resHeaders.vary = interceptorOptions.request.headers.vary ?? 'origin'
+        const existingVary = flattenStandardHeader(resHeaders.vary)
+        if (!existingVary?.split(',').some(v => v.trim().toLowerCase() === 'origin')) {
+          resHeaders.vary = existingVary ? `${existingVary}, Origin` : 'Origin'
+        }
       }
 
       const allowedTimingOrigins = toArray(await value(this.options.timingOrigin, origin, interceptorOptions))
