@@ -91,7 +91,10 @@ export class CORSPlugin<T extends Context> implements StandardHandlerPlugin<T> {
           result.response.headers['access-control-allow-origin'] = origin
         }
 
-        result.response.headers.vary = interceptorOptions.request.headers.vary ?? 'origin'
+        const existingVary = flattenHeader(result.response.headers.vary)
+        if (!existingVary?.split(',').some(v => v.trim().toLowerCase() === 'origin')) {
+          result.response.headers.vary = existingVary ? `${existingVary}, Origin` : 'Origin'
+        }
       }
 
       const allowedTimingOrigin = await value(this.options.timingOrigin, origin, interceptorOptions)
