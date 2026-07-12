@@ -111,7 +111,7 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
         }
 
         const existingVary = flattenStandardHeader(resHeaders.vary)
-        if (!existingVary?.split(',').some(v => v.trim().toLocaleLowerCase() === 'origin')) {
+        if (!existingVary?.split(',').some(v => v.trim().toLowerCase() === 'origin')) {
           resHeaders.vary = existingVary ? `${existingVary}, Origin` : 'Origin'
         }
       }
