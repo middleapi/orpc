@@ -1,7 +1,7 @@
 {
   "name": "@orpc/experimental-durable-iterator",
   "type": "module",
-  "version": "1.14.7",
+  "version": "1.14.8",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
