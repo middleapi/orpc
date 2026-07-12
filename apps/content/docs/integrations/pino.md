@@ -95,7 +95,7 @@ You can provide a custom logger instance for specific requests by passing it thr
 
 ```ts
 import {
-  LOGGER_CONTEXT_SYMBOL,
+  PINO_HANDLER_PLUGIN_CONTEXT_SYMBOL,
   PinoHandlerPlugin,
   PinoHandlerPluginContext
 } from '@orpc/pino'
@@ -121,7 +121,7 @@ const server = createServer(async (req, res) => {
   const { matched } = await handler.handle(req, res, {
     prefix: '/api',
     context: {
-      [LOGGER_CONTEXT_SYMBOL]: req.log, // [!code highlight]
+      [PINO_HANDLER_PLUGIN_CONTEXT_SYMBOL]: { logger: req.log }, // [!code highlight]
     },
   })
 
