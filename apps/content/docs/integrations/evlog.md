@@ -110,7 +110,7 @@ const procedure = os
   .handler(({ context }) => {
     const logger = getLogger(context) // [!code highlight]
 
-    logger?.set({ user: { id: 123, name: 'John Doe' } }) // [!code highlight]
+    logger?.set({ user: { id: 123, name: 'John Doe' } })
 
     return { success: true }
   })
