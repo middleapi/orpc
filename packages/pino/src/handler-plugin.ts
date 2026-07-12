@@ -1,12 +1,16 @@
 import type { Context, ErrorMap, ProcedureClientInterceptor, Schema } from '@orpc/server'
 import type { StandardHandlerInterceptor, StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '@orpc/server/standard'
 import type { Logger } from 'pino'
-import type { LoggerContext } from './context'
 import { wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import { isAbortError, isAsyncIteratorObject, ORPC_NAME, override, toArray, wrapReadableStream } from '@orpc/shared'
 import { flattenStandardHeader } from '@standardserver/core'
 import pino from 'pino'
-import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
+
+export const PINO_HANDLER_PLUGIN_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_PINO_HANDLER_PLUGIN_CONTEXT')
+
+export interface PinoHandlerPluginContext {
+  [PINO_HANDLER_PLUGIN_CONTEXT_SYMBOL]?: undefined | { logger: Logger }
+}
 
 export interface PinoHandlerPluginOptions<T extends Context> {
   /**
@@ -39,7 +43,7 @@ export interface PinoHandlerPluginOptions<T extends Context> {
   logAbort?: boolean
 }
 
-export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
+export class PinoHandlerPlugin<T extends Context & PinoHandlerPluginContext> implements StandardHandlerPlugin<T> {
   name = '~pino'
 
   /**
@@ -70,7 +74,7 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
       const startMs = Date.now()
 
       const logger = (
-        (interceptorOptions.context as LoggerContext)[LOGGER_CONTEXT_SYMBOL] ?? this.logger
+        interceptorOptions.context[PINO_HANDLER_PLUGIN_CONTEXT_SYMBOL]?.logger ?? this.logger
       ).child({})
 
       /**
@@ -101,8 +105,8 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
           ...interceptorOptions,
           context: {
             ...interceptorOptions.context,
-            [LOGGER_CONTEXT_SYMBOL]: logger,
-          },
+            [PINO_HANDLER_PLUGIN_CONTEXT_SYMBOL]: { logger },
+          } satisfies PinoHandlerPluginContext,
         })
 
         if (this.logLifecycle) {
@@ -133,7 +137,7 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
     }
 
     const interceptor: StandardHandlerInterceptor<T> = async ({ next, context, path, request }) => {
-      const logger = getLogger(context)
+      const logger = context[PINO_HANDLER_PLUGIN_CONTEXT_SYMBOL]?.logger
       logger?.setBindings({ rpc: { system: ORPC_NAME, method: path.join('.') } })
 
       if (this.logAbort) {
@@ -159,6 +163,7 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
     }
 
     const clientInterceptor: ProcedureClientInterceptor<T, Schema<unknown>, ErrorMap, any> = async ({ next, context }) => {
+      const logger = context[PINO_HANDLER_PLUGIN_CONTEXT_SYMBOL]?.logger
       const output = await next()
 
       if (isAsyncIteratorObject(output)) {
@@ -168,7 +173,7 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
          */
         return override(output, wrapAsyncIteratorPreservingEventMeta(output, {
           onError: (error) => {
-            logBusinessLogicError(getLogger(context), error)
+            logBusinessLogicError(logger, error)
           },
         }))
       }
@@ -180,7 +185,7 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
          */
         return override(output, wrapReadableStream(output, {
           onError: (error) => {
-            logBusinessLogicError(getLogger(context), error)
+            logBusinessLogicError(logger, error)
           },
         }))
       }

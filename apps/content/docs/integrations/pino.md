@@ -73,9 +73,9 @@ npm run dev | npx pino-pretty
 You can access the logger from the context object using the `getLogger` function:
 
 ```ts
-import { getLogger, LoggerContext } from '@orpc/pino'
+import { getLogger, PinoHandlerPluginContext } from '@orpc/pino'
 
-interface ServerContext extends LoggerContext {} // [!code highlight]
+interface ServerContext extends PinoHandlerPluginContext {} // [!code highlight]
 
 const procedure = os
   .$context<ServerContext>()
@@ -96,14 +96,14 @@ You can provide a custom logger instance for specific requests by passing it thr
 ```ts
 import {
   LOGGER_CONTEXT_SYMBOL,
-  LoggerContext,
-  PinoHandlerPlugin
+  PinoHandlerPlugin,
+  PinoHandlerPluginContext
 } from '@orpc/pino'
 
 const logger = pino()
 const httpLogger = pinoHttp({ logger })
 
-interface ServerContext extends LoggerContext {} // [!code highlight]
+interface ServerContext extends PinoHandlerPluginContext {} // [!code highlight]
 
 const router = {
   ping: os.$context<ServerContext>().handler(() => 'pong')

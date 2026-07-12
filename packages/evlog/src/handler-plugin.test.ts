@@ -1,7 +1,6 @@
 import { AbortError, ORPC_NAME, sleep } from '@orpc/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { LOGGER_CONTEXT_SYMBOL } from './context'
-import { EvlogHandlerPlugin } from './handler-plugin'
+import { EVLOG_HANDLER_PLUGIN_CONTEXT_SYMBOL, EvlogHandlerPlugin } from './handler-plugin'
 
 const mocks = vi.hoisted(() => ({
   defineFrameworkIntegration: vi.fn(),
@@ -179,7 +178,7 @@ describe('evlogHandlerPlugin', () => {
     const { finish, logger, runWith } = mockIntegration()
     const next = vi.fn(async (options: any) => {
       expect(options.context.existing).toBe(true)
-      expect(options.context[LOGGER_CONTEXT_SYMBOL]).toBe(logger)
+      expect(options.context[EVLOG_HANDLER_PLUGIN_CONTEXT_SYMBOL]).toEqual({ logger })
 
       return {
         matched: true,
@@ -374,7 +373,7 @@ describe('evlogHandlerPlugin', () => {
         controller.abort('manual')
         return 'pong'
       }),
-      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+      context: { [EVLOG_HANDLER_PLUGIN_CONTEXT_SYMBOL]: { logger } },
       path: ['nested', 'ping'],
       request: createRequest('/ping', { signal: controller.signal }),
     })).resolves.toBe('pong')
@@ -394,7 +393,7 @@ describe('evlogHandlerPlugin', () => {
 
     await expect(interceptor({
       next: vi.fn().mockResolvedValue('done'),
-      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+      context: { [EVLOG_HANDLER_PLUGIN_CONTEXT_SYMBOL]: { logger } },
       path: ['ping'],
       request: createRequest('/ping', { signal: alreadyAborted.signal }),
     })).resolves.toBe('done')
@@ -415,7 +414,7 @@ describe('evlogHandlerPlugin', () => {
 
     await expect(interceptor({
       next: vi.fn().mockRejectedValue(businessError),
-      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+      context: { [EVLOG_HANDLER_PLUGIN_CONTEXT_SYMBOL]: { logger } },
       path: ['ping'],
       request: createRequest('/ping'),
     })).rejects.toThrow(businessError)
@@ -430,7 +429,7 @@ describe('evlogHandlerPlugin', () => {
 
     await expect(interceptor({
       next: vi.fn().mockRejectedValue(abortError),
-      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+      context: { [EVLOG_HANDLER_PLUGIN_CONTEXT_SYMBOL]: { logger } },
       path: ['ping'],
       request: createRequest('/ping'),
     })).rejects.toThrow(abortError)
@@ -461,7 +460,7 @@ describe('evlogHandlerPlugin', () => {
 
     const output = await client({
       next: vi.fn().mockResolvedValue(source()),
-      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+      context: { [EVLOG_HANDLER_PLUGIN_CONTEXT_SYMBOL]: { logger } },
     })
 
     await expect(collectIterator(output as AsyncIterable<unknown>)).rejects.toThrow(streamError)
@@ -481,7 +480,7 @@ describe('evlogHandlerPlugin', () => {
           controller.error(abortError)
         },
       })),
-      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+      context: { [EVLOG_HANDLER_PLUGIN_CONTEXT_SYMBOL]: { logger } },
     })
 
     await expect(collectStream(output as ReadableStream<unknown>)).rejects.toThrow(abortError)

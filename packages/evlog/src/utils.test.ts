@@ -1,10 +1,11 @@
 import { createRequestLogger } from 'evlog'
-import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
+import { EVLOG_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
+import { getLogger } from './utils'
 
 it('getLogger', async () => {
   expect(getLogger({})).toBeUndefined()
   expect(getLogger({ something: true } as any)).toBeUndefined()
 
   const logger = createRequestLogger()
-  expect(getLogger({ [LOGGER_CONTEXT_SYMBOL]: logger })).toBe(logger)
+  expect(getLogger({ [EVLOG_HANDLER_PLUGIN_CONTEXT_SYMBOL]: { logger } })).toBe(logger)
 })

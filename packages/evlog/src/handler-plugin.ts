@@ -7,7 +7,12 @@ import { wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import { isAbortError, isAsyncIteratorObject, ORPC_NAME, override, sleep, toArray, wrapReadableStream } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standardserver/core'
 import { defineFrameworkIntegration } from 'evlog/toolkit'
-import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
+
+export const EVLOG_HANDLER_PLUGIN_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_EVLOG_HANDLER_PLUGIN_CONTEXT')
+
+export interface EvlogHandlerPluginContext {
+  [EVLOG_HANDLER_PLUGIN_CONTEXT_SYMBOL]?: undefined | { logger: RequestLogger }
+}
 
 export interface EvlogHandlerPluginOptions<_T extends Context> extends BaseEvlogOptions {
   /**
@@ -23,7 +28,7 @@ export interface EvlogHandlerPluginOptions<_T extends Context> extends BaseEvlog
   logAbort?: boolean
 }
 
-export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
+export class EvlogHandlerPlugin<T extends Context & EvlogHandlerPluginContext> implements StandardHandlerPlugin<T> {
   name = '~evlog'
 
   /**
@@ -75,8 +80,8 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
           ...interceptorOptions,
           context: {
             ...interceptorOptions.context,
-            [LOGGER_CONTEXT_SYMBOL]: logger,
-          },
+            [EVLOG_HANDLER_PLUGIN_CONTEXT_SYMBOL]: { logger },
+          } satisfies EvlogHandlerPluginContext,
         }))
 
         if (result.matched) {
@@ -154,7 +159,8 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
     }
 
     const interceptor: StandardHandlerInterceptor<T> = async ({ next, context, path, request }) => {
-      const logger = getLogger(context)
+      const logger = context[EVLOG_HANDLER_PLUGIN_CONTEXT_SYMBOL]?.logger
+
       logger?.set({ rpc: { system: ORPC_NAME, method: path.join('.') } })
 
       if (this.logAbort) {
@@ -190,7 +196,7 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
     }
 
     const clientInterceptor: ProcedureClientInterceptor<T, Schema<unknown>, ErrorMap, any> = async ({ next, context }) => {
-      const logger = getLogger(context)
+      const logger = context[EVLOG_HANDLER_PLUGIN_CONTEXT_SYMBOL]?.logger
       const output = await next()
 
       if (isAsyncIteratorObject(output)) {

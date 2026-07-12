@@ -3,8 +3,8 @@ import { os } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
 import { AbortError } from '@orpc/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
-import { PinoHandlerPlugin } from './handler-plugin'
+import { PINO_HANDLER_PLUGIN_CONTEXT_SYMBOL, PinoHandlerPlugin } from './handler-plugin'
+import { getLogger } from './utils'
 
 const globalSpies = {
   child: vi.fn(),
@@ -352,7 +352,7 @@ describe('pinoHandlerPlugin', () => {
 
       await handler.handle(createRequest('GET', '/ping'), {
         prefix: undefined,
-        context: { [LOGGER_CONTEXT_SYMBOL]: loggerWithReq },
+        context: { [PINO_HANDLER_PLUGIN_CONTEXT_SYMBOL]: { logger: loggerWithReq as any } },
       })
 
       const setBindingsCalls = globalSpies.setBindings.mock.calls
