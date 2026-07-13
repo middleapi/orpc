@@ -97,7 +97,7 @@ describe('module configuration', () => {
     expect(handler).toHaveBeenCalledTimes(2)
   })
 
-  it('context can be async function accepting ExecutionContext and isolated per request', async () => {
+  it('should support context as an async function receiving ExecutionContext, isolated per request', async () => {
     const context = vi.fn((ctx: ExecutionContext) => ({ source: ctx.switchToHttp().getRequest().url }))
 
     const moduleRef = await Test.createTestingModule({
