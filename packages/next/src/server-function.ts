@@ -2,6 +2,7 @@ import type { AnyORPCError, AnyORPCErrorJSON, AnySchema, Context, ErrorMap, Infe
 import type { MaybeOptionalOptions } from '@orpc/shared'
 import { createProcedureClient, toORPCError } from '@orpc/server'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
+import { unstable_rethrow } from 'next/navigation'
 
 export type ServerFunctionORPCErrorJSON<T>
   = T extends ORPCError<infer U, infer V>
@@ -67,15 +68,8 @@ export function createServerFunction<
       return [null, await client(input as any)]
     }
     catch (error) {
-      // special next.js errors
-      if (
-        error instanceof Error
-        && 'digest' in error
-        && typeof error.digest === 'string'
-        && error.digest.startsWith('NEXT_')
-      ) {
-        throw error
-      }
+      // https://nextjs.org/docs/app/api-reference/functions/unstable_rethrow
+      unstable_rethrow(error)
 
       return [
         toORPCError(error).toJSON() as ServerFunctionORPCErrorJSON<ORPCErrorFromErrorMap<TErrorMap> | TReturnedError | ThrowableError>,
