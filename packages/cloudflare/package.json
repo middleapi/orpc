@@ -42,7 +42,7 @@
     "@orpc/publisher": "workspace:*",
     "@orpc/ratelimit": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standardserver/core": "^0.2.1"
+    "@standardserver/core": "^0.3.0"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.16.20",
