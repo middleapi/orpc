@@ -75,22 +75,22 @@ describe('zodToJsonSchemaConverter', () => {
   })
 
   describe('supports $ref at root level', () => {
-    it('with the global metadata registry', () => {
+    it('with the global metadata registry and special json pointers', () => {
       const schema = z.object({
         a: z.string().meta({ id: 'a' }),
         b: z.number().meta({ id: 'b' }),
-      }).meta({ id: 'root' })
+      }).meta({ id: 'root~/' })
 
       expect(converter.convert(schema, 'input')).toEqual([{
-        $ref: '#/$defs/root',
+        $ref: '#/$defs/root~0~1',
         $defs: {
-          a: {
+          'a': {
             type: 'string',
           },
-          b: {
+          'b': {
             type: 'number',
           },
-          root: {
+          'root~/': {
             type: 'object',
             properties: {
               a: {

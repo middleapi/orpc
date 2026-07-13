@@ -1,6 +1,6 @@
 import type { AnySchema, JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
 import type { $ZodType, ToJSONSchemaParams, JSONSchema as ZodJsonSchema } from 'zod/v4/core'
-import { JsonSchemaFormat, JsonSchemaXNativeType } from '@orpc/json-schema'
+import { encodeJsonPointerSegment, JsonSchemaFormat, JsonSchemaXNativeType } from '@orpc/json-schema'
 import { globalRegistry, toJSONSchema } from 'zod/v4/core'
 
 export interface ZodToJsonSchemaConverterOptions extends Omit<ToJSONSchemaParams, 'target' | 'io'> {}
@@ -89,7 +89,7 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
       }
 
       return {
-        $ref: `#/$defs/${defName}`,
+        $ref: `#/$defs/${encodeJsonPointerSegment(defName)}`,
         $defs: {
           ...$defs,
           [defName]: restWithoutDefs,
