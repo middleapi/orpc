@@ -2,7 +2,7 @@ import type { DynamicModule, ExecutionContext } from '@nestjs/common'
 import type { OpenAPIHandlerCodecCoreOptions } from '@orpc/openapi/standard'
 import type { DefaultInitialContext } from '@orpc/server'
 import type { StandardHandlerOptions } from '@orpc/server/standard'
-import type { Promisable } from '@orpc/shared'
+import type { Promisable, Value } from '@orpc/shared'
 import type { StandardLazyRequest } from '@standardserver/core'
 import type { ToEventStreamOptions } from '@standardserver/node'
 import { Module } from '@nestjs/common'
@@ -17,14 +17,12 @@ export interface NestStandardLazyRequest extends StandardLazyRequest {
   params?: undefined | Record<string, string | string[]>
 }
 
-export type ContextFactory = (ctx: ExecutionContext) => Promisable<DefaultInitialContext>
-
 export type ORPCModuleConfig
   = & OpenAPIHandlerCodecCoreOptions<DefaultInitialContext>
     & StandardHandlerOptions<DefaultInitialContext>
     & (object extends DefaultInitialContext
-      ? { context?: DefaultInitialContext | ContextFactory }
-      : { context: DefaultInitialContext | ContextFactory })
+      ? { context?: Value<Promisable<DefaultInitialContext>, [ctx: ExecutionContext]> }
+      : { context: Value<Promisable<DefaultInitialContext>, [ctx: ExecutionContext]> })
     & {
       /**
        * Customize how to convert NestJS `req` and `res` to {@link NestStandardLazyRequest}.

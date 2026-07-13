@@ -187,47 +187,17 @@ declare module '@orpc/server' {
     ORPCModule.forRootAsync({
       inject: [REQUEST],
       useFactory: (request: Request) => ({
-        context: { request }, // [!code highlight]
+        /**
+         * Can be a static value or an async function that
+         * receives the ExecutionContext on each request
+         */
+        context: async (ctx: ExecutionContext) => { // [!code highlight]
+          // `request` and `req` refer to the same object
+          const req = ctx.switchToHttp().getRequest() as Request
+
+          return { request }
+        },
       }),
-    }),
-  ],
-})
-export class AppModule {}
-```
-
-You can also pass a factory function directly to `context` in `ORPCModuleConfig` (works with both `forRoot` and `forRootAsync`). The factory receives the NestJS [`ExecutionContext`](https://docs.nestjs.com/fundamentals/execution-context) on each request, letting you extract per-request data (headers, cookies, session) while keeping `ORPCModule` and `ImplementInterceptor` as singletons.
-
-```ts
-declare module '@orpc/server' {
-  interface DefaultInitialContext {
-    tenantId: string
-  }
-}
-
-@Module({
-  imports: [
-    ORPCModule.forRoot({
-      context: (ctx) => { // [!code highlight]
-        const req = ctx.switchToHttp().getRequest() // [!code highlight]
-        return { tenantId: req.headers['x-tenant-id'] ?? 'default' } // [!code highlight]
-      }, // [!code highlight]
-    }),
-  ],
-})
-export class AppModule {}
-```
-
-The factory can also be `async`:
-
-```ts
-@Module({
-  imports: [
-    ORPCModule.forRoot({
-      context: async (ctx) => {
-        const req = ctx.switchToHttp().getRequest()
-        const user = await db.users.findBySession(req.cookies.session)
-        return { user }
-      },
     }),
   ],
 })
