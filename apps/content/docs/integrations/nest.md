@@ -187,7 +187,16 @@ declare module '@orpc/server' {
     ORPCModule.forRootAsync({
       inject: [REQUEST],
       useFactory: (request: Request) => ({
-        context: { request }, // [!code highlight]
+        /**
+         * Can be a static value or an async function that
+         * receives the ExecutionContext on each request
+         */
+        context: async (ctx: ExecutionContext) => { // [!code highlight]
+          // `request` and `req` refer to the same object
+          const req = ctx.switchToHttp().getRequest() as Request
+
+          return { request }
+        },
       }),
     }),
   ],

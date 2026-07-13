@@ -15,7 +15,7 @@ import { DEFAULT_OPENAPI_METHOD, getDynamicPathParams, getOpenAPIMeta } from '@o
 import { OpenAPIHandlerCodecCore } from '@orpc/openapi/standard'
 import { DEFAULT_SUCCESS_STATUS, getRouter, Procedure, unlazy } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
-import { get, isAsyncIteratorObject, mergeHttpPath, stringifyJSON } from '@orpc/shared'
+import { get, isAsyncIteratorObject, mergeHttpPath, stringifyJSON, value } from '@orpc/shared'
 import { flattenStandardHeader, generateContentDisposition } from '@standardserver/core'
 import { toEventStream, toStandardLazyRequest } from '@standardserver/node'
 import { mergeMap } from 'rxjs'
@@ -153,7 +153,7 @@ export class ImplementInterceptor implements NestInterceptor {
         }, this.config)
 
         const result = await handler.handle(standardRequest, {
-          context: this.config.context ?? {} as DefaultInitialContext,
+          context: await value(this.config.context ?? {} as DefaultInitialContext, ctx),
         })
 
         if (!result.matched) {

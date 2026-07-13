@@ -1,3 +1,4 @@
+import type { ExecutionContext } from '@nestjs/common'
 import { Controller } from '@nestjs/common'
 import { REQUEST } from '@nestjs/core'
 import { Test } from '@nestjs/testing'
@@ -94,5 +95,29 @@ describe('module configuration', () => {
     expect(useFactory).toHaveBeenCalledWith(expect.objectContaining({ url: '/module-config?test=2', method: 'POST' }))
     expect(routingInterceptor).toHaveBeenCalledTimes(2)
     expect(handler).toHaveBeenCalledTimes(2)
+  })
+
+  it('should support context as an async function receiving ExecutionContext, isolated per request', async () => {
+    const context = vi.fn((ctx: ExecutionContext) => ({ source: ctx.switchToHttp().getRequest().url }))
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ImplController],
+      imports: [
+        ORPCModule.forRoot({
+          context,
+        }),
+      ],
+    }).compile()
+
+    const app = moduleRef.createNestApplication()
+    await app.init()
+
+    const res1 = await supertest(app.getHttpServer()).post('/module-config?request=1')
+    expect(res1.statusCode).toEqual(200)
+    expect(res1.body).toEqual('/module-config?request=1')
+
+    const res2 = await supertest(app.getHttpServer()).post('/module-config?request=2')
+    expect(res2.statusCode).toEqual(200)
+    expect(res2.body).toEqual('/module-config?request=2')
   })
 })
