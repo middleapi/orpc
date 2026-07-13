@@ -76,22 +76,26 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
     // `$schema` can be safely omitted here.
     const { $schema, ...rest } = jsonSchema
 
-    try {
-      // workaround until https://github.com/colinhacks/zod/issues/6026 is merged
-      const registry = this.options.metadata ?? globalRegistry
-      const { id } = registry.get(schema) || {}
+    // workaround until https://github.com/colinhacks/zod/issues/6026 is merged
+    const registry = this.options.metadata ?? globalRegistry
+    const { id } = registry.get(schema) || {}
+    if (typeof id === 'string' && rest.$ref === undefined) {
       const { $defs = {}, ...restWithoutDefs } = rest
-      if (id && !(id in $defs)) {
-        return {
-          $ref: `#/$defs/${id}`,
-          $defs: {
-            ...$defs,
-            [id]: restWithoutDefs,
-          },
-        }
+
+      let defName = id
+      let index = 0
+      while (defName in $defs) {
+        defName = `${defName}__${index++}`
+      }
+
+      return {
+        $ref: `#/$defs/${defName}`,
+        $defs: {
+          ...$defs,
+          [defName]: restWithoutDefs,
+        },
       }
     }
-    catch {}
 
     return rest
   }

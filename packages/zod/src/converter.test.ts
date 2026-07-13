@@ -1,6 +1,15 @@
 import * as v from 'valibot'
 import * as z from 'zod'
+import { $ZodRegistry, toJSONSchema } from 'zod/v4/core'
 import { ZodToJsonSchemaConverter } from './converter'
+
+vi.mock('zod/v4/core', async (original) => {
+  const mod = await original<typeof import('zod/v4/core')>()
+  return {
+    ...mod,
+    toJSONSchema: vi.fn((...args: [any]) => mod.toJSONSchema(...args)),
+  }
+})
 
 describe('zodToJsonSchemaConverter', () => {
   const converter = new ZodToJsonSchemaConverter()
@@ -65,39 +74,98 @@ describe('zodToJsonSchemaConverter', () => {
     expect(converter.convert(schema, 'input')).toEqual([{ type: 'string' }, false])
   })
 
-  it('supports $ref & $defs at root level', () => {
-    const schema = z.object({
-      a: z.string().meta({ id: 'a' }),
-      b: z.number().meta({ id: 'b' }),
-    }).meta({ id: 'root' })
+  describe('supports $ref at root level', () => {
+    it('with the global metadata registry', () => {
+      const schema = z.object({
+        a: z.string().meta({ id: 'a' }),
+        b: z.number().meta({ id: 'b' }),
+      }).meta({ id: 'root' })
 
-    expect(converter.convert(schema, 'input')).toEqual([{
-      $ref: '#/$defs/root',
-      $defs: {
-        a: {
-          type: 'string',
-        },
-        b: {
-          type: 'number',
-        },
-        root: {
-          type: 'object',
-          properties: {
-            a: {
-              $ref: '#/$defs/a',
-            },
-            b: {
-              $ref: '#/$defs/b',
-            },
+      expect(converter.convert(schema, 'input')).toEqual([{
+        $ref: '#/$defs/root',
+        $defs: {
+          a: {
+            type: 'string',
           },
-          required: [
-            'a',
-            'b',
-          ],
+          b: {
+            type: 'number',
+          },
+          root: {
+            type: 'object',
+            properties: {
+              a: {
+                $ref: '#/$defs/a',
+              },
+              b: {
+                $ref: '#/$defs/b',
+              },
+            },
+            required: [
+              'a',
+              'b',
+            ],
+          },
         },
-      },
-    }, false],
-    )
+      }, false],
+      )
+    })
+
+    it('with a custom metadata registry', () => {
+      const registry = new $ZodRegistry()
+      const customConverter = new ZodToJsonSchemaConverter({ metadata: registry as any })
+
+      const schema = z.object({
+        a: z.string(),
+      })
+
+      registry.add(schema, { id: 'root' })
+      registry.add(schema.shape.a, { id: 'a' })
+
+      expect(customConverter.convert(schema, 'input')).toEqual([{
+        $ref: '#/$defs/root',
+        $defs: {
+          a: {
+            type: 'string',
+          },
+          root: {
+            type: 'object',
+            properties: {
+              a: {
+                $ref: '#/$defs/a',
+              },
+            },
+            required: [
+              'a',
+            ],
+          },
+        },
+      }, false])
+    })
+
+    it('avoids overwriting existing $defs when the root id collides', () => {
+      const schema = z.string().meta({ id: 'root' })
+
+      vi.mocked(toJSONSchema).mockReturnValueOnce({
+        $defs: {
+          root: {
+            type: 'number',
+          },
+        },
+        type: 'string',
+      } as any)
+
+      expect(converter.convert(schema, 'input')).toEqual([{
+        $ref: '#/$defs/root__0',
+        $defs: {
+          root: {
+            type: 'number',
+          },
+          root__0: {
+            type: 'string',
+          },
+        },
+      }, false])
+    })
   })
 
   describe('optionality', () => {
