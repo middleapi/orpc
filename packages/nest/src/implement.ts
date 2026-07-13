@@ -6,7 +6,7 @@ import type { StandardBodyHint } from '@standardserver/core'
 import type { Request as ExpressRequest, Response as ExpressResponse } from 'express'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
-import type { NestStandardLazyRequest, ORPCModuleConfig } from './module'
+import type { ContextFactory, NestStandardLazyRequest, ORPCModuleConfig } from './module'
 import { Readable } from 'node:stream'
 import { applyDecorators, Delete, Get, Head, HttpCode, HttpException, Inject, Injectable, Optional, Options, Patch, Post, Put, StreamableFile, UseInterceptors } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
@@ -153,7 +153,9 @@ export class ImplementInterceptor implements NestInterceptor {
         }, this.config)
 
         const result = await handler.handle(standardRequest, {
-          context: this.config.context ?? {} as DefaultInitialContext,
+          context: typeof this.config.context === 'function'
+            ? await (this.config.context as ContextFactory)(ctx)
+            : (this.config.context ?? {} as DefaultInitialContext),
         })
 
         if (!result.matched) {

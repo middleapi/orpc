@@ -195,6 +195,45 @@ declare module '@orpc/server' {
 export class AppModule {}
 ```
 
+You can also pass a factory function directly to `context` in `ORPCModuleConfig` (works with both `forRoot` and `forRootAsync`). The factory receives the NestJS [`ExecutionContext`](https://docs.nestjs.com/fundamentals/execution-context) on each request, letting you extract per-request data (headers, cookies, session) while keeping `ORPCModule` and `ImplementInterceptor` as singletons.
+
+```ts
+declare module '@orpc/server' {
+  interface DefaultInitialContext {
+    tenantId: string
+  }
+}
+
+@Module({
+  imports: [
+    ORPCModule.forRoot({
+      context: (ctx) => { // [!code highlight]
+        const req = ctx.switchToHttp().getRequest() // [!code highlight]
+        return { tenantId: req.headers['x-tenant-id'] ?? 'default' } // [!code highlight]
+      }, // [!code highlight]
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+The factory can also be `async`:
+
+```ts
+@Module({
+  imports: [
+    ORPCModule.forRoot({
+      context: async (ctx) => {
+        const req = ctx.switchToHttp().getRequest()
+        const user = await db.users.findBySession(req.cookies.session)
+        return { user }
+      },
+    }),
+  ],
+})
+export class AppModule {}
+```
+
 ### Plugins
 
 Most handler plugins also work in NestJS, for example [Request Headers](/docs/plugins/request-headers), [Response Headers](/docs/plugins/response-headers), [Rethrow](/docs/plugins/rethrow), and [Smart Coercion](/docs/plugins/smart-coercion).
