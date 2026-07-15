@@ -125,6 +125,8 @@ export class PlanetController {
 
 By default, errors thrown in implemented procedures are caught and handled by oRPC, which then rethrows a generic `HttpException` to NestJS. If you want NestJS to catch the original error instead of `HttpException`, use the [Rethrow Plugin](/docs/plugins/rethrow) to bypass oRPC error handling and let NestJS handle the error directly.
 
+To customize input or output validation errors (for example, to format or prettify Zod validation messages), you can configure oRPC interceptors inside the `ORPCModule`. See [Validation Errors](/docs/advanced/validation-errors) for more details.
+
 ## Body Parser
 
 oRPC uses bodies parsed by NestJS when available, and falls back to its own parser otherwise. In some cases, you may want to disable the NestJS body parser so oRPC can handle parsing directly:
@@ -170,15 +172,44 @@ export class AppModule {}
 
 ### Initial Context
 
-To define [initial context](/docs/context#initial-context) for use in oRPC scopes, extend the `DefaultInitialContext` interface and provide `context` through `ORPCModule.forRootAsync` (or `ORPCModule.forRoot` for static configuration).
+To define [initial context](/docs/context#initial-context) for use in oRPC scopes, extend the `DefaultInitialContext` interface and configure `context` in `ORPCModule`.
 
-```ts
+::: code-group
+
+```ts [Function (Recommended)]
 declare module '@orpc/server' {
   /**
    * Extend the context interface to enable typesafe access across oRPC scopes
    */
   interface DefaultInitialContext {
-    request: Request // [!code highlight]
+    request: Request
+  }
+}
+
+@Module({
+  imports: [
+    ORPCModule.forRoot({
+      /**
+       * Can be a static value or an async function that
+       * receives the ExecutionContext on each request
+       */
+      context: (ctx: ExecutionContext) => {
+        const request = ctx.switchToHttp().getRequest() as Request
+        return { request }
+      },
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+```ts [Request Injection (forRootAsync)]
+declare module '@orpc/server' {
+  /**
+   * Extend the context interface to enable typesafe access across oRPC scopes
+   */
+  interface DefaultInitialContext {
+    request: Request
   }
 }
 
@@ -191,7 +222,7 @@ declare module '@orpc/server' {
          * Can be a static value or an async function that
          * receives the ExecutionContext on each request
          */
-        context: async (ctx: ExecutionContext) => { // [!code highlight]
+        context: async (ctx: ExecutionContext) => {
           // `request` and `req` refer to the same object
           const req = ctx.switchToHttp().getRequest() as Request
 
@@ -203,6 +234,8 @@ declare module '@orpc/server' {
 })
 export class AppModule {}
 ```
+
+:::
 
 ### Plugins
 
