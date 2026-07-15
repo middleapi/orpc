@@ -125,7 +125,9 @@ export class PlanetController {
 
 By default, errors thrown in implemented procedures are caught and handled by oRPC, which then rethrows a generic `HttpException` to NestJS. If you want NestJS to catch the original error instead of `HttpException`, use the [Rethrow Plugin](/docs/plugins/rethrow) to bypass oRPC error handling and let NestJS handle the error directly.
 
-To customize input or output validation errors (for example, to format or prettify Zod validation messages), you can configure oRPC interceptors inside the `ORPCModule`. See [Validation Errors](/docs/advanced/validation-errors) for more details.
+::: tip
+Learn how to customize input and output validation errors in [Validation Errors](/docs/advanced/validation-errors) and the [ORPCModule](#configuration) section.
+:::
 
 ## Body Parser
 
@@ -152,7 +154,9 @@ async function bootstrap() {
 Configure `@orpc/nest` by importing `ORPCModule` into your NestJS module. It supports the same
 options as the [OpenAPI Handler](/docs/openapi/handler), except for options that are unrelated to NestJS and options that are specific to NestJS.
 
-```ts
+::: code-group
+
+```ts [Static]
 import { onError } from '@orpc/server'
 import { ORPCModule } from '@orpc/nest'
 
@@ -170,13 +174,36 @@ import { ORPCModule } from '@orpc/nest'
 export class AppModule {}
 ```
 
+```ts [Dynamic with Dependency Injection]
+import { onError } from '@orpc/server'
+import { ORPCModule } from '@orpc/nest'
+
+@Module({
+  imports: [
+    ORPCModule.forRootAsync({
+      inject: [YourLoggerService],
+      useFactory: (logger: YourLoggerService) => ({
+        interceptors: [
+          onError((error) => {
+            logger.error(error)
+          }),
+        ],
+      }),
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+:::
+
 ### Initial Context
 
-To define [initial context](/docs/context#initial-context) for use in oRPC scopes, extend the `DefaultInitialContext` interface and configure `context` in `ORPCModule`.
+To define [initial context](/docs/context#initial-context) for use in oRPC scopes, extend the `DefaultInitialContext` interface and provide `context` through `ORPCModule`.
 
-::: code-group
+```ts
+import { ExecutionContext } from '@nestjs/common'
 
-```ts [Function (Recommended)]
 declare module '@orpc/server' {
   /**
    * Extend the context interface to enable typesafe access across oRPC scopes
@@ -202,40 +229,6 @@ declare module '@orpc/server' {
 })
 export class AppModule {}
 ```
-
-```ts [Request Injection (forRootAsync)]
-declare module '@orpc/server' {
-  /**
-   * Extend the context interface to enable typesafe access across oRPC scopes
-   */
-  interface DefaultInitialContext {
-    request: Request
-  }
-}
-
-@Module({
-  imports: [
-    ORPCModule.forRootAsync({
-      inject: [REQUEST],
-      useFactory: (request: Request) => ({
-        /**
-         * Can be a static value or an async function that
-         * receives the ExecutionContext on each request
-         */
-        context: async (ctx: ExecutionContext) => {
-          // `request` and `req` refer to the same object
-          const req = ctx.switchToHttp().getRequest() as Request
-
-          return { request }
-        },
-      }),
-    }),
-  ],
-})
-export class AppModule {}
-```
-
-:::
 
 ### Plugins
 
