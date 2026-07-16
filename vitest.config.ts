@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => ({
     env: loadEnv(mode, process.cwd(), ''),
     coverage: {
       include: ['packages/*/src/**'],
-      exclude: ['**.test-d.*', '**.test.*', './packages/bun/**', './packages/cloudflare/**'],
+      exclude: ['**.bench.*', '**.test-d.*', '**.test.*', './packages/bun/**', './packages/cloudflare/**'],
     },
     projects: [
       {

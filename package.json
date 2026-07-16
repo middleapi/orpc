@@ -7,6 +7,7 @@
   "scripts": {
     "prepare": "simple-git-hooks",
     "type:check": "pnpm run -r type:check && tsc",
+    "bench": "vitest bench --run --config vitest.benchmarks.ts",
     "test": "pnpm run -r test && vitest run",
     "test:coverage": "pnpm run -r test:coverage && vitest run --coverage",
     "lint": "eslint --max-warnings=0 .",
@@ -16,6 +17,7 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^9.0.0",
+    "@codspeed/vitest-plugin": "^5.7.1",
     "@hono/node-server": "^2.0.4",
     "@opentelemetry/api": "^1.9.1",
     "@orpc/arktype": "workspace:*",
