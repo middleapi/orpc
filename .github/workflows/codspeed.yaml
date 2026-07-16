@@ -24,8 +24,7 @@ jobs:
 
       - run: pnpm i
 
-      - name: Run benchmarks
-        uses: CodSpeedHQ/action@v4
+      - uses: CodSpeedHQ/action@v4
         with:
           mode: simulation
-          run: pnpm exec vitest bench --run --config vitest.benchmarks.ts
+          run: pnpm run bench
