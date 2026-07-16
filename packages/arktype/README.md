@@ -7,6 +7,9 @@
   <a href="https://www.npmjs.com/package/@orpc/arktype">
     <img alt="weekly downloads" src="https://img.shields.io/npm/dw/%40orpc%2Farktype?logo=npm" />
   </a>
+  <a href="https://app.codspeed.io/middleapi/orpc?utm_source=badge">
+    <img alt="CodSpeed" src="https://img.shields.io/endpoint?url=https://codspeed.io/badge.json" />
+  </a>
   <a href="https://github.com/middleapi/orpc/blob/main/LICENSE">
     <img alt="MIT License" src="https://img.shields.io/github/license/middleapi/orpc?logo=open-source-initiative" />
   </a>
