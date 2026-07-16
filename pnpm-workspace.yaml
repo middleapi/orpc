@@ -21,7 +21,7 @@ preferWorkspacePackages: true
 allowBuilds:
   '@parcel/watcher': false
   '@scarf/scarf': false
-  '@swc/core': false
+  '@swc/core': true
   '@tree-sitter-grammars/tree-sitter-yaml': false
   core-js-pure: false
   esbuild: false
