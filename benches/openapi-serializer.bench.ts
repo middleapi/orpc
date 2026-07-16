@@ -4,7 +4,7 @@ import { handlers, PAYLOAD_1KB, PAYLOAD_5MB, PAYLOAD_5MB_WITH_FILES, PAYLOAD_100
 
 const serializer = new OpenAPISerializer({ handlers })
 
-describe('rpc serializer', () => {
+describe('openapi serializer', () => {
   bench('1KB payload', () => {
     serializer.deserialize(
       serializer.serialize(PAYLOAD_1KB),
