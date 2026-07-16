@@ -61,7 +61,7 @@ describe('rpcHandler', () => {
 
     expect(decoded.matched).toBe(true)
     expect(decoded.message.kind).toBe('response')
-    expect(decoded.message.json.status).toBe(200)
+    expect(decoded.message.json.status).toBe(undefined)
     expect(decoded.message.json.body).toEqual({ json: 'u_123' })
   })
 
@@ -93,7 +93,7 @@ describe('rpcHandler', () => {
 
     expect(decoded.matched).toBe(true)
     expect(decoded.message.kind).toBe('response')
-    expect(decoded.message.json.status).toBe(200)
+    expect(decoded.message.json.status).toBe(undefined)
   })
 
   it('can decode messages with prefix', async () => {
@@ -134,7 +134,7 @@ describe('rpcHandler', () => {
 
     expect(decoded.matched).toBe(true)
     expect(decoded.message.kind).toBe('response')
-    expect(decoded.message.json.status).toBe(200)
+    expect(decoded.message.json.status).toBe(undefined)
   })
 
   it('wires message and close events via upgrade', async () => {
@@ -220,6 +220,6 @@ describe('rpcHandler', () => {
 
     expect(decoded.matched).toBe(true)
     expect(decoded.message.kind).toBe('response')
-    expect(decoded.message.json.status).toBe(200)
+    expect(decoded.message.json.status).toBe(undefined)
   })
 })

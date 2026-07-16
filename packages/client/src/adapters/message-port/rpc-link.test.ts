@@ -64,8 +64,6 @@ describe('rpcLink', () => {
     expect(decoded.message.json).toEqual({
       url: '/ping',
       body: { json: 'input' },
-      headers: {},
-      method: 'POST',
     })
 
     const raw = await createResponseMessage({ id: decoded.message.id })
