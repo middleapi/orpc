@@ -6,15 +6,6 @@ import { RPCHandlerCodec, StandardHandler } from '@orpc/server/standard'
 import { bench } from 'vitest'
 import { asReadableStream, asSyncIteratorObject, BYTES_10KB, drainBody, EVENTS_10KB, handlers, PAYLOAD_10KB } from './__shared__/payloads'
 
-/**
- * End-to-end RPC path with inline fetch (no network / HTTP server):
- * createORPCClient → RPCLink → RPCHandler → response
- *
- * Exercises encode, fetch transport, decode, procedure dispatch, and
- * the reverse response path for JSON-like payloads, event streams (SSE),
- * and octet streams.
- */
-
 const serializer = new RPCSerializer({ handlers })
 
 const router = {

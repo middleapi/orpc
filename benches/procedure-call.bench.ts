@@ -1,104 +1,68 @@
-import { call, createProcedureClient, os, type } from '@orpc/server'
+import { createProcedureClient, os, type } from '@orpc/server'
 import { bench } from 'vitest'
 
-interface Input {
-  id: number
-  name: string
-  tags: string[]
-}
-
-interface Output {
-  id: number
-  name: string
-  upper: string
-  tagCount: number
-}
-
-const InputSchema = type<Input>()
-const OutputSchema = type<Output>()
-
-const validInput: Input = {
-  id: 1,
-  name: 'orpc',
-  tags: ['rpc', 'typescript', 'fast'],
-}
-
-const authMiddleware = os.middleware(async ({ next }) => {
+const auth = os.middleware(async ({ next }) => {
   return next({ context: { userId: 'user-1' } })
 })
 
-const logMiddleware = os.middleware(async ({ next }) => {
+const log = os.middleware(async ({ next }) => {
   return next()
 })
 
-const timingMiddleware = os.middleware(async ({ next }) => {
+const timing = os.middleware(async ({ next }) => {
   return next({ context: { startedAt: 0 } })
 })
 
-function mapInput(input: Input): Output {
-  return {
-    id: input.id,
-    name: input.name,
-    upper: input.name.toUpperCase(),
-    tagCount: input.tags.length,
-  }
-}
+const plain = os.handler(({ input }) => input)
 
-const pureProcedure = os.handler(() => 'pong')
+const validated = os
+  .input(type<any>())
+  .output(type<any>())
+  .handler(({ input }) => input)
 
-const validationProcedure = os
-  .input(InputSchema)
-  .output(OutputSchema)
-  .handler(({ input }) => mapInput(input))
+const middlewares = os
+  .use(auth)
+  .use(log)
+  .use(timing)
+  .handler(({ input }) => input)
 
-const middlewareProcedure = os
-  .use(authMiddleware)
-  .use(logMiddleware)
-  .handler(() => 'pong')
+const full = os
+  .use(auth)
+  .use(log)
+  .use(timing)
+  .input(type<any>())
+  .output(type<any>())
+  .handler(({ input }) => input)
 
-const mixedProcedure = os
-  .use(authMiddleware)
-  .use(logMiddleware)
-  .use(timingMiddleware)
-  .input(InputSchema)
-  .output(OutputSchema)
-  .handler(({ input }) => mapInput(input))
+const plainClient = createProcedureClient(plain)
+const validatedClient = createProcedureClient(validated)
+const middlewaresClient = createProcedureClient(middlewares)
+const fullClient = createProcedureClient(full, {
+  interceptors: [({ next }) => next()],
+})
 
 describe('procedure call', () => {
-  const pureClient = createProcedureClient(pureProcedure)
-  const validationClient = createProcedureClient(validationProcedure)
-  const middlewareClient = createProcedureClient(middlewareProcedure)
-  const mixedClient = createProcedureClient(mixedProcedure)
+  const input = {
+    id: 1,
+    name: `1tem-${1}`,
+    active: true,
+    createdAt: new Date('2024-01-01T00:00:00.000Z'),
+    largeInt: 9007199254740993n + BigInt(1),
+  }
 
-  bench('pre-created client: pure procedure', async () => {
-    await pureClient()
+  bench('plain', async () => {
+    await plainClient(input as any)
   })
 
-  bench('pre-created client: procedure with validations', async () => {
-    await validationClient(validInput)
+  bench('validated', async () => {
+    await validatedClient(input)
   })
 
-  bench('pre-created client: procedure with middlewares', async () => {
-    await middlewareClient()
+  bench('middlewares', async () => {
+    await middlewaresClient(input as any)
   })
 
-  bench('pre-created client: mixed procedure', async () => {
-    await mixedClient(validInput)
-  })
-
-  bench('call util: pure procedure', async () => {
-    await call(pureProcedure)
-  })
-
-  bench('call util: procedure with validations', async () => {
-    await call(validationProcedure, validInput)
-  })
-
-  bench('call util: procedure with middlewares', async () => {
-    await call(middlewareProcedure)
-  })
-
-  bench('call util: mixed procedure', async () => {
-    await call(mixedProcedure, validInput)
+  bench('full (middlewares + validated + interceptors)', async () => {
+    await fullClient(input)
   })
 })
