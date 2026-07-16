@@ -1,26 +1,31 @@
-import { RPCJsonSerializer, RPCSerializer } from '@orpc/client'
+import { RPCSerializer } from '@orpc/client'
 import { bench } from 'vitest'
-import { cases, handlers } from './__shared__/payloads'
+import { handlers, PAYLOAD_1KB, PAYLOAD_5MB, PAYLOAD_5MB_WITH_FILES, PAYLOAD_100KB } from './__shared__/payloads'
 
-const jsonSerializer = new RPCJsonSerializer({ handlers })
 const serializer = new RPCSerializer({ handlers })
 
-describe('rpc json serializer', () => {
-  for (const [label, payload] of cases) {
-    bench(label, () => {
-      jsonSerializer.deserialize(
-        jsonSerializer.serialize(payload),
-      )
-    })
-  }
-})
-
 describe('rpc serializer', () => {
-  for (const [label, payload] of cases) {
-    bench(label, () => {
-      serializer.deserialize(
-        serializer.serialize(payload),
-      )
-    })
-  }
+  bench('1KB payload', () => {
+    serializer.deserialize(
+      serializer.serialize(PAYLOAD_1KB),
+    )
+  })
+
+  bench('100KB payload', () => {
+    serializer.deserialize(
+      serializer.serialize(PAYLOAD_100KB),
+    )
+  })
+
+  bench('5MB payload', () => {
+    serializer.deserialize(
+      serializer.serialize(PAYLOAD_5MB),
+    )
+  })
+
+  bench('5MB payload with files', () => {
+    serializer.deserialize(
+      serializer.serialize(PAYLOAD_5MB_WITH_FILES),
+    )
+  })
 })

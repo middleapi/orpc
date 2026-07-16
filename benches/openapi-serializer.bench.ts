@@ -1,26 +1,31 @@
-import { OpenAPIJsonSerializer, OpenAPISerializer } from '@orpc/openapi'
+import { OpenAPISerializer } from '@orpc/openapi'
 import { bench } from 'vitest'
-import { cases, handlers } from './__shared__/payloads'
+import { handlers, PAYLOAD_1KB, PAYLOAD_5MB, PAYLOAD_5MB_WITH_FILES, PAYLOAD_100KB } from './__shared__/payloads'
 
-const jsonSerializer = new OpenAPIJsonSerializer({ handlers })
 const serializer = new OpenAPISerializer({ handlers })
 
-describe('openapi json serializer', () => {
-  for (const [label, payload] of cases) {
-    bench(label, () => {
-      jsonSerializer.deserialize(
-        jsonSerializer.serialize(payload),
-      )
-    })
-  }
-})
+describe('rpc serializer', () => {
+  bench('1KB payload', () => {
+    serializer.deserialize(
+      serializer.serialize(PAYLOAD_1KB),
+    )
+  })
 
-describe('openapi serializer', () => {
-  for (const [label, payload] of cases) {
-    bench(label, () => {
-      serializer.deserialize(
-        serializer.serialize(payload),
-      )
-    })
-  }
+  bench('100KB payload', () => {
+    serializer.deserialize(
+      serializer.serialize(PAYLOAD_100KB),
+    )
+  })
+
+  bench('5MB payload', () => {
+    serializer.deserialize(
+      serializer.serialize(PAYLOAD_5MB),
+    )
+  })
+
+  bench('5MB payload with files', () => {
+    serializer.deserialize(
+      serializer.serialize(PAYLOAD_5MB_WITH_FILES),
+    )
+  })
 })

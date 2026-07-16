@@ -36,10 +36,12 @@ function createUnit(i: number) {
 }
 
 const SIZE_1KB = 1024
+const SIZE_10KB = 10 * SIZE_1KB
 const SIZE_100KB = 100 * SIZE_1KB
 const SIZE_5MB = 5 * 1024 * 1024
 
 export const PAYLOAD_1KB = createUnit(0)
+export const PAYLOAD_10KB = Array.from({ length: 10 }, (_, i) => createUnit(i))
 export const PAYLOAD_100KB = Array.from({ length: 100 }, (_, i) => createUnit(i))
 export const PAYLOAD_5MB = Array.from({ length: 5_000 }, (_, i) => createUnit(i))
 // 3/10 JSON (native types + Person), 7/10 files
@@ -54,25 +56,16 @@ export const PAYLOAD_5MB_WITH_FILES = {
   ],
 }
 
-export const cases = [
-  ['1KB', PAYLOAD_1KB],
-  ['100KB', PAYLOAD_100KB],
-  ['5MB', PAYLOAD_5MB],
-  ['5MB with files', PAYLOAD_5MB_WITH_FILES],
-] as const
+export const EVENTS_1KB = [PAYLOAD_1KB]
+export const EVENTS_10KB = Array.from({ length: 10 }).fill(PAYLOAD_1KB)
+export const EVENTS_100KB = Array.from({ length: 50 }).fill([PAYLOAD_1KB, PAYLOAD_1KB])
+export const EVENTS_5MB = Array.from({ length: 1000 }).fill([PAYLOAD_1KB, PAYLOAD_1KB, PAYLOAD_1KB, PAYLOAD_1KB, PAYLOAD_1KB])
 
-/** Event parts: each entry is one SSE event (reuses structured units). */
-export const eventCases = [
-  ['1KB', [PAYLOAD_1KB]],
-  ['100KB', Array.from({ length: 50 }).fill([PAYLOAD_1KB, PAYLOAD_1KB])],
-  ['5MB', Array.from({ length: 1000 }).fill([PAYLOAD_1KB, PAYLOAD_1KB, PAYLOAD_1KB, PAYLOAD_1KB, PAYLOAD_1KB])],
-] as const
-
-function splitBytes(size: number, parts: number): Uint8Array[] {
+function splitBytes(size: number, parts: number): Uint8Array<ArrayBuffer>[] {
   const buf = new Uint8Array(size)
   const base = Math.floor(size / parts)
   let rem = size - base * parts
-  const out: Uint8Array[] = []
+  const out: Uint8Array<ArrayBuffer>[] = []
   let off = 0
   for (let i = 0; i < parts; i++) {
     const n = base + (rem-- > 0 ? 1 : 0)
@@ -82,15 +75,13 @@ function splitBytes(size: number, parts: number): Uint8Array[] {
   return out
 }
 
-/** Octet parts: chunked binary buffers totaling the labeled size. */
-export const octetCases = [
-  ['1KB', splitBytes(SIZE_1KB, 1)],
-  ['100KB', splitBytes(SIZE_100KB, 50)],
-  ['5MB', splitBytes(SIZE_5MB, 1000)],
-] as const
+export const BYTES_1KB = splitBytes(SIZE_1KB, 1)
+export const BYTES_10KB = splitBytes(SIZE_10KB, 10)
+export const BYTES_100KB = splitBytes(SIZE_100KB, 50)
+export const BYTES_5MB = splitBytes(SIZE_5MB, 1000)
 
 /** Fresh async generator over prebuilt event parts (one-shot per call). */
-export function asEventStream(parts: readonly unknown[]): AsyncGenerator<unknown, void, undefined> {
+export function asSyncIteratorObject(parts: readonly unknown[]): AsyncGenerator<unknown, void, undefined> {
   return (async function* () {
     for (const part of parts) {
       yield part
@@ -99,7 +90,7 @@ export function asEventStream(parts: readonly unknown[]): AsyncGenerator<unknown
 }
 
 /** Fresh ReadableStream over prebuilt octet chunks (one-shot per call). */
-export function asOctetStream(parts: readonly Uint8Array[]): ReadableStream<Uint8Array> {
+export function asReadableStream(parts: readonly Uint8Array<ArrayBuffer>[]): ReadableStream<Uint8Array<ArrayBuffer>> {
   let i = 0
   return new ReadableStream({
     pull(controller) {

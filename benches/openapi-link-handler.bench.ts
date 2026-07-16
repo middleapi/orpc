@@ -1,10 +1,12 @@
 import type { RouterClient } from '@orpc/server'
 import { createORPCClient } from '@orpc/client'
+import { StandardLink } from '@orpc/client/standard'
 import { OpenAPISerializer } from '@orpc/openapi'
-import { OpenAPIHandler, OpenAPILink } from '@orpc/openapi/fetch'
+import { OpenAPIHandlerCodec, OpenAPILinkCodec } from '@orpc/openapi/standard'
 import { os, type } from '@orpc/server'
+import { StandardHandler } from '@orpc/server/standard'
 import { bench } from 'vitest'
-import { asEventStream, asOctetStream, cases, drainBody, eventCases, handlers, octetCases } from './__shared__/payloads'
+import { asReadableStream, asSyncIteratorObject, BYTES_10KB, drainBody, EVENTS_10KB, handlers, PAYLOAD_10KB } from './__shared__/payloads'
 
 /**
  * End-to-end RPC path with inline fetch (no network / HTTP server):
@@ -24,42 +26,39 @@ const router = {
     .handler(({ input }) => input),
 }
 
-const handler = new OpenAPIHandler(router, { serializer })
+const handler = new StandardHandler(new OpenAPIHandlerCodec(router, { serializer }), {})
 
-const link = new OpenAPILink(router, {
-  origin: 'http://localhost',
-  url: '/rpc',
-  serializer,
-  fetch: async (url, init) => {
-    const request = new Request(url, init)
-    const { response } = await handler.handle(request, {
-      prefix: '/rpc',
-    })
+const link = new StandardLink(new OpenAPILinkCodec(router, { serializer }), {
+  async send(request, path, options) {
+    const { matched, response } = await handler.handle(
+      { ...request, resolveBody: () => Promise.resolve(request.body) },
+      options,
+    )
 
-    return response ?? new Response('Not Found', { status: 404 })
+    if (matched) {
+      return { ...response, resolveBody: () => Promise.resolve(response.body) }
+    }
+
+    return { status: 404, headers: {}, resolveBody: () => Promise.resolve('Not Found') }
   },
 })
 
 const client: RouterClient<typeof router> = createORPCClient(link)
 
-describe('openapi link + handler e2e (inline fetch)', () => {
-  for (const [label, payload] of cases) {
-    bench(`${label} buffered`, async () => {
-      await client.ping(payload)
-    })
-  }
+describe('openapi link + handler', () => {
+  bench('buffered', async () => {
+    await client.ping(PAYLOAD_10KB)
+  })
 
-  for (const [label, parts] of eventCases) {
-    bench(`${label} event stream`, async () => {
-      const output = await client.ping(asEventStream(parts))
-      await drainBody(output)
-    })
-  }
+  bench('event stream', async () => {
+    await drainBody(
+      await client.ping(asSyncIteratorObject(EVENTS_10KB)),
+    )
+  })
 
-  for (const [label, parts] of octetCases) {
-    bench(`${label} octet stream`, async () => {
-      const output = await client.ping(asOctetStream(parts))
-      await drainBody(output)
-    })
-  }
+  bench('octet stream', async () => {
+    await drainBody(
+      await client.ping(asReadableStream(BYTES_10KB)),
+    )
+  })
 })

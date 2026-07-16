@@ -1,15 +1,6 @@
 import { call, createProcedureClient, os, type } from '@orpc/server'
 import { bench } from 'vitest'
 
-/**
- * Benchmarks the server-side procedure call path in isolation:
- * pure handlers, validation (via `type` — no external schema libs),
- * middlewares, and mixed complex procedures.
- *
- * Compares pre-created clients vs the one-shot `call` utility so results
- * reflect oRPC overhead only, not Zod/Valibot/etc.
- */
-
 interface Input {
   id: number
   name: string
@@ -73,12 +64,12 @@ const mixedProcedure = os
   .output(OutputSchema)
   .handler(({ input }) => mapInput(input))
 
-const pureClient = createProcedureClient(pureProcedure)
-const validationClient = createProcedureClient(validationProcedure)
-const middlewareClient = createProcedureClient(middlewareProcedure)
-const mixedClient = createProcedureClient(mixedProcedure)
-
 describe('procedure call', () => {
+  const pureClient = createProcedureClient(pureProcedure)
+  const validationClient = createProcedureClient(validationProcedure)
+  const middlewareClient = createProcedureClient(middlewareProcedure)
+  const mixedClient = createProcedureClient(mixedProcedure)
+
   bench('pre-created client: pure procedure', async () => {
     await pureClient()
   })
