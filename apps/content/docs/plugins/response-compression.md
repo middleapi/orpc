@@ -35,7 +35,7 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-<!--@include: @/shared/common-plugin-handler-compatibility.md -->
+<!--@include: @/shared/any-handler-support-info.md -->
 
 ## Client
 
@@ -59,7 +59,7 @@ const link = new RPCLink({
 })
 ```
 
-<!--@include: @/shared/common-plugin-link-compatibility.md -->
+<!--@include: @/shared/any-link-support-info.md -->
 
 ::: warning
 When using the fetch adapter, this plugin is usually unnecessary because most fetch implementations automatically set the `Accept-Encoding` header and decompress response bodies.

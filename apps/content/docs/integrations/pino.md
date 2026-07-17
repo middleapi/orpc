@@ -57,7 +57,7 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-<!--@include: @/shared/common-plugin-handler-compatibility.md -->
+<!--@include: @/shared/any-handler-support-info.md -->
 
 ::: tip
 For improved log readability during development, consider using [pino-pretty](https://github.com/pinojs/pino-pretty) to format your logs in a human-friendly way.

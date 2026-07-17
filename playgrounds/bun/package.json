@@ -30,7 +30,6 @@
     "@types/bun": "latest",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "evlog": "^2.19.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "ts-pattern": "^5.9.0"

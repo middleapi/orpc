@@ -18,7 +18,7 @@ const link = new RPCLink({
 If you do not have a [contract](/docs/contract/router), you can use a [unlazied router](/docs/contract/router#router-to-contract) instead.
 :::
 
-<!--@include: @/shared/common-plugin-link-compatibility.md -->
+<!--@include: @/shared/any-link-support-info.md -->
 
 ## Forward Validated Input
 

@@ -26,4 +26,4 @@ catch (error) {
 }
 ```
 
-<!--@include: @/shared/common-plugin-handler-compatibility.md -->
+<!--@include: @/shared/any-handler-support-info.md -->
