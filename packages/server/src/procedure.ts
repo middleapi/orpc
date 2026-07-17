@@ -56,6 +56,8 @@ export interface ProcedureConfig {
    * When enabled, input schemas are not validated at runtime.
    * Schemas are still used for type inference and OpenAPI generation.
    *
+   * @warning Do not disable validation for schemas that transform values.
+   *
    * @default false
    */
   disableInputValidation?: boolean | undefined
@@ -65,6 +67,8 @@ export interface ProcedureConfig {
    * Schemas are still used for type inference and OpenAPI generation.
    *
    * Useful when output schemas exist only for specification generation.
+   *
+   * @warning Do not disable validation for schemas that transform values.
    *
    * @default false
    */

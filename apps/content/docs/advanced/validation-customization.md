@@ -12,6 +12,8 @@ const base = os.$config({
    * When enabled, input schemas are not validated at runtime.
    * Schemas are still used for type inference and OpenAPI generation.
    *
+   * @warning Do not disable validation for schemas that transform values.
+   *
    * @default false
    */
   disableInputValidation: true,
@@ -21,6 +23,8 @@ const base = os.$config({
    * Schemas are still used for type inference and OpenAPI generation.
    *
    * Useful when output schemas exist only for specification generation.
+   *
+   * @warning Do not disable validation for schemas that transform values.
    *
    * @default false
    */
