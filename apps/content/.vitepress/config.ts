@@ -143,6 +143,8 @@ export default withMermaid(defineConfig({
             { text: 'Node HTTP', link: '/docs/adapters/node-http' },
             { text: 'WebSocket', link: '/docs/adapters/websocket' },
             { text: 'Message Port', link: '/docs/adapters/message-port' },
+            { text: '---' },
+            { text: 'React Native', link: '/docs/adapters/react-native' },
           ],
         },
         {

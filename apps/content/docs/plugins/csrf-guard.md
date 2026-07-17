@@ -32,7 +32,7 @@ const handler = new RPCHandler(router, {
 
 :::
 
-<!--@include: @/shared/common-plugin-handler-compatibility.md -->
+<!--@include: @/shared/any-handler-support-info.md -->
 
 ## Learn More
 

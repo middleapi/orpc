@@ -11,6 +11,8 @@ featuring pre-configured examples accessible instantly via StackBlitz or local s
 | Cloudflare Playground | [Open in StackBlitz](https://stackblitz.com/github/middleapi/orpc/tree/main/playgrounds/cloudflare) | [View Source](https://github.com/middleapi/orpc/tree/main/playgrounds/cloudflare) |
 | NestJS Playground     | [Open in StackBlitz](https://stackblitz.com/github/middleapi/orpc/tree/main/playgrounds/nest)       | [View Source](https://github.com/middleapi/orpc/tree/main/playgrounds/nest)       |
 | Next.js Playground    | [Open in StackBlitz](https://stackblitz.com/github/middleapi/orpc/tree/main/playgrounds/next)       | [View Source](https://github.com/middleapi/orpc/tree/main/playgrounds/next)       |
+| Next.js Playground    | [Open in StackBlitz](https://stackblitz.com/github/middleapi/orpc/tree/main/playgrounds/next)       | [View Source](https://github.com/middleapi/orpc/tree/main/playgrounds/next)       |
+| Expo Playground       | [Open in StackBlitz](https://stackblitz.com/github/middleapi/orpc-expo-playground)                  | [View Source](https://github.com/middleapi/orpc-expo-playground)                  |
 
 :::warning
 StackBlitz has its own limitations, so some features may not work as expected.
@@ -25,6 +27,7 @@ npx giget gh:middleapi/orpc/playgrounds/bun orpc-bun-playground
 npx giget gh:middleapi/orpc/playgrounds/cloudflare orpc-cloudflare-playground
 npx giget gh:middleapi/orpc/playgrounds/nest orpc-nest-playground
 npx giget gh:middleapi/orpc/playgrounds/next orpc-next-playground
+npx giget gh:middleapi/orpc-expo-playground orpc-expo-playground
 ```
 
 Then install dependencies and start the dev server:

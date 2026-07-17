@@ -20,7 +20,7 @@ const link = new RPCLink<ClientContext>({
 })
 ```
 
-<!--@include: @/shared/common-plugin-link-compatibility.md -->
+<!--@include: @/shared/any-link-support-info.md -->
 
 ## Usage
 

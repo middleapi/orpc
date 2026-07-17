@@ -341,4 +341,4 @@ const handler = new RPCHandler(router, {
 You can combine this plugin with [Retry After Plugin](/docs/plugins/retry-after) to enable automatic client-side retries based on server rate limiting headers.
 :::
 
-<!--@include: @/shared/common-plugin-handler-compatibility.md -->
+<!--@include: @/shared/any-handler-support-info.md -->

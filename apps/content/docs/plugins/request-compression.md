@@ -33,7 +33,7 @@ const link = new RPCLink({
 })
 ```
 
-<!--@include: @/shared/common-plugin-link-compatibility.md -->
+<!--@include: @/shared/any-link-support-info.md -->
 
 ## Server
 
@@ -49,7 +49,7 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-<!--@include: @/shared/common-plugin-handler-compatibility.md -->
+<!--@include: @/shared/any-handler-support-info.md -->
 
 ::: tip
 Combine with the [Request Limit Plugin](/docs/plugins/request-limit) to limit the decompressed payload size.
