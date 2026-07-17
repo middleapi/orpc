@@ -39,7 +39,7 @@
     "effect": "4.0.0-beta.94",
     "markdown-it-task-lists": "^2.1.1",
     "mermaid": "^11.15.0",
-    "openai": "^6.44.0",
+    "openai": "^6.47.0",
     "pino": "^10.3.1",
     "superjson": "^2.2.6",
     "vitepress": "1.6.4",
@@ -47,7 +47,7 @@
     "vitepress-plugin-llms": "^1.13.3",
     "vitepress-plugin-mermaid": "^2.0.17",
     "vitepress-plugin-shiki-twoslash": "^0.0.6",
-    "vue": "^3.5.38",
+    "vue": "^3.5.40",
     "zod": "^4.4.3"
   }
 }
