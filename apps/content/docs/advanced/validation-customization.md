@@ -1,6 +1,6 @@
 # Validation Customization
 
-This guide explains advanced validation features in oRPC, including disabling validation and customizing validation errors.
+This guide explains how to customize validation in oRPC, including how to disable runtime validation and how to customize validation errors.
 
 ## Disable Validation
 
@@ -27,6 +27,19 @@ const base = os.$config({
   disableOutputValidation: true
 })
 ```
+
+::: warning
+Do not disable validation for schemas that transform values.
+For example, the following schema accepts a `number` but returns a `string`:
+
+```ts
+z.object({
+  value: z.number().transform(value => String(value)),
+})
+```
+
+If runtime validation is disabled, the transformation is skipped. As a result, the server returns a `number` while the client expects a `string`, leading to unexpected behavior.
+:::
 
 ## Custom Validation Errors
 
