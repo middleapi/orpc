@@ -39,6 +39,15 @@ describe('Builder', () => {
     builder.$context<'invalid'>()
   })
 
+  it('$config', () => {
+    expectTypeOf(builder.$config({ disableInputValidation: true, disableOutputValidation: true })).toEqualTypeOf<
+      typeof builder
+    >()
+
+    // @ts-expect-error - invalid setting
+    builder.$config('invalid')
+  })
+
   it('.errors', () => {
     expectTypeOf(builder.errors({ INVALID: { message: 'invalid' }, OVERRIDE: { message: 'override' } })).toEqualTypeOf<
       Builder<

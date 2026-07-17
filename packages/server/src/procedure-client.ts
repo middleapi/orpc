@@ -221,8 +221,10 @@ async function executeProcedureInternal(procedure: AnyProcedure, options: Proced
       ? inputSchemas.length
       : orderedMiddlewares[midIndex]!.inputSchemasLengthAtUse ?? 0
 
-    for (let i = startInputIndex; i < endInputIndex; i++) {
-      currentInput = await validateInput(i, inputSchemas[i]!, currentInput)
+    if (!procedure['~orpc'].disableInputValidation) {
+      for (let i = startInputIndex; i < endInputIndex; i++) {
+        currentInput = await validateInput(i, inputSchemas[i]!, currentInput)
+      }
     }
 
     let currentOutput: unknown
@@ -290,8 +292,10 @@ async function executeProcedureInternal(procedure: AnyProcedure, options: Proced
       ? outputSchemas.length
       : orderedMiddlewares[midIndex]!.outputSchemasLengthAtUse ?? 0
 
-    for (let i = endOutputIndex - 1; i >= startOutputIndex; i--) {
-      currentOutput = await validateOutput(i, outputSchemas[i]!, currentOutput)
+    if (!procedure['~orpc'].disableOutputValidation) {
+      for (let i = endOutputIndex - 1; i >= startOutputIndex; i--) {
+        currentOutput = await validateOutput(i, outputSchemas[i]!, currentOutput)
+      }
     }
 
     return { output: currentOutput, context: currentContext }

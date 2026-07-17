@@ -6,7 +6,7 @@ import type { Context, MergedInitialContext } from './context'
 import type { ORPCErrorConstructorMap } from './error'
 import type { Middleware } from './middleware'
 import type { DecoratedMiddleware } from './middleware-decorated'
-import type { OrderedMiddleware, ProcedureHandler } from './procedure'
+import type { OrderedMiddleware, ProcedureConfig, ProcedureHandler } from './procedure'
 import type { AnyRouter } from './router'
 import type { AugmentedRouter } from './router-utils'
 import { getHiddenMetaPlugins, mergeErrorMap, resolveMetaPlugins } from '@orpc/contract'
@@ -17,14 +17,13 @@ import { DecoratedProcedure } from './procedure-decorated'
 import { augmentRouter } from './router-utils'
 
 export interface DefaultInitialContext {
-
 }
 
 export interface BuilderDefinition<
   TInputSchema extends AnySchema,
   TInjectedContext extends AnySchema,
   TErrorMap extends ErrorMap,
->extends ProcedureContractDefinition<TInputSchema, TInjectedContext, TErrorMap> {
+>extends ProcedureContractDefinition<TInputSchema, TInjectedContext, TErrorMap>, ProcedureConfig {
   orderedMiddlewares: OrderedMiddleware[]
 }
 
@@ -55,6 +54,13 @@ export class Builder<
 
     // because we can't call $context after .use method so we don't need reset middlewares here
     return this as any
+  }
+
+  $config(config: ProcedureConfig): Builder<TInitialContext, TErrorMap> {
+    return new Builder({
+      ...this['~orpc'],
+      ...config,
+    })
   }
 
   meta(
@@ -208,10 +214,8 @@ export class Builder<
     router: T,
   ): AugmentedRouter<T, TErrorMap> {
     return augmentRouter(router, {
+      ...this['~orpc'],
       middlewares: this['~orpc'].orderedMiddlewares.map(({ middleware }) => middleware),
-      meta: this['~orpc'].meta,
-      metaPlugins: this['~orpc'].metaPlugins,
-      errorMap: this['~orpc'].errorMap,
     }) as any
   }
 

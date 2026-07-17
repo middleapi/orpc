@@ -38,7 +38,7 @@ This plugin reconciles ORPC errors from other interceptors and plugins, allowing
 
 ## Custom Validation Errors
 
-If you have already [customized validation errors on the server](/docs/advanced/validation-errors), you can use interceptors to catch and map the validation errors thrown by this plugin so they match your server-side errors.
+If you have already [customized validation errors on the server](/docs/advanced/validation-customization#custom-validation-errors), you can use interceptors to catch and map the validation errors thrown by this plugin so they match your server-side errors.
 
 ```ts
 import { ORPCError } from '@orpc/client'

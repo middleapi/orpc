@@ -51,6 +51,26 @@ export interface OrderedMiddleware {
   middleware: AnyMiddleware
 }
 
+export interface ProcedureConfig {
+  /**
+   * When enabled, input schemas are not validated at runtime.
+   * Schemas are still used for type inference and OpenAPI generation.
+   *
+   * @default false
+   */
+  disableInputValidation?: boolean | undefined
+
+  /**
+   * When enabled, output schemas are not validated at runtime.
+   * Schemas are still used for type inference and OpenAPI generation.
+   *
+   * Useful when output schemas exist only for specification generation.
+   *
+   * @default false
+   */
+  disableOutputValidation?: boolean | undefined
+}
+
 export interface ProcedureDefinition<
   TInitialContext extends Context,
   TInjectedContext extends Context,
@@ -58,7 +78,7 @@ export interface ProcedureDefinition<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
   TReturnedError extends AnyORPCError,
-> extends ProcedureContractDefinition<TInputSchema, TOutputSchema, TErrorMap> {
+> extends ProcedureContractDefinition<TInputSchema, TOutputSchema, TErrorMap>, ProcedureConfig {
   __TInitialContext?: (type: TInitialContext) => unknown
   __TInjectedContext?: (type: TInjectedContext) => unknown
   __TReturnedError?: () => TReturnedError

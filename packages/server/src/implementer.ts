@@ -1,7 +1,9 @@
 import type { RouterContract } from '@orpc/contract'
+import type { AnyFunction } from '@orpc/shared'
 import type { DefaultInitialContext } from './builder'
 import type { Context } from './context'
 import type { RouterImplementer } from './implementer-router'
+import type { ProcedureConfig } from './procedure'
 import { getOrBind, isTypescriptObject } from '@orpc/shared'
 import { createRouterImplementer } from './implementer-router'
 
@@ -11,22 +13,27 @@ export type Implementer<
 >
   = & {
     $context<T extends Context = DefaultInitialContext>(): Implementer<TContract, T & object>
+    $config(config: ProcedureConfig): Implementer<TContract, TInitialContext>
   }
   & RouterImplementer<TContract, TInitialContext>
 
 export function implement<TContract extends RouterContract, TInitialContext extends Context = DefaultInitialContext>(
   contract: TContract,
+  config: ProcedureConfig = {},
 ): Implementer<TContract, TInitialContext & object> {
   // Using `& object` avoids "has no properties in common with type" errors
   // when combining procedures or routers with compatible but non-overlapping contexts.
 
-  const routerImplementer = createRouterImplementer(contract)
+  const routerImplementer = createRouterImplementer(contract, config)
 
   const implementer = new Proxy(routerImplementer, {
     get(_, p) {
-      let method: undefined | (() => any)
+      let method: undefined | AnyFunction
       if (p === '$context') {
         method = () => implementer
+      }
+      else if (p === '$config') {
+        method = (incoming: ProcedureConfig) => implement(contract, { ...config, ...incoming })
       }
 
       const value = getOrBind(routerImplementer, p)

@@ -22,6 +22,11 @@ describe('Implementer', () => {
     expectTypeOf(withContext).toEqualTypeOf<Implementer<TContract, { auth: string } & object>>()
   })
 
+  it('.$config', () => {
+    const withConfig = implementer.$config({ disableInputValidation: true })
+    expectTypeOf(withConfig).toEqualTypeOf<typeof implementer>()
+  })
+
   it('is a RouterImplementer', () => {
     expectTypeOf(implementer).toExtend<RouterImplementer<TContract, { auth: boolean } & object>>()
   })

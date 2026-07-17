@@ -603,6 +603,84 @@ describe('createProcedureClient', () => {
     })
   })
 
+  describe('disable validations', () => {
+    const inputSchema = z.object({ value: z.string() })
+    const outputSchema = z.object({ value: z.string() })
+    const inputSchemaValidateSpy = vi.spyOn(inputSchema['~standard'], 'validate')
+    const outputSchemaValidateSpy = vi.spyOn(outputSchema['~standard'], 'validate')
+
+    it('skips input validation when disableInputValidation is enabled', async () => {
+      const handler = vi.fn(async (opts: any) => {
+        expect(opts.input).toEqual({ value: 'INVALID' })
+        return { value: 'ok' }
+      })
+      const procedure = os
+        .$config({ disableInputValidation: true })
+        .input(inputSchema)
+        .output(outputSchema)
+        .handler(handler)
+      const client = createProcedureClient(procedure)
+
+      await expect(client({ value: 'INVALID' } as any)).resolves.toEqual({ value: 'ok' })
+
+      expect(inputSchemaValidateSpy).toHaveBeenCalledTimes(0)
+      expect(outputSchemaValidateSpy).toHaveBeenCalledTimes(1)
+      expect(handler).toHaveBeenCalledTimes(1)
+    })
+
+    it('skips output validation when disableOutputValidation is enabled', async () => {
+      const handler = vi.fn(async () => ({ value: 'INVALID' }))
+      const procedure = os
+        .$config({ disableOutputValidation: true })
+        .input(inputSchema)
+        .output(outputSchema)
+        .handler(handler)
+      const client = createProcedureClient(procedure)
+
+      await expect(client({ value: 'ok' })).resolves.toEqual({ value: 'INVALID' })
+
+      expect(inputSchemaValidateSpy).toHaveBeenCalledTimes(1)
+      expect(outputSchemaValidateSpy).toHaveBeenCalledTimes(0)
+      expect(handler).toHaveBeenCalledTimes(1)
+    })
+
+    it('skips both when both flags are enabled', async () => {
+      const handler = vi.fn(async (opts: any) => {
+        expect(opts.input).toEqual({ value: 'INVALID' })
+        return { value: 'INVALID' }
+      })
+      const procedure = os
+        .$config({ disableOutputValidation: true, disableInputValidation: true })
+        .input(inputSchema)
+        .output(outputSchema)
+        .handler(handler)
+      const client = createProcedureClient(procedure)
+
+      await expect(client({ value: 'INVALID' } as any)).resolves.toEqual({ value: 'INVALID' })
+
+      expect(inputSchemaValidateSpy).toHaveBeenCalledTimes(0)
+      expect(outputSchemaValidateSpy).toHaveBeenCalledTimes(0)
+      expect(handler).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not apply schema transforms when validations are disabled', async () => {
+      const transformInputSchema = z.string().transform(value => `in__${value}`)
+      const transformOutputSchema = z.string().transform(value => `out__${value}`)
+      const handler = vi.fn(async (opts: any) => {
+        expect(opts.input).toBe('raw')
+        return 'raw-out'
+      })
+      const procedure = os
+        .$config({ disableOutputValidation: true, disableInputValidation: true })
+        .input(transformInputSchema)
+        .output(transformOutputSchema)
+        .handler(handler)
+      const client = createProcedureClient(procedure)
+
+      await expect(client('raw')).resolves.toBe('raw-out')
+    })
+  })
+
   it('next method can be called multiple times (with transforming schemas)', async () => {
     const inputSchema = z.string().transform(v => `inputSchema__${v}`)
     const outputSchema = z.string().transform(v => `outputSchema__${v}`)
