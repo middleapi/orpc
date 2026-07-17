@@ -109,7 +109,7 @@ export function augmentRouter<
     )
 
     const enhanced = new Procedure({
-      ...omit(options, ['middlewares']),
+      ...omit(options, ['middlewares', 'errorMap', 'meta', 'metaPlugins']),
       ...router['~orpc'],
       meta,
       metaPlugins,
