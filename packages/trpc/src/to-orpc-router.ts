@@ -4,12 +4,12 @@ import type { AnyProcedure, AnyRouter, inferRouterContext } from '@trpc/server'
 import type { Parser, TrackedData } from '@trpc/server/unstable-core-do-not-import'
 import { wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import * as ORPC from '@orpc/server'
-import { getOrBind, isTypescriptObject } from '@orpc/shared'
+import { get, getOrBind, isTypescriptObject } from '@orpc/shared'
 import { isTrackedEnvelope, TRPCError } from '@trpc/server'
 import { isAsyncIterable, isObject } from '@trpc/server/unstable-core-do-not-import'
 
 export interface ORPCMeta {
-  '~openapi'?: OpenAPIMeta
+  route?: OpenAPIMeta
 }
 
 export type ToORPCOutput<T>
@@ -112,9 +112,13 @@ function toORPCProcedure(procedure: AnyProcedure) {
   const inputSchema = toStandardSchema(procedure._def.inputs.at(-1))
   const outputSchema = toStandardSchema((procedure._def as any).output)
 
+  const meta = (procedure._def.meta ?? {}) as ORPC.Meta
+  const route = get(meta, ['route'])
+
   return new ORPC.Procedure({
     errorMap: {},
-    meta: (procedure._def.meta ?? {}) as ORPC.Meta,
+    // expose `route` under the `'~openapi'` key that @orpc/openapi reads
+    meta: isTypescriptObject(route) ? { ...meta, '~openapi': route } : meta,
     orderedMiddlewares: [],
     inputSchemas: inputSchema ? [inputSchema] : undefined,
     outputSchemas: outputSchema ? [outputSchema] : undefined,

@@ -53,7 +53,7 @@ describe('toORPCRouter', async () => {
     const trpcRouter = t.router({
       planet: {
         find: t.procedure
-          .meta({ '~openapi': { method: 'GET', path: '/planets/{id}', summary: 'Find a planet' } })
+          .meta({ route: { method: 'GET', path: '/planets/{id}', summary: 'Find a planet' } })
           .input(z.object({ id: z.string() }))
           .output(z.object({ name: z.string() }))
           .query(() => ({ name: 'Earth' })),
@@ -97,9 +97,12 @@ describe('toORPCRouter', async () => {
     })
   })
 
-  it('meta', async () => {
+  it('meta/route', async () => {
     expect(orpcRouter.ping['~orpc'].meta).toEqual({ meta1: 'test' })
-    expect(orpcRouter.nested.ping['~orpc'].meta).toEqual({ '~openapi': { path: '/nested/ping', description: 'Nested ping procedure' } })
+    expect(orpcRouter.nested.ping['~orpc'].meta).toEqual({
+      'route': { path: '/nested/ping', description: 'Nested ping procedure' },
+      '~openapi': { path: '/nested/ping', description: 'Nested ping procedure' },
+    })
     expect(getOpenAPIMeta(orpcRouter.nested.ping)).toEqual({ path: '/nested/ping', description: 'Nested ping procedure' })
   })
 

@@ -45,7 +45,7 @@ Ensure you set the `.meta` type to `ORPCMeta` when creating your tRPC builder. T
 
 ```ts
 const example = t.procedure
-  .meta({ '~openapi': { path: '/hello', summary: 'Hello procedure' } }) // [!code highlight]
+  .meta({ route: { path: '/hello', summary: 'Hello procedure' } }) // [!code highlight]
   .input(z.object({ name: z.string() }))
   .query(({ input }) => {
     return `Hello, ${input.name}!`
