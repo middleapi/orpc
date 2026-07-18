@@ -158,6 +158,66 @@ describe('toORPCRouter', async () => {
       })
     })
 
+    it('lazy router nested inside a plain object record', async () => {
+      const trpcRouter = t.router({
+        nested: {
+          lazy: lazy(() => Promise.resolve({ default: t.router({
+            ping: t.procedure.query(() => 'pong'),
+          }) })),
+        },
+      })
+
+      const orpcRouter = toORPCRouter(trpcRouter)
+
+      expect((orpcRouter.nested as any).lazy).toBeInstanceOf(Lazy)
+      expect(await unlazy((orpcRouter.nested as any).lazy.ping)).toEqual({ default: expect.any(Procedure) })
+      await expect(
+        call((orpcRouter.nested as any).lazy.ping, undefined, { context: { a: 'test' } }),
+      ).resolves.toEqual('pong')
+    })
+
+    it('lazy router whose parent segment is missing from the record', async () => {
+      // can happen with partially loaded/hand-built tRPC routers
+      const orpcRouter = toORPCRouter({
+        _def: {
+          record: {},
+          lazy: {
+            'deep.lazy': {
+              ref: async () => t.router({
+                ping: t.procedure.query(() => 'pong'),
+              }),
+            },
+          },
+        },
+      } as any)
+
+      expect(await unlazy((orpcRouter as any).deep.lazy.ping)).toEqual({ default: expect.any(Procedure) })
+    })
+
+    it('rethrows non-TRPCError errors as-is', async () => {
+      const trpcRouter = t.router({
+        // tRPC wraps resolver errors in TRPCError, but errors thrown while
+        // consuming the returned value can escape unwrapped
+        broken: t.procedure.subscription(() => ({
+          [Symbol.asyncIterator]: () => {
+            throw new Error('broken iterable')
+          },
+        } as AsyncIterable<unknown>)),
+      })
+
+      const orpcRouter = toORPCRouter(trpcRouter)
+
+      await expect(
+        call(orpcRouter.broken, undefined, { context: { a: 'test' } }),
+      ).rejects.toSatisfy((err: any) => {
+        expect(err).not.toBeInstanceOf(ORPCError)
+        expect(err).toBeInstanceOf(Error)
+        expect(err.message).toBe('broken iterable')
+
+        return true
+      })
+    })
+
     it('deep lazy', async () => {
       const client = createRouterClient(orpcRouter, {
         context: { a: 'test' },
