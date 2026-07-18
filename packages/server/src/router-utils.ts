@@ -3,10 +3,10 @@ import type { Promisable } from '@orpc/shared'
 import type { Context, MergedInitialContext } from './context'
 import type { Lazyable } from './lazy'
 import type { AnyMiddleware } from './middleware'
-import type { AnyProcedure } from './procedure'
+import type { AnyProcedure, ProcedureConfig } from './procedure'
 import type { AnyRouter } from './router'
 import { mergeErrorMap, ProcedureContract, resolveMetaPlugins } from '@orpc/contract'
-import { isTypescriptObject } from '@orpc/shared'
+import { isTypescriptObject, omit } from '@orpc/shared'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
 import { getHiddenRouterContract } from './router-hidden'
@@ -68,7 +68,7 @@ export type AugmentedRouterWithMiddlewares<
             : never
       }
 
-export interface AugmentRouterOptions<TErrorMap extends ErrorMap> extends AugmentContractRouterOptions<TErrorMap> {
+export interface AugmentRouterOptions<TErrorMap extends ErrorMap> extends AugmentContractRouterOptions<TErrorMap>, ProcedureConfig {
   middlewares: AnyMiddleware[]
 }
 
@@ -109,6 +109,7 @@ export function augmentRouter<
     )
 
     const enhanced = new Procedure({
+      ...omit(options, ['middlewares', 'errorMap', 'meta', 'metaPlugins']),
       ...router['~orpc'],
       meta,
       metaPlugins,
@@ -135,7 +136,7 @@ export function augmentRouter<
   return enhanced as any
 }
 
-export interface AugmentImplementedRouterOptions {
+export interface AugmentImplementedRouterOptions extends ProcedureConfig {
   middlewares: AnyMiddleware[]
 }
 
@@ -162,6 +163,7 @@ export function augmentImplementedRouter<
 
   if (router instanceof Procedure) {
     const enhanced = new Procedure({
+      ...omit(options, ['middlewares']),
       ...router['~orpc'],
       orderedMiddlewares: [
         ...options.middlewares.map(middleware => ({ middleware, inputSchemasLengthAtUse: 0, outputSchemasLengthAtUse: 0 })),

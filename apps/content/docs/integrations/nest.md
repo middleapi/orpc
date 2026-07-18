@@ -126,7 +126,7 @@ export class PlanetController {
 By default, errors thrown in implemented procedures are caught and handled by oRPC, which then rethrows a generic `HttpException` to NestJS. If you want NestJS to catch the original error instead of `HttpException`, use the [Rethrow Plugin](/docs/plugins/rethrow) to bypass oRPC error handling and let NestJS handle the error directly.
 
 ::: tip
-Learn how to customize input and output validation errors in [Validation Errors](/docs/advanced/validation-errors) and the [ORPCModule](#configuration) section.
+Learn how to customize input and output validation errors in [Validation Errors](/docs/advanced/validation-customization#custom-validation-errors) and the [ORPCModule](#configuration) section.
 :::
 
 ## Body Parser

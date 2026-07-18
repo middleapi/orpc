@@ -33,8 +33,10 @@ beforeEach(() => {
 })
 
 describe('createRouterImplementer', () => {
+  const config = { disableInputValidation: false }
+
   describe('without middlewares', () => {
-    const implementer = createRouterImplementer(contract)
+    const implementer = createRouterImplementer(contract, config)
 
     describe('router level', () => {
       it('.use', () => {
@@ -105,14 +107,18 @@ describe('createRouterImplementer', () => {
 
   describe('with middlewares', () => {
     const mid = vi.fn()
-    const implementer = createRouterImplementer(contract).use(mid)
+    const implementer = createRouterImplementer(contract, config).use(mid)
 
     describe('router level', () => {
       it('.use', () => {
         const middleware = vi.fn()
         const applied = implementer.use(middleware)
 
-        expect(applied.ping['~orpc'].orderedMiddlewares).toEqual([{ middleware: mid }, { middleware }])
+        expect(applied.ping['~orpc']).toEqual({
+          ...config,
+          ...contract.ping['~orpc'],
+          orderedMiddlewares: [{ middleware: mid }, { middleware }],
+        })
       })
 
       it('.middleware', () => {
@@ -137,6 +143,7 @@ describe('createRouterImplementer', () => {
 
         expect(augmentImplementedRouterSpy).toHaveBeenCalledTimes(1)
         expect(augmentImplementedRouterSpy).toHaveBeenCalledWith(router, {
+          ...config,
           middlewares: [mid],
         })
 
@@ -159,6 +166,7 @@ describe('createRouterImplementer', () => {
 
         expect(augmentImplementedRouterSpy).toHaveBeenCalledTimes(1)
         expect(augmentImplementedRouterSpy).toHaveBeenCalledWith(router, {
+          ...config,
           middlewares: [mid],
         })
 
@@ -176,12 +184,18 @@ describe('createRouterImplementer', () => {
     describe('procedure level', () => {
       it('is a procedureImplementer', () => {
         expect(implementer.ping).toBeInstanceOf(ProcedureImplementer)
-        expect(implementer.ping['~orpc']).toMatchObject(contract.ping['~orpc'])
-        expect(implementer.ping['~orpc'].orderedMiddlewares).toEqual([{ middleware: mid }])
+        expect(implementer.ping['~orpc']).toEqual({
+          ...config,
+          ...contract.ping['~orpc'],
+          orderedMiddlewares: [{ middleware: mid }],
+        })
 
         expect(implementer.nested.pong).toBeInstanceOf(ProcedureImplementer)
-        expect(implementer.nested.pong['~orpc']).toMatchObject(contract.nested.pong['~orpc'])
-        expect(implementer.nested.pong['~orpc'].orderedMiddlewares).toEqual([{ middleware: mid }])
+        expect(implementer.nested.pong['~orpc']).toEqual({
+          ...config,
+          ...contract.nested.pong['~orpc'],
+          orderedMiddlewares: [{ middleware: mid }],
+        })
       })
 
       it('handles procedures with names that conflict with router methods', () => {
@@ -190,19 +204,26 @@ describe('createRouterImplementer', () => {
 
         const procedure = implementer.use.handler(vi.fn())
         expect(procedure).toBeInstanceOf(ImplementedProcedure)
-        expect(procedure['~orpc']).toMatchObject(contract.use['~orpc'])
-        expect(procedure['~orpc'].orderedMiddlewares).toEqual([{ middleware: mid }])
-        expect(procedure['~orpc'].handler).toBeTypeOf('function')
+        expect(procedure['~orpc']).toEqual({
+          ...config,
+          ...contract.use['~orpc'],
+          opaqueReturnedErrors: true,
+          orderedMiddlewares: [{ middleware: mid }],
+          handler: expect.any(Function),
+        })
       })
     })
   })
 
   describe('edge case', () => {
     it('is procedure implementer if implementer for single procedure', () => {
-      const implementer = createRouterImplementer(contract.ping)
+      const implementer = createRouterImplementer(contract.ping, config)
       expect(implementer).toBeInstanceOf(ProcedureImplementer)
-      expect(implementer['~orpc']).toMatchObject(contract.ping['~orpc'])
-      expect(implementer['~orpc'].orderedMiddlewares).toEqual([])
+      expect(implementer['~orpc']).toEqual({
+        ...config,
+        ...contract.ping['~orpc'],
+        orderedMiddlewares: [],
+      })
     })
   })
 })

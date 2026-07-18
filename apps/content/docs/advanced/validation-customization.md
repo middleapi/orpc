@@ -1,10 +1,53 @@
-# Validation Errors
+# Validation Customization
 
-oRPC includes built-in validation errors that work well for most cases. Customize them when you need a different message or error shape.
+This guide explains how to customize validation in oRPC, including how to disable runtime validation and how to customize validation errors.
 
-## Customizing
+## Disable Validation
 
-You can catch validation errors with [interceptors](/docs/rpc/handler#interceptors), [client interceptors](/docs/rpc/handler#client-interceptors), or [middleware](/docs/middleware) applied before `.input` or `.output`.
+You can disable runtime validation with the `.$config`.
+
+```ts
+const base = os.$config({
+  /**
+   * When enabled, input schemas are not validated at runtime.
+   * Schemas are still used for type inference and OpenAPI generation.
+   *
+   * @warning Do not disable validation for schemas that transform values.
+   *
+   * @default false
+   */
+  disableInputValidation: true,
+
+  /**
+   * When enabled, output schemas are not validated at runtime.
+   * Schemas are still used for type inference and OpenAPI generation.
+   *
+   * Useful when output schemas exist only for specification generation.
+   *
+   * @warning Do not disable validation for schemas that transform values.
+   *
+   * @default false
+   */
+  disableOutputValidation: true
+})
+```
+
+::: warning
+Do not disable validation for schemas that transform values.
+For example, the following schema accepts a `number` but returns a `string`:
+
+```ts
+z.object({
+  value: z.number().transform(value => String(value)),
+})
+```
+
+If runtime validation is disabled, the transformation is skipped. As a result, the server returns a `number` while the client expects a `string`, leading to unexpected behavior.
+:::
+
+## Custom Validation Errors
+
+You can catch validation errors with [interceptors](/docs/rpc/handler#interceptors), [client interceptors](/docs/rpc/handler#client-interceptors), or [middleware](/docs/middleware) applied before `.input` or `.output` and then throw a custom error. This is useful if you want to change the error message or shape.
 
 ```ts twoslash
 import { RPCHandler } from '@orpc/server/fetch'
@@ -53,7 +96,7 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-## Typesafe Validation Errors
+### Typesafe Validation Errors
 
 As explained in the [error handling guide](/docs/error-handling#orpcerror-compatibility), if you throw an `ORPCError` whose `code` and `data` match an error defined with `.errors`, oRPC treats it the same as `errors.[code]`.
 

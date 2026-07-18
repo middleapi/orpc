@@ -36,6 +36,7 @@ const procedure1 = new Procedure({
   handler: vi.fn(),
   orderedMiddlewares: [],
   metaPlugins: [{ name: 'test', apply: vi.fn() }],
+  disableInputValidation: false,
 })
 
 const procedure2 = new Procedure({
@@ -50,6 +51,7 @@ const procedure2 = new Procedure({
   outputSchemas: [],
   handler: vi.fn(),
   orderedMiddlewares: [{ middleware: vi.fn() as any, inputSchemasLengthAtUse: 0, outputSchemasLengthAtUse: 0 }],
+  disableOutputValidation: undefined,
 })
 
 /**
@@ -93,6 +95,7 @@ describe('augmentRouter', () => {
       },
       metaPlugins: [{ name: 'plugin1', init: vi.fn() }],
       middlewares: [vi.fn()],
+      disableOutputValidation: true,
     }
   }
 
@@ -115,6 +118,7 @@ describe('augmentRouter', () => {
       original['~orpc'].metaPlugins,
     )
     expect(actual['~orpc']).toEqual({
+      disableOutputValidation: true,
       ...original['~orpc'],
       orderedMiddlewares: [
         ...middlewareEntries(options.middlewares),
@@ -214,6 +218,7 @@ describe('augmentImplementedRouter', () => {
   function createImplementedOptions() {
     return {
       middlewares: [vi.fn()],
+      disableOutputValidation: true,
     }
   }
 
@@ -225,6 +230,7 @@ describe('augmentImplementedRouter', () => {
     expect(actual).toBeInstanceOf(Procedure)
     expect(actual).not.toBe(original)
     expect(actual['~orpc']).toEqual({
+      disableOutputValidation: true,
       ...original['~orpc'],
       orderedMiddlewares: [
         ...middlewareEntries(options.middlewares),

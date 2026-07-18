@@ -224,7 +224,7 @@ export default withMermaid(defineConfig({
             { text: 'Publish Client to NPM', link: '/docs/advanced/publish-client-to-npm' },
             { text: 'Scaling Large Projects', link: '/docs/advanced/scaling-large-projects' },
             { text: 'Testing and Mocking', link: '/docs/advanced/testing-and-mocking' },
-            { text: 'Validation Errors', link: '/docs/advanced/validation-errors' },
+            { text: 'Validation Customization', link: '/docs/advanced/validation-customization' },
           ],
         },
         {

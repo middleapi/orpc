@@ -3,6 +3,7 @@ import type { AnyFunction, IntersectPick, Public } from '@orpc/shared'
 import type { Context, MergedContext, MergedInitialContext } from './context'
 import type { AnyMiddleware, Middleware } from './middleware'
 import type { DecoratedMiddleware } from './middleware-decorated'
+import type { ProcedureConfig } from './procedure'
 import type { ContractedRouter } from './router'
 import type { AugmentedRouterWithMiddlewares } from './router-utils'
 import { ProcedureContract } from '@orpc/contract'
@@ -19,23 +20,31 @@ export class SharedRouterImplementer<
 > {
   private constructor(
     private readonly contract: TContract,
+    private readonly config: ProcedureConfig,
     private readonly middlewares: AnyMiddleware[],
   ) {}
 
   static create<TContract extends RouterContract, TInitialContext extends Context>(
     contract: TContract,
+    config: ProcedureConfig
   ): SharedRouterImplementer<TContract, TInitialContext>
 
   static create<TContract extends RouterContract, TInitialContext extends Context, TInjectedContext extends Context>(
     contract: TContract,
+    config: ProcedureConfig,
     middlewares: AnyMiddleware[],
   ): SharedRouterImplementerWithMiddlewares<TContract, TInitialContext, TInjectedContext>
 
   static create<TContract extends RouterContract, TInitialContext extends Context, TInjectedContext extends Context>(
     contract: TContract,
+    config: ProcedureConfig,
     middlewares: AnyMiddleware[] = [],
   ): SharedRouterImplementer<TContract, TInitialContext> | SharedRouterImplementerWithMiddlewares<TContract, TInitialContext, TInjectedContext> {
-    return new SharedRouterImplementer(contract, middlewares)
+    return new SharedRouterImplementer(
+      contract,
+      config,
+      middlewares,
+    )
   }
 
   use<
@@ -55,7 +64,7 @@ export class SharedRouterImplementer<
     MergedInitialContext<TInitialContext, object, $InContext>,
     $OutContext
   > {
-    return createRouterImplementerInternal(this.contract, [...this.middlewares, middleware]) as any
+    return createRouterImplementerInternal(this.contract, this.config, [...this.middlewares, middleware]) as any
   }
 
   middleware<
@@ -97,6 +106,7 @@ export class SharedRouterImplementer<
   ): T {
     if (this.middlewares.length) {
       router = augmentImplementedRouter(router, {
+        ...this.config,
         middlewares: this.middlewares,
       }) as any
     }
@@ -113,6 +123,7 @@ export class SharedRouterImplementer<
         const { default: router } = await originalLoader()
         return {
           default: augmentImplementedRouter(router, {
+            ...this.config,
             middlewares: this.middlewares,
           }) as any,
         }
@@ -204,8 +215,9 @@ export function createRouterImplementer<
   TInitialContext extends Context,
 >(
   contract: TContract,
+  config: ProcedureConfig,
 ): RouterImplementer<TContract, TInitialContext> {
-  return createRouterImplementerInternal(contract, []) as any
+  return createRouterImplementerInternal(contract, config, []) as any
 }
 
 function createRouterImplementerInternal<
@@ -214,10 +226,12 @@ function createRouterImplementerInternal<
   TInjectedContext extends Context,
 >(
   contract: TContract,
+  config: ProcedureConfig,
   middlewares: AnyMiddleware[],
 ): RouterImplementer<TContract, TInitialContext> | RouterImplementerWithMiddlewares<TContract, TInitialContext, TInjectedContext> {
   if (contract instanceof ProcedureContract) {
     return new ProcedureImplementer({
+      ...config,
       ...contract['~orpc'],
       orderedMiddlewares: middlewares.map(middleware => ({ middleware })),
     }) as any
@@ -227,10 +241,10 @@ function createRouterImplementerInternal<
 
   for (const key in contract) {
     const child = contract[key] as RouterContract
-    implementer[key] = createRouterImplementerInternal(child, middlewares)
+    implementer[key] = createRouterImplementerInternal(child, config, middlewares)
   }
 
-  const shared = bindMethods(SharedRouterImplementer.create(contract, middlewares))
+  const shared = bindMethods(SharedRouterImplementer.create(contract, config, middlewares))
 
   for (const key in shared) {
     const method = (shared as any)[key] as AnyFunction

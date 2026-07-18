@@ -43,6 +43,8 @@ describe('builder', () => {
     orderedMiddlewares: [
       { middleware: vi.fn() as AnyFunction, inputSchemasLengthAtUse: 0, outputSchemasLengthAtUse: 0 },
     ],
+    disableInputValidation: false,
+    disableOutputValidation: false,
   }
 
   const metaPlugin: AnyMetaPlugin = {
@@ -61,6 +63,20 @@ describe('builder', () => {
 
   it('$context', () => {
     expect(builder.$context()).toBe(builder)
+  })
+
+  it('$config', () => {
+    const applied = builder.$config({
+      disableOutputValidation: undefined,
+    })
+
+    expect(applied).toBeInstanceOf(Builder)
+    expect(applied).not.toBe(builder)
+
+    expect(applied['~orpc']).toEqual({
+      ...builder['~orpc'],
+      disableOutputValidation: undefined,
+    })
   })
 
   it('.meta', () => {
@@ -374,10 +390,8 @@ describe('builder', () => {
     expect(applied).toBe(augmentRouterSpy.mock.results[0]?.value)
     expect(augmentRouterSpy).toHaveBeenCalledOnce()
     expect(augmentRouterSpy).toHaveBeenCalledWith(router, {
+      ...builder['~orpc'],
       middlewares: builder['~orpc'].orderedMiddlewares.map((m: any) => m.middleware),
-      meta: builder['~orpc'].meta,
-      metaPlugins: builder['~orpc'].metaPlugins,
-      errorMap: builder['~orpc'].errorMap,
     })
   })
 
@@ -394,10 +408,8 @@ describe('builder', () => {
     expect(unlazied.default).toBe(augmentRouterSpy.mock.results[0]?.value)
     expect(augmentRouterSpy).toHaveBeenCalledOnce()
     expect(augmentRouterSpy).toHaveBeenCalledWith(router, {
+      ...builder['~orpc'],
       middlewares: builder['~orpc'].orderedMiddlewares.map((m: any) => m.middleware),
-      meta: builder['~orpc'].meta,
-      metaPlugins: builder['~orpc'].metaPlugins,
-      errorMap: builder['~orpc'].errorMap,
     })
   })
 })
