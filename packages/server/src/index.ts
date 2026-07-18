@@ -57,6 +57,8 @@ export type {
   ErrorMapItem,
   InferSchemaInput,
   InferSchemaOutput,
+  InitialInputSchema,
+  InitialOutputSchema,
   MergedErrorMap,
   Meta,
   MetaPlugin,
