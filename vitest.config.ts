@@ -26,6 +26,7 @@ export default defineConfig(({ mode }) => ({
           include: [
             './packages/next/**/*.test.tsx',
             './packages/tanstack-query/**/*.test.tsx',
+            './packages/vue-colada/**/*.test.tsx',
           ],
         },
       },
