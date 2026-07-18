@@ -33,23 +33,41 @@ deno add npm:@orpc/trpc@beta
 By converting a [tRPC router](https://trpc.io/docs/server/routers) to an [oRPC router](/docs/router), you can utilize most oRPC features, including OpenAPI specification generation and request handling.
 
 ```ts
-import { ORPCMeta, toORPCRouter } from '@orpc/trpc'
-
-export const t = initTRPC.context<Context>().meta<ORPCMeta>().create()
+import { toORPCRouter } from '@orpc/trpc'
 
 const orpcRouter = toORPCRouter(trpcRouter)
 ```
 
 ::: warning
-Ensure you set the `.meta` type to `ORPCMeta` when creating your tRPC builder. This is required for OpenAPI features to function properly.
+For OpenAPI features to work, define OpenAPI metadata under the `'~openapi'` key in your tRPC meta, typed with `OpenAPIMeta` from `@orpc/openapi`:
 
 ```ts
+import type { OpenAPIMeta } from '@orpc/openapi'
+
+interface Meta {
+  '~openapi'?: OpenAPIMeta
+}
+
+export const t = initTRPC.context<Context>().meta<Meta>().create()
+
 const example = t.procedure
-  .meta({ route: { path: '/hello', summary: 'Hello procedure' } }) // [!code highlight]
+  .meta({ '~openapi': { path: '/hello', summary: 'Hello procedure' } }) // [!code highlight]
   .input(z.object({ name: z.string() }))
   .query(({ input }) => {
     return `Hello, ${input.name}!`
   })
+```
+
+If you prefer keeping the metadata under a different key, use the `mapMeta` option to expose it during conversion:
+
+```ts
+interface Meta {
+  route?: OpenAPIMeta
+}
+
+const orpcRouter = toORPCRouter(trpcRouter, {
+  mapMeta: meta => ({ ...meta, '~openapi': meta.route }), // [!code highlight]
+})
 ```
 
 :::

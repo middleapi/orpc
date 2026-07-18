@@ -40,11 +40,11 @@
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
-    "@orpc/openapi": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
+    "@orpc/openapi": "workspace:*",
     "@trpc/server": "^11.12.0",
     "zod": "^4.4.3"
   }

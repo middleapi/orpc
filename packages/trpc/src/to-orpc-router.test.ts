@@ -1,7 +1,7 @@
 import { getOpenAPIMeta, OpenAPIGenerator } from '@orpc/openapi'
 import { call, createRouterClient, getEventMeta, Lazy, ORPCError, Procedure, unlazy } from '@orpc/server'
 import { isAsyncIteratorObject } from '@orpc/shared'
-import { tracked, TRPCError } from '@trpc/server'
+import { lazy, tracked, TRPCError } from '@trpc/server'
 import * as z from 'zod'
 import { inputSchema, outputSchema, t, trpcRouter } from '../tests/shared'
 import { toORPCRouter } from './to-orpc-router'
@@ -53,7 +53,7 @@ describe('toORPCRouter', async () => {
     const trpcRouter = t.router({
       planet: {
         find: t.procedure
-          .meta({ route: { method: 'GET', path: '/planets/{id}', summary: 'Find a planet' } })
+          .meta({ '~openapi': { method: 'GET', path: '/planets/{id}', summary: 'Find a planet' } })
           .input(z.object({ id: z.string() }))
           .output(z.object({ name: z.string() }))
           .query(() => ({ name: 'Earth' })),
@@ -97,13 +97,35 @@ describe('toORPCRouter', async () => {
     })
   })
 
-  it('meta/route', async () => {
+  it('meta', async () => {
     expect(orpcRouter.ping['~orpc'].meta).toEqual({ meta1: 'test' })
-    expect(orpcRouter.nested.ping['~orpc'].meta).toEqual({
-      'route': { path: '/nested/ping', description: 'Nested ping procedure' },
-      '~openapi': { path: '/nested/ping', description: 'Nested ping procedure' },
-    })
+    expect(orpcRouter.nested.ping['~orpc'].meta).toEqual({ '~openapi': { path: '/nested/ping', description: 'Nested ping procedure' } })
     expect(getOpenAPIMeta(orpcRouter.nested.ping)).toEqual({ path: '/nested/ping', description: 'Nested ping procedure' })
+  })
+
+  it('mapMeta option', async () => {
+    const trpcRouter = t.router({
+      ping: t.procedure
+        .meta({ meta1: 'test' } as any)
+        .query(() => 'pong'),
+
+      lazy: lazy(() => Promise.resolve({ default: t.router({
+        pong: t.procedure
+          .meta({ route: { path: '/pong' } } as any)
+          .query(() => 'pong'),
+      }) })),
+    })
+
+    const orpcRouter = toORPCRouter(trpcRouter, {
+      mapMeta: meta => ({ ...meta, '~openapi': meta.route }),
+    })
+
+    expect(orpcRouter.ping['~orpc'].meta).toEqual({ 'meta1': 'test', '~openapi': undefined })
+
+    // options should propagate through lazy routers
+    const { default: pong } = await unlazy((orpcRouter.lazy as any).pong)
+    expect(pong['~orpc'].meta).toEqual({ 'route': { path: '/pong' }, '~openapi': { path: '/pong' } })
+    expect(getOpenAPIMeta(pong)).toEqual({ path: '/pong' })
   })
 
   describe('calls', () => {

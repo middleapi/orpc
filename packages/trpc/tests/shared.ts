@@ -1,4 +1,4 @@
-import type { ORPCMeta } from '../src/to-orpc-router'
+import type { OpenAPIMeta } from '@orpc/openapi'
 import { initTRPC, lazy, tracked, TRPCError } from '@trpc/server'
 import * as z from 'zod'
 
@@ -7,9 +7,10 @@ export const inputSchema = z.object({ input: z.number().transform(n => `${n}`) }
 export const outputSchema = z.object({ output: z.number().transform(n => `${n}`) })
 
 export type TRPCContext = { a: string }
-export interface TRPCMeta extends ORPCMeta {
-  meta1?: string
-  meta2?: number
+export interface TRPCMeta {
+  '~openapi'?: OpenAPIMeta
+  'meta1'?: string
+  'meta2'?: number
 }
 
 export const t = initTRPC.context<(req: Request) => (TRPCContext)>().meta<TRPCMeta>().create()
@@ -43,7 +44,7 @@ export const trpcRouter = t.router({
 
   nested: {
     ping: t.procedure
-      .meta({ route: { path: '/nested/ping', description: 'Nested ping procedure' } })
+      .meta({ '~openapi': { path: '/nested/ping', description: 'Nested ping procedure' } })
       .input(z.object({ a: z.string() }))
       .output(z.string().transform(val => Number(val)))
       .query(({ input }) => {

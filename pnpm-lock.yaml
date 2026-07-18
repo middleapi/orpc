@@ -785,9 +785,6 @@ importers:
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
-      '@orpc/openapi':
-        specifier: workspace:*
-        version: link:../openapi
       '@orpc/server':
         specifier: workspace:*
         version: link:../server
@@ -795,6 +792,9 @@ importers:
         specifier: workspace:*
         version: link:../shared
     devDependencies:
+      '@orpc/openapi':
+        specifier: workspace:*
+        version: link:../openapi
       '@trpc/server':
         specifier: ^11.12.0
         version: 11.18.0(typescript@6.0.3)
