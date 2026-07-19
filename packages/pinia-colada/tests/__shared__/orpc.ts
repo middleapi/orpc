@@ -1,7 +1,7 @@
 import type { RouterClient } from '@orpc/server'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
-import { os } from '@orpc/server'
+import { asyncIteratorObject, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { PiniaColada } from '@pinia/colada'
 import { mount as baseMount } from '@vue/test-utils'
@@ -16,6 +16,14 @@ export const router = {
     .output(z.object({ output: z.string() }))
     .handler(vi.fn(({ input }) => ({ output: input.input.toString() }))),
   pong: os.handler(vi.fn(() => 'pong')),
+  stream: os
+    .input(z.object({ input: z.number() }).optional())
+    .output(asyncIteratorObject(z.object({ output: z.string() })))
+    .handler(vi.fn(async function* ({ input }) {
+      for (let i = 0; i < (input?.input ?? 0); i++) {
+        yield { output: i.toString() }
+      }
+    })),
   list: os
     .input(z.object({ cursor: z.number() }))
     .output(z.object({ items: z.array(z.string()), next: z.number().nullable() }))

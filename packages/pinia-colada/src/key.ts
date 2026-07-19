@@ -1,5 +1,6 @@
 import type { PartialDeep } from '@orpc/shared'
 import type { EntryKey } from '@pinia/colada'
+import type { SerializableStreamedQueryOptions } from './stream-query'
 import type { OperationType } from './types'
 import { RPCJsonSerializer } from '@orpc/client'
 
@@ -14,6 +15,7 @@ export interface BuildKeyPrefixOptions {
 export interface BuildKeyOptions<TInput> extends BuildKeyPrefixOptions {
   type?: OperationType
   input?: PartialDeep<TInput>
+  fnOptions?: SerializableStreamedQueryOptions
 }
 
 const serializer = new RPCJsonSerializer()
@@ -36,6 +38,7 @@ export function buildKey<TInput>(
     {
       ...options.input !== undefined ? { input: serializer.serialize(options.input).json } : {},
       ...options.type !== undefined ? { type: options.type } : {},
+      ...options.fnOptions !== undefined ? { fnOptions: options.fnOptions } : {},
     },
   ] as EntryKey
 }

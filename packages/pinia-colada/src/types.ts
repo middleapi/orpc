@@ -1,5 +1,9 @@
 import type { ClientContext } from '@orpc/client'
 import type { DefineInfiniteQueryOptions, DefineInfiniteQueryOptionsTagged, DefineMutationOptionsTagged, DefineQueryOptions, DefineQueryOptionsTagged, EntryKey, UseInfiniteQueryData, UseMutationOptions, UseQueryOptions } from '@pinia/colada'
+import type { SerializableStreamedQueryOptions } from './stream-query'
+
+export type InferStreamedQueryOutput<TOutput> = TOutput extends AsyncIterable<infer U> ? U[] : never
+export type InferLiveQueryOutput<TOutput> = TOutput extends AsyncIterable<infer U> ? U : never
 
 export type UseQueryFnContext = Parameters<UseQueryOptions<any>['query']>[0]
 
@@ -7,7 +11,7 @@ export type UseMutationFnContext = Parameters<UseMutationOptions<any, any>['muta
 
 export const OPERATION_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_PINIA_COLADA_OPERATION_CONTEXT') as any
 
-export type OperationType = 'query' | 'infinite' | 'mutation'
+export type OperationType = 'query' | 'streamed' | 'live' | 'infinite' | 'mutation'
 
 export interface OperationContext {
   [OPERATION_CONTEXT_SYMBOL]?: {
@@ -27,6 +31,16 @@ export type QueryOptionsIn<TClientContext extends ClientContext, TInput, TOutput
     & Partial<Pick<DefineQueryOptions<TOutput, TError, TInitialData>, 'key' | 'query'>>
 
 export type QueryOptionsOut<TOutput, TError, TInitialData extends TOutput | undefined> = DefineQueryOptionsTagged<TOutput, TError, TInitialData>
+
+export type StreamedKeyOptions<TInput>
+  = | ((undefined extends TInput ? { input?: TInput } : { input: TInput }) & { fnOptions?: SerializableStreamedQueryOptions })
+    | { key: EntryKey }
+
+export type StreamedOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TInitialData extends TOutput | undefined>
+  = & QueryOptionsIn<TClientContext, TInput, TOutput, TError, TInitialData>
+    & { fnOptions?: SerializableStreamedQueryOptions }
+
+export type StreamedOptionsOut<TOutput, TError, TInitialData extends TOutput | undefined> = QueryOptionsOut<TOutput, TError, TInitialData>
 
 export type InfiniteKeyOptions<TInput, TPageParam>
   = | Pick<InfiniteOptionsIn<any, TInput, any, any, TPageParam, any>, 'input' | 'initialPageParam'>

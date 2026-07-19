@@ -74,6 +74,43 @@ const query = useQuery(orpc.planet.find.queryOptions({
 Options accept plain values only. For reactive inputs, pass a callback to `useQuery` as described in [Reactive Options](#reactive-options).
 :::
 
+## Streamed Query Options Utility
+
+Use `.streamedOptions` to build streamed query options for an [AsyncIteratorObject](/docs/async-iterator-object). The resulting data is an array of chunks, and each new chunk is appended as it arrives. It works with `useQuery`, `defineQueryOptions`, and any other API that accepts query options.
+
+```ts
+const query = useQuery(orpc.streamed.streamedOptions({
+  input: { id: 123 }, // Specify input if needed
+  context: { cache: true }, // Provide client context if needed
+  fnOptions: { // Configure streamed query behavior
+    refetchMode: 'reset',
+    maxChunks: 3,
+  },
+  // additional options...
+}))
+```
+
+::: info
+`refetchMode` determines how data is handled when the query is fetched again:
+
+- `'reset'` _(default)_: Clears existing data and returns the query to a pending state.
+- `'append'`: Adds new streamed chunks to the existing data.
+- `'replace'`: Buffers streamed data and replaces the cache after the stream completes.
+
+:::
+
+## Live Query Options Utility
+
+Use `.liveOptions` to build live query options for an [AsyncIteratorObject](/docs/async-iterator-object). The data always reflects the latest chunk, replacing the previous value whenever a new one arrives. It works with `useQuery`, `defineQueryOptions`, and any other API that accepts query options.
+
+```ts
+const query = useQuery(orpc.live.liveOptions({
+  input: { id: 123 }, // Specify input if needed
+  context: { cache: true }, // Provide client context if needed
+  // additional options...
+}))
+```
+
 ## Infinite Query Options Utility
 
 Use `.infiniteOptions` to build infinite query options. It works with `useInfiniteQuery`, `defineInfiniteQueryOptions`, and any other API that accepts infinite query options.
@@ -111,6 +148,8 @@ oRPC provides helper methods for generating query and mutation keys:
 
 - `.key`: Generates a **partial-match** key for actions such as invalidating queries or checking mutation status.
 - `.queryKey`: Generates a **full-match** key for [Query Options](#query-options-utility).
+- `.streamedKey`: Generates a **full-match** key for [Streamed Query Options](#streamed-query-options-utility).
+- `.liveKey`: Generates a **full-match** key for [Live Query Options](#live-query-options-utility).
 - `.infiniteKey`: Generates a **full-match** key for [Infinite Query Options](#infinite-query-options-utility).
 - `.mutationKey`: Generates a **full-match** key for [Mutation Options](#mutation-options).
 
@@ -224,6 +263,8 @@ import { isInferableError, safe } from '@orpc/client'
 
 const orpc = createPiniaColadaUtils(client, {
   queryInterceptors: [],
+  streamedInterceptors: [],
+  liveInterceptors: [],
   infiniteInterceptors: [],
   mutationInterceptors: [
     async ({ context, path, next }) => {
@@ -271,7 +312,7 @@ import { RPCLink } from '@orpc/client/fetch'
 interface ClientContext extends PiniaColadaOperationContext {
 }
 
-const GET_OPERATION_TYPE = new Set(['query', 'infinite'])
+const GET_OPERATION_TYPE = new Set(['query', 'streamed', 'live', 'infinite'])
 
 const link = new RPCLink<ClientContext>({
   method: ({ context }) => {

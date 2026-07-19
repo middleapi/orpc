@@ -2,9 +2,11 @@ import type { Client, ClientContext } from '@orpc/client'
 import type { Interceptor, MaybeOptionalOptions, PromiseWithError } from '@orpc/shared'
 import type { _EmptyObject, EntryKeyTagged, UseInfiniteQueryData, UseInfiniteQueryFnContext } from '@pinia/colada'
 import type { BuildKeyPrefixOptions } from './key'
-import type { InfiniteKeyOptions, InfiniteOptionsIn, InfiniteOptionsOut, MutationKeyOptions, MutationOptionsIn, MutationOptionsOut, OperationContext, QueryKeyOptions, QueryOptionsIn, QueryOptionsOut, UseMutationFnContext, UseQueryFnContext } from './types'
-import { intercept, resolveMaybeOptionalOptions } from '@orpc/shared'
+import type { InferLiveQueryOutput, InferStreamedQueryOutput, InfiniteKeyOptions, InfiniteOptionsIn, InfiniteOptionsOut, MutationKeyOptions, MutationOptionsIn, MutationOptionsOut, OperationContext, QueryKeyOptions, QueryOptionsIn, QueryOptionsOut, StreamedKeyOptions, StreamedOptionsIn, StreamedOptionsOut, UseMutationFnContext, UseQueryFnContext } from './types'
+import { intercept, isAsyncIteratorObject, resolveMaybeOptionalOptions } from '@orpc/shared'
 import { buildKey } from './key'
+import { liveQuery } from './live-query'
+import { serializableStreamedQuery } from './stream-query'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
 
 export interface ProcedureUtilsQueryInterceptorOptions<TClientContext extends ClientContext, TInput> {
@@ -15,6 +17,16 @@ export interface ProcedureUtilsQueryInterceptorOptions<TClientContext extends Cl
 }
 export type ProcedureUtilsQueryInterceptor<TClientContext extends ClientContext, TInput, TOutput, TError>
   = Interceptor<ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput>, PromiseWithError<TOutput, TError>>
+
+export interface ProcedureUtilsStreamedInterceptorOptions<TClientContext extends ClientContext, TInput> extends ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput> {
+}
+export type ProcedureUtilsStreamedInterceptor<TClientContext extends ClientContext, TInput, TOutput, TError>
+  = Interceptor<ProcedureUtilsStreamedInterceptorOptions<TClientContext, TInput>, PromiseWithError<InferStreamedQueryOutput<TOutput>, TError>>
+
+export interface ProcedureUtilsLiveInterceptorOptions<TClientContext extends ClientContext, TInput> extends ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput> {
+}
+export type ProcedureUtilsLiveInterceptor<TClientContext extends ClientContext, TInput, TOutput, TError>
+  = Interceptor<ProcedureUtilsLiveInterceptorOptions<TClientContext, TInput>, PromiseWithError<InferLiveQueryOutput<TOutput>, TError>>
 
 export interface ProcedureUtilsInfiniteInterceptorOptions<TClientContext extends ClientContext, TInput> {
   path: string[]
@@ -60,6 +72,48 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
    */
   queryOptions?: ProcedureUtilsModifier<
     QueryOptionsIn<TClientContext, TInput, TOutput, TError, TOutput | undefined>
+  >
+
+  /**
+   * Key options modifier for .streamedKey and .streamedOptions
+   * Can be partial options or a function that receives per-call options and returns override this.options.
+   */
+  streamedKey?: ProcedureUtilsModifier<
+    StreamedKeyOptions<TInput>
+  >
+
+  /**
+   * Interceptors that intercept query inside .streamedOptions, guaranteed to be executed.
+   */
+  streamedInterceptors?: ProcedureUtilsStreamedInterceptor<TClientContext, TInput, TOutput, TError>[]
+
+  /**
+   * Options modifier for .streamedOptions
+   * Can be partial options or a function that receives per-call options and returns override this.options.
+   */
+  streamedOptions?: ProcedureUtilsModifier<
+    StreamedOptionsIn<TClientContext, TInput, InferStreamedQueryOutput<TOutput>, TError, InferStreamedQueryOutput<TOutput> | undefined>
+  >
+
+  /**
+   * Key options modifier for .liveKey and .liveOptions
+   * Can be partial options or a function that receives per-call options and returns override this.options.
+   */
+  liveKey?: ProcedureUtilsModifier<
+    QueryKeyOptions<TInput>
+  >
+
+  /**
+   * Interceptors that intercept query inside .liveOptions, guaranteed to be executed.
+   */
+  liveInterceptors?: ProcedureUtilsLiveInterceptor<TClientContext, TInput, TOutput, TError>[]
+
+  /**
+   * Options modifier for .liveOptions
+   * Can be partial options or a function that receives per-call options and returns override this.options.
+   */
+  liveOptions?: ProcedureUtilsModifier<
+    QueryOptionsIn<TClientContext, TInput, InferLiveQueryOutput<TOutput>, TError, InferLiveQueryOutput<TOutput> | undefined>
   >
 
   /**
@@ -191,6 +245,177 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
             }
 
             return this.call(input, { signal: fnContext.signal, context })
+          },
+        )
+      },
+    } as any
+  }
+
+  /**
+   * Generate a **full matching** key for [Streamed Query Options](https://orpc.dev/docs/integrations/pinia-colada#streamed-query-options-utility).
+   *
+   * @see {@link https://orpc.dev/docs/integrations/pinia-colada#query-mutation-key Pinia Colada Query/Mutation Key Docs}
+   */
+  streamedKey(
+    ...rest: MaybeOptionalOptions<StreamedKeyOptions<TInput>>
+  ): EntryKeyTagged<InferStreamedQueryOutput<TOutput>, TError> {
+    let optionsIn = resolveMaybeOptionalOptions(rest)
+
+    if (typeof this.options.streamedKey === 'function') {
+      optionsIn = this.options.streamedKey(optionsIn)
+    }
+    else if (this.options.streamedKey) {
+      optionsIn = { ...this.options.streamedKey, ...optionsIn }
+    }
+
+    const key = (optionsIn as any).key
+      ?? buildKey(this.path, { prefix: this.options.prefix, type: 'streamed', input: (optionsIn as any).input, fnOptions: (optionsIn as any).fnOptions })
+
+    return key as EntryKeyTagged<InferStreamedQueryOutput<TOutput>, TError>
+  }
+
+  /**
+   * Configure queries for [AsyncIteratorObject](https://orpc.dev/docs/async-iterator-object).
+   * The resulting data is an array of chunks, and each new chunk is appended as it arrives.
+   * Works with `useQuery`, `defineQueryOptions`, and any other API that accepts query options.
+   */
+  streamedOptions<UInitialData extends InferStreamedQueryOutput<TOutput> | undefined = undefined>(
+    ...rest: MaybeOptionalOptions<
+      StreamedOptionsIn<TClientContext, TInput, InferStreamedQueryOutput<TOutput>, TError, UInitialData>
+    >
+  ): NoInfer<StreamedOptionsOut<InferStreamedQueryOutput<TOutput>, TError, UInitialData>> {
+    let optionsIn = resolveMaybeOptionalOptions(rest)
+
+    if (typeof this.options.streamedOptions === 'function') {
+      optionsIn = this.options.streamedOptions(optionsIn as any) as any
+    }
+    else if (this.options.streamedOptions) {
+      optionsIn = { ...this.options.streamedOptions, ...optionsIn } as any
+    }
+
+    const { input, context, key: _keyIn, query: queryIn, fnOptions, ...restOptions } = optionsIn as Record<string, any>
+
+    const key = this.streamedKey(optionsIn as StreamedKeyOptions<TInput>)
+
+    return {
+      ...restOptions,
+      key,
+      query: (fnContext: UseQueryFnContext) => {
+        return intercept(
+          this.options.streamedInterceptors,
+          {
+            path: this.path,
+            context: {
+              [OPERATION_CONTEXT_SYMBOL]: {
+                key,
+                type: 'streamed',
+              },
+              ...context,
+            } satisfies OperationContext as any,
+            input: input as TInput,
+            fnContext,
+          },
+          ({ context, input, fnContext }) => {
+            if (queryIn) {
+              return queryIn(fnContext) as PromiseWithError<InferStreamedQueryOutput<TOutput>, TError>
+            }
+
+            return serializableStreamedQuery(
+              async (queryContext) => {
+                const output = await this.call(input, { signal: queryContext.signal, context })
+
+                if (!isAsyncIteratorObject(output)) {
+                  throw new Error('streamedQuery requires an AsyncIteratorObject output')
+                }
+
+                return output
+              },
+              fnOptions,
+            )(fnContext) as PromiseWithError<InferStreamedQueryOutput<TOutput>, TError>
+          },
+        )
+      },
+    } as any
+  }
+
+  /**
+   * Generate a **full matching** key for [Live Query Options](https://orpc.dev/docs/integrations/pinia-colada#live-query-options-utility).
+   *
+   * @see {@link https://orpc.dev/docs/integrations/pinia-colada#query-mutation-key Pinia Colada Query/Mutation Key Docs}
+   */
+  liveKey(
+    ...rest: MaybeOptionalOptions<QueryKeyOptions<TInput>>
+  ): EntryKeyTagged<InferLiveQueryOutput<TOutput>, TError> {
+    let optionsIn = resolveMaybeOptionalOptions(rest)
+
+    if (typeof this.options.liveKey === 'function') {
+      optionsIn = this.options.liveKey(optionsIn)
+    }
+    else if (this.options.liveKey) {
+      optionsIn = { ...this.options.liveKey, ...optionsIn }
+    }
+
+    const key = (optionsIn as any).key
+      ?? buildKey(this.path, { prefix: this.options.prefix, type: 'live', input: (optionsIn as any).input })
+
+    return key as EntryKeyTagged<InferLiveQueryOutput<TOutput>, TError>
+  }
+
+  /**
+   * Configure live queries for [AsyncIteratorObject](https://orpc.dev/docs/async-iterator-object).
+   * Unlike `.streamedOptions` which accumulates chunks, live queries replace the entire result with each new chunk received.
+   * Works with `useQuery`, `defineQueryOptions`, and any other API that accepts query options.
+   */
+  liveOptions<UInitialData extends InferLiveQueryOutput<TOutput> | undefined = undefined>(
+    ...rest: MaybeOptionalOptions<
+      QueryOptionsIn<TClientContext, TInput, InferLiveQueryOutput<TOutput>, TError, UInitialData>
+    >
+  ): NoInfer<QueryOptionsOut<InferLiveQueryOutput<TOutput>, TError, UInitialData>> {
+    let optionsIn = resolveMaybeOptionalOptions(rest)
+
+    if (typeof this.options.liveOptions === 'function') {
+      optionsIn = this.options.liveOptions(optionsIn as any) as any
+    }
+    else if (this.options.liveOptions) {
+      optionsIn = { ...this.options.liveOptions, ...optionsIn } as any
+    }
+
+    const { input, context, key: _keyIn, query: queryIn, ...restOptions } = optionsIn as Record<string, any>
+
+    const key = this.liveKey(optionsIn as QueryKeyOptions<TInput>)
+
+    return {
+      ...restOptions,
+      key,
+      query: (fnContext: UseQueryFnContext) => {
+        return intercept(
+          this.options.liveInterceptors,
+          {
+            path: this.path,
+            context: {
+              [OPERATION_CONTEXT_SYMBOL]: {
+                key,
+                type: 'live',
+              },
+              ...context,
+            } satisfies OperationContext as any,
+            input: input as TInput,
+            fnContext,
+          },
+          ({ context, input, fnContext }) => {
+            if (queryIn) {
+              return queryIn(fnContext) as PromiseWithError<InferLiveQueryOutput<TOutput>, TError>
+            }
+
+            return liveQuery(async (queryContext) => {
+              const output = await this.call(input, { signal: queryContext.signal, context })
+
+              if (!isAsyncIteratorObject(output)) {
+                throw new Error('liveQuery requires an AsyncIteratorObject output')
+              }
+
+              return output
+            })(fnContext)
           },
         )
       },

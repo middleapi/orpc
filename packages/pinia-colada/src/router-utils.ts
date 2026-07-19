@@ -3,7 +3,7 @@ import type { Public } from '@orpc/shared'
 import type { EntryKey } from '@pinia/colada'
 import type { BuildKeyOptions, BuildKeyPrefixOptions } from './key'
 import type { RouterUtilsPlugin } from './plugin'
-import type { ProcedureUtilsInfiniteInterceptor, ProcedureUtilsMutationInterceptor, ProcedureUtilsOptions, ProcedureUtilsQueryInterceptor } from './procedure-utils'
+import type { ProcedureUtilsInfiniteInterceptor, ProcedureUtilsLiveInterceptor, ProcedureUtilsMutationInterceptor, ProcedureUtilsOptions, ProcedureUtilsQueryInterceptor, ProcedureUtilsStreamedInterceptor } from './procedure-utils'
 import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
 import { bindMethods, get, getOrBind, isTypescriptObject, toArray } from '@orpc/shared'
 import { buildKey } from './key'
@@ -45,6 +45,16 @@ export interface RouterUtilsOptions<T extends AnyNestedClient> extends BuildKeyP
    * Interceptors that intercept query inside .queryOptions
    */
   queryInterceptors?: ProcedureUtilsQueryInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[]
+
+  /**
+   * Interceptors that intercept query inside .streamedOptions
+   */
+  streamedInterceptors?: ProcedureUtilsStreamedInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[]
+
+  /**
+   * Interceptors that intercept query inside .liveOptions
+   */
+  liveInterceptors?: ProcedureUtilsLiveInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[]
 
   /**
    * Interceptors that intercept query inside .infiniteOptions
@@ -101,6 +111,8 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
           prefix: options.prefix,
           ...options.scoped,
           queryInterceptors: [...toArray(options.queryInterceptors) as any, ...toArray(options.scoped?.queryInterceptors)],
+          streamedInterceptors: [...toArray(options.streamedInterceptors) as any, ...toArray(options.scoped?.streamedInterceptors)],
+          liveInterceptors: [...toArray(options.liveInterceptors) as any, ...toArray(options.scoped?.liveInterceptors)],
           infiniteInterceptors: [...toArray(options.infiniteInterceptors) as any, ...toArray(options.scoped?.infiniteInterceptors)],
           mutationInterceptors: [...toArray(options.mutationInterceptors) as any, ...toArray(options.scoped?.mutationInterceptors)],
         }),
@@ -149,6 +161,14 @@ function isProcedureUtilsOptions(value: unknown): value is ProcedureUtilsOptions
   }
 
   if (value.queryInterceptors !== undefined && !Array.isArray(value.queryInterceptors)) {
+    return false
+  }
+
+  if (value.streamedInterceptors !== undefined && !Array.isArray(value.streamedInterceptors)) {
+    return false
+  }
+
+  if (value.liveInterceptors !== undefined && !Array.isArray(value.liveInterceptors)) {
     return false
   }
 

@@ -15,6 +15,8 @@ const buildKeySpy = vi.spyOn(KeyModule, 'buildKey')
 
 const emptyInterceptors = {
   queryInterceptors: [],
+  streamedInterceptors: [],
+  liveInterceptors: [],
   infiniteInterceptors: [],
   mutationInterceptors: [],
 }
@@ -186,6 +188,16 @@ describe('createRouterUtils', () => {
       scoped: vi.fn(({ next }) => next()),
       procedure: vi.fn(({ next }) => next()),
     }
+    const streamedInterceptors = {
+      root: vi.fn(({ next }) => next()),
+      init: vi.fn(({ next }) => next()),
+      scoped: vi.fn(({ next }) => next()),
+    }
+    const liveInterceptors = {
+      root: vi.fn(({ next }) => next()),
+      init: vi.fn(({ next }) => next()),
+      scoped: vi.fn(({ next }) => next()),
+    }
     const infiniteInterceptors = {
       root: vi.fn(({ next }) => next()),
       init: vi.fn(({ next }) => next()),
@@ -202,6 +214,8 @@ describe('createRouterUtils', () => {
       init: vi.fn((options: any) => ({
         ...options,
         queryInterceptors: [...options.queryInterceptors, queryInterceptors.init],
+        streamedInterceptors: [...options.streamedInterceptors, streamedInterceptors.init],
+        liveInterceptors: [...options.liveInterceptors, liveInterceptors.init],
         infiniteInterceptors: [...options.infiniteInterceptors, infiniteInterceptors.init],
         mutationInterceptors: [...options.mutationInterceptors, mutationInterceptors.init],
       })),
@@ -217,11 +231,15 @@ describe('createRouterUtils', () => {
 
     const utils = createRouterUtils(client, {
       queryInterceptors: [queryInterceptors.root],
+      streamedInterceptors: [streamedInterceptors.root],
+      liveInterceptors: [liveInterceptors.root],
       infiniteInterceptors: [infiniteInterceptors.root],
       mutationInterceptors: [mutationInterceptors.root],
       scoped: {
         route: {
           queryInterceptors: [queryInterceptors.scoped],
+          streamedInterceptors: [streamedInterceptors.scoped],
+          liveInterceptors: [liveInterceptors.scoped],
           infiniteInterceptors: [infiniteInterceptors.scoped],
           mutationInterceptors: [mutationInterceptors.scoped],
           queryOptions: {
@@ -235,6 +253,8 @@ describe('createRouterUtils', () => {
     expect(plugin.init).toHaveBeenCalledOnce()
     expect(plugin.init).toHaveBeenCalledWith(expect.objectContaining({
       queryInterceptors: [queryInterceptors.root],
+      streamedInterceptors: [streamedInterceptors.root],
+      liveInterceptors: [liveInterceptors.root],
       infiniteInterceptors: [infiniteInterceptors.root],
       mutationInterceptors: [mutationInterceptors.root],
     }))
@@ -244,6 +264,8 @@ describe('createRouterUtils', () => {
     expect(plugin.initProcedureOptions).toHaveBeenCalledOnce()
     expect(plugin.initProcedureOptions).toHaveBeenCalledWith(['route'], expect.objectContaining({
       queryInterceptors: [queryInterceptors.root, queryInterceptors.init, queryInterceptors.scoped],
+      streamedInterceptors: [streamedInterceptors.root, streamedInterceptors.init, streamedInterceptors.scoped],
+      liveInterceptors: [liveInterceptors.root, liveInterceptors.init, liveInterceptors.scoped],
       infiniteInterceptors: [infiniteInterceptors.root, infiniteInterceptors.init, infiniteInterceptors.scoped],
       mutationInterceptors: [mutationInterceptors.root, mutationInterceptors.init, mutationInterceptors.scoped],
       queryOptions: {
@@ -254,6 +276,8 @@ describe('createRouterUtils', () => {
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
     expect(ProcedureUtils).toHaveBeenCalledWith(['route'], client.route, expect.objectContaining({
       queryInterceptors: [queryInterceptors.root, queryInterceptors.init, queryInterceptors.scoped, queryInterceptors.procedure],
+      streamedInterceptors: [streamedInterceptors.root, streamedInterceptors.init, streamedInterceptors.scoped],
+      liveInterceptors: [liveInterceptors.root, liveInterceptors.init, liveInterceptors.scoped],
       infiniteInterceptors: [infiniteInterceptors.root, infiniteInterceptors.init, infiniteInterceptors.scoped],
       mutationInterceptors: [mutationInterceptors.root, mutationInterceptors.init, mutationInterceptors.scoped],
       queryOptions: {
@@ -267,6 +291,8 @@ describe('createRouterUtils', () => {
 
   it.each([
     'queryInterceptors',
+    'streamedInterceptors',
+    'liveInterceptors',
     'infiniteInterceptors',
     'mutationInterceptors',
   ] as const)('does not create procedure utils for invalid %s scoped options', (key) => {

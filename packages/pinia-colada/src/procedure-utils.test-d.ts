@@ -61,6 +61,51 @@ describe('ProcedureUtils', () => {
     })
   })
 
+  describe('.streamedOptions & .liveOptions', () => {
+    const streamUtils = {} as Public<ProcedureUtils<
+      { batch?: boolean },
+      UtilsInput,
+      AsyncIterable<UtilsOutput[number]>,
+      UtilsError
+    >>
+
+    it('works with useQuery', () => {
+      const streamed = useQuery(streamUtils.streamedOptions({
+        input: { search: 'search' },
+        fnOptions: { refetchMode: 'append', maxChunks: 3 },
+      }))
+
+      expectTypeOf(streamed.data.value).toEqualTypeOf<UtilsOutput | undefined>()
+      expectTypeOf(streamed.error.value).toEqualTypeOf<UtilsError | null>()
+
+      const live = useQuery(() => streamUtils.liveOptions({ input: { search: 'search' } }))
+
+      expectTypeOf(live.data.value).toEqualTypeOf<UtilsOutput[number] | undefined>()
+      expectTypeOf(live.error.value).toEqualTypeOf<UtilsError | null>()
+    })
+
+    it('returns tagged keys', () => {
+      const queryCache = useQueryCache()
+
+      expectTypeOf(
+        queryCache.getQueryData(streamUtils.streamedKey({ input: { search: 'search' } })),
+      ).toEqualTypeOf<UtilsOutput | undefined>()
+
+      expectTypeOf(
+        queryCache.getQueryData(streamUtils.liveKey({ input: { search: 'search' } })),
+      ).toEqualTypeOf<UtilsOutput[number] | undefined>()
+    })
+
+    it('infer correct input & fnOptions types', () => {
+      // @ts-expect-error invalid input
+      streamUtils.streamedOptions({ input: 'invalid' })
+      // @ts-expect-error invalid fnOptions
+      streamUtils.streamedOptions({ fnOptions: { refetchMode: 'invalid' } })
+      // @ts-expect-error invalid input
+      streamUtils.liveOptions({ input: 'invalid' })
+    })
+  })
+
   describe('.infiniteKey', () => {
     it('returns tagged key & infers correct input type', () => {
       const queryCache = useQueryCache()

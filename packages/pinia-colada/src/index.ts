@@ -1,9 +1,11 @@
 import { createRouterUtils } from './router-utils'
 
 export * from './key'
+export * from './live-query'
 export * from './plugin'
 export * from './procedure-utils'
 export * from './router-utils'
+export * from './stream-query'
 export * from './types'
 
 export {

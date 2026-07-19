@@ -59,6 +59,23 @@ describe('.queryOptions', () => {
   })
 })
 
+describe('.streamedOptions & .liveOptions', () => {
+  it('useQuery', () => {
+    const streamed = useQuery(() => orpc.stream.streamedOptions({ input: { input: 2 } }))
+
+    expectTypeOf(streamed.data.value).toEqualTypeOf<{ output: string }[] | undefined>()
+
+    const live = useQuery(() => orpc.stream.liveOptions({ input: { input: 2 } }))
+
+    expectTypeOf(live.data.value).toEqualTypeOf<{ output: string } | undefined>()
+
+    useQuery(orpc.stream.streamedOptions({
+      // @ts-expect-error --- input is invalid
+      input: { input: 'INVALID' },
+    }))
+  })
+})
+
 describe('.infiniteOptions', () => {
   it('useInfiniteQuery', () => {
     const query = useInfiniteQuery(() => orpc.list.infiniteOptions({

@@ -1,8 +1,12 @@
 import * as KeyModule from './key'
+import * as LiveQueryModule from './live-query'
 import { ProcedureUtils } from './procedure-utils'
+import * as StreamQueryModule from './stream-query'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
 
 const buildKeySpy = vi.spyOn(KeyModule, 'buildKey')
+const streamedQuerySpy = vi.spyOn(StreamQueryModule, 'serializableStreamedQuery')
+const liveQuerySpy = vi.spyOn(LiveQueryModule, 'liveQuery')
 
 const signal = new AbortController().signal
 
@@ -53,6 +57,314 @@ describe('procedureUtils', () => {
       expect(modifier).toHaveBeenCalledTimes(1)
       expect(modifier).toHaveBeenCalledWith({ input: 1 })
       expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: 9 })
+    })
+  })
+
+  describe('.streamedKey', () => {
+    it('works', () => {
+      expect(utils.streamedKey({ input: { search: '__search__' }, fnOptions: { refetchMode: 'append' } } as any)).toBe(buildKeySpy.mock.results[0]!.value)
+      expect(buildKeySpy).toHaveBeenCalledTimes(1)
+      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { prefix: undefined, type: 'streamed', input: { search: '__search__' }, fnOptions: { refetchMode: 'append' } })
+
+      expect(utils.streamedKey({ key: ['__custom__'] } as any)).toEqual(['__custom__'])
+      expect(buildKeySpy).toHaveBeenCalledTimes(1)
+    })
+
+    it('applies object modifier with per-call options taking precedence', () => {
+      const modifiedUtils = new ProcedureUtils(['ping'], client, {
+        streamedKey: { fnOptions: { maxChunks: 1 } } as any,
+      })
+
+      modifiedUtils.streamedKey()
+      expect(buildKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { prefix: undefined, type: 'streamed', input: undefined, fnOptions: { maxChunks: 1 } })
+
+      modifiedUtils.streamedKey({ fnOptions: { maxChunks: 2 } } as any)
+      expect(buildKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { prefix: undefined, type: 'streamed', input: undefined, fnOptions: { maxChunks: 2 } })
+    })
+
+    it('applies function modifier', () => {
+      const modifier = vi.fn(() => ({ input: 9 }))
+      const modifiedUtils = new ProcedureUtils(['ping'], client, {
+        streamedKey: modifier as any,
+      })
+
+      modifiedUtils.streamedKey({ input: 1 } as any)
+      expect(modifier).toHaveBeenCalledTimes(1)
+      expect(modifier).toHaveBeenCalledWith({ input: 1 })
+      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { prefix: undefined, type: 'streamed', input: 9, fnOptions: undefined })
+    })
+  })
+
+  describe('.streamedOptions', () => {
+    const entry = { state: { value: { status: 'pending', data: undefined, error: null } }, key: ['test'] }
+
+    async function* stream(...values: any[]) {
+      for (const value of values) {
+        yield value
+      }
+    }
+
+    it('works', async () => {
+      const options = utils.streamedOptions({ input: 1, fnOptions: { maxChunks: 3 } } as any) as any
+
+      expect(options.key).toBe(buildKeySpy.mock.results[0]!.value)
+      expect(buildKeySpy).toHaveBeenCalledTimes(1)
+      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { prefix: undefined, type: 'streamed', input: 1, fnOptions: { maxChunks: 3 } })
+      expect(options.fnOptions).toBeUndefined() // consumed, not forwarded to pinia colada
+
+      client.mockResolvedValueOnce(stream('a', 'b'))
+      await expect(options.query({ signal, entry })).resolves.toEqual(['a', 'b'])
+
+      expect(streamedQuerySpy).toHaveBeenCalledTimes(1)
+      expect(streamedQuerySpy).toHaveBeenCalledWith(expect.any(Function), { maxChunks: 3 })
+      expect(client).toHaveBeenCalledTimes(1)
+      expect(client).toHaveBeenCalledWith(1, { signal, context: {
+        [OPERATION_CONTEXT_SYMBOL]: {
+          key: options.key,
+          type: 'streamed',
+        },
+      } })
+    })
+
+    it('throws when output is not an AsyncIteratorObject', async () => {
+      const options = utils.streamedOptions({ input: 1 } as any) as any
+
+      client.mockResolvedValueOnce('__not_iterable__')
+      await expect(options.query({ signal, entry })).rejects.toThrow('streamedQuery requires an AsyncIteratorObject output')
+    })
+
+    it('uses custom query instead of client but still runs interceptors', async () => {
+      const interceptor = vi.fn(({ next }) => next())
+      const interceptedUtils = new ProcedureUtils(['ping'], client, { streamedInterceptors: [interceptor] })
+
+      const query = vi.fn().mockResolvedValue(['__custom__'])
+      const fnContext = { signal, entry } as any
+      const options = interceptedUtils.streamedOptions({ query } as any) as any
+
+      await expect(options.query(fnContext)).resolves.toEqual(['__custom__'])
+      expect(interceptor).toHaveBeenCalledTimes(1)
+      expect(query).toHaveBeenCalledTimes(1)
+      expect(query).toHaveBeenCalledWith(fnContext)
+      expect(client).toHaveBeenCalledTimes(0)
+    })
+
+    it('runs interceptors in order & allows overriding options', async () => {
+      const interceptor1 = vi.fn(({ next }) => next())
+      const interceptor2 = vi.fn(options => options.next({
+        ...options,
+        input: '__override__',
+      }))
+
+      const interceptedUtils = new ProcedureUtils(['ping'], client, {
+        streamedInterceptors: [interceptor1, interceptor2],
+      })
+
+      const options = interceptedUtils.streamedOptions({ input: 1, context: { batch: true } } as any) as any
+      const fnContext = { signal, entry } as any
+
+      client.mockResolvedValueOnce(stream('a'))
+      await expect(options.query(fnContext)).resolves.toEqual(['a'])
+
+      expect(interceptor1).toHaveBeenCalledTimes(1)
+      expect(interceptor1).toHaveBeenCalledWith(expect.objectContaining({
+        path: ['ping'],
+        input: 1,
+        fnContext,
+        context: {
+          batch: true,
+          [OPERATION_CONTEXT_SYMBOL]: {
+            key: options.key,
+            type: 'streamed',
+          },
+        },
+      }))
+      expect(interceptor2).toHaveBeenCalledTimes(1)
+      expect(interceptor1.mock.invocationCallOrder[0]!).toBeLessThan(interceptor2.mock.invocationCallOrder[0]!)
+
+      expect(client).toHaveBeenCalledWith('__override__', { signal, context: {
+        batch: true,
+        [OPERATION_CONTEXT_SYMBOL]: {
+          key: options.key,
+          type: 'streamed',
+        },
+      } })
+    })
+
+    it('applies object modifier with per-call options taking precedence', () => {
+      const modifiedUtils = new ProcedureUtils(['ping'], client, {
+        streamedOptions: { staleTime: 1000, gcTime: 500 } as any,
+      })
+
+      const options = modifiedUtils.streamedOptions({ staleTime: 2000 } as any) as any
+
+      expect(options.staleTime).toEqual(2000)
+      expect(options.gcTime).toEqual(500)
+    })
+
+    it('applies function modifier', () => {
+      const modifier = vi.fn((options: any) => ({ ...options, staleTime: 3000 }))
+      const modifiedUtils = new ProcedureUtils(['ping'], client, {
+        streamedOptions: modifier,
+      })
+
+      const options = modifiedUtils.streamedOptions({ input: 1 } as any) as any
+
+      expect(modifier).toHaveBeenCalledTimes(1)
+      expect(modifier).toHaveBeenCalledWith({ input: 1 })
+      expect(options.staleTime).toEqual(3000)
+    })
+  })
+
+  describe('.liveKey', () => {
+    it('works', () => {
+      expect(utils.liveKey({ input: { search: '__search__' } } as any)).toBe(buildKeySpy.mock.results[0]!.value)
+      expect(buildKeySpy).toHaveBeenCalledTimes(1)
+      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { prefix: undefined, type: 'live', input: { search: '__search__' } })
+
+      expect(utils.liveKey({ key: ['__custom__'] } as any)).toEqual(['__custom__'])
+      expect(buildKeySpy).toHaveBeenCalledTimes(1)
+    })
+
+    it('applies object modifier with per-call options taking precedence', () => {
+      const modifiedUtils = new ProcedureUtils(['ping'], client, {
+        liveKey: { input: 1 } as any,
+      })
+
+      modifiedUtils.liveKey()
+      expect(buildKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { prefix: undefined, type: 'live', input: 1 })
+
+      modifiedUtils.liveKey({ input: 2 } as any)
+      expect(buildKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { prefix: undefined, type: 'live', input: 2 })
+    })
+
+    it('applies function modifier', () => {
+      const modifier = vi.fn(() => ({ input: 9 }))
+      const modifiedUtils = new ProcedureUtils(['ping'], client, {
+        liveKey: modifier as any,
+      })
+
+      modifiedUtils.liveKey({ input: 1 } as any)
+      expect(modifier).toHaveBeenCalledTimes(1)
+      expect(modifier).toHaveBeenCalledWith({ input: 1 })
+      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { prefix: undefined, type: 'live', input: 9 })
+    })
+  })
+
+  describe('.liveOptions', () => {
+    const entry = { state: { value: { status: 'pending', data: undefined, error: null } }, key: ['test'] }
+
+    async function* stream(...values: any[]) {
+      for (const value of values) {
+        yield value
+      }
+    }
+
+    it('works', async () => {
+      const options = utils.liveOptions({ input: 1 } as any) as any
+
+      expect(options.key).toBe(buildKeySpy.mock.results[0]!.value)
+      expect(buildKeySpy).toHaveBeenCalledTimes(1)
+      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { prefix: undefined, type: 'live', input: 1 })
+
+      client.mockResolvedValueOnce(stream('a', 'b'))
+      await expect(options.query({ signal, entry })).resolves.toEqual('b')
+
+      expect(liveQuerySpy).toHaveBeenCalledTimes(1)
+      expect(client).toHaveBeenCalledTimes(1)
+      expect(client).toHaveBeenCalledWith(1, { signal, context: {
+        [OPERATION_CONTEXT_SYMBOL]: {
+          key: options.key,
+          type: 'live',
+        },
+      } })
+    })
+
+    it('throws when output is not an AsyncIteratorObject', async () => {
+      const options = utils.liveOptions({ input: 1 } as any) as any
+
+      client.mockResolvedValueOnce('__not_iterable__')
+      await expect(options.query({ signal, entry })).rejects.toThrow('liveQuery requires an AsyncIteratorObject output')
+    })
+
+    it('uses custom query instead of client but still runs interceptors', async () => {
+      const interceptor = vi.fn(({ next }) => next())
+      const interceptedUtils = new ProcedureUtils(['ping'], client, { liveInterceptors: [interceptor] })
+
+      const query = vi.fn().mockResolvedValue('__custom__')
+      const fnContext = { signal, entry } as any
+      const options = interceptedUtils.liveOptions({ query } as any) as any
+
+      await expect(options.query(fnContext)).resolves.toEqual('__custom__')
+      expect(interceptor).toHaveBeenCalledTimes(1)
+      expect(query).toHaveBeenCalledTimes(1)
+      expect(query).toHaveBeenCalledWith(fnContext)
+      expect(client).toHaveBeenCalledTimes(0)
+    })
+
+    it('runs interceptors in order & allows overriding options', async () => {
+      const interceptor1 = vi.fn(({ next }) => next())
+      const interceptor2 = vi.fn(options => options.next({
+        ...options,
+        input: '__override__',
+      }))
+
+      const interceptedUtils = new ProcedureUtils(['ping'], client, {
+        liveInterceptors: [interceptor1, interceptor2],
+      })
+
+      const options = interceptedUtils.liveOptions({ input: 1, context: { batch: true } } as any) as any
+      const fnContext = { signal, entry } as any
+
+      client.mockResolvedValueOnce(stream('a'))
+      await expect(options.query(fnContext)).resolves.toEqual('a')
+
+      expect(interceptor1).toHaveBeenCalledTimes(1)
+      expect(interceptor1).toHaveBeenCalledWith(expect.objectContaining({
+        path: ['ping'],
+        input: 1,
+        fnContext,
+        context: {
+          batch: true,
+          [OPERATION_CONTEXT_SYMBOL]: {
+            key: options.key,
+            type: 'live',
+          },
+        },
+      }))
+      expect(interceptor2).toHaveBeenCalledTimes(1)
+      expect(interceptor1.mock.invocationCallOrder[0]!).toBeLessThan(interceptor2.mock.invocationCallOrder[0]!)
+
+      expect(client).toHaveBeenCalledWith('__override__', { signal, context: {
+        batch: true,
+        [OPERATION_CONTEXT_SYMBOL]: {
+          key: options.key,
+          type: 'live',
+        },
+      } })
+    })
+
+    it('applies object modifier with per-call options taking precedence', () => {
+      const modifiedUtils = new ProcedureUtils(['ping'], client, {
+        liveOptions: { staleTime: 1000, gcTime: 500 } as any,
+      })
+
+      const options = modifiedUtils.liveOptions({ staleTime: 2000 } as any) as any
+
+      expect(options.staleTime).toEqual(2000)
+      expect(options.gcTime).toEqual(500)
+    })
+
+    it('applies function modifier', () => {
+      const modifier = vi.fn((options: any) => ({ ...options, staleTime: 3000 }))
+      const modifiedUtils = new ProcedureUtils(['ping'], client, {
+        liveOptions: modifier,
+      })
+
+      const options = modifiedUtils.liveOptions({ input: 1 } as any) as any
+
+      expect(modifier).toHaveBeenCalledTimes(1)
+      expect(modifier).toHaveBeenCalledWith({ input: 1 })
+      expect(options.staleTime).toEqual(3000)
     })
   })
 

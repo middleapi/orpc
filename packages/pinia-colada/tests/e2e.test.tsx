@@ -55,6 +55,60 @@ it('case: with useQuery', async () => {
   await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual({ output: '456' }))
 })
 
+it('case: with streamed/useQuery', async () => {
+  const mounted = mount(defineComponent({
+    setup() {
+      const queryCache = useQueryCache()
+      const query = useQuery(orpc.stream.streamedOptions({
+        input: { input: 2 },
+        fnOptions: { refetchMode: 'append', maxChunks: 3 },
+      }))
+
+      return { query, queryCache }
+    },
+    render: () => null,
+  }))
+
+  await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual([
+    { output: '0' },
+    { output: '1' },
+  ]))
+
+  expect(
+    mounted.vm.queryCache.getQueryData(orpc.stream.streamedKey({
+      input: { input: 2 },
+      fnOptions: { refetchMode: 'append', maxChunks: 3 },
+    })),
+  ).toEqual([{ output: '0' }, { output: '1' }])
+
+  // append mode: refetching appends new chunks, limited by maxChunks
+  await mounted.vm.query.refetch()
+
+  await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual([
+    { output: '1' },
+    { output: '0' },
+    { output: '1' },
+  ]))
+})
+
+it('case: with live/useQuery', async () => {
+  const mounted = mount(defineComponent({
+    setup() {
+      const queryCache = useQueryCache()
+      const query = useQuery(orpc.stream.liveOptions({ input: { input: 2 } }))
+
+      return { query, queryCache }
+    },
+    render: () => null,
+  }))
+
+  await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual({ output: '1' }))
+
+  expect(
+    mounted.vm.queryCache.getQueryData(orpc.stream.liveKey({ input: { input: 2 } })),
+  ).toEqual({ output: '1' })
+})
+
 it('case: with useInfiniteQuery', async () => {
   const mounted = mount(defineComponent({
     setup() {
