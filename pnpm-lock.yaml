@@ -785,6 +785,9 @@ importers:
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
+      '@orpc/contract':
+        specifier: workspace:*
+        version: link:../contract
       '@orpc/server':
         specifier: workspace:*
         version: link:../server
