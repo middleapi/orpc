@@ -3,7 +3,7 @@
 This guide shows how to migrate an existing tRPC app to oRPC. Because oRPC is heavily inspired by tRPC, most concepts map directly, so the migration should feel familiar.
 
 ::: info
-If you want to add oRPC features to an existing tRPC app without a full migration, see [tRPC Integration](/docs/openapi/integrations/trpc).
+If you want to add oRPC features to an existing tRPC app without a full migration, see [tRPC Integration](/docs/integrations/trpc).
 :::
 
 ## Core Concepts Comparison

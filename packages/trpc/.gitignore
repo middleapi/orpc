@@ -1,13 +1,7 @@
 # Hidden folders and files
 .*
 !.gitignore
-!.npmrc
 !.*.example
-!.vscode/
-!.github/
-!.vitepress/
-!.claude/
-!.zed/
 
 # Common generated folders
 logs/
@@ -30,4 +24,3 @@ vitest.config.ts.timestamp-*
 # Common manual ignore files
 *.local
 *.pem
-*.local.*

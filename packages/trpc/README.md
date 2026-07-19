@@ -4,8 +4,8 @@
   <a href="https://codecov.io/gh/middleapi/orpc">
     <img alt="codecov" src="https://codecov.io/gh/middleapi/orpc/branch/main/graph/badge.svg">
   </a>
-  <a href="https://www.npmjs.com/package/@orpc/client">
-    <img alt="weekly downloads" src="https://img.shields.io/npm/dw/%40orpc%2Fclient?logo=npm" />
+  <a href="https://www.npmjs.com/package/@orpc/trpc">
+    <img alt="weekly downloads" src="https://img.shields.io/npm/dw/%40orpc%2Ftrpc?logo=npm" />
   </a>
   <a href="https://app.codspeed.io/middleapi/orpc?utm_source=badge">
     <img alt="CodSpeed" src="https://img.shields.io/endpoint?url=https://codspeed.io/badge.json" />

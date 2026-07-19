@@ -14,9 +14,10 @@ export interface OpenAPIMeta {
   method?: 'HEAD' | 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | undefined
 
   /**
-   * URL path for this procedure. Supports dynamic segments via `${}` syntax.
+   * URL path for this procedure. Supports dynamic parameters via `{param}` syntax,
+   * and `{+param}` to allow slashes in the matched value.
    *
-   * @example `/users`, `/users/${id}`
+   * @example `/users`, `/users/{id}`, `/files/{+path}`
    * @default Router segments joined by `'/`
    */
   path?: `/${string}` | undefined

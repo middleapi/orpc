@@ -193,6 +193,7 @@ export default withMermaid(defineConfig({
             { text: 'OpenTelemetry', link: '/docs/integrations/opentelemetry' },
             { text: 'Pino', link: '/docs/integrations/pino' },
             { text: 'Tanstack Query', link: '/docs/integrations/tanstack-query' },
+            { text: 'tRPC', link: '/docs/integrations/trpc' },
           ],
         },
         {
