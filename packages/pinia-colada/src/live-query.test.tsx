@@ -1,5 +1,69 @@
-import { liveQuery } from '../src/live-query'
-import { createChunkController, mountQuery } from './__shared__/query'
+import type { UseQueryOptions } from '@pinia/colada'
+import { PiniaColada, useQuery, useQueryCache } from '@pinia/colada'
+import { mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
+import { defineComponent } from 'vue'
+import { liveQuery } from './live-query'
+
+/**
+ * Mounts a component that runs a real Pinia Colada `useQuery`,
+ * so tests can observe exactly what users see.
+ */
+function mountQuery(options: UseQueryOptions<any, any, any>) {
+  return mount(defineComponent({
+    setup() {
+      const queryCache = useQueryCache()
+      const query = useQuery(options)
+
+      return { query, queryCache }
+    },
+    render: () => null,
+  }), {
+    global: {
+      plugins: [
+        createPinia(),
+        PiniaColada,
+      ],
+    },
+  })
+}
+
+/**
+ * An AsyncIterable whose chunks are pushed manually, so tests can assert
+ * intermediate states deterministically while the stream is still open.
+ */
+function createChunkController<T>() {
+  const buffer: ({ value: T } | { done: true })[] = []
+  let notify: (() => void) | undefined
+
+  return {
+    async* stream() {
+      while (true) {
+        while (buffer.length === 0) {
+          await new Promise<void>((resolve) => {
+            notify = resolve
+          })
+        }
+
+        const item = buffer.shift()!
+
+        if ('done' in item) {
+          return
+        }
+
+        yield item.value
+      }
+    },
+    push(value: T) {
+      buffer.push({ value })
+      notify?.()
+    },
+    close() {
+      buffer.push({ done: true })
+      notify?.()
+    },
+  }
+}
 
 describe('liveQuery', () => {
   it('publishes each chunk to the cache, replacing the previous value', async () => {
