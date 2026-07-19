@@ -3,7 +3,6 @@ import type { Interceptor, MaybeOptionalOptions, PromiseWithError } from '@orpc/
 import type { _EmptyObject } from '@pinia/colada'
 import type { MutationOptions, MutationOptionsIn, OperationContext, QueryOptions, QueryOptionsIn, UseMutationFnContext, UseQueryFnContext } from './types'
 import { intercept, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
-import { computed, toValue } from 'vue'
 import { buildKey } from './key'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
 
@@ -96,7 +95,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
     const { input, context, key: keyIn, query: queryIn, ...restOptions } = optionsIn as Record<string, any>
 
-    const key = keyIn ?? computed(() => buildKey(this.path, { type: 'query', input: toValue(input) }))
+    const key = keyIn ?? buildKey(this.path, { type: 'query', input })
 
     return {
       ...restOptions,
@@ -108,12 +107,12 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
             path: this.path,
             context: {
               [OPERATION_CONTEXT_SYMBOL]: {
-                key: toValue(key),
+                key,
                 type: 'query',
               },
-              ...toValue(context),
+              ...context,
             } satisfies OperationContext as any,
-            input: toValue(input) as TInput,
+            input: input as TInput,
             fnContext,
           },
           ({ context, input, fnContext }) => {
@@ -164,7 +163,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
                 key: typeof key === 'function' ? key(input) : key,
                 type: 'mutation',
               },
-              ...toValue(context),
+              ...context,
             } satisfies OperationContext as any,
             input,
             fnContext,

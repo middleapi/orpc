@@ -1,5 +1,5 @@
 import { isInferableError } from '@orpc/client'
-import { useMutation, useQuery, useQueryCache } from '@pinia/colada'
+import { defineQueryOptions, useMutation, useQuery, useQueryCache } from '@pinia/colada'
 import { computed } from 'vue'
 import { client, orpc } from './__shared__/orpc'
 
@@ -21,8 +21,8 @@ it('.call', () => {
 
 describe('.queryOptions', () => {
   it('useQuery', () => {
-    const query = useQuery(orpc.ping.queryOptions({
-      input: computed(() => ({ input: 123 })),
+    const query = useQuery(() => orpc.ping.queryOptions({
+      input: { input: 123 },
     }))
 
     if (isInferableError(query.error.value) && query.error.value.code === 'OVERRIDE') {
@@ -30,6 +30,11 @@ describe('.queryOptions', () => {
     }
 
     expectTypeOf(query.data.value).toEqualTypeOf<{ output: string } | undefined>()
+
+    useQuery(orpc.ping.queryOptions({
+      // @ts-expect-error --- ref/computed input is not allowed
+      input: computed(() => ({ input: 123 })),
+    }))
 
     useQuery(orpc.ping.queryOptions({
       input: {
@@ -45,6 +50,16 @@ describe('.queryOptions', () => {
         cache: 123,
       },
     }))
+  })
+
+  it('works with defineQueryOptions', () => {
+    const pingQueryOptions = defineQueryOptions(
+      (id: number) => orpc.ping.queryOptions({ input: { input: id } }),
+    )
+
+    const query = useQuery(() => pingQueryOptions(123))
+
+    expectTypeOf(query.data.value).toEqualTypeOf<{ output: string } | undefined>()
   })
 })
 

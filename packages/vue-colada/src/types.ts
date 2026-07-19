@@ -1,6 +1,5 @@
 import type { ClientContext } from '@orpc/client'
-import type { EntryKey, UseMutationOptions, UseQueryOptions } from '@pinia/colada'
-import type { MaybeRefOrGetter } from 'vue'
+import type { DefineMutationOptionsTagged, DefineQueryOptions, DefineQueryOptionsTagged, EntryKey, UseMutationOptions, UseQueryOptions } from '@pinia/colada'
 import type { OperationType } from './key'
 
 export type UseQueryFnContext = Parameters<UseQueryOptions<any>['query']>[0]
@@ -17,16 +16,16 @@ export interface OperationContext {
 }
 
 export type QueryOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TInitialData extends TOutput | undefined>
-  = & (undefined extends TInput ? { input?: MaybeRefOrGetter<TInput> } : { input: MaybeRefOrGetter<TInput> })
-    & (object extends TClientContext ? { context?: MaybeRefOrGetter<TClientContext> } : { context: MaybeRefOrGetter<TClientContext> })
-    & Omit<QueryOptions<TOutput, TError, TInitialData>, 'key' | 'query'>
-    & Partial<Pick<QueryOptions<TOutput, TError, TInitialData>, 'key' | 'query'>>
+  = & (undefined extends TInput ? { input?: TInput } : { input: TInput })
+    & (object extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
+    & Omit<DefineQueryOptions<TOutput, TError, TInitialData>, 'key' | 'query'>
+    & Partial<Pick<DefineQueryOptions<TOutput, TError, TInitialData>, 'key' | 'query'>>
 
-export type QueryOptions<TOutput, TError, TInitialData extends TOutput | undefined> = UseQueryOptions<TOutput, TError, TInitialData>
+export type QueryOptions<TOutput, TError, TInitialData extends TOutput | undefined> = DefineQueryOptionsTagged<TOutput, TError, TInitialData>
 
 export type MutationOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TMutationContext extends Record<any, any>>
-  = & (object extends TClientContext ? { context?: MaybeRefOrGetter<TClientContext> } : { context: MaybeRefOrGetter<TClientContext> })
-    & Omit<MutationOptions<TInput, TOutput, TError, TMutationContext>, 'mutation'>
-    & Partial<Pick<MutationOptions<TInput, TOutput, TError, TMutationContext>, 'mutation'>>
+  = & (object extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
+    & Omit<UseMutationOptions<TOutput, TInput, TError, TMutationContext>, 'mutation'>
+    & Partial<Pick<UseMutationOptions<TOutput, TInput, TError, TMutationContext>, 'mutation'>>
 
-export type MutationOptions<TInput, TOutput, TError, TMutationContext extends Record<any, any>> = UseMutationOptions<TOutput, TInput, TError, TMutationContext>
+export type MutationOptions<TInput, TOutput, TError, TMutationContext extends Record<any, any>> = DefineMutationOptionsTagged<TOutput, TInput, TError, TMutationContext>

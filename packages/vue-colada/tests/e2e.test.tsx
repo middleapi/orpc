@@ -1,6 +1,6 @@
 import { isInferableError, ORPCError } from '@orpc/client'
-import { useMutation, useQuery, useQueryCache } from '@pinia/colada'
-import { computed, defineComponent, ref } from 'vue'
+import { defineQueryOptions, useMutation, useQuery, useQueryCache } from '@pinia/colada'
+import { defineComponent, ref } from 'vue'
 import { createORPCVueColadaUtils, VUE_COLADA_OPERATION_CONTEXT_SYMBOL } from '../src'
 import { client, mount, orpc, router } from './__shared__/orpc'
 
@@ -13,12 +13,16 @@ it('case: call directly', async () => {
 })
 
 it('case: with useQuery', async () => {
+  const pingQueryOptions = defineQueryOptions(
+    (id: number) => orpc.nested.ping.queryOptions({ input: { input: id } }),
+  )
+
   const mounted = mount(defineComponent({
     setup() {
       const id = ref(123)
 
       const queryCache = useQueryCache()
-      const query = useQuery(orpc.nested.ping.queryOptions({ input: computed(() => ({ input: id.value })) }))
+      const query = useQuery(() => pingQueryOptions(id.value))
 
       const setId = (value: number) => {
         id.value = value

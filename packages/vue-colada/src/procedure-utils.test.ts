@@ -1,4 +1,3 @@
-import { ref } from 'vue'
 import * as KeyModule from './key'
 import { ProcedureUtils } from './procedure-utils'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
@@ -23,7 +22,7 @@ describe('procedureUtils', () => {
     it('works', async () => {
       const options = utils.queryOptions({ input: 1 }) as any
 
-      expect(options.key.value).toBe(buildKeySpy.mock.results[0]!.value)
+      expect(options.key).toBe(buildKeySpy.mock.results[0]!.value)
       expect(buildKeySpy).toHaveBeenCalledTimes(1)
       expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: 1 })
 
@@ -32,7 +31,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledTimes(1)
       expect(client).toHaveBeenCalledWith(1, { signal, context: {
         [OPERATION_CONTEXT_SYMBOL]: {
-          key: options.key.value,
+          key: options.key,
           type: 'query',
         },
       } })
@@ -41,7 +40,7 @@ describe('procedureUtils', () => {
     it('works without options', async () => {
       const options = utils.queryOptions() as any
 
-      expect(options.key.value).toBe(buildKeySpy.mock.results[0]!.value)
+      expect(options.key).toBe(buildKeySpy.mock.results[0]!.value)
       expect(buildKeySpy).toHaveBeenCalledTimes(1)
       expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: undefined })
 
@@ -50,33 +49,14 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledTimes(1)
       expect(client).toHaveBeenCalledWith(undefined, { signal, context: {
         [OPERATION_CONTEXT_SYMBOL]: {
-          key: options.key.value,
-          type: 'query',
-        },
-      } })
-    })
-
-    it('works with ref', async () => {
-      const input = ref(1)
-      const options = utils.queryOptions({ input }) as any
-
-      expect(options.key.value).toBe(buildKeySpy.mock.results[0]!.value)
-      expect(buildKeySpy).toHaveBeenCalledTimes(1)
-      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: 1 })
-
-      client.mockResolvedValueOnce('__mocked__')
-      await expect(options.query({ signal })).resolves.toEqual('__mocked__')
-      expect(client).toHaveBeenCalledTimes(1)
-      expect(client).toHaveBeenCalledWith(1, { signal, context: {
-        [OPERATION_CONTEXT_SYMBOL]: {
-          key: options.key.value,
+          key: options.key,
           type: 'query',
         },
       } })
     })
 
     it('works with client context', async () => {
-      const options = utils.queryOptions({ context: ref({ batch: true }) }) as any
+      const options = utils.queryOptions({ context: { batch: true } }) as any
 
       client.mockResolvedValueOnce('__mocked__')
       await expect(options.query({ signal })).resolves.toEqual('__mocked__')
@@ -84,7 +64,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledWith(undefined, { signal, context: {
         batch: true,
         [OPERATION_CONTEXT_SYMBOL]: {
-          key: options.key.value,
+          key: options.key,
           type: 'query',
         },
       } })
@@ -153,7 +133,7 @@ describe('procedureUtils', () => {
         context: {
           batch: true,
           [OPERATION_CONTEXT_SYMBOL]: {
-            key: options.key.value,
+            key: options.key,
             type: 'query',
           },
         },
@@ -166,7 +146,7 @@ describe('procedureUtils', () => {
         batch: true,
         extra: true,
         [OPERATION_CONTEXT_SYMBOL]: {
-          key: options.key.value,
+          key: options.key,
           type: 'query',
         },
       } })
@@ -218,7 +198,7 @@ describe('procedureUtils', () => {
     })
 
     it('works with client context', async () => {
-      const options = utils.mutationOptions({ context: ref({ batch: true }) }) as any
+      const options = utils.mutationOptions({ context: { batch: true } }) as any
 
       expect(options.key('__input__')).toBe(buildKeySpy.mock.results[0]!.value)
       expect(buildKeySpy).toHaveBeenCalledTimes(1)

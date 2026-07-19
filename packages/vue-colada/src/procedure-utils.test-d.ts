@@ -70,16 +70,18 @@ describe('ProcedureUtils', () => {
       utils.queryOptions({ context: { batch: 'invalid' } })
     })
 
-    it('works with ref', () => {
-      utils.queryOptions({
-        input: computed(() => ({ cursor: 1 })),
-        context: computed(() => ({ batch: true })),
-      })
+    it('not allow ref/computed values, reactivity via useQuery callback instead', () => {
+      // @ts-expect-error ref/computed input is not allowed
+      utils.queryOptions({ input: computed(() => ({ cursor: 1 })) })
+      // @ts-expect-error getter input is not allowed
+      utils.queryOptions({ input: () => ({ cursor: 1 }) })
+      // @ts-expect-error ref/computed context is not allowed
+      utils.queryOptions({ context: computed(() => ({ batch: true })) })
 
-      utils.queryOptions({
-        input: () => ({ cursor: 1 }),
-        context: () => ({ batch: true }),
-      })
+      const query = useQuery(() => utils.queryOptions({ input: { cursor: 1 } }))
+
+      expectTypeOf(query.data.value).toEqualTypeOf<UtilsOutput | undefined>()
+      expectTypeOf(query.error.value).toEqualTypeOf<UtilsError | null>()
     })
 
     describe('works with useQuery', () => {
@@ -123,14 +125,11 @@ describe('ProcedureUtils', () => {
       utils.mutationOptions({ context: { batch: 'invalid' } })
     })
 
-    it('works with ref', () => {
-      utils.mutationOptions({
-        context: computed(() => ({ batch: true })),
-      })
-
-      utils.mutationOptions({
-        context: () => ({ batch: true }),
-      })
+    it('not allow ref/computed context', () => {
+      // @ts-expect-error ref/computed context is not allowed
+      utils.mutationOptions({ context: computed(() => ({ batch: true })) })
+      // @ts-expect-error getter context is not allowed
+      utils.mutationOptions({ context: () => ({ batch: true }) })
     })
 
     it('works with useMutation', () => {
