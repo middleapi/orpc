@@ -1,8 +1,9 @@
 import type { Client } from '@orpc/client'
 import type { ORPCErrorFromErrorMap } from '@orpc/contract'
 import type { Public } from '@orpc/shared'
+import type { UseInfiniteQueryData } from '@pinia/colada'
 import type { ProcedureUtils } from './procedure-utils'
-import { useInfiniteQuery, useMutation, useQuery } from '@pinia/colada'
+import { useInfiniteQuery, useMutation, useQuery, useQueryCache } from '@pinia/colada'
 import { computed } from 'vue'
 import z from 'zod'
 
@@ -36,6 +37,60 @@ describe('ProcedureUtils', () => {
         UtilsError
       >
     >()
+  })
+
+  describe('.queryKey', () => {
+    it('returns tagged key & infers correct input type', () => {
+      const queryCache = useQueryCache()
+
+      expectTypeOf(
+        queryCache.getQueryData(utils.queryKey({ input: { search: 'search' } })),
+      ).toEqualTypeOf<UtilsOutput | undefined>()
+
+      utils.queryKey()
+      utils.queryKey({})
+      utils.queryKey({ key: ['__custom__'] })
+
+      // @ts-expect-error invalid input
+      utils.queryKey({ input: 'invalid' })
+
+      const requiredUtils = {} as Public<ProcedureUtils<{ batch?: boolean }, 'input', UtilsOutput, Error>>
+      requiredUtils.queryKey({ input: 'input' })
+      // @ts-expect-error input is required
+      requiredUtils.queryKey()
+    })
+  })
+
+  describe('.infiniteKey', () => {
+    it('returns tagged key & infers correct input type', () => {
+      const queryCache = useQueryCache()
+
+      expectTypeOf(
+        queryCache.getQueryData(utils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 0 })),
+      ).toEqualTypeOf<UseInfiniteQueryData<UtilsOutput, number> | undefined>()
+
+      utils.infiniteKey({ key: ['__custom__'] })
+
+      utils.infiniteKey({
+        // @ts-expect-error invalid input
+        input: (cursor: number) => ({ cursor: 'invalid' }),
+        initialPageParam: 0,
+      })
+    })
+  })
+
+  describe('.mutationKey', () => {
+    it('works', () => {
+      const key = utils.mutationKey()
+
+      if (typeof key === 'function') {
+        expectTypeOf(key).parameter(0).toEqualTypeOf<UtilsInput>()
+      }
+
+      utils.mutationKey({})
+      utils.mutationKey({ key: ['__custom__'] })
+      utils.mutationKey({ key: input => [{ input }] as any })
+    })
   })
 
   describe('.queryOptions', () => {

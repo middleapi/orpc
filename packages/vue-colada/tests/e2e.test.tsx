@@ -51,7 +51,7 @@ it('case: with useQuery', async () => {
   await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual({ output: '123' }))
 
   expect(
-    mounted.vm.queryCache.getQueryData(orpc.nested.ping.key({ type: 'query', input: { input: 123 } })),
+    mounted.vm.queryCache.getQueryData(orpc.nested.ping.queryKey({ input: { input: 123 } })),
   ).toEqual({ output: '123' })
 
   mounted.vm.setId(456)
@@ -96,7 +96,7 @@ it('case: with useInfiniteQuery', async () => {
   expect(mounted.vm.query.hasNextPage.value).toEqual(false)
 
   expect(
-    mounted.vm.queryCache.getQueryData(orpc.list.key({ type: 'infinite', input: { cursor: 0 } })),
+    mounted.vm.queryCache.getQueryData(orpc.list.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 0 })),
   ).toEqual({
     pages: [
       { items: ['item-0'], next: 1 },

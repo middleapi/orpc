@@ -1,7 +1,7 @@
 import type { Client, ClientContext } from '@orpc/client'
 import type { Interceptor, MaybeOptionalOptions, PromiseWithError } from '@orpc/shared'
-import type { _EmptyObject, UseInfiniteQueryData, UseInfiniteQueryFnContext } from '@pinia/colada'
-import type { InfiniteOptionsIn, InfiniteOptionsOut, MutationOptionsIn, MutationOptionsOut, OperationContext, QueryOptionsIn, QueryOptionsOut, UseMutationFnContext, UseQueryFnContext } from './types'
+import type { _EmptyObject, EntryKeyTagged, UseInfiniteQueryData, UseInfiniteQueryFnContext } from '@pinia/colada'
+import type { InfiniteKeyOptions, InfiniteOptionsIn, InfiniteOptionsOut, MutationKeyOptions, MutationOptionsIn, MutationOptionsOut, OperationContext, QueryKeyOptions, QueryOptionsIn, QueryOptionsOut, UseMutationFnContext, UseQueryFnContext } from './types'
 import { intercept, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
 import { buildKey } from './key'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
@@ -41,6 +41,14 @@ export type ProcedureUtilsModifier<T extends object> = Partial<T> | ((options: T
 
 export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError> {
   /**
+   * Key options modifier for .queryKey and .queryOptions
+   * Can be partial options or a function that receives per-call options and returns override this.options.
+   */
+  queryKey?: ProcedureUtilsModifier<
+    QueryKeyOptions<TInput>
+  >
+
+  /**
    * Interceptors that intercept query inside .queryOptions, guaranteed to be executed.
    */
   queryInterceptors?: ProcedureUtilsQueryInterceptor<TClientContext, TInput, TOutput, TError>[]
@@ -54,6 +62,14 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
   >
 
   /**
+   * Key options modifier for .infiniteKey and .infiniteOptions
+   * Can be partial options or a function that receives per-call options and returns override this.options.
+   */
+  infiniteKey?: ProcedureUtilsModifier<
+    InfiniteKeyOptions<TInput, unknown>
+  >
+
+  /**
    * Interceptors that intercept query inside .infiniteOptions, guaranteed to be executed.
    */
   infiniteInterceptors?: ProcedureUtilsInfiniteInterceptor<TClientContext, TInput, TOutput, TError>[]
@@ -64,6 +80,14 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
    */
   infiniteOptions?: ProcedureUtilsModifier<
     InfiniteOptionsIn<TClientContext, TInput, TOutput, TError, unknown, UseInfiniteQueryData<TOutput, unknown> | undefined>
+  >
+
+  /**
+   * Key options modifier for .mutationKey and .mutationOptions
+   * Can be partial options or a function that receives per-call options and returns override this.options.
+   */
+  mutationKey?: ProcedureUtilsModifier<
+    MutationKeyOptions<TInput>
   >
 
   /**
@@ -97,6 +121,29 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
   }
 
   /**
+   * Generate a **full matching** key for useQuery/...
+   *
+   * @see {@link https://orpc.dev/docs/integrations/pinia-colada#query-mutation-key Pinia Colada Query/Mutation Key Docs}
+   */
+  queryKey(
+    ...rest: MaybeOptionalOptions<QueryKeyOptions<TInput>>
+  ): EntryKeyTagged<TOutput, TError> {
+    let optionsIn = resolveMaybeOptionalOptions(rest)
+
+    if (typeof this.options.queryKey === 'function') {
+      optionsIn = this.options.queryKey(optionsIn)
+    }
+    else if (this.options.queryKey) {
+      optionsIn = { ...this.options.queryKey, ...optionsIn }
+    }
+
+    const key = (optionsIn as any).key
+      ?? buildKey(this.path, { type: 'query', input: (optionsIn as any).input })
+
+    return key as EntryKeyTagged<TOutput, TError>
+  }
+
+  /**
    * Generate options used for useQuery/...
    *
    * @see {@link https://orpc.dev/docs/integrations/pinia-colada#query-options-utility Pinia Colada Query Options Utility Docs}
@@ -115,9 +162,9 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
       optionsIn = { ...this.options.queryOptions, ...optionsIn } as any
     }
 
-    const { input, context, key: keyIn, query: queryIn, ...restOptions } = optionsIn as Record<string, any>
+    const { input, context, key: _keyIn, query: queryIn, ...restOptions } = optionsIn as Record<string, any>
 
-    const key = keyIn ?? buildKey(this.path, { type: 'query', input })
+    const key = this.queryKey(optionsIn as QueryKeyOptions<TInput>)
 
     return {
       ...restOptions,
@@ -150,6 +197,34 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
   }
 
   /**
+   * Generate a **full matching** key for useInfiniteQuery/...
+   *
+   * @see {@link https://orpc.dev/docs/integrations/pinia-colada#query-mutation-key Pinia Colada Query/Mutation Key Docs}
+   */
+  infiniteKey<UPageParam>(
+    optionsIn: InfiniteKeyOptions<TInput, UPageParam>,
+  ): EntryKeyTagged<UseInfiniteQueryData<TOutput, UPageParam>, TError> {
+    if (typeof this.options.infiniteKey === 'function') {
+      optionsIn = this.options.infiniteKey(optionsIn as any) as any
+    }
+    else if (this.options.infiniteKey) {
+      optionsIn = { ...this.options.infiniteKey, ...optionsIn } as any
+    }
+
+    const key = (optionsIn as any).key
+      ?? buildKey(this.path, {
+        type: 'infinite',
+        input: (optionsIn as any).input(
+          typeof (optionsIn as any).initialPageParam === 'function'
+            ? (optionsIn as any).initialPageParam()
+            : (optionsIn as any).initialPageParam,
+        ),
+      })
+
+    return key as EntryKeyTagged<UseInfiniteQueryData<TOutput, UPageParam>, TError>
+  }
+
+  /**
    * Generate options used for useInfiniteQuery/...
    *
    * @see {@link https://orpc.dev/docs/integrations/pinia-colada#infinite-query-options-utility Pinia Colada Infinite Query Options Utility Docs}
@@ -164,12 +239,9 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
       optionsIn = { ...this.options.infiniteOptions, ...optionsIn } as any
     }
 
-    const { input, context, key: keyIn, query: queryIn, ...restOptions } = optionsIn as Record<string, any>
+    const { input, context, key: _keyIn, query: queryIn, ...restOptions } = optionsIn as Record<string, any>
 
-    const key = keyIn ?? buildKey(this.path, {
-      type: 'infinite',
-      input: input(typeof optionsIn.initialPageParam === 'function' ? (optionsIn.initialPageParam as () => UPageParam)() : optionsIn.initialPageParam),
-    })
+    const key = this.infiniteKey(optionsIn as InfiniteKeyOptions<TInput, UPageParam>)
 
     return {
       ...restOptions,
@@ -202,6 +274,29 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
   }
 
   /**
+   * Generate a **full matching** key for useMutation/...
+   *
+   * @see {@link https://orpc.dev/docs/integrations/pinia-colada#query-mutation-key Pinia Colada Query/Mutation Key Docs}
+   */
+  mutationKey(
+    ...rest: MaybeOptionalOptions<MutationKeyOptions<TInput>>
+  ): MutationOptionsOut<TInput, TOutput, TError, _EmptyObject>['key'] {
+    let optionsIn = resolveMaybeOptionalOptions(rest)
+
+    if (typeof this.options.mutationKey === 'function') {
+      optionsIn = this.options.mutationKey(optionsIn)
+    }
+    else if (this.options.mutationKey) {
+      optionsIn = { ...this.options.mutationKey, ...optionsIn }
+    }
+
+    const key = optionsIn.key
+      ?? ((input: TInput) => buildKey(this.path, { type: 'mutation', input: input as any }))
+
+    return key as MutationOptionsOut<TInput, TOutput, TError, _EmptyObject>['key']
+  }
+
+  /**
    * Generate options used for useMutation/...
    *
    * @see {@link https://orpc.dev/docs/integrations/pinia-colada#mutation-options Pinia Colada Mutation Options Docs}
@@ -220,9 +315,9 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
       optionsIn = { ...this.options.mutationOptions, ...optionsIn } as any
     }
 
-    const { context, key: keyIn, mutation: mutationIn, ...restOptions } = optionsIn as Record<string, any>
+    const { context, key: _keyIn, mutation: mutationIn, ...restOptions } = optionsIn as Record<string, any>
 
-    const key = keyIn ?? ((input: TInput) => buildKey(this.path, { type: 'mutation', input: input as any }))
+    const key = this.mutationKey(optionsIn as MutationKeyOptions<TInput>)
 
     return {
       ...restOptions,

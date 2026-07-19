@@ -16,6 +16,10 @@ export interface OperationContext {
   }
 }
 
+export type QueryKeyOptions<TInput>
+  = | (undefined extends TInput ? { input?: TInput } : { input: TInput })
+    | { key: EntryKey }
+
 export type QueryOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TInitialData extends TOutput | undefined>
   = & (undefined extends TInput ? { input?: TInput } : { input: TInput })
     & (object extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
@@ -24,6 +28,10 @@ export type QueryOptionsIn<TClientContext extends ClientContext, TInput, TOutput
 
 export type QueryOptionsOut<TOutput, TError, TInitialData extends TOutput | undefined> = DefineQueryOptionsTagged<TOutput, TError, TInitialData>
 
+export type InfiniteKeyOptions<TInput, TPageParam>
+  = | Pick<InfiniteOptionsIn<any, TInput, any, any, TPageParam, any>, 'input' | 'initialPageParam'>
+    | { key: EntryKey }
+
 export type InfiniteOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TPageParam, TInitialData extends UseInfiniteQueryData<TOutput, TPageParam> | undefined>
   = & { input: (pageParam: TPageParam) => TInput }
     & (object extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
@@ -31,6 +39,8 @@ export type InfiniteOptionsIn<TClientContext extends ClientContext, TInput, TOut
     & Partial<Pick<DefineInfiniteQueryOptions<TOutput, TError, TPageParam, TInitialData>, 'key' | 'query'>>
 
 export type InfiniteOptionsOut<TOutput, TError, TPageParam, TInitialData extends UseInfiniteQueryData<TOutput, TPageParam> | undefined> = DefineInfiniteQueryOptionsTagged<TOutput, TError, TPageParam, TInitialData>
+
+export type MutationKeyOptions<TInput> = Pick<MutationOptionsIn<any, TInput, any, any, any>, 'key'>
 
 export type MutationOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TMutationContext extends Record<any, any>>
   = & (object extends TClientContext ? { context?: TClientContext } : { context: TClientContext })

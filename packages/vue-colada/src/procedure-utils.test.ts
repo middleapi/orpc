@@ -18,6 +18,115 @@ describe('procedureUtils', () => {
     expect(utils.call).toBe(client)
   })
 
+  describe('.queryKey', () => {
+    it('works', () => {
+      expect(utils.queryKey({ input: { search: '__search__' } } as any)).toBe(buildKeySpy.mock.results[0]!.value)
+      expect(buildKeySpy).toHaveBeenCalledTimes(1)
+      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: { search: '__search__' } })
+
+      expect(utils.queryKey()).toBe(buildKeySpy.mock.results[1]!.value)
+      expect(buildKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { type: 'query', input: undefined })
+
+      expect(utils.queryKey({ key: ['__custom__'] } as any)).toEqual(['__custom__'])
+      expect(buildKeySpy).toHaveBeenCalledTimes(2)
+    })
+
+    it('applies object modifier with per-call options taking precedence', () => {
+      const modifiedUtils = new ProcedureUtils(['ping'], client, {
+        queryKey: { input: 1 } as any,
+      })
+
+      modifiedUtils.queryKey()
+      expect(buildKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { type: 'query', input: 1 })
+
+      modifiedUtils.queryKey({ input: 2 } as any)
+      expect(buildKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { type: 'query', input: 2 })
+    })
+
+    it('applies function modifier', () => {
+      const modifier = vi.fn(() => ({ input: 9 }))
+      const modifiedUtils = new ProcedureUtils(['ping'], client, {
+        queryKey: modifier as any,
+      })
+
+      modifiedUtils.queryKey({ input: 1 } as any)
+      expect(modifier).toHaveBeenCalledTimes(1)
+      expect(modifier).toHaveBeenCalledWith({ input: 1 })
+      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: 9 })
+    })
+  })
+
+  describe('.infiniteKey', () => {
+    it('works', () => {
+      expect(utils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 0 } as any)).toBe(buildKeySpy.mock.results[0]!.value)
+      expect(buildKeySpy).toHaveBeenCalledTimes(1)
+      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'infinite', input: { cursor: 0 } })
+
+      expect(utils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: () => 5 } as any)).toBe(buildKeySpy.mock.results[1]!.value)
+      expect(buildKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { type: 'infinite', input: { cursor: 5 } })
+
+      expect(utils.infiniteKey({ key: ['__custom__'] } as any)).toEqual(['__custom__'])
+      expect(buildKeySpy).toHaveBeenCalledTimes(2)
+    })
+
+    it('applies object modifier with per-call options taking precedence', () => {
+      const modifiedUtils = new ProcedureUtils(['ping'], client, {
+        infiniteKey: { initialPageParam: 1 } as any,
+      })
+
+      modifiedUtils.infiniteKey({ input: (cursor: number) => ({ cursor }) } as any)
+      expect(buildKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { type: 'infinite', input: { cursor: 1 } })
+
+      modifiedUtils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 2 } as any)
+      expect(buildKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { type: 'infinite', input: { cursor: 2 } })
+    })
+
+    it('applies function modifier', () => {
+      const modifier = vi.fn((options: any) => ({ ...options, initialPageParam: 9 }))
+      const modifiedUtils = new ProcedureUtils(['ping'], client, {
+        infiniteKey: modifier as any,
+      })
+
+      modifiedUtils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 1 } as any)
+      expect(modifier).toHaveBeenCalledTimes(1)
+      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'infinite', input: { cursor: 9 } })
+    })
+  })
+
+  describe('.mutationKey', () => {
+    it('works', () => {
+      const key = utils.mutationKey() as any
+
+      expect(key('__input__')).toBe(buildKeySpy.mock.results[0]!.value)
+      expect(buildKeySpy).toHaveBeenCalledTimes(1)
+      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'mutation', input: '__input__' })
+
+      expect(utils.mutationKey({ key: ['__custom__'] } as any)).toEqual(['__custom__'])
+      expect(buildKeySpy).toHaveBeenCalledTimes(1)
+    })
+
+    it('applies object modifier with per-call options taking precedence', () => {
+      const modifiedUtils = new ProcedureUtils(['ping'], client, {
+        mutationKey: { key: ['__modifier__'] } as any,
+      })
+
+      expect(modifiedUtils.mutationKey()).toEqual(['__modifier__'])
+      expect(modifiedUtils.mutationKey({ key: ['__call__'] } as any)).toEqual(['__call__'])
+      expect(buildKeySpy).toHaveBeenCalledTimes(0)
+    })
+
+    it('applies function modifier', () => {
+      const modifier = vi.fn(() => ({ key: ['__modifier__'] }))
+      const modifiedUtils = new ProcedureUtils(['ping'], client, {
+        mutationKey: modifier as any,
+      })
+
+      expect(modifiedUtils.mutationKey()).toEqual(['__modifier__'])
+      expect(modifier).toHaveBeenCalledTimes(1)
+      expect(modifier).toHaveBeenCalledWith({})
+    })
+  })
+
   describe('.queryOptions', () => {
     it('works', async () => {
       const options = utils.queryOptions({ input: 1 }) as any
