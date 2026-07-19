@@ -28,15 +28,36 @@ deno add npm:@orpc/trpc@beta
 
 :::
 
-## OpenAPI Support
+## Router Conversion
 
-By converting a [tRPC router](https://trpc.io/docs/server/routers) to an [oRPC router](/docs/router), you can utilize most oRPC features, including OpenAPI specification generation and request handling.
+`toORPCRouter` converts a [tRPC router](https://trpc.io/docs/server/routers) into an [oRPC router](/docs/router):
 
 ```ts
 import { toORPCRouter } from '@orpc/trpc'
 
 const orpcRouter = toORPCRouter(trpcRouter)
 ```
+
+The result is a regular oRPC router, so you can use it with any oRPC feature. For example, expose it through an [RPC Handler](/docs/rpc/handler) or [OpenAPI Handler](/docs/openapi/handler), call it directly with [Server-Side Clients](/docs/client/server-side), generate an [OpenAPI Specification](/docs/openapi/specification), and combine it with oRPC [middlewares](/docs/middleware), [plugins](/docs/openapi/handler#plugins), and [interceptors](/docs/openapi/handler#interceptors).
+
+```ts
+import { call, createRouterClient } from '@orpc/server'
+
+// call a procedure directly
+const output = await call(orpcRouter.ping, { input: 123 }, { context: {} })
+
+// or create a server-side client
+const client = createRouterClient(orpcRouter, { context: {} })
+const result = await client.nested.pong({ id: '123' })
+```
+
+::: info
+Input/output validation stays in tRPC's hands: converted procedures delegate execution to the original tRPC procedures, so your tRPC middlewares, validation, and transforms run exactly as before.
+:::
+
+## OpenAPI
+
+The most interesting part for tRPC users: once converted, your tRPC app gets first-class OpenAPI support — both specification generation and OpenAPI-style request handling.
 
 ::: warning
 For OpenAPI features to work, define OpenAPI metadata under the `'~openapi'` key in your tRPC meta. The easiest way is bridging [oRPC meta plugins](/docs/metadata) with `toTRPCMeta`:
