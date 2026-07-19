@@ -29,7 +29,7 @@ it('case: with useQuery', async () => {
     render: () => null,
   }))
 
-  // I don't know why but whe should put error case in the top of the test or it will fail by `Unhandled Rejection`
+  // I don't know why but we should put error case in the top of the test or it will fail by `Unhandled Rejection`
   vi.mocked(router.nested.ping['~orpc'].handler).mockRejectedValueOnce(new ORPCError('OVERRIDE'))
   await vi.waitFor(
     () => expect(mounted.vm.query.error.value).toSatisfy((e: any) => isInferableError(e) && e.code === 'OVERRIDE'),
@@ -75,7 +75,7 @@ it('case: with streamed/useQuery', async () => {
     render: () => null,
   }))
 
-  // I don't know why but whe should put error case in the top of the test or it will fail by `Unhandled Rejection`
+  // I don't know why but we should put error case in the top of the test or it will fail by `Unhandled Rejection`
   vi.mocked(router.stream['~orpc'].handler).mockRejectedValueOnce(new ORPCError('OVERRIDE'))
   await vi.waitFor(
     () => expect(mounted.vm.query.error.value).toSatisfy((e: any) => isInferableError(e) && e.code === 'OVERRIDE'),
@@ -143,7 +143,7 @@ it('case: with live/useQuery', async () => {
     render: () => null,
   }))
 
-  // I don't know why but whe should put error case in the top of the test or it will fail by `Unhandled Rejection`
+  // I don't know why but we should put error case in the top of the test or it will fail by `Unhandled Rejection`
   vi.mocked(router.stream['~orpc'].handler).mockRejectedValueOnce(new ORPCError('OVERRIDE'))
   await vi.waitFor(
     () => expect(mounted.vm.query.error.value).toSatisfy((e: any) => isInferableError(e) && e.code === 'OVERRIDE'),
@@ -186,10 +186,6 @@ it('case: with useInfiniteQuery', async () => {
         initialPageParam: 0,
         getNextPageParam: lastPage => lastPage.next,
       }))
-
-      queryCache.setQueryData(orpc.list.queryKey({ input: { cursor: 1 } }), (old) => {
-        return { ...old }
-      })
 
       return { query, queryCache }
     },
