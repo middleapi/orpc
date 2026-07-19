@@ -3,12 +3,15 @@ import type { EntryKey } from '@pinia/colada'
 import type { OperationType } from './types'
 import { RPCJsonSerializer } from '@orpc/client'
 
-export interface BuildKeyOptions<TInput> {
+export interface BuildKeyPrefixOptions {
   /**
    * Prepended as the first element of the key when present.
    * Use this to avoid key conflicts when multiple router utils share the same client.
    */
   prefix?: string
+}
+
+export interface BuildKeyOptions<TInput> extends BuildKeyPrefixOptions {
   type?: OperationType
   input?: PartialDeep<TInput>
 }

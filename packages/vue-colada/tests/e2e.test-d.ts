@@ -1,5 +1,5 @@
 import { isInferableError } from '@orpc/client'
-import { defineQueryOptions, useInfiniteQuery, useMutation, useQuery, useQueryCache } from '@pinia/colada'
+import { useInfiniteQuery, useMutation, useQuery, useQueryCache } from '@pinia/colada'
 import { computed } from 'vue'
 import { client, orpc } from './__shared__/orpc'
 
@@ -53,11 +53,7 @@ describe('.queryOptions', () => {
   })
 
   it('works with defineQueryOptions', () => {
-    const pingQueryOptions = defineQueryOptions(
-      (id: number) => orpc.ping.queryOptions({ input: { input: id } }),
-    )
-
-    const query = useQuery(() => pingQueryOptions(123))
+    const query = useQuery(() => orpc.ping.queryOptions({ input: { input: 123 } }))
 
     expectTypeOf(query.data.value).toEqualTypeOf<{ output: string } | undefined>()
   })

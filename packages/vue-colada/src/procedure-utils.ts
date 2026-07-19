@@ -1,8 +1,9 @@
 import type { Client, ClientContext } from '@orpc/client'
 import type { Interceptor, MaybeOptionalOptions, PromiseWithError } from '@orpc/shared'
 import type { _EmptyObject, EntryKeyTagged, UseInfiniteQueryData, UseInfiniteQueryFnContext } from '@pinia/colada'
+import type { BuildKeyPrefixOptions } from './key'
 import type { InfiniteKeyOptions, InfiniteOptionsIn, InfiniteOptionsOut, MutationKeyOptions, MutationOptionsIn, MutationOptionsOut, OperationContext, QueryKeyOptions, QueryOptionsIn, QueryOptionsOut, UseMutationFnContext, UseQueryFnContext } from './types'
-import { intercept, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
+import { intercept, resolveMaybeOptionalOptions } from '@orpc/shared'
 import { buildKey } from './key'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
 
@@ -39,7 +40,7 @@ export type ProcedureUtilsMutationInterceptor<TClientContext extends ClientConte
  */
 export type ProcedureUtilsModifier<T extends object> = Partial<T> | ((options: T) => T)
 
-export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError> {
+export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError> extends BuildKeyPrefixOptions {
   /**
    * Key options modifier for .queryKey and .queryOptions
    * Can be partial options or a function that receives per-call options and returns override this.options.
@@ -116,7 +117,6 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     private readonly path: string[],
     client: Client<TClientContext, TInput, TOutput, TError>,
     private readonly options: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError> = {},
-    private readonly prefix?: string,
   ) {
     this.call = client
   }
@@ -139,7 +139,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const key = (optionsIn as any).key
-      ?? buildKey(this.path, { prefix: this.prefix, type: 'query', input: (optionsIn as any).input })
+      ?? buildKey(this.path, { prefix: this.options.prefix, type: 'query', input: (optionsIn as any).input })
 
     return key as EntryKeyTagged<TOutput, TError>
   }
@@ -172,7 +172,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
       key,
       query: (fnContext: UseQueryFnContext) => {
         return intercept(
-          toArray(this.options.queryInterceptors),
+          this.options.queryInterceptors,
           {
             path: this.path,
             context: {
@@ -214,7 +214,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
     const key = (optionsIn as any).key
       ?? buildKey(this.path, {
-        prefix: this.prefix,
+        prefix: this.options.prefix,
         type: 'infinite',
         input: (optionsIn as any).input(
           typeof (optionsIn as any).initialPageParam === 'function'
@@ -250,7 +250,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
       key,
       query: (fnContext: UseInfiniteQueryFnContext<any, any, any, any>) => {
         return intercept(
-          toArray(this.options.infiniteInterceptors),
+          this.options.infiniteInterceptors,
           {
             path: this.path,
             context: {
@@ -293,7 +293,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const key = optionsIn.key
-      ?? ((input: TInput) => buildKey(this.path, { prefix: this.prefix, type: 'mutation', input: input as any }))
+      ?? ((input: TInput) => buildKey(this.path, { prefix: this.options.prefix, type: 'mutation', input: input as any }))
 
     return key as MutationOptionsOut<TInput, TOutput, TError, _EmptyObject>['key']
   }
@@ -326,7 +326,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
       key,
       mutation: (input: TInput, fnContext: UseMutationFnContext) => {
         return intercept(
-          toArray(this.options.mutationInterceptors),
+          this.options.mutationInterceptors,
           {
             path: this.path,
             context: {

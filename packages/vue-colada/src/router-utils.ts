@@ -1,7 +1,7 @@
 import type { AnyNestedClient, Client, InferClientContext, InferClientError } from '@orpc/client'
 import type { Public } from '@orpc/shared'
 import type { EntryKey } from '@pinia/colada'
-import type { BuildKeyOptions } from './key'
+import type { BuildKeyOptions, BuildKeyPrefixOptions } from './key'
 import type { RouterUtilsPlugin } from './plugin'
 import type { ProcedureUtilsInfiniteInterceptor, ProcedureUtilsMutationInterceptor, ProcedureUtilsOptions, ProcedureUtilsQueryInterceptor } from './procedure-utils'
 import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
@@ -13,7 +13,7 @@ import { ProcedureUtils } from './procedure-utils'
 export class SharedRouterUtils<TInput> {
   constructor(
     private readonly path: string[],
-    private readonly prefix?: string,
+    private readonly options: BuildKeyPrefixOptions,
   ) {}
 
   /**
@@ -22,7 +22,7 @@ export class SharedRouterUtils<TInput> {
    * @see {@link https://orpc.dev/docs/integrations/pinia-colada#query-mutation-key Pinia Colada Query/Mutation Key Docs}
    */
   key(options?: Omit<BuildKeyOptions<TInput>, 'prefix'>): EntryKey {
-    return buildKey(this.path, { ...options, prefix: this.prefix })
+    return buildKey(this.path, { ...options, prefix: this.options.prefix })
   }
 }
 
@@ -40,14 +40,7 @@ export type RouterUtilsScoped<T extends AnyNestedClient>
         [K in keyof T]?: T[K] extends AnyNestedClient ? RouterUtilsScoped<T[K]> : never
       }
 
-export interface RouterUtilsOptions<T extends AnyNestedClient> {
-  /**
-   * Prepended as the first element of every entry key when present.
-   * Use this to avoid key conflicts when mounting multiple router utils
-   * instances for the same client.
-   */
-  prefix?: string | undefined
-
+export interface RouterUtilsOptions<T extends AnyNestedClient> extends BuildKeyPrefixOptions {
   /**
    * Interceptors that intercept query inside .queryOptions
    */
@@ -98,19 +91,19 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
   options: RouterUtilsOptions<T>,
   plugin: CompositeRouterUtilsPlugin<any>,
 ): RouterUtils<T> {
-  const sharedUtils = bindMethods(new SharedRouterUtils(path, options.prefix))
+  const sharedUtils = bindMethods(new SharedRouterUtils(path, options))
 
   const procedureUtils = typeof client === 'function' && (options.scoped === undefined || isProcedureUtilsOptions(options.scoped))
     ? bindMethods(new ProcedureUtils(
         path,
         client,
         plugin.initProcedureOptions(path, {
+          prefix: options.prefix,
           ...options.scoped,
           queryInterceptors: [...toArray(options.queryInterceptors) as any, ...toArray(options.scoped?.queryInterceptors)],
           infiniteInterceptors: [...toArray(options.infiniteInterceptors) as any, ...toArray(options.scoped?.infiniteInterceptors)],
           mutationInterceptors: [...toArray(options.mutationInterceptors) as any, ...toArray(options.scoped?.mutationInterceptors)],
         }),
-        options.prefix,
       ))
     : undefined
 

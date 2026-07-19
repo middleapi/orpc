@@ -128,7 +128,7 @@ describe('procedureUtils', () => {
   })
 
   describe('with prefix', () => {
-    const prefixedUtils = new ProcedureUtils(['ping'], client, {}, '__prefix__')
+    const prefixedUtils = new ProcedureUtils(['ping'], client, { prefix: '__prefix__' })
 
     it('includes prefix in generated keys', () => {
       prefixedUtils.queryKey({ input: 1 } as any)

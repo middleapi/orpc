@@ -1,5 +1,5 @@
 import { isInferableError, ORPCError } from '@orpc/client'
-import { defineInfiniteQueryOptions, defineQueryOptions, useInfiniteQuery, useMutation, useQuery, useQueryCache } from '@pinia/colada'
+import { useInfiniteQuery, useMutation, useQuery, useQueryCache } from '@pinia/colada'
 import { defineComponent, ref } from 'vue'
 import { createORPCVueColadaUtils, VUE_COLADA_OPERATION_CONTEXT_SYMBOL } from '../src'
 import { client, mount, orpc, router } from './__shared__/orpc'
@@ -13,16 +13,12 @@ it('case: call directly', async () => {
 })
 
 it('case: with useQuery', async () => {
-  const pingQueryOptions = defineQueryOptions(
-    (id: number) => orpc.nested.ping.queryOptions({ input: { input: id } }),
-  )
-
   const mounted = mount(defineComponent({
     setup() {
       const id = ref(123)
 
       const queryCache = useQueryCache()
-      const query = useQuery(() => pingQueryOptions(id.value))
+      const query = useQuery(() => orpc.nested.ping.queryOptions({ input: { input: id.value } }))
 
       const setId = (value: number) => {
         id.value = value
@@ -60,18 +56,14 @@ it('case: with useQuery', async () => {
 })
 
 it('case: with useInfiniteQuery', async () => {
-  const listInfiniteOptions = defineInfiniteQueryOptions(
-    () => orpc.list.infiniteOptions({
-      input: (cursor: number) => ({ cursor }),
-      initialPageParam: 0,
-      getNextPageParam: lastPage => lastPage.next,
-    }),
-  )
-
   const mounted = mount(defineComponent({
     setup() {
       const queryCache = useQueryCache()
-      const query = useInfiniteQuery(() => listInfiniteOptions())
+      const query = useInfiniteQuery(() => orpc.list.infiniteOptions({
+        input: (cursor: number) => ({ cursor }),
+        initialPageParam: 0,
+        getNextPageParam: lastPage => lastPage.next,
+      }))
 
       return { query, queryCache }
     },
