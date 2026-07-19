@@ -103,31 +103,6 @@ describe('toORPCRouter', async () => {
     expect(getOpenAPIMeta(orpcRouter.nested.ping)).toEqual({ path: '/nested/ping', description: 'Nested ping procedure' })
   })
 
-  it('mapMeta option', async () => {
-    const trpcRouter = t.router({
-      ping: t.procedure
-        .meta({ meta1: 'test' } as any)
-        .query(() => 'pong'),
-
-      lazy: lazy(() => Promise.resolve({ default: t.router({
-        pong: t.procedure
-          .meta({ route: { path: '/pong' } } as any)
-          .query(() => 'pong'),
-      }) })),
-    })
-
-    const orpcRouter = toORPCRouter(trpcRouter, {
-      mapMeta: meta => ({ ...meta, '~openapi': meta.route }),
-    })
-
-    expect(orpcRouter.ping['~orpc'].meta).toEqual({ 'meta1': 'test', '~openapi': undefined })
-
-    // options should propagate through lazy routers
-    const { default: pong } = await unlazy((orpcRouter.lazy as any).pong)
-    expect(pong['~orpc'].meta).toEqual({ 'route': { path: '/pong' }, '~openapi': { path: '/pong' } })
-    expect(getOpenAPIMeta(pong)).toEqual({ path: '/pong' })
-  })
-
   describe('calls', () => {
     it('on success', async () => {
       const result = await call(orpcRouter.ping, { input: 1234 }, { context: { a: 'test' } })

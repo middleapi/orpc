@@ -7,25 +7,6 @@ import { getOrBind, isTypescriptObject } from '@orpc/shared'
 import { isTrackedEnvelope, TRPCError } from '@trpc/server'
 import { isAsyncIterable, isObject } from '@trpc/server/unstable-core-do-not-import'
 
-export interface ToORPCRouterOptions {
-  /**
-   * Maps each procedure's tRPC meta to oRPC meta.
-   *
-   * Useful for exposing custom meta keys under well-known oRPC keys,
-   * such as `'~openapi'` which `@orpc/openapi` reads.
-   *
-   * @example
-   * ```ts
-   * const orpcRouter = toORPCRouter(trpcRouter, {
-   *   mapMeta: meta => ({ ...meta, '~openapi': meta.route }),
-   * })
-   * ```
-   *
-   * @default meta => meta (passthrough)
-   */
-  mapMeta?: (meta: ORPC.Meta) => ORPC.Meta
-}
-
 export type ToORPCOutput<T>
   = T extends AsyncIterable<infer TData, infer TReturn, infer TNext>
     ? AsyncIteratorClass<TData, TReturn, TNext>
@@ -52,17 +33,15 @@ export type ToORPCRouterResult<TContext extends ORPC.Context, TRecord extends Re
  * Convert a tRPC router to an oRPC router.
  *
  * @warning For OpenAPI features, define OpenAPI metadata under the `'~openapi'` key
- * (typed with `OpenAPIMeta` from `@orpc/openapi`) in your tRPC meta, or expose it
- * from a custom key with the `mapMeta` option.
+ * in your tRPC meta, e.g. via `toTRPCMeta(openapi({ ... }))`.
  */
 export function toORPCRouter<T extends AnyRouter>(
   router: T,
-  options: ToORPCRouterOptions = {},
 ): ToORPCRouterResult<
   inferRouterContext<T>,
   T['_def']['record']
 > {
-  const result = recordToORPCRouterRecord(router._def.record, options)
+  const result = recordToORPCRouterRecord(router._def.record)
 
   for (const key in router._def.lazy) {
     const item = router._def.lazy[key]!
@@ -71,7 +50,7 @@ export function toORPCRouter<T extends AnyRouter>(
       meta: {},
       loader: async () => {
         const router = await item.ref()
-        return { default: toORPCRouter(router, options) }
+        return { default: toORPCRouter(router) }
       },
     })
 
@@ -108,32 +87,30 @@ function createAccessibleLazyRouter(lazy: ORPC.Lazy<any>): ORPC.Lazy<any> {
   })
 }
 
-function recordToORPCRouterRecord(records: AnyRouter['_def']['record'], options: ToORPCRouterOptions) {
+function recordToORPCRouterRecord(records: AnyRouter['_def']['record']) {
   const orpcRouter: Record<string, any> = {}
 
   for (const key in records) {
     const item = records[key]
 
     if (typeof item === 'function') {
-      orpcRouter[key] = toORPCProcedure(item, options)
+      orpcRouter[key] = toORPCProcedure(item)
     }
     else {
-      orpcRouter[key] = recordToORPCRouterRecord(item, options)
+      orpcRouter[key] = recordToORPCRouterRecord(item)
     }
   }
 
   return orpcRouter
 }
 
-function toORPCProcedure(procedure: AnyProcedure, options: ToORPCRouterOptions) {
+function toORPCProcedure(procedure: AnyProcedure) {
   const inputSchema = toStandardSchema(procedure._def.inputs.at(-1))
   const outputSchema = toStandardSchema((procedure._def as any).output)
 
-  const meta = (procedure._def.meta ?? {}) as ORPC.Meta
-
   return new ORPC.Procedure({
     errorMap: {},
-    meta: options.mapMeta ? options.mapMeta(meta) : meta,
+    meta: (procedure._def.meta ?? {}) as ORPC.Meta,
     orderedMiddlewares: [],
     inputSchemas: inputSchema ? [inputSchema] : undefined,
     outputSchemas: outputSchema ? [outputSchema] : undefined,
