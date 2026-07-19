@@ -166,11 +166,14 @@ describe('toORPCRouter', () => {
 
     it('rethrows non-TRPCError errors as-is', async () => {
       const orpcRouter = toORPCRouter(t.router({
-        // tRPC wraps resolver errors in TRPCError, but errors thrown while
-        // consuming the returned value can escape unwrapped
-        broken: t.procedure.query(() => {
-          throw new Error('broken iterable')
-        }),
+        // tRPC wraps resolver errors in TRPCError, so a plain query cannot
+        // produce a non-TRPCError - only errors thrown while consuming the
+        // returned value can escape unwrapped
+        broken: t.procedure.subscription(() => ({
+          [Symbol.asyncIterator]: () => {
+            throw new Error('broken iterable')
+          },
+        } as AsyncIterable<unknown>)),
       }))
 
       await expect(
