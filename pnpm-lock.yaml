@@ -780,6 +780,28 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
+  packages/trpc:
+    dependencies:
+      '@orpc/contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@orpc/server':
+        specifier: workspace:*
+        version: link:../server
+      '@orpc/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@orpc/openapi':
+        specifier: workspace:*
+        version: link:../openapi
+      '@trpc/server':
+        specifier: ^11.12.0
+        version: 11.18.0(typescript@6.0.3)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+
   packages/valibot:
     dependencies:
       '@orpc/json-schema':
@@ -4367,6 +4389,12 @@ packages:
     peerDependenciesMeta:
       tree-sitter:
         optional: true
+
+  '@trpc/server@11.18.0':
+    resolution: {integrity: sha512-JAvXOuNTxgXjIDfQaOvDq1j66LMNfDJUH1IU7Slfn8EvRv2EkH6ehu3A7zpYhjO0syHHiYg77v2lG2JFJgvw7Q==}
+    hasBin: true
+    peerDependencies:
+      typescript: '>=5.7.2'
 
   '@tsconfig/node10@1.0.12':
     resolution: {integrity: sha512-UCYBaeFvM11aU2y3YPZ//O5Rhj+xKyzy7mvcIoAjASbigy8mHMryP5cK7dgjlz2hWxh1g5pLw084E0a/wlUSFQ==}
@@ -13943,6 +13971,10 @@ snapshots:
     optionalDependencies:
       tree-sitter: 0.22.4
     optional: true
+
+  '@trpc/server@11.18.0(typescript@6.0.3)':
+    dependencies:
+      typescript: 6.0.3
 
   '@tsconfig/node10@1.0.12': {}
 
