@@ -2,11 +2,17 @@ import type { InferRouterInitialContext, Procedure, Router, Schema } from '@orpc
 import type { AsyncIteratorClass } from '@orpc/shared'
 import type { inferRouterContext } from '@trpc/server'
 import type { TrackedData } from '@trpc/server/unstable-core-do-not-import'
-import type { TRPCContext } from '../tests/shared'
 import type { ToORPCRouterResult } from './to-orpc-router'
-import { lazy, tracked, TRPCError } from '@trpc/server'
+import { initTRPC, lazy, tracked, TRPCError } from '@trpc/server'
 import * as z from 'zod'
-import { inputSchema, outputSchema, t } from '../tests/shared'
+
+type TRPCContext = { a: string }
+
+const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
+
+const outputSchema = z.object({ output: z.number().transform(n => `${n}`) })
+
+const t = initTRPC.context<(req: Request) => TRPCContext>().create()
 
 const trpcRouter = t.router({
   ping: t.procedure

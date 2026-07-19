@@ -1,10 +1,21 @@
+import type { OpenAPIMeta } from '@orpc/openapi'
 import { getOpenAPIMeta } from '@orpc/openapi'
 import { call, createRouterClient, getEventMeta, Lazy, ORPCError, Procedure, unlazy } from '@orpc/server'
 import { isAsyncIteratorObject } from '@orpc/shared'
-import { lazy, tracked, TRPCError } from '@trpc/server'
+import { initTRPC, lazy, tracked, TRPCError } from '@trpc/server'
 import * as z from 'zod'
-import { inputSchema, outputSchema, t } from '../tests/shared'
 import { toORPCRouter } from './to-orpc-router'
+
+const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
+
+const outputSchema = z.object({ output: z.number().transform(n => `${n}`) })
+
+interface TRPCMeta {
+  '~openapi'?: OpenAPIMeta
+  'meta1'?: string
+}
+
+const t = initTRPC.context<(req: Request) => ({ a: string })>().meta<TRPCMeta>().create()
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -157,11 +168,9 @@ describe('toORPCRouter', () => {
       const orpcRouter = toORPCRouter(t.router({
         // tRPC wraps resolver errors in TRPCError, but errors thrown while
         // consuming the returned value can escape unwrapped
-        broken: t.procedure.subscription(() => ({
-          [Symbol.asyncIterator]: () => {
-            throw new Error('broken iterable')
-          },
-        } as AsyncIterable<unknown>)),
+        broken: t.procedure.query(() => {
+          throw new Error('broken iterable')
+        }),
       }))
 
       await expect(
