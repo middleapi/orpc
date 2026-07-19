@@ -58,21 +58,57 @@ it('case: with useQuery', async () => {
 it('case: with streamed/useQuery', async () => {
   const mounted = mount(defineComponent({
     setup() {
+      const input = ref(2)
+
       const queryCache = useQueryCache()
-      const query = useQuery(orpc.stream.streamedOptions({
-        input: { input: 2 },
+      const query = useQuery(() => orpc.stream.streamedOptions({
+        input: { input: input.value },
         fnOptions: { refetchMode: 'append', maxChunks: 3 },
       }))
 
-      return { query, queryCache }
+      const setInput = (value: number) => {
+        input.value = value
+      }
+
+      return { query, queryCache, setInput }
     },
     render: () => null,
   }))
+
+  // I don't know why but whe should put error case in the top of the test or it will fail by `Unhandled Rejection`
+  vi.mocked(router.stream['~orpc'].handler).mockRejectedValueOnce(new ORPCError('OVERRIDE'))
+  await vi.waitFor(
+    () => expect(mounted.vm.query.error.value).toSatisfy((e: any) => isInferableError(e) && e.code === 'OVERRIDE'),
+  )
+
+  // next fetch streams chunk by chunk, gated so intermediate states are observable
+  const releases: (() => void)[] = []
+  vi.mocked(router.stream['~orpc'].handler).mockImplementationOnce(async function* () {
+    yield { output: '0' }
+    await new Promise<void>(resolve => releases.push(resolve))
+    yield { output: '1' }
+  } as any)
+
+  mounted.vm.queryCache.invalidateQueries({ key: orpc.ping.key() })
+  expect(mounted.vm.query.isLoading.value).toEqual(false)
+
+  mounted.vm.queryCache.invalidateQueries({ key: orpc.stream.key({ type: 'live' }) })
+  expect(mounted.vm.query.isLoading.value).toEqual(false)
+
+  mounted.vm.queryCache.invalidateQueries({ key: orpc.stream.key({ type: 'streamed' }) })
+  expect(mounted.vm.query.isLoading.value).toEqual(true)
+
+  // the first chunk is visible while the stream is still open
+  await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual([{ output: '0' }]))
+  expect(mounted.vm.query.isLoading.value).toEqual(true)
+
+  releases[0]!()
 
   await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual([
     { output: '0' },
     { output: '1' },
   ]))
+  await vi.waitFor(() => expect(mounted.vm.query.isLoading.value).toEqual(false))
 
   expect(
     mounted.vm.queryCache.getQueryData(orpc.stream.streamedKey({
@@ -89,6 +125,11 @@ it('case: with streamed/useQuery', async () => {
     { output: '0' },
     { output: '1' },
   ]))
+
+  // changing the input targets a fresh entry
+  mounted.vm.setInput(1)
+
+  await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual([{ output: '0' }]))
 })
 
 it('case: with live/useQuery', async () => {
@@ -102,7 +143,34 @@ it('case: with live/useQuery', async () => {
     render: () => null,
   }))
 
+  // I don't know why but whe should put error case in the top of the test or it will fail by `Unhandled Rejection`
+  vi.mocked(router.stream['~orpc'].handler).mockRejectedValueOnce(new ORPCError('OVERRIDE'))
+  await vi.waitFor(
+    () => expect(mounted.vm.query.error.value).toSatisfy((e: any) => isInferableError(e) && e.code === 'OVERRIDE'),
+  )
+
+  // next fetch streams chunk by chunk, gated so intermediate states are observable
+  const releases: (() => void)[] = []
+  vi.mocked(router.stream['~orpc'].handler).mockImplementationOnce(async function* () {
+    yield { output: '0' }
+    await new Promise<void>(resolve => releases.push(resolve))
+    yield { output: '1' }
+  } as any)
+
+  mounted.vm.queryCache.invalidateQueries({ key: orpc.stream.key({ type: 'streamed' }) })
+  expect(mounted.vm.query.isLoading.value).toEqual(false)
+
+  mounted.vm.queryCache.invalidateQueries({ key: orpc.stream.key({ type: 'live' }) })
+  expect(mounted.vm.query.isLoading.value).toEqual(true)
+
+  // each chunk replaces the previous value while the stream is still open
+  await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual({ output: '0' }))
+  expect(mounted.vm.query.isLoading.value).toEqual(true)
+
+  releases[0]!()
+
   await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual({ output: '1' }))
+  await vi.waitFor(() => expect(mounted.vm.query.isLoading.value).toEqual(false))
 
   expect(
     mounted.vm.queryCache.getQueryData(orpc.stream.liveKey({ input: { input: 2 } })),

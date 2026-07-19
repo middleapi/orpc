@@ -17,6 +17,7 @@ export const router = {
     .handler(vi.fn(({ input }) => ({ output: input.input.toString() }))),
   pong: os.handler(vi.fn(() => 'pong')),
   stream: os
+    .errors({ OVERRIDE: {} })
     .input(z.object({ input: z.number() }).optional())
     .output(asyncIteratorObject(z.object({ output: z.string() })))
     .handler(vi.fn(async function* ({ input }) {
