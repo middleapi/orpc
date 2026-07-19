@@ -177,6 +177,162 @@ describe('procedureUtils', () => {
     })
   })
 
+  describe('.infiniteOptions', () => {
+    const baseOptions = {
+      input: (cursor: number) => ({ cursor }),
+      initialPageParam: 0,
+      getNextPageParam: (lastPage: any) => lastPage.next,
+    }
+
+    it('works', async () => {
+      const options = utils.infiniteOptions(baseOptions as any) as any
+
+      expect(options.key).toBe(buildKeySpy.mock.results[0]!.value)
+      expect(buildKeySpy).toHaveBeenCalledTimes(1)
+      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'infinite', input: { cursor: 0 } })
+      expect(options.initialPageParam).toEqual(0)
+      expect(options.getNextPageParam).toBe(baseOptions.getNextPageParam)
+
+      client.mockResolvedValueOnce('__mocked__')
+      await expect(options.query({ signal, pageParam: 2 })).resolves.toEqual('__mocked__')
+      expect(client).toHaveBeenCalledTimes(1)
+      expect(client).toHaveBeenCalledWith({ cursor: 2 }, { signal, context: {
+        [OPERATION_CONTEXT_SYMBOL]: {
+          key: options.key,
+          type: 'infinite',
+        },
+      } })
+    })
+
+    it('works with initialPageParam as function', () => {
+      const options = utils.infiniteOptions({ ...baseOptions, initialPageParam: () => 5 } as any) as any
+
+      expect(options.key).toBe(buildKeySpy.mock.results[0]!.value)
+      expect(buildKeySpy).toHaveBeenCalledTimes(1)
+      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'infinite', input: { cursor: 5 } })
+    })
+
+    it('works with client context', async () => {
+      const options = utils.infiniteOptions({ ...baseOptions, context: { batch: true } } as any) as any
+
+      client.mockResolvedValueOnce('__mocked__')
+      await expect(options.query({ signal, pageParam: 1 })).resolves.toEqual('__mocked__')
+      expect(client).toHaveBeenCalledTimes(1)
+      expect(client).toHaveBeenCalledWith({ cursor: 1 }, { signal, context: {
+        batch: true,
+        [OPERATION_CONTEXT_SYMBOL]: {
+          key: options.key,
+          type: 'infinite',
+        },
+      } })
+    })
+
+    it('passes rest options through', () => {
+      const options = utils.infiniteOptions({ ...baseOptions, maxPages: 3, staleTime: 1000 } as any) as any
+
+      expect(options.maxPages).toEqual(3)
+      expect(options.staleTime).toEqual(1000)
+    })
+
+    it('respects user provided key', async () => {
+      const options = utils.infiniteOptions({ ...baseOptions, key: ['__custom__'] } as any) as any
+
+      expect(options.key).toEqual(['__custom__'])
+      expect(buildKeySpy).toHaveBeenCalledTimes(0)
+
+      client.mockResolvedValueOnce('__mocked__')
+      await expect(options.query({ signal, pageParam: 0 })).resolves.toEqual('__mocked__')
+      expect(client).toHaveBeenCalledWith({ cursor: 0 }, { signal, context: {
+        [OPERATION_CONTEXT_SYMBOL]: {
+          key: ['__custom__'],
+          type: 'infinite',
+        },
+      } })
+    })
+
+    it('uses custom query instead of client but still runs interceptors', async () => {
+      const interceptor = vi.fn(({ next }) => next())
+      const interceptedUtils = new ProcedureUtils(['ping'], client, { infiniteInterceptors: [interceptor] })
+
+      const query = vi.fn().mockResolvedValue('__custom__')
+      const fnContext = { signal, pageParam: 0 } as any
+      const options = interceptedUtils.infiniteOptions({ ...baseOptions, query } as any) as any
+
+      await expect(options.query(fnContext)).resolves.toEqual('__custom__')
+      expect(interceptor).toHaveBeenCalledTimes(1)
+      expect(query).toHaveBeenCalledTimes(1)
+      expect(query).toHaveBeenCalledWith(fnContext)
+      expect(client).toHaveBeenCalledTimes(0)
+    })
+
+    it('runs interceptors in order & allows overriding options', async () => {
+      const interceptor1 = vi.fn(({ next }) => next())
+      const interceptor2 = vi.fn(options => options.next({
+        ...options,
+        input: '__override__',
+      }))
+
+      const interceptedUtils = new ProcedureUtils(['ping'], client, {
+        infiniteInterceptors: [interceptor1, interceptor2],
+      })
+
+      const options = interceptedUtils.infiniteOptions({ ...baseOptions, context: { batch: true } } as any) as any
+      const fnContext = { signal, pageParam: 1 } as any
+
+      client.mockResolvedValueOnce('__mocked__')
+      await expect(options.query(fnContext)).resolves.toEqual('__mocked__')
+
+      expect(interceptor1).toHaveBeenCalledTimes(1)
+      expect(interceptor1).toHaveBeenCalledWith(expect.objectContaining({
+        path: ['ping'],
+        input: { cursor: 1 },
+        fnContext,
+        context: {
+          batch: true,
+          [OPERATION_CONTEXT_SYMBOL]: {
+            key: options.key,
+            type: 'infinite',
+          },
+        },
+      }))
+      expect(interceptor2).toHaveBeenCalledTimes(1)
+      expect(interceptor1.mock.invocationCallOrder[0]!).toBeLessThan(interceptor2.mock.invocationCallOrder[0]!)
+
+      expect(client).toHaveBeenCalledTimes(1)
+      expect(client).toHaveBeenCalledWith('__override__', { signal, context: {
+        batch: true,
+        [OPERATION_CONTEXT_SYMBOL]: {
+          key: options.key,
+          type: 'infinite',
+        },
+      } })
+    })
+
+    it('applies object modifier with per-call options taking precedence', () => {
+      const modifiedUtils = new ProcedureUtils(['ping'], client, {
+        infiniteOptions: { staleTime: 1000, gcTime: 500 } as any,
+      })
+
+      const options = modifiedUtils.infiniteOptions({ ...baseOptions, staleTime: 2000 } as any) as any
+
+      expect(options.staleTime).toEqual(2000)
+      expect(options.gcTime).toEqual(500)
+    })
+
+    it('applies function modifier', () => {
+      const modifier = vi.fn((options: any) => ({ ...options, staleTime: 3000 }))
+      const modifiedUtils = new ProcedureUtils(['ping'], client, {
+        infiniteOptions: modifier,
+      })
+
+      const options = modifiedUtils.infiniteOptions(baseOptions as any) as any
+
+      expect(modifier).toHaveBeenCalledTimes(1)
+      expect(modifier).toHaveBeenCalledWith(baseOptions)
+      expect(options.staleTime).toEqual(3000)
+    })
+  })
+
   describe('.mutationOptions', () => {
     it('works', async () => {
       const options = utils.mutationOptions() as any

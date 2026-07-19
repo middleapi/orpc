@@ -1,5 +1,5 @@
 import { isInferableError, ORPCError } from '@orpc/client'
-import { defineQueryOptions, useMutation, useQuery, useQueryCache } from '@pinia/colada'
+import { defineInfiniteQueryOptions, defineQueryOptions, useInfiniteQuery, useMutation, useQuery, useQueryCache } from '@pinia/colada'
 import { defineComponent, ref } from 'vue'
 import { createORPCVueColadaUtils, VUE_COLADA_OPERATION_CONTEXT_SYMBOL } from '../src'
 import { client, mount, orpc, router } from './__shared__/orpc'
@@ -57,6 +57,54 @@ it('case: with useQuery', async () => {
   mounted.vm.setId(456)
 
   await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual({ output: '456' }))
+})
+
+it('case: with useInfiniteQuery', async () => {
+  const listInfiniteOptions = defineInfiniteQueryOptions(
+    () => orpc.list.infiniteOptions({
+      input: (cursor: number) => ({ cursor }),
+      initialPageParam: 0,
+      getNextPageParam: lastPage => lastPage.next,
+    }),
+  )
+
+  const mounted = mount(defineComponent({
+    setup() {
+      const queryCache = useQueryCache()
+      const query = useInfiniteQuery(() => listInfiniteOptions())
+
+      return { query, queryCache }
+    },
+    render: () => null,
+  }))
+
+  await vi.waitFor(() => expect(mounted.vm.query.data.value?.pages).toEqual([
+    { items: ['item-0'], next: 1 },
+  ]))
+
+  expect(mounted.vm.query.hasNextPage.value).toEqual(true)
+
+  await mounted.vm.query.loadNextPage()
+  await mounted.vm.query.loadNextPage()
+
+  await vi.waitFor(() => expect(mounted.vm.query.data.value?.pages).toEqual([
+    { items: ['item-0'], next: 1 },
+    { items: ['item-1'], next: 2 },
+    { items: ['item-2'], next: null },
+  ]))
+
+  expect(mounted.vm.query.hasNextPage.value).toEqual(false)
+
+  expect(
+    mounted.vm.queryCache.getQueryData(orpc.list.key({ type: 'infinite', input: { cursor: 0 } })),
+  ).toEqual({
+    pages: [
+      { items: ['item-0'], next: 1 },
+      { items: ['item-1'], next: 2 },
+      { items: ['item-2'], next: null },
+    ],
+    pageParams: [0, 1, 2],
+  })
 })
 
 it('case: with useMutation', async () => {

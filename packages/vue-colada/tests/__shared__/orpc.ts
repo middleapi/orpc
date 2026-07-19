@@ -16,6 +16,13 @@ export const router = {
     .output(z.object({ output: z.string() }))
     .handler(vi.fn(({ input }) => ({ output: input.input.toString() }))),
   pong: os.handler(vi.fn(() => 'pong')),
+  list: os
+    .input(z.object({ cursor: z.number() }))
+    .output(z.object({ items: z.array(z.string()), next: z.number().nullable() }))
+    .handler(vi.fn(({ input }) => ({
+      items: [`item-${input.cursor}`],
+      next: input.cursor < 2 ? input.cursor + 1 : null,
+    }))),
   nested: {
     ping: os
       .errors({ BASE: { data: z.object({ output: z.string() }) }, OVERRIDE: {} })

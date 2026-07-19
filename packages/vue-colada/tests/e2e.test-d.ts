@@ -1,5 +1,5 @@
 import { isInferableError } from '@orpc/client'
-import { defineQueryOptions, useMutation, useQuery, useQueryCache } from '@pinia/colada'
+import { defineQueryOptions, useInfiniteQuery, useMutation, useQuery, useQueryCache } from '@pinia/colada'
 import { computed } from 'vue'
 import { client, orpc } from './__shared__/orpc'
 
@@ -60,6 +60,25 @@ describe('.queryOptions', () => {
     const query = useQuery(() => pingQueryOptions(123))
 
     expectTypeOf(query.data.value).toEqualTypeOf<{ output: string } | undefined>()
+  })
+})
+
+describe('.infiniteOptions', () => {
+  it('useInfiniteQuery', () => {
+    const query = useInfiniteQuery(() => orpc.list.infiniteOptions({
+      input: (cursor: number) => ({ cursor }),
+      initialPageParam: 0,
+      getNextPageParam: lastPage => lastPage.next,
+    }))
+
+    expectTypeOf(query.data.value?.pages).toEqualTypeOf<{ items: string[], next: number | null }[] | undefined>()
+
+    useInfiniteQuery(() => orpc.list.infiniteOptions({
+      // @ts-expect-error --- input is invalid
+      input: (cursor: number) => ({ cursor: 'invalid' }),
+      initialPageParam: 0,
+      getNextPageParam: lastPage => lastPage.next,
+    }))
   })
 })
 

@@ -1,8 +1,7 @@
 import type { PartialDeep } from '@orpc/shared'
 import type { EntryKey } from '@pinia/colada'
+import type { OperationType } from './types'
 import { RPCJsonSerializer } from '@orpc/client'
-
-export type OperationType = 'query' | 'mutation'
 
 export interface BuildKeyOptions<TInput> {
   type?: OperationType

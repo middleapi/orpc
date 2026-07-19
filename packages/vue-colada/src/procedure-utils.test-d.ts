@@ -2,7 +2,7 @@ import type { Client } from '@orpc/client'
 import type { ORPCErrorFromErrorMap } from '@orpc/contract'
 import type { Public } from '@orpc/shared'
 import type { ProcedureUtils } from './procedure-utils'
-import { useMutation, useQuery } from '@pinia/colada'
+import { useInfiniteQuery, useMutation, useQuery } from '@pinia/colada'
 import { computed } from 'vue'
 import z from 'zod'
 
@@ -100,6 +100,68 @@ describe('ProcedureUtils', () => {
         expectTypeOf(query.data.value).toEqualTypeOf<UtilsOutput>()
         expectTypeOf(query.error.value).toEqualTypeOf<UtilsError | null>()
       })
+    })
+  })
+
+  describe('.infiniteOptions', () => {
+    it('infer correct input & page param types', () => {
+      utils.infiniteOptions({
+        input: (cursor: number) => ({ cursor }),
+        initialPageParam: 0,
+        getNextPageParam: (lastPage) => {
+          expectTypeOf(lastPage).toEqualTypeOf<UtilsOutput>()
+          return 1
+        },
+      })
+
+      utils.infiniteOptions({
+        // @ts-expect-error invalid input
+        input: (cursor: number) => ({ cursor: 'invalid' }),
+        initialPageParam: 0,
+        getNextPageParam: () => 1,
+      })
+
+      // @ts-expect-error initialPageParam & getNextPageParam are required
+      utils.infiniteOptions({
+        input: (cursor: number) => ({ cursor }),
+      })
+    })
+
+    it('infer correct context type', () => {
+      utils.infiniteOptions({
+        input: () => undefined,
+        initialPageParam: 0,
+        getNextPageParam: () => 1,
+        context: { batch: true },
+      })
+
+      utils.infiniteOptions({
+        input: () => undefined,
+        initialPageParam: 0,
+        getNextPageParam: () => 1,
+        // @ts-expect-error invalid context
+        context: { batch: 'invalid' },
+      })
+    })
+
+    it('works with useInfiniteQuery', () => {
+      const query = useInfiniteQuery(utils.infiniteOptions({
+        input: (cursor: number) => ({ cursor }),
+        initialPageParam: 0,
+        getNextPageParam: () => 1,
+      }))
+
+      expectTypeOf(query.data.value?.pages).toEqualTypeOf<UtilsOutput[] | undefined>()
+      expectTypeOf(query.data.value?.pageParams).toEqualTypeOf<number[] | undefined>()
+      expectTypeOf(query.error.value).toEqualTypeOf<UtilsError | null>()
+
+      const lazyQuery = useInfiniteQuery(() => utils.infiniteOptions({
+        input: (cursor: number) => ({ cursor }),
+        initialPageParam: 0,
+        getNextPageParam: () => 1,
+      }))
+
+      expectTypeOf(lazyQuery.data.value?.pages).toEqualTypeOf<UtilsOutput[] | undefined>()
     })
   })
 

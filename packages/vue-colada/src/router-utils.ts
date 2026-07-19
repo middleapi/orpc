@@ -3,7 +3,7 @@ import type { Public } from '@orpc/shared'
 import type { EntryKey } from '@pinia/colada'
 import type { BuildKeyOptions } from './key'
 import type { RouterUtilsPlugin } from './plugin'
-import type { ProcedureUtilsMutationInterceptor, ProcedureUtilsOptions, ProcedureUtilsQueryInterceptor } from './procedure-utils'
+import type { ProcedureUtilsInfiniteInterceptor, ProcedureUtilsMutationInterceptor, ProcedureUtilsOptions, ProcedureUtilsQueryInterceptor } from './procedure-utils'
 import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
 import { bindMethods, get, getOrBind, isTypescriptObject, toArray } from '@orpc/shared'
 import { buildKey } from './key'
@@ -50,6 +50,11 @@ export interface RouterUtilsOptions<T extends AnyNestedClient> {
    * Interceptors that intercept query inside .queryOptions
    */
   queryInterceptors?: ProcedureUtilsQueryInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[]
+
+  /**
+   * Interceptors that intercept query inside .infiniteOptions
+   */
+  infiniteInterceptors?: ProcedureUtilsInfiniteInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[]
 
   /**
    * Interceptors that intercept mutation inside .mutationOptions
@@ -101,6 +106,7 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
         plugin.initProcedureOptions(path, {
           ...options.scoped,
           queryInterceptors: [...toArray(options.queryInterceptors) as any, ...toArray(options.scoped?.queryInterceptors)],
+          infiniteInterceptors: [...toArray(options.infiniteInterceptors) as any, ...toArray(options.scoped?.infiniteInterceptors)],
           mutationInterceptors: [...toArray(options.mutationInterceptors) as any, ...toArray(options.scoped?.mutationInterceptors)],
         }),
       ))
@@ -149,6 +155,10 @@ function isProcedureUtilsOptions(value: unknown): value is ProcedureUtilsOptions
   }
 
   if (value.queryInterceptors !== undefined && !Array.isArray(value.queryInterceptors)) {
+    return false
+  }
+
+  if (value.infiniteInterceptors !== undefined && !Array.isArray(value.infiniteInterceptors)) {
     return false
   }
 

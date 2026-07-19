@@ -1,12 +1,13 @@
 import type { ClientContext } from '@orpc/client'
-import type { DefineMutationOptionsTagged, DefineQueryOptions, DefineQueryOptionsTagged, EntryKey, UseMutationOptions, UseQueryOptions } from '@pinia/colada'
-import type { OperationType } from './key'
+import type { DefineInfiniteQueryOptions, DefineInfiniteQueryOptionsTagged, DefineMutationOptionsTagged, DefineQueryOptions, DefineQueryOptionsTagged, EntryKey, UseInfiniteQueryData, UseMutationOptions, UseQueryOptions } from '@pinia/colada'
 
 export type UseQueryFnContext = Parameters<UseQueryOptions<any>['query']>[0]
 
 export type UseMutationFnContext = Parameters<UseMutationOptions<any, any>['mutation']>[1]
 
 export const OPERATION_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_VUE_COLADA_OPERATION_CONTEXT') as any
+
+export type OperationType = 'query' | 'infinite' | 'mutation'
 
 export interface OperationContext {
   [OPERATION_CONTEXT_SYMBOL]?: {
@@ -21,11 +22,19 @@ export type QueryOptionsIn<TClientContext extends ClientContext, TInput, TOutput
     & Omit<DefineQueryOptions<TOutput, TError, TInitialData>, 'key' | 'query'>
     & Partial<Pick<DefineQueryOptions<TOutput, TError, TInitialData>, 'key' | 'query'>>
 
-export type QueryOptions<TOutput, TError, TInitialData extends TOutput | undefined> = DefineQueryOptionsTagged<TOutput, TError, TInitialData>
+export type QueryOptionsOut<TOutput, TError, TInitialData extends TOutput | undefined> = DefineQueryOptionsTagged<TOutput, TError, TInitialData>
+
+export type InfiniteOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TPageParam, TInitialData extends UseInfiniteQueryData<TOutput, TPageParam> | undefined>
+  = & { input: (pageParam: TPageParam) => TInput }
+    & (object extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
+    & Omit<DefineInfiniteQueryOptions<TOutput, TError, TPageParam, TInitialData>, 'key' | 'query'>
+    & Partial<Pick<DefineInfiniteQueryOptions<TOutput, TError, TPageParam, TInitialData>, 'key' | 'query'>>
+
+export type InfiniteOptionsOut<TOutput, TError, TPageParam, TInitialData extends UseInfiniteQueryData<TOutput, TPageParam> | undefined> = DefineInfiniteQueryOptionsTagged<TOutput, TError, TPageParam, TInitialData>
 
 export type MutationOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TMutationContext extends Record<any, any>>
   = & (object extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
     & Omit<UseMutationOptions<TOutput, TInput, TError, TMutationContext>, 'mutation'>
     & Partial<Pick<UseMutationOptions<TOutput, TInput, TError, TMutationContext>, 'mutation'>>
 
-export type MutationOptions<TInput, TOutput, TError, TMutationContext extends Record<any, any>> = DefineMutationOptionsTagged<TOutput, TInput, TError, TMutationContext>
+export type MutationOptionsOut<TInput, TOutput, TError, TMutationContext extends Record<any, any>> = DefineMutationOptionsTagged<TOutput, TInput, TError, TMutationContext>
