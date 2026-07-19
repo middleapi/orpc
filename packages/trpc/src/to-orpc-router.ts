@@ -2,7 +2,7 @@ import type { AsyncIteratorClass } from '@orpc/shared'
 import type { AnyProcedure, AnyRouter, inferRouterContext } from '@trpc/server'
 import type { Parser, TrackedData } from '@trpc/server/unstable-core-do-not-import'
 import * as ORPC from '@orpc/server'
-import { isTypescriptObject, wrapAsyncIterator } from '@orpc/shared'
+import { isTypescriptObject, set, wrapAsyncIterator } from '@orpc/shared'
 import { isTrackedEnvelope, TRPCError } from '@trpc/server'
 import { isAsyncIterable, isObject } from '@trpc/server/unstable-core-do-not-import'
 
@@ -37,30 +37,21 @@ export function toORPCRouter<T extends AnyRouter>(
   inferRouterContext<T>,
   T['_def']['record']
 > {
-  const result = {
-    ...lazyToORPCRouter(router._def.lazy),
-    ...recordToORPCRouterRecord(router._def.record),
-  }
+  const result = recordToORPCRouterRecord(router._def.record)
 
-  return result as any
-}
+  for (const key in router._def.lazy) {
+    const item = router._def.lazy[key]!
 
-function lazyToORPCRouter(lazies: AnyRouter['_def']['lazy']) {
-  const orpcRouter: Record<string, any> = {}
-
-  for (const key in lazies) {
-    const item = lazies[key]!
-
-    orpcRouter[key] = new ORPC.Lazy({
+    set(result, key.split('.') as [string, ...string[]], new ORPC.Lazy({
       meta: {},
       loader: async () => {
         const router = await item.ref()
         return { default: toORPCRouter(router) }
       },
-    })
+    }))
   }
 
-  return orpcRouter
+  return result as any
 }
 
 function recordToORPCRouterRecord(records: AnyRouter['_def']['record']) {

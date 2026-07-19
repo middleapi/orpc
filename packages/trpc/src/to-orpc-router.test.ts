@@ -26,10 +26,6 @@ describe('toORPCRouter', () => {
     const orpcRouter = toORPCRouter(t.router({
       ping: t.procedure.query(() => 'pong'),
 
-      nested: {
-        ping: t.procedure.query(() => 'pong'),
-      },
-
       lazy: lazy(() => Promise.resolve({ default: t.router({
         ping: t.procedure.query(() => 'pong'),
 
@@ -37,18 +33,38 @@ describe('toORPCRouter', () => {
           ping: t.procedure.query(() => 'pong'),
         }) })),
       }) })),
+
+      nested: {
+        ping: t.procedure.query(() => 'pong'),
+
+        lazy: lazy(() => Promise.resolve({ default: t.router({
+          ping: t.procedure.query(() => 'pong'),
+
+          lazy: lazy(() => Promise.resolve({ default: t.router({
+            ping: t.procedure.query(() => 'pong'),
+          }) })),
+        }) })),
+      },
     }))
 
     expect(orpcRouter.ping).toBeInstanceOf(Procedure)
     expect(orpcRouter.nested.ping).toBeInstanceOf(Procedure)
 
     expect(orpcRouter.lazy).toBeInstanceOf(Lazy)
-    const unlazy1 = await unlazy(orpcRouter.lazy)
-    expect(unlazy1.default.ping).toBeInstanceOf(Procedure)
+    const unlazyLazy = await unlazy(orpcRouter.lazy)
+    expect(unlazyLazy.default.ping).toBeInstanceOf(Procedure)
 
-    expect(unlazy1.default.lazy).toBeInstanceOf(Lazy)
-    const unlazy2 = await unlazy(unlazy1.default.lazy)
-    expect(unlazy2.default.ping).toBeInstanceOf(Procedure)
+    expect(unlazyLazy.default.lazy).toBeInstanceOf(Lazy)
+    const unlazyLazyLazy = await unlazy(unlazyLazy.default.lazy)
+    expect(unlazyLazyLazy.default.ping).toBeInstanceOf(Procedure)
+
+    expect(orpcRouter.nested.lazy).toBeInstanceOf(Lazy)
+    const unlazyNestedLazy = await unlazy(orpcRouter.nested.lazy)
+    expect(unlazyNestedLazy.default.ping).toBeInstanceOf(Procedure)
+
+    expect(unlazyNestedLazy.default.lazy).toBeInstanceOf(Lazy)
+    const unlazyNestedLazyUnlazy = await unlazy(unlazyNestedLazy.default.lazy)
+    expect(unlazyNestedLazyUnlazy.default.ping).toBeInstanceOf(Procedure)
   })
 
   it('with input/output schema and validation happen inside handler only', async () => {
