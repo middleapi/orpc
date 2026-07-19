@@ -277,7 +277,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
   /**
    * Configure queries for [AsyncIteratorObject](https://orpc.dev/docs/async-iterator-object).
    * The resulting data is an array of chunks, and each new chunk is appended as it arrives.
-   * Works with `useQuery`, `defineQueryOptions`, and any other API that accepts query options.
+   * Works with `useQuery` and any other API that accepts query options.
    */
   streamedOptions<UInitialData extends InferStreamedQueryOutput<TOutput> | undefined = undefined>(
     ...rest: MaybeOptionalOptions<
@@ -364,7 +364,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
   /**
    * Configure live queries for [AsyncIteratorObject](https://orpc.dev/docs/async-iterator-object).
    * Unlike `.streamedOptions` which accumulates chunks, live queries replace the entire result with each new chunk received.
-   * Works with `useQuery`, `defineQueryOptions`, and any other API that accepts query options.
+   * Works with `useQuery` and any other API that accepts query options.
    */
   liveOptions<UInitialData extends InferLiveQueryOutput<TOutput> | undefined = undefined>(
     ...rest: MaybeOptionalOptions<

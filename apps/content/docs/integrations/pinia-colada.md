@@ -60,7 +60,7 @@ const postORPC = createPiniaColadaUtils(postClient, {
 
 ## Query Options Utility
 
-Use `.queryOptions` to build query options. It works with `useQuery`, `defineQueryOptions`, and any other API that accepts query options.
+Use `.queryOptions` to build query options. It works with `useQuery` and any other API that accepts query options.
 
 ```ts
 const query = useQuery(orpc.planet.find.queryOptions({
@@ -76,7 +76,7 @@ Options accept plain values only. For reactive inputs, pass a callback to `useQu
 
 ## Streamed Query Options Utility
 
-Use `.streamedOptions` to build streamed query options for an [AsyncIteratorObject](/docs/async-iterator-object). The resulting data is an array of chunks, and each new chunk is appended as it arrives. It works with `useQuery`, `defineQueryOptions`, and any other API that accepts query options.
+Use `.streamedOptions` to build streamed query options for an [AsyncIteratorObject](/docs/async-iterator-object). The resulting data is an array of chunks, and each new chunk is appended as it arrives. It works with `useQuery` and any other API that accepts query options.
 
 ```ts
 const query = useQuery(orpc.streamed.streamedOptions({
@@ -101,7 +101,7 @@ const query = useQuery(orpc.streamed.streamedOptions({
 
 ## Live Query Options Utility
 
-Use `.liveOptions` to build live query options for an [AsyncIteratorObject](/docs/async-iterator-object). The data always reflects the latest chunk, replacing the previous value whenever a new one arrives. It works with `useQuery`, `defineQueryOptions`, and any other API that accepts query options.
+Use `.liveOptions` to build live query options for an [AsyncIteratorObject](/docs/async-iterator-object). The data always reflects the latest chunk, replacing the previous value whenever a new one arrives. It works with `useQuery` and any other API that accepts query options.
 
 ```ts
 const query = useQuery(orpc.live.liveOptions({
@@ -113,7 +113,7 @@ const query = useQuery(orpc.live.liveOptions({
 
 ## Infinite Query Options Utility
 
-Use `.infiniteOptions` to build infinite query options. It works with `useInfiniteQuery`, `defineInfiniteQueryOptions`, and any other API that accepts infinite query options.
+Use `.infiniteOptions` to build infinite query options. It works with `useInfiniteQuery` and any other API that accepts infinite query options.
 
 ::: info
 The `input` option must be a function that receives the page parameter and returns the query input. Define the `pageParam` type explicitly if it can be `null` or `undefined`.
@@ -191,7 +191,7 @@ const planet = await orpc.planet.find.call({ id: 123 })
 
 ## Reactive Options
 
-Following the [`defineQueryOptions`](https://pinia-colada.esm.dev/guide/query-keys.html#Typing-Query-Keys-with-defineQueryOptions) pattern, option utilities accept plain values only. For reactive inputs, pass a callback to `useQuery` instead — it re-evaluates whenever its dependencies change.
+Option utilities accept plain values only. For reactive inputs, pass a callback to `useQuery` instead — it re-evaluates whenever its dependencies change.
 
 ```ts
 const id = ref(123)
@@ -199,16 +199,6 @@ const id = ref(123)
 const query = useQuery(() => orpc.planet.find.queryOptions({
   input: { id: id.value },
 }))
-```
-
-This also composes with `defineQueryOptions`:
-
-```ts
-const findPlanetQuery = defineQueryOptions(
-  (id: number) => orpc.planet.find.queryOptions({ input: { id } }),
-)
-
-const query = useQuery(() => findPlanetQuery(id.value))
 ```
 
 ## Default Options

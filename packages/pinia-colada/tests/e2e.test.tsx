@@ -187,6 +187,10 @@ it('case: with useInfiniteQuery', async () => {
         getNextPageParam: lastPage => lastPage.next,
       }))
 
+      queryCache.setQueryData(orpc.list.queryKey({ input: { cursor: 1 } }), (old) => {
+        return { ...old }
+      })
+
       return { query, queryCache }
     },
     render: () => null,
