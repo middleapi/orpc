@@ -13,6 +13,7 @@ import { ProcedureUtils } from './procedure-utils'
 export class SharedRouterUtils<TInput> {
   constructor(
     private readonly path: string[],
+    private readonly prefix?: string,
   ) {}
 
   /**
@@ -20,8 +21,8 @@ export class SharedRouterUtils<TInput> {
    *
    * @see {@link https://orpc.dev/docs/integrations/pinia-colada#query-mutation-key Pinia Colada Query/Mutation Key Docs}
    */
-  key(options?: BuildKeyOptions<TInput>): EntryKey {
-    return buildKey(this.path, options)
+  key(options?: Omit<BuildKeyOptions<TInput>, 'prefix'>): EntryKey {
+    return buildKey(this.path, { ...options, prefix: this.prefix })
   }
 }
 
@@ -41,10 +42,11 @@ export type RouterUtilsScoped<T extends AnyNestedClient>
 
 export interface RouterUtilsOptions<T extends AnyNestedClient> {
   /**
-   * Base path for all entry keys. Use this to avoid conflicts when mounting
-   * multiple router utils instances.
+   * Prepended as the first element of every entry key when present.
+   * Use this to avoid key conflicts when mounting multiple router utils
+   * instances for the same client.
    */
-  path?: string[] | undefined
+  prefix?: string | undefined
 
   /**
    * Interceptors that intercept query inside .queryOptions
@@ -87,17 +89,16 @@ export function createRouterUtils<T extends AnyNestedClient>(
   const plugin = new CompositeRouterUtilsPlugin<T>(options.plugins)
   options = plugin.init(options)
 
-  return createRouterUtilsInternal(client, options, plugin)
+  return createRouterUtilsInternal(client, [], options, plugin)
 }
 
 function createRouterUtilsInternal<T extends AnyNestedClient>(
   client: T,
+  path: string[],
   options: RouterUtilsOptions<T>,
   plugin: CompositeRouterUtilsPlugin<any>,
 ): RouterUtils<T> {
-  const path = toArray(options.path)
-
-  const sharedUtils = bindMethods(new SharedRouterUtils(path))
+  const sharedUtils = bindMethods(new SharedRouterUtils(path, options.prefix))
 
   const procedureUtils = typeof client === 'function' && (options.scoped === undefined || isProcedureUtilsOptions(options.scoped))
     ? bindMethods(new ProcedureUtils(
@@ -109,6 +110,7 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
           infiniteInterceptors: [...toArray(options.infiniteInterceptors) as any, ...toArray(options.scoped?.infiniteInterceptors)],
           mutationInterceptors: [...toArray(options.mutationInterceptors) as any, ...toArray(options.scoped?.mutationInterceptors)],
         }),
+        options.prefix,
       ))
     : undefined
 
@@ -124,9 +126,8 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
         return value
       }
 
-      const nextUtils = createRouterUtilsInternal(nextClient as any, {
+      const nextUtils = createRouterUtilsInternal(nextClient as any, [...path, prop], {
         ...options,
-        path: [...path, prop],
         scoped: get(options.scoped, [prop]) as any,
       }, plugin)
 

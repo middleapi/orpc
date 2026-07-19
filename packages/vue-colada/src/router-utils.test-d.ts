@@ -82,7 +82,13 @@ it('RouterUtils', () => {
 })
 
 it('createRouterUtils', () => {
+  createRouterUtils({} as RouterClient<typeof router, { batch?: boolean }>, {
+    // @ts-expect-error path option was replaced by prefix
+    path: ['base'],
+  })
+
   const utils = createRouterUtils({} as RouterClient<typeof router, { batch?: boolean }>, {
+    prefix: '__prefix__',
     queryInterceptors: [
       ({ next, context, path }) => {
         expectTypeOf(context.batch).toEqualTypeOf<boolean | undefined>()

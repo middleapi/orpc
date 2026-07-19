@@ -127,6 +127,22 @@ describe('procedureUtils', () => {
     })
   })
 
+  describe('with prefix', () => {
+    const prefixedUtils = new ProcedureUtils(['ping'], client, {}, '__prefix__')
+
+    it('includes prefix in generated keys', () => {
+      prefixedUtils.queryKey({ input: 1 } as any)
+      expect(buildKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { prefix: '__prefix__', type: 'query', input: 1 })
+
+      prefixedUtils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 0 } as any)
+      expect(buildKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { prefix: '__prefix__', type: 'infinite', input: { cursor: 0 } })
+
+      const mutationKey = prefixedUtils.mutationKey() as any
+      mutationKey('__input__')
+      expect(buildKeySpy).toHaveBeenNthCalledWith(3, ['ping'], { prefix: '__prefix__', type: 'mutation', input: '__input__' })
+    })
+  })
+
   describe('.queryOptions', () => {
     it('works', async () => {
       const options = utils.queryOptions({ input: 1 }) as any

@@ -116,6 +116,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     private readonly path: string[],
     client: Client<TClientContext, TInput, TOutput, TError>,
     private readonly options: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError> = {},
+    private readonly prefix?: string,
   ) {
     this.call = client
   }
@@ -138,7 +139,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const key = (optionsIn as any).key
-      ?? buildKey(this.path, { type: 'query', input: (optionsIn as any).input })
+      ?? buildKey(this.path, { prefix: this.prefix, type: 'query', input: (optionsIn as any).input })
 
     return key as EntryKeyTagged<TOutput, TError>
   }
@@ -213,6 +214,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
     const key = (optionsIn as any).key
       ?? buildKey(this.path, {
+        prefix: this.prefix,
         type: 'infinite',
         input: (optionsIn as any).input(
           typeof (optionsIn as any).initialPageParam === 'function'
@@ -291,7 +293,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const key = optionsIn.key
-      ?? ((input: TInput) => buildKey(this.path, { type: 'mutation', input: input as any }))
+      ?? ((input: TInput) => buildKey(this.path, { prefix: this.prefix, type: 'mutation', input: input as any }))
 
     return key as MutationOptionsOut<TInput, TOutput, TError, _EmptyObject>['key']
   }

@@ -32,7 +32,18 @@ describe('sharedRouterUtils', () => {
     ).toBe(buildKeySpy.mock.results[0]!.value)
 
     expect(buildKeySpy).toHaveBeenCalledTimes(1)
-    expect(buildKeySpy).toHaveBeenCalledWith(['path'], { input: { search: '__search__' }, type: 'query' })
+    expect(buildKeySpy).toHaveBeenCalledWith(['path'], { input: { search: '__search__' }, type: 'query', prefix: undefined })
+  })
+
+  it('.key with prefix', () => {
+    const prefixedUtils = new SharedRouterUtils(['path'], '__prefix__')
+
+    expect(
+      prefixedUtils.key({ type: 'query' }),
+    ).toBe(buildKeySpy.mock.results[0]!.value)
+
+    expect(buildKeySpy).toHaveBeenCalledTimes(1)
+    expect(buildKeySpy).toHaveBeenCalledWith(['path'], { type: 'query', prefix: '__prefix__' })
   })
 })
 
@@ -43,31 +54,31 @@ describe('createRouterUtils', () => {
 
   it('creates nested procedure & shared utils', () => {
     const utils = createRouterUtils(client, {
-      path: ['__base__'],
+      prefix: '__prefix__',
     }) as any
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
-    expect(ProcedureUtils).toHaveBeenCalledWith(['__base__'], client, emptyInterceptors)
+    expect(ProcedureUtils).toHaveBeenCalledWith([], client, emptyInterceptors, '__prefix__')
     expect(utils.key({ type: 'query' })).toBe(buildKeySpy.mock.results[0]?.value)
-    expect(buildKeySpy).toHaveBeenNthCalledWith(1, ['__base__'], { type: 'query' })
+    expect(buildKeySpy).toHaveBeenNthCalledWith(1, [], { type: 'query', prefix: '__prefix__' })
     expect(utils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.queryOptions.mock.results[0]?.value)
 
     vi.clearAllMocks()
     const keyUtils = utils.key
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
-    expect(ProcedureUtils).toHaveBeenCalledWith(['__base__', 'key'], client.key, emptyInterceptors)
+    expect(ProcedureUtils).toHaveBeenCalledWith(['key'], client.key, emptyInterceptors, '__prefix__')
     expect(keyUtils.key({ type: 'mutation' })).toBe(buildKeySpy.mock.results[0]?.value)
-    expect(buildKeySpy).toHaveBeenNthCalledWith(1, ['__base__', 'key'], { type: 'mutation' })
+    expect(buildKeySpy).toHaveBeenNthCalledWith(1, ['key'], { type: 'mutation', prefix: '__prefix__' })
     expect(keyUtils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.queryOptions.mock.results[0]?.value)
 
     vi.clearAllMocks()
     const pongUtils = keyUtils.pong
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
-    expect(ProcedureUtils).toHaveBeenCalledWith(['__base__', 'key', 'pong'], client.key.pong, emptyInterceptors)
+    expect(ProcedureUtils).toHaveBeenCalledWith(['key', 'pong'], client.key.pong, emptyInterceptors, '__prefix__')
     expect(pongUtils.key({ type: 'query' })).toBe(buildKeySpy.mock.results[0]?.value)
-    expect(buildKeySpy).toHaveBeenNthCalledWith(1, ['__base__', 'key', 'pong'], { type: 'query' })
+    expect(buildKeySpy).toHaveBeenNthCalledWith(1, ['key', 'pong'], { type: 'query', prefix: '__prefix__' })
     expect(pongUtils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.queryOptions.mock.results[0]?.value)
   })
 
@@ -78,18 +89,18 @@ describe('createRouterUtils', () => {
     expect(ProcedureUtils).toHaveBeenCalledTimes(0)
     expect(utils.queryOptions).toBeUndefined()
     expect(utils.key()).toBe(buildKeySpy.mock.results[0]?.value)
-    expect(buildKeySpy).toHaveBeenNthCalledWith(1, [], undefined)
+    expect(buildKeySpy).toHaveBeenNthCalledWith(1, [], { prefix: undefined })
 
     const nestedUtils = utils.nested
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(0)
     expect(nestedUtils.key()).toBe(buildKeySpy.mock.results[1]?.value)
-    expect(buildKeySpy).toHaveBeenNthCalledWith(2, ['nested'], undefined)
+    expect(buildKeySpy).toHaveBeenNthCalledWith(2, ['nested'], { prefix: undefined })
 
     const pingUtils = nestedUtils.ping
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
-    expect(ProcedureUtils).toHaveBeenCalledWith(['nested', 'ping'], router.nested.ping, emptyInterceptors)
+    expect(ProcedureUtils).toHaveBeenCalledWith(['nested', 'ping'], router.nested.ping, emptyInterceptors, undefined)
     expect(pingUtils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.queryOptions.mock.results[0]?.value)
   })
 
@@ -155,12 +166,12 @@ describe('createRouterUtils', () => {
     vi.clearAllMocks()
     const keyUtils = utils.key
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
-    expect(ProcedureUtils).toHaveBeenCalledWith(['key'], client.key, { ...keyOptions, ...emptyInterceptors })
+    expect(ProcedureUtils).toHaveBeenCalledWith(['key'], client.key, { ...keyOptions, ...emptyInterceptors }, undefined)
 
     vi.clearAllMocks()
     const pongUtils = keyUtils.pong
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
-    expect(ProcedureUtils).toHaveBeenCalledWith(['key', 'pong'], client.key.pong, emptyInterceptors)
+    expect(ProcedureUtils).toHaveBeenCalledWith(['key', 'pong'], client.key.pong, emptyInterceptors, undefined)
     expect(pongUtils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.queryOptions.mock.results[0]?.value)
   })
 
@@ -249,7 +260,7 @@ describe('createRouterUtils', () => {
         gcTime: 1000,
         staleTime: 100,
       },
-    }))
+    }), undefined)
 
     expect(routeUtils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.queryOptions.mock.results[0]?.value)
   })

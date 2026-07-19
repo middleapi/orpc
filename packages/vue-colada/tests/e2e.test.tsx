@@ -132,6 +132,42 @@ it('case: with useMutation', async () => {
   })
 })
 
+it('case: with prefix', async () => {
+  const prefixed = createORPCVueColadaUtils(client, { prefix: '__prefix__' })
+
+  expect(prefixed.nested.ping.key({ type: 'query' })).toEqual(['__prefix__', ['nested', 'ping'], { type: 'query' }])
+  expect(prefixed.nested.ping.queryKey({ input: { input: 123 } })).not.toEqual(orpc.nested.ping.queryKey({ input: { input: 123 } }))
+
+  const mounted = mount(defineComponent({
+    setup() {
+      const queryCache = useQueryCache()
+      const prefixedQuery = useQuery(prefixed.nested.ping.queryOptions({ input: { input: 123 } }))
+      const query = useQuery(orpc.nested.ping.queryOptions({ input: { input: 123 } }))
+
+      return { prefixedQuery, query, queryCache }
+    },
+    render: () => null,
+  }))
+
+  await vi.waitFor(() => expect(mounted.vm.prefixedQuery.data.value).toEqual({ output: '123' }))
+  await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual({ output: '123' }))
+
+  expect(
+    mounted.vm.queryCache.getQueryData(prefixed.nested.ping.queryKey({ input: { input: 123 } })),
+  ).toEqual({ output: '123' })
+
+  // invalidating un-prefixed keys does not touch prefixed entries
+  mounted.vm.queryCache.invalidateQueries({ key: orpc.key() })
+  expect(mounted.vm.prefixedQuery.isLoading.value).toEqual(false)
+  expect(mounted.vm.query.isLoading.value).toEqual(true)
+
+  // invalidating prefixed keys does not touch un-prefixed entries
+  await vi.waitFor(() => expect(mounted.vm.query.isLoading.value).toEqual(false))
+  mounted.vm.queryCache.invalidateQueries({ key: prefixed.key() })
+  expect(mounted.vm.prefixedQuery.isLoading.value).toEqual(true)
+  expect(mounted.vm.query.isLoading.value).toEqual(false)
+})
+
 it('case: with interceptors and plugins', async () => {
   const queryInterceptor = vi.fn(({ next }: any) => next())
   const mutationInterceptor = vi.fn(({ next }: any) => next())

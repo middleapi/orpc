@@ -4,6 +4,11 @@ import type { OperationType } from './types'
 import { RPCJsonSerializer } from '@orpc/client'
 
 export interface BuildKeyOptions<TInput> {
+  /**
+   * Prepended as the first element of the key when present.
+   * Use this to avoid key conflicts when multiple router utils share the same client.
+   */
+  prefix?: string
   type?: OperationType
   input?: PartialDeep<TInput>
 }
@@ -23,6 +28,7 @@ export function buildKey<TInput>(
   options: BuildKeyOptions<TInput> = {},
 ): EntryKey {
   return [
+    ...options.prefix !== undefined ? [options.prefix] : [],
     path,
     {
       ...options.input !== undefined ? { input: serializer.serialize(options.input).json } : {},

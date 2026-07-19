@@ -11,4 +11,8 @@ it('buildKey', () => {
 
   const date = new Date()
   expect(buildKey(['path', 'path2'], { input: { a: date } })).toEqual([['path', 'path2'], { input: { a: date.toISOString() } }])
+
+  expect(buildKey(['path'], { prefix: '__prefix__' })).toEqual(['__prefix__', ['path'], {}])
+  expect(buildKey(['path'], { prefix: undefined })).toEqual([['path'], {}])
+  expect(buildKey(['path'], { prefix: '__prefix__', type: 'query', input: { a: 1 } })).toEqual(['__prefix__', ['path'], { type: 'query', input: { a: 1 } }])
 })
