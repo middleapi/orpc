@@ -1,9 +1,8 @@
 import type { AsyncIteratorClass } from '@orpc/shared'
 import type { AnyProcedure, AnyRouter, inferRouterContext } from '@trpc/server'
 import type { Parser, TrackedData } from '@trpc/server/unstable-core-do-not-import'
-import { wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import * as ORPC from '@orpc/server'
-import { getOrBind, isTypescriptObject } from '@orpc/shared'
+import { isTypescriptObject, wrapAsyncIterator } from '@orpc/shared'
 import { isTrackedEnvelope, TRPCError } from '@trpc/server'
 import { isAsyncIterable, isObject } from '@trpc/server/unstable-core-do-not-import'
 
@@ -21,7 +20,7 @@ export type ToORPCRouterResult<TContext extends ORPC.Context, TRecord extends Re
           object,
           ORPC.Schema<TRecord[K]['_def']['$types']['input'], unknown>,
           ORPC.Schema<unknown, ToORPCOutput<TRecord[K]['_def']['$types']['output']>>,
-          Record<never, never>,
+          object,
           never
       >
       : TRecord[K] extends Record<string, any>
@@ -31,9 +30,6 @@ export type ToORPCRouterResult<TContext extends ORPC.Context, TRecord extends Re
 
 /**
  * Convert a tRPC router to an oRPC router.
- *
- * @warning For OpenAPI features, define OpenAPI metadata under the `'~openapi'` key
- * in your tRPC meta, e.g. via `toTRPCMeta(openapi({ ... }))`.
  */
 export function toORPCRouter<T extends AnyRouter>(
   router: T,
@@ -41,50 +37,30 @@ export function toORPCRouter<T extends AnyRouter>(
   inferRouterContext<T>,
   T['_def']['record']
 > {
-  const result = recordToORPCRouterRecord(router._def.record)
+  const result = {
+    ...lazyToORPCRouter(router._def.lazy),
+    ...recordToORPCRouterRecord(router._def.record),
+  }
 
-  for (const key in router._def.lazy) {
-    const item = router._def.lazy[key]!
+  return result as any
+}
 
-    const lazy = new ORPC.Lazy({
+function lazyToORPCRouter(lazies: AnyRouter['_def']['lazy']) {
+  const orpcRouter: Record<string, any> = {}
+
+  for (const key in lazies) {
+    const item = lazies[key]!
+
+    orpcRouter[key] = new ORPC.Lazy({
       meta: {},
       loader: async () => {
         const router = await item.ref()
         return { default: toORPCRouter(router) }
       },
     })
-
-    /**
-     * tRPC keys lazy routers by their dot-joined path relative to the router root,
-     * e.g. `nested.lazy` when a lazy router lives inside a plain object record.
-     */
-    const segments = key.split('.')
-    let parent: Record<string, any> = result
-
-    for (const segment of segments.slice(0, -1)) {
-      parent = parent[segment] ??= {}
-    }
-
-    parent[segments.at(-1)!] = createAccessibleLazyRouter(lazy)
   }
 
-  return result as any
-}
-
-/**
- * Allows accessing procedures/routers behind a lazy router without unlazying it first,
- * since converted lazy routers are typed as plain (non-lazy) routers.
- */
-function createAccessibleLazyRouter(lazy: ORPC.Lazy<any>): ORPC.Lazy<any> {
-  return new Proxy(lazy, {
-    get(target, key) {
-      if (typeof key !== 'string' || key === '~orpc') {
-        return getOrBind(target, key)
-      }
-
-      return createAccessibleLazyRouter(ORPC.getRouter(target, [key]))
-    },
-  })
+  return orpcRouter
 }
 
 function recordToORPCRouterRecord(records: AnyRouter['_def']['record']) {
@@ -117,6 +93,7 @@ function toORPCProcedure(procedure: AnyProcedure) {
     // tRPC procedure calling already validates the input/output
     disableInputValidation: true,
     disableOutputValidation: true,
+    opaqueReturnedErrors: true,
     handler: async ({ context, signal, path, input, lastEventId }) => {
       try {
         const trpcInput = lastEventId !== undefined && (input === undefined || isObject(input))
@@ -135,7 +112,7 @@ function toORPCProcedure(procedure: AnyProcedure) {
         })
 
         if (isAsyncIterable(output)) {
-          return wrapAsyncIteratorPreservingEventMeta(output[Symbol.asyncIterator](), {
+          return wrapAsyncIterator(output[Symbol.asyncIterator](), {
             mapResult: (result) => {
               if (isTrackedEnvelope(result.value)) {
                 const [id, data] = result.value

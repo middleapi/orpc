@@ -39,7 +39,6 @@
     "@trpc/server": ">=11.4.2"
   },
   "dependencies": {
-    "@orpc/client": "workspace:*",
     "@orpc/contract": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*"

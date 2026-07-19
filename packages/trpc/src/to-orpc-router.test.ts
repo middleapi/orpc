@@ -1,7 +1,7 @@
-import { getOpenAPIMeta, OpenAPIGenerator } from '@orpc/openapi'
+import { getOpenAPIMeta } from '@orpc/openapi'
 import { call, createRouterClient, getEventMeta, Lazy, ORPCError, Procedure, unlazy } from '@orpc/server'
 import { isAsyncIteratorObject } from '@orpc/shared'
-import { lazy, tracked, TRPCError } from '@trpc/server'
+import { tracked, TRPCError } from '@trpc/server'
 import * as z from 'zod'
 import { inputSchema, outputSchema, t, trpcRouter } from '../tests/shared'
 import { toORPCRouter } from './to-orpc-router'
@@ -18,17 +18,13 @@ describe('toORPCRouter', async () => {
     expect(orpcRouter.throw).toBeInstanceOf(Procedure)
     expect(orpcRouter.nested.ping).toBeInstanceOf(Procedure)
 
-    const unlazy1 = await unlazy(orpcRouter.lazy as any)
-    const unlazy2 = await unlazy(unlazy1.default.lazy)
-
     expect(orpcRouter.lazy).toBeInstanceOf(Lazy)
+    const unlazy1 = await unlazy(orpcRouter.lazy)
     expect(unlazy1.default.subscribe).toBeInstanceOf(Procedure)
-    expect(unlazy1.default.lazy).toBeInstanceOf(Lazy)
-    expect(unlazy2.default.throw).toBeInstanceOf(Procedure)
 
-    // accessible lazy router
-    expect(await unlazy(orpcRouter.lazy.subscribe as any)).toEqual({ default: expect.any(Procedure) })
-    expect(await unlazy(orpcRouter.lazy.lazy.throw as any)).toEqual({ default: expect.any(Procedure) })
+    expect(unlazy1.default.lazy).toBeInstanceOf(Lazy)
+    const unlazy2 = await unlazy(unlazy1.default.lazy)
+    expect(unlazy2.default.throw).toBeInstanceOf(Procedure)
   })
 
   it('with input/output schema and validation happen inside handler only', async () => {
@@ -49,54 +45,6 @@ describe('toORPCRouter', async () => {
     await expect(call((orpcRouter as any).ping, 'invalid')).rejects.toThrow('Invalid input') // validation happen at tRPC level
   })
 
-  it('openapi spec generation', async () => {
-    const trpcRouter = t.router({
-      planet: {
-        find: t.procedure
-          .meta({ '~openapi': { method: 'GET', path: '/planets/{id}', summary: 'Find a planet' } })
-          .input(z.object({ id: z.string() }))
-          .output(z.object({ name: z.string() }))
-          .query(() => ({ name: 'Earth' })),
-
-        create: t.procedure
-          .input(z.object({ name: z.string() }))
-          .mutation(({ input }) => input),
-      },
-    })
-
-    const generator = new OpenAPIGenerator({
-      converters: [{
-        condition: schema => schema?.['~standard'].vendor === 'zod',
-        async convert(schema, direction) {
-          const jsonSchema = z.toJSONSchema(schema as any, { io: direction })
-          const output = await schema?.['~standard'].validate(undefined)
-          return [jsonSchema as any, !output?.issues]
-        },
-      }],
-    })
-
-    const spec = await generator.generate(toORPCRouter(trpcRouter))
-
-    expect(spec.paths?.['/planets/{id}']?.get).toMatchObject({
-      summary: 'Find a planet',
-      operationId: 'planet.find',
-    })
-
-    expect(spec.paths?.['/planet/create']?.post).toMatchObject({
-      operationId: 'planet.create',
-      requestBody: {
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: { name: { type: 'string' } },
-            },
-          },
-        },
-      },
-    })
-  })
-
   it('meta', async () => {
     expect(orpcRouter.ping['~orpc'].meta).toEqual({ meta1: 'test' })
     expect(orpcRouter.nested.ping['~orpc'].meta).toEqual({ '~openapi': { path: '/nested/ping', description: 'Nested ping procedure' } })
@@ -104,9 +52,30 @@ describe('toORPCRouter', async () => {
   })
 
   describe('calls', () => {
+    const handler = vi.fn()
+    const router = toORPCRouter(t.router({
+      procedure: t.procedure.query(handler),
+    }))
+
     it('on success', async () => {
-      const result = await call(orpcRouter.ping, { input: 1234 }, { context: { a: 'test' } })
+      handler.mockResolvedValueOnce({ output: '1234' })
+      const controller = new AbortController()
+
+      const result = await call(router.procedure, { input: 1234 } as any, {
+        context: { a: 'test' },
+        signal: controller.signal,
+        path: ['nested', 'procedure'],
+      })
+
       expect(result).toEqual({ output: '1234' })
+      expect(handler).toHaveBeenCalledTimes(1)
+      expect(handler).toHaveBeenCalledWith(expect.objectContaining({
+        ctx: { a: 'test' },
+        input: { input: 1234 },
+        path: 'nested.procedure',
+        type: 'query',
+        signal: controller.signal,
+      }))
     })
 
     it('async iterator', async () => {
@@ -131,42 +100,6 @@ describe('toORPCRouter', async () => {
 
         return true
       })
-    })
-
-    it('lazy router nested inside a plain object record', async () => {
-      const trpcRouter = t.router({
-        nested: {
-          lazy: lazy(() => Promise.resolve({ default: t.router({
-            ping: t.procedure.query(() => 'pong'),
-          }) })),
-        },
-      })
-
-      const orpcRouter = toORPCRouter(trpcRouter)
-
-      expect((orpcRouter.nested as any).lazy).toBeInstanceOf(Lazy)
-      expect(await unlazy((orpcRouter.nested as any).lazy.ping)).toEqual({ default: expect.any(Procedure) })
-      await expect(
-        call((orpcRouter.nested as any).lazy.ping, undefined, { context: { a: 'test' } }),
-      ).resolves.toEqual('pong')
-    })
-
-    it('lazy router whose parent segment is missing from the record', async () => {
-      // can happen with partially loaded/hand-built tRPC routers
-      const orpcRouter = toORPCRouter({
-        _def: {
-          record: {},
-          lazy: {
-            'deep.lazy': {
-              ref: async () => t.router({
-                ping: t.procedure.query(() => 'pong'),
-              }),
-            },
-          },
-        },
-      } as any)
-
-      expect(await unlazy((orpcRouter as any).deep.lazy.ping)).toEqual({ default: expect.any(Procedure) })
     })
 
     it('rethrows non-TRPCError errors as-is', async () => {

@@ -782,9 +782,6 @@ importers:
 
   packages/trpc:
     dependencies:
-      '@orpc/client':
-        specifier: workspace:*
-        version: link:../client
       '@orpc/contract':
         specifier: workspace:*
         version: link:../contract

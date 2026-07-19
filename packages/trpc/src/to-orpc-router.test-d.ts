@@ -16,28 +16,28 @@ it('ToORPCRouterResult', () => {
   expectTypeOf<InferRouterInitialContext<typeof orpcRouter>>().toEqualTypeOf<{ a: string }>()
 
   expectTypeOf(orpcRouter.ping).toEqualTypeOf<
-    Procedure<TRPCContext, object, Schema<{ input: number }, unknown>, Schema<unknown, { output: string }>, Record<never, never>, never>
+    Procedure<TRPCContext, object, Schema<{ input: number }, unknown>, Schema<unknown, { output: string }>, object, never>
   >()
 
   expectTypeOf(orpcRouter.throw).toEqualTypeOf<
-    Procedure<TRPCContext, object, Schema<{ b: number, c: string }, unknown>, Schema<unknown, never>, Record<never, never>, never>
+    Procedure<TRPCContext, object, Schema<{ b: number, c: string }, unknown>, Schema<unknown, never>, object, never>
   >()
 
   expectTypeOf(orpcRouter.subscribe).toEqualTypeOf<
-    Procedure<TRPCContext, object, Schema<{ u: string }, unknown>, Schema<unknown, AsyncIteratorClass<'pong' | TrackedData<{ order: number }>, void, any>>, Record<never, never>, never>
+    Procedure<TRPCContext, object, Schema<{ u: string }, unknown>, Schema<unknown, AsyncIteratorClass<'pong' | TrackedData<{ order: number }>, void, any>>, object, never>
   >()
 
   expectTypeOf(orpcRouter.nested).toEqualTypeOf<
     {
-      ping: Procedure<TRPCContext, object, Schema<{ a: string }, unknown>, Schema<unknown, number>, Record<never, never>, never>
+      ping: Procedure<TRPCContext, object, Schema<{ a: string }, unknown>, Schema<unknown, number>, object, never>
     }
   >()
 
   expectTypeOf(orpcRouter.lazy).toEqualTypeOf<
     {
-      subscribe: Procedure<TRPCContext, object, Schema<void, unknown>, Schema<unknown, AsyncIteratorClass<string, void, any>>, Record<never, never>, never>
+      subscribe: Procedure<TRPCContext, object, Schema<void, unknown>, Schema<unknown, AsyncIteratorClass<string, void, any>>, object, never>
       lazy: {
-        throw: Procedure<TRPCContext, object, Schema<{ input: number }, unknown>, Schema<unknown, { output: string }>, Record<never, never>, never>
+        throw: Procedure<TRPCContext, object, Schema<{ input: number }, unknown>, Schema<unknown, { output: string }>, object, never>
       }
     }
   >()
