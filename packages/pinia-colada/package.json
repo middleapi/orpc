@@ -1,5 +1,5 @@
 {
-  "name": "@orpc/vue-colada",
+  "name": "@orpc/pinia-colada",
   "type": "module",
   "version": "2.0.0-beta.18",
   "license": "MIT",
@@ -7,12 +7,12 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
-    "directory": "packages/vue-colada"
+    "directory": "packages/pinia-colada"
   },
   "keywords": [
     "orpc",
     "vue",
-    "vue-colada",
+    "pinia",
     "pinia-colada"
   ],
   "sideEffects": false,

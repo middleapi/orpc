@@ -4,8 +4,8 @@
   <a href="https://codecov.io/gh/middleapi/orpc">
     <img alt="codecov" src="https://codecov.io/gh/middleapi/orpc/branch/main/graph/badge.svg">
   </a>
-  <a href="https://www.npmjs.com/package/@orpc/vue-colada">
-    <img alt="weekly downloads" src="https://img.shields.io/npm/dw/%40orpc%2Fvue-colada?logo=npm" />
+  <a href="https://www.npmjs.com/package/@orpc/pinia-colada">
+    <img alt="weekly downloads" src="https://img.shields.io/npm/dw/%40orpc%2Fpinia-colada?logo=npm" />
   </a>
   <a href="https://app.codspeed.io/middleapi/orpc?utm_source=badge">
     <img alt="CodSpeed" src="https://img.shields.io/endpoint?url=https://codspeed.io/badge.json" />
@@ -50,7 +50,7 @@ You can read the documentation [here](https://orpc.dev).
 
 - [@orpc/next](https://www.npmjs.com/package/@orpc/next): Integrate with [Next.js Server Functions](https://nextjs.org/docs/app/getting-started/mutating-data).
 - [@orpc/tanstack-query](https://www.npmjs.com/package/@orpc/tanstack-query): Integrate with [TanStack Query](https://tanstack.com/query/latest).
-- [@orpc/vue-colada](https://www.npmjs.com/package/@orpc/vue-colada): Integrate with [Pinia Colada](https://pinia-colada.esm.dev/).
+- [@orpc/pinia-colada](https://www.npmjs.com/package/@orpc/pinia-colada): Integrate with [Pinia Colada](https://pinia-colada.esm.dev/).
 - [@orpc/experimental-effect](https://www.npmjs.com/package/@orpc/experimental-effect): Integrate with [Effect](https://effect.website/).
 - [@orpc/nest](https://www.npmjs.com/package/@orpc/nest): Implement your contract with [NestJS](https://nestjs.com/).
 - [@orpc/bun](https://www.npmjs.com/package/@orpc/bun): Adapters for [Bun's Redis](https://bun.sh/).

@@ -7,9 +7,9 @@ export * from './router-utils'
 export * from './types'
 
 export {
-  createRouterUtils as createORPCVueColadaUtils,
+  createRouterUtils as createPiniaColadaUtils,
 }
 export {
-  OPERATION_CONTEXT_SYMBOL as VUE_COLADA_OPERATION_CONTEXT_SYMBOL,
-  type OperationContext as VueColadaOperationContext,
+  OPERATION_CONTEXT_SYMBOL as PINIA_COLADA_OPERATION_CONTEXT_SYMBOL,
+  type OperationContext as PiniaColadaOperationContext,
 } from './types'

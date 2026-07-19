@@ -5,7 +5,7 @@ export type UseQueryFnContext = Parameters<UseQueryOptions<any>['query']>[0]
 
 export type UseMutationFnContext = Parameters<UseMutationOptions<any, any>['mutation']>[1]
 
-export const OPERATION_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_VUE_COLADA_OPERATION_CONTEXT') as any
+export const OPERATION_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_PINIA_COLADA_OPERATION_CONTEXT') as any
 
 export type OperationType = 'query' | 'infinite' | 'mutation'
 

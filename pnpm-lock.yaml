@@ -609,6 +609,31 @@ importers:
         specifier: ^0.220.0
         version: 0.220.0(@opentelemetry/api@1.9.1)
 
+  packages/pinia-colada:
+    dependencies:
+      '@orpc/client':
+        specifier: workspace:*
+        version: link:../client
+      '@orpc/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@pinia/colada':
+        specifier: ^1.4.2
+        version: 1.4.2(pinia@4.0.2(@vue/devtools-api@7.7.10)(typescript@6.0.3)(vue@3.5.39(typescript@6.0.3)))(vue@3.5.39(typescript@6.0.3))
+      '@vue/test-utils':
+        specifier: ^2.4.11
+        version: 2.4.11(@vue/compiler-dom@3.5.39)(@vue/server-renderer@3.5.39(vue@3.5.39(typescript@6.0.3)))(vue@3.5.39(typescript@6.0.3))
+      pinia:
+        specifier: ^4.0.2
+        version: 4.0.2(@vue/devtools-api@7.7.10)(typescript@6.0.3)(vue@3.5.39(typescript@6.0.3))
+      vue:
+        specifier: ^3.5.38
+        version: 3.5.39(typescript@6.0.3)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+
   packages/pino:
     dependencies:
       '@orpc/client':
@@ -814,31 +839,6 @@ importers:
       valibot:
         specifier: ^1.4.1
         version: 1.4.2(typescript@6.0.3)
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-
-  packages/vue-colada:
-    dependencies:
-      '@orpc/client':
-        specifier: workspace:*
-        version: link:../client
-      '@orpc/shared':
-        specifier: workspace:*
-        version: link:../shared
-    devDependencies:
-      '@pinia/colada':
-        specifier: ^1.4.2
-        version: 1.4.2(pinia@4.0.2(@vue/devtools-api@7.7.10)(typescript@6.0.3)(vue@3.5.39(typescript@6.0.3)))(vue@3.5.39(typescript@6.0.3))
-      '@vue/test-utils':
-        specifier: ^2.4.11
-        version: 2.4.11(@vue/compiler-dom@3.5.39)(@vue/server-renderer@3.5.39(vue@3.5.39(typescript@6.0.3)))(vue@3.5.39(typescript@6.0.3))
-      pinia:
-        specifier: ^4.0.2
-        version: 4.0.2(@vue/devtools-api@7.7.10)(typescript@6.0.3)(vue@3.5.39(typescript@6.0.3))
-      vue:
-        specifier: ^3.5.38
-        version: 3.5.39(typescript@6.0.3)
       zod:
         specifier: ^4.4.3
         version: 4.4.3

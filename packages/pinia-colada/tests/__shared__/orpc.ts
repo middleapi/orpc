@@ -7,7 +7,7 @@ import { PiniaColada } from '@pinia/colada'
 import { mount as baseMount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import z from 'zod'
-import { createORPCVueColadaUtils } from '../../src'
+import { createPiniaColadaUtils } from '../../src'
 
 export const router = {
   ping: os
@@ -44,7 +44,7 @@ export const client: RouterClient<typeof router, { cache?: boolean }> = createOR
   },
 }))
 
-export const orpc = createORPCVueColadaUtils(client)
+export const orpc = createPiniaColadaUtils(client)
 
 export const mount: typeof baseMount = (component, options) => {
   return baseMount(component, {

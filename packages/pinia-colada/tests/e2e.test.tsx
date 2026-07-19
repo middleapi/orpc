@@ -1,7 +1,7 @@
 import { isInferableError, ORPCError } from '@orpc/client'
 import { useInfiniteQuery, useMutation, useQuery, useQueryCache } from '@pinia/colada'
 import { defineComponent, ref } from 'vue'
-import { createORPCVueColadaUtils, VUE_COLADA_OPERATION_CONTEXT_SYMBOL } from '../src'
+import { createPiniaColadaUtils, PINIA_COLADA_OPERATION_CONTEXT_SYMBOL } from '../src'
 import { client, mount, orpc, router } from './__shared__/orpc'
 
 beforeEach(() => {
@@ -125,7 +125,7 @@ it('case: with useMutation', async () => {
 })
 
 it('case: with prefix', async () => {
-  const prefixed = createORPCVueColadaUtils(client, { prefix: '__prefix__' })
+  const prefixed = createPiniaColadaUtils(client, { prefix: '__prefix__' })
 
   expect(prefixed.nested.ping.key({ type: 'query' })).toEqual(['__prefix__', ['nested', 'ping'], { type: 'query' }])
   expect(prefixed.nested.ping.queryKey({ input: { input: 123 } })).not.toEqual(orpc.nested.ping.queryKey({ input: { input: 123 } }))
@@ -164,7 +164,7 @@ it('case: with interceptors and plugins', async () => {
   const queryInterceptor = vi.fn(({ next }: any) => next())
   const mutationInterceptor = vi.fn(({ next }: any) => next())
 
-  const utils = createORPCVueColadaUtils(client, {
+  const utils = createPiniaColadaUtils(client, {
     queryInterceptors: [queryInterceptor],
     plugins: [
       {
@@ -194,7 +194,7 @@ it('case: with interceptors and plugins', async () => {
     path: ['nested', 'ping'],
     input: { input: 123 },
     context: expect.objectContaining({
-      [VUE_COLADA_OPERATION_CONTEXT_SYMBOL]: {
+      [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
         key: utils.nested.ping.key({ type: 'query', input: { input: 123 } }),
         type: 'query',
       },
@@ -210,7 +210,7 @@ it('case: with interceptors and plugins', async () => {
     path: ['nested', 'ping'],
     input: { input: 456 },
     context: expect.objectContaining({
-      [VUE_COLADA_OPERATION_CONTEXT_SYMBOL]: {
+      [PINIA_COLADA_OPERATION_CONTEXT_SYMBOL]: {
         key: utils.nested.ping.key({ type: 'mutation', input: { input: 456 } }),
         type: 'mutation',
       },
