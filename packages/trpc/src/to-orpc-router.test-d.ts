@@ -1,10 +1,9 @@
 import type { InferRouterInitialContext, Procedure, Router, Schema } from '@orpc/server'
 import type { AsyncIteratorClass } from '@orpc/shared'
-import type { inferRouterContext } from '@trpc/server'
 import type { TrackedData } from '@trpc/server/unstable-core-do-not-import'
-import type { ToORPCRouterResult } from './to-orpc-router'
 import { initTRPC, lazy, tracked, TRPCError } from '@trpc/server'
 import * as z from 'zod'
+import { toORPCRouter } from './to-orpc-router'
 
 type TRPCContext = { a: string }
 
@@ -64,11 +63,8 @@ const trpcRouter = t.router({
   }) })),
 })
 
-it('ToORPCRouterResult', () => {
-  const orpcRouter = {} as ToORPCRouterResult<
-    inferRouterContext<typeof trpcRouter>,
-    typeof trpcRouter['_def']['record']
-  >
+describe('toORPCRouter', () => {
+  const orpcRouter = toORPCRouter(trpcRouter)
 
   expectTypeOf(orpcRouter).toExtend<Router<TRPCContext>>()
 

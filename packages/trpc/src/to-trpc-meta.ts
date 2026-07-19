@@ -1,4 +1,4 @@
-import type { AnyMetaPlugin, Meta } from '@orpc/contract'
+import type { AnyMetaPlugin } from '@orpc/contract'
 import { resolveMetaPlugins } from '@orpc/contract'
 
 /**
@@ -12,13 +12,23 @@ import { resolveMetaPlugins } from '@orpc/contract'
  * const example = t.procedure
  *   .meta(toTRPCMeta(openapi({ path: '/hello' })))
  *   .query(() => 'Hello, World!')
+ *
+ * const merged = t.procedure
+ *   .meta({
+ *     ...toTRPCMeta(
+ *       openapi({ path: '/hello' }),
+ *       openapi({ method: 'POST' }),
+ *     ),
+ *     other: 'value',
+ *   })
+ *   .mutation(() => 'Hello, World!')
  * ```
  *
- * @warning Unlike oRPC builders, chained tRPC `.meta()` calls merge shallowly,
- * so plugin merge logic (e.g. accumulating openapi `tags`) only applies to
- * plugins resolved within a single `toTRPCMeta` call.
+ * @warning Chained tRPC `.meta` calls merge shallowly, so oRPC metadata merge logic
+ * (e.g. accumulating openapi `tags`) only works within a single `toTRPCMeta`
+ * call.
  */
-export function toTRPCMeta(...plugins: AnyMetaPlugin[]): Meta {
+export function toTRPCMeta(...plugins: AnyMetaPlugin[]): Record<string, any> {
   const [meta] = resolveMetaPlugins({}, undefined, plugins)
   return meta
 }

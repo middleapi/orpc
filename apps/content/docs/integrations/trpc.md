@@ -1,6 +1,6 @@
 # tRPC Integration
 
-This guide explains how to integrate oRPC with [tRPC](https://trpc.io/), allowing you to leverage oRPC features in your existing tRPC applications.
+This guide shows how to integrate [tRPC](https://trpc.io/) with oRPC, so you can use oRPC features in your existing tRPC applications.
 
 ## Installation
 
@@ -38,51 +38,11 @@ import { toORPCRouter } from '@orpc/trpc'
 const orpcRouter = toORPCRouter(trpcRouter)
 ```
 
-The result is a regular oRPC router, so you can use it with any oRPC feature. For example, expose it through an [RPC Handler](/docs/rpc/handler) or [OpenAPI Handler](/docs/openapi/handler), call it directly with [Server-Side Clients](/docs/client/server-side), generate an [OpenAPI Specification](/docs/openapi/specification), and combine it with oRPC [middlewares](/docs/middleware), [plugins](/docs/openapi/handler#plugins), and [interceptors](/docs/openapi/handler#interceptors).
+The result is a regular oRPC router that works with any oRPC feature. For example, you can expose it through an [RPC Handler](/docs/rpc/handler) or [OpenAPI Handler](/docs/openapi/handler), or call it directly with [Server-Side Clients](/docs/client/server-side).
 
-```ts
-import { call, createRouterClient } from '@orpc/server'
+### Error Formatting
 
-// call a procedure directly
-const output = await call(orpcRouter.ping, { input: 123 }, { context: {} })
-
-// or create a server-side client
-const client = createRouterClient(orpcRouter, { context: {} })
-const result = await client.nested.pong({ id: '123' })
-```
-
-::: info
-Input/output validation stays in tRPC's hands: converted procedures delegate execution to the original tRPC procedures, so your tRPC middlewares, validation, and transforms run exactly as before.
-:::
-
-## OpenAPI
-
-Once converted, your tRPC app gets first-class OpenAPI support. Define OpenAPI metadata under the `'~openapi'` key in your tRPC meta by bridging [oRPC meta plugins](/docs/metadata) with `toTRPCMeta`:
-
-```ts
-import type { Meta } from '@orpc/server'
-import { openapi } from '@orpc/openapi'
-import { toTRPCMeta } from '@orpc/trpc'
-
-export const t = initTRPC.context<Context>().meta<Meta>().create()
-
-const example = t.procedure
-  .meta(toTRPCMeta(openapi({ path: '/hello', summary: 'Hello procedure' }))) // [!code highlight]
-  .input(z.object({ name: z.string() }))
-  .query(({ input }) => {
-    return `Hello, ${input.name}!`
-  })
-```
-
-::: warning
-Unlike oRPC builders, chained tRPC `.meta()` calls merge shallowly, so plugin merge logic (e.g. accumulating `tags`) only applies to plugins resolved within a single `toTRPCMeta` call.
-:::
-
-Learn more in [OpenAPI Specification](/docs/openapi/specification) and [OpenAPI Handler](/docs/openapi/handler).
-
-## Error Formatting
-
-The `toORPCRouter` does not support [tRPC Error Formatting](https://trpc.io/docs/server/error-formatting). You should catch errors and format them manually using [interceptors](/docs/openapi/handler#interceptors):
+`toORPCRouter` does not support [tRPC Error Formatting](https://trpc.io/docs/server/error-formatting). Instead, errors thrown by tRPC are wrapped in `ORPCError`.
 
 ```ts
 const handler = new OpenAPIHandler(orpcRouter, {
@@ -110,3 +70,38 @@ const handler = new OpenAPIHandler(orpcRouter, {
   ],
 })
 ```
+
+## Metadata
+
+`toTRPCMeta` bridges [oRPC metadata](/docs/metadata) with tRPC meta. It returns a plain object that you can pass to tRPC `.meta` calls.
+
+```ts
+import { openapi } from '@orpc/openapi'
+import { toTRPCMeta } from '@orpc/trpc'
+
+export const t = initTRPC.context<Context>().create()
+
+const example = t.procedure
+  .meta(toTRPCMeta(openapi({ path: '/hello', summary: 'Hello procedure' }))) // [!code highlight]
+  .input(z.object({ name: z.string() }))
+  .query(({ input }) => {
+    return `Hello, ${input.name}!`
+  })
+
+const merged = t.procedure
+  .meta({
+    ...toTRPCMeta( // [!code highlight]
+      openapi({ path: '/hello' }), // [!code highlight]
+      openapi({ method: 'POST' }), // [!code highlight]
+    ), // [!code highlight]
+    other: 'value',
+  })
+  .input(z.object({ name: z.string() }))
+  .mutation(({ input }) => {
+    return `Hello, ${input.name}!`
+  })
+```
+
+::: warning
+Chained tRPC `.meta()` calls merge shallowly, so oRPC metadata merge logic (e.g. accumulating `openapi.tags`) only works within a single `toTRPCMeta` call.
+:::
