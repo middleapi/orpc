@@ -848,6 +848,9 @@ importers:
       '@orpc/json-schema':
         specifier: workspace:*
         version: link:../json-schema
+      json-schema-typed:
+        specifier: ^8.0.2
+        version: 8.0.2
     devDependencies:
       zod:
         specifier: ^4.4.3

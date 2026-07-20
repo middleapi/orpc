@@ -39,7 +39,8 @@
     "zod": ">=4.3.5"
   },
   "dependencies": {
-    "@orpc/json-schema": "workspace:*"
+    "@orpc/json-schema": "workspace:*",
+    "json-schema-typed": "^8.0.2"
   },
   "devDependencies": {
     "zod": "^4.4.3"
