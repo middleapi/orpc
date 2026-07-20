@@ -63,6 +63,7 @@ describe('createContractUtilsFactory', () => {
     }
     const options = {
       prefix: '__prefix__',
+      path: ['__base__'],
       queryInterceptors: [queryInterceptor],
       mutationInterceptors: [mutationInterceptor],
       plugins: [plugin],
@@ -87,7 +88,7 @@ describe('createContractUtilsFactory', () => {
 
     expect(createRouterUtilsOptions).toEqual({
       ...options,
-      path: ['users', 'list'],
+      path: ['__base__', 'users', 'list'],
       scoped: scopedOptions,
     })
 

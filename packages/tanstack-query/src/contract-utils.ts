@@ -5,7 +5,7 @@ import type { Public } from '@orpc/shared'
 import type { ProcedureUtils } from './procedure-utils'
 import type { RouterUtilsOptions, SharedRouterUtils } from './router-utils'
 import { getPathMeta } from '@orpc/contract'
-import { get } from '@orpc/shared'
+import { get, toArray } from '@orpc/shared'
 import { createRouterUtils } from './router-utils'
 
 export interface ContractUtilsFactory<TClientContext extends ClientContext> {
@@ -22,7 +22,7 @@ export interface ContractUtilsFactory<TClientContext extends ClientContext> {
 
 export interface ContractUtilsFactoryOptions<
   TClientContext extends ClientContext,
-> extends Omit<RouterUtilsOptions<RouterContractClient<RouterContract, TClientContext>>, 'path'> {
+> extends RouterUtilsOptions<RouterContractClient<RouterContract, TClientContext>> {
 }
 
 export function createContractUtilsFactory<
@@ -59,8 +59,8 @@ export function createContractUtilsFactory<
 
     return createRouterUtils(client, {
       ...options as any,
-      path,
       scoped,
+      path: [...toArray(options.path), ...path],
     })
   }
 }
