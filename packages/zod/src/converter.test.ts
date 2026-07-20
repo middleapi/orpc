@@ -247,23 +247,25 @@ describe('zodToJsonSchemaConverter', () => {
       }, false])
     })
 
-    it('prefers direction-specific registries over JSON_SCHEMA_REGISTRY', () => {
+    it('shallow merges JSON_SCHEMA_REGISTRY with direction-specific registries, direction-specific keys win', () => {
       const schema = z.codec(z.string(), z.number(), {
         decode: value => Number(value),
         encode: value => String(value),
       })
 
-      JSON_SCHEMA_REGISTRY.add(schema, { description: 'general' })
+      JSON_SCHEMA_REGISTRY.add(schema, { description: 'general', examples: ['general'] })
       JSON_SCHEMA_INPUT_REGISTRY.add(schema, { examples: ['20'] })
       JSON_SCHEMA_OUTPUT_REGISTRY.add(schema, { examples: [20] })
 
       expect(converter.convert(schema, 'input')).toEqual([{
         type: 'string',
+        description: 'general',
         examples: ['20'],
       }, false])
 
       expect(converter.convert(schema, 'output')).toEqual([{
         type: 'number',
+        description: 'general',
         examples: [20],
       }, false])
     })

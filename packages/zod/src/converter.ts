@@ -108,16 +108,15 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
   }
 
   private getCustomJsonSchema(schema: $ZodType, direction: JsonSchemaConverterDirection): Exclude<JsonSchema, boolean> | undefined {
-    if (direction === 'input' && JSON_SCHEMA_INPUT_REGISTRY.has(schema)) {
-      return JSON_SCHEMA_INPUT_REGISTRY.get(schema) as Exclude<JsonSchema, boolean> | undefined
+    const general = JSON_SCHEMA_REGISTRY.get(schema)
+    const directional = direction === 'input'
+      ? JSON_SCHEMA_INPUT_REGISTRY.get(schema)
+      : JSON_SCHEMA_OUTPUT_REGISTRY.get(schema)
+
+    if (general === undefined && directional === undefined) {
+      return undefined
     }
 
-    if (direction === 'output' && JSON_SCHEMA_OUTPUT_REGISTRY.has(schema)) {
-      return JSON_SCHEMA_OUTPUT_REGISTRY.get(schema) as Exclude<JsonSchema, boolean> | undefined
-    }
-
-    if (JSON_SCHEMA_REGISTRY.has(schema)) {
-      return JSON_SCHEMA_REGISTRY.get(schema) as Exclude<JsonSchema, boolean> | undefined
-    }
+    return { ...general, ...directional } as Exclude<JsonSchema, boolean>
   }
 }
