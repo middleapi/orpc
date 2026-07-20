@@ -83,13 +83,13 @@ describe('createContractUtilsFactory', () => {
     expect(result).toBe(delegatedUtils)
     expect(createRouterUtilsSpy).toHaveBeenCalledTimes(1)
 
-    const [client, createRouterUtilsOptions, createRouterUtilsPath] = createRouterUtilsSpy.mock.calls[0]!
+    const [client, createRouterUtilsOptions] = createRouterUtilsSpy.mock.calls[0]!
 
     expect(createRouterUtilsOptions).toEqual({
       ...options,
+      path: ['users', 'list'],
       scoped: scopedOptions,
     })
-    expect(createRouterUtilsPath).toEqual(['users', 'list'])
 
     expect((client as any)({ value: 'hello' }, { context: { requestId: 'request_1' } })).toBe('__mocked__')
     expect(caller).toHaveBeenCalledTimes(1)
@@ -131,13 +131,13 @@ describe('createContractJsonifiedUtilsFactory', () => {
     expect(result).toBe(delegatedUtils)
     expect(createRouterUtilsSpy).toHaveBeenCalledTimes(1)
 
-    const [client, createRouterUtilsOptions, createRouterUtilsPath] = createRouterUtilsSpy.mock.calls[0]!
+    const [client, createRouterUtilsOptions] = createRouterUtilsSpy.mock.calls[0]!
 
     expect(createRouterUtilsOptions).toEqual({
       prefix: '__json__',
       scoped: scopedOptions,
+      path: ['nested', 'pong'],
     })
-    expect(createRouterUtilsPath).toEqual(['nested', 'pong'])
 
     expect((client as any)('payload')).toBe('__jsonified__')
     expect(caller).toHaveBeenCalledTimes(1)

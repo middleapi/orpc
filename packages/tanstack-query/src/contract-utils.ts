@@ -22,7 +22,7 @@ export interface ContractUtilsFactory<TClientContext extends ClientContext> {
 
 export interface ContractUtilsFactoryOptions<
   TClientContext extends ClientContext,
-> extends RouterUtilsOptions<RouterContractClient<RouterContract, TClientContext>> {
+> extends Omit<RouterUtilsOptions<RouterContractClient<RouterContract, TClientContext>>, 'path'> {
 }
 
 export function createContractUtilsFactory<
@@ -59,8 +59,9 @@ export function createContractUtilsFactory<
 
     return createRouterUtils(client, {
       ...options as any,
+      path,
       scoped,
-    }, path)
+    })
   }
 }
 
