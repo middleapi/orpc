@@ -1,4 +1,4 @@
-import { allAbortSignal, runWithSignal } from './signal'
+import { allAbortSignal, anyAbortSignal, runWithSignal } from './signal'
 
 describe('allAbortSignal', () => {
   it('should return undefined if contains undefined or empty array', () => {
@@ -53,6 +53,70 @@ describe('allAbortSignal', () => {
     controllerLater2.abort()
     expect(batchSignal?.aborted).toBe(true)
     expect(abortSpy).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('anyAbortSignal', () => {
+  it('should return undefined if empty or contains only undefined', () => {
+    expect(anyAbortSignal([])).toBe(undefined)
+    expect(anyAbortSignal([undefined])).toBe(undefined)
+    expect(anyAbortSignal([undefined, undefined])).toBe(undefined)
+  })
+
+  it('should return the signal as-is if only one valid signal is provided', () => {
+    const controller = new AbortController()
+
+    expect(anyAbortSignal([controller.signal])).toBe(controller.signal)
+    expect(anyAbortSignal([undefined, controller.signal, undefined])).toBe(controller.signal)
+  })
+
+  describe.each([
+    { native: true, description: 'built-in AbortSignal.any' },
+    { native: false, description: 'fallback implementation' },
+  ])('with $description', ({ native }) => {
+    const originalAny = AbortSignal.any
+
+    beforeEach(() => {
+      if (!native) {
+        // @ts-expect-error simulate runtimes without AbortSignal.any support
+        AbortSignal.any = undefined
+      }
+    })
+
+    afterEach(() => {
+      AbortSignal.any = originalAny
+    })
+
+    it('should return an aborted signal initially if any input is already aborted', () => {
+      const reason = new Error('already aborted')
+      const controller1 = new AbortController()
+      const controller2 = new AbortController()
+      controller1.abort(reason)
+
+      const anySignal = anyAbortSignal([controller1.signal, controller2.signal])
+      expect(anySignal?.aborted).toBe(true)
+      expect(anySignal?.reason).toBe(reason)
+    })
+
+    it('should abort with the reason of the first signal that aborts', () => {
+      const controller1 = new AbortController()
+      const controller2 = new AbortController()
+
+      const anySignal = anyAbortSignal([controller1.signal, controller2.signal])
+      expect(anySignal?.aborted).toBe(false)
+
+      const abortSpy = vi.fn()
+      anySignal?.addEventListener('abort', abortSpy)
+
+      const reason = new Error('first abort')
+      controller2.abort(reason)
+      expect(anySignal?.aborted).toBe(true)
+      expect(anySignal?.reason).toBe(reason)
+      expect(abortSpy).toHaveBeenCalledTimes(1)
+
+      controller1.abort(new Error('second abort'))
+      expect(anySignal?.reason).toBe(reason)
+    })
   })
 })
 

@@ -167,6 +167,7 @@ export default withMermaid(defineConfig({
             { text: 'Retry After', link: '/docs/plugins/retry-after' },
             { text: 'Retry', link: '/docs/plugins/retry' },
             { text: 'Smart Coercion', link: '/docs/plugins/smart-coercion' },
+            { text: 'Timeout', link: '/docs/plugins/timeout' },
           ],
         },
         {
