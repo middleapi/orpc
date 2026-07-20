@@ -85,15 +85,11 @@ export interface RouterUtilsOptions<T extends AnyNestedClient> extends Operation
 export function createRouterUtils<T extends AnyNestedClient>(
   client: T,
   options: NoInfer<RouterUtilsOptions<T>> = {},
-  /**
-   * Base procedure path the utils are rooted at, mainly for internal contract utils usage.
-   */
-  path: string[] = [],
 ): RouterUtils<T> {
   const plugin = new CompositeRouterUtilsPlugin<T>(options.plugins)
   options = plugin.init(options)
 
-  return createRouterUtilsInternal(client, path, options, plugin)
+  return createRouterUtilsInternal(client, [], options, plugin)
 }
 
 function createRouterUtilsInternal<T extends AnyNestedClient>(
