@@ -276,5 +276,25 @@ describe('zodToJsonSchemaConverter', () => {
         false,
       ])
     })
+
+    it('keeps the `anyOf` when a non-scalar `type` is pinned on a union', () => {
+      // `object`/`array` branches carry real structure the metadata does not
+      // restate, so the composition must survive rather than be discarded.
+      const schema = z.union([
+        z.object({ a: z.string() }),
+        z.object({ b: z.number() }),
+      ]).meta({ type: 'object' })
+
+      expect(converter.convert(schema, 'input')).toEqual([
+        {
+          type: 'object',
+          anyOf: [
+            { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+            { type: 'object', properties: { b: { type: 'number' } }, required: ['b'] },
+          ],
+        },
+        false,
+      ])
+    })
   })
 })
