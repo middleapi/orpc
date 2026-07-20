@@ -22,7 +22,7 @@ export class TimeoutLinkPlugin<T extends ClientContext> implements StandardLinkP
   name = '~timeout'
 
   /**
-   * Should abort if total retry times exceed the configured timeout.
+   * Should abort if the total retry time exceeds the configured timeout
    */
   after = ['~retry']
 
