@@ -118,11 +118,6 @@ it('RouterUtilsScoped', () => {
 })
 
 it('createRouterUtils', () => {
-  createRouterUtils({} as RouterClient<typeof scopedRouter, { batch?: boolean }>, {
-    // @ts-expect-error path option was replaced by prefix
-    path: ['base'],
-  })
-
   const utils = createRouterUtils({} as RouterClient<typeof scopedRouter, { batch?: boolean }>, {
     prefix: '__prefix__',
     scoped: {

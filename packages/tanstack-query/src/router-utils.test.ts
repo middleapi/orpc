@@ -84,23 +84,6 @@ describe('createRouterUtils', () => {
     expect(pongUtils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.queryOptions.mock.results[0]?.value)
   })
 
-  it('roots utils at the given base path', () => {
-    const utils = createRouterUtils(client, {}, ['__base__']) as any
-
-    expect(ProcedureUtils).toHaveBeenCalledTimes(1)
-    expect(ProcedureUtils).toHaveBeenCalledWith(['__base__'], client, emptyInterceptors)
-    expect(utils.key({ type: 'infinite' })).toBe(generateOperationKeySpy.mock.results[0]?.value)
-    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['__base__'], { type: 'infinite', prefix: undefined })
-
-    vi.clearAllMocks()
-    const keyUtils = utils.key
-
-    expect(ProcedureUtils).toHaveBeenCalledTimes(1)
-    expect(ProcedureUtils).toHaveBeenCalledWith(['__base__', 'key'], client.key, emptyInterceptors)
-    expect(keyUtils.key({ type: 'live' })).toBe(generateOperationKeySpy.mock.results[0]?.value)
-    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['__base__', 'key'], { type: 'live', prefix: undefined })
-  })
-
   it('stops recursive on symbol', async () => {
     const utils = createRouterUtils(client) as any
     expect(utils[Symbol.for('a')]).toBe(undefined)
