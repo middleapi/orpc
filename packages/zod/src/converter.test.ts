@@ -2,6 +2,7 @@ import * as v from 'valibot'
 import * as z from 'zod'
 import { $ZodRegistry, toJSONSchema } from 'zod/v4/core'
 import { ZodToJsonSchemaConverter } from './converter'
+import { JSON_SCHEMA_INPUT_REGISTRY, JSON_SCHEMA_OUTPUT_REGISTRY, JSON_SCHEMA_REGISTRY } from './registries'
 
 vi.mock('zod/v4/core', async (original) => {
   const mod = await original<typeof import('zod/v4/core')>()
@@ -225,6 +226,64 @@ describe('zodToJsonSchemaConverter', () => {
       }],
     ] as const)('extends conversion for %s', (schema, jsonSchema) => {
       expect(converter.convert(schema, 'input')).toEqual([jsonSchema, false])
+    })
+  })
+
+  describe('custom json schema registries', () => {
+    it('merges JSON_SCHEMA_REGISTRY entries over the generated schema for both directions', () => {
+      const schema = z.string().min(3)
+      JSON_SCHEMA_REGISTRY.add(schema, { examples: ['example'], minLength: 5 })
+
+      expect(converter.convert(schema, 'input')).toEqual([{
+        type: 'string',
+        minLength: 5,
+        examples: ['example'],
+      }, false])
+
+      expect(converter.convert(schema, 'output')).toEqual([{
+        type: 'string',
+        minLength: 5,
+        examples: ['example'],
+      }, false])
+    })
+
+    it('prefers direction-specific registries over JSON_SCHEMA_REGISTRY', () => {
+      const schema = z.codec(z.string(), z.number(), {
+        decode: value => Number(value),
+        encode: value => String(value),
+      })
+
+      JSON_SCHEMA_REGISTRY.add(schema, { description: 'general' })
+      JSON_SCHEMA_INPUT_REGISTRY.add(schema, { examples: ['20'] })
+      JSON_SCHEMA_OUTPUT_REGISTRY.add(schema, { examples: [20] })
+
+      expect(converter.convert(schema, 'input')).toEqual([{
+        type: 'string',
+        examples: ['20'],
+      }, false])
+
+      expect(converter.convert(schema, 'output')).toEqual([{
+        type: 'number',
+        examples: [20],
+      }, false])
+    })
+
+    it('applies to nested schemas', () => {
+      const name = z.string()
+      JSON_SCHEMA_REGISTRY.add(name, { description: 'name field' })
+
+      const schema = z.object({ name })
+
+      expect(converter.convert(schema, 'input')).toEqual([{
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            description: 'name field',
+          },
+        },
+        required: ['name'],
+      }, false])
     })
   })
 })

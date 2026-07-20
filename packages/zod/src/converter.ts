@@ -2,6 +2,7 @@ import type { AnySchema, JsonSchema, JsonSchemaConverter, JsonSchemaConverterDir
 import type { $ZodType, ToJSONSchemaParams, JSONSchema as ZodJsonSchema } from 'zod/v4/core'
 import { encodeJsonPointerSegment, JsonSchemaFormat, JsonSchemaXNativeType } from '@orpc/json-schema'
 import { globalRegistry, toJSONSchema } from 'zod/v4/core'
+import { JSON_SCHEMA_INPUT_REGISTRY, JSON_SCHEMA_OUTPUT_REGISTRY, JSON_SCHEMA_REGISTRY } from './registries'
 
 export interface ZodToJsonSchemaConverterOptions extends Omit<ToJSONSchemaParams, 'target' | 'io'> {}
 
@@ -68,6 +69,12 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
           ctx.jsonSchema['x-native-type'] = JsonSchemaXNativeType.Map
         }
 
+        const customJsonSchema = this.getCustomJsonSchema(ctx.zodSchema, direction)
+
+        if (customJsonSchema) {
+          Object.assign(ctx.jsonSchema, customJsonSchema)
+        }
+
         this.options.override?.(ctx)
       },
     })
@@ -98,5 +105,19 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
     }
 
     return rest
+  }
+
+  private getCustomJsonSchema(schema: $ZodType, direction: JsonSchemaConverterDirection): Exclude<JsonSchema, boolean> | undefined {
+    if (direction === 'input' && JSON_SCHEMA_INPUT_REGISTRY.has(schema)) {
+      return JSON_SCHEMA_INPUT_REGISTRY.get(schema) as Exclude<JsonSchema, boolean> | undefined
+    }
+
+    if (direction === 'output' && JSON_SCHEMA_OUTPUT_REGISTRY.has(schema)) {
+      return JSON_SCHEMA_OUTPUT_REGISTRY.get(schema) as Exclude<JsonSchema, boolean> | undefined
+    }
+
+    if (JSON_SCHEMA_REGISTRY.has(schema)) {
+      return JSON_SCHEMA_REGISTRY.get(schema) as Exclude<JsonSchema, boolean> | undefined
+    }
   }
 }
