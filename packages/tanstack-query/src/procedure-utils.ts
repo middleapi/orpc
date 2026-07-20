@@ -1,6 +1,7 @@
 import type { Client, ClientContext } from '@orpc/client'
 import type { Interceptor, MaybeOptionalOptions, PromiseWithError } from '@orpc/shared'
 import type { DataTag, InfiniteData, MutationFunctionContext, QueryFunctionContext, QueryKey, SkipToken } from '@tanstack/query-core'
+import type { OperationKeyPrefixOptions } from './key'
 import type {
   InferLiveQueryOutput,
   InferStreamedQueryOutput,
@@ -11,7 +12,6 @@ import type {
   MutationOptionsIn,
   MutationOptionsOut,
   OperationContext,
-  OperationKeyPrefixOptions,
   QueryKeyOptions,
   QueryOptionsIn,
   QueryOptionsOut,
