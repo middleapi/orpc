@@ -227,4 +227,54 @@ describe('zodToJsonSchemaConverter', () => {
       expect(converter.convert(schema, 'input')).toEqual([jsonSchema, false])
     })
   })
+
+  describe('respects an explicit `type` in metadata', () => {
+    it('drops the leftover `anyOf` when a union pins a scalar type', () => {
+      const schema = z.union([z.string(), z.number()]).meta({
+        type: 'string',
+        format: 'date-time',
+        pattern: '^x$',
+      })
+
+      expect(converter.convert(schema, 'input')).toEqual([
+        {
+          type: 'string',
+          format: 'date-time',
+          pattern: '^x$',
+        },
+        false,
+      ])
+    })
+
+    it('applies to unions nested inside an object', () => {
+      const schema = z.object({
+        createdAt: z.union([z.string(), z.number()]).meta({ type: 'string', format: 'date-time' }),
+      })
+
+      expect(converter.convert(schema, 'input')).toEqual([
+        {
+          type: 'object',
+          properties: {
+            createdAt: { type: 'string', format: 'date-time' },
+          },
+          required: ['createdAt'],
+        },
+        false,
+      ])
+    })
+
+    it('leaves object schemas untouched when metadata restates `type`', () => {
+      const schema = z.object({ a: z.string() }).meta({ type: 'object', title: 'Foo' })
+
+      expect(converter.convert(schema, 'input')).toEqual([
+        {
+          type: 'object',
+          properties: { a: { type: 'string' } },
+          required: ['a'],
+          title: 'Foo',
+        },
+        false,
+      ])
+    })
+  })
 })

@@ -30,6 +30,8 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
   }
 
   private convertZod(schema: $ZodType, direction: JsonSchemaConverterDirection): ZodJsonSchema.JSONSchema {
+    const registry = this.options.metadata ?? globalRegistry
+
     const jsonSchema = toJSONSchema(schema, {
       unrepresentable: 'any',
       ...this.options,
@@ -68,6 +70,23 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
           ctx.jsonSchema['x-native-type'] = JsonSchemaXNativeType.Map
         }
 
+        // Respect an explicit JSON Schema `type` declared through `.meta()`.
+        //
+        // Zod copies every metadata field on top of the structural conversion but
+        // does not reconcile them: `z.union([...]).meta({ type: 'string', ... })`
+        // becomes `{ anyOf: [...], type: 'string', ... }` — the intended string
+        // schema polluted with a redundant, contradictory `anyOf`. When metadata
+        // pins a concrete `type`, treat it as authoritative and drop the leftover
+        // structural composition keywords. Scalar/object shapes are untouched:
+        // zod already overwrites a structural `type` on merge, and object schemas
+        // keep their `properties`.
+        const meta = registry.get(ctx.zodSchema) as { type?: unknown } | undefined
+        if (meta !== undefined && typeof meta.type === 'string') {
+          delete ctx.jsonSchema.anyOf
+          delete ctx.jsonSchema.oneOf
+          delete ctx.jsonSchema.allOf
+        }
+
         this.options.override?.(ctx)
       },
     })
@@ -77,7 +96,6 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
     const { $schema, ...rest } = jsonSchema
 
     // workaround until https://github.com/colinhacks/zod/issues/6026 is merged
-    const registry = this.options.metadata ?? globalRegistry
     const { id } = registry.get(schema) || {}
     if (typeof id === 'string' && rest.$ref === undefined) {
       const { $defs = {}, ...restWithoutDefs } = rest
