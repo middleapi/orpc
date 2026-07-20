@@ -36,6 +36,27 @@ describe('procedureUtils', () => {
     expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
   })
 
+  describe('with prefix', () => {
+    const prefixedUtils = new ProcedureUtils(['ping'], client, { prefix: '__prefix__' })
+
+    it('includes prefix in generated keys', () => {
+      prefixedUtils.queryKey({ input: 1 } as any)
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { prefix: '__prefix__', type: 'query', input: 1 })
+
+      prefixedUtils.streamedKey({ input: 1, queryFnOptions: { maxChunks: 1 } } as any)
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { prefix: '__prefix__', type: 'streamed', input: 1, fnOptions: { maxChunks: 1 } })
+
+      prefixedUtils.liveKey({ input: 1 } as any)
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(3, ['ping'], { prefix: '__prefix__', type: 'live', input: 1 })
+
+      prefixedUtils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 0 } as any)
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(4, ['ping'], { prefix: '__prefix__', type: 'infinite', input: { cursor: 0 } })
+
+      prefixedUtils.mutationKey()
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(5, ['ping'], { prefix: '__prefix__', type: 'mutation' })
+    })
+  })
+
   describe('.queryOptions', () => {
     it('without skipToken', async () => {
       const options = utils.queryOptions({ input: { search: '__search__' }, context: { batch: '__batch__' } })

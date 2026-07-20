@@ -8,4 +8,8 @@ it('generateOperationKey', () => {
     .toEqual([['planet', 'find'], { type: 'query', input: { id: 1 } }])
   expect(generateOperationKey(['planet', 'stream'], { type: 'streamed', input: { cursor: 0 }, fnOptions: { refetchMode: 'append' } }))
     .toEqual([['planet', 'stream'], { type: 'streamed', input: { cursor: 0 }, fnOptions: { refetchMode: 'append' } }])
+
+  expect(generateOperationKey(['path'], { prefix: '__prefix__' })).toEqual(['__prefix__', ['path'], {}])
+  expect(generateOperationKey(['path'], { prefix: undefined })).toEqual([['path'], {}])
+  expect(generateOperationKey(['path'], { prefix: '__prefix__', type: 'query', input: { a: 1 } })).toEqual(['__prefix__', ['path'], { type: 'query', input: { a: 1 } }])
 })

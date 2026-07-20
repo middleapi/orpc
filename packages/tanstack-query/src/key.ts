@@ -2,11 +2,15 @@ import type { OperationKey, OperationKeyOptions, OperationType } from './types'
 
 export function generateOperationKey<TType extends OperationType, TInput>(
   path: string[],
-  state: OperationKeyOptions<TType, TInput> = {},
+  options: OperationKeyOptions<TType, TInput> = {},
 ): OperationKey<TType, TInput> {
-  return [path, {
-    ...state.input !== undefined ? { input: state.input } : {},
-    ...state.type !== undefined ? { type: state.type } : {},
-    ...state.fnOptions !== undefined ? { fnOptions: state.fnOptions } : {},
-  } as any]
+  return [
+    ...options.prefix !== undefined ? [options.prefix] : [],
+    path,
+    {
+      ...options.input !== undefined ? { input: options.input } : {},
+      ...options.type !== undefined ? { type: options.type } : {},
+      ...options.fnOptions !== undefined ? { fnOptions: options.fnOptions } : {},
+    },
+  ] as OperationKey<TType, TInput>
 }

@@ -62,7 +62,7 @@ describe('createContractUtilsFactory', () => {
       },
     }
     const options = {
-      path: ['__base__'],
+      prefix: '__prefix__',
       queryInterceptors: [queryInterceptor],
       mutationInterceptors: [mutationInterceptor],
       plugins: [plugin],
@@ -83,13 +83,13 @@ describe('createContractUtilsFactory', () => {
     expect(result).toBe(delegatedUtils)
     expect(createRouterUtilsSpy).toHaveBeenCalledTimes(1)
 
-    const [client, createRouterUtilsOptions] = createRouterUtilsSpy.mock.calls[0]!
+    const [client, createRouterUtilsOptions, createRouterUtilsPath] = createRouterUtilsSpy.mock.calls[0]!
 
     expect(createRouterUtilsOptions).toEqual({
       ...options,
       scoped: scopedOptions,
-      path: ['__base__', 'users', 'list'],
     })
+    expect(createRouterUtilsPath).toEqual(['users', 'list'])
 
     expect((client as any)({ value: 'hello' }, { context: { requestId: 'request_1' } })).toBe('__mocked__')
     expect(caller).toHaveBeenCalledTimes(1)
@@ -119,7 +119,7 @@ describe('createContractJsonifiedUtilsFactory', () => {
     createRouterUtilsSpy.mockReturnValueOnce(delegatedUtils as any)
 
     const factory = createContractJsonifiedUtilsFactory(caller as any, {
-      path: ['__json__'],
+      prefix: '__json__',
       scoped: {
         nested: {
           pong: scopedOptions,
@@ -131,12 +131,13 @@ describe('createContractJsonifiedUtilsFactory', () => {
     expect(result).toBe(delegatedUtils)
     expect(createRouterUtilsSpy).toHaveBeenCalledTimes(1)
 
-    const [client, createRouterUtilsOptions] = createRouterUtilsSpy.mock.calls[0]!
+    const [client, createRouterUtilsOptions, createRouterUtilsPath] = createRouterUtilsSpy.mock.calls[0]!
 
     expect(createRouterUtilsOptions).toEqual({
-      path: ['__json__', 'nested', 'pong'],
+      prefix: '__json__',
       scoped: scopedOptions,
     })
+    expect(createRouterUtilsPath).toEqual(['nested', 'pong'])
 
     expect((client as any)('payload')).toBe('__jsonified__')
     expect(caller).toHaveBeenCalledTimes(1)

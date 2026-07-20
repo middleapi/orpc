@@ -2,7 +2,7 @@ import type { AnyNestedClient, Client, InferClientContext, InferClientError } fr
 import type { Public } from '@orpc/shared'
 import type { RouterUtilsPlugin } from './plugin'
 import type { ProcedureUtilsInfiniteInterceptor, ProcedureUtilsLiveInterceptor, ProcedureUtilsMutationInterceptor, ProcedureUtilsOptions, ProcedureUtilsQueryInterceptor, ProcedureUtilsStreamedInterceptor } from './procedure-utils'
-import type { OperationKey, OperationKeyOptions, OperationType } from './types'
+import type { OperationKey, OperationKeyOptions, OperationKeyPrefixOptions, OperationType } from './types'
 import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
 import { bindMethods, get, getOrBind, isTypescriptObject, toArray } from '@orpc/shared'
 import { generateOperationKey } from './key'
@@ -12,13 +12,14 @@ import { ProcedureUtils } from './procedure-utils'
 export class SharedRouterUtils<TInput> {
   constructor(
     private readonly path: string[],
+    private readonly options: OperationKeyPrefixOptions,
   ) {}
 
   /**
    * Generate a **partial matching** key for actions like revalidating queries, checking mutation status, etc.
    */
-  key<TType extends OperationType>(options: OperationKeyOptions<TType, TInput> = {}): OperationKey<TType, TInput> {
-    return generateOperationKey(this.path, options)
+  key<TType extends OperationType>(options: Omit<OperationKeyOptions<TType, TInput>, 'prefix'> = {}): OperationKey<TType, TInput> {
+    return generateOperationKey(this.path, { ...options, prefix: this.options.prefix })
   }
 }
 
@@ -36,13 +37,7 @@ export type RouterUtilsScoped<T extends AnyNestedClient>
         [K in keyof T]?: T[K] extends AnyNestedClient ? RouterUtilsScoped<T[K]> : never
       }
 
-export interface RouterUtilsOptions<T extends AnyNestedClient> {
-  /**
-   * Base path for all query keys. Use this to avoid conflicts when mounting
-   * multiple router utils instances.
-   */
-  path?: string[] | undefined
-
+export interface RouterUtilsOptions<T extends AnyNestedClient> extends OperationKeyPrefixOptions {
   /**
    * Interceptors that intercept queryFn inside .queryOptions
    */
@@ -89,26 +84,31 @@ export interface RouterUtilsOptions<T extends AnyNestedClient> {
 export function createRouterUtils<T extends AnyNestedClient>(
   client: T,
   options: NoInfer<RouterUtilsOptions<T>> = {},
+  /**
+   * Base procedure path the utils are rooted at, mainly for internal contract utils usage.
+   */
+  path: string[] = [],
 ): RouterUtils<T> {
   const plugin = new CompositeRouterUtilsPlugin<T>(options.plugins)
   options = plugin.init(options)
 
-  return createRouterUtilsInternal(client, options, plugin)
+  return createRouterUtilsInternal(client, path, options, plugin)
 }
 
 function createRouterUtilsInternal<T extends AnyNestedClient>(
   client: T,
-  options: RouterUtilsOptions<T> = {},
+  path: string[],
+  options: RouterUtilsOptions<T>,
   plugin: CompositeRouterUtilsPlugin<any>,
 ): RouterUtils<T> {
-  const path = toArray(options.path)
-  const sharedUtils = bindMethods(new SharedRouterUtils(path))
+  const sharedUtils = bindMethods(new SharedRouterUtils(path, options))
 
   const procedureUtils = typeof client === 'function' && (options.scoped === undefined || isProcedureUtilsOptions(options.scoped))
     ? bindMethods(new ProcedureUtils(
         path,
         client,
         plugin.initProcedureOptions(path, {
+          prefix: options.prefix,
           ...options.scoped,
           queryInterceptors: [...toArray(options.queryInterceptors) as any, ...toArray(options.scoped?.queryInterceptors)],
           streamedInterceptors: [...toArray(options.streamedInterceptors) as any, ...toArray(options.scoped?.streamedInterceptors)],
@@ -131,9 +131,8 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
         return value
       }
 
-      const nextUtils = createRouterUtilsInternal(nextClient as any, {
+      const nextUtils = createRouterUtilsInternal(nextClient as any, [...path, prop], {
         ...options,
-        path: [...path, prop],
         scoped: get(options.scoped, [prop]) as any,
       }, plugin)
 

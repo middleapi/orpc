@@ -8,13 +8,23 @@ export type InferLiveQueryOutput<TOutput> = TOutput extends AsyncIterable<infer 
 
 export type OperationType = 'query' | 'streamed' | 'live' | 'infinite' | 'mutation'
 
-export type OperationKeyOptions<TType extends OperationType, TInput> = {
+export interface OperationKeyPrefixOptions {
+  /**
+   * Prepended as the first element of the key when present.
+   * Use this to avoid key conflicts when multiple router utils share the same client.
+   */
+  prefix?: string
+}
+
+export type OperationKeyOptions<TType extends OperationType, TInput> = OperationKeyPrefixOptions & {
   type?: TType
   input?: TType extends 'mutation' ? never : PartialDeep<TInput>
   fnOptions?: TType extends 'streamed' ? SerializableStreamedQueryOptions : never
 }
 
-export type OperationKey<TType extends OperationType, TInput> = [path: string[], options: OperationKeyOptions<TType, TInput>]
+export type OperationKey<TType extends OperationType, TInput>
+  = | [path: string[], options: Omit<OperationKeyOptions<TType, TInput>, 'prefix'>]
+    | [prefix: string, path: string[], options: Omit<OperationKeyOptions<TType, TInput>, 'prefix'>]
 
 export const OPERATION_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_TANSTACK_QUERY_OPERATION_CONTEXT') as any
 
