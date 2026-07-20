@@ -119,6 +119,7 @@ it('RouterUtilsScoped', () => {
 
 it('createRouterUtils', () => {
   const utils = createRouterUtils({} as RouterClient<typeof scopedRouter, { batch?: boolean }>, {
+    prefix: '__prefix__',
     scoped: {
       nested: {
         ping: {

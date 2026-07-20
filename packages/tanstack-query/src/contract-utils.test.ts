@@ -62,6 +62,7 @@ describe('createContractUtilsFactory', () => {
       },
     }
     const options = {
+      prefix: '__prefix__',
       path: ['__base__'],
       queryInterceptors: [queryInterceptor],
       mutationInterceptors: [mutationInterceptor],
@@ -87,8 +88,8 @@ describe('createContractUtilsFactory', () => {
 
     expect(createRouterUtilsOptions).toEqual({
       ...options,
-      scoped: scopedOptions,
       path: ['__base__', 'users', 'list'],
+      scoped: scopedOptions,
     })
 
     expect((client as any)({ value: 'hello' }, { context: { requestId: 'request_1' } })).toBe('__mocked__')
@@ -119,7 +120,7 @@ describe('createContractJsonifiedUtilsFactory', () => {
     createRouterUtilsSpy.mockReturnValueOnce(delegatedUtils as any)
 
     const factory = createContractJsonifiedUtilsFactory(caller as any, {
-      path: ['__json__'],
+      prefix: '__json__',
       scoped: {
         nested: {
           pong: scopedOptions,
@@ -134,8 +135,9 @@ describe('createContractJsonifiedUtilsFactory', () => {
     const [client, createRouterUtilsOptions] = createRouterUtilsSpy.mock.calls[0]!
 
     expect(createRouterUtilsOptions).toEqual({
-      path: ['__json__', 'nested', 'pong'],
+      prefix: '__json__',
       scoped: scopedOptions,
+      path: ['nested', 'pong'],
     })
 
     expect((client as any)('payload')).toBe('__jsonified__')

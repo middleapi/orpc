@@ -1,6 +1,7 @@
 import type { Client, ClientContext } from '@orpc/client'
 import type { Interceptor, MaybeOptionalOptions, PromiseWithError } from '@orpc/shared'
 import type { DataTag, InfiniteData, MutationFunctionContext, QueryFunctionContext, QueryKey, SkipToken } from '@tanstack/query-core'
+import type { OperationKeyPrefixOptions } from './key'
 import type {
   InferLiveQueryOutput,
   InferStreamedQueryOutput,
@@ -63,7 +64,7 @@ export type ProcedureUtilsMutationInterceptor<TClientContext extends ClientConte
  */
 export type ProcedureUtilsModifier<T extends object> = Partial<T> | ((options: T) => T)
 
-export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError> {
+export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError> extends OperationKeyPrefixOptions {
   /**
    * Key options modifier for .queryKey and .queryOptions
    * Can be partial options or a function that receives per-call options and returns override this.options.
@@ -200,7 +201,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const queryKey = (optionsIn as any).queryKey
-      ?? generateOperationKey(this.path, { type: 'query', input: (optionsIn as any).input })
+      ?? generateOperationKey(this.path, { prefix: this.options.prefix, type: 'query', input: (optionsIn as any).input })
 
     return queryKey as DataTag<QueryKey, TOutput, TError>
   }
@@ -275,7 +276,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const queryKey = (optionsIn as any).queryKey
-      ?? generateOperationKey(this.path, { type: 'streamed', input: (optionsIn as any).input, fnOptions: (optionsIn as any).queryFnOptions })
+      ?? generateOperationKey(this.path, { prefix: this.options.prefix, type: 'streamed', input: (optionsIn as any).input, fnOptions: (optionsIn as any).queryFnOptions })
 
     return queryKey as DataTag<QueryKey, InferStreamedQueryOutput<TOutput>, TError>
   }
@@ -363,7 +364,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const queryKey = (optionsIn as any).queryKey
-      ?? generateOperationKey(this.path, { type: 'live', input: (optionsIn as any).input })
+      ?? generateOperationKey(this.path, { prefix: this.options.prefix, type: 'live', input: (optionsIn as any).input })
 
     return queryKey as DataTag<QueryKey, InferLiveQueryOutput<TOutput>, TError>
   }
@@ -450,6 +451,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
     const queryKey = (optionsIn as any).queryKey
       ?? generateOperationKey(this.path, {
+        prefix: this.options.prefix,
         type: 'infinite',
         input: (optionsIn as any).input === skipToken ? skipToken : (optionsIn as any).input((optionsIn as any).initialPageParam),
       })
@@ -520,7 +522,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
       optionsIn = { ...this.options.mutationKey, ...optionsIn }
     }
 
-    const mutationKey = optionsIn.mutationKey ?? generateOperationKey(this.path, { type: 'mutation' })
+    const mutationKey = optionsIn.mutationKey ?? generateOperationKey(this.path, { prefix: this.options.prefix, type: 'mutation' })
     return mutationKey as DataTag<QueryKey, TOutput, TError>
   }
 

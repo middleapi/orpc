@@ -61,15 +61,15 @@ orpc.planet.find.queryOptions({ input: { id: 123 } })
 
 ::: details Avoiding Query and Mutation Key Conflicts?
 
-To avoid key conflicts, pass a unique base path when creating each set of utils:
+To avoid key conflicts when creating multiple sets of utils, pass a unique `prefix`. It becomes the first element of every query/mutation key, so keys from different utils never overlap.
 
 ```ts
 const userORPC = createTanstackQueryUtils(userClient, {
-  path: ['user']
+  prefix: 'user'
 })
 
 const postORPC = createTanstackQueryUtils(postClient, {
-  path: ['post']
+  prefix: 'post'
 })
 ```
 
