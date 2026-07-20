@@ -191,6 +191,7 @@ export default withMermaid(defineConfig({
             { text: 'NestJS', link: '/docs/integrations/nest' },
             { text: 'Next.js', link: '/docs/integrations/next' },
             { text: 'OpenTelemetry', link: '/docs/integrations/opentelemetry' },
+            { text: 'Pinia Colada', link: '/docs/integrations/pinia-colada' },
             { text: 'Pino', link: '/docs/integrations/pino' },
             { text: 'Tanstack Query', link: '/docs/integrations/tanstack-query' },
             { text: 'tRPC', link: '/docs/integrations/trpc' },
