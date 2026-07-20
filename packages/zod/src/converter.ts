@@ -5,6 +5,13 @@ import { globalRegistry, toJSONSchema } from 'zod/v4/core'
 
 export interface ZodToJsonSchemaConverterOptions extends Omit<ToJSONSchemaParams, 'target' | 'io'> {}
 
+/**
+ * JSON Schema `type` values that pin a single, non-composite shape. A schema
+ * whose metadata declares one of these types cannot also be a meaningful
+ * `anyOf`/`oneOf`/`allOf`, so those leftover composition keywords are dropped.
+ */
+const SCALAR_JSON_SCHEMA_TYPES = new Set(['string', 'number', 'integer', 'boolean', 'null'])
+
 export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
   constructor(private readonly options: ZodToJsonSchemaConverterOptions = {}) {
   }
@@ -30,6 +37,8 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
   }
 
   private convertZod(schema: $ZodType, direction: JsonSchemaConverterDirection): ZodJsonSchema.JSONSchema {
+    const registry = this.options.metadata ?? globalRegistry
+
     const jsonSchema = toJSONSchema(schema, {
       unrepresentable: 'any',
       ...this.options,
@@ -68,6 +77,28 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
           ctx.jsonSchema['x-native-type'] = JsonSchemaXNativeType.Map
         }
 
+        // Respect an explicit scalar JSON Schema `type` declared through `.meta()`.
+        //
+        // Zod copies every metadata field on top of the structural conversion but
+        // does not reconcile them: `z.union([...]).meta({ type: 'string', ... })`
+        // becomes `{ anyOf: [...], type: 'string', ... }` — the intended string
+        // schema polluted with a redundant, contradictory `anyOf`. When metadata
+        // pins a scalar `type`, treat it as authoritative and drop the leftover
+        // structural composition keywords.
+        //
+        // Restricted to scalars on purpose. Zod already overwrites a structural
+        // scalar `type` on merge, so the only unreconciled leftover is the
+        // composition wrapper. `object`/`array` are excluded: there the branches
+        // carry real structure the metadata does not restate (e.g. a union of
+        // objects pinned to `type: 'object'`), so stripping them would silently
+        // discard information rather than remove contradictory noise.
+        const meta = registry.get(ctx.zodSchema) as { type?: unknown } | undefined
+        if (meta !== undefined && SCALAR_JSON_SCHEMA_TYPES.has(meta.type as string)) {
+          delete ctx.jsonSchema.anyOf
+          delete ctx.jsonSchema.oneOf
+          delete ctx.jsonSchema.allOf
+        }
+
         this.options.override?.(ctx)
       },
     })
@@ -77,7 +108,6 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
     const { $schema, ...rest } = jsonSchema
 
     // workaround until https://github.com/colinhacks/zod/issues/6026 is merged
-    const registry = this.options.metadata ?? globalRegistry
     const { id } = registry.get(schema) || {}
     if (typeof id === 'string' && rest.$ref === undefined) {
       const { $defs = {}, ...restWithoutDefs } = rest
