@@ -1,5 +1,5 @@
 export * from './bracket-notation'
-export * from './caller'
+export * from './client-factory'
 export * from './constants'
 export * from './meta'
 export * from './openapi-generator'

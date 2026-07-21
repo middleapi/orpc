@@ -12,7 +12,6 @@ export default defineConfig(({ mode }) => ({
         '**.bench.*',
         '**.test-d.*',
         '**.test.*',
-        '**/.claude/**',
         './packages/bun/**',
         './packages/cloudflare/**',
       ],
