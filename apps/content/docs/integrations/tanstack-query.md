@@ -340,6 +340,34 @@ const orpc = createTanstackQueryUtils(client, {
 })
 ```
 
+### Contract Meta Plugin
+
+Use `tanstackQueryMeta` to define base options and interceptors directly on a [procedure contract](/docs/contract/procedure), then pass the contract to `ContractMetaPlugin` to apply them automatically. Meta options act as the base layer: [default options](#default-options) and [interceptors](#interceptors) defined on the utils merge on top of them.
+
+```ts
+import { ContractMetaPlugin, tanstackQueryMeta } from '@orpc/tanstack-query'
+
+export const contract = {
+  planet: {
+    find: oc
+      .input(z.object({ id: z.number() }))
+      .meta(tanstackQueryMeta({
+        queryOptions: {
+          staleTime: 60 * 1000,
+        },
+      })),
+  },
+}
+
+const orpc = createTanstackQueryUtils(client, {
+  plugins: [new ContractMetaPlugin(contract)],
+})
+```
+
+::: info
+Pass the contract whose shape matches the client used to create the utils. With the [contract utils factory](/docs/advanced/scaling-large-projects#tanstack-query-integration), pass the root router contract.
+:::
+
 ## Client Context
 
 ::: warning

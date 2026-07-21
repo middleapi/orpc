@@ -8,7 +8,7 @@ import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
 import { bindMethods, get, getOrBind, isTypescriptObject, toArray } from '@orpc/shared'
 import { generateOperationKey } from './key'
 import { CompositeRouterUtilsPlugin } from './plugin'
-import { ProcedureUtils } from './procedure-utils'
+import { mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
 
 export class SharedRouterUtils<TInput> {
   constructor(
@@ -111,15 +111,17 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
     ? bindMethods(new ProcedureUtils(
         path,
         client,
-        plugin.initProcedureOptions(path, {
-          prefix: options.prefix,
-          ...options.scoped,
-          queryInterceptors: [...toArray(options.queryInterceptors) as any, ...toArray(options.scoped?.queryInterceptors)],
-          streamedInterceptors: [...toArray(options.streamedInterceptors) as any, ...toArray(options.scoped?.streamedInterceptors)],
-          liveInterceptors: [...toArray(options.liveInterceptors) as any, ...toArray(options.scoped?.liveInterceptors)],
-          infiniteInterceptors: [...toArray(options.infiniteInterceptors) as any, ...toArray(options.scoped?.infiniteInterceptors)],
-          mutationInterceptors: [...toArray(options.mutationInterceptors) as any, ...toArray(options.scoped?.mutationInterceptors)],
-        }),
+        plugin.initProcedureOptions(path, mergeProcedureUtilsOptions(
+          {
+            prefix: options.prefix,
+            queryInterceptors: options.queryInterceptors as any,
+            streamedInterceptors: options.streamedInterceptors as any,
+            liveInterceptors: options.liveInterceptors as any,
+            infiniteInterceptors: options.infiniteInterceptors as any,
+            mutationInterceptors: options.mutationInterceptors as any,
+          },
+          options.scoped ?? {},
+        )),
       ))
     : undefined
 

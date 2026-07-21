@@ -3,7 +3,8 @@ import * as KeyModule from './key'
 import { ProcedureUtils } from './procedure-utils'
 import { createRouterUtils, SharedRouterUtils } from './router-utils'
 
-vi.mock('./procedure-utils', async () => ({
+vi.mock('./procedure-utils', async importOriginal => ({
+  ...await importOriginal<typeof import('./procedure-utils')>(),
   ProcedureUtils: vi.fn(class {
     call = vi.fn()
     queryOptions = vi.fn(() => ({ queryOptions: true }))

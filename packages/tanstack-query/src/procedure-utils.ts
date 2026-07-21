@@ -171,6 +171,47 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
   >
 }
 
+function mergeProcedureUtilsModifier<T extends object>(
+  base: ProcedureUtilsModifier<T> | undefined,
+  override: ProcedureUtilsModifier<T> | undefined,
+): ProcedureUtilsModifier<T> | undefined {
+  if (!base || !override || typeof base === 'function' || typeof override === 'function') {
+    return override ?? base
+  }
+
+  return { ...base, ...override } as Partial<T>
+}
+
+/**
+ * Merge two procedure utils options where `override` takes priority:
+ * interceptors are concatenated (base ones run first), modifiers are
+ * spread-merged when both are plain objects and replaced otherwise.
+ */
+export function mergeProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError>(
+  base: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>,
+  override: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>,
+): ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError> {
+  return {
+    ...base,
+    ...override,
+    queryKey: mergeProcedureUtilsModifier(base.queryKey, override.queryKey),
+    queryInterceptors: [...toArray(base.queryInterceptors), ...toArray(override.queryInterceptors)],
+    queryOptions: mergeProcedureUtilsModifier(base.queryOptions, override.queryOptions),
+    streamedKey: mergeProcedureUtilsModifier(base.streamedKey, override.streamedKey),
+    streamedInterceptors: [...toArray(base.streamedInterceptors), ...toArray(override.streamedInterceptors)],
+    streamedOptions: mergeProcedureUtilsModifier(base.streamedOptions, override.streamedOptions),
+    liveKey: mergeProcedureUtilsModifier(base.liveKey, override.liveKey),
+    liveInterceptors: [...toArray(base.liveInterceptors), ...toArray(override.liveInterceptors)],
+    liveOptions: mergeProcedureUtilsModifier(base.liveOptions, override.liveOptions),
+    infiniteKey: mergeProcedureUtilsModifier(base.infiniteKey, override.infiniteKey),
+    infiniteInterceptors: [...toArray(base.infiniteInterceptors), ...toArray(override.infiniteInterceptors)],
+    infiniteOptions: mergeProcedureUtilsModifier(base.infiniteOptions, override.infiniteOptions),
+    mutationKey: mergeProcedureUtilsModifier(base.mutationKey, override.mutationKey),
+    mutationInterceptors: [...toArray(base.mutationInterceptors), ...toArray(override.mutationInterceptors)],
+    mutationOptions: mergeProcedureUtilsModifier(base.mutationOptions, override.mutationOptions),
+  }
+}
+
 export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutput, TError> {
   /**
    * Calling corresponding procedure client
