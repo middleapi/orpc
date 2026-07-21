@@ -48,6 +48,7 @@ export function anyAbortSignal(signals: readonly (AbortSignal | undefined)[]): A
   }
 
   if (typeof AbortSignal.any === 'function') {
+    // eslint-disable-next-line ban/ban
     return AbortSignal.any(realSignals)
   }
 
