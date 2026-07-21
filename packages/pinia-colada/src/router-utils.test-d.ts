@@ -46,6 +46,11 @@ describe('SharedRouterUtils', () => {
     utils.key({ input: { a: {} } })
     utils.key({ input: { a: { b: {} } } })
     utils.key({ input: { a: { b: { c: 1 } } } })
+    utils.key({ back: 1 })
+    utils.key({ back: 1, type: 'query' })
+
+    // @ts-expect-error invalid back
+    utils.key({ back: '1' })
 
     // @ts-expect-error invalid input
     utils.key({ input: 123 })
