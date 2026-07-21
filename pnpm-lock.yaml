@@ -614,6 +614,12 @@ importers:
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
+      '@orpc/contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@orpc/openapi':
+        specifier: workspace:*
+        version: link:../openapi
       '@orpc/shared':
         specifier: workspace:*
         version: link:../shared

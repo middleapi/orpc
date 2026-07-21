@@ -42,6 +42,13 @@ export type RouterUtilsScoped<T extends AnyNestedClient>
 
 export interface RouterUtilsOptions<T extends AnyNestedClient> extends BuildKeyPrefixOptions {
   /**
+   * Base path for all query keys.
+   *
+   * @internal
+   */
+  path?: string[] | undefined
+
+  /**
    * Interceptors that intercept query inside .queryOptions
    */
   queryInterceptors?: ProcedureUtilsQueryInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[]
@@ -92,15 +99,15 @@ export function createRouterUtils<T extends AnyNestedClient>(
   const plugin = new CompositeRouterUtilsPlugin<T>(options.plugins)
   options = plugin.init(options)
 
-  return createRouterUtilsInternal(client, [], options, plugin)
+  return createRouterUtilsInternal(client, options, plugin)
 }
 
 function createRouterUtilsInternal<T extends AnyNestedClient>(
   client: T,
-  path: string[],
   options: RouterUtilsOptions<T>,
   plugin: CompositeRouterUtilsPlugin<any>,
 ): RouterUtils<T> {
+  const path = toArray(options.path)
   const sharedUtils = bindMethods(new SharedRouterUtils(path, options))
 
   const procedureUtils = typeof client === 'function' && (options.scoped === undefined || isProcedureUtilsOptions(options.scoped))
@@ -131,8 +138,9 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
         return value
       }
 
-      const nextUtils = createRouterUtilsInternal(nextClient as any, [...path, prop], {
+      const nextUtils = createRouterUtilsInternal(nextClient as any, {
         ...options,
+        path: [...path, prop],
         scoped: get(options.scoped, [prop]) as any,
       }, plugin)
 
