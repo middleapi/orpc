@@ -1,28 +1,28 @@
 import type { AnyNestedClient, Client, InferClientContext, InferClientError } from '@orpc/client'
 import type { Public } from '@orpc/shared'
-import type { EntryKey } from '@pinia/colada'
-import type { BuildKeyOptions, BuildKeyPrefixOptions } from './key'
+import type { OperationKey, OperationKeyOptions, OperationKeyPrefixOptions } from './key'
 import type { RouterUtilsPlugin } from './plugin'
 import type { ProcedureUtilsInfiniteInterceptor, ProcedureUtilsLiveInterceptor, ProcedureUtilsMutationInterceptor, ProcedureUtilsOptions, ProcedureUtilsQueryInterceptor, ProcedureUtilsStreamedInterceptor } from './procedure-utils'
+import type { OperationType } from './types'
 import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
 import { bindMethods, get, getOrBind, isTypescriptObject, toArray } from '@orpc/shared'
-import { buildKey } from './key'
+import { generateOperationKey } from './key'
 import { CompositeRouterUtilsPlugin } from './plugin'
 import { ProcedureUtils } from './procedure-utils'
 
 export class SharedRouterUtils<TInput> {
   constructor(
     private readonly path: string[],
-    private readonly options: BuildKeyPrefixOptions,
+    private readonly options: OperationKeyPrefixOptions,
   ) {}
 
   /**
-   * Generate a query/mutation key for checking status, invalidate, set, get, etc.
+   * Generate a **partial matching** key for actions like revalidating queries, checking mutation status, etc.
    *
    * @see {@link https://orpc.dev/docs/integrations/pinia-colada#query-mutation-key Pinia Colada Query/Mutation Key Docs}
    */
-  key(options?: Omit<BuildKeyOptions<TInput>, 'prefix'>): EntryKey {
-    return buildKey(this.path, { ...options, prefix: this.options.prefix })
+  key<TType extends OperationType>(options: Omit<OperationKeyOptions<TType, TInput>, 'prefix'> = {}): OperationKey<TType, TInput> {
+    return generateOperationKey(this.path, { ...options, prefix: this.options.prefix })
   }
 }
 
@@ -40,7 +40,7 @@ export type RouterUtilsScoped<T extends AnyNestedClient>
         [K in keyof T]?: T[K] extends AnyNestedClient ? RouterUtilsScoped<T[K]> : never
       }
 
-export interface RouterUtilsOptions<T extends AnyNestedClient> extends BuildKeyPrefixOptions {
+export interface RouterUtilsOptions<T extends AnyNestedClient> extends OperationKeyPrefixOptions {
   /**
    * Base path for all query keys.
    *

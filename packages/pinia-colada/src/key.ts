@@ -4,7 +4,7 @@ import type { SerializableStreamedQueryOptions } from './stream-query'
 import type { OperationType } from './types'
 import { RPCJsonSerializer } from '@orpc/client'
 
-export interface BuildKeyPrefixOptions {
+export interface OperationKeyPrefixOptions {
   /**
    * Prepended as the first element of the key when present.
    * Use this to avoid key conflicts when multiple router utils share the same client.
@@ -12,26 +12,32 @@ export interface BuildKeyPrefixOptions {
   prefix?: string
 }
 
-export interface BuildKeyOptions<TInput> extends BuildKeyPrefixOptions {
-  type?: OperationType
+export type OperationKeyOptions<TType extends OperationType, TInput> = OperationKeyPrefixOptions & {
+  type?: TType
   input?: PartialDeep<TInput>
-  fnOptions?: SerializableStreamedQueryOptions
+  fnOptions?: TType extends 'streamed' ? SerializableStreamedQueryOptions : never
 }
+
+export type OperationKey<TType extends OperationType, TInput>
+  = EntryKey & (
+    | [path: string[], options: Omit<OperationKeyOptions<TType, TInput>, 'prefix'>]
+    | [prefix: string, path: string[], options: Omit<OperationKeyOptions<TType, TInput>, 'prefix'>]
+  )
 
 const serializer = new RPCJsonSerializer()
 
 /**
- * Build a Pinia Colada entry key for a procedure.
+ * Generate a Pinia Colada entry key for a procedure.
  *
  * The input is serialized to JSON-compatible values because Pinia Colada
  * requires entry keys to be serializable.
  *
  * @see {@link https://orpc.dev/docs/integrations/pinia-colada#query-mutation-key Pinia Colada Query/Mutation Key Docs}
  */
-export function buildKey<TInput>(
+export function generateOperationKey<TType extends OperationType, TInput>(
   path: string[],
-  options: BuildKeyOptions<TInput> = {},
-): EntryKey {
+  options: OperationKeyOptions<TType, TInput> = {},
+): OperationKey<TType, TInput> {
   return [
     ...options.prefix !== undefined ? [options.prefix] : [],
     path,
@@ -40,5 +46,5 @@ export function buildKey<TInput>(
       ...options.type !== undefined ? { type: options.type } : {},
       ...options.fnOptions !== undefined ? { fnOptions: options.fnOptions } : {},
     },
-  ] as EntryKey
+  ] as OperationKey<TType, TInput>
 }
