@@ -867,7 +867,7 @@ describe('CreateProcedureUtilsOptions', () => {
 
   it('should have all keys that ProcedureUtils provides', () => {
     // Ensures every utility method in ProcedureUtils (except 'call') has a corresponding key in CreateProcedureUtilsOptions
-    type ProcedureUtilsKeys = Exclude<keyof ProcedureUtils<any, any, any, any>, 'call'>
+    type ProcedureUtilsKeys = Exclude<keyof ProcedureUtils<any, any, any, any>, 'call' | 'key'>
     type DefaultsKeys = keyof ProcedureUtilsOptions<any, any, any, any>
 
     expectTypeOf<ProcedureUtilsKeys>().toExtend<DefaultsKeys>()

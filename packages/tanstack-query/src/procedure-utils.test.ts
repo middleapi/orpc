@@ -894,6 +894,7 @@ describe('createProcedureUtils with interceptors', () => {
     await expect(options.queryFn!({ signal } as any)).resolves.toBe('__output__')
 
     expect(queryInterceptor).toHaveBeenCalledTimes(1)
+    expect(queryInterceptor.mock.calls[0]![0].utils).toBe(utils)
     expect(queryInterceptor.mock.calls[0]![0]).toMatchObject({
       path: ['ping'],
       input: { search: '__search__' },
@@ -944,6 +945,7 @@ describe('createProcedureUtils with interceptors', () => {
     await expect(options.queryFn!({ signal, client: queryClient, queryKey: options.queryKey } as any)).resolves.toEqual(['__1__'])
 
     expect(streamedInterceptor).toHaveBeenCalledTimes(1)
+    expect(streamedInterceptor.mock.calls[0]![0].utils).toBe(utils)
     expect(streamedInterceptor.mock.calls[0]![0]).toMatchObject({
       path: ['ping'],
       input: { search: '__search__' },
@@ -994,6 +996,7 @@ describe('createProcedureUtils with interceptors', () => {
     await expect(options.queryFn!({ signal, client: queryClient, queryKey: options.queryKey } as any)).resolves.toEqual('__1__')
 
     expect(liveInterceptor).toHaveBeenCalledTimes(1)
+    expect(liveInterceptor.mock.calls[0]![0].utils).toBe(utils)
     expect(liveInterceptor.mock.calls[0]![0]).toMatchObject({
       path: ['ping'],
       input: { search: '__search__' },
@@ -1047,6 +1050,7 @@ describe('createProcedureUtils with interceptors', () => {
     await expect(options.queryFn!({ signal, pageParam: '__pageParam__' } as any)).resolves.toBe('__output__')
 
     expect(infiniteInterceptor).toHaveBeenCalledTimes(1)
+    expect(infiniteInterceptor.mock.calls[0]![0].utils).toBe(utils)
     expect(infiniteInterceptor.mock.calls[0]![0]).toMatchObject({
       path: ['ping'],
       input: { search: '__search__', pageParam: '__pageParam__' },
@@ -1095,6 +1099,7 @@ describe('createProcedureUtils with interceptors', () => {
     await expect(options.mutationFn!('__input__', {} as any)).resolves.toBe('__output__')
 
     expect(mutationInterceptor).toHaveBeenCalledTimes(1)
+    expect(mutationInterceptor.mock.calls[0]![0].utils).toBe(utils)
     expect(mutationInterceptor.mock.calls[0]![0]).toMatchObject({
       path: ['ping'],
       input: '__input__',

@@ -285,7 +285,7 @@ When you configure `queryKey`, it also affects `.queryOptions` because it is use
 
 ## Interceptors
 
-Interceptors let you wrap `queryFn` and `mutationFn` calls. Unlike [default options](#default-options), which can be overridden by per-call options, interceptors always run for every query and mutation.
+Interceptors let you wrap `queryFn` and `mutationFn` calls. Unlike [default options](#default-options), which can be overridden by per-call options, interceptors always run for every query and mutation. Each interceptor receives the corresponding procedure utils through the `utils` option, so you can build keys like `utils.key({ back: 1 })` to target a parent scope.
 
 ```ts
 import { isInferableError, safe } from '@orpc/client'
@@ -314,9 +314,10 @@ const orpc = createTanstackQueryUtils(client, {
     planet: {
       create: {
         mutationInterceptors: [
-          async ({ next, fnContext }) => {
+          async ({ next, utils, fnContext }) => {
             const result = await next()
-            fnContext.client.invalidateQueries({ queryKey: orpc.planet.key() })
+            // invalidate the parent scope: equals orpc.planet.key()
+            fnContext.client.invalidateQueries({ queryKey: utils.key({ back: 1 }) })
             return result
           },
         ],

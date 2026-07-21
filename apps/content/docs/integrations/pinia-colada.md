@@ -251,7 +251,7 @@ When you configure `queryKey`, it also affects `.queryOptions` because it is use
 
 ## Interceptors
 
-Interceptors let you wrap `query` and `mutation` calls. Unlike [default options](#default-options), which can be overridden by per-call options, interceptors always run for every query and mutation.
+Interceptors let you wrap `query` and `mutation` calls. Unlike [default options](#default-options), which can be overridden by per-call options, interceptors always run for every query and mutation. Each interceptor receives the corresponding procedure utils through the `utils` option, so you can build keys like `utils.key({ back: 1 })` to target a parent scope.
 
 ```ts
 import { isInferableError, safe } from '@orpc/client'

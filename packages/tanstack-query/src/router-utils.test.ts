@@ -1,15 +1,24 @@
 import type { RouterUtilsPlugin } from './plugin'
 import * as KeyModule from './key'
 import { ProcedureUtils } from './procedure-utils'
-import { createRouterUtils, SharedRouterUtils } from './router-utils'
+import { createRouterUtils } from './router-utils'
 
-vi.mock('./procedure-utils', async () => ({
-  ProcedureUtils: vi.fn(class {
-    call = vi.fn()
-    queryOptions = vi.fn(() => ({ queryOptions: true }))
-    mutationOptions = vi.fn(() => ({ mutationOptions: true }))
-  }),
-}))
+vi.mock('./procedure-utils', async () => {
+  const { SharedUtils } = await import('./shared-utils')
+
+  return {
+    ProcedureUtils: vi.fn(class extends SharedUtils<unknown> {
+      call = vi.fn()
+      override key = SharedUtils.prototype.key
+      queryOptions = vi.fn(() => ({ queryOptions: true }))
+      mutationOptions = vi.fn(() => ({ mutationOptions: true }))
+
+      constructor(path: string[], _client: unknown, options: any = {}) {
+        super(path, options)
+      }
+    }),
+  }
+})
 
 const generateOperationKeySpy = vi.spyOn(KeyModule, 'generateOperationKey')
 
@@ -23,39 +32,6 @@ const emptyInterceptors = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-})
-
-describe('sharedRouterUtils', () => {
-  const utils = new SharedRouterUtils(['path'], {})
-
-  it('.key', () => {
-    expect(
-      utils.key({ input: { search: '__search__' }, type: 'infinite' }),
-    ).toBe(generateOperationKeySpy.mock.results[0]!.value)
-
-    expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
-    expect(generateOperationKeySpy).toHaveBeenCalledWith(['path'], { input: { search: '__search__' }, type: 'infinite', prefix: undefined })
-  })
-
-  it('.key with prefix', () => {
-    const prefixedUtils = new SharedRouterUtils(['path'], { prefix: '__prefix__' })
-
-    expect(
-      prefixedUtils.key({ type: 'query' }),
-    ).toBe(generateOperationKeySpy.mock.results[0]!.value)
-
-    expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
-    expect(generateOperationKeySpy).toHaveBeenCalledWith(['path'], { type: 'query', prefix: '__prefix__' })
-  })
-
-  it('.key with back', () => {
-    const nestedUtils = new SharedRouterUtils(['planet', 'find'], {})
-
-    expect(nestedUtils.key({ back: 1, type: 'query' })).toBe(generateOperationKeySpy.mock.results[0]!.value)
-    expect(generateOperationKeySpy).toHaveBeenCalledWith(['planet', 'find'], { back: 1, type: 'query', prefix: undefined })
-
-    expect(nestedUtils.key({ back: 1 })).toEqual(new SharedRouterUtils(['planet'], {}).key())
-  })
 })
 
 describe('createRouterUtils', () => {

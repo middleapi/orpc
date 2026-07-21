@@ -7,6 +7,7 @@ export * from './router-utils'
 export {
   createRouterUtils as createPiniaColadaUtils,
 } from './router-utils'
+export * from './shared-utils'
 export * from './stream-query'
 export * from './types'
 export {

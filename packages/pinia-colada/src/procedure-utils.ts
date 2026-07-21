@@ -6,45 +6,49 @@ import type { InferLiveQueryOutput, InferStreamedQueryOutput, InfiniteKeyOptions
 import { intercept, isAsyncIteratorObject, resolveMaybeOptionalOptions } from '@orpc/shared'
 import { generateOperationKey } from './key'
 import { liveQuery } from './live-query'
+import { SharedUtils } from './shared-utils'
 import { serializableStreamedQuery } from './stream-query'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
 
-export interface ProcedureUtilsQueryInterceptorOptions<TClientContext extends ClientContext, TInput> {
+export interface ProcedureUtilsQueryInterceptorOptions<TClientContext extends ClientContext, TInput, TOutput, TError> {
   path: string[]
+  utils: ProcedureUtils<TClientContext, TInput, TOutput, TError>
   context: TClientContext & OperationContext
   input: TInput
   fnContext: UseQueryFnContext
 }
 export type ProcedureUtilsQueryInterceptor<TClientContext extends ClientContext, TInput, TOutput, TError>
-  = Interceptor<ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput>, PromiseWithError<TOutput, TError>>
+  = Interceptor<ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput, TOutput, TError>, PromiseWithError<TOutput, TError>>
 
-export interface ProcedureUtilsStreamedInterceptorOptions<TClientContext extends ClientContext, TInput> extends ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput> {
+export interface ProcedureUtilsStreamedInterceptorOptions<TClientContext extends ClientContext, TInput, TOutput, TError> extends ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput, TOutput, TError> {
 }
 export type ProcedureUtilsStreamedInterceptor<TClientContext extends ClientContext, TInput, TOutput, TError>
-  = Interceptor<ProcedureUtilsStreamedInterceptorOptions<TClientContext, TInput>, PromiseWithError<InferStreamedQueryOutput<TOutput>, TError>>
+  = Interceptor<ProcedureUtilsStreamedInterceptorOptions<TClientContext, TInput, TOutput, TError>, PromiseWithError<InferStreamedQueryOutput<TOutput>, TError>>
 
-export interface ProcedureUtilsLiveInterceptorOptions<TClientContext extends ClientContext, TInput> extends ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput> {
+export interface ProcedureUtilsLiveInterceptorOptions<TClientContext extends ClientContext, TInput, TOutput, TError> extends ProcedureUtilsQueryInterceptorOptions<TClientContext, TInput, TOutput, TError> {
 }
 export type ProcedureUtilsLiveInterceptor<TClientContext extends ClientContext, TInput, TOutput, TError>
-  = Interceptor<ProcedureUtilsLiveInterceptorOptions<TClientContext, TInput>, PromiseWithError<InferLiveQueryOutput<TOutput>, TError>>
+  = Interceptor<ProcedureUtilsLiveInterceptorOptions<TClientContext, TInput, TOutput, TError>, PromiseWithError<InferLiveQueryOutput<TOutput>, TError>>
 
-export interface ProcedureUtilsInfiniteInterceptorOptions<TClientContext extends ClientContext, TInput> {
+export interface ProcedureUtilsInfiniteInterceptorOptions<TClientContext extends ClientContext, TInput, TOutput, TError> {
   path: string[]
+  utils: ProcedureUtils<TClientContext, TInput, TOutput, TError>
   context: TClientContext & OperationContext
   input: TInput
   fnContext: UseInfiniteQueryFnContext<any, any, any, any>
 }
 export type ProcedureUtilsInfiniteInterceptor<TClientContext extends ClientContext, TInput, TOutput, TError>
-  = Interceptor<ProcedureUtilsInfiniteInterceptorOptions<TClientContext, TInput>, PromiseWithError<TOutput, TError>>
+  = Interceptor<ProcedureUtilsInfiniteInterceptorOptions<TClientContext, TInput, TOutput, TError>, PromiseWithError<TOutput, TError>>
 
-export interface ProcedureUtilsMutationInterceptorOptions<TClientContext extends ClientContext, TInput> {
+export interface ProcedureUtilsMutationInterceptorOptions<TClientContext extends ClientContext, TInput, TOutput, TError> {
   path: string[]
+  utils: ProcedureUtils<TClientContext, TInput, TOutput, TError>
   context: TClientContext & OperationContext
   input: TInput
   fnContext: UseMutationFnContext
 }
 export type ProcedureUtilsMutationInterceptor<TClientContext extends ClientContext, TInput, TOutput, TError>
-  = Interceptor<ProcedureUtilsMutationInterceptorOptions<TClientContext, TInput>, PromiseWithError<TOutput, TError>>
+  = Interceptor<ProcedureUtilsMutationInterceptorOptions<TClientContext, TInput, TOutput, TError>, PromiseWithError<TOutput, TError>>
 
 /**
  * Can be partial options for spread-merged options,
@@ -159,7 +163,9 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
   >
 }
 
-export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutput, TError> {
+export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutput, TError> extends SharedUtils<TInput> {
+  declare protected readonly options: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>
+
   /**
    * Calling corresponding procedure client
    *
@@ -168,10 +174,11 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
   call: Client<TClientContext, TInput, TOutput, TError>
 
   constructor(
-    private readonly path: string[],
+    path: string[],
     client: Client<TClientContext, TInput, TOutput, TError>,
-    private readonly options: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError> = {},
+    options: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError> = {},
   ) {
+    super(path, options)
     this.call = client
   }
 
@@ -229,6 +236,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
           this.options.queryInterceptors,
           {
             path: this.path,
+            utils: this,
             context: {
               [OPERATION_CONTEXT_SYMBOL]: {
                 key,
@@ -305,6 +313,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
           this.options.streamedInterceptors,
           {
             path: this.path,
+            utils: this,
             context: {
               [OPERATION_CONTEXT_SYMBOL]: {
                 key,
@@ -392,6 +401,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
           this.options.liveInterceptors,
           {
             path: this.path,
+            utils: this,
             context: {
               [OPERATION_CONTEXT_SYMBOL]: {
                 key,
@@ -478,6 +488,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
           this.options.infiniteInterceptors,
           {
             path: this.path,
+            utils: this,
             context: {
               [OPERATION_CONTEXT_SYMBOL]: {
                 key,
@@ -554,6 +565,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
           this.options.mutationInterceptors,
           {
             path: this.path,
+            utils: this,
             context: {
               [OPERATION_CONTEXT_SYMBOL]: {
                 key: typeof key === 'function' ? key(input) : key,

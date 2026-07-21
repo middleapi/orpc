@@ -166,6 +166,7 @@ describe('procedureUtils', () => {
       await expect(options.query(fnContext)).resolves.toEqual(['a'])
 
       expect(interceptor1).toHaveBeenCalledTimes(1)
+      expect(interceptor1.mock.calls[0]![0].utils).toBe(interceptedUtils)
       expect(interceptor1).toHaveBeenCalledWith(expect.objectContaining({
         path: ['ping'],
         input: 1,
@@ -319,6 +320,7 @@ describe('procedureUtils', () => {
       await expect(options.query(fnContext)).resolves.toEqual('a')
 
       expect(interceptor1).toHaveBeenCalledTimes(1)
+      expect(interceptor1.mock.calls[0]![0].utils).toBe(interceptedUtils)
       expect(interceptor1).toHaveBeenCalledWith(expect.objectContaining({
         path: ['ping'],
         input: 1,
@@ -563,6 +565,7 @@ describe('procedureUtils', () => {
       await expect(options.query(fnContext)).resolves.toEqual('__mocked__')
 
       expect(interceptor1).toHaveBeenCalledTimes(1)
+      expect(interceptor1.mock.calls[0]![0].utils).toBe(interceptedUtils)
       expect(interceptor1).toHaveBeenCalledWith(expect.objectContaining({
         path: ['ping'],
         input: 1,
@@ -720,6 +723,7 @@ describe('procedureUtils', () => {
       await expect(options.query(fnContext)).resolves.toEqual('__mocked__')
 
       expect(interceptor1).toHaveBeenCalledTimes(1)
+      expect(interceptor1.mock.calls[0]![0].utils).toBe(interceptedUtils)
       expect(interceptor1).toHaveBeenCalledWith(expect.objectContaining({
         path: ['ping'],
         input: { cursor: 1 },
@@ -865,6 +869,7 @@ describe('procedureUtils', () => {
       await expect(options.mutation(1, fnContext)).resolves.toEqual('__mocked__')
 
       expect(interceptor1).toHaveBeenCalledTimes(1)
+      expect(interceptor1.mock.calls[0]![0].utils).toBe(interceptedUtils)
       expect(interceptor1).toHaveBeenCalledWith(expect.objectContaining({
         path: ['ping'],
         input: 1,
