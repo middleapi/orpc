@@ -15,6 +15,9 @@ it('generateOperationKey', () => {
   expect(generateOperationKey(['planet', 'find'], { back: 1 })).toEqual([['planet'], {}])
   expect(generateOperationKey(['planet', 'find'], { back: 10 })).toEqual([[], {}])
   expect(generateOperationKey(['planet', 'find'], { back: 0 })).toEqual([['planet', 'find'], {}])
+  expect(generateOperationKey(['planet', 'find'], { back: 0.5 })).toEqual([['planet', 'find'], {}])
+  expect(generateOperationKey(['planet', 'find'], { back: 1.5 })).toEqual([['planet'], {}])
+  expect(generateOperationKey(['planet', 'find'], { back: -1 })).toEqual([['planet', 'find'], {}])
   expect(generateOperationKey(['planet', 'find'], { prefix: '__prefix__', back: 1, type: 'query' })).toEqual(['__prefix__', ['planet'], { type: 'query' }])
 
   expect(generateOperationKey(['path'], { prefix: '__prefix__' })).toEqual(['__prefix__', ['path'], {}])

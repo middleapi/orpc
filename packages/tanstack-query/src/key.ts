@@ -32,7 +32,9 @@ export function generateOperationKey<TType extends OperationType, TInput>(
 ): OperationKey<TType, TInput> {
   return [
     ...options.prefix !== undefined ? [options.prefix] : [],
-    options.back ? path.slice(0, -options.back) : path,
+    options.back
+      ? path.slice(0, Math.max(0, path.length - Math.trunc(options.back)))
+      : path,
     {
       ...options.input !== undefined ? { input: options.input } : {},
       ...options.type !== undefined ? { type: options.type } : {},
