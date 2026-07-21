@@ -196,6 +196,7 @@ export default withMermaid(defineConfig({
             { text: 'Pinia Colada', link: '/docs/integrations/pinia-colada' },
             { text: 'Pino', link: '/docs/integrations/pino' },
             { text: 'Standard Schema', link: '/docs/integrations/standard-schema' },
+            { text: 'Tanstack DB', link: '/docs/integrations/tanstack-db' },
             { text: 'Tanstack Query', link: '/docs/integrations/tanstack-query' },
             { text: 'tRPC', link: '/docs/integrations/trpc' },
             { text: 'Valibot', link: '/docs/integrations/valibot' },
