@@ -38,7 +38,10 @@ describe('SharedRouterUtils', () => {
     utils.key()
     utils.key({})
     utils.key({ type: 'mutation' })
+    // unlike tanstack-query, mutation keys can contain input
+    utils.key({ type: 'mutation', input: {} })
     utils.key({ input: {}, type: 'query' })
+    utils.key({ input: {}, type: 'streamed', fnOptions: { refetchMode: 'append' } })
     utils.key({ input: {} })
     utils.key({ input: { a: {} } })
     utils.key({ input: { a: { b: {} } } })
@@ -54,6 +57,9 @@ describe('SharedRouterUtils', () => {
 
     // @ts-expect-error invalid type
     utils.key({ type: 'ddd' })
+
+    // @ts-expect-error fnOptions is only allowed for streamed type
+    utils.key({ type: 'infinite', fnOptions: { refetchMode: 'append' } })
   })
 })
 

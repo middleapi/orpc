@@ -1,10 +1,10 @@
 import type { Client, ClientContext } from '@orpc/client'
 import type { Interceptor, MaybeOptionalOptions, PromiseWithError } from '@orpc/shared'
 import type { _EmptyObject, EntryKeyTagged, UseInfiniteQueryData, UseInfiniteQueryFnContext } from '@pinia/colada'
-import type { BuildKeyPrefixOptions } from './key'
+import type { OperationKeyPrefixOptions } from './key'
 import type { InferLiveQueryOutput, InferStreamedQueryOutput, InfiniteKeyOptions, InfiniteOptionsIn, InfiniteOptionsOut, MutationKeyOptions, MutationOptionsIn, MutationOptionsOut, OperationContext, QueryKeyOptions, QueryOptionsIn, QueryOptionsOut, StreamedKeyOptions, StreamedOptionsIn, StreamedOptionsOut, UseMutationFnContext, UseQueryFnContext } from './types'
 import { intercept, isAsyncIteratorObject, resolveMaybeOptionalOptions } from '@orpc/shared'
-import { buildKey } from './key'
+import { generateOperationKey } from './key'
 import { liveQuery } from './live-query'
 import { serializableStreamedQuery } from './stream-query'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
@@ -52,7 +52,7 @@ export type ProcedureUtilsMutationInterceptor<TClientContext extends ClientConte
  */
 export type ProcedureUtilsModifier<T extends object> = Partial<T> | ((options: T) => T)
 
-export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError> extends BuildKeyPrefixOptions {
+export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError> extends OperationKeyPrefixOptions {
   /**
    * Key options modifier for .queryKey and .queryOptions
    * Can be partial options or a function that receives per-call options and returns override this.options.
@@ -193,7 +193,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const key = (optionsIn as any).key
-      ?? buildKey(this.path, { prefix: this.options.prefix, type: 'query', input: (optionsIn as any).input })
+      ?? generateOperationKey(this.path, { prefix: this.options.prefix, type: 'query', input: (optionsIn as any).input })
 
     return key as EntryKeyTagged<TOutput, TError>
   }
@@ -269,7 +269,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const key = (optionsIn as any).key
-      ?? buildKey(this.path, { prefix: this.options.prefix, type: 'streamed', input: (optionsIn as any).input, fnOptions: (optionsIn as any).fnOptions })
+      ?? generateOperationKey(this.path, { prefix: this.options.prefix, type: 'streamed', input: (optionsIn as any).input, fnOptions: (optionsIn as any).fnOptions })
 
     return key as EntryKeyTagged<InferStreamedQueryOutput<TOutput>, TError>
   }
@@ -356,7 +356,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const key = (optionsIn as any).key
-      ?? buildKey(this.path, { prefix: this.options.prefix, type: 'live', input: (optionsIn as any).input })
+      ?? generateOperationKey(this.path, { prefix: this.options.prefix, type: 'live', input: (optionsIn as any).input })
 
     return key as EntryKeyTagged<InferLiveQueryOutput<TOutput>, TError>
   }
@@ -438,7 +438,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const key = (optionsIn as any).key
-      ?? buildKey(this.path, {
+      ?? generateOperationKey(this.path, {
         prefix: this.options.prefix,
         type: 'infinite',
         input: (optionsIn as any).input(
@@ -518,7 +518,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const key = optionsIn.key
-      ?? ((input: TInput) => buildKey(this.path, { prefix: this.options.prefix, type: 'mutation', input: input as any }))
+      ?? ((input: TInput) => generateOperationKey(this.path, { prefix: this.options.prefix, type: 'mutation', input: input as any }))
 
     return key as MutationOptionsOut<TInput, TOutput, TError, _EmptyObject>['key']
   }

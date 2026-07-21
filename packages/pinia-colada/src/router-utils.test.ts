@@ -11,7 +11,7 @@ vi.mock('./procedure-utils', async () => ({
   }),
 }))
 
-const buildKeySpy = vi.spyOn(KeyModule, 'buildKey')
+const generateOperationKeySpy = vi.spyOn(KeyModule, 'generateOperationKey')
 
 const emptyInterceptors = {
   queryInterceptors: [],
@@ -31,10 +31,10 @@ describe('sharedRouterUtils', () => {
   it('.key', () => {
     expect(
       utils.key({ input: { search: '__search__' }, type: 'query' }),
-    ).toBe(buildKeySpy.mock.results[0]!.value)
+    ).toBe(generateOperationKeySpy.mock.results[0]!.value)
 
-    expect(buildKeySpy).toHaveBeenCalledTimes(1)
-    expect(buildKeySpy).toHaveBeenCalledWith(['path'], { input: { search: '__search__' }, type: 'query', prefix: undefined })
+    expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
+    expect(generateOperationKeySpy).toHaveBeenCalledWith(['path'], { input: { search: '__search__' }, type: 'query', prefix: undefined })
   })
 
   it('.key with prefix', () => {
@@ -42,10 +42,10 @@ describe('sharedRouterUtils', () => {
 
     expect(
       prefixedUtils.key({ type: 'query' }),
-    ).toBe(buildKeySpy.mock.results[0]!.value)
+    ).toBe(generateOperationKeySpy.mock.results[0]!.value)
 
-    expect(buildKeySpy).toHaveBeenCalledTimes(1)
-    expect(buildKeySpy).toHaveBeenCalledWith(['path'], { type: 'query', prefix: '__prefix__' })
+    expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
+    expect(generateOperationKeySpy).toHaveBeenCalledWith(['path'], { type: 'query', prefix: '__prefix__' })
   })
 })
 
@@ -61,8 +61,8 @@ describe('createRouterUtils', () => {
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
     expect(ProcedureUtils).toHaveBeenCalledWith([], client, { ...emptyInterceptors, prefix: '__prefix__' })
-    expect(utils.key({ type: 'query' })).toBe(buildKeySpy.mock.results[0]?.value)
-    expect(buildKeySpy).toHaveBeenNthCalledWith(1, [], { type: 'query', prefix: '__prefix__' })
+    expect(utils.key({ type: 'query' })).toBe(generateOperationKeySpy.mock.results[0]?.value)
+    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, [], { type: 'query', prefix: '__prefix__' })
     expect(utils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.queryOptions.mock.results[0]?.value)
 
     vi.clearAllMocks()
@@ -70,8 +70,8 @@ describe('createRouterUtils', () => {
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
     expect(ProcedureUtils).toHaveBeenCalledWith(['key'], client.key, { ...emptyInterceptors, prefix: '__prefix__' })
-    expect(keyUtils.key({ type: 'mutation' })).toBe(buildKeySpy.mock.results[0]?.value)
-    expect(buildKeySpy).toHaveBeenNthCalledWith(1, ['key'], { type: 'mutation', prefix: '__prefix__' })
+    expect(keyUtils.key({ type: 'mutation' })).toBe(generateOperationKeySpy.mock.results[0]?.value)
+    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['key'], { type: 'mutation', prefix: '__prefix__' })
     expect(keyUtils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.queryOptions.mock.results[0]?.value)
 
     vi.clearAllMocks()
@@ -79,8 +79,8 @@ describe('createRouterUtils', () => {
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
     expect(ProcedureUtils).toHaveBeenCalledWith(['key', 'pong'], client.key.pong, { ...emptyInterceptors, prefix: '__prefix__' })
-    expect(pongUtils.key({ type: 'query' })).toBe(buildKeySpy.mock.results[0]?.value)
-    expect(buildKeySpy).toHaveBeenNthCalledWith(1, ['key', 'pong'], { type: 'query', prefix: '__prefix__' })
+    expect(pongUtils.key({ type: 'query' })).toBe(generateOperationKeySpy.mock.results[0]?.value)
+    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['key', 'pong'], { type: 'query', prefix: '__prefix__' })
     expect(pongUtils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.queryOptions.mock.results[0]?.value)
   })
 
@@ -90,14 +90,14 @@ describe('createRouterUtils', () => {
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(0)
     expect(utils.queryOptions).toBeUndefined()
-    expect(utils.key()).toBe(buildKeySpy.mock.results[0]?.value)
-    expect(buildKeySpy).toHaveBeenNthCalledWith(1, [], { prefix: undefined })
+    expect(utils.key()).toBe(generateOperationKeySpy.mock.results[0]?.value)
+    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, [], { prefix: undefined })
 
     const nestedUtils = utils.nested
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(0)
-    expect(nestedUtils.key()).toBe(buildKeySpy.mock.results[1]?.value)
-    expect(buildKeySpy).toHaveBeenNthCalledWith(2, ['nested'], { prefix: undefined })
+    expect(nestedUtils.key()).toBe(generateOperationKeySpy.mock.results[1]?.value)
+    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['nested'], { prefix: undefined })
 
     const pingUtils = nestedUtils.ping
 

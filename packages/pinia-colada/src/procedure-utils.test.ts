@@ -4,7 +4,7 @@ import { ProcedureUtils } from './procedure-utils'
 import * as StreamQueryModule from './stream-query'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
 
-const buildKeySpy = vi.spyOn(KeyModule, 'buildKey')
+const generateOperationKeySpy = vi.spyOn(KeyModule, 'generateOperationKey')
 const streamedQuerySpy = vi.spyOn(StreamQueryModule, 'serializableStreamedQuery')
 const liveQuerySpy = vi.spyOn(LiveQueryModule, 'liveQuery')
 
@@ -24,15 +24,15 @@ describe('procedureUtils', () => {
 
   describe('.queryKey', () => {
     it('works', () => {
-      expect(utils.queryKey({ input: { search: '__search__' } } as any)).toBe(buildKeySpy.mock.results[0]!.value)
-      expect(buildKeySpy).toHaveBeenCalledTimes(1)
-      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: { search: '__search__' } })
+      expect(utils.queryKey({ input: { search: '__search__' } } as any)).toBe(generateOperationKeySpy.mock.results[0]!.value)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: { search: '__search__' } })
 
-      expect(utils.queryKey()).toBe(buildKeySpy.mock.results[1]!.value)
-      expect(buildKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { type: 'query', input: undefined })
+      expect(utils.queryKey()).toBe(generateOperationKeySpy.mock.results[1]!.value)
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { type: 'query', input: undefined })
 
       expect(utils.queryKey({ key: ['__custom__'] } as any)).toEqual(['__custom__'])
-      expect(buildKeySpy).toHaveBeenCalledTimes(2)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(2)
     })
 
     it('applies object modifier with per-call options taking precedence', () => {
@@ -41,10 +41,10 @@ describe('procedureUtils', () => {
       })
 
       modifiedUtils.queryKey()
-      expect(buildKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { type: 'query', input: 1 })
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { type: 'query', input: 1 })
 
       modifiedUtils.queryKey({ input: 2 } as any)
-      expect(buildKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { type: 'query', input: 2 })
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { type: 'query', input: 2 })
     })
 
     it('applies function modifier', () => {
@@ -56,18 +56,18 @@ describe('procedureUtils', () => {
       modifiedUtils.queryKey({ input: 1 } as any)
       expect(modifier).toHaveBeenCalledTimes(1)
       expect(modifier).toHaveBeenCalledWith({ input: 1 })
-      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: 9 })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: 9 })
     })
   })
 
   describe('.streamedKey', () => {
     it('works', () => {
-      expect(utils.streamedKey({ input: { search: '__search__' }, fnOptions: { refetchMode: 'append' } } as any)).toBe(buildKeySpy.mock.results[0]!.value)
-      expect(buildKeySpy).toHaveBeenCalledTimes(1)
-      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { prefix: undefined, type: 'streamed', input: { search: '__search__' }, fnOptions: { refetchMode: 'append' } })
+      expect(utils.streamedKey({ input: { search: '__search__' }, fnOptions: { refetchMode: 'append' } } as any)).toBe(generateOperationKeySpy.mock.results[0]!.value)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { prefix: undefined, type: 'streamed', input: { search: '__search__' }, fnOptions: { refetchMode: 'append' } })
 
       expect(utils.streamedKey({ key: ['__custom__'] } as any)).toEqual(['__custom__'])
-      expect(buildKeySpy).toHaveBeenCalledTimes(1)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
     })
 
     it('applies object modifier with per-call options taking precedence', () => {
@@ -76,10 +76,10 @@ describe('procedureUtils', () => {
       })
 
       modifiedUtils.streamedKey()
-      expect(buildKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { prefix: undefined, type: 'streamed', input: undefined, fnOptions: { maxChunks: 1 } })
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { prefix: undefined, type: 'streamed', input: undefined, fnOptions: { maxChunks: 1 } })
 
       modifiedUtils.streamedKey({ fnOptions: { maxChunks: 2 } } as any)
-      expect(buildKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { prefix: undefined, type: 'streamed', input: undefined, fnOptions: { maxChunks: 2 } })
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { prefix: undefined, type: 'streamed', input: undefined, fnOptions: { maxChunks: 2 } })
     })
 
     it('applies function modifier', () => {
@@ -91,7 +91,7 @@ describe('procedureUtils', () => {
       modifiedUtils.streamedKey({ input: 1 } as any)
       expect(modifier).toHaveBeenCalledTimes(1)
       expect(modifier).toHaveBeenCalledWith({ input: 1 })
-      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { prefix: undefined, type: 'streamed', input: 9, fnOptions: undefined })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { prefix: undefined, type: 'streamed', input: 9, fnOptions: undefined })
     })
   })
 
@@ -107,9 +107,9 @@ describe('procedureUtils', () => {
     it('works', async () => {
       const options = utils.streamedOptions({ input: 1, fnOptions: { maxChunks: 3 } } as any) as any
 
-      expect(options.key).toBe(buildKeySpy.mock.results[0]!.value)
-      expect(buildKeySpy).toHaveBeenCalledTimes(1)
-      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { prefix: undefined, type: 'streamed', input: 1, fnOptions: { maxChunks: 3 } })
+      expect(options.key).toBe(generateOperationKeySpy.mock.results[0]!.value)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { prefix: undefined, type: 'streamed', input: 1, fnOptions: { maxChunks: 3 } })
       expect(options.fnOptions).toBeUndefined() // consumed, not forwarded to pinia colada
 
       client.mockResolvedValueOnce(stream('a', 'b'))
@@ -217,12 +217,12 @@ describe('procedureUtils', () => {
 
   describe('.liveKey', () => {
     it('works', () => {
-      expect(utils.liveKey({ input: { search: '__search__' } } as any)).toBe(buildKeySpy.mock.results[0]!.value)
-      expect(buildKeySpy).toHaveBeenCalledTimes(1)
-      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { prefix: undefined, type: 'live', input: { search: '__search__' } })
+      expect(utils.liveKey({ input: { search: '__search__' } } as any)).toBe(generateOperationKeySpy.mock.results[0]!.value)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { prefix: undefined, type: 'live', input: { search: '__search__' } })
 
       expect(utils.liveKey({ key: ['__custom__'] } as any)).toEqual(['__custom__'])
-      expect(buildKeySpy).toHaveBeenCalledTimes(1)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
     })
 
     it('applies object modifier with per-call options taking precedence', () => {
@@ -231,10 +231,10 @@ describe('procedureUtils', () => {
       })
 
       modifiedUtils.liveKey()
-      expect(buildKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { prefix: undefined, type: 'live', input: 1 })
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { prefix: undefined, type: 'live', input: 1 })
 
       modifiedUtils.liveKey({ input: 2 } as any)
-      expect(buildKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { prefix: undefined, type: 'live', input: 2 })
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { prefix: undefined, type: 'live', input: 2 })
     })
 
     it('applies function modifier', () => {
@@ -246,7 +246,7 @@ describe('procedureUtils', () => {
       modifiedUtils.liveKey({ input: 1 } as any)
       expect(modifier).toHaveBeenCalledTimes(1)
       expect(modifier).toHaveBeenCalledWith({ input: 1 })
-      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { prefix: undefined, type: 'live', input: 9 })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { prefix: undefined, type: 'live', input: 9 })
     })
   })
 
@@ -262,9 +262,9 @@ describe('procedureUtils', () => {
     it('works', async () => {
       const options = utils.liveOptions({ input: 1 } as any) as any
 
-      expect(options.key).toBe(buildKeySpy.mock.results[0]!.value)
-      expect(buildKeySpy).toHaveBeenCalledTimes(1)
-      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { prefix: undefined, type: 'live', input: 1 })
+      expect(options.key).toBe(generateOperationKeySpy.mock.results[0]!.value)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { prefix: undefined, type: 'live', input: 1 })
 
       client.mockResolvedValueOnce(stream('a', 'b'))
       await expect(options.query({ signal, entry })).resolves.toEqual('b')
@@ -370,15 +370,15 @@ describe('procedureUtils', () => {
 
   describe('.infiniteKey', () => {
     it('works', () => {
-      expect(utils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 0 } as any)).toBe(buildKeySpy.mock.results[0]!.value)
-      expect(buildKeySpy).toHaveBeenCalledTimes(1)
-      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'infinite', input: { cursor: 0 } })
+      expect(utils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 0 } as any)).toBe(generateOperationKeySpy.mock.results[0]!.value)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'infinite', input: { cursor: 0 } })
 
-      expect(utils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: () => 5 } as any)).toBe(buildKeySpy.mock.results[1]!.value)
-      expect(buildKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { type: 'infinite', input: { cursor: 5 } })
+      expect(utils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: () => 5 } as any)).toBe(generateOperationKeySpy.mock.results[1]!.value)
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { type: 'infinite', input: { cursor: 5 } })
 
       expect(utils.infiniteKey({ key: ['__custom__'] } as any)).toEqual(['__custom__'])
-      expect(buildKeySpy).toHaveBeenCalledTimes(2)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(2)
     })
 
     it('applies object modifier with per-call options taking precedence', () => {
@@ -387,10 +387,10 @@ describe('procedureUtils', () => {
       })
 
       modifiedUtils.infiniteKey({ input: (cursor: number) => ({ cursor }) } as any)
-      expect(buildKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { type: 'infinite', input: { cursor: 1 } })
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { type: 'infinite', input: { cursor: 1 } })
 
       modifiedUtils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 2 } as any)
-      expect(buildKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { type: 'infinite', input: { cursor: 2 } })
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { type: 'infinite', input: { cursor: 2 } })
     })
 
     it('applies function modifier', () => {
@@ -401,7 +401,7 @@ describe('procedureUtils', () => {
 
       modifiedUtils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 1 } as any)
       expect(modifier).toHaveBeenCalledTimes(1)
-      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'infinite', input: { cursor: 9 } })
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'infinite', input: { cursor: 9 } })
     })
   })
 
@@ -409,12 +409,12 @@ describe('procedureUtils', () => {
     it('works', () => {
       const key = utils.mutationKey() as any
 
-      expect(key('__input__')).toBe(buildKeySpy.mock.results[0]!.value)
-      expect(buildKeySpy).toHaveBeenCalledTimes(1)
-      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'mutation', input: '__input__' })
+      expect(key('__input__')).toBe(generateOperationKeySpy.mock.results[0]!.value)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'mutation', input: '__input__' })
 
       expect(utils.mutationKey({ key: ['__custom__'] } as any)).toEqual(['__custom__'])
-      expect(buildKeySpy).toHaveBeenCalledTimes(1)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
     })
 
     it('applies object modifier with per-call options taking precedence', () => {
@@ -424,7 +424,7 @@ describe('procedureUtils', () => {
 
       expect(modifiedUtils.mutationKey()).toEqual(['__modifier__'])
       expect(modifiedUtils.mutationKey({ key: ['__call__'] } as any)).toEqual(['__call__'])
-      expect(buildKeySpy).toHaveBeenCalledTimes(0)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(0)
     })
 
     it('applies function modifier', () => {
@@ -444,14 +444,14 @@ describe('procedureUtils', () => {
 
     it('includes prefix in generated keys', () => {
       prefixedUtils.queryKey({ input: 1 } as any)
-      expect(buildKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { prefix: '__prefix__', type: 'query', input: 1 })
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { prefix: '__prefix__', type: 'query', input: 1 })
 
       prefixedUtils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 0 } as any)
-      expect(buildKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { prefix: '__prefix__', type: 'infinite', input: { cursor: 0 } })
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { prefix: '__prefix__', type: 'infinite', input: { cursor: 0 } })
 
       const mutationKey = prefixedUtils.mutationKey() as any
       mutationKey('__input__')
-      expect(buildKeySpy).toHaveBeenNthCalledWith(3, ['ping'], { prefix: '__prefix__', type: 'mutation', input: '__input__' })
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(3, ['ping'], { prefix: '__prefix__', type: 'mutation', input: '__input__' })
     })
   })
 
@@ -459,9 +459,9 @@ describe('procedureUtils', () => {
     it('works', async () => {
       const options = utils.queryOptions({ input: 1 }) as any
 
-      expect(options.key).toBe(buildKeySpy.mock.results[0]!.value)
-      expect(buildKeySpy).toHaveBeenCalledTimes(1)
-      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: 1 })
+      expect(options.key).toBe(generateOperationKeySpy.mock.results[0]!.value)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: 1 })
 
       client.mockResolvedValueOnce('__mocked__')
       await expect(options.query({ signal })).resolves.toEqual('__mocked__')
@@ -477,9 +477,9 @@ describe('procedureUtils', () => {
     it('works without options', async () => {
       const options = utils.queryOptions() as any
 
-      expect(options.key).toBe(buildKeySpy.mock.results[0]!.value)
-      expect(buildKeySpy).toHaveBeenCalledTimes(1)
-      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: undefined })
+      expect(options.key).toBe(generateOperationKeySpy.mock.results[0]!.value)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'query', input: undefined })
 
       client.mockResolvedValueOnce('__mocked__')
       await expect(options.query({ signal })).resolves.toEqual('__mocked__')
@@ -517,7 +517,7 @@ describe('procedureUtils', () => {
       const options = utils.queryOptions({ key: ['__custom__'] } as any) as any
 
       expect(options.key).toEqual(['__custom__'])
-      expect(buildKeySpy).toHaveBeenCalledTimes(0)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(0)
 
       client.mockResolvedValueOnce('__mocked__')
       await expect(options.query({ signal })).resolves.toEqual('__mocked__')
@@ -624,9 +624,9 @@ describe('procedureUtils', () => {
     it('works', async () => {
       const options = utils.infiniteOptions(baseOptions as any) as any
 
-      expect(options.key).toBe(buildKeySpy.mock.results[0]!.value)
-      expect(buildKeySpy).toHaveBeenCalledTimes(1)
-      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'infinite', input: { cursor: 0 } })
+      expect(options.key).toBe(generateOperationKeySpy.mock.results[0]!.value)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'infinite', input: { cursor: 0 } })
       expect(options.initialPageParam).toEqual(0)
       expect(options.getNextPageParam).toBe(baseOptions.getNextPageParam)
 
@@ -644,9 +644,9 @@ describe('procedureUtils', () => {
     it('works with initialPageParam as function', () => {
       const options = utils.infiniteOptions({ ...baseOptions, initialPageParam: () => 5 } as any) as any
 
-      expect(options.key).toBe(buildKeySpy.mock.results[0]!.value)
-      expect(buildKeySpy).toHaveBeenCalledTimes(1)
-      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'infinite', input: { cursor: 5 } })
+      expect(options.key).toBe(generateOperationKeySpy.mock.results[0]!.value)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'infinite', input: { cursor: 5 } })
     })
 
     it('works with client context', async () => {
@@ -675,7 +675,7 @@ describe('procedureUtils', () => {
       const options = utils.infiniteOptions({ ...baseOptions, key: ['__custom__'] } as any) as any
 
       expect(options.key).toEqual(['__custom__'])
-      expect(buildKeySpy).toHaveBeenCalledTimes(0)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(0)
 
       client.mockResolvedValueOnce('__mocked__')
       await expect(options.query({ signal, pageParam: 0 })).resolves.toEqual('__mocked__')
@@ -774,28 +774,28 @@ describe('procedureUtils', () => {
     it('works', async () => {
       const options = utils.mutationOptions() as any
 
-      expect(options.key('__input__')).toBe(buildKeySpy.mock.results[0]!.value)
-      expect(buildKeySpy).toHaveBeenCalledTimes(1)
-      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'mutation', input: '__input__' })
+      expect(options.key('__input__')).toBe(generateOperationKeySpy.mock.results[0]!.value)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'mutation', input: '__input__' })
 
       client.mockResolvedValueOnce('__mocked__')
       await expect(options.mutation(1, {})).resolves.toEqual('__mocked__')
       expect(client).toHaveBeenCalledTimes(1)
       expect(client).toHaveBeenCalledWith(1, { context: {
         [OPERATION_CONTEXT_SYMBOL]: {
-          key: buildKeySpy.mock.results[1]!.value,
+          key: generateOperationKeySpy.mock.results[1]!.value,
           type: 'mutation',
         },
       } })
-      expect(buildKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { type: 'mutation', input: 1 })
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { type: 'mutation', input: 1 })
     })
 
     it('works with client context', async () => {
       const options = utils.mutationOptions({ context: { batch: true } }) as any
 
-      expect(options.key('__input__')).toBe(buildKeySpy.mock.results[0]!.value)
-      expect(buildKeySpy).toHaveBeenCalledTimes(1)
-      expect(buildKeySpy).toHaveBeenCalledWith(['ping'], { type: 'mutation', input: '__input__' })
+      expect(options.key('__input__')).toBe(generateOperationKeySpy.mock.results[0]!.value)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
+      expect(generateOperationKeySpy).toHaveBeenCalledWith(['ping'], { type: 'mutation', input: '__input__' })
 
       client.mockResolvedValueOnce('__mocked__')
       await expect(options.mutation(1, {})).resolves.toEqual('__mocked__')
@@ -803,7 +803,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledWith(1, { context: {
         batch: true,
         [OPERATION_CONTEXT_SYMBOL]: {
-          key: buildKeySpy.mock.results[1]!.value,
+          key: generateOperationKeySpy.mock.results[1]!.value,
           type: 'mutation',
         },
       } })
@@ -820,7 +820,7 @@ describe('procedureUtils', () => {
       const options = utils.mutationOptions({ key: ['__custom__'] } as any) as any
 
       expect(options.key).toEqual(['__custom__'])
-      expect(buildKeySpy).toHaveBeenCalledTimes(0)
+      expect(generateOperationKeySpy).toHaveBeenCalledTimes(0)
 
       client.mockResolvedValueOnce('__mocked__')
       await expect(options.mutation(1, {})).resolves.toEqual('__mocked__')
@@ -872,7 +872,7 @@ describe('procedureUtils', () => {
         context: {
           batch: true,
           [OPERATION_CONTEXT_SYMBOL]: {
-            key: buildKeySpy.mock.results[0]!.value,
+            key: generateOperationKeySpy.mock.results[0]!.value,
             type: 'mutation',
           },
         },
@@ -884,7 +884,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledWith('__override__', { context: {
         batch: true,
         [OPERATION_CONTEXT_SYMBOL]: {
-          key: buildKeySpy.mock.results[0]!.value,
+          key: generateOperationKeySpy.mock.results[0]!.value,
           type: 'mutation',
         },
       } })
