@@ -12,6 +12,11 @@ it('generateOperationKey', () => {
   const date = new Date()
   expect(generateOperationKey(['path', 'path2'], { input: { a: date } })).toEqual([['path', 'path2'], { input: { a: date.toISOString() } }])
 
+  expect(generateOperationKey(['planet', 'find'], { back: 1 })).toEqual([['planet'], {}])
+  expect(generateOperationKey(['planet', 'find'], { back: 10 })).toEqual([[], {}])
+  expect(generateOperationKey(['planet', 'find'], { back: 0 })).toEqual([['planet', 'find'], {}])
+  expect(generateOperationKey(['planet', 'find'], { prefix: '__prefix__', back: 1, type: 'query' })).toEqual(['__prefix__', ['planet'], { type: 'query' }])
+
   expect(generateOperationKey(['path'], { prefix: '__prefix__' })).toEqual(['__prefix__', ['path'], {}])
   expect(generateOperationKey(['path'], { prefix: undefined })).toEqual([['path'], {}])
   expect(generateOperationKey(['path'], { prefix: '__prefix__', type: 'query', input: { a: 1 } })).toEqual(['__prefix__', ['path'], { type: 'query', input: { a: 1 } }])
