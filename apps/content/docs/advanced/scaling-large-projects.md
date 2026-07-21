@@ -122,3 +122,37 @@ const utils = createUtils(router)
 
 const query = useQuery(utils.path.to.procedure.queryOptions({/** options */}))
 ```
+
+## Pinia Colada Integration
+
+[Pinia Colada Integration](/docs/integrations/pinia-colada) also supports this pattern. First, create a factory that accepts a [contract client factory](#contract-client-factory) and options similar to the [Pinia Colada interceptor options](/docs/integrations/pinia-colada#interceptors), but with less type safety because the full contract is not known up front:
+
+```ts
+import { createContractUtilsFactory } from '@orpc/pinia-colada'
+
+export const createUtils = createContractUtilsFactory(createClient, { /** options */})
+```
+
+::: warning
+If you are using [OpenAPI Link](/docs/openapi/link), or any link that requires the client to be wrapped in `JsonifiedClient`, use `createContractJsonifiedUtilsFactory` from `@orpc/pinia-colada` instead of `createContractUtilsFactory`.
+:::
+
+You can then create utilities for each procedure contract:
+
+```ts
+import { procedure } from './path/to/procedure'
+
+const utils = createUtils(procedure)
+
+const query = useQuery(utils.queryOptions({/** options */}))
+```
+
+Like the [contract client factory](#contract-client-factory), it also accepts a [router contract](/docs/contract/router), returning utilities that mirror its shape:
+
+```ts
+import { router } from './path/to/router'
+
+const utils = createUtils(router)
+
+const query = useQuery(utils.path.to.procedure.queryOptions({/** options */}))
+```

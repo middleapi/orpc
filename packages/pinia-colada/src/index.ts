@@ -1,3 +1,4 @@
+export * from './contract-utils'
 export * from './key'
 export * from './live-query'
 export * from './plugin'

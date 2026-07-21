@@ -43,6 +43,8 @@
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
+    "@orpc/contract": "workspace:*",
+    "@orpc/openapi": "workspace:*",
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
