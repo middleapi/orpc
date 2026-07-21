@@ -1,5 +1,5 @@
 import type { ORPCError } from '@orpc/client'
-import type { ContractCaller } from '@orpc/contract'
+import type { ContractClientFactory } from '@orpc/contract'
 import type { PromiseWithError } from '@orpc/shared'
 import type { ProcedureUtils } from './procedure-utils'
 import type { SharedRouterUtils } from './router-utils'
@@ -19,10 +19,10 @@ const contract = {
 }
 
 describe('createContractUtilsFactory', () => {
-  const caller = {} as ContractCaller<{ cache?: boolean }>
+  const clientFactory = {} as ContractClientFactory<{ cache?: boolean }>
 
   it('infers interceptor input, output, errors types', () => {
-    createContractUtilsFactory(caller, {
+    createContractUtilsFactory(clientFactory, {
       mutationInterceptors: [
         async ({ context, next, input }) => {
           expectTypeOf(input).toEqualTypeOf<unknown>()
@@ -77,21 +77,33 @@ describe('createContractUtilsFactory', () => {
   })
 
   it('return general and procedure utils', () => {
-    const createUtils = createContractUtilsFactory(caller, {})
+    const createUtils = createContractUtilsFactory(clientFactory, {})
     const utils = createUtils(contract.nested.pong)
 
     expectTypeOf(utils).toEqualTypeOf<
-      & Omit<SharedRouterUtils<string>, 'path'>
       & Omit<ProcedureUtils<{ cache?: boolean }, string, Date, Error | ORPCError<'BAD_GATEWAY', RegExp>>, 'path' | 'options'>
+      & Omit<SharedRouterUtils<string>, 'path'>
     >()
+  })
+
+  it('returns router utils when a router contract is passed', () => {
+    const createUtils = createContractUtilsFactory(clientFactory, {})
+    const utils = createUtils(contract)
+
+    expectTypeOf(utils.nested.pong).toEqualTypeOf<
+      & Omit<ProcedureUtils<{ cache?: boolean }, string, Date, Error | ORPCError<'BAD_GATEWAY', RegExp>>, 'path' | 'options'>
+      & Omit<SharedRouterUtils<string>, 'path'>
+    >()
+
+    expectTypeOf(utils.key).toEqualTypeOf<SharedRouterUtils<unknown>['key']>()
   })
 })
 
 describe('createContractJsonifiedUtilsFactory', () => {
-  const caller = {} as ContractCaller<{ cache?: boolean }>
+  const clientFactory = {} as ContractClientFactory<{ cache?: boolean }>
 
   it('infers interceptor input, output, errors types', () => {
-    createContractJsonifiedUtilsFactory(caller, {
+    createContractJsonifiedUtilsFactory(clientFactory, {
       mutationInterceptors: [
         async ({ context, next, input }) => {
           expectTypeOf(input).toEqualTypeOf<unknown>()
@@ -146,12 +158,22 @@ describe('createContractJsonifiedUtilsFactory', () => {
   })
 
   it('return jsonified general and procedure utils', () => {
-    const createUtils = createContractJsonifiedUtilsFactory(caller, {})
+    const createUtils = createContractJsonifiedUtilsFactory(clientFactory, {})
     const utils = createUtils(contract.nested.pong)
 
     expectTypeOf(utils).toEqualTypeOf<
-      & SharedRouterUtils<string>
-      & ProcedureUtils<{ cache?: boolean }, string, string, Error | ORPCError<'BAD_GATEWAY', string>>
+      & Omit<ProcedureUtils<{ cache?: boolean }, string, string, Error | ORPCError<'BAD_GATEWAY', string>>, 'path' | 'options'>
+      & Omit<SharedRouterUtils<string>, 'path'>
+    >()
+  })
+
+  it('returns jsonified router utils when a router contract is passed', () => {
+    const createUtils = createContractJsonifiedUtilsFactory(clientFactory, {})
+    const utils = createUtils(contract)
+
+    expectTypeOf(utils.nested.pong).toEqualTypeOf<
+      & Omit<ProcedureUtils<{ cache?: boolean }, string, string, Error | ORPCError<'BAD_GATEWAY', string>>, 'path' | 'options'>
+      & Omit<SharedRouterUtils<string>, 'path'>
     >()
   })
 })

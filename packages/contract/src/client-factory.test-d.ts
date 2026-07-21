@@ -1,7 +1,7 @@
 import type { ClientLink, ORPCError } from '@orpc/client'
 import type { PromiseWithError } from '@orpc/shared'
 import { oc } from './builder'
-import { createContractCaller } from './caller'
+import { createContractClientFactory } from './client-factory'
 import { type } from './schema-utils'
 
 const contract = {
@@ -14,11 +14,11 @@ const contract = {
   },
 }
 
-describe('createContractCaller', () => {
+describe('createContractClientFactory', () => {
   const link = {} as ClientLink<{ cache?: boolean }>
 
   it('infers interceptor input, output, errors types', () => {
-    createContractCaller(link, {
+    createContractClientFactory(link, {
       contractRef: contract,
       interceptors: [
         async ({ context, next, input }) => {
@@ -73,33 +73,51 @@ describe('createContractCaller', () => {
     })
   })
 
-  it('infers procedure return types', () => {
-    const caller = createContractCaller(link)
+  it('returns a client & infers procedure return types', () => {
+    const factory = createContractClientFactory(link)
 
     expectTypeOf(
-      caller(contract.ping),
+      factory(contract.ping)(),
     ).toEqualTypeOf<
       PromiseWithError<unknown, Error>
     >()
 
     expectTypeOf(
-      caller(contract.nested.pong, 'string', { context: { cache: true } }),
+      factory(contract.nested.pong)('string', { context: { cache: true } }),
+    ).toEqualTypeOf<
+      PromiseWithError<Date, Error | ORPCError<'BAD_GATEWAY', RegExp>>
+    >()
+  })
+
+  it('returns a router client when a router contract is passed', () => {
+    const factory = createContractClientFactory(link)
+
+    const client = factory(contract)
+
+    expectTypeOf(
+      client.ping(),
+    ).toEqualTypeOf<
+      PromiseWithError<unknown, Error>
+    >()
+
+    expectTypeOf(
+      client.nested.pong('string', { context: { cache: true } }),
     ).toEqualTypeOf<
       PromiseWithError<Date, Error | ORPCError<'BAD_GATEWAY', RegExp>>
     >()
   })
 
   it('rejects invalid input', () => {
-    const caller = createContractCaller(link)
+    const factory = createContractClientFactory(link)
 
     // @ts-expect-error - invalid input
-    caller(contract.nested.pong, 123)
+    factory(contract.nested.pong)(123)
   })
 
   it('rejects invalid context', () => {
-    const caller = createContractCaller(link)
+    const factory = createContractClientFactory(link)
 
     // @ts-expect-error - invalid context
-    caller(contract.nested.pong, 'string', { context: { cache: 'invalid' } })
+    factory(contract.nested.pong)('string', { context: { cache: 'invalid' } })
   })
 })

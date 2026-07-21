@@ -18,36 +18,23 @@ function createContract(path?: string[]) {
 }
 
 describe('createContractUtilsFactory', () => {
-  const caller = vi.fn()
+  const clientFactory = vi.fn()
 
-  it('throws when procedure contract has no meta.path', () => {
-    const factory = createContractUtilsFactory(caller as any, {})
-    const procedure = createContract()
+  it('throws when no procedure contract defines meta.path', () => {
+    const factory = createContractUtilsFactory(clientFactory as any, {})
 
-    expect(() => factory(procedure as any)).toThrow(
+    expect(() => factory(createContract() as any)).toThrow(
+      'ContractUtilsFactory: procedure contract must define `meta.path` that matches its path in the root router contract.',
+    )
+
+    expect(() => factory({ users: { list: createContract() } } as any)).toThrow(
       'ContractUtilsFactory: procedure contract must define `meta.path` that matches its path in the root router contract.',
     )
 
     expect(createRouterUtilsSpy).not.toHaveBeenCalled()
   })
 
-  it('throws when scoped option is invalid at given path', () => {
-    const factory = createContractUtilsFactory(caller as any, {
-      scoped: {
-        users: {
-          list: 'invalid' as any,
-        },
-      },
-    })
-
-    expect(() => factory(createContract(['users', 'list']) as any)).toThrow(
-      'ContractUtilsFactory: "scoped" at path "users.list" must be an object or undefined, got "invalid".',
-    )
-
-    expect(createRouterUtilsSpy).not.toHaveBeenCalled()
-  })
-
-  it('scopes options and wraps caller for createRouterUtils', () => {
+  it('passes the created client and resolved path to createRouterUtils', () => {
     const delegatedUtils = { queryOptions: vi.fn() }
     const queryInterceptor = vi.fn()
     const mutationInterceptor = vi.fn()
@@ -63,7 +50,6 @@ describe('createContractUtilsFactory', () => {
     }
     const options = {
       prefix: '__prefix__',
-      path: ['__base__'],
       queryInterceptors: [queryInterceptor],
       mutationInterceptors: [mutationInterceptor],
       plugins: [plugin],
@@ -74,38 +60,72 @@ describe('createContractUtilsFactory', () => {
       },
     }
     const procedure = createContract(['users', 'list'])
+    const delegatedClient = vi.fn()
 
-    caller.mockReturnValueOnce('__mocked__')
+    clientFactory.mockReturnValueOnce(delegatedClient)
     createRouterUtilsSpy.mockReturnValueOnce(delegatedUtils as any)
 
-    const factory = createContractUtilsFactory(caller as any, options as any)
+    const factory = createContractUtilsFactory(clientFactory as any, options as any)
     const result = factory(procedure as any)
 
     expect(result).toBe(delegatedUtils)
+    expect(clientFactory).toHaveBeenCalledTimes(1)
+    expect(clientFactory).toHaveBeenCalledWith(procedure)
+
     expect(createRouterUtilsSpy).toHaveBeenCalledTimes(1)
-
-    const [client, createRouterUtilsOptions] = createRouterUtilsSpy.mock.calls[0]!
-
-    expect(createRouterUtilsOptions).toEqual({
+    expect(createRouterUtilsSpy).toHaveBeenCalledWith(delegatedClient, {
       ...options,
-      path: ['__base__', 'users', 'list'],
+      path: ['users', 'list'],
       scoped: scopedOptions,
     })
+  })
 
-    expect((client as any)({ value: 'hello' }, { context: { requestId: 'request_1' } })).toBe('__mocked__')
-    expect(caller).toHaveBeenCalledTimes(1)
-    expect(caller).toHaveBeenCalledWith(
-      procedure,
-      { value: 'hello' },
-      { context: { requestId: 'request_1' } },
-    )
+  it('resolves the base path when a router contract is passed', () => {
+    const delegatedUtils = { queryOptions: vi.fn() }
+    const delegatedClient = { list: vi.fn(), find: vi.fn() }
+    const scopedListOptions = {
+      queryOptions: {
+        staleTime: 1000,
+      },
+    }
+    const options = {
+      prefix: '__prefix__',
+      scoped: {
+        users: {
+          list: scopedListOptions,
+        },
+      },
+    }
+    const router = {
+      list: createContract(['users', 'list']),
+      find: createContract(['users', 'find']),
+    }
+
+    clientFactory.mockReturnValueOnce(delegatedClient)
+    createRouterUtilsSpy.mockReturnValueOnce(delegatedUtils as any)
+
+    const factory = createContractUtilsFactory(clientFactory as any, options as any)
+    const result = factory(router as any)
+
+    expect(result).toBe(delegatedUtils)
+    expect(clientFactory).toHaveBeenCalledTimes(1)
+    expect(clientFactory).toHaveBeenCalledWith(router)
+
+    expect(createRouterUtilsSpy).toHaveBeenCalledTimes(1)
+    expect(createRouterUtilsSpy).toHaveBeenCalledWith(delegatedClient, {
+      ...options,
+      path: ['users'],
+      scoped: {
+        list: scopedListOptions,
+      },
+    })
   })
 })
 
 describe('createContractJsonifiedUtilsFactory', () => {
-  const caller = vi.fn()
+  const clientFactory = vi.fn()
 
-  it('delegates to createRouterUtils with the scoped path and scoped', () => {
+  it('delegates to createRouterUtils with the resolved path', () => {
     const delegatedUtils = { mutationOptions: vi.fn() }
     const scopedOptions = {
       mutationOptions: {
@@ -114,34 +134,32 @@ describe('createContractJsonifiedUtilsFactory', () => {
         },
       },
     }
-    const procedure = createContract(['nested', 'pong'])
-
-    caller.mockReturnValueOnce('__jsonified__')
-    createRouterUtilsSpy.mockReturnValueOnce(delegatedUtils as any)
-
-    const factory = createContractJsonifiedUtilsFactory(caller as any, {
+    const options = {
       prefix: '__json__',
       scoped: {
         nested: {
           pong: scopedOptions,
         },
       },
-    } as any)
+    }
+    const procedure = createContract(['nested', 'pong'])
+    const delegatedClient = vi.fn()
+
+    clientFactory.mockReturnValueOnce(delegatedClient)
+    createRouterUtilsSpy.mockReturnValueOnce(delegatedUtils as any)
+
+    const factory = createContractJsonifiedUtilsFactory(clientFactory as any, options as any)
     const result = factory(procedure as any)
 
     expect(result).toBe(delegatedUtils)
+    expect(clientFactory).toHaveBeenCalledTimes(1)
+    expect(clientFactory).toHaveBeenCalledWith(procedure)
+
     expect(createRouterUtilsSpy).toHaveBeenCalledTimes(1)
-
-    const [client, createRouterUtilsOptions] = createRouterUtilsSpy.mock.calls[0]!
-
-    expect(createRouterUtilsOptions).toEqual({
-      prefix: '__json__',
-      scoped: scopedOptions,
+    expect(createRouterUtilsSpy).toHaveBeenCalledWith(delegatedClient, {
+      ...options,
       path: ['nested', 'pong'],
+      scoped: scopedOptions,
     })
-
-    expect((client as any)('payload')).toBe('__jsonified__')
-    expect(caller).toHaveBeenCalledTimes(1)
-    expect(caller).toHaveBeenCalledWith(procedure, 'payload')
   })
 })
