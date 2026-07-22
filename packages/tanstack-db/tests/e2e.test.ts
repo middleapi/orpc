@@ -10,7 +10,7 @@ beforeEach(() => {
 
 it('syncs a collection through oRPC procedures', async () => {
   const collection = createCollection(orpc.todo.list.collectionOptions({
-    input: { search: '' },
+    input: () => ({ search: '' }),
     queryClient,
     getKey: todo => todo.id,
     startSync: true,
@@ -51,7 +51,7 @@ it('shares query keys with @orpc/tanstack-query utils', async () => {
   const tanstackQueryUtils = createTanstackQueryUtils(client)
 
   const collection = createCollection(orpc.todo.list.collectionOptions({
-    input: { search: '' },
+    input: () => ({ search: '' }),
     queryClient,
     getKey: todo => todo.id,
     startSync: true,
@@ -59,7 +59,7 @@ it('shares query keys with @orpc/tanstack-query utils', async () => {
 
   await collection.preload()
 
-  expect(queryClient.getQueryData(tanstackQueryUtils.todo.list.queryKey({ input: { search: '' } }))).toEqual([{ id: 1, name: 'first' }])
+  expect(queryClient.getQueryData(tanstackQueryUtils.todo.list.queryKey())).toEqual([{ id: 1, name: 'first' }])
   expect(orpc.todo.list.key({ type: 'query' })).toEqual(tanstackQueryUtils.todo.list.key({ type: 'query' }))
 })
 
@@ -67,7 +67,7 @@ it('supports schema option', async () => {
   const { todoSchema } = await import('./__shared__/orpc')
 
   const collection = createCollection(orpc.todo.list.collectionOptions({
-    input: { search: 'first' },
+    input: () => ({ search: 'first' }),
     queryClient,
     schema: todoSchema,
     getKey: todo => todo.id,

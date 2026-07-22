@@ -18,17 +18,15 @@ export type InferCollectionItem<TOutput> = TOutput extends Array<infer U extends
 
 export type CollectionQueryFn<TOutput> = (context: QueryFunctionContext) => Promise<TOutput>
 
-/**
- * Can be a static input, or a function that resolves the input
- * from the query function context on each fetch.
- */
-export type CollectionInput<TInput> = TInput | ((context: QueryFunctionContext) => TInput)
-
 export type CollectionOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TItem extends object, TKey extends string | number, TSchema extends AnySchema>
-  = & (undefined extends TInput ? { input?: CollectionInput<TInput> } : { input: CollectionInput<TInput> })
-    & (object extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
-    & { queryKey?: QueryKey | ((options: LoadSubsetOptions) => QueryKey) }
-    & Omit<QueryCollectionConfig<TItem, CollectionQueryFn<TOutput>, TError, QueryKey, TKey, TSchema, TOutput>, 'queryKey' | 'queryFn' | 'select' | 'schema'>
+  = & (undefined extends TInput
+    ? { input?: (context: QueryFunctionContext) => TInput }
+    : { input: (context: QueryFunctionContext) => TInput })
+  & (object extends TClientContext
+    ? { context?: (context: QueryFunctionContext) => TClientContext }
+    : { context: (context: QueryFunctionContext) => TClientContext })
+  & { queryKey?: QueryKey | ((options: LoadSubsetOptions) => QueryKey) }
+  & Omit<QueryCollectionConfig<TItem, CollectionQueryFn<TOutput>, TError, QueryKey, TKey, TSchema, TOutput>, 'queryKey' | 'queryFn' | 'select' | 'schema'>
 
 export type CollectionOptionsOut<TItem extends object, TKey extends string | number, TSchema extends AnySchema, TInsertInput extends object, TError>
   = & CollectionConfig<TItem, TKey, TSchema, QueryCollectionUtils<TItem, TKey, TInsertInput, TError>>
@@ -40,11 +38,13 @@ export interface MutationHandlerParams<TItem extends object = any, TType extends
 }
 
 export type MutationHandlerOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TItem extends object, TType extends OperationType, TReturn>
-  = & (object extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
-    & (undefined extends TInput
-      ? { input?: (mutation: PendingMutation<TItem, TType>, params: MutationHandlerParams<TItem, TType>) => TInput }
-      : { input: (mutation: PendingMutation<TItem, TType>, params: MutationHandlerParams<TItem, TType>) => TInput })
-    & { output?: (outputs: TOutput[], params: MutationHandlerParams<TItem, TType>) => TReturn }
+  = & (undefined extends TInput
+    ? { input?: (mutation: PendingMutation<TItem, TType>, params: MutationHandlerParams<TItem, TType>) => TInput }
+    : { input: (mutation: PendingMutation<TItem, TType>, params: MutationHandlerParams<TItem, TType>) => TInput })
+  & (object extends TClientContext
+    ? { context?: (mutation: PendingMutation<TItem, TType>, params: MutationHandlerParams<TItem, TType>) => TClientContext }
+    : { context: (mutation: PendingMutation<TItem, TType>, params: MutationHandlerParams<TItem, TType>) => TClientContext })
+  & { output?: (outputs: TOutput[], params: MutationHandlerParams<TItem, TType>) => TReturn }
 
 export type MutationHandler<TItem extends object, TType extends OperationType, TReturn>
   = (params: MutationHandlerParams<TItem, TType>) => Promise<TReturn>

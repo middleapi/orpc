@@ -44,16 +44,6 @@ describe('ProcedureUtils', () => {
 
     it('handles `input` correctly', () => {
       listUtils.collectionOptions({ queryClient, getKey: item => item.id })
-      listUtils.collectionOptions({ input: { search: '__search__' }, queryClient, getKey: item => item.id })
-      // @ts-expect-error --- input is invalid
-      listUtils.collectionOptions({ input: { search: 123 }, queryClient, getKey: item => item.id })
-
-      requiredInputListUtils.collectionOptions({ input: { search: '__search__' }, queryClient, getKey: item => item.id })
-      // @ts-expect-error --- input is required
-      requiredInputListUtils.collectionOptions({ queryClient, getKey: item => item.id })
-    })
-
-    it('supports dynamic input', () => {
       listUtils.collectionOptions({
         input: (context) => {
           expectTypeOf(context.queryKey).toEqualTypeOf<QueryKey>()
@@ -63,18 +53,32 @@ describe('ProcedureUtils', () => {
         queryClient,
         getKey: item => item.id,
       })
-
-      // @ts-expect-error --- dynamic input return type is invalid
+      // @ts-expect-error --- static input is not allowed
+      listUtils.collectionOptions({ input: { search: '__search__' }, queryClient, getKey: item => item.id })
+      // @ts-expect-error --- input return type is invalid
       listUtils.collectionOptions({ input: () => ({ search: 123 }), queryClient, getKey: item => item.id })
+
+      requiredInputListUtils.collectionOptions({ input: () => ({ search: '__search__' }), queryClient, getKey: item => item.id })
+      // @ts-expect-error --- input is required
+      requiredInputListUtils.collectionOptions({ queryClient, getKey: item => item.id })
     })
 
     it('handles `context` correctly', () => {
       listUtils.collectionOptions({ queryClient, getKey: item => item.id })
+      listUtils.collectionOptions({
+        context: (context) => {
+          expectTypeOf(context.queryKey).toEqualTypeOf<QueryKey>()
+          return { batch: true }
+        },
+        queryClient,
+        getKey: item => item.id,
+      })
+      // @ts-expect-error --- static context is not allowed
       listUtils.collectionOptions({ context: { batch: true }, queryClient, getKey: item => item.id })
-      // @ts-expect-error --- context is invalid
-      listUtils.collectionOptions({ context: { batch: 'invalid' }, queryClient, getKey: item => item.id })
+      // @ts-expect-error --- context return type is invalid
+      listUtils.collectionOptions({ context: () => ({ batch: 'invalid' }), queryClient, getKey: item => item.id })
 
-      requiredContextListUtils.collectionOptions({ context: { batch: true }, queryClient, getKey: item => item.id })
+      requiredContextListUtils.collectionOptions({ context: () => ({ batch: true }), queryClient, getKey: item => item.id })
       // @ts-expect-error --- context is required
       requiredContextListUtils.collectionOptions({ queryClient, getKey: item => item.id })
     })
@@ -152,7 +156,16 @@ describe('ProcedureUtils', () => {
 
       // @ts-expect-error --- context is required
       requiredContextListUtils.mutationHandler()
+      // @ts-expect-error --- static context is not allowed
       requiredContextListUtils.mutationHandler({ context: { batch: true } })
+      requiredContextListUtils.mutationHandler({ context: () => ({ batch: true }) })
+      requiredContextListUtils.mutationHandler<Todo, 'update'>({
+        context: (mutation, params) => {
+          expectTypeOf(mutation.changes).toEqualTypeOf<Partial<Todo>>()
+          expectTypeOf(params.transaction.mutations[0].type).toEqualTypeOf<'update'>()
+          return { batch: true }
+        },
+      })
     })
 
     it('is assignable to TanStack DB persistence handlers', () => {

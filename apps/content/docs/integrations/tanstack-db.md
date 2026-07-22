@@ -66,8 +66,8 @@ Use `.collectionOptions` to build [Query Collection](https://tanstack.com/db/lat
 import { createCollection } from '@tanstack/db'
 
 const todosCollection = createCollection(orpc.todo.list.collectionOptions({
-  input: { search: 'orpc' }, // Specify input if needed
-  context: { cache: true }, // Provide client context if needed
+  input: () => ({ search: 'orpc' }), // Resolve procedure input on each fetch
+  context: () => ({ cache: true }), // Provide client context if needed
   queryClient,
   getKey: todo => todo.id,
   onInsert: orpc.todo.create.mutationHandler({
@@ -96,7 +96,7 @@ const { data: todos } = useLiveQuery(q =>
 The query key is generated the same way as in the [Tanstack Query Integration](/docs/integrations/tanstack-query), so both integrations can share a `queryClient` and actions like invalidation work across them.
 :::
 
-The `input` option also accepts a function that resolves the input from the query function context on each fetch. This is useful when the query key is dynamic, such as with [on-demand sync mode](https://tanstack.com/db/latest/docs/collections/query-collection#queryfn-and-predicate-push-down):
+The `input` and `context` options are functions that receive the query function context, so they are resolved on each fetch. This pairs naturally with a dynamic `queryKey`, such as with [on-demand sync mode](https://tanstack.com/db/latest/docs/collections/query-collection#queryfn-and-predicate-push-down):
 
 ```ts
 const todosCollection = createCollection(orpc.todo.list.collectionOptions({
@@ -109,17 +109,17 @@ const todosCollection = createCollection(orpc.todo.list.collectionOptions({
 ```
 
 ::: warning
-When the input is dynamic, the generated query key no longer includes it. Provide a custom `queryKey` that reflects whatever the input depends on, so each variation is cached separately.
+The generated query key does not include the input. If the input varies, provide a custom `queryKey` that reflects whatever it depends on, so each variation is cached separately.
 :::
 
 ## Mutation Handler Utility
 
-Use `.mutationHandler` to build a [persistence handler](https://tanstack.com/db/latest/docs/guides/mutations) for collection options like `onInsert`, `onUpdate`, and `onDelete`. The `input` option maps each mutation in the transaction to the procedure input, and the procedure is called once per mutation.
+Use `.mutationHandler` to build a [persistence handler](https://tanstack.com/db/latest/docs/guides/mutations) for collection options like `onInsert`, `onUpdate`, and `onDelete`. The procedure is called once per mutation in the transaction, with the `input` and `context` options resolved for each mutation.
 
 ```ts
 const onUpdate = orpc.todo.update.mutationHandler({
   input: mutation => ({ id: mutation.key, data: mutation.changes }),
-  context: { cache: true }, // Provide client context if needed
+  context: mutation => ({ cache: true }), // Provide client context if needed
 })
 ```
 

@@ -63,24 +63,20 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     const { input, context, queryKey: customQueryKey, ...rest } = optionsIn
 
     const queryKey = customQueryKey
-      ?? generateOperationKey(this.path, {
-        prefix: this.options.prefix,
-        type: 'query',
-        input: typeof input === 'function' ? undefined : input,
-      })
+      ?? generateOperationKey(this.path, { prefix: this.options.prefix, type: 'query' })
 
     return queryCollectionOptions({
       ...rest,
       queryKey,
       queryFn: (fnContext) => {
-        return this.call(typeof input === 'function' ? input(fnContext) : input, {
+        return this.call(input?.(fnContext), {
           signal: fnContext.signal,
           context: {
             [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
               key: fnContext.queryKey,
               type: 'query',
             },
-            ...context,
+            ...context?.(fnContext),
           } satisfies TanstackQueryOperationContext,
         })
       },
@@ -99,17 +95,17 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     const mutationKey = generateOperationKey(this.path, { prefix: this.options.prefix, type: 'mutation' })
 
     return async (params) => {
-      const context = {
-        [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
-          key: mutationKey,
-          type: 'mutation',
-        },
-        ...optionsIn.context,
-      } satisfies TanstackQueryOperationContext
-
       const outputs: TOutput[] = []
 
       for (const mutation of params.transaction.mutations) {
+        const context = {
+          [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
+            key: mutationKey,
+            type: 'mutation',
+          },
+          ...optionsIn.context?.(mutation, params),
+        } satisfies TanstackQueryOperationContext
+
         outputs.push(await this.call(optionsIn.input?.(mutation, params), { context: context as any }))
       }
 

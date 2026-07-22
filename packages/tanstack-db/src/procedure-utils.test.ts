@@ -33,7 +33,7 @@ describe('procedureUtils', () => {
 
     it('forwards options to queryCollectionOptions with a generated queryKey', () => {
       const options = utils.collectionOptions({
-        input: { search: '__search__' },
+        input: () => ({ search: '__search__' }),
         queryClient,
         getKey,
         startSync: true,
@@ -42,7 +42,7 @@ describe('procedureUtils', () => {
       expect(queryCollectionOptionsSpy).toHaveBeenCalledTimes(1)
       const config = queryCollectionOptionsSpy.mock.calls[0]![0] as any
 
-      expect(config.queryKey).toEqual(generateOperationKey(['planet', 'list'], { type: 'query', input: { search: '__search__' } }))
+      expect(config.queryKey).toEqual(generateOperationKey(['planet', 'list'], { type: 'query' }))
       expect(config.queryClient).toBe(queryClient)
       expect(config.getKey).toBe(getKey)
       expect(config.startSync).toBe(true)
@@ -52,40 +52,15 @@ describe('procedureUtils', () => {
       expect(options).toBe(queryCollectionOptionsSpy.mock.results[0]!.value)
     })
 
-    it('queryFn calls client with input, signal, and operation context', async () => {
-      client.mockResolvedValueOnce([{ id: 1 }])
-
-      utils.collectionOptions({
-        input: { search: '__search__' },
-        context: { cache: true },
-        queryClient,
-        getKey,
-      } as any)
-
-      const config = queryCollectionOptionsSpy.mock.calls[0]![0] as any
-
-      await expect(config.queryFn({ signal, queryKey: config.queryKey })).resolves.toEqual([{ id: 1 }])
-
-      expect(client).toHaveBeenCalledTimes(1)
-      expect(client).toHaveBeenCalledWith({ search: '__search__' }, {
-        signal,
-        context: {
-          [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
-            key: config.queryKey,
-            type: 'query',
-          },
-          cache: true,
-        },
-      })
-    })
-
-    it('supports dynamic input resolved from queryFn context', async () => {
+    it('queryFn resolves input & context from its context and calls client', async () => {
       client.mockResolvedValueOnce([{ id: 1 }])
 
       const inputFn = vi.fn((fnContext: any) => ({ search: fnContext.queryKey[1].search }))
+      const contextFn = vi.fn(() => ({ cache: true }))
 
       utils.collectionOptions({
         input: inputFn,
+        context: contextFn,
         queryKey: ['__custom__', { search: '__dynamic__' }],
         queryClient,
         getKey,
@@ -99,44 +74,57 @@ describe('procedureUtils', () => {
 
       expect(inputFn).toHaveBeenCalledTimes(1)
       expect(inputFn).toHaveBeenCalledWith({ signal, queryKey: config.queryKey })
-      expect(client).toHaveBeenCalledWith({ search: '__dynamic__' }, expect.any(Object))
+      expect(contextFn).toHaveBeenCalledTimes(1)
+      expect(contextFn).toHaveBeenCalledWith({ signal, queryKey: config.queryKey })
+
+      expect(client).toHaveBeenCalledTimes(1)
+      expect(client).toHaveBeenCalledWith({ search: '__dynamic__' }, {
+        signal,
+        context: {
+          [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
+            key: config.queryKey,
+            type: 'query',
+          },
+          cache: true,
+        },
+      })
     })
 
-    it('excludes dynamic input from generated queryKey', () => {
+    it('works without input & context', async () => {
+      client.mockResolvedValueOnce([{ id: 1 }])
+
       utils.collectionOptions({
-        input: () => ({ search: '__dynamic__' }),
         queryClient,
         getKey,
       } as any)
 
       const config = queryCollectionOptionsSpy.mock.calls[0]![0] as any
-      expect(config.queryKey).toEqual(generateOperationKey(['planet', 'list'], { type: 'query' }))
-    })
 
-    it('supports custom queryKey', () => {
-      utils.collectionOptions({
-        input: { search: '__search__' },
-        queryKey: ['__custom__'],
-        queryClient,
-        getKey,
-      } as any)
+      await expect(config.queryFn({ signal, queryKey: config.queryKey })).resolves.toEqual([{ id: 1 }])
 
-      const config = queryCollectionOptionsSpy.mock.calls[0]![0] as any
-      expect(config.queryKey).toEqual(['__custom__'])
+      expect(client).toHaveBeenCalledWith(undefined, {
+        signal,
+        context: {
+          [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
+            key: config.queryKey,
+            type: 'query',
+          },
+        },
+      })
     })
 
     it('includes prefix in generated queryKey', () => {
       const prefixedUtils = new ProcedureUtils(['planet', 'list'], client as any, { prefix: '__prefix__' })
 
       prefixedUtils.collectionOptions({
-        input: { search: '__search__' },
+        input: () => ({ search: '__search__' }),
         queryClient,
         getKey,
       } as any)
 
       const config = queryCollectionOptionsSpy.mock.calls[0]![0] as any
       expect(config.queryKey).toEqual(
-        generateOperationKey(['planet', 'list'], { prefix: '__prefix__', type: 'query', input: { search: '__search__' } }),
+        generateOperationKey(['planet', 'list'], { prefix: '__prefix__', type: 'query' }),
       )
     })
   })
@@ -208,16 +196,22 @@ describe('procedureUtils', () => {
       expect(outputMapper).toHaveBeenCalledWith([{ txid: 1 }, { txid: 2 }], params)
     })
 
-    it('merges custom context and includes prefix in mutation key', async () => {
+    it('resolves context per mutation and includes prefix in mutation key', async () => {
       const prefixedUtils = new ProcedureUtils(['planet', 'list'], client as any, { prefix: '__prefix__' })
       client.mockResolvedValueOnce('__output1__').mockResolvedValueOnce('__output2__')
 
+      const contextFn = vi.fn((mutation: any) => ({ cache: mutation.key }))
+
       const handler = prefixedUtils.mutationHandler({
         input: (mutation: any) => mutation.key,
-        context: { cache: true },
+        context: contextFn,
       } as any)
 
       await handler(params)
+
+      expect(contextFn).toHaveBeenCalledTimes(2)
+      expect(contextFn).toHaveBeenNthCalledWith(1, params.transaction.mutations[0], params)
+      expect(contextFn).toHaveBeenNthCalledWith(2, params.transaction.mutations[1], params)
 
       expect(client).toHaveBeenNthCalledWith(1, 1, {
         context: {
@@ -225,7 +219,16 @@ describe('procedureUtils', () => {
             key: generateOperationKey(['planet', 'list'], { prefix: '__prefix__', type: 'mutation' }),
             type: 'mutation',
           },
-          cache: true,
+          cache: 1,
+        },
+      })
+      expect(client).toHaveBeenNthCalledWith(2, 2, {
+        context: {
+          [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
+            key: generateOperationKey(['planet', 'list'], { prefix: '__prefix__', type: 'mutation' }),
+            type: 'mutation',
+          },
+          cache: 2,
         },
       })
     })

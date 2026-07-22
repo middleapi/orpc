@@ -15,7 +15,7 @@ it('.call', () => {
 
 it('.collectionOptions with createCollection', () => {
   const collection = createCollection(orpc.todo.list.collectionOptions({
-    input: { search: '__search__' },
+    input: () => ({ search: '__search__' }),
     queryClient,
     getKey: todo => todo.id,
     onInsert: orpc.todo.create.mutationHandler({
