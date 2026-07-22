@@ -11,23 +11,23 @@ This guide assumes you are already familiar with [TanStack DB](https://tanstack.
 ::: code-group
 
 ```sh [npm]
-npm install @orpc/tanstack-db@beta @tanstack/db @tanstack/query-db-collection
+npm install @orpc/experimental-tanstack-db@beta @tanstack/db @tanstack/query-db-collection
 ```
 
 ```sh [yarn]
-yarn add @orpc/tanstack-db@beta @tanstack/db @tanstack/query-db-collection
+yarn add @orpc/experimental-tanstack-db@beta @tanstack/db @tanstack/query-db-collection
 ```
 
 ```sh [pnpm]
-pnpm add @orpc/tanstack-db@beta @tanstack/db @tanstack/query-db-collection
+pnpm add @orpc/experimental-tanstack-db@beta @tanstack/db @tanstack/query-db-collection
 ```
 
 ```sh [bun]
-bun add @orpc/tanstack-db@beta @tanstack/db @tanstack/query-db-collection
+bun add @orpc/experimental-tanstack-db@beta @tanstack/db @tanstack/query-db-collection
 ```
 
 ```sh [deno]
-deno add npm:@orpc/tanstack-db@beta npm:@tanstack/db npm:@tanstack/query-db-collection
+deno add npm:@orpc/experimental-tanstack-db@beta npm:@tanstack/db npm:@tanstack/query-db-collection
 ```
 
 :::
@@ -37,7 +37,7 @@ deno add npm:@orpc/tanstack-db@beta npm:@tanstack/db npm:@tanstack/query-db-coll
 Before you begin, set up either a [server-side client](/docs/client/server-side) or a [client-side client](/docs/client/client-side).
 
 ```ts
-import { createTanstackDBUtils } from '@orpc/tanstack-db'
+import { createTanstackDBUtils } from '@orpc/experimental-tanstack-db'
 
 const orpc = createTanstackDBUtils(client)
 ```
