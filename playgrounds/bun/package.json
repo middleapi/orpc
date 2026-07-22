@@ -26,7 +26,7 @@
     "@orpc/server": "beta",
     "@orpc/tanstack-query": "beta",
     "@orpc/zod": "beta",
-    "@tanstack/react-query": "^5.101.2",
+    "@tanstack/react-query": "^5.101.3",
     "@types/bun": "latest",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",

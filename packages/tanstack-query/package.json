@@ -46,13 +46,13 @@
   },
   "devDependencies": {
     "@angular/core": "^22.0.1",
-    "@tanstack/angular-query-experimental": "^5.101.0",
-    "@tanstack/query-core": "^5.101.0",
-    "@tanstack/react-query": "^5.101.2",
-    "@tanstack/solid-query": "^5.101.0",
-    "@tanstack/svelte-query": "^6.1.34",
-    "@tanstack/vue-query": "^5.101.0",
-    "svelte": "^5.56.3",
+    "@tanstack/angular-query-experimental": "^5.101.3",
+    "@tanstack/query-core": "^5.101.3",
+    "@tanstack/react-query": "^5.101.3",
+    "@tanstack/solid-query": "^5.101.3",
+    "@tanstack/svelte-query": "^6.1.37",
+    "@tanstack/vue-query": "^5.101.3",
+    "svelte": "^5.56.7",
     "vue": "^3.5.38",
     "zod": "^4.4.3"
   }

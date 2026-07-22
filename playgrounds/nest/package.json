@@ -33,7 +33,7 @@
     "@orpc/server": "beta",
     "@orpc/tanstack-query": "beta",
     "@orpc/zod": "beta",
-    "@tanstack/react-query": "^5.101.2",
+    "@tanstack/react-query": "^5.101.3",
     "@types/express": "^5.0.6",
     "@types/node": "^26.0.1",
     "@types/supertest": "^7.2.0",

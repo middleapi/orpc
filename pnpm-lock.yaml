@@ -15,8 +15,8 @@ importers:
         specifier: ^5.7.1
         version: 5.7.1(tinybench@2.9.0)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.0))(vitest@4.1.10)
       '@hono/node-server':
-        specifier: ^2.0.4
-        version: 2.0.10(hono@4.12.31)
+        specifier: ^2.0.11
+        version: 2.0.11(hono@4.12.31)
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -132,8 +132,8 @@ importers:
         specifier: ^17.0.7
         version: 17.1.0
       pkg-pr-new:
-        specifier: ^0.0.78
-        version: 0.0.78
+        specifier: ^0.0.79
+        version: 0.0.79
       react:
         specifier: ^19.2.7
         version: 19.2.7
@@ -225,17 +225,17 @@ importers:
         specifier: ^4.2.0
         version: 4.3.1(typescript@6.0.3)
       '@tanstack/react-query':
-        specifier: ^5.101.2
-        version: 5.101.2(react@19.2.7)
+        specifier: ^5.101.3
+        version: 5.101.3(react@19.2.7)
       '@tanstack/solid-query':
-        specifier: ^5.101.0
-        version: 5.101.2(solid-js@1.9.14)
+        specifier: ^5.101.3
+        version: 5.101.3(solid-js@1.9.14)
       '@tanstack/svelte-query':
-        specifier: ^6.1.34
-        version: 6.1.36(svelte@5.56.6(@typescript-eslint/types@8.64.0))
+        specifier: ^6.1.37
+        version: 6.1.37(svelte@5.56.7(@typescript-eslint/types@8.64.0))
       '@tanstack/vue-query':
-        specifier: ^5.101.0
-        version: 5.101.2(vue@3.5.40(typescript@6.0.3))
+        specifier: ^5.101.3
+        version: 5.101.3(vue@3.5.40(typescript@6.0.3))
       '@types/node':
         specifier: ^26.0.1
         version: 26.1.1
@@ -313,8 +313,8 @@ importers:
         version: link:../shared
     devDependencies:
       ai:
-        specifier: ^7.0.31
-        version: 7.0.31(zod@4.4.3)
+        specifier: ^7.0.32
+        version: 7.0.32(zod@4.4.3)
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -470,8 +470,8 @@ importers:
         version: 0.5.0
     devDependencies:
       evlog:
-        specifier: ^2.19.2
-        version: 2.22.0(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@orpc/server@packages+server)(ai@7.0.31(zod@4.4.3))(express@5.2.1)(fastify@5.10.0)(hono@4.12.31)(next@16.2.10(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(ofetch@1.5.1)(react@19.2.7)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.0))
+        specifier: ^2.22.1
+        version: 2.22.1(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@orpc/server@packages+server)(ai@7.0.32(zod@4.4.3))(express@5.2.1)(fastify@5.10.0)(hono@4.12.31)(next@16.2.10(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(ofetch@1.5.1)(react@19.2.7)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.0))
 
   packages/json-schema:
     dependencies:
@@ -606,8 +606,8 @@ importers:
         version: 0.9.1
     devDependencies:
       '@scalar/api-reference':
-        specifier: ^1.57.2
-        version: 1.62.9(axios@1.18.1)(change-case@5.4.4)(tailwindcss@4.3.3)(typescript@6.0.3)(zod@4.4.3)
+        specifier: ^1.63.0
+        version: 1.63.0(axios@1.18.1)(change-case@5.4.4)(tailwindcss@4.3.3)(typescript@6.0.3)(zod@4.4.3)
       '@types/swagger-ui':
         specifier: ^5.32.0
         version: 5.32.0
@@ -809,26 +809,26 @@ importers:
         specifier: ^22.0.1
         version: 22.0.7(rxjs@7.8.2)
       '@tanstack/angular-query-experimental':
-        specifier: ^5.101.0
-        version: 5.101.2(@angular/common@22.0.7(@angular/core@22.0.7(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.0.7(rxjs@7.8.2))
+        specifier: ^5.101.3
+        version: 5.101.3(@angular/common@22.0.7(@angular/core@22.0.7(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.0.7(rxjs@7.8.2))
       '@tanstack/query-core':
-        specifier: ^5.101.0
-        version: 5.101.2
+        specifier: ^5.101.3
+        version: 5.101.3
       '@tanstack/react-query':
-        specifier: ^5.101.2
-        version: 5.101.2(react@19.2.7)
+        specifier: ^5.101.3
+        version: 5.101.3(react@19.2.7)
       '@tanstack/solid-query':
-        specifier: ^5.101.0
-        version: 5.101.2(solid-js@1.9.14)
+        specifier: ^5.101.3
+        version: 5.101.3(solid-js@1.9.14)
       '@tanstack/svelte-query':
-        specifier: ^6.1.34
-        version: 6.1.36(svelte@5.56.6(@typescript-eslint/types@8.64.0))
+        specifier: ^6.1.37
+        version: 6.1.37(svelte@5.56.7(@typescript-eslint/types@8.64.0))
       '@tanstack/vue-query':
-        specifier: ^5.101.0
-        version: 5.101.2(vue@3.5.40(typescript@6.0.3))
+        specifier: ^5.101.3
+        version: 5.101.3(vue@3.5.40(typescript@6.0.3))
       svelte:
-        specifier: ^5.56.3
-        version: 5.56.6(@typescript-eslint/types@8.64.0)
+        specifier: ^5.56.7
+        version: 5.56.7(@typescript-eslint/types@8.64.0)
       vue:
         specifier: ^3.5.38
         version: 3.5.40(typescript@6.0.3)
@@ -935,8 +935,8 @@ importers:
         specifier: beta
         version: link:../../packages/zod
       '@tanstack/react-query':
-        specifier: ^5.101.2
-        version: 5.101.2(react@19.2.7)
+        specifier: ^5.101.3
+        version: 5.101.3(react@19.2.7)
       '@types/bun':
         specifier: latest
         version: 1.3.14
@@ -998,8 +998,8 @@ importers:
         specifier: beta
         version: link:../../packages/zod
       '@tanstack/react-query':
-        specifier: ^5.101.2
-        version: 5.101.2(react@19.2.7)
+        specifier: ^5.101.3
+        version: 5.101.3(react@19.2.7)
       '@types/node':
         specifier: ^26.0.1
         version: 26.1.1
@@ -1109,8 +1109,8 @@ importers:
         specifier: beta
         version: link:../../packages/zod
       '@tanstack/react-query':
-        specifier: ^5.101.2
-        version: 5.101.2(react@19.2.7)
+        specifier: ^5.101.3
+        version: 5.101.3(react@19.2.7)
       '@types/express':
         specifier: ^5.0.6
         version: 5.0.6
@@ -1202,8 +1202,8 @@ importers:
         specifier: beta
         version: link:../../packages/zod
       '@tanstack/react-query':
-        specifier: ^5.101.2
-        version: 5.101.2(react@19.2.7)
+        specifier: ^5.101.3
+        version: 5.101.3(react@19.2.7)
       '@types/node':
         specifier: ^26.0.1
         version: 26.1.1
@@ -1246,8 +1246,8 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/gateway@4.0.23':
-    resolution: {integrity: sha512-f85diFdPMXYJpxCjOYZchMQkRH8h3r6lhK4Q2xmzJ7UA2OQ80L3W7tFu61742xGQK7zHWm5AhxYhNuc50H9SGQ==}
+  '@ai-sdk/gateway@4.0.24':
+    resolution: {integrity: sha512-RRNCwwYSMxN1SOskxqjyA9LZMuOs3J/fjP8jiB/akWG21jRdUkCcnO9paoiTFVjqnoJMIazrcqbeRfbSGG/PSQ==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -2393,8 +2393,8 @@ packages:
   '@hey-api/types@0.1.4':
     resolution: {integrity: sha512-thWfawrDIP7wSI9ioT13I5soaaqB5vAPIiZmgD8PbeEVKNrkonc0N/Sjj97ezl7oQgusZmaNphGdMKipPO6IBg==}
 
-  '@hono/node-server@2.0.10':
-    resolution: {integrity: sha512-ZcnNVhKTmyDJeg0UlnZjvM73JBsTAuhrH/J4fjwGOw59PwOW51r4J+p6CsKZWXdKSme4MFqU62CZMOsdDrU4CA==}
+  '@hono/node-server@2.0.11':
+    resolution: {integrity: sha512-bjD221KPLoJTWUwso1J6fGKiTXEUFedG/s0visavY4zakFPkeGURMRNly+FhBHs7T8Dz4qHaZIMX9ZoJHSJtKA==}
     engines: {node: '>=20'}
     peerDependencies:
       hono: ^4
@@ -4067,8 +4067,8 @@ packages:
     resolution: {integrity: sha512-bd+2nI27gnfCgzCGEP13u7rd2IlNdAB+Rx+CX0i29UXEu6SVxWpv5hBVrLLTQebfNzcUk9Evr+NkIX/WjSHp0Q==}
     engines: {node: '>=22'}
 
-  '@scalar/api-reference@1.62.9':
-    resolution: {integrity: sha512-DfanI7MEHSws6/qKWw+4UEULW7mm02/FhngqFPRJoof7SqnCGy1Ys7NzOtrjZIBuu+ZLUGo6+7JtGwob2jOXWA==}
+  '@scalar/api-reference@1.63.0':
+    resolution: {integrity: sha512-ie2DfrOeElmaVmY/xHd3aMfUpA5ApBDuPHYbcypn01l7rQPGQMFjPa7GX4QNzp4tgjnEMX3X9BYKSkyMQtH5ng==}
     engines: {node: '>=22'}
 
   '@scalar/asyncapi-upgrader@0.1.4':
@@ -4388,8 +4388,8 @@ packages:
   '@swc/helpers@0.5.23':
     resolution: {integrity: sha512-5lSsMOTXURePglDfvuAQUqkGek9Hg2kksOYay2m0+XR++b2NWYL/4sWyuvVBIs8oKnJaxkdi9whaL/sqN13afw==}
 
-  '@tanstack/angular-query-experimental@5.101.2':
-    resolution: {integrity: sha512-hjQVD0nO35ANRj+wrryK7JxryvHaufeOAYjkyGbQT6ox/ugElo/r4jKLJ66XPK/COh1hqlnqHjgDVxkzbw7egg==}
+  '@tanstack/angular-query-experimental@5.101.3':
+    resolution: {integrity: sha512-/wO0e4cW0mdsDFAIKa/FdwuS7e1vnB25sScSQYaN/XkFbUP61P1oxEp2Hz7jocHeqawOxKtha1Kn0kkqw6n2ZA==}
     peerDependencies:
       '@angular/common': '>=16.0.0'
       '@angular/core': '>=16.0.0'
@@ -4398,32 +4398,32 @@ packages:
     resolution: {integrity: sha512-Wo1iKt2b9OT7d+YGhvEPD3DXvPv2etTusIMhMUoG7fbhmxcXCtIjJDEygy91Y2JFlwGyjqiBPRozme7UD8hoqg==}
     engines: {node: '>=12'}
 
-  '@tanstack/query-core@5.101.2':
-    resolution: {integrity: sha512-hH5MLoJhF7KaIGd7q3xTXGXvslI+GYlM1Z/35aSHHWaCJWB7XvTSHYuV3eM7tw+aE0mT/xMro4M4Q9rCGHT0lw==}
+  '@tanstack/query-core@5.101.3':
+    resolution: {integrity: sha512-pWLyu7AjFFVM5G+frjcL81kKEW9R8GCCPKnL3uaWbMwd2f3ZINFCuy+PtKkdz/+pKw/f/XMsFsYq/H+uJHM4GQ==}
 
-  '@tanstack/query-devtools@5.101.2':
-    resolution: {integrity: sha512-o+wHcqgN7Pp0s8v1i0UGq/ZrrEKrxdIiMQmKRdYb2w7NPtylYSJ4+wg/tIn71m9DLstwUwdEGAvROdly6HXP6w==}
+  '@tanstack/query-devtools@5.101.3':
+    resolution: {integrity: sha512-twEAOB5uBmpFAdlIuy3KIUujwmoZIhCXZpu1PFMTress2XvK/CyzsvV70WrhtTcocszKpbvwMR0Bxq4dqkvH0g==}
 
-  '@tanstack/react-query@5.101.2':
-    resolution: {integrity: sha512-seDkr6kzGzX1okaaTtZPtgA688CDPlXUz1C6xSg0ESqn04Vuc8tlrYms1s3de+znBqhPVxFRfpAfUf+6XvfPWg==}
+  '@tanstack/react-query@5.101.3':
+    resolution: {integrity: sha512-ZjgcRwmQUSCythDPj6pE2NKFi9bpQegxIBxgt3hPytXI1ElFHNaa3A7aWW8vFaLCIRjPv467rbREYHbxcdgQbg==}
     peerDependencies:
       react: ^18 || ^19
 
-  '@tanstack/solid-query@5.101.2':
-    resolution: {integrity: sha512-IbCeM23gEbU0lW4wWFQhS4ELjgdmVXjhyCUh8pFemdMIuA5UswlkqEMryEE+lCMtxLS7m0oN1yWMocKi7vwXdw==}
+  '@tanstack/solid-query@5.101.3':
+    resolution: {integrity: sha512-bD+jOPg0JTQ4AxPPR7uN9S23iIla2kjrrDYO/PLMFHHsL8cXOy7IpzJ93sQV4Zm7Zi51ElRCF/kUBmHVSGR7/Q==}
     peerDependencies:
       solid-js: ^1.6.0
 
-  '@tanstack/svelte-query@6.1.36':
-    resolution: {integrity: sha512-AVyvXPzBh5OQnWFB7rk9gskciPouayAhU9Vm24uMai+Imf+ZfBEbjOAEtdM41oexFK/cdXmpAIySDSVaAzy9zw==}
+  '@tanstack/svelte-query@6.1.37':
+    resolution: {integrity: sha512-VNRzqFSpUP42mzoGpwPeZ60eIsilohpU7Rlr/dOgeMTwNxWC7jzlCFYSXZeX/tl1dfmLZ9H5fA23D+f1ixrqyA==}
     peerDependencies:
       svelte: ^5.25.0
 
-  '@tanstack/virtual-core@3.17.4':
-    resolution: {integrity: sha512-nGm5KteqxasUdThLc2izl6dHUqLv0LQj7Nuyo5gYalTPf/U8a9ermvsl7reT+6ioBW1l8WfpP/mcU338nLXpqw==}
+  '@tanstack/virtual-core@3.17.5':
+    resolution: {integrity: sha512-AXfBC3sq6PuYSwyxYORqqgHCNjPGAvKJvZuBBJ1klhztWBB5cgqgwsq8+fNfaQJG7/K4xYBja9S90QFn2zmQAg==}
 
-  '@tanstack/vue-query@5.101.2':
-    resolution: {integrity: sha512-nFXKNK4dI/PnKNejyIkQmmobBsJWWXTPcpjPvkgFLkpFPz9DcmqIiKIAF2Pa7MZCipH62/+bt2sxEIA0wNEeOg==}
+  '@tanstack/vue-query@5.101.3':
+    resolution: {integrity: sha512-sER8FpbP6nMpTWUCXsAhVZWDPlFqf2eIL++UNS37V159nZjpQwuRD+uR1/OIoZC7q0m8G7oyPQM6GCEZam4cYw==}
     peerDependencies:
       '@vue/composition-api': ^1.1.2
       vue: ^2.6.0 || ^3.3.0
@@ -4431,8 +4431,8 @@ packages:
       '@vue/composition-api':
         optional: true
 
-  '@tanstack/vue-virtual@3.13.32':
-    resolution: {integrity: sha512-E8OCutx7QnwZdvpJijz0Q2PHsYDWBWjnGr3TvgWiqxTU35jB1kVhtkd93scRV7tTFuId2tg3x2iFiw+IE4evjQ==}
+  '@tanstack/vue-virtual@3.13.33':
+    resolution: {integrity: sha512-R1j/o/5pdgzDqV3Us/s7VEV1Il6ocTsElKxK9g04rq66V3m7kIULgKXD04BAQwCO0IMemXsw3ex6LSH4ug3Feg==}
     peerDependencies:
       vue: ^2.7.0 || ^3.0.0
 
@@ -4827,8 +4827,8 @@ packages:
   '@ungap/structured-clone@1.3.3':
     resolution: {integrity: sha512-60YRaenCQcVjYEKOcG824+DRGGIQ3VKErcBoAEDJZz5bKIs2ZG+X/H9Nk+Q6EVkwJk5QNApxbrc5QtBSwtrXAg==}
 
-  '@unhead/vue@2.1.15':
-    resolution: {integrity: sha512-SSByXfEjhzPn8gXdEdgpYqpLMPSkLUH2HVE0GxZfOtNsJ0GgOHQs0g9T67ZZ1z0kTELLKdtOtYrzrbv9+ffF7g==}
+  '@unhead/vue@2.1.16':
+    resolution: {integrity: sha512-t6QykImeMJcrUTbFB0Coy0cB/OZItHdQFRFLoH8GAVXKWmQORGPrwvueP9me7adOCuMH2uVvrv0nCkbi6zksaA==}
     peerDependencies:
       vue: '>=3.5.18'
 
@@ -5235,8 +5235,8 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  ai@7.0.31:
-    resolution: {integrity: sha512-pJfwKXjF5kw0rKRTePwYo60EfWb8wfzJAgf3ojln/YkOsVVKttzZAJVcRPsg37Z3a06ZdKkxX+DSrMAFlPm5Mw==}
+  ai@7.0.32:
+    resolution: {integrity: sha512-EO2a9fv/a9upaabhgFNeoOzOzbWQufhG4Edl6bsVXlftO6Tens+Q/vijEIf6AP1mQMNaAJXxmSX1xR3Su+2jXw==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -6553,8 +6553,8 @@ packages:
     resolution: {integrity: sha512-kJezFj9YFAMLeORyi7aCLxLbD5/qWMQnoMVlVPyHIll7lgRJCc3JVln9Vgl9nwQi0YkMnhdGTMNn7CkRRAptMg==}
     engines: {node: '>=18.0.0'}
 
-  evlog@2.22.0:
-    resolution: {integrity: sha512-xWLQIf93SPldkAuIKQPbeUlqfPrsurBOJIqbKu3KB+a5TQVqUp3qE3edvbKKmdZDmcB2v+w9pIt/RWknV9pQTw==}
+  evlog@2.22.1:
+    resolution: {integrity: sha512-5IfmtCk4Mq/ZsCtykxftgWV8LkqjQu28ssEcwWpqbnqYxkolzo4iyh+my2tM8cZoTCDMnnIFp+X9tyspVE8NsA==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       '@nestjs/common': '>=11.1.28'
@@ -8336,8 +8336,8 @@ packages:
     resolution: {integrity: sha512-r34yH/GlQpKZbU1BvFFqOjhISRo1MNx1tWYsYvmj6KIRHSPMT2+yHOEb1SG6NMvRoHRF0a07kCOox/9yakl1vg==}
     hasBin: true
 
-  pkg-pr-new@0.0.78:
-    resolution: {integrity: sha512-sBfGGCiCLmJArx99Z/QmNN3jmkqRYhp1TV8Y1IOpSpXfOljqFcEjDyyc4HCVy+nbrmlkw9qXRq/9/L4ahF/d4w==}
+  pkg-pr-new@0.0.79:
+    resolution: {integrity: sha512-ip74NzaakGZha5s/X1T7j+Ez9/bRNDhzxQZTfnzAzoI7zO9JnMRdoiIfCLyy+ZzxxXg8WXRW2WcdvdORI0O30w==}
     hasBin: true
 
   pkg-types@1.3.1:
@@ -9383,8 +9383,8 @@ packages:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
 
-  svelte@5.56.6:
-    resolution: {integrity: sha512-p4HDLDogGHKRKCrgckQHNs5PEfXkju6JI5jTywueaKJI5hAdjPohEhRtQ0M1SWC/+TA73SPln+r7srr+7e4nZA==}
+  svelte@5.56.7:
+    resolution: {integrity: sha512-5qERUZX80oQj6XrDMUmD2Uhd/cIpCPDWWKBK3ZHmyRUC9apPyamWM8xMo31mbWsIQxwG2hVoSnOJ/EcnhVkkzQ==}
     engines: {node: '>=18'}
 
   svgo@4.0.2:
@@ -9758,8 +9758,8 @@ packages:
   unenv@2.0.0-rc.24:
     resolution: {integrity: sha512-i7qRCmY42zmCwnYlh9H2SvLEypEFGye5iRmEMKjcGi7zk9UquigRjFtTLz0TYqr0ZGLZhaMHl/foy1bZR+Cwlw==}
 
-  unhead@2.1.15:
-    resolution: {integrity: sha512-MCt5T90mCWyr3Z6pUCdM9lVRXoMoVBlL7z7U4CYVIiaDiuzad/UCfLuMqz5MeNmpZUgoBCQnrucJimU7EZR+XA==}
+  unhead@2.1.16:
+    resolution: {integrity: sha512-cD2Q4a6SQHhW9/bPp17NT4GJ1yS0DSLe75WEHKQ8bKa/wjB6cIki3KeL86hhllNBcpv8i6bxdwtwQunneXPqKQ==}
 
   unicorn-magic@0.3.0:
     resolution: {integrity: sha512-+QBBXBCvifc56fsbuxZQ6Sic3wqqc3WWaqxs58gvJrcOuN83HGTCwz3oS5phzU9LthRNE9VrJCFCLUgHeeFnfA==}
@@ -10287,7 +10287,7 @@ snapshots:
       '@vercel/oidc': 3.1.0
       zod: 4.4.3
 
-  '@ai-sdk/gateway@4.0.23(zod@4.4.3)':
+  '@ai-sdk/gateway@4.0.24(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 4.0.3
       '@ai-sdk/provider-utils': 5.0.11(zod@4.4.3)
@@ -11349,7 +11349,7 @@ snapshots:
   '@floating-ui/vue@1.1.9(vue@3.5.40(typescript@6.0.3))':
     dependencies:
       '@floating-ui/dom': 1.8.0
-      '@floating-ui/utils': 0.2.10
+      '@floating-ui/utils': 0.2.12
       vue-demi: 0.14.10(vue@3.5.40(typescript@6.0.3))
     transitivePeerDependencies:
       - '@vue/composition-api'
@@ -11373,7 +11373,7 @@ snapshots:
 
   '@headlessui/vue@1.7.23(vue@3.5.40(typescript@6.0.3))':
     dependencies:
-      '@tanstack/vue-virtual': 3.13.32(vue@3.5.40(typescript@6.0.3))
+      '@tanstack/vue-virtual': 3.13.33(vue@3.5.40(typescript@6.0.3))
       vue: 3.5.40(typescript@6.0.3)
 
   '@hey-api/spec-types@0.0.0-next-20260408030107':
@@ -11382,7 +11382,7 @@ snapshots:
 
   '@hey-api/types@0.1.4': {}
 
-  '@hono/node-server@2.0.10(hono@4.12.31)':
+  '@hono/node-server@2.0.11(hono@4.12.31)':
     dependencies:
       hono: 4.12.31
 
@@ -13131,7 +13131,7 @@ snapshots:
       - typescript
       - universal-cookie
 
-  '@scalar/api-reference@1.62.9(axios@1.18.1)(change-case@5.4.4)(tailwindcss@4.3.3)(typescript@6.0.3)(zod@4.4.3)':
+  '@scalar/api-reference@1.63.0(axios@1.18.1)(change-case@5.4.4)(tailwindcss@4.3.3)(typescript@6.0.3)(zod@4.4.3)':
     dependencies:
       '@headlessui/vue': 1.7.23(vue@3.5.40(typescript@6.0.3))
       '@scalar/agent-chat': 0.12.22(axios@1.18.1)(change-case@5.4.4)(tailwindcss@4.3.3)(typescript@6.0.3)(zod@4.4.3)
@@ -13151,7 +13151,7 @@ snapshots:
       '@scalar/use-toasts': 0.10.4(typescript@6.0.3)
       '@scalar/validation': 0.6.2
       '@scalar/workspace-store': 0.55.6(typescript@6.0.3)
-      '@unhead/vue': 2.1.15(vue@3.5.40(typescript@6.0.3))
+      '@unhead/vue': 2.1.16(vue@3.5.40(typescript@6.0.3))
       '@vueuse/core': 13.9.0(vue@3.5.40(typescript@6.0.3))
       fuse.js: 7.5.0
       microdiff: 1.5.0
@@ -13970,51 +13970,51 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@tanstack/angular-query-experimental@5.101.2(@angular/common@22.0.7(@angular/core@22.0.7(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.0.7(rxjs@7.8.2))':
+  '@tanstack/angular-query-experimental@5.101.3(@angular/common@22.0.7(@angular/core@22.0.7(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.0.7(rxjs@7.8.2))':
     dependencies:
       '@angular/common': 22.0.7(@angular/core@22.0.7(rxjs@7.8.2))(rxjs@7.8.2)
       '@angular/core': 22.0.7(rxjs@7.8.2)
-      '@tanstack/query-core': 5.101.2
+      '@tanstack/query-core': 5.101.3
     optionalDependencies:
-      '@tanstack/query-devtools': 5.101.2
+      '@tanstack/query-devtools': 5.101.3
 
   '@tanstack/match-sorter-utils@8.19.4':
     dependencies:
       remove-accents: 0.5.0
 
-  '@tanstack/query-core@5.101.2': {}
+  '@tanstack/query-core@5.101.3': {}
 
-  '@tanstack/query-devtools@5.101.2':
+  '@tanstack/query-devtools@5.101.3':
     optional: true
 
-  '@tanstack/react-query@5.101.2(react@19.2.7)':
+  '@tanstack/react-query@5.101.3(react@19.2.7)':
     dependencies:
-      '@tanstack/query-core': 5.101.2
+      '@tanstack/query-core': 5.101.3
       react: 19.2.7
 
-  '@tanstack/solid-query@5.101.2(solid-js@1.9.14)':
+  '@tanstack/solid-query@5.101.3(solid-js@1.9.14)':
     dependencies:
-      '@tanstack/query-core': 5.101.2
+      '@tanstack/query-core': 5.101.3
       solid-js: 1.9.14
 
-  '@tanstack/svelte-query@6.1.36(svelte@5.56.6(@typescript-eslint/types@8.64.0))':
+  '@tanstack/svelte-query@6.1.37(svelte@5.56.7(@typescript-eslint/types@8.64.0))':
     dependencies:
-      '@tanstack/query-core': 5.101.2
-      svelte: 5.56.6(@typescript-eslint/types@8.64.0)
+      '@tanstack/query-core': 5.101.3
+      svelte: 5.56.7(@typescript-eslint/types@8.64.0)
 
-  '@tanstack/virtual-core@3.17.4': {}
+  '@tanstack/virtual-core@3.17.5': {}
 
-  '@tanstack/vue-query@5.101.2(vue@3.5.40(typescript@6.0.3))':
+  '@tanstack/vue-query@5.101.3(vue@3.5.40(typescript@6.0.3))':
     dependencies:
       '@tanstack/match-sorter-utils': 8.19.4
-      '@tanstack/query-core': 5.101.2
+      '@tanstack/query-core': 5.101.3
       '@vue/devtools-api': 6.6.4
       vue: 3.5.40(typescript@6.0.3)
       vue-demi: 0.14.10(vue@3.5.40(typescript@6.0.3))
 
-  '@tanstack/vue-virtual@3.13.32(vue@3.5.40(typescript@6.0.3))':
+  '@tanstack/vue-virtual@3.13.33(vue@3.5.40(typescript@6.0.3))':
     dependencies:
-      '@tanstack/virtual-core': 3.17.4
+      '@tanstack/virtual-core': 3.17.5
       vue: 3.5.40(typescript@6.0.3)
 
   '@testing-library/dom@10.4.1':
@@ -14494,10 +14494,10 @@ snapshots:
 
   '@ungap/structured-clone@1.3.3': {}
 
-  '@unhead/vue@2.1.15(vue@3.5.40(typescript@6.0.3))':
+  '@unhead/vue@2.1.16(vue@3.5.40(typescript@6.0.3))':
     dependencies:
       hookable: 6.1.1
-      unhead: 2.1.15
+      unhead: 2.1.16
       vue: 3.5.40(typescript@6.0.3)
 
   '@upsetjs/venn.js@2.0.0':
@@ -14935,9 +14935,9 @@ snapshots:
       '@opentelemetry/api': 1.9.0
       zod: 4.4.3
 
-  ai@7.0.31(zod@4.4.3):
+  ai@7.0.32(zod@4.4.3):
     dependencies:
-      '@ai-sdk/gateway': 4.0.23(zod@4.4.3)
+      '@ai-sdk/gateway': 4.0.24(zod@4.4.3)
       '@ai-sdk/provider': 4.0.3
       '@ai-sdk/provider-utils': 5.0.11(zod@4.4.3)
       zod: 4.4.3
@@ -16406,11 +16406,11 @@ snapshots:
 
   eventsource-parser@3.1.0: {}
 
-  evlog@2.22.0(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@orpc/server@packages+server)(ai@7.0.31(zod@4.4.3))(express@5.2.1)(fastify@5.10.0)(hono@4.12.31)(next@16.2.10(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(ofetch@1.5.1)(react@19.2.7)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.0)):
+  evlog@2.22.1(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@orpc/server@packages+server)(ai@7.0.32(zod@4.4.3))(express@5.2.1)(fastify@5.10.0)(hono@4.12.31)(next@16.2.10(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(ofetch@1.5.1)(react@19.2.7)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.0)):
     optionalDependencies:
       '@nestjs/common': 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@orpc/server': link:packages/server
-      ai: 7.0.31(zod@4.4.3)
+      ai: 7.0.32(zod@4.4.3)
       express: 5.2.1
       fastify: 5.10.0
       hono: 4.12.31
@@ -18418,7 +18418,7 @@ snapshots:
       sonic-boom: 4.2.1
       thread-stream: 4.2.0
 
-  pkg-pr-new@0.0.78: {}
+  pkg-pr-new@0.0.79: {}
 
   pkg-types@1.3.1:
     dependencies:
@@ -18718,7 +18718,7 @@ snapshots:
       '@floating-ui/vue': 1.1.11(vue@3.5.40(typescript@6.0.3))
       '@internationalized/date': 3.12.2
       '@internationalized/number': 3.6.7
-      '@tanstack/vue-virtual': 3.13.32(vue@3.5.40(typescript@6.0.3))
+      '@tanstack/vue-virtual': 3.13.33(vue@3.5.40(typescript@6.0.3))
       '@vueuse/core': 10.11.1(vue@3.5.40(typescript@6.0.3))
       '@vueuse/shared': 10.11.1(vue@3.5.40(typescript@6.0.3))
       aria-hidden: 1.2.6
@@ -19580,7 +19580,7 @@ snapshots:
 
   supports-preserve-symlinks-flag@1.0.0: {}
 
-  svelte@5.56.6(@typescript-eslint/types@8.64.0):
+  svelte@5.56.7(@typescript-eslint/types@8.64.0):
     dependencies:
       '@jridgewell/remapping': 2.3.5
       '@jridgewell/sourcemap-codec': 1.5.5
@@ -20013,7 +20013,7 @@ snapshots:
     dependencies:
       pathe: 2.0.3
 
-  unhead@2.1.15:
+  unhead@2.1.16:
     dependencies:
       hookable: 6.1.1
 

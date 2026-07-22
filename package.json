@@ -18,7 +18,7 @@
   "devDependencies": {
     "@antfu/eslint-config": "^9.0.0",
     "@codspeed/vitest-plugin": "^5.7.1",
-    "@hono/node-server": "^2.0.4",
+    "@hono/node-server": "^2.0.11",
     "@opentelemetry/api": "^1.9.1",
     "@orpc/arktype": "workspace:*",
     "@orpc/client": "workspace:*",
@@ -57,7 +57,7 @@
     "eslint-plugin-format": "^2.0.1",
     "jsdom": "^29.1.1",
     "lint-staged": "^17.0.7",
-    "pkg-pr-new": "^0.0.78",
+    "pkg-pr-new": "^0.0.79",
     "react": "^19.2.7",
     "sherif": "^1.11.1",
     "simple-git-hooks": "^2.13.1",
