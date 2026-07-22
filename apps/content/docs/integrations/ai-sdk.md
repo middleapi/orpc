@@ -121,9 +121,9 @@ const getWeatherContract = oc
     temperature: z.number().describe('The temperature in Celsius'),
   }))
 
-const implement = implementToolFactory()
+const implementTool = implementToolFactory()
 
-const getWeatherTool = implement(getWeatherContract, {
+const getWeatherTool = implementTool(getWeatherContract, {
   execute: async ({ location }) => ({
     location,
     temperature: 72 + Math.floor(Math.random() * 21) - 10,

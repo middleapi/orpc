@@ -40,10 +40,10 @@ describe('implementToolFactory', () => {
   })
 
   it('can build multiple tools from the same factory', () => {
-    const implement = implementToolFactory()
+    const implementTool = implementToolFactory()
 
-    const tool1 = implement(oc.input(inputSchema), { description: 'First tool' })
-    const tool2 = implement(oc.input(inputSchema).output(outputSchema), { description: 'Second tool' })
+    const tool1 = implementTool(oc.input(inputSchema), { description: 'First tool' })
+    const tool2 = implementTool(oc.input(inputSchema).output(outputSchema), { description: 'Second tool' })
 
     expect(tool1.description).toBe('First tool')
     expect(tool2.description).toBe('Second tool')
@@ -264,9 +264,9 @@ describe('createToolFactory', () => {
       .output(outputSchema)
       .handler(async ({ input }) => ({ greeting: `Hello, ${input.name}!` }))
 
-    const build = createToolFactory()
+    const createTool = createToolFactory()
 
-    const tool = build(procedure, {
+    const tool = createTool(procedure, {
       description: 'Custom description',
       metadata: { source: 'weather-service' },
     })

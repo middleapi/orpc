@@ -168,9 +168,9 @@ export interface ToolImplementer {
  *     }),
  *   )
  *
- * const implement = implementToolFactory()
+ * const implementTool = implementToolFactory()
  *
- * const getWeatherTool = implement(getWeatherContract, {
+ * const getWeatherTool = implementTool(getWeatherContract, {
  *   execute: async ({ location }) => ({
  *     location,
  *     temperature: 72 + Math.floor(Math.random() * 21) - 10,
@@ -240,11 +240,11 @@ export interface ToolFactory<TInitialContext extends Context> {
  *     temperature: 72 + Math.floor(Math.random() * 21) - 10,
  *   }))
  *
- * const toTool = createToolFactory({
+ * const createTool = createToolFactory({
  *   context: {}, // provide initial context if needed
  * })
  *
- * const getWeatherTool = toTool(getWeatherProcedure, {
+ * const getWeatherTool = createTool(getWeatherProcedure, {
  *   // ...AI SDK tool options/overrides here if needed
  * })
  * ```
@@ -253,7 +253,7 @@ export function createToolFactory<TInitialContext extends Context = object>(
   ...rest: MaybeOptionalOptions<CreateToolFactoryOptions<TInitialContext>>
 ): ToolFactory<TInitialContext> {
   const options = resolveMaybeOptionalOptions(rest)
-  const implement = implementToolFactory(options)
+  const implementTool = implementToolFactory(options)
 
   const factory: ToolFactory<TInitialContext> = (procedure, ...rest) => {
     const toolOptions = resolveMaybeOptionalOptions(rest)
@@ -270,7 +270,7 @@ export function createToolFactory<TInitialContext extends Context = object>(
 
     const isIteratorOutput = getIteratorYieldSchemas(toArray(procedure['~orpc'].outputSchemas)) !== undefined
 
-    return implement(procedure, {
+    return implementTool(procedure, {
       ...toolOptions as any,
       /**
        * For `asyncIteratorObject` outputs, the tool streams each event as a
