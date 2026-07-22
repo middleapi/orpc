@@ -8,7 +8,7 @@ This documentation requires AI SDK v7.0.0 or later. For a refresher, review the 
 
 ## Transport
 
-Use oRPC as the chat transport: the server streams AI SDK UI messages through a regular oRPC procedure, and the client consumes them with `useChat`.
+Use oRPC as the transport for AI SDK streams: the server sends them through regular oRPC procedures, and the client converts them back. For example, you can use it as a `useChat` transport.
 
 ### Server
 
