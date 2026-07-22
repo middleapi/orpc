@@ -255,8 +255,8 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
       effect:
-        specifier: 4.0.0-beta.94
-        version: 4.0.0-beta.94
+        specifier: 4.0.0-beta.100
+        version: 4.0.0-beta.100
       markdown-it-task-lists:
         specifier: ^2.1.1
         version: 2.1.1
@@ -451,8 +451,8 @@ importers:
         version: link:../shared
     devDependencies:
       effect:
-        specifier: 4.0.0-beta.94
-        version: 4.0.0-beta.94
+        specifier: 4.0.0-beta.100
+        version: 4.0.0-beta.100
 
   packages/evlog:
     dependencies:
@@ -6196,8 +6196,8 @@ packages:
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
 
-  effect@4.0.0-beta.94:
-    resolution: {integrity: sha512-Q8BrCNbp/3Uh+7xQYHphZBkNfm2SJnl1frQ+8yWfd/j3SU3cL13D38cBMLcnULupwza2Nt4DrjZoMzHWL3CoxQ==}
+  effect@4.0.0-beta.100:
+    resolution: {integrity: sha512-K4ed+BS3HyE+NoAZ8pJss2DpuK41mb856IO7ZlPfnwBXbq8oTtAAurrsVnwe2hzPamIuaZp/Pq4/xp9qORYv8Q==}
 
   electron-to-chromium@1.5.393:
     resolution: {integrity: sha512-kiDJdIUawuEIcp9XoICKp1iTYDEbgguIPq526N1Q7jIQDeQ3CqoMx71025PI/7E48Ddtw2HuWsVjY7afEgNxmg==}
@@ -15928,7 +15928,7 @@ snapshots:
 
   ee-first@1.1.1: {}
 
-  effect@4.0.0-beta.94:
+  effect@4.0.0-beta.100:
     dependencies:
       '@standard-schema/spec': 1.1.0
       fast-check: 4.9.0
