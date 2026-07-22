@@ -187,6 +187,7 @@ export default withMermaid(defineConfig({
           text: 'Integrations',
           collapsed: true,
           items: [
+            { text: 'AI SDK', link: '/docs/integrations/ai-sdk' },
             { text: 'ArkType', link: '/docs/integrations/arktype' },
             { text: 'Effect', link: '/docs/integrations/effect' },
             { text: 'Evlog', link: '/docs/integrations/evlog' },
