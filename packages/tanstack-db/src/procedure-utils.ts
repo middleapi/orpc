@@ -12,7 +12,7 @@ import type {
   MutationHandler,
   MutationHandlerOptionsIn,
 } from './types'
-import { resolveMaybeOptionalOptions } from '@orpc/shared'
+import { resolveMaybeOptionalOptions, value } from '@orpc/shared'
 import { generateOperationKey, TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL } from '@orpc/tanstack-query'
 import { queryCollectionOptions } from '@tanstack/query-db-collection'
 
@@ -109,9 +109,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
         outputs.push(await this.call(optionsIn.input?.(mutation, params), { context: context as any }))
       }
 
-      const refetch = typeof optionsIn.refetch === 'function'
-        ? await optionsIn.refetch(outputs, params)
-        : optionsIn.refetch
+      const refetch = await value(optionsIn.refetch, outputs, params)
 
       return refetch === undefined ? undefined : { refetch }
     }
