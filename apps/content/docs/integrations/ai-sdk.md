@@ -8,7 +8,7 @@ This documentation requires AI SDK v7.0.0 or later. For a refresher, review the 
 
 ## Transport
 
-Use oRPC as the transport for AI SDK streams: the server sends them through regular oRPC procedures, and the client converts them back. For example, you can use it as a `useChat` transport.
+Use oRPC as the transport for AI SDK streams, sending them as either an [AsyncIteratorObject](/docs/async-iterator-object) or a [ReadableStream\<Uint8Array\>](/docs/binary-data#readablestreamuint8array). The examples below use the `AsyncIteratorObject` approach.
 
 ### Server
 
