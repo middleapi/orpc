@@ -1,7 +1,7 @@
 // eslint-disable-next-line no-restricted-imports
 import type * as Draft2020 from 'json-schema-typed/draft-2020-12'
 
-export type JsonSchema = Draft2020.JSONSchema
+export type JsonSchema<Value = any> = Draft2020.JSONSchema<Value>
 export type JsonSchemaKeywords = typeof Draft2020.keywords[number]
 
 export enum JsonSchemaXNativeType {

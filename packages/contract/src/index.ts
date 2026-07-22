@@ -1,6 +1,6 @@
 export * from './builder'
 export * from './builder-variants'
-export * from './caller'
+export * from './client-factory'
 export * from './error'
 export * from './error-utils'
 export * from './meta'

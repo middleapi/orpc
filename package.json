@@ -57,7 +57,7 @@
     "eslint-plugin-format": "^2.0.1",
     "jsdom": "^29.1.1",
     "lint-staged": "^17.0.7",
-    "pkg-pr-new": "^0.0.75",
+    "pkg-pr-new": "^0.0.78",
     "react": "^19.2.7",
     "sherif": "^1.11.1",
     "simple-git-hooks": "^2.13.1",

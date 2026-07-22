@@ -167,6 +167,7 @@ export default withMermaid(defineConfig({
             { text: 'Retry After', link: '/docs/plugins/retry-after' },
             { text: 'Retry', link: '/docs/plugins/retry' },
             { text: 'Smart Coercion', link: '/docs/plugins/smart-coercion' },
+            { text: 'Timeout', link: '/docs/plugins/timeout' },
           ],
         },
         {
@@ -187,6 +188,7 @@ export default withMermaid(defineConfig({
           collapsed: true,
           items: [
             { text: 'AI SDK', link: '/docs/integrations/ai-sdk' },
+            { text: 'ArkType', link: '/docs/integrations/arktype' },
             { text: 'Effect', link: '/docs/integrations/effect' },
             { text: 'Evlog', link: '/docs/integrations/evlog' },
             { text: 'NestJS', link: '/docs/integrations/nest' },
@@ -194,8 +196,11 @@ export default withMermaid(defineConfig({
             { text: 'OpenTelemetry', link: '/docs/integrations/opentelemetry' },
             { text: 'Pinia Colada', link: '/docs/integrations/pinia-colada' },
             { text: 'Pino', link: '/docs/integrations/pino' },
+            { text: 'Standard Schema', link: '/docs/integrations/standard-schema' },
             { text: 'Tanstack Query', link: '/docs/integrations/tanstack-query' },
             { text: 'tRPC', link: '/docs/integrations/trpc' },
+            { text: 'Valibot', link: '/docs/integrations/valibot' },
+            { text: 'Zod', link: '/docs/integrations/zod' },
           ],
         },
         {

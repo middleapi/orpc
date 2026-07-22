@@ -32,6 +32,10 @@ export default antfu({
         name: ['Reflect', 'get'],
         message: 'Use getOrBind instead',
       },
+      {
+        name: ['AbortSignal', 'any'],
+        message: 'Use anyAbortSignal instead',
+      },
     ],
     'no-restricted-imports': ['error', {
       patterns: [{

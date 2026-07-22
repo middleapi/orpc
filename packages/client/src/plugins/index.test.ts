@@ -6,5 +6,6 @@ it('exports plugins', async () => {
     RetryAfterLinkPlugin: expect.any(Function),
     RequestCompressionLinkPlugin: expect.any(Function),
     ResponseCompressionLinkPlugin: expect.any(Function),
+    TimeoutLinkPlugin: expect.any(Function),
   })
 })

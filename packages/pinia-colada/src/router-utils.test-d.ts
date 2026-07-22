@@ -38,11 +38,19 @@ describe('SharedRouterUtils', () => {
     utils.key()
     utils.key({})
     utils.key({ type: 'mutation' })
+    // unlike tanstack-query, mutation keys can contain input
+    utils.key({ type: 'mutation', input: {} })
     utils.key({ input: {}, type: 'query' })
+    utils.key({ input: {}, type: 'streamed', fnOptions: { refetchMode: 'append' } })
     utils.key({ input: {} })
     utils.key({ input: { a: {} } })
     utils.key({ input: { a: { b: {} } } })
     utils.key({ input: { a: { b: { c: 1 } } } })
+    utils.key({ back: 1 })
+    utils.key({ back: 1, type: 'query' })
+
+    // @ts-expect-error invalid back
+    utils.key({ back: '1' })
 
     // @ts-expect-error invalid input
     utils.key({ input: 123 })
@@ -54,6 +62,9 @@ describe('SharedRouterUtils', () => {
 
     // @ts-expect-error invalid type
     utils.key({ type: 'ddd' })
+
+    // @ts-expect-error fnOptions is only allowed for streamed type
+    utils.key({ type: 'infinite', fnOptions: { refetchMode: 'append' } })
   })
 })
 
@@ -82,11 +93,6 @@ it('RouterUtils', () => {
 })
 
 it('createRouterUtils', () => {
-  createRouterUtils({} as RouterClient<typeof router, { batch?: boolean }>, {
-    // @ts-expect-error path option was replaced by prefix
-    path: ['base'],
-  })
-
   const utils = createRouterUtils({} as RouterClient<typeof router, { batch?: boolean }>, {
     prefix: '__prefix__',
     queryInterceptors: [

@@ -146,6 +146,28 @@ const spec = await generator.generate(router, {
 })
 ```
 
+### Json Schema Converters
+
+`OpenAPIGenerator` relies on JSON Schema converters to translate your input, output, and error schemas into JSON Schemas. oRPC provides dedicated converters through the [Zod](/docs/integrations/zod), [Valibot](/docs/integrations/valibot), and [ArkType](/docs/integrations/arktype) integrations:
+
+```ts
+import { ZodToJsonSchemaConverter } from '@orpc/zod'
+import { ValibotToJsonSchemaConverter } from '@orpc/valibot'
+import { ArkTypeToJsonSchemaConverter } from '@orpc/arktype'
+
+const generator = new OpenAPIGenerator({
+  converters: [
+    new ZodToJsonSchemaConverter(),
+    new ValibotToJsonSchemaConverter(),
+    new ArkTypeToJsonSchemaConverter(),
+  ],
+})
+```
+
+::: info
+When no matching converter is configured, `OpenAPIGenerator` falls back to [Standard Json Schema](https://standardschema.dev/json-schema) conversion. See [Standard Schema Integration](/docs/integrations/standard-schema) for details, including how to build your own converter.
+:::
+
 ### Custom Serializer
 
 If your [OpenAPI Handler](/docs/openapi/handler#custom-serializer) uses a custom serializer, configure `OpenAPIGenerator` with the same serializer so the generated document matches the actual formats. For details, see [OpenAPI Serializer](/docs/openapi/serializer).
@@ -208,113 +230,4 @@ const spec = await generator.generate(router, {
     return null
   },
 })
-```
-
-### Json Schema Converters
-
-`OpenAPIGenerator` relies on JSON Schema converters to translate your input, output, and error schemas into JSON Schemas. oRPC provides built-in for [Zod](https://zod.dev/), [Valibot](https://valibot.dev/), and [Arktype](https://arktype.io/):
-
-```ts
-import { ZodToJsonSchemaConverter } from '@orpc/zod'
-import { ValibotToJsonSchemaConverter } from '@orpc/valibot'
-import { ArkTypeToJsonSchemaConverter } from '@orpc/arktype'
-
-const generator = new OpenAPIGenerator({
-  converters: [
-    new ZodToJsonSchemaConverter(),
-    new ValibotToJsonSchemaConverter(),
-    new ArkTypeToJsonSchemaConverter(),
-  ],
-})
-```
-
-::: info
-`OpenAPIGenerator` falls back to [Standard Json Schema](https://standardschema.dev/json-schema) conversion when the required converter is missing.
-:::
-
-::: details Building Your Own Converter?
-
-Building your own converter is straightforward. You can add support for another [Standard Schema](https://standardschema.dev/schema#what-schema-libraries-implement-the-spec) library by implementing the `JsonSchemaConverter` interface:
-
-```ts
-import type { AnySchema } from '@orpc/contract'
-import type {
-  JsonSchema,
-  JsonSchemaConverter,
-  JsonSchemaConverterDirection
-} from '@orpc/json-schema'
-import { toJsonSchema } from '@valibot/to-json-schema'
-
-class MyCustomConverter implements JsonSchemaConverter {
-  condition(schema: AnySchema | undefined, _direction: JsonSchemaConverterDirection): boolean {
-    return schema?.['~standard'].vendor === 'valibot'
-  }
-
-  convert(
-    schema: AnySchema | undefined,
-    direction: JsonSchemaConverterDirection
-  ): [jsonSchema: JsonSchema, optional: boolean] {
-    // In most cases, treating the schema as required is acceptable.
-    return [toJsonSchema(schema as any), false] as any
-  }
-}
-```
-
-:::
-
-#### Customizing `ZodToJsonSchemaConverter`
-
-`ZodToJsonSchemaConverter` wraps [Zod's built-in toJSONSchema](https://zod.dev/json-schema?id=ztojsonschema#ztojsonschema) and adds support for additional types. See the [source code](https://github.com/middleapi/orpc/blob/main/packages/zod/src/converter.ts) for implementation details.
-
-A common pattern is defining reusable schemas with `id` metadata. The converter places them in `$defs`, which `OpenAPIGenerator` then [hoists](#hoisting-defs) into `components.schemas`. For more on `id` and `$ref` in Zod, see [Zod JSON Schema Registries](https://zod.dev/json-schema?id=registries#registries).
-
-```ts
-import { z } from 'zod'
-
-const PlanetSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-}).meta({ id: 'Planet' })
-```
-
-#### Customizing `ValibotToJsonSchemaConverter`
-
-`ValibotToJsonSchemaConverter` wraps [Valibot's built-in toJsonSchema](https://github.com/open-circle/valibot/blob/main/packages/to-json-schema/README.md). See the [source code](https://github.com/middleapi/orpc/blob/main/packages/valibot/src/converter.ts) for implementation details.
-
-A common pattern is defining reusable or recursive schemas via definitions. The converter preserves them in `$defs`, which `OpenAPIGenerator` can then [hoist](#hoisting-defs) into `components.schemas`. For more on how definitions work in Valibot, see [Valibot JSON Schema Definitions](https://github.com/open-circle/valibot/blob/main/packages/to-json-schema/README.md#definitions).
-
-```ts
-import * as v from 'valibot'
-
-const PlanetSchema = v.object({
-  id: v.string(),
-  name: v.string(),
-})
-
-const generator = new OpenAPIGenerator({
-  converters: [
-    new ValibotToJsonSchemaConverter({
-      definitions: { PlanetSchema },
-    }),
-  ],
-})
-```
-
-#### Customizing `ArkTypeToJsonSchemaConverter`
-
-`ArkTypeToJsonSchemaConverter` wraps [ArkType's built-in toJsonSchema](https://arktype.io/docs/type-api#tojsonschema). See the [source code](https://github.com/middleapi/orpc/blob/main/packages/arktype/src/converter.ts) and ArkType's [JSON Schema configuration docs](https://arktype.io/docs/configuration#tojsonschema) for implementation details.
-
-A common pattern is defining reusable or recursive types using scopes. The converter preserves them in `$defs`, which `OpenAPIGenerator` can then [hoist](#hoisting-defs) into `components.schemas`.
-
-```ts
-import { scope } from 'arktype'
-
-const types = scope({
-  Planet: {
-    name: 'string',
-    neighbors: 'Planet[]',
-  },
-})
-
-const PlanetSchema = types.export().Planet
 ```

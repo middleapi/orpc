@@ -1,5 +1,4 @@
 import type { ClientContext } from '@orpc/client'
-import type { PartialDeep } from '@orpc/shared'
 import type { DataTag, InfiniteData, InfiniteQueryObserverOptions, MutationObserverOptions, QueryFunction, QueryKey, QueryObserverOptions, SkipToken } from '@tanstack/query-core'
 import type { SerializableStreamedQueryOptions } from './stream-query'
 
@@ -7,14 +6,6 @@ export type InferStreamedQueryOutput<TOutput> = TOutput extends AsyncIterable<in
 export type InferLiveQueryOutput<TOutput> = TOutput extends AsyncIterable<infer U> ? U : never
 
 export type OperationType = 'query' | 'streamed' | 'live' | 'infinite' | 'mutation'
-
-export type OperationKeyOptions<TType extends OperationType, TInput> = {
-  type?: TType
-  input?: TType extends 'mutation' ? never : PartialDeep<TInput>
-  fnOptions?: TType extends 'streamed' ? SerializableStreamedQueryOptions : never
-}
-
-export type OperationKey<TType extends OperationType, TInput> = [path: string[], options: OperationKeyOptions<TType, TInput>]
 
 export const OPERATION_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_TANSTACK_QUERY_OPERATION_CONTEXT') as any
 

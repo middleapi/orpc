@@ -32,6 +32,45 @@ export function allAbortSignal(signals: readonly (AbortSignal | undefined)[]): A
   return controller.signal
 }
 
+/**
+ * Returns a signal that aborts as soon as any of the provided signals aborts,
+ * with the same abort reason.
+ */
+export function anyAbortSignal(signals: readonly (AbortSignal | undefined)[]): AbortSignal | undefined {
+  const realSignals = signals.filter(signal => signal !== undefined)
+
+  if (realSignals.length === 0) {
+    return undefined
+  }
+
+  if (realSignals.length === 1) {
+    return realSignals[0]
+  }
+
+  if (typeof AbortSignal.any === 'function') {
+    // eslint-disable-next-line ban/ban
+    return AbortSignal.any(realSignals)
+  }
+
+  const controller = new AbortController()
+
+  for (const signal of realSignals) {
+    if (signal.aborted) {
+      controller.abort(signal.reason)
+      break
+    }
+
+    signal.addEventListener('abort', () => {
+      controller.abort(signal.reason)
+    }, {
+      once: true,
+      signal: controller.signal,
+    })
+  }
+
+  return controller.signal
+}
+
 export async function runWithSignal<T>(signal: AbortSignal | undefined, fn: () => Promise<T>): Promise<T> {
   if (!signal) {
     return fn()
