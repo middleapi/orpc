@@ -32,16 +32,16 @@ export interface BunRedisPublisherOptions extends PublisherOptions {
   serializer?: undefined | Pick<RPCSerializer, keyof RPCSerializer>
 
   /**
-   * Configuration for event replay support.
+   * Configuration for event resume support.
    *
    * When enabled, published events are temporarily stored so new
    * subscribers can resume from a previous position using `lastEventId`.
    *
    * @default { enabled: false }
    */
-  replay?: {
+  resume?: {
     /**
-     * Whether event replay support is enabled.
+     * Whether event resume support is enabled.
      *
      * When enabled, published events are temporarily stored so new
      * subscribers can resume from a previous position using `lastEventId`.
@@ -51,7 +51,7 @@ export interface BunRedisPublisherOptions extends PublisherOptions {
     enabled: boolean
 
     /**
-     * How long (in seconds) to retain events for replay.
+     * How long (in seconds) to retain events for resume.
      *
      * Expired events are cleaned up lazily for performance reasons, so
      * some events may remain available slightly longer than this period.
@@ -66,8 +66,8 @@ export class BunRedisPublisher<T extends Record<string, object>> extends Publish
   private subscriber: BunRedisPublisherOptions['subscriber']
   private readonly prefix: Exclude<BunRedisPublisherOptions['prefix'], undefined>
   private readonly serializer: Exclude<BunRedisPublisherOptions['serializer'], undefined>
-  private readonly replayEnabled: boolean
-  private readonly replaySeconds: number
+  private readonly resumeEnabled: boolean
+  private readonly resumeSeconds: number
 
   /**
    * The exactness of the `XTRIM` command.
@@ -83,8 +83,8 @@ export class BunRedisPublisher<T extends Record<string, object>> extends Publish
 
     this.prefix = options.prefix ?? ''
     this.serializer = options.serializer ?? new RPCSerializer()
-    this.replayEnabled = options.replay?.enabled ?? false
-    this.replaySeconds = options.replay?.seconds ?? 300
+    this.resumeEnabled = options.resume?.enabled ?? false
+    this.resumeSeconds = options.resume?.seconds ?? 300
     this.subscriber = options.subscriber
   }
 
@@ -94,13 +94,13 @@ export class BunRedisPublisher<T extends Record<string, object>> extends Publish
     const data = this.serializePayload(payload)
     let id: string | undefined
 
-    if (this.replayEnabled) {
+    if (this.resumeEnabled) {
       const now = Date.now()
 
-      // Remove expired replay windows.
+      // Remove expired resume windows.
       // The next publish for a stale event will perform trimming again.
       for (const [event, firstPublishTime] of this.firstPublishTimeMap) {
-        if (firstPublishTime + this.replaySeconds * 1000 < now) {
+        if (firstPublishTime + this.resumeSeconds * 1000 < now) {
           this.firstPublishTimeMap.delete(event)
         }
       }
@@ -110,10 +110,10 @@ export class BunRedisPublisher<T extends Record<string, object>> extends Publish
 
         const result = await Promise.all([
           this.redis.send('XADD', [redisKey, '*', 'data', stringifyJSON(data)]),
-          this.redis.send('XTRIM', [redisKey, 'MINID', this.xTrimExactness, `${now - this.replaySeconds * 1000}-0`]),
-          // Use a 2x TTL so events published near the end of the replay window
+          this.redis.send('XTRIM', [redisKey, 'MINID', this.xTrimExactness, `${now - this.resumeSeconds * 1000}-0`]),
+          // Use a 2x TTL so events published near the end of the resume window
           // are not expired before the next window updates the key expiration.
-          this.redis.expire(redisKey, this.replaySeconds * 2),
+          this.redis.expire(redisKey, this.resumeSeconds * 2),
         ])
 
         id = result[0] as string
@@ -134,7 +134,7 @@ export class BunRedisPublisher<T extends Record<string, object>> extends Publish
     const redisKey = `${this.prefix}${event}`
 
     let pendingPayloads: T[K][] | undefined = []
-    const replayedIds = new Set<string>()
+    const resumedIds = new Set<string>()
 
     const deduplicatingListener = (payload: T[K]) => {
       if (pendingPayloads) {
@@ -143,7 +143,7 @@ export class BunRedisPublisher<T extends Record<string, object>> extends Publish
       }
 
       const id = getEventMeta(payload)?.id
-      if (id !== undefined && replayedIds.has(id)) { // Already delivered through replay.
+      if (id !== undefined && resumedIds.has(id)) { // Already delivered during resume.
         return
       }
 
@@ -169,7 +169,7 @@ export class BunRedisPublisher<T extends Record<string, object>> extends Publish
       const subscribePromise = subscriber.subscribe(redisKey, redisListener)
 
       try {
-        if (this.replayEnabled && lastEventId !== undefined) {
+        if (this.resumeEnabled && lastEventId !== undefined) {
           /**
            * [Object: null prototype] {
            *    "redis:9d1536ca-8952-4e35-ae79-d466074f9436:orders": [
@@ -186,7 +186,7 @@ export class BunRedisPublisher<T extends Record<string, object>> extends Publish
               const rawData = message[1]
               const data = parseEmptyableJSON(rawData as string)
               const payload = this.deserializePayload(id, data as any)
-              replayedIds.add(id)
+              resumedIds.add(id)
               originalListener(payload as T[K])
             }
           }

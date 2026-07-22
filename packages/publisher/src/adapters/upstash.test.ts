@@ -62,7 +62,7 @@ describe.concurrent(
       }
     })
 
-    it('delivers live events and meta (without replay and prefix)', async () => {
+    it('delivers live events and meta (without resume and prefix)', async () => {
       const publisher = createTestingPublisher({ prefix: undefined })
       const liveEvent = `${crypto.randomUUID()}live`
       const ignoredEvent = `${crypto.randomUUID()}ignored`
@@ -94,19 +94,19 @@ describe.concurrent(
 
       await unsubscribe()
 
-      const replayAttempt = vi.fn()
-      const unsubscribeReplayAttempt = await publisher.subscribe(liveEvent, replayAttempt, { lastEventId: '0' })
+      const resumeAttempt = vi.fn()
+      const unsubscribeResumeAttempt = await publisher.subscribe(liveEvent, resumeAttempt, { lastEventId: '0' })
 
       await sleep(300)
 
-      expect(replayAttempt).not.toHaveBeenCalled()
+      expect(resumeAttempt).not.toHaveBeenCalled()
 
-      await unsubscribeReplayAttempt()
+      await unsubscribeResumeAttempt()
     })
 
-    it('replays missed events in order and preserves event metadata while rewriting ids', async () => {
+    it('resumes missed events in order and preserves event metadata while rewriting ids', async () => {
       const publisher = createTestingPublisher({
-        replay: { enabled: true, seconds: 10 },
+        resume: { enabled: true, seconds: 10 },
       })
       const event = ('orders')
       const liveListener = vi.fn()
@@ -140,26 +140,26 @@ describe.concurrent(
 
       await unsubscribeLive()
 
-      const replayed = vi.fn()
-      const unsubscribeReplay = await publisher.subscribe(event, replayed, {
+      const resumed = vi.fn()
+      const unsubscribeResume = await publisher.subscribe(event, resumed, {
         lastEventId: getEventMeta(secondDelivered)?.id,
       })
 
       await vi.waitFor(() => {
-        expect(replayed).toHaveBeenCalledTimes(1)
+        expect(resumed).toHaveBeenCalledTimes(1)
       })
 
-      const replayedPayload = replayed.mock.calls[0]![0]
+      const resumedPayload = resumed.mock.calls[0]![0]
 
-      expect(replayedPayload).toEqual(thirdDelivered)
-      expect(getEventMeta(replayedPayload)?.id).toEqual(getEventMeta(thirdDelivered)?.id)
+      expect(resumedPayload).toEqual(thirdDelivered)
+      expect(getEventMeta(resumedPayload)?.id).toEqual(getEventMeta(thirdDelivered)?.id)
 
-      await unsubscribeReplay()
+      await unsubscribeResume()
     })
 
-    it('treats an empty replay backlog as a clean starting point and then continues with live messages', async () => {
+    it('treats an empty resume backlog as a clean starting point and then continues with live messages', async () => {
       const publisher = createTestingPublisher({
-        replay: { enabled: true, seconds: 10 },
+        resume: { enabled: true, seconds: 10 },
       })
       const event = ('empty-backlog')
       const listener = vi.fn()
@@ -181,7 +181,7 @@ describe.concurrent(
       await unsubscribe()
     })
 
-    it('deduplicates events that race between replay and live delivery during reconnect', async () => {
+    it('deduplicates events that race between resume and live delivery during reconnect', async () => {
       const { resolve, promise } = promiseWithResolvers<void>()
       const redis = new Proxy(
         new Redis({
@@ -193,7 +193,7 @@ describe.concurrent(
             if (p === 'xread') {
               const originalXRead = getOrBind(target, p)
               return async function xread(...args: [any, any]) {
-                await promise // slow down replay process
+                await promise // slow down resume process
                 return originalXRead(...args)
               }
             }
@@ -204,7 +204,7 @@ describe.concurrent(
       )
 
       const publisher = createTestingPublisher({
-        replay: { enabled: true, seconds: 10 },
+        resume: { enabled: true, seconds: 10 },
       }, { useRedis: redis })
       const event = ('timeline')
 
@@ -265,12 +265,12 @@ describe.concurrent(
       await unsubscribe2()
     })
 
-    it('trims stale replay history on the next publish and lets Redis expire the stream key', async () => {
+    it('trims stale resume history on the next publish and lets Redis expire the stream key', async () => {
       const prefix = `retention:${crypto.randomUUID()}:`
       const event = 'orders'
       const key = `${prefix}${event}`
       const publisher = createTestingPublisher({
-        replay: { enabled: true, seconds: 1 },
+        resume: { enabled: true, seconds: 1 },
         prefix,
       })
 
@@ -317,7 +317,7 @@ describe.concurrent(
       })
 
       const publisher = createTestingPublisher({
-        replay: { enabled: true, seconds: 10 },
+        resume: { enabled: true, seconds: 10 },
         serializer,
         prefix: `custom:${crypto.randomUUID()}:`,
       })
@@ -354,9 +354,9 @@ describe.concurrent(
       await unsub1()
     })
 
-    it('reports replay errors while subscribing', async () => {
+    it('reports resume errors while subscribing', async () => {
       const publisher = createTestingPublisher({
-        replay: { enabled: true, seconds: 10 },
+        resume: { enabled: true, seconds: 10 },
       })
       const event = ('resume-errors')
       const listener = vi.fn()

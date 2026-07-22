@@ -24,7 +24,7 @@ describe('publisher redis adapters compatibility', { timeout: 20_000 }, () => {
     const redis = createClient({ url: `rediss://default:${UPSTASH_REDIS_REST_TOKEN}@${new URL(UPSTASH_REDIS_REST_URL).host}:6379` })
     const publisher = new RedisPublisher(redis, {
       prefix,
-      replay: { enabled: true, seconds: 10 },
+      resume: { enabled: true, seconds: 10 },
     })
     publishers.push({ name: 'redis', publisher })
   }
@@ -34,11 +34,11 @@ describe('publisher redis adapters compatibility', { timeout: 20_000 }, () => {
     const upstashRedis = new Redis({ url: UPSTASH_REDIS_REST_URL, token: UPSTASH_REDIS_REST_TOKEN })
     const publisher = new UpstashPublisher(upstashRedis, {
       prefix,
-      replay: { enabled: true, seconds: 10 },
+      resume: { enabled: true, seconds: 10 },
     })
     publishers.push({ name: 'upstash', publisher: new UpstashPublisher(upstashRedis, {
       prefix,
-      replay: { enabled: true, seconds: 10 },
+      resume: { enabled: true, seconds: 10 },
     }) })
   }
 
@@ -49,7 +49,7 @@ describe('publisher redis adapters compatibility', { timeout: 20_000 }, () => {
           continue
         }
 
-        it(`delivers live events from ${source.name} to ${target.name} and replays from the last received id`, async () => {
+        it(`delivers live events from ${source.name} to ${target.name} and resumes from the last received id`, async () => {
           const event = `live:${crypto.randomUUID()}`
           const liveListener = vi.fn()
 
@@ -77,21 +77,21 @@ describe('publisher redis adapters compatibility', { timeout: 20_000 }, () => {
 
           await source.publisher.publish(event, { order: 3 })
 
-          const replayed = vi.fn()
-          const unsubscribeReplay = await target.publisher.subscribe(event, replayed, {
+          const resumed = vi.fn()
+          const unsubscribeResume = await target.publisher.subscribe(event, resumed, {
             lastEventId: getEventMeta(secondDelivered)?.id,
           })
 
           await vi.waitFor(() => {
-            expect(replayed).toHaveBeenCalledTimes(1)
+            expect(resumed).toHaveBeenCalledTimes(1)
           })
 
-          const replayedPayload = replayed.mock.calls[0]![0]
+          const resumedPayload = resumed.mock.calls[0]![0]
 
-          expect(replayedPayload).toEqual({ order: 3 })
-          expect(getEventMeta(replayedPayload)?.id).toEqual(expect.any(String))
+          expect(resumedPayload).toEqual({ order: 3 })
+          expect(getEventMeta(resumedPayload)?.id).toEqual(expect.any(String))
 
-          await unsubscribeReplay()
+          await unsubscribeResume()
         })
       }
     }

@@ -44,7 +44,7 @@ beforeEach(async () => {
 })
 
 describe('durable publisher', () => {
-  it('sends live messages without replay', async () => {
+  it('sends live messages without resume', async () => {
     const publisher = new DurablePublisher(env.PUBLISHER_DON)
 
     const live = vi.fn()
@@ -73,19 +73,19 @@ describe('durable publisher', () => {
 
     await stopLive()
 
-    const replay = vi.fn()
-    const stopReplay = await publisher.subscribe('message', replay, {
+    const resume = vi.fn()
+    const stopResume = await publisher.subscribe('message', resume, {
       lastEventId: '0',
     })
 
     await sleep(100)
-    expect(replay).toHaveBeenCalledTimes(0)
+    expect(resume).toHaveBeenCalledTimes(0)
 
-    await stopReplay()
+    await stopResume()
   })
 
-  it('sends live messages and replays missed ones', async () => {
-    const publisher = new DurablePublisher(env.PUBLISHER_REPLAY3S_DON)
+  it('sends live messages and resumes missed ones', async () => {
+    const publisher = new DurablePublisher(env.PUBLISHER_RESUME3S_DON)
 
     const live = vi.fn()
     const stopLive = await publisher.subscribe('message', live)
@@ -113,22 +113,22 @@ describe('durable publisher', () => {
 
     await stopLive()
 
-    const replay = vi.fn()
-    const stopReplay = await publisher.subscribe('message', replay, {
+    const resume = vi.fn()
+    const stopResume = await publisher.subscribe('message', resume, {
       lastEventId: getEventMeta(first)?.id,
     })
 
     await vi.waitFor(() => {
-      expect(replay).toHaveBeenCalledTimes(1)
+      expect(resume).toHaveBeenCalledTimes(1)
     })
 
-    expect(replay).toHaveBeenCalledWith(second)
+    expect(resume).toHaveBeenCalledWith(second)
 
-    await stopReplay()
+    await stopResume()
   })
 
-  it('replays old messages before new ones', { repeats: 5 }, async () => {
-    const publisher = new DurablePublisher(env.PUBLISHER_REPLAY3S_DON)
+  it('resumes old messages before new ones', { repeats: 5 }, async () => {
+    const publisher = new DurablePublisher(env.PUBLISHER_RESUME3S_DON)
 
     await publisher.publish('timeline', { order: 1 })
     await publisher.publish('timeline', { order: 2 })

@@ -13,7 +13,7 @@ async function delayMicrotasks(count: number): Promise<void> {
 }
 
 describe('memoryPublisher', () => {
-  it('delivers live events without replay when replay is disabled', async () => {
+  it('delivers live events without resume when resume is disabled', async () => {
     const publisher = new MemoryPublisher<TestEvents>()
     const listener = vi.fn()
 
@@ -37,7 +37,7 @@ describe('memoryPublisher', () => {
     await unsubscribeResumed()
   })
 
-  describe('with replay enabled', () => {
+  describe('with resume enabled', () => {
     beforeEach(() => {
       vi.useFakeTimers()
       vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'))
@@ -47,9 +47,9 @@ describe('memoryPublisher', () => {
       vi.useRealTimers()
     })
 
-    it('replays only events after lastEventId and rewrites event ids', async () => {
+    it('resumes only events after lastEventId and rewrites event ids', async () => {
       const publisher = new MemoryPublisher<TestEvents>({
-        replay: {
+        resume: {
           enabled: true,
         },
       })
@@ -82,20 +82,20 @@ describe('memoryPublisher', () => {
       expect(thirdDelivered).toEqual(thirdPayload)
       expect(getEventMeta(thirdDelivered)?.id).toBe('3')
 
-      const replayed = vi.fn()
-      const unsubscribeReplay = await publisher.subscribe('message', replayed, {
+      const resumed = vi.fn()
+      const unsubscribeResume = await publisher.subscribe('message', resumed, {
         lastEventId: getEventMeta(secondDelivered)?.id,
       })
 
-      expect(replayed).toHaveBeenCalledTimes(1)
-      expect(replayed).toHaveBeenCalledWith(thirdDelivered)
+      expect(resumed).toHaveBeenCalledTimes(1)
+      expect(resumed).toHaveBeenCalledWith(thirdDelivered)
 
-      const emptyReplay = vi.fn()
-      const unsubscribeEmptyReplay = await publisher.subscribe('notice', emptyReplay, {
+      const emptyResume = vi.fn()
+      const unsubscribeEmptyResume = await publisher.subscribe('notice', emptyResume, {
         lastEventId: '0',
       })
 
-      expect(emptyReplay).not.toHaveBeenCalled()
+      expect(emptyResume).not.toHaveBeenCalled()
 
       const afterTail = vi.fn()
       const unsubscribeAfterTail = await publisher.subscribe('message', afterTail, {
@@ -105,14 +105,14 @@ describe('memoryPublisher', () => {
       expect(afterTail).not.toHaveBeenCalled()
 
       await unsubscribeLive()
-      await unsubscribeReplay()
-      await unsubscribeEmptyReplay()
+      await unsubscribeResume()
+      await unsubscribeEmptyResume()
       await unsubscribeAfterTail()
     })
 
     it('expires old events lazily for AsyncIteratorObject subscribers', async () => {
       const publisher = new MemoryPublisher<TestEvents>({
-        replay: {
+        resume: {
           enabled: true,
           seconds: 1,
         },
@@ -148,7 +148,7 @@ describe('memoryPublisher', () => {
 
     it('stays consistent under heavy interleaving of publishes and repeated unsubscriptions', async () => {
       const publisher = new MemoryPublisher<TestEvents>({
-        replay: {
+        resume: {
           enabled: true,
           seconds: 1,
         },
@@ -201,7 +201,7 @@ describe('memoryPublisher', () => {
   describe('edge cases', () => {
     it('allows the same listener to be registered multiple times', async () => {
       const publisher = new MemoryPublisher<TestEvents>({
-        replay: {
+        resume: {
           enabled: true,
           seconds: 1,
         },
@@ -232,7 +232,7 @@ describe('memoryPublisher', () => {
 
     it('lets each unsubscribe function be called multiple times safely', async () => {
       const publisher = new MemoryPublisher<TestEvents>({
-        replay: {
+        resume: {
           enabled: true,
           seconds: 1,
         },
