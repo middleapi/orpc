@@ -123,7 +123,7 @@ const onUpdate = orpc.todo.update.mutationHandler({
 })
 ```
 
-The handler resolves with the list of procedure outputs by default. Use the `output` option when a collection expects a specific return shape, such as [Electric Collection](https://tanstack.com/db/latest/docs/collections/electric-collection) transaction matching:
+The `output` option maps the list of procedure outputs to the handler's return value, and is required when a collection expects a specific return shape, such as [Electric Collection](https://tanstack.com/db/latest/docs/collections/electric-collection) transaction matching:
 
 ```ts
 const todosCollection = createCollection(electricCollectionOptions({

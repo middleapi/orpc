@@ -44,7 +44,9 @@ export type MutationHandlerOptionsIn<TClientContext extends ClientContext, TInpu
   & (object extends TClientContext
     ? { context?: (mutation: PendingMutation<TItem, TType>, params: MutationHandlerParams<TItem, TType>) => TClientContext }
     : { context: (mutation: PendingMutation<TItem, TType>, params: MutationHandlerParams<TItem, TType>) => TClientContext })
-  & { output?: (outputs: TOutput[], params: MutationHandlerParams<TItem, TType>) => TReturn }
+  & (undefined extends TReturn
+    ? { output?: (outputs: TOutput[], params: MutationHandlerParams<TItem, TType>) => TReturn }
+    : { output: (outputs: TOutput[], params: MutationHandlerParams<TItem, TType>) => TReturn })
 
 export type MutationHandler<TItem extends object, TType extends OperationType, TReturn>
   = (params: MutationHandlerParams<TItem, TType>) => Promise<TReturn>

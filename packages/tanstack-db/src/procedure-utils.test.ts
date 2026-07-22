@@ -140,13 +140,13 @@ describe('procedureUtils', () => {
       collection: {},
     } as any
 
-    it('calls client once per mutation and returns outputs', async () => {
+    it('calls client once per mutation and resolves undefined without output mapper', async () => {
       client.mockResolvedValueOnce('__output1__').mockResolvedValueOnce('__output2__')
 
       const inputMapper = vi.fn((mutation: any) => ({ id: mutation.key, data: mutation.changes }))
       const handler = utils.mutationHandler({ input: inputMapper } as any)
 
-      await expect(handler(params)).resolves.toEqual(['__output1__', '__output2__'])
+      await expect(handler(params)).resolves.toBeUndefined()
 
       expect(inputMapper).toHaveBeenCalledTimes(2)
       expect(inputMapper).toHaveBeenNthCalledWith(1, params.transaction.mutations[0], params)
@@ -178,7 +178,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledTimes(1)
 
       resolveFirst('__output1__')
-      await expect(promise).resolves.toEqual(['__output1__', '__output2__'])
+      await expect(promise).resolves.toBeUndefined()
       expect(client).toHaveBeenCalledTimes(2)
     })
 
@@ -238,7 +238,7 @@ describe('procedureUtils', () => {
 
       const handler = utils.mutationHandler()
 
-      await expect(handler(params)).resolves.toEqual(['__output1__', '__output2__'])
+      await expect(handler(params)).resolves.toBeUndefined()
       expect(client).toHaveBeenNthCalledWith(1, undefined, expect.any(Object))
     })
   })

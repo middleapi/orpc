@@ -209,7 +209,19 @@ describe('ProcedureUtils', () => {
         input: mutation => ({ id: mutation.key, data: mutation.changes }),
       })
 
-      expectTypeOf(defaultHandler).returns.resolves.toEqualTypeOf<Todo[]>()
+      expectTypeOf(defaultHandler).returns.resolves.toEqualTypeOf<undefined>()
+    })
+
+    it('requires `output` when return type does not accept undefined', () => {
+      updateUtils.mutationHandler<Todo, 'update', { txid: number }>({
+        input: mutation => ({ id: mutation.key, data: mutation.changes }),
+        output: outputs => ({ txid: outputs.length }),
+      })
+
+      // @ts-expect-error --- output is required
+      updateUtils.mutationHandler<Todo, 'update', { txid: number }>({
+        input: mutation => ({ id: mutation.key, data: mutation.changes }),
+      })
     })
   })
 })
