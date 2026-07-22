@@ -213,6 +213,7 @@ describe('ProcedureUtils', () => {
 
       updateUtils.mutationHandler({
         input: mutation => ({ id: mutation.key, data: mutation.changes }),
+        // @ts-expect-error --- refetch must be sync
         refetch: async () => false,
       })
 

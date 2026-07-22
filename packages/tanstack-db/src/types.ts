@@ -1,6 +1,6 @@
 import type { ClientContext } from '@orpc/client'
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from '@orpc/contract'
-import type { Promisable, Value } from '@orpc/shared'
+import type { Value } from '@orpc/shared'
 import type { Collection, CollectionConfig, LoadSubsetOptions, OperationType, PendingMutation, TransactionWithMutations } from '@tanstack/db'
 import type { QueryFunctionContext, QueryKey } from '@tanstack/query-core'
 import type { QueryCollectionConfig, QueryCollectionUtils } from '@tanstack/query-db-collection'
@@ -51,7 +51,7 @@ export type MutationHandlerOptionsIn<TClientContext extends ClientContext, TInpu
      * Can be a static boolean, or a function that decides from the procedure outputs.
      * When omitted, the collection default applies (query collections refetch).
      */
-    refetch?: Value<Promisable<boolean>, [outputs: TOutput[], params: MutationHandlerParams<TItem, TType>]>
+    refetch?: Value<boolean, [outputs: TOutput[], params: MutationHandlerParams<TItem, TType>]>
   }
 
 export type MutationHandler<TItem extends object, TType extends OperationType>

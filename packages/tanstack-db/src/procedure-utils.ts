@@ -109,7 +109,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
         outputs.push(await this.call(optionsIn.input?.(mutation, params), { context: context as any }))
       }
 
-      const refetch = await value(optionsIn.refetch, outputs, params)
+      const refetch = value(optionsIn.refetch, outputs, params)
 
       return refetch === undefined ? undefined : { refetch }
     }

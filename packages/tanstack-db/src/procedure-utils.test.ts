@@ -196,7 +196,7 @@ describe('procedureUtils', () => {
     it('supports dynamic refetch option', async () => {
       client.mockResolvedValueOnce('__output1__').mockResolvedValueOnce('__output2__')
 
-      const refetchFn = vi.fn(async (outputs: any[]) => outputs.length > 2)
+      const refetchFn = vi.fn((outputs: any[]) => outputs.length > 2)
       const handler = utils.mutationHandler({
         input: (mutation: any) => mutation.modified,
         refetch: refetchFn,
