@@ -63,13 +63,17 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     const { input, context, queryKey: customQueryKey, ...rest } = optionsIn
 
     const queryKey = customQueryKey
-      ?? generateOperationKey(this.path, { prefix: this.options.prefix, type: 'query', input })
+      ?? generateOperationKey(this.path, {
+        prefix: this.options.prefix,
+        type: 'query',
+        input: typeof input === 'function' ? undefined : input,
+      })
 
     return queryCollectionOptions({
       ...rest,
       queryKey,
-      queryFn: (fnContext: any) => {
-        return this.call(input, {
+      queryFn: (fnContext) => {
+        return this.call(typeof input === 'function' ? input(fnContext) : input, {
           signal: fnContext.signal,
           context: {
             [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {

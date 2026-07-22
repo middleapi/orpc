@@ -1,5 +1,6 @@
 import type { Client } from '@orpc/client'
 import type { DeleteMutationFn, InsertMutationFn, UpdateMutationFn } from '@tanstack/db'
+import type { QueryKey } from '@tanstack/query-core'
 import type { QueryCollectionUtils } from '@tanstack/query-db-collection'
 import type { ProcedureUtils } from './procedure-utils'
 import { QueryClient } from '@tanstack/query-core'
@@ -50,6 +51,21 @@ describe('ProcedureUtils', () => {
       requiredInputListUtils.collectionOptions({ input: { search: '__search__' }, queryClient, getKey: item => item.id })
       // @ts-expect-error --- input is required
       requiredInputListUtils.collectionOptions({ queryClient, getKey: item => item.id })
+    })
+
+    it('supports dynamic input', () => {
+      listUtils.collectionOptions({
+        input: (context) => {
+          expectTypeOf(context.queryKey).toEqualTypeOf<QueryKey>()
+          expectTypeOf(context.signal).toEqualTypeOf<AbortSignal>()
+          return { search: '__search__' }
+        },
+        queryClient,
+        getKey: item => item.id,
+      })
+
+      // @ts-expect-error --- dynamic input return type is invalid
+      listUtils.collectionOptions({ input: () => ({ search: 123 }), queryClient, getKey: item => item.id })
     })
 
     it('handles `context` correctly', () => {

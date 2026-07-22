@@ -79,6 +79,40 @@ describe('procedureUtils', () => {
       })
     })
 
+    it('supports dynamic input resolved from queryFn context', async () => {
+      client.mockResolvedValueOnce([{ id: 1 }])
+
+      const inputFn = vi.fn((fnContext: any) => ({ search: fnContext.queryKey[1].search }))
+
+      utils.collectionOptions({
+        input: inputFn,
+        queryKey: ['__custom__', { search: '__dynamic__' }],
+        queryClient,
+        getKey,
+      } as any)
+
+      const config = queryCollectionOptionsSpy.mock.calls[0]![0] as any
+
+      expect(config.queryKey).toEqual(['__custom__', { search: '__dynamic__' }])
+
+      await expect(config.queryFn({ signal, queryKey: config.queryKey })).resolves.toEqual([{ id: 1 }])
+
+      expect(inputFn).toHaveBeenCalledTimes(1)
+      expect(inputFn).toHaveBeenCalledWith({ signal, queryKey: config.queryKey })
+      expect(client).toHaveBeenCalledWith({ search: '__dynamic__' }, expect.any(Object))
+    })
+
+    it('excludes dynamic input from generated queryKey', () => {
+      utils.collectionOptions({
+        input: () => ({ search: '__dynamic__' }),
+        queryClient,
+        getKey,
+      } as any)
+
+      const config = queryCollectionOptionsSpy.mock.calls[0]![0] as any
+      expect(config.queryKey).toEqual(generateOperationKey(['planet', 'list'], { type: 'query' }))
+    })
+
     it('supports custom queryKey', () => {
       utils.collectionOptions({
         input: { search: '__search__' },

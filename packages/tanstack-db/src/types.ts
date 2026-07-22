@@ -18,8 +18,14 @@ export type InferCollectionItem<TOutput> = TOutput extends Array<infer U extends
 
 export type CollectionQueryFn<TOutput> = (context: QueryFunctionContext) => Promise<TOutput>
 
+/**
+ * Can be a static input, or a function that resolves the input
+ * from the query function context on each fetch.
+ */
+export type CollectionInput<TInput> = TInput | ((context: QueryFunctionContext) => TInput)
+
 export type CollectionOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TItem extends object, TKey extends string | number, TSchema extends AnySchema>
-  = & (undefined extends TInput ? { input?: TInput } : { input: TInput })
+  = & (undefined extends TInput ? { input?: CollectionInput<TInput> } : { input: CollectionInput<TInput> })
     & (object extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
     & { queryKey?: QueryKey | ((options: LoadSubsetOptions) => QueryKey) }
     & Omit<QueryCollectionConfig<TItem, CollectionQueryFn<TOutput>, TError, QueryKey, TKey, TSchema, TOutput>, 'queryKey' | 'queryFn' | 'select' | 'schema'>

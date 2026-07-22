@@ -96,6 +96,22 @@ const { data: todos } = useLiveQuery(q =>
 The query key is generated the same way as in the [Tanstack Query Integration](/docs/integrations/tanstack-query), so both integrations can share a `queryClient` and actions like invalidation work across them.
 :::
 
+The `input` option also accepts a function that resolves the input from the query function context on each fetch. This is useful when the query key is dynamic, such as with [on-demand sync mode](https://tanstack.com/db/latest/docs/collections/query-collection#queryfn-and-predicate-push-down):
+
+```ts
+const todosCollection = createCollection(orpc.todo.list.collectionOptions({
+  syncMode: 'on-demand',
+  queryKey: options => ['todos', { limit: options.limit }],
+  input: context => ({ limit: (context.queryKey[1] as any).limit }),
+  queryClient,
+  getKey: todo => todo.id,
+}))
+```
+
+::: warning
+When the input is dynamic, the generated query key no longer includes it. Provide a custom `queryKey` that reflects whatever the input depends on, so each variation is cached separately.
+:::
+
 ## Mutation Handler Utility
 
 Use `.mutationHandler` to build a [persistence handler](https://tanstack.com/db/latest/docs/guides/mutations) for collection options like `onInsert`, `onUpdate`, and `onDelete`. The `input` option maps each mutation in the transaction to the procedure input, and the procedure is called once per mutation.
