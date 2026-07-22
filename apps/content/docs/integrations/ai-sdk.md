@@ -6,7 +6,11 @@
 This documentation requires AI SDK v7.0.0 or later. For a refresher, review the [AI SDK documentation](https://ai-sdk.dev/docs).
 :::
 
-## Server
+## Transport
+
+Use oRPC as the chat transport: the server streams AI SDK UI messages through a regular oRPC procedure, and the client consumes them with `useChat`.
+
+### Server
 
 Use `streamToAsyncIteratorObject` to convert AI SDK streams into [AsyncIteratorObject](/docs/async-iterator-object)s.
 
@@ -30,7 +34,7 @@ export const chat = os
   })
 ```
 
-## Client
+### Client
 
 On the client side, convert the `AsyncIteratorObject` back to a stream using `asyncIteratorToUnproxiedDataStream` or `asyncIteratorToStream`.
 
