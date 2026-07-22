@@ -1,6 +1,5 @@
 import type { InferToolInput, InferToolOutput } from 'ai'
 import { asyncIteratorObject, oc } from '@orpc/contract'
-import { openapi } from '@orpc/openapi'
 import { os } from '@orpc/server'
 import { generateText } from 'ai'
 import { z } from 'zod'
@@ -9,7 +8,6 @@ import { createToolFactory, implementToolFactory } from './tool'
 describe('implementToolFactory', () => {
   it('can use as a tool', () => {
     const contract = oc
-      .meta(openapi({ summary: 'Get the weather in a location' }))
       .input(z.object({
         location: z.string().describe('The location to get the weather for'),
       }))
@@ -67,7 +65,6 @@ describe('implementToolFactory', () => {
 describe('createToolFactory', () => {
   it('can use as a tool', () => {
     const procedure = os
-      .meta(openapi({ summary: 'Get the weather in a location' }))
       .input(z.object({
         location: z.string().describe('The location to get the weather for'),
       }))

@@ -312,9 +312,6 @@ importers:
         specifier: workspace:*
         version: link:../shared
     devDependencies:
-      '@orpc/openapi':
-        specifier: workspace:*
-        version: link:../openapi
       ai:
         specifier: ^7.0.31
         version: 7.0.31(zod@4.4.3)
