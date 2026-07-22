@@ -123,17 +123,13 @@ const onUpdate = orpc.todo.update.mutationHandler({
 })
 ```
 
-The `output` option maps the list of procedure outputs to the handler's return value, and is required when a collection expects a specific return shape, such as [Electric Collection](https://tanstack.com/db/latest/docs/collections/electric-collection) transaction matching:
+By default, [Query Collection](https://tanstack.com/db/latest/docs/collections/query-collection) refetches after a handler completes. Use the `refetch` option to control this behavior, either statically or based on the procedure outputs:
 
 ```ts
-const todosCollection = createCollection(electricCollectionOptions({
-  shapeOptions: { url: '/api/todos' },
-  getKey: todo => todo.id,
-  onInsert: orpc.todo.create.mutationHandler({
-    input: mutation => mutation.modified,
-    output: outputs => ({ txid: outputs.map(output => output.txid) }),
-  }),
-}))
+const onUpdate = orpc.todo.update.mutationHandler({
+  input: mutation => ({ id: mutation.key, data: mutation.changes }),
+  refetch: false, // or (outputs, params) => boolean
+})
 ```
 
 ## Operation Key Utility

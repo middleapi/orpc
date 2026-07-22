@@ -140,7 +140,7 @@ describe('procedureUtils', () => {
       collection: {},
     } as any
 
-    it('calls client once per mutation and resolves undefined without output mapper', async () => {
+    it('calls client once per mutation and resolves undefined without refetch option', async () => {
       client.mockResolvedValueOnce('__output1__').mockResolvedValueOnce('__output2__')
 
       const inputMapper = vi.fn((mutation: any) => ({ id: mutation.key, data: mutation.changes }))
@@ -182,18 +182,29 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledTimes(2)
     })
 
-    it('supports output mapper', async () => {
-      client.mockResolvedValueOnce({ txid: 1 }).mockResolvedValueOnce({ txid: 2 })
+    it('supports static refetch option', async () => {
+      client.mockResolvedValueOnce('__output1__').mockResolvedValueOnce('__output2__')
 
-      const outputMapper = vi.fn((outputs: any[]) => ({ txid: outputs.map(output => output.txid) }))
       const handler = utils.mutationHandler({
         input: (mutation: any) => mutation.modified,
-        output: outputMapper,
+        refetch: false,
       } as any)
 
-      await expect(handler(params)).resolves.toEqual({ txid: [1, 2] })
-      expect(outputMapper).toHaveBeenCalledTimes(1)
-      expect(outputMapper).toHaveBeenCalledWith([{ txid: 1 }, { txid: 2 }], params)
+      await expect(handler(params)).resolves.toEqual({ refetch: false })
+    })
+
+    it('supports dynamic refetch option', async () => {
+      client.mockResolvedValueOnce('__output1__').mockResolvedValueOnce('__output2__')
+
+      const refetchFn = vi.fn(async (outputs: any[]) => outputs.length > 2)
+      const handler = utils.mutationHandler({
+        input: (mutation: any) => mutation.modified,
+        refetch: refetchFn,
+      } as any)
+
+      await expect(handler(params)).resolves.toEqual({ refetch: false })
+      expect(refetchFn).toHaveBeenCalledTimes(1)
+      expect(refetchFn).toHaveBeenCalledWith(['__output1__', '__output2__'], params)
     })
 
     it('resolves context per mutation and includes prefix in mutation key', async () => {

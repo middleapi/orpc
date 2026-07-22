@@ -1,5 +1,6 @@
 import type { ClientContext } from '@orpc/client'
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from '@orpc/contract'
+import type { Promisable } from '@orpc/shared'
 import type { Collection, CollectionConfig, LoadSubsetOptions, OperationType, PendingMutation, TransactionWithMutations } from '@tanstack/db'
 import type { QueryFunctionContext, QueryKey } from '@tanstack/query-core'
 import type { QueryCollectionConfig, QueryCollectionUtils } from '@tanstack/query-db-collection'
@@ -37,16 +38,21 @@ export interface MutationHandlerParams<TItem extends object = any, TType extends
   collection: Collection<TItem, any, any>
 }
 
-export type MutationHandlerOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TItem extends object, TType extends OperationType, TReturn>
+export type MutationHandlerOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TItem extends object, TType extends OperationType>
   = & (undefined extends TInput
     ? { input?: (mutation: PendingMutation<TItem, TType>, params: MutationHandlerParams<TItem, TType>) => TInput }
     : { input: (mutation: PendingMutation<TItem, TType>, params: MutationHandlerParams<TItem, TType>) => TInput })
   & (object extends TClientContext
     ? { context?: (mutation: PendingMutation<TItem, TType>, params: MutationHandlerParams<TItem, TType>) => TClientContext }
     : { context: (mutation: PendingMutation<TItem, TType>, params: MutationHandlerParams<TItem, TType>) => TClientContext })
-  & (undefined extends TReturn
-    ? { output?: (outputs: TOutput[], params: MutationHandlerParams<TItem, TType>) => TReturn }
-    : { output: (outputs: TOutput[], params: MutationHandlerParams<TItem, TType>) => TReturn })
+  & {
+    /**
+     * Whether the collection should refetch after the handler completes.
+     * Can be a static boolean, or a function that decides from the procedure outputs.
+     * When omitted, the collection default applies (query collections refetch).
+     */
+    refetch?: boolean | ((outputs: TOutput[], params: MutationHandlerParams<TItem, TType>) => Promisable<boolean>)
+  }
 
-export type MutationHandler<TItem extends object, TType extends OperationType, TReturn>
-  = (params: MutationHandlerParams<TItem, TType>) => Promise<TReturn>
+export type MutationHandler<TItem extends object, TType extends OperationType>
+  = (params: MutationHandlerParams<TItem, TType>) => Promise<{ refetch: boolean } | undefined>

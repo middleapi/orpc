@@ -63,6 +63,28 @@ it('shares query keys with @orpc/tanstack-query utils', async () => {
   expect(orpc.todo.list.key({ type: 'query' })).toEqual(tanstackQueryUtils.todo.list.key({ type: 'query' }))
 })
 
+it('supports refetch option', async () => {
+  const collection = createCollection(orpc.todo.list.collectionOptions({
+    input: () => ({ search: '' }),
+    queryClient,
+    getKey: todo => todo.id,
+    startSync: true,
+    onInsert: orpc.todo.create.mutationHandler({
+      input: mutation => mutation.modified,
+      refetch: false,
+    }),
+  }))
+
+  await collection.preload()
+  const listCalls = vi.mocked(router.todo.list['~orpc'].handler).mock.calls.length
+
+  const insertTx = collection.insert({ id: 2, name: 'second' })
+  await insertTx.isPersisted.promise
+
+  expect(router.todo.create['~orpc'].handler).toHaveBeenCalledTimes(1)
+  expect(router.todo.list['~orpc'].handler).toHaveBeenCalledTimes(listCalls)
+})
+
 it('supports schema option', async () => {
   const { todoSchema } = await import('./__shared__/orpc')
 

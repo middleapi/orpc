@@ -87,9 +87,9 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
    * Create a persistence handler for [TanStack DB](https://tanstack.com/db) collections.
    * Can be used as `onInsert`, `onUpdate`, or `onDelete` in collection options.
    */
-  mutationHandler<UItem extends object = any, UType extends OperationType = OperationType, UReturn = undefined>(
-    ...rest: MaybeOptionalOptions<MutationHandlerOptionsIn<TClientContext, TInput, TOutput, UItem, UType, UReturn>>
-  ): MutationHandler<UItem, UType, UReturn> {
+  mutationHandler<UItem extends object = any, UType extends OperationType = OperationType>(
+    ...rest: MaybeOptionalOptions<MutationHandlerOptionsIn<TClientContext, TInput, TOutput, UItem, UType>>
+  ): MutationHandler<UItem, UType> {
     const optionsIn = resolveMaybeOptionalOptions(rest) as any
 
     const mutationKey = generateOperationKey(this.path, { prefix: this.options.prefix, type: 'mutation' })
@@ -109,7 +109,11 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
         outputs.push(await this.call(optionsIn.input?.(mutation, params), { context: context as any }))
       }
 
-      return optionsIn.output?.(outputs, params)
+      const refetch = typeof optionsIn.refetch === 'function'
+        ? await optionsIn.refetch(outputs, params)
+        : optionsIn.refetch
+
+      return refetch === undefined ? undefined : { refetch }
     }
   }
 }

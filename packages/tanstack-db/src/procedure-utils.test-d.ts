@@ -194,33 +194,32 @@ describe('ProcedureUtils', () => {
       })
     })
 
-    it('infers return type from `output`', () => {
+    it('handles `refetch` correctly', () => {
       const handler = updateUtils.mutationHandler({
         input: mutation => ({ id: mutation.key, data: mutation.changes }),
-        output: (outputs) => {
+        refetch: false,
+      })
+
+      expectTypeOf(handler).returns.resolves.toEqualTypeOf<{ refetch: boolean } | undefined>()
+
+      updateUtils.mutationHandler({
+        input: mutation => ({ id: mutation.key, data: mutation.changes }),
+        refetch: (outputs, params) => {
           expectTypeOf(outputs).toEqualTypeOf<Todo[]>()
-          return { txid: outputs.length }
+          expectTypeOf(params.transaction.mutations[0].modified).toEqualTypeOf<any>()
+          return outputs.length > 0
         },
       })
 
-      expectTypeOf(handler).returns.resolves.toEqualTypeOf<{ txid: number }>()
-
-      const defaultHandler = updateUtils.mutationHandler({
+      updateUtils.mutationHandler({
         input: mutation => ({ id: mutation.key, data: mutation.changes }),
+        refetch: async () => false,
       })
 
-      expectTypeOf(defaultHandler).returns.resolves.toEqualTypeOf<undefined>()
-    })
-
-    it('requires `output` when return type does not accept undefined', () => {
-      updateUtils.mutationHandler<Todo, 'update', { txid: number }>({
+      updateUtils.mutationHandler({
         input: mutation => ({ id: mutation.key, data: mutation.changes }),
-        output: outputs => ({ txid: outputs.length }),
-      })
-
-      // @ts-expect-error --- output is required
-      updateUtils.mutationHandler<Todo, 'update', { txid: number }>({
-        input: mutation => ({ id: mutation.key, data: mutation.changes }),
+        // @ts-expect-error --- refetch is invalid
+        refetch: 'invalid',
       })
     })
   })
