@@ -3,6 +3,7 @@ export * from './key'
 export * from './procedure-utils'
 export * from './router-utils'
 export { createRouterUtils as createTanstackQueryUtils } from './router-utils'
+export * from './shared-utils'
 export * from './stream-query'
 export * from './types'
 export {

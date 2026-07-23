@@ -2,7 +2,7 @@ import type { ORPCError } from '@orpc/client'
 import type { ContractClientFactory } from '@orpc/contract'
 import type { PromiseWithError } from '@orpc/shared'
 import type { ProcedureUtils } from './procedure-utils'
-import type { SharedRouterUtils } from './router-utils'
+import type { SharedUtils } from './shared-utils'
 import type { OperationContext } from './types'
 import { meta, oc, type } from '@orpc/contract'
 import { createContractJsonifiedUtilsFactory, createContractUtilsFactory } from './contract-utils'
@@ -82,7 +82,6 @@ describe('createContractUtilsFactory', () => {
 
     expectTypeOf(utils).toEqualTypeOf<
       & Omit<ProcedureUtils<{ cache?: boolean }, string, Date, Error | ORPCError<'BAD_GATEWAY', RegExp>>, 'path' | 'options'>
-      & Omit<SharedRouterUtils<string>, 'path'>
     >()
   })
 
@@ -92,10 +91,9 @@ describe('createContractUtilsFactory', () => {
 
     expectTypeOf(utils.nested.pong).toEqualTypeOf<
       & Omit<ProcedureUtils<{ cache?: boolean }, string, Date, Error | ORPCError<'BAD_GATEWAY', RegExp>>, 'path' | 'options'>
-      & Omit<SharedRouterUtils<string>, 'path'>
     >()
 
-    expectTypeOf(utils.key).toEqualTypeOf<SharedRouterUtils<unknown>['key']>()
+    expectTypeOf(utils.key).toEqualTypeOf<SharedUtils<unknown>['key']>()
   })
 })
 
@@ -163,7 +161,6 @@ describe('createContractJsonifiedUtilsFactory', () => {
 
     expectTypeOf(utils).toEqualTypeOf<
       & Omit<ProcedureUtils<{ cache?: boolean }, string, string, Error | ORPCError<'BAD_GATEWAY', string>>, 'path' | 'options'>
-      & Omit<SharedRouterUtils<string>, 'path'>
     >()
   })
 
@@ -173,7 +170,6 @@ describe('createContractJsonifiedUtilsFactory', () => {
 
     expectTypeOf(utils.nested.pong).toEqualTypeOf<
       & Omit<ProcedureUtils<{ cache?: boolean }, string, string, Error | ORPCError<'BAD_GATEWAY', string>>, 'path' | 'options'>
-      & Omit<SharedRouterUtils<string>, 'path'>
     >()
   })
 })

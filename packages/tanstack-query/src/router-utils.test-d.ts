@@ -1,7 +1,8 @@
 import type { ORPCErrorFromErrorMap } from '@orpc/contract'
 import type { RouterClient } from '@orpc/server'
 import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils'
-import type { RouterUtils, RouterUtilsScoped, SharedRouterUtils } from './router-utils'
+import type { RouterUtils, RouterUtilsScoped } from './router-utils'
+import type { SharedUtils } from './shared-utils'
 import { os } from '@orpc/server'
 import z from 'zod'
 import { createRouterUtils } from './router-utils'
@@ -29,55 +30,26 @@ const scopedRouter = {
   }),
 }
 
-describe('SharedRouterUtils', () => {
-  const utils = {} as SharedRouterUtils<{ a: { b: { c: number } } }>
-
-  it('.key', () => {
-    utils.key()
-    utils.key({})
-    utils.key({ type: 'mutation' })
-    utils.key({ input: {}, type: 'query' })
-    utils.key({ input: {}, type: 'streamed', fnOptions: { refetchMode: 'append' } })
-    utils.key({ input: {} })
-    utils.key({ input: { a: {} } })
-    utils.key({ input: { a: { b: {} } } })
-    utils.key({ input: { a: { b: { c: 1 } } } })
-
-    // @ts-expect-error invalid input
-    utils.key({ input: 123 })
-    // @ts-expect-error invalid input
-    utils.key({ input: { a: { b: { c: '1' } } } })
-
-    // @ts-expect-error invalid input
-    utils.key({ type: 'ddd' })
-
-    // @ts-expect-error input is not allowed when type is mutation
-    utils.key({ type: 'mutation', input: {} })
-    // @ts-expect-error fnOptions is not allowed when type not streamed
-    utils.key({ type: 'infinite', fnOptions: { refetchMode: 'append' } })
-  })
-})
-
 it('RouterUtils', () => {
   type G = RouterClient<typeof scopedRouter, { batch?: boolean }>['nested']['ping']
   const utils = {} as RouterUtils<RouterClient<typeof scopedRouter, { batch?: boolean }>>
 
-  expectTypeOf(utils).toExtend<Omit<SharedRouterUtils<unknown>, 'path'>>()
+  expectTypeOf(utils).toExtend<Omit<SharedUtils<unknown>, 'path'>>()
   expectTypeOf<typeof utils>().not.toExtend<
     ProcedureUtils<any, any, any, any>
   >()
 
-  expectTypeOf(utils.nested).toExtend<Omit<SharedRouterUtils<unknown>, 'path'>>()
+  expectTypeOf(utils.nested).toExtend<Omit<SharedUtils<unknown>, 'path'>>()
   expectTypeOf<typeof utils.nested>().not.toExtend<
     ProcedureUtils<any, any, any, any>
   >()
 
-  expectTypeOf(utils.ping).toExtend<Omit<SharedRouterUtils<{ input: number }>, 'path'>>()
+  expectTypeOf(utils.ping).toExtend<Omit<SharedUtils<{ input: number }>, 'path'>>()
   expectTypeOf(utils.ping).toExtend<
     Omit<ProcedureUtils<{ batch?: boolean }, { input: number }, { output: string }, ORPCErrorFromErrorMap<typeof baseErrorMap> | Error>, 'path' | 'options'>
   >()
 
-  expectTypeOf(utils.nested.ping).toExtend<Omit<SharedRouterUtils<{ input: number }>, 'path'>>()
+  expectTypeOf(utils.nested.ping).toExtend<Omit<SharedUtils<{ input: number }>, 'path'>>()
   expectTypeOf(utils.nested.ping).toExtend<
     Omit<ProcedureUtils<{ batch?: boolean }, { input: number }, { output: string }, ORPCErrorFromErrorMap<typeof baseErrorMap> | Error>, 'path' | 'options'>
   >()
