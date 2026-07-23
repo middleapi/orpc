@@ -1,8 +1,9 @@
-import type { Client } from '@orpc/client'
+import type { Client, ORPCError } from '@orpc/client'
 import type { ORPCErrorFromErrorMap } from '@orpc/contract'
-import type { Public } from '@orpc/shared'
-import type { UseInfiniteQueryData } from '@pinia/colada'
-import type { ProcedureUtils } from './procedure-utils'
+import type { PromiseWithError, Public } from '@orpc/shared'
+import type { UseInfiniteQueryData, UseInfiniteQueryFnContext } from '@pinia/colada'
+import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils'
+import type { InfiniteOptionsIn, MutationKeyOptions, MutationOptionsIn, QueryKeyOptions, QueryOptionsIn, StreamedKeyOptions, StreamedOptionsIn, UseMutationFnContext, UseQueryFnContext } from './types'
 import { useInfiniteQuery, useMutation, useQuery, useQueryCache } from '@pinia/colada'
 import { computed } from 'vue'
 import z from 'zod'
@@ -323,5 +324,440 @@ describe('ProcedureUtils', () => {
         },
       })
     })
+  })
+})
+
+describe('ProcedureUtilsOptions', () => {
+  type TestClientContext = { batch?: boolean }
+  type TestInput = { search?: string }
+  type TestOutput = { title: string }
+  type TestError = ORPCError<'TEST', unknown>
+
+  type TestOptions = ProcedureUtilsOptions<TestClientContext, TestInput, TestOutput, TestError>
+
+  type TestStreamedOutput = AsyncIterable<TestOutput>
+  type TestStreamedOptions = ProcedureUtilsOptions<TestClientContext, TestInput, TestStreamedOutput, TestError>
+
+  it('should have all keys that ProcedureUtils provides', () => {
+    // Ensures every utility method in ProcedureUtils (except 'call') has a corresponding key in ProcedureUtilsOptions
+    type ProcedureUtilsKeys = Exclude<keyof ProcedureUtils<any, any, any, any>, 'call' | 'key'>
+    type DefaultsKeys = keyof ProcedureUtilsOptions<any, any, any, any>
+
+    expectTypeOf<ProcedureUtilsKeys>().toExtend<DefaultsKeys>()
+  })
+
+  it('all properties should be optional', () => {
+    const emptyDefaults: TestOptions = {}
+    expectTypeOf(emptyDefaults).toExtend<TestOptions>()
+  })
+
+  it('queryKey should accept Partial<QueryKeyOptions> | modifier function', () => {
+    const _defaults: TestOptions = {
+      queryKey: {
+        input: { search: 'test' },
+      },
+    }
+
+    const _defaults2: TestOptions = {
+      queryKey: {
+        key: ['__custom__'],
+      },
+    }
+
+    const _invalid: TestOptions = {
+      queryKey: {
+        // @ts-expect-error - invalid input type
+        input: { invalid: 'test' },
+      },
+    }
+
+    const _defaults3: TestOptions = {
+      queryKey: (options) => {
+        expectTypeOf(options).toEqualTypeOf<QueryKeyOptions<TestInput>>()
+
+        return { input: { search: 'test' } }
+      },
+    }
+
+    const _invalid2: TestOptions = {
+      // @ts-expect-error - invalid input type
+      queryKey: (options) => {
+        return { input: { invalid: 'test' } }
+      },
+    }
+  })
+
+  it('queryInterceptors should infer correct types', () => {
+    const defaults: TestOptions = {
+      queryInterceptors: [
+        (opts) => {
+          expectTypeOf(opts.input).toEqualTypeOf<TestInput>()
+          expectTypeOf(opts.next()).toEqualTypeOf<PromiseWithError<TestOutput, TestError>>()
+          expectTypeOf(opts.fnContext).toEqualTypeOf<UseQueryFnContext>()
+
+          return opts.next()
+        },
+      ],
+    }
+  })
+
+  it('queryOptions should accept Partial<QueryOptionsIn> | modifier function', () => {
+    const _defaults: TestOptions = {
+      queryOptions: {
+        input: { search: 'test' },
+        staleTime: 1000,
+        context: { batch: true },
+      },
+    }
+
+    const _invalid: TestOptions = {
+      queryOptions: {
+        // @ts-expect-error - invalid input type
+        input: { invalid: 'test' },
+      },
+    }
+
+    const _defaults2: TestOptions = {
+      queryOptions: (options) => {
+        expectTypeOf(options).toEqualTypeOf<QueryOptionsIn<TestClientContext, TestInput, TestOutput, TestError, TestOutput | undefined>>()
+
+        return {
+          ...options,
+          input: { search: 'test' },
+          staleTime: 1000,
+          context: { batch: true },
+        }
+      },
+    }
+
+    const _invalid2: TestOptions = {
+      // @ts-expect-error - invalid input type
+      queryOptions: options => ({
+        ...options,
+        input: { invalid: 'test' },
+      }),
+    }
+  })
+
+  it('streamedKey should accept Partial<StreamedKeyOptions> | modifier function', () => {
+    const _defaults: TestOptions = {
+      streamedKey: {
+        input: { search: 'test' },
+        fnOptions: { maxChunks: 10 },
+      },
+    }
+
+    const _invalid: TestOptions = {
+      streamedKey: {
+        // @ts-expect-error - invalid input type
+        input: { invalid: 'test' },
+      },
+    }
+
+    const _defaults2: TestOptions = {
+      streamedKey: (options) => {
+        expectTypeOf(options).toEqualTypeOf<StreamedKeyOptions<TestInput>>()
+
+        return {
+          input: { search: 'test' },
+          fnOptions: { maxChunks: 10 },
+        }
+      },
+    }
+
+    const _invalid2: TestOptions = {
+      // @ts-expect-error - invalid input type
+      streamedKey: () => ({
+        input: { invalid: 'test' },
+      }),
+    }
+  })
+
+  it('streamedInterceptors should infer correct types', () => {
+    const defaults: TestStreamedOptions = {
+      streamedInterceptors: [
+        (opts) => {
+          expectTypeOf(opts.input).toEqualTypeOf<TestInput>()
+          expectTypeOf(opts.next()).toEqualTypeOf<PromiseWithError<TestOutput[], TestError>>()
+          expectTypeOf(opts.fnContext).toEqualTypeOf<UseQueryFnContext>()
+
+          return opts.next()
+        },
+      ],
+    }
+  })
+
+  it('streamedOptions should accept Partial<StreamedOptionsIn> | modifier function', () => {
+    const _defaults: TestOptions = {
+      streamedOptions: {
+        input: { search: 'test' },
+        staleTime: 1000,
+      },
+    }
+
+    const _invalid: TestOptions = {
+      streamedOptions: {
+        // @ts-expect-error - invalid input type
+        input: { invalid: 'test' },
+      },
+    }
+
+    const _defaults2: TestOptions = {
+      streamedOptions: (options) => {
+        expectTypeOf(options).toEqualTypeOf<StreamedOptionsIn<TestClientContext, TestInput, never, TestError, undefined>>()
+
+        return {
+          ...options,
+          input: { search: 'test' },
+          staleTime: 1000,
+        }
+      },
+    }
+
+    const _invalid2: TestOptions = {
+      // @ts-expect-error - invalid input type
+      streamedOptions: options => ({
+        ...options,
+        input: { invalid: 'test' },
+      }),
+    }
+  })
+
+  it('liveKey should accept Partial<QueryKeyOptions> | modifier function', () => {
+    const _defaults: TestOptions = {
+      liveKey: {
+        input: { search: 'test' },
+      },
+    }
+
+    const _invalid: TestOptions = {
+      liveKey: {
+        // @ts-expect-error - invalid input type
+        input: { invalid: 'test' },
+      },
+    }
+
+    const _defaults2: TestOptions = {
+      liveKey: (options) => {
+        expectTypeOf(options).toEqualTypeOf<QueryKeyOptions<TestInput>>()
+
+        return {
+          input: { search: 'test' },
+        }
+      },
+    }
+
+    const _invalid2: TestOptions = {
+      // @ts-expect-error - invalid input type
+      liveKey: options => ({
+        ...options,
+        input: { invalid: 'test' },
+      }),
+    }
+  })
+
+  it('liveInterceptors should infer correct types', () => {
+    const defaults: TestStreamedOptions = {
+      liveInterceptors: [
+        (opts) => {
+          expectTypeOf(opts.input).toEqualTypeOf<TestInput>()
+          expectTypeOf(opts.next()).toEqualTypeOf<PromiseWithError<TestOutput, TestError>>()
+          expectTypeOf(opts.fnContext).toEqualTypeOf<UseQueryFnContext>()
+
+          return opts.next()
+        },
+      ],
+    }
+  })
+
+  it('liveOptions should accept Partial<QueryOptionsIn> | modifier function', () => {
+    const _defaults: TestOptions = {
+      liveOptions: {
+        input: { search: 'test' },
+        staleTime: 1000,
+      },
+    }
+
+    const _invalid: TestOptions = {
+      liveOptions: {
+        // @ts-expect-error - invalid input type
+        input: { invalid: 'test' },
+      },
+    }
+
+    const _defaults2: TestOptions = {
+      liveOptions: (options) => {
+        expectTypeOf(options).toEqualTypeOf<QueryOptionsIn<TestClientContext, TestInput, never, TestError, undefined>>()
+
+        return {
+          ...options,
+          input: { search: 'test' },
+          staleTime: 1000,
+        }
+      },
+    }
+
+    const _invalid2: TestOptions = {
+      // @ts-expect-error - invalid input type
+      liveOptions: options => ({
+        ...options,
+        input: { invalid: 'test' },
+      }),
+    }
+  })
+
+  it('infiniteKey should accept Partial input, initialPageParam, key', () => {
+    const _defaults: TestOptions = {
+      infiniteKey: {
+        initialPageParam: 0,
+      },
+    }
+
+    const _defaults2: TestOptions = {
+      infiniteKey: {
+        key: ['__custom__'],
+      },
+    }
+
+    const _invalid: TestOptions = {
+      infiniteKey: {
+        // @ts-expect-error - invalid input type
+        input: { invalid: 'test' },
+      },
+    }
+  })
+
+  it('infiniteInterceptors should infer correct types', () => {
+    const defaults: TestOptions = {
+      infiniteInterceptors: [
+        (opts) => {
+          expectTypeOf(opts.input).toEqualTypeOf<TestInput>()
+          expectTypeOf(opts.next()).toEqualTypeOf<PromiseWithError<TestOutput, TestError>>()
+          expectTypeOf(opts.fnContext).toEqualTypeOf<UseInfiniteQueryFnContext<any, any, any, any>>()
+
+          return opts.next()
+        },
+      ],
+    }
+  })
+
+  it('infiniteOptions should accept Partial<InfiniteOptionsIn> | modifier function', () => {
+    const _defaults: TestOptions = {
+      infiniteOptions: {
+        staleTime: 1000,
+      },
+    }
+
+    const _invalid: TestOptions = {
+      infiniteOptions: {
+        // @ts-expect-error - invalid input type
+        input: { invalid: 'test' },
+      },
+    }
+
+    const _defaults2: TestOptions = {
+      infiniteOptions: (options) => {
+        expectTypeOf(options).toEqualTypeOf<InfiniteOptionsIn<TestClientContext, TestInput, TestOutput, TestError, unknown, UseInfiniteQueryData<TestOutput, unknown> | undefined>>()
+
+        return {
+          ...options,
+          staleTime: 1000,
+        }
+      },
+    }
+
+    const _invalid2: TestOptions = {
+      // @ts-expect-error - invalid input type
+      infiniteOptions: options => ({
+        ...options,
+        input: { invalid: 'test' },
+      }),
+    }
+  })
+
+  it('mutationKey should accept Partial key | modifier function', () => {
+    const _defaults: TestOptions = {
+      mutationKey: {
+        key: ['__custom__'],
+      },
+    }
+
+    const _invalid: TestOptions = {
+      mutationKey: {
+        // @ts-expect-error - invalid key type
+        key: 1,
+      },
+    }
+
+    const _defaults2: TestOptions = {
+      mutationKey: (options) => {
+        expectTypeOf(options).toEqualTypeOf<MutationKeyOptions<TestInput>>()
+
+        return {
+          key: ['__custom__'],
+        }
+      },
+    }
+
+    const _invalid2: TestOptions = {
+      // @ts-expect-error - invalid key type
+      mutationKey: options => ({
+        key: 1,
+      }),
+    }
+  })
+
+  it('mutationInterceptors should infer correct types', () => {
+    const defaults: TestOptions = {
+      mutationInterceptors: [
+        (opts) => {
+          expectTypeOf(opts.input).toEqualTypeOf<TestInput>()
+          expectTypeOf(opts.next()).toEqualTypeOf<PromiseWithError<TestOutput, TestError>>()
+          expectTypeOf(opts.fnContext).toEqualTypeOf<UseMutationFnContext>()
+
+          return opts.next()
+        },
+      ],
+    }
+  })
+
+  it('mutationOptions should accept Partial<MutationOptionsIn> | modifier function', () => {
+    const _defaults: TestOptions = {
+      mutationOptions: {
+        onSuccess: (output) => {
+          expectTypeOf(output).toEqualTypeOf<TestOutput>()
+        },
+        context: { batch: true },
+      },
+    }
+
+    const _invalid: TestOptions = {
+      mutationOptions: {
+        // @ts-expect-error - invalid context type
+        context: { batch: 'invalid' },
+      },
+    }
+
+    const _defaults2: TestOptions = {
+      mutationOptions: (options) => {
+        expectTypeOf(options).toEqualTypeOf<MutationOptionsIn<TestClientContext, TestInput, TestOutput, TestError, Record<any, any>>>()
+
+        return {
+          ...options,
+          onSuccess: (output) => {
+            expectTypeOf(output).toEqualTypeOf<TestOutput>()
+          },
+          context: { batch: true },
+        }
+      },
+    }
+
+    const _invalid2: TestOptions = {
+      // @ts-expect-error - invalid context type
+      mutationOptions: options => ({
+        ...options,
+        context: { batch: 'invalid' },
+      }),
+    }
   })
 })

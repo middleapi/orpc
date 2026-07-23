@@ -854,7 +854,7 @@ describe('ProcedureUtils', () => {
   })
 })
 
-describe('CreateProcedureUtilsOptions', () => {
+describe('ProcedureUtilsOptions', () => {
   type TestClientContext = { batch?: boolean }
   type TestInput = { search?: string }
   type TestOutput = { title: string }
