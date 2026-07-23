@@ -1,5 +1,5 @@
 import { oc } from '@orpc/contract'
-import { ContractMetaUtilsPlugin, getTanstackQueryMeta, tanstackQuery } from './meta'
+import { ContractOptionsUtilsPlugin, getTanstackQueryMeta, tanstackQuery } from './meta'
 import { createRouterUtils } from './router-utils'
 
 describe('tanstackQuery', () => {
@@ -70,7 +70,7 @@ describe('tanstackQuery', () => {
 
 describe('contractMetaPlugin', () => {
   it('leaves options unchanged when no procedure or no meta at path', () => {
-    const plugin = new ContractMetaUtilsPlugin({ planet: { find: oc } })
+    const plugin = new ContractOptionsUtilsPlugin({ planet: { find: oc } })
     const options = { prefix: '__prefix__' }
 
     expect(plugin.initProcedureOptions(['unknown'], options)).toBe(options)
@@ -82,7 +82,7 @@ describe('contractMetaPlugin', () => {
     const metaInterceptor = vi.fn()
     const existingInterceptor = vi.fn()
 
-    const plugin = new ContractMetaUtilsPlugin({
+    const plugin = new ContractOptionsUtilsPlugin({
       planet: {
         find: oc.meta(tanstackQuery({
           queryOptions: { staleTime: 1000, retry: 1 },
@@ -143,7 +143,7 @@ describe('contractMetaPlugin', () => {
           },
         },
       },
-      plugins: [new ContractMetaUtilsPlugin(contract)],
+      plugins: [new ContractOptionsUtilsPlugin(contract)],
     }) as any
 
     const options = utils.planet.find.queryOptions({ input: { id: 1 } })

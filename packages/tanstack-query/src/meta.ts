@@ -22,9 +22,9 @@ export interface TanstackQueryMetaPlugin<
  * Applied multiple times, later options are spread-merged with higher priority
  * while interceptors are concatenated.
  *
- * Apply them to router utils with {@link ContractMetaUtilsPlugin}.
+ * Apply them to router utils with {@link ContractOptionsUtilsPlugin}.
  *
- * @see {@link https://orpc.dev/docs/integrations/tanstack-query#contract-meta-plugin TanStack Query Contract Meta Plugin Docs}
+ * @see {@link https://orpc.dev/docs/integrations/tanstack-query#contract-options-plugin TanStack Query Contract Options Plugin Docs}
  */
 export function tanstackQuery<
   TInputSchema extends AnySchema,
@@ -65,10 +65,10 @@ export function getTanstackQueryMeta(
  * The contract shape must match the client the utils are created from,
  * so pass the root router contract when utils paths start from the root.
  *
- * @see {@link https://orpc.dev/docs/integrations/tanstack-query#contract-meta-plugin TanStack Query Contract Meta Plugin Docs}
+ * @see {@link https://orpc.dev/docs/integrations/tanstack-query#contract-options-plugin TanStack Query Contract Options Plugin Docs}
  */
-export class ContractMetaUtilsPlugin<T extends AnyNestedClient = AnyNestedClient> implements RouterUtilsPlugin<T> {
-  readonly name = '~contract-meta'
+export class ContractOptionsUtilsPlugin<T extends AnyNestedClient = AnyNestedClient> implements RouterUtilsPlugin<T> {
+  readonly name = '~contract-options'
 
   constructor(
     private readonly contract: RouterContract,
