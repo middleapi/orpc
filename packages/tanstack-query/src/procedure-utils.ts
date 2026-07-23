@@ -175,8 +175,16 @@ function mergeProcedureUtilsModifier<T extends object>(
   base: ProcedureUtilsModifier<T> | undefined,
   override: ProcedureUtilsModifier<T> | undefined,
 ): ProcedureUtilsModifier<T> | undefined {
-  if (!base || !override || typeof base === 'function' || typeof override === 'function') {
+  if (!base || !override) {
     return override ?? base
+  }
+
+  if (typeof base === 'function' && typeof override === 'function') {
+    return options => override(base(options))
+  }
+
+  if (typeof base === 'function' || typeof override === 'function') {
+    return override
   }
 
   return { ...base, ...override } as Partial<T>
@@ -185,7 +193,8 @@ function mergeProcedureUtilsModifier<T extends object>(
 /**
  * Merge two procedure utils options where `override` takes priority:
  * interceptors are concatenated (base ones run first), modifiers are
- * spread-merged when both are plain objects and replaced otherwise.
+ * spread-merged when both are plain objects, composed (base applied first)
+ * when both are functions, and replaced otherwise.
  */
 export function mergeProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError>(
   base: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>,

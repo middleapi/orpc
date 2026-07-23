@@ -45,6 +45,20 @@ describe('tanstackQuery', () => {
     })
   })
 
+  it('composes function modifiers, base applied first', () => {
+    const contract = oc
+      .meta(tanstackQuery({
+        queryOptions: options => ({ ...options, staleTime: 1000, retry: 1 }),
+      }))
+      .meta(tanstackQuery({
+        queryOptions: options => ({ ...options, retry: 2 }),
+      }))
+
+    const merged: any = getTanstackQueryMeta(contract)?.queryOptions
+
+    expect(merged({ enabled: true })).toEqual({ enabled: true, staleTime: 1000, retry: 2 })
+  })
+
   it('propagates base meta to procedures via .router', () => {
     const router = oc
       .meta(tanstackQuery({ queryOptions: { staleTime: 1000 } }))

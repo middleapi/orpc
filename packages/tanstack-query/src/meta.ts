@@ -45,7 +45,7 @@ export function tanstackQuery<
 
       return {
         ...meta,
-        '~tanstack-query': current ? mergeProcedureUtilsOptions(current, options as any) : options,
+        '~tanstack-query': current ? mergeProcedureUtilsOptions(current, options) : options,
       }
     },
   }
