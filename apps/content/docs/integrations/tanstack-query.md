@@ -371,7 +371,7 @@ const orpc = createTanstackQueryUtils(client, {
 ```
 
 ::: warning
-Types inferred from the contract are for reference only. The actual types depend on the client the utils are created from — for example, a `JsonifiedClient` created from [OpenAPI Link](/docs/openapi/link#typesafe-clients) returns jsonified outputs that may not match the contract schemas.
+Types inferred from the contract are for reference only. The actual types depend on the client the utils are created from. For example, a `JsonifiedClient` created from [OpenAPI Link](/docs/openapi/link#typesafe-clients) returns jsonified outputs that may not match the contract schemas.
 :::
 
 ## Client Context
