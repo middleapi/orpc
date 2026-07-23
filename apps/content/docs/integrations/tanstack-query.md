@@ -374,6 +374,52 @@ const orpc = createTanstackQueryUtils(client, {
 Types inferred from the contract are for reference only. The actual types depend on the client the utils are created from. For example, a `JsonifiedClient` created from [OpenAPI Link](/docs/openapi/link#typesafe-clients) returns jsonified outputs that may not match the contract schemas.
 :::
 
+::: details Accessing router utils inside interceptors?
+Contract interceptors cannot import your router utils directly, but you can pass them through mutation meta. [Register a global meta type](https://tanstack.com/query/latest/docs/framework/react/typescript#registering-global-meta) that carries the utils, then read it from `fnContext.meta` to invalidate queries, apply optimistic updates, and more.
+
+```ts
+import type { RouterContractClient } from '@orpc/contract'
+import type { RouterUtils } from '@orpc/tanstack-query'
+
+declare module '@tanstack/react-query' {
+  interface Register {
+    mutationMeta: {
+      utils?: RouterUtils<RouterContractClient<typeof contract>>
+    }
+  }
+}
+
+export const contract = {
+  planet: {
+    find: oc.input(z.object({ id: z.number() })),
+    update: oc
+      .input(z.object({ id: z.number(), name: z.string() }))
+      .meta(tanstackQuery({
+        mutationInterceptors: [
+          async ({ next, fnContext }) => {
+            const output = await next()
+
+            // invalidate planet queries after a successful update
+            if (fnContext.meta?.utils) {
+              await fnContext.client.invalidateQueries({
+                queryKey: fnContext.meta.utils.planet.key(),
+              })
+            }
+
+            return output
+          },
+        ],
+      })),
+  },
+}
+
+const mutation = useMutation(orpc.planet.update.mutationOptions({
+  meta: { utils: orpc },
+}))
+```
+
+:::
+
 ## Client Context
 
 ::: warning
