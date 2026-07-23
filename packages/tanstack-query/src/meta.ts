@@ -22,7 +22,7 @@ export interface TanstackQueryMetaPlugin<
  * Applied multiple times, later options are spread-merged with higher priority
  * while interceptors are concatenated.
  *
- * Apply them to router utils with {@link ContractMetaPlugin}.
+ * Apply them to router utils with {@link ContractMetaUtilsPlugin}.
  *
  * @see {@link https://orpc.dev/docs/integrations/tanstack-query#contract-meta-plugin TanStack Query Contract Meta Plugin Docs}
  */
@@ -67,7 +67,7 @@ export function getTanstackQueryMeta(
  *
  * @see {@link https://orpc.dev/docs/integrations/tanstack-query#contract-meta-plugin TanStack Query Contract Meta Plugin Docs}
  */
-export class ContractMetaPlugin<T extends AnyNestedClient = AnyNestedClient> implements RouterUtilsPlugin<T> {
+export class ContractMetaUtilsPlugin<T extends AnyNestedClient = AnyNestedClient> implements RouterUtilsPlugin<T> {
   readonly name = '~contract-meta'
 
   constructor(
