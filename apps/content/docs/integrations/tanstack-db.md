@@ -118,12 +118,25 @@ const onUpdate = orpc.todo.update.mutationHandler({
 })
 ```
 
-By default, [Query Collection](https://tanstack.com/db/latest/docs/collections/query-collection) refetches after a handler completes. Use the `refetch` option to control this behavior, either statically or based on the procedure outputs:
+The `output` option maps the list of procedure outputs to the handler's return value. It is required when a collection expects a specific return shape, and optional otherwise. For example, [Electric Collection](https://tanstack.com/db/latest/docs/collections/electric-collection) transaction matching:
+
+```ts
+const todosCollection = createCollection(electricCollectionOptions({
+  shapeOptions: { url: '/api/todos' },
+  getKey: todo => todo.id,
+  onInsert: orpc.todo.create.mutationHandler({
+    input: mutation => mutation.modified,
+    output: outputs => ({ txid: outputs.map(output => output.txid) }),
+  }),
+}))
+```
+
+Or skipping the [Query Collection](https://tanstack.com/db/latest/docs/collections/query-collection) refetch after a handler completes:
 
 ```ts
 const onUpdate = orpc.todo.update.mutationHandler({
   input: mutation => ({ id: mutation.key, data: mutation.changes }),
-  refetch: false, // or (outputs, params) => boolean
+  output: () => ({ refetch: false }),
 })
 ```
 

@@ -48,8 +48,10 @@
   },
   "devDependencies": {
     "@tanstack/db": "^0.6.16",
+    "@tanstack/electric-db-collection": "^0.3.14",
     "@tanstack/query-core": "^5.101.0",
     "@tanstack/query-db-collection": "^1.1.0",
+    "@tanstack/react-db": "^0.1.94",
     "zod": "^4.4.3"
   }
 }

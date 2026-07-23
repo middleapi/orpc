@@ -783,12 +783,18 @@ importers:
       '@tanstack/db':
         specifier: ^0.6.16
         version: 0.6.16(typescript@6.0.3)
+      '@tanstack/electric-db-collection':
+        specifier: ^0.3.14
+        version: 0.3.14(typescript@6.0.3)
       '@tanstack/query-core':
         specifier: ^5.101.0
         version: 5.101.2
       '@tanstack/query-db-collection':
         specifier: ^1.1.0
         version: 1.1.0(@tanstack/query-core@5.101.2)(typescript@6.0.3)
+      '@tanstack/react-db':
+        specifier: ^0.1.94
+        version: 0.1.94(react@19.2.7)(typescript@6.0.3)
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -1772,6 +1778,10 @@ packages:
         optional: true
       oxlint:
         optional: true
+
+  '@electric-sql/client@1.5.24':
+    resolution: {integrity: sha512-ItOjBFTfiZvYosglF9Dn4TSqE59yL/psoemHJ7vX8gvEUmElHB2QdP5eQC6q9/lswyv7oqhkZT0Kk8kuq2P5vA==}
+    hasBin: true
 
   '@emnapi/core@1.11.1':
     resolution: {integrity: sha512-RSvbQmHzdKzNsLYa/wHrbc3KN4sYLKAdPZxqiM2HATqv/SBk2/ENSHpvXGaLOMcsAyz0poEGqkmmKYG3OWiJEQ==}
@@ -2803,6 +2813,9 @@ packages:
     resolution: {integrity: sha512-7jf4sBNoaZCz2RSayefcvc/CZX0PDVA9aVk44bHpUebLrap+xjzDDw4T03klcYrBl/FdC7NamwvqjUMCtYdBvQ==}
     peerDependencies:
       '@opentelemetry/api': ~1.9.0
+
+  '@microsoft/fetch-event-source@2.0.1':
+    resolution: {integrity: sha512-W6CLUJ2eBMw3Rec70qrsEW0jOm/3twwJv21mrmj2yORiaVmVYGS4sSS5yUwvQc1ZlDLYGPnClVWmUUMagKNsfA==}
 
   '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4':
     resolution: {integrity: sha512-LCkGo6JDfaBhgST7UpPWgNgLINpcpabaHfyz5OBx75nUYxBsaEPxjnyNjWpeb/xBup/682QnBfRBy2/LvPutZQ==}
@@ -4391,6 +4404,9 @@ packages:
     peerDependencies:
       typescript: '>=4.7'
 
+  '@tanstack/electric-db-collection@0.3.14':
+    resolution: {integrity: sha512-r0tknthqxwetQ/ofGTFnNfyO7JgCkLEA4TtTpmi9XsXd6z0YHS2FB1YC5zBt27QcqCkaSfCZeSPsYFRicCdilA==}
+
   '@tanstack/match-sorter-utils@8.19.4':
     resolution: {integrity: sha512-Wo1iKt2b9OT7d+YGhvEPD3DXvPv2etTusIMhMUoG7fbhmxcXCtIjJDEygy91Y2JFlwGyjqiBPRozme7UD8hoqg==}
     engines: {node: '>=12'}
@@ -4411,6 +4427,11 @@ packages:
   '@tanstack/query-devtools@5.101.2':
     resolution: {integrity: sha512-o+wHcqgN7Pp0s8v1i0UGq/ZrrEKrxdIiMQmKRdYb2w7NPtylYSJ4+wg/tIn71m9DLstwUwdEGAvROdly6HXP6w==}
 
+  '@tanstack/react-db@0.1.94':
+    resolution: {integrity: sha512-ZtSMBOCdR/ElcBxg84uboXrqQ+kqiOwlq6kTy+o54UDywYr/by02jmWKHqayrnoiPVlrx83WNHDaomfe141f4A==}
+    peerDependencies:
+      react: '>=16.8.0'
+
   '@tanstack/react-query@5.101.2':
     resolution: {integrity: sha512-seDkr6kzGzX1okaaTtZPtgA688CDPlXUz1C6xSg0ESqn04Vuc8tlrYms1s3de+znBqhPVxFRfpAfUf+6XvfPWg==}
     peerDependencies:
@@ -4420,6 +4441,9 @@ packages:
     resolution: {integrity: sha512-IbCeM23gEbU0lW4wWFQhS4ELjgdmVXjhyCUh8pFemdMIuA5UswlkqEMryEE+lCMtxLS7m0oN1yWMocKi7vwXdw==}
     peerDependencies:
       solid-js: ^1.6.0
+
+  '@tanstack/store@0.9.3':
+    resolution: {integrity: sha512-8reSzl/qGWGGVKhBoxXPMWzATSbZLZFWhwBAFO9NAyp0TxzfBP0mIrGb8CP8KrQTmvzXlR/vFPPUrHTLBGyFyw==}
 
   '@tanstack/svelte-query@6.1.36':
     resolution: {integrity: sha512-AVyvXPzBh5OQnWFB7rk9gskciPouayAhU9Vm24uMai+Imf+ZfBEbjOAEtdM41oexFK/cdXmpAIySDSVaAzy9zw==}
@@ -10942,6 +10966,12 @@ snapshots:
     optionalDependencies:
       eslint: 10.7.0(jiti@2.7.0)
 
+  '@electric-sql/client@1.5.24':
+    dependencies:
+      '@microsoft/fetch-event-source': 2.0.1
+    optionalDependencies:
+      '@rollup/rollup-darwin-arm64': 4.62.2
+
   '@emnapi/core@1.11.1':
     dependencies:
       '@emnapi/wasi-threads': 1.2.2
@@ -11767,6 +11797,8 @@ snapshots:
       '@opentelemetry/resources': 2.9.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-trace-base': 2.9.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/semantic-conventions': 1.43.0
+
+  '@microsoft/fetch-event-source@2.0.1': {}
 
   '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4':
     optional: true
@@ -13973,6 +14005,17 @@ snapshots:
       '@tanstack/pacer-lite': 0.2.2
       typescript: 6.0.3
 
+  '@tanstack/electric-db-collection@0.3.14(typescript@6.0.3)':
+    dependencies:
+      '@electric-sql/client': 1.5.24
+      '@standard-schema/spec': 1.1.0
+      '@tanstack/db': 0.6.16(typescript@6.0.3)
+      '@tanstack/store': 0.9.3
+      debug: 4.4.3
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
   '@tanstack/match-sorter-utils@8.19.4':
     dependencies:
       remove-accents: 0.5.0
@@ -13991,6 +14034,14 @@ snapshots:
   '@tanstack/query-devtools@5.101.2':
     optional: true
 
+  '@tanstack/react-db@0.1.94(react@19.2.7)(typescript@6.0.3)':
+    dependencies:
+      '@tanstack/db': 0.6.16(typescript@6.0.3)
+      react: 19.2.7
+      use-sync-external-store: 1.6.0(react@19.2.7)
+    transitivePeerDependencies:
+      - typescript
+
   '@tanstack/react-query@5.101.2(react@19.2.7)':
     dependencies:
       '@tanstack/query-core': 5.101.2
@@ -14000,6 +14051,8 @@ snapshots:
     dependencies:
       '@tanstack/query-core': 5.101.2
       solid-js: 1.9.14
+
+  '@tanstack/store@0.9.3': {}
 
   '@tanstack/svelte-query@6.1.36(svelte@5.56.6(@typescript-eslint/types@8.64.0))':
     dependencies:

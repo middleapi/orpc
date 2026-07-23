@@ -1,8 +1,9 @@
 import type { Client } from '@orpc/client'
-import type { DeleteMutationFn, InsertMutationFn, LoadSubsetOptions, UpdateMutationFn } from '@tanstack/db'
+import type { DeleteMutationFn, InsertMutationFn, InsertMutationFnParams, LoadSubsetOptions, UpdateMutationFn } from '@tanstack/db'
 import type { QueryKey } from '@tanstack/query-core'
 import type { QueryCollectionUtils } from '@tanstack/query-db-collection'
 import type { ProcedureUtils } from './procedure-utils'
+import { electricCollectionOptions } from '@tanstack/electric-db-collection'
 import { QueryClient } from '@tanstack/query-core'
 import z from 'zod'
 
@@ -21,6 +22,7 @@ describe('ProcedureUtils', () => {
   const requiredContextListUtils = {} as ProcedureUtils<{ batch: boolean }, ListInput, Todo[], Error>
   const nonArrayListUtils = {} as ProcedureUtils<{ batch?: boolean }, ListInput, { items: Todo[] }, Error>
   const createUtils = {} as ProcedureUtils<{ batch?: boolean }, Todo, Todo, Error>
+  const createWithTxidUtils = {} as ProcedureUtils<{ batch?: boolean }, Todo, { txid: number }, Error>
   const updateUtils = {} as ProcedureUtils<{ batch?: boolean }, { id: number, data: Partial<Todo> }, Todo, Error>
 
   it('.call', () => {
@@ -193,33 +195,57 @@ describe('ProcedureUtils', () => {
       })
     })
 
-    it('handles `refetch` correctly', () => {
+    it('infers return type from `output`', () => {
       const handler = updateUtils.mutationHandler({
         input: mutation => ({ id: mutation.key, data: mutation.changes }),
-        refetch: false,
-      })
-
-      expectTypeOf(handler).returns.resolves.toEqualTypeOf<{ refetch: boolean } | undefined>()
-
-      updateUtils.mutationHandler({
-        input: mutation => ({ id: mutation.key, data: mutation.changes }),
-        refetch: (outputs, params) => {
+        output: (outputs, params) => {
           expectTypeOf(outputs).toEqualTypeOf<Todo[]>()
           expectTypeOf(params.transaction.mutations[0].modified).toEqualTypeOf<any>()
-          return outputs.length > 0
+          return { refetch: outputs.length > 0 }
         },
       })
 
-      updateUtils.mutationHandler({
+      expectTypeOf(handler).returns.resolves.toEqualTypeOf<{ refetch: boolean }>()
+
+      const defaultHandler = updateUtils.mutationHandler({
         input: mutation => ({ id: mutation.key, data: mutation.changes }),
-        // @ts-expect-error --- refetch must be sync
-        refetch: async () => false,
       })
 
-      updateUtils.mutationHandler({
-        input: mutation => ({ id: mutation.key, data: mutation.changes }),
-        // @ts-expect-error --- refetch is invalid
-        refetch: 'invalid',
+      expectTypeOf(defaultHandler).returns.resolves.toEqualTypeOf<undefined>()
+    })
+
+    it('requires `output` when expected return type does not accept undefined', () => {
+      const _valid: (params: InsertMutationFnParams<Todo>) => Promise<{ txid: number }> = createWithTxidUtils.mutationHandler({
+        input: mutation => mutation.modified,
+        output: outputs => ({ txid: outputs[0]!.txid }),
+      })
+
+      // @ts-expect-error --- output is required
+      const _invalid: (params: InsertMutationFnParams<Todo>) => Promise<{ txid: number }> = createWithTxidUtils.mutationHandler({
+        input: mutation => mutation.modified,
+      })
+    })
+
+    it('works with electric collection options', () => {
+      interface ElectricTodo extends Record<string, unknown> {
+        id: number
+        name: string
+      }
+
+      const electricCreateUtils = {} as ProcedureUtils<{ batch?: boolean }, ElectricTodo, { txid: number }, Error>
+
+      electricCollectionOptions({
+        shapeOptions: { url: 'http://localhost:3000/v1/shape' },
+        getKey: (item: ElectricTodo) => item.id,
+        onInsert: electricCreateUtils.mutationHandler({
+          input: (mutation) => {
+            expectTypeOf(mutation.modified).toEqualTypeOf<ElectricTodo>()
+            return mutation.modified
+          },
+          output: outputs => ({ txid: outputs.map(output => output.txid) }),
+        }),
+        // returning nothing is allowed by electric, so output is optional
+        onDelete: electricCreateUtils.mutationHandler({ input: mutation => mutation.modified }),
       })
     })
   })

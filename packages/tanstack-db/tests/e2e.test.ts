@@ -63,7 +63,7 @@ it('shares query keys with @orpc/tanstack-query utils', async () => {
   expect(orpc.todo.list.key({ type: 'query' })).toEqual(tanstackQueryUtils.todo.list.key({ type: 'query' }))
 })
 
-it('supports refetch option', async () => {
+it('supports output mapper', async () => {
   const collection = createCollection(orpc.todo.list.collectionOptions({
     input: () => ({ search: '' }),
     queryClient,
@@ -71,7 +71,7 @@ it('supports refetch option', async () => {
     startSync: true,
     onInsert: orpc.todo.create.mutationHandler({
       input: mutation => mutation.modified,
-      refetch: false,
+      output: () => ({ refetch: false }),
     }),
   }))
 
