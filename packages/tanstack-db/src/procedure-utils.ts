@@ -94,7 +94,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
   mutationHandler<UItem extends object = any, UType extends OperationType = OperationType>(
     ...rest: MaybeOptionalOptions<MutationHandlerOptionsIn<TClientContext, TInput, TOutput, UItem, UType>>
   ): MutationHandler<UItem, UType> {
-    const optionsIn = resolveMaybeOptionalOptions(rest) as any
+    const optionsIn = resolveMaybeOptionalOptions(rest)
 
     const mutationKey = generateOperationKey(this.path, { prefix: this.options.prefix, type: 'mutation' })
 
@@ -108,7 +108,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
           ...optionsIn.context?.(mutation, params),
         } satisfies TanstackQueryOperationContext
 
-        return this.call(optionsIn.input?.(mutation, params), { context: context as any })
+        return this.call(optionsIn.input?.(mutation, params) as TInput, { context: context as any })
       }))
 
       const refetch = value(optionsIn.refetch, outputs, params)
