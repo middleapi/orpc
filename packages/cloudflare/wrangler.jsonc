@@ -16,8 +16,8 @@
         "class_name": "PublisherDO"
       },
       {
-        "name": "PUBLISHER_REPLAY3S_DON",
-        "class_name": "PublisherReplay3sDO"
+        "name": "PUBLISHER_RESUME3S_DON",
+        "class_name": "PublisherResume3sDO"
       }
     ]
   },
@@ -26,7 +26,7 @@
       "tag": "v1",
       "new_sqlite_classes": [
         "PublisherDO",
-        "PublisherReplay3sDO"
+        "PublisherResume3sDO"
       ]
     }
   ]

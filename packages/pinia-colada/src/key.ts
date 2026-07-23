@@ -16,18 +16,12 @@ export type OperationKeyOptions<TType extends OperationType, TInput> = Operation
   type?: TType
   input?: PartialDeep<TInput>
   fnOptions?: TType extends 'streamed' ? SerializableStreamedQueryOptions : never
-
-  /**
-   * Number of trailing path segments to drop before generating the key.
-   * Use this to target a parent path, e.g. `orpc.planet.find.key({ back: 1 })` equals `orpc.planet.key()`.
-   */
-  back?: number
 }
 
 export type OperationKey<TType extends OperationType, TInput>
   = EntryKey & (
-    | [path: string[], options: Omit<OperationKeyOptions<TType, TInput>, 'prefix' | 'back'>]
-    | [prefix: string, path: string[], options: Omit<OperationKeyOptions<TType, TInput>, 'prefix' | 'back'>]
+    | [path: string[], options: Omit<OperationKeyOptions<TType, TInput>, 'prefix'>]
+    | [prefix: string, path: string[], options: Omit<OperationKeyOptions<TType, TInput>, 'prefix'>]
   )
 
 const serializer = new RPCJsonSerializer()
@@ -46,7 +40,7 @@ export function generateOperationKey<TType extends OperationType, TInput>(
 ): OperationKey<TType, TInput> {
   return [
     ...options.prefix !== undefined ? [options.prefix] : [],
-    options.back ? path.slice(0, -options.back) : path,
+    path,
     {
       ...options.input !== undefined ? { input: serializer.serialize(options.input).json } : {},
       ...options.type !== undefined ? { type: options.type } : {},

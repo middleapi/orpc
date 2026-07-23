@@ -30,7 +30,7 @@ describe('publisher redis adapters compatibility', () => {
       name: 'redis',
       publisher: new RedisPublisher(redis, {
         prefix,
-        replay: { enabled: true, seconds: 10 },
+        resume: { enabled: true, seconds: 10 },
       }),
     })
 
@@ -44,7 +44,7 @@ describe('publisher redis adapters compatibility', () => {
       name: 'bun-redis',
       publisher: new BunRedisPublisher(bunRedis, {
         prefix,
-        replay: { enabled: true, seconds: 10 },
+        resume: { enabled: true, seconds: 10 },
       }),
     })
   }
@@ -56,7 +56,7 @@ describe('publisher redis adapters compatibility', () => {
           continue
         }
 
-        it(`delivers live events from ${source.name} to ${target.name} and replays from the last received id`, async () => {
+        it(`delivers live events from ${source.name} to ${target.name} and resumes from the last received id`, async () => {
           const event = `live:${crypto.randomUUID()}`
           const liveListener = vi.fn()
 
@@ -84,21 +84,21 @@ describe('publisher redis adapters compatibility', () => {
 
           await source.publisher.publish(event, { order: 3 })
 
-          const replayed = vi.fn()
-          const unsubscribeReplay = await target.publisher.subscribe(event, replayed, {
+          const resumed = vi.fn()
+          const unsubscribeResume = await target.publisher.subscribe(event, resumed, {
             lastEventId: getEventMeta(secondDelivered)?.id,
           })
 
           await waitFor(() => {
-            expect(replayed).toHaveBeenCalledTimes(1)
+            expect(resumed).toHaveBeenCalledTimes(1)
           })
 
-          const replayedPayload = replayed.mock.calls[0]![0]
+          const resumedPayload = resumed.mock.calls[0]![0]
 
-          expect(replayedPayload).toEqual({ order: 3 })
-          expect(getEventMeta(replayedPayload)?.id).toEqual(expect.any(String))
+          expect(resumedPayload).toEqual({ order: 3 })
+          expect(getEventMeta(resumedPayload)?.id).toEqual(expect.any(String))
 
-          await unsubscribeReplay()
+          await unsubscribeResume()
         }, { timeout: 20_000 })
       }
     }

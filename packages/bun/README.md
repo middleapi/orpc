@@ -46,7 +46,9 @@ You can read the documentation [here](https://orpc.dev).
 **Framework & ecosystem integrations**
 
 - [@orpc/next](https://www.npmjs.com/package/@orpc/next): Integrate with [Next.js Server Functions](https://nextjs.org/docs/app/getting-started/mutating-data).
+- [@orpc/ai-sdk](https://www.npmjs.com/package/@orpc/ai-sdk): Turn contracts and procedures into [AI SDK](https://ai-sdk.dev/) tools.
 - [@orpc/tanstack-query](https://www.npmjs.com/package/@orpc/tanstack-query): Integrate with [TanStack Query](https://tanstack.com/query/latest).
+- [@orpc/pinia-colada](https://www.npmjs.com/package/@orpc/pinia-colada): Integrate with [Pinia Colada](https://pinia-colada.esm.dev/).
 - [@orpc/experimental-effect](https://www.npmjs.com/package/@orpc/experimental-effect): Integrate with [Effect](https://effect.website/).
 - [@orpc/nest](https://www.npmjs.com/package/@orpc/nest): Implement your contract with [NestJS](https://nestjs.com/).
 - [@orpc/bun](https://www.npmjs.com/package/@orpc/bun): Adapters for [Bun's Redis](https://bun.sh/).
@@ -103,11 +105,10 @@ Like what we build over at [middleapi](https://github.com/middleapi)? You can he
    <td align="center"><a href="https://github.com/valerii15298?ref=orpc" target="_blank" rel="noopener" title="Valerii Petryniak"><img src="https://avatars.githubusercontent.com/u/44531564?u=88ac74d9bacd20401518441907acad21063cd397&amp;v=4" width="139" alt="Valerii Petryniak"/><br />Valerii Petryniak</a></td>
    <td align="center"><a href="https://github.com/letstri?ref=orpc" target="_blank" rel="noopener" title="Valerii Strilets"><img src="https://avatars.githubusercontent.com/u/13253748?u=c7b10399ccc8f8081e24db94ec32cd9858e86ac3&amp;v=4" width="139" alt="Valerii Strilets"/><br />Valerii Strilets</a></td>
    <td align="center"><a href="https://github.com/K-Mistele?ref=orpc" target="_blank" rel="noopener" title="Kyle Mistele"><img src="https://avatars.githubusercontent.com/u/18430555?u=3afebeb81de666e35aaac3ed46f14159d7603ffb&amp;v=4" width="139" alt="Kyle Mistele"/><br />Kyle Mistele</a></td>
-   <td align="center"><a href="https://github.com/andrewpeters9?ref=orpc" target="_blank" rel="noopener" title="Andrew Peters"><img src="https://avatars.githubusercontent.com/u/36251325?v=4" width="139" alt="Andrew Peters"/><br />Andrew Peters</a></td>
    <td align="center"><a href="https://github.com/R44VC0RP?ref=orpc" target="_blank" rel="noopener" title="Ryan Vogel"><img src="https://avatars.githubusercontent.com/u/89211796?u=1857347b9787d8d8a7ea5bfc333f96be92d5a683&amp;v=4" width="139" alt="Ryan Vogel"/><br />Ryan Vogel</a></td>
+   <td align="center"><a href="https://github.com/christ12938?ref=orpc" target="_blank" rel="noopener" title="christ12938"><img src="https://avatars.githubusercontent.com/u/25758598?v=4" width="139" alt="christ12938"/><br />christ12938</a></td>
   </tr>
   <tr>
-   <td align="center"><a href="https://github.com/christ12938?ref=orpc" target="_blank" rel="noopener" title="christ12938"><img src="https://avatars.githubusercontent.com/u/25758598?v=4" width="139" alt="christ12938"/><br />christ12938</a></td>
    <td align="center"><a href="https://github.com/Ryanjso?ref=orpc" target="_blank" rel="noopener" title="Ryan Soderberg"><img src="https://avatars.githubusercontent.com/u/39172778?u=5ed913c31d57e7221b75784abcad48c7ebddde27&amp;v=4" width="139" alt="Ryan Soderberg"/><br />Ryan Soderberg</a></td>
    <td align="center"><a href="https://github.com/itigoore01?ref=orpc" target="_blank" rel="noopener" title="shota"><img src="https://avatars.githubusercontent.com/u/11831107?u=c976a6dc7e055eb026304c46c99100ed22b0c8e0&amp;v=4" width="139" alt="shota"/><br />shota</a></td>
   </tr>
@@ -167,6 +168,7 @@ Like what we build over at [middleapi](https://github.com/middleapi)? You can he
   <a href="https://github.com/nelsonlaidev?ref=orpc" target="_blank" rel="noopener" title="Nelson Lai"><img src="https://avatars.githubusercontent.com/u/75498339?u=2fc0e0b95dd184c5ffb744df977cb15a18b60672&amp;v=4" width="32" height="32" alt="Nelson Lai" /></a>
   <a href="https://github.com/nguyenlc1993?ref=orpc" target="_blank" rel="noopener" title="Lê Cao Nguyên"><img src="https://avatars.githubusercontent.com/u/13871971?u=83c8b69d9e35b589c4e1f066cc113b1d9461386f&amp;v=4" width="32" height="32" alt="Lê Cao Nguyên" /></a>
   <a href="https://github.com/wobsoriano?ref=orpc" target="_blank" rel="noopener" title="Robert Soriano"><img src="https://avatars.githubusercontent.com/u/13049130?u=6d72104182e7c9ed25934815313fb69107332111&amp;v=4" width="32" height="32" alt="Robert Soriano" /></a>
+  <a href="https://github.com/andrewpeters9?ref=orpc" target="_blank" rel="noopener" title="Andrew Peters"><img src="https://avatars.githubusercontent.com/u/36251325?v=4" width="32" height="32" alt="Andrew Peters" /></a>
   <a href="https://github.com/SKostyukovich?ref=orpc" target="_blank" rel="noopener" title="SKostyukovich"><img src="https://avatars.githubusercontent.com/u/10700067?v=4" width="32" height="32" alt="SKostyukovich" /></a>
   <a href="https://github.com/peter-adam-dy?ref=orpc" target="_blank" rel="noopener" title="Peter Adam"><img src="https://avatars.githubusercontent.com/u/132129459?u=4f3dbbb3b443990b56acb7d6a5d11ed2c555f6db&amp;v=4" width="32" height="32" alt="Peter Adam" /></a>
   <a href="https://github.com/FabworksHQ?ref=orpc" target="_blank" rel="noopener" title="Fabworks"><img src="https://avatars.githubusercontent.com/u/160179500?v=4" width="32" height="32" alt="Fabworks" /></a>

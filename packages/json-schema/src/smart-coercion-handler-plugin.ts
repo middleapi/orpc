@@ -31,14 +31,14 @@ export class SmartCoercionHandlerPlugin<T extends Context> implements StandardHa
     return {
       ...options,
       clientInterceptors: [
-        async ({ next, input, ...interceptorOptions }) => {
+        ({ next, input, ...interceptorOptions }) => {
           const inputSchemas = interceptorOptions.procedure['~orpc'].inputSchemas
 
           if (!inputSchemas) {
             return next()
           }
 
-          const coercedInput = await this.coerceValue(inputSchemas, input)
+          const coercedInput = this.coerceValue(inputSchemas, input)
           return next({ ...interceptorOptions, input: coercedInput })
         },
         ...toArray(options.clientInterceptors),
@@ -46,12 +46,12 @@ export class SmartCoercionHandlerPlugin<T extends Context> implements StandardHa
     }
   }
 
-  private async coerceValue(schemas: AnySchema[], value: unknown): Promise<unknown> {
+  private coerceValue(schemas: AnySchema[], value: unknown): unknown {
     for (const schema of schemas) {
       let converted = this.cache.get(schema)
 
       if (!converted) {
-        converted = await this.converter.convert(schema, 'input')
+        converted = this.converter.convert(schema, 'input')
         this.cache.set(schema, converted)
       }
 

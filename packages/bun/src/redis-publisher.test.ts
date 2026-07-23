@@ -45,7 +45,7 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
     return publisher
   }
 
-  it('delivers live events and meta (without replay and without prefix)', async () => {
+  it('delivers live events and meta (without resume and without prefix)', async () => {
     const publisher = createTestingPublisher({ prefix: undefined })
     const liveEvent = `${crypto.randomUUID()}live`
     const ignoredEvent = `${crypto.randomUUID()}ignored`
@@ -71,19 +71,19 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
 
     await unsubscribe()
 
-    const replayAttempt = vi.fn()
-    const unsubscribeReplayAttempt = await publisher.subscribe(liveEvent, replayAttempt, { lastEventId: '0' })
+    const resumeAttempt = vi.fn()
+    const unsubscribeResumeAttempt = await publisher.subscribe(liveEvent, resumeAttempt, { lastEventId: '0' })
 
     await sleep(300)
 
-    expect(replayAttempt).not.toHaveBeenCalled()
+    expect(resumeAttempt).not.toHaveBeenCalled()
 
-    await unsubscribeReplayAttempt()
+    await unsubscribeResumeAttempt()
   }, { timeout: 20_000 })
 
-  it('replays missed events in order and preserves event metadata while rewriting ids', async () => {
+  it('resumes missed events in order and preserves event metadata while rewriting ids', async () => {
     const publisher = createTestingPublisher({
-      replay: { enabled: true, seconds: 10 },
+      resume: { enabled: true, seconds: 10 },
     })
     const event = 'orders'
     const liveListener = vi.fn()
@@ -117,26 +117,26 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
 
     await unsubscribeLive()
 
-    const replayed = vi.fn()
-    const unsubscribeReplay = await publisher.subscribe(event, replayed, {
+    const resumed = vi.fn()
+    const unsubscribeResume = await publisher.subscribe(event, resumed, {
       lastEventId: getEventMeta(secondDelivered)?.id,
     })
 
     await waitFor(() => {
-      expect(replayed).toHaveBeenCalledTimes(1)
+      expect(resumed).toHaveBeenCalledTimes(1)
     })
 
-    const replayedPayload = replayed.mock.calls[0]![0]
+    const resumedPayload = resumed.mock.calls[0]![0]
 
-    expect(replayedPayload).toEqual(thirdDelivered)
-    expect(getEventMeta(replayedPayload)?.id).toEqual(getEventMeta(thirdDelivered)?.id)
+    expect(resumedPayload).toEqual(thirdDelivered)
+    expect(getEventMeta(resumedPayload)?.id).toEqual(getEventMeta(thirdDelivered)?.id)
 
-    await unsubscribeReplay()
+    await unsubscribeResume()
   }, { timeout: 20_000 })
 
-  it('treats an empty replay backlog as a clean starting point and then continues with live messages', async () => {
+  it('treats an empty resume backlog as a clean starting point and then continues with live messages', async () => {
     const publisher = createTestingPublisher({
-      replay: { enabled: true, seconds: 10 },
+      resume: { enabled: true, seconds: 10 },
     })
     const event = 'empty-backlog'
     const listener = vi.fn()
@@ -158,7 +158,7 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
     await unsubscribe()
   }, { timeout: 20_000 })
 
-  it('deduplicates events that race between replay and live delivery during reconnect', async () => {
+  it('deduplicates events that race between resume and live delivery during reconnect', async () => {
     const { resolve, promise } = promiseWithResolvers<void>()
     const delayedRedis = new Proxy(new RedisClient(REDIS_URL), {
       get(target, p) {
@@ -182,7 +182,7 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
     })
 
     const publisher = createTestingPublisher({
-      replay: { enabled: true, seconds: 10 },
+      resume: { enabled: true, seconds: 10 },
     }, { useRedis: delayedRedis })
     const event = 'timeline'
 
@@ -207,12 +207,12 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
     await unsubscribe()
   }, { timeout: 20_000 })
 
-  it('trims stale replay history on the next publish and lets Redis expire the stream key', async () => {
+  it('trims stale resume history on the next publish and lets Redis expire the stream key', async () => {
     const prefix = `retention:${crypto.randomUUID()}:`
     const event = 'orders'
     const key = `${prefix}${event}`
     const publisher = createTestingPublisher({
-      replay: { enabled: true, seconds: 1 },
+      resume: { enabled: true, seconds: 1 },
       prefix,
     })
 
@@ -262,7 +262,7 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
     const prefix = `custom:${crypto.randomUUID()}:`
     const event = 'profile-updated'
     const publisher = createTestingPublisher({
-      replay: { enabled: true, seconds: 10 },
+      resume: { enabled: true, seconds: 10 },
       serializer,
       prefix,
     })
@@ -300,9 +300,9 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
     await unsubscribe()
   }, { timeout: 20_000 })
 
-  it('reports replay errors while subscribing', async () => {
+  it('reports resume errors while subscribing', async () => {
     const publisher = createTestingPublisher({
-      replay: { enabled: true, seconds: 10 },
+      resume: { enabled: true, seconds: 10 },
     })
     const event = 'resume-errors'
     const listener = vi.fn()

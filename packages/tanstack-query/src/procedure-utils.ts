@@ -23,6 +23,7 @@ import { intercept, isAsyncIteratorObject, resolveMaybeOptionalOptions, toArray 
 import { skipToken } from '@tanstack/query-core'
 import { generateOperationKey } from './key'
 import { liveQuery } from './live-query'
+import { SharedUtils } from './shared-utils'
 import { serializableStreamedQuery } from './stream-query'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
 
@@ -221,17 +222,20 @@ export function mergeProcedureUtilsOptions<TClientContext extends ClientContext,
   }
 }
 
-export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutput, TError> {
+export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutput, TError> extends SharedUtils<TInput> {
+  declare protected readonly options: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>
+
   /**
    * Calling corresponding procedure client
    */
   call: Client<TClientContext, TInput, TOutput, TError>
 
   constructor(
-    private readonly path: string[],
+    path: string[],
     client: Client<TClientContext, TInput, TOutput, TError>,
-    private readonly options: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError> = {},
+    options: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError> = {},
   ) {
+    super(path, options)
     this.call = client
   }
 

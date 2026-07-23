@@ -23,16 +23,16 @@ export interface UpstashPublisherOptions extends PublisherOptions {
   serializer?: undefined | Pick<RPCSerializer, keyof RPCSerializer>
 
   /**
-   * Configuration for event replay support.
+   * Configuration for event resume support.
    *
    * When enabled, published events are temporarily stored so new
    * subscribers can resume from a previous position using `lastEventId`.
    *
    * @default { enabled: false }
    */
-  replay?: {
+  resume?: {
     /**
-     * Whether event replay support is enabled.
+     * Whether event resume support is enabled.
      *
      * When enabled, published events are temporarily stored so new
      * subscribers can resume from a previous position using `lastEventId`.
@@ -42,7 +42,7 @@ export interface UpstashPublisherOptions extends PublisherOptions {
     enabled: boolean
 
     /**
-     * How long (in seconds) to retain events for replay.
+     * How long (in seconds) to retain events for resume.
      *
      * Expired events are cleaned up lazily for performance reasons, so
      * some events may remain available slightly longer than this period.
@@ -59,8 +59,8 @@ export class UpstashPublisher<T extends Record<string, object>> extends Publishe
   private readonly listenersMap = new Map<keyof T, Array<(payload: any) => void>>()
   private readonly onErrorsMap = new Map<keyof T, Array<(error: ThrowableError) => void>>()
   private readonly subscriptionMap = new Map<keyof T, ReturnType<typeof this.redis.subscribe>>() // Upstash subscription objects
-  private readonly replayEnabled: boolean
-  private readonly replaySeconds: number
+  private readonly resumeEnabled: boolean
+  private readonly resumeSeconds: number
 
   /**
    * The exactness of the `XTRIM` command.
@@ -70,12 +70,12 @@ export class UpstashPublisher<T extends Record<string, object>> extends Publishe
 
   constructor(
     private readonly redis: Redis,
-    { replay, prefix, serializer, ...options }: UpstashPublisherOptions = {},
+    { resume, prefix, serializer, ...options }: UpstashPublisherOptions = {},
   ) {
     super(options)
     this.prefix = prefix ?? ''
-    this.replayEnabled = replay?.enabled ?? false
-    this.replaySeconds = replay?.seconds ?? 300
+    this.resumeEnabled = resume?.enabled ?? false
+    this.resumeSeconds = resume?.seconds ?? 300
     this.serializer = serializer ?? new RPCSerializer()
   }
 
@@ -85,13 +85,13 @@ export class UpstashPublisher<T extends Record<string, object>> extends Publishe
     const data = this.serializePayload(payload)
     let id: string | undefined
 
-    if (this.replayEnabled) {
+    if (this.resumeEnabled) {
       const now = Date.now()
 
-      // Remove expired replay windows.
+      // Remove expired resume windows.
       // The next publish for a stale event will perform trimming again.
       for (const [event, firstPublishTime] of this.firstPublishTimeMap) {
-        if (firstPublishTime + this.replaySeconds * 1000 < now) {
+        if (firstPublishTime + this.resumeSeconds * 1000 < now) {
           this.firstPublishTimeMap.delete(event)
         }
       }
@@ -101,10 +101,10 @@ export class UpstashPublisher<T extends Record<string, object>> extends Publishe
 
         const results = await this.redis.multi()
           .xadd(redisKey, '*', { data })
-          .xtrim(redisKey, { strategy: 'MINID', exactness: this.xTrimExactness, threshold: `${now - this.replaySeconds * 1000}-0` })
-          // Use a 2x TTL so events published near the end of the replay window
+          .xtrim(redisKey, { strategy: 'MINID', exactness: this.xTrimExactness, threshold: `${now - this.resumeSeconds * 1000}-0` })
+          // Use a 2x TTL so events published near the end of the resume window
           // are not expired before the next window updates the key expiration.
-          .expire(redisKey, this.replaySeconds * 2)
+          .expire(redisKey, this.resumeSeconds * 2)
           .exec()
 
         id = results[0]
@@ -125,17 +125,17 @@ export class UpstashPublisher<T extends Record<string, object>> extends Publishe
     const redisKey = `${this.prefix}${event}`
 
     let pendingPayloads: T[K][] | undefined = []
-    const replayedIds = new Set<string>()
+    const resumedIds = new Set<string>()
 
     const deduplicatingListener = (payload: T[K]) => {
-      // queue payload while replaying events
+      // queue payload while resuming missed events
       if (pendingPayloads) {
         pendingPayloads.push(payload)
         return
       }
 
       const id = getEventMeta(payload)?.id
-      if (id !== undefined && replayedIds.has(id)) { // Already delivered through replay.
+      if (id !== undefined && resumedIds.has(id)) { // Already delivered during resume.
         return
       }
 
@@ -155,7 +155,7 @@ export class UpstashPublisher<T extends Record<string, object>> extends Publishe
       const subscribeEventPromise = this.subscribeEvent(event)
 
       try {
-        if (this.replayEnabled && lastEventId !== undefined) {
+        if (this.resumeEnabled && lastEventId !== undefined) {
           const results = await this.redis.xread(redisKey, lastEventId)
           if (results && results[0]) {
             const [_, items] = results[0] as any
@@ -163,7 +163,7 @@ export class UpstashPublisher<T extends Record<string, object>> extends Publishe
             for (const [id, fields] of items) {
               const data = fields[1]! // [key: 'data', value, ...]
               const payload = this.deserializePayload(id, data)
-              replayedIds.add(id)
+              resumedIds.add(id)
               originalListener(payload as T[K])
             }
           }
@@ -190,8 +190,8 @@ export class UpstashPublisher<T extends Record<string, object>> extends Publishe
       throw error
     }
 
-    // Register error listeners only after subscription and replay succeeds.
-    // Subscription or replay failures are reported directly via the rejected promise.
+    // Register error listeners only after subscription and resume succeeds.
+    // Subscription or resume failures are reported directly via the rejected promise.
     if (onError) {
       let onErrors = this.onErrorsMap.get(event)
       if (!onErrors) {

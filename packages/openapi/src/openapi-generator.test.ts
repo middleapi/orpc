@@ -8,10 +8,10 @@ import { OpenAPIGenerator } from './openapi-generator'
 describe('openAPIGenerator', () => {
   const zodJsonSchemaConverter: JsonSchemaConverter = {
     condition: schema => schema?.['~standard'].vendor === 'zod',
-    async convert(schema, direction) {
+    convert(schema, direction) {
       const jsonSchema = z.toJSONSchema(schema as any, { io: direction })
-      const output = await schema?.['~standard'].validate(undefined)
-      return [jsonSchema as any, !output?.issues]
+      const output = schema?.['~standard'].validate(undefined)
+      return [jsonSchema as any, !(output instanceof Promise) && !output?.issues]
     },
   }
 
@@ -3086,7 +3086,7 @@ describe('openAPIGenerator', () => {
           converters: [
             {
               condition: schema => schema === planetSchema,
-              async convert(_schema, _direction) {
+              convert(_schema, _direction) {
                 return [{
                   type: 'object',
                   properties: {
@@ -3150,7 +3150,7 @@ describe('openAPIGenerator', () => {
           converters: [
             {
               condition: schema => schema === planetSchema,
-              async convert(_schema, _direction) {
+              convert(_schema, _direction) {
                 return [{
                   type: 'object',
                   properties: {
