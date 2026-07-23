@@ -3,10 +3,10 @@ import { DurablePublisherObject } from '../../src/publisher-object'
 export class PublisherDO extends DurablePublisherObject {
 }
 
-export class PublisherReplay3sDO extends DurablePublisherObject {
+export class PublisherResume3sDO extends DurablePublisherObject {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env, {
-      replay: {
+      resume: {
         enabled: true,
         seconds: 3,
         cleanupIntervalSeconds: 30,

@@ -2,9 +2,9 @@ import type { EventMeta } from '@standardserver/core'
 import { stringifyJSON } from '@orpc/shared'
 import { DurableObject } from 'cloudflare:workers'
 
-export interface DurablePublisherObjectReplayOptions {
+export interface DurablePublisherObjectResumeOptions {
   /**
-   * Whether event replay support is enabled.
+   * Whether event resume support is enabled.
    *
    * When enabled, published events are temporarily stored so new
    * subscribers can resume from a previous position using `lastEventId`.
@@ -14,7 +14,7 @@ export interface DurablePublisherObjectReplayOptions {
   enabled: boolean
 
   /**
-   * How long (in seconds) to retain events for replay.
+   * How long (in seconds) to retain events for resume.
    *
    * Expired events are cleaned up lazily for performance reasons, so
    * some events may remain available slightly longer than this period.
@@ -45,22 +45,22 @@ export interface DurablePublisherObjectReplayOptions {
 
 export interface DurablePublisherObjectOptions {
   /**
-   * Configuration for event replay support.
+   * Configuration for event resume support.
    *
    * When enabled, published events are temporarily stored so new
    * subscribers can resume from a previous position using `lastEventId`.
    *
    * @default { enabled: false }
    */
-  replay?: DurablePublisherObjectReplayOptions
+  resume?: DurablePublisherObjectResumeOptions
 }
 
 export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> extends DurableObject<Env, Props> {
-  private readonly replayStorage: ReplayStorage
+  private readonly resumeStorage: ResumeStorage
 
   constructor(ctx: DurableObjectState<Props>, env: Env, options: DurablePublisherObjectOptions = {}) {
     super(ctx, env)
-    this.replayStorage = new ReplayStorage(ctx, options.replay)
+    this.resumeStorage = new ResumeStorage(ctx, options.resume)
   }
 
   override fetch(request: Request): Promise<Response> {
@@ -75,7 +75,7 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
     let stringifiedPayload = await request.text()
 
     try {
-      stringifiedPayload = this.replayStorage.store(stringifiedPayload)
+      stringifiedPayload = this.resumeStorage.store(stringifiedPayload)
     }
     catch (e) {
       console.error('Failed to store published event:', e)
@@ -100,7 +100,7 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
 
     const lastEventId = request.headers.get('last-event-id')
     if (lastEventId !== null) {
-      const payloads = this.replayStorage.getAfter(lastEventId)
+      const payloads = this.resumeStorage.getAfter(lastEventId)
 
       for (const payload of payloads) {
         server.send(payload)
@@ -114,7 +114,7 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
   }
 
   override async alarm(): Promise<void> {
-    await this.replayStorage.alarm()
+    await this.resumeStorage.alarm()
   }
 }
 
@@ -123,7 +123,7 @@ interface SerializedPayload {
   meta?: EventMeta
 }
 
-class ReplayStorage {
+class ResumeStorage {
   private readonly enabled: boolean
   private readonly seconds: number
   private readonly cleanupIntervalSeconds: number
@@ -135,7 +135,7 @@ class ReplayStorage {
 
   constructor(
     private readonly ctx: DurableObjectState,
-    options: DurablePublisherObjectReplayOptions = { enabled: false },
+    options: DurablePublisherObjectResumeOptions = { enabled: false },
   ) {
     this.enabled = options.enabled
     this.seconds = options.seconds ?? 300
@@ -183,7 +183,7 @@ class ReplayStorage {
        * failure. If the retry also fails, the error propagates to the
        * caller so it can be surfaced as a clean error response.
        */
-      console.error('Failed to insert event, resetting replay storage schema.', e)
+      console.error('Failed to insert event, resetting resume storage schema.', e)
       this.resetSchema()
       return insertEvent()
     }

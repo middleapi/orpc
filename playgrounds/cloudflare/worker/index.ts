@@ -85,7 +85,7 @@ export default instrument({
 export class PublisherDO extends DurablePublisherObject {
   constructor(state: DurableObjectState, env: Env) {
     super(state, env, {
-      replay: {
+      resume: {
         enabled: true,
       },
     })

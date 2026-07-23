@@ -5,16 +5,16 @@ import { Publisher } from '../publisher'
 
 export interface MemoryPublisherOptions extends PublisherOptions {
   /**
-   * Configuration for event replay support.
+   * Configuration for event resume support.
    *
    * When enabled, published events are temporarily stored so new
    * subscribers can resume from a previous position using `lastEventId`.
    *
    * @default { enabled: false }
    */
-  replay?: {
+  resume?: {
     /**
-     * Whether event replay support is enabled.
+     * Whether event resume support is enabled.
      *
      * When enabled, published events are temporarily stored so new
      * subscribers can resume from a previous position using `lastEventId`.
@@ -24,7 +24,7 @@ export interface MemoryPublisherOptions extends PublisherOptions {
     enabled: boolean
 
     /**
-     * How long (in seconds) to retain events for replay.
+     * How long (in seconds) to retain events for resume.
      *
      * Expired events are cleaned up lazily for performance reasons, so
      * some events may remain available slightly longer than this period.
@@ -44,20 +44,20 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
   private readonly listenersMap: Map<keyof T, ((payload: any) => void)[]> = new Map()
   private readonly idGenerator = new SequentialIdGenerator()
   private readonly eventsMap: Map<keyof T, Array<StoredEvent<T[keyof T]>>> = new Map()
-  private readonly replayEnabled: boolean
-  private readonly replaySeconds: number
+  private readonly resumeEnabled: boolean
+  private readonly resumeSeconds: number
 
-  constructor({ replay, ...options }: MemoryPublisherOptions = {}) {
+  constructor({ resume, ...options }: MemoryPublisherOptions = {}) {
     super(options)
-    this.replayEnabled = replay?.enabled ?? false
-    this.replaySeconds = replay?.seconds ?? 300
+    this.resumeEnabled = resume?.enabled ?? false
+    this.resumeSeconds = resume?.seconds ?? 300
   }
 
   async publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void> {
     this.cleanup()
 
-    if (this.replayEnabled) {
-      const expiresAt = Date.now() + this.replaySeconds * 1000
+    if (this.resumeEnabled) {
+      const expiresAt = Date.now() + this.resumeSeconds * 1000
 
       let bucket = this.eventsMap.get(event)
       if (!bucket) {
@@ -66,7 +66,7 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
 
       const [original, meta] = unwrapEvent(payload)
 
-      // Attach a monotonically increasing ID for replay support.
+      // Attach a monotonically increasing ID for resume support.
       payload = withEventMeta(original, { ...meta, id: this.idGenerator.generate() })
       bucket.push({ expiresAt, payload })
     }
@@ -82,10 +82,10 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
   ): Promise<() => Promise<void>> {
     this.cleanup()
 
-    if (this.replayEnabled && options?.lastEventId !== undefined) {
+    if (this.resumeEnabled && options?.lastEventId !== undefined) {
       const bucket = this.eventsMap.get(event)
       if (bucket?.length) {
-        const startIdx = findReplayStartIndex(bucket, options.lastEventId)
+        const startIdx = findResumeStartIndex(bucket, options.lastEventId)
         for (let i = startIdx; i < bucket.length; i++) {
           listener(bucket[i]!.payload as T[K])
         }
@@ -111,14 +111,14 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
 
   private lastCleanupTime: number = 0
   private cleanup(): void {
-    if (!this.replayEnabled) {
+    if (!this.resumeEnabled) {
       return
     }
 
     const now = Date.now()
 
     // Throttle: only run cleanup at most once per retention window.
-    if (now - this.lastCleanupTime < this.replaySeconds * 1000) {
+    if (now - this.lastCleanupTime < this.resumeSeconds * 1000) {
       return
     }
 
@@ -134,7 +134,7 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
   }
 }
 
-function findReplayStartIndex<T>(
+function findResumeStartIndex<T>(
   bucket: Array<StoredEvent<T>>,
   lastEventId: string,
 ): number {

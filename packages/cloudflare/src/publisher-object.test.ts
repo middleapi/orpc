@@ -77,7 +77,7 @@ beforeEach(async () => {
 })
 
 describe('durable publisher object', () => {
-  it('sends live messages and does not replay when replay is off', async () => {
+  it('sends live messages and does not resume when resume is off', async () => {
     const stub = env.PUBLISHER_DON.getByName(crypto.randomUUID())
 
     const firstSubscriber = await openSocket(stub)
@@ -104,8 +104,8 @@ describe('durable publisher object', () => {
     await closeSocket(resumedSubscriber)
   })
 
-  it('replays missed messages and gives them new ids', async () => {
-    const stub = env.PUBLISHER_REPLAY3S_DON.getByName(crypto.randomUUID())
+  it('resumes missed messages and gives them new ids', async () => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
 
     const liveSubscriber = await openSocket(stub)
 
@@ -124,10 +124,10 @@ describe('durable publisher object', () => {
       { data: { text: 'third' }, meta: { id: '3' } },
     ])
 
-    const replaySubscriber = await openSocket(stub, '2')
-    const replayedMessages = await readMessages(replaySubscriber, 1)
+    const resumeSubscriber = await openSocket(stub, '2')
+    const resumedMessages = await readMessages(resumeSubscriber, 1)
 
-    expect(replayedMessages).toEqual([liveMessages[2]])
+    expect(resumedMessages).toEqual([liveMessages[2]])
 
     const tailSubscriber = await openSocket(stub, '3')
 
@@ -135,12 +135,12 @@ describe('durable publisher object', () => {
     expect(tailSubscriber.messages).toHaveLength(0)
 
     await closeSocket(liveSubscriber)
-    await closeSocket(replaySubscriber)
+    await closeSocket(resumeSubscriber)
     await closeSocket(tailSubscriber)
   })
 
-  it('keeps replay before new live messages', { repeats: 5 }, async () => {
-    const stub = env.PUBLISHER_REPLAY3S_DON.getByName(crypto.randomUUID())
+  it('keeps resume before new live messages', { repeats: 5 }, async () => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
 
     expect((await publish(stub, { data: { order: 1 } })).status).toBe(204)
     expect((await publish(stub, { data: { order: 2 } })).status).toBe(204)
@@ -159,8 +159,8 @@ describe('durable publisher object', () => {
     await closeSocket(subscriber)
   })
 
-  it('drops old replay messages on subscribe', { timeout: 20_000 }, async () => {
-    const stub = env.PUBLISHER_REPLAY3S_DON.getByName(crypto.randomUUID())
+  it('drops old resume messages on subscribe', { timeout: 20_000 }, async () => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
 
     expect((await publish(stub, { data: { text: 'event 1' } })).status).toBe(204)
     await evictDurableObject(stub)
@@ -210,8 +210,8 @@ describe('durable publisher object', () => {
     await closeSocket(subscriber4)
   })
 
-  it('drops old replay messages on publish', { timeout: 20_000 }, async () => {
-    const stub = env.PUBLISHER_REPLAY3S_DON.getByName(crypto.randomUUID())
+  it('drops old resume messages on publish', { timeout: 20_000 }, async () => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
 
     expect((await publish(stub, { data: { text: 'event 1' } })).status).toBe(204)
     await evictDurableObject(stub)
@@ -286,8 +286,8 @@ describe('durable publisher object', () => {
     await closeSocket(healthySubscriber)
   })
 
-  it('returns 400 for bad replay data and still works after', async () => {
-    const stub = env.PUBLISHER_REPLAY3S_DON.getByName(crypto.randomUUID())
+  it('returns 400 for bad resume data and still works after', async () => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const subscriber = await openSocket(stub)
@@ -307,9 +307,9 @@ describe('durable publisher object', () => {
     await closeSocket(subscriber)
   })
 
-  it('reject subscribe request when replay send fails', async ({ onTestFinished }) => {
-    const stub = env.PUBLISHER_REPLAY3S_DON.getByName(crypto.randomUUID())
-    expect((await publish(stub, { data: { text: 'stored replay' } })).status).toBe(204)
+  it('reject subscribe request when resume send fails', async ({ onTestFinished }) => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
+    expect((await publish(stub, { data: { text: 'stored resume' } })).status).toBe(204)
 
     await runInDurableObject(stub, async () => {
       const globalObject = globalThis as typeof globalThis & {
@@ -321,7 +321,7 @@ describe('durable publisher object', () => {
       globalObject.WebSocketPair = function ThrowingWebSocketPair() {
         const pair = new OriginalWebSocketPair()
         pair[1].send = () => {
-          throw new Error('forced replay send failure')
+          throw new Error('forced resume send failure')
         }
 
         return pair
@@ -332,11 +332,11 @@ describe('durable publisher object', () => {
       })
     })
 
-    await expect(openSocket(stub, '0')).rejects.toThrow('forced replay send failure')
+    await expect(openSocket(stub, '0')).rejects.toThrow('forced resume send failure')
   })
 
   it('keeps a cleanup alarm that is already far enough out', async () => {
-    const stub = env.PUBLISHER_REPLAY3S_DON.getByName(crypto.randomUUID())
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
     const existingAlarm = Date.now() + 60_000
 
     await runInDurableObject(stub, async (_, state) => {
@@ -351,7 +351,7 @@ describe('durable publisher object', () => {
   })
 
   it('moves a cleanup alarm when it would fire too soon', async () => {
-    const stub = env.PUBLISHER_REPLAY3S_DON.getByName(crypto.randomUUID())
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
     const existingAlarm = Date.now() + 1_000
 
     await runInDurableObject(stub, async (_, state) => {
@@ -365,8 +365,8 @@ describe('durable publisher object', () => {
     })
   })
 
-  it('resets replay storage when the id reaches the max value', async () => {
-    const stub = env.PUBLISHER_REPLAY3S_DON.getByName(crypto.randomUUID())
+  it('resets resume storage when the id reaches the max value', async () => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     expect((await publish(stub, { data: { text: 'initial' } })).status).toBe(204)
@@ -381,18 +381,18 @@ describe('durable publisher object', () => {
     expect((await publish(stub, { data: { text: 'recovered' } })).status).toBe(204)
     expect(consoleError).toHaveBeenCalled()
 
-    const replaySubscriber = await openSocket(stub, '0')
+    const resumeSubscriber = await openSocket(stub, '0')
 
-    expect((await readMessages(replaySubscriber, 1))[0]).toEqual({
+    expect((await readMessages(resumeSubscriber, 1))[0]).toEqual({
       data: { text: 'recovered' },
       meta: { id: '1' },
     })
 
-    await closeSocket(replaySubscriber)
+    await closeSocket(resumeSubscriber)
   })
 
   it('does not clean up while a socket is still open', async () => {
-    const stub = env.PUBLISHER_REPLAY3S_DON.getByName(crypto.randomUUID())
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
     const subscriber = await openSocket(stub, '0')
 
     await runDurableObjectAlarm(stub)
@@ -410,10 +410,10 @@ describe('durable publisher object', () => {
     await closeSocket(subscriber)
   })
 
-  it('cleans up old replay data after idle time', async () => {
-    const stub = env.PUBLISHER_REPLAY3S_DON.getByName(crypto.randomUUID())
+  it('cleans up old resume data after idle time', async () => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
 
-    expect((await publish(stub, { data: { text: 'fresh replay event' } })).status).toBe(204)
+    expect((await publish(stub, { data: { text: 'fresh resume event' } })).status).toBe(204)
 
     await runDurableObjectAlarm(stub)
     expect(await getAlarm(stub)).not.toBeNull()
@@ -421,7 +421,7 @@ describe('durable publisher object', () => {
     const beforeExpirySubscriber = await openSocket(stub, '0')
 
     expect((await readMessages(beforeExpirySubscriber, 1))[0]).toEqual({
-      data: { text: 'fresh replay event' },
+      data: { text: 'fresh resume event' },
       meta: { id: '1' },
     })
 
