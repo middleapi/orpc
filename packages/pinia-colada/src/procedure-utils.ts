@@ -6,6 +6,7 @@ import type { InferLiveQueryOutput, InferStreamedQueryOutput, InfiniteKeyOptions
 import { intercept, isAsyncIteratorObject, resolveMaybeOptionalOptions } from '@orpc/shared'
 import { generateOperationKey } from './key'
 import { liveQuery } from './live-query'
+import { SharedUtils } from './shared-utils'
 import { serializableStreamedQuery } from './stream-query'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
 
@@ -159,7 +160,9 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
   >
 }
 
-export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutput, TError> {
+export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutput, TError> extends SharedUtils<TInput> {
+  declare protected readonly options: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>
+
   /**
    * Calling corresponding procedure client
    *
@@ -168,10 +171,11 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
   call: Client<TClientContext, TInput, TOutput, TError>
 
   constructor(
-    private readonly path: string[],
+    path: string[],
     client: Client<TClientContext, TInput, TOutput, TError>,
-    private readonly options: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError> = {},
+    options: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError> = {},
   ) {
+    super(path, options)
     this.call = client
   }
 

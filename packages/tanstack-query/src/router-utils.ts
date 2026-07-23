@@ -1,35 +1,20 @@
 import type { AnyNestedClient, Client, InferClientContext, InferClientError } from '@orpc/client'
 import type { Public } from '@orpc/shared'
-import type { OperationKey, OperationKeyOptions, OperationKeyPrefixOptions } from './key'
+import type { OperationKeyPrefixOptions } from './key'
 import type { RouterUtilsPlugin } from './plugin'
 import type { ProcedureUtilsInfiniteInterceptor, ProcedureUtilsLiveInterceptor, ProcedureUtilsMutationInterceptor, ProcedureUtilsOptions, ProcedureUtilsQueryInterceptor, ProcedureUtilsStreamedInterceptor } from './procedure-utils'
-import type { OperationType } from './types'
 import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
 import { bindMethods, get, getOrBind, isTypescriptObject, toArray } from '@orpc/shared'
-import { generateOperationKey } from './key'
 import { CompositeRouterUtilsPlugin } from './plugin'
 import { ProcedureUtils } from './procedure-utils'
-
-export class SharedRouterUtils<TInput> {
-  constructor(
-    private readonly path: string[],
-    private readonly options: OperationKeyPrefixOptions,
-  ) {}
-
-  /**
-   * Generate a **partial matching** key for actions like revalidating queries, checking mutation status, etc.
-   */
-  key<TType extends OperationType>(options: Omit<OperationKeyOptions<TType, TInput>, 'prefix'> = {}): OperationKey<TType, TInput> {
-    return generateOperationKey(this.path, { ...options, prefix: this.options.prefix })
-  }
-}
+import { SharedUtils } from './shared-utils'
 
 export type RouterUtils<T extends AnyNestedClient>
   = T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
-    ? Public<ProcedureUtils<UClientContext, UInput, UOutput, UError>> & Public<SharedRouterUtils<UInput>>
+    ? Public<ProcedureUtils<UClientContext, UInput, UOutput, UError>>
     : {
       [K in keyof T]: T[K] extends AnyNestedClient ? RouterUtils<T[K]> : never
-    } & Public<SharedRouterUtils<unknown>>
+    } & Public<SharedUtils<unknown>>
 
 export type RouterUtilsScoped<T extends AnyNestedClient>
   = T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
@@ -105,9 +90,8 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
   plugin: CompositeRouterUtilsPlugin<any>,
 ): RouterUtils<T> {
   const path = toArray(options.path)
-  const sharedUtils = bindMethods(new SharedRouterUtils(path, options))
 
-  const procedureUtils = typeof client === 'function' && (options.scoped === undefined || isProcedureUtilsOptions(options.scoped))
+  const utils = typeof client === 'function' && (options.scoped === undefined || isProcedureUtilsOptions(options.scoped))
     ? bindMethods(new ProcedureUtils(
         path,
         client,
@@ -121,12 +105,9 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
           mutationInterceptors: [...toArray(options.mutationInterceptors) as any, ...toArray(options.scoped?.mutationInterceptors)],
         }),
       ))
-    : undefined
+    : bindMethods(new SharedUtils(path, options))
 
-  const recursive = new Proxy({
-    ...sharedUtils,
-    ...procedureUtils,
-  }, {
+  const recursive = new Proxy(utils, {
     get(target, prop) {
       const value = getOrBind(target, prop)
       const nextClient = get(client, [prop])
