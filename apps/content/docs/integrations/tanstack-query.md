@@ -370,10 +370,6 @@ const orpc = createTanstackQueryUtils(client, {
 })
 ```
 
-::: info
-`tanstackQuery` merges when applied multiple times, and utils level options merge on top of contract meta the same way: interceptors are concatenated, plain option objects are spread-merged, and function modifiers are composed. Later layers take priority.
-:::
-
 ::: warning
 Types inferred from the contract are for reference only. The actual types depend on the client the utils are created from. For example, a `JsonifiedClient` created from [OpenAPI Link](/docs/openapi/link#typesafe-clients) returns jsonified outputs that may not match the contract schemas.
 :::
