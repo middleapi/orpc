@@ -53,7 +53,7 @@ export class SmartCoercionLinkPlugin<T extends ClientContext> implements Standar
               return output
             }
 
-            const coercedOutput = await this.coerceValue(outputSchemas, output)
+            const coercedOutput = this.coerceValue(outputSchemas, output)
             return coercedOutput
           }
           catch (error) {
@@ -69,7 +69,7 @@ export class SmartCoercionLinkPlugin<T extends ClientContext> implements Standar
             }
 
             const cloned = cloneORPCError(error)
-            cloned.data = await this.coerceValue([dataSchema], cloned.data)
+            cloned.data = this.coerceValue([dataSchema], cloned.data)
             throw cloned
           }
         },
@@ -77,12 +77,12 @@ export class SmartCoercionLinkPlugin<T extends ClientContext> implements Standar
     }
   }
 
-  private async coerceValue(schemas: AnySchema[], value: unknown): Promise<unknown> {
+  private coerceValue(schemas: AnySchema[], value: unknown): unknown {
     for (const schema of schemas) {
       let converted = this.cache.get(schema)
 
       if (!converted) {
-        converted = await this.converter.convert(schema, 'output')
+        converted = this.converter.convert(schema, 'output')
         this.cache.set(schema, converted)
       }
 

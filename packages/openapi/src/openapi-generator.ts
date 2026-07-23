@@ -111,7 +111,7 @@ export class OpenAPIGenerator {
 
     const errors: string[] = []
 
-    await walkProcedureContractsAsync(router, async (contract, path) => {
+    await walkProcedureContractsAsync(router, (contract, path) => {
       if (value(options.filter, contract, path) === false) {
         return
       }
@@ -140,9 +140,9 @@ export class OpenAPIGenerator {
             tags: meta?.tags?.map(tag => tag),
           }
 
-          await this.request(doc, operationRef, def, meta, dynamicPathParams, options, path)
-          await this.successResponse(doc, operationRef, def, meta, options, path)
-          await this.errorResponse(doc, operationRef, def, meta, options)
+          this.request(doc, operationRef, def, meta, dynamicPathParams, options, path)
+          this.successResponse(doc, operationRef, def, meta, options, path)
+          this.errorResponse(doc, operationRef, def, meta, options)
         }
 
         if (typeof meta?.spec === 'function') {
@@ -172,17 +172,17 @@ export class OpenAPIGenerator {
     return this.serializer.serialize(doc, { asFormData: false, useFormDataForBlobFields: false }) as OpenAPIDocument
   }
 
-  private async convertSchema(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): Promise<[JsonSchema, boolean]> {
-    const [jsonSchema, optional] = await this.converter.convert(schema as any, direction)
+  private convertSchema(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): [JsonSchema, boolean] {
+    const [jsonSchema, optional] = this.converter.convert(schema as any, direction)
     return [strip$schemaField(jsonSchema), optional]
   }
 
-  private async convertSchemas(schemas: AnySchema[] | undefined, direction: JsonSchemaConverterDirection): Promise<[JsonSchema, boolean]> {
+  private convertSchemas(schemas: AnySchema[] | undefined, direction: JsonSchemaConverterDirection): [JsonSchema, boolean] {
     if (!schemas || schemas.length <= 1) {
       return this.convertSchema(schemas?.[0], direction)
     }
 
-    const results = await Promise.all(schemas.map(s => this.convertSchema(s, direction)))
+    const results = schemas.map(s => this.convertSchema(s, direction))
     const allOfSchemas: JsonSchema[] = []
     let optional = true
 
@@ -196,7 +196,7 @@ export class OpenAPIGenerator {
     return [combineJsonSchemasWithComposition('allOf', allOfSchemas), optional]
   }
 
-  private async request(
+  private request(
     doc: OpenAPIDocument,
     ref: OpenAPIOperationObject,
     def: AnyProcedureContract['~orpc'],
@@ -204,7 +204,7 @@ export class OpenAPIGenerator {
     dynamicPathParams: DynamicPathParam[] | undefined,
     options: OpenAPIGeneratorGenerateOptions,
     path: string[],
-  ): Promise<void> {
+  ): void {
     const method = meta?.method ?? DEFAULT_OPENAPI_METHOD
     const inputStructure = meta?.inputStructure ?? DEFAULT_OPENAPI_INPUT_STRUCTURE
     const inputSchemas = def.inputSchemas
@@ -214,8 +214,8 @@ export class OpenAPIGenerator {
 
       if (asyncIteratorObjectDetails) {
         const [yieldSchemas, returnSchemas] = asyncIteratorObjectDetails
-        const yieldResult = await this.convertSchemas(yieldSchemas, 'input')
-        const returnResult = await this.convertSchemas(returnSchemas, 'input')
+        const yieldResult = this.convertSchemas(yieldSchemas, 'input')
+        const returnResult = this.convertSchemas(returnSchemas, 'input')
 
         ref.requestBody = {
           required: true,
@@ -228,7 +228,7 @@ export class OpenAPIGenerator {
 
     const dynamicParams = dynamicPathParams?.map(v => v.parameterName)
 
-    const [schema, optional] = await this.convertSchemas(inputSchemas, 'input')
+    const [schema, optional] = this.convertSchemas(inputSchemas, 'input')
 
     if (isUnconstrainedSchema(schema) && !dynamicParams?.length) {
       return
@@ -374,14 +374,14 @@ export class OpenAPIGenerator {
     }
   }
 
-  private async successResponse(
+  private successResponse(
     doc: OpenAPIDocument,
     ref: OpenAPIOperationObject,
     def: AnyProcedureContract['~orpc'],
     meta: OpenAPIMeta | undefined,
     options: OpenAPIGeneratorGenerateOptions,
     path: string[],
-  ): Promise<void> {
+  ): void {
     const outputSchemas = def.outputSchemas
     const status = meta?.successStatus ?? DEFAULT_SUCCESS_STATUS
     const description = meta?.successDescription ?? DEFAULT_OPENAPI_SUCCESS_DESCRIPTION
@@ -392,8 +392,8 @@ export class OpenAPIGenerator {
 
       if (iteratorDetails) {
         const [yieldSchemas, returnSchemas] = iteratorDetails
-        const yieldResult = await this.convertSchemas(yieldSchemas, 'output')
-        const returnResult = await this.convertSchemas(returnSchemas, 'output')
+        const yieldResult = this.convertSchemas(yieldSchemas, 'output')
+        const returnResult = this.convertSchemas(returnSchemas, 'output')
 
         ref.responses ??= {}
         ref.responses[status] = {
@@ -405,7 +405,7 @@ export class OpenAPIGenerator {
       }
     }
 
-    const [schema] = await this.convertSchemas(outputSchemas, 'output')
+    const [schema] = this.convertSchemas(outputSchemas, 'output')
 
     if (isUnconstrainedSchema(schema) || outputStructure === 'compact') {
       ref.responses ??= {}
@@ -481,13 +481,13 @@ export class OpenAPIGenerator {
     }
   }
 
-  private async errorResponse(
+  private errorResponse(
     doc: OpenAPIDocument,
     ref: OpenAPIOperationObject,
     def: AnyProcedureContract['~orpc'],
     meta: OpenAPIMeta | undefined,
     options: OpenAPIGeneratorGenerateOptions,
-  ): Promise<void> {
+  ): void {
     const errorStatusMap: Record<string, number> = options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP
     const errorMap: ErrorMap = def.errorMap
 
@@ -504,7 +504,7 @@ export class OpenAPIGenerator {
 
       const status = errorStatusMap[code] ?? DEFAULT_ERROR_STATUS
       const defaultMessage = config.message
-      const [dataJsonSchema, dataOptional] = await this.convertSchema(config.data, 'output')
+      const [dataJsonSchema, dataOptional] = this.convertSchema(config.data, 'output')
 
       const definitions = errorDefinitionsByStatus.get(status)
       if (definitions) {
