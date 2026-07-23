@@ -190,11 +190,6 @@ queryClient.invalidateQueries({
   queryKey: orpc.planet.find.key({ input: { id: 123 } })
 })
 
-// Walk back the key path with `back` — this equals orpc.planet.key()
-queryClient.invalidateQueries({
-  queryKey: orpc.planet.find.key({ back: 1 })
-})
-
 // Update the planet find query with id 123
 queryClient.setQueryData(orpc.planet.find.queryKey({ input: { id: 123 } }), (old) => {
   return { ...old, id: 123, name: 'Earth' }
