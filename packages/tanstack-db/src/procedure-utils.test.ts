@@ -113,6 +113,23 @@ describe('procedureUtils', () => {
       expect(config.queryKey).toEqual(['__custom__'])
     })
 
+    it('supports custom queryFn', async () => {
+      const customQueryFn = vi.fn(async () => [{ id: 1 }])
+
+      utils.collectionOptions({
+        input: () => ({ search: '__search__' }),
+        queryFn: customQueryFn,
+        queryClient,
+        getKey,
+      } as any)
+
+      const config = queryCollectionOptionsSpy.mock.calls[0]![0] as any
+      expect(config.queryFn).toBe(customQueryFn)
+
+      await expect(config.queryFn({ signal })).resolves.toEqual([{ id: 1 }])
+      expect(client).not.toHaveBeenCalled()
+    })
+
     it('works without input & context', async () => {
       client.mockResolvedValueOnce([{ id: 1 }])
 

@@ -2,7 +2,7 @@ import type { Client, ClientContext } from '@orpc/client'
 import type { AnySchema } from '@orpc/contract'
 import type { MaybeOptionalOptions } from '@orpc/shared'
 import type { OperationKeyPrefixOptions, TanstackQueryOperationContext } from '@orpc/tanstack-query'
-import type { LoadSubsetOptions, OperationType } from '@tanstack/db'
+import type { OperationType } from '@tanstack/db'
 import type {
   CollectionOptionsIn,
   CollectionOptionsOut,
@@ -47,24 +47,21 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
   collectionOptions<UItem extends object = InferCollectionItem<TOutput>, UKey extends string | number = string | number>(
     options: & CollectionOptionsIn<TClientContext, TInput, TOutput, TError, UItem, UKey, never>
-      & { schema?: never, select?: (data: TOutput) => UItem[] }
-      & (TOutput extends UItem[] ? unknown : { select: unknown })
+      & { schema?: never }
+      & (TOutput extends UItem[] ? { select?: (data: TOutput) => UItem[] } : { select: (data: TOutput) => UItem[] })
   ): CollectionOptionsOut<UItem, UKey, never, UItem, TError> & { schema?: never }
 
   collectionOptions(optionsIn: any): any {
-    const { input, context, queryKey: customQueryKey, ...rest } = optionsIn
-
-    const queryKey = customQueryKey
-      ?? ((options: LoadSubsetOptions) => generateOperationKey(this.path, {
-        prefix: this.options.prefix,
-        type: 'query',
-        input: input?.(options),
-      }))
+    const { input, context, queryKey, queryFn, ...rest } = optionsIn
 
     return queryCollectionOptions({
       ...rest,
-      queryKey,
-      queryFn: (fnContext) => {
+      queryKey: queryKey ?? (options => generateOperationKey(this.path, {
+        prefix: this.options.prefix,
+        type: 'query',
+        input: input?.(options),
+      })),
+      queryFn: queryFn ?? ((fnContext) => {
         return this.call(input?.(fnContext.meta!.loadSubsetOptions!), {
           signal: fnContext.signal,
           context: {
@@ -75,7 +72,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
             ...context?.(fnContext),
           } satisfies TanstackQueryOperationContext,
         })
-      },
+      }),
     })
   }
 
