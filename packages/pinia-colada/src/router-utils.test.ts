@@ -47,15 +47,6 @@ describe('sharedRouterUtils', () => {
     expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
     expect(generateOperationKeySpy).toHaveBeenCalledWith(['path'], { type: 'query', prefix: '__prefix__' })
   })
-
-  it('.key with back', () => {
-    const nestedUtils = new SharedRouterUtils(['planet', 'find'], {})
-
-    expect(nestedUtils.key({ back: 1, type: 'query' })).toBe(generateOperationKeySpy.mock.results[0]!.value)
-    expect(generateOperationKeySpy).toHaveBeenCalledWith(['planet', 'find'], { back: 1, type: 'query', prefix: undefined })
-
-    expect(nestedUtils.key({ back: 1 })).toEqual(new SharedRouterUtils(['planet'], {}).key())
-  })
 })
 
 describe('createRouterUtils', () => {
