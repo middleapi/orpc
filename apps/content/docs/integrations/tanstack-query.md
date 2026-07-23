@@ -374,8 +374,10 @@ const orpc = createTanstackQueryUtils(client, {
 Types inferred from the contract are for reference only. The actual types depend on the client the utils are created from. For example, a `JsonifiedClient` created from [OpenAPI Link](/docs/openapi/link#typesafe-clients) returns jsonified outputs that may not match the contract schemas.
 :::
 
-::: details Accessing router utils inside interceptors?
-Contract interceptors cannot import your router utils directly, but you can pass them through mutation meta. [Register a global meta type](https://tanstack.com/query/latest/docs/framework/react/typescript#registering-global-meta) that carries the utils, then read it from `fnContext.meta` to invalidate queries, apply optimistic updates, and more.
+::: details Passing runtime values into contract meta?
+Contracts are defined separately from your app, so anything inside `tanstackQuery` cannot import runtime values such as your router utils. Instead, [register a global meta type](https://tanstack.com/query/latest/docs/framework/react/typescript#registering-global-meta) for `queryMeta` and `mutationMeta`, pass the values through the `meta` option, and read them from `fnContext.meta`.
+
+The example below passes router utils through `mutationMeta` to invalidate queries after a successful update. The same pattern works everywhere: query interceptors, optimistic updates, and more.
 
 ```ts
 import type { RouterContractClient } from '@orpc/contract'
