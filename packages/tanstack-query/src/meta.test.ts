@@ -1,11 +1,11 @@
 import { oc } from '@orpc/contract'
-import { ContractMetaPlugin, getTanstackQueryMeta, tanstackQueryMeta } from './meta'
+import { ContractMetaPlugin, getTanstackQueryMeta, tanstackQuery } from './meta'
 import { createRouterUtils } from './router-utils'
 
-describe('tanstackQueryMeta', () => {
+describe('tanstackQuery', () => {
   it('stores options readable via getTanstackQueryMeta', () => {
     const interceptor = vi.fn()
-    const contract = oc.meta(tanstackQueryMeta({
+    const contract = oc.meta(tanstackQuery({
       queryOptions: { staleTime: 1000 },
       queryInterceptors: [interceptor],
     }))
@@ -24,12 +24,12 @@ describe('tanstackQueryMeta', () => {
     const keyModifier = vi.fn()
 
     const contract = oc
-      .meta(tanstackQueryMeta({
+      .meta(tanstackQuery({
         queryKey: keyModifier,
         queryOptions: { staleTime: 1000, retry: 1 },
         queryInterceptors: [interceptor1],
       }))
-      .meta(tanstackQueryMeta({
+      .meta(tanstackQuery({
         queryOptions: { retry: 2 },
         mutationInterceptors: [interceptor2],
       }))
@@ -47,9 +47,9 @@ describe('tanstackQueryMeta', () => {
 
   it('propagates base meta to procedures via .router', () => {
     const router = oc
-      .meta(tanstackQueryMeta({ queryOptions: { staleTime: 1000 } }))
+      .meta(tanstackQuery({ queryOptions: { staleTime: 1000 } }))
       .router({
-        ping: oc.meta(tanstackQueryMeta({ queryOptions: { retry: 2 } })),
+        ping: oc.meta(tanstackQuery({ queryOptions: { retry: 2 } })),
         pong: oc,
       })
 
@@ -84,7 +84,7 @@ describe('contractMetaPlugin', () => {
 
     const plugin = new ContractMetaPlugin({
       planet: {
-        find: oc.meta(tanstackQueryMeta({
+        find: oc.meta(tanstackQuery({
           queryOptions: { staleTime: 1000, retry: 1 },
           queryInterceptors: [metaInterceptor],
         })),
@@ -121,7 +121,7 @@ describe('contractMetaPlugin', () => {
 
     const contract = {
       planet: {
-        find: oc.meta(tanstackQueryMeta({
+        find: oc.meta(tanstackQuery({
           queryOptions: { staleTime: 1000, retry: 1 },
           queryInterceptors: [metaInterceptor],
         })),

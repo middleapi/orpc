@@ -3,15 +3,15 @@ import type { PromiseWithError } from '@orpc/shared'
 import type { SkipToken } from '@tanstack/query-core'
 import type { OperationContext } from './types'
 import { oc, type } from '@orpc/contract'
-import { tanstackQueryMeta } from './meta'
+import { tanstackQuery } from './meta'
 
-describe('tanstackQueryMeta', () => {
+describe('tanstackQuery', () => {
   it('infers input, output and error types from the contract', () => {
     oc
       .errors({ BAD_GATEWAY: { data: type<string, RegExp>(vi.fn()) } })
       .input(type<string, boolean>(vi.fn()))
       .output(type<number, Date>(vi.fn()))
-      .meta(tanstackQueryMeta({
+      .meta(tanstackQuery({
         queryOptions: { staleTime: 1000 },
         queryInterceptors: [
           async ({ context, input, next }) => {
@@ -37,7 +37,7 @@ describe('tanstackQueryMeta', () => {
   })
 
   it('rejects invalid base options', () => {
-    oc.output(type<number, Date>(vi.fn())).meta(tanstackQueryMeta({
+    oc.output(type<number, Date>(vi.fn())).meta(tanstackQuery({
       queryOptions: {
         // @ts-expect-error - staleTime must be a number
         staleTime: 'invalid',

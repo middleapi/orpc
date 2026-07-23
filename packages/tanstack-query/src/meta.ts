@@ -26,7 +26,7 @@ export interface TanstackQueryMetaPlugin<
  *
  * @see {@link https://orpc.dev/docs/integrations/tanstack-query#contract-meta-plugin TanStack Query Contract Meta Plugin Docs}
  */
-export function tanstackQueryMeta<
+export function tanstackQuery<
   TInputSchema extends AnySchema,
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
@@ -58,7 +58,7 @@ export function getTanstackQueryMeta(
 }
 
 /**
- * Router utils plugin that applies base options defined via {@link tanstackQueryMeta}
+ * Router utils plugin that applies base options defined via {@link tanstackQuery}
  * on the given router contract. Meta options act as the base layer: options defined
  * on the utils override them, and utils interceptors run after meta interceptors.
  *
