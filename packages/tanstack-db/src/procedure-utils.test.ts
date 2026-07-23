@@ -190,7 +190,7 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenNthCalledWith(2, { id: 2, data: { name: '__modified2__' } }, expect.any(Object))
     })
 
-    it('calls client sequentially', async () => {
+    it('calls client concurrently', async () => {
       let resolveFirst!: (value: string) => void
       client.mockImplementationOnce(() => new Promise((resolve) => {
         resolveFirst = resolve
@@ -200,12 +200,10 @@ describe('procedureUtils', () => {
       const handler = utils.mutationHandler({ input: (mutation: any) => mutation.key } as any)
       const promise = handler(params)
 
-      await new Promise(resolve => setTimeout(resolve, 10))
-      expect(client).toHaveBeenCalledTimes(1)
+      expect(client).toHaveBeenCalledTimes(2)
 
       resolveFirst('__output1__')
       await expect(promise).resolves.toBeUndefined()
-      expect(client).toHaveBeenCalledTimes(2)
     })
 
     it('supports static refetch option', async () => {

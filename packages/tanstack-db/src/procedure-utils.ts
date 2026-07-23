@@ -99,9 +99,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     const mutationKey = generateOperationKey(this.path, { prefix: this.options.prefix, type: 'mutation' })
 
     return async (params) => {
-      const outputs: TOutput[] = []
-
-      for (const mutation of params.transaction.mutations) {
+      const outputs = await Promise.all(params.transaction.mutations.map((mutation) => {
         const context = {
           [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
             key: mutationKey,
@@ -110,8 +108,8 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
           ...optionsIn.context?.(mutation, params),
         } satisfies TanstackQueryOperationContext
 
-        outputs.push(await this.call(optionsIn.input?.(mutation, params), { context: context as any }))
-      }
+        return this.call(optionsIn.input?.(mutation, params), { context: context as any })
+      }))
 
       const refetch = value(optionsIn.refetch, outputs, params)
 
