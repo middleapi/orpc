@@ -355,6 +355,12 @@ export const contract = {
         queryOptions: {
           staleTime: 60 * 1000,
         },
+        queryInterceptors: [
+          async ({ input, next }) => {
+            // input, output, and errors are typed based on the contract
+            return await next()
+          },
+        ],
       })),
   },
 }
@@ -364,8 +370,8 @@ const orpc = createTanstackQueryUtils(client, {
 })
 ```
 
-::: info
-Pass the contract whose shape matches the client used to create the utils. With the [contract utils factory](/docs/advanced/scaling-large-projects#tanstack-query-integration), pass the root router contract.
+::: warning
+Types inferred from the contract are for reference only. The actual types depend on the client the utils are created from — for example, a `JsonifiedClient` created from [OpenAPI Link](/docs/openapi/link#typesafe-clients) returns jsonified outputs that may not match the contract schemas.
 :::
 
 ## Client Context
