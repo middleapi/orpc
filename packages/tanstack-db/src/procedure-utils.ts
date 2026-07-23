@@ -100,7 +100,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
         return this.call(optionsIn.input?.(mutation, params) as TInput, { context: context as any })
       }))
 
-      return (optionsIn as any).output?.(outputs, params)
+      return optionsIn.output?.(outputs, params) as any
     }
   }
 }
