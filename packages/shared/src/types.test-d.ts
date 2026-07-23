@@ -1,4 +1,4 @@
-import type { IntersectPick, PromiseWithError, Public } from './types'
+import type { IntersectPick, PromiseWithError, Public, SetOptional } from './types'
 
 interface Empty {}
 
@@ -6,6 +6,16 @@ it('IntersectPick', () => {
   expectTypeOf<IntersectPick<{ a: number }, { a: number, b: number }>>().toEqualTypeOf<{ a: number }>()
   expectTypeOf<IntersectPick<{ a: number, b: number }, { b: number }>>().toEqualTypeOf<{ b: number }>()
   expectTypeOf<IntersectPick<{ a: number }, { b: number }>>().toEqualTypeOf<Empty>()
+})
+
+it('SetOptional', () => {
+  type A = SetOptional<{ a: number, b: number }, 'a'>
+
+  expectTypeOf<A['a']>().toEqualTypeOf<number | undefined>()
+  expectTypeOf<A['b']>().toEqualTypeOf<number>()
+  expectTypeOf({ b: 1 }).toExtend<A>()
+  expectTypeOf({ a: 1, b: 1 }).toExtend<A>()
+  expectTypeOf({ a: 1 }).not.toExtend<A>()
 })
 
 it('PromiseWithError', () => {

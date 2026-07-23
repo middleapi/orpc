@@ -45,6 +45,5 @@ export type {
   IsEqual,
   PartialDeep,
   Promisable,
-  SetOptional,
   Writable,
 } from 'type-fest'

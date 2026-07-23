@@ -1,6 +1,11 @@
 export type IntersectPick<T, U> = Pick<T, keyof T & keyof U>
 
 /**
+ * Make the given keys optional while keeping the rest unchanged.
+ */
+export type SetOptional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>
+
+/**
  * Remove protected/private properties/methods
  */
 export type Public<T> = Pick<T, keyof T>
