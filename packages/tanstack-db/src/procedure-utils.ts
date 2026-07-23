@@ -73,7 +73,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
       ...rest,
       queryKey,
       queryFn: (fnContext) => {
-        return this.call(input?.(fnContext.meta?.loadSubsetOptions ?? {}), {
+        return this.call(input?.(fnContext.meta!.loadSubsetOptions!), {
           signal: fnContext.signal,
           context: {
             [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {
