@@ -1,5 +1,5 @@
 import type { Client } from '@orpc/client'
-import type { DeleteMutationFn, InsertMutationFn, UpdateMutationFn } from '@tanstack/db'
+import type { DeleteMutationFn, InsertMutationFn, LoadSubsetOptions, UpdateMutationFn } from '@tanstack/db'
 import type { QueryKey } from '@tanstack/query-core'
 import type { QueryCollectionUtils } from '@tanstack/query-db-collection'
 import type { ProcedureUtils } from './procedure-utils'
@@ -45,9 +45,8 @@ describe('ProcedureUtils', () => {
     it('handles `input` correctly', () => {
       listUtils.collectionOptions({ queryClient, getKey: item => item.id })
       listUtils.collectionOptions({
-        input: (context) => {
-          expectTypeOf(context.queryKey).toEqualTypeOf<QueryKey>()
-          expectTypeOf(context.signal).toEqualTypeOf<AbortSignal>()
+        input: (options) => {
+          expectTypeOf(options).toEqualTypeOf<LoadSubsetOptions>()
           return { search: '__search__' }
         },
         queryClient,

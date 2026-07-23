@@ -21,8 +21,8 @@ export type CollectionQueryFn<TOutput> = (context: QueryFunctionContext) => Prom
 
 export type CollectionOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TItem extends object, TKey extends string | number, TSchema extends AnySchema>
   = & (undefined extends TInput
-    ? { input?: (context: QueryFunctionContext) => TInput }
-    : { input: (context: QueryFunctionContext) => TInput })
+    ? { input?: (options: LoadSubsetOptions) => TInput }
+    : { input: (options: LoadSubsetOptions) => TInput })
   & (object extends TClientContext
     ? { context?: (context: QueryFunctionContext) => TClientContext }
     : { context: (context: QueryFunctionContext) => TClientContext })

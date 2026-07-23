@@ -59,7 +59,7 @@ it('shares query keys with @orpc/tanstack-query utils', async () => {
 
   await collection.preload()
 
-  expect(queryClient.getQueryData(tanstackQueryUtils.todo.list.queryKey())).toEqual([{ id: 1, name: 'first' }])
+  expect(queryClient.getQueryData(tanstackQueryUtils.todo.list.queryKey({ input: { search: '' } }))).toEqual([{ id: 1, name: 'first' }])
   expect(orpc.todo.list.key({ type: 'query' })).toEqual(tanstackQueryUtils.todo.list.key({ type: 'query' }))
 })
 

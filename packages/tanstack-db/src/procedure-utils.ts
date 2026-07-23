@@ -2,7 +2,7 @@ import type { Client, ClientContext } from '@orpc/client'
 import type { AnySchema } from '@orpc/contract'
 import type { MaybeOptionalOptions } from '@orpc/shared'
 import type { OperationKeyPrefixOptions, TanstackQueryOperationContext } from '@orpc/tanstack-query'
-import type { OperationType } from '@tanstack/db'
+import type { LoadSubsetOptions, OperationType } from '@tanstack/db'
 import type {
   CollectionOptionsIn,
   CollectionOptionsOut,
@@ -63,13 +63,17 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     const { input, context, queryKey: customQueryKey, ...rest } = optionsIn
 
     const queryKey = customQueryKey
-      ?? generateOperationKey(this.path, { prefix: this.options.prefix, type: 'query' })
+      ?? ((options: LoadSubsetOptions) => generateOperationKey(this.path, {
+        prefix: this.options.prefix,
+        type: 'query',
+        input: input?.(options),
+      }))
 
     return queryCollectionOptions({
       ...rest,
       queryKey,
       queryFn: (fnContext) => {
-        return this.call(input?.(fnContext), {
+        return this.call(input?.(fnContext.meta?.loadSubsetOptions ?? {}), {
           signal: fnContext.signal,
           context: {
             [TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL]: {

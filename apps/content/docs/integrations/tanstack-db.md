@@ -66,7 +66,7 @@ Use `.collectionOptions` to build [Query Collection](https://tanstack.com/db/lat
 import { createCollection } from '@tanstack/db'
 
 const todosCollection = createCollection(orpc.todo.list.collectionOptions({
-  input: () => ({ search: 'orpc' }), // Resolve procedure input on each fetch
+  input: () => ({ search: 'orpc' }), // Resolve procedure input for each subset
   context: () => ({ cache: true }), // Provide client context if needed
   queryClient,
   getKey: todo => todo.id,
@@ -96,21 +96,16 @@ const { data: todos } = useLiveQuery(q =>
 The query key is generated the same way as in the [Tanstack Query Integration](/docs/integrations/tanstack-query), so both integrations can share a `queryClient` and actions like invalidation work across them.
 :::
 
-The `input` and `context` options are functions that receive the query function context, so they are resolved on each fetch. This pairs naturally with a dynamic `queryKey`, such as with [on-demand sync mode](https://tanstack.com/db/latest/docs/collections/query-collection#queryfn-and-predicate-push-down):
+The `input` option resolves the procedure input from [load subset options](https://tanstack.com/db/latest/docs/collections/query-collection#queryfn-and-predicate-push-down), and the resolved input becomes part of the generated query key. With [on-demand sync mode](https://tanstack.com/db/latest/docs/collections/query-collection#queryfn-and-predicate-push-down), each subset is fetched and cached with its own input:
 
 ```ts
 const todosCollection = createCollection(orpc.todo.list.collectionOptions({
   syncMode: 'on-demand',
-  queryKey: options => ['todos', { limit: options.limit }],
-  input: context => ({ limit: (context.queryKey[1] as any).limit }),
+  input: options => ({ limit: options.limit }),
   queryClient,
   getKey: todo => todo.id,
 }))
 ```
-
-::: warning
-The generated query key does not include the input. If the input varies, provide a custom `queryKey` that reflects whatever it depends on, so each variation is cached separately.
-:::
 
 ## Mutation Handler Utility
 
