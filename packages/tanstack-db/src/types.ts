@@ -1,6 +1,6 @@
 import type { ClientContext } from '@orpc/client'
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from '@orpc/contract'
-import type { Value } from '@orpc/shared'
+import type { SetOptional, Value } from '@orpc/shared'
 import type { Collection, CollectionConfig, LoadSubsetOptions, OperationType, PendingMutation, TransactionWithMutations } from '@tanstack/db'
 import type { QueryFunctionContext, QueryKey } from '@tanstack/query-core'
 import type { QueryCollectionConfig, QueryCollectionUtils } from '@tanstack/query-db-collection'
@@ -26,8 +26,7 @@ export type CollectionOptionsIn<TClientContext extends ClientContext, TInput, TO
   & (object extends TClientContext
     ? { context?: (context: QueryFunctionContext) => TClientContext }
     : { context: (context: QueryFunctionContext) => TClientContext })
-  & { queryKey?: Value<QueryKey, [options: LoadSubsetOptions]> }
-  & Omit<QueryCollectionConfig<TItem, CollectionQueryFn<TOutput>, TError, QueryKey, TKey, TSchema, TOutput>, 'queryKey' | 'queryFn' | 'select' | 'schema'>
+  & SetOptional<Omit<QueryCollectionConfig<TItem, CollectionQueryFn<TOutput>, TError, QueryKey, TKey, TSchema, TOutput>, 'queryFn' | 'select' | 'schema'>, 'queryKey'>
 
 export type CollectionOptionsOut<TItem extends object, TKey extends string | number, TSchema extends AnySchema, TInsertInput extends object, TError>
   = & CollectionConfig<TItem, TKey, TSchema, QueryCollectionUtils<TItem, TKey, TInsertInput, TError>>
