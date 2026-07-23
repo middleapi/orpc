@@ -39,25 +39,17 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
    */
   collectionOptions<USchema extends AnySchema, UKey extends string | number = string | number>(
     options: & CollectionOptionsIn<TClientContext, TInput, TOutput, TError, InferCollectionSchemaOutput<USchema>, UKey, USchema>
-      & { schema: USchema, select: (data: TOutput) => InferCollectionSchemaInput<USchema>[] }
+      & { schema: USchema }
+      & (TOutput extends InferCollectionSchemaOutput<USchema>[]
+        ? { select?: (data: TOutput) => InferCollectionSchemaInput<USchema>[] }
+        : { select: (data: TOutput) => InferCollectionSchemaInput<USchema>[] })
   ): CollectionOptionsOut<InferCollectionSchemaOutput<USchema>, UKey, USchema, InferCollectionSchemaInput<USchema>, TError> & { schema: USchema }
 
-  collectionOptions<UItem extends object, UKey extends string | number = string | number>(
+  collectionOptions<UItem extends object = InferCollectionItem<TOutput>, UKey extends string | number = string | number>(
     options: & CollectionOptionsIn<TClientContext, TInput, TOutput, TError, UItem, UKey, never>
-      & { schema?: never, select: (data: TOutput) => UItem[] }
+      & { schema?: never, select?: (data: TOutput) => UItem[] }
+      & (TOutput extends UItem[] ? unknown : { select: unknown })
   ): CollectionOptionsOut<UItem, UKey, never, UItem, TError> & { schema?: never }
-
-  collectionOptions<USchema extends AnySchema, UKey extends string | number = string | number>(
-    options: & CollectionOptionsIn<TClientContext, TInput, TOutput, TError, InferCollectionSchemaOutput<USchema>, UKey, USchema>
-      & { schema: USchema, select?: never }
-      & (TOutput extends InferCollectionSchemaOutput<USchema>[] ? unknown : { select: (data: TOutput) => InferCollectionSchemaInput<USchema>[] })
-  ): CollectionOptionsOut<InferCollectionSchemaOutput<USchema>, UKey, USchema, InferCollectionSchemaInput<USchema>, TError> & { schema: USchema }
-
-  collectionOptions<UKey extends string | number = string | number>(
-    options: & CollectionOptionsIn<TClientContext, TInput, TOutput, TError, InferCollectionItem<TOutput>, UKey, never>
-      & { schema?: never, select?: never }
-      & (TOutput extends object[] ? unknown : { select: (data: TOutput) => object[] })
-  ): CollectionOptionsOut<InferCollectionItem<TOutput>, UKey, never, InferCollectionItem<TOutput>, TError> & { schema?: never }
 
   collectionOptions(optionsIn: any): any {
     const { input, context, queryKey: customQueryKey, ...rest } = optionsIn
