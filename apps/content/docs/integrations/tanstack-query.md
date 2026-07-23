@@ -375,9 +375,7 @@ Types inferred from the contract are for reference only. The actual types depend
 :::
 
 ::: details Passing runtime values into contract meta?
-Contracts are defined separately from your app, so anything inside `tanstackQuery` cannot import runtime values such as your router utils. Instead, [register a global meta type](https://tanstack.com/query/latest/docs/framework/react/typescript#registering-global-meta) for `queryMeta` and `mutationMeta`, pass the values through the `meta` option, and read them from `fnContext.meta`.
-
-The example below passes router utils through `mutationMeta` to invalidate queries after a successful update. The same pattern works everywhere: query interceptors, optimistic updates, and more.
+Contracts are defined separately from your app, so anything inside `tanstackQuery` cannot import runtime values such as your router utils. Instead, [register a global meta type](https://tanstack.com/query/latest/docs/framework/react/typescript#registering-global-meta) and pass the values through the `meta` option. The example below reads router utils from `fnContext.meta` to optimistically update a query:
 
 ```ts
 import type { RouterContractClient } from '@orpc/contract'
@@ -398,17 +396,30 @@ export const contract = {
       .input(z.object({ id: z.number(), name: z.string() }))
       .meta(tanstackQuery({
         mutationInterceptors: [
-          async ({ next, fnContext }) => {
-            const output = await next()
+          async ({ input, next, fnContext }) => {
+            const utils = fnContext.meta?.utils
 
-            // invalidate planet queries after a successful update
-            if (fnContext.meta?.utils) {
-              await fnContext.client.invalidateQueries({
-                queryKey: fnContext.meta.utils.planet.key(),
-              })
+            if (!utils) {
+              return next()
             }
 
-            return output
+            const queryKey = utils.planet.find.queryKey({ input: { id: input.id } })
+            const previous = fnContext.client.getQueryData(queryKey)
+
+            // optimistically update before the request
+            fnContext.client.setQueryData(queryKey, input)
+
+            try {
+              return await next()
+            }
+            catch (error) {
+              // roll back on error
+              fnContext.client.setQueryData(queryKey, previous)
+              throw error
+            }
+            finally {
+              fnContext.client.invalidateQueries({ queryKey })
+            }
           },
         ],
       })),
