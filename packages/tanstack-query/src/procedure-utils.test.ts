@@ -1134,6 +1134,7 @@ describe('isProcedureUtilsOptions', () => {
     expect(isProcedureUtilsOptions('invalid')).toBe(false)
     expect(isProcedureUtilsOptions({ prefix: 123 })).toBe(false)
     expect(isProcedureUtilsOptions({ queryInterceptors: { invalid: true } })).toBe(false)
+    expect(isProcedureUtilsOptions({ queryInterceptors: [{ invalid: true }] })).toBe(false)
     expect(isProcedureUtilsOptions({ queryOptions: 'invalid' })).toBe(false)
   })
 })

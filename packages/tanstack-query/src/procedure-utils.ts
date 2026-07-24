@@ -209,12 +209,12 @@ export function isProcedureUtilsOptions(value: unknown): value is ProcedureUtils
       }
     }
     else if (PROCEDURE_UTILS_INTERCEPTOR_KEYS.includes(key)) {
-      if (!Array.isArray(value[key])) {
+      if (!Array.isArray(value[key]) || value[key].some(i => typeof i !== 'function')) {
         return false
       }
     }
     else if (PROCEDURE_UTILS_MODIFIER_KEYS.includes(key)) {
-      if (typeof value[key] !== 'function' && !isTypescriptObject(value[key])) {
+      if (!isTypescriptObject(value[key])) {
         return false
       }
     }
