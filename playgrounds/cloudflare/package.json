@@ -11,7 +11,7 @@
     "jaeger": "docker run -p 16686:16686 -p 4318:4318 jaegertracing/all-in-one:latest"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.42.4",
+    "@cloudflare/vite-plugin": "^1.46.0",
     "@microlabs/otel-cf-workers": "1.0.0-rc.52",
     "@opentelemetry/api": "^1.9.1",
     "@orpc/client": "beta",
@@ -24,16 +24,16 @@
     "@orpc/server": "beta",
     "@orpc/tanstack-query": "beta",
     "@orpc/zod": "beta",
-    "@tanstack/react-query": "^5.101.2",
+    "@tanstack/react-query": "^5.101.4",
     "@types/node": "^26.0.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.2",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.0.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "ts-pattern": "^5.9.0",
     "typescript": "^6.0.3",
     "vite": "^8.1.0",
-    "wrangler": "^4.106.0"
+    "wrangler": "^4.113.0"
   }
 }
