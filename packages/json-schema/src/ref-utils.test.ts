@@ -1,5 +1,66 @@
 import type { JsonSchema } from './types'
-import { decodeJsonPointerSegment, encodeJsonPointerSegment, hoistRecursiveRefToDef, mapJsonSchemaRefs, resolveJsonSchemaRootLocalRef } from './ref-utils'
+import { decodeJsonPointerSegment, encodeJsonPointerSegment, hoistRecursiveRefToDef, mapJsonSchemaRefs, resolveJsonSchemaRootLocalRef, visitJsonSchemaRefs } from './ref-utils'
+
+describe('visitJsonSchemaRefs', () => {
+  it('visits refs under the same keywords mapJsonSchemaRefs rewrites, and skips non-schema keywords', () => {
+    const schema: JsonSchema = {
+      type: 'object',
+      properties: { child: { $ref: '#/$defs/A' } },
+      patternProperties: { '^x-': { $ref: '#/$defs/B' } },
+      propertyNames: { $ref: '#/$defs/C' },
+      dependentSchemas: { other: { $ref: '#/$defs/D' } },
+      contains: { $ref: '#/$defs/E' },
+      prefixItems: [{ $ref: '#/$defs/F' }],
+      not: { $ref: '#/$defs/G' },
+      if: { $ref: '#/$defs/H' },
+      then: { $ref: '#/$defs/I' },
+      else: { $ref: '#/$defs/J' },
+      items: { $ref: '#/$defs/K' },
+      additionalProperties: { $ref: '#/$defs/L' },
+      anyOf: [{ $ref: '#/$defs/M' }],
+      $defs: { Nested: { $ref: '#/$defs/N' } },
+      examples: [{ $ref: '#/$defs/Ignored' }],
+    }
+
+    const mapped: string[] = []
+    mapJsonSchemaRefs(schema, (ref) => {
+      mapped.push(ref)
+      return ref
+    })
+
+    const visited: string[] = []
+    visitJsonSchemaRefs(schema, ref => visited.push(ref))
+
+    expect(visited.sort()).toEqual(mapped.sort())
+    expect(visited).not.toContain('#/$defs/Ignored')
+    expect(visited.length).toBe(14)
+  })
+
+  it('visits shared and cyclic object instances once', () => {
+    const shared: JsonSchema = { $ref: '#/$defs/Shared' }
+    const cyclic: Record<string, unknown> = { type: 'object' }
+    cyclic.items = cyclic
+
+    const visited: string[] = []
+    visitJsonSchemaRefs({
+      type: 'object',
+      properties: {
+        a: shared,
+        b: shared,
+        c: cyclic as JsonSchema,
+      },
+    }, ref => visited.push(ref))
+
+    expect(visited).toEqual(['#/$defs/Shared'])
+  })
+
+  it('ignores non-object schemas', () => {
+    const visited: string[] = []
+    visitJsonSchemaRefs(true, ref => visited.push(ref))
+    visitJsonSchemaRefs(false, ref => visited.push(ref))
+    expect(visited).toEqual([])
+  })
+})
 
 describe('json pointer utils', () => {
   it('encodes and decodes JSON pointer segments', () => {

@@ -25,6 +25,42 @@ export function decodeJsonPointerSegment(segment: string): string {
   return segment.replaceAll('~1', '/').replaceAll('~0', '~')
 }
 
+/**
+ * Visits every `$ref` in a schema, traversing the same keywords as {@link mapJsonSchemaRefs}.
+ * Shared or cyclic object instances are visited once.
+ */
+export function visitJsonSchemaRefs(
+  value: JsonSchema,
+  visit: (ref: string) => void,
+  schemaLevel = true,
+  seen = new Set<object>(),
+): void {
+  if (!value || typeof value !== 'object' || seen.has(value)) {
+    return
+  }
+
+  seen.add(value)
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      visitJsonSchemaRefs(item, visit, schemaLevel, seen)
+    }
+    return
+  }
+
+  for (const [key, val] of Object.entries(value)) {
+    if (key === '$ref' && typeof val === 'string') {
+      visit(val)
+    }
+    else if (!schemaLevel) {
+      visitJsonSchemaRefs(val as JsonSchema, visit, true, seen)
+    }
+    else if (JSON_SCHEMA_LOGIC_KEYWORDS.has(key) || JSON_SCHEMA_RECORD_KEYWORDS.has(key)) {
+      visitJsonSchemaRefs(val as JsonSchema, visit, !JSON_SCHEMA_RECORD_KEYWORDS.has(key), seen)
+    }
+  }
+}
+
 export function mapJsonSchemaRefs(
   value: JsonSchema,
   map: (ref: string, path: Array<string | number>) => string,
