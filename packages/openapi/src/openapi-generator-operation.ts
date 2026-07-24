@@ -119,7 +119,7 @@ export function buildRequest(
     ? extractCompactRequestParts(schema, optional, method, dynamicParams)
     : extractDetailedRequestParts(schema)
 
-  renderPathParameters(ctx, operation, dynamicParams, parts.paramsEntries)
+  renderPathParameters(ctx, operation, dynamicParams, parts.paramsEntries, meta?.paramsStyles)
   renderQueryParameters(ctx, operation, parts.queryEntries, meta?.queryStyles)
   renderHeaderParameters(ctx, operation, parts.headersEntries)
 
@@ -194,6 +194,7 @@ function renderPathParameters(
   operation: OpenAPIOperationObject,
   dynamicParams: string[] | undefined,
   paramsEntries: JsonObjectSchemaEntry[] | undefined,
+  paramsStyles: OpenAPIMeta['paramsStyles'],
 ): void {
   if (!dynamicParams?.length) {
     return
@@ -225,13 +226,24 @@ function renderPathParameters(
       )
     }
 
-    operation.parameters ??= []
-    operation.parameters.push({
+    const style = paramsStyles?.[name]
+    const parameter: Exclude<OpenAPIOperationObject['parameters'], undefined>[number] = {
       in: 'path',
       required: true,
       name,
       schema: ctx.registry.toOpenAPISchema(entry[1]),
-    })
+    }
+
+    if (style === 'comma-delimited-array' || style === 'comma-delimited-object') {
+      parameter.style = 'simple'
+      parameter.explode = false
+    }
+    else {
+      const _expect: 'primitive' | undefined = style
+    }
+
+    operation.parameters ??= []
+    operation.parameters.push(parameter)
   }
 }
 

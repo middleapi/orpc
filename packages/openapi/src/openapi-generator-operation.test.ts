@@ -148,6 +148,37 @@ describe('openAPIGenerator operation builders', () => {
       })
     })
 
+    it('applies params styles to path parameters', () => {
+      const { ctx, operation } = createContext()
+      const path = '/planets/{id}/{tags}/{filters}' as const
+
+      buildRequest(ctx, operation, testDef({
+        inputs: [testSchema({
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            tags: { type: 'array' },
+            filters: { type: 'object' },
+          },
+          required: ['id', 'tags', 'filters'],
+        })],
+      }), {
+        method: 'GET',
+        path,
+        paramsStyles: {
+          id: 'primitive',
+          tags: 'comma-delimited-array',
+          filters: 'comma-delimited-object',
+        },
+      }, getDynamicPathParams(path))
+
+      expect(operation.parameters).toEqual([
+        { in: 'path', required: true, name: 'id', schema: { type: 'string' } },
+        { in: 'path', required: true, name: 'tags', style: 'simple', explode: false, schema: { type: 'array' } },
+        { in: 'path', required: true, name: 'filters', style: 'simple', explode: false, schema: { type: 'object' } },
+      ])
+    })
+
     it('marks the request body optional when every non-param field is optional', () => {
       const { ctx, operation } = createContext()
       const path = '/planets/{id}' as const

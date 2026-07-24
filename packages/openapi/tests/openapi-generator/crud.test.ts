@@ -52,6 +52,16 @@ describe('openAPIGenerator e2e: crud api', () => {
           description: z.string().optional(),
         }))
         .output(Planet),
+      compare: oc
+        .meta(openapi({
+          method: 'GET',
+          prefix: '/api/v1',
+          path: '/planets/{ids}/compare',
+          tags: ['planets'],
+          paramsStyles: { ids: 'comma-delimited-array' },
+        }))
+        .input(z.object({ ids: z.array(z.string()) }))
+        .output(z.array(Planet)),
     },
   }
 
@@ -70,7 +80,25 @@ describe('openAPIGenerator e2e: crud api', () => {
         get: expect.objectContaining({ operationId: 'planet.find' }),
         put: expect.objectContaining({ operationId: 'planet.update' }),
       },
+      '/api/v1/planets/{ids}/compare': {
+        get: expect.objectContaining({ operationId: 'planet.compare' }),
+      },
     })
+  })
+
+  it('documents comma-delimited path params with the simple style', async () => {
+    const doc = await generator.generate(router)
+
+    expect(doc.paths?.['/api/v1/planets/{ids}/compare']?.get?.parameters).toEqual([
+      {
+        name: 'ids',
+        in: 'path',
+        required: true,
+        style: 'simple',
+        explode: false,
+        schema: { type: 'array', items: { type: 'string' } },
+      },
+    ])
   })
 
   it('maps list inputs to query parameters with the configured styles', async () => {
