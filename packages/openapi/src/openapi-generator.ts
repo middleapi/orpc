@@ -146,15 +146,13 @@ export class OpenAPIGenerator {
         if (!(e instanceof OpenAPIGeneratorError)) {
           throw e
         }
-        errors.push(
-          `[OpenAPIGenerator] Error occurred while generating OpenAPI for procedure at path: ${path.join('.')}\n${e.message}`,
-        )
+        errors.push(e.message)
       }
     })
 
     if (errors.length) {
       throw new OpenAPIGeneratorError(
-        `Some error occurred during OpenAPI generation:\n\n${errors.join('\n\n')}`,
+        `[OpenAPIGenerator] Failed to generate the OpenAPI document (${errors.length} error${errors.length === 1 ? '' : 's'}):\n\n${errors.join('\n\n')}`,
       )
     }
 

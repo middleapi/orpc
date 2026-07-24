@@ -192,9 +192,9 @@ describe('openAPIGenerator e2e: crud api', () => {
       e => e,
     )
 
-    expect(error.message).toContain('procedure at path: find')
-    expect(error.message).toContain('marked as optional')
-    expect(error.message).toContain('procedure at path: list')
-    expect(error.message).toContain('uses method "GET" but its input schema is not an object')
+    expect(error.message).toContain('Procedure "find"')
+    expect(error.message).toContain('is optional in the input schema')
+    expect(error.message).toContain('Procedure "list"')
+    expect(error.message).toContain('method is GET but the input schema is not an object')
   })
 })

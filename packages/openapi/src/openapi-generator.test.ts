@@ -402,8 +402,18 @@ describe('openAPIGenerator basic & options', () => {
     )
 
     expect(error).toBeInstanceOf(OpenAPIGeneratorError)
-    expect(error.message).toContain('procedure at path: first')
-    expect(error.message).toContain('procedure at path: nested.second')
+    expect(error.message).toContain('Failed to generate the OpenAPI document (2 errors)')
+    expect(error.message).toContain('Procedure "first"')
+    expect(error.message).toContain('Procedure "nested.second"')
+
+    const single = await generator.generate({
+      only: oc.meta(openapi({ method: 'GET' })).input(z.string()),
+    }).then(
+      () => { throw new Error('expected generate to reject') },
+      e => e,
+    )
+
+    expect(single.message).toContain('Failed to generate the OpenAPI document (1 error)')
   })
 
   it('rethrows non-generator errors immediately without wrapping', async () => {

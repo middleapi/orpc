@@ -351,21 +351,21 @@ describe('openAPIGenerator operation builders', () => {
         inputs: [testSchema({ type: 'string' })],
         meta: { method: 'GET' as const },
         path: undefined,
-        message: 'uses method "GET" but its input schema is not an object',
+        message: 'method is GET but the input schema is not an object',
       },
       {
         name: 'a detailed input schema is not an object',
         inputs: [testSchema({ type: 'string' })],
         meta: { inputStructure: 'detailed' as const },
         path: undefined,
-        message: 'has inputStructure "detailed" but its input schema is not an object',
+        message: 'inputStructure is "detailed" but the input schema is not an object',
       },
       {
         name: 'dynamic params exist but the input schema is not an object',
         inputs: [testSchema({ type: 'string' })],
         meta: { path: '/planets/{id}' as const },
         path: '/planets/{id}' as const,
-        message: 'has dynamic path params (id) but its input schema is not an object',
+        message: 'declares path params ({id}) but there is no object schema to source them from',
       },
       {
         name: 'a dynamic param is missing from the input schema',
@@ -378,7 +378,7 @@ describe('openAPIGenerator operation builders', () => {
         })],
         meta: { inputStructure: 'detailed' as const, path: '/planets/{id}' as const },
         path: '/planets/{id}' as const,
-        message: 'is missing dynamic param "id" in its input schema',
+        message: 'dynamic param "{id}" is missing from the input schema',
       },
       {
         name: 'a dynamic param is missing and the input schema has no keys at all',
@@ -392,7 +392,7 @@ describe('openAPIGenerator operation builders', () => {
         inputs: [testSchema({ type: 'object', properties: { id: { type: 'string' } } })],
         meta: { path: '/planets/{id}' as const },
         path: '/planets/{id}' as const,
-        message: 'has dynamic param "id" marked as optional in its input schema',
+        message: 'dynamic param "id" is optional in the input schema',
       },
     ])('throws when $name', ({ inputs, meta, path, message }) => {
       const { ctx, operation } = createContext()
@@ -580,22 +580,22 @@ describe('openAPIGenerator operation builders', () => {
       {
         name: 'a detailed output member is not an object',
         output: { anyOf: [{ type: 'object' }, { type: 'string' }] },
-        message: 'has outputStructure "detailed" but its output schema is not an object',
+        message: 'outputStructure is "detailed" but the output schema (or one of its union members) is not an object',
       },
       {
         name: 'a detailed status is not a schema object',
         output: { type: 'object', properties: { status: true }, required: ['status'] },
-        message: 'has an invalid "status" field',
+        message: 'invalid "status" field in the detailed output schema',
       },
       {
         name: 'a detailed status is not a const integer',
         output: { type: 'object', properties: { status: { type: 'number' } }, required: ['status'] },
-        message: 'has an invalid "status" field',
+        message: 'invalid "status" field in the detailed output schema',
       },
       {
         name: 'a detailed status is not a success status',
         output: { type: 'object', properties: { status: { const: 400 } }, required: ['status'] },
-        message: 'has an invalid "status" field',
+        message: 'invalid "status" field in the detailed output schema',
       },
     ])('throws when $name', ({ output, message }) => {
       const { ctx, operation } = createContext()

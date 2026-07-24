@@ -143,9 +143,9 @@ function extractCompactRequestParts(
 
   if (!entries && method === 'GET') {
     throw new OpenAPIGeneratorError(
-      `Procedure at path "${path.join('.')}" uses method "GET" but its input schema is not an object.\n`
-      + `  GET procedures map all input fields to query parameters, so the schema must be an object.\n`
-      + `  Expected: Record<string, unknown>`,
+      `Procedure "${path.join('.')}": method is GET but the input schema is not an object.\n`
+      + `  GET sends every input field as a query parameter, so the input must be an object schema.\n`
+      + `  Fix: make the input an object, or use a method with a request body (POST, PUT, PATCH, DELETE).`,
     )
   }
 
@@ -175,8 +175,8 @@ function extractDetailedRequestParts(schema: JsonSchema, path: string[]): Reques
 
   if (!entries) {
     throw new OpenAPIGeneratorError(
-      `Procedure at path "${path.join('.')}" has inputStructure "detailed" but its input schema is not an object.\n`
-      + `  Expected shape: { params?: Record<string, unknown>, query?: Record<string, unknown>, headers?: Record<string, unknown>, body?: unknown }`,
+      `Procedure "${path.join('.')}": inputStructure is "detailed" but the input schema is not an object.\n`
+      + `  Expected an object shaped like: { params?: object, query?: object, headers?: object, body?: unknown }`,
     )
   }
 
@@ -204,8 +204,9 @@ function renderPathParameters(
 
   if (!paramsEntries) {
     throw new OpenAPIGeneratorError(
-      `Procedure at path "${path.join('.')}" has dynamic path params (${dynamicParams.join(', ')}) but its input schema is not an object.\n`
-      + `  Each dynamic param must appear as a required key in the schema.`,
+      `Procedure "${path.join('.')}": the route declares path params (${dynamicParams.map(p => `{${p}}`).join(', ')}) but there is no object schema to source them from.\n`
+      + `  compact mode:  the input schema must be an object containing each param.\n`
+      + `  detailed mode: the input's "params" section must be an object containing each param.`,
     )
   }
 
@@ -214,7 +215,7 @@ function renderPathParameters(
 
     if (!entry) {
       throw new OpenAPIGeneratorError(
-        `Procedure at path "${path.join('.')}" is missing dynamic param "${name}" in its input schema.\n`
+        `Procedure "${path.join('.')}": dynamic param "{${name}}" is missing from the input schema.\n`
         + `  Route params: ${dynamicParams.map(p => `{${p}}`).join(', ')}\n`
         + `  Schema keys:  ${paramsEntries.map(([n]) => n).join(', ') || '(none)'}`,
       )
@@ -222,7 +223,8 @@ function renderPathParameters(
 
     if (entry[2]) {
       throw new OpenAPIGeneratorError(
-        `Procedure at path "${path.join('.')}" has dynamic param "${name}" marked as optional in its input schema, but path params must always be required in OpenAPI.`,
+        `Procedure "${path.join('.')}": dynamic param "${name}" is optional in the input schema.\n`
+        + `  OpenAPI requires path params to be required. Make "${name}" required.`,
       )
     }
 
@@ -387,8 +389,8 @@ function extractDetailedResponseParts(
 
     if (!entries) {
       throw new OpenAPIGeneratorError(
-        `Procedure at path "${path.join('.')}" has outputStructure "detailed" but its output schema is not an object.\n`
-        + `  Expected shape: { status?: number (less than 400), headers?: Record<string, string | string[]>, body?: unknown }`,
+        `Procedure "${path.join('.')}": outputStructure is "detailed" but the output schema (or one of its union members) is not an object.\n`
+        + `  Expected each member shaped like: { status?: number (< 400), headers?: object, body?: unknown }`,
       )
     }
 
@@ -396,8 +398,8 @@ function extractDetailedResponseParts(
 
     if (statusSchema !== undefined && (typeof statusSchema !== 'object' || !Number.isInteger(statusSchema.const) || statusSchema.const >= 400)) {
       throw new OpenAPIGeneratorError(
-        `Procedure at path "${path.join('.')}" has an invalid "status" field in its outputStructure "detailed" schema.\n`
-        + `  Expected: a const integer less than 400\n`
+        `Procedure "${path.join('.')}": invalid "status" field in the detailed output schema.\n`
+        + `  Expected: a literal (const) integer below 400\n`
         + `  Received: ${stringifyJSON(statusSchema)}`,
       )
     }
