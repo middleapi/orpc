@@ -59,6 +59,24 @@ describe('tanstackQuery', () => {
     expect(merged({ enabled: true })).toEqual({ enabled: true, staleTime: 1000, retry: 2 })
   })
 
+  it('composes mixed object and function modifiers', () => {
+    const objectFirst = oc
+      .meta(tanstackQuery({ queryOptions: { staleTime: 1000, retry: 1 } }))
+      .meta(tanstackQuery({ queryOptions: options => ({ ...options, retry: 2 }) }))
+
+    const objectFirstMerged: any = getTanstackQueryMeta(objectFirst)?.queryOptions
+
+    expect(objectFirstMerged({ enabled: true })).toEqual({ enabled: true, staleTime: 1000, retry: 2 })
+
+    const functionFirst = oc
+      .meta(tanstackQuery({ queryOptions: options => ({ ...options, staleTime: 1000 }) }))
+      .meta(tanstackQuery({ queryOptions: { retry: 2 } }))
+
+    const functionFirstMerged: any = getTanstackQueryMeta(functionFirst)?.queryOptions
+
+    expect(functionFirstMerged({ enabled: true })).toEqual({ enabled: true, staleTime: 1000, retry: 2 })
+  })
+
   it('propagates base meta to procedures via .router', () => {
     const router = oc
       .meta(tanstackQuery({ queryOptions: { staleTime: 1000 } }))

@@ -180,22 +180,21 @@ function mergeProcedureUtilsModifier<T extends object>(
     return override ?? base
   }
 
-  if (typeof base === 'function' && typeof override === 'function') {
-    return options => override(base(options))
+  if (typeof base !== 'function' && typeof override !== 'function') {
+    return { ...base, ...override } as Partial<T>
   }
 
-  if (typeof base === 'function' || typeof override === 'function') {
-    return override
-  }
+  const applyBase = typeof base === 'function' ? base : (options: T) => ({ ...base, ...options })
+  const applyOverride = typeof override === 'function' ? override : (options: T) => ({ ...override, ...options })
 
-  return { ...base, ...override } as Partial<T>
+  return options => applyOverride(applyBase(options))
 }
 
 /**
  * Merge two procedure utils options where `override` takes priority:
  * interceptors are concatenated (base ones run first), modifiers are
- * spread-merged when both are plain objects, composed (base applied first)
- * when both are functions, and replaced otherwise.
+ * spread-merged when both are plain objects and composed (base applied first)
+ * otherwise, with plain objects applied as regular spread merges.
  */
 export function mergeProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError>(
   base: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>,
