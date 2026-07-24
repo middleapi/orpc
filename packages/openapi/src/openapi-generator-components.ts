@@ -67,7 +67,7 @@ export class OpenAPIComponentRegistry {
         continue
       }
 
-      const normalized = normalizeHoistedDefSchema(defSchema)
+      const normalized = ensureJsonSchemaObject(defSchema)
 
       if (value(this.shouldHoistDef, defName, normalized) !== false) {
         hoistedDefs[defName] = normalized
@@ -137,12 +137,6 @@ export class OpenAPIComponentRegistry {
   toOpenAPISchema(schema: JsonSchema): OpenAPIV3_1.SchemaObject {
     return ensureJsonSchemaObject(this.hoistDefs(schema)) as OpenAPIV3_1.SchemaObject
   }
-}
-
-function normalizeHoistedDefSchema(schema: JsonSchema): Exclude<JsonSchema, boolean> {
-  return typeof schema === 'boolean'
-    ? (schema ? {} : { not: {} })
-    : schema
 }
 
 function visitLocalDefRefs(schema: JsonSchema, onRef: (defName: string) => void): void {

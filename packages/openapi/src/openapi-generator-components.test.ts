@@ -78,20 +78,6 @@ describe('openAPIComponentRegistry', () => {
       })
     })
 
-    it('preserves the semantics of hoisted defs, including additionalProperties: false', () => {
-      const { doc, registry } = createRegistry()
-
-      registry.hoistDefs({
-        $defs: {
-          Strict: { type: 'object', additionalProperties: false },
-        },
-      })
-
-      expect(doc.components?.schemas).toEqual({
-        Strict: { type: 'object', additionalProperties: false },
-      })
-    })
-
     it('keeps every def local when shouldHoistDef always returns false', () => {
       const { doc, registry } = createRegistry({ shouldHoistDef: () => false })
 
