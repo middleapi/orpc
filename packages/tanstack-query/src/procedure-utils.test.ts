@@ -1126,6 +1126,7 @@ describe('isProcedureUtilsOptions', () => {
     expect(isProcedureUtilsOptions({ queryInterceptors: [], mutationInterceptors: [vi.fn()] })).toBe(true)
     expect(isProcedureUtilsOptions({ queryOptions: { staleTime: 1000 }, mutationKey: () => ({}) })).toBe(true)
     expect(isProcedureUtilsOptions({ liveOptions: undefined, streamedKey: undefined })).toBe(true)
+    expect(isProcedureUtilsOptions({ unknown: 'allowed' })).toBe(true)
   })
 
   it('rejects non procedure utils options shapes', () => {
@@ -1134,6 +1135,5 @@ describe('isProcedureUtilsOptions', () => {
     expect(isProcedureUtilsOptions({ prefix: 123 })).toBe(false)
     expect(isProcedureUtilsOptions({ queryInterceptors: { invalid: true } })).toBe(false)
     expect(isProcedureUtilsOptions({ queryOptions: 'invalid' })).toBe(false)
-    expect(isProcedureUtilsOptions({ child: { queryOptions: { staleTime: 1000 } } })).toBe(false)
   })
 })

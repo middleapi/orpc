@@ -237,6 +237,7 @@ describe('createRouterUtils', () => {
 
     const utils = createRouterUtils(client, {
       scoped: {
+        queryInterceptors: { invalid: true },
         child: {
           queryOptions: {
             staleTime: 1000,

@@ -218,9 +218,6 @@ export function isProcedureUtilsOptions(value: unknown): value is ProcedureUtils
         return false
       }
     }
-    else {
-      return false
-    }
   }
 
   return true
