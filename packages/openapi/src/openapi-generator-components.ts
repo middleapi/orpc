@@ -109,19 +109,19 @@ export class OpenAPIComponentRegistry {
       ) as Record<string, JsonSchema>
       const prelimSchema = candidateSchemas[defName]!
 
-      const reusableComponentName = findReusableComponentName(componentsSchemas, defName, prelimSchema, candidateSchemas)
-
-      if (reusableComponentName !== undefined) {
-        renameMap[defName] = reusableComponentName
-        continue
-      }
-
-      const componentName = componentsSchemas[defName] === undefined
-        ? defName
-        : findUniqueComponentName(componentsSchemas, defName)
+      const [componentName, reuseExisting] = resolveComponentName(
+        componentsSchemas,
+        new Set(Object.values(renameMap)),
+        defName,
+        prelimSchema,
+        candidateSchemas,
+      )
 
       renameMap[defName] = componentName
-      pendingSchemas.push({ cleanSchema, componentName })
+
+      if (!reuseExisting) {
+        pendingSchemas.push({ cleanSchema, componentName })
+      }
     }
 
     for (const { cleanSchema, componentName } of pendingSchemas) {
@@ -224,60 +224,43 @@ function collectReferencedLocalDefNames(
 }
 
 /**
- * Only called when `baseName` is already taken, so it starts probing at `${baseName}2`.
+ * Walks the `name`, `name2`, `name3`, ... family until it finds an equivalent existing
+ * component to reuse or a free slot to fill. Equal schemas under unrelated names are
+ * never merged: a different name signals a different purpose.
  */
-function findUniqueComponentName(componentsSchemas: Record<string, any>, baseName: string): string {
-  let i = 2
-  while (componentsSchemas[`${baseName}${i}`] !== undefined) {
-    i++
-  }
-  return `${baseName}${i}`
-}
-
-function findReusableComponentName(
+function resolveComponentName(
   componentsSchemas: Record<string, any>,
+  claimedNames: Set<string>,
   defName: string,
   schema: JsonSchema,
   candidateSchemas: Record<string, JsonSchema>,
-): string | undefined {
-  const exactMatch = componentsSchemas[defName]
+): [componentName: string, reuseExisting: boolean] {
+  for (let i = 1; ; i++) {
+    const componentName = i === 1 ? defName : `${defName}${i}`
+    const existingSchema = componentsSchemas[componentName]
 
-  if (
-    exactMatch !== undefined
-    && areSchemasEquivalentForReuse(
-      schema,
-      exactMatch,
-      schema,
-      exactMatch,
-      candidateSchemas,
-      componentsSchemas,
-      new Map([[defName, defName]]),
-      new Map([[defName, defName]]),
-    )
-  ) {
-    return defName
-  }
+    if (existingSchema === undefined) {
+      // a sibling def can claim a slot before its schema is written, keep probing past it
+      if (claimedNames.has(componentName)) {
+        continue
+      }
 
-  for (const [componentName, componentSchema] of Object.entries(componentsSchemas)) {
-    if (componentName === defName) {
-      continue
+      return [componentName, false]
     }
 
     if (areSchemasEquivalentForReuse(
       schema,
-      componentSchema,
+      existingSchema,
       schema,
-      componentSchema,
+      existingSchema,
       candidateSchemas,
       componentsSchemas,
       new Map([[defName, componentName]]),
       new Map([[componentName, defName]]),
     )) {
-      return componentName
+      return [componentName, true]
     }
   }
-
-  return undefined
 }
 
 function definedKeysOf(object: Record<string, unknown>): string[] {

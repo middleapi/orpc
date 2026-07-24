@@ -167,7 +167,7 @@ describe('openAPIComponentRegistry', () => {
       expect(doc.components?.schemas).toEqual({ Planet: planet })
     })
 
-    it('reuses an equal existing component under a different name', () => {
+    it('does not merge equal schemas registered under different names', () => {
       const { doc, registry } = createRegistry({ schemas: { Existing: { type: 'string' } } })
 
       const result = registry.hoistDefs({
@@ -175,8 +175,28 @@ describe('openAPIComponentRegistry', () => {
         $defs: { Renamed: { type: 'string' } },
       })
 
-      expect(result).toEqual({ $ref: '#/components/schemas/Existing' })
-      expect(doc.components?.schemas).toEqual({ Existing: { type: 'string' } })
+      expect(result).toEqual({ $ref: '#/components/schemas/Renamed' })
+      expect(doc.components?.schemas).toEqual({
+        Existing: { type: 'string' },
+        Renamed: { type: 'string' },
+      })
+    })
+
+    it('reuses an equal component within the same name family', () => {
+      const { doc, registry } = createRegistry({
+        schemas: {
+          Planet: { type: 'string' },
+          Planet2: { type: 'number' },
+        },
+      })
+
+      const result = registry.hoistDefs({
+        $ref: '#/$defs/Planet',
+        $defs: { Planet: { type: 'number' } },
+      })
+
+      expect(result).toEqual({ $ref: '#/components/schemas/Planet2' })
+      expect(Object.keys(doc.components?.schemas ?? {}).sort()).toEqual(['Planet', 'Planet2'])
     })
 
     it('ignores undefined-valued keys when comparing schemas', () => {
@@ -398,6 +418,29 @@ describe('openAPIComponentRegistry', () => {
       expect(doc.components?.schemas?.NodeA2).toEqual({
         type: 'object',
         properties: { next: { $ref: '#/components/schemas/NodeA2' } },
+      })
+    })
+
+    it('keeps sibling defs distinct when their names collide within one family', () => {
+      const { doc, registry } = createRegistry({
+        schemas: {
+          Node: { type: 'object', properties: { next: { $ref: '#/components/schemas/Node' } } },
+        },
+      })
+
+      const result = registry.hoistDefs({
+        $ref: '#/$defs/Node',
+        $defs: {
+          Node: { type: 'object', properties: { next: { $ref: '#/$defs/Node2' } } },
+          Node2: { type: 'object', properties: { next: { $ref: '#/$defs/Node' } } },
+        },
+      })
+
+      expect(result).toEqual({ $ref: '#/components/schemas/Node2' })
+      expect(doc.components?.schemas).toEqual({
+        Node: { type: 'object', properties: { next: { $ref: '#/components/schemas/Node' } } },
+        Node2: { type: 'object', properties: { next: { $ref: '#/components/schemas/Node22' } } },
+        Node22: { type: 'object', properties: { next: { $ref: '#/components/schemas/Node2' } } },
       })
     })
 

@@ -91,17 +91,24 @@ describe('openAPIGenerator e2e: reusable component schemas', () => {
     const Planet = z.object({ id: z.string() }).meta({ id: 'Planet' })
 
     const doc = await generator.generate({
-      planet: oc
+      createPlanet: oc
+        .input(z.object({ planet: Planet }))
+        .output(z.object({ planet: Planet })),
+      clonePlanet: oc
         .input(z.object({ planet: Planet }))
         .output(z.object({ planet: Planet })),
     })
 
-    expect((doc.paths?.['/planet']?.post?.requestBody as any).content['application/json'].schema.properties).toEqual({
-      planet: { $ref: '#/components/schemas/Planet' },
-    })
-    expect((doc.paths?.['/planet']?.post?.responses?.[200] as any).content['application/json'].schema.properties).toEqual({
-      planet: { $ref: '#/components/schemas/Planet2' },
-    })
+    for (const path of ['/createPlanet', '/clonePlanet'] as const) {
+      expect((doc.paths?.[path]?.post?.requestBody as any).content['application/json'].schema.properties).toEqual({
+        planet: { $ref: '#/components/schemas/Planet' },
+      })
+      expect((doc.paths?.[path]?.post?.responses?.[200] as any).content['application/json'].schema.properties).toEqual({
+        planet: { $ref: '#/components/schemas/Planet2' },
+      })
+    }
+
+    expect(Object.keys(doc.components?.schemas ?? {}).sort()).toEqual(['Planet', 'Planet2'])
 
     expect(doc.components?.schemas?.Planet).toEqual({
       type: 'object',
