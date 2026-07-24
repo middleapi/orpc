@@ -35,7 +35,7 @@
     "react-dom": "^19.2.7",
     "server-only": "^0.0.1",
     "ts-pattern": "^5.9.0",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "zod": "^4.4.3"
   }
 }
