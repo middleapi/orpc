@@ -61,14 +61,13 @@ describe('openAPIComponentRegistry', () => {
       })
     })
 
-    it('normalizes boolean defs, strips additionalProperties: false, and skips undefined defs', () => {
+    it('normalizes boolean defs and skips undefined defs', () => {
       const { doc, registry } = createRegistry()
 
       registry.hoistDefs({
         $defs: {
           Anything: true,
           Nothing: false,
-          Strict: { type: 'object', additionalProperties: false },
           Ghost: undefined,
         },
       } as any)
@@ -76,7 +75,20 @@ describe('openAPIComponentRegistry', () => {
       expect(doc.components?.schemas).toEqual({
         Anything: {},
         Nothing: { not: {} },
-        Strict: { type: 'object' },
+      })
+    })
+
+    it('preserves the semantics of hoisted defs, including additionalProperties: false', () => {
+      const { doc, registry } = createRegistry()
+
+      registry.hoistDefs({
+        $defs: {
+          Strict: { type: 'object', additionalProperties: false },
+        },
+      })
+
+      expect(doc.components?.schemas).toEqual({
+        Strict: { type: 'object', additionalProperties: false },
       })
     })
 

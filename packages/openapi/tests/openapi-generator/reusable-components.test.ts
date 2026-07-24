@@ -7,7 +7,7 @@ describe('openAPIGenerator e2e: reusable component schemas', () => {
   const generator = new OpenAPIGenerator({ converters: [zodJsonSchemaConverter] })
 
   it('hoists a recursive entity into a single component referenced everywhere', async () => {
-    const Category: z.ZodTypeAny = z.lazy(() => z.object({
+    const Category: z.ZodTypeAny = z.lazy(() => z.looseObject({
       name: z.string(),
       children: z.array(Category).optional(),
     })).meta({ id: 'Category' })
@@ -52,13 +52,13 @@ describe('openAPIGenerator e2e: reusable component schemas', () => {
   })
 
   it('hoists mutually recursive entities that reference each other', async () => {
-    const User: z._ZodType = z.object({
+    const User: z._ZodType = z.looseObject({
       name: z.string(),
       // eslint-disable-next-line ts/no-use-before-define
       posts: z.array(z.lazy(() => Post)).optional(),
     }).meta({ id: 'User' })
 
-    const Post: z.ZodTypeAny = z.object({
+    const Post: z.ZodTypeAny = z.looseObject({
       title: z.string(),
       author: z.lazy(() => User).optional(),
     }).meta({ id: 'Post' })
@@ -82,6 +82,37 @@ describe('openAPIGenerator e2e: reusable component schemas', () => {
           author: { $ref: '#/components/schemas/User' },
         }),
       }),
+    })
+  })
+
+  it('keeps strict entities direction-specific instead of altering their semantics', async () => {
+    // a plain z.object accepts unknown keys on input but strips them from its output,
+    // so its input and output json schemas genuinely differ (additionalProperties: false)
+    const Planet = z.object({ id: z.string() }).meta({ id: 'Planet' })
+
+    const doc = await generator.generate({
+      planet: oc
+        .input(z.object({ planet: Planet }))
+        .output(z.object({ planet: Planet })),
+    })
+
+    expect((doc.paths?.['/planet']?.post?.requestBody as any).content['application/json'].schema.properties).toEqual({
+      planet: { $ref: '#/components/schemas/Planet' },
+    })
+    expect((doc.paths?.['/planet']?.post?.responses?.[200] as any).content['application/json'].schema.properties).toEqual({
+      planet: { $ref: '#/components/schemas/Planet2' },
+    })
+
+    expect(doc.components?.schemas?.Planet).toEqual({
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    })
+    expect(doc.components?.schemas?.Planet2).toEqual({
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+      additionalProperties: false,
     })
   })
 

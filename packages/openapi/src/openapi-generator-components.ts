@@ -140,16 +140,9 @@ export class OpenAPIComponentRegistry {
 }
 
 function normalizeHoistedDefSchema(schema: JsonSchema): Exclude<JsonSchema, boolean> {
-  let cleanSchema = typeof schema === 'boolean'
+  return typeof schema === 'boolean'
     ? (schema ? {} : { not: {} })
-    : { ...schema }
-
-  if (cleanSchema.additionalProperties === false) {
-    const { additionalProperties: _ignored, ...withoutAdditionalProperties } = cleanSchema
-    cleanSchema = withoutAdditionalProperties
-  }
-
-  return cleanSchema
+    : schema
 }
 
 function visitLocalDefRefs(schema: JsonSchema, onRef: (defName: string) => void): void {
