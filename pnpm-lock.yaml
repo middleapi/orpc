@@ -578,8 +578,8 @@ importers:
   packages/openapi:
     dependencies:
       '@hey-api/spec-types':
-        specifier: 0.0.0-next-20260408030107
-        version: 0.0.0-next-20260408030107
+        specifier: 0.2.0
+        version: 0.2.0
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
@@ -2387,8 +2387,8 @@ packages:
     peerDependencies:
       vue: ^3.2.0
 
-  '@hey-api/spec-types@0.0.0-next-20260408030107':
-    resolution: {integrity: sha512-P5DKr4dpZ7lmZpZt2bc2KWuzU9vl4GZcN7VrjchZF1WWKNGZFnwWhBxZo1t6P2muOCopIvqD2Fvp5os4QiitKA==}
+  '@hey-api/spec-types@0.2.0':
+    resolution: {integrity: sha512-ibQ8Is7evMavzr8GNyJCcTg975d8DpaMUyLmOrQ85UBdy1l6t1KuRAwgChAbesJsIlNV6gjmlXruWyegDX18Fg==}
 
   '@hey-api/types@0.1.4':
     resolution: {integrity: sha512-thWfawrDIP7wSI9ioT13I5soaaqB5vAPIiZmgD8PbeEVKNrkonc0N/Sjj97ezl7oQgusZmaNphGdMKipPO6IBg==}
@@ -11376,7 +11376,7 @@ snapshots:
       '@tanstack/vue-virtual': 3.13.32(vue@3.5.40(typescript@6.0.3))
       vue: 3.5.40(typescript@6.0.3)
 
-  '@hey-api/spec-types@0.0.0-next-20260408030107':
+  '@hey-api/spec-types@0.2.0':
     dependencies:
       '@hey-api/types': 0.1.4
 
