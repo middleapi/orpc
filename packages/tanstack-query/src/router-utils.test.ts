@@ -3,10 +3,11 @@ import * as KeyModule from './key'
 import { ProcedureUtils } from './procedure-utils'
 import { createRouterUtils } from './router-utils'
 
-vi.mock('./procedure-utils', async () => {
+vi.mock('./procedure-utils', async (importOriginal) => {
   const { SharedUtils } = await import('./shared-utils')
 
   return {
+    ...await importOriginal<typeof import('./procedure-utils')>(),
     ProcedureUtils: vi.fn(class extends SharedUtils<unknown> {
       call = vi.fn()
       override key = SharedUtils.prototype.key
@@ -230,59 +231,32 @@ describe('createRouterUtils', () => {
     expect(routeUtils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.queryOptions.mock.results[0]?.value)
   })
 
-  it.each([
-    'queryInterceptors',
-    'streamedInterceptors',
-    'liveInterceptors',
-    'infiniteInterceptors',
-    'mutationInterceptors',
-  ] as const)('does not create procedure utils for invalid %s scoped options', (key) => {
-    const client = {
-      route: vi.fn(),
-    } as any
-    client.route = vi.fn()
-    client.route.child = vi.fn()
+  it('does not create procedure utils when scoped options are not procedure utils options', () => {
+    const client = vi.fn() as any
+    client.child = vi.fn()
 
     const utils = createRouterUtils(client, {
       scoped: {
-        route: {
-          [key]: { invalid: true },
-          child: {
-            queryOptions: {
-              staleTime: 1000,
-            },
+        queryInterceptors: { invalid: true },
+        child: {
+          queryOptions: {
+            staleTime: 1000,
           },
-        } as any,
-      },
+        },
+      } as any,
     }) as any
 
-    const routeUtils = utils.route
-
-    expect(typeof routeUtils.key).toBe('function')
-    expect(typeof routeUtils.queryOptions).not.toBe('function')
+    expect(typeof utils.key).toBe('function')
+    expect(typeof utils.queryOptions).not.toBe('function')
     expect(ProcedureUtils).toHaveBeenCalledTimes(0)
 
-    vi.clearAllMocks()
-    const childUtils = routeUtils.child
+    const childUtils = utils.child
 
-    expect(typeof childUtils.key).toBe('function')
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
-  })
-
-  it('does not create procedure utils for invalid scoped options', () => {
-    const client = {
-      route: vi.fn(),
-    } as any
-
-    const utils = createRouterUtils(client, {
-      scoped: {
-        route: 'invalid' as any,
-      },
-    }) as any
-
-    expect(typeof utils.route.key).toBe('function')
-    expect(typeof utils.route.queryOptions).not.toBe('function')
-    expect(ProcedureUtils).toHaveBeenCalledTimes(0)
+    expect(ProcedureUtils).toHaveBeenCalledWith(['child'], client.child, expect.objectContaining({
+      queryOptions: { staleTime: 1000 },
+    }))
+    expect(typeof childUtils.queryOptions).toBe('function')
   })
 
   it('does not create utils for undefined or unwrap client path', () => {

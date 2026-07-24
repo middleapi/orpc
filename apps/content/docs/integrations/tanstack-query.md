@@ -335,6 +335,103 @@ const orpc = createTanstackQueryUtils(client, {
 })
 ```
 
+### Contract Options Plugin
+
+Use `tanstackQuery` to define base options and interceptors directly on a [procedure contract](/docs/contract/procedure), then pass the contract to `ContractOptionsUtilsPlugin` to apply them automatically. Meta options act as the base layer: [default options](#default-options) and [interceptors](#interceptors) defined on the utils merge on top of them.
+
+```ts
+import { ContractOptionsUtilsPlugin, tanstackQuery } from '@orpc/tanstack-query'
+
+export const contract = {
+  planet: {
+    find: oc
+      .input(z.object({ id: z.number() }))
+      .meta(tanstackQuery({
+        queryOptions: {
+          staleTime: 60 * 1000,
+        },
+        queryInterceptors: [
+          async ({ input, next }) => {
+            // input, output, and errors are typed based on the contract
+            return await next()
+          },
+        ],
+      })),
+  },
+}
+
+const orpc = createTanstackQueryUtils(client, {
+  plugins: [new ContractOptionsUtilsPlugin(contract)],
+})
+```
+
+::: warning
+Types inferred from the contract are for reference only. The actual types depend on the client the utils are created from. For example, a `JsonifiedClient` created from [OpenAPI Link](/docs/openapi/link#typesafe-clients) returns jsonified outputs that may not match the contract schemas.
+:::
+
+::: details Passing runtime values into contract meta?
+Contracts are defined separately from your app, so anything inside `tanstackQuery` cannot import runtime values such as your router utils. Instead, [register a global meta type](https://tanstack.com/query/latest/docs/framework/react/typescript#registering-global-meta) and pass the values through the `meta` option, per hook or globally via query client default options. The example below reads router utils from `fnContext.meta` to optimistically update a query:
+
+```ts
+import type { RouterContractClient } from '@orpc/contract'
+import type { RouterUtils } from '@orpc/tanstack-query'
+
+declare module '@tanstack/react-query' {
+  interface Register {
+    mutationMeta: {
+      utils?: RouterUtils<RouterContractClient<typeof contract>>
+    }
+  }
+}
+
+export const contract = {
+  planet: {
+    find: oc.input(z.object({ id: z.number() })),
+    update: oc
+      .input(z.object({ id: z.number(), name: z.string() }))
+      .meta(tanstackQuery({
+        mutationInterceptors: [
+          async ({ input, next, fnContext }) => {
+            const utils = fnContext.meta?.utils
+
+            if (!utils) {
+              return next()
+            }
+
+            const queryKey = utils.planet.find.queryKey({ input: { id: input.id } })
+            const previous = fnContext.client.getQueryData(queryKey)
+
+            // optimistically update before the request
+            fnContext.client.setQueryData(queryKey, input)
+
+            try {
+              return await next()
+            }
+            catch (error) {
+              // roll back on error
+              fnContext.client.setQueryData(queryKey, previous)
+              throw error
+            }
+            finally {
+              fnContext.client.invalidateQueries({ queryKey })
+            }
+          },
+        ],
+      })),
+  },
+}
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    mutations: {
+      meta: { utils: orpc },
+    },
+  },
+})
+```
+
+:::
+
 ## Client Context
 
 ::: warning
