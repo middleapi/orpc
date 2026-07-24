@@ -87,7 +87,6 @@ export function buildRequest(
   def: AnyProcedureContract['~orpc'],
   meta: OpenAPIMeta | undefined,
   dynamicPathParams: DynamicPathParam[] | undefined,
-  path: string[],
 ): void {
   const method = meta?.method ?? DEFAULT_OPENAPI_METHOD
   const inputStructure = meta?.inputStructure ?? DEFAULT_OPENAPI_INPUT_STRUCTURE
@@ -117,10 +116,10 @@ export function buildRequest(
   }
 
   const parts = inputStructure === 'compact'
-    ? extractCompactRequestParts(schema, optional, method, dynamicParams, path)
-    : extractDetailedRequestParts(schema, path)
+    ? extractCompactRequestParts(schema, optional, method, dynamicParams)
+    : extractDetailedRequestParts(schema)
 
-  renderPathParameters(ctx, operation, dynamicParams, parts.paramsEntries, path)
+  renderPathParameters(ctx, operation, dynamicParams, parts.paramsEntries)
   renderQueryParameters(ctx, operation, parts.queryEntries, meta?.queryStyles)
   renderHeaderParameters(ctx, operation, parts.headersEntries)
 
@@ -137,13 +136,12 @@ function extractCompactRequestParts(
   optional: boolean,
   method: NonNullable<OpenAPIMeta['method']>,
   dynamicParams: string[] | undefined,
-  path: string[],
 ): RequestParts {
   const entries = extractJsonObjectSchemaEntries(schema)
 
   if (!entries && method === 'GET') {
     throw new OpenAPIGeneratorError(
-      `Procedure "${path.join('.')}": method is GET but the input schema is not an object.\n`
+      `method is GET but the input schema is not an object.\n`
       + `  GET sends every input field as a query parameter, so the input must be an object schema.\n`
       + `  Fix: make the input an object, or use a method with a request body (POST, PUT, PATCH, DELETE).`,
     )
@@ -170,12 +168,12 @@ function extractCompactRequestParts(
   }
 }
 
-function extractDetailedRequestParts(schema: JsonSchema, path: string[]): RequestParts {
+function extractDetailedRequestParts(schema: JsonSchema): RequestParts {
   const entries = extractJsonObjectSchemaEntries(schema)
 
   if (!entries) {
     throw new OpenAPIGeneratorError(
-      `Procedure "${path.join('.')}": inputStructure is "detailed" but the input schema is not an object.\n`
+      `inputStructure is "detailed" but the input schema is not an object.\n`
       + `  Expected an object shaped like: { params?: object, query?: object, headers?: object, body?: unknown }`,
     )
   }
@@ -196,7 +194,6 @@ function renderPathParameters(
   operation: OpenAPIOperationObject,
   dynamicParams: string[] | undefined,
   paramsEntries: JsonObjectSchemaEntry[] | undefined,
-  path: string[],
 ): void {
   if (!dynamicParams?.length) {
     return
@@ -204,7 +201,7 @@ function renderPathParameters(
 
   if (!paramsEntries) {
     throw new OpenAPIGeneratorError(
-      `Procedure "${path.join('.')}": the route declares path params (${dynamicParams.map(p => `{${p}}`).join(', ')}) but there is no object schema to source them from.\n`
+      `the route declares path params (${dynamicParams.map(p => `{${p}}`).join(', ')}) but there is no object schema to source them from.\n`
       + `  compact mode:  the input schema must be an object containing each param.\n`
       + `  detailed mode: the input's "params" section must be an object containing each param.`,
     )
@@ -215,7 +212,7 @@ function renderPathParameters(
 
     if (!entry) {
       throw new OpenAPIGeneratorError(
-        `Procedure "${path.join('.')}": dynamic param "{${name}}" is missing from the input schema.\n`
+        `dynamic param "{${name}}" is missing from the input schema.\n`
         + `  Route params: ${dynamicParams.map(p => `{${p}}`).join(', ')}\n`
         + `  Schema keys:  ${paramsEntries.map(([n]) => n).join(', ') || '(none)'}`,
       )
@@ -223,7 +220,7 @@ function renderPathParameters(
 
     if (entry[2]) {
       throw new OpenAPIGeneratorError(
-        `Procedure "${path.join('.')}": dynamic param "${name}" is optional in the input schema.\n`
+        `dynamic param "${name}" is optional in the input schema.\n`
         + `  OpenAPI requires path params to be required. Make "${name}" required.`,
       )
     }
@@ -313,7 +310,6 @@ export function buildSuccessResponse(
   operation: OpenAPIOperationObject,
   def: AnyProcedureContract['~orpc'],
   meta: OpenAPIMeta | undefined,
-  path: string[],
 ): void {
   const status = meta?.successStatus ?? DEFAULT_SUCCESS_STATUS
   const description = meta?.successDescription ?? DEFAULT_OPENAPI_SUCCESS_DESCRIPTION
@@ -348,7 +344,7 @@ export function buildSuccessResponse(
     return
   }
 
-  for (const [responseStatus, parts] of extractDetailedResponseParts(schema, status, path)) {
+  for (const [responseStatus, parts] of extractDetailedResponseParts(schema, status)) {
     const responseObject: OpenAPIV3_1.ResponseObject = {
       description: parts.descriptions.length ? parts.descriptions.join(', ') : description,
     }
@@ -380,7 +376,6 @@ export function buildSuccessResponse(
 function extractDetailedResponseParts(
   schema: JsonSchema,
   defaultStatus: number,
-  path: string[],
 ): Map<number, { descriptions: string[], bodies: JsonSchema[], headers: JsonSchema[] }> {
   const partsByStatus = new Map<number, { descriptions: string[], bodies: JsonSchema[], headers: JsonSchema[] }>()
 
@@ -389,7 +384,7 @@ function extractDetailedResponseParts(
 
     if (!entries) {
       throw new OpenAPIGeneratorError(
-        `Procedure "${path.join('.')}": outputStructure is "detailed" but the output schema (or one of its union members) is not an object.\n`
+        `outputStructure is "detailed" but the output schema (or one of its union members) is not an object.\n`
         + `  Expected each member shaped like: { status?: number (< 400), headers?: object, body?: unknown }`,
       )
     }
@@ -398,7 +393,7 @@ function extractDetailedResponseParts(
 
     if (statusSchema !== undefined && (typeof statusSchema !== 'object' || !Number.isInteger(statusSchema.const) || statusSchema.const >= 400)) {
       throw new OpenAPIGeneratorError(
-        `Procedure "${path.join('.')}": invalid "status" field in the detailed output schema.\n`
+        `invalid "status" field in the detailed output schema.\n`
         + `  Expected: a literal (const) integer below 400\n`
         + `  Received: ${stringifyJSON(statusSchema)}`,
       )

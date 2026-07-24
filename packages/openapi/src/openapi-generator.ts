@@ -129,8 +129,8 @@ export class OpenAPIGenerator {
             tags: meta?.tags?.map(tag => tag),
           }
 
-          buildRequest(ctx, operation, def, meta, dynamicPathParams, path)
-          buildSuccessResponse(ctx, operation, def, meta, path)
+          buildRequest(ctx, operation, def, meta, dynamicPathParams)
+          buildSuccessResponse(ctx, operation, def, meta)
           buildErrorResponse(ctx, operation, def)
         }
 
@@ -146,7 +146,7 @@ export class OpenAPIGenerator {
         if (!(e instanceof OpenAPIGeneratorError)) {
           throw e
         }
-        errors.push(e.message)
+        errors.push(`Procedure at ${path.join('.') || '(root)'}: ${e.message}`)
       }
     })
 

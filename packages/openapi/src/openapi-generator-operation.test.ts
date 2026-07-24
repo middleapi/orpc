@@ -75,8 +75,8 @@ describe('openAPIGenerator operation builders', () => {
     it('does nothing for unconstrained inputs without dynamic params', () => {
       const { ctx, operation } = createContext()
 
-      buildRequest(ctx, operation, testDef(), undefined, undefined, ['test'])
-      buildRequest(ctx, operation, testDef({ inputs: [testSchema(true)] }), undefined, undefined, ['test'])
+      buildRequest(ctx, operation, testDef(), undefined, undefined)
+      buildRequest(ctx, operation, testDef({ inputs: [testSchema(true)] }), undefined, undefined)
 
       expect(operation).toEqual({})
     })
@@ -86,7 +86,7 @@ describe('openAPIGenerator operation builders', () => {
 
       buildRequest(ctx, operation, testDef({
         inputs: [testSchema({ type: 'object', properties: { name: { type: 'string' } }, required: ['name'] })],
-      }), undefined, undefined, ['test'])
+      }), undefined, undefined)
 
       expect(operation).toEqual({
         requestBody: {
@@ -105,7 +105,7 @@ describe('openAPIGenerator operation builders', () => {
 
       buildRequest(ctx, operation, testDef({
         inputs: [testSchema({ type: 'object' }, { optional: true })],
-      }), undefined, undefined, ['test'])
+      }), undefined, undefined)
 
       expect(operation.requestBody).toEqual({
         content: { 'application/json': { schema: { type: 'object' } } },
@@ -126,7 +126,7 @@ describe('openAPIGenerator operation builders', () => {
           },
           required: ['id', 'name'],
         })],
-      }), { method: 'POST', path }, getDynamicPathParams(path), ['test'])
+      }), { method: 'POST', path }, getDynamicPathParams(path))
 
       expect(operation.parameters).toEqual([
         { in: 'path', required: true, name: 'id', schema: { type: 'string' } },
@@ -158,7 +158,7 @@ describe('openAPIGenerator operation builders', () => {
           properties: { id: { type: 'string' }, note: { type: 'string' } },
           required: ['id'],
         })],
-      }), { method: 'POST', path }, getDynamicPathParams(path), ['test'])
+      }), { method: 'POST', path }, getDynamicPathParams(path))
 
       expect((operation.requestBody as any)?.required).toBeUndefined()
     })
@@ -192,7 +192,7 @@ describe('openAPIGenerator operation builders', () => {
           spaceArray: 'space-delimited-array',
           json: 'json',
         },
-      }, undefined, ['test'])
+      }, undefined)
 
       expect(operation.parameters).toEqual([
         { in: 'query', name: 'primitive', required: true, allowEmptyValue: true, allowReserved: true, schema: { type: 'string' } },
@@ -218,7 +218,7 @@ describe('openAPIGenerator operation builders', () => {
           properties: { id: { type: 'string' }, verbose: { type: 'boolean' } },
           required: ['id', 'verbose'],
         })],
-      }), { method: 'HEAD', path }, getDynamicPathParams(path), ['test'])
+      }), { method: 'HEAD', path }, getDynamicPathParams(path))
 
       expect(operation.parameters).toEqual([
         { in: 'path', required: true, name: 'id', schema: { type: 'string' } },
@@ -241,7 +241,7 @@ describe('openAPIGenerator operation builders', () => {
           },
           required: ['params', 'headers'],
         })],
-      }), { inputStructure: 'detailed', path }, getDynamicPathParams(path), ['test'])
+      }), { inputStructure: 'detailed', path }, getDynamicPathParams(path))
 
       expect(operation.parameters).toEqual([
         { in: 'path', required: true, name: 'id', schema: { type: 'string' } },
@@ -267,7 +267,7 @@ describe('openAPIGenerator operation builders', () => {
           properties: { body: { type: 'string' } },
           required: ['body'],
         })],
-      }), { inputStructure: 'detailed' }, undefined, ['test'])
+      }), { inputStructure: 'detailed' }, undefined)
 
       expect(operation.parameters).toBeUndefined()
       expect(operation.requestBody).toEqual({
@@ -281,7 +281,7 @@ describe('openAPIGenerator operation builders', () => {
 
       buildRequest(ctx, operation, testDef({
         inputs: [asyncIteratorObject(testSchema({ type: 'string' }), testSchema({ type: 'boolean' }))],
-      }), undefined, undefined, ['test'])
+      }), undefined, undefined)
 
       expect(operation.requestBody).toEqual({
         required: true,
@@ -331,7 +331,7 @@ describe('openAPIGenerator operation builders', () => {
 
       buildRequest(ctx, operation, testDef({
         inputs: [asyncIteratorObject(testSchema({ type: 'string' }))],
-      }), undefined, undefined, ['test'])
+      }), undefined, undefined)
 
       expect(((operation.requestBody as any)?.content?.['text/event-stream']?.schema as any).oneOf[1]).toEqual({
         type: 'object',
@@ -403,7 +403,6 @@ describe('openAPIGenerator operation builders', () => {
         testDef({ inputs }),
         meta,
         path ? getDynamicPathParams(path) : undefined,
-        ['test'],
       )).toThrow(message)
     })
   })
@@ -412,7 +411,7 @@ describe('openAPIGenerator operation builders', () => {
     it('creates a success response without content when there is no output schema', () => {
       const { ctx, operation } = createContext()
 
-      buildSuccessResponse(ctx, operation, testDef(), undefined, ['test'])
+      buildSuccessResponse(ctx, operation, testDef(), undefined)
 
       expect(operation.responses).toEqual({
         200: { description: 'OK', content: {} },
@@ -424,7 +423,7 @@ describe('openAPIGenerator operation builders', () => {
 
       buildSuccessResponse(ctx, operation, testDef({
         outputs: [testSchema({ type: 'object' })],
-      }), { successStatus: 201, successDescription: 'Created' }, ['test'])
+      }), { successStatus: 201, successDescription: 'Created' })
 
       expect(operation.responses).toEqual({
         201: {
@@ -446,7 +445,7 @@ describe('openAPIGenerator operation builders', () => {
             { type: 'object' },
           ],
         })],
-      }), undefined, ['test'])
+      }), undefined)
 
       expect(operation.responses?.[200]).toEqual({
         description: 'OK',
@@ -473,7 +472,7 @@ describe('openAPIGenerator operation builders', () => {
           type: 'object',
           properties: { file: { type: 'string', contentEncoding: 'binary' } },
         })],
-      }), undefined, ['test'])
+      }), undefined)
 
       expect(operation.responses?.[200]).toEqual({
         description: 'OK',
@@ -493,7 +492,7 @@ describe('openAPIGenerator operation builders', () => {
 
       buildSuccessResponse(ctx, operation, testDef({
         outputs: [asyncIteratorObject(testSchema({ type: 'string' }))],
-      }), undefined, ['test'])
+      }), undefined)
 
       expect(operation.responses?.[200]).toEqual({
         description: 'OK',
@@ -545,7 +544,7 @@ describe('openAPIGenerator operation builders', () => {
             },
           ],
         })],
-      }), { outputStructure: 'detailed', successStatus: 299 }, ['test'])
+      }), { outputStructure: 'detailed', successStatus: 299 })
 
       expect(operation.responses).toEqual({
         201: {
@@ -605,7 +604,6 @@ describe('openAPIGenerator operation builders', () => {
         operation,
         testDef({ outputs: [testSchema(output as any)] }),
         { outputStructure: 'detailed' },
-        ['test'],
       )).toThrow(message)
     })
   })
