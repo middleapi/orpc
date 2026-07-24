@@ -1,6 +1,6 @@
 import * as KeyModule from './key'
 import * as LiveQueryModule from './live-query'
-import { ProcedureUtils } from './procedure-utils'
+import { isProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
 import * as StreamQueryModule from './stream-query'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
 
@@ -914,5 +914,25 @@ describe('procedureUtils', () => {
       expect(modifier).toHaveBeenCalledWith({ onSuccess })
       expect(options.gcTime).toEqual(3000)
     })
+  })
+})
+
+describe('isProcedureUtilsOptions', () => {
+  it('accepts procedure utils options shapes', () => {
+    expect(isProcedureUtilsOptions({})).toBe(true)
+    expect(isProcedureUtilsOptions({ prefix: 'planet' })).toBe(true)
+    expect(isProcedureUtilsOptions({ queryInterceptors: [], mutationInterceptors: [vi.fn()] })).toBe(true)
+    expect(isProcedureUtilsOptions({ queryOptions: { staleTime: 1000 }, mutationKey: () => ({}) })).toBe(true)
+    expect(isProcedureUtilsOptions({ liveOptions: undefined, streamedKey: undefined })).toBe(true)
+    expect(isProcedureUtilsOptions({ unknown: 'allowed' })).toBe(true)
+  })
+
+  it('rejects non procedure utils options shapes', () => {
+    expect(isProcedureUtilsOptions(undefined)).toBe(false)
+    expect(isProcedureUtilsOptions('invalid')).toBe(false)
+    expect(isProcedureUtilsOptions({ prefix: 123 })).toBe(false)
+    expect(isProcedureUtilsOptions({ queryInterceptors: { invalid: true } })).toBe(false)
+    expect(isProcedureUtilsOptions({ queryInterceptors: [{ invalid: true }] })).toBe(false)
+    expect(isProcedureUtilsOptions({ queryOptions: 'invalid' })).toBe(false)
   })
 })

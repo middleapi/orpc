@@ -6,7 +6,7 @@ import type { ProcedureUtilsInfiniteInterceptor, ProcedureUtilsLiveInterceptor, 
 import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
 import { bindMethods, get, getOrBind, isTypescriptObject, toArray } from '@orpc/shared'
 import { CompositeRouterUtilsPlugin } from './plugin'
-import { ProcedureUtils } from './procedure-utils'
+import { isProcedureUtilsOptions, mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
 import { SharedUtils } from './shared-utils'
 
 export type RouterUtils<T extends AnyNestedClient>
@@ -96,15 +96,17 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
     ? bindMethods(new ProcedureUtils(
         path,
         client,
-        plugin.initProcedureOptions(path, {
-          prefix: options.prefix,
-          ...options.scoped,
-          queryInterceptors: [...toArray(options.queryInterceptors) as any, ...toArray(options.scoped?.queryInterceptors)],
-          streamedInterceptors: [...toArray(options.streamedInterceptors) as any, ...toArray(options.scoped?.streamedInterceptors)],
-          liveInterceptors: [...toArray(options.liveInterceptors) as any, ...toArray(options.scoped?.liveInterceptors)],
-          infiniteInterceptors: [...toArray(options.infiniteInterceptors) as any, ...toArray(options.scoped?.infiniteInterceptors)],
-          mutationInterceptors: [...toArray(options.mutationInterceptors) as any, ...toArray(options.scoped?.mutationInterceptors)],
-        }),
+        plugin.initProcedureOptions(path, mergeProcedureUtilsOptions(
+          {
+            prefix: options.prefix,
+            queryInterceptors: options.queryInterceptors as any,
+            streamedInterceptors: options.streamedInterceptors as any,
+            liveInterceptors: options.liveInterceptors as any,
+            infiniteInterceptors: options.infiniteInterceptors as any,
+            mutationInterceptors: options.mutationInterceptors as any,
+          },
+          options.scoped ?? {},
+        )),
       ))
     : bindMethods(new SharedUtils(path, options))
 
@@ -140,32 +142,4 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
   })
 
   return recursive as any
-}
-
-function isProcedureUtilsOptions(value: unknown): value is ProcedureUtilsOptions<any, any, any, any> {
-  if (!isTypescriptObject(value)) {
-    return false
-  }
-
-  if (value.queryInterceptors !== undefined && !Array.isArray(value.queryInterceptors)) {
-    return false
-  }
-
-  if (value.streamedInterceptors !== undefined && !Array.isArray(value.streamedInterceptors)) {
-    return false
-  }
-
-  if (value.liveInterceptors !== undefined && !Array.isArray(value.liveInterceptors)) {
-    return false
-  }
-
-  if (value.infiniteInterceptors !== undefined && !Array.isArray(value.infiniteInterceptors)) {
-    return false
-  }
-
-  if (value.mutationInterceptors !== undefined && !Array.isArray(value.mutationInterceptors)) {
-    return false
-  }
-
-  return true
 }

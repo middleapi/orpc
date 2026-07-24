@@ -288,6 +288,40 @@ const orpc = createPiniaColadaUtils(client, {
 })
 ```
 
+### Contract Options Plugin
+
+Use `piniaColada` to define base options and interceptors directly on a [procedure contract](/docs/contract/procedure), then pass the contract to `ContractOptionsUtilsPlugin` to apply them automatically. Meta options act as the base layer: [default options](#default-options) and [interceptors](#interceptors) defined on the utils merge on top of them.
+
+```ts
+import { ContractOptionsUtilsPlugin, piniaColada } from '@orpc/pinia-colada'
+
+export const contract = {
+  planet: {
+    find: oc
+      .input(z.object({ id: z.number() }))
+      .meta(piniaColada({
+        queryOptions: {
+          staleTime: 60 * 1000,
+        },
+        queryInterceptors: [
+          async ({ input, next }) => {
+            // input, output, and errors are typed based on the contract
+            return await next()
+          },
+        ],
+      })),
+  },
+}
+
+const orpc = createPiniaColadaUtils(client, {
+  plugins: [new ContractOptionsUtilsPlugin(contract)],
+})
+```
+
+::: warning
+Types inferred from the contract are for reference only. The actual types depend on the client the utils are created from. For example, a `JsonifiedClient` created from [OpenAPI Link](/docs/openapi/link#typesafe-clients) returns jsonified outputs that may not match the contract schemas.
+:::
+
 ## Client Context
 
 When a client is invoked through the Pinia Colada integration, an **operation context** is automatically added to the [client context](/docs/client/client-side#client-context). You can use this context to configure request behavior, such as selecting the HTTP method for [RPC Link](/docs/rpc/link#request-method).
