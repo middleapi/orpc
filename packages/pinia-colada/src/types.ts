@@ -1,5 +1,5 @@
 import type { ClientContext } from '@orpc/client'
-import type { DefineInfiniteQueryOptions, DefineInfiniteQueryOptionsTagged, DefineMutationOptionsTagged, DefineQueryOptions, DefineQueryOptionsTagged, EntryKey, UseInfiniteQueryData, UseMutationOptions, UseQueryOptions } from '@pinia/colada'
+import type { DefineInfiniteQueryOptions, DefineInfiniteQueryOptionsTagged, DefineMutationOptionsTagged, DefineQueryOptions, DefineQueryOptionsTagged, EntryKey, UseInfiniteQueryData, UseMutationOptions, UseMutationOptionsGlobal, UseQueryOptions } from '@pinia/colada'
 import type { SerializableStreamedQueryOptions } from './stream-query'
 
 export type InferStreamedQueryOutput<TOutput> = TOutput extends AsyncIterable<infer U> ? U[] : never
@@ -7,7 +7,11 @@ export type InferLiveQueryOutput<TOutput> = TOutput extends AsyncIterable<infer 
 
 export type UseQueryFnContext = Parameters<UseQueryOptions<any>['query']>[0]
 
-export type UseMutationFnContext = Parameters<UseMutationOptions<any, any>['mutation']>[1]
+/**
+ * The context passed to the mutation function, including the merged
+ * `UseMutationGlobalContext` values provided by a global `onMutate` hook.
+ */
+export type UseMutationFnContext = Parameters<NonNullable<UseMutationOptionsGlobal['onSuccess']>>[2]
 
 export const OPERATION_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_PINIA_COLADA_OPERATION_CONTEXT') as any
 

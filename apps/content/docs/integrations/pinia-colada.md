@@ -288,6 +288,104 @@ const orpc = createPiniaColadaUtils(client, {
 })
 ```
 
+### Contract Options Plugin
+
+Use `piniaColada` to define base options and interceptors directly on a [procedure contract](/docs/contract/procedure), then pass the contract to `ContractOptionsUtilsPlugin` to apply them automatically. Meta options act as the base layer: [default options](#default-options) and [interceptors](#interceptors) defined on the utils merge on top of them.
+
+```ts
+import { ContractOptionsUtilsPlugin, piniaColada } from '@orpc/pinia-colada'
+
+export const contract = {
+  planet: {
+    find: oc
+      .input(z.object({ id: z.number() }))
+      .meta(piniaColada({
+        queryOptions: {
+          staleTime: 60 * 1000,
+        },
+        queryInterceptors: [
+          async ({ input, next }) => {
+            // input, output, and errors are typed based on the contract
+            return await next()
+          },
+        ],
+      })),
+  },
+}
+
+const orpc = createPiniaColadaUtils(client, {
+  plugins: [new ContractOptionsUtilsPlugin(contract)],
+})
+```
+
+::: warning
+Types inferred from the contract are for reference only. The actual types depend on the client the utils are created from. For example, a `JsonifiedClient` created from [OpenAPI Link](/docs/openapi/link#typesafe-clients) returns jsonified outputs that may not match the contract schemas.
+:::
+
+::: details Passing runtime values into contract meta?
+Contracts are defined separately from your app, so anything inside `piniaColada` cannot import runtime values such as your router utils. Instead, augment [`UseMutationContextCommon`](https://pinia-colada.esm.dev/api/@pinia/colada/interfaces/UseMutationContextCommon.html) and provide the values through a global `onMutate` hook, which merges them into the `fnContext` of every mutation. The example below reads router utils and the query cache from `fnContext` to optimistically update a query:
+
+```ts
+import type { RouterContractClient } from '@orpc/contract'
+import type { RouterUtils } from '@orpc/pinia-colada'
+import type { QueryCache } from '@pinia/colada'
+
+declare module '@pinia/colada' {
+  interface UseMutationContextCommon {
+    utils: RouterUtils<RouterContractClient<typeof contract>>
+    queryCache: QueryCache
+  }
+}
+
+export const contract = {
+  planet: {
+    find: oc.input(z.object({ id: z.number() })),
+    update: oc
+      .input(z.object({ id: z.number(), name: z.string() }))
+      .meta(piniaColada({
+        mutationInterceptors: [
+          async ({ input, next, fnContext }) => {
+            const { utils, queryCache } = fnContext
+
+            if (!utils || !queryCache) {
+              return next()
+            }
+
+            const queryKey = utils.planet.find.queryKey({ input: { id: input.id } })
+            const previous = queryCache.getQueryData(queryKey)
+
+            // optimistically update before the request
+            queryCache.setQueryData(queryKey, input)
+
+            try {
+              return await next()
+            }
+            catch (error) {
+              // roll back on error
+              queryCache.setQueryData(queryKey, previous)
+              throw error
+            }
+            finally {
+              queryCache.invalidateQueries({ key: queryKey })
+            }
+          },
+        ],
+      })),
+  },
+}
+
+app.use(PiniaColada, {
+  mutationOptions: {
+    onMutate: () => ({
+      utils: orpc,
+      queryCache: useQueryCache(pinia),
+    }),
+  },
+})
+```
+
+:::
+
 ## Client Context
 
 When a client is invoked through the Pinia Colada integration, an **operation context** is automatically added to the [client context](/docs/client/client-side#client-context). You can use this context to configure request behavior, such as selecting the HTTP method for [RPC Link](/docs/rpc/link#request-method).
