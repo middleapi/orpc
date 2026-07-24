@@ -1,7 +1,7 @@
 import { QueryClient, skipToken } from '@tanstack/query-core'
 import * as KeyModule from './key'
 import * as LiveQuery from './live-query'
-import { ProcedureUtils } from './procedure-utils'
+import { isProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
 import * as streamQueryModule from './stream-query'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
 
@@ -1116,5 +1116,24 @@ describe('createProcedureUtils with interceptors', () => {
         },
       },
     })
+  })
+})
+
+describe('isProcedureUtilsOptions', () => {
+  it('accepts procedure utils options shapes', () => {
+    expect(isProcedureUtilsOptions({})).toBe(true)
+    expect(isProcedureUtilsOptions({ prefix: 'planet' })).toBe(true)
+    expect(isProcedureUtilsOptions({ queryInterceptors: [], mutationInterceptors: [vi.fn()] })).toBe(true)
+    expect(isProcedureUtilsOptions({ queryOptions: { staleTime: 1000 }, mutationKey: () => ({}) })).toBe(true)
+    expect(isProcedureUtilsOptions({ liveOptions: undefined, streamedKey: undefined })).toBe(true)
+  })
+
+  it('rejects non procedure utils options shapes', () => {
+    expect(isProcedureUtilsOptions(undefined)).toBe(false)
+    expect(isProcedureUtilsOptions('invalid')).toBe(false)
+    expect(isProcedureUtilsOptions({ prefix: 123 })).toBe(false)
+    expect(isProcedureUtilsOptions({ queryInterceptors: { invalid: true } })).toBe(false)
+    expect(isProcedureUtilsOptions({ queryOptions: 'invalid' })).toBe(false)
+    expect(isProcedureUtilsOptions({ child: { queryOptions: { staleTime: 1000 } } })).toBe(false)
   })
 })

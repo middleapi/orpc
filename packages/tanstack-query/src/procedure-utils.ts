@@ -19,7 +19,7 @@ import type {
   StreamedOptionsIn,
   StreamedOptionsOut,
 } from './types'
-import { intercept, isAsyncIteratorObject, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
+import { intercept, isAsyncIteratorObject, isTypescriptObject, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
 import { skipToken } from '@tanstack/query-core'
 import { generateOperationKey } from './key'
 import { liveQuery } from './live-query'
@@ -170,6 +170,60 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
   mutationOptions?: ProcedureUtilsModifier<
     MutationOptionsIn<TClientContext, TInput, TOutput, TError, unknown>
   >
+}
+
+const PROCEDURE_UTILS_INTERCEPTOR_KEYS: string[] = [
+  'queryInterceptors',
+  'streamedInterceptors',
+  'liveInterceptors',
+  'infiniteInterceptors',
+  'mutationInterceptors',
+]
+
+const PROCEDURE_UTILS_MODIFIER_KEYS: string[] = [
+  'queryKey',
+  'queryOptions',
+  'streamedKey',
+  'streamedOptions',
+  'liveKey',
+  'liveOptions',
+  'infiniteKey',
+  'infiniteOptions',
+  'mutationKey',
+  'mutationOptions',
+]
+
+export function isProcedureUtilsOptions(value: unknown): value is ProcedureUtilsOptions<any, any, any, any> {
+  if (!isTypescriptObject(value)) {
+    return false
+  }
+
+  for (const key in value) {
+    if (value[key] === undefined) {
+      continue
+    }
+
+    if (key === 'prefix') {
+      if (typeof value[key] !== 'string') {
+        return false
+      }
+    }
+    else if (PROCEDURE_UTILS_INTERCEPTOR_KEYS.includes(key)) {
+      if (!Array.isArray(value[key])) {
+        return false
+      }
+    }
+    else if (PROCEDURE_UTILS_MODIFIER_KEYS.includes(key)) {
+      if (typeof value[key] !== 'function' && !isTypescriptObject(value[key])) {
+        return false
+      }
+    }
+    else {
+      return false
+    }
+  }
+
+  return true
 }
 
 function mergeProcedureUtilsModifier<T extends object>(

@@ -6,7 +6,7 @@ import type { ProcedureUtilsInfiniteInterceptor, ProcedureUtilsLiveInterceptor, 
 import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
 import { bindMethods, get, getOrBind, isTypescriptObject, toArray } from '@orpc/shared'
 import { CompositeRouterUtilsPlugin } from './plugin'
-import { mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
+import { isProcedureUtilsOptions, mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
 import { SharedUtils } from './shared-utils'
 
 export type RouterUtils<T extends AnyNestedClient>
@@ -141,32 +141,4 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
   })
 
   return recursive as any
-}
-
-function isProcedureUtilsOptions(value: unknown): value is ProcedureUtilsOptions<any, any, any, any> {
-  if (!isTypescriptObject(value)) {
-    return false
-  }
-
-  if (value.queryInterceptors !== undefined && !Array.isArray(value.queryInterceptors)) {
-    return false
-  }
-
-  if (value.streamedInterceptors !== undefined && !Array.isArray(value.streamedInterceptors)) {
-    return false
-  }
-
-  if (value.liveInterceptors !== undefined && !Array.isArray(value.liveInterceptors)) {
-    return false
-  }
-
-  if (value.infiniteInterceptors !== undefined && !Array.isArray(value.infiniteInterceptors)) {
-    return false
-  }
-
-  if (value.mutationInterceptors !== undefined && !Array.isArray(value.mutationInterceptors)) {
-    return false
-  }
-
-  return true
 }
