@@ -1,9 +1,9 @@
 import { oc } from '@orpc/contract'
 import z from 'zod'
-import { openapi, OpenAPIGenerator } from '../src'
-import { zodJsonSchemaConverter } from './__shared__/schema'
+import { openapi, OpenAPIGenerator } from '../../src'
+import { zodJsonSchemaConverter } from '../__shared__/schema'
 
-describe('e2e: composed schemas', () => {
+describe('openAPIGenerator e2e: composed schemas', () => {
   const generator = new OpenAPIGenerator({ converters: [zodJsonSchemaConverter] })
 
   it('documents polymorphic payloads: extracts the shared path param and keeps the body polymorphic', async () => {

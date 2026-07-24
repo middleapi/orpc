@@ -1,9 +1,9 @@
 import { oc } from '@orpc/contract'
 import z from 'zod'
-import { openapi, OpenAPIGenerator } from '../src'
-import { zodJsonSchemaConverter } from './__shared__/schema'
+import { openapi, OpenAPIGenerator } from '../../src'
+import { zodJsonSchemaConverter } from '../__shared__/schema'
 
-describe('e2e: file upload and download', () => {
+describe('openAPIGenerator e2e: file upload and download', () => {
   const generator = new OpenAPIGenerator({ converters: [zodJsonSchemaConverter] })
 
   it('documents raw uploads with one content entry per accepted mime type', async () => {

@@ -1,9 +1,9 @@
 import { oc } from '@orpc/contract'
 import z from 'zod'
-import { openapi, OpenAPIGenerator } from '../src'
-import { zodJsonSchemaConverter } from './__shared__/schema'
+import { openapi, OpenAPIGenerator } from '../../src'
+import { zodJsonSchemaConverter } from '../__shared__/schema'
 
-describe('e2e: typed errors', () => {
+describe('openAPIGenerator e2e: typed errors', () => {
   const generator = new OpenAPIGenerator({ converters: [zodJsonSchemaConverter] })
 
   const router = {

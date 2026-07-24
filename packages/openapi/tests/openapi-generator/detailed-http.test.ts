@@ -1,9 +1,9 @@
 import { oc } from '@orpc/contract'
 import z from 'zod'
-import { openapi, OpenAPIGenerator } from '../src'
-import { zodJsonSchemaConverter } from './__shared__/schema'
+import { openapi, OpenAPIGenerator } from '../../src'
+import { zodJsonSchemaConverter } from '../__shared__/schema'
 
-describe('e2e: webhook endpoint with full http control', () => {
+describe('openAPIGenerator e2e: webhook endpoint with full http control', () => {
   const generator = new OpenAPIGenerator({ converters: [zodJsonSchemaConverter] })
 
   const router = {

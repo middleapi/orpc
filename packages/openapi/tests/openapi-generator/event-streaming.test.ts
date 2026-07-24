@@ -1,9 +1,9 @@
 import { asyncIteratorObject, oc } from '@orpc/contract'
 import z from 'zod'
-import { openapi, OpenAPIGenerator } from '../src'
-import { zodJsonSchemaConverter } from './__shared__/schema'
+import { openapi, OpenAPIGenerator } from '../../src'
+import { zodJsonSchemaConverter } from '../__shared__/schema'
 
-describe('e2e: server-sent event streaming', () => {
+describe('openAPIGenerator e2e: server-sent event streaming', () => {
   const generator = new OpenAPIGenerator({ converters: [zodJsonSchemaConverter] })
 
   it('documents a bidirectional chat stream as text/event-stream on both sides', async () => {
