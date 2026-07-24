@@ -323,7 +323,7 @@ Types inferred from the contract are for reference only. The actual types depend
 :::
 
 ::: details Passing runtime values into contract meta?
-Contracts are defined separately from your app, so anything inside `piniaColada` cannot import runtime values such as your router utils. Instead, augment [`UseMutationGlobalContext`](https://pinia-colada.esm.dev/api/@pinia/colada/interfaces/UseMutationGlobalContext.html) and provide the values through a global `onMutate` hook, which merges them into the `fnContext` of every mutation. The example below reads router utils and the query cache from `fnContext` to optimistically update a query:
+Contracts are defined separately from your app, so anything inside `piniaColada` cannot import runtime values such as your router utils. Instead, augment [`UseMutationContextCommon`](https://pinia-colada.esm.dev/api/@pinia/colada/interfaces/UseMutationContextCommon.html) and provide the values through a global `onMutate` hook, which merges them into the `fnContext` of every mutation. The example below reads router utils and the query cache from `fnContext` to optimistically update a query:
 
 ```ts
 import type { RouterContractClient } from '@orpc/contract'
@@ -331,9 +331,9 @@ import type { RouterUtils } from '@orpc/pinia-colada'
 import type { QueryCache } from '@pinia/colada'
 
 declare module '@pinia/colada' {
-  export interface UseMutationGlobalContext {
-    utils?: RouterUtils<RouterContractClient<typeof contract>>
-    queryCache?: QueryCache
+  interface UseMutationContextCommon {
+    utils: RouterUtils<RouterContractClient<typeof contract>>
+    queryCache: QueryCache
   }
 }
 
