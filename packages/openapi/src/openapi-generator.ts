@@ -67,7 +67,7 @@ export interface OpenAPIGeneratorGenerateOptions {
   /**
    * Mapping ORPCError Code -> HTTP Status Code
    *
-   * @default COMMON_ERROR_STATUS_MAP, DEFAULT_ERROR_STATUS
+   * @default COMMON_ERROR_STATUS_MAP
    */
   errorStatusMap?: Record<string, number> | undefined
 }
