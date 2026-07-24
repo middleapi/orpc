@@ -370,7 +370,7 @@ Types inferred from the contract are for reference only. The actual types depend
 :::
 
 ::: details Passing runtime values into contract meta?
-Contracts are defined separately from your app, so anything inside `tanstackQuery` cannot import runtime values such as your router utils. Instead, [register a global meta type](https://tanstack.com/query/latest/docs/framework/react/typescript#registering-global-meta) and pass the values through the `meta` option. The example below reads router utils from `fnContext.meta` to optimistically update a query:
+Contracts are defined separately from your app, so anything inside `tanstackQuery` cannot import runtime values such as your router utils. Instead, [register a global meta type](https://tanstack.com/query/latest/docs/framework/react/typescript#registering-global-meta) and pass the values through the `meta` option, per hook or globally via query client default options. The example below reads router utils from `fnContext.meta` to optimistically update a query:
 
 ```ts
 import type { RouterContractClient } from '@orpc/contract'
@@ -421,9 +421,13 @@ export const contract = {
   },
 }
 
-const mutation = useMutation(orpc.planet.update.mutationOptions({
-  meta: { utils: orpc },
-}))
+const queryClient = new QueryClient({
+  defaultOptions: {
+    mutations: {
+      meta: { utils: orpc },
+    },
+  },
+})
 ```
 
 :::
