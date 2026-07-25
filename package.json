@@ -62,7 +62,7 @@
     "sherif": "^1.11.1",
     "simple-git-hooks": "^2.13.1",
     "supertest": "^7.2.2",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "unbuild": "^3.6.1",
     "valibot": "^1.4.1",
     "vite": "^8.1.0",
