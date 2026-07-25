@@ -24,7 +24,7 @@ import type {
   ZodTypeAny,
   ZodUnion,
 } from 'zod/v3'
-import { guard, isObject } from '@orpc/shared'
+import { guard, isObject, NullProtoObj } from '@orpc/shared'
 import { ZodFirstPartyTypeKind } from 'zod/v3'
 import { getCustomZodDef } from './schemas/base'
 
@@ -146,16 +146,22 @@ function zodCoerceInternal(
       const schema_ = schema as ZodObject<{ [k: string]: ZodTypeAny }>
 
       if (isObject(value)) {
-        const newObj: Record<string, unknown> = {}
+        /**
+         * Keys come from untrusted input, a null-prototype object keeps
+         * `newObj[key] = value` from reaching `Object.prototype` members like `__proto__`.
+         */
+        const newObj: Record<string, unknown> = new NullProtoObj()
+
+        const shape = schema_.shape
 
         const keys = new Set([
           ...Object.keys(value),
-          ...Object.keys(schema_.shape),
+          ...Object.keys(shape),
         ])
 
         for (const k of keys) {
           newObj[k] = zodCoerceInternal(
-            schema_.shape[k] ?? schema_._def.catchall,
+            (Object.hasOwn(shape, k) ? shape[k] : undefined) ?? schema_._def.catchall,
             value[k],
           )
         }
@@ -170,7 +176,7 @@ function zodCoerceInternal(
       const schema_ = schema as ZodRecord
 
       if (isObject(value)) {
-        const newObj: any = {}
+        const newObj: any = new NullProtoObj()
 
         for (const [k, v] of Object.entries(value)) {
           const key = zodCoerceInternal(schema_._def.keyType, k)

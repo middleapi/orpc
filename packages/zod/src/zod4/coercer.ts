@@ -22,7 +22,7 @@ import type {
   $ZodType,
   $ZodUnion,
 } from 'zod/v4/core'
-import { guard, isObject } from '@orpc/shared'
+import { guard, isObject, NullProtoObj } from '@orpc/shared'
 
 /**
  * @deprecated Use [Smart Coercion Plugin](https://orpc.dev/docs/openapi/plugins/smart-coercion) instead.
@@ -164,15 +164,21 @@ export class experimental_ZodSmartCoercionPlugin<TContext extends Context> imple
         }
 
         if (isObject(value)) {
-          const newObj: Record<string, unknown> = {}
+          /**
+           * Keys come from untrusted input, a null-prototype object keeps
+           * `newObj[key] = value` from reaching `Object.prototype` members like `__proto__`.
+           */
+          const newObj: Record<string, unknown> = new NullProtoObj()
+
+          const shape = object._zod.def.shape
 
           const keys = new Set([
             ...Object.keys(value),
-            ...Object.keys(object._zod.def.shape),
+            ...Object.keys(shape),
           ])
 
           for (const k of keys) {
-            const s = object._zod.def.shape[k] ?? object._zod.def.catchall
+            const s = (Object.hasOwn(shape, k) ? shape[k] : undefined) ?? object._zod.def.catchall
             newObj[k] = s ? this.#coerce(s, value[k]) : value[k]
           }
 
@@ -190,7 +196,7 @@ export class experimental_ZodSmartCoercionPlugin<TContext extends Context> imple
         }
 
         if (isObject(value)) {
-          const newObj: Record<string, unknown> = {}
+          const newObj: Record<string, unknown> = new NullProtoObj()
 
           for (const [k, v] of Object.entries(value)) {
             const key = this.#coerce(record._zod.def.keyType, k)
