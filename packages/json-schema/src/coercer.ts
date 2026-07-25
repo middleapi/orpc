@@ -1,5 +1,5 @@
 import type { JsonSchema } from './types'
-import { guard, isObject, toArray } from '@orpc/shared'
+import { guard, isObject, NullProtoObj, toArray } from '@orpc/shared'
 import { JsonSchemaXNativeType } from './types'
 
 const FLEXIBLE_DATE_FORMAT_REGEX = /^[^-]+-[^-]+-[^-]+$/
@@ -166,14 +166,18 @@ export class JsonSchemaCoercer {
 
           if (isObject(coerced)) {
             let shouldUseCoercedItems = false
-            const coercedItems: Record<string, unknown> = {}
+            /**
+             * Use a null-prototype object, keys come from untrusted input
+             * so `coercedItems[key] = value` must never touch `Object.prototype` members like `__proto__`.
+             */
+            const coercedItems: Record<string, unknown> = new NullProtoObj()
 
             const patternProperties = Object.entries(schema.patternProperties ?? {})
               .map(([key, value]) => [new RegExp(key), value] as const)
 
             for (const key in coerced) {
               const value = coerced[key]
-              const subSchema = schema.properties?.[key]
+              const subSchema = (schema.properties !== undefined && Object.hasOwn(schema.properties, key) ? schema.properties[key] : undefined)
                 ?? patternProperties.find(([pattern]) => pattern.test(key))?.[1]
                 ?? schema.additionalProperties
 

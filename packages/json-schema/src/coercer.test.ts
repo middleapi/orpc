@@ -162,6 +162,35 @@ describe('jsonSchemaCoercer', () => {
     ).toEqual({ 0: 123, 1: true })
   })
 
+  it('prevents prototype injection when coercing objects', () => {
+    const schema = {
+      type: 'object',
+      properties: { a: { type: 'number' } },
+      additionalProperties: { type: 'boolean' },
+    } as any
+
+    const coerced: any = coercer.coerce(schema, JSON.parse('{"a":"123","__proto__":{"polluted":"true"}}'))
+
+    // `__proto__` must stay a normal own property instead of replacing the prototype
+    expect(coerced.a).toBe(123)
+    expect(Object.hasOwn(coerced, '__proto__')).toBe(true)
+    expect(Object.getOwnPropertyDescriptor(coerced, '__proto__')!.value).toEqual({ polluted: 'true' })
+    expect(coerced.polluted).toBeUndefined()
+    expect(({} as any).polluted).toBeUndefined()
+
+    // `Object.prototype` members must not be used as sub-schemas
+    const unionSchema = {
+      anyOf: [
+        { type: 'object', properties: { a: { type: 'number' } } },
+        { type: 'object', additionalProperties: { type: 'boolean' } },
+      ],
+    } as any
+
+    expect(coercer.coerce(unionSchema, { constructor: 'true' })).toEqual({ constructor: true })
+    expect(coercer.coerce(unionSchema, { toString: 'true' })).toEqual({ toString: true })
+    expect(coercer.coerce(unionSchema, JSON.parse('{"__proto__":"true"}'))).toEqual({ ['__proto__']: true })
+  })
+
   it('can handle union types', () => {
     const schema = {
       anyOf: [
