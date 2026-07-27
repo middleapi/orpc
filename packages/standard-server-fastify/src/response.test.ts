@@ -343,5 +343,70 @@ describe('sendStandardResponse', () => {
 
       expect(reply.send).not.toHaveBeenCalled()
     })
+
+    it('rejects when response was destroyed with an error', async () => {
+      let clean = false
+      const body = (async function* () {
+        try {
+          yield 1
+        }
+        finally {
+          clean = true
+        }
+      })()
+
+      const raw = new Writable({
+        write(chunk, encoding, callback) {
+          callback()
+        },
+      })
+
+      raw.once('error', () => {})
+      raw.destroy(new Error('test'))
+
+      const reply = {
+        raw,
+        status: vi.fn(),
+        headers: vi.fn(),
+        send: vi.fn(),
+      } as any
+
+      await expect(sendStandardResponse(reply, {
+        status: 200,
+        headers: {},
+        body,
+      })).rejects.toThrow('test')
+
+      await vi.waitFor(() => {
+        expect(clean).toBe(true)
+      })
+
+      expect(reply.send).not.toHaveBeenCalled()
+    })
+
+    it('resolves when body is not a stream', async () => {
+      const raw = new Writable({
+        write(chunk, encoding, callback) {
+          callback()
+        },
+      })
+
+      raw.destroy()
+
+      const reply = {
+        raw,
+        status: vi.fn(),
+        headers: vi.fn(),
+        send: vi.fn(),
+      } as any
+
+      await expect(sendStandardResponse(reply, {
+        status: 200,
+        headers: {},
+        body: { foo: 'bar' },
+      })).resolves.toBeUndefined()
+
+      expect(reply.send).not.toHaveBeenCalled()
+    })
   })
 })
