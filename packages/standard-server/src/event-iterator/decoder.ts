@@ -53,23 +53,67 @@ export interface EventDecoderOptions {
   onEvent?: (event: EventMessage) => void
 }
 
+/**
+ * Buffers incoming SSE chunks and emits a decoded {@link EventMessage} for
+ * each complete `\n\n`-terminated event.
+ *
+ * Chunks are kept in an array rather than concatenated into one string.
+ * `'\n\n'` is 2 characters, so it can only appear (a) inside one incoming
+ * chunk, or (b) split exactly across the boundary between the previous
+ * chunk's last character and this chunk's first — never spanning 3+ chunks.
+ * So each `feed` only needs to check the new chunk (bounded by that chunk's
+ * own size) plus one carried-over character, not the buffered backlog.
+ * `chunks.join('')` — the only operation whose cost depends on the backlog
+ * size — runs once per completed event rather than once per chunk.
+ *
+ * The previous implementation kept a single growing string (`incomplete +=
+ * chunk`) and called `incomplete.lastIndexOf('\n\n')` on every `feed`. That
+ * search is O(n) in the buffered length so far, and for one large event
+ * delivered across many small chunks — no `'\n\n'` appears until the event
+ * completes — every intermediate call pays that O(n) cost just to confirm
+ * absence, making the whole decode O(n^2) in that event's size. A `fromIndex`
+ * does not fix it either: a string built by repeated `+=` is represented as a
+ * rope (V8's ConsString), and any read forces reflattening the whole rope
+ * regardless of where the search starts.
+ */
 export class EventDecoder {
-  private incomplete: string = ''
+  private chunks: string[] = []
+  private chunksLength = 0
+  private lastChar = ''
 
   constructor(private options: EventDecoderOptions = {}) {
   }
 
   feed(chunk: string): void {
-    this.incomplete += chunk
-
-    const lastCompleteIndex = this.incomplete.lastIndexOf('\n\n')
-
-    if (lastCompleteIndex === -1) {
+    if (chunk.length === 0) {
       return
     }
 
-    const completes = this.incomplete.slice(0, lastCompleteIndex).split(/\n\n/)
-    this.incomplete = this.incomplete.slice(lastCompleteIndex + 2)
+    const boundaryDelimiter = this.lastChar === '\n' && chunk.charCodeAt(0) === 10
+    const hasDelimiterInChunk = chunk.includes('\n\n')
+
+    this.chunks.push(chunk)
+    this.chunksLength += chunk.length
+    this.lastChar = chunk.slice(-1)
+
+    if (!boundaryDelimiter && !hasDelimiterInChunk) {
+      return
+    }
+
+    const incomplete = this.chunks.join('')
+    const lastCompleteIndex = incomplete.lastIndexOf('\n\n')
+
+    if (lastCompleteIndex === -1) {
+      this.chunks = [incomplete]
+      return
+    }
+
+    const completes = incomplete.slice(0, lastCompleteIndex).split(/\n\n/)
+    const remainder = incomplete.slice(lastCompleteIndex + 2)
+
+    this.chunks = remainder.length > 0 ? [remainder] : []
+    this.chunksLength = remainder.length
+    this.lastChar = remainder.slice(-1)
 
     for (const encoded of completes) {
       const message = decodeEventMessage(`${encoded}\n\n`)
@@ -81,7 +125,7 @@ export class EventDecoder {
   }
 
   end(): void {
-    if (this.incomplete) {
+    if (this.chunksLength > 0) {
       throw new EventDecoderError('Event Iterator ended before complete')
     }
   }

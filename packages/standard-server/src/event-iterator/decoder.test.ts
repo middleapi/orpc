@@ -158,6 +158,44 @@ describe('eventDecoder', () => {
       comments: [],
     })
   })
+
+  it('decodes identically no matter how a message is split across feed calls', () => {
+    const full = 'id: 1\nevent: a\ndata: {"x":1}\n\nid: 2\nevent: b\ndata: {"x":2}\n\nid: 3\nevent: c\ndata: {"x":3}\n\n'
+
+    for (const chunkSize of [1, 2, 3, 7, 1000]) {
+      const onEvent = vi.fn()
+      const decoder = new EventDecoder({ onEvent })
+
+      for (let i = 0; i < full.length; i += chunkSize) {
+        decoder.feed(full.slice(i, i + chunkSize))
+      }
+      decoder.end()
+
+      expect(onEvent.mock.calls.map(([event]) => event.id)).toEqual(['1', '2', '3'])
+    }
+  })
+
+  it('decodes a large single event fed in many small chunks, and stays fast doing it', () => {
+    const onEvent = vi.fn()
+    const decoder = new EventDecoder({ onEvent })
+
+    // Regression test for a quadratic-time bug: the previous implementation
+    // buffered chunks into one growing string and re-scanned the whole thing
+    // on every feed(), which made decoding a single large event O(n^2) in its
+    // size. A 6MB event fed in 64-byte chunks took minutes under that
+    // implementation; this must complete well within the test timeout.
+    const chunk = 'x'.repeat(64)
+    const chunkCount = Math.floor((6 * 1024 * 1024) / chunk.length)
+
+    for (let i = 0; i < chunkCount; i++) {
+      decoder.feed(chunk)
+    }
+    decoder.feed('\n\n')
+    decoder.end()
+
+    expect(onEvent).toHaveBeenCalledTimes(1)
+    expect(onEvent.mock.calls[0][0].comments).toEqual([])
+  }, 2000)
 })
 
 describe('eventDecoderStream', () => {
