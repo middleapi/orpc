@@ -1,7 +1,7 @@
 {
   "name": "@orpc/contract-first-playground",
   "type": "module",
-  "version": "1.14.10",
+  "version": "1.14.12",
   "private": true,
   "scripts": {
     "dev": "tsx --watch src/main.ts",
