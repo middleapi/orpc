@@ -302,4 +302,69 @@ describe('sendStandardResponse', () => {
       await sendPromise
     })
   })
+
+  describe('response closed before sending', () => {
+    it('resolves and destroys the body', async () => {
+      let clean = false
+      const res: StandardResponse = {
+        body: (async function* () {
+          try {
+            yield 1
+          }
+          finally {
+            clean = true
+          }
+        })(),
+        headers: {},
+        status: 200,
+      }
+
+      const responseStream = new Stream.Writable({
+        write(chunk, encoding, callback) {
+          callback()
+        },
+      })
+
+      ;(responseStream as any).writeHead = vi.fn()
+
+      responseStream.destroy()
+
+      await vi.waitFor(() => {
+        expect(responseStream.closed).toBe(true)
+      })
+
+      await expect(sendStandardResponse(responseStream as any, res)).resolves.toBeUndefined()
+
+      await vi.waitFor(() => {
+        expect(clean).toBe(true)
+      })
+
+      expect((responseStream as any).writeHead).not.toHaveBeenCalled()
+    })
+
+    it('rejects when response was destroyed with an error', async () => {
+      const responseStream = new Stream.Writable({
+        write(chunk, encoding, callback) {
+          callback()
+        },
+      })
+
+      ;(responseStream as any).writeHead = vi.fn()
+
+      responseStream.once('error', () => {})
+      responseStream.destroy(new Error('test'))
+
+      await vi.waitFor(() => {
+        expect(responseStream.closed).toBe(true)
+      })
+
+      await expect(sendStandardResponse(responseStream as any, {
+        body: { foo: 'bar' },
+        headers: {},
+        status: 200,
+      })).rejects.toThrow('test')
+
+      expect((responseStream as any).writeHead).not.toHaveBeenCalled()
+    })
+  })
 })

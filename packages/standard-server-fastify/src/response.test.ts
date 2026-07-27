@@ -1,4 +1,4 @@
-import { Readable } from 'node:stream'
+import { Readable, Writable } from 'node:stream'
 import FastifyCookie from '@fastify/cookie'
 import * as StandardServerNode from '@orpc/standard-server-node'
 import Fastify from 'fastify'
@@ -301,6 +301,47 @@ describe('sendStandardResponse', () => {
       })
 
       expect(res.text).toEqual(JSON.stringify({ foo: 'bar' }))
+    })
+  })
+
+  describe('response closed before sending', () => {
+    it('resolves and destroys the body', async () => {
+      let clean = false
+      const body = (async function* () {
+        try {
+          yield 1
+        }
+        finally {
+          clean = true
+        }
+      })()
+
+      const raw = new Writable({
+        write(chunk, encoding, callback) {
+          callback()
+        },
+      })
+
+      raw.destroy()
+
+      const reply = {
+        raw,
+        status: vi.fn(),
+        headers: vi.fn(),
+        send: vi.fn(),
+      } as any
+
+      await expect(sendStandardResponse(reply, {
+        status: 200,
+        headers: {},
+        body,
+      })).resolves.toBeUndefined()
+
+      await vi.waitFor(() => {
+        expect(clean).toBe(true)
+      })
+
+      expect(reply.send).not.toHaveBeenCalled()
     })
   })
 })

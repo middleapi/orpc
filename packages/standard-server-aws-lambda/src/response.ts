@@ -12,10 +12,25 @@ export function sendStandardResponse(
   options: SendStandardResponseOptions = {},
 ): Promise<void> {
   return new Promise((resolve, reject) => {
+    const [body, standardHeaders] = toLambdaBody(standardResponse.body, standardResponse.headers, options)
+
+    if (responseStream.closed || responseStream.destroyed) {
+      if (typeof body === 'object' && !body.closed) {
+        body.destroy(responseStream.errored ?? undefined)
+      }
+
+      if (responseStream.errored) {
+        reject(responseStream.errored)
+      }
+      else {
+        resolve()
+      }
+
+      return
+    }
+
     responseStream.once('error', reject)
     responseStream.once('close', resolve)
-
-    const [body, standardHeaders] = toLambdaBody(standardResponse.body, standardResponse.headers, options)
     const [headers, setCookies] = toLambdaHeaders(standardHeaders)
 
     // awslambda is global aws lambda global object

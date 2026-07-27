@@ -3,6 +3,7 @@ import type { ToNodeHttpBodyOptions } from './body'
 import type { NodeHttpResponse } from './types'
 import { toNodeHttpBody } from './body'
 import { toNodeHttpHeaders } from './headers'
+import { isNodeResponseStreamEnded } from './utils'
 
 export interface SendStandardResponseOptions extends ToNodeHttpBodyOptions {}
 
@@ -12,12 +13,27 @@ export function sendStandardResponse(
   options: SendStandardResponseOptions = {},
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    res.once('error', reject)
-    res.once('close', resolve)
-
     const resHeaders: StandardHeaders = { ...standardResponse.headers }
 
     const resBody = toNodeHttpBody(standardResponse.body, resHeaders, options)
+
+    if (isNodeResponseStreamEnded(res)) {
+      if (typeof resBody === 'object' && !resBody.closed) {
+        resBody.destroy(res.errored ?? undefined)
+      }
+
+      if (res.errored) {
+        reject(res.errored)
+      }
+      else {
+        resolve()
+      }
+
+      return
+    }
+
+    res.once('error', reject)
+    res.once('close', resolve)
 
     // Node.js throws an error when a header is undefined, so remember to use toNodeHttpHeaders
     // to filter out undefined headers
