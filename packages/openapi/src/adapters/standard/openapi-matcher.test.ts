@@ -185,6 +185,147 @@ describe('standardOpenAPIMatcher', () => {
     expect(pongLoader).toHaveBeenCalledTimes(4)
   })
 
+  it('lazy router inside lazy router with concurrent requests', async () => {
+    const base = os.$context<any>()
+
+    let resolveNested!: (value: { default: any }) => void
+    const nestedLoader = vi.fn(() => new Promise<{ default: any }>((resolve) => {
+      resolveNested = resolve
+    }))
+    const pongLoader = vi.fn(() => Promise.resolve({ default: pong }))
+
+    const rpcMatcher = new StandardOpenAPIMatcher()
+    rpcMatcher.init(base.router({
+      nested: base.lazy(nestedLoader),
+    }))
+
+    const match1 = rpcMatcher.match('POST', '/nested/pong')
+    const match2 = rpcMatcher.match('POST', '/nested/pong')
+
+    expect(nestedLoader).toHaveBeenCalledTimes(1)
+
+    resolveNested({ default: { pong: base.lazy(pongLoader) } })
+
+    expect(await match1).toEqual({
+      path: ['nested', 'pong'],
+      procedure: pong,
+    })
+
+    expect(await match2).toEqual({
+      path: ['nested', 'pong'],
+      procedure: pong,
+    })
+
+    expect(nestedLoader).toHaveBeenCalledTimes(1)
+    expect(pongLoader).toHaveBeenCalledTimes(1)
+
+    // subsequent requests still work without reloading
+    expect(await rpcMatcher.match('POST', '/nested/pong')).toEqual({
+      path: ['nested', 'pong'],
+      procedure: pong,
+    })
+
+    expect(nestedLoader).toHaveBeenCalledTimes(1)
+    expect(pongLoader).toHaveBeenCalledTimes(1)
+  })
+
+  it('multiple lazy routers with lazy router inside lazy router', async () => {
+    const base = os.$context<any>()
+
+    const userFindLoader = vi.fn(() => Promise.resolve({ default: pong }))
+    const usersLoader = vi.fn(() => Promise.resolve({
+      default: {
+        find: base.lazy(userFindLoader),
+      },
+    }))
+
+    const planetDeepLoader = vi.fn(() => Promise.resolve({ default: pong }))
+    const planetNestedLoader = vi.fn(() => Promise.resolve({
+      default: {
+        deep: base.lazy(planetDeepLoader),
+      },
+    }))
+    const planetsLoader = vi.fn(() => Promise.resolve({
+      default: {
+        nested: base.lazy(planetNestedLoader),
+        pong,
+      },
+    }))
+
+    const unusedLoader = vi.fn(() => Promise.resolve({ default: pong }))
+
+    const rpcMatcher = new StandardOpenAPIMatcher()
+    rpcMatcher.init(base.router({
+      users: base.prefix('/users').lazy(usersLoader),
+      planets: base.prefix('/planets').lazy(planetsLoader),
+      unused: base.prefix('/unused').lazy(unusedLoader),
+    }))
+
+    // concurrent requests across different lazy branches
+    const [match1, match2, match3] = await Promise.all([
+      rpcMatcher.match('POST', '/users/find'),
+      rpcMatcher.match('POST', '/planets/nested/deep'),
+      rpcMatcher.match('POST', '/planets/pong'),
+    ])
+
+    expect(match1).toEqual({
+      path: ['users', 'find'],
+      procedure: pong,
+    })
+
+    expect(match2).toEqual({
+      path: ['planets', 'nested', 'deep'],
+      procedure: pong,
+    })
+
+    expect(match3).toEqual({
+      path: ['planets', 'pong'],
+      procedure: pong,
+    })
+
+    expect(usersLoader).toHaveBeenCalledTimes(1)
+    expect(userFindLoader).toHaveBeenCalledTimes(1)
+    expect(planetsLoader).toHaveBeenCalledTimes(1)
+    expect(planetNestedLoader).toHaveBeenCalledTimes(1)
+    expect(planetDeepLoader).toHaveBeenCalledTimes(1)
+
+    // prefixed router not matched by any request stays lazy
+    expect(unusedLoader).toHaveBeenCalledTimes(0)
+
+    // subsequent requests still work without reloading
+    expect(await rpcMatcher.match('POST', '/planets/nested/deep')).toEqual({
+      path: ['planets', 'nested', 'deep'],
+      procedure: pong,
+    })
+
+    expect(planetsLoader).toHaveBeenCalledTimes(1)
+    expect(planetNestedLoader).toHaveBeenCalledTimes(1)
+    expect(planetDeepLoader).toHaveBeenCalledTimes(1)
+    expect(unusedLoader).toHaveBeenCalledTimes(0)
+  })
+
+  it('lazy router can retry after loader failure', async () => {
+    const base = os.$context<any>()
+
+    const pongLoader = vi.fn()
+      .mockRejectedValueOnce(new Error('loader failed'))
+      .mockResolvedValueOnce({ default: pong })
+
+    const rpcMatcher = new StandardOpenAPIMatcher()
+    rpcMatcher.init(base.router({
+      pong: base.lazy(pongLoader),
+    }))
+
+    await expect(rpcMatcher.match('POST', '/pong')).rejects.toThrow('loader failed')
+
+    expect(await rpcMatcher.match('POST', '/pong')).toEqual({
+      path: ['pong'],
+      procedure: pong,
+    })
+
+    expect(pongLoader).toHaveBeenCalledTimes(2)
+  })
+
   it('/ in path', async () => {
     const ping1 = new Procedure({
       ...ping['~orpc'],

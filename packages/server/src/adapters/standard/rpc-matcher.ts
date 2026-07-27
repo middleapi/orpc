@@ -34,7 +34,10 @@ export class StandardRPCMatcher implements StandardMatcher {
     }
   > = new NullProtoObj()
 
-  private pendingRouters: (LazyTraverseContractProceduresOptions & { httpPathPrefix: HTTPPath }) [] = []
+  private readonly pendingRouters: (LazyTraverseContractProceduresOptions & {
+    httpPathPrefix: HTTPPath
+    initPromise?: Promise<void>
+  }) [] = []
 
   constructor(options: StandardRPCMatcherOptions = {}) {
     this.filter = options.filter ?? true
@@ -75,20 +78,33 @@ export class StandardRPCMatcher implements StandardMatcher {
   }
 
   async match(_method: string, pathname: HTTPPath): Promise<StandardMatchResult> {
-    if (this.pendingRouters.length) {
-      const newPendingRouters: typeof this.pendingRouters = []
+    /**
+     * Resolve pending routers one at a time and re-scan after each, so lazy routers
+     * nested inside a just-initialized lazy router are also picked up.
+     */
+    while (true) {
+      const pendingRouter = this.pendingRouters.find(
+        pendingRouter => pathname.startsWith(pendingRouter.httpPathPrefix),
+      )
 
-      for (const pendingRouter of this.pendingRouters) {
-        if (pathname.startsWith(pendingRouter.httpPathPrefix)) {
-          const { default: router } = await unlazy(pendingRouter.router)
-          this.init(router, pendingRouter.path)
-        }
-        else {
-          newPendingRouters.push(pendingRouter)
-        }
+      if (!pendingRouter) {
+        break
       }
 
-      this.pendingRouters = newPendingRouters
+      /**
+       * Memoize the init work and only remove the pending router after it finishes,
+       * so concurrent requests share a single init instead of re-initializing
+       * the same router or dropping pending routers pushed by each other.
+       */
+      pendingRouter.initPromise ??= unlazy(pendingRouter.router).then(({ default: router }) => {
+        this.init(router, pendingRouter.path)
+        this.pendingRouters.splice(this.pendingRouters.indexOf(pendingRouter), 1)
+      }).catch((error) => {
+        pendingRouter.initPromise = undefined // allow retrying on failure
+        throw error
+      })
+
+      await pendingRouter.initPromise
     }
 
     const match = this.tree[pathname]

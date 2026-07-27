@@ -29,7 +29,11 @@ export class StandardOpenAPIMatcher implements StandardMatcher {
     router: AnyRouter
   }>()
 
-  private pendingRouters: (LazyTraverseContractProceduresOptions & { httpPathPrefix: HTTPPath, laziedPrefix: string | undefined }) [] = []
+  private readonly pendingRouters: (LazyTraverseContractProceduresOptions & {
+    httpPathPrefix: HTTPPath
+    laziedPrefix: string | undefined
+    initPromise?: Promise<void>
+  }) [] = []
 
   constructor(options: StandardOpenAPIMatcherOptions = {}) {
     this.filter = options.filter ?? true
@@ -72,24 +76,35 @@ export class StandardOpenAPIMatcher implements StandardMatcher {
   }
 
   async match(method: string, pathname: HTTPPath): Promise<StandardMatchResult> {
-    if (this.pendingRouters.length) {
-      const newPendingRouters: typeof this.pendingRouters = []
-
-      for (const pendingRouter of this.pendingRouters) {
-        if (
-          !pendingRouter.laziedPrefix
+    /**
+     * Resolve pending routers one at a time and re-scan after each, so lazy routers
+     * nested inside a just-initialized lazy router are also picked up.
+     */
+    while (true) {
+      const pendingRouter = this.pendingRouters.find(
+        pendingRouter => !pendingRouter.laziedPrefix
           || pathname.startsWith(pendingRouter.laziedPrefix)
-          || pathname.startsWith(pendingRouter.httpPathPrefix)
-        ) {
-          const { default: router } = await unlazy(pendingRouter.router)
-          this.init(router, pendingRouter.path)
-        }
-        else {
-          newPendingRouters.push(pendingRouter)
-        }
+          || pathname.startsWith(pendingRouter.httpPathPrefix),
+      )
+
+      if (!pendingRouter) {
+        break
       }
 
-      this.pendingRouters = newPendingRouters
+      /**
+       * Memoize the init work and only remove the pending router after it finishes,
+       * so concurrent requests share a single init instead of re-initializing
+       * the same router or dropping pending routers pushed by each other.
+       */
+      pendingRouter.initPromise ??= unlazy(pendingRouter.router).then(({ default: router }) => {
+        this.init(router, pendingRouter.path)
+        this.pendingRouters.splice(this.pendingRouters.indexOf(pendingRouter), 1)
+      }).catch((error) => {
+        pendingRouter.initPromise = undefined // allow retrying on failure
+        throw error
+      })
+
+      await pendingRouter.initPromise
     }
 
     const match = findRoute(this.tree, method, pathname)
