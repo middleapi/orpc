@@ -19,7 +19,7 @@ export function sendStandardResponse(
 
     if (isNodeResponseStreamEnded(res)) {
       if (typeof resBody === 'object' && !resBody.closed) {
-        resBody.destroy(res.errored ?? undefined)
+        resBody.destroy()
       }
 
       if (res.errored) {

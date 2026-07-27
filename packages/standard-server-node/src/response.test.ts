@@ -343,6 +343,20 @@ describe('sendStandardResponse', () => {
     })
 
     it('rejects when response was destroyed with an error', async () => {
+      let clean = false
+      const res: StandardResponse = {
+        body: (async function* () {
+          try {
+            yield 1
+          }
+          finally {
+            clean = true
+          }
+        })(),
+        headers: {},
+        status: 200,
+      }
+
       const responseStream = new Stream.Writable({
         write(chunk, encoding, callback) {
           callback()
@@ -358,11 +372,11 @@ describe('sendStandardResponse', () => {
         expect(responseStream.closed).toBe(true)
       })
 
-      await expect(sendStandardResponse(responseStream as any, {
-        body: { foo: 'bar' },
-        headers: {},
-        status: 200,
-      })).rejects.toThrow('test')
+      await expect(sendStandardResponse(responseStream as any, res)).rejects.toThrow('test')
+
+      await vi.waitFor(() => {
+        expect(clean).toBe(true)
+      })
 
       expect((responseStream as any).writeHead).not.toHaveBeenCalled()
     })

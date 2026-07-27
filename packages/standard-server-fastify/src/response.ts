@@ -17,7 +17,7 @@ export function sendStandardResponse(
 
     if (isNodeResponseStreamEnded(reply.raw)) {
       if (typeof resBody === 'object' && !resBody.closed) {
-        resBody.destroy(reply.raw.errored ?? undefined)
+        resBody.destroy()
       }
 
       if (reply.raw.errored) {

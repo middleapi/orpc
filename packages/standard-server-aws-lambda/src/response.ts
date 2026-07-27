@@ -16,7 +16,7 @@ export function sendStandardResponse(
 
     if (responseStream.closed || responseStream.destroyed) {
       if (typeof body === 'object' && !body.closed) {
-        body.destroy(responseStream.errored ?? undefined)
+        body.destroy()
       }
 
       if (responseStream.errored) {
