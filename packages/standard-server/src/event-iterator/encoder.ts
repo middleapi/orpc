@@ -1,15 +1,22 @@
 import type { EventMessage } from './types'
 import { EventEncoderError } from './errors'
 
+const LINE_ENDING_REGEX = /\r\n|[\n\r]/
+const LINE_ENDING_GLOBAL_REGEX = /\r\n|[\n\r]/g
+
+function containsLineBreak(value: string): boolean {
+  return LINE_ENDING_REGEX.test(value)
+}
+
 export function assertEventId(id: string): void {
-  if (id.includes('\n')) {
-    throw new EventEncoderError('Event\'s id must not contain a newline character')
+  if (containsLineBreak(id)) {
+    throw new EventEncoderError('Event\'s id must not contain a carriage return or newline character')
   }
 }
 
 export function assertEventName(event: string): void {
-  if (event.includes('\n')) {
-    throw new EventEncoderError('Event\'s event must not contain a newline character')
+  if (containsLineBreak(event)) {
+    throw new EventEncoderError('Event\'s event must not contain a carriage return or newline character')
   }
 }
 
@@ -20,21 +27,17 @@ export function assertEventRetry(retry: number): void {
 }
 
 export function assertEventComment(comment: string): void {
-  if (comment.includes('\n')) {
-    throw new EventEncoderError('Event\'s comment must not contain a newline character')
+  if (containsLineBreak(comment)) {
+    throw new EventEncoderError('Event\'s comment must not contain a carriage return or newline character')
   }
 }
 
 export function encodeEventData(data: string | undefined): string {
-  const lines = data?.split(/\n/) ?? []
-
-  let output = ''
-
-  for (const line of lines) {
-    output += `data: ${line}\n`
+  if (data === undefined) {
+    return ''
   }
 
-  return output
+  return `data: ${data.replace(LINE_ENDING_GLOBAL_REGEX, '\ndata: ')}\n`
 }
 
 export function encodeEventComments(comments: string[] | undefined): string {
