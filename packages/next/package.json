@@ -60,7 +60,7 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "next": "^16.2.11",
+    "next": "^16.2.12",
     "react": "^19.2.8"
   }
 }

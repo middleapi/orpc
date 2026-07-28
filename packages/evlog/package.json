@@ -51,6 +51,6 @@
     "@standardserver/core": "^0.5.0"
   },
   "devDependencies": {
-    "evlog": "^2.22.3"
+    "evlog": "^2.22.4"
   }
 }
