@@ -132,8 +132,8 @@ importers:
         specifier: ^17.2.0
         version: 17.2.0
       pkg-pr-new:
-        specifier: ^0.0.79
-        version: 0.0.79
+        specifier: ^0.0.81
+        version: 0.0.81
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -8525,8 +8525,8 @@ packages:
     resolution: {integrity: sha512-r34yH/GlQpKZbU1BvFFqOjhISRo1MNx1tWYsYvmj6KIRHSPMT2+yHOEb1SG6NMvRoHRF0a07kCOox/9yakl1vg==}
     hasBin: true
 
-  pkg-pr-new@0.0.79:
-    resolution: {integrity: sha512-ip74NzaakGZha5s/X1T7j+Ez9/bRNDhzxQZTfnzAzoI7zO9JnMRdoiIfCLyy+ZzxxXg8WXRW2WcdvdORI0O30w==}
+  pkg-pr-new@0.0.81:
+    resolution: {integrity: sha512-7KhFp8gWeHlXxzXelD80tOAniOgESRn1Ew8IDtEHAiCDkKDW6PPJl7HJl1Kad55rHUM8MLswJUSLdFSAuCAQ1w==}
     hasBin: true
 
   pkg-types@1.3.1:
@@ -18725,7 +18725,7 @@ snapshots:
       sonic-boom: 4.2.1
       thread-stream: 4.2.0
 
-  pkg-pr-new@0.0.79: {}
+  pkg-pr-new@0.0.81: {}
 
   pkg-types@1.3.1:
     dependencies:
