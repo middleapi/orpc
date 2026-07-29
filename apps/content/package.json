@@ -30,7 +30,7 @@
     "@tanstack/solid-query": "^5.101.4",
     "@tanstack/svelte-query": "^6.1.38",
     "@tanstack/vue-query": "^5.101.4",
-    "@types/node": "^26.0.1",
+    "@types/node": "^26.1.2",
     "@vueuse/core": "^14.3.0",
     "cytoscape": "^3.34.0",
     "cytoscape-cose-bilkent": "^4.1.0",
