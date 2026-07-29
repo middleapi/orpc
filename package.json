@@ -16,7 +16,7 @@
     "sponsors:sync": "node scripts/sync-sponsors.ts && eslint --max-warnings=0 --fix **/README.md apps/content/.vitepress/theme/sponsors.ts"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^9.0.0",
+    "@antfu/eslint-config": "^9.2.0",
     "@codspeed/vitest-plugin": "^5.7.1",
     "@hono/node-server": "^2.0.11",
     "@opentelemetry/api": "^1.9.1",
@@ -52,7 +52,7 @@
     "bumpp": "^12.0.0",
     "changelogithub": "^14.0.0",
     "crossws": "^0.4.6",
-    "eslint": "^10.5.0",
+    "eslint": "^10.8.0",
     "eslint-plugin-ban": "^2.0.0",
     "eslint-plugin-format": "^2.0.1",
     "jsdom": "^29.1.1",
