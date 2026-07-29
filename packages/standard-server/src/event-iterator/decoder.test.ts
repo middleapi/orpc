@@ -1,6 +1,19 @@
 import type { EventMessage } from './types'
 import { decodeEventMessage, EventDecoder, EventDecoderStream } from './decoder'
 
+function feedAll(chunks: string[]): EventMessage[] {
+  const events: EventMessage[] = []
+  const decoder = new EventDecoder({ onEvent: event => events.push(event) })
+
+  for (const chunk of chunks) {
+    decoder.feed(chunk)
+  }
+
+  decoder.end()
+
+  return events
+}
+
 describe('decodeEventMessage', () => {
   it('on success', () => {
     expect(decodeEventMessage('\n')).toEqual({
@@ -45,10 +58,37 @@ describe('decodeEventMessage', () => {
       data: ' hello\n world',
       comments: [' hi'],
     })
+
+    // Per spec, only a single U+0020 SPACE is stripped — not tabs.
+    expect(decodeEventMessage('data:\thello\n\n')).toEqual({
+      data: '\thello',
+      comments: [],
+    })
+  })
+
+  it('supports LF, CR, and CRLF line endings', () => {
+    expect(decodeEventMessage('event: message\rdata: hello\r\ndata: world\rid: 123\r\nretry: 10000\r\r\n')).toEqual({
+      event: 'message',
+      data: 'hello\nworld',
+      id: '123',
+      retry: 10000,
+      comments: [],
+    })
+  })
+
+  it('treats lines without a colon as fields with empty values', () => {
+    expect(decodeEventMessage('data\n\n')).toEqual({ data: '', comments: [] })
+    expect(decodeEventMessage('data:\n\n')).toEqual({ data: '', comments: [] })
+    expect(decodeEventMessage('data: a\ndata:\ndata: b\n\n')).toEqual({ data: 'a\n\nb', comments: [] })
+    expect(decodeEventMessage('event\ndata: x\n\n')).toEqual({ event: '', data: 'x', comments: [] })
   })
 
   it('unknown keys', () => {
     expect(decodeEventMessage('foo: bar\n\n')).toEqual({
+      comments: [],
+    })
+
+    expect(decodeEventMessage('Data: x\nEVENT: y\n\n')).toEqual({
       comments: [],
     })
   })
@@ -61,6 +101,11 @@ describe('decodeEventMessage', () => {
   })
 
   it('invalid retry', () => {
+    expect(decodeEventMessage('retry: 0\n\n')).toEqual({
+      retry: 0,
+      comments: [],
+    })
+
     expect(decodeEventMessage('retry: hello\n\n')).toEqual({
       comments: [],
     })
@@ -78,6 +123,19 @@ describe('decodeEventMessage', () => {
     })
 
     expect(decodeEventMessage('retry: Infinity\n\n')).toEqual({
+      comments: [],
+    })
+
+    expect(decodeEventMessage('retry: 010\n\n')).toEqual({
+      comments: [],
+    })
+
+    expect(decodeEventMessage('retry: +10\n\n')).toEqual({
+      comments: [],
+    })
+
+    // extra space survives the single-space strip
+    expect(decodeEventMessage('retry:  10\n\n')).toEqual({
       comments: [],
     })
   })
@@ -137,6 +195,121 @@ describe('eventDecoder', () => {
       retry: 10000,
       comments: [],
     })
+  })
+
+  it('ignores empty chunks', () => {
+    expect(feedAll(['', 'data: hello', '', '\n\n', ''])).toEqual([
+      { data: 'hello', comments: [] },
+    ])
+  })
+
+  it('emits the same events regardless of chunk size', () => {
+    const stream = 'event: a\r\ndata: 1\r\n\r\n: comment\ndata: 2\ndata: 3\n\nid: 9\rretry: 50\rdata: 4\r\revent: done\ndata: bye\n\n'
+
+    const expected = feedAll([stream])
+    expect(expected).toHaveLength(4)
+
+    for (const size of [1, 2, 3, 4, 5, 7, 11]) {
+      const chunks: string[] = []
+      for (let i = 0; i < stream.length; i += size) {
+        chunks.push(stream.slice(i, i + size))
+      }
+
+      expect(feedAll(chunks), `chunk size ${size}`).toEqual(expected)
+    }
+  })
+
+  it('decodes a large message fed in many small chunks', () => {
+    const value = 'x'.repeat(64 * 1024)
+    const stream = `event: big\ndata: ${value}\ndata: ${value}\n\n`
+
+    const chunks: string[] = []
+    for (let i = 0; i < stream.length; i += 251) {
+      chunks.push(stream.slice(i, i + 251))
+    }
+
+    expect(feedAll(chunks)).toEqual([
+      { event: 'big', data: `${value}\n${value}`, comments: [] },
+    ])
+  })
+
+  it('handles every delimiter split at every position', () => {
+    for (const delimiter of ['\n\n', '\r\r', '\n\r', '\n\r\n', '\r\n\n', '\r\n\r\n']) {
+      const stream = `data: first${delimiter}data: second${delimiter}`
+
+      for (let split = 1; split < stream.length; split++) {
+        const events = feedAll([stream.slice(0, split), stream.slice(split)])
+
+        expect(events, `delimiter ${JSON.stringify(delimiter)} split at ${split}`).toEqual([
+          { data: 'first', comments: [] },
+          { data: 'second', comments: [] },
+        ])
+      }
+    }
+  })
+
+  it('handles CR & CRLF delimiters', () => {
+    const events = feedAll([
+      'event: message\rdata: hello\r\ndata: world\r',
+      '\r\nevent: done\r',
+      'data: bye\r\n\r',
+    ])
+
+    expect(events).toEqual([
+      { event: 'message', data: 'hello\nworld', comments: [] },
+      { event: 'done', data: 'bye', comments: [] },
+    ])
+  })
+
+  it('handles CRLF line endings split across chunks', () => {
+    const events = feedAll([
+      'event: message\r',
+      '\ndata: hello\r',
+      '\ndata: world\r',
+      '\n\r',
+      '\n',
+      'event: done\rdata: bye\r\r',
+    ])
+
+    expect(events).toEqual([
+      { event: 'message', data: 'hello\nworld', comments: [] },
+      { event: 'done', data: 'bye', comments: [] },
+    ])
+  })
+
+  it('keeps the CRLF discard window open across empty chunks', () => {
+    const events = feedAll([
+      'data: first\n\r',
+      '',
+      '\n\ndata: second\n\n',
+    ])
+
+    expect(events).toEqual([
+      { data: 'first', comments: [] },
+      { data: 'second', comments: [] },
+    ])
+  })
+
+  // Per spec, the '\n' completes the buffered '\r' into a single CRLF line
+  // ending, so the following '\n' is a blank line terminating the message.
+  it('handles a CRLF+LF delimiter split between the CR and LF', () => {
+    const events = feedAll([
+      'data: first\r',
+      '\n\ndata: second\n\n',
+    ])
+
+    expect(events).toEqual([
+      { data: 'first', comments: [] },
+      { data: 'second', comments: [] },
+    ])
+  })
+
+  it('does not throw when nothing was fed or the stream completed cleanly', () => {
+    const decoder = new EventDecoder()
+    expect(() => decoder.end()).not.toThrow()
+
+    decoder.feed('data: hello\n\n')
+    expect(() => decoder.end()).not.toThrow()
   })
 
   it('on incomplete message', () => {
