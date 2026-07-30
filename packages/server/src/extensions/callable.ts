@@ -7,7 +7,7 @@ import type { ProcedureClient, ProcedureClientOptions } from '../procedure-clien
 import { createProcedureClient } from '../procedure-client'
 import { DecoratedProcedure } from '../procedure-decorated'
 
-declare module '../procedure-decorated' {
+declare module '@orpc/server' {
   interface DecoratedProcedure<
     TInitialContext extends Context,
     TInjectedContext extends Context,
