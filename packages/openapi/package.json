@@ -97,7 +97,7 @@
   "devDependencies": {
     "@scalar/api-reference": "^1.63.0",
     "@types/swagger-ui": "^5.32.0",
-    "fastify": "^5.8.5",
+    "fastify": "^5.11.0",
     "swagger-ui": "^5.32.11",
     "zod": "^4.4.3"
   }
