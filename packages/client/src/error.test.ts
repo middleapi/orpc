@@ -102,5 +102,12 @@ describe('oRPCError', () => {
     expect(new Error('message') instanceof ORPCError).toBe(false)
     expect(new CrossContextORPCError() instanceof ORPCError).toBe(true)
     expect(new ExtendedCrossContextORPCError() instanceof ORPCError).toBe(true)
+
+    // same-graph instances still match while multiple graphs exist
+    class ExtendedORPCError extends ORPCError<any, any> {}
+    expect(new ORPCError('test') instanceof ORPCError).toBe(true)
+    expect(new ExtendedORPCError('test') instanceof ORPCError).toBe(true)
+    expect(new ExtendedORPCError('test') instanceof ExtendedORPCError).toBe(true)
+    expect(new ORPCError('test') instanceof ExtendedORPCError).toBe(false)
   })
 })
