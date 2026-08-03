@@ -50,7 +50,7 @@
     "@vitest/coverage-v8": "^4.1.9",
     "arktype": "^2.2.1",
     "bumpp": "^12.1.1",
-    "changelogithub": "^14.0.0",
+    "changelogithub": "^15.0.4",
     "crossws": "^0.4.6",
     "eslint": "^10.8.0",
     "eslint-plugin-ban": "^2.0.0",
