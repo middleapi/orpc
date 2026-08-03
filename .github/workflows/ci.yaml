@@ -37,7 +37,7 @@ jobs:
           - 6379:6379
     strategy:
       matrix:
-        node-version: [26, 24, 22]
+        node-version: [26, 24, 22, 20]
       fail-fast: false
     steps:
       - uses: actions/checkout@v7

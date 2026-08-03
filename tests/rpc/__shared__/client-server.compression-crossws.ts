@@ -7,6 +7,7 @@ import { RPCLink } from '@orpc/client/websocket'
 import { experimental_RPCHandler as RPCHandler } from '@orpc/server/crossws'
 import { RequestCompressionHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 import crossws from 'crossws/adapters/node'
+import { WebSocket as FallbackWebSocket } from 'ws'
 import { defaultSerializer } from './client-server'
 
 export const createCompressionCrosswsClientServerTest: CreateClientServerTest = (
@@ -59,7 +60,7 @@ export const createCompressionCrosswsClientServerTest: CreateClientServerTest = 
 
   const link = new RPCLink({
     url: '/rpc',
-    connect: () => new WebSocket(`ws://localhost:${addressInfo.port}`),
+    connect: () => new (typeof WebSocket !== 'undefined' ? WebSocket : FallbackWebSocket)(`ws://localhost:${addressInfo.port}`),
     serializer,
     encodePeerMessage: { prefix: '__PREFIX__' },
     decodePeerMessage: { prefix: '__PREFIX__' },
