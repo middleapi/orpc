@@ -110,8 +110,8 @@
     "@scalar/api-reference": "^1.64.0",
     "@standardserver/aws-lambda": "^0.7.1",
     "@types/swagger-ui": "^5.32.0",
-    "fastify": "^5.11.0",
-    "swagger-ui": "^5.32.11",
+    "fastify": "^5.11.2",
+    "swagger-ui": "^5.32.12",
     "zod": "^4.4.3"
   }
 }
