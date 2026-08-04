@@ -28,8 +28,8 @@
     "@orpc/zod": "beta",
     "@tanstack/react-query": "^5.101.4",
     "@types/bun": "latest",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "ts-pattern": "^5.9.0"
