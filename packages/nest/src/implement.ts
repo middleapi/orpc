@@ -85,6 +85,8 @@ export function Implement<T extends ContractRouter<any>>(
         return getRouter(router, [key])
       }
 
+      Object.setPrototypeOf(target[methodName], descriptor.value!)
+
       for (const p of Reflect.getOwnMetadataKeys(target, propertyKey)) {
         Reflect.defineMetadata(p, Reflect.getOwnMetadata(p, target, propertyKey), target, methodName)
       }

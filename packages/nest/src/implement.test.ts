@@ -1,9 +1,10 @@
+import type { CanActivate, ExecutionContext } from '@nestjs/common'
 import type { NodeHttpRequest } from '@orpc/standard-server-node'
 import type { Request } from 'express'
 import type { FastifyReply } from 'fastify'
 import FastifyCookie from '@fastify/cookie'
 import { HonoAdapter } from '@mnigos/platform-hono'
-import { Controller, Req, Res } from '@nestjs/common'
+import { Controller, Req, Res, UseGuards } from '@nestjs/common'
 import { REQUEST } from '@nestjs/core'
 import { FastifyAdapter } from '@nestjs/platform-fastify'
 import { Test } from '@nestjs/testing'
@@ -242,6 +243,86 @@ describe('@Implement', async () => {
     expect(Reflect.getMetadata('orpc:meta', controller, 'router_pong')).toEqual({ path: '/advanced' })
     expect(Reflect.getMetadata('orpc:meta', controller, 'router_nested')).toEqual({ path: '/advanced' })
     expect(Reflect.getMetadata('orpc:meta', controller, 'router_nested_peng_0')).toEqual({ path: '/advanced' })
+  })
+
+  describe('method-level guards on synthesized router methods', () => {
+    const can_activate = vi.fn((ctx: ExecutionContext) => {
+      const request: NodeHttpRequest = ctx.switchToHttp().getRequest()
+      return request.headers?.['x-allow'] === 'yes'
+    })
+
+    class TestGuard implements CanActivate {
+      canActivate(ctx: ExecutionContext): boolean {
+        return can_activate(ctx)
+      }
+    }
+
+    const router_impl = () => ({
+      ping: implement(contract.ping).handler(ping_handler),
+      pong: implement(contract.pong).handler(pong_handler),
+      nested: {
+        peng: implement(contract.nested.peng).handler(peng_handler),
+      },
+    })
+
+    @Controller()
+    class GuardAboveController {
+      @UseGuards(TestGuard)
+      @Implement(contract)
+      router() {
+        return router_impl()
+      }
+    }
+
+    @Controller()
+    class GuardBelowController {
+      @Implement(contract)
+      @UseGuards(TestGuard)
+      router() {
+        return router_impl()
+      }
+    }
+
+    describe.each([
+      [GuardAboveController, '@UseGuards above @Implement'],
+      [GuardBelowController, '@UseGuards below @Implement'],
+    ] as const)('order: $1', async (Controller, _) => {
+      const moduleRef = await Test.createTestingModule({
+        controllers: [Controller],
+      }).compile()
+
+      const app = moduleRef.createNestApplication()
+      await app.init()
+
+      const httpServer = app.getHttpServer()
+
+      it('rejects requests when the guard denies', async () => {
+        const res = await supertest(httpServer)
+          .post('/ping')
+          .send({ hello: 'world' })
+
+        expect(res.statusCode).toEqual(403)
+        expect(can_activate).toHaveBeenCalledTimes(1)
+        expect(ping_handler).not.toHaveBeenCalled()
+
+        const res2 = await supertest(httpServer).get('/pong/world')
+
+        expect(res2.statusCode).toEqual(403)
+        expect(pong_handler).not.toHaveBeenCalled()
+      })
+
+      it('allows requests when the guard accepts', async () => {
+        const res = await supertest(httpServer)
+          .post('/ping')
+          .set('x-allow', 'yes')
+          .send({ hello: 'world' })
+
+        expect(res.statusCode).toEqual(200)
+        expect(res.body).toEqual('pong')
+        expect(can_activate).toHaveBeenCalledTimes(1)
+        expect(ping_handler).toHaveBeenCalledTimes(1)
+      })
+    })
   })
 
   it('on body parsing error', async () => {
