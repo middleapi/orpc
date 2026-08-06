@@ -3,6 +3,7 @@ import { getCollection } from 'astro:content'
 import BlumePage from 'blume/components/BlumePage.astro'
 import PageLayout from 'blume/components/layout/PageLayout.astro'
 import data from 'blume:data'
+import SponsorSlot from '../../sponsor-ads/SponsorSlot.astro'
 
 export const prerender = true
 
@@ -172,7 +173,7 @@ const postJsonLd = {
     <hr class="my-10 border-border" />
 
     <div class="prose max-w-none">
-      <BlumePage id={route.entryId} />
+      <BlumePage id={route.entryId} components={{ SponsorSlot }} />
     </div>
   </article>
 </PageLayout>

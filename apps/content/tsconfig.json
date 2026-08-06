@@ -5,7 +5,9 @@
   },
   "include": [
     "blume.config.ts",
+    "components.ts",
     "pages",
+    "sponsor-ads",
     ".blume/.astro/types.d.ts",
     ".blume/src/env.d.ts"
   ],

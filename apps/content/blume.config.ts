@@ -1,4 +1,6 @@
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'blume'
+import { sponsorAdsInjectPlugin } from './sponsor-ads/inject'
 
 export default defineConfig({
   title: 'oRPC',
@@ -62,6 +64,20 @@ export default defineConfig({
     x: { creator: '@middleapi', handle: '@middleapi' },
   },
   export: true,
+  integrations: [
+    {
+      name: 'sponsor-ads',
+      hooks: {
+        'astro:config:setup': ({ injectScript, updateConfig }) => {
+          // Inject <SponsorSlot /> into docs/blog MDX at build; fill the
+          // slots with a random sponsor per view via the client script.
+          updateConfig({ vite: { plugins: [sponsorAdsInjectPlugin()] } })
+          const clientPath = fileURLToPath(new URL('./sponsor-ads/client.ts', import.meta.url))
+          injectScript('page', `import '${clientPath.replaceAll('\\', '\\\\').replaceAll('\'', '\\\'')}'`)
+        },
+      },
+    },
+  ],
   ai: {
     mcp: {
       enabled: true,
