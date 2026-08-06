@@ -2,34 +2,17 @@ import { readFile } from 'node:fs/promises'
 import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const WORDS_PER_AD = 400
-export const LINES_PER_AD = 55
+export const WORDS_PER_AD = 150
 export const SLOT_TAG = '<SponsorSlot />'
 
 /**
- * Pick `n` unique, evenly spaced indices in `[0, total)`.
- * Assumes `n <= total`.
- */
-function pickEvenIndices(total: number, n: number): number[] {
-  const picked = new Set<number>()
-  for (let i = 0; i < n; i++) {
-    let idx = Math.min(total - 1, Math.max(0, Math.round(((i + 1) * total) / (n + 1))))
-    while (picked.has(idx) && idx < total - 1) idx++
-    while (picked.has(idx) && idx > 0) idx--
-    picked.add(idx)
-  }
-  return [...picked].sort((a, b) => a - b)
-}
-
-/**
- * Insert `<SponsorSlot />` tags into MDX source: one per ~400 words or per
- * ~55 non-empty lines, whichever gives more (code blocks count for both;
- * lines catch code-heavy pages that are line-dense but word-sparse), min 1,
- * no fixed maximum. The first slot always sits right before the first
- * `##` heading (end of the intro); the rest go after evenly spaced `##`
- * headings — section boundaries, never mid-paragraph — so the total is
- * structurally capped at one per section. Pages without `##` headings get a
- * single slot at the end. Code fences and frontmatter are left untouched.
+ * Insert `<SponsorSlot />` tags into MDX source. One simple rule: walk the
+ * page accumulating words (code blocks count; fences are tracked only so a
+ * `##` inside one is ignored), and place a slot right before a `##` heading
+ * whenever it is the page's first heading or at least `WORDS_PER_AD` words
+ * have passed since the last slot, resetting the count. If the trailing
+ * content also clears the bar — or the page never triggered at all — one
+ * more slot goes at the end. Frontmatter is left untouched.
  */
 export function injectSlots(source: string): string {
   const lines = source.split('\n')
@@ -43,46 +26,29 @@ export function injectSlots(source: string): string {
   }
 
   let inFence = false
+  let seenH2 = false
   let words = 0
-  let contentLines = 0
-  const h2Lines: number[] = []
+  const insertBefore: number[] = []
   for (let i = bodyStart; i < lines.length; i++) {
     const trimmed = lines[i]!.trim()
-    if (trimmed !== '') {
-      contentLines++
-    }
     if (trimmed.startsWith('```') || trimmed.startsWith('~~~')) {
       inFence = !inFence
-      continue
     }
-    if (!inFence && /^##\s/.test(trimmed)) {
-      h2Lines.push(i)
+    else if (!inFence && /^##\s/.test(trimmed) && (!seenH2 || words >= WORDS_PER_AD)) {
+      seenH2 = true
+      insertBefore.push(i)
+      words = 0
     }
-    words += trimmed.split(/\s+/).filter(Boolean).length
+    words += trimmed === '' ? 0 : trimmed.split(/\s+/).length
   }
 
-  const count = Math.max(
-    1,
-    Math.floor(words / WORDS_PER_AD),
-    Math.floor(contentLines / LINES_PER_AD),
-  )
-
-  if (h2Lines.length === 0) {
+  // Splice bottom-up so earlier indices stay valid.
+  for (const line of insertBefore.reverse()) {
+    lines.splice(line, 0, '', SLOT_TAG, '')
+  }
+  if (insertBefore.length === 0 || words >= WORDS_PER_AD) {
     lines.push('', SLOT_TAG, '')
-    return lines.join('\n')
   }
-
-  // Slots beyond the first go after evenly spaced headings, at most one per
-  // section; all their insertion points sit at or below the first heading, so
-  // splicing bottom-up keeps every index valid, with the before-intro slot last.
-  const remaining = Math.min(count - 1, h2Lines.length)
-  const afterLines = remaining > 0
-    ? pickEvenIndices(h2Lines.length, remaining).map(idx => h2Lines[idx]!)
-    : []
-  for (const line of afterLines.sort((a, b) => b - a)) {
-    lines.splice(line + 1, 0, '', SLOT_TAG, '')
-  }
-  lines.splice(h2Lines[0]!, 0, '', SLOT_TAG, '')
 
   return lines.join('\n')
 }
