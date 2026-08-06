@@ -5,32 +5,32 @@ function withTracking(href: string): string {
   return `${href}${href.includes('?') ? '&' : '?'}ref=orpc`
 }
 
-function buildCard(sponsor: AdSponsor): HTMLAnchorElement {
-  const link = document.createElement('a')
-  link.className = 'sponsor-slot__body'
-  link.href = withTracking(sponsor.href)
-  link.target = '_blank'
-  link.rel = 'sponsored noopener'
+/**
+ * Clone the slot's server-rendered <template> card (its markup and Tailwind
+ * classes live in SponsorSlot.astro, which Blume scans) and fill it with the
+ * given sponsor.
+ */
+function buildCard(slot: Element, sponsor: AdSponsor): Element | null {
+  const template = slot.querySelector<HTMLTemplateElement>('template[data-sponsor-template]')
+  const card = template?.content.firstElementChild?.cloneNode(true) as HTMLAnchorElement | undefined
+  if (!card) {
+    return null
+  }
 
-  const logo = document.createElement('img')
-  logo.className = 'sponsor-slot__logo'
-  logo.src = sponsor.logo
-  logo.alt = ''
-  logo.loading = 'lazy'
-  logo.setAttribute('data-no-zoom', '')
-
-  const text = document.createElement('span')
-  text.className = 'sponsor-slot__text'
-  const name = document.createElement('span')
-  name.className = 'sponsor-slot__name'
-  name.textContent = sponsor.name
-  const desc = document.createElement('span')
-  desc.className = 'sponsor-slot__desc'
-  desc.textContent = sponsor.description
-  text.append(name, desc)
-
-  link.append(logo, text)
-  return link
+  card.href = withTracking(sponsor.href)
+  const logo = card.querySelector<HTMLImageElement>('[data-sponsor-logo]')
+  if (logo) {
+    logo.src = sponsor.logo
+  }
+  const name = card.querySelector('[data-sponsor-name]')
+  if (name) {
+    name.textContent = sponsor.name
+  }
+  const desc = card.querySelector('[data-sponsor-desc]')
+  if (desc) {
+    desc.textContent = sponsor.description
+  }
+  return card
 }
 
 /**
@@ -40,8 +40,8 @@ function buildCard(sponsor: AdSponsor): HTMLAnchorElement {
  * smaller than the slot count.
  */
 function fillSlots(): void {
-  const bodies = document.querySelectorAll('[data-sponsor-body]')
-  if (bodies.length === 0) {
+  const slots = document.querySelectorAll('[data-sponsor-slot]')
+  if (slots.length === 0) {
     return
   }
 
@@ -51,8 +51,9 @@ function fillSlots(): void {
     ;[pool[i], pool[j]] = [pool[j]!, pool[i]!]
   }
 
-  bodies.forEach((body, index) => {
-    body.replaceWith(buildCard(pool[index % pool.length]!))
+  slots.forEach((slot, index) => {
+    const card = buildCard(slot, pool[index % pool.length]!)
+    slot.querySelector('[data-sponsor-body]')?.replaceWith(card ?? '')
   })
 }
 

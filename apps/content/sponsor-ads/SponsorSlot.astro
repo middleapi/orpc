@@ -1,110 +1,42 @@
 ---
 // Fixed-height sponsor slot. The server renders a skeleton so prerendered
 // HTML reserves the final card's exact size (no layout shift); client.ts
-// fills [data-sponsor-body] with a randomly picked sponsor on every view.
+// replaces [data-sponsor-body] with a clone of the <template> card, filled
+// with a randomly picked sponsor on every view.
+//
+// Styled with Blume's Tailwind utilities (border-border, rounded-blume, …)
+// per its theming guide, so the card tracks theme tokens and dark mode. The
+// card markup lives in the template (not client.ts) because Blume's Tailwind
+// only scans .astro/.tsx/.jsx files for classes.
 ---
 
-<aside class="sponsor-slot" data-sponsor-slot aria-label="Sponsor">
-  <span class="sponsor-slot__badge" aria-hidden="true">Sponsor</span>
-  <div class="sponsor-slot__body" data-sponsor-body>
-    <span class="sponsor-slot__ghost-icon"></span>
-    <span class="sponsor-slot__ghost-lines">
-      <span class="sponsor-slot__ghost-line" style="width: 8rem"></span>
-      <span class="sponsor-slot__ghost-line" style="width: 14rem"></span>
+<aside
+  class="relative my-6 box-border h-[76px] overflow-hidden rounded-blume border border-border"
+  data-sponsor-slot
+  aria-label="Sponsor"
+>
+  <span
+    class="absolute top-2 right-2.5 font-mono text-[10px] tracking-widest uppercase text-muted-foreground"
+    aria-hidden="true"
+  >Sponsor</span>
+  <div class="flex h-full items-center gap-3 px-4" data-sponsor-body>
+    <span class="size-8 flex-none rounded-md bg-muted"></span>
+    <span class="flex min-w-0 flex-1 flex-col gap-1.5">
+      <span class="h-2.5 w-32 max-w-full rounded bg-muted"></span>
+      <span class="h-2.5 w-56 max-w-full rounded bg-muted"></span>
     </span>
   </div>
+  <template data-sponsor-template>
+    <a
+      class="flex h-full items-center gap-3 px-4 no-underline hover:bg-muted"
+      target="_blank"
+      rel="sponsored noopener"
+    >
+      <img class="m-0 size-8 flex-none rounded-md" alt="" loading="lazy" data-no-zoom data-sponsor-logo>
+      <span class="flex min-w-0 flex-col gap-0.5">
+        <span class="truncate text-sm leading-tight font-semibold text-foreground" data-sponsor-name></span>
+        <span class="truncate text-xs leading-tight text-muted-foreground" data-sponsor-desc></span>
+      </span>
+    </a>
+  </template>
 </aside>
-
-{/* Global, not scoped: the card DOM created by client.ts has no scope attrs. */}
-<style is:global>
-  .sponsor-slot {
-    position: relative;
-    box-sizing: border-box;
-    height: 76px;
-    margin: 1.5rem 0;
-    border: 1px solid var(--color-border, #88888844);
-    border-radius: var(--radius-blume, 8px);
-    overflow: hidden;
-  }
-
-  .sponsor-slot__badge {
-    position: absolute;
-    top: 8px;
-    right: 10px;
-    font-family: var(--font-mono, monospace);
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--color-muted-foreground, #888888);
-  }
-
-  .sponsor-slot__body {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    height: 100%;
-    padding: 0 16px;
-    text-decoration: none;
-  }
-
-  a.sponsor-slot__body:hover {
-    background: var(--color-muted, #88888811);
-  }
-
-  .sponsor-slot__logo {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    flex: none;
-    margin: 0;
-  }
-
-  .sponsor-slot__text {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .sponsor-slot__name {
-    font-weight: 600;
-    font-size: 14px;
-    line-height: 1.3;
-    color: var(--color-foreground, inherit);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .sponsor-slot__desc {
-    font-size: 12.5px;
-    line-height: 1.3;
-    color: var(--color-muted-foreground, #888888);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .sponsor-slot__ghost-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    background: var(--color-muted, #88888822);
-    flex: none;
-  }
-
-  .sponsor-slot__ghost-lines {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    flex: 1;
-    min-width: 0;
-  }
-
-  .sponsor-slot__ghost-line {
-    height: 10px;
-    max-width: 100%;
-    border-radius: 4px;
-    background: var(--color-muted, #88888822);
-  }
-</style>
