@@ -21,8 +21,9 @@ function pickEvenIndices(total: number, n: number): number[] {
 }
 
 /**
- * Insert `<SponsorSlot />` tags into MDX source: one per ~600 prose words,
- * min 1, no fixed maximum. The first slot always sits right before the first
+ * Insert `<SponsorSlot />` tags into MDX source: one per ~600 words (code
+ * blocks included in the count), min 1, no fixed maximum. The first slot
+ * always sits right before the first
  * `##` heading (end of the intro); the rest go after evenly spaced `##`
  * headings — section boundaries, never mid-paragraph — so the total is
  * structurally capped at one per section. Pages without `##` headings get a
@@ -48,14 +49,8 @@ export function injectSlots(source: string): string {
       inFence = !inFence
       continue
     }
-    if (inFence) {
-      continue
-    }
-    if (/^##\s/.test(trimmed)) {
+    if (!inFence && /^##\s/.test(trimmed)) {
       h2Lines.push(i)
-    }
-    if (trimmed.startsWith('import ') || trimmed.startsWith('export ')) {
-      continue
     }
     words += trimmed.split(/\s+/).filter(Boolean).length
   }
