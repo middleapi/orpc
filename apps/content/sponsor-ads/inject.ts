@@ -2,8 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const WORDS_PER_AD = 1000
-export const MAX_ADS = 3
+export const WORDS_PER_AD = 600
 export const SLOT_TAG = '<SponsorSlot />'
 
 /**
@@ -22,11 +21,12 @@ function pickEvenIndices(total: number, n: number): number[] {
 }
 
 /**
- * Insert `<SponsorSlot />` tags into MDX source: one per ~1000 prose words
- * (min 1, max 3), each placed right after an evenly spaced `##` heading —
- * the start of a section, never mid-paragraph. Pages with fewer `##`
- * headings than slots get the remainder (at most one) appended at the end.
- * Code fences and frontmatter are left untouched.
+ * Insert `<SponsorSlot />` tags into MDX source: one per ~600 prose words,
+ * min 1, no fixed maximum. The first slot always sits right before the first
+ * `##` heading (end of the intro); the rest go after evenly spaced `##`
+ * headings — section boundaries, never mid-paragraph — so the total is
+ * structurally capped at one per section. Pages without `##` headings get a
+ * single slot at the end. Code fences and frontmatter are left untouched.
  */
 export function injectSlots(source: string): string {
   const lines = source.split('\n')
@@ -60,20 +60,24 @@ export function injectSlots(source: string): string {
     words += trimmed.split(/\s+/).filter(Boolean).length
   }
 
-  const wanted = Math.min(MAX_ADS, Math.max(1, Math.floor(words / WORDS_PER_AD)))
-  const count = Math.min(wanted, h2Lines.length + 1)
+  const count = Math.max(1, Math.floor(words / WORDS_PER_AD))
 
-  const afterLines = count > h2Lines.length
-    ? [...h2Lines]
-    : pickEvenIndices(h2Lines.length, count).map(idx => h2Lines[idx]!)
-  const appendAtEnd = count > h2Lines.length
+  if (h2Lines.length === 0) {
+    lines.push('', SLOT_TAG, '')
+    return lines.join('\n')
+  }
 
-  for (const line of [...afterLines].sort((a, b) => b - a)) {
+  // Slots beyond the first go after evenly spaced headings, at most one per
+  // section; all their insertion points sit at or below the first heading, so
+  // splicing bottom-up keeps every index valid, with the before-intro slot last.
+  const remaining = Math.min(count - 1, h2Lines.length)
+  const afterLines = remaining > 0
+    ? pickEvenIndices(h2Lines.length, remaining).map(idx => h2Lines[idx]!)
+    : []
+  for (const line of afterLines.sort((a, b) => b - a)) {
     lines.splice(line + 1, 0, '', SLOT_TAG, '')
   }
-  if (appendAtEnd) {
-    lines.push('', SLOT_TAG, '')
-  }
+  lines.splice(h2Lines[0]!, 0, '', SLOT_TAG, '')
 
   return lines.join('\n')
 }
