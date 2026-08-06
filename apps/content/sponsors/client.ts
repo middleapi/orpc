@@ -2,6 +2,10 @@ import type { AdSponsor } from './data'
 import { adPool } from './data'
 
 function withTracking(href: string): string {
+  // mailto: links take no tracking param; synced hrefs may carry their own.
+  if (!href.startsWith('http') || href.includes('ref=')) {
+    return href
+  }
   return `${href}${href.includes('?') ? '&' : '?'}ref=orpc`
 }
 
@@ -36,8 +40,9 @@ function buildCard(slot: Element, sponsor: AdSponsor): Element | null {
 /**
  * Fill every server-rendered sponsor skeleton with a randomly picked sponsor.
  * Runs on each page load (the site is an MPA), so every view gets a fresh
- * pick; slots on the same page never repeat a sponsor unless the pool is
- * smaller than the slot count.
+ * pick. Each slot draws independently, with a sponsor's chance being its
+ * `weight` as a percentage of the pool's total — so the same ad can appear
+ * multiple times on one page.
  */
 function fillSlots(): void {
   const slots = document.querySelectorAll('[data-sponsor-slot]')
@@ -45,14 +50,26 @@ function fillSlots(): void {
     return
   }
 
-  const pool = [...adPool()]
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[pool[i], pool[j]] = [pool[j]!, pool[i]!]
+  const pool = adPool()
+  if (pool.length === 0) {
+    slots.forEach(slot => slot.remove())
+    return
   }
 
-  slots.forEach((slot, index) => {
-    const card = buildCard(slot, pool[index % pool.length]!)
+  const totalWeight = pool.reduce((sum, sponsor) => sum + sponsor.weight, 0)
+  const pick = (): AdSponsor => {
+    let r = Math.random() * totalWeight
+    for (const sponsor of pool) {
+      r -= sponsor.weight
+      if (r <= 0) {
+        return sponsor
+      }
+    }
+    return pool[pool.length - 1]!
+  }
+
+  slots.forEach((slot) => {
+    const card = buildCard(slot, pick())
     slot.querySelector('[data-sponsor-body]')?.replaceWith(card ?? '')
   })
 }

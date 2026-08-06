@@ -63,7 +63,7 @@ const contentDirs = ['docs', 'blog'].map(
  */
 export function sponsorAdsInjectPlugin() {
   return {
-    name: 'sponsor-ads-inject',
+    name: 'sponsors-inject',
     enforce: 'pre' as const,
     async load(id: string) {
       const path = id.split('?')[0]!
