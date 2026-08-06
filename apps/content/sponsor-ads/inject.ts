@@ -3,6 +3,7 @@ import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const WORDS_PER_AD = 400
+export const LINES_PER_AD = 55
 export const SLOT_TAG = '<SponsorSlot />'
 
 /**
@@ -21,9 +22,10 @@ function pickEvenIndices(total: number, n: number): number[] {
 }
 
 /**
- * Insert `<SponsorSlot />` tags into MDX source: one per ~400 words (code
- * blocks included in the count), min 1, no fixed maximum. The first slot
- * always sits right before the first
+ * Insert `<SponsorSlot />` tags into MDX source: one per ~400 words or per
+ * ~55 non-empty lines, whichever gives more (code blocks count for both;
+ * lines catch code-heavy pages that are line-dense but word-sparse), min 1,
+ * no fixed maximum. The first slot always sits right before the first
  * `##` heading (end of the intro); the rest go after evenly spaced `##`
  * headings — section boundaries, never mid-paragraph — so the total is
  * structurally capped at one per section. Pages without `##` headings get a
@@ -42,9 +44,13 @@ export function injectSlots(source: string): string {
 
   let inFence = false
   let words = 0
+  let contentLines = 0
   const h2Lines: number[] = []
   for (let i = bodyStart; i < lines.length; i++) {
     const trimmed = lines[i]!.trim()
+    if (trimmed !== '') {
+      contentLines++
+    }
     if (trimmed.startsWith('```') || trimmed.startsWith('~~~')) {
       inFence = !inFence
       continue
@@ -55,7 +61,11 @@ export function injectSlots(source: string): string {
     words += trimmed.split(/\s+/).filter(Boolean).length
   }
 
-  const count = Math.max(1, Math.floor(words / WORDS_PER_AD))
+  const count = Math.max(
+    1,
+    Math.floor(words / WORDS_PER_AD),
+    Math.floor(contentLines / LINES_PER_AD),
+  )
 
   if (h2Lines.length === 0) {
     lines.push('', SLOT_TAG, '')
