@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const WORDS_PER_AD = 600
+export const WORDS_PER_AD = 400
 export const SLOT_TAG = '<SponsorSlot />'
 
 /**
@@ -21,7 +21,7 @@ function pickEvenIndices(total: number, n: number): number[] {
 }
 
 /**
- * Insert `<SponsorSlot />` tags into MDX source: one per ~600 words (code
+ * Insert `<SponsorSlot />` tags into MDX source: one per ~400 words (code
  * blocks included in the count), min 1, no fixed maximum. The first slot
  * always sits right before the first
  * `##` heading (end of the intro); the rest go after evenly spaced `##`
