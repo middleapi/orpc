@@ -54,15 +54,14 @@ export function createORPCErrorFromJson<TCode extends ORPCErrorCode, TData>(
   return error
 }
 
-export function cloneORPCError<T extends ORPCErrorCode, TData>(error: ORPCError<T, TData>): ORPCError<T, TData> {
-  const cloned = new ORPCError(error.code, {
-    ...error,
-    message: error.message,
-    data: error.data,
-    cause: error.cause,
-  })
+export function cloneORPCError<T extends AnyORPCError>(error: T): T {
+  const cloned = Object.create(Object.getPrototypeOf(error))
 
+  Object.assign(cloned, error)
+
+  cloned.message = error.message
   cloned.stack = error.stack
+  cloned.cause = error.cause
   ;(cloned.defined as Writable<typeof cloned.defined>) = error.defined
   ;(cloned.inferable as Writable<typeof cloned.inferable>) = error.inferable
 

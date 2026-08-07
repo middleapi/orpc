@@ -234,4 +234,22 @@ describe('cloneORPCError', () => {
     expect(original.data).toBe(1)
     expect(cloned.data).toBe(2)
   })
+
+  it('preserves custom subclass prototype chain', () => {
+    class CustomSubclassError extends ORPCError<'BAD_REQUEST', { customField: string }> {
+      customProp = 'test'
+    }
+
+    const original = new CustomSubclassError('BAD_REQUEST', {
+      message: 'Custom error message',
+      data: { customField: 'value' },
+    })
+
+    const cloned = cloneORPCError(original)
+
+    expect(cloned).toBeInstanceOf(CustomSubclassError)
+    expect(cloned).toBeInstanceOf(ORPCError)
+    expect(cloned.customProp).toBe('test')
+    expect(cloned.message).toBe('Custom error message')
+  })
 })
