@@ -45,6 +45,10 @@ const getFile = os
   .input(z.object({ path: z.string() }))
 ```
 
+:::warning
+Path parameters strictly require OpenAPI curly brace syntax (`/{name}`). Express-style colon parameters (`/:name`) are treated as literal static paths and will not extract path parameters into procedure input.
+:::
+
 :::info
 To customize path parameter encoding and decoding, see [Path Parameter Styles](/docs/openapi/input-and-output-mapping#path-parameter-styles).
 :::
