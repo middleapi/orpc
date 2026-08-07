@@ -262,8 +262,6 @@ describe('cloneORPCError', () => {
 
     expect(Object.prototype.toString.call(cloned)).toBe('[object Error]')
     expect(Object.keys(cloned)).toEqual(Object.keys(original))
-    // `message`, `stack`, and `cause` must stay non-enumerable so spreading
-    // or iterating a cloned error does not expose them
     expect({ ...cloned }).toEqual({ ...original })
   })
 })
