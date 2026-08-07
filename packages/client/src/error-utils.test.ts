@@ -234,4 +234,36 @@ describe('cloneORPCError', () => {
     expect(original.data).toBe(1)
     expect(cloned.data).toBe(2)
   })
+
+  it('preserves custom subclass prototype chain', () => {
+    class CustomSubclassError extends ORPCError<'BAD_REQUEST', { customField: string }> {
+      customProp = 'test'
+    }
+
+    const original = new CustomSubclassError('BAD_REQUEST', {
+      message: 'Custom error message',
+      data: { customField: 'value' },
+      cause: new Error('why'),
+    })
+
+    const cloned = cloneORPCError(original)
+
+    expect(cloned).toBeInstanceOf(CustomSubclassError)
+    expect(cloned).toBeInstanceOf(ORPCError)
+    expect(cloned.customProp).toBe('test')
+    expect(cloned.message).toBe('Custom error message')
+    expect(cloned.stack).toBe(original.stack)
+    expect(cloned.cause).toBe(original.cause)
+  })
+
+  it('clone keeps native error semantics and property shape', () => {
+    const original = new ORPCError('BAD_REQUEST', { message: 'msg', data: 1, cause: 'why' })
+    const cloned = cloneORPCError(original)
+
+    expect(Object.prototype.toString.call(cloned)).toBe('[object Error]')
+    expect(Object.keys(cloned)).toEqual(Object.keys(original))
+    // `message`, `stack`, and `cause` must stay non-enumerable so spreading
+    // or iterating a cloned error does not expose them
+    expect({ ...cloned }).toEqual({ ...original })
+  })
 })

@@ -54,17 +54,23 @@ export function createORPCErrorFromJson<TCode extends ORPCErrorCode, TData>(
   return error
 }
 
-export function cloneORPCError<T extends ORPCErrorCode, TData>(error: ORPCError<T, TData>): ORPCError<T, TData> {
+/**
+ * Clones an `ORPCError` while preserving its prototype chain, so instances of
+ * `ORPCError` subclasses remain `instanceof` their class. Subclass constructors
+ * are not re-run, so private fields (`#field`) are not carried over.
+ */
+export function cloneORPCError<T extends AnyORPCError>(error: T): T {
   const cloned = new ORPCError(error.code, {
-    ...error,
     message: error.message,
     data: error.data,
     cause: error.cause,
   })
 
+  Object.setPrototypeOf(cloned, Object.getPrototypeOf(error))
+  Object.defineProperties(cloned, Object.getOwnPropertyDescriptors(error))
+  // `stack` is not an own property in every engine (e.g. an accessor on
+  // `Error.prototype` in SpiderMonkey), so copy it explicitly as well.
   cloned.stack = error.stack
-  ;(cloned.defined as Writable<typeof cloned.defined>) = error.defined
-  ;(cloned.inferable as Writable<typeof cloned.inferable>) = error.inferable
 
-  return cloned
+  return cloned as T
 }
