@@ -19,7 +19,7 @@
   "devDependencies": {
     "@antfu/eslint-config": "^9.2.0",
     "@codspeed/vitest-plugin": "^5.7.1",
-    "@hono/node-server": "^2.0.11",
+    "@hono/node-server": "^2.1.0",
     "@opentelemetry/api": "^1.9.1",
     "@orpc/arktype": "workspace:*",
     "@orpc/client": "workspace:*",
@@ -50,7 +50,7 @@
     "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^4.1.9",
     "arktype": "^2.2.1",
-    "bumpp": "^12.1.1",
+    "bumpp": "^12.2.0",
     "changelogithub": "^15.0.4",
     "crossws": "^0.4.6",
     "eslint": "^10.8.0",
@@ -59,7 +59,7 @@
     "github-slugger": "^2.0.0",
     "jsdom": "^29.1.1",
     "lint-staged": "^17.3.0",
-    "pkg-pr-new": "^0.0.86",
+    "pkg-pr-new": "^0.0.87",
     "react": "^19.2.8",
     "sherif": "^1.11.1",
     "simple-git-hooks": "^2.13.1",
@@ -69,7 +69,7 @@
     "valibot": "^1.4.1",
     "vite": "^8.2.0",
     "vitest": "^4.1.9",
-    "ws": "^8.21.0",
+    "ws": "^8.21.2",
     "zod": "^4.4.3"
   },
   "simple-git-hooks": {
