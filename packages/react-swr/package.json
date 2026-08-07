@@ -1,7 +1,7 @@
 {
   "name": "@orpc/experimental-react-swr",
   "type": "module",
-  "version": "1.14.14",
+  "version": "1.14.15",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
