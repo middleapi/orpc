@@ -54,6 +54,14 @@ export function createORPCErrorFromJson<TCode extends ORPCErrorCode, TData>(
   return error
 }
 
+/**
+ * Clones an `ORPCError` while preserving its prototype chain, so instances of
+ * `ORPCError` subclasses remain `instanceof` their class.
+ *
+ * Limitation: subclass constructors are not re-run, so private fields
+ * (`#field`) are not carried over and subclass members that read them
+ * will throw on the clone.
+ */
 export function cloneORPCError<T extends AnyORPCError>(error: T): T {
   const cloned = new ORPCError(error.code, {
     message: error.message,

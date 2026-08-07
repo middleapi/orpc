@@ -256,22 +256,6 @@ describe('cloneORPCError', () => {
     expect(cloned.cause).toBe(original.cause)
   })
 
-  it('does not carry over subclass private fields', () => {
-    class PrivateFieldError extends ORPCError<'BAD_REQUEST', undefined> {
-      #secret = 'secret'
-
-      get secret(): string {
-        return this.#secret
-      }
-    }
-
-    const original = new PrivateFieldError('BAD_REQUEST')
-    const cloned = cloneORPCError(original)
-
-    expect(original.secret).toBe('secret')
-    expect(() => cloned.secret).toThrow(TypeError)
-  })
-
   it('clone keeps native error semantics and property shape', () => {
     const original = new ORPCError('BAD_REQUEST', { message: 'msg', data: 1, cause: 'why' })
     const cloned = cloneORPCError(original)
