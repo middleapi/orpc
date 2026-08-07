@@ -1,5 +1,8 @@
 import type { Client, ORPCError } from '@orpc/client'
+import type { ContractRouterClient } from '@orpc/contract'
+import type { AsyncIteratorClass } from '@orpc/shared'
 import type { JsonifiedClient, JsonifiedValue } from './types'
+import { eventIterator, oc, type } from '@orpc/contract'
 
 describe('JsonifiedValue', () => {
   it('flat', () => {
@@ -18,7 +21,9 @@ describe('JsonifiedValue', () => {
     expectTypeOf<JsonifiedValue<Set<number>>>().toEqualTypeOf<number[]>()
     expectTypeOf<JsonifiedValue<Array<number>>>().toEqualTypeOf<number[]>()
     expectTypeOf<JsonifiedValue<{ a: number, b: Date }>>().toEqualTypeOf<{ a: number, b: string }>()
-    expectTypeOf<JsonifiedValue<AsyncGenerator<Date, Date>>>().toEqualTypeOf<AsyncIteratorObject<string, string>>()
+    expectTypeOf<JsonifiedValue<AsyncIteratorClass<Date, Date>>>().toEqualTypeOf<AsyncIteratorClass<string, string>>()
+    expectTypeOf<JsonifiedValue<AsyncGenerator<Date, Date>>>().toEqualTypeOf<AsyncGenerator<string, string>>()
+    expectTypeOf<JsonifiedValue<AsyncIteratorObject<Date, Date>>>().toEqualTypeOf<AsyncIteratorObject<string, string>>()
 
     expectTypeOf<JsonifiedValue<DateConstructor>>().toEqualTypeOf<unknown>()
   })
@@ -39,6 +44,14 @@ describe('JsonifiedClient', () => {
     >>().toEqualTypeOf<
       Client<{ cache?: boolean }, { now: Date }, { b: string[] }, Error | ORPCError<string, { a: string }>>
     >()
+  })
+
+  it('preserves event iterator yield/return types', () => {
+    const contract = oc.output(eventIterator(type<Date>(), type<Date>()))
+
+    expectTypeOf<
+      Awaited<ReturnType<JsonifiedClient<ContractRouterClient<typeof contract>>>>
+    >().toEqualTypeOf<AsyncIteratorClass<string, string>>()
   })
 
   it('nested', () => {
