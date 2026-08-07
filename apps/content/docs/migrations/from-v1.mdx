@@ -426,6 +426,23 @@ if (error && isDefined) {
 v2 also introduces `error` factories for defining reusable typed errors outside `.errors`. See [Error Handling](/docs/error-handling).
 :::
 
+### Custom Error Code Registry Augmentation
+
+In v2, custom error codes and autocomplete are configured via TypeScript module augmentation on `Registry.ORPCErrorCode`. You can combine `keyof typeof COMMON_ERROR_STATUS_MAP` with custom error codes:
+
+```ts
+import type { COMMON_ERROR_STATUS_MAP } from '@orpc/server'
+
+declare module '@orpc/server' { // or '@orpc/client'
+  interface Registry {
+    ORPCErrorCode:
+      | keyof typeof COMMON_ERROR_STATUS_MAP
+      | 'MY_CUSTOM_ERROR'
+      | 'VALIDATION_FAILED'
+  }
+}
+```
+
 ## AsyncIteratorObject (Event Iterator)
 
 The "Event Iterator" concept was renamed to [AsyncIteratorObject](/docs/async-iterator-object) (see also [AsyncIteratorObject in Client](/docs/client/async-iterator-object)). All old names still work as deprecated aliases:

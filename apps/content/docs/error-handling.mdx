@@ -185,14 +185,19 @@ if (err instanceof RateLimitedError) {
 By default, oRPC allows any string as an error code and suggests common HTTP codes like `NOT_FOUND` and `UNAUTHORIZED`. You can override this with your own set of allowed error codes for better type safety and consistency.
 
 ```ts
+import type { COMMON_ERROR_STATUS_MAP } from '@orpc/server'
+
 declare module '@orpc/server' { // or '@orpc/client'
   interface Registry {
-    ORPCErrorCode: 'NOT_FOUND' | 'UNAUTHORIZED' | 'RATE_LIMITED' | 'MY_CUSTOM_ERROR' | (string & {})
+    ORPCErrorCode:
+      | keyof typeof COMMON_ERROR_STATUS_MAP
+      | 'MY_CUSTOM_ERROR'
+      | 'VALIDATION_FAILED'
   }
 }
 ```
 
-With this configuration, only `NOT_FOUND`, `UNAUTHORIZED`, `RATE_LIMITED`, and `MY_CUSTOM_ERROR` will be suggested as error codes. The `(string & {})` fallback ensures you can still use any string value when needed.
+With this configuration, the built-in HTTP error codes along with `MY_CUSTOM_ERROR` and `VALIDATION_FAILED` will be suggested as error codes.
 
 ## Using Custom Error Classes
 
