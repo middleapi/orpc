@@ -54,4 +54,14 @@ describe('createSafeClient', () => {
     expect(safeClient[Symbol('test')]).toEqual(undefined)
     expect(safeClient.nested[Symbol('test')]).toEqual(undefined)
   })
+
+  it('not proxy on unwrap keys', () => {
+    expect(() => String(safeClient)).not.toThrow()
+    expect(() => `${safeClient}`).not.toThrow()
+    expect(JSON.stringify({ safeClient })).toEqual('{}')
+    expect(typeof safeClient.bind).toEqual('function')
+
+    expect(client.ping).not.toBeCalled()
+    expect(client.nested.pong).not.toBeCalled()
+  })
 })

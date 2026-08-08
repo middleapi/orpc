@@ -46,6 +46,20 @@ describe('createORPCClient', () => {
     expect(client[Symbol('test')]).toBeUndefined()
   })
 
+  it('not recursive on unwrap keys', async () => {
+    const client = createORPCClient(mockedLink) as any
+
+    expect(() => String(client)).not.toThrow()
+    expect(() => `${client}`).not.toThrow()
+    expect(() => `${client.nested}`).not.toThrow()
+    expect(JSON.stringify(client)).toBeUndefined()
+    expect(JSON.stringify({ client })).toEqual('{}')
+    expect(typeof client.bind).toEqual('function')
+    expect(typeof client.nested.bind).toEqual('function')
+
+    expect(mockedLink.call).not.toBeCalled()
+  })
+
   it('prevent native await', async () => {
     const client = createORPCClient(mockedLink) as any
 

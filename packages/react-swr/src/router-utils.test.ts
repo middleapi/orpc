@@ -63,4 +63,23 @@ describe('createRouterUtils', () => {
     const utils = createRouterUtils(client) as any
     expect(utils[Symbol.for('a')]).toBe(undefined)
   })
+
+  it('safe on primitive coercion and serialization', () => {
+    const utils = createRouterUtils(client) as any
+
+    expect(() => String(utils)).not.toThrow()
+    expect(() => `${utils}`).not.toThrow()
+    expect(() => `${utils.key}`).not.toThrow()
+    expect(() => JSON.stringify({ utils })).not.toThrow()
+
+    expect(client).not.toBeCalled()
+    expect(client.key).not.toBeCalled()
+  })
+
+  it('not recursive on non-object clients', () => {
+    const utils = createRouterUtils(undefined as any) as any
+
+    expect(utils.nonExists).toBeUndefined()
+    expect(utils.key()).toEqual(procedureUtilsSpy.mock.results[0]!.value.key())
+  })
 })
