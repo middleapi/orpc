@@ -3,14 +3,16 @@
 // makes it readable: a code block loses its highlighting, a table its columns, a
 // callout its framing.
 //
-// This replaces that text with the page itself. The blocks around the match are
-// lifted out of the target page's HTML and dropped into a `.prose` wrapper, the
-// same container the page renders them in, so Shiki highlighting, callouts,
-// tables and images all look exactly as they do on the page — pre-rendered at
-// build time, with no renderer shipped to the browser. `zoom` shrinks the
-// fragment to preview scale without changing how any of it is laid out. Pages
-// are fetched once and cached; the fetch doubles as a warm cache for the
-// navigation the reader is about to make.
+// This replaces that text with the page itself. The whole article is lifted out
+// of the target page's HTML and dropped into a `.prose` wrapper, the same
+// container the page renders it in, so Shiki highlighting, callouts, tables and
+// images all look exactly as they do on the page — pre-rendered at build time,
+// with no renderer shipped to the browser. `zoom` shrinks it to preview scale
+// without changing how any of it is laid out, and the pane opens scrolled to the
+// section the query matched, so a result is a small view of the real page opened
+// at the relevant place rather than a clipping of it. Pages are fetched once and
+// cached; the fetch doubles as a warm cache for the navigation the reader is
+// about to make.
 //
 // It augments Blume's built-in dialog rather than forking it (747 lines that
 // would then need re-merging on every upgrade). Blume rewrites the preview's
@@ -46,15 +48,21 @@ const DEBOUNCE = 120
  */
 const PREFETCH_AHEAD = 3
 /**
- * Preview scale. Page text is sized for a full column; at ~0.85 the fragment
- * still reads at the pane's width while keeping every proportion the page has.
+ * Preview scale. Page text is sized for a full column; at ~0.85 the page still
+ * reads at the pane's width while keeping every proportion it has.
  */
 const ZOOM = '0.85'
-/** Blocks of context kept after the match, and how far back a heading is taken. */
-const TRAILING = 4
+/** How far back from the match a heading is taken as the section's start. */
 const HEADING_LOOKBACK = 3
+/** Breathing room above the section the pane opens at. */
+const SCROLL_PADDING = 12
 /** Parsed articles held at once — enough for a result list, bounded for memory. */
 const CACHE_LIMIT = 8
+/**
+ * Rendered pages held at once. Smaller than the article cache: a built page
+ * carries the marks and is only useful while the query that made it stands.
+ */
+const BUILD_LIMIT = 6
 
 /** Page furniture that is not page content, dropped before anything is scored. */
 const CHROME = '[data-sponsor-slot], script, style, .twoslash-popup-container'
@@ -76,6 +84,73 @@ const articles = new Map<string, Promise<Element | null>>()
  * page can be rendered *now* has to be answerable synchronously.
  */
 const ready = new Map<string, Element | null>()
+
+/** A rendered page and where in it the pane should open. */
+interface Built {
+  section: HTMLElement
+  /** Index of the block the query matched, or -1 when the page carries no mark. */
+  matched: number
+  /** Index of the heading that block sits under, or -1 alongside `matched`. */
+  start: number
+  /**
+   * How far into the page the pane should scroll, in the pane's own pixels.
+   * Resolved once while the page is fully laid out — see {@link locate} — and
+   * null until then, or for a page with no match, which opens at the top.
+   */
+  offset: number | null
+  /** Whether its blocks have been measured and handed to {@link compact}. */
+  measured: boolean
+}
+
+/**
+ * Let the browser skip the off-screen blocks. A whole docs page laid out in the
+ * pane costs tens of milliseconds — far more than cloning and marking it — and
+ * that bill comes due every time the page is put back on screen. With
+ * `content-visibility` only the visible slice is laid out.
+ *
+ * The measurement is what makes this safe. `contain-intrinsic-size` is a
+ * placeholder for skipped content, and a guessed one would put every block at
+ * the wrong offset, landing the opening scroll in the wrong place. Each block is
+ * measured after it has been laid out for real, so the placeholder equals the
+ * height it replaces and offsets stay exact; `auto` then has the browser prefer
+ * the last rendered size over the placeholder as blocks are visited.
+ *
+ * `offsetHeight`, not `getBoundingClientRect`: the section is zoomed, so the
+ * rect is scaled while `contain-intrinsic-size` is in the block's own pixels —
+ * the units `offsetHeight` reports.
+ */
+function compact(built: Built): void {
+  if (built.measured) {
+    return
+  }
+  built.measured = true
+
+  // Every height is read before the first style is written. Interleaving them
+  // invalidates the layout that the next read then forces again — a page's worth
+  // of layouts instead of one, which costs more than this saves.
+  const blocks = [...built.section.children] as HTMLElement[]
+  const heights = blocks.map(block => block.offsetHeight)
+  for (const [index, block] of blocks.entries()) {
+    const height = heights[index]!
+    if (height > 0) {
+      block.style.containIntrinsicSize = `auto ${height}px`
+      block.style.contentVisibility = 'auto'
+    }
+  }
+}
+
+/** Rendered pages by page URL and query, oldest first. */
+const sections = new Map<string, Built>()
+
+/** Run off the critical path, where the browser has time to spare. */
+function whenIdle(work: () => void): void {
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(work)
+  }
+  else {
+    setTimeout(work)
+  }
+}
 
 /**
  * Fetch a page and keep its article, stripped of chrome. The sponsor slot goes
@@ -132,34 +207,36 @@ function tokens(query: string): string[] {
   return query.trim().split(/\s+/u).filter(Boolean)
 }
 
-/** Case-insensitive alternation over `words`, or null when there are none. */
-function pattern(words: string[], capture = false): RegExp | null {
+/**
+ * Case-insensitive alternation over `words`, or null when there are none. The
+ * group is what lets `String.split` hand back the matches along with the text
+ * between them, which is how the marking walks a text node in one pass.
+ */
+function pattern(words: string[]): RegExp | null {
   if (words.length === 0) {
     return null
   }
-  const body = words.map(escapeToken).join('|')
-  return new RegExp(capture ? `(${body})` : body, 'giu')
+  return new RegExp(`(${words.map(escapeToken).join('|')})`, 'giu')
 }
 
 /**
- * The block that best explains the match: most occurrences of the query wins,
- * ties going to the first block on the page. Blume renders an article as a flat
- * run of top-level blocks, so a child here is a whole paragraph, code block,
- * table or callout — the unit a reader recognizes.
+ * The block that best explains the match: most marks wins, ties going to the
+ * first block on the page. Blume renders an article as a flat run of top-level
+ * blocks, so a child here is a whole paragraph, code block, table or callout —
+ * the unit a reader recognizes.
  *
- * A page whose blocks match nothing is left to Blume's text preview. That
- * happens when the match is in the title or description, where an arbitrary
- * opening paragraph would be noise rather than an answer.
+ * Counting the marks rather than re-scanning the text keeps the section the pane
+ * opens at consistent with what is actually highlighted in it, including where
+ * only the word-by-word fallback matched, and spares the page a second pass.
+ *
+ * A page with no marks opens at the top, which is the right place to start
+ * reading a page matched on its title alone.
  */
-function bestIndex(nodes: Element[], words: string[]): number {
-  const match = pattern(words)
-  if (!match) {
-    return -1
-  }
+function bestIndex(nodes: Element[]): number {
   let best = -1
   let bestScore = 0
   for (const [index, node] of nodes.entries()) {
-    const score = (node.textContent ?? '').match(match)?.length ?? 0
+    const score = node.querySelectorAll('mark').length
     if (score > bestScore) {
       best = index
       bestScore = score
@@ -169,30 +246,28 @@ function bestIndex(nodes: Element[], words: string[]): number {
 }
 
 /**
- * The run of blocks to show: the match, the heading that introduces it, and
- * enough of what follows to read as a passage rather than a clipping. The
- * heading is only taken when it is close by — further back it belongs to
- * something else on the way to the match.
+ * Where to open the page: the heading that introduces the match, so the reader
+ * lands on a section rather than mid-sentence. The heading is only taken when it
+ * is close by — further back it belongs to something else on the way to the
+ * match, and the match itself is then the better anchor.
  */
-function fragment(nodes: Element[], index: number): Element[] {
-  let start = index
+function sectionStart(nodes: Element[], index: number): number {
   for (let step = 1; step <= HEADING_LOOKBACK && index - step >= 0; step += 1) {
     if (HEADING.test(nodes[index - step]!.tagName)) {
-      start = index - step
-      break
+      return index - step
     }
   }
-  return nodes.slice(start, index + 1 + TRAILING)
+  return index
 }
 
 /**
- * Wrap matches in `<mark>` inside the fragment's text nodes, so the reason a
- * block was chosen is visible without reading it line by line. Text nodes are
+ * Wrap matches in `<mark>` inside the page's text nodes, so the reason a
+ * section was chosen is visible without reading it line by line. Text nodes are
  * collected before splitting, since splitting one appends siblings the walker
  * would otherwise revisit forever. Returns whether anything was marked.
  */
 function markMatches(root: Element, words: string[]): boolean {
-  const match = pattern(words, true)
+  const match = pattern(words)
   if (!match) {
     return false
   }
@@ -254,7 +329,7 @@ function markQuery(root: Element, words: string[]): void {
 let renders = 0
 
 /**
- * Namespace the identifiers a fragment carries in. Cloned markup sits in the
+ * Namespace the identifiers the page carries in. Cloned markup sits in the
  * same document as the page it came from, and a duplicated `id` silently
  * repoints that page's own `label[for]` and anchor targets at the copy inside
  * the dialog. Prefixing keeps them unique without breaking the pairs, so a
@@ -276,18 +351,22 @@ function isolate(root: Element): void {
 }
 
 /**
- * Build the fragment as the page renders it. `.prose` is what carries Blume's
- * content styles — including `.prose :where(pre.astro-code)`, which holds the
- * Shiki light/dark variables — so the wrapper reproduces the page's own article
- * element, and `zoom` scales the result down as one piece.
+ * Build the page as it renders itself. `.prose` is what carries Blume's content
+ * styles — including `.prose :where(pre.astro-code)`, which holds the Shiki
+ * light/dark variables — so the wrapper reproduces the page's own article
+ * element, and `zoom` scales the whole thing down as one piece.
+ *
+ * The cached article is cloned rather than moved: marking matches and
+ * namespacing ids both mutate, and the cache has to stay pristine for the next
+ * query to mark a different term in the same page.
  */
-function buildSection(blocks: Element[], words: string[]): HTMLElement {
+function buildSection(article: Element, words: string[]): HTMLElement {
   const section = document.createElement('div')
   section.setAttribute(OWN, '')
   section.className
     = 'prose max-w-none [&_mark]:rounded-sm [&_mark]:bg-accent/25 [&_mark]:text-inherit'
   section.style.zoom = ZOOM
-  section.append(...blocks.map(block => block.cloneNode(true)))
+  section.append(...[...article.children].map(block => block.cloneNode(true)))
 
   isolate(section)
   markQuery(section, words)
@@ -333,24 +412,57 @@ function revealTab(mark: Element): void {
   }
 }
 
+/** How far `target`'s top sits below the top of the page it belongs to. */
+function offsetWithin(section: HTMLElement, target: Element): number {
+  return (
+    target.getBoundingClientRect().top - section.getBoundingClientRect().top
+  )
+}
+
 /**
- * Bring the first match into view. The pane is the scroller here — the fragment
- * flows at full height inside it, the way the page itself would — so the offset
- * is measured between the two rather than read off `offsetTop`, which would be
- * relative to whichever ancestor happens to be positioned.
+ * Work out where the pane should open, while the page is still laid out in full.
+ *
+ * This runs once per built page, before {@link compact} hands the off-screen
+ * blocks to the browser to skip — after that their geometry is a placeholder by
+ * design, and asking a skipped block where its mark sits gives an answer that
+ * would scroll somewhere else entirely. Resolving the offset up front also makes
+ * every later showing of the page land in exactly the same place.
+ *
+ * The section heading is what gets aligned, since landing on it is what tells
+ * the reader where in the page they are. When the match itself would then sit
+ * below the fold — a long section, or a heading far above its code block — the
+ * match wins and is centered instead: the reader came here for it.
  */
-function revealMatch(preview: HTMLElement, section: HTMLElement): void {
-  // The first mark in document order is the first match, the one markMatches
-  // walked to first.
-  const mark = section.querySelector('mark')
-  if (!mark) {
+function locate(preview: HTMLElement, built: Built): void {
+  const heading = built.section.children[built.start]
+  if (!heading) {
     return
   }
+  // The mark inside the matched block is the one that chose this section.
+  const mark = built.section.children[built.matched]?.querySelector('mark')
   // Before measuring: opening a tab changes what sits above the match.
-  revealTab(mark)
-  const offset
-    = mark.getBoundingClientRect().top - preview.getBoundingClientRect().top
-  preview.scrollTop += offset - preview.clientHeight / 2
+  if (mark) {
+    revealTab(mark)
+  }
+
+  const offset = offsetWithin(built.section, heading) - SCROLL_PADDING
+  const markOffset = mark ? offsetWithin(built.section, mark) : offset
+  built.offset
+    = markOffset - offset > preview.clientHeight
+      ? markOffset - preview.clientHeight / 2
+      : offset
+}
+
+/** Scroll the pane to the offset {@link locate} settled on. */
+function openAt(preview: HTMLElement, built: Built): void {
+  if (built.offset === null) {
+    return
+  }
+  const top
+    = built.section.getBoundingClientRect().top
+      - preview.getBoundingClientRect().top
+      + preview.scrollTop
+  preview.scrollTop = top + built.offset
 }
 
 const preview = document.querySelector<HTMLElement>(PREVIEW)
@@ -369,36 +481,89 @@ if (preview && results && input) {
     return [...results!.querySelectorAll<HTMLAnchorElement>('a')]
   }
 
-  /** Render the passage for the selected row, or leave Blume's text preview. */
-  function render(article: Element | null, words: string[]): void {
-    const blocks = article ? [...article.children] : []
-    const index = bestIndex(blocks, words)
+  /**
+   * The rendered page for a row, built once per page and query. Cloning a whole
+   * article and marking it costs tens of milliseconds, and a reader walking a
+   * result list revisits the same rows constantly — rebuilding each time is what
+   * a hover would feel. The built node is detached when Blume clears the pane
+   * and re-appended on the next visit, which is free.
+   */
+  function sectionFor(url: string, article: Element, words: string[]): Built {
+    const key = `${url}\n${words.join(' ')}`
+    const cached = sections.get(key)
+    if (cached) {
+      return cached
+    }
+
+    const section = buildSection(article, words)
+    const blocks = [...section.children]
+    const matched = bestIndex(blocks)
+    const built: Built = {
+      matched,
+      measured: false,
+      offset: null,
+      section,
+      start: matched < 0 ? -1 : sectionStart(blocks, matched),
+    }
+
+    sections.set(key, built)
+    if (sections.size > BUILD_LIMIT) {
+      sections.delete(sections.keys().next().value!)
+    }
+    return built
+  }
+
+  /** Render the selected row's page, or leave Blume's text preview in place. */
+  function render(url: string, article: Element | null, words: string[]): void {
     // Re-checked here rather than by the caller: on the awaited path Blume may
-    // have rewritten the pane while the page was in flight, and a second
-    // fragment would stack under the first.
-    if (index < 0 || preview!.querySelector(`[${OWN}]`)) {
+    // have rewritten the pane while the page was in flight, and a second copy
+    // would stack under the first.
+    if (!article || preview!.querySelector(`[${OWN}]`)) {
       return
     }
 
-    const section = buildSection(fragment(blocks, index), words)
-    preview!.append(section)
+    const built = sectionFor(url, article, words)
+    preview!.append(built.section)
     // Only now that the real thing is on screen: the text preview would
     // otherwise be the fallback vanishing before its replacement arrives.
     preview!.querySelector<HTMLElement>(TEXT_PREVIEW)?.setAttribute('hidden', '')
-    revealMatch(preview!, section)
+
+    // First showing only: settle where to open and hand the rest of the page to
+    // the browser to skip. Both need the full layout that appending just forced,
+    // so they cost nothing extra here and spare every later showing.
+    if (!built.measured) {
+      if (built.matched >= 0) {
+        locate(preview!, built)
+      }
+      compact(built)
+    }
+    // Every showing: Blume gave the pane a fresh scroll position when it rewrote
+    // it, so the page has to be scrolled back down to its section.
+    openAt(preview!, built)
   }
 
   /**
-   * Warm the rows just past the selection. `loadArticle` dedupes, so this is a
-   * no-op once a result list has been walked, and repeating it per selection
-   * keeps the window sliding with the reader rather than fetching a whole list
-   * up front — most of which is never previewed.
+   * Warm the rows just past the selection: fetch their pages, then build them
+   * while the reader is still reading the current one, so arriving costs an
+   * append. `loadArticle` and `sectionFor` both dedupe, so this is a no-op once
+   * a result list has been walked, and repeating it per selection keeps the
+   * window sliding with the reader rather than doing the whole list up front —
+   * most of which is never previewed.
+   *
+   * Building is deferred to idle time. It is the expensive half, and nothing is
+   * waiting on it: a row reached before its build finishes just builds on
+   * arrival, exactly as it did before.
    */
-  function prefetch(selected: HTMLAnchorElement): void {
+  function prefetch(selected: HTMLAnchorElement, words: string[]): void {
     const listed = rows()
     const from = listed.indexOf(selected) + 1
     for (const row of listed.slice(from, from + PREFETCH_AHEAD)) {
-      void loadArticle(row.href)
+      const url = row.href
+      void loadArticle(url).then((article) => {
+        if (article) {
+          whenIdle(() => sectionFor(url, article, words))
+        }
+      })
     }
   }
 
@@ -418,19 +583,20 @@ if (preview && results && input) {
     if (!selected || words.length === 0) {
       return
     }
-    prefetch(selected)
+    prefetch(selected, words)
+    const url = selected.href
 
-    // Already loaded: render in this tick, so the fragment is on screen in the
-    // same frame Blume wrote its text preview and the reader never sees the
+    // Already loaded: render in this tick, so the page is on screen in the same
+    // frame Blume wrote its text preview and the reader never sees the
     // placeholder it replaces.
-    if (ready.has(selected.href)) {
-      render(ready.get(selected.href)!, words)
+    if (ready.has(url)) {
+      render(url, ready.get(url)!, words)
       return
     }
 
-    void loadArticle(selected.href).then((article) => {
+    void loadArticle(url).then((article) => {
       if (current === generation) {
-        render(article, words)
+        render(url, article, words)
       }
     })
   }
