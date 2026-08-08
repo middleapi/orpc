@@ -4,17 +4,18 @@ import type { ContractedRouter, DefaultInitialContext } from '@orpc/server'
 import type { Promisable } from '@orpc/shared'
 import type { Observable } from 'rxjs'
 import type { ORPCModuleOptions } from './options'
-import { applyDecorators, Delete, Get, Head, HttpCode, HttpException, Inject, Injectable, Optional, Options, Patch, Post, Put, UseInterceptors } from '@nestjs/common'
+import { applyDecorators, Delete, Get, Head, HttpCode, Inject, Injectable, Optional, Options, Patch, Post, Put, UseInterceptors } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { getPathMeta, ProcedureContract } from '@orpc/contract'
 import { DEFAULT_OPENAPI_METHOD, getDynamicPathParams, getOpenAPIMeta } from '@orpc/openapi'
 import { OpenAPIHandlerCodecCore } from '@orpc/openapi/standard'
-import { DEFAULT_SUCCESS_STATUS, getRouter, Procedure, unlazy } from '@orpc/server'
+import { DEFAULT_SUCCESS_STATUS, Procedure, unlazy } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
-import { isPlainObject, mergeHttpPath, NullProtoObj, value } from '@orpc/shared'
+import { mergeHttpPath, NullProtoObj, value } from '@orpc/shared'
 import { mergeMap } from 'rxjs'
+import { synthesizeControllerMethod } from '../common/implement-utils'
+import { handleNestStandardExecution } from '../common/interceptor-utils'
 import { defaultToNestStandardLazyRequest } from '../common/lazy-request'
-import { sendStandardResponseToNest } from '../common/response-adapter'
 import { ORPC_MODULE_OPTIONS_TOKEN } from './options'
 
 const MethodDecoratorMap = {
@@ -87,30 +88,8 @@ function implementOpenAPIRouterContract(
   descriptor: TypedPropertyDescriptor<(...args: any[]) => any>,
 ): void {
   for (const key in contract) {
-    let methodName = `${propertyKey}_${key}`
-    let i = 0
-    while (methodName in target) {
-      methodName = `${propertyKey}_${key}_${i++}`
-    }
-
-    target[methodName] = async function (...args: any[]) {
-      const router = await descriptor.value!.apply(this, args)
-      return getRouter(router, [key])
-    }
-
-    Object.setPrototypeOf(target[methodName], descriptor.value!)
-
-    queueMicrotask(() => {
-      for (const p of Reflect.getOwnMetadataKeys(target, propertyKey)) {
-        Reflect.defineMetadata(p, Reflect.getOwnMetadata(p, target, propertyKey), target, methodName)
-      }
-      for (const p of Reflect.getOwnMetadataKeys(target.constructor, propertyKey)) {
-        Reflect.defineMetadata(p, Reflect.getOwnMetadata(p, target.constructor, propertyKey), target.constructor, methodName)
-      }
-    })
-
+    const { methodName, childDescriptor } = synthesizeControllerMethod(target, propertyKey, descriptor, key)
     const childContract = (contract as any)[key]
-    const childDescriptor = Object.getOwnPropertyDescriptor(target, methodName)!
 
     if (childContract instanceof ProcedureContract) {
       const routeDecorator = toOpenAPINestRouteDecorator(childContract)
@@ -167,25 +146,14 @@ export class ImplementInterceptor implements NestInterceptor {
           encodeOutput: this.codec.encodeOutput.bind(this.codec),
         }, this.config)
 
-        const result = await handler.handle(standardRequest, {
-          context: await value(this.config.context ?? {}, ctx),
-        })
+        const initialContext = await value(this.config.context ?? {}, ctx)
 
-        if (!result.matched) {
-          throw new TypeError('oRPC NestJS OpenAPI handler returned an unmatched result.')
-        }
-
-        if (
-          result.response.status >= 300
-          && isPlainObject(result.response.body)
-        ) {
-          throw new HttpException(result.response.body, result.response.status)
-        }
-
-        return sendStandardResponseToNest(
-          this.httpAdapterHost.httpAdapter,
+        return handleNestStandardExecution(
+          handler,
+          standardRequest,
+          initialContext,
           res,
-          result.response,
+          this.httpAdapterHost.httpAdapter,
           this.config.toNestResponse,
         )
       }),

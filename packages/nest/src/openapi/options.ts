@@ -1,21 +1,11 @@
-import type { ExecutionContext } from '@nestjs/common'
 import type { OpenAPIHandlerCodecCoreOptions } from '@orpc/openapi/standard'
 import type { DefaultInitialContext } from '@orpc/server'
-import type { StandardHandlerOptions } from '@orpc/server/standard'
-import type { Promisable, Value } from '@orpc/shared'
-import type { NestStandardLazyRequest, ToNestResponseConfig } from '../common/types'
+import type { BaseORPCModuleOptions } from '../common/options'
 import { ConfigurableModuleBuilder } from '@nestjs/common'
 
 export type ORPCModuleOptions
-  = & OpenAPIHandlerCodecCoreOptions<DefaultInitialContext>
-    & StandardHandlerOptions<DefaultInitialContext>
-    & (object extends DefaultInitialContext
-      ? { context?: Value<Promisable<DefaultInitialContext>, [ctx: ExecutionContext]> }
-      : { context: Value<Promisable<DefaultInitialContext>, [ctx: ExecutionContext]> })
-    & {
-      toNestStandardLazyRequest?: undefined | ((req: any, res: any) => NestStandardLazyRequest)
-      toNestResponse?: undefined | ToNestResponseConfig
-    }
+  = & BaseORPCModuleOptions
+    & OpenAPIHandlerCodecCoreOptions<DefaultInitialContext>
 
 export const {
   ConfigurableModuleClass: ORPCConfigurableModuleClass,
