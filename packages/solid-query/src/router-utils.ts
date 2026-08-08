@@ -1,6 +1,8 @@
 import type { Client, NestedClient } from '@orpc/client'
 import type { GeneralUtils } from './general-utils'
 import type { ProcedureUtils } from './procedure-utils'
+import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
+import { isTypescriptObject } from '@orpc/shared'
 import { createGeneralUtils } from './general-utils'
 import { createProcedureUtils } from './procedure-utils'
 
@@ -36,8 +38,9 @@ export function createRouterUtils<T extends NestedClient<any>>(
   }, {
     get(target, prop) {
       const value = Reflect.get(target, prop)
+      const nextClient = isTypescriptObject(client) ? Reflect.get(client, prop) : undefined
 
-      if (typeof prop !== 'string') {
+      if (typeof prop !== 'string' || RECURSIVE_CLIENT_UNWRAP_KEYS.has(prop) || !isTypescriptObject(nextClient)) {
         return value
       }
 
@@ -48,7 +51,11 @@ export function createRouterUtils<T extends NestedClient<any>>(
       }
 
       return new Proxy(value, {
-        get(_, prop) {
+        get(target, prop) {
+          if (typeof prop !== 'string' || RECURSIVE_CLIENT_UNWRAP_KEYS.has(prop)) {
+            return Reflect.get(target, prop)
+          }
+
           return Reflect.get(nextUtils, prop)
         },
       })

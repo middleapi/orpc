@@ -1,6 +1,7 @@
 import type { Client, ClientRest, NestedClient } from './types'
 import type { SafeResult } from './utils'
 import { isTypescriptObject } from '@orpc/shared'
+import { RECURSIVE_CLIENT_UNWRAP_KEYS } from './consts'
 import { safe } from './utils'
 
 export type SafeClient<T extends NestedClient<any>>
@@ -23,12 +24,12 @@ export type SafeClient<T extends NestedClient<any>>
  */
 export function createSafeClient<T extends NestedClient<any>>(client: T): SafeClient<T> {
   const proxy = new Proxy((...args: any[]) => safe((client as any)(...args)), {
-    get(_, prop, receiver) {
-      const value = Reflect.get(client, prop, receiver)
-
-      if (typeof prop !== 'string') {
-        return value
+    get(target, prop, receiver) {
+      if (typeof prop !== 'string' || RECURSIVE_CLIENT_UNWRAP_KEYS.has(prop)) {
+        return Reflect.get(target, prop)
       }
+
+      const value = Reflect.get(client, prop, receiver)
 
       if (!isTypescriptObject(value)) {
         return value
