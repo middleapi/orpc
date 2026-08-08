@@ -1,0 +1,102 @@
+---
+title: "Static File Plugin"
+description: "Use StaticFileHandlerPlugin to serve static files alongside your procedures with standard HTTP semantics: ETag and Last-Modified conditional requests, range requests, index files, and directory traversal protection."
+sidebar:
+  label: "Static File"
+---
+
+## Installation
+
+```package-install
+npm install @orpc/node@beta
+```
+
+## How It Works
+
+After routing, when no procedure matches a GET or HEAD request, the plugin maps the request path to a file inside `rootDir` and serves it. Matched procedures always take precedence. Requests that resolve to a directory are redirected to their trailing slash form and answered with the directory's `index.html`.
+
+Every file response carries a weak [ETag](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/ETag) and [Last-Modified](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Last-Modified) header, so clients sending `If-None-Match` or `If-Modified-Since` receive `304 Not Modified` when the file is unchanged. Single [range requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Range_requests) are answered with `206 Partial Content`, which enables media seeking and resumable downloads.
+
+Dot segments like `..` are resolved in URL space and clamped at the served directory, following the [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986#section-5.2.4) normalization browsers and proxies apply, so a request can never read outside `rootDir`. Dotfiles are treated as not found unless explicitly enabled.
+
+## Setup
+
+The plugin reads files through the Node.js filesystem API but only interacts with the handler through standard oRPC interfaces, so it works with any handler on a Node.js compatible runtime, whether it uses the [Node HTTP Adapter](/docs/adapters/node-http) or the [Fetch API Adapter](/docs/adapters/fetch-api).
+
+```ts
+import { StaticFileHandlerPlugin } from '@orpc/node'
+import { RPCHandler } from '@orpc/server/node'
+
+const handler = new RPCHandler(router, {
+  plugins: [
+    new StaticFileHandlerPlugin({
+      /**
+       * The directory files are served from. Resolved against the working
+       * directory when relative.
+       */
+      rootDir: './public',
+
+      /**
+       * The URL path files are served under, appended to the handler prefix
+       * when one is set.
+       *
+       * @default '/'
+       */
+      path: '/',
+
+      /**
+       * The file served when the request path resolves to a directory.
+       * Set to `false` to disable directory index files.
+       *
+       * @default 'index.html'
+       */
+      indexFile: 'index.html',
+
+      /**
+       * A file served with status 200 when no file matches the request path,
+       * relative to `rootDir`. Useful for single-page application routing.
+       *
+       * @default undefined
+       */
+      fallbackFile: 'index.html',
+
+      /**
+       * The `Cache-Control` response header value. Set to `false` to omit the header.
+       *
+       * @default 'public, max-age=0'
+       */
+      cacheControl: 'public, max-age=0',
+
+      /**
+       * Whether files and directories whose name starts with a dot can be served.
+       *
+       * @default false
+       */
+      dotfiles: false,
+
+      /**
+       * Whether precompressed sidecar files (`.br`, `.zst`, `.gz`) can be served
+       * when the client accepts their encoding and the content type is compressible.
+       *
+       * @default false
+       */
+      precompressed: false,
+
+      /**
+       * Extra content types keyed by lowercase file extension without the dot,
+       * merged over the built-in mapping. Unknown extensions are served as
+       * `application/octet-stream`.
+       */
+      mimeTypes: {},
+    }),
+  ],
+})
+```
+
+:::info
+When the handler is served under a [prefix](/docs/rpc/handler), files are only reachable inside that prefix, because a handler never intercepts requests outside its prefix.
+:::
+
+## Learn More
+
+For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/node/src/static-file-handler-plugin.ts).

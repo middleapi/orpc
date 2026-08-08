@@ -1,7 +1,7 @@
 import type { StandardBodyHint } from '@standardserver/core'
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard'
 import type { Context } from '../context'
-import { isAsyncIteratorObject, isCompressibleContentType, stringifyJSON, toArray } from '@orpc/shared'
+import { isAsyncIteratorObject, isCompressibleContentType, parseAcceptEncodings, stringifyJSON, toArray } from '@orpc/shared'
 import { flattenStandardHeader, generateContentDisposition } from '@standardserver/core'
 
 // Rough UTF-8 estimate. Mostly ASCII text stays close to 1 byte/char;
@@ -234,22 +234,6 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
       ],
     }
   }
-}
-
-/**
- * Parse Accept-Encoding into coding tokens (q-values ignored; order is client preference).
- *
- * @see https://www.rfc-editor.org/rfc/rfc9110.html#name-accept-encoding
- */
-function parseAcceptEncodings(header: string | undefined): string[] {
-  if (header === undefined) {
-    return []
-  }
-
-  return header
-    .split(',')
-    .map(part => part.trim().split(';')[0]!.trim().toLowerCase())
-    .filter(Boolean)
 }
 
 /**

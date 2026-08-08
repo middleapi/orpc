@@ -28,6 +28,7 @@
     "@orpc/experimental-effect": "workspace:*",
     "@orpc/json-schema": "workspace:*",
     "@orpc/next": "workspace:*",
+    "@orpc/node": "workspace:*",
     "@orpc/openapi": "workspace:*",
     "@orpc/opentelemetry": "workspace:*",
     "@orpc/pino": "workspace:*",
