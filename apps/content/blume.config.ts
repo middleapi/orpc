@@ -15,7 +15,6 @@ export default defineConfig({
           'index.mdx',
           'docs/**/*.{md,mdx}',
           'blog/**/*.{md,mdx}',
-          'learn-and-contribute/**/*.{md,mdx}',
         ],
       },
       {
@@ -49,7 +48,6 @@ export default defineConfig({
       { label: 'Blog', path: '/blog', href: '/blog' },
       { label: 'Changelog', path: '/changelog', href: '/changelog' },
       { label: 'Comparison', path: '/docs', href: '/docs/comparison' },
-      { label: 'Contribute', path: '/learn-and-contribute' },
       {
         label: 'More',
         path: '',

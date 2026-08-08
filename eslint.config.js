@@ -79,7 +79,6 @@ export default antfu({
     'apps/content/blog/**',
     'apps/content/docs/**',
     'apps/content/examples/**',
-    'apps/content/learn-and-contribute/**',
     'playgrounds/**',
     'packages/*/playground/**',
   ],
