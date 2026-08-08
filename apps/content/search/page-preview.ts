@@ -32,8 +32,19 @@ const TEXT_PREVIEW = 'h3 + div'
 /** Marks our own subtree so the observer ignores the mutations it causes. */
 const OWN = 'data-orpc-page-preview'
 
-/** Wait out a burst of arrow-key selections before spending a fetch. */
+/**
+ * Wait out a burst of arrow-key selections before spending a fetch on a page
+ * that isn't loaded yet. A page already in the cache skips this entirely and
+ * renders in the same tick the selection changed, so moving down a result list
+ * never shows the text preview flicker past on its way to the real thing.
+ */
 const DEBOUNCE = 120
+/**
+ * How far past the selection to fetch ahead. Readers move down a result list, so
+ * the next few rows are the ones about to be asked for; fetching them while the
+ * reader reads the current one is what makes those selections instant.
+ */
+const PREFETCH_AHEAD = 3
 /**
  * Preview scale. Page text is sized for a full column; at ~0.85 the fragment
  * still reads at the pane's width while keeping every proportion the page has.
@@ -59,6 +70,12 @@ const NON_WORD = /[^\p{L}\p{N}_]+/gu
 
 /** Parsed articles by URL, oldest first (insertion order backs the eviction). */
 const articles = new Map<string, Promise<Element | null>>()
+/**
+ * The same articles once they have resolved. Awaiting a settled promise still
+ * costs a microtask, and Blume paints its text preview in between — so whether a
+ * page can be rendered *now* has to be answerable synchronously.
+ */
+const ready = new Map<string, Element | null>()
 
 /**
  * Fetch a page and keep its article, stripped of chrome. The sponsor slot goes
@@ -90,10 +107,16 @@ function loadArticle(url: string): Promise<Element | null> {
       // Blume's text preview. Cache the miss so it isn't retried per keystroke,
       // and let a page reload be what retries it.
       .catch(() => null)
+      .then((found) => {
+        ready.set(url, found)
+        return found
+      })
 
     articles.set(url, article)
     if (articles.size > CACHE_LIMIT) {
-      articles.delete(articles.keys().next().value!)
+      const oldest = articles.keys().next().value!
+      articles.delete(oldest)
+      ready.delete(oldest)
     }
   }
   return article
@@ -341,7 +364,45 @@ if (preview && results && input) {
   let generation = 0
   let timer: number | undefined
 
-  async function enrich(): Promise<void> {
+  /** Result rows, in the order they are listed. */
+  function rows(): HTMLAnchorElement[] {
+    return [...results!.querySelectorAll<HTMLAnchorElement>('a')]
+  }
+
+  /** Render the passage for the selected row, or leave Blume's text preview. */
+  function render(article: Element | null, words: string[]): void {
+    const blocks = article ? [...article.children] : []
+    const index = bestIndex(blocks, words)
+    // Re-checked here rather than by the caller: on the awaited path Blume may
+    // have rewritten the pane while the page was in flight, and a second
+    // fragment would stack under the first.
+    if (index < 0 || preview!.querySelector(`[${OWN}]`)) {
+      return
+    }
+
+    const section = buildSection(fragment(blocks, index), words)
+    preview!.append(section)
+    // Only now that the real thing is on screen: the text preview would
+    // otherwise be the fallback vanishing before its replacement arrives.
+    preview!.querySelector<HTMLElement>(TEXT_PREVIEW)?.setAttribute('hidden', '')
+    revealMatch(preview!, section)
+  }
+
+  /**
+   * Warm the rows just past the selection. `loadArticle` dedupes, so this is a
+   * no-op once a result list has been walked, and repeating it per selection
+   * keeps the window sliding with the reader rather than fetching a whole list
+   * up front — most of which is never previewed.
+   */
+  function prefetch(selected: HTMLAnchorElement): void {
+    const listed = rows()
+    const from = listed.indexOf(selected) + 1
+    for (const row of listed.slice(from, from + PREFETCH_AHEAD)) {
+      void loadArticle(row.href)
+    }
+  }
+
+  function enrich(): void {
     generation += 1
     const current = generation
 
@@ -357,25 +418,21 @@ if (preview && results && input) {
     if (!selected || words.length === 0) {
       return
     }
+    prefetch(selected)
 
-    const article = await loadArticle(selected.href)
-    if (!article || current !== generation) {
-      return
-    }
-    const blocks = [...article.children]
-    const index = bestIndex(blocks, words)
-    // Re-checked after the await: Blume may have rewritten the pane while the
-    // page was in flight, and a second fragment would stack under the first.
-    if (index < 0 || preview!.querySelector(`[${OWN}]`)) {
+    // Already loaded: render in this tick, so the fragment is on screen in the
+    // same frame Blume wrote its text preview and the reader never sees the
+    // placeholder it replaces.
+    if (ready.has(selected.href)) {
+      render(ready.get(selected.href)!, words)
       return
     }
 
-    const section = buildSection(fragment(blocks, index), words)
-    preview!.append(section)
-    // Only now that the real thing is on screen: the text preview would
-    // otherwise be the fallback vanishing before its replacement arrives.
-    preview!.querySelector<HTMLElement>(TEXT_PREVIEW)?.setAttribute('hidden', '')
-    revealMatch(preview!, section)
+    void loadArticle(selected.href).then((article) => {
+      if (current === generation) {
+        render(article, words)
+      }
+    })
   }
 
   const observer = new MutationObserver((records) => {
@@ -390,7 +447,15 @@ if (preview && results && input) {
     }
     generation += 1
     window.clearTimeout(timer)
-    timer = window.setTimeout(() => void enrich(), DEBOUNCE)
+    // A cached page is rendered straight away; only a fetch is worth waiting to
+    // see whether the reader settles on this row first.
+    const selected = results!.querySelector<HTMLAnchorElement>(`a.${SELECTED}`)
+    if (selected && ready.has(selected.href)) {
+      enrich()
+    }
+    else {
+      timer = window.setTimeout(enrich, DEBOUNCE)
+    }
   })
 
   observer.observe(preview, { childList: true })
