@@ -278,6 +278,127 @@ describe('routing', () => {
       })
     })
   })
+
+  describe.each([
+    ['express adapter', undefined],
+    ['fastify adapter', new FastifyAdapter()],
+  ] as const)('params edge cases with %s', async (_, adapter) => {
+    const contract = {
+      staticPath: oc.meta(openapi({
+        path: '/static',
+        method: 'GET',
+      })).input(z.object({ tenant: z.string() })),
+
+      dynamicPath: oc.meta(openapi({
+        path: '/dynamic/{id}',
+        method: 'GET',
+      })).input(z.object({ tenant: z.string(), id: z.string() })),
+
+      restPath: oc.meta(openapi({
+        path: '/rest/{+rest}',
+        method: 'GET',
+      })).input(z.object({ tenant: z.string(), rest: z.string() })),
+
+      pathNamedParam: oc.meta(openapi({
+        path: '/files/{path}',
+        method: 'GET',
+      })).input(z.object({ tenant: z.string(), path: z.string() })),
+    }
+
+    @Controller('/:tenant')
+    class TenantController {
+      @Implement(contract.staticPath)
+      staticPath() {
+        return implement(contract.staticPath).handler(({ input }) => input)
+      }
+
+      @Implement(contract.dynamicPath)
+      dynamicPath() {
+        return implement(contract.dynamicPath).handler(({ input }) => input)
+      }
+
+      @Implement(contract.restPath)
+      restPath() {
+        return implement(contract.restPath).handler(({ input }) => input)
+      }
+
+      @Implement(contract.pathNamedParam)
+      pathNamedParam() {
+        return implement(contract.pathNamedParam).handler(({ input }) => input)
+      }
+    }
+
+    const protoContract = oc.meta(openapi({
+      path: '/proto/{+__proto__}',
+      inputStructure: 'detailed',
+    }))
+
+    @Controller()
+    class ProtoController {
+      @Implement(protoContract)
+      proto() {
+        return implement(protoContract).handler(({ input }) => {
+          const params = (input as any).params
+
+          return {
+            entries: Object.entries(params),
+            constructor: typeof params.constructor,
+          }
+        })
+      }
+    }
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [TenantController, ProtoController],
+    }).compile()
+
+    const app = moduleRef.createNestApplication(adapter as any)
+    await app.init()
+
+    if (adapter) {
+      await app.getHttpAdapter().getInstance().ready()
+    }
+
+    const httpServer = app.getHttpServer()
+
+    it('should keep dynamic controller prefix params when the contract path has none', async () => {
+      const res = await supertest(httpServer).get('/acme/static')
+
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual({ tenant: 'acme' })
+    })
+
+    it('should keep dynamic controller prefix params alongside contract params', async () => {
+      const res = await supertest(httpServer).get('/acme/dynamic/123')
+
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual({ tenant: 'acme', id: '123' })
+    })
+
+    it('should keep dynamic controller prefix params alongside contract rest params', async () => {
+      const res = await supertest(httpServer).get('/acme/rest/some/long/path')
+
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual({ tenant: 'acme', rest: 'some/long/path' })
+    })
+
+    it('should keep a non-rest param literally named `path`', async () => {
+      const res = await supertest(httpServer).get('/acme/files/xxx')
+
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual({ tenant: 'acme', path: 'xxx' })
+    })
+
+    it('should treat params named like `__proto__` as own properties without polluting the prototype', async () => {
+      const res = await supertest(httpServer).post('/proto/some/value')
+
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual({
+        entries: [['__proto__', 'some/value']],
+        constructor: 'undefined',
+      })
+    })
+  })
 })
 
 describe('response status, headers and body should follow standardserver', () => {
@@ -1207,6 +1328,44 @@ describe('compatibility', () => {
       expect.objectContaining({ url: '/parser/value' }),
       expect.objectContaining({ end: expect.any(Function) }),
     )
+  })
+
+  it('ignores contract rest params when custom request parser provides no wildcard param', async () => {
+    const contract = oc.meta(openapi({
+      path: '/parser-rest/{+rest}',
+      inputStructure: 'detailed',
+    }))
+
+    @Controller()
+    class ImplController {
+      @Implement(contract)
+      parserRest() {
+        return implement(contract).handler(({ input }) => (input as any).params)
+      }
+    }
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ImplController],
+      imports: [
+        ORPCModule.forRoot({
+          toNestStandardLazyRequest: () => ({
+            url: '/parser-rest/value',
+            method: 'POST',
+            headers: {},
+            resolveBody: async () => undefined,
+            params: { other: '__OTHER__' },
+          } satisfies NestStandardLazyRequest),
+        }),
+      ],
+    }).compile()
+
+    const app = moduleRef.createNestApplication()
+    await app.init()
+
+    const res = await supertest(app.getHttpServer()).post('/parser-rest/some/value')
+
+    expect(res.statusCode).toEqual(200)
+    expect(res.body).toEqual({ other: '__OTHER__' })
   })
 
   it('procedure path[] should use meta.path or fall back to empty', async () => {

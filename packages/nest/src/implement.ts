@@ -15,7 +15,7 @@ import { DEFAULT_OPENAPI_METHOD, getDynamicPathParams, getOpenAPIMeta } from '@o
 import { OpenAPIHandlerCodecCore } from '@orpc/openapi/standard'
 import { DEFAULT_SUCCESS_STATUS, getRouter, Procedure, unlazy } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
-import { isAsyncIteratorObject, mergeHttpPath, stringifyJSON, value } from '@orpc/shared'
+import { isAsyncIteratorObject, mergeHttpPath, NullProtoObj, stringifyJSON, value } from '@orpc/shared'
 import { flattenStandardHeader, generateContentDisposition } from '@standardserver/core'
 import { toEventStream, toStandardLazyRequest } from '@standardserver/node'
 import { mergeMap } from 'rxjs'
@@ -293,39 +293,41 @@ export class ImplementInterceptor implements NestInterceptor {
   }
 }
 
-function flattenParamValue(value: undefined | string | string[]): undefined | string {
+function flattenParamValue(value: string | string[]): string {
   return Array.isArray(value) ? value.join('/') : value
 }
 
 function toORPCOpenAPIParams(contract: AnyProcedureContract, params: NestStandardLazyRequest['params']): undefined | Record<string, string> {
   const meta = getOpenAPIMeta(contract)
 
-  /* c8 ignore start - there cases almost never happen only for type guard purpose */
-  if (!params || meta?.path === undefined) {
-    return undefined
-  }
-  /* c8 ignore stop */
-
-  const dynamicParams = getDynamicPathParams(meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path)
-  if (!dynamicParams) {
+  if (!params || meta?.path === undefined || Object.keys(params).length === 0) {
     return undefined
   }
 
-  return dynamicParams.reduce((acc: Record<string, string>, config) => {
-    const value = config.allowsSlash
-      ? flattenParamValue(params?.['*'] ?? params?.path) // express use `path` while fastify use `*` for rest matching
-      : flattenParamValue(params?.[config.parameterName])
+  // NullProtoObj prevents prototype injection when a param is named like `__proto__`
+  const orpcParams: Record<string, string> = new NullProtoObj()
+  // express use `path` while fastify use `*` for rest matching
+  const restKey = Object.hasOwn(params, '*') ? '*' : 'path'
 
-    /* c8 ignore start - this case almost never happen only for type guard purpose */
-    if (value === undefined) {
-      return acc
+  for (const [key, value] of Object.entries(params)) {
+    if (key === restKey) {
+      const restParams = getDynamicPathParams(
+        meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path,
+      )?.filter(c => c.allowsSlash)
+
+      if (restParams?.length) {
+        for (const c of restParams) {
+          orpcParams[c.parameterName] = flattenParamValue(value)
+        }
+
+        continue
+      }
     }
-    /* c8 ignore stop */
 
-    acc[config.parameterName] = value
+    orpcParams[key] = flattenParamValue(value)
+  }
 
-    return acc
-  }, {})
+  return orpcParams
 }
 
 function toNestPattern(path: `/${string}`): `/${string}` {
