@@ -165,21 +165,55 @@ main#blume-content {
    ::before hanging outside its box). */
 @media (width > 48rem) {
   .prose .twoslash-hover .twoslash-popup-container {
+    /* The dead gap the 2em shift leaves between the code line and the
+       popup (~0.54em); the bridge and flip rules below must all agree on
+       it, or the hover seam reopens. */
+    --twoslash-gap: 0.55em;
+
     transform: translateY(2em);
+    /* Cap oversized popups; the internal scrolling lives on the children
+       below. */
+    max-height: min(45vh, 28rem);
   }
 
   .prose .twoslash-hover .twoslash-popup-container::before {
     content: '';
     position: absolute;
-    /* Exactly the dead gap (~0.54em: the 2em shift minus the code line
-       under the popup's static position) plus 1px into the line's lower
-       half-leading so rounding can't reopen a seam. Any taller and it
-       overlaps the code line, trapping sideways movement between
-       neighboring hover tokens. */
-    top: calc(-0.55em - 1px);
+    /* The gap plus 1px into the line's lower half-leading so rounding
+       can't reopen a seam. Any taller and it overlaps the code line,
+       trapping sideways movement between neighboring hover tokens. */
+    top: calc(-1px - var(--twoslash-gap));
     left: 0;
     right: 0;
-    height: calc(0.55em + 1px);
+    height: calc(var(--twoslash-gap) + 1px);
+  }
+
+  /* Flip: twoslash-mobile.ts sets .twoslash-flip on the hover when the
+     popup can't fit under a token near the viewport bottom. Anchor the
+     popup the same gap above the token (the hover span is position:
+     relative) and hang the bridge off its bottom edge instead, 1px into
+     the line's upper half-leading — same seam logic as below. */
+  .prose .twoslash-hover.twoslash-flip .twoslash-popup-container {
+    top: auto;
+    bottom: calc(100% + var(--twoslash-gap));
+    transform: none;
+  }
+
+  .prose .twoslash-hover.twoslash-flip .twoslash-popup-container::before {
+    top: auto;
+    bottom: calc(-1px - var(--twoslash-gap));
+  }
+
+  /* The internal scrolling for the max-height cap above. It must live on
+     the flex children, not the container: the container anchors two
+     elements hanging outside its box — the ::before hover bridge and the
+     popup arrow — and container-level overflow would clip both, closing
+     the popup the moment the pointer crosses the gap. */
+  .prose .twoslash-hover .twoslash-popup-container > * {
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-color: var(--blume-border) transparent;
+    scrollbar-width: thin;
   }
 }
 
@@ -190,6 +224,15 @@ main#blume-content {
    viewport centering here is only the first-frame fallback until the
    script can measure the popup's width. */
 @media (max-width: 48rem) {
+  /* Scrolling dismisses the placed popup (twoslash-mobile.ts sets
+     .twoslash-dismissed, the next placement lifts it). display, not
+     opacity: the popup must also disappear in browsers whose sticky
+     tap-:hover would otherwise keep the reveal alive, and the bridge
+     must go with it so the stale fixed strip can't swallow a tap. */
+  .prose .twoslash-hover.twoslash-dismissed :is(.twoslash-popup-container, .twoslash-mobile-bridge) {
+    display: none;
+  }
+
   .prose .twoslash-popup-container {
     position: fixed;
     inset: auto auto auto 50%;
