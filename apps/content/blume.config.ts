@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'blume'
+import { searchCodeIndexPlugin } from './search/code-index'
 import { sponsorAdsInjectPlugin } from './sponsors/inject'
 
 export default defineConfig({
@@ -98,6 +99,19 @@ export default defineConfig({
       hooks: {
         'astro:config:setup': ({ injectScript }) => {
           const clientPath = fileURLToPath(new URL('./components/blume/twoslash-mobile.ts', import.meta.url))
+          injectScript('page', `import '${clientPath.replaceAll('\\', '\\\\').replaceAll('\'', '\\\'')}'`)
+        },
+      },
+    },
+    {
+      // Blume drops fenced code from the search index; fold it back in so the
+      // code-first docs are searchable by the API they demonstrate.
+      name: 'search-code-index',
+      hooks: {
+        'astro:config:setup': ({ updateConfig, injectScript }) => {
+          updateConfig({ vite: { plugins: [searchCodeIndexPlugin()] } })
+          // Render the matched passage in the preview pane the way the page does.
+          const clientPath = fileURLToPath(new URL('./search/page-preview.ts', import.meta.url))
           injectScript('page', `import '${clientPath.replaceAll('\\', '\\\\').replaceAll('\'', '\\\'')}'`)
         },
       },
