@@ -1,7 +1,7 @@
 import type { Publisher } from '@orpc/publisher'
 import { Module } from '@nestjs/common'
 import { SmartCoercionHandlerPlugin } from '@orpc/json-schema'
-import { ORPCModule } from '@orpc/nest'
+import { ORPCModule } from '@orpc/nest/openapi'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { messagePublisher } from './context'
 import { FileController } from './controllers/file.controller'

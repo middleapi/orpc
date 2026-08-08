@@ -14,16 +14,22 @@
   "publishConfig": {
     "exports": {
       "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
+      "./openapi": {
+        "types": "./dist/openapi/index.d.mts",
+        "import": "./dist/openapi/index.mjs",
+        "default": "./dist/openapi/index.mjs"
+      },
+      "./rpc": {
+        "types": "./dist/rpc/index.d.mts",
+        "import": "./dist/rpc/index.mjs",
+        "default": "./dist/rpc/index.mjs"
       }
     }
   },
   "exports": {
     "./package.json": "./package.json",
-    ".": "./src/index.ts"
+    "./openapi": "./src/openapi/index.ts",
+    "./rpc": "./src/rpc/index.ts"
   },
   "files": [
     "dist"
