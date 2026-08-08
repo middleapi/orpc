@@ -27,7 +27,7 @@ const PREVIEW = '[data-blume-search-preview]'
 const RESULTS = '[data-blume-search-results]'
 const INPUT = '[data-blume-search-input]'
 /** Blume marks the selected row with this class (ROW_ON in its Search.astro). */
-const SELECTED = 'bg-muted'
+const SELECTED = 'a.bg-muted'
 /** Blume's own text preview: the block it renders after the result title. */
 const TEXT_PREVIEW = 'h3 + div'
 
@@ -56,17 +56,17 @@ const ZOOM = '0.85'
 const HEADING_LOOKBACK = 3
 /** Breathing room above the section the pane opens at. */
 const SCROLL_PADDING = 12
-/** Parsed articles held at once — enough for a result list, bounded for memory. */
+/** Pages held at once — enough for a result list, bounded for memory. */
 const CACHE_LIMIT = 8
 /**
- * Rendered pages held at once. Smaller than the article cache: a built page
+ * Rendered pages held at once. Smaller than the page cache: a rendered page
  * carries the marks and is only useful while the query that made it stands.
  */
 const BUILD_LIMIT = 6
 
 /** Page furniture that is not page content, dropped before anything is scored. */
 const CHROME = '[data-sponsor-slot], script, style, .twoslash-popup-container'
-/** A heading opens the section a match sits in, so it comes along as context. */
+/** A heading opens the section a match sits in, so it is what the pane opens at. */
 const HEADING = /^h[1-6]$/iu
 /** Attributes that would collide with the live page's own copies. */
 const IDENTIFIERS = ['id', 'for', 'name'] as const
@@ -76,71 +76,42 @@ const REGEXP_SPECIAL = /[$()*+.?[\\\]^{|}]/gu
 /** Splits an identifier-shaped token into the words Shiki renders separately. */
 const NON_WORD = /[^\p{L}\p{N}_]+/gu
 
-/** Parsed articles by URL, oldest first (insertion order backs the eviction). */
-const articles = new Map<string, Promise<Element | null>>()
 /**
- * The same articles once they have resolved. Awaiting a settled promise still
- * costs a microtask, and Blume paints its text preview in between — so whether a
- * page can be rendered *now* has to be answerable synchronously.
+ * A fetched page. `article` is the promise every caller awaits; `settled` and
+ * `value` are the same result made readable synchronously, because awaiting even
+ * a settled promise costs a microtask and Blume paints its text preview in that
+ * gap — whether a page can be rendered *now* has to be answerable without one.
  */
-const ready = new Map<string, Element | null>()
+interface Page {
+  article: Promise<Element | null>
+  settled: boolean
+  value: Element | null
+}
 
 /** A rendered page and where in it the pane should open. */
 interface Built {
   section: HTMLElement
-  /** Index of the block the query matched, or -1 when the page carries no mark. */
-  matched: number
-  /** Index of the heading that block sits under, or -1 alongside `matched`. */
-  start: number
   /**
    * How far into the page the pane should scroll, in the pane's own pixels.
-   * Resolved once while the page is fully laid out — see {@link locate} — and
-   * null until then, or for a page with no match, which opens at the top.
+   * Resolved once while the page is fully laid out — see {@link measure} — and
+   * null before that, or for a page with no match, which opens at the top.
    */
   offset: number | null
-  /** Whether its blocks have been measured and handed to {@link compact}. */
+  /** Whether {@link measure} has run, which it does exactly once per page. */
   measured: boolean
 }
 
-/**
- * Let the browser skip the off-screen blocks. A whole docs page laid out in the
- * pane costs tens of milliseconds — far more than cloning and marking it — and
- * that bill comes due every time the page is put back on screen. With
- * `content-visibility` only the visible slice is laid out.
- *
- * The measurement is what makes this safe. `contain-intrinsic-size` is a
- * placeholder for skipped content, and a guessed one would put every block at
- * the wrong offset, landing the opening scroll in the wrong place. Each block is
- * measured after it has been laid out for real, so the placeholder equals the
- * height it replaces and offsets stay exact; `auto` then has the browser prefer
- * the last rendered size over the placeholder as blocks are visited.
- *
- * `offsetHeight`, not `getBoundingClientRect`: the section is zoomed, so the
- * rect is scaled while `contain-intrinsic-size` is in the block's own pixels —
- * the units `offsetHeight` reports.
- */
-function compact(built: Built): void {
-  if (built.measured) {
-    return
-  }
-  built.measured = true
-
-  // Every height is read before the first style is written. Interleaving them
-  // invalidates the layout that the next read then forces again — a page's worth
-  // of layouts instead of one, which costs more than this saves.
-  const blocks = [...built.section.children] as HTMLElement[]
-  const heights = blocks.map(block => block.offsetHeight)
-  for (const [index, block] of blocks.entries()) {
-    const height = heights[index]!
-    if (height > 0) {
-      block.style.containIntrinsicSize = `auto ${height}px`
-      block.style.contentVisibility = 'auto'
-    }
-  }
-}
-
+/** Fetched pages by URL, oldest first (insertion order backs the eviction). */
+const pages = new Map<string, Page>()
 /** Rendered pages by page URL and query, oldest first. */
 const sections = new Map<string, Built>()
+
+/** Drop the oldest entries until `cache` is back within `limit`. */
+function evict(cache: Map<string, unknown>, limit: number): void {
+  while (cache.size > limit) {
+    cache.delete(cache.keys().next().value!)
+  }
+}
 
 /** Run off the critical path, where the browser has time to spare. */
 function whenIdle(work: () => void): void {
@@ -160,10 +131,14 @@ function whenIdle(work: () => void): void {
  * inside a modal dialog that puts them in the wrong place, often over the
  * results list.
  */
-function loadArticle(url: string): Promise<Element | null> {
-  let article = articles.get(url)
-  if (!article) {
-    article = fetch(url, { headers: { Accept: 'text/html' } })
+function loadPage(url: string): Page {
+  const cached = pages.get(url)
+  if (cached) {
+    return cached
+  }
+
+  const page: Page = {
+    article: fetch(url, { headers: { Accept: 'text/html' } })
       .then(response => (response.ok ? response.text() : ''))
       .then((html) => {
         const found = html
@@ -183,18 +158,17 @@ function loadArticle(url: string): Promise<Element | null> {
       // and let a page reload be what retries it.
       .catch(() => null)
       .then((found) => {
-        ready.set(url, found)
+        page.settled = true
+        page.value = found
         return found
-      })
-
-    articles.set(url, article)
-    if (articles.size > CACHE_LIMIT) {
-      const oldest = articles.keys().next().value!
-      articles.delete(oldest)
-      ready.delete(oldest)
-    }
+      }),
+    settled: false,
+    value: null,
   }
-  return article
+
+  pages.set(url, page)
+  evict(pages, CACHE_LIMIT)
+  return page
 }
 
 /** Escape a literal so it can be spliced into a pattern. */
@@ -217,47 +191,6 @@ function pattern(words: string[]): RegExp | null {
     return null
   }
   return new RegExp(`(${words.map(escapeToken).join('|')})`, 'giu')
-}
-
-/**
- * The block that best explains the match: most marks wins, ties going to the
- * first block on the page. Blume renders an article as a flat run of top-level
- * blocks, so a child here is a whole paragraph, code block, table or callout —
- * the unit a reader recognizes.
- *
- * Counting the marks rather than re-scanning the text keeps the section the pane
- * opens at consistent with what is actually highlighted in it, including where
- * only the word-by-word fallback matched, and spares the page a second pass.
- *
- * A page with no marks opens at the top, which is the right place to start
- * reading a page matched on its title alone.
- */
-function bestIndex(nodes: Element[]): number {
-  let best = -1
-  let bestScore = 0
-  for (const [index, node] of nodes.entries()) {
-    const score = node.querySelectorAll('mark').length
-    if (score > bestScore) {
-      best = index
-      bestScore = score
-    }
-  }
-  return best
-}
-
-/**
- * Where to open the page: the heading that introduces the match, so the reader
- * lands on a section rather than mid-sentence. The heading is only taken when it
- * is close by — further back it belongs to something else on the way to the
- * match, and the match itself is then the better anchor.
- */
-function sectionStart(nodes: Element[], index: number): number {
-  for (let step = 1; step <= HEADING_LOOKBACK && index - step >= 0; step += 1) {
-    if (HEADING.test(nodes[index - step]!.tagName)) {
-      return index - step
-    }
-  }
-  return index
 }
 
 /**
@@ -325,7 +258,7 @@ function markQuery(root: Element, words: string[]): void {
   }
 }
 
-/** Distinguishes one rendered fragment's identifiers from the next one's. */
+/** Distinguishes one rendered page's identifiers from the next one's. */
 let renders = 0
 
 /**
@@ -373,6 +306,29 @@ function buildSection(article: Element, words: string[]): HTMLElement {
   return section
 }
 
+/**
+ * The rendered page for a row, built once per page and query. Cloning a whole
+ * article and marking it costs milliseconds, and a reader walking a result list
+ * revisits the same rows constantly. The built node is detached when Blume
+ * clears the pane and re-appended on the next visit, which is free.
+ */
+function sectionFor(url: string, article: Element, words: string[]): Built {
+  const key = `${url}\n${words.join(' ')}`
+  const cached = sections.get(key)
+  if (cached) {
+    return cached
+  }
+
+  const built: Built = {
+    measured: false,
+    offset: null,
+    section: buildSection(article, words),
+  }
+  sections.set(key, built)
+  evict(sections, BUILD_LIMIT)
+  return built
+}
+
 /** The `<blume-tabs>` API used to switch panels once the element has upgraded. */
 interface TabsElement extends Element {
   activate?: (index: number, sync: boolean, updateHash: boolean) => void
@@ -381,8 +337,8 @@ interface TabsElement extends Element {
 /**
  * Open the tab holding the match, if it is in one. A tabbed block shows a single
  * panel — the Cloudflare variant of a snippet, one package manager of four — and
- * a match in any other panel renders to zero height, so the fragment would look
- * like it doesn't contain what the reader searched for.
+ * a match in any other panel renders to zero height, so the page would look like
+ * it doesn't contain what the reader searched for.
  *
  * An upgraded `<blume-tabs>` is asked to switch, which keeps its trigger row in
  * step (styling the panel directly would leave the tabs stuck, since a later
@@ -395,7 +351,7 @@ interface TabsElement extends Element {
 function revealTab(mark: Element): void {
   const tabs: TabsElement | null = mark.closest('blume-tabs')
   const content = tabs?.querySelector(':scope > [data-blume-tab-content]')
-  if (!content) {
+  if (!tabs || !content) {
     return
   }
   const panels = [...content.children]
@@ -403,8 +359,8 @@ function revealTab(mark: Element): void {
   if (index < 0) {
     return
   }
-  if (typeof tabs!.activate === 'function') {
-    tabs!.activate(index, false, false)
+  if (typeof tabs.activate === 'function') {
+    tabs.activate(index, false, false)
     return
   }
   for (const [position, panel] of panels.entries()) {
@@ -412,48 +368,107 @@ function revealTab(mark: Element): void {
   }
 }
 
-/** How far `target`'s top sits below the top of the page it belongs to. */
-function offsetWithin(section: HTMLElement, target: Element): number {
-  return (
-    target.getBoundingClientRect().top - section.getBoundingClientRect().top
-  )
-}
-
 /**
- * Work out where the pane should open, while the page is still laid out in full.
+ * Where the pane should open: the heading that introduces the block carrying the
+ * most marks, so the reader lands on a section rather than mid-sentence. Blume
+ * renders an article as a flat run of top-level blocks, so a child here is a
+ * whole paragraph, code block, table or callout — the unit a reader recognizes.
  *
- * This runs once per built page, before {@link compact} hands the off-screen
- * blocks to the browser to skip — after that their geometry is a placeholder by
- * design, and asking a skipped block where its mark sits gives an answer that
- * would scroll somewhere else entirely. Resolving the offset up front also makes
- * every later showing of the page land in exactly the same place.
+ * Ranking by marks rather than re-scanning the text keeps where the pane opens
+ * consistent with what is actually highlighted, including where only the
+ * word-by-word fallback matched. Null — no marks at all — opens the page at the
+ * top, which is where a page matched on its title alone should start.
  *
- * The section heading is what gets aligned, since landing on it is what tells
- * the reader where in the page they are. When the match itself would then sit
- * below the fold — a long section, or a heading far above its code block — the
- * match wins and is centered instead: the reader came here for it.
+ * A heading is only taken when it is close by; further back it belongs to
+ * something else on the way to the match, which is then its own best anchor. And
+ * when the match would sit below the fold — a long section, or a heading far
+ * above its code block — the match wins and is centered instead: the reader came
+ * here for it, not for the heading.
  */
-function locate(preview: HTMLElement, built: Built): void {
-  const heading = built.section.children[built.start]
-  if (!heading) {
-    return
+function locate(preview: HTMLElement, section: HTMLElement): number | null {
+  const blocks = [...section.children]
+  let matched = -1
+  let best = 0
+  for (const [index, block] of blocks.entries()) {
+    const marks = block.querySelectorAll('mark').length
+    if (marks > best) {
+      matched = index
+      best = marks
+    }
   }
-  // The mark inside the matched block is the one that chose this section.
-  const mark = built.section.children[built.matched]?.querySelector('mark')
+  if (matched < 0) {
+    return null
+  }
+
+  let start = matched
+  for (let step = 1; step <= HEADING_LOOKBACK && matched - step >= 0; step += 1) {
+    if (HEADING.test(blocks[matched - step]!.tagName)) {
+      start = matched - step
+      break
+    }
+  }
+
+  const mark = blocks[matched]!.querySelector('mark')
   // Before measuring: opening a tab changes what sits above the match.
   if (mark) {
     revealTab(mark)
   }
 
-  const offset = offsetWithin(built.section, heading) - SCROLL_PADDING
-  const markOffset = mark ? offsetWithin(built.section, mark) : offset
-  built.offset
-    = markOffset - offset > preview.clientHeight
-      ? markOffset - preview.clientHeight / 2
-      : offset
+  const top = section.getBoundingClientRect().top
+  const heading = blocks[start]!.getBoundingClientRect().top - top - SCROLL_PADDING
+  const match = mark ? mark.getBoundingClientRect().top - top : heading
+  return match - heading > preview.clientHeight
+    ? match - preview.clientHeight / 2
+    : heading
 }
 
-/** Scroll the pane to the offset {@link locate} settled on. */
+/**
+ * Settle where the page opens and let the browser skip its off-screen blocks —
+ * both while it is laid out in full, which appending it just paid for, and both
+ * exactly once per page.
+ *
+ * The order matters. `content-visibility` gives skipped blocks a placeholder
+ * geometry by design, so asking one where its mark sits afterwards would scroll
+ * somewhere else entirely; resolving the offset first also makes every later
+ * showing of the page land in exactly the same place.
+ *
+ * Measuring is what makes the skipping safe. `contain-intrinsic-size` stands in
+ * for skipped content, and a guessed one would put every block at the wrong
+ * offset. Each block is measured after being laid out for real, so the
+ * placeholder equals the height it replaces; `auto` then has the browser prefer
+ * the last rendered size over the placeholder as blocks are visited.
+ *
+ * `offsetHeight`, not `getBoundingClientRect`: the page is zoomed, so the rect
+ * is scaled while `contain-intrinsic-size` is in the block's own pixels — the
+ * units `offsetHeight` reports.
+ */
+function measure(preview: HTMLElement, built: Built): void {
+  if (built.measured) {
+    return
+  }
+  built.measured = true
+  built.offset = locate(preview, built.section)
+
+  // Every height is read before the first style is written. Interleaving them
+  // invalidates the layout that the next read then forces again — a page's worth
+  // of layouts instead of one, which costs more than this saves.
+  const blocks = [...built.section.children] as HTMLElement[]
+  const heights = blocks.map(block => block.offsetHeight)
+  for (const [index, block] of blocks.entries()) {
+    const height = heights[index]!
+    if (height > 0) {
+      block.style.containIntrinsicSize = `auto ${height}px`
+      block.style.contentVisibility = 'auto'
+    }
+  }
+}
+
+/**
+ * Scroll the pane to the offset {@link measure} settled on. The pane is the
+ * scroller — the page flows at full height inside it, the way it does in a
+ * browser window — and Blume's result title sits above the page inside it, so
+ * the page's own top is found rather than assumed to be the scroll origin.
+ */
 function openAt(preview: HTMLElement, built: Built): void {
   if (built.offset === null) {
     return
@@ -465,101 +480,59 @@ function openAt(preview: HTMLElement, built: Built): void {
   preview.scrollTop = top + built.offset
 }
 
-const preview = document.querySelector<HTMLElement>(PREVIEW)
-const results = document.querySelector<HTMLElement>(RESULTS)
-const input = document.querySelector<HTMLInputElement>(INPUT)
-
-if (preview && results && input) {
+function start(
+  preview: HTMLElement,
+  results: HTMLElement,
+  input: HTMLInputElement,
+): void {
   // Every selection change supersedes the pending one: the fetch it awaits can
   // land after the reader has arrowed on, and appending then would attach a
-  // stale fragment to a different result's preview.
+  // stale page to a different result's preview.
   let generation = 0
   let timer: number | undefined
 
-  /** Result rows, in the order they are listed. */
-  function rows(): HTMLAnchorElement[] {
-    return [...results!.querySelectorAll<HTMLAnchorElement>('a')]
-  }
+  const selectedRow = (): HTMLAnchorElement | null =>
+    results.querySelector<HTMLAnchorElement>(SELECTED)
 
-  /**
-   * The rendered page for a row, built once per page and query. Cloning a whole
-   * article and marking it costs tens of milliseconds, and a reader walking a
-   * result list revisits the same rows constantly — rebuilding each time is what
-   * a hover would feel. The built node is detached when Blume clears the pane
-   * and re-appended on the next visit, which is free.
-   */
-  function sectionFor(url: string, article: Element, words: string[]): Built {
-    const key = `${url}\n${words.join(' ')}`
-    const cached = sections.get(key)
-    if (cached) {
-      return cached
-    }
-
-    const section = buildSection(article, words)
-    const blocks = [...section.children]
-    const matched = bestIndex(blocks)
-    const built: Built = {
-      matched,
-      measured: false,
-      offset: null,
-      section,
-      start: matched < 0 ? -1 : sectionStart(blocks, matched),
-    }
-
-    sections.set(key, built)
-    if (sections.size > BUILD_LIMIT) {
-      sections.delete(sections.keys().next().value!)
-    }
-    return built
-  }
-
-  /** Render the selected row's page, or leave Blume's text preview in place. */
+  /** Show a page in the pane, or leave Blume's text preview in place. */
   function render(url: string, article: Element | null, words: string[]): void {
     // Re-checked here rather than by the caller: on the awaited path Blume may
     // have rewritten the pane while the page was in flight, and a second copy
     // would stack under the first.
-    if (!article || preview!.querySelector(`[${OWN}]`)) {
+    if (!article || preview.querySelector(`[${OWN}]`)) {
       return
     }
 
     const built = sectionFor(url, article, words)
-    preview!.append(built.section)
+    preview.append(built.section)
     // Only now that the real thing is on screen: the text preview would
     // otherwise be the fallback vanishing before its replacement arrives.
-    preview!.querySelector<HTMLElement>(TEXT_PREVIEW)?.setAttribute('hidden', '')
+    preview.querySelector(TEXT_PREVIEW)?.setAttribute('hidden', '')
 
-    // First showing only: settle where to open and hand the rest of the page to
-    // the browser to skip. Both need the full layout that appending just forced,
-    // so they cost nothing extra here and spare every later showing.
-    if (!built.measured) {
-      if (built.matched >= 0) {
-        locate(preview!, built)
-      }
-      compact(built)
-    }
+    measure(preview, built)
     // Every showing: Blume gave the pane a fresh scroll position when it rewrote
     // it, so the page has to be scrolled back down to its section.
-    openAt(preview!, built)
+    openAt(preview, built)
   }
 
   /**
    * Warm the rows just past the selection: fetch their pages, then build them
    * while the reader is still reading the current one, so arriving costs an
-   * append. `loadArticle` and `sectionFor` both dedupe, so this is a no-op once
-   * a result list has been walked, and repeating it per selection keeps the
-   * window sliding with the reader rather than doing the whole list up front —
-   * most of which is never previewed.
+   * append. `loadPage` and `sectionFor` both dedupe, so this is a no-op once a
+   * result list has been walked, and repeating it per selection keeps the window
+   * sliding with the reader rather than doing the whole list up front — most of
+   * which is never previewed.
    *
    * Building is deferred to idle time. It is the expensive half, and nothing is
    * waiting on it: a row reached before its build finishes just builds on
    * arrival, exactly as it did before.
    */
   function prefetch(selected: HTMLAnchorElement, words: string[]): void {
-    const listed = rows()
-    const from = listed.indexOf(selected) + 1
-    for (const row of listed.slice(from, from + PREFETCH_AHEAD)) {
+    const rows = [...results.querySelectorAll<HTMLAnchorElement>('a')]
+    const from = rows.indexOf(selected) + 1
+    for (const row of rows.slice(from, from + PREFETCH_AHEAD)) {
       const url = row.href
-      void loadArticle(url).then((article) => {
+      void loadPage(url).article.then((article) => {
         if (article) {
           whenIdle(() => sectionFor(url, article, words))
         }
@@ -574,27 +547,27 @@ if (preview && results && input) {
     // Blume keeps writing the pane while it is hidden — below `md`, and
     // whenever the reader has toggled the preview off with ⌘J. Neither case
     // should spend a page fetch on markup nobody will see.
-    if (preview!.offsetParent === null) {
+    if (preview.offsetParent === null) {
       return
     }
 
-    const selected = results!.querySelector<HTMLAnchorElement>(`a.${SELECTED}`)
-    const words = tokens(input!.value)
+    const selected = selectedRow()
+    const words = tokens(input.value)
     if (!selected || words.length === 0) {
       return
     }
     prefetch(selected, words)
-    const url = selected.href
 
+    const url = selected.href
+    const page = loadPage(url)
     // Already loaded: render in this tick, so the page is on screen in the same
     // frame Blume wrote its text preview and the reader never sees the
     // placeholder it replaces.
-    if (ready.has(url)) {
-      render(url, ready.get(url)!, words)
+    if (page.settled) {
+      render(url, page.value, words)
       return
     }
-
-    void loadArticle(url).then((article) => {
+    void page.article.then((article) => {
       if (current === generation) {
         render(url, article, words)
       }
@@ -613,10 +586,10 @@ if (preview && results && input) {
     }
     generation += 1
     window.clearTimeout(timer)
-    // A cached page is rendered straight away; only a fetch is worth waiting to
+    // A loaded page is rendered straight away; only a fetch is worth waiting to
     // see whether the reader settles on this row first.
-    const selected = results!.querySelector<HTMLAnchorElement>(`a.${SELECTED}`)
-    if (selected && ready.has(selected.href)) {
+    const selected = selectedRow()
+    if (selected && pages.get(selected.href)?.settled) {
       enrich()
     }
     else {
@@ -625,4 +598,12 @@ if (preview && results && input) {
   })
 
   observer.observe(preview, { childList: true })
+}
+
+const preview = document.querySelector<HTMLElement>(PREVIEW)
+const results = document.querySelector<HTMLElement>(RESULTS)
+const input = document.querySelector<HTMLInputElement>(INPUT)
+
+if (preview && results && input) {
+  start(preview, results, input)
 }

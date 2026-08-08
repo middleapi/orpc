@@ -48,10 +48,10 @@ const TWOSLASH_LINE = /^[ \t]*\/\/[ \t]*(?:@[a-zA-Z]|-{3}cut|\^[?^|])[^\n]*$/gmu
 /** A fence's info string: language first, then meta such as `twoslash` or a title. */
 const INFO_LANGUAGE = /^[a-zA-Z0-9-]+/u
 
+/** The fields of a search document this plugin reads and rewrites. */
 interface IndexedDocument {
   route: string
   content: string
-  [key: string]: unknown
 }
 
 /**
@@ -63,7 +63,7 @@ interface IndexedDocument {
  * a bag of words — the repeats add weight to boilerplate and bytes to the index
  * the browser downloads, without making any page easier to find.
  */
-export function extractCode(markdown: string): string {
+function extractCode(markdown: string): string {
   const lines = new Set<string>()
 
   for (const match of markdown.matchAll(FENCE)) {
@@ -88,11 +88,6 @@ export function extractCode(markdown: string): string {
   return [...lines].join('\n')
 }
 
-/** Whether an id points at the generated search index (Windows ids use `/` too). */
-function isSearchIndex(id: string): boolean {
-  return id.split('?')[0]!.endsWith(SEARCH_JSON)
-}
-
 /**
  * Fold each page's fenced code into its search document, so code is searchable
  * and the preview pane can find the block a query matched.
@@ -104,7 +99,8 @@ export function searchCodeIndexPlugin(): Plugin {
     // module rather than the file's JSON text.
     enforce: 'pre',
     async transform(code, id) {
-      if (!isSearchIndex(id)) {
+      // Vite ids use `/` on every platform, and can carry a query suffix.
+      if (!id.split('?')[0]!.endsWith(SEARCH_JSON)) {
         return null
       }
 
@@ -112,16 +108,16 @@ export function searchCodeIndexPlugin(): Plugin {
         await readFile(join(dirname(id), RAW_MARKDOWN), 'utf8'),
       ) as Record<string, { mdx?: string }>
 
-      const documents = (JSON.parse(code) as IndexedDocument[]).map((doc) => {
+      // Rewritten in place: the documents were just parsed here, so nothing else
+      // holds a reference for a copy to protect.
+      const documents = JSON.parse(code) as IndexedDocument[]
+      for (const doc of documents) {
         const markdown = raw[doc.route]?.mdx
-        if (!markdown) {
-          return doc
+        const extracted = markdown ? extractCode(markdown) : ''
+        if (extracted) {
+          doc.content = `${doc.content}\n${extracted}`
         }
-        const extracted = extractCode(markdown)
-        return extracted
-          ? { ...doc, content: `${doc.content}\n${extracted}` }
-          : doc
-      })
+      }
 
       return { code: stringifyJSON(documents), map: null }
     },
