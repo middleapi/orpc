@@ -24,6 +24,10 @@ const router = {
 }
 ```
 
+::: warning
+For compatibility, do not use these router keys: `then`, `bind`, `valueOf`, `toString`, `toJSON`.
+:::
+
 ## Extending Router
 
 Routers can be modified to include additional features. For example, to require authentication on all procedures:
