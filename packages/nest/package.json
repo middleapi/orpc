@@ -14,16 +14,16 @@
   "publishConfig": {
     "exports": {
       "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
+      "./openapi": {
+        "types": "./dist/openapi/index.d.mts",
+        "import": "./dist/openapi/index.mjs",
+        "default": "./dist/openapi/index.mjs"
       }
     }
   },
   "exports": {
     "./package.json": "./package.json",
-    ".": "./src/index.ts"
+    "./openapi": "./src/openapi/index.ts"
   },
   "files": [
     "dist"

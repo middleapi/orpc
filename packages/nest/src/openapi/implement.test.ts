@@ -1,7 +1,7 @@
 import type { CallHandler, CanActivate, ExecutionContext, NestInterceptor } from '@nestjs/common'
 import type { Request as ExpressRequest } from 'express'
 import type { FastifyReply } from 'fastify'
-import type { NestStandardLazyRequest } from './module'
+import type { NestStandardLazyRequest } from '../common/types'
 import { Buffer } from 'node:buffer'
 import FastifyCookie from '@fastify/cookie'
 import { Controller, HttpException, Req, Res, SetMetadata, StreamableFile, UseGuards, UseInterceptors } from '@nestjs/common'
@@ -16,8 +16,7 @@ import { catchError, tap } from 'rxjs'
 import supertest from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as z from 'zod'
-import { Implement } from './implement'
-import { ORPCModule } from './module'
+import { Implement, ORPCModule } from './index'
 
 beforeEach(() => {
   vi.clearAllMocks()
