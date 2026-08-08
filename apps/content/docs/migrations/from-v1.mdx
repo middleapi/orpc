@@ -105,6 +105,28 @@ const router = {
 
 </CodeGroup>
 
+### Path parameter syntax (`/{id}` vs `/:id`)
+
+In v2, OpenAPI path parameters strictly require curly brace syntax (`/{id}`). Express-style colon parameters (`/:id`) are no longer converted automatically and are treated as literal static paths, causing path parameter parsing and input validation to fail.
+
+<CodeGroup>
+
+```ts v2
+import { openapi } from '@orpc/openapi'
+
+const getPlanet = os
+  .meta(openapi({ method: 'GET', path: '/planets/{id}' }))
+  .input(z.object({ id: z.string() }))
+```
+
+```ts v1
+const getPlanet = os
+  .route({ method: 'GET', path: '/planets/:id' })
+  .input(z.object({ id: z.string() }))
+```
+
+</CodeGroup>
+
 ## Procedure Builder
 
 ### `.callable` is no longer built in
