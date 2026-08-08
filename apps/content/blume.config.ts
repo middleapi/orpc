@@ -110,8 +110,8 @@ export default defineConfig({
       hooks: {
         'astro:config:setup': ({ updateConfig, injectScript }) => {
           updateConfig({ vite: { plugins: [searchCodeIndexPlugin()] } })
-          // Show the matched block, already highlighted, in the preview pane.
-          const clientPath = fileURLToPath(new URL('./search/code-preview.ts', import.meta.url))
+          // Render the matched passage in the preview pane the way the page does.
+          const clientPath = fileURLToPath(new URL('./search/page-preview.ts', import.meta.url))
           injectScript('page', `import '${clientPath.replaceAll('\\', '\\\\').replaceAll('\'', '\\\'')}'`)
         },
       },
