@@ -1,6 +1,6 @@
 ---
 title: "Implement oRPC contract with NestJS"
-description: "Learn how to implement oRPC contracts in NestJS with the @orpc/nest package while keeping type safety and OpenAPI compatibility."
+description: "Learn how to implement oRPC contracts in NestJS with the @orpc/nest package while keeping type safety and OpenAPI or RPC protocol compatibility."
 sidebar:
   label: "NestJS"
 ---
@@ -27,7 +27,7 @@ oRPC is an ESM-only library, but NestJS versions below v12 do not natively suppo
 
 ## Define Your Contract
 
-Before implementation, define your [contract](/docs/contract/procedure) as usual, including [routing](/docs/openapi/routing). There is no special requirement, except that each contract must define an `openapi.path` meta.
+Before implementation, define your [contract](/docs/contract/procedure) as usual, including [OpenAPI Routing](/docs/openapi/routing) or [RPC Protocol](/docs/rpc/protocol). There is no special requirement, except that each OpenAPI contract must define an `openapi.path` meta.
 
 ```ts
 import { oc } from '@orpc/contract'
@@ -46,10 +46,12 @@ const contract = populateRouterContractOpenAPIPaths({
 
 ## Implement Your Contract
 
-To implement your contract in NestJS, use the `@Implement` decorator and the `implement` function. The `@Implement` very similar to NestJS built-in HTTP method decorators (e.g., `@Get`, `@Post`) and can be used to implement either a single procedure contract or an [router contract](/docs/contract/router) or combine with other NestJS decorators.
+To implement your contract in NestJS, use the `@Implement` decorator and the `implement` function. `@orpc/nest` exports dedicated subpath entrypoints for [OpenAPI Handler](/docs/openapi/handler) (`@orpc/nest/openapi`) and [RPC Handler](/docs/rpc/handler) (`@orpc/nest/rpc`).
+
+The `@Implement` decorator works very similarly to NestJS built-in HTTP method decorators (e.g., `@Get`, `@Post`) and can be used to implement either a single procedure contract or a [router contract](/docs/contract/router), or combine with other NestJS decorators.
 
 ```ts
-import { Implement } from '@orpc/nest'
+import { Implement } from '@orpc/nest/openapi' // or '@orpc/nest/rpc'
 import { implement, ORPCError } from '@orpc/server'
 
 @Controller()
@@ -120,14 +122,13 @@ async function bootstrap() {
 
 ## Configuration
 
-Configure `@orpc/nest` by importing `ORPCModule` into your NestJS module. It supports the same
-options as the [OpenAPI Handler](/docs/openapi/handler), except for options that are unrelated to NestJS and options that are specific to NestJS.
+Configure `@orpc/nest` by importing `ORPCModule` from `@orpc/nest/openapi` or `@orpc/nest/rpc` into your NestJS module. It supports the same options as the [OpenAPI Handler](/docs/openapi/handler) or [RPC Handler](/docs/rpc/handler), except for options that are unrelated to NestJS and options that are specific to NestJS.
 
 <CodeGroup>
 
 ```ts Static
 import { onError } from '@orpc/server'
-import { ORPCModule } from '@orpc/nest'
+import { ORPCModule } from '@orpc/nest/openapi' // or '@orpc/nest/rpc'
 
 @Module({
   imports: [
@@ -145,7 +146,7 @@ export class AppModule {}
 
 ```ts title="Dynamic with Dependency Injection"
 import { onError } from '@orpc/server'
-import { ORPCModule } from '@orpc/nest'
+import { ORPCModule } from '@orpc/nest/openapi' // or '@orpc/nest/rpc'
 
 @Module({
   imports: [
@@ -288,7 +289,7 @@ export class AppModule {}
 By default, `@orpc/nest` supports the Express and Fastify adapters. If you use another adapter, you may need to customize how a NestJS request is converted into a standard request (including additional params). For details, see [Standard Server](http://standardserver.dev/).
 
 ```ts
-import { NestStandardLazyRequest } from '@orpc/nest'
+import { NestStandardLazyRequest } from '@orpc/nest/openapi' // or '@orpc/nest/rpc'
 import { toStandardLazyRequest } from '@standardserver/fetch'
 
 @Module({
@@ -308,4 +309,4 @@ export class AppModule {}
 
 ## Typesafe Client
 
-After implementing your contract in NestJS, you can use the same contract to create a typesafe client. See [OpenAPI Link](/docs/openapi/link) for more details.
+After implementing your contract in NestJS, you can use the same contract to create a typesafe client. See [OpenAPI Link](/docs/openapi/link) or [RPC Link](/docs/rpc/link) for more details.

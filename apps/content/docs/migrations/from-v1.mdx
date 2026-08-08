@@ -649,6 +649,28 @@ wss.on('connection', (ws) => {
 
 </CodeGroup>
 
+## NestJS Integration
+
+### `@orpc/nest` subpath imports
+
+In v2, `@orpc/nest` exports dedicated subpath entrypoints for OpenAPI and RPC protocols. See [NestJS Integration](/docs/integrations/nest).
+
+<CodeGroup>
+
+```ts v2
+import { Implement, ORPCModule } from '@orpc/nest/openapi' // or '@orpc/nest/rpc'
+```
+
+```ts v1
+import { Implement, ORPCModule } from '@orpc/nest'
+```
+
+</CodeGroup>
+
+:::info
+To keep the exact same behavior as v1 (OpenAPI routing), import from `@orpc/nest/openapi`. Use `@orpc/nest/rpc` if you want native RPC protocol handling over HTTP POST.
+:::
+
 ## Server Plugins
 
 Handler plugins were renamed with a `HandlerPlugin` suffix. Deprecated aliases exist unless noted:
