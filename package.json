@@ -17,7 +17,7 @@
     "sponsors:sync": "node scripts/sync-sponsors.ts && eslint --max-warnings=0 --fix **/README.md"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^9.2.0",
+    "@antfu/eslint-config": "^9.3.0",
     "@codspeed/vitest-plugin": "^5.7.1",
     "@hono/node-server": "^2.0.11",
     "@opentelemetry/api": "^1.9.1",
