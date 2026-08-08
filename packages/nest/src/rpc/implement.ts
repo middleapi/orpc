@@ -94,7 +94,8 @@ export class ImplementInterceptor implements NestInterceptor {
     @Inject(ORPC_MODULE_OPTIONS_TOKEN) @Optional() config: ORPCModuleOptions | undefined,
     @Inject(HttpAdapterHost) httpAdapterHost: HttpAdapterHost,
   ) {
-    this.config = config ?? {}
+    // @Optional() does not allow set default value so we need to do it here
+    this.config = (config ?? {}) as ORPCModuleOptions
     this.httpAdapterHost = httpAdapterHost
     this.codec = new RPCHandlerCodecCore(this.config)
     this.toNestStandardLazyRequest = this.config.toNestStandardLazyRequest ?? defaultToNestStandardLazyRequest

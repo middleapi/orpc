@@ -1,5 +1,5 @@
 import { Controller } from '@nestjs/common'
-import { Implement } from '@orpc/nest'
+import { Implement } from '@orpc/nest/openapi'
 import { implement } from '@orpc/server'
 import { contract } from '../contracts'
 
