@@ -12,7 +12,7 @@ import { parseStandardUrl } from '@standardserver/core'
 import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '../../constants'
 import { RPCMatcher } from './rpc-matcher'
 
-export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOptions {
+export interface RPCHandlerCodecCoreOptions<T extends Context> {
   /**
    * Override the default RPC serializer.
    */
@@ -37,40 +37,27 @@ export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOpt
   errorStatusMap?: Record<string, number> | undefined
 }
 
-export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<T> {
-  private readonly matcher: RPCMatcher
+export class RPCHandlerCodecCore<T extends Context> {
   private readonly serializer: Pick<RPCSerializer, keyof RPCSerializer>
-  private readonly errorStatusMap: Exclude<RPCHandlerCodecOptions<T>['errorStatusMap'], undefined>
-  private readonly outputStatus: RPCHandlerCodecOptions<T>['outputStatus']
+  private readonly errorStatusMap: Exclude<RPCHandlerCodecCoreOptions<T>['errorStatusMap'], undefined>
+  private readonly outputStatus: RPCHandlerCodecCoreOptions<T>['outputStatus']
 
-  constructor(router: AnyRouter, options: RPCHandlerCodecOptions<T> = {}) {
-    this.matcher = new RPCMatcher(router, options)
+  constructor(options: RPCHandlerCodecCoreOptions<T> = {}) {
     this.serializer = options.serializer ?? new RPCSerializer()
     this.errorStatusMap = options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP
     this.outputStatus = options.outputStatus
   }
 
-  async resolveProcedure(request: StandardLazyRequest, options: StandardHandlerHandleOptions<T>): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
-    const [pathname, query] = parseStandardUrl(request.url)
+  async decodeInput({ procedure: _procedure }: { procedure: AnyProcedure }, request: StandardLazyRequest): Promise<unknown> {
+    const [_, query] = parseStandardUrl(request.url)
 
-    const matched = await this.matcher.match(request.method, pathname, options.prefix)
-    if (!matched) {
-      return undefined
+    if (request.method === 'GET') {
+      const dataString = (new URLSearchParams(query)).getAll('data').at(-1)
+      return this.serializer.deserialize(parseEmptyableJSON(dataString))
     }
 
-    return {
-      procedure: matched.procedure,
-      path: matched.path,
-      decodeInput: async () => {
-        if (request.method === 'GET') {
-          const dataString = (new URLSearchParams(query)).getAll('data').at(-1)
-          return this.serializer.deserialize(parseEmptyableJSON(dataString))
-        }
-
-        const body = await request.resolveBody()
-        return this.serializer.deserialize(body)
-      },
-    }
+    const body = await request.resolveBody()
+    return this.serializer.deserialize(body)
   }
 
   encodeOutput(output: unknown, procedure: AnyProcedure, path: string[], options: StandardHandlerHandleOptions<T>): Promisable<StandardResponse> {
@@ -88,6 +75,33 @@ export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<
       headers: {},
       status,
       body: this.serializer.serialize(error.toJSON()),
+    }
+  }
+}
+
+export interface RPCHandlerCodecOptions<T extends Context>
+  extends RPCHandlerCodecCoreOptions<T>, RPCMatcherOptions {}
+
+export class RPCHandlerCodec<T extends Context> extends RPCHandlerCodecCore<T> implements StandardHandlerCodec<T> {
+  private readonly matcher: RPCMatcher
+
+  constructor(router: AnyRouter, options: RPCHandlerCodecOptions<T> = {}) {
+    super(options)
+    this.matcher = new RPCMatcher(router, options)
+  }
+
+  async resolveProcedure(request: StandardLazyRequest, options: StandardHandlerHandleOptions<T>): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
+    const [pathname] = parseStandardUrl(request.url)
+
+    const matched = await this.matcher.match(request.method, pathname, options.prefix)
+    if (!matched) {
+      return undefined
+    }
+
+    return {
+      procedure: matched.procedure,
+      path: matched.path,
+      decodeInput: () => this.decodeInput(matched, request),
     }
   }
 }

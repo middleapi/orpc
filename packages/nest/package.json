@@ -18,12 +18,18 @@
         "types": "./dist/openapi/index.d.mts",
         "import": "./dist/openapi/index.mjs",
         "default": "./dist/openapi/index.mjs"
+      },
+      "./rpc": {
+        "types": "./dist/rpc/index.d.mts",
+        "import": "./dist/rpc/index.mjs",
+        "default": "./dist/rpc/index.mjs"
       }
     }
   },
   "exports": {
     "./package.json": "./package.json",
-    "./openapi": "./src/openapi/index.ts"
+    "./openapi": "./src/openapi/index.ts",
+    "./rpc": "./src/rpc/index.ts"
   },
   "files": [
     "dist"
