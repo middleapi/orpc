@@ -30,6 +30,10 @@ describe('createTestCaller', () => {
       db: context.db,
     }))
 
+  afterEach(() => {
+    configureTestCaller({ context: undefined })
+  })
+
   it('supports static context mode', async () => {
     const caller = createTestCaller(pingProcedure, {
       context: { db: 'mock-db' },

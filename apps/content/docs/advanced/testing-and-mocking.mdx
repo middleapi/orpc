@@ -78,7 +78,7 @@ it('overrides context for a single call', async () => {
 })
 ```
 
-```ts Global
+```ts title="Global Context"
 import { configureTestCaller, createTestCaller } from '@orpc/server/testing'
 
 // Set global test context in test setup file (e.g., vitest.setup.ts)
@@ -87,6 +87,9 @@ configureTestCaller({
     db: testDatabaseInstance,
   }),
 })
+
+// Reset global test context defaults between tests if needed:
+// configureTestCaller({ context: undefined })
 
 it('inherits suite-wide context automatically', async () => {
   const listPlanets = createTestCaller(router.planet.list)

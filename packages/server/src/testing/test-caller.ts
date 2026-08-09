@@ -21,14 +21,19 @@ let globalTestContext: TestContextOption<Context> | undefined
 
 /**
  * Configure global/suite-wide test context defaults.
+ * Pass `{ context: undefined }` or call without arguments to reset global test context defaults.
+ *
+ * @see {@link https://orpc.dev/docs/advanced/testing-and-mocking#test-callers-createtestcaller | Testing and Mocking - Test Callers (createTestCaller)}
  */
-export function configureTestCaller(options: { context?: TestContextOption<Context> }): void {
-  globalTestContext = options.context
+export function configureTestCaller(options?: { context?: TestContextOption<Context> }): void {
+  globalTestContext = options?.context
 }
 
 /**
  * Create a typed test procedure caller supporting static context, dynamic context factories,
  * per-call context overrides, and suite-wide context defaults.
+ *
+ * @see {@link https://orpc.dev/docs/advanced/testing-and-mocking#test-callers-createtestcaller | Testing and Mocking - Test Callers (createTestCaller)}
  */
 export function createTestCaller<
   TInitialContext extends Context,
