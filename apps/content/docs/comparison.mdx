@@ -121,11 +121,3 @@ A minimal client and server pair, measured the same day with [bundlejs](https://
 | Minified + gzip | 14.1 kB | 25.5 kB | 16.4 kB |
 
 Measure yourself: [oRPC](https://bundlejs.com/?q=%40orpc%2Fclient%402.0.0-beta.26%2C%40orpc%2Fclient%402.0.0-beta.26%2Ffetch%2C%40orpc%2Fserver%402.0.0-beta.26%2C%40orpc%2Fserver%402.0.0-beta.26%2Fnode&treeshake=%5B%7B+createORPCClient+%7D%5D%2C%5B%7B+RPCLink+%7D%5D%2C%5B%7B+os+%7D%5D%2C%5B%7B+RPCHandler+%7D%5D) · [tRPC](https://bundlejs.com/?q=%40trpc%2Fclient%2C%40trpc%2Fserver%2C%40trpc%2Fserver%2Fadapters%2Fstandalone%2Csuperjson&treeshake=%5B%7B+createTRPCClient%2ChttpLink%2ChttpSubscriptionLink%2CsplitLink+%7D%5D%2C%5B%7B+initTRPC+%7D%5D%2C%5B%7B+createHTTPServer+%7D%5D%2C%5B%7B+default+as+SuperJSON+%7D%5D) · [Hono](https://bundlejs.com/?q=hono%2Chono%2Fclient%2C%40hono%2Fnode-server&treeshake=%5B%7B+Hono+%7D%5D%2C%5B%7B+hc+%7D%5D%2C%5B%7B+serve+%7D%5D)
-
-## Which One Should You Pick?
-
-It depends on your project:
-
-- **tRPC** has the largest community and years of production use. A solid choice for pure TypeScript RPC when you never need OpenAPI or non-TypeScript consumers.
-- **Hono** is a full web framework: routing, middleware, static files, JSX, edge-first deployment. Pick it for a general-purpose server with a light typed client. You can also serve oRPC inside a Hono app via the [Fetch adapter](/docs/adapters/fetch-api).
-- **oRPC** gives you typed RPC and OpenAPI from the same procedures, typed errors and files, and first-class integrations across query libraries, runtimes, and frameworks.
