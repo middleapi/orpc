@@ -1,8 +1,131 @@
 ---
 title: Comparison
-description: "See how oRPC compares to alternatives like tRPC and ts-rest across type safety, OpenAPI support, and framework integrations."
+description: "See how oRPC compares to tRPC and Hono across type safety, OpenAPI support, framework integrations, and runtime performance."
 sidebar:
   icon: scale
 ---
 
-// TODO
+oRPC, [tRPC](https://trpc.io/), and [Hono](https://hono.dev/) all deliver end-to-end typesafe APIs in TypeScript, but they take different approaches. tRPC focuses on RPC for full-stack TypeScript apps, Hono is a general-purpose web framework with an RPC feature, and oRPC combines typesafe RPC with first-class OpenAPI support.
+
+## Features
+
+- ✅ First-class, built-in support
+- 🟡 Lacks features or requires third-party integrations
+- 🛑 Not supported or not documented
+
+### Type Safety
+
+| Feature | oRPC | tRPC | Hono |
+| --- | --- | --- | --- |
+| End-to-end typesafe input/output | ✅ | ✅ | ✅ |
+| [End-to-end typesafe errors](/docs/client/error-handling) | ✅ | 🟡 | ✅ |
+| [End-to-end typesafe File/Blob](/docs/binary-data) | ✅ | 🟡 | 🟡 |
+| [End-to-end typesafe Server-Sent Events](/docs/async-iterator-object) | ✅ | ✅ | 🛑 |
+| [End-to-end typesafe `ReadableStream<Uint8Array>`](/docs/binary-data#readablestreamuint8array) | ✅ | 🛑 | 🛑 |
+| [Typesafe at scale](#type-checking-performance) | ✅ | ✅ | 🛑 |
+
+oRPC supports several typesafe error approaches: throw a plain `ORPCError`, [declare errors per procedure](/docs/error-handling), return an `ORPCError` from handlers, or define errors once and reuse them everywhere via an [error factory](/docs/error-handling#error-factory).
+
+### API Design & OpenAPI
+
+| Feature | oRPC | tRPC | Hono |
+| --- | --- | --- | --- |
+| Implementation-first approach | ✅ | ✅ | ✅ |
+| [Contract-first approach](/docs/contract/procedure) | ✅ | 🛑 | ✅ |
+| [OpenAPI generation](/docs/openapi/specification) | ✅ | 🟡 | ✅ |
+| [Standard Schema (Zod, Valibot, ArkType, ...)](/docs/integrations/standard-schema) | ✅ | ✅ | 🟡 |
+| [Native types (Date, URL, Set, Map, ...)](/docs/rpc/serializer#supported-data-types) | ✅ | 🟡 | 🛑 |
+| [Custom serializers](/docs/rpc/serializer#custom-serializers) | ✅ | ✅ | 🛑 |
+| [Bracket notation](/docs/openapi/bracket-notation) | ✅ | 🛑 | 🛑 |
+| [Interactive API docs (Scalar)](/docs/openapi/scalar) | ✅ | 🛑 | ✅ |
+
+oRPC serves the same procedures over its [RPC protocol](/docs/rpc/protocol) and RESTful [OpenAPI endpoints](/docs/openapi/handler), and generates the OpenAPI spec natively with no extra packages.
+
+### Integrations & Ecosystem
+
+| Feature | oRPC | tRPC | Hono |
+| --- | --- | --- | --- |
+| [WebSockets](/docs/adapters/websocket) | ✅ | ✅ | 🟡 |
+| [Hibernation APIs (Cloudflare WebSocket Hibernation, ...)](/docs/integrations/hibernation) | ✅ | 🛑 | 🛑 |
+| [Message Port (Electron, browser extensions, workers, ...)](/docs/adapters/message-port) | ✅ | 🟡 | 🛑 |
+| [Batch requests](/docs/plugins/batch) | ✅ | ✅ | 🛑 |
+| [Client plugins and interceptors](/docs/rpc/link) | ✅ | ✅ | 🛑 |
+| [TanStack Query integration (React)](/docs/integrations/tanstack-query) | ✅ | ✅ | 🛑 |
+| [TanStack Query integration (Vue, Solid, Svelte, Angular)](/docs/integrations/tanstack-query) | ✅ | 🛑 | 🛑 |
+| [SWR and Pinia Colada integrations](/docs/integrations/swr) | ✅ | 🟡 | 🛑 |
+| [AI SDK integration](/docs/integrations/ai-sdk) | ✅ | 🛑 | 🛑 |
+| [Next.js Server Actions support](/docs/integrations/next) | ✅ | ✅ | 🛑 |
+| [Lazy router (code splitting, faster cold starts)](/docs/router#lazy-router) | ✅ | ✅ | 🛑 |
+| [Built-in plugins (CORS, CSRF, Retry, ...)](/docs/plugins/cors) | ✅ | 🛑 | ✅ |
+| [Built-in helpers (cookie, encryption, rate limit, pub/sub, ...)](/docs/helpers/cookie) | ✅ | 🛑 | ✅ |
+| [NestJS integration](/docs/integrations/nest) | ✅ | 🟡 | 🛑 |
+| [OpenTelemetry integration](/docs/integrations/opentelemetry) | ✅ | 🛑 | 🟡 |
+
+:::info
+Coming from tRPC? Follow the [migration guide](/docs/migrations/from-trpc), or [use both together](/docs/integrations/trpc) during a gradual migration.
+:::
+
+## Performance
+
+:::warning
+Treat these numbers as reference measurements, not a reason to switch frameworks. All three are fast enough for production. The per-request difference is tiny next to your business logic, database, and network, and results vary across environments and workloads.
+:::
+
+All numbers were measured on 2026-08-09 with oRPC 2.0.0-beta.26, tRPC 11.18.0, and Hono 4.13.1, and are reproducible from [middleapi/orpc-benchmarks](https://github.com/middleapi/orpc-benchmarks). Handlers are no-ops with pass-through validation, so the results measure framework overhead only.
+
+### Throughput
+
+| Scenario | oRPC | tRPC | Hono |
+| --- | --- | --- | --- |
+| RPC over HTTP (req/s avg) | 18,551 | 4,299 | n/a |
+| RPC over WebSocket (req/s avg) | 24,126 | 5,054 | n/a |
+| OpenAPI (RESTful) over HTTP (req/s avg) | 17,871 | n/a | 16,932 |
+
+oRPC handles about 4.3x as many requests as tRPC over HTTP and 4.8x over WebSocket. oRPC and Hono are effectively tied on RESTful throughput.
+
+### Clinic Doctor Profiles
+
+Every run also profiles the server with [Clinic.js Doctor](https://clinicjs.org/doctor/):
+
+| Run | CPU (avg) | Memory (RSS) | Detected issues | Full report |
+| --- | --- | --- | --- | --- |
+| RPC over HTTP · oRPC | ~104% | 71-92 MB | none | [view](https://htmlpreview.github.io/?https://github.com/middleapi/orpc-benchmarks/blob/main/benchmarks/rpc-orpc/.clinic/report.clinic-doctor.html) |
+| RPC over HTTP · tRPC | ~113% | 73-247 MB | none | [view](https://htmlpreview.github.io/?https://github.com/middleapi/orpc-benchmarks/blob/main/benchmarks/rpc-trpc/.clinic/report.clinic-doctor.html) |
+| RPC over WebSocket · oRPC | ~104% | 71-110 MB | none | [view](https://htmlpreview.github.io/?https://github.com/middleapi/orpc-benchmarks/blob/main/benchmarks/ws-orpc/.clinic/report.clinic-doctor.html) |
+| RPC over WebSocket · tRPC | ~41% | 67-75 MB | cpu: performance | [view](https://htmlpreview.github.io/?https://github.com/middleapi/orpc-benchmarks/blob/main/benchmarks/ws-trpc/.clinic/report.clinic-doctor.html) |
+| OpenAPI over HTTP · oRPC | ~104% | 71-92 MB | none | [view](https://htmlpreview.github.io/?https://github.com/middleapi/orpc-benchmarks/blob/main/benchmarks/openapi-orpc/.clinic/report.clinic-doctor.html) |
+| OpenAPI over HTTP · Hono | ~103% | 71-95 MB | none | [view](https://htmlpreview.github.io/?https://github.com/middleapi/orpc-benchmarks/blob/main/benchmarks/openapi-hono/.clinic/report.clinic-doctor.html) |
+
+The profiles show where the throughput gap comes from. Over HTTP, oRPC serves over 4x tRPC's requests at similar CPU usage (~104% vs ~113%), so its per-request CPU cost is several times lower, and its event loop stays responsive: 0.04 ms average delay versus tRPC's 0.70 ms. Memory stays flat between 71 and 110 MB in every oRPC run, while tRPC's HTTP run climbs to 247 MB, more than double oRPC's highest reading, a sign of per-request allocation pressure. oRPC and Hono profile nearly identically, matching their tied throughput.
+
+tRPC's low WebSocket CPU is not an advantage: the `cpu: performance` issue means the server cannot keep the CPU busy, so throughput is capped elsewhere in the stack.
+
+### Type-Checking Performance
+
+On a large, fully typed project with 3,000 procedures across 1,501 routers, oRPC type-checks about 20% faster than tRPC and uses about 28% less memory:
+
+| Metric | oRPC | tRPC |
+| --- | --- | --- |
+| Total time | 1.96s | 2.47s |
+| Memory used | 487 MB | 677 MB |
+
+Hono is excluded: its RPC types hit [documented limits](https://hono.dev/docs/guides/rpc#known-issues) at this scale and need workarounds like pre-compiled client types, an issue oRPC avoids by design.
+
+### Bundle Size
+
+A minimal client and server pair, measured the same day with [bundlejs](https://bundlejs.com/) following the [v1 announcement](/blog/v1-announcement) methodology. tRPC includes `superjson` to match oRPC's built-in native types, and Hono includes `@hono/node-server` to match the Node.js servers in the other bundles.
+
+| Metric | oRPC | tRPC | Hono |
+| --- | --- | --- | --- |
+| Minified | 45.0 kB | 82.9 kB | 43.3 kB |
+| Minified + gzip | 14.1 kB | 25.5 kB | 16.4 kB |
+
+Measure yourself: [oRPC](https://bundlejs.com/?q=%40orpc%2Fclient%402.0.0-beta.26%2C%40orpc%2Fclient%402.0.0-beta.26%2Ffetch%2C%40orpc%2Fserver%402.0.0-beta.26%2C%40orpc%2Fserver%402.0.0-beta.26%2Fnode&treeshake=%5B%7B+createORPCClient+%7D%5D%2C%5B%7B+RPCLink+%7D%5D%2C%5B%7B+os+%7D%5D%2C%5B%7B+RPCHandler+%7D%5D) · [tRPC](https://bundlejs.com/?q=%40trpc%2Fclient%2C%40trpc%2Fserver%2C%40trpc%2Fserver%2Fadapters%2Fstandalone%2Csuperjson&treeshake=%5B%7B+createTRPCClient%2ChttpLink%2ChttpSubscriptionLink%2CsplitLink+%7D%5D%2C%5B%7B+initTRPC+%7D%5D%2C%5B%7B+createHTTPServer+%7D%5D%2C%5B%7B+default+as+SuperJSON+%7D%5D) · [Hono](https://bundlejs.com/?q=hono%2Chono%2Fclient%2C%40hono%2Fnode-server&treeshake=%5B%7B+Hono+%7D%5D%2C%5B%7B+hc+%7D%5D%2C%5B%7B+serve+%7D%5D)
+
+## Which One Should You Pick?
+
+It depends on your project:
+
+- **tRPC** has the largest community and years of production use. A solid choice for pure TypeScript RPC when you never need OpenAPI or non-TypeScript consumers.
+- **Hono** is a full web framework: routing, middleware, static files, JSX, edge-first deployment. Pick it for a general-purpose server with a light typed client. You can also serve oRPC inside a Hono app via the [Fetch adapter](/docs/adapters/fetch-api).
+- **oRPC** gives you typed RPC and OpenAPI from the same procedures, typed errors and files, and first-class integrations across query libraries, runtimes, and frameworks.
