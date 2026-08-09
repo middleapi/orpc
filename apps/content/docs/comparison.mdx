@@ -32,12 +32,12 @@ oRPC types errors per procedure or globally: throw a plain `ORPCError`, [declare
 | --- | --- | --- | --- |
 | Implementation-first approach | ✅ | ✅ | ✅ |
 | [Contract-first approach](/docs/contract/procedure) | ✅ | 🛑 | ✅ |
-| [OpenAPI generation](/docs/openapi/specification) | ✅ | 🟡 | ✅ |
+| [OpenAPI spec](/docs/openapi/specification) | ✅ | 🟡 | ✅ |
 | [Standard Schema (Zod, Valibot, ArkType, ...)](/docs/integrations/standard-schema) | ✅ | ✅ | 🟡 |
 | [Native types (Date, URL, Set, Map, ...)](/docs/rpc/serializer#supported-data-types) | ✅ | 🟡 | 🛑 |
 | [Custom serializers](/docs/rpc/serializer#custom-serializers) | ✅ | ✅ | 🛑 |
 | [Bracket notation](/docs/openapi/bracket-notation) | ✅ | 🛑 | 🛑 |
-| [Interactive API docs (Scalar)](/docs/openapi/scalar) | ✅ | 🟡 | ✅ |
+| [Lazy router (code splitting, faster cold starts)](/docs/router#lazy-router) | ✅ | ✅ | 🛑 |
 
 oRPC serves the same procedures over its [RPC protocol](/docs/rpc/protocol) and RESTful [OpenAPI endpoints](/docs/openapi/handler) and generates the OpenAPI spec natively, while tRPC and Hono depend on extra packages for OpenAPI. Native types like `Date` or `Map` work out of the box in oRPC; tRPC needs a transformer, and Hono has no serialization layer: what you pass to `c.json()` is what you get.
 
@@ -55,7 +55,6 @@ oRPC serves the same procedures over its [RPC protocol](/docs/rpc/protocol) and 
 | [SWR and Pinia Colada integrations](/docs/integrations/swr) | ✅ | 🟡 | 🟡 |
 | [AI SDK integration](/docs/integrations/ai-sdk) | ✅ | 🛑 | 🛑 |
 | [Next.js Server Actions support](/docs/integrations/next) | ✅ | ✅ | 🛑 |
-| [Lazy router (code splitting, faster cold starts)](/docs/router#lazy-router) | ✅ | ✅ | 🛑 |
 | [Built-in plugins (CORS, CSRF, Retry, ...)](/docs/plugins/cors) | ✅ | 🛑 | ✅ |
 | [Built-in helpers (cookie, encryption, rate limit, pub/sub, ...)](/docs/helpers/cookie) | ✅ | 🛑 | ✅ |
 | [NestJS integration](/docs/integrations/nest) | ✅ | 🟡 | 🛑 |
