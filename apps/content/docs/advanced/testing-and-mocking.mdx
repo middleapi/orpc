@@ -1,11 +1,15 @@
 ---
 title: "Testing and Mocking"
-description: "Learn how to test oRPC procedures directly with server-side clients and create mock implementations with the implementer."
+description: "Learn how to test oRPC procedures directly with server-side clients, test callers, and create mock implementations with the implementer."
 ---
 
 ## Testing
 
-For fast, focused tests, use [Server-Side Clients](/docs/client/server-side) or call your procedures directly with `call`. This lets you verify validation, middleware, and handler logic without going through HTTP.
+For fast, focused tests, call your procedures directly with `call` or use `createTestCaller` from `@orpc/server/testing`. This lets you verify validation, middleware, and handler logic without going through HTTP.
+
+### One-Off Procedure Calls
+
+Use `call` to invoke a procedure directly with optional context:
 
 ```ts
 import { call } from '@orpc/server'
@@ -19,6 +23,78 @@ it('lists planets', async () => {
   ])
 })
 ```
+
+### Test Callers (`createTestCaller`)
+
+When procedures require initial context (e.g. database connections or session state), `createTestCaller` binds context once for your test suite without repeating boilerplate on every call.
+
+<CodeGroup>
+
+```ts title="Static Context"
+import { createTestCaller } from '@orpc/server/testing'
+
+const listPlanets = createTestCaller(router.planet.list, {
+  context: {
+    db: mockDatabase,
+  },
+})
+
+it('lists planets with static context', async () => {
+  const planets = await listPlanets({ page: 1, size: 10 })
+  expect(planets).toHaveLength(2)
+})
+```
+
+```ts title="Dynamic Context"
+import { createTestCaller } from '@orpc/server/testing'
+
+const createPlanet = createTestCaller(router.planet.create, {
+  context: () => ({
+    requestId: crypto.randomUUID(), // Dynamic fresh UUID per call!
+    db: mockDatabase,
+  }),
+})
+
+it('creates planets with dynamic request IDs', async () => {
+  await createPlanet({ name: 'Earth' })
+  await createPlanet({ name: 'Mars' })
+})
+```
+
+```ts title="Per-Call Override"
+const getPlanet = createTestCaller(router.planet.find, {
+  context: { db: defaultMockDb },
+})
+
+it('overrides context for a single call', async () => {
+  // Uses default mock DB
+  await getPlanet({ id: 'earth' })
+
+  // Override context ONLY for this call
+  await getPlanet(
+    { id: 'mars' },
+    { context: { db: readOnlyMockDb } }
+  )
+})
+```
+
+```ts Global
+import { configureTestCaller, createTestCaller } from '@orpc/server/testing'
+
+// Set global test context in test setup file (e.g., vitest.setup.ts)
+configureTestCaller({
+  context: () => ({
+    db: testDatabaseInstance,
+  }),
+})
+
+it('inherits suite-wide context automatically', async () => {
+  const listPlanets = createTestCaller(router.planet.list)
+  await listPlanets({ page: 1 })
+})
+```
+
+</CodeGroup>
 
 :::info
 For a production-like test setup, create [fetch-based internal clients](/docs/best-practices/optimizing-ssr#implementation).
