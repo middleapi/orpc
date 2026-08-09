@@ -9,7 +9,7 @@ Most of your code keeps working: many v1 names still compile through deprecated 
 
 :::warning[Read these first]
 
-- The [RPC Protocol](/docs/rpc/protocol) changed, so a v1 client cannot talk to a v2 server. Deploy the upgraded server and client together.
+- The RPC serializer format and the error response format changed, so v1 [RPC Link](/docs/rpc/link) and [OpenAPI Link](/docs/openapi/link) clients cannot talk to a v2 server. Deploy the upgraded server and client together. See [Wire Format Changes](#wire-format-changes).
 - Automatic middleware deduplication was removed. Middleware applied at both router and procedure level now runs twice. See [Middleware](#middleware).
 - The Batch Plugin replaced `exclude` with `filter`, which has the opposite meaning. In most cases you can simply remove `exclude`. See [Batch Plugin](#batch-plugin).
 
@@ -42,6 +42,28 @@ Some packages were renamed, merged, or promoted from experimental status:
 :::warning
 The Hey API and Durable Iterator integrations no longer exist in v2. In place of Durable Iterator, use [Hibernation](/docs/integrations/hibernation) or [DurablePublisher](/docs/helpers/publisher#adapters).
 :::
+
+## Wire Format Changes
+
+Two formats changed on the wire:
+
+- The [RPC serializer](/docs/rpc/serializer) format, described in the [RPC Protocol](/docs/rpc/protocol).
+- The error response body, which no longer contains a `status` field since [`status` was removed from errors](#status-removed-from-errors).
+
+Because of these changes, a v1 [RPC Link](/docs/rpc/link) or [OpenAPI Link](/docs/openapi/link) cannot talk to a v2 server (and vice versa). Deploy the upgraded server and clients together.
+
+If your [OpenAPI Handler](/docs/openapi/handler) endpoints have external consumers that expect the v1 error format, add the `status` field back with a [custom error response](/docs/openapi/handler#custom-error-response):
+
+```ts
+import { COMMON_ERROR_STATUS_MAP } from '@orpc/openapi'
+
+const handler = new OpenAPIHandler(router, {
+  customErrorResponseBodyEncoder: error => ({
+    ...error.toJSON(),
+    status: COMMON_ERROR_STATUS_MAP[error.code] ?? 500,
+  }),
+})
+```
 
 ## Routing Moved to OpenAPI Metadata
 
@@ -360,7 +382,7 @@ The `dedupeLeadingMiddlewares` config option was removed together with this beha
 
 ### `status` removed from errors
 
-`ORPCError` and `.errors` definitions no longer accept a `status`. HTTP status codes are now a handler concern, configured with `errorStatusMap`. See [Error Handling](/docs/error-handling) and [RPC Handler](/docs/rpc/handler).
+`ORPCError` and `.errors` definitions no longer accept a `status`. HTTP status codes are now a handler concern, configured with `errorStatusMap`. Error response bodies no longer contain the field either, see [Wire Format Changes](#wire-format-changes). See [Error Handling](/docs/error-handling) and [RPC Handler](/docs/rpc/handler).
 
 <CodeGroup>
 
