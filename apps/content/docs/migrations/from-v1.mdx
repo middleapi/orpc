@@ -48,7 +48,7 @@ The Hey API and Durable Iterator integrations no longer exist in v2. In place of
 Two formats changed on the wire:
 
 - The [RPC serializer](/docs/rpc/serializer) format, described in the [RPC Protocol](/docs/rpc/protocol).
-- The error response body, which no longer contains a `status` field since [`status` was removed from errors](#status-removed-from-errors).
+- The error response body, which adds an `inferable` field and no longer contains a `status` field, since [`status` was removed from errors](#status-removed-from-errors).
 
 Because of these changes, a v1 [RPC Link](/docs/rpc/link) or [OpenAPI Link](/docs/openapi/link) cannot talk to a v2 server (and vice versa). Deploy the upgraded server and clients together.
 
