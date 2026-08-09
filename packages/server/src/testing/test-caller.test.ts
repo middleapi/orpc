@@ -88,4 +88,18 @@ describe('createTestCaller', () => {
 
     expect(result.context.globalDb).toBe('postgres-test')
   })
+
+  it('supports partial context overrides', async () => {
+    const caller = createTestCaller(tenantProcedure, {
+      context: { tenantId: 'tenant-partial' },
+    })
+
+    const res = await caller(
+      { theme: 'dark' },
+      { context: { db: 'db-partial' } },
+    )
+
+    expect(res.activeTenantId).toBe('tenant-partial')
+    expect(res.db).toBe('db-partial')
+  })
 })

@@ -7,7 +7,7 @@ import type { Procedure } from '../procedure'
 import { value } from '@orpc/shared'
 import { createProcedureClient } from '../procedure-client'
 
-export type TestContextOption<TInitialContext extends Context> = Value<Promisable<TInitialContext>>
+export type TestContextOption<TInitialContext extends Context = Context> = Value<Promisable<Partial<TInitialContext>>>
 
 export interface TestCallerOptions<TInitialContext extends Context> {
   context?: TestContextOption<TInitialContext>
@@ -47,11 +47,12 @@ export function createTestCaller<
     const globalCtx = globalTestContext ? await value(globalTestContext) : undefined
     const callerCtx = callerOptions?.context ? await value(callerOptions.context) : undefined
 
-    const finalContext = {
-      ...globalCtx,
-      ...callerCtx,
-      ...invocationOptions?.context,
-    } as TInitialContext
+    const finalContext = Object.assign(
+      {},
+      globalCtx,
+      callerCtx,
+      invocationOptions?.context,
+    ) as TInitialContext
 
     const client = createProcedureClient(procedure, {
       context: finalContext,
