@@ -37,7 +37,7 @@ oRPC types errors per procedure or globally: throw a plain `ORPCError`, [declare
 | [Native types (Date, URL, Set, Map, ...)](/docs/rpc/serializer#supported-data-types) | ✅ | 🟡 | 🛑 |
 | [Custom serializers](/docs/rpc/serializer#custom-serializers) | ✅ | ✅ | 🛑 |
 | [Bracket notation](/docs/openapi/bracket-notation) | ✅ | 🛑 | 🛑 |
-| [Interactive API docs (Scalar)](/docs/openapi/scalar) | ✅ | 🛑 | ✅ |
+| [Interactive API docs (Scalar)](/docs/openapi/scalar) | ✅ | 🟡 | ✅ |
 
 oRPC serves the same procedures over its [RPC protocol](/docs/rpc/protocol) and RESTful [OpenAPI endpoints](/docs/openapi/handler) and generates the OpenAPI spec natively, while tRPC and Hono depend on extra packages for OpenAPI. Native types like `Date` or `Map` work out of the box in oRPC; tRPC needs a transformer, and Hono has no serialization layer: what you pass to `c.json()` is what you get.
 
@@ -50,9 +50,9 @@ oRPC serves the same procedures over its [RPC protocol](/docs/rpc/protocol) and 
 | [Message Port (Electron, browser extensions, workers, ...)](/docs/adapters/message-port) | ✅ | 🟡 | 🛑 |
 | [Batch requests](/docs/plugins/batch) | ✅ | ✅ | 🛑 |
 | [Client plugins and interceptors](/docs/rpc/link) | ✅ | ✅ | 🛑 |
-| [TanStack Query integration (React)](/docs/integrations/tanstack-query) | ✅ | ✅ | 🛑 |
-| [TanStack Query integration (Vue, Solid, Svelte, Angular)](/docs/integrations/tanstack-query) | ✅ | 🛑 | 🛑 |
-| [SWR and Pinia Colada integrations](/docs/integrations/swr) | ✅ | 🟡 | 🛑 |
+| [TanStack Query integration (React)](/docs/integrations/tanstack-query) | ✅ | ✅ | 🟡 |
+| [TanStack Query integration (Vue, Solid, Svelte, Angular)](/docs/integrations/tanstack-query) | ✅ | 🟡 | 🛑 |
+| [SWR and Pinia Colada integrations](/docs/integrations/swr) | ✅ | 🟡 | 🟡 |
 | [AI SDK integration](/docs/integrations/ai-sdk) | ✅ | 🛑 | 🛑 |
 | [Next.js Server Actions support](/docs/integrations/next) | ✅ | ✅ | 🛑 |
 | [Lazy router (code splitting, faster cold starts)](/docs/router#lazy-router) | ✅ | ✅ | 🛑 |
