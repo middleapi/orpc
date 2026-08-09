@@ -24,7 +24,7 @@ oRPC, [tRPC](https://trpc.io/), and [Hono](https://hono.dev/) all deliver end-to
 | [End-to-end typesafe `ReadableStream<Uint8Array>`](/docs/binary-data#readablestreamuint8array) | ✅ | 🛑 | 🛑 |
 | [Typesafe at scale](#type-checking-performance) | ✅ | ✅ | 🛑 |
 
-oRPC types errors per procedure, while tRPC exposes one global error shape and Hono only types errors returned with an explicit status code. You can throw a plain `ORPCError`, [declare errors per procedure](/docs/error-handling), or define them once and reuse them everywhere via an [error factory](/docs/error-handling#error-factory). oRPC is also the only one that types binary data in both directions: tRPC and Hono cover uploads but not typed binary responses.
+oRPC types errors per procedure or globally: throw a plain `ORPCError`, [declare errors](/docs/error-handling) on a single procedure or a shared builder, or define them once and reuse them everywhere via an [error factory](/docs/error-handling#error-factory). tRPC exposes one global error shape, and Hono only types errors returned with an explicit status code. oRPC is also the only one that types binary data in both directions: tRPC and Hono cover uploads but not typed binary responses.
 
 ### API Design & OpenAPI
 
