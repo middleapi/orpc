@@ -24,7 +24,7 @@ oRPC, [tRPC](https://trpc.io/), and [Hono](https://hono.dev/) all deliver end-to
 | [End-to-end typesafe `ReadableStream<Uint8Array>`](/docs/binary-data#readablestreamuint8array) | ✅ | 🛑 | 🛑 |
 | [Typesafe at scale](#type-checking-performance) | ✅ | ✅ | 🛑 |
 
-oRPC supports several typesafe error approaches: throw a plain `ORPCError`, [declare errors per procedure](/docs/error-handling), return an `ORPCError` from handlers, or define errors once and reuse them everywhere via an [error factory](/docs/error-handling#error-factory).
+oRPC types errors per procedure, while tRPC exposes one global error shape and Hono only types errors returned with an explicit status code. You can throw a plain `ORPCError`, [declare errors per procedure](/docs/error-handling), or define them once and reuse them everywhere via an [error factory](/docs/error-handling#error-factory). oRPC is also the only one that types binary data in both directions: tRPC and Hono cover uploads but not typed binary responses.
 
 ### API Design & OpenAPI
 
@@ -39,7 +39,7 @@ oRPC supports several typesafe error approaches: throw a plain `ORPCError`, [dec
 | [Bracket notation](/docs/openapi/bracket-notation) | ✅ | 🛑 | 🛑 |
 | [Interactive API docs (Scalar)](/docs/openapi/scalar) | ✅ | 🛑 | ✅ |
 
-oRPC serves the same procedures over its [RPC protocol](/docs/rpc/protocol) and RESTful [OpenAPI endpoints](/docs/openapi/handler), and generates the OpenAPI spec natively with no extra packages.
+oRPC serves the same procedures over its [RPC protocol](/docs/rpc/protocol) and RESTful [OpenAPI endpoints](/docs/openapi/handler) and generates the OpenAPI spec natively, while tRPC and Hono depend on extra packages for OpenAPI. Native types like `Date` or `Map` work out of the box in oRPC; tRPC needs a transformer, and Hono has no serialization layer: what you pass to `c.json()` is what you get.
 
 ### Integrations & Ecosystem
 
@@ -60,6 +60,8 @@ oRPC serves the same procedures over its [RPC protocol](/docs/rpc/protocol) and 
 | [Built-in helpers (cookie, encryption, rate limit, pub/sub, ...)](/docs/helpers/cookie) | ✅ | 🛑 | ✅ |
 | [NestJS integration](/docs/integrations/nest) | ✅ | 🟡 | 🛑 |
 | [OpenTelemetry integration](/docs/integrations/opentelemetry) | ✅ | 🛑 | 🟡 |
+
+Every oRPC integration above is first-party, while tRPC leaves several to community packages and Hono's typed client is a bare fetch wrapper you wire into query libraries yourself.
 
 :::info
 Coming from tRPC? Follow the [migration guide](/docs/migrations/from-trpc), or [use both together](/docs/integrations/trpc) during a gradual migration.
