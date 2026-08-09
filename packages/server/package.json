@@ -83,6 +83,11 @@
         "types": "./dist/extensions/callable.d.mts",
         "import": "./dist/extensions/callable.mjs",
         "default": "./dist/extensions/callable.mjs"
+      },
+      "./testing": {
+        "types": "./dist/testing/index.d.mts",
+        "import": "./dist/testing/index.mjs",
+        "default": "./dist/testing/index.mjs"
       }
     }
   },
@@ -100,7 +105,8 @@
     "./websocket": "./src/adapters/websocket/index.ts",
     "./message-port": "./src/adapters/message-port/index.ts",
     "./crossws": "./src/adapters/crossws/index.ts",
-    "./extensions/callable": "./src/extensions/callable.ts"
+    "./extensions/callable": "./src/extensions/callable.ts",
+    "./testing": "./src/testing/index.ts"
   },
   "files": [
     "dist"
