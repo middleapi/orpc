@@ -71,7 +71,7 @@
     "@standardserver/core": "^0.7.1"
   },
   "devDependencies": {
-    "@upstash/redis": "^1.38.1",
+    "@upstash/redis": "^1.38.2",
     "redis": "^6.2.0"
   }
 }
