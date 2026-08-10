@@ -64,7 +64,7 @@ const tierGroups = computed(() => {
           <a
             :href="sponsor.link"
             target="_blank"
-            rel="noopener"
+            rel="sponsored noopener"
             :title="sponsor.name || sponsor.login"
             :class="$style['sponsor-link']"
           >
@@ -79,29 +79,10 @@ const tierGroups = computed(() => {
       </div>
     </div>
 
-    <div v-if="pastSponsors.length > 0" :class="$style['tier-section']">
-      <h3 :class="$style['tier-title']">
-        Past Sponsors
-      </h3>
-      <div :class="$style['past-sponsors']">
-        <a
-          v-for="sponsor in pastSponsors"
-          :key="sponsor.login"
-          :href="sponsor.link"
-          target="_blank"
-          rel="noopener"
-          :title="sponsor.name || sponsor.login"
-          :class="$style['past-sponsor-link']"
-        >
-          <img
-            :src="sponsor.avatar"
-            :alt="sponsor.name || sponsor.login"
-            :class="$style['past-sponsor-avatar']"
-            loading="lazy"
-          >
-        </a>
-      </div>
-    </div>
+    <p v-if="pastSponsors.length > 0" :class="$style['past-sponsors-note']">
+      With thanks to {{ pastSponsors.length }}
+      {{ pastSponsors.length === 1 ? 'past sponsor who' : 'past sponsors who' }} helped get oRPC here.
+    </p>
   </div>
 </template>
 
@@ -199,35 +180,10 @@ const tierGroups = computed(() => {
   color: var(--vp-c-text-2);
 }
 
-.past-sponsors {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 8px;
-}
-
-.past-sponsor-link {
-  opacity: 0.7;
-  transition: opacity 0.2s;
-}
-
-.past-sponsor-link:hover {
-  opacity: 1;
-}
-
-.past-sponsor-avatar {
+.past-sponsors-note {
   width: 100%;
-  height: auto;
-}
-
-@media (min-width: 640px) {
-  .past-sponsors {
-    grid-template-columns: repeat(12, 1fr);
-  }
-}
-
-@media (min-width: 768px) {
-  .past-sponsors {
-    grid-template-columns: repeat(18, 1fr);
-  }
+  margin-top: 24px;
+  font-size: 14px;
+  color: var(--vp-c-text-2);
 }
 </style>

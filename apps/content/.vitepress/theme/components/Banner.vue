@@ -84,7 +84,7 @@ function dismissBanner(key: BannerKey) {
             The screenshot API <span :class="$style['banner-helper']">for developers</span> -
           </div>
 
-          <a :class="$style['banner-action']" href="https://screenshotone.com/?ref=orpc" target="_blank" rel="noopener">
+          <a :class="$style['banner-action']" href="https://screenshotone.com/?ref=orpc" target="_blank" rel="sponsored noopener">
             Try ScreenshotOne
           </a>
         </div>
