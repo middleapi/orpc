@@ -421,6 +421,19 @@ export const sponsors: JSONSponsor[] = [
     sidebarLogo: 'https://avatars.githubusercontent.com/u/520852?u=6b0f7105f694e7b5cacf410a3f04c7044b469dc8&v=4',
   },
   {
+    name: 'Guy Ariely',
+    login: 'guyariely',
+    avatar: 'https://avatars.githubusercontent.com/u/42813496?u=edb6b7f563bf28e160a290832e7da57c0506f8ca&v=4',
+    amount: 5,
+    link: 'https://github.com/guyariely?ref=orpc',
+    org: false,
+    createdAt: '2026-08-01T14:25:58Z',
+    tierTitle: 'Backers',
+    tierLevel: 1,
+    sidebarSize: 'none',
+    sidebarLogo: 'https://avatars.githubusercontent.com/u/42813496?u=edb6b7f563bf28e160a290832e7da57c0506f8ca&v=4',
+  },
+  {
     name: 'Alex',
     login: 'piscis',
     avatar: 'https://avatars.githubusercontent.com/u/326163?u=b245f368bd940cf51d08c0b6bf55f8257f359437&v=4',
@@ -436,7 +449,7 @@ export const sponsors: JSONSponsor[] = [
   {
     name: 'Andrey Gubanov',
     login: 'finom',
-    avatar: 'https://avatars.githubusercontent.com/u/1082083?u=29e91400dbd4a9c217048a8f59562c4f740498e6&v=4',
+    avatar: 'https://avatars.githubusercontent.com/u/1082083?u=c5f2daf7ebece498e85c83367bb37b4e10e2649d&v=4',
     amount: 1,
     link: 'https://github.com/finom?ref=orpc',
     org: false,
@@ -444,7 +457,7 @@ export const sponsors: JSONSponsor[] = [
     tierTitle: 'Backers',
     tierLevel: 1,
     sidebarSize: 'none',
-    sidebarLogo: 'https://avatars.githubusercontent.com/u/1082083?u=29e91400dbd4a9c217048a8f59562c4f740498e6&v=4',
+    sidebarLogo: 'https://avatars.githubusercontent.com/u/1082083?u=c5f2daf7ebece498e85c83367bb37b4e10e2649d&v=4',
   },
   {
     name: 'Maxie',

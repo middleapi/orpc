@@ -124,7 +124,7 @@ function buildSponsorsSection(sponsors: Sponsor[]): string {
       const displayName = sponsor.name ?? sponsor.login
       const escapedName = escapeHtml(displayName)
 
-      lines.push(`   <td align="center"><a href="${escapeHtml(href)}" target="_blank" rel="noopener" title="${escapedName}"><img src="${escapeHtml(sponsor.avatar)}" width="${imageSize}" alt="${escapedName}"/><br />${escapedName}</a></td>`)
+      lines.push(`   <td align="center"><a href="${escapeHtml(href)}" target="_blank" rel="sponsored noopener" title="${escapedName}"><img src="${escapeHtml(sponsor.avatar)}" width="${imageSize}" alt="${escapedName}"/><br />${escapedName}</a></td>`)
 
       const isRowEnd = (index + 1) % columns === 0
       const isLast = index === tierSponsors.length - 1
@@ -141,19 +141,9 @@ function buildSponsorsSection(sponsors: Sponsor[]): string {
   }
 
   if (pastSponsors.length > 0) {
-    lines.push('### Past Sponsors')
-    lines.push('')
-    lines.push('<p>')
+    const noun = pastSponsors.length === 1 ? 'past sponsor who' : 'past sponsors who'
 
-    for (const sponsor of pastSponsors) {
-      const href = sponsor.link
-      const displayName = sponsor.name ?? sponsor.login
-      const escapedName = escapeHtml(displayName)
-
-      lines.push(`  <a href="${escapeHtml(href)}" target="_blank" rel="noopener" title="${escapedName}"><img src="${escapeHtml(sponsor.avatar)}" width="32" height="32" alt="${escapedName}" /></a>`)
-    }
-
-    lines.push('</p>')
+    lines.push(`With thanks to ${pastSponsors.length} ${noun} helped get oRPC here.`)
     lines.push('')
   }
 

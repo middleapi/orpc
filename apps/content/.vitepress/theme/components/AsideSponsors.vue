@@ -10,7 +10,7 @@ const smallSponsors = sponsors.filter(s => s.sidebarSize === 'small')
     <a :class="$style['aside-sponsors-title']" href="https://github.com/sponsors/dinwwwh" target="_blank" rel="noopener">SPONSORS</a>
 
     <div :class="$style['aside-sponsors-list']">
-      <a v-for="sponsor in normalSponsors" :key="sponsor.login" :class="$style['aside-sponsor']" target="_blank" rel="noopener" :href="sponsor.link">
+      <a v-for="sponsor in normalSponsors" :key="sponsor.login" :class="$style['aside-sponsor']" target="_blank" rel="sponsored noopener" :href="sponsor.link">
         <img :src="sponsor.sidebarLogo" :alt="sponsor.name || sponsor.login">
       </a>
 
@@ -19,7 +19,7 @@ const smallSponsors = sponsors.filter(s => s.sidebarSize === 'small')
       </a>
 
       <div :class="$style['aside-sponsors-small']">
-        <a v-for="sponsor in smallSponsors" :key="sponsor.login" :class="$style['aside-sponsor']" target="_blank" rel="noopener" :href="sponsor.link">
+        <a v-for="sponsor in smallSponsors" :key="sponsor.login" :class="$style['aside-sponsor']" target="_blank" rel="sponsored noopener" :href="sponsor.link">
           <img :src="sponsor.sidebarLogo" :alt="sponsor.name || sponsor.login">
         </a>
       </div>
