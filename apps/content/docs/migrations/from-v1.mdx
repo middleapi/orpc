@@ -538,7 +538,7 @@ const handler = new RPCHandler(router)
 The simplest migration is to stop sending GET instead of allowing it: remove the `method` option from your [RPC Link](/docs/rpc/link) so every call uses POST (the default), and keep the handler's default `allowMethods`. Only allow GET when you really need it, for example for HTTP caching.
 :::
 
-The v2 [Simple CSRF Protection Plugin](/docs/plugins/simple-csrf-protection) checks the `Sec-Fetch-Mode` header, so it no longer needs a matching link plugin. Remove `SimpleCsrfProtectionLinkPlugin` from your client; it no longer exists.
+The v2 [Simple CSRF Protection Plugin](/docs/plugins/simple-csrf-protection) checks the browser's `Sec-Fetch-*` headers, so it no longer needs a matching link plugin. Remove `SimpleCsrfProtectionLinkPlugin` from your client; it no longer exists. If your client runs on a different site than your API, list its origin in the plugin's `origin` option.
 
 ### Interceptor options renamed
 

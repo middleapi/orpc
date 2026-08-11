@@ -49,10 +49,6 @@ const handler = new OpenAPIHandler(router, {
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one. The plugin is most useful with [OpenAPIHandler](/docs/openapi/handler), where the HTTP method decides which procedure a request matches.
 :::
 
-:::warning
-This plugin is incompatible with the [Simple CSRF Protection Plugin](/docs/plugins/simple-csrf-protection), which blocks the `navigate` fetch mode used by regular HTML form submissions.
-:::
-
 ## Learn More
 
 For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/method-override.ts).

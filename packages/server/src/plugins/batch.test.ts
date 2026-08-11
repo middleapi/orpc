@@ -379,6 +379,48 @@ describe('batchHandlerPlugin', () => {
     })
   })
 
+  describe('sub-request headers', () => {
+    function createHeaderCapturingHandler() {
+      const seenHeaders: Record<string, string | string[] | undefined>[] = []
+
+      const handler = new RPCHandler(router, {
+        plugins: [new BatchHandlerPlugin()],
+        interceptors: [({ next, request }) => {
+          seenHeaders.push(request.headers)
+          return next()
+        }],
+      })
+
+      return { handler, seenHeaders }
+    }
+
+    function createBatchRequestWithHeaders(headers: Record<string, string>, subRequestHeaders: Record<string, string>) {
+      return new Request('https://example.com/__batch__', {
+        method: 'POST',
+        headers: { 'orpc-batch': 'buffered', 'content-type': 'application/json', ...headers },
+        body: JSON.stringify([
+          { kind: 'request', id: 0, json: { method: 'POST', url: '/ping', headers: subRequestHeaders }, binary: undefined },
+        ]),
+      })
+    }
+
+    it('merges batch request headers into sub-requests and lets sub-requests win', async () => {
+      const { handler, seenHeaders } = createHeaderCapturingHandler()
+
+      await handler.handle(createBatchRequestWithHeaders(
+        { 'x-from-batch': 'batch', 'x-overridden': 'batch' },
+        { 'x-from-sub-request': 'sub-request', 'x-overridden': 'sub-request' },
+      ))
+
+      expect(seenHeaders[0]).toMatchObject({
+        'x-from-batch': 'batch',
+        'x-from-sub-request': 'sub-request',
+        'x-overridden': 'sub-request',
+      })
+      expect(seenHeaders[0]!['orpc-batch']).toBeUndefined()
+    })
+  })
+
   describe('configuration options', () => {
     it('supports custom successStatus', async () => {
       const handler = createHandler(new BatchHandlerPlugin({ successStatus: 200 }))

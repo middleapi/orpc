@@ -101,10 +101,12 @@ import { RPC_DEFAULT_ALLOW_METHODS } from '@orpc/server/standard'
 const handler = new RPCHandler(router, {
   allowMethods: ['GET', ...RPC_DEFAULT_ALLOW_METHODS],
   plugins: [
-    new SimpleCsrfProtectionHandlerPlugin(), // reject requests triggered by navigations, forms, etc.
+    new SimpleCsrfProtectionHandlerPlugin(), // reject requests initiated by another site
   ],
 })
 ```
+
+The plugin rejects any request the browser reports as initiated elsewhere. List the origins of clients on other sites in its `origin` option.
 
 Or pass a function to decide per request. For example, only allow `GET` for procedures that declare it via [OpenAPI metadata](/docs/openapi/routing):
 

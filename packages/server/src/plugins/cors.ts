@@ -12,7 +12,7 @@ export interface CORSHandlerPluginOptions<T extends Context> {
    *
    * @default (origin) => origin
    */
-  origin?: Value<string | readonly string[] | null | undefined, [origin: string, options: StandardHandlerRoutingInterceptorOptions<T>]>
+  origin?: Value<string | readonly string[] | null | undefined, [origin: string | undefined, options: StandardHandlerRoutingInterceptorOptions<T>]>
 
   /**
    * Configures the `Timing-Allow-Origin` header.
@@ -20,7 +20,7 @@ export interface CORSHandlerPluginOptions<T extends Context> {
    *
    * @default undefined
    */
-  timingOrigin?: Value<string | readonly string[] | null | undefined, [origin: string, options: StandardHandlerRoutingInterceptorOptions<T>]>
+  timingOrigin?: Value<string | readonly string[] | null | undefined, [origin: string | undefined, options: StandardHandlerRoutingInterceptorOptions<T>]>
 
   /**
    * Configures the `Access-Control-Allow-Methods` header for preflight requests.
@@ -99,7 +99,7 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
 
       const resHeaders = { ...result.response.headers }
 
-      const origin = flattenStandardHeader(interceptorOptions.request.headers.origin) ?? ''
+      const origin = flattenStandardHeader(interceptorOptions.request.headers.origin)
 
       const allowedOrigins = toArray(value(this.options.origin, origin, interceptorOptions))
 
@@ -107,7 +107,7 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
         resHeaders['access-control-allow-origin'] = '*'
       }
       else {
-        if (allowedOrigins.includes(origin)) {
+        if (origin !== undefined && allowedOrigins.includes(origin)) {
           resHeaders['access-control-allow-origin'] = origin
         }
 
@@ -122,7 +122,7 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
       if (allowedTimingOrigins.includes('*')) {
         resHeaders['timing-allow-origin'] = '*'
       }
-      else if (allowedTimingOrigins.includes(origin)) {
+      else if (origin !== undefined && allowedTimingOrigins.includes(origin)) {
         resHeaders['timing-allow-origin'] = origin
       }
 
