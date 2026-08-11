@@ -108,6 +108,63 @@ describe('dedupeLinkPlugin', () => {
     }))
   })
 
+  it('dedupes identical QUERY requests by default', async () => {
+    const codec = makeCodec()
+    const transport = makeTransport()
+
+    const link = new StandardLink(codec, transport, {
+      plugins: [new DedupeLinkPlugin({
+        groups: [{ condition: () => true, context: { group: true } }],
+      })],
+    })
+
+    const [output1, output2] = await Promise.all([
+      link.call(['QUERY', 'planet'], { value: 1 }, { context: {} }),
+      link.call(['QUERY', 'planet'], { value: 1 }, { context: {} }),
+    ])
+
+    expect(output1).toBe(output2)
+    expect(transport.send).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not dedupe QUERY requests with different bodies', async () => {
+    const codec = makeCodec()
+    const transport = makeTransport()
+
+    const link = new StandardLink(codec, transport, {
+      plugins: [new DedupeLinkPlugin({
+        groups: [{ condition: () => true, context: { group: true } }],
+      })],
+    })
+
+    const [output1, output2] = await Promise.all([
+      link.call(['QUERY', 'planet'], { value: 1 }, { context: {} }),
+      link.call(['QUERY', 'planet'], { value: 2 }, { context: {} }),
+    ])
+
+    expect(output1).not.toBe(output2)
+    expect(transport.send).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not dedupe unsafe methods by default', async () => {
+    const codec = makeCodec()
+    const transport = makeTransport()
+
+    const link = new StandardLink(codec, transport, {
+      plugins: [new DedupeLinkPlugin({
+        groups: [{ condition: () => true, context: { group: true } }],
+      })],
+    })
+
+    const [output1, output2] = await Promise.all([
+      link.call(['POST', 'planet'], { value: 1 }, { context: {} }),
+      link.call(['POST', 'planet'], { value: 1 }, { context: {} }),
+    ])
+
+    expect(output1).not.toBe(output2)
+    expect(transport.send).toHaveBeenCalledTimes(2)
+  })
+
   it('computes group context from all deduped matching options', async () => {
     const codec = makeCodec()
     const transport = makeTransport()

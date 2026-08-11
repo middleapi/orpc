@@ -30,7 +30,7 @@ The `link` can be any supported oRPC link, such as [RPCLink](/docs/rpc/link), [O
 
 ## Filter
 
-By default, the plugin deduplicates only `GET` requests. You can customize this behavior by providing a `filter` function.
+By default, the plugin deduplicates `GET` and `QUERY` requests. You can customize this behavior by providing a `filter` function.
 
 ```ts
 const link = new RPCLink({

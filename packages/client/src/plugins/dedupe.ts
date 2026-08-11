@@ -26,7 +26,7 @@ export interface DedupeLinkPluginOptions<T extends ClientContext> {
   /**
    * Filters requests to dedupe.
    *
-   * @default ({ request }) => request.method === 'GET'
+   * @default ({ request }) => request.method === 'GET' || request.method === 'QUERY'
    */
   filter?: Value<boolean, [options: StandardLinkTransportInterceptorOptions<T>]>
 }
@@ -48,7 +48,7 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
 
   constructor(options: NoInfer<DedupeLinkPluginOptions<T>>) {
     this.groups = options.groups
-    this.filter = options.filter ?? (({ request }) => request.method === 'GET')
+    this.filter = options.filter ?? (({ request }) => request.method === 'GET' || request.method === 'QUERY')
   }
 
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
