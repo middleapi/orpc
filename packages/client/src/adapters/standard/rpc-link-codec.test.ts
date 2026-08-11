@@ -88,6 +88,37 @@ describe('rpcLinkCodec', () => {
       expect(request.url).toBe('/api/ping')
     })
 
+    it('falls back to QUERY with a body when GET url exceeds maxUrlLength', async () => {
+      const codec = new RPCLinkCodec({
+        url: '/api',
+        method: 'GET',
+        maxUrlLength: 10,
+        fallbackMethod: 'QUERY',
+        serializer,
+      })
+
+      const request = await codec.encodeInput('input', ['ping'], { context: {} })
+
+      expect(request.method).toBe('QUERY')
+      expect(request.body).toBe(serializeSpy.mock.results[0]!.value)
+      expect(request.url).toBe('/api/ping')
+    })
+
+    it('falls back to POST by default when GET url exceeds maxUrlLength', async () => {
+      const codec = new RPCLinkCodec({
+        url: '/api',
+        method: 'GET',
+        maxUrlLength: 10,
+        serializer,
+      })
+
+      const request = await codec.encodeInput('input', ['ping'], { context: {} })
+
+      expect(request.method).toBe('POST')
+      expect(request.body).toBe(serializeSpy.mock.results[0]!.value)
+      expect(request.url).toBe('/api/ping')
+    })
+
     it.each([
       ['FormData', () => {
         const f = new FormData()

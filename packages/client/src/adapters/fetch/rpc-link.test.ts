@@ -56,6 +56,35 @@ describe('rpcLink', () => {
     )
   })
 
+  it('sends QUERY requests with body-encoded input', async () => {
+    const fetch = vi.fn(async () => {
+      return new Response(JSON.stringify({ json: 'pong' }), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+        },
+      })
+    })
+
+    const orpc = createORPCClient(new RPCLink({
+      fetch,
+      method: 'QUERY',
+      origin: 'http://api.example.com',
+    })) as any
+
+    await expect(orpc.ping('input')).resolves.toEqual('pong')
+
+    expect(fetch).toHaveBeenCalledWith(
+      'http://api.example.com/ping',
+      expect.objectContaining({
+        body: JSON.stringify({ json: 'input' }),
+        method: 'QUERY',
+      }),
+      expect.objectContaining({ context: {} }),
+      ['ping'],
+    )
+  })
+
   it('supports custom headers and query parameters in origin', async () => {
     const fetch = vi.fn(async () => {
       return new Response(JSON.stringify({ json: 'pong' }), {

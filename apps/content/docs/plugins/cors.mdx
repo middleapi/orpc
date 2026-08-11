@@ -17,7 +17,7 @@ const handler = new RPCHandler(router, {
   plugins: [
     new CORSHandlerPlugin({
       origin: (origin, options) => origin,
-      allowMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH'],
+      allowMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH', 'QUERY'],
       // ...
     }),
   ],
@@ -26,6 +26,8 @@ const handler = new RPCHandler(router, {
 
 :::info
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
+
+The default `allowMethods` list includes [`QUERY`](https://www.rfc-editor.org/rfc/rfc10008.html). Browser QUERY requests are not CORS-safelisted, so they require a preflight response that advertises the method. Providing `allowMethods` replaces the default list.
 :::
 
 :::warning

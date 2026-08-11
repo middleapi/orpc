@@ -25,7 +25,7 @@ export interface CORSHandlerPluginOptions<T extends Context> {
   /**
    * Configures the `Access-Control-Allow-Methods` header for preflight requests.
    *
-   * @default ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH']
+   * @default ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH', 'QUERY']
    */
   allowMethods?: readonly string[]
 
@@ -80,7 +80,7 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
   constructor(options: CORSHandlerPluginOptions<T> = {}) {
     const defaults: CORSHandlerPluginOptions<T> = {
       origin: origin => origin,
-      allowMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH'],
+      allowMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH', 'QUERY'],
     }
 
     this.options = {

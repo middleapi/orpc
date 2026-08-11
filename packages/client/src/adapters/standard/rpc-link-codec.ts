@@ -32,7 +32,7 @@ export interface RPCLinkCodecOptions<T extends ClientContext> {
    *
    * @default 'POST'
    */
-  method?: Value<Promisable<'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'>, [options: ClientOptions<T>, path: string[], input: unknown]>
+  method?: Value<Promisable<'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'QUERY'>, [options: ClientOptions<T>, path: string[], input: unknown]>
 
   /**
    * The method to use when the payload cannot safely pass to the server with method return from method function.
@@ -40,7 +40,7 @@ export interface RPCLinkCodecOptions<T extends ClientContext> {
    *
    * @default 'POST'
    */
-  fallbackMethod?: 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+  fallbackMethod?: 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'QUERY'
 
   /**
    * Inject headers to the request.
