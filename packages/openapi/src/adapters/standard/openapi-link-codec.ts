@@ -20,8 +20,6 @@ import { OpenAPISerializer } from '../../openapi-serializer'
 import { getDynamicPathParams, isBodylessMethod } from '../../utils'
 import { serializeHeaders } from './utils'
 
-export class OpenAPILinkCodecError extends TypeError {}
-
 export interface OpenAPILinkCodecOptions<T extends ClientContext> {
   /**
    * Base URL for all requests, without origin. Should match the OpenAPI handler mount path.
@@ -94,7 +92,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
       if (dynamicParams?.length) {
         if (!isTypescriptObject(input)) {
-          throw new OpenAPILinkCodecError(
+          throw new TypeError(
             `Input must be an object with "compact" input structure when the path has dynamic params (${dynamicParams.map(p => p.parameterName).join(', ')}) in call to procedure (${path.join('.')}).`,
           )
         }
@@ -139,7 +137,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     }
 
     if (!isValidDetailedInput(input)) {
-      throw new OpenAPILinkCodecError(`
+      throw new TypeError(`
         Invalid "detailed" input structure in call to procedure (${path.join('.')}):
         • Expected an object or undefined with optional properties:
           - params (object, required when the path has dynamic params)
@@ -154,7 +152,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
     if (dynamicParams?.length) {
       if (!input?.params) {
-        throw new OpenAPILinkCodecError(
+        throw new TypeError(
           `The "params" property is required for "detailed" input when the path has dynamic params (${dynamicParams.map(p => p.parameterName).join(', ')}) in call to procedure (${path.join('.')}).`,
         )
       }
@@ -231,7 +229,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     }
 
     if (!encoded) {
-      throw new OpenAPILinkCodecError(`Path param "${param.parameterName}" cannot be empty in call to procedure (${path.join('.')}).`)
+      throw new TypeError(`Path param "${param.parameterName}" cannot be empty in call to procedure (${path.join('.')}).`)
     }
 
     return encoded
@@ -434,7 +432,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     const { default: maybeProcedure } = await unlazy(getRouterContract(this.router, path))
 
     if (!(maybeProcedure instanceof ProcedureContract)) {
-      throw new OpenAPILinkCodecError(`Expected a procedure or contract at path (${path.join('.')})`)
+      throw new TypeError(`Expected a procedure or contract at path (${path.join('.')})`)
     }
 
     return maybeProcedure

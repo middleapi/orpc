@@ -46,6 +46,8 @@ export interface ValidationErrorOptions extends ErrorOptions {
  * @see {@link https://orpc.dev/docs/advanced/validation-customization | Validation Customization}
  */
 export class ValidationError extends Error {
+  override name: string = 'ValidationError'
+
   /**
    * This array is readonly because the upstream Standard Schema returns readonly issues.
    */

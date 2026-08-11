@@ -31,8 +31,6 @@ export interface BatchLinkPluginGroup<T extends ClientContext> {
   path?: Value<string[], [items: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]>
 }
 
-export class BatchLinkPluginError extends TypeError {}
-
 export interface BatchLinkPluginOptions<T extends ClientContext> {
   groups: [BatchLinkPluginGroup<T>, ...BatchLinkPluginGroup<T>[]]
 
@@ -334,10 +332,10 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
               await decodeLengthPrefixedStream(body, peer)
             }
             else {
-              throw new BatchLinkPluginError('Invalid batch response format.')
+              throw new TypeError('Invalid batch response format.')
             }
 
-            await peer.close(new BatchLinkPluginError('Batch response is incomplete.'))
+            await peer.close(new TypeError('Batch response is incomplete.'))
           }
           catch (error) {
             await peer.close(error)
@@ -365,7 +363,7 @@ async function decodeLengthPrefixedBlob(blob: Blob, peer: ClientPeer): Promise<v
 
   while (offset < buffer.length) {
     if (offset + 4 > buffer.length) {
-      throw new BatchLinkPluginError('Invalid batch response: incomplete length header.')
+      throw new TypeError('Invalid batch response: incomplete length header.')
     }
 
     const view = new DataView(buffer.buffer, buffer.byteOffset + offset, 4)
@@ -373,7 +371,7 @@ async function decodeLengthPrefixedBlob(blob: Blob, peer: ClientPeer): Promise<v
     offset += 4
 
     if (offset + length > buffer.length) {
-      throw new BatchLinkPluginError('Invalid batch response: incomplete message.')
+      throw new TypeError('Invalid batch response: incomplete message.')
     }
 
     const messageBytes = buffer.subarray(offset, offset + length)
@@ -381,7 +379,7 @@ async function decodeLengthPrefixedBlob(blob: Blob, peer: ClientPeer): Promise<v
 
     const result = decodePeerMessage(messageBytes)
     if (!result.matched || !isServerPeerSendMessage(result.message)) {
-      throw new BatchLinkPluginError('Invalid batch response: invalid message.')
+      throw new TypeError('Invalid batch response: invalid message.')
     }
 
     await peer.message(result.message)
@@ -423,7 +421,7 @@ async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array>, pe
         const result = decodePeerMessage(messageBytes)
 
         if (!result.matched || !isServerPeerSendMessage(result.message)) {
-          throw new BatchLinkPluginError('Invalid batch response: invalid message.')
+          throw new TypeError('Invalid batch response: invalid message.')
         }
 
         await peer.message(result.message)
