@@ -3,8 +3,24 @@ import type { OpenAPIV3_1 } from '@hey-api/spec-types'
 import type { AnyNestedClient, Client, ORPCError } from '@orpc/client'
 import type { AsyncIteratorClass } from '@orpc/shared'
 
-export type OpenAPIDocument = OpenAPIV3_1.Document
 export type OpenAPIOperationObject = OpenAPIV3_1.OperationObject
+
+export type OpenAPIPathItemObject = OpenAPIV3_1.PathItemObject & {
+  query?: OpenAPIOperationObject | undefined
+}
+
+export type OpenAPIPathsObject = OpenAPIV3_1.PathsObject & {
+  [path: `/${string}`]: OpenAPIPathItemObject
+}
+
+/**
+ * An OpenAPI 3.1 document with the OpenAPI 3.2 QUERY additions used by oRPC.
+ * This type does not claim support for the complete OpenAPI 3.2 specification.
+ */
+export type OpenAPIDocument = Omit<OpenAPIV3_1.Document, 'openapi' | 'paths'> & {
+  openapi: OpenAPIV3_1.Document['openapi'] | '3.2.0'
+  paths?: OpenAPIPathsObject | undefined
+}
 
 export type JsonifiedValue<T>
   = T extends string ? T

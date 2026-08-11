@@ -25,6 +25,21 @@ const router = {
 
 In this example, `list` is exposed as `GET /planets` because it overrides the default method and path. `create` keeps the default behavior, so it is exposed as `POST /planet/create`.
 
+### QUERY Method
+
+Use the [`QUERY` method defined by RFC 10008](https://www.rfc-editor.org/rfc/rfc10008.html) for safe, idempotent operations that need body-encoded input:
+
+```ts
+const searchPlanets = os
+  .meta(openapi({ method: 'QUERY', path: '/planets/search' }))
+  .input(z.object({ names: z.array(z.string()) }))
+  .handler(async ({ input }) => findPlanets(input.names))
+```
+
+The OpenAPI client sends compact QUERY input in the request body, and the OpenAPI handler reads it from there. Documenting QUERY requires an [explicit OpenAPI 3.2 base document](/docs/openapi/specification#query-operations).
+
+QUERY works only when every HTTP runtime, framework, proxy, gateway, and client in the request path accepts and forwards the method.
+
 ## Path Parameters
 
 To define a path parameter, use `{name}` in the `path` and add the same field as a required key in the input schema:

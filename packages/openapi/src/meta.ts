@@ -11,7 +11,7 @@ export interface OpenAPIMeta {
    *
    * @default 'POST'
    */
-  method?: 'HEAD' | 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | undefined
+  method?: 'HEAD' | 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'QUERY' | undefined
 
   /**
    * URL path for this procedure. Supports dynamic parameters via `{param}` syntax,

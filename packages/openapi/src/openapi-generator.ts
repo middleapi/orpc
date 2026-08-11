@@ -78,7 +78,8 @@ export interface OpenAPIGeneratorGenerateOptions {
 }
 
 /**
- * Generates an OpenAPI 3.1 document from a contract or a router.
+ * Generates an OpenAPI 3.1 document, or an OpenAPI 3.2 document for QUERY operations,
+ * from a contract or a router.
  * Relies on JSON schema converters to translate input, output, and error schemas into JSON Schemas.
  *
  * @see {@link https://orpc.dev/docs/openapi/specification#openapi-generator | OpenAPI Specification - OpenAPI Generator}
@@ -121,6 +122,13 @@ export class OpenAPIGenerator {
         const meta = getOpenAPIMeta(contract)
 
         const method = (meta?.method ?? DEFAULT_OPENAPI_METHOD).toLowerCase() as Lowercase<NonNullable<OpenAPIMeta['method']>>
+
+        if (method === 'query' && doc.openapi !== '3.2.0') {
+          throw new OpenAPIGeneratorError(
+            `QUERY operations require OpenAPI 3.2. Set base.openapi to '3.2.0'.`,
+          )
+        }
+
         const postPath = meta?.path ?? pathToHttpPath(path)
         const httpPath = meta?.prefix ? mergeHttpPath(meta.prefix, postPath) : postPath
         const dynamicPathParams = getDynamicPathParams(httpPath)

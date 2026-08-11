@@ -14,6 +14,9 @@ describe('openapiLink', () => {
       .meta(openapi({ method: 'GET', path: '/ping/{pong}' }))
       .handler(({ input }) => input),
     post: os.handler(({ input }) => input),
+    query: os
+      .meta(openapi({ method: 'QUERY', path: '/query' }))
+      .handler(({ input }) => input),
   }
 
   const handler = new OpenAPIHandler(router)
@@ -103,6 +106,39 @@ describe('openapiLink', () => {
         arr: [3, date.toISOString()],
       },
     })
+  })
+
+  it('calls a QUERY OpenAPI endpoint with body-encoded input', async () => {
+    const fetch = vi.fn(async (url: string, init: RequestInit) => {
+      const request = new Request(url, init)
+
+      await expect(request.clone().json()).resolves.toEqual({ search: 'earth' })
+
+      const { matched, response } = await handler.handle(request, {
+        prefix: '/api',
+      })
+
+      if (!matched || !response) {
+        throw new Error('No procedure match')
+      }
+
+      return response
+    })
+
+    const client = createORPCClient(new OpenAPILink(router, {
+      fetch,
+      origin: 'http://localhost:3000',
+      url: '/api',
+    })) as any
+
+    await expect(client.query({ search: 'earth' })).resolves.toEqual({ search: 'earth' })
+
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/api/query',
+      expect.objectContaining({ method: 'QUERY' }),
+      expect.objectContaining({ context: {} }),
+      ['query'],
+    )
   })
 
   it('calls a POST OpenAPI endpoint with multipart payloads', async () => {

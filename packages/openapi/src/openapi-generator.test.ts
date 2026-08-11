@@ -18,6 +18,52 @@ describe('openAPIGenerator basic & options', () => {
     })
   })
 
+  it('generates QUERY operations in an explicit OpenAPI 3.2 document', async () => {
+    const doc = await generator.generate({
+      search: oc
+        .meta(openapi({ method: 'QUERY', path: '/search' }))
+        .input(z.object({ term: z.string() }))
+        .output(z.object({ result: z.string() })),
+    }, {
+      base: { openapi: '3.2.0' },
+    })
+
+    expect(doc.openapi).toBe('3.2.0')
+    expect(doc.paths?.['/search']?.query).toEqual(expect.objectContaining({
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: expect.objectContaining({
+              properties: { term: { type: 'string' } },
+              required: ['term'],
+            }),
+          },
+        },
+      },
+      responses: {
+        200: expect.objectContaining({
+          content: {
+            'application/json': {
+              schema: expect.objectContaining({
+                properties: { result: { type: 'string' } },
+                required: ['result'],
+              }),
+            },
+          },
+        }),
+      },
+    }))
+  })
+
+  it('rejects QUERY operations unless the base document uses OpenAPI 3.2', async () => {
+    await expect(generator.generate({
+      search: oc.meta(openapi({ method: 'QUERY', path: '/search' })),
+    })).rejects.toThrow(
+      'QUERY operations require OpenAPI 3.2. Set base.openapi to \'3.2.0\'.',
+    )
+  })
+
   it('merges the provided base document and serialize the result', async () => {
     const serializer = {
       serialize: vi.fn(document => document),

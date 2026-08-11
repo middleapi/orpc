@@ -1,9 +1,17 @@
 import type { Client, ORPCError } from '@orpc/client'
 import type { RouterContractClient } from '@orpc/contract'
 import type { AsyncIteratorClass } from '@orpc/shared'
-import type { JsonifiedClient, JsonifiedValue } from './types'
+import type { JsonifiedClient, JsonifiedValue, OpenAPIDocument, OpenAPIOperationObject } from './types'
 import { asyncIteratorObject, oc } from '@orpc/contract'
 import z from 'zod'
+
+describe('OpenAPIDocument', () => {
+  it('narrowly supports OpenAPI 3.2 QUERY path items', () => {
+    expectTypeOf<OpenAPIDocument['openapi']>().toEqualTypeOf<'3.1.0' | '3.1.1' | '3.1.2' | '3.2.0'>()
+
+    expectTypeOf<NonNullable<OpenAPIDocument['paths']>['/search']['query']>().toEqualTypeOf<OpenAPIOperationObject | undefined>()
+  })
+})
 
 describe('JsonifiedValue', () => {
   it('flat', () => {
