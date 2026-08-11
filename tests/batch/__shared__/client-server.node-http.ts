@@ -12,12 +12,14 @@ export const createNodeHttpBatchClientServerTest: CreateBatchClientServerTest = 
   router,
   {
     context = defaultBatchClientServerOptions.context,
+    method = 'POST',
     mode = defaultBatchClientServerOptions.mode,
     serializer = defaultBatchClientServerOptions.serializer,
   } = {},
 ) => {
   const handler = new RPCHandler(router, {
     serializer,
+    allowMethods: ['POST', 'PUT', 'PATCH', 'DELETE', 'QUERY'],
     plugins: [new BatchHandlerPlugin()],
   })
 
@@ -40,6 +42,7 @@ export const createNodeHttpBatchClientServerTest: CreateBatchClientServerTest = 
   const link = new RPCLink({
     url: '/rpc',
     origin: `http://localhost:${addressInfo.port}`,
+    method,
     serializer,
     fetch: fetchSpy,
     plugins: [new BatchLinkPlugin({ groups: [defaultBatchGroup], mode })],

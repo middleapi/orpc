@@ -408,14 +408,14 @@ describe('batchLinkPlugin', () => {
       expect(subResponse2.headers['x-index']).toEqual('1')
     })
 
-    it('separates GET and POST requests into distinct batches', async () => {
+    it('separates GET, QUERY, and unsafe requests into distinct batches', async () => {
       const codec = makeCodec()
       const transport = makeTransport()
 
       let callIndex = 0
       vi.mocked(codec.encodeInput).mockImplementation(async () => {
         callIndex++
-        const method = callIndex <= 2 ? 'GET' : 'POST'
+        const method = callIndex <= 2 ? 'GET' : callIndex <= 4 ? 'QUERY' : 'PUT'
         return {
           method,
           url: `/test-${callIndex}` as `/${string}`,
@@ -441,19 +441,23 @@ describe('batchLinkPlugin', () => {
       await Promise.all([
         link.call(['get1'], {}, { context: {} }),
         link.call(['get2'], {}, { context: {} }),
-        link.call(['post1'], {}, { context: {} }),
-        link.call(['post2'], {}, { context: {} }),
+        link.call(['query1'], {}, { context: {} }),
+        link.call(['query2'], {}, { context: {} }),
+        link.call(['put1'], {}, { context: {} }),
+        link.call(['put2'], {}, { context: {} }),
       ])
 
-      // Should have at least 2 batch calls: one for GET, one for POST
-      expect(transport.send).toHaveBeenCalledTimes(2)
+      expect(transport.send).toHaveBeenCalledTimes(3)
 
       const sentGetRequest = vi.mocked(transport.send).mock.calls.find(([request]) => request.method === 'GET')![0]
-      expect(sentGetRequest).toBeDefined()
+      expect(extractBatchMessagesFromRequest(sentGetRequest).map(message => message.json.method)).toEqual(['GET', 'GET'])
       expect(sentGetRequest.headers['orpc-batch']).toBe('buffered')
 
+      const sentQueryRequest = vi.mocked(transport.send).mock.calls.find(([request]) => request.method === 'QUERY')![0]
+      expect(extractBatchMessagesFromRequest(sentQueryRequest).map(message => message.json.method)).toEqual(['QUERY', 'QUERY'])
+
       const sentPostRequest = vi.mocked(transport.send).mock.calls.find(([request]) => request.method === 'POST')![0]
-      expect(sentPostRequest).toBeDefined()
+      expect(extractBatchMessagesFromRequest(sentPostRequest).map(message => message.json.method)).toEqual(['PUT', 'PUT'])
       expect(sentPostRequest.headers['orpc-batch']).toBe('buffered')
     })
 

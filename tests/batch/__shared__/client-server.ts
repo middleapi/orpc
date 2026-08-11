@@ -5,6 +5,7 @@ import { defaultSerializer } from '../../rpc/__shared__/client-server'
 
 export interface BatchClientServerTestOptions {
   context?: Context
+  method?: 'GET' | 'POST' | 'QUERY'
   mode?: BatchLinkPluginMode
   serializer?: Pick<RPCSerializer, keyof RPCSerializer>
 }

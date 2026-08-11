@@ -217,15 +217,17 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
 
     for (const [group, items] of pending) {
       const getItems = items.filter(([options]) => options.request.method === 'GET')
-      const restItems = items.filter(([options]) => options.request.method !== 'GET')
+      const queryItems = items.filter(([options]) => options.request.method === 'QUERY')
+      const unsafeItems = items.filter(([options]) => options.request.method !== 'GET' && options.request.method !== 'QUERY')
 
       this.executeBatch('GET', group, getItems)
-      this.executeBatch('POST', group, restItems)
+      this.executeBatch('QUERY', group, queryItems)
+      this.executeBatch('POST', group, unsafeItems)
     }
   }
 
   private async executeBatch(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'QUERY' | 'POST',
     group: BatchLinkPluginGroup<T>,
     groupItems: typeof this.queue extends Map<any, infer U> ? U : never,
   ): Promise<void> {

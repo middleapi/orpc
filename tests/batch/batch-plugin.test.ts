@@ -185,3 +185,21 @@ describe.each([
     expect(fetchSpy).toHaveBeenCalledTimes(1) // ensure batch was used
   })
 })
+
+describe('batch plugin: QUERY over node-http', () => {
+  it('round-trips concurrent calls through one outer QUERY request', async () => {
+    const router = {
+      echo: os.input(z.string()).handler(({ input }) => `echo:${input}`),
+    }
+
+    const { client, fetchSpy } = createNodeHttpBatchClientServerTest(router, { method: 'QUERY' })
+
+    await Promise.all([
+      expect(client.echo('alpha')).resolves.toBe('echo:alpha'),
+      expect(client.echo('beta')).resolves.toBe('echo:beta'),
+    ])
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(fetchSpy.mock.calls[0]![1]).toEqual(expect.objectContaining({ method: 'QUERY' }))
+  })
+})

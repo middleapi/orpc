@@ -12,13 +12,14 @@ export const createHonoFetchBatchClientServerTest: CreateBatchClientServerTest =
   router,
   {
     context = defaultBatchClientServerOptions.context,
+    method = 'GET',
     mode = defaultBatchClientServerOptions.mode,
     serializer = defaultBatchClientServerOptions.serializer,
   } = {},
 ) => {
   const handler = new RPCHandler(router, {
     serializer,
-    allowMethods: ['GET', 'POST'], // the client below sends GET requests (POST as fallback)
+    allowMethods: ['GET', 'POST', 'QUERY'],
     plugins: [new BatchHandlerPlugin()],
   })
 
@@ -43,7 +44,7 @@ export const createHonoFetchBatchClientServerTest: CreateBatchClientServerTest =
 
   const link = new RPCLink({
     url: '/rpc',
-    method: 'GET', // hono-fetch use GET while node-http use POST for better coverage
+    method, // hono-fetch uses GET by default while node-http uses POST for better coverage
     origin: `http://localhost:${addressInfo.port}`,
     serializer,
     fetch: fetchSpy,

@@ -20,7 +20,7 @@ function makePeerRequestMessage(id: number, url: string, method = 'POST', body?:
 function createBatchRequest(options: {
   mode: 'buffered' | 'streaming'
   messages?: unknown
-  method?: 'POST' | 'GET'
+  method?: 'POST' | 'GET' | 'QUERY'
   data?: string
 }) {
   if (options.method === 'GET') {
@@ -33,7 +33,7 @@ function createBatchRequest(options: {
   }
 
   return new Request('https://example.com/__batch__', {
-    method: 'POST',
+    method: options.method ?? 'POST',
     headers: { 'orpc-batch': options.mode, 'content-type': 'application/json' },
     body: JSON.stringify(options.messages),
   })
@@ -340,6 +340,25 @@ describe('batchHandlerPlugin', () => {
 
       expect(response!.status).toBe(400)
       expect(await response!.text()).toContain('GET batch requests only accept GET sub-requests')
+      expect(handlerFn).toHaveBeenCalledTimes(0)
+    })
+  })
+
+  describe('query batches', () => {
+    it('returns 400 before execution when a QUERY batch contains a non-QUERY sub-request', async () => {
+      const handler = createHandler()
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        method: 'QUERY',
+        messages: [
+          makePeerRequestMessage(0, '/ping', 'QUERY'),
+          makePeerRequestMessage(1, '/ping', 'POST'),
+        ],
+      }))
+
+      expect(response!.status).toBe(400)
+      expect(await response!.text()).toContain('QUERY batch requests only accept QUERY sub-requests')
       expect(handlerFn).toHaveBeenCalledTimes(0)
     })
   })
