@@ -153,7 +153,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         else {
           const mightBeMessages = await interceptorOptions.request.resolveBody()
 
-          if (!Array.isArray(mightBeMessages)) {
+          if (!Array.isArray(mightBeMessages) || mightBeMessages.some(m => !isClientPeerSendMessage(m))) {
             return {
               matched: true,
               response: { status: 400, headers: {}, body: 'Invalid batch request body' },

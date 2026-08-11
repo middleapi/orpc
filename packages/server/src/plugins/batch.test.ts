@@ -153,6 +153,7 @@ describe('batchHandlerPlugin', () => {
       }))
 
       expect(response!.status).toBe(400)
+      expect(await response!.text()).toContain('Invalid batch request body')
       expect(handlerFn).toHaveBeenCalledTimes(0)
     })
 
@@ -345,6 +346,21 @@ describe('batchHandlerPlugin', () => {
   })
 
   describe('query batches', () => {
+    it('returns 400 before execution when a QUERY batch contains a non-request message', async () => {
+      const handler = createHandler()
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        method: 'QUERY',
+        messages: [
+          { kind: 'response', id: 0, json: { method: 'POST', url: '/ping', headers: {} } },
+        ],
+      }))
+
+      expect(response!.status).toBe(400)
+      expect(handlerFn).toHaveBeenCalledTimes(0)
+    })
+
     it('returns 400 before execution when a QUERY batch contains a non-QUERY sub-request', async () => {
       const handler = createHandler()
 
