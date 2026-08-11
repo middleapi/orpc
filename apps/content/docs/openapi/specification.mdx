@@ -1,6 +1,6 @@
 ---
 title: "OpenAPI Specification"
-description: "Learn how to configure openapi metadata and generate OpenAPI documents from your oRPC contracts and routers with OpenAPIGenerator."
+description: "Learn how to configure openapi metadata and generate OpenAPI 3.1 documents from your oRPC contracts and routers with OpenAPIGenerator."
 ---
 
 ## Metadata
@@ -131,7 +131,7 @@ In this example, the final `tags` is `undefined`, so no tags are applied to `exa
 
 ## OpenAPI Generator
 
-`OpenAPIGenerator` accepts either a [contract](/docs/contract/router) or a [router](/docs/router) and generates an OpenAPI document. It uses OpenAPI 3.1.2 by default.
+`OpenAPIGenerator` accepts either a [contract](/docs/contract/router) or a [router](/docs/router) and generates an OpenAPI 3.1 document.
 
 ```ts
 import { OpenAPIGenerator } from '@orpc/openapi'
@@ -152,26 +152,6 @@ const spec = await generator.generate(router, {
   },
 })
 ```
-
-### QUERY Operations
-
-OpenAPI defines the `query` Path Item field starting in OpenAPI 3.2. When a router contains a [`QUERY` operation](/docs/openapi/routing#query-method), explicitly select OpenAPI 3.2 in the base document:
-
-```ts
-const spec = await generator.generate(router, {
-  base: {
-    openapi: '3.2.0',
-    info: {
-      title: 'Planet API',
-      version: '1.0.0',
-    },
-  },
-})
-```
-
-Without `base.openapi: '3.2.0'`, generation fails rather than emitting the 3.2-only `query` field in the default OpenAPI 3.1.2 document. Routers without QUERY operations continue to generate OpenAPI 3.1.2 documents by default.
-
-oRPC's public document type includes only the OpenAPI 3.2 compatibility needed for QUERY Path Items; it does not claim complete OpenAPI 3.2 coverage. OpenAPI viewers, client generators, validators, HTTP runtimes, proxies, and gateways may not support OpenAPI 3.2 or the QUERY method yet. Verify every tool and network hop used by your API before adopting it.
 
 ### Json Schema Converters
 

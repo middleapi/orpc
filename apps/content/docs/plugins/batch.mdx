@@ -56,18 +56,6 @@ const cors = new CORSHandlerPlugin({
 
 :::
 
-## Request Methods
-
-Within each configured group, the client keeps request methods in separate batches:
-
-- `GET` calls use an outer GET request with the batch data encoded in the URL.
-- `QUERY` calls use a body-bearing outer QUERY request.
-- Unsafe calls use an outer POST request.
-
-GET, QUERY, and unsafe calls are never mixed in one batch. The server also requires every request message inside a safe outer GET or QUERY batch to use that same method, and rejects the entire malformed batch before any procedure executes. This preserves method-based security, caching, and policy boundaries.
-
-QUERY remains opt-in on the RPC handler. Add it to the handler's [`allowMethods`](/docs/rpc/handler#supported-http-methods) and only use it for safe, idempotent procedures. QUERY batching works only when every HTTP runtime, framework, proxy, and gateway in the request path accepts and forwards custom methods.
-
 ## Response Modes
 
 By default, the plugin uses `streaming` mode. Responses are sent as soon as they are ready, so one slow request does not block the rest of the batch.

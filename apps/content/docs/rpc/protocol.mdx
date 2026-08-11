@@ -42,7 +42,7 @@ const router = {
 
 ## Sending Input
 
-Requests can use the `POST`, `PUT`, `PATCH`, or `DELETE` method, or other methods like `GET` and [`QUERY`](https://www.rfc-editor.org/rfc/rfc10008.html) when the server [allows them](/docs/rpc/handler#supported-http-methods). Send input in the query string for `GET` and in the request body for all other methods. QUERY requires explicit server opt-in and an HTTP runtime that accepts custom methods.
+Requests can use the `POST`, `PUT`, `PATCH`, or `DELETE` method, or other methods like `GET` and `QUERY` when the server [allows them](/docs/rpc/handler#supported-http-methods). Send input in the query string (`GET`) or request body (other methods).
 
 :::info
 Request payloads depend on the serializer and are not plain JSON. Learn more in [RPC Serializer Format](/docs/rpc/serializer#serialization-format).

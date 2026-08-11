@@ -263,29 +263,8 @@ const link = new RPCLink({
 
 `RPCLink` sends requests with `POST` by default. Use `method` to choose the method per call.
 
-To send safe, idempotent requests with body-encoded input, choose the [`QUERY` method defined by RFC 10008](https://www.rfc-editor.org/rfc/rfc10008.html):
-
-```ts
-const link = new RPCLink({
-  url: '/rpc',
-  method: 'QUERY',
-})
-```
-
-When using `GET`, input is encoded in the URL. If the URL exceeds `maxUrlLength` or cannot carry the serialized input, `RPCLink` sends the input in a request body using `fallbackMethod`. The fallback defaults to `POST`; choose `QUERY` explicitly when the procedure is safe and idempotent:
-
-```ts
-const link = new RPCLink({
-  url: '/rpc',
-  method: 'GET',
-  fallbackMethod: 'QUERY',
-})
-```
-
 :::warning
 By default, [RPC handlers](/docs/rpc/handler#supported-http-methods) only accept `POST`, `PUT`, `PATCH`, and `DELETE` requests. Before sending `GET` or `QUERY` requests, allow them in the handler first, and understand [the risks of enabling `GET`](/docs/rpc/handler#enabling-the-get-method).
-
-Browser `QUERY` requests require a CORS preflight. QUERY also works only when every HTTP runtime, framework, proxy, and gateway in the request path accepts and forwards custom methods.
 :::
 
 ```ts

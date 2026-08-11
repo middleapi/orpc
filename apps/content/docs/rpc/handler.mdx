@@ -70,7 +70,7 @@ By default, `RPCHandler` only responds to `POST`, `PUT`, `PATCH`, and `DELETE` r
 
 This is a security default: cross-site, browsers can only send these methods via a [CORS preflight](https://developer.mozilla.org/en-US/docs/Glossary/Preflight_request) or an HTML form, never from a plain link. Safe methods like `GET` or `HEAD` are excluded because invoking a procedure can modify data.
 
-Use `allowMethods` to replace the allowlist: tighten it to `POST` only, or explicitly accept [`QUERY`](https://www.rfc-editor.org/rfc/rfc10008.html), which is a safe, idempotent method that reads input from the request body and stays preflight-protected. Only enable QUERY for procedures that satisfy those semantics. It remains excluded from the default allowlist, and support depends on every HTTP runtime, framework, proxy, and gateway in the request path accepting and forwarding custom methods:
+Use `allowMethods` to replace the allowlist: tighten it to `POST` only, or also accept [`QUERY`](https://datatracker.ietf.org/doc/draft-ietf-httpbis-safe-method-w-body/), which reads input from the request body and stays preflight-protected:
 
 ```ts
 const handler = new RPCHandler(router, {
