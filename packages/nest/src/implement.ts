@@ -83,6 +83,13 @@ function toNestRouteDecorator(contract: AnyProcedureContract): MethodDecorator {
   const path = toNestPattern(meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path)
   const successStatus = meta.successStatus ?? DEFAULT_SUCCESS_STATUS
 
+  if (method === 'QUERY') {
+    throw new TypeError(`
+      @Implement decorator does not support the 'QUERY' HTTP method because NestJS does not support it.
+      Use the 'GET' method instead.
+    `)
+  }
+
   return applyDecorators(
     MethodDecoratorMap[method](path),
     HttpCode(successStatus),

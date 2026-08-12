@@ -40,6 +40,23 @@ describe('requirements', () => {
     }).toThrow(/openapi\.path/)
   })
 
+  it('should throw if @Implement uses the QUERY HTTP method', () => {
+    const contract = oc.meta(openapi({
+      path: '/procedure',
+      method: 'QUERY',
+    }))
+
+    expect(() => {
+      @Controller()
+      class ImplController {
+        @Implement(contract)
+        procedure() {
+          return implement(contract).handler(() => {})
+        }
+      }
+    }).toThrow(/does not support the 'QUERY' HTTP method/)
+  })
+
   it('should error if implemented method return invalid procedure', async () => {
     const contract = oc.meta(openapi({
       path: '/procedure',
