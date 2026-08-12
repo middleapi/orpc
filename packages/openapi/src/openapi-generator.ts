@@ -78,8 +78,7 @@ export interface OpenAPIGeneratorGenerateOptions {
 }
 
 /**
- * Generates an OpenAPI 3.1 document, or an OpenAPI 3.2 document for QUERY operations,
- * from a contract or a router.
+ * Generates an OpenAPI document from a contract or router.
  * Relies on JSON schema converters to translate input, output, and error schemas into JSON Schemas.
  *
  * @see {@link https://orpc.dev/docs/openapi/specification#openapi-generator | OpenAPI Specification - OpenAPI Generator}
