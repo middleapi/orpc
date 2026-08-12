@@ -131,7 +131,7 @@ In this example, the final `tags` is `undefined`, so no tags are applied to `exa
 
 ## OpenAPI Generator
 
-`OpenAPIGenerator` accepts either a [contract](/docs/contract/router) or a [router](/docs/router) and generates an OpenAPI 3.1 document.
+`OpenAPIGenerator` accepts either a [contract](/docs/contract/router) or a [router](/docs/router) and generates an OpenAPI 3.1 document by default. OpenAPI 3.2 is partially supported.
 
 ```ts
 import { OpenAPIGenerator } from '@orpc/openapi'
@@ -149,6 +149,18 @@ const spec = await generator.generate(router, {
     servers: [
       { url: 'https://example.com/api' },
     ],
+  },
+})
+```
+
+### QUERY method
+
+If your router contains a procedure that uses the `QUERY` method, explicitly set the OpenAPI version to `3.2.0`, because OpenAPI 3.1 does not support `QUERY`.
+
+```ts
+const spec = await generator.generate(router, {
+  base: {
+    openapi: '3.2.0',
   },
 })
 ```
