@@ -19,7 +19,7 @@ export const createNodeHttpBatchClientServerTest: CreateBatchClientServerTest = 
 ) => {
   const handler = new RPCHandler(router, {
     serializer,
-    allowMethods: ['POST', 'PUT', 'PATCH', 'DELETE', 'QUERY'],
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'QUERY'],
     plugins: [new BatchHandlerPlugin()],
   })
 
