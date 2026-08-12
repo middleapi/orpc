@@ -6,6 +6,7 @@ export {
    */
   CORSHandlerPlugin as CORSPlugin,
 } from './cors'
+export * from './get-method-csrf-protection'
 export * from './method-override'
 export * from './request-compression'
 export * from './request-headers'
@@ -37,4 +38,3 @@ export type {
   ResponseHeadersHandlerPluginContext as ResponseHeadersPluginContext,
 } from './response-headers'
 export * from './rethrow'
-export * from './simple-csrf-protection'

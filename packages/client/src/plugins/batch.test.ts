@@ -408,6 +408,49 @@ describe('batchLinkPlugin', () => {
       expect(subResponse2.headers['x-index']).toEqual('1')
     })
 
+    it('uses custom mapSubresponse and forwards its response to the caller', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(transport.send).mockImplementation(async (request) => {
+        const response = makeBufferedBatchResponseFromRequest(request)
+        return {
+          ...response,
+          headers: { ...response.headers, 'x-from-batch-response': 'true' },
+        }
+      })
+
+      const mapSubresponse = vi.fn((subResponse: StandardLazyResponse, batchResponse: StandardLazyResponse): StandardLazyResponse => ({
+        ...subResponse,
+        headers: {
+          ...subResponse.headers,
+          'x-mapped': 'true',
+          'x-batch-status': `${batchResponse.status}`,
+        },
+        resolveBody: async () => `mapped-${await subResponse.resolveBody()}`,
+      }))
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({
+          groups: [defaultGroup],
+          mapSubresponse,
+        })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {} })).resolves.toBe('mapped-result-0'),
+        expect(link.call(['b'], {}, { context: {} })).resolves.toBe('mapped-result-1'),
+      ])
+
+      expect(mapSubresponse).toHaveBeenCalledTimes(2)
+
+      const subResponse1 = vi.mocked(codec.decodeResponse).mock.calls[0]![0]
+      expect(subResponse1.headers['x-mapped']).toEqual('true')
+      expect(subResponse1.headers['x-batch-status']).toEqual('207')
+      // the default merge of batch response headers is not applied anymore
+      expect(subResponse1.headers['x-from-batch-response']).toBeUndefined()
+    })
+
     it('separates GET, QUERY, and unsafe requests into distinct batches', async () => {
       const codec = makeCodec()
       const transport = makeTransport()
@@ -844,6 +887,76 @@ describe('batchLinkPlugin', () => {
       await Promise.all([
         expect(link.call(['a'], {}, { context: {} })).rejects.toThrow('Invalid batch response: invalid message.'),
         expect(link.call(['b'], {}, { context: {} })).rejects.toThrow('Invalid batch response: invalid message.'),
+      ])
+    })
+  })
+
+  describe('error batch responses', () => {
+    it.each(['buffered', 'streaming'] as const)('forwards %s batch responses with status >= 400 to every subrequest', async (mode) => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(transport.send).mockImplementation(async () => {
+        return {
+          status: 502,
+          headers: { 'x-error': 'gateway' },
+          resolveBody: async () => 'Bad Gateway',
+        }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {} })).resolves.toBe('Bad Gateway'),
+        expect(link.call(['b'], {}, { context: {} })).resolves.toBe('Bad Gateway'),
+      ])
+
+      expect(codec.decodeResponse).toHaveBeenCalledTimes(2)
+      expect(vi.mocked(codec.decodeResponse).mock.calls[0]![0]).toMatchObject({
+        status: 502,
+        headers: { 'x-error': 'gateway' },
+      })
+      expect(vi.mocked(codec.decodeResponse).mock.calls[1]![0]).toMatchObject({
+        status: 502,
+        headers: { 'x-error': 'gateway' },
+      })
+    })
+
+    it('resolves the error response body only once for all subrequests', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+      const resolveBody = vi.fn(async () => 'Bad Gateway')
+
+      vi.mocked(transport.send).mockImplementation(async () => {
+        return { status: 502, headers: {}, resolveBody }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered' })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {} })).resolves.toBe('Bad Gateway'),
+        expect(link.call(['b'], {}, { context: {} })).resolves.toBe('Bad Gateway'),
+      ])
+
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(resolveBody).toHaveBeenCalledTimes(1)
+    })
+
+    it('still parses batch responses with status < 400', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered' })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {} })).resolves.toBe('result-0'),
+        expect(link.call(['b'], {}, { context: {} })).resolves.toBe('result-1'),
       ])
     })
   })
