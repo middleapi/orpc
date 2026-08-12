@@ -17,7 +17,7 @@ const handler = new RPCHandler(router, {
   plugins: [
     new CORSHandlerPlugin({
       origin: (origin, options) => origin,
-      allowMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH'],
+      allowMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH', 'QUERY'],
       // ...
     }),
   ],
