@@ -40,21 +40,6 @@ export const listPlanets = publicOS
     return planets.slice(cursor, cursor + limit)
   })
 
-export const searchPlanets = publicOS
-  .meta(openapi({
-    method: 'QUERY',
-    path: '/planets/search',
-    summary: 'Search planets by name',
-    tags: ['Planet'],
-  }))
-  .input(z.object({
-    names: z.array(z.string()),
-  }))
-  .output(z.array(PlanetSchema))
-  .handler(({ input }) => {
-    return DB.filter(planet => input.names.includes(planet.name))
-  })
-
 export const findPlanet = publicOS
   .meta(openapi({
     method: 'GET',

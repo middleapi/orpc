@@ -1,6 +1,6 @@
 import { deleteFile, findFile, uploadFile } from './file'
 import { publishMessage, subscribeMessages } from './message'
-import { createPlanet, deletePlanet, findPlanet, listPlanets, searchPlanets, updatePlanet } from './planet'
+import { createPlanet, deletePlanet, findPlanet, listPlanets, updatePlanet } from './planet'
 
 export const router = {
   file: {
@@ -11,7 +11,6 @@ export const router = {
 
   planet: {
     list: listPlanets,
-    search: searchPlanets,
     find: findPlanet,
     create: createPlanet,
     update: updatePlanet,

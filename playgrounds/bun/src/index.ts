@@ -30,7 +30,6 @@ const openapiHandler = new OpenAPIHandler(router, {
     new OpenAPIReferenceHandlerPlugin({
       spec: () => openapiGenerator.generate(router, {
         base: {
-          openapi: '3.2.0',
           servers: [{ url: '/api' }],
           components: {
             securitySchemes: {
