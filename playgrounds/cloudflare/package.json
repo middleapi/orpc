@@ -11,7 +11,7 @@
     "jaeger": "docker run -p 16686:16686 -p 4318:4318 jaegertracing/all-in-one:latest"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.51.2",
+    "@cloudflare/vite-plugin": "^1.51.3",
     "@microlabs/otel-cf-workers": "1.0.0-rc.52",
     "@opentelemetry/api": "^1.9.1",
     "@orpc/client": "beta",
@@ -35,6 +35,6 @@
     "ts-pattern": "^5.9.0",
     "typescript": "^6.0.3",
     "vite": "^8.2.1",
-    "wrangler": "^4.120.1"
+    "wrangler": "^4.121.0"
   }
 }
