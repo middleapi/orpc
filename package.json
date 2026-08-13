@@ -58,7 +58,7 @@
     "eslint-plugin-ban": "^2.0.0",
     "eslint-plugin-format": "^2.0.1",
     "github-slugger": "^2.0.0",
-    "jsdom": "^29.1.1",
+    "jsdom": "^30.0.1",
     "lint-staged": "^17.3.0",
     "pkg-pr-new": "^0.0.87",
     "react": "^19.2.8",
