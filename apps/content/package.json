@@ -31,7 +31,7 @@
     "@tanstack/vue-query": "^5.101.4",
     "@types/node": "^26.2.0",
     "blume": "^1.4.3",
-    "effect": "4.0.0-beta.101",
+    "effect": "4.0.0-rc.109",
     "pino": "^10.3.1",
     "superjson": "^2.2.6",
     "zod": "^4.4.3"
