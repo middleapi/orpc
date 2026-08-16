@@ -121,23 +121,25 @@ If you find oRPC valuable and would like to support its development, you can do 
 <table>
   <tr>
    <td align="center"><a href="https://github.com/hrmcdonald?ref=orpc" target="_blank" rel="sponsored noopener" title="Reece McDonald"><img src="https://avatars.githubusercontent.com/u/39349270?v=4" width="139" alt="Reece McDonald"/><br />Reece McDonald</a></td>
+   <td align="center"><a href="https://github.com/u1-liquid?ref=orpc" target="_blank" rel="sponsored noopener" title="あわわわとーにゅ"><img src="https://avatars.githubusercontent.com/u/17376330?u=de3353804be889f009f7e0a1582daf04d0ab292d&amp;v=4" width="139" alt="あわわわとーにゅ"/><br />あわわわとーにゅ</a></td>
    <td align="center"><a href="https://github.com/nicognaW?ref=orpc" target="_blank" rel="sponsored noopener" title="nk"><img src="https://avatars.githubusercontent.com/u/66731869?u=4699bda3a9092d3ec34fbd959450767bcc8b8b6d&amp;v=4" width="139" alt="nk"/><br />nk</a></td>
    <td align="center"><a href="https://github.com/supastarter?ref=orpc" target="_blank" rel="sponsored noopener" title="supastarter"><img src="https://avatars.githubusercontent.com/u/110960143?v=4" width="139" alt="supastarter"/><br />supastarter</a></td>
    <td align="center"><a href="https://github.com/divmgl?ref=orpc" target="_blank" rel="sponsored noopener" title="Dexter Miguel"><img src="https://avatars.githubusercontent.com/u/5452298?u=645993204be8696c085ecf0d228c3062efe2ed65&amp;v=4" width="139" alt="Dexter Miguel"/><br />Dexter Miguel</a></td>
    <td align="center"><a href="https://github.com/herrfugbaum?ref=orpc" target="_blank" rel="sponsored noopener" title="herrfugbaum"><img src="https://avatars.githubusercontent.com/u/12859776?u=644dc1666d0220bc0468eb0de3c56b919f635b16&amp;v=4" width="139" alt="herrfugbaum"/><br />herrfugbaum</a></td>
-   <td align="center"><a href="https://github.com/ryota-murakami?ref=orpc" target="_blank" rel="sponsored noopener" title="Ryota Murakami"><img src="https://avatars.githubusercontent.com/u/5501268?u=599389e03340734325726ca3f8f423c021d47d7f&amp;v=4" width="139" alt="Ryota Murakami"/><br />Ryota Murakami</a></td>
   </tr>
   <tr>
+   <td align="center"><a href="https://github.com/ryota-murakami?ref=orpc" target="_blank" rel="sponsored noopener" title="Ryota Murakami"><img src="https://avatars.githubusercontent.com/u/5501268?u=599389e03340734325726ca3f8f423c021d47d7f&amp;v=4" width="139" alt="Ryota Murakami"/><br />Ryota Murakami</a></td>
    <td align="center"><a href="https://github.com/dcramer?ref=orpc" target="_blank" rel="sponsored noopener" title="David Cramer"><img src="https://avatars.githubusercontent.com/u/23610?v=4" width="139" alt="David Cramer"/><br />David Cramer</a></td>
    <td align="center"><a href="https://github.com/valerii15298?ref=orpc" target="_blank" rel="sponsored noopener" title="Valerii Petryniak"><img src="https://avatars.githubusercontent.com/u/44531564?u=88ac74d9bacd20401518441907acad21063cd397&amp;v=4" width="139" alt="Valerii Petryniak"/><br />Valerii Petryniak</a></td>
    <td align="center"><a href="https://github.com/letstri?ref=orpc" target="_blank" rel="sponsored noopener" title="Valerii Strilets"><img src="https://avatars.githubusercontent.com/u/13253748?u=c7b10399ccc8f8081e24db94ec32cd9858e86ac3&amp;v=4" width="139" alt="Valerii Strilets"/><br />Valerii Strilets</a></td>
    <td align="center"><a href="https://github.com/K-Mistele?ref=orpc" target="_blank" rel="sponsored noopener" title="Kyle Mistele"><img src="https://avatars.githubusercontent.com/u/18430555?u=3afebeb81de666e35aaac3ed46f14159d7603ffb&amp;v=4" width="139" alt="Kyle Mistele"/><br />Kyle Mistele</a></td>
    <td align="center"><a href="https://github.com/christ12938?ref=orpc" target="_blank" rel="sponsored noopener" title="christ12938"><img src="https://avatars.githubusercontent.com/u/25758598?v=4" width="139" alt="christ12938"/><br />christ12938</a></td>
-   <td align="center"><a href="https://github.com/Ryanjso?ref=orpc" target="_blank" rel="sponsored noopener" title="Ryan Soderberg"><img src="https://avatars.githubusercontent.com/u/39172778?u=5ed913c31d57e7221b75784abcad48c7ebddde27&amp;v=4" width="139" alt="Ryan Soderberg"/><br />Ryan Soderberg</a></td>
   </tr>
   <tr>
+   <td align="center"><a href="https://github.com/Ryanjso?ref=orpc" target="_blank" rel="sponsored noopener" title="Ryan Soderberg"><img src="https://avatars.githubusercontent.com/u/39172778?u=5ed913c31d57e7221b75784abcad48c7ebddde27&amp;v=4" width="139" alt="Ryan Soderberg"/><br />Ryan Soderberg</a></td>
    <td align="center"><a href="https://github.com/itigoore01?ref=orpc" target="_blank" rel="sponsored noopener" title="shota"><img src="https://avatars.githubusercontent.com/u/11831107?u=c976a6dc7e055eb026304c46c99100ed22b0c8e0&amp;v=4" width="139" alt="shota"/><br />shota</a></td>
    <td align="center"><a href="https://github.com/ellis-driscoll?ref=orpc" target="_blank" rel="sponsored noopener" title="Ellis Driscoll"><img src="https://avatars.githubusercontent.com/u/70685966?u=c5f95bc33b5991d9744abe00052542e4a2ed3cb9&amp;v=4" width="139" alt="Ellis Driscoll"/><br />Ellis Driscoll</a></td>
+   <td align="center"><a href="https://github.com/hoangbn?ref=orpc" target="_blank" rel="sponsored noopener" title="Hoang Nguyen"><img src="https://avatars.githubusercontent.com/u/38968280?u=c90084c6de65c56facabab7ba13a72a49ddbc3e4&amp;v=4" width="139" alt="Hoang Nguyen"/><br />Hoang Nguyen</a></td>
   </tr>
 </table>
 
@@ -169,7 +171,7 @@ If you find oRPC valuable and would like to support its development, you can do 
   </tr>
 </table>
 
-With thanks to 38 past sponsors who helped get oRPC here.
+With thanks to 37 past sponsors who helped get oRPC here.
 
 ## License
 
