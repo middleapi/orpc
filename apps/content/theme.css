@@ -48,6 +48,20 @@
   min-height: calc(100vh - var(--docs-header-height));
 }
 
+/* Below 2xl the frame spans the viewport, so the docs grid pays for its
+   TOC rail out of the gutters the frame would otherwise leave empty
+   rather than out of the prose column. Every layout is drawn against
+   this variable — the header on all of them, the grid on docs and blog
+   posts — so one declaration keeps the landing page, the blog, and the
+   docs on the same container at any given viewport. Under the frame
+   width it is what `min()` already resolved to, so the widths this
+   actually changes run from 81.875rem to 2xl. */
+@media (max-width: 95.9375rem) {
+  :root {
+    --docs-frame-width: 100%;
+  }
+}
+
 @media (min-width: 64rem) {
   /* Scoped to grids that carry Blume's own responsive column classes:
      "bare" pages (the changelog index) render a single centered column
@@ -71,22 +85,31 @@
   }
 }
 
-/* TOC appears only when the full three-column frame fits (like the
-   reference's max-2xl collapse). */
+/* TOC rail: like the nav rail it sits under the shorter header, and it
+   opens level with the content column's first line. Both rails carry
+   `sticky`, so these metrics only apply once `hidden xl:block` reveals
+   them — the tier Blume also stops rendering the mobile `<details>`
+   fallback at. */
 [data-blume-toc] {
-  display: none;
+  top: var(--docs-header-height);
+  height: calc(100dvh - var(--docs-header-height));
+  padding-top: 3rem;
 }
 
+/* Three columns from that same tier. The nav rail holds its two-column
+   width so nothing shifts as the TOC appears, and the content column
+   takes whatever the full-width frame has left over. */
+@media (min-width: 80rem) {
+  [data-blume-doc-grid][class*='xl:grid-cols-'] {
+    grid-template-columns: 14.5rem minmax(0, 1fr) 16.5rem;
+  }
+}
+
+/* From 2xl the frame stops growing, so the rail can take its wider
+   width and the prose column its designed measure. */
 @media (min-width: 96rem) {
   [data-blume-doc-grid][class*='xl:grid-cols-'] {
     grid-template-columns: 15.875rem minmax(0, 51.25rem) 16.5rem;
-  }
-
-  [data-blume-toc] {
-    display: block;
-    top: var(--docs-header-height);
-    height: calc(100dvh - var(--docs-header-height));
-    padding-top: 3rem;
   }
 }
 

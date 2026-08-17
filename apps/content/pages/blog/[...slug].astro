@@ -115,7 +115,7 @@ const postJsonLd = {
   />
   {/*
     The docs frame: theme.css centers `[data-blume-doc-grid]` on the header
-    width and, from 96rem, sizes any grid whose class carries `xl:grid-cols-`.
+    width and, from 80rem, sizes any grid whose class carries `xl:grid-cols-`.
     The nav column stays empty here, which keeps the article centered opposite
     the table of contents.
   */}
@@ -208,11 +208,12 @@ const postJsonLd = {
       </div>
     </article>
 
-    {/* theme.css owns the rail's visibility and vertical metrics (it only
-        appears once the three-column frame fits); the rest is styling. */}
+    {/* `hidden xl:block` is how Blume's own rail appears with the third
+        column, and the mobile collapsible above takes over below it;
+        theme.css owns the vertical metrics. */}
     <aside
       aria-label={ui.toc.title}
-      class="sticky overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent px-4 pb-10 text-sm xl:col-start-3"
+      class="sticky hidden overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent px-4 pb-10 text-sm xl:col-start-3 xl:block"
       data-blume-toc
     >
       <TableOfContents headings={tocHeadings} title={ui.toc.title} variant="desktop" />
