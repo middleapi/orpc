@@ -1,6 +1,6 @@
 ---
 title: "Handling File Uploads Bigger Than Your RAM"
-description: "Streaming uploads to disk behind the standard File API: lazy blobs, the platform's 2 GiB potholes, deletion timing, and why one size limit is never enough."
+description: "Streaming uploads to disk behind the standard File API: lazy blobs, deletion timing, and why one size limit is never enough."
 type: blog
 date: 2026-08-17
 search:
@@ -32,7 +32,7 @@ The standard `File` and `FormData` APIs made uploads pleasant, and quietly made 
 
 This is not a new problem, and the old solutions were good. PHP has streamed uploads into temporary files [since practically forever](https://www.php.net/manual/en/features.file-upload.post-method.php): your script receives a `tmp_name` path, not a buffer. The Express era had a whole [ecosystem of streaming multipart parsers](https://bytearcher.com/articles/formidable-vs-busboy-vs-multer-vs-multiparty/): busboy hands you a readable stream per file as the bytes arrive, formidable and [multer](https://github.com/expressjs/multer) spool to disk on top of that.
 
-Then the fetch-standard era arrived. Every runtime speaks `Request` and `Response` now, which is genuinely great, but `await request.formData()` became the blessed path and the temp-file wisdom got traded away for API convenience. The trade is worse than it looks, because the buffering path is not just hungry, it is capped: Node's multipart parser has been [reported to give up entirely past 2 GiB](https://smoores.dev/post/overcoming_io_limits/), failing with an error that looks like a malformed body rather than a size problem.
+Then the fetch-standard era arrived. Every runtime speaks `Request` and `Response` now, which is genuinely great, but `await request.formData()` became the blessed path and the temp-file wisdom got traded away for API convenience.
 
 So the question that led to this work was: can you have both? Keep the standard `File` API that validation libraries and application code already understand, and still parse an upload of any size in constant memory?
 
@@ -61,16 +61,6 @@ export class TmpFile extends File {
 `super([blob], ...)` does not copy anything: composing a `File` from blob parts just references them. The result is a real `File` that weighs a few hundred bytes regardless of content size. Schema validation passes, `instanceof File` is true, `.stream()` reads from disk, and code that never heard of temp files cannot tell the difference. The one extra affordance is `.path`, so instead of copying gigabytes you can `rename` them into place.
 
 There is one honest caveat: a disk-backed `Blob` is a promise that the bytes will still be there when read. Move or delete the underlying file and later reads fail.
-
-### The 2 GiB Potholes
-
-"Any size" is where the platform starts to creak, so I measured instead of trusting the docs. On Node v22.23.2, I created a sparse 5 GiB file and opened it with `openAsBlob`:
-
-- `blob.size` reported 1 GiB: the true size modulo 4 GiB, a classic unsigned 32-bit truncation.
-- A ten-byte `slice()` across the 2 GiB boundary came back empty. Slicing further out can crash outright ([nodejs/node#52585](https://github.com/nodejs/node/issues/52585), still open).
-- `blob.stream()`, however, delivered all 5,368,709,120 bytes correctly.
-
-The whole-file streaming path is solid, which is exactly the path a spool-then-stream design exercises, but if your handler needs `.size` or random access past 2 GiB, read from the temp file's path directly until that issue is fixed. And these limits are not unique to blobs: `fs.readFile` refuses anything over 2 GiB with `ERR_FS_FILE_TOO_LARGE` (I verified this too), because libuv caps individual I/O calls at `INT32_MAX` bytes. Past 2 GiB, streaming is not an optimization, it is the only correct interface.
 
 ## The Hard Part Is Deleting Them
 
@@ -126,4 +116,4 @@ Temporary files are removed when the request finishes. Move or copy an upload in
 
 ## The Takeaway
 
-The `File` interface never demanded buffering; we defaulted to it because it was the shortest code. Browsers knew better all along, PHP knew the right shape in the 90s, and the platform now gives servers lazy blobs to express it cleanly, potholes and all. The remaining engineering is not about bytes. It is about lifetimes: knowing exactly when the last reader is done, pricing each kind of byte at what it actually costs, and never trusting a header you can count for yourself.
+The `File` interface never demanded buffering; we defaulted to it because it was the shortest code. Browsers knew better all along, PHP knew the right shape in the 90s, and the platform now gives servers lazy blobs to express it cleanly. The remaining engineering is not about bytes. It is about lifetimes: knowing exactly when the last reader is done, pricing each kind of byte at what it actually costs, and never trusting a header you can count for yourself.
