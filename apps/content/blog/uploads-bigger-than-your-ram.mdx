@@ -1,6 +1,6 @@
 ---
-title: "Handling File Uploads Bigger Than Your RAM"
-description: "Streaming uploads to disk behind the standard File API: lazy blobs, deletion timing, and why one size limit is never enough."
+title: "Handling File Uploads Bigger Than Your RAM in Node.js"
+description: "Stream large file uploads to disk in Node.js while keeping the standard File API: lazy blobs with fs.openAsBlob, safe temp file cleanup, and per-category body size limits."
 type: blog
 date: 2026-08-17
 search:
@@ -15,32 +15,32 @@ ai:
   exclude: true
 ---
 
-## The Innocent Line of Code
+## Why request.formData() Runs Out of Memory
 
-Almost every modern JavaScript server handles uploads with some variation of this:
+Almost every modern JavaScript server handles uploads like this:
 
 ```ts
 const form = await request.formData()
 const video = form.get('video') as File
 ```
 
-It reads like nothing. It is also a memory bomb. [`request.formData()`](https://developer.mozilla.org/en-US/docs/Web/API/Request/formData) resolves only after the entire body is parsed, and on the server that means buffering every byte into memory. A 2 GB video becomes 2 GB of heap. Five people uploading at once become 10 GB. Your container has 512 MB, so the process dies before your handler even runs, and it dies in framework code you never wrote.
+It looks harmless. It is a memory bomb. [`request.formData()`](https://developer.mozilla.org/en-US/docs/Web/API/Request/formData) resolves only after the entire body is parsed, and on the server that means buffering every byte in memory. A 2 GB video becomes 2 GB of heap. Five concurrent uploads become 10 GB. Your 512 MB container dies before your handler runs, in framework code you never wrote.
 
 The standard `File` and `FormData` APIs made uploads pleasant, and quietly made them dangerous.
 
-## We Solved This Decades Ago, Then Forgot
+## The Old Fix: Stream Uploads to Temp Files
 
-This is not a new problem, and the old solutions were good. PHP has streamed uploads into temporary files [since practically forever](https://www.php.net/manual/en/features.file-upload.post-method.php): your script receives a `tmp_name` path, not a buffer. The Express era had a whole [ecosystem of streaming multipart parsers](https://bytearcher.com/articles/formidable-vs-busboy-vs-multer-vs-multiparty/): busboy hands you a readable stream per file as the bytes arrive, formidable and [multer](https://github.com/expressjs/multer) spool to disk on top of that.
+PHP has streamed uploads into temporary files [since practically forever](https://www.php.net/manual/en/features.file-upload.post-method.php): your script receives a `tmp_name` path, not a buffer. Express had a whole [ecosystem of streaming multipart parsers](https://bytearcher.com/articles/formidable-vs-busboy-vs-multer-vs-multiparty/): busboy hands you a readable stream per file, formidable and [multer](https://github.com/expressjs/multer) spool to disk on top of it.
 
-Then the fetch-standard era arrived. Every runtime speaks `Request` and `Response` now, which is genuinely great, but `await request.formData()` became the blessed path and the temp-file wisdom got traded away for API convenience.
+Then the fetch-standard era arrived. Every runtime speaks `Request` and `Response`, which is great, but `await request.formData()` became the blessed path and the temp-file wisdom was traded for API convenience.
 
-So the question behind this post: can you have both? The standard `File` API that validation libraries and application code already understand, and constant memory for uploads of any size?
+So the question behind this post: can you keep the standard `File` API and still handle uploads of any size in constant memory?
 
 ## A File That Lives on Disk
 
-Here is the thing: browsers never buffered your files in the first place. A `File` picked from an `<input>` is a lazy, disk-backed handle, and reading it is deferred until someone calls `.stream()` or `.arrayBuffer()`. Chrome even manages a blob store that spills to disk when memory runs short. [The hidden nuance of the JavaScript File API](https://nickb.dev/blog/the-hidden-nuance-of-the-javascript-file-api/) is a great tour of this asymmetry: the interface was always a handle to bytes plus a size and a type, and buffering everything in memory is an implementation shortcut, not a law.
+Browsers never buffered your files in the first place. A `File` picked from an `<input>` is a lazy, disk-backed handle; nothing is read until you call `.stream()` or `.arrayBuffer()`. Chrome even spills its blob store to disk when memory runs short. [The hidden nuance of the JavaScript File API](https://nickb.dev/blog/the-hidden-nuance-of-the-javascript-file-api/) is a great tour of this asymmetry: `File` was always a handle to bytes plus a size and a type. Buffering is an implementation shortcut, not a law.
 
-Servers can play the same trick. Node ships [`fs.openAsBlob`](https://nodejs.org/api/fs.html#fsopenasblobpath-options), which returns a `Blob` whose bytes stay on disk and are read lazily, and userland has [lazy-file](https://www.npmjs.com/package/@remix-run/lazy-file) for the same idea over arbitrary sources. Stream the incoming bytes to a temporary file, then wrap the result:
+Node can play the same trick. [`fs.openAsBlob`](https://nodejs.org/api/fs.html#fsopenasblobpath-options) returns a `Blob` whose bytes stay on disk and are read lazily; [lazy-file](https://www.npmjs.com/package/@remix-run/lazy-file) does the same over arbitrary sources. Stream the incoming bytes to a temp file, then wrap the result:
 
 ```ts
 export class TmpFile extends File {
@@ -58,7 +58,9 @@ export class TmpFile extends File {
 }
 ```
 
-`super([blob], ...)` does not copy anything: composing a `File` from blob parts just references them. The result is a real `File` that weighs a few hundred bytes no matter how large its content is. Schema validation passes, `instanceof File` is true, `.stream()` reads from disk, and code that never heard of temp files cannot tell the difference. The one extra affordance is `.path`, so instead of copying gigabytes you can `rename` them into place. The one caveat: a disk-backed `Blob` is a promise that the bytes will still be there when read, so move or delete the underlying file and later reads fail.
+`super([blob], ...)` copies nothing: a `File` composed from blob parts just references them. The result is a real `File` weighing a few hundred bytes regardless of content size. Schema validation passes, `instanceof File` is true, `.stream()` reads from disk. Code that never heard of temp files cannot tell the difference, and `.path` lets you `rename` gigabytes into place instead of copying them. One caveat: a disk-backed `Blob` assumes the bytes stay put. Move or delete the file and later reads fail.
+
+## A Minimal Streaming Upload Server with node:http
 
 The whole trick fits in a plain `node:http` server, no framework required:
 
@@ -95,29 +97,29 @@ createServer(async (req, res) => {
 }).listen(3000)
 ```
 
-[`pipeline`](https://nodejs.org/api/stream.html#streampipelinesource-transforms-destination-callback) handles backpressure, so a fast client cannot outrun your disk and pile bytes up in memory. A multipart body needs a streaming parser like busboy on top to split the parts, but the per-file principle is exactly this. And the piece of the example that looks trivial is the actual hard part: that `finally`.
+[`pipeline`](https://nodejs.org/api/stream.html#streampipelinesource-transforms-destination-callback) handles backpressure, so a fast client cannot outrun your disk and pile bytes up in memory. Multipart bodies need a streaming parser like busboy to split the parts, but the per-file principle is exactly this. The piece that looks trivial is the real hard part: that `finally`.
 
-## The Hard Part Is Deleting Them
+## When to Delete the Temp Files
 
 Writing bytes to a temp file is the easy 20%. Making them reliably disappear is the other 80%.
 
-**When is a request "done"?** The obvious rule, delete when the handler returns, is wrong. A handler can return a streaming response, like an event stream or a raw binary stream, that reads the upload *while* transmitting. Delete at return time and the response fails halfway. The rule that works: if the response body is a stream or an async iterator, deletion rides on the body finishing instead of the handler returning. That also covers clients that disappear mid-download, because the server cancels the body and cancellation reaches the same finish hook. Every other response is sent after removal, so the temp files live exactly as long as anything can read them, and not a request longer.
+**When is a request "done"?** Deleting when the handler returns is wrong: a streaming response, like an event stream or a raw binary stream, may read the upload *while* transmitting, and would fail halfway. The rule that works: if the response body is a stream or an async iterator, deletion rides on the body finishing. That also covers clients that vanish mid-download, since cancelling the body reaches the same finish hook. Every other response is sent after removal, so temp files live exactly as long as anything can read them, and not a request longer.
 
-**Open handles.** Each request that spools an upload gets its own directory under the OS temp dir, and content lands through self-contained appends rather than long-lived file handles. However many files a request carries, it holds at most one transient descriptor per in-flight write, so a burst of uploads cannot exhaust the process's descriptor table. And deletion never fights an open handle, which matters on Windows where deleting an open file is an error.
+**Open handles.** Each request gets its own directory under the OS temp dir, and content lands through self-contained appends instead of long-lived file handles: at most one transient descriptor per in-flight write, however many files the request carries. A burst of uploads cannot exhaust the descriptor table, and deletion never fights an open handle, which matters on Windows where deleting an open file is an error.
 
-**Failure isolation.** Disk full is your problem; a malformed multipart body is the client's. The two must not blur: filesystem failures surface as internal server errors with details attached only to the error's `cause`, which never serializes to the client, while parse failures stay bad requests. And if cleanup itself fails, the request outcome must not change, because a response that succeeded should never turn into an error over a temp file the OS will reap anyway.
+**Failure isolation.** Disk full is your problem; a malformed multipart body is the client's. Filesystem failures surface as internal server errors with details only on the error's `cause`, never serialized to the client; parse failures stay bad requests. And a failed cleanup must not change the request outcome: a response that succeeded should never turn into an error over a temp file the OS will reap anyway.
 
-## One Size Limit Is the Wrong Number of Size Limits
+## Three Body Size Limits, Not One
 
-Most body-limit middleware takes a single number. But once uploads spool to disk, a byte is no longer a byte:
+Most body-limit middleware takes a single number. Once uploads spool to disk, a byte is no longer a byte:
 
 - A byte of **JSON** sits in memory from arrival until parsing ends. It is the most expensive byte you accept.
 - A byte of **upload** touches memory only as a passing chunk on its way to disk. You can afford about a thousand times more of these.
 - A byte of an **event stream** is consumed on the fly and costs almost nothing to relay.
 
-One limit forces you to price all three at the highest rate, so the design takes three: `memory`, `file`, and `stream`. Configuring one requires configuring all three, so no category is left unbounded by accident; unlimited must be spelled `Number.POSITIVE_INFINITY`, on purpose.
+One limit prices all three at the highest rate, so take three: `memory`, `file`, and `stream`. Configuring one requires configuring all three, so nothing is left unbounded by accident; unlimited must be spelled `Number.POSITIVE_INFINITY`, on purpose.
 
-Enforcement has its own subtlety: `Content-Length` is a hint, not a fact. [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110#name-content-length) allows it to be absent, and a hostile client can simply lie. An oversized declared length rejects immediately for free, but the real enforcement counts bytes as they arrive and cuts the request off mid-stream with `413 Payload Too Large` the moment it crosses the line. A multipart body is bounded by `memory + file` in total, framing included, so a body that hides its bulk in part headers rather than part content is caught too.
+Enforcement has its own subtlety: `Content-Length` is a hint, not a fact. [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110#name-content-length) allows it to be absent, and a hostile client can lie. Use the declared length to reject oversized requests early for free, but count the bytes as they arrive and cut the request off mid-stream with `413 Payload Too Large` the moment it crosses the line. Bound a multipart body by `memory + file` in total, framing included, so bulk hidden in part headers is caught too.
 
 ## Where This Landed
 
@@ -151,4 +153,4 @@ Temporary files are removed when the request finishes. Move or copy an upload in
 
 ## The Takeaway
 
-The `File` interface never demanded buffering; we defaulted to it because it was the shortest code. Browsers knew better all along, PHP knew the right shape in the 90s, and the platform now gives servers lazy blobs to express it cleanly. The remaining engineering is not about bytes. It is about lifetimes: knowing exactly when the last reader is done, pricing each kind of byte at what it actually costs, and never trusting a header you can count for yourself.
+The `File` interface never demanded buffering; we defaulted to it because it was the shortest code. Browsers knew better all along, PHP knew the right shape in the 90s, and Node now gives servers lazy blobs to express it cleanly. The remaining engineering is about lifetimes, not bytes: know when the last reader is done, price each kind of byte at what it costs, and never trust a header you can count for yourself.
