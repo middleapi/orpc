@@ -1,6 +1,6 @@
 ---
-title: "Handling File Uploads Bigger Than Your RAM in Node.js"
-description: "Stream large file uploads to disk in Node.js while keeping the standard File API: lazy blobs with fs.openAsBlob, safe temp file cleanup, and per-category body size limits."
+title: "Handling File Uploads Bigger Than Your RAM in JavaScript"
+description: "Stream large file uploads to disk in any JavaScript runtime while keeping the standard File API: lazy blobs, safe temp file cleanup, and per-category body size limits."
 type: blog
 date: 2026-08-17
 search:
@@ -40,7 +40,7 @@ So the question behind this post: can you keep the standard `File` API and still
 
 Browsers never buffered your files in the first place. A `File` picked from an `<input>` is a lazy, disk-backed handle; nothing is read until you call `.stream()` or `.arrayBuffer()`. Chrome even spills its blob store to disk when memory runs short. [The hidden nuance of the JavaScript File API](https://nickb.dev/blog/the-hidden-nuance-of-the-javascript-file-api/) is a great tour of this asymmetry: `File` was always a handle to bytes plus a size and a type. Buffering is an implementation shortcut, not a law.
 
-Node can play the same trick. [`fs.openAsBlob`](https://nodejs.org/api/fs.html#fsopenasblobpath-options) returns a `Blob` whose bytes stay on disk and are read lazily. Bun ships the same idea as a first-class primitive, [`Bun.file`](https://bun.com/docs/api/file-io), and [lazy-file](https://www.npmjs.com/package/@remix-run/lazy-file) generalizes it to arbitrary sources. Stream the incoming bytes to a temp file, then wrap the result:
+Server runtimes can play the same trick. Node ships [`fs.openAsBlob`](https://nodejs.org/api/fs.html#fsopenasblobpath-options), which returns a `Blob` whose bytes stay on disk and are read lazily. Bun ships the same idea as a first-class primitive, [`Bun.file`](https://bun.com/docs/api/file-io), Deno covers it through its [Node compatibility layer](https://docs.deno.com/api/node/fs/~/openAsBlob), and [lazy-file](https://www.npmjs.com/package/@remix-run/lazy-file) generalizes it to arbitrary sources. Stream the incoming bytes to a temp file, then wrap the result:
 
 ```ts
 export class TmpFile extends File {
@@ -153,4 +153,4 @@ Temporary files are removed when the request finishes. Move or copy an upload in
 
 ## The Takeaway
 
-The `File` interface never demanded buffering; we defaulted to it because it was the shortest code. Browsers knew better all along, PHP knew the right shape in the 90s, and Node now gives servers lazy blobs to express it cleanly. The remaining engineering is about lifetimes, not bytes: know when the last reader is done, price each kind of byte at what it costs, and never trust a header you can count for yourself.
+The `File` interface never demanded buffering; we defaulted to it because it was the shortest code. Browsers knew better all along, PHP knew the right shape in the 90s, and every major JavaScript runtime now gives servers lazy blobs to express it cleanly. The remaining engineering is about lifetimes, not bytes: know when the last reader is done, price each kind of byte at what it costs, and never trust a header you can count for yourself.
