@@ -40,7 +40,7 @@ So the question behind this post: can you have both? The standard `File` API tha
 
 Here is the thing: browsers never buffered your files in the first place. A `File` picked from an `<input>` is a lazy, disk-backed handle, and reading it is deferred until someone calls `.stream()` or `.arrayBuffer()`. Chrome even manages a blob store that spills to disk when memory runs short. [The hidden nuance of the JavaScript File API](https://nickb.dev/blog/the-hidden-nuance-of-the-javascript-file-api/) is a great tour of this asymmetry: the interface was always a handle to bytes plus a size and a type, and buffering everything in memory is an implementation shortcut, not a law.
 
-Servers can play the same trick. Node ships [`fs.openAsBlob`](https://nodejs.org/api/fs.html#fsopenasblobpath-options), which returns a `Blob` whose bytes stay on disk and are read lazily, and userland has [lazy-file](https://github.com/mjackson/lazy-file) for the same idea over arbitrary sources. Stream the incoming bytes to a temporary file, then wrap the result:
+Servers can play the same trick. Node ships [`fs.openAsBlob`](https://nodejs.org/api/fs.html#fsopenasblobpath-options), which returns a `Blob` whose bytes stay on disk and are read lazily, and userland has [lazy-file](https://www.npmjs.com/package/@remix-run/lazy-file) for the same idea over arbitrary sources. Stream the incoming bytes to a temporary file, then wrap the result:
 
 ```ts
 export class TmpFile extends File {
