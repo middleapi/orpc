@@ -40,7 +40,7 @@ So the question behind this post: can you keep the standard `File` API and still
 
 Browsers never buffered your files in the first place. A `File` picked from an `<input>` is a lazy, disk-backed handle; nothing is read until you call `.stream()` or `.arrayBuffer()`. Chrome even spills its blob store to disk when memory runs short. [The hidden nuance of the JavaScript File API](https://nickb.dev/blog/the-hidden-nuance-of-the-javascript-file-api/) is a great tour of this asymmetry: `File` was always a handle to bytes plus a size and a type. Buffering is an implementation shortcut, not a law.
 
-Node can play the same trick. [`fs.openAsBlob`](https://nodejs.org/api/fs.html#fsopenasblobpath-options) returns a `Blob` whose bytes stay on disk and are read lazily; [lazy-file](https://www.npmjs.com/package/@remix-run/lazy-file) does the same over arbitrary sources. Stream the incoming bytes to a temp file, then wrap the result:
+Node can play the same trick. [`fs.openAsBlob`](https://nodejs.org/api/fs.html#fsopenasblobpath-options) returns a `Blob` whose bytes stay on disk and are read lazily. Bun ships the same idea as a first-class primitive, [`Bun.file`](https://bun.com/docs/api/file-io), and [lazy-file](https://www.npmjs.com/package/@remix-run/lazy-file) generalizes it to arbitrary sources. Stream the incoming bytes to a temp file, then wrap the result:
 
 ```ts
 export class TmpFile extends File {
@@ -97,7 +97,7 @@ createServer(async (req, res) => {
 }).listen(3000)
 ```
 
-[`pipeline`](https://nodejs.org/api/stream.html#streampipelinesource-transforms-destination-callback) handles backpressure, so a fast client cannot outrun your disk and pile bytes up in memory. Multipart bodies need a streaming parser like busboy to split the parts, but the per-file principle is exactly this. The piece that looks trivial is the real hard part: that `finally`.
+[`pipeline`](https://nodejs.org/api/stream.html#streampipelinesource-transforms-destination-callback) handles backpressure, so a fast client cannot outrun your disk and pile bytes up in memory. Multipart bodies need a streaming parser like busboy to split the parts, but the per-file principle is exactly this. It is not even Node-specific: Bun implements both `node:http` and `fs.openAsBlob`, so the example runs there unchanged. The piece that looks trivial is the real hard part: that `finally`.
 
 ## When to Delete the Temp Files
 
