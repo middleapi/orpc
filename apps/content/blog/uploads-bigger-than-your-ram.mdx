@@ -60,6 +60,43 @@ export class TmpFile extends File {
 
 `super([blob], ...)` does not copy anything: composing a `File` from blob parts just references them. The result is a real `File` that weighs a few hundred bytes regardless of content size. Schema validation passes, `instanceof File` is true, `.stream()` reads from disk, and code that never heard of temp files cannot tell the difference. The one extra affordance is `.path`, so instead of copying gigabytes you can `rename` them into place.
 
+The whole trick fits in a plain `node:http` server, no framework required:
+
+```ts
+import { createWriteStream, openAsBlob } from 'node:fs'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { createServer } from 'node:http'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { pipeline } from 'node:stream/promises'
+
+createServer(async (req, res) => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'upload-'))
+  const tmpPath = path.join(dir, 'upload')
+
+  try {
+    // constant memory, no matter how large the body is
+    await pipeline(req, createWriteStream(tmpPath))
+
+    const file = new TmpFile(
+      await openAsBlob(tmpPath),
+      tmpPath,
+      'video.mp4',
+      { type: req.headers['content-type'] },
+    )
+
+    // hand it to anything that expects a standard File
+    console.log(file.name, file.size, file instanceof File)
+    res.end('ok')
+  }
+  finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+}).listen(3000)
+```
+
+[`pipeline`](https://nodejs.org/api/stream.html#streampipelinesource-transforms-destination-callback) handles backpressure, so a fast client cannot outrun your disk and pile bytes up in memory. A multipart body needs a streaming parser like busboy on top to split the parts, but the per-file principle is exactly this. The part of the example that looks trivial and is not: that `finally`.
+
 There is one honest caveat: a disk-backed `Blob` is a promise that the bytes will still be there when read. Move or delete the underlying file and later reads fail.
 
 ## The Hard Part Is Deleting Them
