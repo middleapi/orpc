@@ -15,16 +15,16 @@ ai:
   exclude: true
 ---
 
-## Why request.formData() Runs Out of Memory
+## Why request.formData() and Friends Run Out of Memory
 
-Almost every modern JavaScript server handles uploads like this:
+The common way to read an upload in a fetch-standard server:
 
 ```ts
 const form = await request.formData()
 const video = form.get('video') as File
 ```
 
-It looks harmless. It is a memory bomb. [`request.formData()`](https://developer.mozilla.org/en-US/docs/Web/API/Request/formData) resolves only after the entire body is parsed, and on the server that means buffering every byte in memory. A 2 GB video becomes 2 GB of heap. Five concurrent uploads become 10 GB. Your 512 MB container dies before your handler runs, in framework code you never wrote.
+It looks harmless. It is a memory bomb. [`request.formData()`](https://developer.mozilla.org/en-US/docs/Web/API/Request/formData) resolves only after the entire body is parsed, and on the server that means buffering every byte in memory. Its siblings are no better: `.blob()`, `.arrayBuffer()`, `.bytes()`, and `.text()` all buffer the whole body the same way. A 2 GB video becomes 2 GB of heap. Five concurrent uploads become 10 GB. Your 512 MB container dies before your handler runs, in framework code you never wrote.
 
 The standard `File` and `FormData` APIs made uploads pleasant, and quietly made them dangerous.
 
