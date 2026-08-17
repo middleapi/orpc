@@ -1,6 +1,6 @@
 ---
 title: "Handling File Uploads Bigger Than Your RAM"
-description: "How oRPC streams uploads to disk behind the standard File API, and the parts that turned out to be genuinely tricky: lazy Blobs, deletion timing, and why one size limit is never enough."
+description: "Streaming uploads to disk behind the standard File API: lazy blobs, the platform's 2 GiB potholes, deletion timing, and why one size limit is never enough."
 type: blog
 date: 2026-08-17
 search:
@@ -24,27 +24,23 @@ const form = await request.formData()
 const video = form.get('video') as File
 ```
 
-It reads like nothing. It is also a memory bomb. [`request.formData()`](https://developer.mozilla.org/en-US/docs/Web/API/Request/formData) parses the entire body before it resolves, and on the server that means buffering every byte into memory. A 2 GB video becomes 2 GB of heap. Five people uploading at once become 10 GB. Your container has 512 MB, so the process dies before your handler even runs, and it dies in framework code you never wrote.
+It reads like nothing. It is also a memory bomb. [`request.formData()`](https://developer.mozilla.org/en-US/docs/Web/API/Request/formData) resolves only after the entire body is parsed, and on the server that means buffering every byte into memory. A 2 GB video becomes 2 GB of heap. Five people uploading at once become 10 GB. Your container has 512 MB, so the process dies before your handler even runs, and it dies in framework code you never wrote.
 
 The standard `File` and `FormData` APIs made uploads pleasant, and quietly made them dangerous.
 
 ## We Solved This Decades Ago, Then Forgot
 
-This is not a new problem, and the old solutions were good. PHP has streamed uploads into temporary files [since practically forever](https://www.php.net/manual/en/features.file-upload.post-method.php): your script receives a `tmp_name` path, not a buffer. In the Express era, [multer](https://github.com/expressjs/multer) did the same with its disk storage, built on busboy's streaming multipart parser.
+This is not a new problem, and the old solutions were good. PHP has streamed uploads into temporary files [since practically forever](https://www.php.net/manual/en/features.file-upload.post-method.php): your script receives a `tmp_name` path, not a buffer. The Express era had a whole [ecosystem of streaming multipart parsers](https://bytearcher.com/articles/formidable-vs-busboy-vs-multer-vs-multiparty/): busboy hands you a readable stream per file as the bytes arrive, formidable and [multer](https://github.com/expressjs/multer) spool to disk on top of that.
 
-Then the fetch-standard era arrived. Every runtime speaks `Request` and `Response` now, which is genuinely great, but `await request.formData()` became the blessed path and the temp-file wisdom got traded away for API convenience.
+Then the fetch-standard era arrived. Every runtime speaks `Request` and `Response` now, which is genuinely great, but `await request.formData()` became the blessed path and the temp-file wisdom got traded away for API convenience. The trade is worse than it looks, because the buffering path is not just hungry, it is capped: Node's multipart parser has been [reported to give up entirely past 2 GiB](https://smoores.dev/post/overcoming_io_limits/), failing with an error that looks like a malformed body rather than a size problem.
 
-So the question that led to oRPC's new upload handler was: can you have both? Keep the standard `File` API that validation libraries and application code already understand, and still parse a 50 GB upload in constant memory?
-
-It turns out yes, and the way there is more interesting than I expected.
+So the question that led to this work was: can you have both? Keep the standard `File` API that validation libraries and application code already understand, and still parse an upload of any size in constant memory?
 
 ## A File That Lives on Disk
 
-The key piece is [`fs.openAsBlob`](https://nodejs.org/api/fs.html#fsopenasblobpath-options), a small Node.js API that deserves more attention. It returns a `Blob` whose bytes stay on disk and are read lazily when someone calls `.stream()`, `.arrayBuffer()`, or `.text()`.
+Here is the thing: browsers never buffered your files in the first place. A `File` picked from an `<input>` is a lazy, disk-backed handle, and reading it is deferred until someone calls `.stream()` or `.arrayBuffer()`. Chrome even manages a blob store that spills to disk when memory runs short. [The hidden nuance of the JavaScript File API](https://nickb.dev/blog/the-hidden-nuance-of-the-javascript-file-api/) is a great tour of this asymmetry: the interface was always a handle to bytes plus a size and a type, and buffering everything in memory is an implementation shortcut, not a law.
 
-That works because a `Blob` was never required to be a buffer. The interface is a handle to bytes plus a size and a type. Browsers have always backed blobs with whatever they liked. Buffering everything in memory was an implementation shortcut, not a law.
-
-So the upload handler streams incoming bytes to a temporary file, then wraps the result:
+Servers can play the same trick. Node ships [`fs.openAsBlob`](https://nodejs.org/api/fs.html#fsopenasblobpath-options), which returns a `Blob` whose bytes stay on disk and are read lazily, and userland has [lazy-file](https://github.com/mjackson/lazy-file) for the same idea over arbitrary sources. So the upload handler streams incoming bytes to a temporary file, then wraps the result:
 
 ```ts
 export class TmpFile extends File {
@@ -62,21 +58,25 @@ export class TmpFile extends File {
 }
 ```
 
-`super([blob], ...)` does not copy anything: composing a `File` from blob parts just references them. The result is a real `File` that happens to weigh a few hundred bytes regardless of content size. Schema validation passes, `instanceof File` is true, `.stream()` reads from disk, and code that never heard of the plugin cannot tell the difference. The one extra affordance is `.path`, so instead of copying gigabytes you can move them:
+`super([blob], ...)` does not copy anything: composing a `File` from blob parts just references them. The result is a real `File` that weighs a few hundred bytes regardless of content size. Schema validation passes, `instanceof File` is true, `.stream()` reads from disk, and code that never heard of temp files cannot tell the difference. The one extra affordance is `.path`, so instead of copying gigabytes you can `rename` them into place.
 
-```ts
-if (input.video instanceof TmpFile) {
-  await rename(input.video.path, `./videos/${crypto.randomUUID()}`)
-}
-```
+There is one honest caveat: a disk-backed `Blob` is a promise that the bytes will still be there when read. Move or delete the underlying file and later reads fail.
 
-There is one honest caveat: a disk-backed `Blob` is a promise that the bytes will still be there when read. Move or delete the underlying file and later reads fail. Which brings us to the actually hard part.
+### The 2 GiB Potholes
+
+"Any size" is where the platform starts to creak, so I measured instead of trusting the docs. On Node v22.23.2, I created a sparse 5 GiB file and opened it with `openAsBlob`:
+
+- `blob.size` reported 1 GiB: the true size modulo 4 GiB, a classic unsigned 32-bit truncation.
+- A ten-byte `slice()` across the 2 GiB boundary came back empty. Slicing further out can crash outright ([nodejs/node#52585](https://github.com/nodejs/node/issues/52585), still open).
+- `blob.stream()`, however, delivered all 5,368,709,120 bytes correctly.
+
+The whole-file streaming path is solid, which is exactly the path a spool-then-stream design exercises, but if your handler needs `.size` or random access past 2 GiB, read from the temp file's path directly until that issue is fixed. And these limits are not unique to blobs: `fs.readFile` refuses anything over 2 GiB with `ERR_FS_FILE_TOO_LARGE` (I verified this too), because libuv caps individual I/O calls at `INT32_MAX` bytes. Past 2 GiB, streaming is not an optimization, it is the only correct interface.
 
 ## The Hard Part Is Deleting Them
 
-Writing bytes to a temp file is the easy 20%. Making them reliably disappear is where the design work went.
+Writing bytes to a temp file is the easy 20%. Making them reliably disappear is where the design work went, and none of it is specific to any framework.
 
-**When is a request "done"?** The obvious rule, delete when the handler returns, is wrong. A handler can return a streaming response, like an event stream or a raw binary stream, that reads the upload *while* transmitting. Delete at return time and the response fails halfway. So the handler inspects what came back: if the response body is a stream or an async iterator, deletion rides on the body finishing instead of the handler returning. That rule also covers clients that disappear mid-download, because the server cancels the body and cancellation reaches the same finish hook. Every non-streaming response is sent after removal, so the temp files live exactly as long as anything can read them, and not a request longer.
+**When is a request "done"?** The obvious rule, delete when the handler returns, is wrong. A handler can return a streaming response, like an event stream or a raw binary stream, that reads the upload *while* transmitting. Delete at return time and the response fails halfway. The rule that works: inspect what the handler returned, and if the response body is a stream or an async iterator, deletion rides on the body finishing instead of the handler returning. That also covers clients that disappear mid-download, because the server cancels the body and cancellation reaches the same finish hook. Every non-streaming response is sent after removal, so the temp files live exactly as long as anything can read them, and not a request longer.
 
 **Open handles.** Each request that spools an upload gets its own directory under the OS temp dir, and content lands through self-contained appends rather than long-lived file handles. However many files a request carries, it holds at most one transient descriptor per in-flight write, so a burst of uploads cannot exhaust the process's descriptor table. As a bonus, deletion never fights an open handle, which matters on Windows where deleting an open file is an error.
 
@@ -90,43 +90,40 @@ Most body-limit middleware takes a single number. But once uploads spool to disk
 - A byte of **upload** touches memory only as a passing chunk on its way to disk. You can afford about a thousand times more of these.
 - A byte of an **event stream** is consumed on the fly and costs almost nothing to relay.
 
-One limit forces you to price all three at the highest rate. So the plugin takes three:
+One limit forces you to price all three at the highest rate, so the design takes three: `memory`, `file`, and `stream`, and when limits are configured, all three kinds are required, so no category is left unbounded by accident. Unlimited must be spelled `Number.POSITIVE_INFINITY`, on purpose.
+
+The enforcement side has its own subtlety: `Content-Length` is a hint, not a fact. [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110#name-content-length) allows it to be absent, and a hostile client can simply lie. So an oversized declared length rejects immediately for free, but the real enforcement counts bytes as they arrive and cuts the request off mid-stream with `413 Payload Too Large` the moment it crosses the line. A multipart body is bounded by `memory + file` in total, framing included, so a body that hides its bulk in part headers rather than part content is caught too.
+
+## Where This Landed
+
+Everything above ships as the [Tmp File Upload Handler Plugin](/docs/plugins/tmp-file-upload) in `@orpc/node`. One plugin, zero changes to your procedures:
 
 ```ts
-new TmpFileUploadHandlerPlugin({
-  maxBodySize: {
-    memory: 1024 * 1024, // JSON, forms, multipart text fields
-    file: 500 * 1024 * 1024, // uploads spooled to disk
-    stream: Number.POSITIVE_INFINITY, // event streams, raw streams
-  },
-})
-```
-
-Two details here are the kind you only get right by being paranoid. First, when the option is given, all three kinds are required, so no category is left unbounded by accident: unlimited must be spelled `Number.POSITIVE_INFINITY`, on purpose. Second, `Content-Length` is treated as a hint, not a fact. [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110#name-content-length) allows it to be absent, and a hostile client can simply lie. So an oversized declared length rejects immediately for free, but the real enforcement counts bytes as they arrive and cuts the request off mid-stream with `PAYLOAD_TOO_LARGE` the moment it crosses the line. A multipart body is bounded by `memory + file` in total, framing included, so a body that hides its bulk in part headers rather than part content is caught too.
-
-## If You Use oRPC
-
-Everything above ships as the [Tmp File Upload Handler Plugin](/docs/plugins/tmp-file-upload) in `@orpc/node`, currently in beta. One plugin, zero changes to your procedures:
-
-```ts
-import { TmpFileUploadHandlerPlugin } from '@orpc/node'
-import { RPCHandler } from '@orpc/server/node'
-
 const handler = new RPCHandler(router, {
   plugins: [
-    new TmpFileUploadHandlerPlugin(),
+    new TmpFileUploadHandlerPlugin({
+      maxBodySize: {
+        memory: 1024 * 1024, // JSON, forms, multipart text fields
+        file: 500 * 1024 * 1024, // uploads spooled to disk
+        stream: Number.POSITIVE_INFINITY, // event streams, raw streams
+      },
+    }),
   ],
 })
+
+const uploadVideo = os
+  .input(z.object({ video: z.file() }))
+  .handler(async ({ input }) => {
+    if (input.video instanceof TmpFile) {
+      await rename(input.video.path, `./videos/${crypto.randomUUID()}`)
+    }
+  })
 ```
 
-Your handlers keep receiving standard `File` instances. The only visible differences are that huge uploads no longer eat your heap, and `TmpFile` gives you a `.path` to `rename` instead of copy.
-
 :::warning
-Temporary files are removed when the request finishes. Move or copy an upload inside your handler if you need it afterwards, and don't return the upload itself as a non-streaming response body, since it would be read after removal.
+Temporary files are removed when the request finishes. Move or copy an upload inside your handler if you need it afterwards.
 :::
 
 ## The Takeaway
 
-The lesson I keep relearning from this kind of work: standard APIs and efficient implementations are rarely in real tension. The `File` interface never demanded buffering; we defaulted to it because it was the shortest code. PHP knew the right shape in the 90s, the platform now gives us lazy blobs to express it cleanly, and the remaining engineering is not about bytes at all. It is about lifetimes: knowing exactly when the last reader is done, and pricing each kind of byte at what it actually costs you.
-
-If that is the kind of care you want in the rest of your API layer too, [oRPC](https://orpc.dev) is built the same way, end to end.
+The `File` interface never demanded buffering; we defaulted to it because it was the shortest code. Browsers knew better all along, PHP knew the right shape in the 90s, and the platform now gives servers lazy blobs to express it cleanly, potholes and all. The remaining engineering is not about bytes. It is about lifetimes: knowing exactly when the last reader is done, pricing each kind of byte at what it actually costs, and never trusting a header you can count for yourself.
