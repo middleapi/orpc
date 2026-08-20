@@ -52,7 +52,7 @@ describe('with an implemented router', () => {
   afterAll(() => server.close())
 
   it('mocks procedures instead of calling their real handlers', async () => {
-    const utils = createRouterUtils(router, { baseUrl: 'http://localhost:3000/rpc' })
+    const utils = createRouterUtils(router, { url: 'http://localhost:3000/rpc' })
 
     server.use(utils.ping.handler(({ input }) => ({ value: input.value * 2 })))
 

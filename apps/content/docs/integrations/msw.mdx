@@ -23,11 +23,11 @@ Create MSW utils from a [router contract](/docs/contract/router) or an implement
 import { createMSWUtils } from '@orpc/msw'
 
 export const mock = createMSWUtils(contract, {
-  baseUrl: 'https://example.com/rpc',
+  url: 'https://example.com/rpc',
 })
 ```
 
-The `baseUrl` option must match the URL your [RPC Link](/docs/rpc/link) sends requests to and supports MSW wildcards, such as `*/rpc` to match any origin.
+The `url` option must match the URL your [RPC Link](/docs/rpc/link) sends requests to and supports MSW wildcards, such as `*/rpc` to match any origin.
 
 :::info
 When you mock an implemented router, only the mock implementations run. The real handlers and middleware are never invoked.
@@ -89,7 +89,7 @@ By default, mocks speak the [RPC protocol](/docs/rpc/handler). If your client us
 ```ts
 const mock = createMSWUtils(contract, {
   protocol: 'openapi',
-  baseUrl: '*/api',
+  url: '*/api',
 })
 ```
 
@@ -101,7 +101,7 @@ Everything else works the same: `.handler` receives the deserialized input, `.er
 
 ```ts
 const mock = createMSWUtils(contract, {
-  baseUrl: '*/rpc',
+  url: '*/rpc',
   disableOutputValidation: true,
 })
 ```
@@ -113,7 +113,7 @@ import { RPCHandler } from '@orpc/server/fetch'
 import { ResponseHeadersPlugin } from '@orpc/server/plugins'
 
 const mock = createMSWUtils(contract, {
-  baseUrl: '*/rpc',
+  url: '*/rpc',
   handler: router => new RPCHandler(router, {
     plugins: [new ResponseHeadersPlugin()],
   }),

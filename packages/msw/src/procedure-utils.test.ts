@@ -29,7 +29,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
-const orpc = createMSWUtils(contract, { baseUrl: 'http://localhost:3000/rpc' })
+const orpc = createMSWUtils(contract, { url: 'http://localhost:3000/rpc' })
 
 const client: RouterContractClient<typeof contract> = createORPCClient(new RPCLink({
   origin: 'http://localhost:3000',
@@ -121,7 +121,7 @@ describe('handler', () => {
   })
 
   it('supports wildcard base urls', async () => {
-    const wildcardORPC = createMSWUtils(contract, { baseUrl: '*/api/rpc' })
+    const wildcardORPC = createMSWUtils(contract, { url: '*/api/rpc' })
 
     server.use(wildcardORPC.planet.list.handler(() => [{ id: 1, name: 'Mars' }]))
 
@@ -147,7 +147,7 @@ describe('handler', () => {
     }))
 
     const customORPC = createMSWUtils(contract, {
-      baseUrl: 'http://localhost:3000/rpc',
+      url: 'http://localhost:3000/rpc',
       handler: factory,
     })
 

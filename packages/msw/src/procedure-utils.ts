@@ -27,7 +27,7 @@ export interface ProcedureUtilsBaseOptions extends ProcedureConfig {
    *
    * @default ''
    */
-  baseUrl?: string
+  url?: string
 
   /**
    * Override how the fetch handler serving each mock is created, useful for
@@ -136,7 +136,7 @@ export class ProcedureUtils<
     private readonly path: readonly string[],
     private readonly options: ProcedureUtilsOptions,
   ) {
-    const baseUrl = (this.options.baseUrl ?? '').replace(/\/+$/, '')
+    const url = (this.options.url ?? '').replace(/\/+$/, '')
     const httpPath = this.resolveHttpPath()
     const dynamicParams = this.options.protocol === 'openapi'
       ? getDynamicPathParams(httpPath) ?? []
@@ -157,7 +157,7 @@ export class ProcedureUtils<
       prefixSource = replace(prefixSource, param.allowsSlash ? '.+' : '[^/]+', true)
     }
 
-    this.urlPattern = httpPath === '/' ? (baseUrl || '/') : `${baseUrl}${mswPath}`
+    this.urlPattern = httpPath === '/' ? (url || '/') : `${url}${mswPath}`
     this.prefixRegExp = httpPath === '/' ? undefined : new RegExp(`^(.*?)${prefixSource}$`)
   }
 
@@ -248,7 +248,7 @@ export class ProcedureUtils<
 
   /**
    * The fetch handlers match procedures by pathname, so derive the prefix from
-   * the actual request instead of `baseUrl`, which may contain MSW wildcards.
+   * the actual request instead of `url`, which may contain MSW wildcards.
    */
   private resolveHttpPathPrefix(request: Request): `/${string}` | undefined {
     let pathname = new URL(request.url).pathname as `/${string}`

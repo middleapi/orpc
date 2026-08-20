@@ -37,7 +37,7 @@ afterAll(() => server.close())
 
 const mock = createMSWUtils(contract, {
   protocol: 'openapi',
-  baseUrl: 'http://localhost:3000/api',
+  url: 'http://localhost:3000/api',
 })
 
 const client: JsonifiedClient<RouterContractClient<typeof contract>> = createORPCClient(new OpenAPILink(contract, {
@@ -93,7 +93,7 @@ it('responds with defined errors', async () => {
 })
 
 it('supports wildcard base urls', async () => {
-  const wildcardMock = createMSWUtils(contract, { protocol: 'openapi', baseUrl: '*/api' })
+  const wildcardMock = createMSWUtils(contract, { protocol: 'openapi', url: '*/api' })
 
   server.use(wildcardMock.planet.create.handler(({ input }) => ({ id: 1, name: input.name })))
 

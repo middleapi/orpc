@@ -20,7 +20,7 @@ const contract = {
   },
 }
 
-const utils = createRouterUtils(contract, { baseUrl: '/rpc' })
+const utils = createRouterUtils(contract, { url: '/rpc' })
 
 it('handler', () => {
   const handler = utils.ping.handler(({ input, errors, request, signal, lastEventId }) => {
@@ -72,7 +72,7 @@ it('loading', () => {
 })
 
 it('protocol options', () => {
-  createRouterUtils(contract, { protocol: 'openapi', baseUrl: '*/api' })
+  createRouterUtils(contract, { protocol: 'openapi', url: '*/api' })
   // rpc options are the default
   createRouterUtils(contract, { allowMethods: ['GET'] })
   createRouterUtils(contract, { protocol: 'rpc', allowMethods: ['GET'] })
