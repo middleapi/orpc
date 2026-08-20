@@ -32,8 +32,6 @@ const orpc = createMSWUtils(contract, { baseUrl: 'http://localhost:3000/rpc' })
 const client: RouterContractClient<typeof contract> = createORPCClient(new RPCLink({
   origin: 'http://localhost:3000',
   url: '/rpc',
-  // late-bind fetch so msw's patched globalThis.fetch is used
-  fetch: (url, init) => globalThis.fetch(url, init),
 }))
 
 describe('handler', () => {

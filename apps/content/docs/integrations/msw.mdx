@@ -108,5 +108,4 @@ const mock = createMSWUtils(contract, {
 
 ## Limitations
 
-- In Node.js, [RPC Link](/docs/rpc/link) captures `globalThis.fetch` when constructed. Start MSW interception before creating your link, or pass a late-bound fetch: `fetch: (url, init) => globalThis.fetch(url, init)`.
-- Requests sent through the [Batch Requests Plugin](/docs/plugins/batch) bundle multiple calls into a single HTTP request, which cannot match per-procedure handlers. Disable batching when mocking with MSW.
+Requests sent through the [Batch Requests Plugin](/docs/plugins/batch) bundle multiple calls into a single HTTP request, which cannot match per-procedure handlers. Disable batching when mocking with MSW.

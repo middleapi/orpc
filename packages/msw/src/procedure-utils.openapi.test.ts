@@ -43,8 +43,6 @@ const mock = createMSWUtils(contract, {
 const client: JsonifiedClient<RouterContractClient<typeof contract>> = createORPCClient(new OpenAPILink(contract, {
   origin: 'http://localhost:3000',
   url: '/api',
-  // late-bind fetch so msw's patched globalThis.fetch is used
-  fetch: (url, init) => globalThis.fetch(url, init),
 }))
 
 it('mocks custom routes with path parameters', async () => {
@@ -102,7 +100,6 @@ it('supports wildcard base urls', async () => {
   const wildcardClient: JsonifiedClient<RouterContractClient<typeof contract>> = createORPCClient(new OpenAPILink(contract, {
     origin: 'http://example.com',
     url: '/api',
-    fetch: (url, init) => globalThis.fetch(url, init),
   }))
 
   await expect(wildcardClient.planet.create({ name: 'Pluto' })).resolves.toEqual({ id: 1, name: 'Pluto' })
