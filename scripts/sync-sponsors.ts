@@ -81,37 +81,25 @@ function getTierImageSizeAndColumns(tierLevel: number, tierLevels: number[]): [c
 /**
  * The slot sponsors' cards, mirroring the docs ad cards — logo on the left,
  * name over tagline on the right — but without the brand backgrounds (GitHub
- * strips inline styles anyway). One full-width card per row, so the featured
- * sponsors read bigger than the tier tables below. The cell width is a
- * preferred width, not a minimum: auto table layout still shrinks the cell
- * and wraps the text on phones. One cell per card, the logo floated with the
+ * strips inline styles anyway). One card per row. The oversized cell width is
+ * a preferred width, not a minimum: GitHub caps tables at the container, so
+ * the card spans the full row on any screen and the text wraps on phones
+ * instead of scrolling. One cell per card, the logo floated with the
  * deprecated-but-sanitizer-safe `align`/`hspace` attributes, so no table
  * border cuts through the card.
  */
 function buildSlotCards(slotSponsors: Sponsor[]): string[] {
-  const columns = 1
-  const cellWidth = Math.floor(838 / columns)
-  const lines = ['<table>', '  <tr>']
+  const lines = ['<table>']
 
-  for (const [index, sponsor] of slotSponsors.entries()) {
-    const displayName = sponsor.name ?? sponsor.login
-    const escapedName = escapeHtml(displayName)
-    const escapedLink = escapeHtml(sponsor.link)
-    const escapedDescription = escapeHtml(sponsor.description ?? '')
-    const rel = relAttribute(sponsor)
+  for (const sponsor of slotSponsors) {
+    const name = escapeHtml(sponsor.name ?? sponsor.login)
+    const description = escapeHtml(sponsor.description ?? '')
 
-    lines.push(`   <td width="${cellWidth}"><a href="${escapedLink}" target="_blank" rel="${rel}" title="${escapedDescription}"><img src="${escapeHtml(sponsor.avatar)}" width="64" align="left" hspace="12" alt="${escapedName}"/><b>${escapedName}</b></a><br /><sub>${escapedDescription}</sub></td>`)
-
-    const isRowEnd = (index + 1) % columns === 0
-    const isLast = index === slotSponsors.length - 1
-
-    if (isRowEnd && !isLast) {
-      lines.push('  </tr>')
-      lines.push('  <tr>')
-    }
+    lines.push('  <tr>')
+    lines.push(`   <td width="2000"><a href="${escapeHtml(sponsor.link)}" target="_blank" rel="${relAttribute(sponsor)}" title="${description}"><img src="${escapeHtml(sponsor.avatar)}" width="64" align="left" hspace="12" alt="${name}"/><b>${name}</b></a><br /><sub>${description}</sub></td>`)
+    lines.push('  </tr>')
   }
 
-  lines.push('  </tr>')
   lines.push('</table>')
   lines.push('')
 
@@ -215,7 +203,10 @@ function replaceSponsorsSection(content: string, replacement: string): string {
   const nextHeadingIndex = content.indexOf('\n## ', startIndex + heading.length)
   const endIndex = nextHeadingIndex === -1 ? content.length : nextHeadingIndex + 1
 
-  return `${content.slice(0, startIndex)}${replacement}${content.slice(endIndex)}`
+  // Trimmed to a single trailing newline, or a section replaced at the end of
+  // the file leaves a blank last line that eslint's markdown fixer removes —
+  // and the next sync would put back, forever.
+  return `${`${content.slice(0, startIndex)}${replacement}${content.slice(endIndex)}`.trimEnd()}\n`
 }
 
 function generatedModule(entries: unknown): string {
@@ -275,7 +266,8 @@ async function writeSlotsData(sponsors: Sponsor[]): Promise<void> {
       logo: sponsor.avatar,
       href: sponsor.link,
       rel: sponsor.rel,
-      ...(sponsor.background ? { background: sponsor.background } : {}),
+      // JSON.stringify drops it when absent.
+      background: sponsor.background,
     }))
 
   await writeFile(path.join(ROOT_DIR, SLOTS_OUTPUT_FILE), generatedModule(entries))
