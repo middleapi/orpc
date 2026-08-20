@@ -81,14 +81,14 @@ function getTierImageSizeAndColumns(tierLevel: number, tierLevels: number[]): [c
 /**
  * The slot sponsors' cards, mirroring the docs ad cards — logo on the left,
  * name over tagline on the right — but without the brand backgrounds (GitHub
- * strips inline styles anyway). One full-width card per row, so the featured
- * sponsors read bigger than the tier tables below. One cell per card, the
- * logo floated with the deprecated-but-sanitizer-safe `align`/`hspace`
+ * strips inline styles anyway). One card per row, so the featured sponsors
+ * read bigger than the tier tables below; no fixed cell width, so the text
+ * wraps instead of forcing a horizontal scroll on phones. One cell per card,
+ * the logo floated with the deprecated-but-sanitizer-safe `align`/`hspace`
  * attributes, so no table border cuts through the card.
  */
 function buildSlotCards(slotSponsors: Sponsor[]): string[] {
   const columns = 1
-  const cellWidth = Math.floor(838 / columns)
   const lines = ['<table>', '  <tr>']
 
   for (const [index, sponsor] of slotSponsors.entries()) {
@@ -98,7 +98,7 @@ function buildSlotCards(slotSponsors: Sponsor[]): string[] {
     const escapedDescription = escapeHtml(sponsor.description ?? '')
     const rel = relAttribute(sponsor)
 
-    lines.push(`   <td width="${cellWidth}"><a href="${escapedLink}" target="_blank" rel="${rel}" title="${escapedDescription}"><img src="${escapeHtml(sponsor.avatar)}" width="64" align="left" hspace="12" alt="${escapedName}"/><b>${escapedName}</b></a><br /><sub>${escapedDescription}</sub></td>`)
+    lines.push(`   <td><a href="${escapedLink}" target="_blank" rel="${rel}" title="${escapedDescription}"><img src="${escapeHtml(sponsor.avatar)}" width="64" align="left" hspace="12" alt="${escapedName}"/><b>${escapedName}</b></a><br /><sub>${escapedDescription}</sub></td>`)
 
     const isRowEnd = (index + 1) % columns === 0
     const isLast = index === slotSponsors.length - 1
