@@ -249,11 +249,30 @@ describe('passthrough', () => {
         handler: router => new RPCHandler(router),
       })
 
-      server.use(realORPC.planet.list.passthrough())
+      server.use(
+        realORPC.planet.list.passthrough(),
+        realORPC.planet.find.handler(({ input }) => ({
+          id: input.id,
+          name: 'Earth',
+          discoveredAt: new Date('2020-01-01'),
+        })),
+      )
 
       const response = await fetch(`http://localhost:${port}/rpc/planet/list`, { method: 'POST' })
 
       await expect(response.text()).resolves.toBe('real')
+
+      // other procedures fall through the passthrough handler and stay mocked
+      const mocked = await fetch(`http://localhost:${port}/rpc/planet/find`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ json: { id: 1 } }),
+      })
+
+      await expect(mocked.json()).resolves.toEqual({
+        json: { id: 1, name: 'Earth', discoveredAt: '2020-01-01T00:00:00.000Z' },
+        meta: [['date', 'discoveredAt']],
+      })
     }
     finally {
       realServer.close()

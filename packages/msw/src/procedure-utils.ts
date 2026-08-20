@@ -1,7 +1,7 @@
 import type { AnyORPCError, ORPCErrorCode } from '@orpc/client'
 import type { AnyProcedureContract, AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, ORPCErrorConstructorMap } from '@orpc/contract'
 import type { AnyRouter, Context, ProcedureConfig } from '@orpc/server'
-import type { FetchHandler } from '@orpc/server/fetch'
+import type { FetchHandler, FetchHandlerHandleResult } from '@orpc/server/fetch'
 import type { Promisable, Value } from '@orpc/shared'
 import type { HttpHandler, HttpResponseResolver } from 'msw'
 import { implement } from '@orpc/server'
@@ -157,16 +157,7 @@ export class ProcedureUtils<
       }),
     )
 
-    const fetchHandler = this.options.handler(this.toRouter(procedure))
-
-    return http.all(this.mswPathPredicate, async (info) => {
-      const { matched, response } = await fetchHandler.handle(
-        info.request.clone(),
-        { prefix: this.prefix, context: await this.resolveContext(info) },
-      )
-
-      return matched ? response : undefined
-    })
+    return this.toMSWHandler(procedure, ({ matched, response }) => matched ? response : undefined)
   }
 
   /**
@@ -210,33 +201,40 @@ export class ProcedureUtils<
       disableOutputValidation: true,
     }).handler(() => undefined)
 
-    const fetchHandler = this.options.handler(this.toRouter(procedure))
-
-    return http.all(this.mswPathPredicate, async (info) => {
-      const { matched } = await fetchHandler.handle(
-        info.request.clone(),
-        { prefix: this.prefix, context: await this.resolveContext(info) },
-      )
-
-      return matched ? passthrough() : undefined
-    })
+    return this.toMSWHandler(procedure, ({ matched }) => matched ? passthrough() : undefined)
   }
 
   /**
-   * Nests the procedure back under its path, forming the single-procedure
-   * router given to the `handler` option.
+   * Serves the procedure through the fetch handler created by the `handler`
+   * option and resolves the MSW response from its result.
    */
-  private toRouter(procedure: AnyRouter): AnyRouter {
-    return this.path.reduceRight<AnyRouter>(
+  private toMSWHandler(
+    procedure: AnyRouter,
+    resolve: (result: FetchHandlerHandleResult) => Response | undefined,
+  ): HttpHandler {
+    const router = this.path.reduceRight<AnyRouter>(
       (acc, segment) => ({ [segment]: acc }),
       procedure,
     )
-  }
 
-  private async resolveContext(info: ProcedureUtilsResolverInfo): Promise<TContext & ProcedureUtilsResolverInfo> {
-    return {
-      ...await value(this.options.context, info),
-      ...info,
-    } as TContext & ProcedureUtilsResolverInfo
+    const fetchHandler = this.options.handler(router)
+
+    return http.all(this.mswPathPredicate, async (info) => {
+      const context = {
+        ...await value(this.options.context, info),
+        ...info,
+      } as TContext & ProcedureUtilsResolverInfo
+
+      /**
+       * The fetch handler consumes the request body, so hand it a clone
+       * and keep the original readable for the mock handler.
+       */
+      const result = await fetchHandler.handle(info.request.clone(), {
+        prefix: this.prefix,
+        context,
+      })
+
+      return resolve(result)
+    })
   }
 }
