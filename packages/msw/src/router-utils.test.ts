@@ -3,6 +3,7 @@ import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { oc } from '@orpc/contract'
 import { Lazy, os } from '@orpc/server'
+import { RPCHandler } from '@orpc/server/fetch'
 import { setupServer } from 'msw/node'
 import z from 'zod'
 import { createRouterUtils } from './router-utils'
@@ -15,7 +16,7 @@ const contract = {
 }
 
 it('mirrors the router-contract shape', () => {
-  const utils = createRouterUtils(contract)
+  const utils = createRouterUtils(contract, { handler: router => new RPCHandler(router) })
 
   expect(utils.ping.handler).toBeTypeOf('function')
   expect(utils.ping.error).toBeTypeOf('function')
@@ -24,7 +25,7 @@ it('mirrors the router-contract shape', () => {
 })
 
 it('supports destructuring thanks to bound methods', () => {
-  const { loading } = createRouterUtils(contract).nested.pong
+  const { loading } = createRouterUtils(contract, { handler: router => new RPCHandler(router) }).nested.pong
 
   expect(loading()).toBeDefined()
 })
@@ -32,7 +33,7 @@ it('supports destructuring thanks to bound methods', () => {
 it('throws on lazy routers', () => {
   const lazy = new Lazy({ loader: async () => ({ default: {} }), meta: {} })
 
-  expect(() => createRouterUtils({ nested: lazy } as any)).toThrow(
+  expect(() => createRouterUtils({ nested: lazy } as any, { handler: router => new RPCHandler(router) })).toThrow(
     'Lazy routers are not supported at path: "nested".',
   )
 })
@@ -52,7 +53,10 @@ describe('with an implemented router', () => {
   afterAll(() => server.close())
 
   it('mocks procedures instead of calling their real handlers', async () => {
-    const utils = createRouterUtils(router, { url: 'http://localhost:3000/rpc' })
+    const utils = createRouterUtils(router, {
+      url: 'http://localhost:3000/rpc',
+      handler: router => new RPCHandler(router),
+    })
 
     server.use(utils.ping.handler(({ input }) => ({ value: input.value * 2 })))
 

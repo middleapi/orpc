@@ -1,14 +1,11 @@
 import type { AnyORPCError, ORPCErrorCode } from '@orpc/client'
 import type { AnyProcedureContract, AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, ORPCErrorConstructorMap } from '@orpc/contract'
-import type { OpenAPIHandlerOptions } from '@orpc/openapi/fetch'
 import type { AnyRouter, ProcedureConfig } from '@orpc/server'
-import type { FetchHandler, RPCHandlerOptions } from '@orpc/server/fetch'
+import type { FetchHandler } from '@orpc/server/fetch'
 import type { Promisable } from '@orpc/shared'
 import type { HttpHandler, HttpResponseResolver } from 'msw'
 import { getDynamicPathParams, getOpenAPIMeta } from '@orpc/openapi'
-import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { implement } from '@orpc/server'
-import { RPCHandler } from '@orpc/server/fetch'
 import { mergeHttpPath, pathToHttpPath } from '@orpc/shared'
 import { http, passthrough } from 'msw'
 
@@ -19,7 +16,12 @@ import { http, passthrough } from 'msw'
  */
 export type ProcedureUtilsResolverInfo = Parameters<HttpResponseResolver>[0]
 
-export interface ProcedureUtilsBaseOptions extends ProcedureConfig {
+/**
+ * Options for creating MSW procedure utils.
+ *
+ * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
+ */
+export interface ProcedureUtilsOptions extends ProcedureConfig {
   /**
    * The URL prefix requests are matched against, joined with the procedure's
    * HTTP path to form the MSW path predicate. Supports MSW wildcards in the
@@ -30,53 +32,25 @@ export interface ProcedureUtilsBaseOptions extends ProcedureConfig {
   url?: string
 
   /**
-   * Override how the fetch handler serving each mock is created, useful for
-   * reusing your production handler configuration, such as plugins.
+   * How procedure URLs are matched: `'rpc'` matches the RPC paths, `'openapi'`
+   * matches each procedure's route metadata. Keep it in sync with the
+   * protocol the created `handler` speaks.
    *
-   * The router passed in contains only the procedure being mocked, and URL
-   * matching still follows the `protocol` option.
+   * @default 'rpc'
+   */
+  protocol?: 'rpc' | 'openapi'
+
+  /**
+   * Creates the fetch handler that serves each mock, using the same
+   * configuration as your production handler, such as plugins.
+   *
+   * The router passed in contains only the procedure being mocked. Requests
+   * the created handler does not match fall through to other MSW handlers.
    *
    * @see {@link https://orpc.dev/docs/integrations/msw#advanced-configuration | MSW Integration - Advanced Configuration}
    */
-  handler?: (router: AnyRouter) => Pick<FetchHandler<ProcedureUtilsResolverInfo>, 'handle'>
+  handler: (router: AnyRouter) => Pick<FetchHandler<ProcedureUtilsResolverInfo>, 'handle'>
 }
-
-/**
- * Options for mocking procedures served over the RPC protocol.
- *
- * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
- */
-export interface RPCProcedureUtilsOptions extends ProcedureUtilsBaseOptions, RPCHandlerOptions<ProcedureUtilsResolverInfo> {
-  /**
-   * Which protocol requests and responses are encoded with, matching the
-   * handler the mocked client talks to in production.
-   *
-   * @default 'rpc'
-   */
-  protocol?: 'rpc' | undefined
-}
-
-/**
- * Options for mocking procedures served over the OpenAPI protocol.
- *
- * @see {@link https://orpc.dev/docs/integrations/msw#openapi-protocol | MSW Integration - OpenAPI Protocol}
- */
-export interface OpenAPIProcedureUtilsOptions extends ProcedureUtilsBaseOptions, OpenAPIHandlerOptions<ProcedureUtilsResolverInfo> {
-  /**
-   * Which protocol requests and responses are encoded with, matching the
-   * handler the mocked client talks to in production.
-   *
-   * @default 'rpc'
-   */
-  protocol: 'openapi'
-}
-
-/**
- * Options for creating MSW procedure utils.
- *
- * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
- */
-export type ProcedureUtilsOptions = RPCProcedureUtilsOptions | OpenAPIProcedureUtilsOptions
 
 /**
  * Options passed to a mock procedure handler: the deserialized `input`, the
@@ -186,11 +160,7 @@ export class ProcedureUtils<
       procedure,
     )
 
-    const fetchHandler = this.options.handler
-      ? this.options.handler(router)
-      : this.options.protocol === 'openapi'
-        ? new OpenAPIHandler<ProcedureUtilsResolverInfo>(router as AnyRouter, this.options)
-        : new RPCHandler<ProcedureUtilsResolverInfo>(router as AnyRouter, this.options)
+    const fetchHandler = this.options.handler(router)
 
     return http.all(this.urlPattern, async (info) => {
       /**

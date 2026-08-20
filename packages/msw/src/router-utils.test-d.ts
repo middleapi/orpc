@@ -3,6 +3,7 @@ import type { ProcedureUtils } from './procedure-utils'
 import type { RouterUtils } from './router-utils'
 import { oc } from '@orpc/contract'
 import { os } from '@orpc/server'
+import { RPCHandler } from '@orpc/server/fetch'
 import z from 'zod'
 import { createRouterUtils } from './router-utils'
 
@@ -17,7 +18,7 @@ const contract = {
 }
 
 it('mirrors the router-contract shape', () => {
-  const utils = createRouterUtils(contract)
+  const utils = createRouterUtils(contract, { handler: router => new RPCHandler(router) })
 
   expectTypeOf(utils).toEqualTypeOf<RouterUtils<typeof contract>>()
   expectTypeOf(utils.ping).toExtend<Public<ProcedureUtils<typeof inputSchema, typeof outputSchema, object>>>()
@@ -35,7 +36,7 @@ it('supports implemented routers', () => {
       .handler(({ input }) => ({ output: Number(input.input) })),
   }
 
-  const utils = createRouterUtils(router)
+  const utils = createRouterUtils(router, { handler: router => new RPCHandler(router) })
 
   utils.ping.handler(({ input }) => {
     expectTypeOf(input).toEqualTypeOf<{ input: string }>()

@@ -20,7 +20,7 @@ const contract = {
   },
 }
 
-const utils = createRouterUtils(contract, { url: '/rpc' })
+const utils = createRouterUtils(contract, { url: '/rpc', handler: router => new RPCHandler(router) })
 
 it('handler', () => {
   const handler = utils.ping.handler(({ input, errors, request, signal, lastEventId }) => {
@@ -75,22 +75,15 @@ it('passthrough', () => {
   expectTypeOf(utils.ping.passthrough).toEqualTypeOf<() => HttpHandler>()
 })
 
-it('protocol options', () => {
-  createRouterUtils(contract, { protocol: 'openapi', url: '*/api' })
-  // rpc options are the default
-  createRouterUtils(contract, { allowMethods: ['GET'] })
-  createRouterUtils(contract, { protocol: 'rpc', allowMethods: ['GET'] })
-
-  // @ts-expect-error --- allowMethods is rpc-only
-  createRouterUtils(contract, { protocol: 'openapi', allowMethods: ['GET'] })
-  // @ts-expect-error --- invalid protocol
-  createRouterUtils(contract, { protocol: 'invalid' })
-})
-
-it('handler option', () => {
+it('options', () => {
   createRouterUtils(contract, { handler: router => new RPCHandler(router) })
-  createRouterUtils(contract, { protocol: 'openapi', handler: router => new OpenAPIHandler(router) })
+  createRouterUtils(contract, { protocol: 'rpc', url: '*/rpc', handler: router => new RPCHandler(router) })
+  createRouterUtils(contract, { protocol: 'openapi', url: '*/api', handler: router => new OpenAPIHandler(router) })
 
+  // @ts-expect-error --- handler is required
+  createRouterUtils(contract, { url: '/rpc' })
   // @ts-expect-error --- must return a fetch handler
   createRouterUtils(contract, { handler: () => ({}) })
+  // @ts-expect-error --- invalid protocol
+  createRouterUtils(contract, { protocol: 'invalid', handler: router => new RPCHandler(router) })
 })

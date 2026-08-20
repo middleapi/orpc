@@ -31,7 +31,10 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
-const orpc = createMSWUtils(contract, { url: 'http://localhost:3000/rpc' })
+const orpc = createMSWUtils(contract, {
+  url: 'http://localhost:3000/rpc',
+  handler: router => new RPCHandler(router),
+})
 
 const client: RouterContractClient<typeof contract> = createORPCClient(new RPCLink({
   origin: 'http://localhost:3000',
@@ -123,7 +126,7 @@ describe('handler', () => {
   })
 
   it('supports wildcard base urls', async () => {
-    const wildcardORPC = createMSWUtils(contract, { url: '*/api/rpc' })
+    const wildcardORPC = createMSWUtils(contract, { url: '*/api/rpc', handler: router => new RPCHandler(router) })
 
     server.use(wildcardORPC.planet.list.handler(() => [{ id: 1, name: 'Mars' }]))
 
@@ -135,7 +138,7 @@ describe('handler', () => {
     await expect(wildcardClient.planet.list()).resolves.toEqual([{ id: 1, name: 'Mars' }])
   })
 
-  it('supports overriding the fetch handler, e.g. to configure plugins', async () => {
+  it('serves mocks through the provided handler, e.g. with plugins', async () => {
     const factory = vi.fn((router: AnyRouter) => new RPCHandler(router, {
       fetchInterceptors: [async ({ next }) => {
         const result = await next()
@@ -212,7 +215,10 @@ describe('passthrough', () => {
     const port = (realServer.address() as AddressInfo).port
 
     try {
-      const realORPC = createMSWUtils(contract, { url: `http://localhost:${port}/rpc` })
+      const realORPC = createMSWUtils(contract, {
+        url: `http://localhost:${port}/rpc`,
+        handler: router => new RPCHandler(router),
+      })
 
       server.use(realORPC.planet.list.passthrough())
 

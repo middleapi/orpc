@@ -3,7 +3,7 @@ import type { JsonifiedClient } from '@orpc/openapi'
 import { createORPCClient, isDefinedError, ORPCError } from '@orpc/client'
 import { oc } from '@orpc/contract'
 import { openapi } from '@orpc/openapi'
-import { OpenAPILink } from '@orpc/openapi/fetch'
+import { OpenAPIHandler, OpenAPILink } from '@orpc/openapi/fetch'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import z from 'zod'
@@ -38,6 +38,7 @@ afterAll(() => server.close())
 const mock = createMSWUtils(contract, {
   protocol: 'openapi',
   url: 'http://localhost:3000/api',
+  handler: router => new OpenAPIHandler(router),
 })
 
 const client: JsonifiedClient<RouterContractClient<typeof contract>> = createORPCClient(new OpenAPILink(contract, {
@@ -93,7 +94,11 @@ it('responds with defined errors', async () => {
 })
 
 it('supports wildcard base urls', async () => {
-  const wildcardMock = createMSWUtils(contract, { protocol: 'openapi', url: '*/api' })
+  const wildcardMock = createMSWUtils(contract, {
+    protocol: 'openapi',
+    url: '*/api',
+    handler: router => new OpenAPIHandler(router),
+  })
 
   server.use(wildcardMock.planet.create.handler(({ input }) => ({ id: 1, name: input.name })))
 

@@ -17,13 +17,15 @@ npm install @orpc/msw@beta
 
 ## Setup
 
-Create MSW utils from a [router contract](/docs/contract/router) or an implemented [router](/docs/router). Every request and response goes through the real [RPC Handler](/docs/rpc/handler) (or [OpenAPI Handler](/docs/openapi/handler), see [OpenAPI Protocol](#openapi-protocol)), so serialization, validation, and error envelopes always behave exactly like your production server.
+Create MSW utils from a [router contract](/docs/contract/router) or an implemented [router](/docs/router). The `handler` option creates the fetch handler serving each mock, typically a [RPC Handler](/docs/rpc/handler) configured like your production one, so serialization, validation, and error envelopes always behave exactly like your production server.
 
 ```ts
 import { createMSWUtils } from '@orpc/msw'
+import { RPCHandler } from '@orpc/server/fetch'
 
 export const mock = createMSWUtils(contract, {
   url: 'https://example.com/rpc',
+  handler: router => new RPCHandler(router),
 })
 ```
 
@@ -95,12 +97,15 @@ const handlers = [
 
 ## OpenAPI Protocol
 
-By default, mocks speak the [RPC protocol](/docs/rpc/handler). If your client uses the [OpenAPI Link](/docs/openapi/link), pass `protocol: 'openapi'` to serve mocks through the [OpenAPI Handler](/docs/openapi/handler) instead. Requests are matched against each procedure's [route](/docs/openapi/routing), including custom methods, prefixes, and path parameters such as `/planets/{id}` or greedy `/files/{+path}` segments.
+By default, procedure URLs are matched following the [RPC protocol](/docs/rpc/handler). If your client uses the [OpenAPI Link](/docs/openapi/link), pass `protocol: 'openapi'` and create an [OpenAPI Handler](/docs/openapi/handler) instead. Requests are then matched against each procedure's [route](/docs/openapi/routing), including custom methods, prefixes, and path parameters such as `/planets/{id}` or greedy `/files/{+path}` segments.
 
 ```ts
+import { OpenAPIHandler } from '@orpc/openapi/fetch'
+
 const mock = createMSWUtils(contract, {
   protocol: 'openapi',
   url: '*/api',
+  handler: router => new OpenAPIHandler(router),
 })
 ```
 
@@ -108,16 +113,7 @@ Everything else works the same: `.handler` receives the deserialized input, `.er
 
 ## Advanced Configuration
 
-`createMSWUtils` accepts the same options as the selected protocol's handler, so you can mirror your production configuration, such as a custom serializer or `allowMethods` if your client sends [GET requests](/docs/rpc/handler#supported-http-methods) over the RPC protocol. You can also disable validation of the mocked data:
-
-```ts
-const mock = createMSWUtils(contract, {
-  url: '*/rpc',
-  disableOutputValidation: true,
-})
-```
-
-For full control, pass a `handler` callback that creates the fetch handler yourself, useful for reusing your production handler configuration, such as plugins:
+All handler behavior is configured through the `handler` option, so mocks can mirror your production setup exactly, such as plugins, a custom serializer, or `allowMethods` if your client sends [GET requests](/docs/rpc/handler#supported-http-methods) over the RPC protocol:
 
 ```ts
 import { RPCHandler } from '@orpc/server/fetch'
@@ -131,7 +127,17 @@ const mock = createMSWUtils(contract, {
 })
 ```
 
-Each mock serves a router containing only the procedure being mocked, and URL matching still follows the `protocol` option, so make sure the handler you create speaks the same protocol.
+You can also disable validation of the mocked data:
+
+```ts
+const mock = createMSWUtils(contract, {
+  url: '*/rpc',
+  handler: router => new RPCHandler(router),
+  disableOutputValidation: true,
+})
+```
+
+Each mock serves a router containing only the procedure being mocked, and URL matching follows the `protocol` option, so make sure the handler you create speaks the same protocol. Requests the created handler does not match simply fall through to other MSW handlers.
 
 ## Limitations
 

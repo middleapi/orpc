@@ -24,7 +24,7 @@ export type RouterUtils<T extends RouterContract>
  *
  * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
  */
-export type RouterUtilsOptions = ProcedureUtilsOptions
+export interface RouterUtilsOptions extends ProcedureUtilsOptions {}
 
 /**
  * Creates MSW utils from a router-contract (or an implemented router),
@@ -35,7 +35,7 @@ export type RouterUtilsOptions = ProcedureUtilsOptions
  */
 export function createRouterUtils<T extends RouterContract>(
   contract: T,
-  options: NoInfer<RouterUtilsOptions> = {},
+  options: NoInfer<RouterUtilsOptions>,
 ): RouterUtils<T> {
   return createRouterUtilsInternal(contract, options, []) as RouterUtils<T>
 }
