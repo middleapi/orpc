@@ -9,7 +9,7 @@ import { RPCHandler } from '@orpc/server/fetch'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import z from 'zod'
-import { createMSWUtils } from './index'
+import { createHTTPUtils } from './index'
 
 const contract = {
   planet: {
@@ -31,8 +31,9 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
-const orpc = createMSWUtils(contract, {
-  url: 'http://localhost:3000/rpc',
+const orpc = createHTTPUtils(contract, {
+  origin: 'http://localhost:3000',
+  prefix: '/rpc',
   handler: router => new RPCHandler(router),
 })
 
@@ -126,7 +127,7 @@ describe('handler', () => {
   })
 
   it('supports wildcard base urls', async () => {
-    const wildcardORPC = createMSWUtils(contract, { url: '*/api/rpc', handler: router => new RPCHandler(router) })
+    const wildcardORPC = createHTTPUtils(contract, { origin: '*', prefix: '/api/rpc', handler: router => new RPCHandler(router) })
 
     server.use(wildcardORPC.planet.list.handler(() => [{ id: 1, name: 'Mars' }]))
 
@@ -151,8 +152,9 @@ describe('handler', () => {
       }],
     }))
 
-    const customORPC = createMSWUtils(contract, {
-      url: 'http://localhost:3000/rpc',
+    const customORPC = createHTTPUtils(contract, {
+      origin: 'http://localhost:3000',
+      prefix: '/rpc',
       handler: factory,
     })
 
@@ -215,8 +217,9 @@ describe('passthrough', () => {
     const port = (realServer.address() as AddressInfo).port
 
     try {
-      const realORPC = createMSWUtils(contract, {
-        url: `http://localhost:${port}/rpc`,
+      const realORPC = createHTTPUtils(contract, {
+        origin: `http://localhost:${port}`,
+        prefix: '/rpc',
         handler: router => new RPCHandler(router),
       })
 

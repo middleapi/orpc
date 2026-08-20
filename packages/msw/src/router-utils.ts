@@ -29,7 +29,7 @@ export interface RouterUtilsOptions extends ProcedureUtilsOptions {}
 /**
  * Creates MSW utils from a router-contract (or an implemented router),
  * exposing typed MSW request handler builders for every procedure, served
- * over the RPC protocol by default or the OpenAPI protocol via `protocol`.
+ * through the fetch handler created by the `handler` option.
  *
  * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
  */

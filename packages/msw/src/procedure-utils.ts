@@ -5,6 +5,7 @@ import type { FetchHandler } from '@orpc/server/fetch'
 import type { Promisable } from '@orpc/shared'
 import type { HttpHandler, HttpResponseResolver } from 'msw'
 import { getDynamicPathParams, getOpenAPIMeta } from '@orpc/openapi'
+import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { implement } from '@orpc/server'
 import { mergeHttpPath, pathToHttpPath } from '@orpc/shared'
 import { http, passthrough } from 'msw'
@@ -17,39 +18,44 @@ import { http, passthrough } from 'msw'
 export type ProcedureUtilsResolverInfo = Parameters<HttpResponseResolver>[0]
 
 /**
+ * The part of a fetch handler MSW procedure utils rely on to serve mocks.
+ *
+ * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
+ */
+export type ProcedureUtilsFetchHandler = Pick<FetchHandler<ProcedureUtilsResolverInfo>, 'handle'>
+
+/**
  * Options for creating MSW procedure utils.
  *
  * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
  */
 export interface ProcedureUtilsOptions extends ProcedureConfig {
   /**
-   * The URL prefix requests are matched against, joined with the procedure's
-   * HTTP path to form the MSW path predicate. Supports MSW wildcards in the
-   * origin portion, such as `*\/rpc`.
+   * The origin requests are matched against. Supports MSW wildcards,
+   * such as `*` to match any origin.
    *
    * @default ''
    */
-  url?: string
+  origin?: string
 
   /**
-   * How procedure URLs are matched: `'rpc'` matches the RPC paths, `'openapi'`
-   * matches each procedure's route metadata. Keep it in sync with the
-   * protocol the created `handler` speaks.
-   *
-   * @default 'rpc'
+   * The path prefix procedures are served under, matching the `prefix`
+   * the corresponding handler is mounted at in production.
    */
-  protocol?: 'rpc' | 'openapi'
+  prefix?: `/${string}`
 
   /**
    * Creates the fetch handler that serves each mock, using the same
-   * configuration as your production handler, such as plugins.
+   * configuration as your production handler, such as plugins. When it
+   * creates an `OpenAPIHandler`, request URLs are matched using each
+   * procedure's route metadata; otherwise, the RPC paths are used.
    *
    * The router passed in contains only the procedure being mocked. Requests
    * the created handler does not match fall through to other MSW handlers.
    *
    * @see {@link https://orpc.dev/docs/integrations/msw#advanced-configuration | MSW Integration - Advanced Configuration}
    */
-  handler: (router: AnyRouter) => Pick<FetchHandler<ProcedureUtilsResolverInfo>, 'handle'>
+  handler: (router: AnyRouter) => ProcedureUtilsFetchHandler
 }
 
 /**
@@ -86,8 +92,8 @@ export interface ProcedureUtilsHandler<
 
 /**
  * Creates typed MSW request handlers for a procedure-contract. Requests and
- * responses go through the real RPC or OpenAPI runtime, so serialization,
- * validation, and error envelopes always match the production handler.
+ * responses go through a real fetch handler, so serialization, validation,
+ * and error envelopes always match the production handler.
  *
  * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
  */
@@ -96,43 +102,18 @@ export class ProcedureUtils<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
 > {
-  private readonly urlPattern: string
-
-  /**
-   * Matches the procedure's HTTP path (with resolved path parameters) at the
-   * end of a pathname, capturing the leading prefix. `undefined` when the
-   * HTTP path is `/`, where the whole pathname is the prefix.
-   */
-  private readonly prefixRegExp: RegExp | undefined
+  private readonly origin: string
+  private readonly prefix: `/${string}` | undefined
 
   constructor(
     private readonly contract: AnyProcedureContract,
     private readonly path: readonly string[],
     private readonly options: ProcedureUtilsOptions,
   ) {
-    const url = (this.options.url ?? '').replace(/\/+$/, '')
-    const httpPath = this.resolveHttpPath()
-    const dynamicParams = this.options.protocol === 'openapi'
-      ? getDynamicPathParams(httpPath) ?? []
-      : []
-
-    let mswPath: string = httpPath
-    let prefixSource = escapeRegExp(httpPath)
-
-    for (let i = dynamicParams.length - 1; i >= 0; i--) {
-      const param = dynamicParams[i]!
-      const replace = (target: string, replacement: string, escaped: boolean) => {
-        const start = escaped ? escapeRegExp(httpPath.slice(0, param.startIndex)).length : param.startIndex
-        const length = escaped ? escapeRegExp(param.segment).length : param.segment.length
-        return target.slice(0, start) + replacement + target.slice(start + length)
-      }
-
-      mswPath = replace(mswPath, param.allowsSlash ? '*' : `:${param.parameterName}`, false)
-      prefixSource = replace(prefixSource, param.allowsSlash ? '.+' : '[^/]+', true)
-    }
-
-    this.urlPattern = httpPath === '/' ? (url || '/') : `${url}${mswPath}`
-    this.prefixRegExp = httpPath === '/' ? undefined : new RegExp(`^(.*?)${prefixSource}$`)
+    this.origin = (this.options.origin ?? '').replace(/\/+$/, '')
+    this.prefix = this.options.prefix === undefined
+      ? undefined
+      : `/${this.options.prefix.replace(/\/+$/, '').slice(1)}`
   }
 
   /**
@@ -155,20 +136,15 @@ export class ProcedureUtils<
       }),
     )
 
-    const router = this.path.reduceRight<AnyRouter>(
-      (acc, segment) => ({ [segment]: acc }),
-      procedure,
-    )
+    const fetchHandler = this.options.handler(this.toRouter(procedure))
 
-    const fetchHandler = this.options.handler(router)
-
-    return http.all(this.urlPattern, async (info) => {
+    return http.all(this.resolveMSWPath(fetchHandler), async (info) => {
       /**
        * The fetch handler consumes the request body, so hand it a clone
        * and keep the original readable for the mock handler.
        */
       const { matched, response } = await fetchHandler.handle(info.request.clone(), {
-        prefix: this.resolveHttpPathPrefix(info.request),
+        prefix: this.prefix,
         context: info,
       })
 
@@ -198,7 +174,9 @@ export class ProcedureUtils<
    * @see {@link https://orpc.dev/docs/integrations/msw#mocking-loading-states | MSW Integration - Mocking Loading States}
    */
   loading(): HttpHandler {
-    return http.all(this.urlPattern, () => new Promise<never>(() => {}))
+    const fetchHandler = this.options.handler(this.toRouter(this.contract))
+
+    return http.all(this.resolveMSWPath(fetchHandler), () => new Promise<never>(() => {}))
   }
 
   /**
@@ -208,15 +186,50 @@ export class ProcedureUtils<
    * @see {@link https://orpc.dev/docs/integrations/msw#passthrough | MSW Integration - Passthrough}
    */
   passthrough(): HttpHandler {
-    return http.all(this.urlPattern, () => passthrough())
+    const fetchHandler = this.options.handler(this.toRouter(this.contract))
+
+    return http.all(this.resolveMSWPath(fetchHandler), () => passthrough())
+  }
+
+  /**
+   * Nests the procedure (or its bare contract) back under its path,
+   * forming the single-procedure router given to the `handler` option.
+   */
+  private toRouter(leaf: AnyRouter | AnyProcedureContract): AnyRouter {
+    return this.path.reduceRight<AnyRouter>(
+      (acc, segment) => ({ [segment]: acc }),
+      leaf as AnyRouter,
+    )
+  }
+
+  /**
+   * Resolves the MSW path predicate matching this procedure, following the
+   * protocol of the created fetch handler.
+   */
+  private resolveMSWPath(fetchHandler: ProcedureUtilsFetchHandler): string {
+    const isOpenAPI = fetchHandler instanceof OpenAPIHandler
+    const httpPath = this.resolveHttpPath(isOpenAPI)
+    const dynamicParams = isOpenAPI ? getDynamicPathParams(httpPath) ?? [] : []
+
+    let mswPath: string = httpPath
+
+    for (let i = dynamicParams.length - 1; i >= 0; i--) {
+      const param = dynamicParams[i]!
+      const pattern = param.allowsSlash ? '*' : `:${param.parameterName}`
+      mswPath = mswPath.slice(0, param.startIndex) + pattern + mswPath.slice(param.startIndex + param.segment.length)
+    }
+
+    const base = `${this.origin}${this.prefix === undefined || this.prefix === '/' ? '' : this.prefix}`
+
+    return httpPath === '/' ? (base || '/') : `${base}${mswPath}`
   }
 
   /**
    * Resolves the HTTP path the corresponding handler would serve this
    * procedure at, without any prefix.
    */
-  private resolveHttpPath(): `/${string}` {
-    if (this.options.protocol === 'openapi') {
+  private resolveHttpPath(isOpenAPI: boolean): `/${string}` {
+    if (isOpenAPI) {
       const meta = getOpenAPIMeta(this.contract)
       const httpPath = meta?.path ?? pathToHttpPath(this.path)
 
@@ -225,28 +238,4 @@ export class ProcedureUtils<
 
     return pathToHttpPath(this.path)
   }
-
-  /**
-   * The fetch handlers match procedures by pathname, so derive the prefix from
-   * the actual request instead of `url`, which may contain MSW wildcards.
-   */
-  private resolveHttpPathPrefix(request: Request): `/${string}` | undefined {
-    let pathname = new URL(request.url).pathname as `/${string}`
-
-    if (pathname.length > 1 && pathname.endsWith('/')) {
-      pathname = `/${pathname.replace(/\/+$/, '').slice(1)}`
-    }
-
-    if (this.prefixRegExp === undefined) {
-      return pathname
-    }
-
-    const prefix = pathname.match(this.prefixRegExp)?.[1]
-
-    return prefix ? prefix as `/${string}` : undefined
-  }
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`)
 }

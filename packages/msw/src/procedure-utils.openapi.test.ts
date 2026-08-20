@@ -7,7 +7,7 @@ import { OpenAPIHandler, OpenAPILink } from '@orpc/openapi/fetch'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import z from 'zod'
-import { createMSWUtils } from './index'
+import { createHTTPUtils } from './index'
 
 const contract = {
   planet: {
@@ -35,9 +35,9 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
-const mock = createMSWUtils(contract, {
-  protocol: 'openapi',
-  url: 'http://localhost:3000/api',
+const mock = createHTTPUtils(contract, {
+  origin: 'http://localhost:3000',
+  prefix: '/api',
   handler: router => new OpenAPIHandler(router),
 })
 
@@ -94,9 +94,9 @@ it('responds with defined errors', async () => {
 })
 
 it('supports wildcard base urls', async () => {
-  const wildcardMock = createMSWUtils(contract, {
-    protocol: 'openapi',
-    url: '*/api',
+  const wildcardMock = createHTTPUtils(contract, {
+    origin: '*',
+    prefix: '/api',
     handler: router => new OpenAPIHandler(router),
   })
 

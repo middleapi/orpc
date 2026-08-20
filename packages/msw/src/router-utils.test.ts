@@ -54,7 +54,8 @@ describe('with an implemented router', () => {
 
   it('mocks procedures instead of calling their real handlers', async () => {
     const utils = createRouterUtils(router, {
-      url: 'http://localhost:3000/rpc',
+      origin: 'http://localhost:3000',
+      prefix: '/rpc',
       handler: router => new RPCHandler(router),
     })
 

@@ -20,7 +20,7 @@ const contract = {
   },
 }
 
-const utils = createRouterUtils(contract, { url: '/rpc', handler: router => new RPCHandler(router) })
+const utils = createRouterUtils(contract, { prefix: '/rpc', handler: router => new RPCHandler(router) })
 
 it('handler', () => {
   const handler = utils.ping.handler(({ input, errors, request, signal, lastEventId }) => {
@@ -77,13 +77,13 @@ it('passthrough', () => {
 
 it('options', () => {
   createRouterUtils(contract, { handler: router => new RPCHandler(router) })
-  createRouterUtils(contract, { protocol: 'rpc', url: '*/rpc', handler: router => new RPCHandler(router) })
-  createRouterUtils(contract, { protocol: 'openapi', url: '*/api', handler: router => new OpenAPIHandler(router) })
+  createRouterUtils(contract, { origin: '*', prefix: '/rpc', handler: router => new RPCHandler(router) })
+  createRouterUtils(contract, { origin: 'http://localhost:3000', prefix: '/api', handler: router => new OpenAPIHandler(router) })
 
   // @ts-expect-error --- handler is required
-  createRouterUtils(contract, { url: '/rpc' })
+  createRouterUtils(contract, { origin: '*' })
   // @ts-expect-error --- must return a fetch handler
   createRouterUtils(contract, { handler: () => ({}) })
-  // @ts-expect-error --- invalid protocol
-  createRouterUtils(contract, { protocol: 'invalid', handler: router => new RPCHandler(router) })
+  // @ts-expect-error --- prefix must start with /
+  createRouterUtils(contract, { prefix: 'rpc', handler: router => new RPCHandler(router) })
 })
