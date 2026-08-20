@@ -2,7 +2,7 @@ import type { AnyORPCError, ORPCErrorCode } from '@orpc/client'
 import type { AnyProcedureContract, AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, ORPCErrorConstructorMap } from '@orpc/contract'
 import type { OpenAPIHandlerOptions } from '@orpc/openapi/fetch'
 import type { AnyRouter, ProcedureConfig } from '@orpc/server'
-import type { RPCHandlerOptions } from '@orpc/server/fetch'
+import type { FetchHandler, RPCHandlerOptions } from '@orpc/server/fetch'
 import type { Promisable } from '@orpc/shared'
 import type { HttpHandler, HttpResponseResolver } from 'msw'
 import { getDynamicPathParams, getOpenAPIMeta } from '@orpc/openapi'
@@ -28,6 +28,17 @@ export interface ProcedureUtilsBaseOptions extends ProcedureConfig {
    * @default ''
    */
   baseUrl?: string
+
+  /**
+   * Override how the fetch handler serving each mock is created, useful for
+   * reusing your production handler configuration, such as plugins.
+   *
+   * The router passed in contains only the procedure being mocked, and URL
+   * matching still follows the `protocol` option.
+   *
+   * @see {@link https://orpc.dev/docs/integrations/msw#advanced-configuration | MSW Integration - Advanced Configuration}
+   */
+  handler?: (router: AnyRouter) => Pick<FetchHandler<ProcedureUtilsResolverInfo>, 'handle'>
 }
 
 /**
@@ -175,9 +186,11 @@ export class ProcedureUtils<
       procedure,
     )
 
-    const fetchHandler = this.options.protocol === 'openapi'
-      ? new OpenAPIHandler<ProcedureUtilsResolverInfo>(router as AnyRouter, this.options)
-      : new RPCHandler<ProcedureUtilsResolverInfo>(router as AnyRouter, this.options)
+    const fetchHandler = this.options.handler
+      ? this.options.handler(router)
+      : this.options.protocol === 'openapi'
+        ? new OpenAPIHandler<ProcedureUtilsResolverInfo>(router as AnyRouter, this.options)
+        : new RPCHandler<ProcedureUtilsResolverInfo>(router as AnyRouter, this.options)
 
     return http.all(this.urlPattern, async (info) => {
       /**

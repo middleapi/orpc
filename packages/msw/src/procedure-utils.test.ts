@@ -1,7 +1,9 @@
 import type { RouterContractClient } from '@orpc/contract'
+import type { AnyRouter } from '@orpc/server'
 import { createORPCClient, isDefinedError, ORPCError } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { asyncIteratorObject, oc } from '@orpc/contract'
+import { RPCHandler } from '@orpc/server/fetch'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import z from 'zod'
@@ -129,6 +131,39 @@ describe('handler', () => {
     }))
 
     await expect(wildcardClient.planet.list()).resolves.toEqual([{ id: 1, name: 'Mars' }])
+  })
+
+  it('supports overriding the fetch handler, e.g. to configure plugins', async () => {
+    const factory = vi.fn((router: AnyRouter) => new RPCHandler(router, {
+      fetchInterceptors: [async ({ next }) => {
+        const result = await next()
+
+        if (result.matched) {
+          result.response.headers.set('x-mocked', '1')
+        }
+
+        return result
+      }],
+    }))
+
+    const customORPC = createMSWUtils(contract, {
+      baseUrl: 'http://localhost:3000/rpc',
+      handler: factory,
+    })
+
+    server.use(customORPC.planet.list.handler(() => []))
+
+    const response = await fetch('http://localhost:3000/rpc/planet/list', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    })
+
+    expect(response.headers.get('x-mocked')).toBe('1')
+    await expect(response.json()).resolves.toEqual({ json: [] })
+
+    // the factory receives a router containing only the mocked procedure
+    expect(Object.keys(factory.mock.calls[0]![0])).toEqual(['planet'])
   })
 
   it('leaves unmatched requests to other msw handlers', async () => {

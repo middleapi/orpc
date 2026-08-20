@@ -1,5 +1,7 @@
 import type { HttpHandler } from 'msw'
 import { oc } from '@orpc/contract'
+import { OpenAPIHandler } from '@orpc/openapi/fetch'
+import { RPCHandler } from '@orpc/server/fetch'
 import z from 'zod'
 import { createRouterUtils } from './router-utils'
 
@@ -79,4 +81,12 @@ it('protocol options', () => {
   createRouterUtils(contract, { protocol: 'openapi', allowMethods: ['GET'] })
   // @ts-expect-error --- invalid protocol
   createRouterUtils(contract, { protocol: 'invalid' })
+})
+
+it('handler option', () => {
+  createRouterUtils(contract, { handler: router => new RPCHandler(router) })
+  createRouterUtils(contract, { protocol: 'openapi', handler: router => new OpenAPIHandler(router) })
+
+  // @ts-expect-error --- must return a fetch handler
+  createRouterUtils(contract, { handler: () => ({}) })
 })

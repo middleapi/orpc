@@ -106,6 +106,22 @@ const mock = createMSWUtils(contract, {
 })
 ```
 
+For full control, pass a `handler` callback that creates the fetch handler yourself, useful for reusing your production handler configuration, such as plugins:
+
+```ts
+import { RPCHandler } from '@orpc/server/fetch'
+import { ResponseHeadersPlugin } from '@orpc/server/plugins'
+
+const mock = createMSWUtils(contract, {
+  baseUrl: '*/rpc',
+  handler: router => new RPCHandler(router, {
+    plugins: [new ResponseHeadersPlugin()],
+  }),
+})
+```
+
+Each mock serves a router containing only the procedure being mocked, and URL matching still follows the `protocol` option, so make sure the handler you create speaks the same protocol.
+
 ## Limitations
 
 Requests sent through the [Batch Requests Plugin](/docs/plugins/batch) bundle multiple calls into a single HTTP request, which cannot match per-procedure handlers. Disable batching when mocking with MSW.
