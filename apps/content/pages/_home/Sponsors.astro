@@ -119,15 +119,17 @@ const past = pastSponsors()
 
         {past.length > 0 && (
           <p class="mt-6 text-sm text-muted-foreground">
+            With thanks to{' '}
             {/* The SVG wall lists everyone, current and past, in one place. */}
             <a
-              class="underline-offset-4 transition-colors hover:text-foreground hover:underline"
+              class="underline underline-offset-4 transition-colors hover:text-foreground"
               href={PAST_SPONSORS_URL}
               rel="noopener"
               target="_blank"
             >
-              With thanks to {past.length} past sponsors who helped get oRPC here.
-            </a>
+              {past.length} past sponsors
+            </a>{' '}
+            who helped get oRPC here.
           </p>
         )}
       </div>

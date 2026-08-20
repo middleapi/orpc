@@ -99,4 +99,4 @@ Like what we build over at [middleapi](https://github.com/middleapi)? You can he
   </tr>
 </table>
 
-[With thanks to 37 past sponsors who helped get oRPC here.](https://htmlpreview.github.io/?https://github.com/middleapi/static/blob/main/sponsors.svg)
+With thanks to [37 past sponsors](https://htmlpreview.github.io/?https://github.com/middleapi/static/blob/main/sponsors.svg) who helped get oRPC here.

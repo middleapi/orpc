@@ -195,7 +195,7 @@ function buildSponsorsSection(sponsors: Sponsor[]): string {
   if (pastSponsors.length > 0) {
     const noun = pastSponsors.length === 1 ? 'past sponsor' : 'past sponsors'
 
-    lines.push(`[With thanks to ${pastSponsors.length} ${noun} who helped get oRPC here.](${PAST_SPONSORS_URL})`)
+    lines.push(`With thanks to [${pastSponsors.length} ${noun}](${PAST_SPONSORS_URL}) who helped get oRPC here.`)
     lines.push('')
   }
 
