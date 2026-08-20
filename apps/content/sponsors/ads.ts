@@ -1,13 +1,16 @@
 /**
- * Hand-maintained ad inventory, plus the helpers that shape it for rendering.
- * Unlike sponsors.ts (synced from GitHub Sponsors), the map below is edited by
- * hand: slots are sold individually, so a sponsor picks the position it wants
- * and keeps it until it lapses. Positions are fixed and 1-based; whatever is
- * left empty renders as a dimmed `+` opening a mailto that names it.
+ * The ad-slot inventory, plus the helpers that shape it for rendering. Slots
+ * are sold individually: a sponsor picks the position it wants (the `slot`
+ * field in the upstream sponsors.json) and keeps it until it lapses.
+ * scripts/sync-sponsors.ts distils that into slots.ts; positions are fixed and
+ * 1-based, and whatever is left empty renders as a dimmed `+` opening a mailto
+ * that names it.
  *
  * Deliberately free of any sponsors.ts import: client.ts needs this module, and
- * the sponsor wall's data has no business in the browser bundle.
+ * the sponsor wall's data has no business in the browser bundle — slots.ts
+ * carries only the handful of sponsors that bought a position.
  */
+import slots from './slots'
 
 export interface AdSponsor {
   name: string
@@ -15,8 +18,10 @@ export interface AdSponsor {
   description: string
   /** Square icon URL (a GitHub avatar works) or an inline data URI. */
   logo: string
-  /** Destination, tracking params and all — write `ref`/`utm_*` into it here. */
+  /** Destination, tracking params and all — upstream bakes `ref`/`utm_*` in. */
   href: string
+  /** Extra rel tokens from the data (e.g. `sponsored`); may be empty. */
+  rel: string
   /**
    * Optional brand tint behind the card. Both modes are required together so a
    * sponsor never ships a colour that only works in one theme. Aim for the
@@ -33,23 +38,22 @@ export const AD_POSITIONS = [1, 2, 3, 4, 5, 6, 7, 8] as const
 
 export type AdPosition = typeof AD_POSITIONS[number]
 
-// Annotated rather than `satisfies` so the type stays indexable by any
-// AdPosition — an out-of-range or misspelled key is still a type error.
-const inventory: Partial<Record<AdPosition, AdSponsor>> = {
-  1: {
-    name: 'ScreenshotOne',
-    description: 'The screenshot API for developers',
-    logo: 'https://github.com/screenshotone.png',
-    href: 'https://screenshotone.com?ref=orpc&utm_source=orpc&utm_medium=sponsor',
-    background: { light: '#f7f5ff', dark: '#303147' },
-  },
-  2: {
-    name: 'MisskeyHQ',
-    description: 'Decentralized microblogging SNS born on Earth',
-    logo: 'https://github.com/MisskeyIO.png',
-    href: 'https://misskey.io?ref=orpc&utm_source=orpc&utm_medium=sponsor',
-    background: { light: '#f8faf0', dark: '#313a2e' },
-  },
+function isAdPosition(position: number): position is AdPosition {
+  return (AD_POSITIONS as readonly number[]).includes(position)
+}
+
+// Keyed off the generated file; a position outside the grid is dropped rather
+// than crashing the build over a data typo upstream.
+const inventory: Partial<Record<AdPosition, AdSponsor>> = {}
+for (const { position, ...sponsor } of slots) {
+  if (isAdPosition(position)) {
+    inventory[position] = sponsor
+  }
+}
+
+/** The rel a sponsor link renders with: `noopener` always, plus the data's tokens. */
+export function relAttribute(rel: string): string {
+  return ['noopener', rel].filter(Boolean).join(' ')
 }
 
 export interface AdSlot {

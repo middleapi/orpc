@@ -7,13 +7,14 @@ export interface Sponsor {
   name: string
   login: string
   avatar: string
-  /** Sponsor's own link, carrying the `ref=orpc` tracking param. */
+  /** Sponsor's own link, tracking params already baked in upstream. */
   link: string
-  /** GitHub Sponsors tier label, e.g. `🏆 Platinum Sponsor`. */
+  /** Extra rel tokens for the link (e.g. `sponsored`); may be empty. */
+  rel: string
+  /** GitHub Sponsors tier label, e.g. `Special Sponsor`. */
   tierTitle: string
   /** Higher is a bigger tier; `0` marks a lapsed sponsor. */
   tierLevel: number
-  org: boolean
 }
 
 export interface SponsorTier {

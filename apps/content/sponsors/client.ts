@@ -1,5 +1,5 @@
 import type { AdSponsor } from './ads'
-import { soldSponsors, tintStyle } from './ads'
+import { relAttribute, soldSponsors, tintStyle } from './ads'
 
 // Only the inline slots rotate. The grid is static and carries no
 // [data-sponsor-slot], so nothing here touches it.
@@ -17,6 +17,7 @@ function setText(card: Element, selector: string, text: string): void {
  */
 function apply(card: HTMLAnchorElement, sponsor: AdSponsor): void {
   card.href = sponsor.href
+  card.rel = relAttribute(sponsor.rel)
   // The tagline truncates in the card, so it doubles as the hover tooltip.
   card.title = sponsor.description
 

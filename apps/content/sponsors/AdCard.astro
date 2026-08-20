@@ -4,7 +4,7 @@
 // hence the data-sponsor-* hooks.
 //
 import type { AdSponsor } from './ads'
-import { tintStyle } from './ads'
+import { relAttribute, tintStyle } from './ads'
 
 interface Props {
   sponsor: AdSponsor
@@ -17,7 +17,7 @@ const { sponsor } = Astro.props
   class="slot-card flex h-[76px] items-center gap-3 rounded-blume border border-border px-4 transition"
   data-sponsor-card
   href={sponsor.href}
-  rel="sponsored noopener"
+  rel={relAttribute(sponsor.rel)}
   style={tintStyle(sponsor)}
   target="_blank"
   title={sponsor.description}
