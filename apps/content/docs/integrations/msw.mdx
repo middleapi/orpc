@@ -124,4 +124,4 @@ Each mock serves a router containing only the procedure being mocked, and URL ma
 
 ## Limitations
 
-Requests sent through the [Batch Requests Plugin](/docs/plugins/batch) bundle multiple calls into a single HTTP request, which cannot match per-procedure handlers. Disable batching when mocking with MSW.
+Requests sent through the [Batch Requests Plugin](/docs/plugins/batch) cannot be mocked. Each mock serves a router containing only its own procedure, so even a `handler` configured with the batch plugin cannot resolve the other procedures bundled into the same HTTP request. Disable batching when mocking with MSW.
