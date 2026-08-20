@@ -1,7 +1,8 @@
 {
   "name": "@orpc/next",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.29",
+  "description": "Next.js integration for oRPC: call typesafe procedures through Next.js Server Functions",
   "license": "MIT",
   "funding": "https://github.com/sponsors/dinwwwh",
   "homepage": "https://orpc.dev",
@@ -12,7 +13,14 @@
   },
   "keywords": [
     "orpc",
-    "next"
+    "nextjs",
+    "next",
+    "server-functions",
+    "server-actions",
+    "react",
+    "rpc",
+    "typescript",
+    "typesafe"
   ],
   "sideEffects": [
     "./dist/extensions/actionable.mjs"

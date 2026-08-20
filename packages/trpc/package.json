@@ -1,7 +1,8 @@
 {
   "name": "@orpc/trpc",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.29",
+  "description": "tRPC interop for oRPC: reuse existing tRPC routers with oRPC clients and OpenAPI",
   "license": "MIT",
   "funding": "https://github.com/sponsors/dinwwwh",
   "homepage": "https://orpc.dev",
@@ -12,7 +13,13 @@
   },
   "keywords": [
     "orpc",
-    "trpc"
+    "trpc",
+    "interop",
+    "migration",
+    "rpc",
+    "openapi",
+    "typescript",
+    "typesafe"
   ],
   "sideEffects": false,
   "publishConfig": {

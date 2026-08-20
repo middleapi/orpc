@@ -1,7 +1,8 @@
 {
   "name": "@orpc/openapi",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.29",
+  "description": "Generate OpenAPI specs from oRPC routers and serve OpenAPI-compliant APIs with end-to-end type safety",
   "license": "MIT",
   "funding": "https://github.com/sponsors/dinwwwh",
   "homepage": "https://orpc.dev",
@@ -12,7 +13,15 @@
   },
   "keywords": [
     "orpc",
-    "openapi"
+    "rpc",
+    "api",
+    "typescript",
+    "typesafe",
+    "openapi",
+    "swagger",
+    "scalar",
+    "json-schema",
+    "rest"
   ],
   "sideEffects": [
     "./dist/extensions/route.mjs"
@@ -92,9 +101,15 @@
     "swagger-ui": ">=5.32.6"
   },
   "peerDependenciesMeta": {
-    "@scalar/api-reference": { "optional": true },
-    "@types/swagger-ui": { "optional": true },
-    "swagger-ui": { "optional": true }
+    "@scalar/api-reference": {
+      "optional": true
+    },
+    "@types/swagger-ui": {
+      "optional": true
+    },
+    "swagger-ui": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@hey-api/spec-types": "0.0.0-next-20260408030107",

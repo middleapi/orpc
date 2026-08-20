@@ -9,16 +9,24 @@ interface Sponsor {
   amount: number
   createdAt: string
   tierTitle: string
+  tierTitlePlural: string
   tierLevel: number
+  /** Extra rel tokens for the sponsor's link (e.g. `sponsored`); may be empty. */
+  rel: string
   link: string
-  org: boolean
-  sidebarSize?: string
-  sidebarLogo?: string
+  /** Tagline, present on sponsors that bought an ad slot. */
+  description?: string
+  /** Brand tint behind the ad card, both themes required together. */
+  background?: { light: string, dark: string }
+  /** 1-based ad-grid position the sponsor bought. */
+  slot?: number
   [key: string]: unknown
 }
 
 const SPONSORS_SOURCE_URL = 'https://raw.githubusercontent.com/middleapi/static/refs/heads/main/sponsors.json'
 const SPONSORS_OUTPUT_FILE = 'apps/content/sponsors/sponsors.ts'
+const SLOTS_OUTPUT_FILE = 'apps/content/sponsors/slots.ts'
+const PAST_SPONSORS_URL = 'https://htmlpreview.github.io/?https://github.com/middleapi/static/blob/main/sponsors.svg'
 const ROOT_DIR = process.cwd()
 const README_FILE_NAME = 'README.md'
 
@@ -48,17 +56,9 @@ async function findReadmes(dir: string): Promise<string[]> {
   return result.concat(...subResults)
 }
 
-function withTracking(url: string): string {
-  try {
-    const tracked = new URL(url)
-
-    tracked.searchParams.set('ref', 'orpc')
-
-    return tracked.toString()
-  }
-  catch {
-    return url
-  }
+/** `noopener` always, plus whatever extra tokens the data carries. */
+function relAttribute(sponsor: Sponsor): string {
+  return ['noopener', sponsor.rel].filter(Boolean).join(' ')
 }
 
 function escapeHtml(value: string): string {
@@ -78,13 +78,48 @@ function getTierImageSizeAndColumns(tierLevel: number, tierLevels: number[]): [c
   return [column, Math.floor(838 / column)]
 }
 
+/**
+ * The slot sponsors' cards, mirroring the docs ad cards — logo on the left,
+ * name over tagline on the right — but without the brand backgrounds (GitHub
+ * strips inline styles anyway). One card per row. The oversized cell width is
+ * a preferred width, not a minimum: GitHub caps tables at the container, so
+ * the card spans the full row on any screen and the text wraps on phones
+ * instead of scrolling. One cell per card, the logo floated with the
+ * deprecated-but-sanitizer-safe `align`/`hspace` attributes, so no table
+ * border cuts through the card.
+ */
+function buildSlotCards(slotSponsors: Sponsor[]): string[] {
+  const lines = ['<table>']
+
+  for (const sponsor of slotSponsors) {
+    const name = escapeHtml(sponsor.name ?? sponsor.login)
+    const description = escapeHtml(sponsor.description ?? '')
+
+    lines.push('  <tr>')
+    lines.push(`   <td width="2000"><a href="${escapeHtml(sponsor.link)}" target="_blank" rel="${relAttribute(sponsor)}" title="${description}"><img src="${escapeHtml(sponsor.avatar)}" width="64" align="left" hspace="12" alt="${name}"/><b>${name}</b></a><br /><sub>${description}</sub></td>`)
+    lines.push('  </tr>')
+  }
+
+  lines.push('</table>')
+  lines.push('')
+
+  return lines
+}
+
 function buildSponsorsSection(sponsors: Sponsor[]): string {
   const activeSponsors = sponsors.filter(sponsor => sponsor.tierLevel > 0 && sponsor.amount > 0)
   const pastSponsors = sponsors.filter(sponsor => sponsor.tierLevel <= 0 || sponsor.amount <= 0)
 
+  // Slot sponsors are featured as cards up top; the tier tables below carry
+  // everyone else so nobody appears twice.
+  const slotSponsors = activeSponsors
+    .filter(sponsor => sponsor.slot !== undefined)
+    .sort((a, b) => a.slot! - b.slot!)
+  const tieredSponsors = activeSponsors.filter(sponsor => sponsor.slot === undefined)
+
   const groupedSponsors = new Map<number, Sponsor[]>()
 
-  for (const sponsor of activeSponsors) {
+  for (const sponsor of tieredSponsors) {
     const group = groupedSponsors.get(sponsor.tierLevel)
 
     if (group) {
@@ -102,6 +137,13 @@ function buildSponsorsSection(sponsors: Sponsor[]): string {
     '',
   ]
 
+  if (slotSponsors.length > 0) {
+    lines.push(...buildSlotCards(slotSponsors))
+  }
+
+  // Sizes rank against every active tier, slot sponsors' tiers included, so
+  // featuring the top tiers as cards does not inflate the tables below them.
+  const sizeTierLevels = [...new Set(activeSponsors.map(sponsor => sponsor.tierLevel))].sort((a, b) => b - a)
   const tierLevels = [...groupedSponsors.keys()].sort((a, b) => b - a)
 
   for (const tierLevel of tierLevels) {
@@ -111,8 +153,8 @@ function buildSponsorsSection(sponsors: Sponsor[]): string {
       continue
     }
 
-    const tierTitle = tierSponsors[0]?.tierTitle ?? `Tier ${tierLevel}`
-    const [columns, imageSize] = getTierImageSizeAndColumns(tierLevel, tierLevels)
+    const tierTitle = tierSponsors[0]?.tierTitlePlural ?? `Tier ${tierLevel}`
+    const [columns, imageSize] = getTierImageSizeAndColumns(tierLevel, sizeTierLevels)
 
     lines.push(`### ${tierTitle}`)
     lines.push('')
@@ -124,7 +166,7 @@ function buildSponsorsSection(sponsors: Sponsor[]): string {
       const displayName = sponsor.name ?? sponsor.login
       const escapedName = escapeHtml(displayName)
 
-      lines.push(`   <td align="center"><a href="${escapeHtml(href)}" target="_blank" rel="sponsored noopener" title="${escapedName}"><img src="${escapeHtml(sponsor.avatar)}" width="${imageSize}" alt="${escapedName}"/><br />${escapedName}</a></td>`)
+      lines.push(`   <td align="center"><a href="${escapeHtml(href)}" target="_blank" rel="${relAttribute(sponsor)}" title="${escapedName}"><img src="${escapeHtml(sponsor.avatar)}" width="${imageSize}" alt="${escapedName}"/><br />${escapedName}</a></td>`)
 
       const isRowEnd = (index + 1) % columns === 0
       const isLast = index === tierSponsors.length - 1
@@ -143,7 +185,7 @@ function buildSponsorsSection(sponsors: Sponsor[]): string {
   if (pastSponsors.length > 0) {
     const noun = pastSponsors.length === 1 ? 'past sponsor' : 'past sponsors'
 
-    lines.push(`With thanks to ${pastSponsors.length} ${noun} who helped get oRPC here.`)
+    lines.push(`With thanks to [${pastSponsors.length} ${noun}](${PAST_SPONSORS_URL}) who helped get oRPC here.`)
     lines.push('')
   }
 
@@ -161,7 +203,22 @@ function replaceSponsorsSection(content: string, replacement: string): string {
   const nextHeadingIndex = content.indexOf('\n## ', startIndex + heading.length)
   const endIndex = nextHeadingIndex === -1 ? content.length : nextHeadingIndex + 1
 
-  return `${content.slice(0, startIndex)}${replacement}${content.slice(endIndex)}`
+  // Trimmed to a single trailing newline, or a section replaced at the end of
+  // the file leaves a blank last line that eslint's markdown fixer removes —
+  // and the next sync would put back, forever.
+  return `${`${content.slice(0, startIndex)}${replacement}${content.slice(endIndex)}`.trimEnd()}\n`
+}
+
+function generatedModule(entries: unknown): string {
+  return [
+    '/* eslint-disable eslint-comments/no-unlimited-disable */',
+    '/* eslint-disable */',
+    `// Generated by scripts/sync-sponsors.ts from ${SPONSORS_SOURCE_URL} — do not edit.`,
+    '',
+    // eslint-disable-next-line ban/ban
+    `export default ${JSON.stringify(entries, null, 2)}`,
+    '',
+  ].join('\n')
 }
 
 /**
@@ -183,27 +240,39 @@ async function writeSponsorsData(sponsors: Sponsor[]): Promise<void> {
       login: sponsor.login,
       avatar: sponsor.avatar,
       link: sponsor.link,
+      rel: sponsor.rel,
       tierTitle: sponsor.tierTitle,
       tierLevel: sponsor.tierLevel,
-      org: sponsor.org,
     }))
 
-  const content = [
-    '/* eslint-disable eslint-comments/no-unlimited-disable */',
-    '/* eslint-disable */',
-    `// Generated by scripts/sync-sponsors.ts from ${SPONSORS_SOURCE_URL} — do not edit.`,
-    '',
-    // eslint-disable-next-line ban/ban
-    `export default ${JSON.stringify(entries, null, 2)}`,
-    '',
-  ].join('\n')
-
-  await writeFile(path.join(ROOT_DIR, SPONSORS_OUTPUT_FILE), content)
+  await writeFile(path.join(ROOT_DIR, SPONSORS_OUTPUT_FILE), generatedModule(entries))
   console.log(`Wrote ${entries.length} sponsors to ${SPONSORS_OUTPUT_FILE}.`)
 }
 
-// Ads are not synced: slots are sold one position at a time, so
-// apps/content/sponsors/ads.ts is maintained by hand.
+/**
+ * Emit the ad-slot inventory (sponsors carrying a `slot` position), shaped for
+ * apps/content/sponsors/ads.ts. Kept apart from sponsors.ts because the slot
+ * rotation script ships to the browser and the sponsor wall's data has no
+ * business in that bundle.
+ */
+async function writeSlotsData(sponsors: Sponsor[]): Promise<void> {
+  const entries = sponsors
+    .filter(sponsor => sponsor.slot !== undefined && sponsor.tierLevel > 0 && sponsor.amount > 0)
+    .sort((a, b) => a.slot! - b.slot!)
+    .map(sponsor => ({
+      position: sponsor.slot!,
+      name: sponsor.name ?? sponsor.login,
+      description: sponsor.description ?? '',
+      logo: sponsor.avatar,
+      href: sponsor.link,
+      rel: sponsor.rel,
+      // JSON.stringify drops it when absent.
+      background: sponsor.background,
+    }))
+
+  await writeFile(path.join(ROOT_DIR, SLOTS_OUTPUT_FILE), generatedModule(entries))
+  console.log(`Wrote ${entries.length} ad slots to ${SLOTS_OUTPUT_FILE}.`)
+}
 
 async function main(): Promise<void> {
   const response = await fetch(SPONSORS_SOURCE_URL)
@@ -212,11 +281,13 @@ async function main(): Promise<void> {
     throw new Error(`Failed to fetch sponsors data: ${response.status} ${response.statusText}`)
   }
 
-  const sponsors = (await response.json() as Sponsor[]).map(sponsor => ({ ...sponsor, link: withTracking(sponsor.link) }))
+  // Links arrive with their tracking params already baked in upstream.
+  const sponsors = await response.json() as Sponsor[]
   const readmeFiles = await findReadmes(ROOT_DIR)
   const replacement = buildSponsorsSection(sponsors)
 
   await writeSponsorsData(sponsors)
+  await writeSlotsData(sponsors)
 
   const readmeContents = await Promise.all(
     readmeFiles.map(readmePath => readFile(readmePath, 'utf8')),

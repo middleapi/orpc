@@ -1,7 +1,8 @@
 {
   "name": "@orpc/ai-sdk",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.29",
+  "description": "AI SDK integration for oRPC: turn contracts and procedures into typesafe AI SDK tools",
   "license": "MIT",
   "funding": "https://github.com/sponsors/dinwwwh",
   "homepage": "https://orpc.dev",
@@ -12,7 +13,13 @@
   },
   "keywords": [
     "orpc",
-    "ai-sdk"
+    "ai",
+    "ai-sdk",
+    "tools",
+    "llm",
+    "agents",
+    "typescript",
+    "typesafe"
   ],
   "sideEffects": false,
   "publishConfig": {

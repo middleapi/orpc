@@ -1,7 +1,8 @@
 {
   "name": "@orpc/experimental-effect",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.29",
+  "description": "Effect integration for oRPC: build typesafe procedures with Effect",
   "license": "MIT",
   "funding": "https://github.com/sponsors/dinwwwh",
   "homepage": "https://orpc.dev",
@@ -12,7 +13,11 @@
   },
   "keywords": [
     "orpc",
-    "effect"
+    "effect",
+    "effect-ts",
+    "rpc",
+    "typescript",
+    "typesafe"
   ],
   "sideEffects": [
     "./dist/extensions/effect.mjs",

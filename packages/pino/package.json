@@ -1,7 +1,8 @@
 {
   "name": "@orpc/pino",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.29",
+  "description": "Pino integration for oRPC: structured logging for typesafe APIs",
   "license": "MIT",
   "funding": "https://github.com/sponsors/dinwwwh",
   "homepage": "https://orpc.dev",
@@ -12,7 +13,11 @@
   },
   "keywords": [
     "orpc",
-    "pino"
+    "pino",
+    "logging",
+    "logger",
+    "observability",
+    "typescript"
   ],
   "sideEffects": false,
   "publishConfig": {

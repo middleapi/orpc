@@ -1,7 +1,8 @@
 {
   "name": "@orpc/valibot",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.29",
+  "description": "Valibot integration for oRPC: convert Valibot schemas into JSON Schema for OpenAPI generation",
   "license": "MIT",
   "funding": "https://github.com/sponsors/dinwwwh",
   "homepage": "https://orpc.dev",
@@ -12,7 +13,12 @@
   },
   "keywords": [
     "orpc",
-    "valibot"
+    "valibot",
+    "json-schema",
+    "openapi",
+    "validation",
+    "typescript",
+    "typesafe"
   ],
   "sideEffects": false,
   "publishConfig": {

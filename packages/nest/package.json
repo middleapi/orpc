@@ -1,7 +1,8 @@
 {
   "name": "@orpc/nest",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.29",
+  "description": "NestJS integration for oRPC: implement typesafe contracts in NestJS controllers",
   "license": "MIT",
   "funding": "https://github.com/sponsors/dinwwwh",
   "homepage": "https://orpc.dev",
@@ -10,6 +11,16 @@
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/nest"
   },
+  "keywords": [
+    "orpc",
+    "nestjs",
+    "nest",
+    "contract-first",
+    "rpc",
+    "openapi",
+    "typescript",
+    "typesafe"
+  ],
   "sideEffects": false,
   "publishConfig": {
     "exports": {

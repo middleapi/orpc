@@ -1,7 +1,8 @@
 {
   "name": "@orpc/tanstack-query",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.29",
+  "description": "TanStack Query integration for oRPC: typesafe queries, mutations, streaming, and SSR for React, Vue, Solid, Svelte, and Angular",
   "license": "MIT",
   "funding": "https://github.com/sponsors/dinwwwh",
   "homepage": "https://orpc.dev",
@@ -12,7 +13,17 @@
   },
   "keywords": [
     "orpc",
-    "tanstack query"
+    "tanstack-query",
+    "react-query",
+    "vue-query",
+    "solid-query",
+    "svelte-query",
+    "angular-query",
+    "query",
+    "mutation",
+    "ssr",
+    "typescript",
+    "typesafe"
   ],
   "sideEffects": false,
   "publishConfig": {

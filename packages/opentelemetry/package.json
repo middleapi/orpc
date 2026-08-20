@@ -1,7 +1,8 @@
 {
   "name": "@orpc/opentelemetry",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.29",
+  "description": "OpenTelemetry integration for oRPC: distributed tracing for typesafe APIs",
   "license": "MIT",
   "funding": "https://github.com/sponsors/dinwwwh",
   "homepage": "https://orpc.dev",
@@ -11,7 +12,12 @@
     "directory": "packages/opentelemetry"
   },
   "keywords": [
-    "orpc"
+    "orpc",
+    "opentelemetry",
+    "otel",
+    "tracing",
+    "observability",
+    "typescript"
   ],
   "sideEffects": false,
   "publishConfig": {

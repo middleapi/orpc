@@ -1,7 +1,8 @@
 {
   "name": "@orpc/swr",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.29",
+  "description": "SWR integration for oRPC: typesafe React data fetching hooks",
   "license": "MIT",
   "funding": "https://github.com/sponsors/dinwwwh",
   "homepage": "https://orpc.dev",
@@ -12,8 +13,13 @@
   },
   "keywords": [
     "orpc",
+    "swr",
     "react",
-    "swr"
+    "hooks",
+    "data-fetching",
+    "query",
+    "typescript",
+    "typesafe"
   ],
   "sideEffects": false,
   "publishConfig": {
