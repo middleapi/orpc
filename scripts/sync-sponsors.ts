@@ -81,12 +81,13 @@ function getTierImageSizeAndColumns(tierLevel: number, tierLevels: number[]): [c
 /**
  * The slot sponsors' cards, mirroring the docs ad cards — logo on the left,
  * name over tagline on the right — but without the brand backgrounds (GitHub
- * strips inline styles anyway). Two cards per row, like the docs grid. One
- * cell per card, the logo floated with the deprecated-but-sanitizer-safe
- * `align`/`hspace` attributes, so no table border cuts through the card.
+ * strips inline styles anyway). One full-width card per row, so the featured
+ * sponsors read bigger than the tier tables below. One cell per card, the
+ * logo floated with the deprecated-but-sanitizer-safe `align`/`hspace`
+ * attributes, so no table border cuts through the card.
  */
 function buildSlotCards(slotSponsors: Sponsor[]): string[] {
-  const columns = 2
+  const columns = 1
   const cellWidth = Math.floor(838 / columns)
   const lines = ['<table>', '  <tr>']
 
