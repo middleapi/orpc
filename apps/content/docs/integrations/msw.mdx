@@ -82,6 +82,17 @@ export const Loading: Story = {
 }
 ```
 
+## Passthrough
+
+The `.passthrough` method creates an MSW request handler that performs matching requests against the real server as-is, useful to exempt specific procedures from mocking, for example while [onUnhandledRequest](https://mswjs.io/docs/api/setup-server/listen#onunhandledrequest) treats everything else as an error:
+
+```ts
+const handlers = [
+  mock.planet.list.handler(() => []),
+  mock.planet.find.passthrough(), // hits the real server
+]
+```
+
 ## OpenAPI Protocol
 
 By default, mocks speak the [RPC protocol](/docs/rpc/handler). If your client uses the [OpenAPI Link](/docs/openapi/link), pass `protocol: 'openapi'` to serve mocks through the [OpenAPI Handler](/docs/openapi/handler) instead. Requests are matched against each procedure's [route](/docs/openapi/routing), including custom methods, prefixes, and path parameters such as `/planets/{id}` or greedy `/files/{+path}` segments.

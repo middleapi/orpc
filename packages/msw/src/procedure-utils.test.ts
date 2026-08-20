@@ -1,5 +1,7 @@
 import type { RouterContractClient } from '@orpc/contract'
 import type { AnyRouter } from '@orpc/server'
+import type { AddressInfo } from 'node:net'
+import { createServer } from 'node:http'
 import { createORPCClient, isDefinedError, ORPCError } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { asyncIteratorObject, oc } from '@orpc/contract'
@@ -200,6 +202,27 @@ describe('error', () => {
     server.use(orpc.planet.find.error('NOT_FOUND', { message: 'custom message', data: { id: 1 } }))
 
     await expect(client.planet.find({ id: 1 })).rejects.toThrow('custom message')
+  })
+})
+
+describe('passthrough', () => {
+  it('performs the request against the real server', async () => {
+    const realServer = createServer((req, res) => res.end('real'))
+    await new Promise<void>(resolve => realServer.listen(0, resolve))
+    const port = (realServer.address() as AddressInfo).port
+
+    try {
+      const realORPC = createMSWUtils(contract, { url: `http://localhost:${port}/rpc` })
+
+      server.use(realORPC.planet.list.passthrough())
+
+      const response = await fetch(`http://localhost:${port}/rpc/planet/list`, { method: 'POST' })
+
+      await expect(response.text()).resolves.toBe('real')
+    }
+    finally {
+      realServer.close()
+    }
   })
 })
 

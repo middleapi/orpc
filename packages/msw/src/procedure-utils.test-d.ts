@@ -71,6 +71,10 @@ it('loading', () => {
   expectTypeOf(utils.ping.loading).toEqualTypeOf<() => HttpHandler>()
 })
 
+it('passthrough', () => {
+  expectTypeOf(utils.ping.passthrough).toEqualTypeOf<() => HttpHandler>()
+})
+
 it('protocol options', () => {
   createRouterUtils(contract, { protocol: 'openapi', url: '*/api' })
   // rpc options are the default

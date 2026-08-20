@@ -10,7 +10,7 @@ import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { implement } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { mergeHttpPath, pathToHttpPath } from '@orpc/shared'
-import { http } from 'msw'
+import { http, passthrough } from 'msw'
 
 /**
  * The extra request information MSW provides to a response resolver.
@@ -229,6 +229,16 @@ export class ProcedureUtils<
    */
   loading(): HttpHandler {
     return http.all(this.urlPattern, () => new Promise<never>(() => {}))
+  }
+
+  /**
+   * Creates an MSW request handler that performs matching requests against
+   * the real server as-is, useful to exempt a procedure from mocking.
+   *
+   * @see {@link https://orpc.dev/docs/integrations/msw#passthrough | MSW Integration - Passthrough}
+   */
+  passthrough(): HttpHandler {
+    return http.all(this.urlPattern, () => passthrough())
   }
 
   /**
