@@ -33,7 +33,7 @@ export const mock = createHTTPUtils(contract, {
 The `origin` and `prefix` options must match where your [RPC Link](/docs/rpc/link) sends requests. `origin` supports MSW wildcards, such as `*` to match any origin.
 
 :::info
-When you mock an implemented router, only the mock implementations run. The real handlers and middleware are never invoked.
+When you mock an implemented router, only the mock implementations run. The real handlers and middleware are never invoked. [Lazy routers](/docs/router#lazy-router) are not supported directly, [unlazy the router](/docs/contract/router#router-to-contract) first.
 :::
 
 ## Mocking Procedures
@@ -127,6 +127,26 @@ const mock = createHTTPUtils(contract, {
     plugins: [new ResponseHeadersPlugin()],
   }),
 })
+```
+
+The `context` option controls the [context](/docs/context) passed to the created handler for each request, and mock handlers receive it as `context`, enabling context-driven behaviors such as the [Response Headers Plugin](/docs/plugins/response-headers):
+
+```ts
+import { ResponseHeadersPlugin } from '@orpc/server/plugins'
+
+const mock = createHTTPUtils(contract, {
+  context: () => ({ resHeaders: new Headers() }),
+  handler: router => new RPCHandler(router, {
+    plugins: [new ResponseHeadersPlugin()],
+  }),
+})
+
+const handlers = [
+  mock.planet.list.handler(({ context }) => {
+    context.resHeaders.set('x-custom-header', 'value')
+    return []
+  }),
+]
 ```
 
 You can also disable validation of the mocked data:

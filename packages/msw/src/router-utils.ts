@@ -1,4 +1,5 @@
 import type { RouterContract } from '@orpc/contract'
+import type { Context } from '@orpc/server'
 import type { Public } from '@orpc/shared'
 import type { ProcedureUtilsOptions } from './procedure-utils'
 import { ProcedureContract } from '@orpc/contract'
@@ -12,11 +13,11 @@ import { ProcedureUtils } from './procedure-utils'
  *
  * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
  */
-export type RouterUtils<T extends RouterContract>
+export type RouterUtils<T extends RouterContract, TContext extends Context = Record<never, never>>
   = T extends ProcedureContract<infer UInputSchema, infer UOutputSchema, infer UErrorMap>
-    ? Public<ProcedureUtils<UInputSchema, UOutputSchema, UErrorMap>>
+    ? Public<ProcedureUtils<TContext, UInputSchema, UOutputSchema, UErrorMap>>
     : {
-        [K in keyof T]: T[K] extends RouterContract ? RouterUtils<T[K]> : never
+        [K in keyof T]: T[K] extends RouterContract ? RouterUtils<T[K], TContext> : never
       }
 
 /**
@@ -24,7 +25,7 @@ export type RouterUtils<T extends RouterContract>
  *
  * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
  */
-export interface RouterUtilsOptions extends ProcedureUtilsOptions {}
+export interface RouterUtilsOptions<TContext extends Context> extends ProcedureUtilsOptions<TContext> {}
 
 /**
  * Creates MSW utils from a router-contract (or an implemented router),
@@ -33,16 +34,16 @@ export interface RouterUtilsOptions extends ProcedureUtilsOptions {}
  *
  * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
  */
-export function createRouterUtils<T extends RouterContract>(
+export function createRouterUtils<T extends RouterContract, TContext extends Context = Record<never, never>>(
   contract: T,
-  options: NoInfer<RouterUtilsOptions>,
-): RouterUtils<T> {
-  return createRouterUtilsInternal(contract, options, []) as RouterUtils<T>
+  options: RouterUtilsOptions<TContext>,
+): RouterUtils<T, TContext> {
+  return createRouterUtilsInternal(contract, options, []) as RouterUtils<T, TContext>
 }
 
 function createRouterUtilsInternal(
   contract: RouterContract,
-  options: RouterUtilsOptions,
+  options: RouterUtilsOptions<any>,
   path: readonly string[],
 ): unknown {
   if (contract instanceof ProcedureContract) {
@@ -51,7 +52,7 @@ function createRouterUtilsInternal(
 
   if (contract instanceof Lazy) {
     throw new TypeError(
-      `Lazy routers are not supported at path: "${path.join('.')}". Please unlazy the router before creating MSW utils.`,
+      `Lazy routers are not supported at path: "${path.join('.')}". Please convert the router with unlazyRouter before creating MSW utils.`,
     )
   }
 

@@ -71,6 +71,26 @@ it('loading', () => {
   expectTypeOf(utils.ping.loading).toEqualTypeOf<() => HttpHandler>()
 })
 
+it('context option', () => {
+  const contextUtils = createRouterUtils(contract, {
+    context: () => ({ userId: '1' }),
+    handler: router => new RPCHandler(router),
+  })
+
+  contextUtils.ping.handler(({ context }) => {
+    expectTypeOf(context).toEqualTypeOf<{ userId: string }>()
+
+    return { output: 123 }
+  })
+
+  // context defaults to an empty object when not provided
+  utils.ping.handler(({ context }) => {
+    expectTypeOf(context).toEqualTypeOf<Record<never, never>>()
+
+    return { output: 123 }
+  })
+})
+
 it('passthrough', () => {
   expectTypeOf(utils.ping.passthrough).toEqualTypeOf<() => HttpHandler>()
 })

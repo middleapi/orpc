@@ -21,7 +21,7 @@ it('mirrors the router-contract shape', () => {
   const utils = createRouterUtils(contract, { handler: router => new RPCHandler(router) })
 
   expectTypeOf(utils).toEqualTypeOf<RouterUtils<typeof contract>>()
-  expectTypeOf(utils.ping).toExtend<Public<ProcedureUtils<typeof inputSchema, typeof outputSchema, object>>>()
+  expectTypeOf(utils.ping).toExtend<Public<ProcedureUtils<Record<never, never>, typeof inputSchema, typeof outputSchema, object>>>()
   expectTypeOf(utils.nested.pong).toExtend<{ loading: () => unknown }>()
 
   // @ts-expect-error --- not a procedure

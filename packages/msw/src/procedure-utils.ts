@@ -1,13 +1,13 @@
 import type { AnyORPCError, ORPCErrorCode } from '@orpc/client'
 import type { AnyProcedureContract, AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, ORPCErrorConstructorMap } from '@orpc/contract'
-import type { AnyRouter, ProcedureConfig } from '@orpc/server'
+import type { AnyRouter, Context, ProcedureConfig } from '@orpc/server'
 import type { FetchHandler } from '@orpc/server/fetch'
-import type { Promisable } from '@orpc/shared'
+import type { Promisable, Value } from '@orpc/shared'
 import type { HttpHandler, HttpResponseResolver } from 'msw'
 import { getDynamicPathParams, getOpenAPIMeta } from '@orpc/openapi'
 import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { implement } from '@orpc/server'
-import { mergeHttpPath, pathToHttpPath } from '@orpc/shared'
+import { mergeHttpPath, pathToHttpPath, value } from '@orpc/shared'
 import { http, passthrough } from 'msw'
 
 /**
@@ -22,14 +22,15 @@ export type ProcedureUtilsResolverInfo = Parameters<HttpResponseResolver>[0]
  *
  * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
  */
-export type ProcedureUtilsFetchHandler = Pick<FetchHandler<ProcedureUtilsResolverInfo>, 'handle'>
+export type ProcedureUtilsFetchHandler<TContext extends Context>
+  = Pick<FetchHandler<TContext & ProcedureUtilsResolverInfo>, 'handle'>
 
 /**
  * Options for creating MSW procedure utils.
  *
  * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
  */
-export interface ProcedureUtilsOptions extends ProcedureConfig {
+export interface ProcedureUtilsOptions<TContext extends Context> extends ProcedureConfig {
   /**
    * The origin requests are matched against. Supports MSW wildcards,
    * such as `*` to match any origin.
@@ -45,6 +46,15 @@ export interface ProcedureUtilsOptions extends ProcedureConfig {
   prefix?: `/${string}`
 
   /**
+   * The context passed to the created handler for each request, alongside the
+   * MSW resolver information, useful for context-driven behaviors such as the
+   * Response Headers Plugin. Mock handlers receive it as `context`.
+   *
+   * @see {@link https://orpc.dev/docs/integrations/msw#advanced-configuration | MSW Integration - Advanced Configuration}
+   */
+  context?: Value<Promisable<TContext>, [info: ProcedureUtilsResolverInfo]>
+
+  /**
    * Creates the fetch handler that serves each mock, using the same
    * configuration as your production handler, such as plugins. When it
    * creates an `OpenAPIHandler`, request URLs are matched using each
@@ -55,19 +65,22 @@ export interface ProcedureUtilsOptions extends ProcedureConfig {
    *
    * @see {@link https://orpc.dev/docs/integrations/msw#advanced-configuration | MSW Integration - Advanced Configuration}
    */
-  handler: (router: AnyRouter) => ProcedureUtilsFetchHandler
+  handler: (router: AnyRouter) => NoInfer<ProcedureUtilsFetchHandler<TContext>>
 }
 
 /**
  * Options passed to a mock procedure handler: the deserialized `input`, the
- * contract's typed `errors` constructors, and the MSW resolver information.
+ * contract's typed `errors` constructors, the handler `context`, and the MSW
+ * resolver information.
  *
  * @see {@link https://orpc.dev/docs/integrations/msw#mocking-procedures | MSW Integration - Mocking Procedures}
  */
 export interface ProcedureUtilsHandlerOptions<
+  TContext extends Context,
   TInputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
 > extends ProcedureUtilsResolverInfo {
+  context: TContext
   input: InferSchemaOutput<TInputSchema>
   errors: ORPCErrorConstructorMap<TErrorMap>
   signal?: AbortSignal | undefined
@@ -81,12 +94,13 @@ export interface ProcedureUtilsHandlerOptions<
  * @see {@link https://orpc.dev/docs/integrations/msw#mocking-procedures | MSW Integration - Mocking Procedures}
  */
 export interface ProcedureUtilsHandler<
+  TContext extends Context,
   TInputSchema extends AnySchema,
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
 > {
   (
-    options: ProcedureUtilsHandlerOptions<TInputSchema, TErrorMap>,
+    options: ProcedureUtilsHandlerOptions<TContext, TInputSchema, TErrorMap>,
   ): Promisable<AnyORPCError | InferSchemaInput<TOutputSchema>>
 }
 
@@ -98,6 +112,7 @@ export interface ProcedureUtilsHandler<
  * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
  */
 export class ProcedureUtils<
+  TContext extends Context,
   TInputSchema extends AnySchema,
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
@@ -108,7 +123,7 @@ export class ProcedureUtils<
   constructor(
     private readonly contract: AnyProcedureContract,
     private readonly path: readonly string[],
-    private readonly options: ProcedureUtilsOptions,
+    private readonly options: ProcedureUtilsOptions<TContext>,
   ) {
     this.origin = (this.options.origin ?? '').replace(/\/+$/, '')
     this.prefix = this.options.prefix === undefined
@@ -122,13 +137,14 @@ export class ProcedureUtils<
    *
    * @see {@link https://orpc.dev/docs/integrations/msw#mocking-procedures | MSW Integration - Mocking Procedures}
    */
-  handler(handler: ProcedureUtilsHandler<TInputSchema, TOutputSchema, TErrorMap>): HttpHandler {
+  handler(handler: ProcedureUtilsHandler<TContext, TInputSchema, TOutputSchema, TErrorMap>): HttpHandler {
     const procedure = implement(this.contract, {
       disableInputValidation: this.options.disableInputValidation,
       disableOutputValidation: this.options.disableOutputValidation,
     }).handler(
       ({ context, input, errors, signal, lastEventId }) => handler({
-        ...(context as ProcedureUtilsResolverInfo),
+        ...(context as TContext & ProcedureUtilsResolverInfo),
+        context: context as TContext,
         input: input as InferSchemaOutput<TInputSchema>,
         errors,
         signal,
@@ -139,13 +155,18 @@ export class ProcedureUtils<
     const fetchHandler = this.options.handler(this.toRouter(procedure))
 
     return http.all(this.resolveMSWPath(fetchHandler), async (info) => {
+      const context = {
+        ...await value(this.options.context, info),
+        ...info,
+      } as TContext & ProcedureUtilsResolverInfo
+
       /**
        * The fetch handler consumes the request body, so hand it a clone
        * and keep the original readable for the mock handler.
        */
       const { matched, response } = await fetchHandler.handle(info.request.clone(), {
         prefix: this.prefix,
-        context: info,
+        context,
       })
 
       return matched ? response : undefined
@@ -206,7 +227,7 @@ export class ProcedureUtils<
    * Resolves the MSW path predicate matching this procedure, following the
    * protocol of the created fetch handler.
    */
-  private resolveMSWPath(fetchHandler: ProcedureUtilsFetchHandler): string {
+  private resolveMSWPath(fetchHandler: ProcedureUtilsFetchHandler<TContext>): string {
     const isOpenAPI = fetchHandler instanceof OpenAPIHandler
     const httpPath = this.resolveHttpPath(isOpenAPI)
     const dynamicParams = isOpenAPI ? getDynamicPathParams(httpPath) ?? [] : []

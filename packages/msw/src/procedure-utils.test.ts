@@ -6,6 +6,7 @@ import { createORPCClient, isDefinedError, ORPCError } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { asyncIteratorObject, oc } from '@orpc/contract'
 import { RPCHandler } from '@orpc/server/fetch'
+import { ResponseHeadersPlugin } from '@orpc/server/plugins'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import z from 'zod'
@@ -171,6 +172,31 @@ describe('handler', () => {
 
     // the factory receives a router containing only the mocked procedure
     expect(Object.keys(factory.mock.calls[0]![0])).toEqual(['planet'])
+  })
+
+  it('supports controlling the handler context, e.g. for response headers', async () => {
+    const contextORPC = createHTTPUtils(contract, {
+      origin: 'http://localhost:3000',
+      prefix: '/rpc',
+      context: () => ({ resHeaders: new Headers() }),
+      handler: router => new RPCHandler(router, {
+        plugins: [new ResponseHeadersPlugin()],
+      }),
+    })
+
+    server.use(contextORPC.planet.list.handler(({ context }) => {
+      context.resHeaders.set('x-mocked-context', '1')
+      return []
+    }))
+
+    const response = await fetch('http://localhost:3000/rpc/planet/list', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    })
+
+    expect(response.headers.get('x-mocked-context')).toBe('1')
+    await expect(response.json()).resolves.toEqual({ json: [] })
   })
 
   it('leaves unmatched requests to other msw handlers', async () => {

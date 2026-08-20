@@ -34,7 +34,7 @@ it('throws on lazy routers', () => {
   const lazy = new Lazy({ loader: async () => ({ default: {} }), meta: {} })
 
   expect(() => createRouterUtils({ nested: lazy } as any, { handler: router => new RPCHandler(router) })).toThrow(
-    'Lazy routers are not supported at path: "nested".',
+    'Lazy routers are not supported at path: "nested". Please convert the router with unlazyRouter',
   )
 })
 
