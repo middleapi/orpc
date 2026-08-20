@@ -28,6 +28,7 @@
     "@orpc/experimental-effect": "workspace:*",
     "@orpc/hibernation": "workspace:*",
     "@orpc/json-schema": "workspace:*",
+    "@orpc/msw": "workspace:*",
     "@orpc/next": "workspace:*",
     "@orpc/node": "workspace:*",
     "@orpc/openapi": "workspace:*",

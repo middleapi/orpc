@@ -39,7 +39,7 @@ const fakeListPlanet = implement(router.planet.list).handler(() => [])
 Use `fakeListPlanet` anywhere your test would normally use the real `listPlanet` procedure.
 
 :::info
-`implement` is also useful for building mock servers in frontend tests.
+`implement` is also useful for building mock servers in frontend tests. To mock at the network level instead, for example in Storybook stories or browser tests, use the [MSW Integration](/docs/integrations/msw).
 :::
 
 :::warning

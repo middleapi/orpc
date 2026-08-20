@@ -1,0 +1,99 @@
+---
+title: "MSW Integration"
+description: "Mock oRPC procedures at the network level with typed MSW request handlers, reusing the real RPC runtime for serialization and validation."
+sidebar:
+  label: "MSW"
+---
+
+:::warning
+This guide assumes you are already familiar with [MSW](https://mswjs.io/). If you need a refresher, review the official MSW documentation before continuing.
+:::
+
+## Installation
+
+```package-install
+npm install @orpc/msw@beta
+```
+
+## Setup
+
+Create MSW utils from a [router contract](/docs/contract/router) or an implemented [router](/docs/router). Every request and response goes through the real [RPC Handler](/docs/rpc/handler), so serialization, validation, and error envelopes always behave exactly like your production server.
+
+```ts
+import { createMSWUtils } from '@orpc/msw'
+
+export const mock = createMSWUtils(contract, {
+  baseUrl: 'https://example.com/rpc',
+})
+```
+
+The `baseUrl` option must match the URL your [RPC Link](/docs/rpc/link) sends requests to and supports MSW wildcards, such as `*/rpc` to match any origin.
+
+:::info
+When you mock an implemented router, only the mock implementations run. The real handlers and middleware are never invoked.
+:::
+
+## Mocking Procedures
+
+The `.handler` method creates an MSW request handler that resolves a procedure. The input is deserialized and validated before your mock runs, and the return value is validated against the output schema and serialized with the [RPC serializer](/docs/rpc/serializer), so types like `Date`, `Map`, or `BigInt` reach the client intact.
+
+```ts
+import { setupServer } from 'msw/node'
+
+const server = setupServer(
+  mock.planet.list.handler(({ input }) => [
+    { id: 1, name: 'Earth' },
+  ]),
+)
+
+server.listen()
+```
+
+Beyond `input`, the mock also receives the MSW resolver information, such as the raw `request`.
+
+:::info
+[AsyncIteratorObject](/docs/async-iterator-object) outputs work too: return an async generator and the client receives a streamed response.
+:::
+
+## Mocking Errors
+
+The `.error` method creates an MSW request handler that rejects a procedure with an error defined in the contract, serialized exactly like a server-thrown error. Inside `.handler`, you can also throw typed errors dynamically via the `errors` constructors.
+
+```ts
+const handlers = [
+  mock.planet.find.error('NOT_FOUND', { data: { id: 123 } }),
+  mock.planet.update.handler(({ input, errors }) => {
+    throw errors.CONFLICT({ data: { id: input.id } })
+  }),
+]
+```
+
+## Mocking Loading States
+
+The `.loading` method creates an MSW request handler that never resolves, useful for testing loading states, for example in [Storybook](https://storybook.js.org/docs/writing-stories/mocking-data-and-modules/mocking-network-requests) stories:
+
+```ts
+export const Loading: Story = {
+  parameters: {
+    msw: {
+      handlers: [mock.planet.list.loading()],
+    },
+  },
+}
+```
+
+## Advanced Configuration
+
+`createMSWUtils` accepts the same options as the [RPC Handler](/docs/rpc/handler), so you can mirror your production configuration, such as a custom serializer or `allowMethods` if your client sends [GET requests](/docs/rpc/handler#supported-http-methods). You can also disable validation of the mocked data:
+
+```ts
+const mock = createMSWUtils(contract, {
+  baseUrl: '*/rpc',
+  disableOutputValidation: true,
+})
+```
+
+## Limitations
+
+- In Node.js, [RPC Link](/docs/rpc/link) captures `globalThis.fetch` when constructed. Start MSW interception before creating your link, or pass a late-bound fetch: `fetch: (url, init) => globalThis.fetch(url, init)`.
+- Requests sent through the [Batch Requests Plugin](/docs/plugins/batch) bundle multiple calls into a single HTTP request, which cannot match per-procedure handlers. Disable batching when mocking with MSW.
