@@ -98,7 +98,7 @@ function buildSlotCards(slotSponsors: Sponsor[]): string[] {
     const escapedDescription = escapeHtml(sponsor.description ?? '')
     const rel = relAttribute(sponsor)
 
-    lines.push(`   <td width="${cellWidth}"><a href="${escapedLink}" target="_blank" rel="${rel}" title="${escapedDescription}"><img src="${escapeHtml(sponsor.avatar)}" width="48" align="left" hspace="8" alt="${escapedName}"/><b>${escapedName}</b></a><br /><sub>${escapedDescription}</sub></td>`)
+    lines.push(`   <td width="${cellWidth}"><a href="${escapedLink}" target="_blank" rel="${rel}" title="${escapedDescription}"><img src="${escapeHtml(sponsor.avatar)}" width="64" align="left" hspace="12" alt="${escapedName}"/><b>${escapedName}</b></a><br /><sub>${escapedDescription}</sub></td>`)
 
     const isRowEnd = (index + 1) % columns === 0
     const isLast = index === slotSponsors.length - 1
