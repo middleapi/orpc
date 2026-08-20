@@ -500,9 +500,6 @@ importers:
       '@orpc/contract':
         specifier: workspace:*
         version: link:../contract
-      '@orpc/openapi':
-        specifier: workspace:*
-        version: link:../openapi
       '@orpc/server':
         specifier: workspace:*
         version: link:../server
@@ -510,6 +507,9 @@ importers:
         specifier: workspace:*
         version: link:../shared
     devDependencies:
+      '@orpc/openapi':
+        specifier: workspace:*
+        version: link:../openapi
       msw:
         specifier: ^2.15.0
         version: 2.15.0(@types/node@26.2.0)(typescript@6.0.3)

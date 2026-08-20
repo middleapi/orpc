@@ -55,7 +55,6 @@ it('mocks custom routes with path parameters', async () => {
 
   const options = fn.mock.calls[0]![0] as any
   expect(options.input).toEqual({ id: 42 })
-  expect(options.params).toEqual({ id: '42' })
   expect(options.request.url).toBe('http://localhost:3000/api/planets/42')
 })
 
