@@ -3,6 +3,7 @@
   "references": [
     { "path": "../client" },
     { "path": "../contract" },
+    { "path": "../openapi" },
     { "path": "../server" },
     { "path": "../shared" }
   ],

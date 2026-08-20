@@ -500,6 +500,9 @@ importers:
       '@orpc/contract':
         specifier: workspace:*
         version: link:../contract
+      '@orpc/openapi':
+        specifier: workspace:*
+        version: link:../openapi
       '@orpc/server':
         specifier: workspace:*
         version: link:../server

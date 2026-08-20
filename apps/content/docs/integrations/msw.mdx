@@ -1,6 +1,6 @@
 ---
 title: "MSW Integration"
-description: "Mock oRPC procedures at the network level with typed MSW request handlers, reusing the real RPC runtime for serialization and validation."
+description: "Mock oRPC procedures at the network level with typed MSW request handlers, reusing the real RPC or OpenAPI runtime for serialization and validation."
 sidebar:
   label: "MSW"
 ---
@@ -17,7 +17,7 @@ npm install @orpc/msw@beta
 
 ## Setup
 
-Create MSW utils from a [router contract](/docs/contract/router) or an implemented [router](/docs/router). Every request and response goes through the real [RPC Handler](/docs/rpc/handler), so serialization, validation, and error envelopes always behave exactly like your production server.
+Create MSW utils from a [router contract](/docs/contract/router) or an implemented [router](/docs/router). Every request and response goes through the real [RPC Handler](/docs/rpc/handler) (or [OpenAPI Handler](/docs/openapi/handler), see [OpenAPI Protocol](#openapi-protocol)), so serialization, validation, and error envelopes always behave exactly like your production server.
 
 ```ts
 import { createMSWUtils } from '@orpc/msw'
@@ -82,9 +82,22 @@ export const Loading: Story = {
 }
 ```
 
+## OpenAPI Protocol
+
+By default, mocks speak the [RPC protocol](/docs/rpc/handler). If your client uses the [OpenAPI Link](/docs/openapi/link), pass `protocol: 'openapi'` to serve mocks through the [OpenAPI Handler](/docs/openapi/handler) instead. Requests are matched against each procedure's [route](/docs/openapi/routing), including custom methods, prefixes, and path parameters such as `/planets/{id}` or greedy `/files/{+path}` segments.
+
+```ts
+const mock = createMSWUtils(contract, {
+  protocol: 'openapi',
+  baseUrl: '*/api',
+})
+```
+
+Everything else works the same: `.handler` receives the deserialized input, `.error` responds with typed errors, and the OpenAPI serializer handles the response, so the mocked client behaves exactly like one talking to a real OpenAPI Handler.
+
 ## Advanced Configuration
 
-`createMSWUtils` accepts the same options as the [RPC Handler](/docs/rpc/handler), so you can mirror your production configuration, such as a custom serializer or `allowMethods` if your client sends [GET requests](/docs/rpc/handler#supported-http-methods). You can also disable validation of the mocked data:
+`createMSWUtils` accepts the same options as the selected protocol's handler, so you can mirror your production configuration, such as a custom serializer or `allowMethods` if your client sends [GET requests](/docs/rpc/handler#supported-http-methods) over the RPC protocol. You can also disable validation of the mocked data:
 
 ```ts
 const mock = createMSWUtils(contract, {

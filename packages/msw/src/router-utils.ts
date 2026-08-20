@@ -24,11 +24,12 @@ export type RouterUtils<T extends RouterContract>
  *
  * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
  */
-export interface RouterUtilsOptions extends ProcedureUtilsOptions {}
+export type RouterUtilsOptions = ProcedureUtilsOptions
 
 /**
  * Creates MSW utils from a router-contract (or an implemented router),
- * exposing typed MSW request handler builders for every procedure.
+ * exposing typed MSW request handler builders for every procedure, served
+ * over the RPC protocol by default or the OpenAPI protocol via `protocol`.
  *
  * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
  */

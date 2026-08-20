@@ -68,3 +68,15 @@ it('error', () => {
 it('loading', () => {
   expectTypeOf(utils.ping.loading).toEqualTypeOf<() => HttpHandler>()
 })
+
+it('protocol options', () => {
+  createRouterUtils(contract, { protocol: 'openapi', baseUrl: '*/api' })
+  // rpc options are the default
+  createRouterUtils(contract, { allowMethods: ['GET'] })
+  createRouterUtils(contract, { protocol: 'rpc', allowMethods: ['GET'] })
+
+  // @ts-expect-error --- allowMethods is rpc-only
+  createRouterUtils(contract, { protocol: 'openapi', allowMethods: ['GET'] })
+  // @ts-expect-error --- invalid protocol
+  createRouterUtils(contract, { protocol: 'invalid' })
+})
