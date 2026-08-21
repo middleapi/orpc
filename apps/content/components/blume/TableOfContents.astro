@@ -1,6 +1,7 @@
 ---
 import type { Heading } from "blume/core/types.ts";
 import Icon from "blume/components/Icon.astro";
+import CoffeeCard from "../../sponsors/CoffeeCard.astro";
 
 interface Props {
   /** Headings to list (already filtered to the depths shown in the TOC). */
@@ -65,6 +66,7 @@ const { headings, title, variant } = Astro.props;
           ))}
         </ul>
       </blume-toc>
+      <CoffeeCard />
     </>
   )
 }
