@@ -89,6 +89,28 @@ it('context option', () => {
 
     return { output: 123 }
   })
+
+  // inferred from the created handler
+  const inferredUtils = createRouterUtils(contract, {
+    handler: router => new RPCHandler<{ userId?: string }>(router),
+  })
+
+  inferredUtils.ping.handler(({ context }) => {
+    expectTypeOf(context).toEqualTypeOf<{ userId?: string }>()
+
+    return { output: 123 }
+  })
+
+  // required when an empty object cannot satisfy it
+  createRouterUtils(contract, {
+    context: (): { userId: string } => ({ userId: '1' }),
+    handler: router => new RPCHandler<{ userId: string }>(router),
+  })
+
+  // @ts-expect-error --- context is required
+  createRouterUtils(contract, {
+    handler: router => new RPCHandler<{ userId: string }>(router),
+  })
 })
 
 it('passthrough', () => {

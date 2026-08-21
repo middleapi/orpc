@@ -1,6 +1,6 @@
 import type { AnyORPCError, ORPCErrorCode } from '@orpc/client'
 import type { AnyProcedureContract, AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, ORPCErrorConstructorMap } from '@orpc/contract'
-import type { AnyRouter, Context, ProcedureConfig } from '@orpc/server'
+import type { AnyRouter, Context, ProcedureConfig, ProcedureHandler } from '@orpc/server'
 import type { FetchHandler, FetchHandlerHandleResult } from '@orpc/server/fetch'
 import type { Promisable, Value } from '@orpc/shared'
 import type { HttpHandler, HttpRequestResolverExtras, PathParams, ResponseResolverInfo } from 'msw'
@@ -9,11 +9,11 @@ import { value } from '@orpc/shared'
 import { http, passthrough } from 'msw'
 
 /**
- * Options for creating MSW procedure utils.
+ * Options for creating MSW procedure utils, see {@link ProcedureUtilsOptions}.
  *
  * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
  */
-export interface ProcedureUtilsOptions<TContext extends Context> extends ProcedureConfig {
+export interface ProcedureUtilsBaseOptions<TContext extends Context> extends ProcedureConfig {
   /**
    * The origin requests are matched against. Supports MSW wildcards,
    * such as `*` to match any origin.
@@ -47,43 +47,21 @@ export interface ProcedureUtilsOptions<TContext extends Context> extends Procedu
    *
    * @see {@link https://orpc.dev/docs/integrations/msw#advanced-configuration | MSW Integration - Advanced Configuration}
    */
-  handler: (router: AnyRouter) => NoInfer<FetchHandler<TContext>>
+  handler: (router: AnyRouter) => FetchHandler<TContext>
 }
 
 /**
- * Options passed to a mock procedure handler: the deserialized `input`, the
- * contract's typed `errors` constructors, and the handler `context`.
+ * Options for creating MSW procedure utils. The context type is inferred from
+ * the `context` option or the created handler, and `context` becomes required
+ * when an empty object cannot satisfy it.
  *
- * @see {@link https://orpc.dev/docs/integrations/msw#mocking-procedures | MSW Integration - Mocking Procedures}
+ * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
  */
-export interface ProcedureUtilsHandlerOptions<
-  TContext extends Context,
-  TInputSchema extends AnySchema,
-  TErrorMap extends ErrorMap,
-> {
-  context: TContext
-  input: InferSchemaOutput<TInputSchema>
-  errors: ORPCErrorConstructorMap<TErrorMap>
-  signal?: AbortSignal | undefined
-  lastEventId?: string | undefined
-}
-
-/**
- * A mock procedure handler. Its return value is validated against the
- * contract's output schema before being serialized.
- *
- * @see {@link https://orpc.dev/docs/integrations/msw#mocking-procedures | MSW Integration - Mocking Procedures}
- */
-export interface ProcedureUtilsHandler<
-  TContext extends Context,
-  TInputSchema extends AnySchema,
-  TOutputSchema extends AnySchema,
-  TErrorMap extends ErrorMap,
-> {
-  (
-    options: ProcedureUtilsHandlerOptions<TContext, TInputSchema, TErrorMap>,
-  ): Promisable<AnyORPCError | InferSchemaInput<TOutputSchema>>
-}
+export type ProcedureUtilsOptions<TContext extends Context>
+  = & ProcedureUtilsBaseOptions<TContext>
+    & (object extends TContext ? unknown : {
+      context: Value<Promisable<TContext>, [info: ResponseResolverInfo<HttpRequestResolverExtras<PathParams>>]>
+    })
 
 /**
  * Creates typed MSW request handlers for a procedure-contract. Requests are
@@ -126,19 +104,18 @@ export class ProcedureUtils<
    *
    * @see {@link https://orpc.dev/docs/integrations/msw#mocking-procedures | MSW Integration - Mocking Procedures}
    */
-  handler(handler: ProcedureUtilsHandler<TContext, TInputSchema, TOutputSchema, TErrorMap>): HttpHandler {
+  handler(
+    handler: ProcedureHandler<
+      TContext,
+      InferSchemaOutput<TInputSchema>,
+      AnyORPCError | InferSchemaInput<TOutputSchema>,
+      ORPCErrorConstructorMap<TErrorMap>
+    >,
+  ): HttpHandler {
     const procedure = implement(this.contract, {
       disableInputValidation: this.options.disableInputValidation,
       disableOutputValidation: this.options.disableOutputValidation,
-    }).handler(
-      ({ context, input, errors, signal, lastEventId }) => handler({
-        context: context as TContext,
-        input: input as InferSchemaOutput<TInputSchema>,
-        errors,
-        signal,
-        lastEventId,
-      }),
-    )
+    }).handler(handler as ProcedureHandler<any, any, any, any>)
 
     return this.toMSWHandler(procedure, ({ matched, response }) => matched ? response : undefined)
   }

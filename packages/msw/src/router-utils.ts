@@ -25,7 +25,7 @@ export type RouterUtils<T extends RouterContract, TContext extends Context = Rec
  *
  * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
  */
-export interface RouterUtilsOptions<TContext extends Context> extends ProcedureUtilsOptions<TContext> {}
+export type RouterUtilsOptions<TContext extends Context> = ProcedureUtilsOptions<TContext>
 
 /**
  * Creates MSW utils from a router-contract (or an implemented router),
@@ -37,8 +37,11 @@ export interface RouterUtilsOptions<TContext extends Context> extends ProcedureU
 export function createRouterUtils<T extends RouterContract, TContext extends Context = Record<never, never>>(
   contract: T,
   options: RouterUtilsOptions<TContext>,
-): RouterUtils<T, TContext> {
-  return createRouterUtilsInternal(contract, options, []) as RouterUtils<T, TContext>
+): RouterUtils<T, 0 extends 1 & TContext ? Record<never, never> : TContext> {
+  // `0 extends 1 & TContext` detects `any`, which is inferred when the
+  // `handler` option creates a handler without an explicit context type,
+  // and falls back to the default context instead.
+  return createRouterUtilsInternal(contract, options, []) as any
 }
 
 function createRouterUtilsInternal(

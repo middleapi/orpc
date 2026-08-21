@@ -117,7 +117,7 @@ const mock = createHTTPUtils(contract, {
 })
 ```
 
-The `context` option controls the [context](/docs/context) passed to the created handler for each request, and mock handlers receive it as `context`, enabling context-driven behaviors such as the [Response Headers Plugin](/docs/plugins/response-headers). Define an interface extending the context types your plugins expect and annotate the factory with it:
+The `context` option controls the [context](/docs/context) passed to the created handler for each request, and mock handlers receive it as `context`, enabling context-driven behaviors such as the [Response Headers Plugin](/docs/plugins/response-headers). Define an interface extending the context types your plugins expect and annotate the factory with it. The context type can also be inferred from the created handler, such as `new RPCHandler<MockServerContext>(router)`, and `context` becomes required whenever an empty object cannot satisfy its type:
 
 ```ts
 import { ResponseHeadersHandlerPlugin, type ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
