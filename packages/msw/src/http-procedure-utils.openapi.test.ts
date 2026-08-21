@@ -1,6 +1,6 @@
 import type { RouterContractClient } from '@orpc/contract'
 import type { JsonifiedClient } from '@orpc/openapi'
-import { createORPCClient, isDefinedError, ORPCError } from '@orpc/client'
+import { createORPCClient, isInferableError, ORPCError } from '@orpc/client'
 import { oc } from '@orpc/contract'
 import { openapi } from '@orpc/openapi'
 import { OpenAPIHandler, OpenAPILink } from '@orpc/openapi/fetch'
@@ -84,7 +84,7 @@ it('responds with defined errors', async () => {
   }
   catch (error) {
     expect(error).toBeInstanceOf(ORPCError)
-    expect(isDefinedError(error)).toBe(true)
+    expect(isInferableError(error)).toBe(true)
     expect((error as any).code).toBe('NOT_FOUND')
     expect((error as any).message).toBe('Planet not found')
     expect((error as any).data).toEqual({ id: 42 })
@@ -111,11 +111,12 @@ it('supports wildcard base urls', async () => {
 it('leaves requests with unmatched methods to other msw handlers', async () => {
   server.use(
     mock.planet.find.handler(({ input }) => ({ id: input.id, name: 'Earth' })),
-    http.all('http://localhost:3000/*', () => HttpResponse.text('fallback')),
+    http.all('http://localhost:3000/*', async ({ request }) => HttpResponse.text(`fallback: ${await request.text()}`)),
   )
 
   // the find route only accepts GET, so a POST should fall through
-  const response = await fetch('http://localhost:3000/api/planets/42', { method: 'POST' })
+  // with its body untouched, since matching never reads the body
+  const response = await fetch('http://localhost:3000/api/planets/42', { method: 'POST', body: 'raw-body' })
 
-  await expect(response.text()).resolves.toBe('fallback')
+  await expect(response.text()).resolves.toBe('fallback: raw-body')
 })

@@ -12,37 +12,32 @@ This guide assumes you are already familiar with [MSW](https://mswjs.io/). If yo
 ## Installation
 
 ```package-install
-npm install @orpc/msw@beta
+npm install @orpc/experimental-msw@beta
 ```
 
 ## Setup
 
-Create MSW utils from a [router contract](/docs/contract/router) or an implemented [router](/docs/router). The `handler` option creates the fetch handler serving each mock, typically a [RPC Handler](/docs/rpc/handler) configured like your production one, so serialization, validation, and error envelopes always behave exactly like your production server.
+Create MSW utils from a [router contract](/docs/contract/router) or an implemented [router](/docs/router) (convert [lazy routers](/docs/router#lazy-router) with [`unlazyRouter`](/docs/contract/router#router-to-contract) first). The `handler` option creates the fetch handler that serves each mock. Configure it like your production handler, so serialization, validation, and error envelopes behave exactly like your real server.
 
 ```ts
-import { createHTTPUtils } from '@orpc/msw'
+import { createHTTPUtils } from '@orpc/experimental-msw'
 import { RPCHandler } from '@orpc/server/fetch'
 
 export const mock = createHTTPUtils(contract, {
-  origin: 'https://example.com',
   prefix: '/rpc',
   handler: router => new RPCHandler(router),
 })
 ```
 
-The `origin` and `prefix` options must match where your [RPC Link](/docs/rpc/link) sends requests. `origin` supports MSW wildcards, such as `*` to match any origin.
+Set `prefix` to the prefix your link sends requests to. Any origin matches by default; narrow it with the `origin` option, which supports MSW wildcards.
 
 :::tip
-Any protocol works: if your client uses the [OpenAPI Link](/docs/openapi/link), create an [OpenAPI Handler](/docs/openapi/handler) instead, and requests are matched against each procedure's [route](/docs/openapi/routing), including custom methods, prefixes, and path parameters such as `/planets/{id}`.
-:::
-
-:::info
-When you mock an implemented router, only the mock implementations run. The real handlers and middleware are never invoked. [Lazy routers](/docs/router#lazy-router) are not supported directly, [unlazy the router](/docs/contract/router#router-to-contract) first.
+Any protocol works: pair the [RPCLink](/docs/rpc/link) with a [RPCHandler](/docs/rpc/handler), or the [OpenAPILink](/docs/openapi/link) with an [OpenAPIHandler](/docs/openapi/handler).
 :::
 
 ## Mocking Procedures
 
-The `.handler` method creates an MSW request handler that resolves a procedure. The input is deserialized and validated before your mock runs, and the return value is validated against the output schema and serialized with the [RPC serializer](/docs/rpc/serializer), so types like `Date`, `Map`, or `BigInt` reach the client intact.
+The `.handler` method creates an MSW request handler that resolves a procedure. The input your mock receives and the output it returns are validated and serialized by the created fetch handler, exactly like on a real server.
 
 ```ts
 import { setupServer } from 'msw/node'
@@ -64,13 +59,18 @@ To access request details, such as the raw `request`, expose them through the [`
 
 ## Mocking Errors
 
-The `.error` method creates an MSW request handler that rejects a procedure with an error defined in the contract, serialized exactly like a server-thrown error. Inside `.handler`, you can also throw typed errors dynamically via the `errors` constructors.
+The `.error` method creates an MSW request handler that rejects a procedure with one of its [defined errors](/docs/contract/procedure#typesafe-errors), serialized exactly like a server-thrown error. For dynamic or arbitrary errors, use `.handler` and throw the `errors` constructors or any [`ORPCError`](/docs/error-handling#orpcerror-class):
 
 ```ts
+import { ORPCError } from '@orpc/client'
+
 const handlers = [
   mock.planet.find.error('NOT_FOUND', { data: { id: 123 } }),
   mock.planet.update.handler(({ input, errors }) => {
     throw errors.CONFLICT({ data: { id: input.id } })
+  }),
+  mock.planet.delete.handler(() => {
+    throw new ORPCError('SERVICE_UNAVAILABLE')
   }),
 ]
 ```
@@ -109,7 +109,6 @@ import { RPCHandler } from '@orpc/server/fetch'
 import { ResponseHeadersHandlerPlugin } from '@orpc/server/plugins'
 
 const mock = createHTTPUtils(contract, {
-  origin: '*',
   prefix: '/rpc',
   handler: router => new RPCHandler(router, {
     plugins: [new ResponseHeadersHandlerPlugin()],
@@ -117,17 +116,17 @@ const mock = createHTTPUtils(contract, {
 })
 ```
 
-The `context` option controls the [context](/docs/context) passed to the created handler for each request, and mock handlers receive it as `context`, enabling context-driven behaviors such as the [Response Headers Plugin](/docs/plugins/response-headers). Define an interface extending the context types your plugins expect and annotate the factory with it. The context type can also be inferred from the created handler, such as `new RPCHandler<MockServerContext>(router)`, and `context` becomes required whenever an empty object cannot satisfy its type:
+The `context` option controls the [context](/docs/context) passed to the created handler on each request, and mock handlers receive it as `context`, enabling context-driven behaviors such as the [Response Headers Plugin](/docs/plugins/response-headers).
 
 ```ts
 import { ResponseHeadersHandlerPlugin, type ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
 
 interface MockServerContext extends ResponseHeadersHandlerPluginContext {
-  request: Request
+  reqHeaders: Headers
 }
 
 const mock = createHTTPUtils(contract, {
-  context: (info): MockServerContext => ({ request: info.request }),
+  context: (info): MockServerContext => ({ reqHeaders: info.request.headers }),
   handler: router => new RPCHandler(router, {
     plugins: [new ResponseHeadersHandlerPlugin()],
   }),
@@ -135,17 +134,19 @@ const mock = createHTTPUtils(contract, {
 
 const handlers = [
   mock.planet.list.handler(({ context }) => {
-    context.resHeaders?.set('x-custom-header', 'value')
+    const locale = context.reqHeaders.get('accept-language') ?? 'en'
+    context.resHeaders?.set('content-language', locale)
     return []
   }),
 ]
 ```
 
-You can also disable validation of the mocked data:
+You can also disable input or output validation of the mocked data:
 
 ```ts
 const mock = createHTTPUtils(contract, {
   handler: router => new RPCHandler(router),
+  disableInputValidation: true,
   disableOutputValidation: true,
 })
 ```

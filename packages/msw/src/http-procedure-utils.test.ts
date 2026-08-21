@@ -3,7 +3,7 @@ import type { AnyRouter } from '@orpc/server'
 import type { ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
 import type { AddressInfo } from 'node:net'
 import { createServer } from 'node:http'
-import { createORPCClient, isDefinedError, ORPCError } from '@orpc/client'
+import { createORPCClient, isInferableError, ORPCError } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { asyncIteratorObject, oc } from '@orpc/contract'
 import { RPCHandler } from '@orpc/server/fetch'
@@ -68,7 +68,8 @@ describe('handler', () => {
     const infoORPC = createHTTPUtils(contract, {
       origin: 'http://localhost:3000',
       prefix: '/rpc',
-      context: info => ({ request: info.request, requestId: info.requestId }),
+      // clone so the raw body stays readable after input deserialization
+      context: info => ({ request: info.request.clone(), requestId: info.requestId }),
       handler: router => new RPCHandler(router),
     })
 
@@ -79,7 +80,6 @@ describe('handler', () => {
     expect(context.request).toBeInstanceOf(Request)
     expect(context.request.url).toBe('http://localhost:3000/rpc/planet/find')
     expect(context.requestId).toBeTypeOf('string')
-    // the fetch handler consumes a clone, the context request stays readable
     await expect(context.request.json()).resolves.toEqual({ json: { id: 1 } })
   })
 
@@ -114,7 +114,7 @@ describe('handler', () => {
     }
     catch (error) {
       expect(error).toBeInstanceOf(ORPCError)
-      expect(isDefinedError(error)).toBe(true)
+      expect(isInferableError(error)).toBe(true)
       expect((error as any).code).toBe('NOT_FOUND')
       expect((error as any).message).toBe('Planet not found')
       expect((error as any).data).toEqual({ id: 7 })
@@ -134,6 +134,14 @@ describe('handler', () => {
     }
 
     expect(messages).toEqual(['hello', 'world'])
+  })
+
+  it('matches any origin by default', async () => {
+    const defaultORPC = createHTTPUtils(contract, { prefix: '/rpc', handler: router => new RPCHandler(router) })
+
+    server.use(defaultORPC.planet.list.handler(() => [{ id: 1, name: 'Venus' }]))
+
+    await expect(client.planet.list()).resolves.toEqual([{ id: 1, name: 'Venus' }])
   })
 
   it('supports wildcard base urls', async () => {
@@ -236,7 +244,7 @@ describe('error', () => {
     }
     catch (error) {
       expect(error).toBeInstanceOf(ORPCError)
-      expect(isDefinedError(error)).toBe(true)
+      expect(isInferableError(error)).toBe(true)
       expect((error as any).code).toBe('NOT_FOUND')
       expect((error as any).message).toBe('Planet not found')
       expect((error as any).data).toEqual({ id: 42 })
@@ -252,7 +260,11 @@ describe('error', () => {
 
 describe('passthrough', () => {
   it('performs the request against the real server', async () => {
-    const realServer = createServer((req, res) => res.end('real'))
+    const realServer = createServer((req, res) => {
+      let body = ''
+      req.on('data', chunk => (body += chunk))
+      req.on('end', () => res.end(`real:${body}`))
+    })
     await new Promise<void>(resolve => realServer.listen(0, resolve))
     const port = (realServer.address() as AddressInfo).port
 
@@ -272,9 +284,10 @@ describe('passthrough', () => {
         })),
       )
 
-      const response = await fetch(`http://localhost:${port}/rpc/planet/list`, { method: 'POST' })
+      // the body must survive the matching attempt to reach the real server
+      const response = await fetch(`http://localhost:${port}/rpc/planet/list`, { method: 'POST', body: '{}' })
 
-      await expect(response.text()).resolves.toBe('real')
+      await expect(response.text()).resolves.toBe('real:{}')
 
       // other procedures fall through the passthrough handler and stay mocked
       const mocked = await fetch(`http://localhost:${port}/rpc/planet/find`, {
@@ -307,6 +320,9 @@ describe('loading', () => {
       new Promise(resolve => setTimeout(resolve, 100, 'still-loading')),
     ])).resolves.toBe('still-loading')
 
+    // aborting rejects the pending mock, releasing its resources
     controller.abort()
+    await expect(pending).rejects.toThrow()
+    await new Promise(resolve => setTimeout(resolve, 50))
   })
 })

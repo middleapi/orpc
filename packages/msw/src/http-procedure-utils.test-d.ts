@@ -3,7 +3,7 @@ import { oc } from '@orpc/contract'
 import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { RPCHandler } from '@orpc/server/fetch'
 import z from 'zod'
-import { createRouterUtils } from './router-utils'
+import { createHTTPUtils } from './http-router-utils'
 
 const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
 const outputSchema = z.object({ output: z.number().transform(n => `${n}`) })
@@ -20,12 +20,12 @@ const contract = {
   },
 }
 
-const utils = createRouterUtils(contract, { prefix: '/rpc', handler: router => new RPCHandler(router) })
+const utils = createHTTPUtils(contract, { prefix: '/rpc', handler: router => new RPCHandler(router) })
 
 it('handler', () => {
   const handler = utils.ping.handler(({ input, errors, context, signal, lastEventId }) => {
     expectTypeOf(input).toEqualTypeOf<{ input: string }>()
-    expectTypeOf(context).toEqualTypeOf<Record<never, never>>()
+    expectTypeOf(context).toEqualTypeOf<object>()
     expectTypeOf(signal).toEqualTypeOf<AbortSignal | undefined>()
     expectTypeOf(lastEventId).toEqualTypeOf<string | undefined>()
 
@@ -72,7 +72,7 @@ it('loading', () => {
 })
 
 it('context option', () => {
-  const contextUtils = createRouterUtils(contract, {
+  const contextUtils = createHTTPUtils(contract, {
     context: () => ({ userId: '1' }),
     handler: router => new RPCHandler(router),
   })
@@ -83,33 +83,22 @@ it('context option', () => {
     return { output: 123 }
   })
 
-  // context defaults to an empty object when not provided
+  // context defaults to `object` when it cannot be inferred
   utils.ping.handler(({ context }) => {
-    expectTypeOf(context).toEqualTypeOf<Record<never, never>>()
-
-    return { output: 123 }
-  })
-
-  // inferred from the created handler
-  const inferredUtils = createRouterUtils(contract, {
-    handler: router => new RPCHandler<{ userId?: string }>(router),
-  })
-
-  inferredUtils.ping.handler(({ context }) => {
-    expectTypeOf(context).toEqualTypeOf<{ userId?: string }>()
+    expectTypeOf(context).toEqualTypeOf<object>()
 
     return { output: 123 }
   })
 
   // required when an empty object cannot satisfy it
-  createRouterUtils(contract, {
+  createHTTPUtils(contract, {
     context: (): { userId: string } => ({ userId: '1' }),
-    handler: router => new RPCHandler<{ userId: string }>(router),
+    handler: router => new RPCHandler(router),
   })
 
   // @ts-expect-error --- context is required
-  createRouterUtils(contract, {
-    handler: router => new RPCHandler<{ userId: string }>(router),
+  createHTTPUtils<typeof contract, { userId: string }>(contract, {
+    handler: router => new RPCHandler(router),
   })
 })
 
@@ -118,14 +107,14 @@ it('passthrough', () => {
 })
 
 it('options', () => {
-  createRouterUtils(contract, { handler: router => new RPCHandler(router) })
-  createRouterUtils(contract, { origin: '*', prefix: '/rpc', handler: router => new RPCHandler(router) })
-  createRouterUtils(contract, { origin: 'http://localhost:3000', prefix: '/api', handler: router => new OpenAPIHandler(router) })
+  createHTTPUtils(contract, { handler: router => new RPCHandler(router) })
+  createHTTPUtils(contract, { origin: '*', prefix: '/rpc', handler: router => new RPCHandler(router) })
+  createHTTPUtils(contract, { origin: 'http://localhost:3000', prefix: '/api', handler: router => new OpenAPIHandler(router) })
 
   // @ts-expect-error --- handler is required
-  createRouterUtils(contract, { origin: '*' })
+  createHTTPUtils(contract, { origin: '*' })
   // @ts-expect-error --- must return a fetch handler
-  createRouterUtils(contract, { handler: () => ({}) })
+  createHTTPUtils(contract, { handler: () => ({}) })
   // @ts-expect-error --- prefix must start with /
-  createRouterUtils(contract, { prefix: 'rpc', handler: router => new RPCHandler(router) })
+  createHTTPUtils(contract, { prefix: 'rpc', handler: router => new RPCHandler(router) })
 })

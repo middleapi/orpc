@@ -1,6 +1,6 @@
-import type { AnyORPCError, ORPCErrorCode } from '@orpc/client'
+import type { AnyORPCError } from '@orpc/client'
 import type { AnyProcedureContract, AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, ORPCErrorConstructorMap } from '@orpc/contract'
-import type { AnyRouter, Context, ProcedureConfig, ProcedureHandler } from '@orpc/server'
+import type { Context, ProcedureConfig, ProcedureHandler, Router } from '@orpc/server'
 import type { FetchHandler, FetchHandlerHandleResult } from '@orpc/server/fetch'
 import type { Promisable, Value } from '@orpc/shared'
 import type { HttpHandler, HttpRequestResolverExtras, PathParams, ResponseResolverInfo } from 'msw'
@@ -8,69 +8,71 @@ import { implement } from '@orpc/server'
 import { value } from '@orpc/shared'
 import { http, passthrough } from 'msw'
 
-/**
- * Options for creating MSW procedure utils, see {@link ProcedureUtilsOptions}.
- *
- * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
- */
-export interface ProcedureUtilsBaseOptions<TContext extends Context> extends ProcedureConfig {
-  /**
-   * The origin requests are matched against. Supports MSW wildcards,
-   * such as `*` to match any origin.
-   *
-   * @default ''
-   */
-  origin?: string
+export type HTTPProcedureUtilsOptions<TContext extends Context>
+  = & ProcedureConfig
+    & {
+    /**
+     * The origin requests are matched against. Supports MSW wildcards.
+     * Set `''` to match only same-origin requests in the browser.
+     *
+     * @default '*'
+     */
+      origin?: string
 
-  /**
-   * The path prefix procedures are served under, matching the `prefix`
-   * the corresponding handler is mounted at in production.
-   */
-  prefix?: `/${string}`
+      /**
+       * The path prefix procedures are served under, matching the `prefix`
+       * the corresponding handler is mounted at in production.
+       */
+      prefix?: `/${string}`
 
-  /**
-   * The context passed to the created handler for each request, resolved with
-   * the MSW resolver information, useful for context-driven behaviors such as
-   * the Response Headers Plugin. Mock handlers receive it as `context`.
-   *
-   * @see {@link https://orpc.dev/docs/integrations/msw#advanced-configuration | MSW Integration - Advanced Configuration}
-   */
-  context?: Value<Promisable<TContext>, [info: ResponseResolverInfo<HttpRequestResolverExtras<PathParams>>]>
-
-  /**
-   * Creates the fetch handler that serves each mock, using the same
-   * configuration as your production handler, such as plugins. Requests are
-   * matched entirely by the created handler, so any protocol works.
-   *
-   * The router passed in contains only the procedure being mocked. Requests
-   * the created handler does not match fall through to other MSW handlers.
-   *
-   * @see {@link https://orpc.dev/docs/integrations/msw#advanced-configuration | MSW Integration - Advanced Configuration}
-   */
-  handler: (router: AnyRouter) => FetchHandler<TContext>
-}
-
-/**
- * Options for creating MSW procedure utils. The context type is inferred from
- * the `context` option or the created handler, and `context` becomes required
- * when an empty object cannot satisfy it.
- *
- * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
- */
-export type ProcedureUtilsOptions<TContext extends Context>
-  = & ProcedureUtilsBaseOptions<TContext>
-    & (object extends TContext ? unknown : {
+      /**
+       * Creates the fetch handler that serves each mock, using the same
+       * configuration as your production handler, such as plugins. Requests are
+       * matched entirely by the created handler, so any protocol works.
+       *
+       * The router passed in contains only the procedure being mocked. Requests
+       * the created handler does not match fall through to other MSW handlers.
+       *
+       * @see {@link https://orpc.dev/docs/integrations/msw#advanced-configuration | MSW Integration - Advanced Configuration}
+       */
+      handler: (router: Router<TContext>) => NoInfer<FetchHandler<TContext>>
+    }
+    & (object extends TContext ? {
+    /**
+     * The context passed to the created handler for each request, resolved
+     * with the MSW resolver information. Mock handlers receive it as
+     * `context`, enabling context-driven behaviors such as the Response
+     * Headers Plugin.
+     *
+     * Optional when an empty object can satisfy the context type,
+     * required otherwise.
+     *
+     * @see {@link https://orpc.dev/docs/integrations/msw#advanced-configuration | MSW Integration - Advanced Configuration}
+     */
+      context?: Value<Promisable<TContext>, [info: ResponseResolverInfo<HttpRequestResolverExtras<PathParams>>]>
+    } : {
+    /**
+     * The context passed to the created handler for each request, resolved
+     * with the MSW resolver information. Mock handlers receive it as
+     * `context`, enabling context-driven behaviors such as the Response
+     * Headers Plugin.
+     *
+     * Optional when an empty object can satisfy the context type,
+     * required otherwise.
+     *
+     * @see {@link https://orpc.dev/docs/integrations/msw#advanced-configuration | MSW Integration - Advanced Configuration}
+     */
       context: Value<Promisable<TContext>, [info: ResponseResolverInfo<HttpRequestResolverExtras<PathParams>>]>
     })
 
 /**
- * Creates typed MSW request handlers for a procedure-contract. Requests are
- * matched and served by a real fetch handler, so routing, serialization,
+ * Creates typed MSW HTTP request handlers for a procedure-contract. Requests
+ * are matched and served by a real fetch handler, so routing, serialization,
  * validation, and error envelopes always match the production handler.
  *
  * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
  */
-export class ProcedureUtils<
+export class HTTPProcedureUtils<
   TContext extends Context,
   TInputSchema extends AnySchema,
   TOutputSchema extends AnySchema,
@@ -78,7 +80,7 @@ export class ProcedureUtils<
 > {
   /**
    * Matches every request under `origin` + `prefix`, the created fetch
-   * handler decides whether the request targets this procedure.
+   * handler decides whether a request targets this procedure.
    */
   private readonly mswPathPredicate: string
 
@@ -87,15 +89,15 @@ export class ProcedureUtils<
   constructor(
     private readonly contract: AnyProcedureContract,
     private readonly path: readonly string[],
-    private readonly options: ProcedureUtilsOptions<TContext>,
+    private readonly options: HTTPProcedureUtilsOptions<TContext>,
   ) {
-    const origin = (this.options.origin ?? '').replace(/\/+$/, '')
+    const origin = this.options.origin ?? '*'
     this.prefix = this.options.prefix === undefined
       ? undefined
       : `/${this.options.prefix.replace(/\/+$/, '').slice(1)}`
 
     const base = `${origin}${this.prefix === undefined || this.prefix === '/' ? '' : this.prefix}`
-    this.mswPathPredicate = base === '' ? '*' : `${base}/*`
+    this.mswPathPredicate = base === '' || base === '*' ? '*' : `${base}/*`
   }
 
   /**
@@ -126,7 +128,7 @@ export class ProcedureUtils<
    *
    * @see {@link https://orpc.dev/docs/integrations/msw#mocking-errors | MSW Integration - Mocking Errors}
    */
-  error<TCode extends keyof TErrorMap & ORPCErrorCode>(
+  error<TCode extends keyof TErrorMap>(
     code: TCode,
     ...rest: Parameters<ORPCErrorConstructorMap<TErrorMap>[TCode]>
   ): HttpHandler {
@@ -137,12 +139,15 @@ export class ProcedureUtils<
 
   /**
    * Creates an MSW request handler that never resolves, useful for testing
-   * loading states.
+   * loading states. It rejects once the request is aborted, releasing the
+   * pending request's resources.
    *
    * @see {@link https://orpc.dev/docs/integrations/msw#mocking-loading-states | MSW Integration - Mocking Loading States}
    */
   loading(): HttpHandler {
-    return this.handler(() => new Promise<never>(() => {}))
+    return this.handler(({ signal }) => new Promise<never>((_, reject) => {
+      signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+    }))
   }
 
   /**
@@ -161,7 +166,7 @@ export class ProcedureUtils<
       disableOutputValidation: true,
     }).handler(() => undefined)
 
-    return this.toMSWHandler(procedure, ({ matched }) => matched ? passthrough() : undefined)
+    return this.toMSWHandler(procedure, ({ matched }) => matched ? passthrough() : undefined, true)
   }
 
   /**
@@ -169,10 +174,15 @@ export class ProcedureUtils<
    * option and resolves the MSW response from its result.
    */
   private toMSWHandler(
-    procedure: AnyRouter,
+    procedure: Router<TContext>,
     resolve: (result: FetchHandlerHandleResult) => Response | undefined,
+    /**
+     * Passthrough re-sends the original request to the real server, so the
+     * matching attempt must consume a clone instead of the original.
+     */
+    cloneRequest = false,
   ): HttpHandler {
-    const router = this.path.reduceRight<AnyRouter>(
+    const router = this.path.reduceRight<Router<TContext>>(
       (acc, segment) => ({ [segment]: acc }),
       procedure,
     )
@@ -183,10 +193,11 @@ export class ProcedureUtils<
       const context = (await value(this.options.context, info) ?? {}) as TContext
 
       /**
-       * The fetch handler consumes the request body, so hand it a clone
-       * and keep the original readable, e.g. for accessing through `context`.
+       * Matching never reads the body, so unmatched requests fall through
+       * intact. Serving a matched request consumes the body like any MSW
+       * resolver, clone the request in `context` if you need to read it.
        */
-      const result = await fetchHandler.handle(info.request.clone(), {
+      const result = await fetchHandler.handle(cloneRequest ? info.request.clone() : info.request, {
         prefix: this.prefix,
         context,
       })

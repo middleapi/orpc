@@ -54,7 +54,7 @@ You can read the documentation [here](https://orpc.dev).
 - [@orpc/tanstack-query](https://npmx.dev/package/@orpc/tanstack-query): Integrate with [TanStack Query](https://tanstack.com/query/latest).
 - [@orpc/pinia-colada](https://npmx.dev/package/@orpc/pinia-colada): Integrate with [Pinia Colada](https://pinia-colada.esm.dev/).
 - [@orpc/swr](https://npmx.dev/package/@orpc/swr): Integrate with [SWR](https://swr.vercel.app/).
-- [@orpc/msw](https://npmx.dev/package/@orpc/msw): Mock procedures with [Mock Service Worker](https://mswjs.io/).
+- [@orpc/experimental-msw](https://npmx.dev/package/@orpc/experimental-msw): Mock procedures with [Mock Service Worker](https://mswjs.io/).
 - [@orpc/experimental-effect](https://npmx.dev/package/@orpc/experimental-effect): Integrate with [Effect](https://effect.website/).
 - [@orpc/nest](https://npmx.dev/package/@orpc/nest): Implement your contract with [NestJS](https://nestjs.com/).
 - [@orpc/node](https://npmx.dev/package/@orpc/node): [Node.js](https://nodejs.org/) plugins for static file serving and large uploads.

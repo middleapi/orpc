@@ -2,11 +2,11 @@ import type { RouterClient } from '@orpc/server'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { oc } from '@orpc/contract'
-import { Lazy, os } from '@orpc/server'
+import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { setupServer } from 'msw/node'
 import z from 'zod'
-import { createRouterUtils } from './router-utils'
+import { createHTTPUtils } from './http-router-utils'
 
 const contract = {
   ping: oc.input(z.object({ value: z.number() })).output(z.object({ value: z.number() })),
@@ -16,7 +16,7 @@ const contract = {
 }
 
 it('mirrors the router-contract shape', () => {
-  const utils = createRouterUtils(contract, { handler: router => new RPCHandler(router) })
+  const utils = createHTTPUtils(contract, { handler: router => new RPCHandler(router) })
 
   expect(utils.ping.handler).toBeTypeOf('function')
   expect(utils.ping.error).toBeTypeOf('function')
@@ -24,18 +24,13 @@ it('mirrors the router-contract shape', () => {
   expect(utils.nested.pong.handler).toBeTypeOf('function')
 })
 
-it('supports destructuring thanks to bound methods', () => {
-  const { loading } = createRouterUtils(contract, { handler: router => new RPCHandler(router) }).nested.pong
+it('keeps non-router values as-is', () => {
+  const utils: any = createHTTPUtils({ ping: contract.ping, invalid: null } as any, {
+    handler: router => new RPCHandler(router),
+  })
 
-  expect(loading()).toBeDefined()
-})
-
-it('throws on lazy routers', () => {
-  const lazy = new Lazy({ loader: async () => ({ default: {} }), meta: {} })
-
-  expect(() => createRouterUtils({ nested: lazy } as any, { handler: router => new RPCHandler(router) })).toThrow(
-    'Lazy routers are not supported at path: "nested". Please convert the router with unlazyRouter',
-  )
+  expect(utils.invalid).toBeNull()
+  expect(utils.ping.handler).toBeTypeOf('function')
 })
 
 describe('with an implemented router', () => {
@@ -53,7 +48,7 @@ describe('with an implemented router', () => {
   afterAll(() => server.close())
 
   it('mocks procedures instead of calling their real handlers', async () => {
-    const utils = createRouterUtils(router, {
+    const utils = createHTTPUtils(router, {
       origin: 'http://localhost:3000',
       prefix: '/rpc',
       handler: router => new RPCHandler(router),
