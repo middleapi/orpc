@@ -2,6 +2,7 @@
   "name": "@orpc/experimental-msw",
   "type": "module",
   "version": "2.0.0-beta.29",
+  "description": "MSW integration for oRPC: mock procedures at the network level with typed MSW request handlers",
   "license": "MIT",
   "funding": "https://github.com/sponsors/dinwwwh",
   "homepage": "https://orpc.dev",
