@@ -69,14 +69,14 @@
   },
   "devDependencies": {
     "@fastify/cookie": "^11.0.2",
-    "@nestjs/common": "^11.1.29",
-    "@nestjs/core": "^11.1.29",
-    "@nestjs/platform-express": "^11.1.29",
-    "@nestjs/platform-fastify": "^11.1.29",
-    "@nestjs/testing": "^11.1.29",
+    "@nestjs/common": "^11.2.1",
+    "@nestjs/core": "^11.2.1",
+    "@nestjs/platform-express": "^11.2.1",
+    "@nestjs/platform-fastify": "^11.2.1",
+    "@nestjs/testing": "^11.2.1",
     "@types/express": "^5.0.6",
     "express": "^5.2.1",
-    "fastify": "^5.11.3",
+    "fastify": "^5.12.1",
     "rxjs": "^7.8.2"
   }
 }

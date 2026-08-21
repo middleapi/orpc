@@ -57,7 +57,7 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "@angular/core": "^22.1.1",
+    "@angular/core": "^22.1.3",
     "@tanstack/angular-query-experimental": "^5.101.4",
     "@tanstack/query-core": "^5.101.4",
     "@tanstack/react-query": "^5.101.4",

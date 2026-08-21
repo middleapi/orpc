@@ -123,11 +123,11 @@
     "rou3": "^0.9.1"
   },
   "devDependencies": {
-    "@scalar/api-reference": "^1.64.1",
+    "@scalar/api-reference": "^1.65.1",
     "@standardserver/aws-lambda": "^0.8.0",
     "@types/swagger-ui": "^5.32.0",
-    "fastify": "^5.11.3",
-    "swagger-ui": "^5.32.13",
+    "fastify": "^5.12.1",
+    "swagger-ui": "^5.32.14",
     "zod": "^4.4.3"
   }
 }
