@@ -57,7 +57,7 @@
     "arktype": "^2.2.1",
     "bumpp": "^12.2.0",
     "changelogithub": "^15.0.4",
-    "crossws": "^0.4.6",
+    "crossws": "^0.4.11",
     "eslint": "^10.8.0",
     "eslint-plugin-ban": "^2.0.0",
     "eslint-plugin-format": "^2.0.1",

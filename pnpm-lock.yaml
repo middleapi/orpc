@@ -129,8 +129,8 @@ importers:
         specifier: ^15.0.4
         version: 15.0.4
       crossws:
-        specifier: ^0.4.6
-        version: 0.4.10
+        specifier: ^0.4.11
+        version: 0.4.11
       eslint:
         specifier: ^10.8.0
         version: 10.8.1(jiti@2.7.0)(supports-color@10.2.2)
@@ -806,8 +806,8 @@ importers:
         version: 2.0.1
     devDependencies:
       crossws:
-        specifier: ^0.4.6
-        version: 0.4.10
+        specifier: ^0.4.11
+        version: 0.4.11
       fastify:
         specifier: ^5.12.1
         version: 5.12.1
@@ -6950,8 +6950,8 @@ packages:
   crossws@0.3.5:
     resolution: {integrity: sha512-ojKiDvcmByhwa8YYqbQI/hg7MEU0NC03+pSdEq4ZUnZR9xXpwk7E43SMNGkn+JxJGPFtNvQ48+vV2p+P1ml5PA==}
 
-  crossws@0.4.10:
-    resolution: {integrity: sha512-pz3oubH/dt12KjqsUB0IuXW4nwRDQ583iDsP4555Cpdqx0NoU7pGlWBcayyFI8f/l/idRpgjMEfwuOxSWJYlIA==}
+  crossws@0.4.11:
+    resolution: {integrity: sha512-qCHS/+7vxBgoGM5WxkfJDXLzEjSkbNjoFrExW7nEHr0BRuqEoA2vvPubTqJCe6+LlQKKlUZ7GLL7yEcNrkxHFQ==}
     peerDependencies:
       srvx: '>=0.11.5'
     peerDependenciesMeta:
@@ -18845,7 +18845,7 @@ snapshots:
     dependencies:
       uncrypto: 0.1.3
 
-  crossws@0.4.10: {}
+  crossws@0.4.11: {}
 
   css-declaration-sorter@7.4.0(postcss@8.5.26):
     dependencies:
