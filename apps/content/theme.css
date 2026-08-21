@@ -27,13 +27,13 @@
   /* Palette — dark (Zed One Dark values; page background lives in
      blume.config.ts `theme`). Surfaces sit above the page, code blocks
      recess below it like Zed's editor pane. */
-  --blume-foreground: #dce0e5;
+  --blume-foreground: #ffffff;
   /* Blume forces white accent text in dark mode; our accent there is the
      light brand pink (#ff6ca5), where white text fails contrast (2.6:1).
      Flip the text dark instead (7.5:1). */
   --blume-accent-foreground: oklch(0.145 0 0);
   --blume-muted: #2f343e;
-  --blume-muted-foreground: #a9afbc;
+  --blume-muted-foreground: #e6e6e6;
   --blume-border: #363c46;
   --blume-code-background: #21252b;
 }
