@@ -221,6 +221,28 @@ describe('handler', () => {
     await expect(response.json()).resolves.toEqual({ json: [] })
   })
 
+  it('does not match other origins when origin is empty', async () => {
+    const sameOriginORPC = createHTTPUtils(contract, {
+      origin: '',
+      prefix: '/rpc',
+      handler: router => new RPCHandler(router),
+    })
+
+    server.use(
+      sameOriginORPC.planet.list.handler(() => []),
+      http.all('http://localhost:3000/*', () => HttpResponse.text('fallback')),
+    )
+
+    // the mask stays relative, so it never matches an absolute origin
+    const response = await fetch('http://localhost:3000/rpc/planet/list', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    })
+
+    await expect(response.text()).resolves.toBe('fallback')
+  })
+
   it('leaves unmatched requests to other msw handlers', async () => {
     server.use(
       orpc.planet.list.handler(() => []),
@@ -308,6 +330,25 @@ describe('passthrough', () => {
 })
 
 describe('loading', () => {
+  it('rejects immediately when the request is already aborted', async () => {
+    const controller = new AbortController()
+
+    const abortedORPC = createHTTPUtils(contract, {
+      origin: 'http://localhost:3000',
+      prefix: '/rpc',
+      context: async () => {
+        controller.abort()
+        await new Promise(resolve => setTimeout(resolve, 20))
+        return {}
+      },
+      handler: router => new RPCHandler(router),
+    })
+
+    server.use(abortedORPC.planet.list.loading())
+
+    await expect(client.planet.list(undefined, { signal: controller.signal })).rejects.toThrow()
+  })
+
   it('never resolves', async () => {
     server.use(orpc.planet.list.loading())
 

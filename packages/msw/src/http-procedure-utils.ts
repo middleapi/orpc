@@ -97,7 +97,7 @@ export class HTTPProcedureUtils<
       : `/${this.options.prefix.replace(/\/+$/, '').slice(1)}`
 
     const base = `${origin}${this.prefix === undefined || this.prefix === '/' ? '' : this.prefix}`
-    this.mswPathPredicate = base === '' || base === '*' ? '*' : `${base}/*`
+    this.mswPathPredicate = base === '*' ? '*' : `${base}/*`
   }
 
   /**
@@ -146,6 +146,11 @@ export class HTTPProcedureUtils<
    */
   loading(): HttpHandler {
     return this.handler(({ signal }) => new Promise<never>((_, reject) => {
+      if (signal?.aborted) {
+        reject(signal.reason)
+        return
+      }
+
       signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
     }))
   }
