@@ -32,6 +32,10 @@ export const mock = createHTTPUtils(contract, {
 
 The `origin` and `prefix` options must match where your [RPC Link](/docs/rpc/link) sends requests. `origin` supports MSW wildcards, such as `*` to match any origin.
 
+:::tip
+Any protocol works: if your client uses the [OpenAPI Link](/docs/openapi/link), create an [OpenAPI Handler](/docs/openapi/handler) instead, and requests are matched against each procedure's [route](/docs/openapi/routing), including custom methods, prefixes, and path parameters such as `/planets/{id}`.
+:::
+
 :::info
 When you mock an implemented router, only the mock implementations run. The real handlers and middleware are never invoked. [Lazy routers](/docs/router#lazy-router) are not supported directly, [unlazy the router](/docs/contract/router#router-to-contract) first.
 :::
@@ -96,54 +100,42 @@ const handlers = [
 ]
 ```
 
-## OpenAPI Protocol
-
-If your client uses the [OpenAPI Link](/docs/openapi/link), create an [OpenAPI Handler](/docs/openapi/handler) instead. Requests are then matched against each procedure's [route](/docs/openapi/routing), including custom methods, prefixes, and path parameters such as `/planets/{id}` or greedy `/files/{+path}` segments.
-
-```ts
-import { OpenAPIHandler } from '@orpc/openapi/fetch'
-
-const mock = createHTTPUtils(contract, {
-  origin: '*',
-  prefix: '/api',
-  handler: router => new OpenAPIHandler(router),
-})
-```
-
-Everything else works the same: `.handler` receives the deserialized input, `.error` responds with typed errors, and the OpenAPI serializer handles the response, so the mocked client behaves exactly like one talking to a real OpenAPI Handler.
-
 ## Advanced Configuration
 
 All handler behavior is configured through the `handler` option, so mocks can mirror your production setup exactly, such as plugins, a custom serializer, or `allowMethods` if your client sends [GET requests](/docs/rpc/handler#supported-http-methods) over the RPC protocol:
 
 ```ts
 import { RPCHandler } from '@orpc/server/fetch'
-import { ResponseHeadersPlugin } from '@orpc/server/plugins'
+import { ResponseHeadersHandlerPlugin } from '@orpc/server/plugins'
 
 const mock = createHTTPUtils(contract, {
   origin: '*',
   prefix: '/rpc',
   handler: router => new RPCHandler(router, {
-    plugins: [new ResponseHeadersPlugin()],
+    plugins: [new ResponseHeadersHandlerPlugin()],
   }),
 })
 ```
 
-The `context` option controls the [context](/docs/context) passed to the created handler for each request, and mock handlers receive it as `context`, enabling context-driven behaviors such as the [Response Headers Plugin](/docs/plugins/response-headers):
+The `context` option controls the [context](/docs/context) passed to the created handler for each request, and mock handlers receive it as `context`, enabling context-driven behaviors such as the [Response Headers Plugin](/docs/plugins/response-headers). Define an interface extending the context types your plugins expect and annotate the factory with it:
 
 ```ts
-import { ResponseHeadersPlugin } from '@orpc/server/plugins'
+import { ResponseHeadersHandlerPlugin, type ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
+
+interface MockServerContext extends ResponseHeadersHandlerPluginContext {
+  request: Request
+}
 
 const mock = createHTTPUtils(contract, {
-  context: () => ({ resHeaders: new Headers() }),
+  context: (info): MockServerContext => ({ request: info.request }),
   handler: router => new RPCHandler(router, {
-    plugins: [new ResponseHeadersPlugin()],
+    plugins: [new ResponseHeadersHandlerPlugin()],
   }),
 })
 
 const handlers = [
   mock.planet.list.handler(({ context }) => {
-    context.resHeaders.set('x-custom-header', 'value')
+    context.resHeaders?.set('x-custom-header', 'value')
     return []
   }),
 ]

@@ -3,25 +3,10 @@ import type { AnyProcedureContract, AnySchema, ErrorMap, InferSchemaInput, Infer
 import type { AnyRouter, Context, ProcedureConfig } from '@orpc/server'
 import type { FetchHandler, FetchHandlerHandleResult } from '@orpc/server/fetch'
 import type { Promisable, Value } from '@orpc/shared'
-import type { HttpHandler, HttpResponseResolver } from 'msw'
+import type { HttpHandler, HttpRequestResolverExtras, PathParams, ResponseResolverInfo } from 'msw'
 import { implement } from '@orpc/server'
 import { value } from '@orpc/shared'
 import { http, passthrough } from 'msw'
-
-/**
- * The extra request information MSW provides to a response resolver.
- *
- * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
- */
-export type ProcedureUtilsResolverInfo = Parameters<HttpResponseResolver>[0]
-
-/**
- * The part of a fetch handler MSW procedure utils rely on to serve mocks.
- *
- * @see {@link https://orpc.dev/docs/integrations/msw | MSW Integration}
- */
-export type ProcedureUtilsFetchHandler<TContext extends Context>
-  = Pick<FetchHandler<TContext & ProcedureUtilsResolverInfo>, 'handle'>
 
 /**
  * Options for creating MSW procedure utils.
@@ -50,7 +35,7 @@ export interface ProcedureUtilsOptions<TContext extends Context> extends Procedu
    *
    * @see {@link https://orpc.dev/docs/integrations/msw#advanced-configuration | MSW Integration - Advanced Configuration}
    */
-  context?: Value<Promisable<TContext>, [info: ProcedureUtilsResolverInfo]>
+  context?: Value<Promisable<TContext>, [info: ResponseResolverInfo<HttpRequestResolverExtras<PathParams>>]>
 
   /**
    * Creates the fetch handler that serves each mock, using the same
@@ -62,7 +47,7 @@ export interface ProcedureUtilsOptions<TContext extends Context> extends Procedu
    *
    * @see {@link https://orpc.dev/docs/integrations/msw#advanced-configuration | MSW Integration - Advanced Configuration}
    */
-  handler: (router: AnyRouter) => NoInfer<ProcedureUtilsFetchHandler<TContext>>
+  handler: (router: AnyRouter) => NoInfer<FetchHandler<TContext & ResponseResolverInfo<HttpRequestResolverExtras<PathParams>>>>
 }
 
 /**
@@ -76,7 +61,7 @@ export interface ProcedureUtilsHandlerOptions<
   TContext extends Context,
   TInputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
-> extends ProcedureUtilsResolverInfo {
+> extends ResponseResolverInfo<HttpRequestResolverExtras<PathParams>> {
   context: TContext
   input: InferSchemaOutput<TInputSchema>
   errors: ORPCErrorConstructorMap<TErrorMap>
@@ -148,7 +133,7 @@ export class ProcedureUtils<
       disableOutputValidation: this.options.disableOutputValidation,
     }).handler(
       ({ context, input, errors, signal, lastEventId }) => handler({
-        ...(context as TContext & ProcedureUtilsResolverInfo),
+        ...(context as TContext & ResponseResolverInfo<HttpRequestResolverExtras<PathParams>>),
         context: context as TContext,
         input: input as InferSchemaOutput<TInputSchema>,
         errors,
@@ -223,7 +208,7 @@ export class ProcedureUtils<
       const context = {
         ...await value(this.options.context, info),
         ...info,
-      } as TContext & ProcedureUtilsResolverInfo
+      } as TContext & ResponseResolverInfo<HttpRequestResolverExtras<PathParams>>
 
       /**
        * The fetch handler consumes the request body, so hand it a clone
