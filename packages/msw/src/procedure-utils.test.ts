@@ -58,21 +58,29 @@ describe('handler', () => {
     expect(planet.discoveredAt).toBeInstanceOf(Date)
   })
 
-  it('provides msw resolver info with a readable request', async () => {
+  it('exposes msw resolver info through the context option', async () => {
     const fn = vi.fn(({ input }: { input: { id: number } }) => ({
       id: input.id,
       name: 'Earth',
       discoveredAt: new Date('2020-01-01'),
     }))
 
-    server.use(orpc.planet.find.handler(fn))
+    const infoORPC = createHTTPUtils(contract, {
+      origin: 'http://localhost:3000',
+      prefix: '/rpc',
+      context: info => ({ request: info.request, requestId: info.requestId }),
+      handler: router => new RPCHandler(router),
+    })
+
+    server.use(infoORPC.planet.find.handler(fn))
     await client.planet.find({ id: 1 })
 
-    const options = fn.mock.calls[0]![0] as any
-    expect(options.request).toBeInstanceOf(Request)
-    expect(options.request.url).toBe('http://localhost:3000/rpc/planet/find')
-    expect(options.requestId).toBeTypeOf('string')
-    await expect(options.request.json()).resolves.toEqual({ json: { id: 1 } })
+    const { context } = fn.mock.calls[0]![0] as any
+    expect(context.request).toBeInstanceOf(Request)
+    expect(context.request.url).toBe('http://localhost:3000/rpc/planet/find')
+    expect(context.requestId).toBeTypeOf('string')
+    // the fetch handler consumes a clone, the context request stays readable
+    await expect(context.request.json()).resolves.toEqual({ json: { id: 1 } })
   })
 
   it('validates input like the real rpc handler', async () => {

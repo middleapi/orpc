@@ -23,9 +23,9 @@ const contract = {
 const utils = createRouterUtils(contract, { prefix: '/rpc', handler: router => new RPCHandler(router) })
 
 it('handler', () => {
-  const handler = utils.ping.handler(({ input, errors, request, signal, lastEventId }) => {
+  const handler = utils.ping.handler(({ input, errors, context, signal, lastEventId }) => {
     expectTypeOf(input).toEqualTypeOf<{ input: string }>()
-    expectTypeOf(request).toExtend<Request>()
+    expectTypeOf(context).toEqualTypeOf<Record<never, never>>()
     expectTypeOf(signal).toEqualTypeOf<AbortSignal | undefined>()
     expectTypeOf(lastEventId).toEqualTypeOf<string | undefined>()
 

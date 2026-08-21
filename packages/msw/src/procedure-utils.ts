@@ -29,9 +29,9 @@ export interface ProcedureUtilsOptions<TContext extends Context> extends Procedu
   prefix?: `/${string}`
 
   /**
-   * The context passed to the created handler for each request, alongside the
-   * MSW resolver information, useful for context-driven behaviors such as the
-   * Response Headers Plugin. Mock handlers receive it as `context`.
+   * The context passed to the created handler for each request, resolved with
+   * the MSW resolver information, useful for context-driven behaviors such as
+   * the Response Headers Plugin. Mock handlers receive it as `context`.
    *
    * @see {@link https://orpc.dev/docs/integrations/msw#advanced-configuration | MSW Integration - Advanced Configuration}
    */
@@ -47,13 +47,12 @@ export interface ProcedureUtilsOptions<TContext extends Context> extends Procedu
    *
    * @see {@link https://orpc.dev/docs/integrations/msw#advanced-configuration | MSW Integration - Advanced Configuration}
    */
-  handler: (router: AnyRouter) => NoInfer<FetchHandler<TContext & ResponseResolverInfo<HttpRequestResolverExtras<PathParams>>>>
+  handler: (router: AnyRouter) => NoInfer<FetchHandler<TContext>>
 }
 
 /**
  * Options passed to a mock procedure handler: the deserialized `input`, the
- * contract's typed `errors` constructors, the handler `context`, and the MSW
- * resolver information.
+ * contract's typed `errors` constructors, and the handler `context`.
  *
  * @see {@link https://orpc.dev/docs/integrations/msw#mocking-procedures | MSW Integration - Mocking Procedures}
  */
@@ -61,7 +60,7 @@ export interface ProcedureUtilsHandlerOptions<
   TContext extends Context,
   TInputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
-> extends ResponseResolverInfo<HttpRequestResolverExtras<PathParams>> {
+> {
   context: TContext
   input: InferSchemaOutput<TInputSchema>
   errors: ORPCErrorConstructorMap<TErrorMap>
@@ -133,7 +132,6 @@ export class ProcedureUtils<
       disableOutputValidation: this.options.disableOutputValidation,
     }).handler(
       ({ context, input, errors, signal, lastEventId }) => handler({
-        ...(context as TContext & ResponseResolverInfo<HttpRequestResolverExtras<PathParams>>),
         context: context as TContext,
         input: input as InferSchemaOutput<TInputSchema>,
         errors,
@@ -205,14 +203,11 @@ export class ProcedureUtils<
     const fetchHandler = this.options.handler(router)
 
     return http.all(this.mswPathPredicate, async (info) => {
-      const context = {
-        ...await value(this.options.context, info),
-        ...info,
-      } as TContext & ResponseResolverInfo<HttpRequestResolverExtras<PathParams>>
+      const context = (await value(this.options.context, info) ?? {}) as TContext
 
       /**
        * The fetch handler consumes the request body, so hand it a clone
-       * and keep the original readable for the mock handler.
+       * and keep the original readable, e.g. for accessing through `context`.
        */
       const result = await fetchHandler.handle(info.request.clone(), {
         prefix: this.prefix,

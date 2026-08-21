@@ -56,7 +56,7 @@ const server = setupServer(
 server.listen()
 ```
 
-Beyond `input`, the mock also receives the MSW resolver information, such as the raw `request`.
+To access request details, such as the raw `request`, expose them through the [`context` option](#advanced-configuration).
 
 :::info
 [AsyncIteratorObject](/docs/async-iterator-object) outputs work too: return an async generator and the client receives a streamed response.
