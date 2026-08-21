@@ -30,7 +30,7 @@ export default defineConfig({
     // mode uses the true brand pink (its text flips dark in theme.css).
     accent: { light: 'oklch(0.58 0.19 359)', dark: '#ff6ca5' },
     // Zed One Dark editor background; the rest of the palette lives in theme.css.
-    background: { dark: '#282c33' },
+    background: { dark: '#0d1016' },
     fonts: {
       display: 'inter',
       body: 'inter',
