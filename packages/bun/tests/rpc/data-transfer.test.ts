@@ -21,8 +21,13 @@ describe.each([
   }
   const client = createClientServer(router)
 
-  // TODO: fix blob content type problem
-  it.skipIf(adapter.includes('compression')).each(builtInRPCSupportDataTypes)('should support $name', async ({ value, expected }) => {
+  // TODO: related to https://github.com/oven-sh/bun/issues/32801 - Bun's blob()/formData() do not
+  // derive the type from the Content-Type header, so the blob type is lost after (de)compression
+  const supportedDataTypes = adapter.includes('compression')
+    ? builtInRPCSupportDataTypes.filter(({ name }) => name !== 'blob')
+    : builtInRPCSupportDataTypes
+
+  it.each(supportedDataTypes)('should support $name', async ({ value, expected }) => {
     const actual = await client.ping(value)
 
     if (typeof expected === 'function') {

@@ -1,0 +1,34 @@
+---
+// The "Keep it brewing" card pinned to the bottom of the desktop on-this-page
+// aside, linking straight to the $5/month ☕ Backer tier checkout on GitHub
+// Sponsors so one click lands on the tier instead of the profile page.
+//
+// Pinning without owning RootLayout: the aside flex rule in theme.css plus
+// `order-1` place the card after Blume's non-overridable PageActions, `mt-auto`
+// rests it at the rail's bottom when the content is short, and `sticky
+// bottom-0` keeps it in view once the rail scrolls. The wrapper owns the
+// rail's bottom padding (theme.css zeroes the aside's) so the resting and
+// stuck positions coincide; its solid background and `z-10` keep the actions
+// (positioned dropdown containers, later in the DOM) from showing through.
+import Icon from 'blume/components/Icon.astro'
+
+const COFFEE_TIER_HREF = 'https://github.com/sponsors/dinwwwh/sponsorships?tier_id=475114'
+---
+
+<div class="sticky bottom-0 z-10 order-1 mt-auto bg-background py-4">
+  <a
+    class="group flex items-center gap-3 rounded-blume border border-border px-3 py-2.5 transition hover:border-accent/50 hover:bg-accent/10 focus-visible:border-accent/50 focus-visible:bg-accent/10"
+    href={COFFEE_TIER_HREF}
+    rel="noopener"
+    target="_blank"
+    title="Sponsor oRPC for $5 a month on GitHub Sponsors"
+  >
+    <span class="flex size-8 flex-none items-center justify-center rounded-md bg-accent/15 text-accent transition-transform group-hover:-rotate-6">
+      <Icon name="coffee" size={16} />
+    </span>
+    <span class="flex flex-col gap-0.5">
+      <span class="text-sm leading-tight font-semibold text-foreground">Keep it brewing</span>
+      <span class="text-xs leading-tight text-muted-foreground">$5/month</span>
+    </span>
+  </a>
+</div>
