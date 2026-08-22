@@ -194,13 +194,13 @@ export class ImplementInterceptor implements NestInterceptor {
         const standardRequest = this.toNestStandardLazyRequest(req, res)
 
         const handler = new StandardHandler({
-          resolveProcedure: () => Promise.resolve({
+          resolveProcedure: request => Promise.resolve({
             path: getPathMeta(procedure) ?? [],
             procedure,
             decodeInput: () => this.codec.decodeInput({
               procedure,
               params: toORPCOpenAPIParams(procedure, standardRequest.params),
-            }, standardRequest),
+            }, request),
           }),
           encodeError: this.codec.encodeError.bind(this.codec),
           encodeOutput: this.codec.encodeOutput.bind(this.codec),
