@@ -11,6 +11,7 @@ import { Test } from '@nestjs/testing'
 import { meta, oc } from '@orpc/contract'
 import { openapi } from '@orpc/openapi'
 import { implement, ORPCError, os, Procedure } from '@orpc/server'
+import { RequestLimitHandlerPlugin } from '@orpc/server/plugins'
 import { getOrBind } from '@orpc/shared'
 import { catchError, tap } from 'rxjs'
 import supertest from 'supertest'
@@ -110,6 +111,50 @@ describe('requirements', () => {
     routingInterceptor.mockResolvedValueOnce({ matched: false })
     const res = await supertest(app.getHttpServer()).post('/procedure')
     expect(res.status).toBe(500)
+  })
+})
+
+describe('request limit plugin', () => {
+  const contract = oc
+    .meta(openapi({ method: 'POST', path: '/request-limit' }))
+    .input(z.object({ value: z.string() }))
+
+  @Controller()
+  class ImplController {
+    @Implement(contract)
+    requestLimit() {
+      return implement(contract).handler(({ input }) => input.value)
+    }
+  }
+
+  describe.each([
+    ['express adapter', undefined],
+    ['fastify adapter', new FastifyAdapter()],
+  ] as const)('with %s', async (_, adapter) => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ImplController],
+      imports: [
+        ORPCModule.forRoot({
+          plugins: [new RequestLimitHandlerPlugin({ maxBodySize: 10 })],
+        }),
+      ],
+    }).compile()
+
+    const app = moduleRef.createNestApplication(adapter as any)
+    await app.init()
+
+    if (adapter) {
+      await app.getHttpAdapter().getInstance().ready()
+    }
+
+    it('rejects a request whose content length exceeds the limit', async () => {
+      const res = await supertest(app.getHttpServer())
+        .post('/request-limit')
+        .send({ value: 'over limit' })
+
+      expect(res.statusCode).toEqual(413)
+      expect(res.body).toMatchObject({ code: 'PAYLOAD_TOO_LARGE' })
+    })
   })
 })
 
