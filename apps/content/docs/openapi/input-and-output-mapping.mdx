@@ -145,6 +145,34 @@ Supported query styles:
 When using delimited styles, do not use delimiter characters like `,`, ` `, or `|` in keys or values. They can make the parameter ambiguous.
 :::
 
+### Dynamic Parameter Style Resolvers
+
+For reusable style rules, `paramsStyles` and `queryStyles` also accept a resolver. The resolver receives the current parameter name and the procedure's complete input schema stack, and returns a style or `undefined` to keep the default behavior.
+
+```ts
+const searchPlanets = os
+  .meta(openapi({
+    method: 'GET',
+    path: '/planets',
+    queryStyles: (name, inputSchemas) => {
+      const usesZod = inputSchemas?.some(
+        schema => schema['~standard'].vendor === 'zod',
+      )
+
+      return usesZod && name.endsWith('Ids')
+        ? 'comma-delimited-array'
+        : undefined
+    },
+  }))
+  .input(z.object({
+    regionIds: z.array(z.string()),
+    q: z.string().optional(),
+  }))
+  .handler(async () => [])
+```
+
+The schema argument is the original `readonly AnySchema[]` stack, in input-definition order, or `undefined` when the procedure has no input schema. oRPC provides the complete stack instead of a field schema because Standard Schema has no vendor-independent way to extract fields, and a procedure can compose multiple input schemas. A resolver can apply library-specific inspection when needed.
+
 ## Output Mapping
 
 By default, oRPC uses `compact` mode. The procedure's return value becomes the response body, and the status code comes from `successStatus`, which defaults to `200` (should be in the `2xx` range and must be less than `400`).
@@ -237,7 +265,7 @@ Learn more about body hints in the [Standard Server documentation](https://githu
 
 ## Metadata Merging
 
-When `openapi` is applied multiple times, `paramsStyles` and `queryStyles` are merged per parameter, and the most recent style defined for a parameter wins. `inputStructure`, `outputStructure`, `responseBodyHint`, and `requestBodyHint` are overridden by the most recent call. For the full merge behavior of every field, see [Metadata Merging](/docs/openapi/specification#metadata-merging).
+When `openapi` is applied multiple times, two `paramsStyles` or `queryStyles` records are merged per parameter, and the most recent style defined for a parameter wins. A later resolver replaces the previous record or resolver, and a later record replaces a previous resolver. `inputStructure`, `outputStructure`, `responseBodyHint`, and `requestBodyHint` are overridden by the most recent call. For the full merge behavior of every field, see [Metadata Merging](/docs/openapi/specification#metadata-merging).
 
 ```ts
 const router = os

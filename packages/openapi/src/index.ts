@@ -5,6 +5,12 @@ export * from './meta'
 export * from './openapi-generator'
 export * from './openapi-json-serializer'
 export * from './openapi-serializer'
+export type {
+  OpenAPIParameterStyleResolver,
+  OpenAPIParameterStyles,
+  OpenAPIParamsStyle,
+  OpenAPIQueryStyle,
+} from './parameter-styles'
 export * from './router-utils'
 export * from './types'
 export * from './utils'

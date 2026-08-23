@@ -179,6 +179,48 @@ describe('openAPIGenerator operation builders', () => {
       ])
     })
 
+    it('resolves parameter styles by name with the original input schemas', () => {
+      const { ctx, operation } = createContext()
+      const path = '/planets/{ids}' as const
+      const inputSchemas = [
+        testSchema({
+          type: 'object',
+          properties: {
+            ids: { type: 'array' },
+            filter: { type: 'object' },
+          },
+          required: ['ids', 'filter'],
+        }),
+        testSchema({
+          type: 'object',
+          properties: { search: { type: 'string' } },
+          required: ['search'],
+        }),
+      ]
+      const paramsStyles = vi.fn((name: string, _schemas: readonly AnySchema[] | undefined) => (
+        name === 'ids' ? 'comma-delimited-array' as const : undefined
+      ))
+      const queryStyles = vi.fn((name: string, _schemas: readonly AnySchema[] | undefined) => (
+        name === 'filter' ? 'json' as const : undefined
+      ))
+
+      buildRequest(ctx, operation, testDef({ inputs: inputSchemas }), {
+        method: 'GET',
+        path,
+        paramsStyles,
+        queryStyles,
+      }, getDynamicPathParams(path))
+
+      expect(paramsStyles).toHaveBeenCalledWith('ids', inputSchemas)
+      expect(queryStyles).toHaveBeenCalledWith('filter', inputSchemas)
+      expect(queryStyles).toHaveBeenCalledWith('search', inputSchemas)
+      expect(operation.parameters).toEqual([
+        { in: 'path', required: true, name: 'ids', style: 'simple', explode: false, schema: { type: 'array' } },
+        { in: 'query', name: 'filter', required: true, allowEmptyValue: true, allowReserved: true, content: { 'application/json': { schema: { type: 'object' } } } },
+        { in: 'query', name: 'search', required: true, allowEmptyValue: true, allowReserved: true, schema: { type: 'string' } },
+      ])
+    })
+
     it('marks the request body optional when every non-param field is optional', () => {
       const { ctx, operation } = createContext()
       const path = '/planets/{id}' as const

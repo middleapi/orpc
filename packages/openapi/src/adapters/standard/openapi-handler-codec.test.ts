@@ -1,3 +1,4 @@
+import type { AnySchema } from '@orpc/contract'
 import type { StandardLazyRequest } from '@standardserver/core'
 import { ORPCError } from '@orpc/client'
 import { DEFAULT_ERROR_STATUS, os } from '@orpc/server'
@@ -176,6 +177,41 @@ describe('openAPIHandlerCodec', () => {
           filters: { size: 'large', brand: 'nike' },
           page: '2',
         })
+      })
+
+      it('resolves path and query styles with the procedure input schemas', async () => {
+        const inputSchema1 = { id: 1 } as unknown as AnySchema
+        const inputSchema2 = { id: 2 } as unknown as AnySchema
+        const inputSchemas = [inputSchema1, inputSchema2]
+        const paramsStyles = vi.fn((name: string, _schemas: readonly AnySchema[] | undefined) => (
+          name === 'ids' ? 'comma-delimited-array' as const : undefined
+        ))
+        const queryStyles = vi.fn((name: string, _schemas: readonly AnySchema[] | undefined) => (
+          name === 'tags' ? 'array' as const : name === 'meta' ? 'json' as const : undefined
+        ))
+        const procedure = os
+          .input(inputSchema1)
+          .input(inputSchema2)
+          .meta(openapi({ method: 'GET', path: '/{ids}', paramsStyles, queryStyles }))
+          .handler(vi.fn())
+        const codec = new OpenAPIHandlerCodec(procedure)
+
+        const result = await codec.resolveProcedure(createRequest({
+          method: 'GET',
+          url: '/red,blue?tags=one&tags=two&meta=%7B%22active%22%3Atrue%7D&plain=value',
+        }), options as any)
+
+        expect(result).toBeDefined()
+        await expect(result!.decodeInput()).resolves.toEqual({
+          ids: ['red', 'blue'],
+          tags: ['one', 'two'],
+          meta: { active: true },
+          plain: 'value',
+        })
+        expect(paramsStyles).toHaveBeenCalledWith('ids', inputSchemas)
+        expect(queryStyles).toHaveBeenCalledWith('tags', inputSchemas)
+        expect(queryStyles).toHaveBeenCalledWith('meta', inputSchemas)
+        expect(queryStyles).toHaveBeenCalledWith('plain', inputSchemas)
       })
     })
 

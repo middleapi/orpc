@@ -58,7 +58,7 @@ const getPlanet = oc
 When `openapi` is applied multiple times, most fields, such as `method`, `path`, `operationId`, `summary`, and `description`, are overridden by the most recent call. Only the following fields are merged:
 
 - `tags` and `prefix` values are concatenated in definition order.
-- `paramsStyles` and `queryStyles` are merged per parameter. The most recent style defined for a parameter wins.
+- Two `paramsStyles` or `queryStyles` records are merged per parameter. The most recent style defined for a parameter wins. A resolver replaces the previous record or resolver, and a record replaces a previous resolver.
 - `spec` values are combined: two functions are chained so the most recent one receives the result of the previous one, a function combined with an object is applied to that object, and between two objects the most recent one wins.
 
 For implementation details, see the [source code](https://github.com/orpc/orpc/blob/main/packages/openapi/src/meta.ts).

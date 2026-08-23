@@ -1,4 +1,5 @@
 import type { AnyORPCError } from '@orpc/client'
+import type { AnySchema } from '@orpc/contract'
 import type { AnyProcedure, AnyRouter, Context } from '@orpc/server'
 import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure, StandardHandlerHandleOptions } from '@orpc/server/standard'
 import type { Promisable } from '@orpc/shared'
@@ -15,6 +16,7 @@ import {
 } from '../../constants'
 import { getOpenAPIMeta } from '../../meta'
 import { OpenAPISerializer } from '../../openapi-serializer'
+import { resolveOpenAPIParameterStyle } from '../../parameter-styles'
 import { isBodylessMethod } from '../../utils'
 import { OpenAPIMatcher } from './openapi-matcher'
 import { serializeHeaders } from './utils'
@@ -63,9 +65,10 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
     const [_, search] = parseStandardUrl(request.url)
 
     const meta = getOpenAPIMeta(matched.procedure)
+    const inputSchemas = matched.procedure['~orpc'].inputSchemas
     const inputStructure = meta?.inputStructure ?? DEFAULT_OPENAPI_INPUT_STRUCTURE
-    const params = this.deserializeParams(matched.params, meta?.paramsStyles)
-    const query = this.deserializeQuery(search, meta?.queryStyles)
+    const params = this.deserializeParams(matched.params, meta?.paramsStyles, inputSchemas)
+    const query = this.deserializeQuery(search, meta?.queryStyles, inputSchemas)
 
     if (inputStructure === 'compact') {
       const data = isBodylessMethod(request.method)
@@ -149,6 +152,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
   private deserializeQuery(
     search: `?${string}` | undefined,
     styles: OpenAPIMeta['queryStyles'],
+    inputSchemas: AnySchema[] | undefined,
   ): unknown {
     const searchParams = new URLSearchParams(search)
     const parsed = this.serializer.deserialize(searchParams)
@@ -157,7 +161,11 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
       return parsed
     }
 
-    Object.entries(styles).forEach(([key, hint]) => {
+    const keys = typeof styles === 'function' ? Object.keys(parsed) : Object.keys(styles)
+
+    keys.forEach((key) => {
+      const hint = resolveOpenAPIParameterStyle(styles, key, inputSchemas)
+
       if (hint === undefined) {
         return
       }
@@ -219,6 +227,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
   private deserializeParams(
     params: Record<string, string> | undefined,
     styles: OpenAPIMeta['paramsStyles'],
+    inputSchemas: AnySchema[] | undefined,
   ): Record<string, unknown> | undefined {
     if (!params || !styles) {
       return params
@@ -226,7 +235,11 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
 
     const parsed: Record<string, unknown> = { ...params }
 
-    Object.entries(styles).forEach(([key, hint]) => {
+    const keys = typeof styles === 'function' ? Object.keys(params) : Object.keys(styles)
+
+    keys.forEach((key) => {
+      const hint = resolveOpenAPIParameterStyle(styles, key, inputSchemas)
+
       if (hint === undefined || hint === 'primitive') {
         return
       }

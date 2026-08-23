@@ -1,3 +1,4 @@
+import type { AnySchema } from '@orpc/contract'
 import { MalformedResponseError, ORPCError } from '@orpc/client'
 import { oc } from '@orpc/contract'
 import { openapi } from '../../meta'
@@ -119,6 +120,43 @@ describe('openAPILinkCodec', () => {
         expect(url.searchParams.get('file')).toBe('[object File]')
       })
 
+      it('resolves path and query styles with the contract input schemas', async () => {
+        const inputSchema1 = { id: 1 } as unknown as AnySchema
+        const inputSchema2 = { id: 2 } as unknown as AnySchema
+        const inputSchemas = [inputSchema1, inputSchema2]
+        const paramsStyles = vi.fn((name: string, _schemas: readonly AnySchema[] | undefined) => (
+          name === 'ids' ? 'comma-delimited-array' as const : undefined
+        ))
+        const queryStyles = vi.fn((name: string, _schemas: readonly AnySchema[] | undefined) => (
+          name === 'filter' ? 'json' as const : undefined
+        ))
+        const codec = new OpenAPILinkCodec({
+          item: oc
+            .input(inputSchema1)
+            .input(inputSchema2)
+            .meta(openapi({
+              method: 'GET',
+              path: '/items/{ids}',
+              paramsStyles,
+              queryStyles,
+            })),
+        }, { url: '/api', serializer })
+
+        const request = await codec.encodeInput({
+          ids: ['first', 'second'],
+          filter: { active: true },
+          search: 'value',
+        }, ['item'], { context: {} })
+
+        const url = new URL(request.url, 'http://localhost')
+        expect(url.pathname).toBe('/api/items/first,second')
+        expect(url.searchParams.get('filter')).toBe('{"active":true}')
+        expect(url.searchParams.get('search')).toBe('value')
+        expect(paramsStyles).toHaveBeenCalledWith('ids', inputSchemas)
+        expect(queryStyles).toHaveBeenCalledWith('filter', inputSchemas)
+        expect(queryStyles).toHaveBeenCalledWith('search', inputSchemas)
+      })
+
       it('rejects non-object input when dynamic path params must be resolved', async () => {
         const codec = new OpenAPILinkCodec({
           ping: oc.meta(openapi({ path: '/items/{id}' })),
@@ -164,6 +202,41 @@ describe('openAPILinkCodec', () => {
           body: { title: 'Hello' },
           signal: undefined,
         })
+      })
+
+      it('resolves detailed path and query styles with the contract input schemas', async () => {
+        const inputSchema1 = { id: 1 } as unknown as AnySchema
+        const inputSchema2 = { id: 2 } as unknown as AnySchema
+        const inputSchemas = [inputSchema1, inputSchema2]
+        const paramsStyles = vi.fn((name: string, _schemas: readonly AnySchema[] | undefined) => (
+          name === 'tags' ? 'comma-delimited-array' as const : undefined
+        ))
+        const queryStyles = vi.fn((name: string, _schemas: readonly AnySchema[] | undefined) => (
+          name === 'meta' ? 'json' as const : undefined
+        ))
+        const codec = new OpenAPILinkCodec({
+          search: oc
+            .input(inputSchema1)
+            .input(inputSchema2)
+            .meta(openapi({
+              method: 'POST',
+              path: '/search/{tags}',
+              inputStructure: 'detailed',
+              paramsStyles,
+              queryStyles,
+            })),
+        }, { url: '/api', serializer })
+
+        const request = await codec.encodeInput({
+          params: { tags: ['alpha', 'beta'] },
+          query: { meta: { enabled: true }, plain: 'value' },
+          body: { title: 'Hello' },
+        }, ['search'], { context: {} })
+
+        expect(request.url).toBe('/api/search/alpha,beta?plain=value&meta=%7B%22enabled%22%3Atrue%7D')
+        expect(paramsStyles).toHaveBeenCalledWith('tags', inputSchemas)
+        expect(queryStyles).toHaveBeenCalledWith('meta', inputSchemas)
+        expect(queryStyles).toHaveBeenCalledWith('plain', inputSchemas)
       })
 
       it('uses base headers when detailed input omits the headers field', async () => {

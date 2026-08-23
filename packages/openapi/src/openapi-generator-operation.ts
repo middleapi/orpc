@@ -26,6 +26,7 @@ import {
   DEFAULT_OPENAPI_OUTPUT_STRUCTURE,
   DEFAULT_OPENAPI_SUCCESS_DESCRIPTION,
 } from './constants'
+import { resolveOpenAPIParameterStyle } from './parameter-styles'
 import { isBodylessMethod } from './utils'
 
 export type DynamicPathParam = NonNullable<ReturnType<typeof getDynamicPathParams>>[number]
@@ -121,8 +122,8 @@ export function buildRequest(
     ? extractCompactRequestParts(schema, optional, method, dynamicParams)
     : extractDetailedRequestParts(schema)
 
-  renderPathParameters(ctx, operation, dynamicParams, parts.paramsEntries, meta?.paramsStyles)
-  renderQueryParameters(ctx, operation, parts.queryEntries, meta?.queryStyles)
+  renderPathParameters(ctx, operation, dynamicParams, parts.paramsEntries, meta?.paramsStyles, def.inputSchemas)
+  renderQueryParameters(ctx, operation, parts.queryEntries, meta?.queryStyles, def.inputSchemas)
   renderHeaderParameters(ctx, operation, parts.headersEntries)
 
   if (parts.bodySchema !== undefined) {
@@ -197,6 +198,7 @@ function renderPathParameters(
   dynamicParams: string[] | undefined,
   paramsEntries: JsonObjectSchemaEntry[] | undefined,
   paramsStyles: OpenAPIMeta['paramsStyles'],
+  inputSchemas: AnySchema[] | undefined,
 ): void {
   if (!dynamicParams?.length) {
     return
@@ -228,7 +230,7 @@ function renderPathParameters(
       )
     }
 
-    const style = paramsStyles?.[name]
+    const style = resolveOpenAPIParameterStyle(paramsStyles, name, inputSchemas)
     const parameter: Exclude<OpenAPIOperationObject['parameters'], undefined>[number] = {
       in: 'path',
       required: true,
@@ -254,9 +256,10 @@ function renderQueryParameters(
   operation: OpenAPIOperationObject,
   queryEntries: JsonObjectSchemaEntry[] | undefined,
   queryStyles: OpenAPIMeta['queryStyles'],
+  inputSchemas: AnySchema[] | undefined,
 ): void {
   for (const [name, schema, optional] of queryEntries ?? []) {
-    const style = queryStyles?.[name]
+    const style = resolveOpenAPIParameterStyle(queryStyles, name, inputSchemas)
     const parameter: Exclude<OpenAPIOperationObject['parameters'], undefined>[number] = {
       in: 'query',
       name,

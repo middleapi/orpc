@@ -4,6 +4,7 @@ import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
 import type { Promisable, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standardserver/core'
 import type { OpenAPIMeta } from '../../meta'
+import type { OpenAPIParamsStyle } from '../../parameter-styles'
 import { createORPCErrorFromJson, createORPCErrorFromMalformedResponse, isORPCErrorJson } from '@orpc/client'
 import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import { unlazy } from '@orpc/server'
@@ -17,6 +18,7 @@ import {
 } from '../../constants'
 import { getOpenAPIMeta } from '../../meta'
 import { OpenAPISerializer } from '../../openapi-serializer'
+import { resolveOpenAPIParameterStyle } from '../../parameter-styles'
 import { getDynamicPathParams, isBodylessMethod } from '../../utils'
 import { serializeHeaders } from './utils'
 
@@ -76,6 +78,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     const baseUrl = await value(this.baseUrl, options, path, input)
     const procedure = await this.resolveProcedure(path)
     const meta = getOpenAPIMeta(procedure)
+    const inputSchemas = procedure['~orpc'].inputSchemas
 
     const method = meta?.method ?? DEFAULT_OPENAPI_METHOD
     const inputStructure = meta?.inputStructure ?? DEFAULT_OPENAPI_INPUT_STRUCTURE
@@ -101,7 +104,8 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
         for (let i = dynamicParams.length - 1; i >= 0; i--) {
           const param = dynamicParams[i]!
-          const encoded = this.encodePathParam(input[param.parameterName], param, meta?.paramsStyles?.[param.parameterName], path)
+          const style = resolveOpenAPIParameterStyle(meta?.paramsStyles, param.parameterName, inputSchemas)
+          const encoded = this.encodePathParam(input[param.parameterName], param, style, path)
           pathname = `${pathname.slice(0, param.startIndex)}${encoded}${pathname.slice(param.startIndex + param.segment.length)}` as `/${string}`
           delete remaining[param.parameterName]
         }
@@ -112,7 +116,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       pathname = `${basePathname.replace(END_SLASH_REGEX, '')}${pathname}` as `/${string}`
 
       if (isBodylessMethod(method)) {
-        const queryString = this.serializeQueryString(data, meta?.queryStyles)
+        const queryString = this.serializeQueryString(data, meta?.queryStyles, inputSchemas)
         const search = combineSearch(baseSearch, queryString)
         const url = `${pathname}${search ?? ''}${baseHash ?? ''}` as StandardUrl
 
@@ -160,7 +164,8 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       for (let i = dynamicParams.length - 1; i >= 0; i--) {
         const param = dynamicParams[i]!
         const val = input.params[param.parameterName]
-        const encoded = this.encodePathParam(val, param, meta?.paramsStyles?.[param.parameterName], path)
+        const style = resolveOpenAPIParameterStyle(meta?.paramsStyles, param.parameterName, inputSchemas)
+        const encoded = this.encodePathParam(val, param, style, path)
         pathname = `${pathname.slice(0, param.startIndex)}${encoded}${pathname.slice(param.startIndex + param.segment.length)}` as `/${string}`
       }
     }
@@ -170,7 +175,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     }
 
     pathname = `${basePathname.replace(END_SLASH_REGEX, '')}${pathname}` as `/${string}`
-    const queryString = this.serializeQueryString(input?.query, meta?.queryStyles)
+    const queryString = this.serializeQueryString(input?.query, meta?.queryStyles, inputSchemas)
     const search = combineSearch(baseSearch, queryString)
     const url = `${pathname}${search ?? ''}${baseHash ?? ''}` as StandardUrl
 
@@ -196,7 +201,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
   private encodePathParam(
     val: unknown,
     param: { parameterName: string, allowsSlash: boolean, segment: string },
-    style: Exclude<OpenAPIMeta['paramsStyles'], undefined>[string],
+    style: OpenAPIParamsStyle | undefined,
     path: string[],
   ): string {
     let encoded: string | undefined
@@ -235,7 +240,11 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     return encoded
   }
 
-  private serializeQueryString(data: unknown, queryStyles: OpenAPIMeta['queryStyles']): string | undefined {
+  private serializeQueryString(
+    data: unknown,
+    queryStyles: OpenAPIMeta['queryStyles'],
+    inputSchemas: AnyProcedureContract['~orpc']['inputSchemas'],
+  ): string | undefined {
     if (!queryStyles || !isTypescriptObject(data)) {
       return toURLSearchParams(
         this.serializer.serialize(data, { asFormData: true }) as FormData,
@@ -245,7 +254,11 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     const remaining = { ...data }
     let query = ''
 
-    Object.entries(queryStyles).forEach(([key, style]) => {
+    const keys = typeof queryStyles === 'function' ? Object.keys(data) : Object.keys(queryStyles)
+
+    keys.forEach((key) => {
+      const style = resolveOpenAPIParameterStyle(queryStyles, key, inputSchemas)
+
       if (style === undefined) {
         return
       }

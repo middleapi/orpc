@@ -88,6 +88,23 @@ describe('openapi meta', () => {
           tags: 'array',
         })
       })
+
+      it('replaces a record with the latest resolver', () => {
+        const resolver = vi.fn(() => 'array' as const)
+        const procedure = oc
+          .meta(openapi({ queryStyles: { keyword: 'primitive' } }))
+          .meta(openapi({ queryStyles: resolver }))
+
+        expect(getOpenAPIMeta(procedure)?.queryStyles).toBe(resolver)
+      })
+
+      it('replaces a resolver with the latest record', () => {
+        const procedure = oc
+          .meta(openapi({ queryStyles: () => 'primitive' }))
+          .meta(openapi({ queryStyles: { tags: 'array' } }))
+
+        expect(getOpenAPIMeta(procedure)?.queryStyles).toEqual({ tags: 'array' })
+      })
     })
 
     describe('paramsStyles merging', () => {
@@ -120,6 +137,24 @@ describe('openapi meta', () => {
         expect(getOpenAPIMeta(procedure)?.paramsStyles).toEqual({
           tags: 'comma-delimited-array',
         })
+      })
+
+      it('replaces a resolver with the latest resolver', () => {
+        const latest = vi.fn(() => 'comma-delimited-array' as const)
+        const procedure = oc
+          .meta(openapi({ paramsStyles: () => 'primitive' }))
+          .meta(openapi({ paramsStyles: latest }))
+
+        expect(getOpenAPIMeta(procedure)?.paramsStyles).toBe(latest)
+      })
+
+      it('keeps a resolver when a later call omits paramsStyles', () => {
+        const resolver = vi.fn(() => 'primitive' as const)
+        const procedure = oc
+          .meta(openapi({ paramsStyles: resolver }))
+          .meta(openapi({}))
+
+        expect(getOpenAPIMeta(procedure)?.paramsStyles).toBe(resolver)
       })
     })
 

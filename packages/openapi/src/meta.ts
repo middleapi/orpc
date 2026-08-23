@@ -2,6 +2,7 @@ import type { AnyProcedureContract, AnySchema, ErrorMap, MetaPlugin } from '@orp
 import type { Lazy } from '@orpc/server'
 import type { Value } from '@orpc/shared'
 import type { StandardBodyHint } from '@standardserver/core'
+import type { OpenAPIParameterStyles, OpenAPIParamsStyle, OpenAPIQueryStyle } from './parameter-styles'
 import type { OpenAPIOperationObject } from './types'
 import { mergeHttpPath } from '@orpc/shared'
 
@@ -70,8 +71,12 @@ export interface OpenAPIMeta {
   /**
    * Controls how individual path parameters are decoded.
    *
-   * **Merging**: When defined multiple times, styles are merged per parameter.
-   * The most recent style defined for a parameter wins.
+   * Pass either a record or a resolver that receives the parameter name and the procedure's
+   * complete input schema stack. The full stack is provided because Standard Schema does not
+   * define a vendor-agnostic way to extract a schema for an individual field.
+   *
+   * **Merging**: Two records are merged per parameter, with the most recent style winning.
+   * A resolver replaces the previous record or resolver, and a record replaces a previous resolver.
    * Explicitly setting `undefined` resets the styles instead of merging.
    *
    * Each key maps a path parameter name to one of the following strategies:
@@ -113,16 +118,17 @@ export interface OpenAPIMeta {
    *
    * @default `primitive` for all parameters
    */
-  paramsStyles?: Record<
-    string,
-    'primitive' | 'comma-delimited-array' | 'comma-delimited-object' | undefined
-  > | undefined
+  paramsStyles?: OpenAPIParameterStyles<OpenAPIParamsStyle> | undefined
 
   /**
    * Controls how individual query parameters are encoding/decoding.
    *
-   * **Merging**: When defined multiple times, styles are merged per parameter.
-   * The most recent style defined for a parameter wins.
+   * Pass either a record or a resolver that receives the parameter name and the procedure's
+   * complete input schema stack. The full stack is provided because Standard Schema does not
+   * define a vendor-agnostic way to extract a schema for an individual field.
+   *
+   * **Merging**: Two records are merged per parameter, with the most recent style winning.
+   * A resolver replaces the previous record or resolver, and a record replaces a previous resolver.
    * Explicitly setting `undefined` resets the styles instead of merging.
    *
    * Each key maps a query parameter name to one of the following strategies:
@@ -169,10 +175,7 @@ export interface OpenAPIMeta {
    *
    * @default `undefined` for all parameters (bracket-notation decoding)
    */
-  queryStyles?: Record<
-    string,
-    'primitive' | 'array' | 'comma-delimited-array' | 'comma-delimited-object' | 'space-delimited-array' | 'space-delimited-object' | 'pipe-delimited-array' | 'pipe-delimited-object' | 'json' | undefined
-  > | undefined
+  queryStyles?: OpenAPIParameterStyles<OpenAPIQueryStyle> | undefined
 
   /**
    * Hint for how to parse the incoming request body.
@@ -356,6 +359,27 @@ export interface OpenAPIFunction {
   prefix(method: OpenAPIMeta['prefix']): OpenAPIPrefixMetaPlugin<any, any, any>
 }
 
+function mergeParameterStyles<TStyle>(
+  existing: OpenAPIParameterStyles<TStyle> | undefined,
+  incoming: OpenAPIParameterStyles<TStyle> | undefined,
+  hasIncoming: boolean,
+): OpenAPIParameterStyles<TStyle> | undefined {
+  if (!hasIncoming) {
+    return existing
+  }
+
+  if (
+    typeof existing === 'object'
+    && existing !== null
+    && typeof incoming === 'object'
+    && incoming !== null
+  ) {
+    return { ...existing, ...incoming }
+  }
+
+  return incoming
+}
+
 /**
  * Creates OpenAPI meta plugins that control how a procedure is exposed over HTTP,
  * such as its method, path, prefix, and OpenAPI operation spec.
@@ -372,13 +396,17 @@ export const openapi: OpenAPIFunction = incoming => ({
       ? [...existing.tags, ...incoming.tags]
       : 'tags' in incoming ? incoming.tags : existing?.tags
 
-    const queryStyles = existing?.queryStyles && incoming.queryStyles
-      ? { ...existing.queryStyles, ...incoming.queryStyles }
-      : 'queryStyles' in incoming ? incoming.queryStyles : existing?.queryStyles
+    const queryStyles = mergeParameterStyles(
+      existing?.queryStyles,
+      incoming.queryStyles,
+      'queryStyles' in incoming,
+    )
 
-    const paramsStyles = existing?.paramsStyles && incoming.paramsStyles
-      ? { ...existing.paramsStyles, ...incoming.paramsStyles }
-      : 'paramsStyles' in incoming ? incoming.paramsStyles : existing?.paramsStyles
+    const paramsStyles = mergeParameterStyles(
+      existing?.paramsStyles,
+      incoming.paramsStyles,
+      'paramsStyles' in incoming,
+    )
 
     const existingSpec = existing?.spec
     const incomingSpec = incoming.spec
