@@ -23,6 +23,16 @@ export interface LoggingHandlerPluginOptions<T extends Context> {
   generateId?: (options: StandardHandlerInterceptorOptions<T>) => string
 
   /**
+   * Logs errors raised while handling a request.
+   *
+   * Use this callback to customize the error payload or log level. Abort errors
+   * remain informational and are not passed to this callback.
+   *
+   * @default (logger, error) => logger.error(error)
+   */
+  logError?: (logger: Logger, error: unknown) => void
+
+  /**
    * Enables logging for request/response events.
    *
    * @example
@@ -50,6 +60,7 @@ export interface LoggingHandlerPluginOptions<T extends Context> {
 export class LoggingHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
   private readonly logger: Exclude<LoggingHandlerPluginOptions<T>['logger'], undefined>
   private readonly generateId: Exclude<LoggingHandlerPluginOptions<T>['generateId'], undefined>
+  private readonly logError: Exclude<LoggingHandlerPluginOptions<T>['logError'], undefined>
   private readonly logRequestResponse: Exclude<LoggingHandlerPluginOptions<T>['logRequestResponse'], undefined>
   private readonly logRequestAbort: Exclude<LoggingHandlerPluginOptions<T>['logRequestAbort'], undefined>
 
@@ -58,6 +69,7 @@ export class LoggingHandlerPlugin<T extends Context> implements StandardHandlerP
   ) {
     this.logger = options.logger ?? pino()
     this.generateId = options.generateId ?? (() => crypto.randomUUID())
+    this.logError = options.logError ?? ((logger, error) => logger.error(error))
     this.logRequestResponse = options.logRequestResponse ?? false
     this.logRequestAbort = options.logRequestAbort ?? false
   }
@@ -138,7 +150,7 @@ export class LoggingHandlerPlugin<T extends Context> implements StandardHandlerP
          * Any error here is internal (interceptor/framework), not business logic.
          * Indicates unexpected handler failure.
          */
-        logger.error(error)
+        this.logError(logger, error)
         throw error
       }
     })
@@ -156,8 +168,8 @@ export class LoggingHandlerPlugin<T extends Context> implements StandardHandlerP
         if (request.signal?.aborted && request.signal.reason === error) {
           logger?.info(error)
         }
-        else {
-          logger?.error(error)
+        else if (logger) {
+          this.logError(logger, error)
         }
         throw error
       }
@@ -182,8 +194,8 @@ export class LoggingHandlerPlugin<T extends Context> implements StandardHandlerP
               if (signal?.aborted && signal.reason === error) {
                 logger?.info(error)
               }
-              else {
-                logger?.error(error)
+              else if (logger) {
+                this.logError(logger, error)
               }
               return error
             },

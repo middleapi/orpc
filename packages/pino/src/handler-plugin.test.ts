@@ -1,4 +1,5 @@
 import type { StandardLazyRequest } from '@orpc/standard-server'
+import type { Logger } from 'pino'
 import { StandardRPCJsonSerializer, StandardRPCSerializer } from '@orpc/client/standard'
 import { os } from '@orpc/server'
 import { StandardHandler, StandardRPCCodec, StandardRPCMatcher } from '@orpc/server/standard'
@@ -11,6 +12,7 @@ const globalSpies = {
   child: vi.fn(),
   info: vi.fn(),
   error: vi.fn(),
+  warn: vi.fn(),
   setBindings: vi.fn(),
 }
 
@@ -35,6 +37,11 @@ class FakeLogger {
   error(...args: any[]) {
     expect(this.childDeep).toBeGreaterThan(0) // Ensure child logger is used
     globalSpies.error(...args)
+  }
+
+  warn(...args: any[]) {
+    expect(this.childDeep).toBeGreaterThan(0) // Ensure child logger is used
+    globalSpies.warn(...args)
   }
 
   setBindings(bindings: any) {
@@ -161,6 +168,7 @@ describe('loggingHandlerPlugin', () => {
     vi.clearAllMocks()
     const controller = new AbortController()
     const abortError = new Error('abort-reason')
+    const logError = vi.fn()
     controller.abort(abortError)
 
     const handler2 = new StandardHandler(
@@ -172,7 +180,7 @@ describe('loggingHandlerPlugin', () => {
       new StandardRPCMatcher(),
       codec,
       {
-        plugins: [new LoggingHandlerPlugin({ logger: baseLogger as any })],
+        plugins: [new LoggingHandlerPlugin({ logger: baseLogger as any, logError })],
       },
     )
 
@@ -180,6 +188,7 @@ describe('loggingHandlerPlugin', () => {
     const result2 = await handler2.handle(request2, { prefix: undefined, context: {} })
     expect(result2.matched).toBe(true)
     expect(globalSpies.info).toHaveBeenCalledWith(abortError)
+    expect(logError).not.toHaveBeenCalled()
   })
 
   it('logs internal errors', async () => {
@@ -205,6 +214,99 @@ describe('loggingHandlerPlugin', () => {
     // Root interceptor errors are thrown, not encoded in response
     await expect(handler.handle(request, { prefix: undefined, context: {} })).rejects.toThrow(error)
     expect(globalSpies.error).toHaveBeenCalledWith(error)
+  })
+
+  it('customizes internal error logging', async () => {
+    const error = new Error('internal-error')
+    const baseLogger = new FakeLogger({ orpc: {} })
+    const logError = vi.fn((logger: Logger, caught: unknown) => {
+      logger.warn({ caught }, 'custom internal error')
+    })
+    const handler = new StandardHandler(
+      {
+        ping: os.handler(() => 'pong'),
+      },
+      new StandardRPCMatcher(),
+      codec,
+      {
+        plugins: [new LoggingHandlerPlugin({ logger: baseLogger as any, logError })],
+        rootInterceptors: [
+          async () => {
+            throw error
+          },
+        ],
+      },
+    )
+
+    const request = createRequest('GET', 'http://localhost/ping')
+    await expect(handler.handle(request, { prefix: undefined, context: {} })).rejects.toThrow(error)
+
+    expect(logError).toHaveBeenCalledWith(expect.any(FakeLogger), error)
+    expect(globalSpies.warn).toHaveBeenCalledWith({ caught: error }, 'custom internal error')
+    expect(globalSpies.error).not.toHaveBeenCalled()
+  })
+
+  it('customizes business error logging', async () => {
+    const error = new Error('business-error')
+    const baseLogger = new FakeLogger({ orpc: {} })
+    const logError = vi.fn((logger: Logger, caught: unknown) => {
+      logger.warn({ caught }, 'custom business error')
+    })
+    const handler = new StandardHandler(
+      {
+        ping: os.handler(() => {
+          throw error
+        }),
+      },
+      new StandardRPCMatcher(),
+      codec,
+      {
+        plugins: [new LoggingHandlerPlugin({ logger: baseLogger as any, logError })],
+      },
+    )
+
+    const request = createRequest('GET', 'http://localhost/ping')
+    const result = await handler.handle(request, { prefix: undefined, context: {} })
+
+    expect(result.matched).toBe(true)
+    expect(result.response?.status).toBe(500)
+    expect(logError).toHaveBeenCalledWith(expect.any(FakeLogger), error)
+    expect(globalSpies.warn).toHaveBeenCalledWith({ caught: error }, 'custom business error')
+    expect(globalSpies.error).not.toHaveBeenCalled()
+  })
+
+  it('customizes stream error logging', async () => {
+    const error = new Error('stream-error')
+    const baseLogger = new FakeLogger({ orpc: {} })
+    const logError = vi.fn((logger: Logger, caught: unknown) => {
+      logger.warn({ caught }, 'custom stream error')
+    })
+    const handler = new StandardHandler(
+      {
+        ping: os.handler(async function* () {
+          yield 1
+          throw error
+        }),
+      },
+      new StandardRPCMatcher(),
+      codec,
+      {
+        plugins: [new LoggingHandlerPlugin({ logger: baseLogger as any, logError })],
+      },
+    )
+
+    const request = createRequest('GET', 'http://localhost/ping')
+    const result = await handler.handle(request, { prefix: undefined, context: {} })
+
+    try {
+      for await (const _ of result.response?.body as AsyncIterable<unknown>) {
+        // consume the stream
+      }
+    }
+    catch {}
+    expect(logError).toHaveBeenCalledWith(expect.any(FakeLogger), error)
+    expect(globalSpies.warn).toHaveBeenCalledWith({ caught: error }, 'custom stream error')
+    expect(globalSpies.error).not.toHaveBeenCalled()
   })
 
   it('sets path on client interceptor and handles non-stream output', async () => {
@@ -272,6 +374,7 @@ describe('loggingHandlerPlugin', () => {
     vi.clearAllMocks()
     const controller = new AbortController()
     const abortedError = new Error('aborted-stream')
+    const logError = vi.fn()
     controller.abort(abortedError)
 
     const handler2 = new StandardHandler(
@@ -283,7 +386,7 @@ describe('loggingHandlerPlugin', () => {
       new StandardRPCMatcher(),
       codec,
       {
-        plugins: [new LoggingHandlerPlugin({ logger: baseLogger as any })],
+        plugins: [new LoggingHandlerPlugin({ logger: baseLogger as any, logError })],
       },
     )
 
@@ -300,6 +403,7 @@ describe('loggingHandlerPlugin', () => {
     expect(globalSpies.error).toHaveBeenCalledTimes(0)
     expect(globalSpies.info).toHaveBeenCalledTimes(1)
     expect(globalSpies.info).toHaveBeenCalledWith(abortedError)
+    expect(logError).not.toHaveBeenCalled()
   })
 
   describe('edge cases', () => {

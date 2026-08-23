@@ -52,6 +52,7 @@ const handler = new RPCHandler(router, {
     new LoggingHandlerPlugin({
       logger, // Custom logger instance
       generateId: ({ request }) => crypto.randomUUID(), // Custom ID generator
+      logError: (logger, error) => logger.warn(error), // Custom error level or payload
       logRequestResponse: true, // Log request start/end (disabled by default)
       logRequestAbort: true, // Log when requests are aborted (disabled by default)
     }),
@@ -62,6 +63,10 @@ const handler = new RPCHandler(router, {
 ::: info
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc-handler), [OpenAPIHandler](/docs/openapi/openapi-handler), or another custom handler.
 :::
+
+By default, handler errors are logged with `logger.error(error)`. Use `logError`
+to choose a different level, enrich the payload, or forward the error to another
+destination. Request aborts remain informational and do not invoke `logError`.
 
 ::: tip
 For improved log readability during development, consider using [pino-pretty](https://github.com/pinojs/pino-pretty) to format your logs in a human-friendly way.
