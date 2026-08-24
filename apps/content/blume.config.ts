@@ -198,7 +198,7 @@ export default defineConfig({
   },
   deployment: {
     output: 'server',
-    adapter: 'vercel',
+    adapter: 'cloudflare',
     site: 'https://orpc.dev',
   },
 })

@@ -191,6 +191,9 @@ importers:
 
   apps/content:
     devDependencies:
+      '@astrojs/cloudflare':
+        specifier: ^14.2.3
+        version: 14.2.3(@types/node@26.2.0)(astro@7.2.4(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)(wrangler@4.124.0)(yaml@2.9.0)
       '@opentelemetry/instrumentation':
         specifier: ^0.221.0
         version: 0.221.0(@opentelemetry/api@1.9.1)(supports-color@10.2.2)
@@ -256,7 +259,7 @@ importers:
         version: 26.2.0
       blume:
         specifier: ^1.5.3
-        version: 1.5.3(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@shikijs/themes@4.4.3)(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(csstype@3.2.3)(esbuild@0.28.2)(next@16.3.1(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(prettier@3.9.6)(rollup@4.62.4)(supports-color@10.2.2)(svelte@5.56.9(@typescript-eslint/types@8.67.0))(terser@5.50.0)(vite@8.2.2(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(vue@3.5.41(typescript@6.0.3))(ws@8.21.3)(yaml@2.9.0)
+        version: 1.5.3(4f37e8c30923bacb6b6775379b0a0df7)
       effect:
         specifier: 4.0.0-rc.109
         version: 4.0.0-rc.109
@@ -1008,7 +1011,7 @@ importers:
         version: 5.101.4(react@19.2.8)
       '@types/bun':
         specifier: latest
-        version: 1.3.14
+        version: 1.4.0
       '@types/react':
         specifier: ^19.2.18
         version: 19.2.18
@@ -1509,6 +1512,12 @@ packages:
     peerDependencies:
       typescript: ^5.0.0 || ^6.0.0
 
+  '@astrojs/cloudflare@14.2.3':
+    resolution: {integrity: sha512-rXTj2wnRehICDXCfvJBMFi2S5+FOJe6Z+Izt0VlEmdDL8Z905rasnO+ZjLZLhzw+MV1EcKxH93U8phdjtSmMaA==}
+    peerDependencies:
+      astro: ^7.2.0
+      wrangler: ^4.83.0
+
   '@astrojs/compiler-binding-darwin-arm64@0.3.2':
     resolution: {integrity: sha512-MM8tn8CSimcfytaOla4b6acN8mKWiL/rlAA1fpT3/Wl7dNGSE4y8FjTN/zJVNnb63CsLWG5zZwCt01TXtDKh9g==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -1629,6 +1638,9 @@ packages:
   '@astrojs/telemetry@3.3.3':
     resolution: {integrity: sha512-C1TLn5sPJr0x4vk56piHWKbnqlEB8BKyte5Y45V02U+D7BGO5eMqZDH5aPjnkXQWJggvmsTXxH03QMZ9NgWLzQ==}
     engines: {node: 18.20.8 || ^20.3.0 || >=22.0.0}
+
+  '@astrojs/underscore-redirects@1.0.4':
+    resolution: {integrity: sha512-sD3bn7i2yC+ocxlhCTshdg3gUM471Nag3wgyHilA+kpmufokvmUu1p5Mw5GT5Xp8SPC1Nlq0BJAgV/lslnWvRw==}
 
   '@astrojs/vercel@11.0.7':
     resolution: {integrity: sha512-Kq9X4sEffNgmmqlFAaLzuWdMJBAz/aGfHRUpx6Q4ljX9roJBXvUnifbABho4V/raBg8fr765Yy9HvxbCtUvcpQ==}
@@ -5439,6 +5451,9 @@ packages:
   '@types/bun@1.3.14':
     resolution: {integrity: sha512-h1hFqFVcvAvD9j9K7ZW7vd82aSA+rTdznZa+5bwvCwqSB1jmmfLcbIWhOLx1/+boy/xmjgCs/OMUL8hRJSmnPw==}
 
+  '@types/bun@1.4.0':
+    resolution: {integrity: sha512-K+lZULY23vRgK/CfTjFIV+tyifaNdSMlPh9j+6mQ/cLfpOznLyAuzgV/JQysyECpkBQLVMSyvjlr2fBUSA9wFQ==}
+
   '@types/bunyan@1.8.11':
     resolution: {integrity: sha512-758fRH7umIMk5qt5ELmRMff4mLDlN+xyYzC+dkPTdKwbSkJFvz6xwyScrytPU0QIBbRRwbiE8/BIg8bpajerNQ==}
 
@@ -6592,6 +6607,9 @@ packages:
 
   bun-types@1.3.14:
     resolution: {integrity: sha512-4N0ig0fEomHt5R0KCFWjovxow98rIoRwKolrYdCcknNwMekCXRnWEUvgu5soYV8QXtVsrUD8B95MBOZGPvr6KQ==}
+
+  bun-types@1.4.0:
+    resolution: {integrity: sha512-iIKw23BspnQQYd3prITOBxeUsxBHnwzX6YJfGMuNOZzeNcMmVqzIIVGRm1l69ogaPQmb4wB6BN8mA5bE9YuC5Q==}
 
   bundle-name@4.1.0:
     resolution: {integrity: sha512-tjwM5exMg6BGRI+kNmTntNsvdZS1X8BFYS6tnJ2hdH0kVxM6/eVZ2xy+FqStSWvYmtfFMDLIxurorHwDKfDz5Q==}
@@ -12597,6 +12615,31 @@ snapshots:
       - prettier
       - prettier-plugin-astro
 
+  '@astrojs/cloudflare@14.2.3(@types/node@26.2.0)(astro@7.2.4(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)(wrangler@4.124.0)(yaml@2.9.0)':
+    dependencies:
+      '@astrojs/internal-helpers': 0.10.4
+      '@astrojs/underscore-redirects': 1.0.4
+      '@cloudflare/vite-plugin': 1.53.0(vite@8.2.2(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(wrangler@4.124.0)
+      astro: 7.2.4(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0)
+      piccolore: 0.1.3
+      vite: 8.2.2(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0)
+      wrangler: 4.124.0
+    transitivePeerDependencies:
+      - '@types/node'
+      - '@vitejs/devtools'
+      - bufferutil
+      - esbuild
+      - jiti
+      - less
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - terser
+      - tsx
+      - utf-8-validate
+      - yaml
+
   '@astrojs/compiler-binding-darwin-arm64@0.3.2':
     optional: true
 
@@ -12785,6 +12828,8 @@ snapshots:
       dset: 3.1.4
       is-docker: 4.0.0
       package-manager-detector: 1.8.0
+
+  '@astrojs/underscore-redirects@1.0.4': {}
 
   '@astrojs/vercel@11.0.7(astro@7.2.4(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(next@16.3.1(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(rollup@4.62.4)(supports-color@10.2.2)(svelte@5.56.9(@typescript-eslint/types@8.67.0))(vue@3.5.41(typescript@6.0.3))(ws@8.21.3)':
     dependencies:
@@ -17055,6 +17100,10 @@ snapshots:
     dependencies:
       bun-types: 1.3.14
 
+  '@types/bun@1.4.0':
+    dependencies:
+      bun-types: 1.4.0
+
   '@types/bunyan@1.8.11':
     dependencies:
       '@types/node': 26.2.0
@@ -18298,7 +18347,7 @@ snapshots:
 
   blake3-wasm@2.1.5: {}
 
-  blume@1.5.3(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@shikijs/themes@4.4.3)(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(csstype@3.2.3)(esbuild@0.28.2)(next@16.3.1(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(prettier@3.9.6)(rollup@4.62.4)(supports-color@10.2.2)(svelte@5.56.9(@typescript-eslint/types@8.67.0))(terser@5.50.0)(vite@8.2.2(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(vue@3.5.41(typescript@6.0.3))(ws@8.21.3)(yaml@2.9.0):
+  blume@1.5.3(4f37e8c30923bacb6b6775379b0a0df7):
     dependencies:
       '@astrojs/check': 0.9.10(prettier@3.9.6)(typescript@6.0.3)
       '@astrojs/markdown-satteri': 0.3.7
@@ -18379,6 +18428,8 @@ snapshots:
       undici: 8.10.0
       write-file-atomic: 8.0.0
       zod: 4.4.3
+    optionalDependencies:
+      '@astrojs/cloudflare': 14.2.3(@types/node@26.2.0)(astro@7.2.4(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)(wrangler@4.124.0)(yaml@2.9.0)
     transitivePeerDependencies:
       - '@astrojs/markdown-remark'
       - '@aws-sdk/credential-provider-web-identity'
@@ -18503,6 +18554,10 @@ snapshots:
       yaml: 2.9.0
 
   bun-types@1.3.14:
+    dependencies:
+      '@types/node': 26.2.0
+
+  bun-types@1.4.0:
     dependencies:
       '@types/node': 26.2.0
 

@@ -9,6 +9,7 @@
     "docs:validate": "blume validate --strict"
   },
   "devDependencies": {
+    "@astrojs/cloudflare": "^14.2.3",
     "@opentelemetry/instrumentation": "^0.221.0",
     "@opentelemetry/sdk-node": "^0.221.0",
     "@opentelemetry/sdk-trace-web": "^2.10.0",
