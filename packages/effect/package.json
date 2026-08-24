@@ -69,6 +69,6 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "effect": "4.0.0-rc.109"
+    "effect": "4.0.0-rc.111"
   }
 }
