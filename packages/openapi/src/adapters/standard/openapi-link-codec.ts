@@ -451,12 +451,6 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
    */
   private async resolveRoute(path: string[]): Promise<ResolvedOpenAPIRoute> {
     const key = stringifyJSON(path)
-    const cached = this.routes.get(key)
-
-    if (cached) {
-      return cached
-    }
-
     let promise = this.routePromises.get(key)
 
     if (!promise) {
