@@ -51,3 +51,28 @@ describe('rpc link + handler', () => {
     )
   })
 })
+
+describe('rpc link codec path encoding depth', () => {
+  const codec = new RPCLinkCodec({ serializer })
+  const options = { context: {} } as any
+
+  // Memoized paths, matching how createORPCClient caches per-procedure paths.
+  const pathDepth10 = Array.from({ length: 10 }, (_, i) => `level${i}`)
+  const pathDepth20 = Array.from({ length: 20 }, (_, i) => `level${i}`)
+
+  bench('encodeInput at path depth 10', async () => {
+    await codec.encodeInput(undefined, pathDepth10, options)
+  })
+
+  bench('encodeInput at path depth 20', async () => {
+    await codec.encodeInput(undefined, pathDepth20, options)
+  })
+
+  /**
+   * Worst case: a fresh array per call never hits the identity-keyed
+   * path cache and pays the WeakMap lookup on top of encoding.
+   */
+  bench('encodeInput at path depth 20 (fresh array per call)', async () => {
+    await codec.encodeInput(undefined, Array.from({ length: 20 }, (_, i) => `level${i}`), options)
+  })
+})
