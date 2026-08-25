@@ -278,14 +278,14 @@ function logProcedureError(
 
   logger.error(toErrorOrString(error))
 
-  const level = procedureErrorLevel(error, defaultErrorLevel(error))
+  const level = procedureErrorLevel(error, defaultProcedureErrorLevel(error))
 
   if (level !== 'error') {
     logger.setLevel(level)
   }
 }
 
-function defaultErrorLevel(error: unknown): LogLevel {
+function defaultProcedureErrorLevel(error: unknown): LogLevel {
   // An abort means the client withdrew the request, not that something failed,
   // so record it as normal operation.
   if (isAbortError(error)) {

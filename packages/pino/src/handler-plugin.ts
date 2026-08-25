@@ -229,10 +229,10 @@ function logProcedureError(
   error: unknown,
   procedureErrorLevel: Exclude<PinoHandlerPluginOptions<any>['procedureErrorLevel'], undefined>,
 ) {
-  logger?.[procedureErrorLevel(error, defaultErrorLevel(error))](error)
+  logger?.[procedureErrorLevel(error, defaultProcedureErrorLevel(error))](error)
 }
 
-function defaultErrorLevel(error: unknown): pino.Level {
+function defaultProcedureErrorLevel(error: unknown): pino.Level {
   // An abort means the client withdrew the request, not that something failed,
   // so record it as normal operation.
   if (isAbortError(error)) {
