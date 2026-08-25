@@ -323,11 +323,7 @@ function getExecutionPlan(procedure: AnyProcedure): ProcedureExecutionPlan {
  * skipping the spread entirely beats copying an empty override into the context.
  * The `hasOwnProperty` guard mirrors what `{ ...context, ...next }` would copy.
  */
-function hasEnumerableProperties(context: Context | undefined): boolean {
-  if (context === undefined) {
-    return false
-  }
-
+function hasEnumerableProperties(context: Context): boolean {
   for (const key in context) {
     if (Object.hasOwn(context, key)) {
       return true

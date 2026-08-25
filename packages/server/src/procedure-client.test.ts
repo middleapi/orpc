@@ -1042,6 +1042,15 @@ describe('untraced fast path and context edge cases', () => {
     SharedV2Module.setOpenTelemetryConfig(previousOtelConfig as any)
   })
 
+  it('validates input and output without tracing', async () => {
+    const procedure = os
+      .input(z.string().transform(value => `input:${value}`))
+      .output(z.string().transform(value => `output:${value}`))
+      .handler(async ({ input }) => input)
+
+    await expect(createProcedureClient(procedure)('value')).resolves.toBe('output:input:value')
+  })
+
   it('propagates parent context when middleware passes an empty context object', async () => {
     const handler = vi.fn(async ({ context }: any) => context.userId)
     const procedure = os
