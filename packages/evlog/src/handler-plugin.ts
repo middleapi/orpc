@@ -1,7 +1,7 @@
 import type { Context, ErrorMap, ProcedureClientInterceptor, Schema } from '@orpc/server'
 import type { StandardHandlerInterceptor, StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '@orpc/server/standard'
 import type { StandardRequest } from '@standardserver/core'
-import type { RequestLogger } from 'evlog'
+import type { LogLevel, RequestLogger } from 'evlog'
 import type { BaseEvlogOptions, FrameworkIntegrationHelpers, FrameworkIntegrationSpec } from 'evlog/toolkit'
 import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import { isAbortError, isAsyncIteratorObject, ORPC_NAME, override, sleep, toArray, wrapReadableStream } from '@orpc/shared'
@@ -21,6 +21,16 @@ export interface EvlogHandlerPluginOptions<_T extends Context> extends BaseEvlog
    * @default false
    */
   logAbort?: boolean
+
+  /**
+   * Customizes the log level for errors thrown from procedures;
+   * internal handler failures are always logged at error level.
+   * Receives the level applied by default; return it to keep the default behavior:
+   * 'info' for abort errors, 'warn' for ORPCError except INTERNAL_SERVER_ERROR, 'error' otherwise.
+   *
+   * @default (error, level) => level
+   */
+  procedureErrorLevel?: (error: unknown, level: LogLevel) => LogLevel
 }
 
 /**
@@ -41,14 +51,16 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
   before = ['~opentelemetry', '~batch', '~hibernation']
 
   private readonly logAbort: Exclude<EvlogHandlerPluginOptions<T>['logAbort'], undefined>
+  private readonly procedureErrorLevel: Exclude<EvlogHandlerPluginOptions<T>['procedureErrorLevel'], undefined>
   private readonly integration: FrameworkIntegrationHelpers<{ request: StandardRequest }>
   private readonly evlogOptions: BaseEvlogOptions
 
   constructor(
-    { storage, logAbort, ...evlogOptions }: EvlogHandlerPluginOptions<T> = {},
+    { storage, logAbort, procedureErrorLevel, ...evlogOptions }: EvlogHandlerPluginOptions<T> = {},
   ) {
     this.evlogOptions = evlogOptions
     this.logAbort = logAbort ?? false
+    this.procedureErrorLevel = procedureErrorLevel ?? ((_, level) => level)
     this.integration = defineFrameworkIntegration({
       name: ORPC_NAME,
       storage,
@@ -193,7 +205,7 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
         return await next()
       }
       catch (error) {
-        logBusinessLogicError(logger, error)
+        logProcedureError(logger, error, this.procedureErrorLevel)
         throw error
       }
     }
@@ -209,7 +221,7 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
          */
         return override(output, wrapAsyncIteratorPreservingEventMeta(output, {
           onError: (error) => {
-            logBusinessLogicError(logger, error)
+            logProcedureError(logger, error, this.procedureErrorLevel)
           },
         }))
       }
@@ -221,7 +233,7 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
          */
         return override(output, wrapReadableStream(output, {
           onError: (error) => {
-            logBusinessLogicError(logger, error)
+            logProcedureError(logger, error, this.procedureErrorLevel)
           },
         }))
       }
@@ -255,18 +267,35 @@ function toErrorOrString(error: unknown) {
   return String(error)
 }
 
-function logBusinessLogicError(logger: RequestLogger | undefined, error: unknown) {
+function logProcedureError(
+  logger: RequestLogger | undefined,
+  error: unknown,
+  procedureErrorLevel: Exclude<EvlogHandlerPluginOptions<any>['procedureErrorLevel'], undefined>,
+) {
   logger?.error(toErrorOrString(error))
 
+  const level = procedureErrorLevel(error, defaultErrorLevel(error))
+
+  if (level !== 'error') {
+    logger?.setLevel(level)
+  }
+}
+
+function defaultErrorLevel(error: unknown): LogLevel {
   // An abort means the client withdrew the request, not that something failed,
   // so record it as normal operation.
   if (isAbortError(error)) {
-    logger?.setLevel('info')
+    return 'info'
   }
+
   // A thrown ORPCError is a deliberate business rejection delivered to the client,
-  // so keep it reviewable without treating it as a failure.
-  // Anything else is unexpected and stays at error level.
-  else if (error instanceof ORPCError) {
-    logger?.setLevel('warn')
+  // so keep it reviewable without treating it as a failure. INTERNAL_SERVER_ERROR
+  // is the exception: it signals a server-side failure (oRPC itself throws it for
+  // failures like output validation), so it stays at error level along with
+  // anything unexpected.
+  if (error instanceof ORPCError && error.code !== 'INTERNAL_SERVER_ERROR') {
+    return 'warn'
   }
+
+  return 'error'
 }

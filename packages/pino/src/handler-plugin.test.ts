@@ -8,6 +8,7 @@ import { PinoHandlerPlugin } from './handler-plugin'
 
 const globalSpies = {
   child: vi.fn(),
+  debug: vi.fn(),
   info: vi.fn(),
   warn: vi.fn(),
   error: vi.fn(),
@@ -24,6 +25,11 @@ class FakeLogger {
   child(opts: any) {
     globalSpies.child(opts)
     return new FakeLogger({ ...this._bindings, ...opts }, this.childDepth + 1)
+  }
+
+  debug(...args: any[]) {
+    expect(this.childDepth).toBeGreaterThan(0)
+    globalSpies.debug(...args)
   }
 
   info(...args: any[]) {
@@ -148,7 +154,7 @@ describe('pinoHandlerPlugin', () => {
     expect(globalSpies.info).toHaveBeenCalledWith('request was aborted before handling (manual)')
   })
 
-  it('logs business errors (ORPCError) as warn, unexpected errors as error, and abort errors as info', async () => {
+  it('logs business errors (ORPCError) as warn except INTERNAL_SERVER_ERROR, unexpected errors as error, and abort errors as info', async () => {
     const baseLogger = new FakeLogger({ rpc: {} })
     const businessError = new ORPCError('UNAUTHORIZED')
     const handler1 = new StandardHandler(createCodec(os.handler(() => {
@@ -194,6 +200,57 @@ describe('pinoHandlerPlugin', () => {
     expect(globalSpies.info).toHaveBeenCalledWith(abortError)
     expect(globalSpies.warn).not.toHaveBeenCalled()
     expect(globalSpies.error).not.toHaveBeenCalled()
+
+    vi.clearAllMocks()
+
+    const internalError = new ORPCError('INTERNAL_SERVER_ERROR')
+    const handler4 = new StandardHandler(createCodec(os.handler(() => {
+      throw internalError
+    })) as any, {
+      plugins: [new PinoHandlerPlugin({ logger: baseLogger as any })],
+    })
+
+    const result4 = await handler4.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
+
+    expect(result4.matched).toBe(true)
+    expect(globalSpies.error).toHaveBeenCalledWith(internalError)
+    expect(globalSpies.warn).not.toHaveBeenCalled()
+  })
+
+  it('honors the procedureErrorLevel option, passing the error and its default level', async () => {
+    const baseLogger = new FakeLogger({ rpc: {} })
+    const businessError = new ORPCError('UNAUTHORIZED')
+    const procedureErrorLevel = vi.fn(
+      (error: unknown, level: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace') =>
+        error instanceof ORPCError && error.code === 'UNAUTHORIZED' ? 'debug' as const : level,
+    )
+
+    const handler1 = new StandardHandler(createCodec(os.handler(() => {
+      throw businessError
+    })) as any, {
+      plugins: [new PinoHandlerPlugin({ logger: baseLogger as any, procedureErrorLevel })],
+    })
+
+    await handler1.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
+
+    expect(procedureErrorLevel).toHaveBeenCalledWith(businessError, 'warn')
+    expect(globalSpies.debug).toHaveBeenCalledWith(businessError)
+    expect(globalSpies.warn).not.toHaveBeenCalled()
+
+    vi.clearAllMocks()
+
+    const otherError = new ORPCError('CONFLICT')
+    const handler2 = new StandardHandler(createCodec(os.handler(() => {
+      throw otherError
+    })) as any, {
+      plugins: [new PinoHandlerPlugin({ logger: baseLogger as any, procedureErrorLevel })],
+    })
+
+    await handler2.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
+
+    expect(procedureErrorLevel).toHaveBeenCalledWith(otherError, 'warn')
+    expect(globalSpies.debug).not.toHaveBeenCalled()
+    expect(globalSpies.warn).toHaveBeenCalledWith(otherError)
   })
 
   it('logs internal errors', async () => {

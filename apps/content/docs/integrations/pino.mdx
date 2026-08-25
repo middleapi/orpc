@@ -53,6 +53,22 @@ npm run dev | npx pino-pretty
 
 :::
 
+## Error Logging Levels
+
+Errors thrown from your procedures are logged at a level matching their intent: `info` for abort errors, `warn` for `ORPCError` instances since they represent deliberate rejections, and `error` for everything else, including `ORPCError` with the `INTERNAL_SERVER_ERROR` code. Use the `procedureErrorLevel` option to customize this behavior:
+
+```ts
+const plugin = new PinoHandlerPlugin({
+  procedureErrorLevel: (error, level) => {
+    if (level === 'error' && error instanceof ExpectedError) {
+      return 'warn'
+    }
+
+    return level
+  },
+})
+```
+
 ## Using the Logger in Your Code
 
 You can access the logger from the context object using the `getLogger` function:

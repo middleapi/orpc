@@ -435,7 +435,7 @@ describe('evlogHandlerPlugin', () => {
     })
   })
 
-  it('downgrades business errors (ORPCError) to warn level and abort errors to info level, keeps unexpected errors at error level', async () => {
+  it('downgrades business errors (ORPCError) to warn level and abort errors to info level, keeps INTERNAL_SERVER_ERROR and unexpected errors at error level', async () => {
     const logger = createLogger()
     const plugin = new EvlogHandlerPlugin()
     const { interceptor } = getPluginHooks(plugin)
@@ -480,6 +480,58 @@ describe('evlogHandlerPlugin', () => {
 
     expect(logger.error).toHaveBeenCalledWith(abortError)
     expect(logger.setLevel).toHaveBeenCalledWith('info')
+
+    logger.error.mockClear()
+    logger.setLevel.mockClear()
+
+    const internalError = new ORPCError('INTERNAL_SERVER_ERROR')
+
+    await expect(interceptor({
+      next: vi.fn().mockRejectedValue(internalError),
+      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+      path: ['ping'],
+      request: createRequest('/ping'),
+    })).rejects.toThrow(internalError)
+
+    expect(logger.error).toHaveBeenCalledWith(internalError)
+    expect(logger.setLevel).not.toHaveBeenCalled()
+  })
+
+  it('honors the procedureErrorLevel option, passing the error and its default level', async () => {
+    const logger = createLogger()
+    const procedureErrorLevel = vi.fn(
+      (error: unknown, level: 'info' | 'error' | 'warn' | 'debug') =>
+        error instanceof ORPCError && error.code === 'UNAUTHORIZED' ? 'debug' as const : level,
+    )
+    const plugin = new EvlogHandlerPlugin({ procedureErrorLevel })
+    const { interceptor } = getPluginHooks(plugin)
+    const businessError = new ORPCError('UNAUTHORIZED')
+
+    await expect(interceptor({
+      next: vi.fn().mockRejectedValue(businessError),
+      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+      path: ['ping'],
+      request: createRequest('/ping'),
+    })).rejects.toThrow(businessError)
+
+    expect(procedureErrorLevel).toHaveBeenCalledWith(businessError, 'warn')
+    expect(logger.error).toHaveBeenCalledWith(businessError)
+    expect(logger.setLevel).toHaveBeenCalledWith('debug')
+
+    logger.error.mockClear()
+    logger.setLevel.mockClear()
+
+    const otherError = new ORPCError('CONFLICT')
+
+    await expect(interceptor({
+      next: vi.fn().mockRejectedValue(otherError),
+      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+      path: ['ping'],
+      request: createRequest('/ping'),
+    })).rejects.toThrow(otherError)
+
+    expect(procedureErrorLevel).toHaveBeenCalledWith(otherError, 'warn')
+    expect(logger.setLevel).toHaveBeenCalledWith('warn')
   })
 
   it('returns non-stream client outputs unchanged', async () => {
