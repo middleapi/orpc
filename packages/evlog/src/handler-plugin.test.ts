@@ -497,6 +497,22 @@ describe('evlogHandlerPlugin', () => {
     expect(logger.setLevel).not.toHaveBeenCalled()
   })
 
+  it('skips procedure error logging when no logger is in the context', async () => {
+    const procedureErrorLevel = vi.fn()
+    const plugin = new EvlogHandlerPlugin({ procedureErrorLevel })
+    const { interceptor } = getPluginHooks(plugin)
+    const error = new Error('boom')
+
+    await expect(interceptor({
+      next: vi.fn().mockRejectedValue(error),
+      context: {},
+      path: ['ping'],
+      request: createRequest('/ping'),
+    })).rejects.toThrow(error)
+
+    expect(procedureErrorLevel).not.toHaveBeenCalled()
+  })
+
   it('honors the procedureErrorLevel option, passing the error and its default level', async () => {
     const logger = createLogger()
     const procedureErrorLevel = vi.fn(

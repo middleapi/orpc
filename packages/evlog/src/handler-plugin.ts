@@ -272,12 +272,16 @@ function logProcedureError(
   error: unknown,
   procedureErrorLevel: Exclude<EvlogHandlerPluginOptions<any>['procedureErrorLevel'], undefined>,
 ) {
-  logger?.error(toErrorOrString(error))
+  if (!logger) {
+    return
+  }
+
+  logger.error(toErrorOrString(error))
 
   const level = procedureErrorLevel(error, defaultErrorLevel(error))
 
   if (level !== 'error') {
-    logger?.setLevel(level)
+    logger.setLevel(level)
   }
 }
 
