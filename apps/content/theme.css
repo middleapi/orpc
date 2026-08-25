@@ -75,7 +75,7 @@
     top: var(--docs-header-height);
     height: calc(100dvh - var(--docs-header-height));
     border-inline-end: 1px solid var(--blume-border);
-    padding: 2rem 1.5rem 2.5rem 1.25rem;
+    padding: 1.5rem 1.5rem 2rem 1.25rem;
   }
 
   /* Docs content column only — PageLayout pages (blog, custom landings)
