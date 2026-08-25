@@ -460,7 +460,10 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     let promise = this.routePromises.get(key)
 
     if (!promise) {
-      promise = this.computeRoute(path, key)
+      const stablePath = path.slice()
+      // Defer computation until after the promise enters the in-flight map, so
+      // a synchronous loader failure can remove itself in `finally`.
+      promise = Promise.resolve().then(() => this.computeRoute(stablePath, key))
       this.routePromises.set(key, promise)
     }
 

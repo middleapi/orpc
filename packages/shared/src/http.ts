@@ -1,20 +1,25 @@
 import { tryDecodeURIComponent } from './uri'
 
 /**
- * Procedure paths are stable arrays reused across calls (memoized client nodes,
- * matcher entries), so an identity-keyed cache skips re-encoding per call.
+ * Procedure paths are usually stable arrays reused across calls. Keep a
+ * snapshot so mutable arrays cannot return a stale encoded path.
  */
-const HTTP_PATH_CACHE = new WeakMap<readonly string[], `/${string}`>()
+const HTTP_PATH_CACHE = new WeakMap<readonly string[], [readonly string[], `/${string}`]>()
 
 export function pathToHttpPath(path: readonly string[]): `/${string}` {
-  let cached = HTTP_PATH_CACHE.get(path)
+  const cached = HTTP_PATH_CACHE.get(path)
 
-  if (cached === undefined) {
-    cached = `/${path.map(encodeURIComponent).join('/')}`
-    HTTP_PATH_CACHE.set(path, cached)
+  if (
+    cached !== undefined
+    && cached[0].length === path.length
+    && cached[0].every((segment, index) => segment === path[index])
+  ) {
+    return cached[1]
   }
 
-  return cached
+  const httpPath = `/${path.map(encodeURIComponent).join('/')}` as `/${string}`
+  HTTP_PATH_CACHE.set(path, [path.slice(), httpPath])
+  return httpPath
 }
 
 export function normalizeHttpPath(path: string): `/${string}` {

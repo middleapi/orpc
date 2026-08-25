@@ -920,6 +920,58 @@ describe('openAPILinkCodec route cache', () => {
     expect(request.url).toBe('/lazy')
   })
 
+  it('does not cache a lazy loader that throws synchronously', async () => {
+    let shouldFail = true
+    let loads = 0
+    const codec = new OpenAPILinkCodec({
+      lazy: new Lazy({
+        meta: {},
+        loader: () => {
+          loads++
+          if (shouldFail) {
+            throw new Error('loader failed')
+          }
+          return Promise.resolve({ default: oc.meta(openapi({ method: 'GET', path: '/lazy' })) })
+        },
+      }) as any,
+    }, { serializer })
+
+    await expect(codec.encodeInput(undefined, ['lazy'], { context: {} })).rejects.toThrow('loader failed')
+    shouldFail = false
+
+    await expect(codec.encodeInput(undefined, ['lazy'], { context: {} })).resolves.toMatchObject({ url: '/lazy' })
+    expect(loads).toBe(2)
+  })
+
+  it('uses a stable path while a lazy route loads', async () => {
+    let markStarted!: () => void
+    let finishLoading!: () => void
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve
+    })
+    const loading = new Promise<void>((resolve) => {
+      finishLoading = resolve
+    })
+    const codec = new OpenAPILinkCodec({
+      lazy: new Lazy({
+        meta: {},
+        loader: async () => {
+          markStarted()
+          await loading
+          return { default: oc.meta(openapi({ method: 'GET' })) }
+        },
+      }) as any,
+    }, { serializer })
+    const path = ['lazy']
+
+    const request = codec.encodeInput(undefined, path, { context: {} })
+    await started
+    path[0] = 'other'
+    finishLoading()
+
+    await expect(request).resolves.toMatchObject({ url: '/lazy' })
+  })
+
   it('keeps base url parsing correct when the url alternates per call', async () => {
     let toggle = false
     const codec = new OpenAPILinkCodec({

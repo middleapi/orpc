@@ -79,7 +79,12 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
       })
     }
 
-    return this.callInterceptors(path, input, options, undefined, traced)
+    try {
+      return Promise.resolve(this.callInterceptors(path, input, options, undefined, traced))
+    }
+    catch (error) {
+      return Promise.reject(error)
+    }
   }
 
   private callInterceptors(

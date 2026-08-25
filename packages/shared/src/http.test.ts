@@ -37,6 +37,17 @@ describe('pathToHttpPath', () => {
     expect(pathToHttpPath(['x'])).toBe('/x')
     expect(pathToHttpPath(cached)).toBe('/x/y')
   })
+
+  it('invalidates the cache when the same array changes', () => {
+    const path = ['x']
+    expect(pathToHttpPath(path)).toBe('/x')
+
+    path.push('y')
+    expect(pathToHttpPath(path)).toBe('/x/y')
+
+    path[0] = 'z'
+    expect(pathToHttpPath(path)).toBe('/z/y')
+  })
 })
 
 describe('normalizeHttpPath', () => {

@@ -246,4 +246,26 @@ describe('standardLink with OpenTelemetry disabled', () => {
       setOpenTelemetryConfig(previousOtelConfig as any)
     }
   })
+
+  it('returns a rejected promise when an interceptor throws synchronously', async () => {
+    const previousOtelConfig = getOpenTelemetryConfig()
+    setOpenTelemetryConfig(undefined)
+
+    try {
+      const error = new Error('interceptor failed')
+      const link = new StandardLink(makeCodec(), makeTransport(), {
+        interceptors: [() => {
+          throw error
+        }],
+      })
+
+      const result = link.call(['ping'], 'input', { context: {} })
+
+      expect(result).toBeInstanceOf(Promise)
+      await expect(result).rejects.toBe(error)
+    }
+    finally {
+      setOpenTelemetryConfig(previousOtelConfig as any)
+    }
+  })
 })
