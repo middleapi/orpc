@@ -1,5 +1,6 @@
 import { MalformedResponseError, ORPCError } from '@orpc/client'
 import { oc } from '@orpc/contract'
+import { Lazy } from '@orpc/server'
 import { openapi } from '../../meta'
 import { OpenAPISerializer } from '../../openapi-serializer'
 import { OpenAPILinkCodec } from './openapi-link-codec'
@@ -853,5 +854,86 @@ describe('openAPILinkCodec', () => {
 
       expect(result.kind).toBe('error')
     })
+  })
+})
+
+describe('openAPILinkCodec route cache', () => {
+  it('does not collide a dotted procedure key with the equivalent nested path', async () => {
+    const codec = new OpenAPILinkCodec({
+      'a.b': oc.meta(openapi({ method: 'GET', path: '/dotted' })),
+      'a': {
+        b: oc.meta(openapi({ method: 'POST', path: '/nested' })),
+      },
+    }, { serializer })
+
+    // both paths stringify to the same 'a.b' key, but resolve to different procedures
+    const dotted = await codec.encodeInput(undefined, ['a.b'], { context: {} })
+    const nested = await codec.encodeInput(undefined, ['a', 'b'], { context: {} })
+
+    expect(dotted.method).toBe('GET')
+    expect(dotted.url).toBe('/dotted')
+
+    expect(nested.method).toBe('POST')
+    expect(nested.url).toBe('/nested')
+  })
+
+  it('resolves a lazy procedure contract once and reuses the route', async () => {
+    let loads = 0
+    const codec = new OpenAPILinkCodec({
+      lazy: new Lazy({
+        meta: {},
+        loader: async () => {
+          loads++
+          return { default: oc.meta(openapi({ method: 'GET', path: '/lazy' })) }
+        },
+      }) as any,
+    }, { serializer })
+
+    const first = await codec.encodeInput(undefined, ['lazy'], { context: {} })
+    const second = await codec.encodeInput(undefined, ['lazy'], { context: {} })
+
+    expect(first.url).toBe('/lazy')
+    expect(second.url).toBe('/lazy')
+    expect(loads).toBe(1)
+  })
+
+  it('does not cache a failed lazy resolution', async () => {
+    let shouldFail = true
+    const codec = new OpenAPILinkCodec({
+      lazy: new Lazy({
+        meta: {},
+        loader: async () => {
+          if (shouldFail) {
+            throw new Error('loader failed')
+          }
+          return { default: oc.meta(openapi({ method: 'GET', path: '/lazy' })) }
+        },
+      }) as any,
+    }, { serializer })
+
+    await expect(codec.encodeInput(undefined, ['lazy'], { context: {} })).rejects.toThrow('loader failed')
+    await expect(codec.encodeInput(undefined, ['lazy'], { context: {} })).rejects.toThrow('loader failed')
+
+    shouldFail = false
+
+    const request = await codec.encodeInput(undefined, ['lazy'], { context: {} })
+    expect(request.url).toBe('/lazy')
+  })
+
+  it('keeps base url parsing correct when the url alternates per call', async () => {
+    let toggle = false
+    const codec = new OpenAPILinkCodec({
+      ping: oc.meta(openapi({})),
+    }, {
+      url: () => {
+        toggle = !toggle
+        return toggle ? '/api1' : '/api2?base=1'
+      },
+      serializer,
+    })
+
+    expect((await codec.encodeInput('input', ['ping'], { context: {} })).url).toBe('/api1/ping')
+    expect((await codec.encodeInput('input', ['ping'], { context: {} })).url).toBe('/api2/ping?base=1')
+    expect((await codec.encodeInput('input', ['ping'], { context: {} })).url).toBe('/api1/ping')
   })
 })

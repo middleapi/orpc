@@ -28,6 +28,15 @@ describe('pathToHttpPath', () => {
   it('encodes slashes inside segments', () => {
     expect(pathToHttpPath(['a/b'])).toBe('/a%2Fb')
   })
+
+  it('returns consistent results across cached and uncached arrays', () => {
+    const cached = ['x', 'y']
+    expect(pathToHttpPath(cached)).toBe('/x/y')
+    expect(pathToHttpPath(cached)).toBe('/x/y')
+    expect(pathToHttpPath(['x', 'y'])).toBe('/x/y')
+    expect(pathToHttpPath(['x'])).toBe('/x')
+    expect(pathToHttpPath(cached)).toBe('/x/y')
+  })
 })
 
 describe('normalizeHttpPath', () => {

@@ -62,6 +62,7 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
   private readonly expectedMethod: Exclude<RPCLinkCodecOptions<T>['method'], undefined>
   private readonly headers: Exclude<RPCLinkCodecOptions<T>['headers'], undefined>
   private readonly serializer: Exclude<RPCLinkCodecOptions<T>['serializer'], undefined>
+  private parsedBaseUrl: [StandardUrl, `/${string}`, `?${string}` | undefined, `#${string}` | undefined] | undefined
 
   constructor(
     options: RPCLinkCodecOptions<T>,
@@ -82,8 +83,7 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
 
     const expectedMethod = await value(this.expectedMethod, options, path, input)
     const baseUrl = await value(this.baseUrl, options, path, input)
-
-    const [pathname, search, hash] = parseStandardUrl(baseUrl)
+    const [pathname, search, hash] = this.parseBaseUrl(baseUrl)
     const newPathname = `${pathname.replace(END_SLASH_REGEX, '')}${pathToHttpPath(path)}` as StandardUrl
     const serialized = this.serializer.serialize(input)
 
@@ -119,6 +119,22 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
       body: serialized,
       signal: options.signal,
     }
+  }
+
+  /**
+   * Single-slot cache keyed by the resolved url value: parsing the same base
+   * url on every call is pure overhead, and distinct values are rare.
+   */
+  private parseBaseUrl(baseUrl: StandardUrl): [`/${string}`, `?${string}` | undefined, `#${string}` | undefined] {
+    const cached = this.parsedBaseUrl
+
+    if (cached?.[0] === baseUrl) {
+      return [cached[1], cached[2], cached[3]]
+    }
+
+    const parsed = parseStandardUrl(baseUrl)
+    this.parsedBaseUrl = [baseUrl, ...parsed]
+    return parsed
   }
 
   async decodeResponse(response: StandardLazyResponse): Promise<StandardLinkCodecDecodedResponse> {

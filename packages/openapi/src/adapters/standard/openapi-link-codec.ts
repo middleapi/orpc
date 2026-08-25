@@ -1,6 +1,6 @@
 import type { AnyORPCError, ClientContext, ClientOptions } from '@orpc/client'
 import type { StandardLinkCodec, StandardLinkCodecDecodedResponse } from '@orpc/client/standard'
-import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
+import type { RouterContract } from '@orpc/contract'
 import type { Promisable, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standardserver/core'
 import type { OpenAPIMeta } from '../../meta'
@@ -51,11 +51,27 @@ export interface OpenAPILinkCodecOptions<T extends ClientContext> {
 
 const END_SLASH_REGEX = /\/$/
 
+interface ResolvedOpenAPIRoute {
+  readonly meta: ReturnType<typeof getOpenAPIMeta>
+  readonly method: NonNullable<OpenAPIMeta['method']>
+  readonly inputStructure: NonNullable<OpenAPIMeta['inputStructure']>
+  readonly outputStructure: NonNullable<OpenAPIMeta['outputStructure']>
+  /**
+   * Path template (prefix merged) with `{param}` placeholders still in place;
+   * per-call values are spliced into a copy during encoding.
+   */
+  readonly pathname: `/${string}`
+  readonly dynamicParams: ReturnType<typeof getDynamicPathParams>
+}
+
 export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCodec<T> {
   private readonly baseUrl: Exclude<OpenAPILinkCodecOptions<T>['url'], undefined>
   private readonly headers: Exclude<OpenAPILinkCodecOptions<T>['headers'], undefined>
   private readonly serializer: Exclude<OpenAPILinkCodecOptions<T>['serializer'], undefined>
   private readonly customErrorResponseBodyDecoder: OpenAPILinkCodecOptions<T>['customErrorResponseBodyDecoder']
+  private parsedBaseUrl: [StandardUrl, `/${string}`, `?${string}` | undefined, `#${string}` | undefined] | undefined
+  private readonly routes = new Map<string, ResolvedOpenAPIRoute>()
+  private readonly routePromises = new Map<string, Promise<ResolvedOpenAPIRoute>>()
 
   constructor(
     private readonly router: RouterContract,
@@ -74,18 +90,12 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     }
 
     const baseUrl = await value(this.baseUrl, options, path, input)
-    const procedure = await this.resolveProcedure(path)
-    const meta = getOpenAPIMeta(procedure)
+    const route = this.routes.get(stringifyJSON(path)) ?? await this.resolveRoute(path)
+    const { meta, method, inputStructure, dynamicParams } = route
 
-    const method = meta?.method ?? DEFAULT_OPENAPI_METHOD
-    const inputStructure = meta?.inputStructure ?? DEFAULT_OPENAPI_INPUT_STRUCTURE
-    let pathname = meta?.path ?? pathToHttpPath(path)
-    if (meta?.prefix) {
-      pathname = mergeHttpPath(meta.prefix, pathname)
-    }
+    let pathname = route.pathname
 
-    const [basePathname, baseSearch, baseHash] = parseStandardUrl(baseUrl)
-    const dynamicParams = getDynamicPathParams(pathname)
+    const [basePathname, baseSearch, baseHash] = this.parseBaseUrl(baseUrl)
 
     if (inputStructure === 'compact') {
       let data = input
@@ -369,8 +379,8 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     _options: ClientOptions<T>,
   ): Promise<StandardLinkCodecDecodedResponse> {
     const isOk = response.status < 400
-    const procedure = await this.resolveProcedure(path)
-    const meta = getOpenAPIMeta(procedure)
+    const route = this.routes.get(stringifyJSON(path)) ?? await this.resolveRoute(path)
+    const meta = route.meta
 
     const body = await response.resolveBody(meta?.responseBodyHint)
 
@@ -404,7 +414,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       }
     }
 
-    const outputStructure = meta?.outputStructure ?? DEFAULT_OPENAPI_OUTPUT_STRUCTURE
+    const outputStructure = route.outputStructure
 
     return outputStructure === 'compact'
       ? { kind: 'output', output: deserialized }
@@ -418,14 +428,75 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
         }
   }
 
-  private async resolveProcedure(path: string[]): Promise<AnyProcedureContract> {
-    const { default: maybeProcedure } = await unlazy(getRouterContract(this.router, path))
+  /**
+   * Single-slot cache keyed by the resolved url value: parsing the same base
+   * url on every call is pure overhead, and distinct values are rare.
+   */
+  private parseBaseUrl(baseUrl: StandardUrl): [`/${string}`, `?${string}` | undefined, `#${string}` | undefined] {
+    const cached = this.parsedBaseUrl
 
-    if (!(maybeProcedure instanceof ProcedureContract)) {
-      throw new TypeError(`Expected a procedure or contract at path (${path.join('.')})`)
+    if (cached?.[0] === baseUrl) {
+      return [cached[1], cached[2], cached[3]]
     }
 
-    return maybeProcedure
+    const parsed = parseStandardUrl(baseUrl)
+    this.parsedBaseUrl = [baseUrl, ...parsed]
+    return parsed
+  }
+
+  /**
+   * Route resolution walks the contract tree and scans the path template for
+   * dynamic params — all per-procedure constants, memoized after the first call
+   * (with in-flight dedupe for concurrent first calls, failures not cached).
+   */
+  private async resolveRoute(path: string[]): Promise<ResolvedOpenAPIRoute> {
+    const key = stringifyJSON(path)
+    const cached = this.routes.get(key)
+
+    if (cached) {
+      return cached
+    }
+
+    let promise = this.routePromises.get(key)
+
+    if (!promise) {
+      promise = this.computeRoute(path, key)
+      this.routePromises.set(key, promise)
+    }
+
+    return promise
+  }
+
+  private async computeRoute(path: string[], key: string): Promise<ResolvedOpenAPIRoute> {
+    try {
+      const { default: maybeProcedure } = await unlazy(getRouterContract(this.router, path))
+
+      if (!(maybeProcedure instanceof ProcedureContract)) {
+        throw new TypeError(`Expected a procedure or contract at path (${path.join('.')})`)
+      }
+
+      const meta = getOpenAPIMeta(maybeProcedure)
+
+      let pathname = meta?.path ?? pathToHttpPath(path)
+      if (meta?.prefix) {
+        pathname = mergeHttpPath(meta.prefix, pathname)
+      }
+
+      const route: ResolvedOpenAPIRoute = {
+        meta,
+        method: meta?.method ?? DEFAULT_OPENAPI_METHOD,
+        inputStructure: meta?.inputStructure ?? DEFAULT_OPENAPI_INPUT_STRUCTURE,
+        outputStructure: meta?.outputStructure ?? DEFAULT_OPENAPI_OUTPUT_STRUCTURE,
+        pathname,
+        dynamicParams: getDynamicPathParams(pathname),
+      }
+
+      this.routes.set(key, route)
+      return route
+    }
+    finally {
+      this.routePromises.delete(key)
+    }
   }
 }
 

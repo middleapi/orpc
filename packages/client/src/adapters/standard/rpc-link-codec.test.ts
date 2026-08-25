@@ -358,3 +358,19 @@ describe('rpcLinkCodec', () => {
     })
   })
 })
+
+describe('rPCLinkCodec url resolution', () => {
+  it('keeps parsing correct when the url alternates per call', async () => {
+    let toggle = false
+    const codec = new RPCLinkCodec({
+      url: () => {
+        toggle = !toggle
+        return toggle ? '/api1' : '/api2?base=1'
+      },
+    })
+
+    expect((await codec.encodeInput('input', ['ping'], { context: {} })).url).toBe('/api1/ping')
+    expect((await codec.encodeInput('input', ['ping'], { context: {} })).url).toBe('/api2/ping?base=1')
+    expect((await codec.encodeInput('input', ['ping'], { context: {} })).url).toBe('/api1/ping')
+  })
+})

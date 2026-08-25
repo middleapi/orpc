@@ -1,7 +1,7 @@
 import type { StandardLazyResponse, StandardRequest } from '@standardserver/core'
 import type { StandardLinkCodec } from './codec'
 import type { StandardLinkTransport } from './transport'
-import { isAsyncIteratorObject } from '@orpc/shared'
+import { getOpenTelemetryConfig, isAsyncIteratorObject, setOpenTelemetryConfig } from '@orpc/shared'
 import { ORPCError } from '../../error'
 import { StandardLink } from './link'
 
@@ -172,5 +172,78 @@ describe('standardLink', () => {
     })
 
     await expect(link.call(['test'], 'input', { context: {} })).resolves.toBe('__INTERCEPTED__')
+  })
+})
+
+describe('standardLink with OpenTelemetry disabled', () => {
+  function makeCodec(): StandardLinkCodec<any> {
+    return {
+      encodeInput: vi.fn(),
+      decodeResponse: vi.fn(),
+    }
+  }
+
+  function makeTransport(): StandardLinkTransport<any> {
+    return {
+      send: vi.fn(),
+    }
+  }
+
+  it('round-trips a call without tracing configured', async () => {
+    const previousOtelConfig = getOpenTelemetryConfig()
+    setOpenTelemetryConfig(undefined)
+
+    try {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const link = new StandardLink(codec, transport)
+
+      vi.mocked(codec.encodeInput).mockResolvedValueOnce({
+        method: 'POST',
+        url: '/ping',
+        headers: {},
+        body: 'input',
+      })
+      vi.mocked(transport.send).mockResolvedValueOnce({
+        status: 200,
+        headers: {},
+        resolveBody: () => Promise.resolve('body'),
+      })
+      vi.mocked(codec.decodeResponse).mockResolvedValueOnce({ kind: 'output', output: 'output' })
+
+      await expect(link.call(['ping'], 'input', { context: {} })).resolves.toBe('output')
+
+      expect(codec.encodeInput).toHaveBeenCalledTimes(1)
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(codec.decodeResponse).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      setOpenTelemetryConfig(previousOtelConfig as any)
+    }
+  })
+
+  it('propagates transport errors without tracing configured', async () => {
+    const previousOtelConfig = getOpenTelemetryConfig()
+    setOpenTelemetryConfig(undefined)
+
+    try {
+      const codec = makeCodec()
+      const transport = makeTransport()
+      const link = new StandardLink(codec, transport)
+
+      vi.mocked(codec.encodeInput).mockResolvedValueOnce({
+        method: 'POST',
+        url: '/ping',
+        headers: {},
+        body: 'input',
+      })
+      vi.mocked(transport.send).mockRejectedValueOnce(new Error('network down'))
+
+      await expect(link.call(['ping'], 'input', { context: {} })).rejects.toThrow('network down')
+    }
+    finally {
+      setOpenTelemetryConfig(previousOtelConfig as any)
+    }
   })
 })
