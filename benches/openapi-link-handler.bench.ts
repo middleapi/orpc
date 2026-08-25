@@ -7,11 +7,22 @@ import { os, type } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
 import { bench } from 'vitest'
 import { asReadableStream, asSyncIteratorObject, BYTES_10KB, drainBody, EVENTS_10KB, handlers, PAYLOAD_10KB } from './__shared__/payloads'
+import '@orpc/openapi/extensions/route'
 
 const serializer = new OpenAPISerializer({ handlers })
 
 const router = {
   ping: os
+    .input(type<any>())
+    .output(type<any>())
+    .handler(({ input }) => input),
+  getUser: os
+    .route({ method: 'GET', path: '/users/{id}' })
+    .input(type<any>())
+    .output(type<any>())
+    .handler(({ input }) => input),
+  updatePost: os
+    .route({ method: 'POST', path: '/posts/{id}' })
     .input(type<any>())
     .output(type<any>())
     .handler(({ input }) => input),
@@ -51,5 +62,15 @@ describe('openapi link + handler', () => {
     await drainBody(
       await client.ping(asReadableStream(BYTES_10KB)),
     )
+  })
+
+  describe('dynamic paths (tiny payload)', () => {
+    bench('get dynamic path param', async () => {
+      await client.getUser({ id: 1 })
+    })
+
+    bench('post dynamic path param + body', async () => {
+      await client.updatePost({ id: 1, title: 'Hello', content: 'World' })
+    })
   })
 })

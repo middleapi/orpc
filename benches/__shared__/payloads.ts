@@ -40,6 +40,25 @@ const SIZE_10KB = 10 * SIZE_1KB
 const SIZE_100KB = 100 * SIZE_1KB
 const SIZE_5MB = 5 * 1024 * 1024
 
+/** Plain JSON only: strings, numbers, booleans, arrays, plain objects. */
+function createJsonUnit(i: number) {
+  return {
+    id: i,
+    name: `item-${i}`,
+    active: true,
+    score: 0.5 + (i % 100) / 100,
+    tags: ['a', 'b', 'c'],
+    metadata: {
+      version: '2.0.0',
+      count: i,
+      nested: { depth: 2, ok: true },
+    },
+  }
+}
+
+export const PURE_JSON_1KB = createJsonUnit(0)
+export const PURE_JSON_100KB = Array.from({ length: 100 }, (_, i) => createJsonUnit(i))
+
 export const PAYLOAD_1KB = createUnit(0)
 export const PAYLOAD_10KB = Array.from({ length: 10 }, (_, i) => createUnit(i))
 export const PAYLOAD_100KB = Array.from({ length: 100 }, (_, i) => createUnit(i))
