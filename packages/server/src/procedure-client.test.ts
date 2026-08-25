@@ -1026,3 +1026,133 @@ describe('createProcedureClient', () => {
     })
   })
 })
+
+describe('untraced fast path and context edge cases', () => {
+  const SYMBOL_KEY = Symbol('untraced-test')
+  let previousOtelConfig: unknown
+
+  beforeEach(() => {
+    // The test setup registers a no-op tracer; disable it to exercise the
+    // untraced branches, restoring the config afterwards.
+    previousOtelConfig = SharedV2Module.getOpenTelemetryConfig()
+    SharedV2Module.setOpenTelemetryConfig(undefined)
+  })
+
+  afterEach(() => {
+    SharedV2Module.setOpenTelemetryConfig(previousOtelConfig as any)
+  })
+
+  it('propagates parent context when middleware passes an empty context object', async () => {
+    const handler = vi.fn(async ({ context }: any) => context.userId)
+    const procedure = os
+      .use(async ({ next }) => next({ context: { userId: 'user-1' } }))
+      .use(async ({ next }) => next({ context: {} }))
+      .handler(handler)
+
+    await expect(createProcedureClient(procedure)()).resolves.toBe('user-1')
+    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ context: { userId: 'user-1' } }), undefined)
+  })
+
+  it('treats next(undefined) the same as next()', async () => {
+    const handler = vi.fn(async ({ context }: any) => context.userId)
+    const procedure = os
+      .use(async ({ next }) => next({ context: { userId: 'user-1' } }))
+      .use(async ({ next }) => next(undefined as any))
+      .handler(handler)
+
+    await expect(createProcedureClient(procedure)()).resolves.toBe('user-1')
+    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ context: { userId: 'user-1' } }), undefined)
+  })
+
+  it('propagates symbol-keyed context overrides to the handler', async () => {
+    const handler = vi.fn(async ({ context }: any) => context[SYMBOL_KEY])
+    const procedure = os
+      .use(async ({ next }) => next({ context: { [SYMBOL_KEY]: 'symbol-value', visible: 'yes' } }))
+      .handler(handler)
+
+    await expect(createProcedureClient(procedure)()).resolves.toBe('symbol-value')
+    expect(handler).toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.objectContaining({ visible: 'yes' }) }),
+      undefined,
+    )
+  })
+
+  it('keeps the outer context when a middleware result omits context', async () => {
+    const first = vi.fn(async ({ next }: any) => next({ context: { userId: 'user-1' } }))
+    const second = vi.fn(async ({ next }: any) => {
+      const result = await next()
+      return { output: result.output, context: undefined } as any
+    })
+    const procedure = os
+      .use(first)
+      .use(second)
+      .handler(async () => 'ok')
+
+    await expect(createProcedureClient(procedure)()).resolves.toBe('ok')
+    expect(second).toHaveBeenCalledTimes(1)
+    expect(first).toHaveResolvedWith({
+      output: 'ok',
+      context: expect.objectContaining({ userId: 'user-1' }),
+    })
+  })
+
+  it.each([
+    ['string', 'plain-string'],
+    ['number', 42],
+    ['boolean', true],
+    ['null', null],
+    ['undefined', undefined],
+  ])('returns a primitive %s output untouched', async (_kind, output) => {
+    const procedure = os.handler(async () => output)
+    await expect(createProcedureClient(procedure)()).resolves.toBe(output)
+  })
+})
+
+describe('traced path span names', () => {
+  it('emits the expected span names through a full procedure call', async () => {
+    const spans: string[] = []
+    const span = {
+      setAttribute: vi.fn(),
+      recordException: vi.fn(),
+      setStatus: vi.fn(),
+      addEvent: vi.fn(),
+      end: vi.fn(),
+    }
+    const tracer = {
+      startActiveSpan(name: string, _options: unknown, argA?: unknown, argB?: unknown) {
+        spans.push(name)
+        const callback = typeof argA === 'function' ? argA : argB
+        return (callback as (span: unknown) => unknown)(span)
+      },
+    }
+
+    const previousOtelConfig = SharedV2Module.getOpenTelemetryConfig()
+    SharedV2Module.setOpenTelemetryConfig({
+      tracer,
+      trace: { getActiveSpan: () => undefined, setSpan: (context: unknown, _span: unknown) => context },
+      context: { active: () => ({}) },
+    } as any)
+
+    try {
+      const namedMiddleware = async ({ next }: any) => next()
+      const procedure = os
+        .use(namedMiddleware)
+        .input(z.any())
+        .output(z.any())
+        .handler(async () => 'ok')
+
+      await expect(createProcedureClient(procedure)()).resolves.toBe('ok')
+    }
+    finally {
+      SharedV2Module.setOpenTelemetryConfig(previousOtelConfig as any)
+    }
+
+    expect(spans).toEqual([
+      'call_procedure',
+      'middleware.namedMiddleware',
+      'validate_input.0',
+      'handler',
+      'validate_output.0',
+    ])
+  })
+})
