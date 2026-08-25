@@ -293,7 +293,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     const fileName = contentDisposition !== undefined ? getFilenameFromContentDisposition(contentDisposition) : undefined
     const contentType = flattenStandardHeader(request.headers['content-type'])
 
-    const limited = fileLimit === Number.POSITIVE_INFINITY ? stream : limitStream(stream, fileLimit)
+    const limited = limitStream(stream, fileLimit)
 
     const tmpPath = await tmpFiles.allocate()
 
@@ -328,7 +328,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
       return stream
     }
 
-    const limited = totalLimit === Number.POSITIVE_INFINITY ? stream : limitStream(stream, totalLimit)
+    const limited = limitStream(stream, totalLimit)
 
     const form = new FormData()
     let memoryUsed = 0
@@ -399,18 +399,24 @@ function assertContentLengthWithin(headers: StandardHeaders, limit: number): voi
 function limitStream(stream: ReadableStream<Uint8Array>, limit: number): ReadableStream<Uint8Array> {
   let total = 0
 
-  return stream.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
-    transform(chunk, controller) {
-      total += chunk.byteLength
+  async function* generate(): AsyncGenerator<Uint8Array> {
+    try {
+      for await (const chunk of stream.values({ preventCancel: true })) {
+        total += chunk.byteLength
 
-      if (total > limit) {
-        controller.error(new ORPCError('PAYLOAD_TOO_LARGE'))
-        return
+        if (total > limit) {
+          throw new ORPCError('PAYLOAD_TOO_LARGE')
+        }
+
+        yield chunk
       }
+    }
+    finally {
+      void stream.pipeTo(new WritableStream()).catch(() => {})
+    }
+  }
 
-      controller.enqueue(chunk)
-    },
-  }))
+  return ReadableStream.from(generate())
 }
 
 const EMPTY_CHUNK = new Uint8Array(0)
