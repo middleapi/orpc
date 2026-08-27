@@ -1,3 +1,4 @@
+import type { AsyncIteratorClass } from '@orpc/shared'
 import { ORPCError } from '@orpc/client'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { os } from '../builder'
@@ -98,6 +99,60 @@ describe('prototypePollutionProtectionHandlerPlugin', () => {
       input.self = input
 
       await expectAllowed(input)
+    })
+  })
+
+  describe('asyncIteratorObject inputs', () => {
+    function invokeWithIterator(input: AsyncIterator<unknown>) {
+      const next = vi.fn(async (options: any) => options.input)
+      const { interceptor } = getPlugin()
+
+      return (async () => interceptor({ context: {}, input, next } as any))() as Promise<AsyncIteratorClass<unknown, unknown>>
+    }
+
+    it('forwards a guarded iterator and passes benign values through', async () => {
+      async function* input() {
+        yield { name: 'Earth' }
+        yield { name: 'Mars' }
+      }
+
+      const original = input()
+      const guarded = await invokeWithIterator(original)
+
+      expect(guarded).not.toBe(original)
+
+      const values = []
+      for await (const value of guarded) {
+        values.push(value)
+      }
+
+      expect(values).toEqual([{ name: 'Earth' }, { name: 'Mars' }])
+    })
+
+    it('fails the iteration when a yielded value pollutes', async () => {
+      async function* input() {
+        yield { name: 'Earth' }
+        yield JSON.parse('{"__proto__": {"isAdmin": true}}')
+      }
+
+      const guarded = await invokeWithIterator(input())
+
+      await expect(guarded.next()).resolves.toEqual({ done: false, value: { name: 'Earth' } })
+      await expect(guarded.next()).rejects.toSatisfy(error =>
+        error instanceof ORPCError
+        && error.code === 'BAD_REQUEST'
+        && error.message === 'Request blocked by prototype pollution protection.')
+    })
+
+    it('checks the return value too', async () => {
+      async function* input() {
+        return JSON.parse('{"constructor": {"prototype": {}}}')
+      }
+
+      const guarded = await invokeWithIterator(input())
+
+      await expect(guarded.next()).rejects.toSatisfy(error =>
+        error instanceof ORPCError && error.code === 'BAD_REQUEST')
     })
   })
 

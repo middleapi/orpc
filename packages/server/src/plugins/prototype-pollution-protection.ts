@@ -3,19 +3,15 @@ import type { StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/
 import type { Context } from '../context'
 import type { ProcedureClientInterceptor } from '../procedure-client'
 import { ORPCError } from '@orpc/client'
-import { isPlainObject, isTypescriptObject, toArray } from '@orpc/shared'
+import { isAsyncIteratorObject, isPlainObject, isTypescriptObject, override, toArray, wrapAsyncIterator } from '@orpc/shared'
 
 /**
  * Rejects requests whose decoded input contains prototype-polluting keys: an own
  * `__proto__` key, or an own `constructor` key holding a `prototype` key. oRPC's own
  * decoding never assigns through the prototype chain, so this plugin exists to stop such
  * keys from reaching application code that merges, clones, or path-sets input with a
- * library vulnerable to prototype pollution.
- *
- * @remarks
- * **Note**: Only the decoded request input is inspected. Values yielded later by an
- * [event iterator](https://orpc.dev/docs/async-iterator-object) input arrive after this
- * check runs, so they pass through uninspected.
+ * library vulnerable to prototype pollution. An `AsyncIteratorObject` input is checked
+ * value by value as it arrives, and a polluting value fails that iteration instead.
  *
  * @see {@link https://orpc.dev/docs/plugins/prototype-pollution-protection | Prototype Pollution Protection Plugin}
  */
@@ -24,9 +20,24 @@ export class PrototypePollutionProtectionHandlerPlugin<T extends Context> implem
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     const interceptor: ProcedureClientInterceptor<T, Schema<unknown>, ErrorMap, any> = (interceptorOptions) => {
-      if (this.containsPollutingKey(interceptorOptions.input)) {
-        throw new ORPCError('BAD_REQUEST', { message: 'Request blocked by prototype pollution protection.' })
+      const input = interceptorOptions.input
+
+      if (isAsyncIteratorObject(input)) {
+        /**
+         * @warning
+         * Remember use `override` for AsyncIteratorObject to remain other special properties
+         */
+        const guardedInput = override(input, wrapAsyncIterator(input, {
+          mapResult: (result) => {
+            this.rejectPollutingInput(result.value)
+            return result
+          },
+        }))
+
+        return interceptorOptions.next({ ...interceptorOptions, input: guardedInput })
       }
+
+      this.rejectPollutingInput(input)
 
       return interceptorOptions.next()
     }
@@ -34,6 +45,12 @@ export class PrototypePollutionProtectionHandlerPlugin<T extends Context> implem
     return {
       ...options,
       clientInterceptors: [interceptor, ...toArray(options.clientInterceptors)],
+    }
+  }
+
+  private rejectPollutingInput(input: unknown): void {
+    if (this.containsPollutingKey(input)) {
+      throw new ORPCError('BAD_REQUEST', { message: 'Request blocked by prototype pollution protection.' })
     }
   }
 

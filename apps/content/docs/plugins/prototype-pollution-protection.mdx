@@ -14,7 +14,7 @@ The plugin closes that gap by inspecting the decoded input of every matched requ
 - an own `__proto__` key on an object
 - an own `constructor` key holding a `prototype` key, the same rule [secure-json-parse](https://github.com/fastify/secure-json-parse) enforces for Fastify
 
-The walk covers everything the built-in codecs can decode: plain objects, arrays, and `Map`/`Set` keys and values, at any depth. A lone `constructor` or `prototype` key stays allowed, since either alone cannot pollute and both are common in real data. Because the check runs on the decoded input, it applies to any handler and content type: JSON and query data in [RPCHandler](/docs/rpc/handler), plus form data and [bracket notation](/docs/openapi/bracket-notation) in [OpenAPIHandler](/docs/openapi/handler).
+The walk covers everything the built-in codecs can decode: plain objects, arrays, and `Map`/`Set` keys and values, at any depth. An [AsyncIteratorObject](/docs/async-iterator-object) input is checked value by value as it arrives, and a polluting value fails that iteration with the same error. A lone `constructor` or `prototype` key stays allowed, since either alone cannot pollute and both are common in real data. Because the check runs on the decoded input, it applies to any handler and content type: JSON and query data in [RPCHandler](/docs/rpc/handler), plus form data and [bracket notation](/docs/openapi/bracket-notation) in [OpenAPIHandler](/docs/openapi/handler).
 
 ## Setup
 
@@ -37,7 +37,6 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 
 ## Limitations
 
-- Only the decoded request input is inspected. Values yielded later by an [event iterator](/docs/async-iterator-object) input arrive after the check runs, so they pass through uninspected.
 - The plugin is defense in depth, not a substitute for safe code: prefer `Object.create(null)` or `Map` for attacker-keyed lookups, and keep merge/clone utilities patched, per the [OWASP guidance](https://cheatsheetseries.owasp.org/cheatsheets/Prototype_Pollution_Prevention_Cheat_Sheet.html).
 - Rejection is all-or-nothing with a generic `BAD_REQUEST`. If a procedure must accept these keys as data, drop the plugin for that handler and validate the field with your schema instead.
 
