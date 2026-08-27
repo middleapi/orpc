@@ -1,0 +1,79 @@
+{
+  "name": "@orpc/cache",
+  "type": "module",
+  "version": "2.0.0-beta.28",
+  "license": "MIT",
+  "funding": "https://github.com/sponsors/dinwwwh",
+  "homepage": "https://orpc.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/middleapi/orpc.git",
+    "directory": "packages/cache"
+  },
+  "keywords": [
+    "orpc",
+    "cache"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "./memory": {
+        "types": "./dist/adapters/memory.d.mts",
+        "import": "./dist/adapters/memory.mjs",
+        "default": "./dist/adapters/memory.mjs"
+      },
+      "./redis": {
+        "types": "./dist/adapters/redis.d.mts",
+        "import": "./dist/adapters/redis.mjs",
+        "default": "./dist/adapters/redis.mjs"
+      },
+      "./vercel": {
+        "types": "./dist/adapters/vercel.d.mts",
+        "import": "./dist/adapters/vercel.mjs",
+        "default": "./dist/adapters/vercel.mjs"
+      }
+    }
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./memory": "./src/adapters/memory.ts",
+    "./redis": "./src/adapters/redis.ts",
+    "./vercel": "./src/adapters/vercel.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "unbuild",
+    "type:check": "tsc -b"
+  },
+  "peerDependencies": {
+    "@vercel/functions": ">=2.1.0",
+    "redis": ">=6.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@vercel/functions": {
+      "optional": true
+    },
+    "redis": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@orpc/client": "workspace:*",
+    "@orpc/server": "workspace:*",
+    "@orpc/shared": "workspace:*",
+    "@standardserver/core": "^0.8.0"
+  },
+  "devDependencies": {
+    "@vercel/functions": "^3.9.5",
+    "redis": "^6.2.1"
+  }
+}

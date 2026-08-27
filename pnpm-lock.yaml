@@ -23,6 +23,9 @@ importers:
       '@orpc/arktype':
         specifier: workspace:*
         version: link:packages/arktype
+      '@orpc/cache':
+        specifier: workspace:*
+        version: link:packages/cache
       '@orpc/client':
         specifier: workspace:*
         version: link:packages/client
@@ -194,6 +197,9 @@ importers:
       '@orpc/arktype':
         specifier: workspace:*
         version: link:../../packages/arktype
+      '@orpc/cache':
+        specifier: workspace:*
+        version: link:../../packages/cache
       '@orpc/client':
         specifier: workspace:*
         version: link:../../packages/client
@@ -247,7 +253,7 @@ importers:
         version: 26.2.0
       blume:
         specifier: ^1.4.3
-        version: 1.4.3(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@shikijs/themes@4.4.3)(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(csstype@3.2.3)(esbuild@0.28.2)(next@16.3.0(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(prettier@3.9.6)(rollup@4.62.4)(supports-color@10.2.2)(svelte@5.56.9(@typescript-eslint/types@8.67.0))(terser@5.50.0)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(vue@3.5.41(typescript@6.0.3))(ws@8.21.3)(yaml@2.9.0)
+        version: 1.4.3(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@shikijs/themes@4.4.3)(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(@upstash/redis@1.38.2)(@vercel/functions@3.9.5(ws@8.21.3))(csstype@3.2.3)(esbuild@0.28.2)(next@16.3.0(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(prettier@3.9.6)(rollup@4.62.4)(supports-color@10.2.2)(svelte@5.56.9(@typescript-eslint/types@8.67.0))(terser@5.50.0)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(vue@3.5.41(typescript@6.0.3))(ws@8.21.3)(yaml@2.9.0)
       effect:
         specifier: 4.0.0-rc.109
         version: 4.0.0-rc.109
@@ -330,6 +336,28 @@ importers:
         specifier: ^6.2.1
         version: 6.2.1(@opentelemetry/api@1.9.1)
 
+  packages/cache:
+    dependencies:
+      '@orpc/client':
+        specifier: workspace:*
+        version: link:../client
+      '@orpc/server':
+        specifier: workspace:*
+        version: link:../server
+      '@orpc/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@standardserver/core':
+        specifier: ^0.8.0
+        version: 0.8.0
+    devDependencies:
+      '@vercel/functions':
+        specifier: ^3.9.5
+        version: 3.9.5(ws@8.21.3)
+      redis:
+        specifier: ^6.2.1
+        version: 6.2.1(@opentelemetry/api@1.9.1)
+
   packages/client:
     dependencies:
       '@orpc/shared':
@@ -351,6 +379,9 @@ importers:
 
   packages/cloudflare:
     dependencies:
+      '@orpc/cache':
+        specifier: workspace:*
+        version: link:../cache
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
@@ -974,7 +1005,7 @@ importers:
         version: 5.101.4(react@19.2.8)
       '@types/bun':
         specifier: latest
-        version: 1.3.14
+        version: 1.4.0
       '@types/react':
         specifier: ^19.2.18
         version: 19.2.18
@@ -5162,6 +5193,9 @@ packages:
   '@types/bun@1.3.14':
     resolution: {integrity: sha512-h1hFqFVcvAvD9j9K7ZW7vd82aSA+rTdznZa+5bwvCwqSB1jmmfLcbIWhOLx1/+boy/xmjgCs/OMUL8hRJSmnPw==}
 
+  '@types/bun@1.4.0':
+    resolution: {integrity: sha512-K+lZULY23vRgK/CfTjFIV+tyifaNdSMlPh9j+6mQ/cLfpOznLyAuzgV/JQysyECpkBQLVMSyvjlr2fBUSA9wFQ==}
+
   '@types/bunyan@1.8.11':
     resolution: {integrity: sha512-758fRH7umIMk5qt5ELmRMff4mLDlN+xyYzC+dkPTdKwbSkJFvz6xwyScrytPU0QIBbRRwbiE8/BIg8bpajerNQ==}
 
@@ -5560,12 +5594,27 @@ packages:
   '@vercel/cli-config@0.2.3':
     resolution: {integrity: sha512-Ggh0Wmi92TUkUexmSUPkkDtvJmbjUr7IvF5T3FkSsWrXXs3GFzOujfxFpECdJZpux1JG4SWDv9BT4w++TDgD6A==}
 
+  '@vercel/cli-config@0.2.4':
+    resolution: {integrity: sha512-kZ5SojbrV06GHoU6QIWGwDXLov+s9rWZ7QqdqKfJfBGCNUieGfgaCjeeenNy8Y+QC0bwC0dZ2B4l5Hvdmrgpdw==}
+
   '@vercel/cli-exec@1.0.1':
     resolution: {integrity: sha512-g9XerViJ/paZujufXYcu5XYI2vU2rtB4sgdpjUHde5RnOkdmpu0ngH46LCFGHoPXO/C+qDPSczIHIRN+8Q2YKQ==}
     engines: {node: '>= 18'}
 
   '@vercel/functions@3.9.3':
     resolution: {integrity: sha512-cbzTdASCZDnufrABc8oO00e/FqlqFFSdld+iGZPhrWBDHP4Pu8ESKKYIzASqYvbYYUIWujBvEa5LLCcZzm7WEw==}
+    engines: {node: '>= 20'}
+    peerDependencies:
+      '@aws-sdk/credential-provider-web-identity': '*'
+      ws: '>=8'
+    peerDependenciesMeta:
+      '@aws-sdk/credential-provider-web-identity':
+        optional: true
+      ws:
+        optional: true
+
+  '@vercel/functions@3.9.5':
+    resolution: {integrity: sha512-EUfqlb7AzoEh7URlMNAO4jbJiLWz9grDBHvfjKTDvEP9c8y3DqX3SWPvfaQkUjtkm3b83flhaUUMuewdHa+qmw==}
     engines: {node: '>= 20'}
     peerDependencies:
       '@aws-sdk/credential-provider-web-identity': '*'
@@ -5591,6 +5640,10 @@ packages:
 
   '@vercel/oidc@3.8.4':
     resolution: {integrity: sha512-FGNvVZ5pgX9FaBqkPt6VkYFZ6bWAMDzYi7nxW+1Xt+Z4fn5PuTULVwsxjKc+0uKhysyWBQmvsmM50Oh6C2/oMA==}
+    engines: {node: '>= 20'}
+
+  '@vercel/oidc@3.8.5':
+    resolution: {integrity: sha512-RwXYtnt6za+5UO4IaLywN/6B95AlLqynPRUWRJxeJ/qufwkcLUbZNUxYtzT0uMpuraWhlNcGqPNGkTnZr4BGBw==}
     engines: {node: '>= 20'}
 
   '@vercel/otel@2.1.3':
@@ -6279,6 +6332,9 @@ packages:
 
   bun-types@1.3.14:
     resolution: {integrity: sha512-4N0ig0fEomHt5R0KCFWjovxow98rIoRwKolrYdCcknNwMekCXRnWEUvgu5soYV8QXtVsrUD8B95MBOZGPvr6KQ==}
+
+  bun-types@1.4.0:
+    resolution: {integrity: sha512-iIKw23BspnQQYd3prITOBxeUsxBHnwzX6YJfGMuNOZzeNcMmVqzIIVGRm1l69ogaPQmb4wB6BN8mA5bE9YuC5Q==}
 
   bundle-name@4.1.0:
     resolution: {integrity: sha512-tjwM5exMg6BGRI+kNmTntNsvdZS1X8BFYS6tnJ2hdH0kVxM6/eVZ2xy+FqStSWvYmtfFMDLIxurorHwDKfDz5Q==}
@@ -12031,13 +12087,13 @@ snapshots:
       hast-util-from-html: 2.0.3
       satteri: 0.9.5
 
-  '@astrojs/mdx@7.0.5(@astrojs/markdown-satteri@0.3.5)(astro@7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(supports-color@10.2.2)':
+  '@astrojs/mdx@7.0.5(@astrojs/markdown-satteri@0.3.5)(astro@7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(supports-color@10.2.2)':
     dependencies:
       '@astrojs/internal-helpers': 0.10.2
       '@astrojs/markdown-remark': 7.2.2(supports-color@10.2.2)
       '@mdx-js/mdx': 3.1.1(supports-color@10.2.2)
       acorn: 8.18.0
-      astro: 7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0)
+      astro: 7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0)
       es-module-lexer: 2.3.1
       estree-util-visit: 2.0.0
       hast-util-to-html: 9.0.5
@@ -12053,10 +12109,10 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@astrojs/node@11.1.1(astro@7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(supports-color@10.2.2)':
+  '@astrojs/node@11.1.1(astro@7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(supports-color@10.2.2)':
     dependencies:
       '@astrojs/internal-helpers': 0.10.2
-      astro: 7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0)
+      astro: 7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0)
       send: 1.2.1(supports-color@10.2.2)
       server-destroy: 1.0.1
     transitivePeerDependencies:
@@ -12099,14 +12155,14 @@ snapshots:
       is-docker: 4.0.0
       package-manager-detector: 1.8.0
 
-  '@astrojs/vercel@11.0.5(astro@7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(next@16.3.0(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(rollup@4.62.4)(supports-color@10.2.2)(svelte@5.56.9(@typescript-eslint/types@8.67.0))(vue@3.5.41(typescript@6.0.3))(ws@8.21.3)':
+  '@astrojs/vercel@11.0.5(astro@7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(next@16.3.0(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(rollup@4.62.4)(supports-color@10.2.2)(svelte@5.56.9(@typescript-eslint/types@8.67.0))(vue@3.5.41(typescript@6.0.3))(ws@8.21.3)':
     dependencies:
       '@astrojs/internal-helpers': 0.10.2
       '@vercel/analytics': 1.6.1(next@16.3.0(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(svelte@5.56.9(@typescript-eslint/types@8.67.0))(vue@3.5.41(typescript@6.0.3))
       '@vercel/functions': 3.9.3(ws@8.21.3)
       '@vercel/nft': 1.10.2(rollup@4.62.4)(supports-color@10.2.2)
       '@vercel/routing-utils': 5.3.3
-      astro: 7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0)
+      astro: 7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0)
       esbuild: 0.28.2
       tinyglobby: 0.2.17
     transitivePeerDependencies:
@@ -14983,10 +15039,10 @@ snapshots:
       - universal-cookie
       - zod
 
-  '@scalar/astro@0.4.14(astro@7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))':
+  '@scalar/astro@0.4.14(astro@7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))':
     dependencies:
       '@scalar/client-side-rendering': 0.3.7
-      astro: 7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0)
+      astro: 7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0)
 
   '@scalar/asyncapi-upgrader@0.1.5':
     dependencies:
@@ -16059,6 +16115,10 @@ snapshots:
     dependencies:
       bun-types: 1.3.14
 
+  '@types/bun@1.4.0':
+    dependencies:
+      bun-types: 1.4.0
+
   '@types/bunyan@1.8.11':
     dependencies:
       '@types/node': 26.2.0
@@ -16496,6 +16556,11 @@ snapshots:
       xdg-app-paths: 5.5.1
       zod: 4.1.11
 
+  '@vercel/cli-config@0.2.4':
+    dependencies:
+      xdg-app-paths: 5.5.1
+      zod: 4.1.11
+
   '@vercel/cli-exec@1.0.1':
     dependencies:
       execa: 5.1.1
@@ -16503,6 +16568,12 @@ snapshots:
   '@vercel/functions@3.9.3(ws@8.21.3)':
     dependencies:
       '@vercel/oidc': 3.8.4
+    optionalDependencies:
+      ws: 8.21.3
+
+  '@vercel/functions@3.9.5(ws@8.21.3)':
+    dependencies:
+      '@vercel/oidc': 3.8.5
     optionalDependencies:
       ws: 8.21.3
 
@@ -16532,6 +16603,12 @@ snapshots:
   '@vercel/oidc@3.8.4':
     dependencies:
       '@vercel/cli-config': 0.2.3
+      '@vercel/cli-exec': 1.0.1
+      jose: 5.10.0
+
+  '@vercel/oidc@3.8.5':
+    dependencies:
+      '@vercel/cli-config': 0.2.4
       '@vercel/cli-exec': 1.0.1
       jose: 5.10.0
 
@@ -17096,7 +17173,7 @@ snapshots:
 
   astring@1.9.0: {}
 
-  astro@7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0):
+  astro@7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0):
     dependencies:
       '@astrojs/compiler-rs': 0.3.2(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)
       '@astrojs/internal-helpers': 0.10.2
@@ -17144,7 +17221,7 @@ snapshots:
       tinyglobby: 0.2.17
       ultrahtml: 1.7.0
       unifont: 0.7.5
-      unstorage: 1.17.5(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))
+      unstorage: 1.17.5(@upstash/redis@1.38.2)(@vercel/functions@3.9.5(ws@8.21.3))
       vite: 8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0)
       vitefu: 1.1.3(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))
       xxhash-wasm: 1.1.0
@@ -17265,14 +17342,14 @@ snapshots:
 
   blake3-wasm@2.1.5: {}
 
-  blume@1.4.3(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@shikijs/themes@4.4.3)(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(csstype@3.2.3)(esbuild@0.28.2)(next@16.3.0(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(prettier@3.9.6)(rollup@4.62.4)(supports-color@10.2.2)(svelte@5.56.9(@typescript-eslint/types@8.67.0))(terser@5.50.0)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(vue@3.5.41(typescript@6.0.3))(ws@8.21.3)(yaml@2.9.0):
+  blume@1.4.3(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@shikijs/themes@4.4.3)(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(@upstash/redis@1.38.2)(@vercel/functions@3.9.5(ws@8.21.3))(csstype@3.2.3)(esbuild@0.28.2)(next@16.3.0(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(prettier@3.9.6)(rollup@4.62.4)(supports-color@10.2.2)(svelte@5.56.9(@typescript-eslint/types@8.67.0))(terser@5.50.0)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(vue@3.5.41(typescript@6.0.3))(ws@8.21.3)(yaml@2.9.0):
     dependencies:
       '@astrojs/check': 0.9.10(prettier@3.9.6)(typescript@6.0.3)
       '@astrojs/markdown-satteri': 0.3.5
-      '@astrojs/mdx': 7.0.5(@astrojs/markdown-satteri@0.3.5)(astro@7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(supports-color@10.2.2)
-      '@astrojs/node': 11.1.1(astro@7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(supports-color@10.2.2)
+      '@astrojs/mdx': 7.0.5(@astrojs/markdown-satteri@0.3.5)(astro@7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(supports-color@10.2.2)
+      '@astrojs/node': 11.1.1(astro@7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(supports-color@10.2.2)
       '@astrojs/react': 6.0.2(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(esbuild@0.28.2)(jiti@2.7.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(terser@5.50.0)(yaml@2.9.0)
-      '@astrojs/vercel': 11.0.5(astro@7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(next@16.3.0(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(rollup@4.62.4)(supports-color@10.2.2)(svelte@5.56.9(@typescript-eslint/types@8.67.0))(vue@3.5.41(typescript@6.0.3))(ws@8.21.3)
+      '@astrojs/vercel': 11.0.5(astro@7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))(next@16.3.0(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(rollup@4.62.4)(supports-color@10.2.2)(svelte@5.56.9(@typescript-eslint/types@8.67.0))(vue@3.5.41(typescript@6.0.3))(ws@8.21.3)
       '@clack/prompts': 1.7.0
       '@iconify-json/lucide': 1.2.123
       '@iconify/types': 2.0.0
@@ -17280,7 +17357,7 @@ snapshots:
       '@modelcontextprotocol/sdk': 1.30.0(supports-color@10.2.2)(zod@4.4.3)
       '@orama/orama': 3.1.18
       '@pierre/diffs': 1.3.5(@shikijs/themes@4.4.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@scalar/astro': 0.4.14(astro@7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))
+      '@scalar/astro': 0.4.14(astro@7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0))
       '@scalar/openapi-parser': 0.28.13
       '@scalar/openapi-types': 0.9.4
       '@shikijs/transformers': 4.4.3
@@ -17290,7 +17367,7 @@ snapshots:
       '@types/mdast': 4.0.4
       '@vercel/analytics': 2.0.1(next@16.3.0(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(svelte@5.56.9(@typescript-eslint/types@8.67.0))(vue@3.5.41(typescript@6.0.3))
       ai: 7.0.64(zod@4.4.3)
-      astro: 7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0)
+      astro: 7.2.1(@astrojs/markdown-remark@7.2.2(supports-color@10.2.2))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(@upstash/redis@1.38.2)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.50.0)(yaml@2.9.0)
       babel-plugin-react-compiler: 1.0.0
       chokidar: 5.0.0
       citty: 0.1.6
@@ -17468,6 +17545,10 @@ snapshots:
       yaml: 2.9.0
 
   bun-types@1.3.14:
+    dependencies:
+      '@types/node': 26.2.0
+
+  bun-types@1.4.0:
     dependencies:
       '@types/node': 26.2.0
 
@@ -23050,7 +23131,7 @@ snapshots:
 
   unraw@3.0.0: {}
 
-  unstorage@1.17.5(@upstash/redis@1.38.2)(@vercel/functions@3.9.3(ws@8.21.3)):
+  unstorage@1.17.5(@upstash/redis@1.38.2)(@vercel/functions@3.9.5(ws@8.21.3)):
     dependencies:
       anymatch: 3.1.3
       chokidar: 5.0.0
@@ -23062,7 +23143,7 @@ snapshots:
       ufo: 1.6.4
     optionalDependencies:
       '@upstash/redis': 1.38.2
-      '@vercel/functions': 3.9.3(ws@8.21.3)
+      '@vercel/functions': 3.9.5(ws@8.21.3)
 
   untyped@2.0.0:
     dependencies:

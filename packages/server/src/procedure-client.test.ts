@@ -369,7 +369,7 @@ describe('createProcedureClient', () => {
       expect(mid3).toHaveBeenCalledTimes(1)
       expect(mid3).toHaveBeenCalledAfter(mid2)
       expect(mid3).toHaveBeenCalledWith(
-        expect.objectContaining({}),
+        expect.objectContaining({ }),
         'inputSchema3__inputSchema2__inputSchema1__INPUT',
         expect.any(Function),
       )
@@ -622,9 +622,11 @@ describe('createProcedureClient', () => {
         .resolves
         .toEqual({ parent: 'parent__PARENT', child: 'child__CHILD' })
 
+      // Middlewares receive the full input with the validated fragments merged over
+      // it, instead of only the parts validated up to their position.
       expect(rootMid).toHaveBeenCalledWith(expect.any(Object), { parent: 'PARENT', child: 'CHILD', unknown: 'UNKNOWN' }, expect.any(Function))
-      expect(parentMid).toHaveBeenCalledWith(expect.any(Object), { parent: 'parent__PARENT' }, expect.any(Function))
-      expect(childMid).toHaveBeenCalledWith(expect.any(Object), { parent: 'parent__PARENT', child: 'child__CHILD' }, expect.any(Function))
+      expect(parentMid).toHaveBeenCalledWith(expect.any(Object), { parent: 'parent__PARENT', child: 'CHILD', unknown: 'UNKNOWN' }, expect.any(Function))
+      expect(childMid).toHaveBeenCalledWith(expect.any(Object), { parent: 'parent__PARENT', child: 'child__CHILD', unknown: 'UNKNOWN' }, expect.any(Function))
     })
 
     it('composes fragments nested one level deep', async () => {

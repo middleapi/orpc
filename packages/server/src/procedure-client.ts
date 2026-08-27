@@ -242,6 +242,15 @@ async function executeProcedureInternal(procedure: AnyProcedure, options: Proced
     if (midIndex < orderedMiddlewares.length) {
       const { middleware } = orderedMiddlewares[midIndex]!
 
+      /**
+       * With stacked object schemas, the validated fragments only cover the schemas
+       * declared before this middleware, so they are merged over the original input
+       * to give middlewares the full input instead of only the validated parts.
+       */
+      const middlewareInput = inputSchemas.length > 1 && isPlainObject(currentInput)
+        ? mergeTwoLevels(options.input, currentInput)
+        : currentInput
+
       const result = await runWithSpan(`middleware.${middleware.name}`, async (span) => {
         span?.setAttribute('middleware.index', midIndex)
 
@@ -262,7 +271,7 @@ async function executeProcedureInternal(procedure: AnyProcedure, options: Proced
             },
             lastEventId: options.lastEventId,
           },
-          currentInput,
+          middlewareInput,
           middlewareDone,
         )
       })

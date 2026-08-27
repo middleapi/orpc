@@ -44,6 +44,7 @@ You can read the documentation [here](https://orpc.dev).
 
 - [@orpc/publisher](https://npmx.dev/package/@orpc/publisher): Pub/Sub with memory, Redis, and Upstash adapters.
 - [@orpc/ratelimit](https://npmx.dev/package/@orpc/ratelimit): Rate limiting with memory, Redis, and Upstash adapters.
+- [@orpc/cache](https://npmx.dev/package/@orpc/cache): Tag-based caching and revalidation with memory, Redis, and Vercel adapters.
 - [@orpc/hibernation](https://npmx.dev/package/@orpc/hibernation): Leverage Hibernation APIs like [Cloudflare's Hibernation WebSocket](https://developers.cloudflare.com/durable-objects/best-practices/websockets/#durable-objects-hibernation-websocket-api).
 - [@orpc/json-schema](https://npmx.dev/package/@orpc/json-schema): Smart coercion for OpenAPI requests.
 
@@ -58,7 +59,7 @@ You can read the documentation [here](https://orpc.dev).
 - [@orpc/nest](https://npmx.dev/package/@orpc/nest): Implement your contract with [NestJS](https://nestjs.com/).
 - [@orpc/node](https://npmx.dev/package/@orpc/node): [Node.js](https://nodejs.org/) plugins for static file serving and large uploads.
 - [@orpc/bun](https://npmx.dev/package/@orpc/bun): Adapters for [Bun's Redis](https://bun.sh/).
-- [@orpc/cloudflare](https://npmx.dev/package/@orpc/cloudflare): Adapters for [Cloudflare's RateLimit and Durable Objects](https://developers.cloudflare.com/workers/).
+- [@orpc/cloudflare](https://npmx.dev/package/@orpc/cloudflare): Adapters for [Cloudflare's KV, Cache API, Workers Caching, RateLimit, and Durable Objects](https://developers.cloudflare.com/workers/).
 - [@orpc/trpc](https://npmx.dev/package/@orpc/trpc): Reuse existing [tRPC](https://trpc.io/) routers within oRPC.
 
 **Observability**
