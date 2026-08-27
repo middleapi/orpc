@@ -61,7 +61,7 @@ When `openapi` is applied multiple times, most fields, such as `method`, `path`,
 - `paramsStyles` and `queryStyles` are merged per parameter. The most recent style defined for a parameter wins.
 - `spec` values are combined: two functions are chained so the most recent one receives the result of the previous one, a function combined with an object is applied to that object, and between two objects the most recent one wins.
 
-For implementation details, see the [source code](https://github.com/orpc/orpc/blob/main/packages/openapi/src/meta.ts).
+For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/openapi/src/meta.ts).
 
 ```ts
 const router = os

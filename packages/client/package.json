@@ -1,9 +1,13 @@
 {
   "name": "@orpc/client",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.31",
+  "description": "Consume oRPC and OpenAPI APIs with end-to-end type safety over HTTP, WebSocket, or message ports",
   "license": "MIT",
-  "funding": "https://github.com/sponsors/dinwwwh",
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
+  ],
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
@@ -11,7 +15,15 @@
     "directory": "packages/client"
   },
   "keywords": [
-    "orpc"
+    "orpc",
+    "rpc",
+    "api",
+    "typescript",
+    "typesafe",
+    "client",
+    "fetch",
+    "websocket",
+    "openapi"
   ],
   "sideEffects": false,
   "publishConfig": {
@@ -67,9 +79,9 @@
   },
   "dependencies": {
     "@orpc/shared": "workspace:*",
-    "@standardserver/core": "^0.8.0",
-    "@standardserver/fetch": "^0.8.0",
-    "@standardserver/peer": "^0.8.0"
+    "@standardserver/core": "^0.8.2",
+    "@standardserver/fetch": "^0.8.2",
+    "@standardserver/peer": "^0.8.2"
   },
   "devDependencies": {
     "zod": "^4.4.3"

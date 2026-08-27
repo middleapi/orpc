@@ -1,9 +1,13 @@
 {
   "name": "@orpc/publisher",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.31",
+  "description": "Typesafe pub/sub for oRPC event streaming, with memory, Redis, and Upstash adapters",
   "license": "MIT",
-  "funding": "https://github.com/sponsors/dinwwwh",
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
+  ],
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
@@ -11,7 +15,15 @@
     "directory": "packages/publisher"
   },
   "keywords": [
-    "orpc"
+    "orpc",
+    "pubsub",
+    "publish-subscribe",
+    "events",
+    "event-iterator",
+    "sse",
+    "redis",
+    "upstash",
+    "typescript"
   ],
   "sideEffects": false,
   "publishConfig": {
@@ -68,7 +80,7 @@
   "dependencies": {
     "@orpc/client": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standardserver/core": "^0.8.0"
+    "@standardserver/core": "^0.8.2"
   },
   "devDependencies": {
     "@upstash/redis": "^1.38.2",

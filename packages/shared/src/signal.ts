@@ -35,6 +35,9 @@ export function allAbortSignal(signals: readonly (AbortSignal | undefined)[]): A
 /**
  * Returns a signal that aborts as soon as any of the provided signals aborts,
  * with the same abort reason.
+ *
+ * Prefers the native `AbortSignal.any` when available, and falls back to a manual
+ * implementation otherwise, including in runtimes without the `AbortSignal` global.
  */
 export function anyAbortSignal(signals: readonly (AbortSignal | undefined)[]): AbortSignal | undefined {
   const realSignals = signals.filter(signal => signal !== undefined)
@@ -47,8 +50,9 @@ export function anyAbortSignal(signals: readonly (AbortSignal | undefined)[]): A
     return realSignals[0]
   }
 
-  if (typeof AbortSignal.any === 'function') {
-    // eslint-disable-next-line ban/ban
+  // eslint-disable-next-line no-restricted-globals
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.any === 'function') {
+    // eslint-disable-next-line ban/ban, no-restricted-globals
     return AbortSignal.any(realSignals)
   }
 

@@ -139,11 +139,11 @@ Contract-first workflows belong to the `orpc-contract` skill: defining the shape
 
 ## Full documentation
 
-If this skill and a fetched docs page disagree, trust the page: this skill is a summary and v2 is still moving. While v2 is in beta the docs are served at https://v2.orpc.dev:
+If this skill and a fetched docs page disagree, trust the page: this skill is a summary and v2 is still moving. The docs are served at https://orpc.dev (the v1 docs stay at https://v1.orpc.dev):
 
-- https://v2.orpc.dev/llms.txt : index of every page with descriptions (links inside print the orpc.dev domain; swap in v2.orpc.dev before fetching)
-- https://v2.orpc.dev/llms-full.txt : the entire docs in one file (large; prefer single pages)
-- Append `.md` to any docs URL for that page's exact source markdown (for example https://v2.orpc.dev/docs/openapi/routing.md)
+- https://orpc.dev/llms.txt : index of every page with descriptions
+- https://orpc.dev/llms-full.txt : the entire docs in one file (large; prefer single pages)
+- Append `.md` to any docs URL for that page's exact source markdown (for example https://orpc.dev/docs/openapi/routing.md)
 
 Pages to fetch when you need details beyond this skill:
 

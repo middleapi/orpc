@@ -43,7 +43,7 @@ export interface ValidationErrorOptions extends ErrorOptions {
  * carrying the standard-schema `issues` and the invalid data.
  * Usually found as the `cause` of an `ORPCError`.
  *
- * @see {@link https://orpc.dev/docs/advanced/validation-customization | Validation Customization}
+ * @see {@link https://orpc.dev/docs/recipes/validation-customization | Validation Customization}
  */
 export class ValidationError extends Error {
   override name: string = 'ValidationError'

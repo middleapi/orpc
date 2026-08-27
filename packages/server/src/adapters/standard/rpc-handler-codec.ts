@@ -7,7 +7,7 @@ import type { AnyRouter } from '../../router'
 import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure, StandardHandlerHandleOptions } from '../standard'
 import type { RPCMatcherOptions } from './rpc-matcher'
 import { COMMON_ERROR_STATUS_MAP, RPCSerializer } from '@orpc/client'
-import { parseEmptyableJSON, value } from '@orpc/shared'
+import { getOwn, parseEmptyableJSON, value } from '@orpc/shared'
 import { parseStandardUrl } from '@standardserver/core'
 import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '../../constants'
 import { RPCMatcher } from './rpc-matcher'
@@ -82,7 +82,7 @@ export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<
   }
 
   encodeError(error: AnyORPCError, _procedure: AnyProcedure, _path: string[], _options: StandardHandlerHandleOptions<T>): Promisable<StandardResponse> {
-    const status = this.errorStatusMap[error.code] ?? DEFAULT_ERROR_STATUS
+    const status = getOwn(this.errorStatusMap, error.code) ?? DEFAULT_ERROR_STATUS
 
     return {
       headers: {},

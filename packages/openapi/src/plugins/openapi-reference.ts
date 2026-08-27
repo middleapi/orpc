@@ -26,6 +26,14 @@ export interface OpenAPIReferenceHandlerPluginOptions<T extends Context, TProvid
   spec: Value<Promisable<OpenAPIDocument>, [StandardHandlerRoutingInterceptorOptions<T>]>
 
   /**
+   * Determines whether the docs UI and OpenAPI JSON are allowed to be served for a request.
+   * When it resolves to `false`, the request falls through as unmatched,
+   * as if the plugin were not installed. Useful for restricting access
+   * to authenticated users.
+   */
+  allow?: Value<Promisable<boolean>, [StandardHandlerRoutingInterceptorOptions<T>]>
+
+  /**
    * The URL path at which to serve the OpenAPI JSON.
    *
    * @default '/spec.json'
@@ -102,6 +110,7 @@ export class OpenAPIReferenceHandlerPlugin<
   name = '~openapi-reference'
 
   private readonly spec: OpenAPIReferenceHandlerPluginOptions<T, TProvider>['spec']
+  private readonly allow: OpenAPIReferenceHandlerPluginOptions<T, TProvider>['allow']
   private readonly specPath: Exclude<OpenAPIReferenceHandlerPluginOptions<T, TProvider>['specPath'], undefined>
   private readonly provider: Exclude<OpenAPIReferenceHandlerPluginOptions<T, TProvider>['provider'], undefined>
   private readonly providerConfig: OpenAPIReferenceHandlerPluginOptions<T, TProvider>['providerConfig']
@@ -113,6 +122,7 @@ export class OpenAPIReferenceHandlerPlugin<
 
   constructor(options: OpenAPIReferenceHandlerPluginOptions<T, TProvider>) {
     this.spec = options.spec
+    this.allow = options.allow
     this.specPath = options.specPath ?? '/spec.json'
     this.provider = options.provider ?? 'scalar' as TProvider
     this.providerConfig = options.providerConfig
@@ -147,6 +157,10 @@ export class OpenAPIReferenceHandlerPlugin<
           )
 
           if (!isSpecPath && !isDocsPath) {
+            return result
+          }
+
+          if (await value(this.allow, routingInterceptorOptions) === false) {
             return result
           }
 

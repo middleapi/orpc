@@ -88,6 +88,10 @@ Sometimes you need to import the contract on the client, for example when using 
     Cast `contract` to `typeof router` to preserve type safety, since standard schema types cannot be serialized to JSON and must be cast manually.
     :::
 
+:::tip
+Instead of regenerating the JSON file manually whenever the router changes, you can run the same steps in a build-time macro. See [OpenAPI Link Without Runtime Imports](/docs/openapi/link-without-runtime-imports).
+:::
+
 ## Utilities
 
 :::info

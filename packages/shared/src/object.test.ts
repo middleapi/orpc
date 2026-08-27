@@ -1,7 +1,7 @@
 import * as a from 'arktype'
 import * as v from 'valibot'
 import z from 'zod'
-import { bindMethods, clone, findDeepMatches, get, getConstructor, getConstructors, isPlainObject, isPropertyKey, mergeTwoLevels, NullProtoObj, omit, set } from './object'
+import { bindMethods, clone, findDeepMatches, get, getConstructor, getConstructors, getOwn, isPlainObject, isPropertyKey, mergeTwoLevels, NullProtoObj, omit, set } from './object'
 
 it('findDeepMatches', () => {
   const { maps, values } = findDeepMatches(v => typeof v === 'string', {
@@ -113,6 +113,13 @@ it('isPlainObject', () => {
     Object.setPrototypeOf(obj, null)
     return obj
   })()).toSatisfy(isPlainObject)
+})
+
+it('getOwn', () => {
+  expect(getOwn({ a: 1 }, 'a')).toEqual(1)
+  expect(getOwn({ a: 1 }, 'b')).toBeUndefined()
+  expect(getOwn({ a: 1 }, 'toString')).toBeUndefined()
+  expect(getOwn({ toString: 1 } as any, 'toString')).toEqual(1)
 })
 
 it('get', () => {

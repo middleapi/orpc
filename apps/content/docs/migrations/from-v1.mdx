@@ -225,7 +225,7 @@ Stacked object input schemas compose into a single flat value, so one schema nev
 
 ### `.$config` options changed
 
-The index-based validation options were replaced by two simple flags. v2 tracks the order of middleware and validation automatically, so `dedupeLeadingMiddlewares` and the index options are gone. See [Validation Customization](/docs/advanced/validation-customization).
+The index-based validation options were replaced by two simple flags. v2 tracks the order of middleware and validation automatically, so `dedupeLeadingMiddlewares` and the index options are gone. See [Validation Customization](/docs/recipes/validation-customization).
 
 <CodeGroup>
 
@@ -360,7 +360,7 @@ v1 automatically skipped router-level middleware that was already applied to a p
 Middleware applied at both the router and the procedure level now runs twice. Nothing warns you about it: an auth or logging middleware simply executes two times per request.
 :::
 
-Guard shared middleware yourself with the context flag pattern from [Dedupe Middleware](/docs/best-practices/dedupe-middleware):
+Guard shared middleware yourself with the context flag pattern from [Dedupe Middleware](/docs/recipes/dedupe-middleware):
 
 ```ts
 const authMiddleware = os
@@ -718,6 +718,35 @@ const handler = new RPCHandler(router, {
 When serving binary data cross-origin, allow and expose both the `Content-Disposition` and the new `Standard-Server` headers in your CORS configuration. See [Binary Data](/docs/binary-data).
 :::
 
+### CORS allows any origin by default
+
+In v1, `CORSPlugin` reflected the request origin by default. In v2, `CORSHandlerPlugin` defaults `origin` to `*`, which browsers reject for [credentialed requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS#requests_with_credentials). If you rely on `credentials`, restore the v1 behavior or list your allowed origins explicitly. The `origin` and `timingOrigin` functions can now also be async. See [CORS](/docs/plugins/cors).
+
+<CodeGroup>
+
+```ts v2
+const handler = new RPCHandler(router, {
+  plugins: [
+    new CORSHandlerPlugin({
+      origin: origin => origin, // restore the v1 default
+      credentials: true,
+    }),
+  ],
+})
+```
+
+```ts v1
+const handler = new RPCHandler(router, {
+  plugins: [
+    new CORSPlugin({
+      credentials: true,
+    }),
+  ],
+})
+```
+
+</CodeGroup>
+
 ## Client
 
 ### `RPCLink` splits `url` into `origin` and `url`
@@ -889,7 +918,7 @@ Contract types and utilities changed word order from `ContractRouter*` to `Route
 | `RequestValidationPlugin`                        | `RequestValidationLinkPlugin`                          |
 | `ResponseValidationPlugin`                       | `ResponseValidationLinkPlugin`                         |
 
-The implementer works the same as in v1: `implement(contract)` still supports `.$context`, `.use`, and `.middleware`. New in v2, it also accepts a [procedure config](/docs/advanced/validation-customization), either as a second argument or through `.$config`. See [Contract Implementation](/docs/contract/implementation).
+The implementer works the same as in v1: `implement(contract)` still supports `.$context`, `.use`, and `.middleware`. New in v2, it also accepts a [procedure config](/docs/recipes/validation-customization), either as a second argument or through `.$config`. See [Contract Implementation](/docs/contract/implementation).
 
 ```ts
 import { implement } from '@orpc/server'

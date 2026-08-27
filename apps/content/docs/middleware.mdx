@@ -124,6 +124,10 @@ const adaptedCanUpdate = canUpdate.adaptInput((input: { id: number }) => input.i
 
 :::
 
+:::danger
+A middleware placed between [multiple input schemas](/docs/procedure#multiple-schemas) also receives the raw fields the remaining schemas have not validated yet. Only trust fields validated before the middleware; treat the rest as untrusted client input.
+:::
+
 ## Middleware Output
 
 Middleware can also modify the output of a handler, such as implementing caching mechanisms.

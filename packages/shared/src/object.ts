@@ -69,6 +69,14 @@ export function isPlainObject(value: unknown): value is Record<PropertyKey, unkn
   return proto === Object.prototype || !proto || !proto.constructor
 }
 
+/**
+ * Returns `object[key]` only when it is an own property, so keys like
+ * `toString` do not resolve through the prototype chain.
+ */
+export function getOwn<T extends object>(object: T, key: PropertyKey): T[keyof T] | undefined {
+  return Object.hasOwn(object, key) ? object[key as keyof T] : undefined
+}
+
 export function get(object: unknown, path: readonly PropertyKey[]): unknown {
   let current: unknown = object
 

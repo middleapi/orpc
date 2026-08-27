@@ -36,12 +36,14 @@ allowBuilds:
   vue-demi: false
   workerd: false
 
+# Only needed while a version is younger than the minimumReleaseAge gate.
+# Entries go inert once the version ages past it, so prune them on the next bump
+# instead of letting versions accumulate.
 minimumReleaseAgeExclude:
-  - blume@1.3.1
-  - '@standardserver/core@0.7.1 || 0.8.0'
-  - '@standardserver/fetch@0.7.1 || 0.8.0'
-  - '@standardserver/node@0.7.1 || 0.8.0'
-  - '@standardserver/peer@0.7.1 || 0.8.0'
-  - '@standardserver/shared@0.7.1 || 0.8.0'
-  - '@standardserver/aws-lambda@0.7.1 || 0.8.0'
-  - '@standardserver/fastify@0.7.1 || 0.8.0'
+  - '@standardserver/core@0.8.2'
+  - '@standardserver/fetch@0.8.2'
+  - '@standardserver/node@0.8.2'
+  - '@standardserver/peer@0.8.2'
+  - '@standardserver/shared@0.8.2'
+  - '@standardserver/aws-lambda@0.8.2'
+  - '@standardserver/fastify@0.8.2'

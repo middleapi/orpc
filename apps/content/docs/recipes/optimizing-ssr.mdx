@@ -29,7 +29,7 @@ const orpc: RouterClient<typeof router> = createORPCClient(internalLink)
 const orpc: RouterClient<typeof router> = createORPCClient(remoteLink)
 ```
 
-But how? A naive `typeof window === 'undefined'` check works, **but exposes your router logic to the client**. We need a hack that ensures server‑only code never reaches the browser.
+But how? A naive runtime check with a static import would pull your router into the client bundle. The trick is a conditional import guarded by a flag your bundler resolves at build time, so server-only code never reaches the browser.
 
 ## Implementation
 
@@ -45,6 +45,10 @@ This setup is not limited to [RPC Link](/docs/rpc/link) or [Next.js](https://nex
 import type { RouterClient } from '@orpc/server'
 import { RPCLink } from '@orpc/client/fetch'
 import { createORPCClient } from '@orpc/client'
+
+if (import.meta.env.SSR) {
+  await import('./orpc.server')
+}
 
 declare global {
   var $client: RouterClient<typeof router> | undefined
@@ -67,8 +71,6 @@ export const client: RouterClient<typeof router> = globalThis.$client ?? createO
 ```
 
 ```ts lib/orpc.server.ts
-import 'server-only'
-
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import type { RouterClient } from '@orpc/server'
@@ -95,28 +97,11 @@ globalThis.$client = createORPCClient(internalLink)
 
 </CodeGroup>
 
-Import `lib/orpc.server.ts` before other server code so the SSR client is registered early. In Next.js, add it to both `instrumentation.ts` and `app/layout.tsx`:
+The `import.meta.env.SSR` guard is resolved at build time, so the client bundle never contains `orpc.server.ts`. On webpack builds, guard with `typeof window === 'undefined'` instead, which Next.js also replaces at build time. With this setup, importing `client` from `lib/orpc.ts` uses the internal-link client during SSR and the remote client in the browser.
 
-<CodeGroup>
-
-```ts instrumentation.ts
-export async function register() {
-  // Conditionally import if facing runtime compatibility issues
-  // if (process.env.NEXT_RUNTIME === "nodejs") {
-  await import('./lib/orpc.server')
-  // }
-}
-```
-
-```ts app/layout.tsx
-import '../lib/orpc.server' // for pre-rendering
-
-// Rest of the code
-```
-
-</CodeGroup>
-
-With this setup, importing `client` from `lib/orpc.ts` uses the internal-link client during SSR and the remote client in the browser.
+:::tip
+See the [Next.js](/docs/adapters/next#optimize-ssr), [Nuxt](/docs/adapters/nuxt#optimize-ssr), [SolidStart](/docs/adapters/solid-start#optimize-ssr), [SvelteKit](/docs/adapters/svelte-kit#optimize-ssr), and [TanStack Start](/docs/adapters/tanstack-start#optimize-ssr) adapter pages for framework-specific setups.
+:::
 
 ## Using Server-Side Client Directly
 
@@ -127,8 +112,6 @@ Both a [fetch-based internal link](#implementation) and the [server-side client]
 :::
 
 ```ts
-import 'server-only'
-
 import { createRouterClient } from '@orpc/server'
 import { headers } from 'next/headers'
 

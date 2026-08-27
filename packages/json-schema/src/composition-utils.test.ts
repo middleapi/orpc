@@ -765,6 +765,87 @@ describe('combineJsonObjectSchemaEntries', () => {
       },
     })
   })
+
+  it('promotes def bodies per property, renaming only what the rebase makes distinct', () => {
+    // the exact same schema object for both entries: Self and Sibling rebase onto their own
+    // property and must not dedupe, Wrapper follows them, while Leaf and Dangling stay shared
+    const entry: JsonSchema = {
+      type: 'object',
+      properties: {
+        value: { type: 'string' },
+      },
+      allOf: [{ $ref: '#/$defs/Wrapper' }],
+      $defs: {
+        Self: { $ref: '#' },
+        Sibling: { $ref: '#/properties/value' },
+        Dangling: { $ref: '#/nonExists' },
+        Leaf: { type: 'string' },
+        Wrapper: { allOf: [{ $ref: '#/$defs/Leaf' }, { $ref: '#/$defs/Self' }, { $ref: '#/$defs/Sibling' }] },
+      },
+    }
+
+    expect(combineJsonObjectSchemaEntries([
+      ['left', entry, false],
+      ['right', entry, true],
+    ])).toEqual({
+      type: 'object',
+      properties: {
+        left: {
+          type: 'object',
+          properties: { value: { type: 'string' } },
+          allOf: [{ $ref: '#/$defs/Wrapper' }],
+        },
+        right: {
+          type: 'object',
+          properties: { value: { type: 'string' } },
+          allOf: [{ $ref: '#/$defs/Wrapper2' }],
+        },
+      },
+      required: ['left'],
+      $defs: {
+        Self: { $ref: '#/properties/left' },
+        Sibling: { $ref: '#/properties/left/properties/value' },
+        Dangling: { $ref: '#/nonExists' },
+        Leaf: { type: 'string' },
+        Wrapper: { allOf: [{ $ref: '#/$defs/Leaf' }, { $ref: '#/$defs/Self' }, { $ref: '#/$defs/Sibling' }] },
+        Self2: { $ref: '#/properties/right' },
+        Sibling2: { $ref: '#/properties/right/properties/value' },
+        Wrapper2: { allOf: [{ $ref: '#/$defs/Leaf' }, { $ref: '#/$defs/Self2' }, { $ref: '#/$defs/Sibling2' }] },
+      },
+    })
+  })
+
+  it('encodes the property name when rebasing entry root pointers', () => {
+    expect(combineJsonObjectSchemaEntries([
+      ['a/b', {
+        type: 'object',
+        properties: {
+          self: { $ref: '#' },
+          deep: { $ref: '#/properties/self' },
+        },
+      }, false],
+    ])).toEqual({
+      type: 'object',
+      properties: {
+        'a/b': {
+          type: 'object',
+          properties: {
+            self: { $ref: '#/properties/a~1b' },
+            deep: { $ref: '#/properties/a~1b/properties/self' },
+          },
+        },
+      },
+      required: ['a/b'],
+    })
+  })
+
+  it('keeps a property named __proto__ as an own key', () => {
+    // an own __proto__ key can neither be written as an object literal nor compared with toEqual
+    expect(JSON.stringify(combineJsonObjectSchemaEntries([
+      ['__proto__', { type: 'string' }, false],
+      ['safe', { type: 'number' }, true],
+    ]))).toBe('{"type":"object","properties":{"__proto__":{"type":"string"},"safe":{"type":"number"}},"required":["__proto__"]}')
+  })
 })
 
 describe('flattenJsonUnionSchema', () => {
@@ -839,6 +920,38 @@ describe('flattenJsonUnionSchema', () => {
     ])
   })
 
+  it('flattens every sibling branch that references the same $defs entry', () => {
+    const schema = {
+      $defs: { Shared: { type: 'string' } },
+      anyOf: [
+        { $ref: '#/$defs/Shared', minLength: 2 },
+        { $ref: '#/$defs/Shared', maxLength: 5 },
+      ],
+    } satisfies JsonSchema
+
+    expect(flattenJsonUnionSchema(schema)).toEqual([
+      { $defs: schema.$defs, $ref: '#/$defs/Shared', minLength: 2 },
+      { $defs: schema.$defs, $ref: '#/$defs/Shared', maxLength: 5 },
+    ])
+  })
+
+  it('flattens every sibling branch that references the same union $defs entry', () => {
+    const schema = {
+      $defs: { Shared: { anyOf: [{ type: 'number' }, { type: 'boolean' }] } },
+      anyOf: [
+        { $ref: '#/$defs/Shared', description: 'first' },
+        { $ref: '#/$defs/Shared', description: 'second' },
+      ],
+    } satisfies JsonSchema
+
+    expect(flattenJsonUnionSchema(schema)).toEqual([
+      { $defs: schema.$defs, description: 'first', type: 'number' },
+      { $defs: schema.$defs, description: 'first', type: 'boolean' },
+      { $defs: schema.$defs, description: 'second', type: 'number' },
+      { $defs: schema.$defs, description: 'second', type: 'boolean' },
+    ])
+  })
+
   it('flattens transitive local $ref union branches', () => {
     const schema = {
       $defs: {
@@ -879,6 +992,23 @@ describe('flattenJsonUnionSchema', () => {
       { $defs: schema.$defs, type: 'number' },
       { $defs: schema.$defs, type: 'boolean' },
       { $defs: schema.$defs, type: 'string' },
+    ])
+  })
+
+  it('flattening mutually recursive union $ref branches', () => {
+    const schema = {
+      $defs: {
+        A: { anyOf: [{ $ref: '#/$defs/B' }, { type: 'string' }] },
+        B: { anyOf: [{ $ref: '#/$defs/A' }, { type: 'number' }] },
+      },
+      anyOf: [{ $ref: '#/$defs/A' }, { $ref: '#/$defs/B' }],
+    } satisfies JsonSchema
+
+    expect(flattenJsonUnionSchema(schema)).toEqual([
+      { $defs: schema.$defs, $ref: '#/$defs/B' },
+      { $defs: schema.$defs, type: 'string' },
+      { $defs: schema.$defs, $ref: '#/$defs/A' },
+      { $defs: schema.$defs, type: 'number' },
     ])
   })
 
@@ -1268,6 +1398,258 @@ describe('combineJsonSchemasWithComposition', () => {
     })
   })
 
+  it('only dedupes against the def sharing its name', () => {
+    // the renamed body is byte-identical to `B`, but `B` is not a dedupe candidate for `A`
+    expect(combineJsonSchemasWithComposition('anyOf', [
+      {
+        allOf: [{ $ref: '#/$defs/A' }, { $ref: '#/$defs/B' }],
+        $defs: {
+          A: { type: 'string' },
+          B: { type: 'number' },
+        },
+      },
+      {
+        $ref: '#/$defs/A',
+        $defs: {
+          A: { type: 'number' },
+        },
+      },
+    ])).toEqual({
+      anyOf: [
+        { allOf: [{ $ref: '#/$defs/A' }, { $ref: '#/$defs/B' }] },
+        { $ref: '#/$defs/A2' },
+      ],
+      $defs: {
+        A: { type: 'string' },
+        B: { type: 'number' },
+        A2: { type: 'number' },
+      },
+    })
+  })
+
+  it('rewrites refs inside promoted def bodies so renamed defs stay reachable', () => {
+    expect(combineJsonSchemasWithComposition('anyOf', [
+      {
+        $ref: '#/$defs/Wrapper',
+        $defs: {
+          Leaf: { type: 'string' },
+          Wrapper: { type: 'array', items: { $ref: '#/$defs/Leaf' } },
+        },
+      },
+      {
+        $ref: '#/$defs/Wrapper',
+        $defs: {
+          Leaf: { type: 'number' },
+          Wrapper: { type: 'array', items: { $ref: '#/$defs/Leaf' } },
+        },
+      },
+    ])).toEqual({
+      anyOf: [
+        { $ref: '#/$defs/Wrapper' },
+        { $ref: '#/$defs/Wrapper2' },
+      ],
+      $defs: {
+        Leaf: { type: 'string' },
+        Wrapper: { type: 'array', items: { $ref: '#/$defs/Leaf' } },
+        Leaf2: { type: 'number' },
+        Wrapper2: { type: 'array', items: { $ref: '#/$defs/Leaf2' } },
+      },
+    })
+
+    // referencing defs still dedupe when everything they point at dedupes too
+    expect(combineJsonSchemasWithComposition('anyOf', [
+      {
+        $ref: '#/$defs/Wrapper',
+        $defs: {
+          Leaf: { type: 'string' },
+          Wrapper: { type: 'array', items: { $ref: '#/$defs/Leaf' } },
+        },
+      },
+      {
+        $ref: '#/$defs/Wrapper',
+        $defs: {
+          Leaf: { type: 'string' },
+          Wrapper: { type: 'array', items: { $ref: '#/$defs/Leaf' } },
+        },
+      },
+    ])).toEqual({
+      anyOf: [
+        { $ref: '#/$defs/Wrapper' },
+        { $ref: '#/$defs/Wrapper' },
+      ],
+      $defs: {
+        Leaf: { type: 'string' },
+        Wrapper: { type: 'array', items: { $ref: '#/$defs/Leaf' } },
+      },
+    })
+  })
+
+  it('cascades def renames through a chain declared before its dependencies', () => {
+    // Outer and Middle both compare equal until the def they reach has been renamed, so this
+    // only settles after three passes
+    const chain = (leaf: JsonSchema): JsonSchema => ({
+      $ref: '#/$defs/Outer',
+      $defs: {
+        Outer: { type: 'object', properties: { value: { $ref: '#/$defs/Middle' } } },
+        Middle: { type: 'array', items: { $ref: '#/$defs/Inner' } },
+        Inner: leaf,
+      },
+    })
+
+    expect(combineJsonSchemasWithComposition('anyOf', [
+      chain({ type: 'string' }),
+      chain({ type: 'number' }),
+    ])).toEqual({
+      anyOf: [
+        { $ref: '#/$defs/Outer' },
+        { $ref: '#/$defs/Outer2' },
+      ],
+      $defs: {
+        Outer: { type: 'object', properties: { value: { $ref: '#/$defs/Middle' } } },
+        Middle: { type: 'array', items: { $ref: '#/$defs/Inner' } },
+        Inner: { type: 'string' },
+        Outer2: { type: 'object', properties: { value: { $ref: '#/$defs/Middle2' } } },
+        Middle2: { type: 'array', items: { $ref: '#/$defs/Inner2' } },
+        Inner2: { type: 'number' },
+      },
+    })
+  })
+
+  it('never renames a def onto a name another def in the same branch already claims', () => {
+    expect(combineJsonSchemasWithComposition('anyOf', [
+      {
+        $ref: '#/$defs/Shared',
+        $defs: {
+          Shared: { type: 'string' },
+        },
+      },
+      {
+        allOf: [{ $ref: '#/$defs/Shared' }, { $ref: '#/$defs/Shared2' }],
+        $defs: {
+          Shared: { type: 'number' },
+          Shared2: { type: 'boolean' },
+        },
+      },
+    ])).toEqual({
+      anyOf: [
+        { $ref: '#/$defs/Shared' },
+        { allOf: [{ $ref: '#/$defs/Shared3' }, { $ref: '#/$defs/Shared2' }] },
+      ],
+      $defs: {
+        Shared: { type: 'string' },
+        Shared3: { type: 'number' },
+        Shared2: { type: 'boolean' },
+      },
+    })
+  })
+
+  it('promotes def names that shadow Object.prototype members', () => {
+    expect(combineJsonSchemasWithComposition('anyOf', [
+      {
+        allOf: [{ $ref: '#/$defs/toString' }, { $ref: '#/$defs/valueOf' }],
+        $defs: {
+          toString: { type: 'string' },
+          constructor: { type: 'boolean' },
+        },
+      },
+      {
+        $ref: '#/$defs/toString',
+        $defs: {
+          toString: { type: 'number' },
+          constructor: { type: 'boolean' },
+        },
+      },
+    ])).toEqual({
+      anyOf: [
+        { allOf: [{ $ref: '#/$defs/toString' }, { $ref: '#/$defs/valueOf' }] },
+        { $ref: '#/$defs/toString2' },
+      ],
+      $defs: {
+        toString: { type: 'string' },
+        constructor: { type: 'boolean' },
+        toString2: { type: 'number' },
+      },
+    })
+
+    // a def literally named __proto__ has to survive as an own key
+    expect(JSON.stringify(combineJsonSchemasWithComposition('anyOf', [
+      JSON.parse('{"$ref":"#/$defs/__proto__","$defs":{"__proto__":{"type":"string"}}}'),
+      { type: 'object' },
+    ]))).toBe('{"anyOf":[{"$ref":"#/$defs/__proto__"},{"type":"object"}],"$defs":{"__proto__":{"type":"string"}}}')
+  })
+
+  it('never lets two renames in the same branch land on the same target', () => {
+    // A skips the taken A2..A11 and lands on A12, which A1 would otherwise take as its own first choice
+    const taken = Object.fromEntries(
+      ['A', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11'].map(name => [name, { type: 'string' }]),
+    )
+
+    expect(combineJsonSchemasWithComposition('anyOf', [
+      {
+        allOf: [{ $ref: '#/$defs/A' }, { $ref: '#/$defs/A1' }],
+        $defs: taken,
+      },
+      {
+        allOf: [{ $ref: '#/$defs/A' }, { $ref: '#/$defs/A1' }],
+        $defs: {
+          A: { type: 'number' },
+          A1: { type: 'boolean' },
+        },
+      },
+    ])).toEqual({
+      anyOf: [
+        { allOf: [{ $ref: '#/$defs/A' }, { $ref: '#/$defs/A1' }] },
+        { allOf: [{ $ref: '#/$defs/A12' }, { $ref: '#/$defs/A13' }] },
+      ],
+      $defs: {
+        ...taken,
+        A12: { type: 'number' },
+        A13: { type: 'boolean' },
+      },
+    })
+  })
+
+  it('rebases root pointers inside promoted def bodies and never dedupes them across branches', () => {
+    // the exact same schema object on both sides: Self and Sibling are only distinguishable
+    // once rebased, while Dangling and Relative resolve nowhere and dedupe
+    const branch: JsonSchema = {
+      type: 'object',
+      properties: {
+        value: { type: 'string' },
+      },
+      allOf: [{ $ref: '#/$defs/Self' }, { $ref: '#/$defs/Sibling' }],
+      $defs: {
+        Self: { $ref: '#' },
+        Sibling: { $ref: '#/properties/value' },
+        Dangling: { $ref: '#/nonExists' },
+        Relative: { $ref: '../External' },
+      },
+    }
+
+    expect(combineJsonSchemasWithComposition('anyOf', [branch, branch])).toEqual({
+      anyOf: [
+        {
+          type: 'object',
+          properties: { value: { type: 'string' } },
+          allOf: [{ $ref: '#/$defs/Self' }, { $ref: '#/$defs/Sibling' }],
+        },
+        {
+          type: 'object',
+          properties: { value: { type: 'string' } },
+          allOf: [{ $ref: '#/$defs/Self2' }, { $ref: '#/$defs/Sibling2' }],
+        },
+      ],
+      $defs: {
+        Self: { $ref: '#/anyOf/0' },
+        Sibling: { $ref: '#/anyOf/0/properties/value' },
+        Dangling: { $ref: '#/nonExists' },
+        Relative: { $ref: '../External' },
+        Self2: { $ref: '#/anyOf/1' },
+        Sibling2: { $ref: '#/anyOf/1/properties/value' },
+      },
+    })
+  })
+
   it('ignore relative refs unchanged', () => {
     expect(combineJsonSchemasWithComposition('allOf', [
       {
@@ -1332,6 +1714,30 @@ describe('combineJsonSchemasWithComposition', () => {
     })
   })
 
+  it('decodes encoded segments when rebasing root pointers', () => {
+    expect(combineJsonSchemasWithComposition('anyOf', [
+      {
+        type: 'object',
+        properties: {
+          'a/b': { type: 'string' },
+          'ref': { $ref: '#/properties/a~1b' },
+        },
+      },
+      { type: 'object' },
+    ])).toEqual({
+      anyOf: [
+        {
+          type: 'object',
+          properties: {
+            'a/b': { type: 'string' },
+            'ref': { $ref: '#/anyOf/0/properties/a~1b' },
+          },
+        },
+        { type: 'object' },
+      ],
+    })
+  })
+
   it('preserves encoded pointer refs', () => {
     expect(combineJsonSchemasWithComposition('allOf', [
       {
@@ -1370,6 +1776,32 @@ describe('combineJsonSchemasWithComposition', () => {
     })
   })
 
+  it('renames encoded def names and re-encodes the rewritten refs', () => {
+    expect(combineJsonSchemasWithComposition('anyOf', [
+      {
+        allOf: [{ $ref: '#/$defs/path~1name' }, { $ref: '#/$defs/path~1name/properties/x' }],
+        $defs: {
+          'path/name': { type: 'object', properties: { x: { type: 'string' } } },
+        },
+      },
+      {
+        allOf: [{ $ref: '#/$defs/path~1name' }, { $ref: '#/$defs/path~1name/properties/x' }],
+        $defs: {
+          'path/name': { type: 'object', properties: { x: { type: 'number' } } },
+        },
+      },
+    ])).toEqual({
+      anyOf: [
+        { allOf: [{ $ref: '#/$defs/path~1name' }, { $ref: '#/$defs/path~1name/properties/x' }] },
+        { allOf: [{ $ref: '#/$defs/path~1name2' }, { $ref: '#/$defs/path~1name2/properties/x' }] },
+      ],
+      $defs: {
+        'path/name': { type: 'object', properties: { x: { type: 'string' } } },
+        'path/name2': { type: 'object', properties: { x: { type: 'number' } } },
+      },
+    })
+  })
+
   it('ignores undefined defs entries while promoting valid defs', () => {
     expect(combineJsonSchemasWithComposition('allOf', [
       {
@@ -1383,7 +1815,8 @@ describe('combineJsonSchemasWithComposition', () => {
         },
       },
       { type: 'object' },
-    ])).toEqual({
+    // toEqual would treat a `Missing: undefined` key as absent, so this has to be strict
+    ])).toStrictEqual({
       allOf: [
         {
           type: 'object',

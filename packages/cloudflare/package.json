@@ -1,9 +1,13 @@
 {
   "name": "@orpc/cloudflare",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.31",
+  "description": "Cloudflare integration for oRPC: KV, Cache API, and Workers Caching cache stores, Durable Object pub/sub, and Workers rate limiting adapters",
   "license": "MIT",
-  "funding": "https://github.com/sponsors/dinwwwh",
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
+  ],
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
@@ -12,7 +16,14 @@
   },
   "keywords": [
     "orpc",
-    "cloudflare workers"
+    "cloudflare",
+    "cloudflare-workers",
+    "durable-objects",
+    "ratelimit",
+    "pubsub",
+    "cache",
+    "kv",
+    "typescript"
   ],
   "sideEffects": false,
   "publishConfig": {
@@ -45,12 +56,12 @@
     "@orpc/publisher": "workspace:*",
     "@orpc/ratelimit": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standardserver/core": "^0.8.0"
+    "@standardserver/core": "^0.8.2"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.21.1",
-    "@vitest/coverage-istanbul": "^4.1.9",
-    "vitest": "^4.1.9",
-    "wrangler": "^4.121.0"
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@vitest/coverage-istanbul": "^4.1.11",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.124.0"
   }
 }

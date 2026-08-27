@@ -44,7 +44,7 @@ const router = os.use(requiredAuth).meta(requireAuthMeta).router({
 ```
 
 :::danger
-If you apply middleware with `.use` at both the router and procedure levels, it may run more than once. That duplication can hurt performance. To avoid redundant middleware execution, see our [best practices for middleware deduplication](/docs/best-practices/dedupe-middleware).
+If you apply middleware with `.use` at both the router and procedure levels, it may run more than once. That duplication can hurt performance. To avoid redundant middleware execution, see the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe.
 :::
 
 ## Lazy Router

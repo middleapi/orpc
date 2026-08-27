@@ -1,4 +1,4 @@
-import { readdir, readFile } from 'node:fs/promises'
+import { access, readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { parseArgs } from 'node:util'
@@ -15,6 +15,7 @@ import ts from 'typescript'
 const ROOT_DIR = process.cwd()
 const CONTENT_DIR = path.join(ROOT_DIR, 'apps/content')
 const PACKAGES_DIR = path.join(ROOT_DIR, 'packages')
+const PLAYGROUNDS_DIR = path.join(ROOT_DIR, 'playgrounds')
 const SITE_URL_PREFIX = 'https://orpc.dev/'
 const DOCS_URL_PREFIX = 'https://orpc.dev/docs/'
 
@@ -434,63 +435,107 @@ function checkMention(
 const ORPC_URL_RE = /https:\/\/orpc\.dev[^\s)}\]|'"`]*/g
 
 /**
+ * Routes served outside the markdown content: custom Astro pages
+ * (apps/content/pages). Their anchors cannot be verified, so links to them
+ * are checked for existence only.
+ */
+async function collectCustomPageRoutes(): Promise<Set<string>> {
+  const routes = new Set<string>()
+
+  for (const file of await findFiles(path.join(CONTENT_DIR, 'pages'), '.astro')) {
+    const relPath = path.relative(path.join(CONTENT_DIR, 'pages'), file).replaceAll(path.sep, '/')
+
+    // underscore-prefixed segments are not routed; dynamic routes are unpredictable
+    if (relPath.split('/').some(part => part.startsWith('_') || part.startsWith('['))) {
+      continue
+    }
+
+    routes.add(relPath.replace(/\.astro$/, '').replace(/(?:^|\/)index$/, ''))
+  }
+
+  return routes
+}
+
+async function isPublicAsset(pagePath: string): Promise<boolean> {
+  if (!pagePath) {
+    return false
+  }
+
+  try {
+    await access(path.join(CONTENT_DIR, 'public', pagePath))
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
+/**
  * Validates that every `https://orpc.dev...` URL appearing anywhere in package
- * sources (inline markdown links, member-level docs, ...) points to an existing
- * content page and heading. Existence only — titles are enforced on `@see` tags.
+ * or playground sources (inline markdown links, member-level docs, ...) points to
+ * an existing content page and heading. Existence only — titles are enforced on
+ * `@see` tags.
  */
 async function scanSourceLinks(context: CheckContext, filterDirs: Set<string> | undefined): Promise<number> {
   let scanned = 0
-  const entries = await readdir(PACKAGES_DIR, { withFileTypes: true })
+  const customPageRoutes = await collectCustomPageRoutes()
 
-  for (const entry of entries) {
-    if (!entry.isDirectory() || (filterDirs && !filterDirs.has(entry.name))) {
-      continue
-    }
+  for (const baseDir of [PACKAGES_DIR, PLAYGROUNDS_DIR]) {
+    const groupPrefix = path.relative(ROOT_DIR, baseDir)
+    const entries = await readdir(baseDir, { withFileTypes: true })
 
-    const srcDir = path.join(PACKAGES_DIR, entry.name, 'src')
-    let files: string[]
-
-    try {
-      files = [...await findFiles(srcDir, '.ts'), ...await findFiles(srcDir, '.tsx')]
-    }
-    catch {
-      continue
-    }
-
-    for (const file of files) {
-      if (/\.(?:test|test-d|bench)\./.test(file) || file.includes('__tests__') || file.includes('__mocks__')) {
+    for (const entry of entries) {
+      if (!entry.isDirectory() || (filterDirs && !filterDirs.has(entry.name))) {
         continue
       }
 
-      const lines = (await readFile(file, 'utf8')).split('\n')
+      const srcDir = path.join(baseDir, entry.name, 'src')
+      let files: string[]
 
-      for (const [index, line] of lines.entries()) {
-        for (const match of line.matchAll(ORPC_URL_RE)) {
-          const url = match[0].replace(/[.,;:]+$/, '')
-          scanned += 1
+      try {
+        files = [...await findFiles(srcDir, '.ts'), ...await findFiles(srcDir, '.tsx')]
+      }
+      catch {
+        continue
+      }
 
-          const report = (code: string, message: string): void => {
-            context.issues.push({
-              severity: 'error',
-              code,
-              message,
-              group: `packages/${entry.name}`,
-              label: 'link',
-              location: `${path.relative(ROOT_DIR, file)}:${index + 1}`,
-            })
-          }
+      for (const file of files) {
+        if (/\.(?:test|test-d|bench)\./.test(file) || file.includes('__tests__') || file.includes('__mocks__')) {
+          continue
+        }
 
-          const [rawPath = '', anchor] = url.slice(SITE_URL_PREFIX.length - 1).split('#')
-          const pagePath = rawPath.replace(/^\/+/, '').replace(/\/+$/, '')
-          const page = context.pages.get(pagePath)
+        const lines = (await readFile(file, 'utf8')).split('\n')
 
-          if (!page) {
-            report('E4', `link page "/${pagePath}" has no apps/content/${pagePath || 'index'}.md`)
-            continue
-          }
+        for (const [index, line] of lines.entries()) {
+          for (const match of line.matchAll(ORPC_URL_RE)) {
+            const url = match[0].replace(/[.,;:]+$/, '')
+            scanned += 1
 
-          if (anchor !== undefined && !page.slugs.has(anchor)) {
-            report('E5', `anchor "#${anchor}" not found in apps/content/${pagePath || 'index'}.md`)
+            const report = (code: string, message: string): void => {
+              context.issues.push({
+                severity: 'error',
+                code,
+                message,
+                group: `${groupPrefix}/${entry.name}`,
+                label: 'link',
+                location: `${path.relative(ROOT_DIR, file)}:${index + 1}`,
+              })
+            }
+
+            const [rawPath = '', anchor] = url.slice(SITE_URL_PREFIX.length - 1).split('#')
+            const pagePath = rawPath.replace(/^\/+/, '').replace(/\/+$/, '')
+            const page = context.pages.get(pagePath)
+
+            if (!page) {
+              if (!customPageRoutes.has(pagePath) && !await isPublicAsset(pagePath)) {
+                report('E4', `link page "/${pagePath}" has no apps/content/${pagePath || 'index'}.md`)
+              }
+              continue
+            }
+
+            if (anchor !== undefined && !page.slugs.has(anchor)) {
+              report('E5', `anchor "#${anchor}" not found in apps/content/${pagePath || 'index'}.md`)
+            }
           }
         }
       }

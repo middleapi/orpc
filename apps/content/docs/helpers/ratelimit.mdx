@@ -2,7 +2,7 @@
 title: "Rate Limit Helpers"
 description: "Add rate limiting to oRPC with a unified RateLimiter interface, storage adapters, procedure middleware, and a handler plugin for HTTP headers."
 sidebar:
-  label: "Ratelimit"
+  label: "Rate Limit"
 ---
 
 ## Installation
@@ -47,7 +47,7 @@ Each adapter might require `maxRequests` and `window` to configure the limit, al
 | ----------------------- | ------------- | --------------------------------------------------------------------------------------------------------- |
 | `MemoryRateLimiter`     | ✅            | In-memory storage                                                                                         |
 | `RedisRateLimiter`      | ✅            | [Redis](https://github.com/redis/redis)                                                                   |
-| `UpstashRateLimiter`    | ✅            | [Upstash Rate Limit](https://npmx.dev/package/@upstash/ratelimit)                                    |
+| `UpstashRateLimiter`    | ✅            | [Upstash Rate Limit](https://www.npmjs.com/package/@upstash/ratelimit)                                    |
 | `BunRedisRateLimiter`   | ✅            | [Bun's Redis](https://bun.com/docs/runtime/redis)                                                         |
 | `CloudflareRateLimiter` | ❌            | [Cloudflare's Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) |
 
@@ -276,7 +276,7 @@ const result = await call(
 ```
 
 :::info[Automatic Deduplication]
-When the same `limiter` and `key` combination is used multiple times in a single request chain, the `ratelimit` middleware performs the rate limit check only once. This behavior follows the [Dedupe Middleware Best Practice](/docs/best-practices/dedupe-middleware). To disable deduplication, set `dedupe: false`.
+When the same `limiter` and `key` combination is used multiple times in a single request chain, the `ratelimit` middleware performs the rate limit check only once. This behavior follows the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe. To disable deduplication, set `dedupe: false`.
 :::
 
 :::tip[Conditional Limiter]

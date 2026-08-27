@@ -1,9 +1,13 @@
 {
   "name": "@orpc/ratelimit",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.31",
+  "description": "Rate limiting for oRPC procedures, with memory, Redis, and Upstash adapters",
   "license": "MIT",
-  "funding": "https://github.com/sponsors/dinwwwh",
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
+  ],
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
@@ -12,7 +16,13 @@
   },
   "keywords": [
     "orpc",
-    "ratelimit"
+    "ratelimit",
+    "rate-limiting",
+    "redis",
+    "upstash",
+    "middleware",
+    "api",
+    "typescript"
   ],
   "sideEffects": false,
   "publishConfig": {
@@ -69,7 +79,7 @@
   "dependencies": {
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standardserver/core": "^0.8.0"
+    "@standardserver/core": "^0.8.2"
   },
   "devDependencies": {
     "@upstash/ratelimit": "^2.0.8",

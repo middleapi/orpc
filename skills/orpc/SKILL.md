@@ -8,9 +8,9 @@ license: MIT
 
 oRPC is a typesafe API framework: write plain TypeScript functions on the server, call them from clients like local functions. Input is validated at runtime, types flow end to end, and there is no code generation step. The same router can also be served as a REST API with an OpenAPI spec.
 
-This skill targets oRPC v2. Check what is installed before writing code: `npm ls @orpc/server` (or any `@orpc/*` package). A 1.x version means v1, where this skill's guidance does not apply; use the `orpc-migrate` skill to upgrade. v2 currently ships under the `beta` dist-tag (`npm install @orpc/server@beta @orpc/client@beta`; a plain install silently gets v1). If `npm view @orpc/server dist-tags` shows `latest` at 2.x, the beta has ended: install normally and read docs at https://orpc.dev instead of https://v2.orpc.dev.
+This skill targets oRPC v2. Check what is installed before writing code: `npm ls @orpc/server` (or any `@orpc/*` package). A 1.x version means v1, where this skill's guidance does not apply; use the `orpc-migrate` skill to upgrade. v2 currently ships under the `beta` dist-tag (`npm install @orpc/server@beta @orpc/client@beta`; a plain install silently gets v1). If `npm view @orpc/server dist-tags` shows `latest` at 2.x, the beta has ended: install normally.
 
-Pretrained oRPC knowledge describes v1 and is often wrong for v2 (routing moved to `.meta(openapi(...))`, `RPCLink` split `url` into `origin` plus a path, automatic middleware dedupe was removed). Prefer retrieval: the index of every docs page is at https://v2.orpc.dev/llms.txt; see [Full documentation](#full-documentation) for the mechanics.
+Pretrained oRPC knowledge describes v1 and is often wrong for v2 (routing moved to `.meta(openapi(...))`, `RPCLink` split `url` into `origin` plus a path, automatic middleware dedupe was removed). Prefer retrieval: the index of every docs page is at https://orpc.dev/llms.txt; see [Full documentation](#full-documentation) for the mechanics.
 
 Package map:
 
@@ -157,7 +157,7 @@ const server = createServer(async (req, res) => {
 server.listen(3000)
 ```
 
-Unmatched requests fall through to your own handling. By default `RPCHandler` accepts only `POST`, `PUT`, `PATCH`, and `DELETE`; enabling `GET` via `allowMethods` is a CSRF risk with cookie auth, see [RPC Handler](https://v2.orpc.dev/docs/rpc/handler). Handler options also include `interceptors`, `routingInterceptors`, `clientInterceptors`, `plugins`, `filter`, and `errorStatusMap`. Adapters also exist for [AWS Lambda](https://v2.orpc.dev/docs/adapters/aws-lambda), [Fastify](https://v2.orpc.dev/docs/adapters/fastify), [WebSocket](https://v2.orpc.dev/docs/adapters/websocket), [Message Port](https://v2.orpc.dev/docs/adapters/message-port), and [React Native](https://v2.orpc.dev/docs/adapters/react-native).
+Unmatched requests fall through to your own handling. By default `RPCHandler` accepts only `POST`, `PUT`, `PATCH`, and `DELETE`; enabling `GET` via `allowMethods` is a CSRF risk with cookie auth, see [RPC Handler](https://orpc.dev/docs/rpc/handler). Handler options also include `interceptors`, `routingInterceptors`, `clientInterceptors`, `plugins`, `filter`, and `errorStatusMap`. Adapters also exist for [AWS Lambda](https://orpc.dev/docs/adapters/aws-lambda), [Fastify](https://orpc.dev/docs/adapters/fastify), [WebSocket](https://orpc.dev/docs/adapters/websocket), [Message Port](https://orpc.dev/docs/adapters/message-port), and [Expo](https://orpc.dev/docs/adapters/expo).
 
 ## Call procedures
 
@@ -209,29 +209,29 @@ const safeClient = createSafeClient(orpc) // every call returns [error, data]
 
 ## Beyond the basics
 
-- Streaming / SSE: return an async generator from `.handler`, validate events with `asyncIteratorObject`, resume via `lastEventId`: [AsyncIteratorObject](https://v2.orpc.dev/docs/async-iterator-object)
-- OpenAPI: serve the same router as REST with routing metadata plus `OpenAPIHandler`, and generate a spec (covered in depth by the `orpc-openapi` skill): [OpenAPI Handler](https://v2.orpc.dev/docs/openapi/handler)
-- Contract-first: define contracts with `@orpc/contract`, implement with `implement` (covered in depth by the `orpc-contract` skill): [Contracts](https://v2.orpc.dev/docs/contract/procedure)
-- Plugins for handler and link: batch, CORS, dedupe, retry, compression, request limits, smart coercion, static files, timeout, tmp file upload, and more. Fetch a plugin's docs page before configuring it; option names are not guessable: [Plugins](https://v2.orpc.dev/docs/plugins/batch)
-- Integrations: [TanStack Query](https://v2.orpc.dev/docs/integrations/tanstack-query) (`createTanstackQueryUtils`), [SWR](https://v2.orpc.dev/docs/integrations/swr), [Pinia Colada](https://v2.orpc.dev/docs/integrations/pinia-colada), [Next.js](https://v2.orpc.dev/docs/integrations/next), [NestJS](https://v2.orpc.dev/docs/integrations/nest), [AI SDK](https://v2.orpc.dev/docs/integrations/ai-sdk), [OpenTelemetry](https://v2.orpc.dev/docs/integrations/opentelemetry)
-- Testing: `call` procedures directly; mock with `implement(router.planet.list).handler(() => [])`, and run the project's typecheck before declaring success, since end-to-end types are oRPC's first correctness signal: [Testing and Mocking](https://v2.orpc.dev/docs/advanced/testing-and-mocking)
-- Monorepos: TypeScript project references keep client types resolvable: [Monorepo Setup](https://v2.orpc.dev/docs/best-practices/monorepo-setup)
+- Streaming / SSE: return an async generator from `.handler`, validate events with `asyncIteratorObject`, resume via `lastEventId`: [AsyncIteratorObject](https://orpc.dev/docs/async-iterator-object)
+- OpenAPI: serve the same router as REST with routing metadata plus `OpenAPIHandler`, and generate a spec (covered in depth by the `orpc-openapi` skill): [OpenAPI Handler](https://orpc.dev/docs/openapi/handler)
+- Contract-first: define contracts with `@orpc/contract`, implement with `implement` (covered in depth by the `orpc-contract` skill): [Contracts](https://orpc.dev/docs/contract/procedure)
+- Plugins for handler and link: batch, CORS, dedupe, retry, compression, request limits, smart coercion, static files, timeout, tmp file upload, and more. Fetch a plugin's docs page before configuring it; option names are not guessable: [Plugins](https://orpc.dev/docs/plugins/batch)
+- Integrations: [TanStack Query](https://orpc.dev/docs/integrations/tanstack-query) (`createTanstackQueryUtils`), [SWR](https://orpc.dev/docs/integrations/swr), [Pinia Colada](https://orpc.dev/docs/integrations/pinia-colada), [Next.js](https://orpc.dev/docs/integrations/next), [NestJS](https://orpc.dev/docs/integrations/nest), [AI SDK](https://orpc.dev/docs/integrations/ai-sdk), [OpenTelemetry](https://orpc.dev/docs/integrations/opentelemetry)
+- Testing: `call` procedures directly; mock with `implement(router.planet.list).handler(() => [])`, and run the project's typecheck before declaring success, since end-to-end types are oRPC's first correctness signal: [Testing and Mocking](https://orpc.dev/docs/recipes/testing-and-mocking)
+- Monorepos: TypeScript project references keep client types resolvable: [Monorepo Setup](https://orpc.dev/docs/recipes/monorepo-setup)
 - Migrating from tRPC or oRPC v1: use the `orpc-migrate` skill
 
 ## Full documentation
 
-This skill is an overview; fetch exact docs instead of guessing APIs, and if this skill and a fetched page disagree, trust the page. While v2 is in beta the docs are served at https://v2.orpc.dev:
+This skill is an overview; fetch exact docs instead of guessing APIs, and if this skill and a fetched page disagree, trust the page. The docs are served at https://orpc.dev (the v1 docs stay at https://v1.orpc.dev):
 
-- https://v2.orpc.dev/llms.txt : index of every page with descriptions (links inside print the orpc.dev domain; swap in v2.orpc.dev before fetching)
-- https://v2.orpc.dev/llms-full.txt : the entire docs in one file (large; prefer single pages)
-- Append `.md` to any docs URL for that page's exact source markdown (for example https://v2.orpc.dev/docs/procedure.md)
+- https://orpc.dev/llms.txt : index of every page with descriptions
+- https://orpc.dev/llms-full.txt : the entire docs in one file (large; prefer single pages)
+- Append `.md` to any docs URL for that page's exact source markdown (for example https://orpc.dev/docs/procedure.md)
 
-Doc map, all under `https://v2.orpc.dev/docs/`:
+Doc map, all under `https://orpc.dev/docs/`:
 
 - Top level: `procedure`, `router`, `middleware`, `context`, `error-handling`, `metadata`, plus `binary-data` (file uploads) and `async-iterator-object` (streaming/SSE)
 - `rpc/*`, `openapi/*`: protocol details, handlers, links; `contract/*`: contract-first (the `orpc-contract` skill)
 - `client/*`: server- and client-side clients, error handling, `DynamicLink`
-- `adapters/*`: per-runtime serving quirks (fetch-api, node-http, aws-lambda, fastify, websocket, message-port, react-native)
+- `adapters/*`: per-runtime serving quirks (fetch-api, node-http, aws-lambda, fastify, websocket, message-port, expo)
 - `plugins/*`: twenty handler/link plugins; `helpers/*`: cookie, encryption, form-data, publisher, ratelimit, signing, base64url
-- `integrations/*`: framework glue; `best-practices/*` and `advanced/*`: guidance (testing, SSR, scaling, validation)
+- `integrations/*`: framework glue; `recipes/*`: guidance (testing, SSR, monorepos, validation)
 - `migrations/from-v1`, `migrations/from-trpc`: upgrades (use the `orpc-migrate` skill)

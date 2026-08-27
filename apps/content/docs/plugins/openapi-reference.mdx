@@ -83,6 +83,21 @@ npm install swagger-ui @types/swagger-ui
 You can also load custom assets for the docs UI by setting `providerScriptUrl` and `providerCssUrl`.
 :::
 
+## Restricting Access
+
+By default, the docs UI and OpenAPI specification are publicly accessible. Use `allow` to serve them conditionally. When it resolves to `false`, the request falls through as unmatched, as if the plugin were not installed.
+
+```ts
+const handler = new OpenAPIHandler(router, {
+  plugins: [
+    new OpenAPIReferenceHandlerPlugin({
+      spec: () => generator.generate(router),
+      allow: async ({ context }) => context.user !== undefined,
+    }),
+  ]
+})
+```
+
 ## Learn More
 
 For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/openapi/src/plugins/openapi-reference.ts).

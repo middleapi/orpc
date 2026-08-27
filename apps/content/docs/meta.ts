@@ -3,7 +3,9 @@ import { defineMeta } from 'blume'
 export default defineMeta({
   pages: [
     'getting-started',
+    'contract-first',
     'comparison',
+    'requirements',
     'ecosystem',
     'playgrounds',
     'api-reference',
@@ -23,8 +25,7 @@ export default defineMeta({
     'plugins',
     'helpers',
     'integrations',
-    'best-practices',
-    'advanced',
+    'recipes',
     'migrations',
   ],
 })

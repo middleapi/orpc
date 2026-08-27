@@ -1,0 +1,40 @@
+---
+title: "Prototype Pollution Protection Plugin"
+description: "Use PrototypePollutionProtectionHandlerPlugin to reject request input carrying __proto__ or constructor.prototype keys before it reaches your procedures."
+sidebar:
+  label: "Prototype Pollution Protection"
+---
+
+## How It Works
+
+Prototype pollution happens when attacker-controlled keys such as `__proto__` end up assigned onto `Object.prototype`, changing the behavior of every object in the process. oRPC's own decoding never assigns through the prototype chain, so the risk appears later, when your code passes the decoded input to something that merges, clones, or path-sets it, such as a vulnerable `merge` or `set` utility.
+
+The plugin closes that gap by inspecting the decoded input of every matched request and rejecting it with a `400` when either appears:
+
+- an own `__proto__` key on an object
+- an own `constructor` key holding a `prototype` key, the same rule [secure-json-parse](https://github.com/fastify/secure-json-parse) enforces for Fastify
+
+The walk covers everything the built-in codecs can decode: plain objects, arrays, and `Map`/`Set` keys and values, at any depth. An [AsyncIteratorObject](/docs/async-iterator-object) input is checked value by value as it arrives, and a polluting value fails that iteration with the same error. A lone `constructor` or `prototype` key stays allowed, since either alone cannot pollute and both are common in real data. Because the check runs on the decoded input, it applies to any handler and content type: JSON and query data in [RPCHandler](/docs/rpc/handler), plus form data and [bracket notation](/docs/openapi/bracket-notation) in [OpenAPIHandler](/docs/openapi/handler).
+
+## Setup
+
+```ts twoslash
+import { RPCHandler } from '@orpc/server/fetch'
+import { router } from './shared/planet'
+// ---cut---
+import { PrototypePollutionProtectionHandlerPlugin } from '@orpc/server/plugins'
+
+const handler = new RPCHandler(router, {
+  plugins: [
+    new PrototypePollutionProtectionHandlerPlugin(),
+  ],
+})
+```
+
+:::info
+The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
+:::
+
+## Learn More
+
+Learn more about the attack this plugin prevents on [MDN](https://developer.mozilla.org/en-US/docs/Web/Security/Attacks/Prototype_pollution) and in the [OWASP Prototype Pollution Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Prototype_Pollution_Prevention_Cheat_Sheet.html). For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/prototype-pollution-protection.ts).

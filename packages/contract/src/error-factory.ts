@@ -4,7 +4,7 @@ import type { ErrorMap, ErrorMapItem } from './error'
 import type { AnySchema, InferSchemaInput, Schema } from './schema'
 
 import { ORPCError } from '@orpc/client'
-import { resolveMaybeOptionalOptions } from '@orpc/shared'
+import { getOwn, resolveMaybeOptionalOptions } from '@orpc/shared'
 import { ValidationError } from './error'
 import { type } from './schema-utils'
 
@@ -162,7 +162,7 @@ export function createORPCErrorConstructorMap<T extends ErrorMap>(errorMap: T): 
 
       const item: ORPCErrorConstructorMapItem<string, unknown> = (...rest) => {
         const options = resolveMaybeOptionalOptions(rest)
-        const config = errorMap[code]
+        const config = getOwn(errorMap as ErrorMap, code)
 
         const error = new ORPCError(code, {
           message: options.message ?? config?.message,

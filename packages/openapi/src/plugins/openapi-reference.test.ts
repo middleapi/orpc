@@ -119,6 +119,44 @@ describe('openAPIReferenceHandlerPlugin', () => {
     expect(spec).not.toHaveBeenCalled()
   })
 
+  it('returns the unmatched result when allow resolves to false', async () => {
+    const spec = vi.fn().mockResolvedValue(createSpec())
+    const allow = vi.fn().mockResolvedValue(false)
+    const plugin = new OpenAPIReferenceHandlerPlugin({ spec, allow })
+    const { interceptor } = getInterceptor(plugin)
+    const nextResult = { matched: false as const }
+
+    for (const url of ['/', '/spec.json'] as const) {
+      const { result } = await invoke(interceptor, { url, nextResult })
+
+      expect(result).toBe(nextResult)
+    }
+
+    expect(allow).toHaveBeenCalledTimes(2)
+    expect(allow).toHaveBeenCalledWith(expect.objectContaining({
+      context: {},
+      request: expect.objectContaining({ url: '/spec.json' }),
+    }))
+    expect(spec).not.toHaveBeenCalled()
+  })
+
+  it('serves normally when allow resolves to true, without calling it for unrelated paths', async () => {
+    const spec = vi.fn().mockResolvedValue(createSpec())
+    const allow = vi.fn().mockResolvedValue(true)
+    const plugin = new OpenAPIReferenceHandlerPlugin({ spec, allow })
+    const { interceptor } = getInterceptor(plugin)
+
+    await invoke(interceptor, { url: '/not-found' })
+
+    expect(allow).not.toHaveBeenCalled()
+
+    const { result } = await invoke(interceptor, { url: '/spec.json' })
+
+    expect(allow).toHaveBeenCalledOnce()
+    expect(result.matched).toBe(true)
+    expect(result.response?.status).toBe(200)
+  })
+
   it('serves the OpenAPI spec file from a custom spec path with a runtime prefix', async () => {
     const specDocument = createSpec('Generated API')
     const spec = vi.fn().mockResolvedValue(specDocument)

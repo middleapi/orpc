@@ -1,5 +1,6 @@
 import type { AnyORPCError, ORPCErrorCode } from '@orpc/server'
 import { ORPCError } from '@orpc/server'
+import { getOwn } from '@orpc/shared'
 import { Effect, Function } from 'effect'
 
 /**
@@ -144,8 +145,8 @@ export const catchORPCErrorCodes: {
     cases: Record<string, ((error: AnyORPCError) => Effect.Effect<any, any, any>) | undefined>,
   ) => self.pipe(
     Effect.catchIf(
-      (error): error is AnyORPCError => error instanceof ORPCError && typeof cases[error.code] === 'function',
-      error => cases[error.code]!(error),
+      (error): error is AnyORPCError => error instanceof ORPCError && typeof getOwn(cases, error.code) === 'function',
+      error => getOwn(cases, error.code)!(error),
     ),
   ),
 )

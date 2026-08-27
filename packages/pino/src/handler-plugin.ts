@@ -37,6 +37,16 @@ export interface PinoHandlerPluginOptions<T extends Context> {
    * @default false
    */
   logAbort?: boolean
+
+  /**
+   * Customizes the log level for errors thrown from procedures;
+   * internal handler failures are always logged at error level.
+   * Receives the level applied by default; return it to keep the default behavior:
+   * 'info' for abort errors, 'warn' for ORPCError except INTERNAL_SERVER_ERROR, 'error' otherwise.
+   *
+   * @default (error, level) => level
+   */
+  procedureErrorLevel?: (error: unknown, level: pino.Level) => pino.Level
 }
 
 /**
@@ -60,6 +70,7 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
   private readonly generateRequestId: Exclude<PinoHandlerPluginOptions<T>['generateRequestId'], undefined>
   private readonly logLifecycle: Exclude<PinoHandlerPluginOptions<T>['logLifecycle'], undefined>
   private readonly logAbort: Exclude<PinoHandlerPluginOptions<T>['logAbort'], undefined>
+  private readonly procedureErrorLevel: Exclude<PinoHandlerPluginOptions<T>['procedureErrorLevel'], undefined>
 
   constructor(
     options: PinoHandlerPluginOptions<T> = {},
@@ -69,6 +80,7 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
       ?? (({ request }) => flattenStandardHeader(request.headers['x-request-id']) ?? crypto.randomUUID())
     this.logLifecycle = options.logLifecycle ?? false
     this.logAbort = options.logAbort ?? false
+    this.procedureErrorLevel = options.procedureErrorLevel ?? ((_, level) => level)
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
@@ -159,7 +171,7 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
         return await next()
       }
       catch (error) {
-        logBusinessLogicError(logger, error)
+        logProcedureError(logger, error, this.procedureErrorLevel)
         throw error
       }
     }
@@ -174,7 +186,7 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
          */
         return override(output, wrapAsyncIteratorPreservingEventMeta(output, {
           onError: (error) => {
-            logBusinessLogicError(getLogger(context), error)
+            logProcedureError(getLogger(context), error, this.procedureErrorLevel)
           },
         }))
       }
@@ -186,7 +198,7 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
          */
         return override(output, wrapReadableStream(output, {
           onError: (error) => {
-            logBusinessLogicError(getLogger(context), error)
+            logProcedureError(getLogger(context), error, this.procedureErrorLevel)
           },
         }))
       }
@@ -212,19 +224,29 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
   }
 }
 
-function logBusinessLogicError(logger: Logger | undefined, error: unknown) {
+function logProcedureError(
+  logger: Logger | undefined,
+  error: unknown,
+  procedureErrorLevel: Exclude<PinoHandlerPluginOptions<any>['procedureErrorLevel'], undefined>,
+) {
+  logger?.[procedureErrorLevel(error, defaultProcedureErrorLevel(error))](error)
+}
+
+function defaultProcedureErrorLevel(error: unknown): pino.Level {
   // An abort means the client withdrew the request, not that something failed,
   // so record it as normal operation.
   if (isAbortError(error)) {
-    logger?.info(error)
+    return 'info'
   }
+
   // A thrown ORPCError is a deliberate business rejection delivered to the client,
-  // so keep it reviewable without treating it as a failure.
-  else if (error instanceof ORPCError) {
-    logger?.warn(error)
+  // so keep it reviewable without treating it as a failure. INTERNAL_SERVER_ERROR
+  // is the exception: it signals a server-side failure (oRPC itself throws it for
+  // failures like output validation), so it stays at error level along with
+  // anything unexpected.
+  if (error instanceof ORPCError && error.code !== 'INTERNAL_SERVER_ERROR') {
+    return 'warn'
   }
-  // Anything else is unexpected and stays at error level.
-  else {
-    logger?.error(error)
-  }
+
+  return 'error'
 }

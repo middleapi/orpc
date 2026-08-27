@@ -1,9 +1,13 @@
 {
   "name": "@orpc/contract",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.31",
+  "description": "Define typesafe API contracts as the single source of truth for oRPC, powered by Standard Schema",
   "license": "MIT",
-  "funding": "https://github.com/sponsors/dinwwwh",
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
+  ],
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
@@ -11,7 +15,15 @@
     "directory": "packages/contract"
   },
   "keywords": [
-    "orpc"
+    "orpc",
+    "rpc",
+    "api",
+    "typescript",
+    "typesafe",
+    "contract",
+    "contract-first",
+    "standard-schema",
+    "openapi"
   ],
   "sideEffects": false,
   "publishConfig": {

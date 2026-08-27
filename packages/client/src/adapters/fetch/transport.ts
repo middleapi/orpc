@@ -56,7 +56,7 @@ export interface FetchLinkTransportOptions<T extends ClientContext> {
   /**
    * Override the default fetch implementation.
    *
-   * @default globalThis.fetch.bind(globalThis)
+   * @default (url, init) => globalThis.fetch(url, init)
    */
   fetch?(url: string, init: RequestInit, options: ClientOptions<T>, path: string[]): Promise<Response>
 
@@ -78,7 +78,9 @@ export class FetchLinkTransport<T extends ClientContext> implements StandardLink
     options = new CompositeFetchLinkTransportPlugin(options.plugins).initFetchLinkTransportOptions(options)
 
     this.origin = options.origin
-    this.fetch = options.fetch ?? globalThis.fetch.bind(globalThis)
+    // Resolve `globalThis.fetch` lazily so interception tools (msw, undici MockAgent, etc.)
+    // that patch it after this transport is constructed still take effect.
+    this.fetch = options.fetch ?? ((url, init) => (globalThis.fetch)(url, init))
     this.toFetchRequestOptions = options.toFetchRequest
     this.fetchInterceptors = options.fetchInterceptors
   }

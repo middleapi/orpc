@@ -92,7 +92,7 @@ const apiClient: JsonifiedClient<RouterContractClient<typeof contract>> = create
 - `JsonifiedClient` is required over `OpenAPILink` because OpenAPI serialization is one-way (a `Date` returns as a string); dropping it via Smart Coercion, plus `OpenAPILink` options and CORS caveats, are in the `orpc-openapi` skill.
 - Per-call client context is the second type parameter, `RouterContractClient<typeof contract, ClientContext>`, then `client.planet.find(input, { context: { token } })`; link options like `headers` accept functions of that context.
 - Export `RouterContractClient<typeof contract>` as a type from the server package so clients never import the contract module itself (still needed as a runtime value for `OpenAPILink`; ship the minified JSON below).
-- In very large codebases, skip the root client: pin each procedure with `.meta(meta.path([...]))` and build per-procedure clients with `createContractClientFactory` from `@orpc/contract` (`createContractJsonifiedClientFactory` from `@orpc/openapi` when the link needs `JsonifiedClient`); fetch `advanced/scaling-large-projects` before adopting it.
+- In very large codebases, skip the root client: pin each procedure with `.meta(meta.path([...]))` and build per-procedure clients with `createContractClientFactory` from `@orpc/contract` (`createContractJsonifiedClientFactory` from `@orpc/openapi` when the link needs `JsonifiedClient`); fetch `contract/client-factory` before adopting it.
 
 ## Ship the contract
 
@@ -126,7 +126,7 @@ export function createMyApi(apiKey: string): RouterContractClient<typeof contrac
 }
 ```
 
-Bundle with `tsdown --dts src/index.ts`, point `exports` at `dist` types plus import entries, list `@orpc/client` and `@orpc/contract` as dependencies, and publish. Consumers get a fully typed client that works with every oRPC client integration (TanStack Query included). Fetch `advanced/publish-client-to-npm` for the complete `package.json`.
+Bundle with `tsdown --dts src/index.ts`, point `exports` at `dist` types plus import entries, list `@orpc/client` and `@orpc/contract` as dependencies, and publish. Consumers get a fully typed client that works with every oRPC client integration (TanStack Query included). Fetch `recipes/publish-client-to-npm` for the complete `package.json`.
 
 ## Generate the contract from an existing OpenAPI spec
 
@@ -146,14 +146,14 @@ Then run `npx @hey-api/openapi-ts`. It writes `orpc.gen.ts` (one procedure contr
 
 ## Full documentation
 
-If this skill and a fetched docs page disagree, trust the page: this skill is a summary and v2 is still moving. While v2 is in beta the docs are served at https://v2.orpc.dev:
+If this skill and a fetched docs page disagree, trust the page: this skill is a summary and v2 is still moving. The docs are served at https://orpc.dev (the v1 docs stay at https://v1.orpc.dev):
 
-- https://v2.orpc.dev/llms.txt : index of every page with descriptions (links inside print the orpc.dev domain; swap in v2.orpc.dev before fetching)
-- https://v2.orpc.dev/llms-full.txt : the entire docs in one file (large; prefer single pages)
-- Append `.md` to any docs URL for that page's exact source markdown (for example https://v2.orpc.dev/docs/contract/procedure.md)
+- https://orpc.dev/llms.txt : index of every page with descriptions
+- https://orpc.dev/llms-full.txt : the entire docs in one file (large; prefer single pages)
+- Append `.md` to any docs URL for that page's exact source markdown (for example https://orpc.dev/docs/contract/procedure.md)
 
 Pages to fetch when you need details beyond this skill:
 
 - Contract: `contract/procedure`, `contract/router`, `contract/implementation`, `contract/generate-from-openapi`
 - Clients: `client/client-side`, `client/server-side`, `client/error-handling`, `openapi/link`
-- Workflows: `advanced/publish-client-to-npm`, `advanced/scaling-large-projects`, `best-practices/monorepo-setup`
+- Workflows: `recipes/publish-client-to-npm`, `contract/client-factory`, `recipes/monorepo-setup`

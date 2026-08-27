@@ -5,7 +5,7 @@ import type { JsonSchemaConverter } from './convert'
 import type { JsonSchema } from './types'
 import { cloneORPCError, ORPCError } from '@orpc/client'
 import { getProcedureContractOrThrow } from '@orpc/contract'
-import { toArray } from '@orpc/shared'
+import { getOwn, toArray } from '@orpc/shared'
 import { JsonSchemaCoercer } from './coercer'
 import { DelegatingJsonSchemaConverter } from './convert'
 import { StandardJsonSchemaConverter } from './standard-json-schema-converter'
@@ -68,7 +68,7 @@ export class SmartCoercionLinkPlugin<T extends ClientContext> implements Standar
             }
 
             const errorMap: ErrorMap = procedure['~orpc'].errorMap
-            const dataSchema = errorMap[error.code]?.data
+            const dataSchema = getOwn(errorMap, error.code)?.data
 
             if (!dataSchema) {
               throw error

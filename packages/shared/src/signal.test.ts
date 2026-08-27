@@ -71,19 +71,26 @@ describe('anyAbortSignal', () => {
   })
 
   describe.each([
-    { native: true, description: 'built-in AbortSignal.any' },
-    { native: false, description: 'fallback implementation' },
-  ])('with $description', ({ native }) => {
+    { mode: 'native', description: 'built-in AbortSignal.any' },
+    { mode: 'without-any', description: 'fallback implementation' },
+    { mode: 'without-global', description: 'fallback implementation without the AbortSignal global' },
+  ] as const)('with $description', ({ mode }) => {
     const originalAny = AbortSignal.any
 
     beforeEach(() => {
-      if (!native) {
+      if (mode === 'without-any') {
         // @ts-expect-error simulate runtimes without AbortSignal.any support
         AbortSignal.any = undefined
+      }
+
+      if (mode === 'without-global') {
+        // simulate runtimes without the AbortSignal global, such as bare React Native
+        vi.stubGlobal('AbortSignal', undefined)
       }
     })
 
     afterEach(() => {
+      vi.unstubAllGlobals()
       AbortSignal.any = originalAny
     })
 

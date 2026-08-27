@@ -280,4 +280,11 @@ describe('reconcileORPCError', () => {
       expect(validated.inferable).toBe(true)
     })
   })
+
+  it('does not resolve error codes through Object.prototype', async () => {
+    const error = new ORPCError('toString', { message: 'm', data: 'd' })
+    ;(error.defined as any) = true
+
+    expect((await reconcileORPCError({}, error)).defined).toBe(false)
+  })
 })

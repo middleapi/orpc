@@ -15,6 +15,7 @@ const columns: { title: string, links: FooterLink[] }[] = [
     title: 'Documentation',
     links: [
       { label: 'Getting started', href: '/docs/getting-started' },
+      { label: 'Contract-first', href: '/docs/contract-first' },
       { label: 'OpenAPI', href: '/docs/openapi/handler' },
       { label: 'Error handling', href: '/docs/error-handling' },
       { label: 'Migrate from tRPC', href: '/docs/migrations/from-trpc' },
@@ -25,6 +26,7 @@ const columns: { title: string, links: FooterLink[] }[] = [
     title: 'Ecosystem',
     links: [
       { label: 'TanStack Query', href: '/docs/integrations/tanstack-query' },
+      { label: 'AI SDK', href: '/docs/integrations/ai-sdk' },
       { label: 'NestJS', href: '/docs/integrations/nest' },
       { label: 'Adapters', href: '/docs/adapters/fetch-api' },
       { label: 'Plugins', href: '/docs/plugins/cors' },
@@ -37,7 +39,8 @@ const columns: { title: string, links: FooterLink[] }[] = [
       { label: 'Playgrounds', href: '/docs/playgrounds' },
       { label: 'Comparison', href: '/docs/comparison' },
       { label: 'Blog', href: '/blog' },
-      { label: 'Changelog', href: '/changelog' },
+      { label: 'LLM context', href: '/llms.txt', external: true },
+      { label: 'Releases', href: 'https://github.com/middleapi/orpc/releases' },
       { label: 'V1 documentation', href: 'https://v1.orpc.dev' },
     ],
   },
@@ -45,12 +48,11 @@ const columns: { title: string, links: FooterLink[] }[] = [
     title: 'Community',
     links: [
       { label: 'GitHub', href: 'https://github.com/middleapi/orpc' },
-      { label: 'Discord', href: 'https://discord.gg/TXEbwRBvQn' },
       { label: 'Discussions', href: 'https://github.com/middleapi/orpc/discussions' },
-      { label: 'Sponsors', href: 'https://github.com/sponsors/dinwwwh' },
-      // Same-origin but not a page: leaving the site for a raw text dump in the
-      // current tab is a dead end, so it opens in a new one like the rest.
-      { label: 'LLM context', href: '/llms.txt', external: true },
+      { label: 'Discord', href: 'https://discord.gg/TXEbwRBvQn' },
+      { label: 'X', href: 'https://x.com/middleapi' },
+      { label: 'GitHub Sponsors', href: 'https://github.com/sponsors/dinwwwh' },
+      { label: 'Open Collective', href: 'https://opencollective.com/middleapi' },
     ],
   },
 ]

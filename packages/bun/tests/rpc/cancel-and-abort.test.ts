@@ -38,8 +38,7 @@ describe.each([
     expect(handler.mock.calls[0]![0].signal.aborted).toBe(true)
   })
 
-  // TODO: https://github.com/oven-sh/bun/issues/33227
-  it.skipIf(adapter === 'bun-fetch' || adapter === 'compression-bun-fetch')('server should cancel AsyncIteratorObject response and abort request when client cancels', async () => {
+  it('server should cancel AsyncIteratorObject response and abort request when client cancels', async () => {
     const cancel = vi.fn()
     handler.mockResolvedValueOnce(new AsyncIteratorClass(
       async () => {
@@ -62,7 +61,8 @@ describe.each([
     await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true })
   })
 
-  // TODO: https://github.com/oven-sh/bun/issues/33227
+  // TODO: https://github.com/oven-sh/bun/issues/33227 is fixed for async iterator (SSE) responses in Bun 1.4,
+  // but cancelling an octet stream response still does not abort the request on the server
   it.skipIf(adapter === 'bun-fetch' || adapter === 'compression-bun-fetch')('server should cancel octet stream response and abort request when client cancels', async () => {
     const cancel = vi.fn()
     handler.mockResolvedValueOnce(new ReadableStream({

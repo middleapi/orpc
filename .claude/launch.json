@@ -6,6 +6,12 @@
       "runtimeExecutable": "env",
       "runtimeArgs": ["NODE_OPTIONS=--max-old-space-size=8192", "pnpm", "--filter", "@orpc/content", "dev"],
       "port": 4321
+    },
+    {
+      "name": "next-playground",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@orpc/next-playground", "dev"],
+      "port": 3000
     }
   ]
 }

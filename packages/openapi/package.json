@@ -1,9 +1,13 @@
 {
   "name": "@orpc/openapi",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.31",
+  "description": "Generate OpenAPI specs from oRPC routers and serve OpenAPI-compliant APIs with end-to-end type safety",
   "license": "MIT",
-  "funding": "https://github.com/sponsors/dinwwwh",
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
+  ],
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
@@ -12,7 +16,15 @@
   },
   "keywords": [
     "orpc",
-    "openapi"
+    "rpc",
+    "api",
+    "typescript",
+    "typesafe",
+    "openapi",
+    "swagger",
+    "scalar",
+    "json-schema",
+    "rest"
   ],
   "sideEffects": [
     "./dist/extensions/route.mjs"
@@ -92,9 +104,15 @@
     "swagger-ui": ">=5.32.6"
   },
   "peerDependenciesMeta": {
-    "@scalar/api-reference": { "optional": true },
-    "@types/swagger-ui": { "optional": true },
-    "swagger-ui": { "optional": true }
+    "@scalar/api-reference": {
+      "optional": true
+    },
+    "@types/swagger-ui": {
+      "optional": true
+    },
+    "swagger-ui": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@hey-api/spec-types": "0.0.0-next-20260408030107",
@@ -103,16 +121,16 @@
     "@orpc/json-schema": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standardserver/core": "^0.8.0",
-    "@standardserver/fetch": "^0.8.0",
+    "@standardserver/core": "^0.8.2",
+    "@standardserver/fetch": "^0.8.2",
     "rou3": "^0.9.1"
   },
   "devDependencies": {
-    "@scalar/api-reference": "^1.64.1",
-    "@standardserver/aws-lambda": "^0.8.0",
+    "@scalar/api-reference": "^1.65.1",
+    "@standardserver/aws-lambda": "^0.8.2",
     "@types/swagger-ui": "^5.32.0",
-    "fastify": "^5.11.3",
-    "swagger-ui": "^5.32.13",
+    "fastify": "^5.12.1",
+    "swagger-ui": "^5.32.14",
     "zod": "^4.4.3"
   }
 }

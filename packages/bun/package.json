@@ -1,15 +1,27 @@
 {
   "name": "@orpc/bun",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.31",
+  "description": "Bun integration for oRPC: Redis-backed pub/sub and rate limiting using Bun's built-in Redis client",
   "license": "MIT",
-  "funding": "https://github.com/sponsors/dinwwwh",
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
+  ],
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/bun"
   },
+  "keywords": [
+    "orpc",
+    "bun",
+    "redis",
+    "pubsub",
+    "ratelimit",
+    "typescript"
+  ],
   "sideEffects": false,
   "publishConfig": {
     "exports": {
@@ -40,7 +52,7 @@
     "@orpc/ratelimit": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standardserver/core": "^0.8.0"
+    "@standardserver/core": "^0.8.2"
   },
   "devDependencies": {
     "@types/bun": "^1.3.14",

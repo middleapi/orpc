@@ -11,6 +11,87 @@ import { decodeJsonPointerSegment, encodeJsonPointerSegment, hoistRecursiveRefTo
 import { ensureJsonSchemaObject, isJsonArraySchema } from './utils'
 
 /**
+ * Moves a schema's `$defs` into the shared root map, renaming only the names whose bodies
+ * conflict with an already promoted def, and returns the schema body rebased onto `basePath`.
+ *
+ * Refs inside the promoted def bodies are rewritten too: they share the schema's namespace, so
+ * a rename left unapplied there would silently bind the body to another schema's defs.
+ */
+function promoteJsonSchemaDefs(
+  schema: Exclude<JsonSchema, boolean>,
+  mergedDefs: Map<string, JsonSchema>,
+  basePath: string,
+): JsonSchema {
+  const { $defs, ...rootBody } = schema
+  const renameMap = new Map<string, string>()
+
+  /**
+   * `basePath` is where `rootBody` lands in the combined document, so pointers resolved against
+   * the original root are rebased onto it, while `#/$defs/` pointers follow the promoted defs.
+   */
+  const mapRef = (ref: string): string => {
+    if (ref === '#') {
+      return basePath
+    }
+
+    if (ref.startsWith('#/$defs/')) {
+      const [encodedName, ...segments] = ref.slice('#/$defs/'.length).split('/')
+      const newName = renameMap.get(decodeJsonPointerSegment(encodedName!))
+
+      return newName === undefined
+        ? ref
+        : ['#/$defs', encodeJsonPointerSegment(newName), ...segments].join('/')
+    }
+
+    if (ref.startsWith('#/') && get(rootBody, ref.slice(2).split('/').map(decodeJsonPointerSegment)) !== undefined) {
+      return `${basePath}/${ref.slice(2)}`
+    }
+
+    return ref
+  }
+
+  const defs = Object.entries($defs ?? {}).filter(([, def]) => def !== undefined)
+
+  if (defs.length > 0) {
+    const promoted = new Map<string, JsonSchema>()
+    const reserved = new Set([...mergedDefs.keys(), ...defs.map(([name]) => name)])
+
+    /**
+     * A def body must be rewritten into the merged namespace before it can be compared for
+     * deduplication, and each rename invalidates every body pointing at the renamed def, so
+     * keep rewriting until a full pass renames nothing.
+     */
+    for (let changed = true; changed;) {
+      changed = false
+
+      for (const [name, def] of defs) {
+        const body = mapJsonSchemaRefs(def, mapRef)
+        promoted.set(name, body)
+
+        if (renameMap.has(name) || !mergedDefs.has(name) || isDeepEqual(mergedDefs.get(name), body)) {
+          continue
+        }
+
+        let counter = 2
+        while (reserved.has(`${name}${counter}`)) {
+          counter++
+        }
+
+        reserved.add(`${name}${counter}`)
+        renameMap.set(name, `${name}${counter}`)
+        changed = true
+      }
+    }
+
+    for (const [name, body] of promoted) {
+      mergedDefs.set(renameMap.get(name) ?? name, body)
+    }
+  }
+
+  return mapJsonSchemaRefs(rootBody, mapRef)
+}
+
+/**
  * Combines multiple schemas under the requested composition keyword, promoting branch `$defs` to the root.
  */
 export function combineJsonSchemasWithComposition(
@@ -21,84 +102,20 @@ export function combineJsonSchemasWithComposition(
     return schemas[0] ?? true
   }
 
-  const mergedDefs: Record<string, JsonSchema> = {}
+  const mergedDefs = new Map<string, JsonSchema>()
   const compositionBranches: JsonSchema[] = []
 
   for (let i = 0; i < schemas.length; i++) {
     const schema = schemas[i]!
 
-    if (typeof schema === 'boolean') {
-      compositionBranches.push(schema)
-      continue
-    }
-
-    const { $defs, ...rest } = schema
-    const renameMap: Record<string, string> = {}
-    const promotedNames = new Set<string>()
-
-    if ($defs) {
-      for (const [name, def] of Object.entries($defs)) {
-        if (def === undefined)
-          continue
-        promotedNames.add(name)
-
-        if (name in mergedDefs) {
-          if (isDeepEqual(mergedDefs[name], def)) {
-            continue
-          }
-
-          let counter = 2
-          let newName = `${name}${counter}`
-          while (newName in mergedDefs) {
-            counter++
-            newName = `${name}${counter}`
-          }
-          mergedDefs[newName] = def
-          renameMap[name] = newName
-        }
-        else {
-          mergedDefs[name] = def
-        }
-      }
-    }
-
-    compositionBranches.push(mapJsonSchemaRefs(
-      rest,
-      (ref) => {
-        if (ref === '#') {
-          return `#/${keyword}/${i}`
-        }
-
-        if (ref.startsWith('#/$defs/')) {
-          const afterPrefix = ref.slice('#/$defs/'.length)
-          const slashIdx = afterPrefix.indexOf('/')
-          const encodedSegment = slashIdx === -1 ? afterPrefix : afterPrefix.slice(0, slashIdx)
-          const rest = slashIdx === -1 ? '' : afterPrefix.slice(slashIdx)
-          const defName = decodeJsonPointerSegment(encodedSegment)
-
-          if (!promotedNames.has(defName)) {
-            return ref
-          }
-
-          if (defName in renameMap) {
-            return `#/$defs/${encodeJsonPointerSegment(renameMap[defName]!)}${rest}`
-          }
-
-          return ref
-        }
-
-        if (ref.startsWith('#/') && get(rest, ref.slice(2).split('/').map(decodeJsonPointerSegment)) !== undefined) {
-          return `#/${keyword}/${i}/${ref.slice(2)}`
-        }
-
-        return ref
-      },
-    ))
+    compositionBranches.push(typeof schema === 'boolean'
+      ? schema
+      : promoteJsonSchemaDefs(schema, mergedDefs, `#/${keyword}/${i}`))
   }
 
   const result: Exclude<JsonSchema, boolean> = { [keyword]: compositionBranches }
-  if (Object.keys(mergedDefs).length > 0) {
-    result.$defs = mergedDefs
+  if (mergedDefs.size > 0) {
+    result.$defs = Object.fromEntries(mergedDefs)
   }
 
   return result
@@ -110,96 +127,31 @@ export type JsonObjectSchemaEntry = [name: string, schema: JsonSchema, optional:
  * Combines object property entries back into a single object schema.
  */
 export function combineJsonObjectSchemaEntries(entries: JsonObjectSchemaEntry[]): JsonObjectSchema {
-  const properties: Record<string, JsonSchema> = {}
+  const properties = new Map<string, JsonSchema>()
   const required: string[] = []
-  const mergedDefs: Record<string, JsonSchema> = {}
+  const mergedDefs = new Map<string, JsonSchema>()
 
   for (const [name, propertySchema, optional] of entries) {
     if (!optional) {
       required.push(name)
     }
 
-    if (typeof propertySchema === 'boolean') {
-      properties[name] = propertySchema
-      continue
-    }
-
-    const { $defs, ...rest } = propertySchema
-    const renameMap: Record<string, string> = {}
-    const promotedNames = new Set<string>()
-
-    if ($defs) {
-      for (const [defName, def] of Object.entries($defs)) {
-        if (def === undefined) {
-          continue
-        }
-
-        promotedNames.add(defName)
-
-        if (defName in mergedDefs) {
-          if (isDeepEqual(mergedDefs[defName], def)) {
-            continue
-          }
-
-          let counter = 2
-          let newName = `${defName}${counter}`
-          while (newName in mergedDefs) {
-            counter++
-            newName = `${defName}${counter}`
-          }
-
-          mergedDefs[newName] = def
-          renameMap[defName] = newName
-        }
-        else {
-          mergedDefs[defName] = def
-        }
-      }
-    }
-
-    const propertyPathPrefix = `#/properties/${encodeJsonPointerSegment(name)}`
-    properties[name] = mapJsonSchemaRefs(rest, (ref) => {
-      if (ref.startsWith('#/$defs/')) {
-        const afterPrefix = ref.slice('#/$defs/'.length)
-        const slashIdx = afterPrefix.indexOf('/')
-        const encodedSegment = slashIdx === -1 ? afterPrefix : afterPrefix.slice(0, slashIdx)
-        const refRest = slashIdx === -1 ? '' : afterPrefix.slice(slashIdx)
-        const defName = decodeJsonPointerSegment(encodedSegment)
-
-        if (!promotedNames.has(defName)) {
-          return ref
-        }
-
-        if (defName in renameMap) {
-          return `#/$defs/${encodeJsonPointerSegment(renameMap[defName]!)}${refRest}`
-        }
-
-        return ref
-      }
-
-      if (ref === '#') {
-        return propertyPathPrefix
-      }
-
-      if (ref.startsWith('#/') && get(rest, ref.slice(2).split('/').map(decodeJsonPointerSegment)) !== undefined) {
-        return `${propertyPathPrefix}/${ref.slice(2)}`
-      }
-
-      return ref
-    })
+    properties.set(name, typeof propertySchema === 'boolean'
+      ? propertySchema
+      : promoteJsonSchemaDefs(propertySchema, mergedDefs, `#/properties/${encodeJsonPointerSegment(name)}`))
   }
 
   const schema: JsonObjectSchema = {
     type: 'object',
-    properties,
+    properties: Object.fromEntries(properties),
   }
 
   if (required.length > 0) {
     schema.required = required
   }
 
-  if (Object.keys(mergedDefs).length > 0) {
-    schema.$defs = mergedDefs
+  if (mergedDefs.size > 0) {
+    schema.$defs = Object.fromEntries(mergedDefs)
   }
 
   return schema
@@ -380,7 +332,7 @@ function flattenJsonUnionSchemaInternal(
     const resolved = resolveJsonSchemaRootLocalRef(schema)
 
     if (resolved !== schema) {
-      const result = flattenJsonUnionSchemaInternal(resolved, resolvingRefs.add(schema.$ref))
+      const result = flattenJsonUnionSchemaInternal(resolved, new Set(resolvingRefs).add(schema.$ref))
       if (result.length > 1) {
         return result
       }

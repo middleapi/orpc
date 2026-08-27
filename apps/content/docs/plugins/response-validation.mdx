@@ -43,7 +43,7 @@ This plugin reconciles ORPC errors from other interceptors and plugins, allowing
 
 ## Custom Validation Errors
 
-If you have already [customized validation errors on the server](/docs/advanced/validation-customization#custom-validation-errors), you can use interceptors to catch and map the validation errors thrown by this plugin so they match your server-side errors.
+If you have already [customized validation errors on the server](/docs/recipes/validation-customization#custom-validation-errors), you can use interceptors to catch and map the validation errors thrown by this plugin so they match your server-side errors.
 
 ```ts
 import { ORPCError } from '@orpc/client'
@@ -76,7 +76,7 @@ const link = new RPCLink({
 
 ## Advanced Usage
 
-You can also use this plugin in guides such as [Expanding Type Support for OpenAPI Link](/docs/advanced/expanding-type-support-for-openapi-link).
+You can also use this plugin in guides such as [Expanding Type Support for OpenAPI Link](/docs/openapi/expanding-type-support-for-link).
 
 ## Learn More
 

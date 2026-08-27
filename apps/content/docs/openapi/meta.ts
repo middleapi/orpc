@@ -11,5 +11,7 @@ export default defineMeta({
     'link',
     'specification',
     'scalar',
+    'expanding-type-support-for-link',
+    'link-without-runtime-imports',
   ],
 })

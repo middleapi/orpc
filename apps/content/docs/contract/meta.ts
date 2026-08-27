@@ -6,5 +6,6 @@ export default defineMeta({
     'router',
     'implementation',
     'generate-from-openapi',
+    'client-factory',
   ],
 })

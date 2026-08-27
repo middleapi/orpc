@@ -225,6 +225,14 @@ describe('rpcHandlerCodec', () => {
       expect(serializer.serialize).toHaveBeenCalledWith(error.toJSON())
     })
 
+    it('does not resolve error codes through Object.prototype', async () => {
+      const serializer = { serialize: vi.fn(), deserialize: vi.fn() } as any
+      const codec = new RPCHandlerCodec(router, { serializer })
+      const error = new ORPCError('toString' as any)
+
+      expect((await codec.encodeError(error, procedure as any, ['ping'], options as any)).status).toEqual(DEFAULT_ERROR_STATUS)
+    })
+
     it('custom status with errorStatusCodes option', () => {
       const serializer = {
         serialize: vi.fn()

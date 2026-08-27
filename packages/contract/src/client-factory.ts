@@ -30,7 +30,7 @@ export interface ContractClientFactoryOptions<
  * @remarks
  * **Warning**: Every procedure contract passed to the factory must define `meta.path` matching its location in the root contract.
  *
- * @see {@link https://orpc.dev/docs/advanced/scaling-large-projects#contract-client-factory | Scaling Large Projects - Contract Client Factory}
+ * @see {@link https://orpc.dev/docs/contract/client-factory | Contract Client Factory}
  */
 export function createContractClientFactory<
   TClientContext extends ClientContext,

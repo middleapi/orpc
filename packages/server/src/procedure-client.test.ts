@@ -369,7 +369,7 @@ describe('createProcedureClient', () => {
       expect(mid3).toHaveBeenCalledTimes(1)
       expect(mid3).toHaveBeenCalledAfter(mid2)
       expect(mid3).toHaveBeenCalledWith(
-        expect.objectContaining({ }),
+        expect.objectContaining({}),
         'inputSchema3__inputSchema2__inputSchema1__INPUT',
         expect.any(Function),
       )
@@ -622,11 +622,43 @@ describe('createProcedureClient', () => {
         .resolves
         .toEqual({ parent: 'parent__PARENT', child: 'child__CHILD' })
 
-      // Middlewares receive the full input with the validated fragments merged over
-      // it, instead of only the parts validated up to their position.
       expect(rootMid).toHaveBeenCalledWith(expect.any(Object), { parent: 'PARENT', child: 'CHILD', unknown: 'UNKNOWN' }, expect.any(Function))
       expect(parentMid).toHaveBeenCalledWith(expect.any(Object), { parent: 'parent__PARENT', child: 'CHILD', unknown: 'UNKNOWN' }, expect.any(Function))
-      expect(childMid).toHaveBeenCalledWith(expect.any(Object), { parent: 'parent__PARENT', child: 'child__CHILD', unknown: 'UNKNOWN' }, expect.any(Function))
+      expect(childMid).toHaveBeenCalledWith(expect.any(Object), { parent: 'parent__PARENT', child: 'child__CHILD' }, expect.any(Function))
+    })
+
+    it('gives middleware between schemas the not-yet-validated rest of the input, validated fields win', async () => {
+      const beforeMid = vi.fn(({ next }, _input: unknown) => next())
+      const betweenMid = vi.fn(({ next }) => next())
+      const afterMid = vi.fn(({ next }) => next())
+
+      const procedure = os
+        .use(beforeMid)
+        .input(z.object({ params: z.object({ id: z.string().transform(value => `id__${value}`) }) }))
+        .use(betweenMid)
+        .input(z.object({ params: z.object({ slug: z.string() }), page: z.coerce.number() }))
+        .use(afterMid)
+        .handler(({ input }) => input)
+
+      const client = createProcedureClient(procedure)
+
+      const rawInput: any = { params: { id: 'ID', slug: 'SLUG', unknown: 'UNKNOWN' }, page: '2', unknown: 'UNKNOWN' }
+
+      await expect(client(rawInput))
+        .resolves
+        .toEqual({ params: { id: 'id__ID', slug: 'SLUG' }, page: 2 })
+
+      expect(beforeMid.mock.calls[0]![1]).toBe(rawInput)
+      expect(betweenMid).toHaveBeenCalledWith(
+        expect.any(Object),
+        { params: { id: 'id__ID', slug: 'SLUG', unknown: 'UNKNOWN' }, page: '2', unknown: 'UNKNOWN' },
+        expect.any(Function),
+      )
+      expect(afterMid).toHaveBeenCalledWith(
+        expect.any(Object),
+        { params: { id: 'id__ID', slug: 'SLUG' }, page: 2 },
+        expect.any(Function),
+      )
     })
 
     it('composes fragments nested one level deep', async () => {

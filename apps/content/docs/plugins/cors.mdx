@@ -16,7 +16,7 @@ import { CORSHandlerPlugin } from '@orpc/server/plugins'
 const handler = new RPCHandler(router, {
   plugins: [
     new CORSHandlerPlugin({
-      origin: (origin, options) => origin,
+      origin: ['https://app.example.com', 'https://admin.example.com'],
       allowMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH', 'QUERY'],
       // ...
     }),
@@ -27,6 +27,24 @@ const handler = new RPCHandler(router, {
 :::info
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
 :::
+
+:::warning
+By default, `origin` is `*`, which allows any origin. The wildcard is rejected by browsers for [credentialed requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS#requests_with_credentials), so list your allowed origins explicitly when you enable `credentials`.
+:::
+
+## Dynamic Origin
+
+The `origin` and `timingOrigin` options also accept a function (optionally async) that receives the request origin and the interceptor options, including the [handler context](/docs/context). This lets you resolve the allowed origin per request:
+
+```ts
+const handler = new RPCHandler(router, {
+  plugins: [
+    new CORSHandlerPlugin({
+      origin: async (origin, { context }) => context.tenant ? origin : null,
+    }),
+  ],
+})
+```
 
 :::warning
 To better support `Blob`, `File`, and `ReadableStream<Uint8Array>` at the root level in cross-origin scenarios,

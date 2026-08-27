@@ -139,15 +139,19 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
   }, { timeout: 20_000 })
 
   it('rethrows non-NOSCRIPT client errors', async () => {
-    const disconnectedRedis = new RedisClient('rediss://invalid')
-    const limiter = new BunRedisRateLimiter(disconnectedRedis, {
-      maxRequests: 3,
-      window: 10_000,
-    })
+    const limiter = await createTestingRateLimiter()
+    const errorScriptSha = await redis.send('SCRIPT', [
+      'LOAD',
+      'return redis.error_reply("something went wrong")',
+    ]) as string
+    ; (limiter as any).scriptSha = errorScriptSha
 
     await expect(
-      limiter.limit('closed-client'),
-    ).rejects.toThrow()
+      limiter.limit('non-noscript'),
+    ).rejects.toThrow('something went wrong')
+
+    // the sha must not be reset, proving the NOSCRIPT reload path was not taken
+    expect((limiter as any).scriptSha).toEqual(errorScriptSha)
   }, { timeout: 20_000 })
 
   it('rejects invalid weights', async () => {

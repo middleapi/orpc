@@ -150,10 +150,39 @@ describe('rpcLink', () => {
         method: 'POST',
         redirect: 'manual',
       }),
+    )
+  })
+
+  it('uses the current global fetch even when it is patched after link construction', async ({ onTestFinished }) => {
+    const orpc = createORPCClient(new RPCLink({
+      origin: 'http://api.example.com/',
+    })) as any
+
+    const fetchSpy = vi.fn(async () => {
+      return new Response(JSON.stringify({ json: 'pong' }), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+        },
+      })
+    })
+
+    const originalFetch = globalThis.fetch
+    ;(globalThis as any).fetch = fetchSpy
+
+    onTestFinished(() => {
+      globalThis.fetch = originalFetch
+    })
+
+    await expect(orpc.ping('input')).resolves.toEqual('pong')
+
+    expect(fetchSpy).toHaveBeenCalledOnce()
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://api.example.com/ping',
       expect.objectContaining({
-        context: {},
+        method: 'POST',
+        redirect: 'manual',
       }),
-      ['ping'],
     )
   })
 

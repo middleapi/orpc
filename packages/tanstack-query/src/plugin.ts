@@ -4,6 +4,11 @@ import type { ProcedureUtilsOptions } from './procedure-utils'
 import type { RouterUtilsOptions } from './router-utils'
 import { sortPlugins } from '@orpc/shared'
 
+/**
+ * Plugin that packages reusable defaults and interceptors for router utils.
+ *
+ * @see {@link https://orpc.dev/docs/integrations/tanstack-query#plugins | TanStack Query Integration - Plugins}
+ */
 export interface RouterUtilsPlugin<T extends AnyNestedClient> extends OrderablePlugin {
   /**
    * Initializes the router utils plugin and returns updated router utils options.

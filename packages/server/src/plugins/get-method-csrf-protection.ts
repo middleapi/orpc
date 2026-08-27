@@ -1,5 +1,6 @@
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
+import type { StandardHandlerInterceptor, StandardHandlerInterceptorOptions, StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard'
 import type { Context } from '../context'
+import { ORPCError } from '@orpc/client'
 import { toArray } from '@orpc/shared'
 import { flattenStandardHeader } from '@standardserver/core'
 
@@ -8,6 +9,8 @@ import { flattenStandardHeader } from '@standardserver/core'
  * secure as unsafe ones such as `POST`. It rejects `GET` requests arriving as top-level
  * navigations initiated cross-site or from outside the browser, the only context where
  * another site can make a browser attach `SameSite=Lax` cookies to a safe-method request.
+ * Requests matching no procedure stay unmatched, so they can fall through to whatever
+ * serves the rest of the site.
  *
  * @remarks
  * **Note**: Requests browsers send without `SameSite=Lax` cookies, such as cross-site `fetch`
@@ -20,28 +23,27 @@ import { flattenStandardHeader } from '@standardserver/core'
 export class GetMethodCsrfProtectionHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
   name = '~get-method-csrf-protection'
 
-  /** Judge the real request, before batch splits it into client-authored sub-requests. */
-  after = ['~batch']
-
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
-    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = (interceptorOptions) => {
+    /**
+     * Batch sub-requests are judged individually here, which is safe: navigations cannot
+     * carry the custom `orpc-batch` header, and the batch plugin's default `mapSubrequest`
+     * keeps the transport headers authoritative over client-authored sub-request headers.
+     */
+    const interceptor: StandardHandlerInterceptor<T> = (interceptorOptions) => {
       if (this.isAllowed(interceptorOptions)) {
         return interceptorOptions.next()
       }
 
-      return Promise.resolve({
-        matched: true,
-        response: { status: 403, headers: {}, body: 'Request blocked by CSRF protection.' },
-      })
+      throw new ORPCError('FORBIDDEN', { message: 'Request blocked by CSRF protection.' })
     }
 
     return {
       ...options,
-      routingInterceptors: [routingInterceptor, ...toArray(options.routingInterceptors)],
+      interceptors: [interceptor, ...toArray(options.interceptors)],
     }
   }
 
-  private isAllowed({ request }: StandardHandlerRoutingInterceptorOptions<T>): boolean {
+  private isAllowed({ request }: StandardHandlerInterceptorOptions<T>): boolean {
     // Navigations can only use `GET` or `POST` per the HTML spec, and `POST` is unsafe, so
     // `GET` is the only method `SameSite=Lax` cookies ride cross-site.
     if (request.method !== 'GET') {

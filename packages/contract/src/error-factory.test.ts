@@ -225,4 +225,12 @@ describe('createORPCErrorConstructorMap', () => {
     expect('BAD_GATEWAY' in constructors).toBe(true)
     expect('ANY_THING' in constructors).toBe(false)
   })
+
+  it('does not resolve error codes through Object.prototype', () => {
+    const e = (constructors as any).toString()
+
+    expect(e.code).toEqual('toString')
+    expect(e.defined).toEqual(false)
+    expect(e.inferable).toEqual(false)
+  })
 })

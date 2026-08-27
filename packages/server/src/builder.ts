@@ -88,7 +88,7 @@ export class Builder<
    * Overrides the procedure configuration, such as disabling runtime
    * input/output validation.
    *
-   * @see {@link https://orpc.dev/docs/advanced/validation-customization | Validation Customization}
+   * @see {@link https://orpc.dev/docs/recipes/validation-customization | Validation Customization}
    */
   $config(config: ProcedureConfig): Builder<TInitialContext, TErrorMap> {
     return new Builder({

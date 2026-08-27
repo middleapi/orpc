@@ -1,6 +1,6 @@
 ---
 title: "Testing and Mocking"
-description: "Learn how to test oRPC procedures directly with server-side clients and create mock implementations with the implementer."
+description: "Learn how to test oRPC procedures directly with server-side clients, create mock implementations with the implementer, and mock network requests with MSW."
 ---
 
 ## Testing
@@ -21,7 +21,7 @@ it('lists planets', async () => {
 ```
 
 :::info
-For a production-like test setup, create [fetch-based internal clients](/docs/best-practices/optimizing-ssr#implementation).
+For a production-like test setup, create [fetch-based internal clients](/docs/recipes/optimizing-ssr#implementation).
 :::
 
 ## Mocking
@@ -45,3 +45,21 @@ Use `fakeListPlanet` anywhere your test would normally use the real `listPlanet`
 :::warning
 `implement` does not support [lazy routers](/docs/router#lazy-router) directly. If you need to mock one, first [unlazy the router](/docs/contract/router#router-to-contract).
 :::
+
+## Mocking Network Requests
+
+To mock at the network level instead, for example in [Storybook](https://storybook.js.org/) stories or browser tests, use the [MSW Integration](/docs/integrations/msw). It turns a contract or router into typed [MSW](https://mswjs.io/) request handlers served through a real fetch handler:
+
+```ts
+import { createHTTPUtils } from '@orpc/experimental-msw'
+import { RPCHandler } from '@orpc/server/fetch'
+
+const mock = createHTTPUtils(router, {
+  prefix: '/rpc',
+  handler: router => new RPCHandler(router),
+})
+
+const handlers = [
+  mock.planet.list.handler(() => []),
+]
+```

@@ -404,7 +404,7 @@ describe('batchHandlerPlugin', () => {
       })
     }
 
-    it('merges batch request headers into sub-requests and lets sub-requests win', async () => {
+    it('merges batch request headers into sub-requests and lets the batch request win', async () => {
       const { handler, seenHeaders } = createHeaderCapturingHandler()
 
       await handler.handle(createBatchRequestWithHeaders(
@@ -415,9 +415,20 @@ describe('batchHandlerPlugin', () => {
       expect(seenHeaders[0]).toMatchObject({
         'x-from-batch': 'batch',
         'x-from-sub-request': 'sub-request',
-        'x-overridden': 'sub-request',
+        'x-overridden': 'batch',
       })
       expect(seenHeaders[0]!['orpc-batch']).toBeUndefined()
+    })
+
+    it('prevents a sub-request from spoofing a header the batch request already carries', async () => {
+      const { handler, seenHeaders } = createHeaderCapturingHandler()
+
+      await handler.handle(createBatchRequestWithHeaders(
+        { authorization: 'Bearer real' },
+        { authorization: 'Bearer spoofed' },
+      ))
+
+      expect(seenHeaders[0]!.authorization).toEqual('Bearer real')
     })
   })
 

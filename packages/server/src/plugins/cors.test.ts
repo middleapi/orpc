@@ -26,8 +26,8 @@ describe('corsHandlerPlugin', () => {
 
     expect(handlerFn).toHaveBeenCalledTimes(0)
     expect(response!.status).toBe(204)
-    expect(response!.headers.get('access-control-allow-origin')).toBe('https://example.com')
-    expect(response!.headers.get('vary')).toBe('Origin')
+    expect(response!.headers.get('access-control-allow-origin')).toBe('*')
+    expect(response!.headers.get('vary')).toBeNull()
     expect(response!.headers.get('access-control-allow-methods')).toBe('GET, HEAD, PUT, POST, DELETE, PATCH, QUERY')
     expect(response!.headers.get('access-control-max-age')).toBeNull()
   })
@@ -232,9 +232,9 @@ describe('corsHandlerPlugin', () => {
     expect(response!.headers.get('access-control-allow-headers')).toBe('X-Requested-With, Content-Type')
   })
 
-  it('does not set access-control-allow-origin when request has no origin header', async () => {
+  it('does not set access-control-allow-origin when reflecting and request has no origin header', async () => {
     const handler = new RPCHandler(router, {
-      plugins: [new CORSHandlerPlugin()],
+      plugins: [new CORSHandlerPlugin({ origin: origin => origin })],
     })
 
     const { response } = await handler.handle(new Request('https://example.com/ping', {
@@ -245,14 +245,62 @@ describe('corsHandlerPlugin', () => {
       body: JSON.stringify({ json: null }),
     }))
 
-    // the default origin function receives undefined, so there is no origin to reflect
+    // the reflect origin function receives undefined, so there is no origin to reflect
     expect(response!.headers.get('access-control-allow-origin')).toBeNull()
     expect(response!.headers.get('vary')).toBe('Origin')
   })
 
+  it('supports an async origin function resolved per request', async () => {
+    const plugin = new CORSHandlerPlugin({
+      origin: async origin => origin === 'https://allowed.com' ? origin : null,
+    })
+    const handler = new RPCHandler(router, {
+      plugins: [plugin],
+    })
+
+    const { response } = await handler.handle(new Request('https://example.com/ping', {
+      method: 'POST',
+      headers: {
+        'origin': 'https://allowed.com',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ json: null }),
+    }))
+    expect(response!.headers.get('access-control-allow-origin')).toBe('https://allowed.com')
+
+    const { response: response2 } = await handler.handle(new Request('https://example.com/ping', {
+      method: 'POST',
+      headers: {
+        'origin': 'https://disallowed.com',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ json: null }),
+    }))
+    expect(response2!.headers.get('access-control-allow-origin')).toBeNull()
+  })
+
+  it('supports an async timingOrigin function resolved per request', async () => {
+    const plugin = new CORSHandlerPlugin({
+      timingOrigin: async origin => origin === 'https://timing.com' ? origin : null,
+    })
+    const handler = new RPCHandler(router, {
+      plugins: [plugin],
+    })
+
+    const { response } = await handler.handle(new Request('https://example.com/ping', {
+      method: 'POST',
+      headers: {
+        'origin': 'https://timing.com',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ json: null }),
+    }))
+    expect(response!.headers.get('timing-allow-origin')).toBe('https://timing.com')
+  })
+
   it('does not copy Vary from the request', async () => {
     const handler = new RPCHandler(router, {
-      plugins: [new CORSHandlerPlugin()],
+      plugins: [new CORSHandlerPlugin({ origin: origin => origin })],
     })
 
     const { response } = await handler.handle(new Request('https://example.com', {
@@ -297,7 +345,7 @@ describe('corsHandlerPlugin', () => {
             }
           },
         },
-        new CORSHandlerPlugin(),
+        new CORSHandlerPlugin({ origin: origin => origin }),
       ],
     })
 
@@ -343,7 +391,7 @@ describe('corsHandlerPlugin', () => {
             }
           },
         },
-        new CORSHandlerPlugin(),
+        new CORSHandlerPlugin({ origin: origin => origin }),
       ],
     })
 

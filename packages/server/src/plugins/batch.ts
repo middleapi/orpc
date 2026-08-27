@@ -28,7 +28,8 @@ export interface BatchHandlerPluginOptions<T extends Context> {
   /**
    * Map each subrequest in the batch before it is processed.
    *
-   * @default merges the batch request headers into the subrequest and remove `orpc-batch` header to prevent nested batching
+   * @default merges the batch request headers into the subrequest, giving them priority over
+   * the subrequest headers, and removes the `orpc-batch` header to prevent nested batching
    */
   mapSubrequest?: (subrequest: StandardLazyRequest, batchOptions: StandardHandlerRoutingInterceptorOptions<T>) => StandardLazyRequest
 
@@ -102,8 +103,13 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
     this.mapSubrequest = options.mapSubrequest ?? ((subRequest, { request: batchRequest }) => ({
       ...subRequest,
       headers: {
-        ...batchRequest.headers,
         ...subRequest.headers,
+        /**
+         * The batch request headers win over the subrequest ones. They are the only ones the
+         * transport actually saw, so headers the browser injects on its own, such as `cookie`
+         * or `origin`, cannot be overridden by a subrequest, which is just request payload.
+         */
+        ...batchRequest.headers,
         'orpc-batch': undefined, // useful in case batch plugin is used multiple times
       },
     }))

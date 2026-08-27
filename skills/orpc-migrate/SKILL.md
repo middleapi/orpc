@@ -103,7 +103,7 @@ Most v1 names still compile through deprecated aliases (strike-through hints, no
    - Option renames, scoped: handler `rootInterceptors` to `routingInterceptors` (handler `clientInterceptors` still exists, unchanged); link `clientInterceptors` to `transportInterceptors`; on both, `adapterInterceptors` is renamed after the adapter, e.g. `fetchInterceptors` on the fetch adapter. Flat `eventIterator*` options moved under the adapter's request/response mapping: `toFetchResponse.eventStream` on the fetch handler, `sendStandardResponse.eventStream` on Node, `toFetchRequest.eventStream` on the link.
 3. **Audit silent behavior changes** (compile fine, behave differently):
    - **Wire format changed:** a v1 link cannot talk to a v2 server, in either direction. Deploy the upgraded server and clients together.
-   - **Automatic middleware deduplication removed:** middleware applied at both router and procedure level now runs twice, with no warning. Guard shared middleware with the context-flag pattern from the dedupe-middleware best practice.
+   - **Automatic middleware deduplication removed:** middleware applied at both router and procedure level now runs twice, with no warning. Guard shared middleware with the context-flag pattern from the dedupe-middleware recipe.
    - **Batch Plugin `exclude` became `filter` with the opposite meaning.** Usually delete `exclude`; if skipping is still needed, negate the predicate.
    - **`RPCHandler` rejects GET by default** (`allowMethods` defaults to POST/PUT/PATCH/DELETE). Simplest fix: stop sending GET from the link; only allow GET deliberately, with CSRF protection.
    - **Handler `filter` takes positional arguments now;** the v1 destructured form still type-checks but reads wrong values.
@@ -114,10 +114,10 @@ Verification: typecheck and unit tests after steps 1, 2, and 4; step 3 needs int
 
 ## Docs retrieval
 
-Fetch pages instead of recalling them, and if this skill and a fetched page disagree, trust the page. The v2 docs live at https://v2.orpc.dev; while v2 is in beta, https://orpc.dev still serves the v1 docs (same-looking slugs, wrong or missing content), so never fetch from it. The index of every docs page is at https://v2.orpc.dev/llms.txt (its links print the orpc.dev domain; swap in v2.orpc.dev before fetching), https://v2.orpc.dev/llms-full.txt bundles the entire docs in one large file, and appending `.md` to any page URL returns its exact source markdown.
+Fetch pages instead of recalling them, and if this skill and a fetched page disagree, trust the page. The v2 docs live at https://orpc.dev and the v1 docs at https://v1.orpc.dev; slugs look alike across both hosts, so check which host a page came from before copying anything from it. The index of every v2 docs page is at https://orpc.dev/llms.txt, https://orpc.dev/llms-full.txt bundles the entire docs in one large file, and appending `.md` to any page URL returns its exact source markdown.
 
 Authoritative pages to consult during the migration (this skill deliberately omits their full mapping tables):
 
-- https://v2.orpc.dev/docs/migrations/from-trpc : side-by-side tRPC/oRPC code for every step, including server setup per framework
-- https://v2.orpc.dev/docs/migrations/from-v1 : every v2 breaking change with v1/v2 comparisons, package rename table, and the deprecated alias cheat sheet
-- https://v2.orpc.dev/docs/integrations/trpc : `toORPCRouter` and `toTRPCMeta` reference for the incremental path
+- https://orpc.dev/docs/migrations/from-trpc : side-by-side tRPC/oRPC code for every step, including server setup per framework
+- https://orpc.dev/docs/migrations/from-v1 : every v2 breaking change with v1/v2 comparisons, package rename table, and the deprecated alias cheat sheet
+- https://orpc.dev/docs/integrations/trpc : `toORPCRouter` and `toTRPCMeta` reference for the incremental path

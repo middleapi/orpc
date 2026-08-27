@@ -1,4 +1,4 @@
-import type { Value } from '@orpc/shared'
+import type { Promisable, Value } from '@orpc/shared'
 import type { StandardHeaders } from '@standardserver/core'
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
@@ -8,19 +8,17 @@ import { flattenStandardHeader } from '@standardserver/core'
 export interface CORSHandlerPluginOptions<T extends Context> {
   /**
    * Configures the `Access-Control-Allow-Origin` header.
-   * Can be a string, an array of allowed origins, or a function that returns the allowed origin(s).
+   * Can be a string, an array of allowed origins, or a function (optionally async) that returns the allowed origin(s).
    *
-   * @default (origin) => origin
+   * @default '*'
    */
-  origin?: Value<string | readonly string[] | null | undefined, [origin: string | undefined, options: StandardHandlerRoutingInterceptorOptions<T>]>
+  origin?: Value<Promisable<string | readonly string[] | null | undefined>, [origin: string | undefined, options: StandardHandlerRoutingInterceptorOptions<T>]>
 
   /**
    * Configures the `Timing-Allow-Origin` header.
-   * Can be a string, an array of allowed origins, or a function that returns the allowed origin(s).
-   *
-   * @default undefined
+   * Can be a string, an array of allowed origins, or a function (optionally async) that returns the allowed origin(s).
    */
-  timingOrigin?: Value<string | readonly string[] | null | undefined, [origin: string | undefined, options: StandardHandlerRoutingInterceptorOptions<T>]>
+  timingOrigin?: Value<Promisable<string | readonly string[] | null | undefined>, [origin: string | undefined, options: StandardHandlerRoutingInterceptorOptions<T>]>
 
   /**
    * Configures the `Access-Control-Allow-Methods` header for preflight requests.
@@ -32,29 +30,21 @@ export interface CORSHandlerPluginOptions<T extends Context> {
   /**
    * Configures the `Access-Control-Allow-Headers` header for preflight requests.
    * Falls back to the request's `Access-Control-Request-Headers` if not set.
-   *
-   * @default undefined
    */
   allowHeaders?: readonly string[]
 
   /**
    * Configures the `Access-Control-Max-Age` header (in seconds) for preflight requests.
-   *
-   * @default undefined
    */
   maxAge?: number
 
   /**
    * Configures the `Access-Control-Allow-Credentials` header.
-   *
-   * @default undefined
    */
   credentials?: boolean
 
   /**
    * Configures the `Access-Control-Expose-Headers` header.
-   *
-   * @default undefined
    */
   exposeHeaders?: readonly string[]
 }
@@ -79,7 +69,7 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
 
   constructor(options: CORSHandlerPluginOptions<T> = {}) {
     const defaults: CORSHandlerPluginOptions<T> = {
-      origin: origin => origin,
+      origin: '*',
       allowMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH', 'QUERY'],
     }
 
@@ -101,7 +91,7 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
 
       const origin = flattenStandardHeader(interceptorOptions.request.headers.origin)
 
-      const allowedOrigins = toArray(value(this.options.origin, origin, interceptorOptions))
+      const allowedOrigins = toArray(await value(this.options.origin, origin, interceptorOptions))
 
       if (allowedOrigins.includes('*')) {
         resHeaders['access-control-allow-origin'] = '*'
@@ -117,7 +107,7 @@ export class CORSHandlerPlugin<T extends Context> implements StandardHandlerPlug
         }
       }
 
-      const allowedTimingOrigins = toArray(value(this.options.timingOrigin, origin, interceptorOptions))
+      const allowedTimingOrigins = toArray(await value(this.options.timingOrigin, origin, interceptorOptions))
 
       if (allowedTimingOrigins.includes('*')) {
         resHeaders['timing-allow-origin'] = '*'

@@ -1,13 +1,16 @@
 /**
- * Hand-maintained ad inventory, plus the helpers that shape it for rendering.
- * Unlike sponsors.ts (synced from GitHub Sponsors), the map below is edited by
- * hand: slots are sold individually, so a sponsor picks the position it wants
- * and keeps it until it lapses. Positions are fixed and 1-based; whatever is
- * left empty renders as a dimmed `+` opening a mailto that names it.
+ * The ad-slot inventory, plus the helpers that shape it for rendering. Slots
+ * are sold individually: a sponsor picks the position it wants (the `slot`
+ * field in the upstream sponsors.json) and keeps it until it lapses.
+ * scripts/sync-sponsors.ts distils that into slots.ts; positions are fixed and
+ * 1-based, and whatever is left empty renders as a dimmed `+` opening a mailto
+ * that names it.
  *
  * Deliberately free of any sponsors.ts import: client.ts needs this module, and
- * the sponsor wall's data has no business in the browser bundle.
+ * the sponsor wall's data has no business in the browser bundle — slots.ts
+ * carries only the handful of sponsors that bought a position.
  */
+import slots from './slots'
 
 export interface AdSponsor {
   name: string
@@ -15,12 +18,14 @@ export interface AdSponsor {
   description: string
   /** Square icon URL (a GitHub avatar works) or an inline data URI. */
   logo: string
-  /** Destination, tracking params and all — write `ref`/`utm_*` into it here. */
+  /** Destination, tracking params and all — upstream bakes `ref`/`utm_*` in. */
   href: string
+  /** Extra rel tokens from the data (e.g. `sponsored`); may be empty. */
+  rel: string
   /**
    * Optional brand tint behind the card. Both modes are required together so a
    * sponsor never ships a colour that only works in one theme. Aim for the
-   * lightness of Blume's muted surface (#f6f6f7 light, #2f343e dark) carrying
+   * lightness of Blume's muted surface (#f6f6f7 light, #1a202a dark) carrying
    * a hint of the brand hue — roughly the brand mixed 6% into the page in
    * light mode and 10% in dark — so the card reads as a surface rather than a
    * banner and --blume-muted-foreground still clears AA on top. Omit for none.
@@ -28,28 +33,39 @@ export interface AdSponsor {
   background?: { light: string, dark: string }
 }
 
-/** The grid is a fixed 8 cells; positions outside this range are a type error. */
-export const AD_POSITIONS = [1, 2, 3, 4, 5, 6, 7, 8] as const
+/**
+ * The grid starts at six cells and grows to fit the highest sold position,
+ * rounded up to an even count — it renders as two columns on `md`, so an odd
+ * total would leave a hole in the last row.
+ */
+const DEFAULT_SLOT_COUNT = 6
 
-export type AdPosition = typeof AD_POSITIONS[number]
+const soldPositions = slots
+  .map(({ position }) => position)
+  .filter(position => Number.isInteger(position) && position >= 1)
 
-// Annotated rather than `satisfies` so the type stays indexable by any
-// AdPosition — an out-of-range or misspelled key is still a type error.
-const inventory: Partial<Record<AdPosition, AdSponsor>> = {
-  1: {
-    name: 'ScreenshotOne',
-    description: 'The screenshot API for developers',
-    logo: 'https://github.com/screenshotone.png',
-    href: 'https://screenshotone.com?ref=orpc&utm_source=orpc&utm_medium=sponsor',
-    background: { light: '#f7f5ff', dark: '#303147' },
-  },
-  2: {
-    name: 'MisskeyHQ',
-    description: 'Decentralized microblogging SNS born on Earth',
-    logo: 'https://github.com/MisskeyIO.png',
-    href: 'https://misskey.io?ref=orpc&utm_source=orpc&utm_medium=sponsor',
-    background: { light: '#f8faf0', dark: '#313a2e' },
-  },
+const slotCount = Math.max(DEFAULT_SLOT_COUNT, ...soldPositions)
+
+export const AD_POSITIONS: readonly number[] = Array.from(
+  { length: slotCount + (slotCount % 2) },
+  (_, index) => index + 1,
+)
+
+export type AdPosition = number
+
+// Keyed off the generated file; a position that is not one of the grid's cells
+// (fractional, zero, negative) is dropped rather than crashing the build over
+// a data typo upstream.
+const inventory: Partial<Record<AdPosition, AdSponsor>> = {}
+for (const { position, ...sponsor } of slots) {
+  if (AD_POSITIONS.includes(position)) {
+    inventory[position] = sponsor
+  }
+}
+
+/** The rel a sponsor link renders with: `noopener` always, plus the data's tokens. */
+export function relAttribute(rel: string): string {
+  return ['noopener', rel].filter(Boolean).join(' ')
 }
 
 export interface AdSlot {

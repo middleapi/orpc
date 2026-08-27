@@ -18,7 +18,7 @@ const { items, currentRoute, strings } = Astro.props;
 ---
 
 {/* From `md` the header's inline tab bar takes over; keep the drawer
-    list only when there is no page tree to show (e.g. the changelog). */}
+    list only when there is no page tree to show (e.g. the blog). */}
 <SectionsNav
   class={`mb-4 border-border border-b pb-4${items.length > 0 ? " md:hidden" : ""}`}
   currentRoute={currentRoute}

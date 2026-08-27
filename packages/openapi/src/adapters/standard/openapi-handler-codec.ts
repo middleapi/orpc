@@ -7,7 +7,7 @@ import type { OpenAPIMeta } from '../../meta'
 import type { OpenAPIMatcherOptions } from './openapi-matcher'
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
 import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '@orpc/server'
-import { isPlainObject, isTypescriptObject, NullProtoObj, parseEmptyableJSON, stringifyJSON } from '@orpc/shared'
+import { getOwn, isPlainObject, isTypescriptObject, NullProtoObj, parseEmptyableJSON, stringifyJSON } from '@orpc/shared'
 import { parseStandardUrl } from '@standardserver/core'
 import {
   DEFAULT_OPENAPI_INPUT_STRUCTURE,
@@ -82,8 +82,8 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
 
       if (isPlainObject(data)) {
         return {
-          ...params,
           ...data,
+          ...params,
         }
       }
 
@@ -137,7 +137,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
   }
 
   encodeError(error: AnyORPCError): Promisable<StandardResponse> {
-    const status = this.errorStatusMap[error.code] ?? DEFAULT_ERROR_STATUS
+    const status = getOwn(this.errorStatusMap, error.code) ?? DEFAULT_ERROR_STATUS
 
     return {
       status,

@@ -1,9 +1,13 @@
 {
   "name": "@orpc/evlog",
   "type": "module",
-  "version": "2.0.0-beta.28",
+  "version": "2.0.0-beta.31",
+  "description": "Evlog integration for oRPC: wide-event logging for typesafe APIs",
   "license": "MIT",
-  "funding": "https://github.com/sponsors/dinwwwh",
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
+  ],
   "homepage": "https://orpc.dev",
   "repository": {
     "type": "git",
@@ -12,7 +16,11 @@
   },
   "keywords": [
     "orpc",
-    "evlog"
+    "evlog",
+    "logging",
+    "wide-events",
+    "observability",
+    "typescript"
   ],
   "sideEffects": false,
   "publishConfig": {
@@ -49,7 +57,7 @@
     "@orpc/client": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standardserver/core": "^0.8.0"
+    "@standardserver/core": "^0.8.2"
   },
   "devDependencies": {
     "evlog": "^2.26.0"

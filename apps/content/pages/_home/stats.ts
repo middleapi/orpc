@@ -122,7 +122,7 @@ export async function landingStats(): Promise<Stat[]> {
       ? [{
           value: downloads,
           label: 'Downloads each week',
-          href: `https://npmx.dev/package/${NPM_PACKAGE}`,
+          href: `https://www.npmjs.com/package/${NPM_PACKAGE}`,
         }]
       : []),
     ...(covered

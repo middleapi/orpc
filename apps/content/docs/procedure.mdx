@@ -70,7 +70,7 @@ By specifying `.output` or the handler's return type, TypeScript can infer the o
 
 `.input` and `.output` can be called multiple times. Each call adds a schema instead of replacing the previous one, and the value must pass all of them.
 
-Every `.input` object schema validates the original input, then the results are merged. This lets you extend a base procedure without repeating its fields. Fields that no schema defines are dropped for the handler. [Middleware](/docs/middleware) receives the full input with the fields validated before it merged over the original, though its input type only reflects the validated ones.
+Every `.input` object schema validates the original input, then the results are merged. This lets you extend a base procedure without repeating its fields. Fields that no schema defines are dropped before the handler runs. [Middleware](/docs/middleware) placed between schemas sees the fields validated so far plus the raw rest of the input, so a whole-input middleware like caching works anywhere in the chain, but fields a later schema defines are not validated yet at that point.
 
 ```ts
 const base = os

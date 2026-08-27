@@ -23,7 +23,7 @@ export interface ContractUtilsFactoryOptions<
  * @remarks
  * **Note**: The contract must define a `path` meta matching its position in the root router contract.
  *
- * @see {@link https://orpc.dev/docs/advanced/scaling-large-projects#tanstack-query-integration | Scaling Large Projects - TanStack Query Integration}
+ * @see {@link https://orpc.dev/docs/contract/client-factory#tanstack-query-integration | Contract Client Factory - TanStack Query Integration}
  */
 export function createContractUtilsFactory<
   TClientContext extends ClientContext,

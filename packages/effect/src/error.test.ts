@@ -206,4 +206,13 @@ describe('catchORPCErrorCodes', () => {
 
     expect(exit).toEqual(Exit.fail(error))
   })
+
+  it('does not resolve error codes through Object.prototype', async () => {
+    const error = new ORPCError('toString')
+    const exit = await Effect.runPromiseExit(
+      catchORPCErrorCodes(Effect.fail(error), {} as any) as Effect.Effect<unknown, unknown>,
+    )
+
+    expect(exit).toEqual(Exit.fail(error))
+  })
 })

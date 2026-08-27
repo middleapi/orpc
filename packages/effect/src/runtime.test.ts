@@ -52,16 +52,16 @@ describe('runPromise & extractErrorFromCause', () => {
       await expect(runPromise(effect)).rejects.toThrow(defect)
     })
 
-    it('throws the finalizer error on sequential cause (mirrors try/finally)', async () => {
-      const finalizerError = new Error('finalizer also failed')
+    it('throws the use error when the finalizer also fails', async () => {
+      const useError = new Error('use failed')
 
       const effect = Effect.acquireUseRelease(
         Effect.succeed('resource'),
-        () => Effect.fail(new Error('use failed')),
-        () => Effect.fail(finalizerError) as Effect.Effect<never, never>,
+        () => Effect.fail(useError),
+        () => Effect.fail(new Error('finalizer also failed')) as Effect.Effect<never, never>,
       )
 
-      await expect(runPromise(effect)).rejects.toThrow(finalizerError)
+      await expect(runPromise(effect)).rejects.toThrow(useError)
     })
 
     it('throws the left error on parallel cause', async () => {

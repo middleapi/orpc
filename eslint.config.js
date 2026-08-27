@@ -69,12 +69,29 @@ export default antfu({
     'pnpm/json-enforce-catalog': 'off',
   },
 }, {
+  files: ['packages/*/src/**'],
+  rules: {
+    // a scoped block replaces the base rule rather than extending it,
+    // so the first two names repeat what @antfu/eslint-config already bans
+    'no-restricted-globals': ['error', {
+      name: 'global',
+      message: 'Use `globalThis` instead.',
+    }, {
+      name: 'self',
+      message: 'Use `globalThis` instead.',
+    }, {
+      name: 'AbortSignal',
+      message: 'AbortSignal is not a global in every runtime, read it only behind a typeof guard',
+    }],
+  },
+}, {
   files: ['**/*.test.ts', '**/*.test.tsx', '**/*.test-d.ts', '**/*.test-d.tsx', 'apps/content/shared/**', 'playgrounds/**', 'packages/*/playground/**'],
   rules: {
     'unused-imports/no-unused-vars': 'off',
     'antfu/no-top-level-await': 'off',
     'no-alert': 'off',
     'ban/ban': 'off',
+    'no-restricted-globals': 'off',
   },
 }, {
   files: [

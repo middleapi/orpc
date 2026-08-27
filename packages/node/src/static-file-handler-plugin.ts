@@ -5,9 +5,9 @@ import type { Stats } from 'node:fs'
 import { createReadStream } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
-import { Readable } from 'node:stream'
 import { getOpenTelemetryConfig, isCompressibleContentType, matchesHttpPathPrefix, mergeHttpPath, parseAcceptEncodingQualities, toArray, tryDecodeURIComponent } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standardserver/core'
+import { toWebReadableStream } from '@standardserver/node'
 import mime from 'mime'
 
 /**
@@ -457,7 +457,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
      */
     const body: ReadableStream<Uint8Array<ArrayBuffer>> = request.method === 'HEAD'
       ? new ReadableStream({ start: controller => controller.close() })
-      : Readable.toWeb(status === 206 ? createReadStream(filePath, { start, end }) : createReadStream(filePath)) as ReadableStream<Uint8Array<ArrayBuffer>>
+      : toWebReadableStream(status === 206 ? createReadStream(filePath, { start, end }) : createReadStream(filePath))
 
     return { status, headers, body }
   }

@@ -2,6 +2,7 @@ import type { AnyORPCError } from '@orpc/client'
 import type { Writable } from '@orpc/shared'
 import type { ErrorMap } from './error'
 import { cloneORPCError } from '@orpc/client'
+import { getOwn } from '@orpc/shared'
 
 export type MergedErrorMap<T1 extends ErrorMap, T2 extends ErrorMap>
   = keyof T1 extends never | keyof T2
@@ -16,7 +17,7 @@ export async function reconcileORPCError(
   map: ErrorMap,
   error: AnyORPCError,
 ): Promise<AnyORPCError> {
-  const config = map[error.code]
+  const config = getOwn(map, error.code)
 
   if (!config) {
     // Do not check `error.inferable` here, because even when config is undefined,

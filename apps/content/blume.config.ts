@@ -7,6 +7,11 @@ export default defineConfig({
   title: 'oRPC',
   description: 'Build APIs that are typesafe end to end, with OpenAPI included',
   logo: '/logo.svg',
+  banner: {
+    content: 'You are reading the v2 docs, currently in beta.',
+    link: { href: 'https://v1.orpc.dev', text: 'V1 docs' },
+    dismissible: true,
+  },
   content: {
     sources: [
       {
@@ -16,13 +21,6 @@ export default defineConfig({
           'docs/**/*.{md,mdx}',
           'blog/**/*.{md,mdx}',
         ],
-      },
-      {
-        type: 'github-releases',
-        prefix: 'changelog',
-        owner: 'middleapi',
-        repo: 'orpc',
-        prereleases: true,
       },
     ],
   },
@@ -36,8 +34,9 @@ export default defineConfig({
     // Light mode darkens it so white accent text keeps AA contrast; dark
     // mode uses the true brand pink (its text flips dark in theme.css).
     accent: { light: 'oklch(0.58 0.19 359)', dark: '#ff6ca5' },
-    // Zed One Dark editor background; the rest of the palette lives in theme.css.
-    background: { dark: '#282c33' },
+    // Zed's dark editor/content ground (#282c33 is only its sidebar color);
+    // the rest of the palette lives in theme.css.
+    background: { dark: '#0d1016' },
     fonts: {
       display: 'inter',
       body: 'inter',
@@ -45,28 +44,39 @@ export default defineConfig({
   },
   lastModified: true,
   navigation: {
+    sidebar: {
+      display: 'group',
+    },
     tabs: [
       { label: 'Documentation', path: '/docs' },
       { label: 'Blog', path: '/blog', href: '/blog' },
-      { label: 'Changelog', path: '/changelog', href: '/changelog' },
       { label: 'Comparison', path: '/docs', href: '/docs/comparison' },
+      { label: 'From V1', path: '/docs', href: '/docs/migrations/from-v1' },
       {
         label: 'More',
         path: '',
         items: [
-          { label: 'V1 Documentation', path: 'https://v1.orpc.dev' },
+          { label: 'Releases', path: 'https://github.com/middleapi/orpc/releases' },
           { label: 'Discussions', path: 'https://github.com/middleapi/orpc/discussions' },
-          { label: 'Sponsors', path: 'https://github.com/sponsors/dinwwwh' },
+          { label: 'GitHub Sponsors', path: 'https://github.com/sponsors/dinwwwh' },
+          { label: 'Open Collective', path: 'https://opencollective.com/middleapi' },
           { label: 'LLM Context', path: 'https://orpc.dev/llms.txt' },
           { label: 'LLM Context (Full)', path: 'https://orpc.dev/llms-full.txt' },
+          { label: 'V1 Documentation', path: 'https://v1.orpc.dev' },
         ],
       },
     ],
   },
   analytics: {
     posthog: {
+      /** Reverse proxy on our own domain, so ad blockers don't drop events. */
+      host: 'https://poho.orpc.dev',
       key: 'phc_YHeqjC9tR604AHH45kQi63fT4aBvpsS7zAaCxntBzZm',
     },
+    scripts: [
+      /** A reverse proxy requires `ui_host`, and Blume has no option for it. */
+      { content: 'posthog.set_config({ ui_host: "https://us.posthog.com" })' },
+    ],
   },
 
   seo: {
@@ -77,6 +87,61 @@ export default defineConfig({
       },
     },
   },
+  /** v1 URLs Google still indexes, pointed at their v2 counterparts. */
+  redirects: [
+    { from: '/docs/adapters/http', to: '/docs/adapters/fetch-api' },
+
+    { from: '/docs/contract-first/define-contract', to: '/docs/contract/procedure' },
+    { from: '/docs/contract-first/implement-contract', to: '/docs/contract/implementation' },
+    { from: '/docs/contract-first/router-to-contract', to: '/docs/contract/router' },
+    { from: '/docs/advanced/scaling-large-projects', to: '/docs/contract/client-factory' },
+    { from: '/docs/openapi/openapi-to-contract', to: '/docs/contract/generate-from-openapi' },
+
+    { from: '/docs/advanced/exceeds-the-maximum-length-problem', to: '/docs/recipes/exceeds-the-maximum-length-problem' },
+    { from: '/docs/advanced/publish-client-to-npm', to: '/docs/recipes/publish-client-to-npm' },
+    { from: '/docs/advanced/testing-mocking', to: '/docs/recipes/testing-and-mocking' },
+    { from: '/docs/advanced/validation-errors', to: '/docs/recipes/validation-customization' },
+    { from: '/docs/openapi/advanced/disabling-output-validation', to: '/docs/recipes/validation-customization' },
+    { from: '/docs/best-practices/dedupe-middleware', to: '/docs/recipes/dedupe-middleware' },
+    { from: '/docs/best-practices/monorepo-setup', to: '/docs/recipes/monorepo-setup' },
+    { from: '/docs/best-practices/no-throw-literal', to: '/docs/recipes/no-throw-literal' },
+    { from: '/docs/best-practices/optimize-ssr', to: '/docs/recipes/optimizing-ssr' },
+
+    { from: '/docs/rpc-handler', to: '/docs/rpc/handler' },
+    { from: '/docs/client/rpc-link', to: '/docs/rpc/link' },
+    { from: '/docs/advanced/rpc-protocol', to: '/docs/rpc/protocol' },
+    { from: '/docs/advanced/rpc-json-serializer', to: '/docs/rpc/serializer' },
+
+    { from: '/docs/openapi/getting-started', to: '/docs/openapi/routing' },
+    { from: '/docs/openapi/openapi-handler', to: '/docs/openapi/handler' },
+    { from: '/docs/openapi/error-handling', to: '/docs/openapi/handler' },
+    { from: '/docs/openapi/advanced/customizing-error-response', to: '/docs/openapi/handler' },
+    { from: '/docs/openapi/client/openapi-link', to: '/docs/openapi/link' },
+    { from: '/docs/openapi/openapi-specification', to: '/docs/openapi/specification' },
+    { from: '/docs/openapi/advanced/openapi-json-serializer', to: '/docs/openapi/serializer' },
+    { from: '/docs/openapi/input-output-structure', to: '/docs/openapi/input-and-output-mapping' },
+    { from: '/docs/openapi/advanced/expanding-type-support-for-openapi-link', to: '/docs/openapi/expanding-type-support-for-link' },
+
+    { from: '/docs/event-iterator', to: '/docs/async-iterator-object' },
+    { from: '/docs/client/event-iterator', to: '/docs/client/async-iterator-object' },
+    { from: '/docs/file-upload-download', to: '/docs/binary-data' },
+
+    { from: '/docs/plugins/batch-requests', to: '/docs/plugins/batch' },
+    { from: '/docs/plugins/dedupe-requests', to: '/docs/plugins/dedupe' },
+    { from: '/docs/plugins/client-retry', to: '/docs/plugins/retry' },
+    { from: '/docs/plugins/rethrow-handler', to: '/docs/plugins/rethrow' },
+    { from: '/docs/plugins/body-limit', to: '/docs/plugins/request-limit' },
+    { from: '/docs/plugins/compression', to: '/docs/plugins/response-compression' },
+    { from: '/docs/plugins/body-compression', to: '/docs/plugins/response-compression' },
+    { from: '/docs/openapi/plugins/openapi-reference', to: '/docs/plugins/openapi-reference' },
+    { from: '/docs/openapi/plugins/smart-coercion', to: '/docs/plugins/smart-coercion' },
+    { from: '/docs/plugins/hibernation', to: '/docs/integrations/hibernation' },
+
+    { from: '/docs/integrations/react-swr', to: '/docs/integrations/swr' },
+    { from: '/docs/openapi/integrations/implement-contract-in-nest', to: '/docs/integrations/nest' },
+    { from: '/docs/openapi/integrations/trpc', to: '/docs/integrations/trpc' },
+    { from: '/docs/server-action', to: '/docs/integrations/next' },
+  ],
   export: true,
   integrations: [
     {
@@ -144,7 +209,7 @@ export default defineConfig({
   },
   deployment: {
     output: 'server',
-    adapter: 'vercel',
+    adapter: 'cloudflare',
     site: 'https://orpc.dev',
   },
 })
