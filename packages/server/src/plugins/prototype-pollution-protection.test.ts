@@ -102,6 +102,24 @@ describe('prototypePollutionProtectionHandlerPlugin', () => {
     })
   })
 
+  describe('deeply nested inputs, beyond call stack limits', () => {
+    function nest(leaf: unknown, depth: number) {
+      let value = leaf
+      for (let i = 0; i < depth; i++) {
+        value = { nested: value, list: [value] }
+      }
+      return value
+    }
+
+    it('allows a benign one instead of overflowing the stack', async () => {
+      await expectAllowed(nest({ name: 'Earth' }, 100_000))
+    })
+
+    it('blocks one polluted at the bottom', async () => {
+      await expectBlocked(nest(JSON.parse('{"__proto__": {"isAdmin": true}}'), 100_000))
+    })
+  })
+
   describe('asyncIteratorObject inputs', () => {
     function invokeWithIterator(input: AsyncIterator<unknown>) {
       const next = vi.fn(async (options: any) => options.input)

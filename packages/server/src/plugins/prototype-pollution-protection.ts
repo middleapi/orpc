@@ -57,48 +57,63 @@ export class PrototypePollutionProtectionHandlerPlugin<T extends Context> implem
   /**
    * Walks the containers the built-in codecs can produce: arrays, maps, sets, and plain
    * objects, including null-prototype ones. Other objects, such as files and dates, carry
-   * no attacker-authored keys and are left alone.
+   * no attacker-authored keys and are left alone. The walk is iterative, so input nested
+   * deeper than the call stack allows still gets the intended verdict instead of a
+   * `RangeError`.
    */
-  private containsPollutingKey(value: unknown, visited = new WeakSet<object>()): boolean {
-    if (typeof value !== 'object' || value === null || visited.has(value)) {
-      return false
-    }
+  private containsPollutingKey(root: unknown): boolean {
+    const visited = new WeakSet<object>()
+    const stack = [root]
 
-    visited.add(value)
+    while (stack.length !== 0) {
+      const value = stack.pop()
 
-    if (Array.isArray(value)) {
-      return value.some(item => this.containsPollutingKey(item, visited))
-    }
-
-    // A map yields `[key, item]` entry arrays, so recursing covers both keys and values.
-    if (value instanceof Map || value instanceof Set) {
-      for (const entry of value) {
-        if (this.containsPollutingKey(entry, visited)) {
-          return true
-        }
+      if (typeof value !== 'object' || value === null || visited.has(value)) {
+        continue
       }
 
-      return false
+      visited.add(value)
+
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          stack.push(item)
+        }
+
+        continue
+      }
+
+      // A map yields `[key, item]` entry arrays, so walking them covers both keys and values.
+      if (value instanceof Map || value instanceof Set) {
+        for (const entry of value) {
+          stack.push(entry)
+        }
+
+        continue
+      }
+
+      if (!isPlainObject(value)) {
+        continue
+      }
+
+      if (Object.hasOwn(value, '__proto__')) {
+        return true
+      }
+
+      // A lone `constructor` key is harmless and common, such as user text. Pollution
+      // requires reaching `constructor.prototype`, mirroring secure-json-parse.
+      if (
+        Object.hasOwn(value, 'constructor')
+        && isTypescriptObject(value.constructor)
+        && Object.hasOwn(value.constructor, 'prototype')
+      ) {
+        return true
+      }
+
+      for (const key of Object.keys(value)) {
+        stack.push(value[key])
+      }
     }
 
-    if (!isPlainObject(value)) {
-      return false
-    }
-
-    if (Object.hasOwn(value, '__proto__')) {
-      return true
-    }
-
-    // A lone `constructor` key is harmless and common, such as user text. Pollution
-    // requires reaching `constructor.prototype`, mirroring secure-json-parse.
-    if (
-      Object.hasOwn(value, 'constructor')
-      && isTypescriptObject(value.constructor)
-      && Object.hasOwn(value.constructor, 'prototype')
-    ) {
-      return true
-    }
-
-    return Object.keys(value).some(key => this.containsPollutingKey(value[key], visited))
+    return false
   }
 }
