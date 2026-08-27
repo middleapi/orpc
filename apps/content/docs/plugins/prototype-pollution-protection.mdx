@@ -35,11 +35,6 @@ const handler = new RPCHandler(router, {
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
 :::
 
-## Limitations
-
-- The plugin is defense in depth, not a substitute for safe code: prefer `Object.create(null)` or `Map` for attacker-keyed lookups, and keep merge/clone utilities patched, per the [OWASP guidance](https://cheatsheetseries.owasp.org/cheatsheets/Prototype_Pollution_Prevention_Cheat_Sheet.html).
-- Rejection is all-or-nothing with a generic `BAD_REQUEST`. If a procedure must accept these keys as data, drop the plugin for that handler and validate the field with your schema instead.
-
 ## Learn More
 
 Learn more about the attack this plugin prevents on [MDN](https://developer.mozilla.org/en-US/docs/Web/Security/Attacks/Prototype_pollution) and in the [OWASP Prototype Pollution Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Prototype_Pollution_Prevention_Cheat_Sheet.html). For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/prototype-pollution-protection.ts).
