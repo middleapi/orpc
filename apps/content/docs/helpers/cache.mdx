@@ -47,7 +47,14 @@ An entry stays fresh for `ttl` milliseconds and is retained for an extra `swr` w
 ```ts memory
 import { MemoryCacheStore } from '@orpc/cache/memory'
 
-const store = new MemoryCacheStore()
+const store = new MemoryCacheStore({
+  /**
+   * Serializer used to encode non-string keys.
+   *
+   * @default RPCJsonSerializer
+   */
+  serializer: undefined,
+})
 ```
 
 ```ts redis

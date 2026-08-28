@@ -1,3 +1,4 @@
+import { RPCJsonSerializer } from '@orpc/client'
 import { MemoryCacheStore } from './memory'
 
 describe('memoryCacheStore', () => {
@@ -34,6 +35,17 @@ describe('memoryCacheStore', () => {
     await expect(store.get([['planet', 'find'], { a: 1, b: 2 }])).resolves.toMatchObject({ output: 'v' })
     await expect(store.get([['planet', 'find'], { a: 1, b: 3 }])).resolves.toBeUndefined()
     await expect(store.get([['planet', 'list'], { a: 1, b: 2 }])).resolves.toBeUndefined()
+  })
+
+  it('supports a custom key serializer', async () => {
+    const serializer = new RPCJsonSerializer()
+    const serializeSpy = vi.spyOn(serializer, 'serialize')
+    const store = new MemoryCacheStore({ serializer })
+
+    await store.set({ id: 1 }, 'v')
+
+    await expect(store.get({ id: 1 })).resolves.toMatchObject({ output: 'v' })
+    expect(serializeSpy).toHaveBeenCalled()
   })
 
   it('encodes complex key values, ignoring unsupported ones like blobs', async () => {

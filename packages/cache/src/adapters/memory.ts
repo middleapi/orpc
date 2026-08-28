@@ -1,6 +1,17 @@
+import type { RPCJsonSerializer } from '@orpc/client'
+import type { Public } from '@orpc/shared'
 import type { CacheEntry, CacheSetOptions, CacheStore } from '../types'
 import { toArray } from '@orpc/shared'
 import { encodeCacheKey } from '../utils'
+
+export interface MemoryCacheStoreOptions {
+  /**
+   * Serializer used to encode non-string keys.
+   *
+   * @default RPCJsonSerializer
+   */
+  serializer?: undefined | Public<RPCJsonSerializer>
+}
 
 interface MemoryCacheStoreEntry {
   output: unknown
@@ -23,16 +34,21 @@ interface MemoryCacheStoreEntry {
 export class MemoryCacheStore implements CacheStore {
   private readonly entries = new Map<string, MemoryCacheStoreEntry>()
   private readonly tagVersions = new Map<string, number>()
+  private readonly serializer: Public<RPCJsonSerializer> | undefined
+
+  constructor(options: MemoryCacheStoreOptions = {}) {
+    this.serializer = options.serializer
+  }
 
   async get(key: unknown): Promise<CacheEntry | undefined> {
-    const entry = this.entries.get(encodeCacheKey(key))
+    const entry = this.entries.get(encodeCacheKey(key, this.serializer))
 
     if (!entry) {
       return undefined
     }
 
     if (entry.evictAt !== undefined && Date.now() >= entry.evictAt) {
-      this.entries.delete(encodeCacheKey(key))
+      this.entries.delete(encodeCacheKey(key, this.serializer))
       return undefined
     }
 
@@ -41,7 +57,7 @@ export class MemoryCacheStore implements CacheStore {
     )
 
     if (revalidated) {
-      this.entries.delete(encodeCacheKey(key))
+      this.entries.delete(encodeCacheKey(key, this.serializer))
       return undefined
     }
 
@@ -57,7 +73,7 @@ export class MemoryCacheStore implements CacheStore {
     const expiresAt = options?.ttl !== undefined ? Date.now() + options.ttl : undefined
     const evictAt = expiresAt !== undefined ? expiresAt + (options?.swr ?? 0) : undefined
 
-    this.entries.set(encodeCacheKey(key), {
+    this.entries.set(encodeCacheKey(key, this.serializer), {
       output,
       tags,
       tagVersions: tags.map(tag => this.tagVersions.get(tag) ?? 0),
