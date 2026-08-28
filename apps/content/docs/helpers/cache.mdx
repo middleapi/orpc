@@ -40,7 +40,6 @@ An entry stays fresh for `ttl` milliseconds and is retained for an extra `swr` w
 | `RedisCacheStore`             | [Redis](https://github.com/redis/redis)                                                                                                                              |
 | `VercelCacheStore`            | [Vercel Runtime Cache](https://vercel.com/docs/caching/runtime-cache)                                                                                                |
 | `CloudflareKVCacheStore`      | [Cloudflare Workers KV](https://developers.cloudflare.com/kv/)                                                                                                       |
-| `CloudflareCacheApiCacheStore` | [Cloudflare Cache API](https://developers.cloudflare.com/workers/runtime-apis/cache/) with [tag purging](https://developers.cloudflare.com/cache/how-to/purge-cache/purge-by-tags/) |
 | `CloudflareWorkersCacheStore` | [Cloudflare Workers Caching](https://developers.cloudflare.com/workers/cache/), purge only                                                                          |
 
 <CodeGroup>
@@ -114,47 +113,6 @@ export default {
        * @default 'orpc:cache:'
        */
       prefix: 'orpc:cache:',
-
-      /**
-       * Serializer for cached outputs. The default preserves Date, BigInt,
-       * Set, Map, URL, RegExp, NaN, and undefined values, and rejects
-       * outputs containing Blob or File values.
-       */
-      serializer: undefined,
-    })
-  },
-}
-```
-
-```ts cloudflare-cache-api
-import { CloudflareCacheApiCacheStore } from '@orpc/cloudflare'
-
-export default {
-  async fetch(request, env) {
-    // Entries are cached per data center, while revalidations
-    // purge their tags zone-wide through Cloudflare's Instant Purge.
-    const store = new CloudflareCacheApiCacheStore({
-      /**
-       * An URL under your zone used to derive the synthetic cache keys.
-       */
-      baseUrl: 'https://example.com/__orpc/cache',
-
-      /**
-       * The zone ID used for tag purges.
-       */
-      zoneId: env.CF_ZONE_ID,
-
-      /**
-       * An API token with the Zone > Cache Purge permission.
-       */
-      apiToken: env.CF_API_TOKEN,
-
-      /**
-       * The Cache API instance to store entries in.
-       *
-       * @default caches.default
-       */
-      cache: caches.default,
 
       /**
        * Serializer for cached outputs. The default preserves Date, BigInt,
