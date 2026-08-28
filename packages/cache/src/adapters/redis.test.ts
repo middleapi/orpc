@@ -146,3 +146,174 @@ describe.concurrent('redis cache store integration', {
     await lazyRedis.destroy()
   })
 })
+
+describe('redis cache store with a mocked client', () => {
+  function createMockedRedis() {
+    const multi = {
+      incr: vi.fn(() => multi),
+      exec: vi.fn(async () => []),
+    }
+
+    const redis = {
+      isOpen: true,
+      connect: vi.fn(async () => {
+        redis.isOpen = true
+      }),
+      get: vi.fn(async (_key: string): Promise<string | null> => null),
+      set: vi.fn(async (_key: string, _value: string, _options?: unknown) => 'OK'),
+      del: vi.fn(async (_key: string) => 1),
+      incr: vi.fn(async (_key: string) => 1),
+      mGet: vi.fn(async (_keys: string[]): Promise<(string | null)[]> => []),
+      multi: vi.fn(() => multi),
+    }
+
+    return { redis, multi }
+  }
+
+  function createMockedStore() {
+    const { redis, multi } = createMockedRedis()
+    return { store: new RedisCacheStore({ redis: redis as any, prefix: 'p:' }), redis, multi }
+  }
+
+  it('misses on unknown keys without connecting an open client', async () => {
+    const { store, redis } = createMockedStore()
+
+    await expect(store.get('k')).resolves.toBeUndefined()
+
+    expect(redis.get).toHaveBeenCalledWith('p:entry:k')
+    expect(redis.connect).not.toHaveBeenCalled()
+  })
+
+  it('lazily connects a closed client', async () => {
+    const { store, redis } = createMockedStore()
+    redis.isOpen = false
+
+    await store.get('k')
+
+    expect(redis.connect).toHaveBeenCalledTimes(1)
+  })
+
+  it('stores envelopes with snapshotted tag versions and PX retention', async () => {
+    const { store, redis } = createMockedStore()
+    redis.mGet.mockResolvedValueOnce(['2'])
+
+    await store.set('k', { a: 1 }, { tags: ['t'], ttl: 1000, swr: 500 })
+
+    expect(redis.mGet).toHaveBeenCalledWith(['p:tag:t'])
+    expect(redis.set).toHaveBeenCalledWith(
+      'p:entry:k',
+      expect.stringContaining('"tagVersions":{"t":2}'),
+      { expiration: { type: 'PX', value: 1500 } },
+    )
+  })
+
+  it('stores untagged entries without expiration or tag reads', async () => {
+    const { store, redis } = createMockedStore()
+
+    await store.set('k', 'v')
+
+    expect(redis.mGet).not.toHaveBeenCalled()
+    expect(redis.set).toHaveBeenCalledWith('p:entry:k', expect.any(String), undefined)
+  })
+
+  it('ignores outputs containing blobs', async () => {
+    const { store, redis } = createMockedStore()
+
+    await store.set('k', { file: new Blob(['x']) })
+
+    expect(redis.set).not.toHaveBeenCalled()
+  })
+
+  it('round-trips stored envelopes, skipping tag reads for untagged entries', async () => {
+    const { store, redis } = createMockedStore()
+
+    await store.set('k', { a: 1 })
+    redis.get.mockResolvedValueOnce(redis.set.mock.calls[0]![1])
+
+    await expect(store.get('k')).resolves.toEqual({ output: { a: 1 }, tags: [], expiresAt: undefined })
+    expect(redis.mGet).not.toHaveBeenCalled()
+  })
+
+  it('returns entries whose tag versions still match', async () => {
+    const { store, redis } = createMockedStore()
+    redis.mGet.mockResolvedValue(['2'])
+
+    await store.set('k', 'v', { tags: ['t'], ttl: 1000 })
+    redis.get.mockResolvedValueOnce(redis.set.mock.calls[0]![1])
+
+    const entry = await store.get('k')
+    expect(entry!.output).toBe('v')
+    expect(entry!.tags).toEqual(['t'])
+    expect(entry!.expiresAt).toBeGreaterThan(0)
+  })
+
+  it('deletes and misses entries whose tag versions changed', async () => {
+    const { store, redis } = createMockedStore()
+    redis.mGet.mockResolvedValueOnce(['2'])
+
+    await store.set('k', 'v', { tags: ['t'] })
+    redis.get.mockResolvedValueOnce(redis.set.mock.calls[0]![1])
+    redis.mGet.mockResolvedValueOnce(['3']) // revalidated since the snapshot
+
+    await expect(store.get('k')).resolves.toBeUndefined()
+    expect(redis.del).toHaveBeenCalledWith('p:entry:k')
+  })
+
+  it('revalidates a single tag with one INCR, and many atomically', async () => {
+    const { store, redis, multi } = createMockedStore()
+
+    await store.revalidateTag('t')
+    expect(redis.incr).toHaveBeenCalledWith('p:tag:t')
+
+    await store.revalidateTag(['a', 'b'])
+    expect(multi.incr).toHaveBeenCalledWith('p:tag:a')
+    expect(multi.incr).toHaveBeenCalledWith('p:tag:b')
+    expect(multi.exec).toHaveBeenCalledTimes(1)
+
+    await store.revalidateTag([])
+    expect(redis.incr).toHaveBeenCalledTimes(1)
+    expect(multi.exec).toHaveBeenCalledTimes(1)
+  })
+
+  it('supports a custom serializer and treats missing tag counters as zero', async () => {
+    const serializer = new RPCSerializer()
+    const serializeSpy = vi.spyOn(serializer, 'serialize')
+    const { redis } = createMockedRedis()
+    const store = new RedisCacheStore({ redis: redis as any })
+
+    redis.mGet.mockResolvedValueOnce([null])
+    await store.set('k', 'v', { tags: ['t'], ttl: 1000 })
+
+    expect(redis.set).toHaveBeenCalledWith(
+      'entry:k',
+      expect.stringContaining('"tagVersions":{"t":0}'),
+      { expiration: { type: 'PX', value: 1000 } },
+    )
+
+    const customStore = new RedisCacheStore({ redis: redis as any, serializer })
+    redis.get.mockResolvedValueOnce(redis.set.mock.calls[0]![1])
+    redis.mGet.mockResolvedValueOnce([null]) // still matches the zero snapshot
+
+    await expect(customStore.get('k')).resolves.toMatchObject({ output: 'v' })
+    expect(serializeSpy).not.toHaveBeenCalled() // only used for writes and key encoding
+  })
+
+  it('treats tags missing from the snapshot as version zero', async () => {
+    const { store, redis } = createMockedStore()
+
+    redis.get.mockResolvedValueOnce(JSON.stringify({ output: { json: 'v' }, tags: ['t'], tagVersions: {} }))
+    redis.mGet.mockResolvedValueOnce([null])
+
+    await expect(store.get('k')).resolves.toMatchObject({ output: 'v' })
+  })
+
+  it('encodes non-string keys stably', async () => {
+    const { store, redis } = createMockedStore()
+
+    await store.get([['planet', 'find'], { b: 2, a: 1 }])
+    await store.get([['planet', 'find'], { a: 1, b: 2 }])
+
+    expect(redis.get.mock.calls[0]![0]).toBe(redis.get.mock.calls[1]![0])
+    expect(redis.get.mock.calls[0]![0]).toMatch(/^p:entry:\[/)
+  })
+})

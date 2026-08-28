@@ -68,14 +68,15 @@ export class KVCacheStore implements CacheStore {
   }
 
   async get(key: unknown): Promise<CacheEntry | undefined> {
-    const envelope = await this.kv.get<KVCacheStoreEnvelope>(this.entryKey(key), 'json')
+    const entryKey = this.entryKey(key)
+    const envelope = await this.kv.get<KVCacheStoreEnvelope>(entryKey, 'json')
 
     if (envelope === null) {
       return undefined
     }
 
     if (envelope.evictAt !== undefined && Date.now() >= envelope.evictAt) {
-      await this.kv.delete(this.entryKey(key))
+      await this.kv.delete(entryKey)
       return undefined
     }
 
@@ -87,7 +88,7 @@ export class KVCacheStore implements CacheStore {
       )
 
       if (revalidated) {
-        await this.kv.delete(this.entryKey(key))
+        await this.kv.delete(entryKey)
         return undefined
       }
     }

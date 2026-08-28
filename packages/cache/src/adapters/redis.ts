@@ -62,7 +62,8 @@ export class RedisCacheStore implements CacheStore {
   async get(key: unknown): Promise<CacheEntry | undefined> {
     await this.ensureConnection()
 
-    const raw = await this.redis.get(this.entryKey(key))
+    const entryKey = this.entryKey(key)
+    const raw = await this.redis.get(entryKey)
 
     if (raw === null) {
       return undefined
@@ -78,7 +79,7 @@ export class RedisCacheStore implements CacheStore {
       )
 
       if (revalidated) {
-        await this.redis.del(this.entryKey(key))
+        await this.redis.del(entryKey)
         return undefined
       }
     }

@@ -51,14 +51,15 @@ export class VercelCacheStore implements CacheStore {
   }
 
   async get(key: unknown): Promise<CacheEntry | undefined> {
-    const envelope = await this.cache.get(encodeCacheKey(key)) as VercelCacheStoreEnvelope | null | undefined
+    const encodedKey = encodeCacheKey(key)
+    const envelope = await this.cache.get(encodedKey) as VercelCacheStoreEnvelope | null | undefined
 
     if (envelope == null) {
       return undefined
     }
 
     if (envelope.evictAt !== undefined && Date.now() >= envelope.evictAt) {
-      await this.cache.delete(encodeCacheKey(key))
+      await this.cache.delete(encodedKey)
       return undefined
     }
 

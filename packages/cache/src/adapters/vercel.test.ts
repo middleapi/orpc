@@ -72,6 +72,24 @@ describe('vercelCacheStore', () => {
       await expect(store.get('a')).resolves.toBeUndefined()
       await expect(store.get('b')).resolves.toBeUndefined()
     })
+
+    it('defaults to getCache when no cache is given', async () => {
+      const store = new VercelCacheStore()
+      const key = crypto.randomUUID()
+
+      await store.set(key, 'v')
+
+      await expect(store.get(key)).resolves.toMatchObject({ output: 'v' })
+    })
+
+    it('skips purging when no tags are given', async () => {
+      const store = createTestingStore()
+
+      await store.set('k', 'v', { tags: ['t'] })
+      await store.revalidateTag([])
+
+      await expect(store.get('k')).resolves.toBeDefined()
+    })
   })
 
   describe('against a mocked runtime cache', () => {
@@ -108,6 +126,15 @@ describe('vercelCacheStore', () => {
       await store.set('k', 'v', { tags: ['t'], ttl: 1000, swr: 500 })
 
       expect(cache.set).toHaveBeenCalledWith('k', expect.objectContaining({ tags: ['t'], expiresAt: 1000, evictAt: 1500 }), { tags: ['t'], ttl: 2 })
+    })
+
+    it('maps a ttl without swr to its exact retention', async () => {
+      const cache = createMockedCache()
+      const store = new VercelCacheStore({ cache })
+
+      await store.set('k', 'v', { ttl: 1000 })
+
+      expect(cache.set).toHaveBeenCalledWith('k', expect.objectContaining({ expiresAt: 1000, evictAt: 1000 }), { ttl: 1 })
     })
 
     it('omits ttl and tags options when unset', async () => {

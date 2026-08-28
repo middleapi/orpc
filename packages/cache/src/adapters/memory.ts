@@ -41,14 +41,15 @@ export class MemoryCacheStore implements CacheStore {
   }
 
   async get(key: unknown): Promise<CacheEntry | undefined> {
-    const entry = this.entries.get(encodeCacheKey(key, this.serializer))
+    const encodedKey = encodeCacheKey(key, this.serializer)
+    const entry = this.entries.get(encodedKey)
 
     if (!entry) {
       return undefined
     }
 
     if (entry.evictAt !== undefined && Date.now() >= entry.evictAt) {
-      this.entries.delete(encodeCacheKey(key, this.serializer))
+      this.entries.delete(encodedKey)
       return undefined
     }
 
@@ -57,7 +58,7 @@ export class MemoryCacheStore implements CacheStore {
     )
 
     if (revalidated) {
-      this.entries.delete(encodeCacheKey(key, this.serializer))
+      this.entries.delete(encodedKey)
       return undefined
     }
 

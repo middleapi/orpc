@@ -34,6 +34,26 @@ describe('workersCacheStore', () => {
     expect(purger.purge).toHaveBeenCalledWith({ tags: ['planets'] })
   })
 
+  it('skips purging when no tags are given', async () => {
+    const purger = createPurger()
+    const store = new WorkersCacheStore({ cache: purger })
+
+    await store.revalidateTag([])
+
+    expect(purger.purge).not.toHaveBeenCalled()
+  })
+
+  it('throws a bare error when the purge fails without messages', async () => {
+    const purger = {
+      purge: vi.fn(async () => ({ success: false })),
+    }
+    const store = new WorkersCacheStore({ cache: purger })
+
+    await expect(store.revalidateTag('planets')).rejects.toThrow(
+      'WorkersCacheStore failed to purge tags',
+    )
+  })
+
   it('throws when the purge fails, including error messages', async () => {
     const purger = {
       purge: vi.fn(async () => ({ success: false, errors: [{ code: 429, message: 'Rate limited' }] })),

@@ -77,6 +77,15 @@ describe('kvCacheStore', () => {
     await expect(store.get('other')).resolves.toBeDefined()
   })
 
+  it('skips revalidation when no tags are given', async () => {
+    const { store } = createTestingStore()
+
+    await store.set('k', 'v', { tags: ['t'] })
+    await store.revalidateTag([])
+
+    await expect(store.get('k')).resolves.toBeDefined()
+  })
+
   it('revalidates many tags at once', async () => {
     const { store } = createTestingStore()
 
@@ -120,6 +129,16 @@ describe('kvCacheStore', () => {
 
     await expect(store.get('evicted')).resolves.toBeUndefined()
     await expect(env.CACHE_KV.get(`${prefix}entry:evicted`)).resolves.toBeNull()
+  })
+
+  it('defaults to no prefix', async () => {
+    const store = new KVCacheStore({ kv: env.CACHE_KV })
+    const key = crypto.randomUUID()
+
+    await store.set(key, 'v')
+
+    await expect(env.CACHE_KV.get(`entry:${key}`)).resolves.toBeTypeOf('string')
+    await expect(store.get(key)).resolves.toMatchObject({ output: 'v' })
   })
 
   it('stores entries and tag tokens under the prefixed key families', async () => {
