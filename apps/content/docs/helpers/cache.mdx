@@ -34,13 +34,15 @@ An entry stays fresh for `ttl` milliseconds and is retained for an extra `swr` w
 
 ## Adapters
 
-| Name                          | Adapter for                                                                                                                                                          |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MemoryCacheStore`            | In-memory storage                                                                                                                                                    |
-| `RedisCacheStore`             | [Redis](https://github.com/redis/redis)                                                                                                                              |
-| `VercelCacheStore`            | [Vercel Runtime Cache](https://vercel.com/docs/caching/runtime-cache)                                                                                                |
-| `KVCacheStore`      | [Cloudflare Workers KV](https://developers.cloudflare.com/kv/)                                                                                                       |
-| `WorkersCacheStore` | [Cloudflare Workers Caching](https://developers.cloudflare.com/workers/cache/), purge only                                                                          |
+| Name                | Adapter for                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------ |
+| `MemoryCacheStore`  | In-memory storage                                                                          |
+| `RedisCacheStore`   | [Redis](https://github.com/redis/redis)                                                    |
+| `VercelCacheStore`  | [Vercel Runtime Cache](https://vercel.com/docs/caching/runtime-cache)                      |
+| `KVCacheStore`      | [Cloudflare Workers KV](https://developers.cloudflare.com/kv/)                             |
+| `WorkersCacheStore` | [Cloudflare Workers Caching](https://developers.cloudflare.com/workers/cache/), purge only |
+
+Keys may be any serializable value. Strings are used verbatim, while anything else is encoded with `encodeCacheKey`: serialized first, so complex values like Date, Map, or Set become plain JSON, then canonicalized, so structurally equal keys resolve the same entry regardless of property order. Reuse it when implementing your own store.
 
 <CodeGroup>
 
