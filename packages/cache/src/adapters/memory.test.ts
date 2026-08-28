@@ -36,12 +36,15 @@ describe('memoryCacheStore', () => {
     await expect(store.get([['planet', 'list'], { a: 1, b: 2 }])).resolves.toBeUndefined()
   })
 
-  it('throws for keys containing blobs', async () => {
+  it('encodes complex key values, ignoring unsupported ones like blobs', async () => {
     const store = new MemoryCacheStore()
 
-    await expect(store.get({ file: new Blob(['x']) })).rejects.toThrow(
-      'Cache keys must be serializable to JSON, provide an explicit string key instead',
-    )
+    await store.set({ date: new Date(1), big: 1n }, 'v')
+    await expect(store.get({ big: 1n, date: new Date(1) })).resolves.toMatchObject({ output: 'v' })
+    await expect(store.get({ big: 2n, date: new Date(1) })).resolves.toBeUndefined()
+
+    await store.set({ file: new Blob(['a']), id: 1 }, 'blobbed')
+    await expect(store.get({ file: new Blob(['b']), id: 1 })).resolves.toMatchObject({ output: 'blobbed' })
   })
 
   it('returns fresh entries with a future expiresAt, then evicts at ttl without swr', async () => {

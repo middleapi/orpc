@@ -2,7 +2,8 @@ import type { Public } from '@orpc/shared'
 import type { RedisClientType } from 'redis'
 import type { CacheEntry, CacheSetOptions, CacheStore } from '../types'
 import { RPCSerializer } from '@orpc/client'
-import { deepSortKeys, isAsyncIteratorObject, stringifyJSON, toArray } from '@orpc/shared'
+import { isAsyncIteratorObject, stringifyJSON, toArray } from '@orpc/shared'
+import { encodeCacheKey } from '../utils'
 
 interface RedisCacheStoreEnvelope {
   /**
@@ -147,22 +148,8 @@ export class RedisCacheStore implements CacheStore {
     await multi.exec()
   }
 
-  private encodeKey(key: unknown): string {
-    if (typeof key === 'string') {
-      return key
-    }
-
-    const serialized = this.serializer.serialize(deepSortKeys(key))
-
-    if (serialized instanceof Blob || serialized instanceof FormData || serialized instanceof ReadableStream || isAsyncIteratorObject(serialized)) {
-      throw new TypeError('Cache keys must be serializable to JSON, provide an explicit string key instead')
-    }
-
-    return `${stringifyJSON(serialized)}`
-  }
-
   private entryKey(key: unknown): string {
-    return `${this.prefix}entry:${this.encodeKey(key)}`
+    return `${this.prefix}entry:${encodeCacheKey(key)}`
   }
 
   private tagKey(tag: string): string {

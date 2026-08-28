@@ -1,7 +1,8 @@
 import type { CacheEntry, CacheSetOptions, CacheStore } from '@orpc/cache'
 import type { Public } from '@orpc/shared'
+import { encodeCacheKey } from '@orpc/cache'
 import { RPCSerializer } from '@orpc/client'
-import { deepSortKeys, isAsyncIteratorObject, stringifyJSON, toArray } from '@orpc/shared'
+import { isAsyncIteratorObject, stringifyJSON, toArray } from '@orpc/shared'
 
 interface KVCacheStoreEnvelope {
   /**
@@ -146,22 +147,8 @@ export class KVCacheStore implements CacheStore {
     await Promise.all(tags.map(t => this.kv.put(this.tagKey(t), crypto.randomUUID())))
   }
 
-  private encodeKey(key: unknown): string {
-    if (typeof key === 'string') {
-      return key
-    }
-
-    const serialized = this.serializer.serialize(deepSortKeys(key))
-
-    if (serialized instanceof Blob || serialized instanceof FormData || serialized instanceof ReadableStream || isAsyncIteratorObject(serialized)) {
-      throw new TypeError('Cache keys must be serializable to JSON, provide an explicit string key instead')
-    }
-
-    return `${stringifyJSON(serialized)}`
-  }
-
   private entryKey(key: unknown): string {
-    return `${this.prefix}entry:${this.encodeKey(key)}`
+    return `${this.prefix}entry:${encodeCacheKey(key)}`
   }
 
   private tagKey(tag: string): string {
