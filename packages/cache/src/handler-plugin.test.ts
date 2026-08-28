@@ -18,12 +18,29 @@ describe('cacheHandlerPlugin', () => {
   const handler = new RPCHandler(procedure, {
     allowMethods: ['GET'], // tests below send GET requests
     plugins: [
-      new CacheHandlerPlugin(),
+      new CacheHandlerPlugin({ headers: [CACHE_TAG_HEADER, CACHE_TAG_INVALIDATION_HEADER] }),
     ],
   })
 
   afterEach(() => {
     handlerFn.mockReset()
+  })
+
+  it('does nothing by default', async () => {
+    const defaultHandler = new RPCHandler(procedure, {
+      allowMethods: ['GET'],
+      plugins: [new CacheHandlerPlugin()],
+    })
+
+    handlerFn.mockImplementationOnce(({ context }) => {
+      expect(context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]).toBeUndefined()
+    })
+
+    const { response } = await defaultHandler.handle(new Request('http://localhost:3000'))
+
+    expect(handlerFn).toHaveBeenCalledTimes(1)
+    expect(response!.headers.get(CACHE_TAG_HEADER)).toBe(null)
+    expect(response!.headers.get(CACHE_TAG_INVALIDATION_HEADER)).toBe(null)
   })
 
   it('reflects cache tags from the first check of the called procedure', async () => {
@@ -155,7 +172,7 @@ describe('cacheHandlerPlugin', () => {
 
     const nestedHandler = new RPCHandler({ outer, inner }, {
       allowMethods: ['GET'],
-      plugins: [new CacheHandlerPlugin()],
+      plugins: [new CacheHandlerPlugin({ headers: [CACHE_TAG_HEADER, CACHE_TAG_INVALIDATION_HEADER] })],
     })
 
     const { response } = await nestedHandler.handle(new Request('http://localhost:3000/outer'), {
@@ -167,13 +184,13 @@ describe('cacheHandlerPlugin', () => {
   })
 })
 
-describe('cacheHandlerPlugin httpCacheHeaders', () => {
+describe('cacheHandlerPlugin cache-control and cache-tag headers', () => {
   const handlerFn = vi.fn()
   const procedure = os.handler(handlerFn)
   const handler = new RPCHandler(procedure, {
     allowMethods: ['GET', 'POST'],
     plugins: [
-      new CacheHandlerPlugin({ httpCacheHeaders: true }),
+      new CacheHandlerPlugin({ headers: ['cache-control', 'cache-tag'] }),
     ],
   })
 
@@ -190,7 +207,7 @@ describe('cacheHandlerPlugin httpCacheHeaders', () => {
 
     const { response } = await handler.handle(new Request('http://localhost:3000'))
 
-    expect(response!.headers.get(CACHE_TAG_HEADER)).toBe('planets,a%2Cb')
+    expect(response!.headers.get(CACHE_TAG_HEADER)).toBe(null) // only configured headers are set
     expect(response!.headers.get('cache-tag')).toBe('planets,a%2Cb')
     expect(response!.headers.get('cache-control')).toBe('public, s-maxage=2, stale-while-revalidate=1')
   })
@@ -221,7 +238,6 @@ describe('cacheHandlerPlugin httpCacheHeaders', () => {
       headers: { 'content-type': 'application/json' },
     }))
 
-    expect(response!.headers.get(CACHE_TAG_HEADER)).toBe('planets')
     expect(response!.headers.get('cache-tag')).toBe(null)
     expect(response!.headers.get('cache-control')).toBe(null)
   })
@@ -235,25 +251,6 @@ describe('cacheHandlerPlugin httpCacheHeaders', () => {
 
     const { response } = await handler.handle(new Request('http://localhost:3000'))
 
-    expect(response!.headers.get(CACHE_TAG_INVALIDATION_HEADER)).toBe('planets')
-    expect(response!.headers.get('cache-control')).toBe(null)
-  })
-
-  it('never emits HTTP caching headers by default', async () => {
-    const defaultHandler = new RPCHandler(procedure, {
-      allowMethods: ['GET'],
-      plugins: [new CacheHandlerPlugin()],
-    })
-
-    handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
-      context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL].caches.push(
-        { path, procedure, hit: false, stale: false, key: 'k', tags: ['planets'], ttl: 1500 },
-      )
-    })
-
-    const { response } = await defaultHandler.handle(new Request('http://localhost:3000'))
-
-    expect(response!.headers.get(CACHE_TAG_HEADER)).toBe('planets')
     expect(response!.headers.get('cache-tag')).toBe(null)
     expect(response!.headers.get('cache-control')).toBe(null)
   })

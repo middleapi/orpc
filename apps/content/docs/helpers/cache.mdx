@@ -153,7 +153,7 @@ import { WorkersCacheStore } from '@orpc/cloudflare'
 export default {
   async fetch(request, env, ctx) {
     // Workers Caching caches whole responses in front of the Worker via the
-    // `httpCacheHeaders` option of the handler plugin; this store only purges
+    // `cache-control` and `cache-tag` plugin headers; this store only purges
     // tags on revalidation. Requires `"cache": { "enabled": true }` in your
     // wrangler configuration. Purges are scoped to the calling entrypoint,
     // tags match case-insensitively, and purge calls always use the Free
@@ -246,35 +246,28 @@ const updatePlanet = os
 
 ## Handler Plugin
 
-The `CacheHandlerPlugin` reflects cache activity in HTTP response headers when used with [Cache Middleware](#cache-middleware) and [Revalidate Middleware](#revalidate-middleware):
+The `CacheHandlerPlugin` reflects the cache activity of [Cache Middleware](#cache-middleware) and [Revalidate Middleware](#revalidate-middleware) into response headers. It does nothing by default; only the headers you list are set:
 
 - `orpc-cache-tag` carries the tags the response depends on.
 - `orpc-cache-tag-invalidation` carries the tags revalidated by the request, useful for invalidating tagged data in client caches.
+- `cache-control` and `cache-tag` are the standard HTTP counterparts for response caches in front, such as CDNs or Cloudflare Workers Caching. They are only set on GET and HEAD responses and never override existing headers.
 
 Tags are joined with commas. Only `%`, `,`, and characters that cannot appear in a header value are percent-encoded, so typical tags stay readable. Use `decodeCacheTagHeader` to parse a header back into tags.
 
 ```ts
-import { CacheHandlerPlugin } from '@orpc/cache'
+import { CACHE_TAG_HEADER, CACHE_TAG_INVALIDATION_HEADER, CacheHandlerPlugin } from '@orpc/cache'
 
 const handler = new RPCHandler(router, {
   plugins: [
     new CacheHandlerPlugin({
-      /**
-       * Also reflect the root cache check into `Cache-Control` and `Cache-Tag`
-       * headers on GET and HEAD responses, so response caches in front, such
-       * as CDNs or Cloudflare Workers Caching, can serve and purge whole
-       * responses. Headers already present are never overridden.
-       *
-       * @default false
-       */
-      httpCacheHeaders: false,
+      headers: [CACHE_TAG_HEADER, CACHE_TAG_INVALIDATION_HEADER],
     }),
   ],
 })
 ```
 
 :::info[Response Caches in Front]
-With `httpCacheHeaders` enabled, a response cache in front serves cached responses without invoking your server at all. Pair it with a purge-capable store, such as `WorkersCacheStore`, so revalidations also purge the front cache. Since standard HTTP caches only store GET and HEAD responses, this mainly benefits [OpenAPIHandler](/docs/openapi/handler) routes; RPC requests use POST.
+With `cache-control` and `cache-tag` configured, a response cache in front serves cached responses without invoking your server at all. Pair it with a purge-capable store, such as `WorkersCacheStore`, so revalidations also purge the front cache. Since standard HTTP caches only store GET and HEAD responses, this mainly benefits [OpenAPIHandler](/docs/openapi/handler) routes; RPC requests use POST.
 :::
 
 :::info

@@ -57,39 +57,55 @@ export function decodeCacheTagHeader(header: string): string[] {
   return header.split(',').filter(Boolean).map(tryDecodeURIComponent)
 }
 
+/**
+ * The response headers the cache handler plugin can set.
+ *
+ * @see {@link https://orpc.dev/docs/helpers/cache#handler-plugin | Cache Helpers - Handler Plugin}
+ */
+export type CacheHandlerPluginHeader
+  = | typeof CACHE_TAG_HEADER
+    | typeof CACHE_TAG_INVALIDATION_HEADER
+    | 'cache-control'
+    | 'cache-tag'
+
 export interface CacheHandlerPluginOptions {
   /**
-   * Also reflects the root cache check into standard HTTP caching headers on
-   * GET and HEAD responses: `Cache-Tag` with the same encoded tags, and
-   * `Cache-Control: public, s-maxage=...` (plus `stale-while-revalidate` when
-   * `swr` is set) derived from the check's freshness. Headers already present
-   * on the response are never overridden. This lets response caches in front,
-   * such as CDNs or Cloudflare Workers Caching, serve and purge whole responses.
+   * The response headers to set from the root procedure's cache activity;
+   * only listed headers are set. `orpc-cache-tag` carries the tags the
+   * response depends on and `orpc-cache-tag-invalidation` the tags
+   * revalidated by the request, for client-side revalidation. `cache-tag`
+   * and `cache-control` are their standard HTTP counterparts for response
+   * caches in front, such as CDNs or Cloudflare Workers Caching: they are
+   * only set on GET and HEAD responses and never override existing headers.
    *
-   * @default false
+   * @default []
    */
-  httpCacheHeaders?: boolean
+  headers?: readonly CacheHandlerPluginHeader[]
 }
 
 /**
- * Reflects cache tags and revalidated tags into the `orpc-cache-tag` and
- * `orpc-cache-tag-invalidation` response headers when used with the `cache` and
- * `revalidate` middlewares. Only the first check belonging to the procedure
- * the client called is reflected, so nested procedure calls never leak
- * their tags into the response.
+ * Reflects the cache activity of the `cache` and `revalidate` middlewares
+ * into the configured response headers. Only the first check belonging to
+ * the procedure the client called is reflected, so nested procedure calls
+ * never leak their tags into the response. Does nothing until headers are
+ * configured.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#handler-plugin | Cache Helpers - Handler Plugin}
  */
 export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
   name = '~cache'
 
-  private readonly httpCacheHeaders: boolean
+  private readonly headers: Set<CacheHandlerPluginHeader>
 
   constructor(options: CacheHandlerPluginOptions = {}) {
-    this.httpCacheHeaders = options.httpCacheHeaders ?? false
+    this.headers = new Set(options.headers)
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
+    if (!this.headers.size) {
+      return options
+    }
+
     const interceptor: StandardHandlerInterceptor<T> = async (interceptorOptions) => {
       const pluginContext: Exclude<CacheHandlerPluginContext[typeof CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL], undefined> = { caches: [], revalidations: [] }
 
@@ -109,39 +125,38 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
       )
 
       const method = interceptorOptions.request.method.toUpperCase()
-      const emitHttpHeaders = this.httpCacheHeaders && rootCache !== undefined && (method === 'GET' || method === 'HEAD')
-
-      if (!rootCache?.tags.length && !rootRevalidation?.tags.length && !emitHttpHeaders) {
-        return response
-      }
+      const isHttpCacheable = rootCache !== undefined && (method === 'GET' || method === 'HEAD')
 
       const headers: StandardHeaders = { ...response.headers }
+      let changed = false
 
-      if (rootCache?.tags.length) {
+      if (this.headers.has(CACHE_TAG_HEADER) && rootCache?.tags.length) {
         headers[CACHE_TAG_HEADER] = encodeCacheTagHeader(rootCache.tags)
+        changed = true
       }
 
-      if (rootRevalidation?.tags.length) {
+      if (this.headers.has(CACHE_TAG_INVALIDATION_HEADER) && rootRevalidation?.tags.length) {
         headers[CACHE_TAG_INVALIDATION_HEADER] = encodeCacheTagHeader(rootRevalidation.tags)
+        changed = true
       }
 
-      if (emitHttpHeaders) {
-        if (headers['cache-tag'] === undefined && rootCache.tags.length) {
-          headers['cache-tag'] = encodeCacheTagHeader(rootCache.tags)
-        }
-
-        if (headers['cache-control'] === undefined) {
-          /**
-           * Entries without a ttl stay valid until revalidated, so front caches
-           * hold them for a year and rely on tag purges.
-           */
-          const sMaxAge = rootCache.ttl !== undefined ? Math.ceil(rootCache.ttl / 1000) : 31536000
-          const staleWhileRevalidate = rootCache.swr !== undefined && rootCache.swr > 0 ? `, stale-while-revalidate=${Math.ceil(rootCache.swr / 1000)}` : ''
-          headers['cache-control'] = `public, s-maxage=${sMaxAge}${staleWhileRevalidate}`
-        }
+      if (this.headers.has('cache-tag') && isHttpCacheable && rootCache.tags.length && headers['cache-tag'] === undefined) {
+        headers['cache-tag'] = encodeCacheTagHeader(rootCache.tags)
+        changed = true
       }
 
-      return { ...response, headers }
+      if (this.headers.has('cache-control') && isHttpCacheable && headers['cache-control'] === undefined) {
+        /**
+         * Entries without a ttl stay valid until revalidated, so front caches
+         * hold them for a year and rely on tag purges.
+         */
+        const sMaxAge = rootCache.ttl !== undefined ? Math.ceil(rootCache.ttl / 1000) : 31536000
+        const staleWhileRevalidate = rootCache.swr !== undefined && rootCache.swr > 0 ? `, stale-while-revalidate=${Math.ceil(rootCache.swr / 1000)}` : ''
+        headers['cache-control'] = `public, s-maxage=${sMaxAge}${staleWhileRevalidate}`
+        changed = true
+      }
+
+      return changed ? { ...response, headers } : response
     }
 
     return {

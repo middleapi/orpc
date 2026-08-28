@@ -23,8 +23,8 @@ export interface WorkersCacheStoreOptions {
 /**
  * Purge-only cache store for Cloudflare Workers Caching. Responses are cached
  * in front of the Worker through `Cache-Control` and `Cache-Tag` headers (see
- * the `CacheHandlerPlugin` `httpCacheHeaders` option), so `get` always misses
- * and `set` stores nothing; `revalidateTag` purges the tags through Workers
+ * the `CacheHandlerPlugin` `headers` option), so `get` always misses and
+ * `set` stores nothing; `revalidateTag` purges the tags through Workers
  * Caching.
  *
  * @remarks

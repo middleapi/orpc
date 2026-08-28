@@ -2,7 +2,7 @@ import type { CacheContext } from '../src'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { z } from 'zod'
-import { cache, CacheHandlerPlugin, revalidate } from '../src'
+import { cache, CACHE_TAG_HEADER, CACHE_TAG_INVALIDATION_HEADER, CacheHandlerPlugin, revalidate } from '../src'
 import { MemoryCacheStore } from '../src/adapters/memory'
 
 it('works', async () => {
@@ -32,7 +32,7 @@ it('works', async () => {
 
   const handler = new RPCHandler(router, {
     plugins: [
-      new CacheHandlerPlugin(),
+      new CacheHandlerPlugin({ headers: [CACHE_TAG_HEADER, CACHE_TAG_INVALIDATION_HEADER] }),
     ],
   })
 
