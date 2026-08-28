@@ -1,12 +1,12 @@
-import type { CloudflareKVCacheStoreOptions } from './cache'
+import type { KVCacheStoreOptions } from './kv-cache'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
-import { CloudflareKVCacheStore } from './cache'
+import { KVCacheStore } from './kv-cache'
 
-describe('cloudflareKVCacheStore', () => {
-  function createTestingStore(options: CloudflareKVCacheStoreOptions = {}) {
+describe('kvCacheStore', () => {
+  function createTestingStore(options: KVCacheStoreOptions = {}) {
     const prefix = `orpc-kv-cache-store-${crypto.randomUUID()}:`
-    return { store: new CloudflareKVCacheStore(env.CACHE_KV, { prefix, ...options }), prefix }
+    return { store: new KVCacheStore(env.CACHE_KV, { prefix, ...options }), prefix }
   }
 
   it('round-trips outputs with tags and expiresAt, including undefined', async () => {
@@ -49,7 +49,7 @@ describe('cloudflareKVCacheStore', () => {
 
     await expect(
       store.set('k', { file: new Blob(['x']) }),
-    ).rejects.toThrow('CloudflareKVCacheStore cannot cache outputs containing Blob or File values')
+    ).rejects.toThrow('KVCacheStore cannot cache outputs containing Blob or File values')
   })
 
   it('supports a custom serializer', async () => {

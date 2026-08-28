@@ -8,7 +8,7 @@ import { toArray } from '@orpc/shared'
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
-export interface CloudflareWorkersCachePurger {
+export interface WorkersCachePurger {
   purge(options: { tags: string[] }): Promise<{ success: boolean, errors?: { code?: number, message?: string }[] }>
 }
 
@@ -26,9 +26,9 @@ export interface CloudflareWorkersCachePurger {
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
-export class CloudflareWorkersCacheStore implements CacheStore {
+export class WorkersCacheStore implements CacheStore {
   constructor(
-    private readonly cache: CloudflareWorkersCachePurger,
+    private readonly cache: WorkersCachePurger,
   ) {}
 
   async get(_key: string): Promise<CacheEntry | undefined> {
@@ -53,7 +53,7 @@ export class CloudflareWorkersCacheStore implements CacheStore {
 
     if (!result.success) {
       const messages = toArray(result.errors).map(error => error.message).filter(Boolean).join('; ')
-      throw new Error(`CloudflareWorkersCacheStore failed to purge tags${messages ? `: ${messages}` : ''}`)
+      throw new Error(`WorkersCacheStore failed to purge tags${messages ? `: ${messages}` : ''}`)
     }
   }
 }

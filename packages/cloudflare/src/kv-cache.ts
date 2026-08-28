@@ -2,7 +2,7 @@ import type { CacheEntry, CacheOutputSerializer, CacheSetOptions, CacheStore } f
 import { createRpcJsonOutputSerializer } from '@orpc/cache'
 import { stringifyJSON, toArray } from '@orpc/shared'
 
-interface CloudflareKVCacheStoreEnvelope {
+interface KVCacheStoreEnvelope {
   /**
    * The cached output, encoded with the store's serializer.
    */
@@ -18,7 +18,7 @@ interface CloudflareKVCacheStoreEnvelope {
   evictAt?: number | undefined
 }
 
-export interface CloudflareKVCacheStoreOptions {
+export interface KVCacheStoreOptions {
   /**
    * The prefix to use for KV keys.
    *
@@ -48,22 +48,22 @@ export interface CloudflareKVCacheStoreOptions {
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
-export class CloudflareKVCacheStore implements CacheStore {
+export class KVCacheStore implements CacheStore {
   private readonly kv: KVNamespace
   private readonly prefix: string
   private readonly serializer: CacheOutputSerializer
 
   constructor(
     kv: KVNamespace,
-    options: CloudflareKVCacheStoreOptions = {},
+    options: KVCacheStoreOptions = {},
   ) {
     this.kv = kv
     this.prefix = options.prefix ?? ''
-    this.serializer = options.serializer ?? createRpcJsonOutputSerializer('CloudflareKVCacheStore')
+    this.serializer = options.serializer ?? createRpcJsonOutputSerializer('KVCacheStore')
   }
 
   async get(key: string): Promise<CacheEntry | undefined> {
-    const envelope = await this.kv.get<CloudflareKVCacheStoreEnvelope>(this.entryKey(key), 'json')
+    const envelope = await this.kv.get<KVCacheStoreEnvelope>(this.entryKey(key), 'json')
 
     if (envelope === null) {
       return undefined
@@ -110,7 +110,7 @@ export class CloudflareKVCacheStore implements CacheStore {
     const expiresAt = options?.ttl !== undefined ? Date.now() + options.ttl : undefined
     const evictAt = retention !== undefined ? Date.now() + retention : undefined
 
-    const envelope: CloudflareKVCacheStoreEnvelope = {
+    const envelope: KVCacheStoreEnvelope = {
       output: serialized,
       tags,
       tagTokens,

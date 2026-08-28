@@ -1,4 +1,4 @@
-export * from './cache'
+export * from './kv-cache'
 export * from './publisher'
 export * from './publisher-object'
 export * from './ratelimit'

@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
-import { CloudflareWorkersCacheStore } from './workers-cache'
+import { WorkersCacheStore } from './workers-cache'
 
-describe('cloudflareWorkersCacheStore', () => {
+describe('workersCacheStore', () => {
   const createPurger = () => ({
     purge: vi.fn(async () => ({ success: true })),
   })
 
   it('always misses and stores nothing', async () => {
     const purger = createPurger()
-    const store = new CloudflareWorkersCacheStore(purger)
+    const store = new WorkersCacheStore(purger)
 
     await store.set('k', 'v', { tags: ['t'], ttl: 1000 })
     await expect(store.get('k')).resolves.toBeUndefined()
@@ -17,7 +17,7 @@ describe('cloudflareWorkersCacheStore', () => {
 
   it('purges encoded tags through workers caching', async () => {
     const purger = createPurger()
-    const store = new CloudflareWorkersCacheStore(purger)
+    const store = new WorkersCacheStore(purger)
 
     await store.revalidateTag(['planets', 'a,b'])
 
@@ -27,7 +27,7 @@ describe('cloudflareWorkersCacheStore', () => {
 
   it('accepts a single tag', async () => {
     const purger = createPurger()
-    const store = new CloudflareWorkersCacheStore(purger)
+    const store = new WorkersCacheStore(purger)
 
     await store.revalidateTag('planets')
 
@@ -38,10 +38,10 @@ describe('cloudflareWorkersCacheStore', () => {
     const purger = {
       purge: vi.fn(async () => ({ success: false, errors: [{ code: 429, message: 'Rate limited' }] })),
     }
-    const store = new CloudflareWorkersCacheStore(purger)
+    const store = new WorkersCacheStore(purger)
 
     await expect(store.revalidateTag('planets')).rejects.toThrow(
-      'CloudflareWorkersCacheStore failed to purge tags: Rate limited',
+      'WorkersCacheStore failed to purge tags: Rate limited',
     )
   })
 })

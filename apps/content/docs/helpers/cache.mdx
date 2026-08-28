@@ -39,8 +39,8 @@ An entry stays fresh for `ttl` milliseconds and is retained for an extra `swr` w
 | `MemoryCacheStore`            | In-memory storage                                                                                                                                                    |
 | `RedisCacheStore`             | [Redis](https://github.com/redis/redis)                                                                                                                              |
 | `VercelCacheStore`            | [Vercel Runtime Cache](https://vercel.com/docs/caching/runtime-cache)                                                                                                |
-| `CloudflareKVCacheStore`      | [Cloudflare Workers KV](https://developers.cloudflare.com/kv/)                                                                                                       |
-| `CloudflareWorkersCacheStore` | [Cloudflare Workers Caching](https://developers.cloudflare.com/workers/cache/), purge only                                                                          |
+| `KVCacheStore`      | [Cloudflare Workers KV](https://developers.cloudflare.com/kv/)                                                                                                       |
+| `WorkersCacheStore` | [Cloudflare Workers Caching](https://developers.cloudflare.com/workers/cache/), purge only                                                                          |
 
 <CodeGroup>
 
@@ -100,13 +100,13 @@ const store = new VercelCacheStore({
 ```
 
 ```ts cloudflare-kv
-import { CloudflareKVCacheStore } from '@orpc/cloudflare'
+import { KVCacheStore } from '@orpc/cloudflare'
 
 export default {
   async fetch(request, env) {
     // KV is eventually consistent: writes and revalidations may take
     // 60 seconds or more to be visible in other locations.
-    const store = new CloudflareKVCacheStore(env.CACHE_KV, {
+    const store = new KVCacheStore(env.CACHE_KV, {
       /**
        * The prefix to use for KV keys.
        *
@@ -126,7 +126,7 @@ export default {
 ```
 
 ```ts cloudflare-workers-caching
-import { CloudflareWorkersCacheStore } from '@orpc/cloudflare'
+import { WorkersCacheStore } from '@orpc/cloudflare'
 
 export default {
   async fetch(request, env, ctx) {
@@ -136,7 +136,7 @@ export default {
     // wrangler configuration. Purges are scoped to the calling entrypoint,
     // tags match case-insensitively, and purge calls always use the Free
     // tier rate limits regardless of your plan.
-    const store = new CloudflareWorkersCacheStore(ctx.cache)
+    const store = new WorkersCacheStore(ctx.cache)
   },
 }
 ```
@@ -252,7 +252,7 @@ const handler = new RPCHandler(router, {
 ```
 
 :::info[Response Caches in Front]
-With `httpCacheHeaders` enabled, a response cache in front serves cached responses without invoking your server at all. Pair it with a purge-capable store, such as `CloudflareWorkersCacheStore`, so revalidations also purge the front cache. Since standard HTTP caches only store GET and HEAD responses, this mainly benefits [OpenAPIHandler](/docs/openapi/handler) routes; RPC requests use POST.
+With `httpCacheHeaders` enabled, a response cache in front serves cached responses without invoking your server at all. Pair it with a purge-capable store, such as `WorkersCacheStore`, so revalidations also purge the front cache. Since standard HTTP caches only store GET and HEAD responses, this mainly benefits [OpenAPIHandler](/docs/openapi/handler) routes; RPC requests use POST.
 :::
 
 :::info
