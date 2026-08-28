@@ -74,9 +74,10 @@ const store = new RedisCacheStore({
   prefix: undefined,
 
   /**
-   * Serializer for cached outputs. The default preserves Date, BigInt,
-   * Set, Map, URL, RegExp, NaN, and undefined values, and rejects
-   * outputs containing Blob or File values.
+   * Serializer for cached outputs. Outputs containing Blob or File
+   * values are ignored and never stored.
+   *
+   * @default RPCSerializer
    */
   serializer: undefined,
 })
@@ -96,9 +97,10 @@ const store = new VercelCacheStore({
   cache: getCache(),
 
   /**
-   * Serializer for cached outputs. The default preserves Date, BigInt,
-   * Set, Map, URL, RegExp, NaN, and undefined values, and rejects
-   * outputs containing Blob or File values.
+   * Serializer for cached outputs. Outputs containing Blob or File
+   * values are ignored and never stored.
+   *
+   * @default RPCSerializer
    */
   serializer: undefined,
 })
@@ -125,9 +127,10 @@ export default {
       prefix: undefined,
 
       /**
-       * Serializer for cached outputs. The default preserves Date, BigInt,
-       * Set, Map, URL, RegExp, NaN, and undefined values, and rejects
-       * outputs containing Blob or File values.
+       * Serializer for cached outputs. Outputs containing Blob or File
+       * values are ignored and never stored.
+       *
+       * @default RPCSerializer
        */
       serializer: undefined,
     })

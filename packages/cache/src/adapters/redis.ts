@@ -1,16 +1,14 @@
+import type { Public } from '@orpc/shared'
 import type { RedisClientType } from 'redis'
 import type { CacheEntry, CacheSetOptions, CacheStore } from '../types'
-import type { CacheOutputSerializer } from './output-serializer'
-import { stringifyJSON, toArray } from '@orpc/shared'
-import { createRpcJsonOutputSerializer } from './output-serializer'
-
-export type RedisCacheStoreSerializer = CacheOutputSerializer
+import { RPCSerializer } from '@orpc/client'
+import { isAsyncIteratorObject, stringifyJSON, toArray } from '@orpc/shared'
 
 interface RedisCacheStoreEnvelope {
   /**
    * The cached output, encoded with the store's serializer.
    */
-  output: string
+  output: unknown
   tags: readonly string[]
   /**
    * Tag version counters snapshotted at set time.
@@ -35,28 +33,29 @@ export interface RedisCacheStoreOptions {
   /**
    * Serializer for cached outputs.
    *
-   * @default an RPCJsonSerializer-backed serializer preserving Date, BigInt, Set, Map, URL, RegExp, NaN, and undefined values
+   * @default RPCSerializer
    */
-  serializer?: RedisCacheStoreSerializer
+  serializer?: undefined | Public<RPCSerializer>
 }
 
 /**
  * Cache store adapter for Redis with tag-based invalidation. Entries are
  * retained for `ttl + swr` via `PX` expiry; tag counters have no expiry
  * since expiring one would resurrect stale entries. Revalidated entries
- * are removed lazily on the next `get` of their key.
+ * are removed lazily on the next `get` of their key. Outputs containing
+ * Blob or File values are ignored and never stored.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
 export class RedisCacheStore implements CacheStore {
   private readonly redis: RedisClientType<any, any, any, any, any>
   private readonly prefix: string
-  private readonly serializer: RedisCacheStoreSerializer
+  private readonly serializer: Public<RPCSerializer>
 
   constructor(options: RedisCacheStoreOptions) {
     this.redis = options.redis
     this.prefix = options.prefix ?? ''
-    this.serializer = options.serializer ?? createRpcJsonOutputSerializer('RedisCacheStore')
+    this.serializer = options.serializer ?? new RPCSerializer()
   }
 
   async get(key: string): Promise<CacheEntry | undefined> {
@@ -84,17 +83,23 @@ export class RedisCacheStore implements CacheStore {
     }
 
     return {
-      output: this.serializer.parse(envelope.output),
+      output: this.serializer.deserialize(envelope.output as any),
       tags: envelope.tags,
       expiresAt: envelope.expiresAt,
     }
   }
 
   async set(key: string, output: unknown, options?: CacheSetOptions): Promise<void> {
+    const serialized = this.serializer.serialize(output)
+
+    // Outputs containing blobs or streaming values cannot be stored, so they are ignored.
+    if (serialized instanceof Blob || serialized instanceof FormData || serialized instanceof ReadableStream || isAsyncIteratorObject(serialized)) {
+      return
+    }
+
     await this.ensureConnection()
 
     const tags = options?.tags ?? []
-    const serialized = this.serializer.stringify(output)
 
     const tagVersions: Record<string, number> = {}
     if (tags.length) {

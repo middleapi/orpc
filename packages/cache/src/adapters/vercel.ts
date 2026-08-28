@@ -1,17 +1,15 @@
+import type { Public } from '@orpc/shared'
 import type { RuntimeCache } from '@vercel/functions'
 import type { CacheEntry, CacheSetOptions, CacheStore } from '../types'
-import type { CacheOutputSerializer } from './output-serializer'
-import { toArray } from '@orpc/shared'
+import { RPCSerializer } from '@orpc/client'
+import { isAsyncIteratorObject, toArray } from '@orpc/shared'
 import { getCache } from '@vercel/functions'
-import { createRpcJsonOutputSerializer } from './output-serializer'
-
-export type VercelCacheStoreSerializer = CacheOutputSerializer
 
 interface VercelCacheStoreEnvelope {
   /**
    * The cached output, encoded with the store's serializer.
    */
-  output: string
+  output: unknown
   tags: readonly string[]
   expiresAt?: number | undefined
   evictAt?: number | undefined
@@ -28,26 +26,27 @@ export interface VercelCacheStoreOptions {
   /**
    * Serializer for cached outputs.
    *
-   * @default an RPCJsonSerializer-backed serializer preserving Date, BigInt, Set, Map, URL, RegExp, NaN, and undefined values
+   * @default RPCSerializer
    */
-  serializer?: VercelCacheStoreSerializer
+  serializer?: undefined | Public<RPCSerializer>
 }
 
 /**
  * Cache store adapter for the Vercel Runtime Cache. Tags are expired
  * natively via `expireTag`, and entries are retained for `ttl + swr`
  * rounded up to whole seconds. Outside Vercel, the default `getCache()`
- * falls back to an in-memory cache.
+ * falls back to an in-memory cache. Outputs containing Blob or File
+ * values are ignored and never stored.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
 export class VercelCacheStore implements CacheStore {
   private readonly cache: RuntimeCache
-  private readonly serializer: VercelCacheStoreSerializer
+  private readonly serializer: Public<RPCSerializer>
 
   constructor(options: VercelCacheStoreOptions = {}) {
     this.cache = options.cache ?? getCache()
-    this.serializer = options.serializer ?? createRpcJsonOutputSerializer('VercelCacheStore')
+    this.serializer = options.serializer ?? new RPCSerializer()
   }
 
   async get(key: string): Promise<CacheEntry | undefined> {
@@ -63,20 +62,27 @@ export class VercelCacheStore implements CacheStore {
     }
 
     return {
-      output: this.serializer.parse(envelope.output),
+      output: this.serializer.deserialize(envelope.output as any),
       tags: envelope.tags,
       expiresAt: envelope.expiresAt,
     }
   }
 
   async set(key: string, output: unknown, options?: CacheSetOptions): Promise<void> {
+    const serialized = this.serializer.serialize(output)
+
+    // Outputs containing blobs or streaming values cannot be stored, so they are ignored.
+    if (serialized instanceof Blob || serialized instanceof FormData || serialized instanceof ReadableStream || isAsyncIteratorObject(serialized)) {
+      return
+    }
+
     const tags = options?.tags ?? []
     const retention = options?.ttl !== undefined ? options.ttl + (options.swr ?? 0) : undefined
     const expiresAt = options?.ttl !== undefined ? Date.now() + options.ttl : undefined
     const evictAt = retention !== undefined ? Date.now() + retention : undefined
 
     const envelope: VercelCacheStoreEnvelope = {
-      output: this.serializer.stringify(output),
+      output: serialized,
       tags,
       expiresAt,
       evictAt,

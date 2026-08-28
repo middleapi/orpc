@@ -1,12 +1,13 @@
-import type { CacheEntry, CacheOutputSerializer, CacheSetOptions, CacheStore } from '@orpc/cache'
-import { createRpcJsonOutputSerializer } from '@orpc/cache'
-import { stringifyJSON, toArray } from '@orpc/shared'
+import type { CacheEntry, CacheSetOptions, CacheStore } from '@orpc/cache'
+import type { Public } from '@orpc/shared'
+import { RPCSerializer } from '@orpc/client'
+import { isAsyncIteratorObject, stringifyJSON, toArray } from '@orpc/shared'
 
 interface KVCacheStoreEnvelope {
   /**
    * The cached output, encoded with the store's serializer.
    */
-  output: string
+  output: unknown
   tags: readonly string[]
   /**
    * Tag tokens snapshotted at set time. A tag's live token changes on every
@@ -34,9 +35,9 @@ export interface KVCacheStoreOptions {
   /**
    * Serializer for cached outputs.
    *
-   * @default an RPCJsonSerializer-backed serializer preserving Date, BigInt, Set, Map, URL, RegExp, NaN, and undefined values
+   * @default RPCSerializer
    */
-  serializer?: CacheOutputSerializer
+  serializer?: undefined | Public<RPCSerializer>
 }
 
 /**
@@ -44,7 +45,8 @@ export interface KVCacheStoreOptions {
  * Tags are tracked with random tokens rewritten on every revalidation, so no
  * atomic operations are required. Entries are retained for `ttl + swr` via
  * `expirationTtl`, clamped to KV's 60 second minimum; the exact bounds are
- * still enforced on `get`.
+ * still enforced on `get`. Outputs containing Blob or File values are
+ * ignored and never stored.
  *
  * @remarks
  * **Note**: KV is [eventually consistent](https://developers.cloudflare.com/kv/concepts/how-kv-works/#consistency):
@@ -56,12 +58,12 @@ export interface KVCacheStoreOptions {
 export class KVCacheStore implements CacheStore {
   private readonly kv: KVNamespace
   private readonly prefix: string
-  private readonly serializer: CacheOutputSerializer
+  private readonly serializer: Public<RPCSerializer>
 
   constructor(options: KVCacheStoreOptions) {
     this.kv = options.kv
     this.prefix = options.prefix ?? ''
-    this.serializer = options.serializer ?? createRpcJsonOutputSerializer('KVCacheStore')
+    this.serializer = options.serializer ?? new RPCSerializer()
   }
 
   async get(key: string): Promise<CacheEntry | undefined> {
@@ -90,15 +92,21 @@ export class KVCacheStore implements CacheStore {
     }
 
     return {
-      output: this.serializer.parse(envelope.output),
+      output: this.serializer.deserialize(envelope.output as any),
       tags: envelope.tags,
       expiresAt: envelope.expiresAt,
     }
   }
 
   async set(key: string, output: unknown, options?: CacheSetOptions): Promise<void> {
+    const serialized = this.serializer.serialize(output)
+
+    // Outputs containing blobs or streaming values cannot be stored, so they are ignored.
+    if (serialized instanceof Blob || serialized instanceof FormData || serialized instanceof ReadableStream || isAsyncIteratorObject(serialized)) {
+      return
+    }
+
     const tags = options?.tags ?? []
-    const serialized = this.serializer.stringify(output)
 
     const tagTokens: Record<string, string | null> = {}
     if (tags.length) {

@@ -1,4 +1,5 @@
 import type { KVCacheStoreOptions } from './kv-cache'
+import { RPCSerializer } from '@orpc/client'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
 import { KVCacheStore } from './kv-cache'
@@ -29,14 +30,13 @@ describe('kvCacheStore', () => {
     await expect(store.get('unknown')).resolves.toBeUndefined()
   })
 
-  it('preserves Date, Map, Set, BigInt, and undefined outputs', async () => {
+  it('preserves Date, Map, Set, and BigInt outputs', async () => {
     const { store } = createTestingStore()
     const output = {
       date: new Date('2026-01-02T03:04:05.678Z'),
       map: new Map([['a', 1]]),
       set: new Set([1, 2]),
       big: 123n,
-      nothing: undefined,
     }
 
     await store.set('k', output)
@@ -44,26 +44,25 @@ describe('kvCacheStore', () => {
     await expect(store.get('k')).resolves.toMatchObject({ output })
   })
 
-  it('rejects outputs containing blobs', async () => {
+  it('ignores outputs containing blobs', async () => {
     const { store } = createTestingStore()
 
-    await expect(
-      store.set('k', { file: new Blob(['x']) }),
-    ).rejects.toThrow('KVCacheStore cannot cache outputs containing Blob or File values')
+    await store.set('k', { file: new Blob(['x']) })
+
+    await expect(store.get('k')).resolves.toBeUndefined()
   })
 
   it('supports a custom serializer', async () => {
-    const serializer = {
-      stringify: vi.fn((data: unknown) => `custom:${JSON.stringify(data)}`),
-      parse: vi.fn((text: string) => JSON.parse(text.slice('custom:'.length))),
-    }
+    const serializer = new RPCSerializer()
+    const serializeSpy = vi.spyOn(serializer, 'serialize')
+    const deserializeSpy = vi.spyOn(serializer, 'deserialize')
     const { store } = createTestingStore({ serializer })
 
     await store.set('k', { a: 1 })
 
     await expect(store.get('k')).resolves.toMatchObject({ output: { a: 1 } })
-    expect(serializer.stringify).toHaveBeenCalled()
-    expect(serializer.parse).toHaveBeenCalled()
+    expect(serializeSpy).toHaveBeenCalled()
+    expect(deserializeSpy).toHaveBeenCalled()
   })
 
   it('invalidates entries by any of their tags', async () => {
@@ -105,7 +104,7 @@ describe('kvCacheStore', () => {
 
     // Craft envelopes directly so the test does not have to wait for real time to pass.
     const envelope = (expiresAt: number, evictAt: number) => JSON.stringify({
-      output: JSON.stringify({ json: 'v' }),
+      output: { json: 'v' },
       tags: [],
       tagTokens: {},
       expiresAt,
