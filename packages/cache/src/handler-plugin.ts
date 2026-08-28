@@ -38,14 +38,19 @@ export const CACHE_TAG_INVALIDATION_HEADER = 'orpc-cache-tag-invalidation'
 
 /**
  * Encodes cache tags into a header value: tags are joined with commas, and
- * only `%`, `,`, and characters that cannot appear in a header value
- * (whitespace, control characters, non-ASCII) are percent-encoded, so
- * typical tags stay readable.
+ * only `%`, `,`, uppercase letters, and characters that cannot appear in a
+ * header value (whitespace, control characters, non-ASCII) are
+ * percent-encoded, so typical tags stay readable. Uppercase letters are
+ * encoded because caches like Cloudflare Workers Caching match tags
+ * case-insensitively; the encoded form stays unambiguous under case folding.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#handler-plugin | Cache Helpers - Handler Plugin}
  */
 export function encodeCacheTagHeader(tags: readonly string[]): string {
-  return tags.map(tag => tag.replace(/[^\x21-\x7E]|[%,]/gu, c => encodeURIComponent(c))).join(',')
+  return tags.map(tag => tag.replace(
+    /[^\x21-\x7E]|[%,A-Z]/gu,
+    c => /[A-Z]/.test(c) ? `%${c.charCodeAt(0).toString(16).toUpperCase()}` : encodeURIComponent(c),
+  )).join(',')
 }
 
 /**

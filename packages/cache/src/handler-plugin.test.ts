@@ -257,10 +257,15 @@ describe('cacheHandlerPlugin cache-control and cache-tag headers', () => {
 })
 
 describe('encodeCacheTagHeader & decodeCacheTagHeader', () => {
-  it('round-trips tags with commas, percents, and unicode', () => {
-    const tags = ['plain', 'a,b', '100%', 'tiếng việt', 'sp ace']
+  it('round-trips tags with commas, percents, uppercase, and unicode', () => {
+    const tags = ['plain', 'a,b', '100%', 'CamelCase', 'tiếng việt', 'sp ace']
 
     expect(decodeCacheTagHeader(encodeCacheTagHeader(tags))).toEqual(tags)
+  })
+
+  it('percent-encodes uppercase letters so case-insensitive caches keep tags distinct', () => {
+    expect(encodeCacheTagHeader(['Planets'])).toBe('%50lanets')
+    expect(encodeCacheTagHeader(['Planets'])).not.toBe(encodeCacheTagHeader(['planets']))
   })
 
   it('decodes empty headers to no tags', () => {

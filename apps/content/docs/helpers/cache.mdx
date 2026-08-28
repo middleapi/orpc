@@ -252,7 +252,7 @@ The `CacheHandlerPlugin` reflects the cache activity of [Cache Middleware](#cach
 - `orpc-cache-tag-invalidation` carries the tags revalidated by the request, useful for invalidating tagged data in client caches.
 - `cache-control` and `cache-tag` are the standard HTTP counterparts for response caches in front, such as CDNs or Cloudflare Workers Caching. They are only set on GET and HEAD responses and never override existing headers.
 
-Tags are joined with commas. Only `%`, `,`, and characters that cannot appear in a header value are percent-encoded, so typical tags stay readable. Use `decodeCacheTagHeader` to parse a header back into tags.
+Tags are joined with commas. Only `%`, `,`, uppercase letters, and characters that cannot appear in a header value are percent-encoded, so typical tags stay readable. Uppercase letters are encoded because caches like Cloudflare Workers Caching match tags case-insensitively; the encoded form stays unambiguous under case folding. Use `decodeCacheTagHeader` to parse a header back into tags.
 
 ```ts
 import { CACHE_TAG_HEADER, CACHE_TAG_INVALIDATION_HEADER, CacheHandlerPlugin } from '@orpc/cache'
