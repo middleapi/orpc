@@ -2,8 +2,6 @@ import type { Public } from '@orpc/shared'
 import { RPCJsonSerializer } from '@orpc/client'
 import { deepSortKeys, stringifyJSON } from '@orpc/shared'
 
-const defaultKeySerializer = new RPCJsonSerializer()
-
 /**
  * Encodes a cache key into a stable string: strings are used verbatim, while
  * any other value is serialized with the RPC JSON serializer first, so
@@ -13,7 +11,7 @@ const defaultKeySerializer = new RPCJsonSerializer()
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
-export function encodeCacheKey(key: unknown, serializer: Public<RPCJsonSerializer> = defaultKeySerializer): string {
+export function encodeCacheKey(key: unknown, serializer: Public<RPCJsonSerializer> = new RPCJsonSerializer()): string {
   if (typeof key === 'string') {
     return key
   }
