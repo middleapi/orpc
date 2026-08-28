@@ -17,10 +17,10 @@ describe.concurrent('redis cache store integration', {
   })
 
   function createTestingStore(
-    options: ConstructorParameters<typeof RedisCacheStore>[1] = {},
+    options: Partial<ConstructorParameters<typeof RedisCacheStore>[0]> = {},
   ) {
     const prefix = `orpc-redis-cache-store-${crypto.randomUUID()}:`
-    return { store: new RedisCacheStore(redis, { prefix, ...options }), prefix }
+    return { store: new RedisCacheStore({ redis, prefix, ...options }), prefix }
   }
 
   it('round-trips outputs with tags and expiresAt', async () => {
@@ -138,7 +138,7 @@ describe.concurrent('redis cache store integration', {
 
   it('lazily connects a closed client', async () => {
     const lazyRedis = createClient({ url: REDIS_URL })
-    const store = new RedisCacheStore(lazyRedis, { prefix: `orpc-redis-cache-store-${crypto.randomUUID()}:` })
+    const store = new RedisCacheStore({ redis: lazyRedis, prefix: `orpc-redis-cache-store-${crypto.randomUUID()}:` })
 
     expect(lazyRedis.isOpen).toBe(false)
     await expect(store.get('unknown')).resolves.toBeUndefined()

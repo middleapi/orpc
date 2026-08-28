@@ -20,6 +20,11 @@ interface KVCacheStoreEnvelope {
 
 export interface KVCacheStoreOptions {
   /**
+   * The KV namespace to store entries in.
+   */
+  kv: KVNamespace
+
+  /**
    * The prefix to use for KV keys.
    *
    * @default undefined
@@ -53,11 +58,8 @@ export class KVCacheStore implements CacheStore {
   private readonly prefix: string
   private readonly serializer: CacheOutputSerializer
 
-  constructor(
-    kv: KVNamespace,
-    options: KVCacheStoreOptions = {},
-  ) {
-    this.kv = kv
+  constructor(options: KVCacheStoreOptions) {
+    this.kv = options.kv
     this.prefix = options.prefix ?? ''
     this.serializer = options.serializer ?? createRpcJsonOutputSerializer('KVCacheStore')
   }

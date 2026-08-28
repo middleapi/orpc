@@ -12,6 +12,14 @@ export interface WorkersCachePurger {
   purge(options: { tags: string[] }): Promise<{ success: boolean, errors?: { code?: number, message?: string }[] }>
 }
 
+export interface WorkersCacheStoreOptions {
+  /**
+   * The Workers Caching purge surface: `ctx.cache` or `cache` imported
+   * from `cloudflare:workers`.
+   */
+  cache: WorkersCachePurger
+}
+
 /**
  * Purge-only cache store for Cloudflare Workers Caching. Responses are cached
  * in front of the Worker through `Cache-Control` and `Cache-Tag` headers (see
@@ -27,9 +35,11 @@ export interface WorkersCachePurger {
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
 export class WorkersCacheStore implements CacheStore {
-  constructor(
-    private readonly cache: WorkersCachePurger,
-  ) {}
+  private readonly cache: WorkersCachePurger
+
+  constructor(options: WorkersCacheStoreOptions) {
+    this.cache = options.cache
+  }
 
   async get(_key: string): Promise<CacheEntry | undefined> {
     return undefined

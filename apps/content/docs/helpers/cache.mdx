@@ -60,7 +60,12 @@ const client = createClient({ url: 'redis://localhost:6379' })
 // You can still call `client.connect()` manually, but it is optional.
 await client.connect()
 
-const store = new RedisCacheStore(client, {
+const store = new RedisCacheStore({
+  /**
+   * The Redis client to store entries in. Connected lazily when needed.
+   */
+  redis: client,
+
   /**
    * The prefix to use for Redis keys.
    *
@@ -106,7 +111,12 @@ export default {
   async fetch(request, env) {
     // KV is eventually consistent: writes and revalidations may take
     // 60 seconds or more to be visible in other locations.
-    const store = new KVCacheStore(env.CACHE_KV, {
+    const store = new KVCacheStore({
+      /**
+       * The KV namespace to store entries in.
+       */
+      kv: env.CACHE_KV,
+
       /**
        * The prefix to use for KV keys.
        *
@@ -136,7 +146,7 @@ export default {
     // wrangler configuration. Purges are scoped to the calling entrypoint,
     // tags match case-insensitively, and purge calls always use the Free
     // tier rate limits regardless of your plan.
-    const store = new WorkersCacheStore(ctx.cache)
+    const store = new WorkersCacheStore({ cache: ctx.cache })
   },
 }
 ```

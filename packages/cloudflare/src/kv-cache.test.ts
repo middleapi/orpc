@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { KVCacheStore } from './kv-cache'
 
 describe('kvCacheStore', () => {
-  function createTestingStore(options: KVCacheStoreOptions = {}) {
+  function createTestingStore(options: Partial<KVCacheStoreOptions> = {}) {
     const prefix = `orpc-kv-cache-store-${crypto.randomUUID()}:`
-    return { store: new KVCacheStore(env.CACHE_KV, { prefix, ...options }), prefix }
+    return { store: new KVCacheStore({ kv: env.CACHE_KV, prefix, ...options }), prefix }
   }
 
   it('round-trips outputs with tags and expiresAt, including undefined', async () => {

@@ -8,7 +8,7 @@ describe('workersCacheStore', () => {
 
   it('always misses and stores nothing', async () => {
     const purger = createPurger()
-    const store = new WorkersCacheStore(purger)
+    const store = new WorkersCacheStore({ cache: purger })
 
     await store.set('k', 'v', { tags: ['t'], ttl: 1000 })
     await expect(store.get('k')).resolves.toBeUndefined()
@@ -17,7 +17,7 @@ describe('workersCacheStore', () => {
 
   it('purges encoded tags through workers caching', async () => {
     const purger = createPurger()
-    const store = new WorkersCacheStore(purger)
+    const store = new WorkersCacheStore({ cache: purger })
 
     await store.revalidateTag(['planets', 'a,b'])
 
@@ -27,7 +27,7 @@ describe('workersCacheStore', () => {
 
   it('accepts a single tag', async () => {
     const purger = createPurger()
-    const store = new WorkersCacheStore(purger)
+    const store = new WorkersCacheStore({ cache: purger })
 
     await store.revalidateTag('planets')
 
@@ -38,7 +38,7 @@ describe('workersCacheStore', () => {
     const purger = {
       purge: vi.fn(async () => ({ success: false, errors: [{ code: 429, message: 'Rate limited' }] })),
     }
-    const store = new WorkersCacheStore(purger)
+    const store = new WorkersCacheStore({ cache: purger })
 
     await expect(store.revalidateTag('planets')).rejects.toThrow(
       'WorkersCacheStore failed to purge tags: Rate limited',

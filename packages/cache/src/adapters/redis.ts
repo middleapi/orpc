@@ -21,6 +21,11 @@ interface RedisCacheStoreEnvelope {
 
 export interface RedisCacheStoreOptions {
   /**
+   * The Redis client to store entries in. Connected lazily when needed.
+   */
+  redis: RedisClientType<any, any, any, any, any>
+
+  /**
    * The prefix to use for Redis keys.
    *
    * @default undefined
@@ -48,11 +53,8 @@ export class RedisCacheStore implements CacheStore {
   private readonly prefix: string
   private readonly serializer: RedisCacheStoreSerializer
 
-  constructor(
-    redis: RedisClientType<any, any, any, any, any>,
-    options: RedisCacheStoreOptions = {},
-  ) {
-    this.redis = redis
+  constructor(options: RedisCacheStoreOptions) {
+    this.redis = options.redis
     this.prefix = options.prefix ?? ''
     this.serializer = options.serializer ?? createRpcJsonOutputSerializer('RedisCacheStore')
   }
