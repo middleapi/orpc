@@ -1,13 +1,13 @@
-import type { KVCacheStoreOptions } from './kv-cache'
+import type { experimental_KVCacheStoreOptions } from './kv-cache'
 import { RPCSerializer } from '@orpc/client'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
-import { KVCacheStore } from './kv-cache'
+import { experimental_KVCacheStore } from './kv-cache'
 
-describe('kvCacheStore', () => {
-  function createTestingStore(options: Partial<KVCacheStoreOptions> = {}) {
+describe('experimental_KVCacheStore', () => {
+  function createTestingStore(options: Partial<experimental_KVCacheStoreOptions> = {}) {
     const prefix = `orpc-kv-cache-store-${crypto.randomUUID()}:`
-    return { store: new KVCacheStore({ kv: env.CACHE_KV, prefix, ...options }), prefix }
+    return { store: new experimental_KVCacheStore({ kv: env.CACHE_KV, prefix, ...options }), prefix }
   }
 
   it('round-trips outputs with tags and expiresAt, including undefined', async () => {
@@ -132,7 +132,7 @@ describe('kvCacheStore', () => {
   })
 
   it('defaults to no prefix', async () => {
-    const store = new KVCacheStore({ kv: env.CACHE_KV })
+    const store = new experimental_KVCacheStore({ kv: env.CACHE_KV })
     const key = crypto.randomUUID()
 
     await store.set(key, 'v')

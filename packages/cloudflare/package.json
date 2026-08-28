@@ -51,8 +51,8 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@orpc/cache": "workspace:*",
     "@orpc/client": "workspace:*",
+    "@orpc/experimental-cache": "workspace:*",
     "@orpc/publisher": "workspace:*",
     "@orpc/ratelimit": "workspace:*",
     "@orpc/shared": "workspace:*",

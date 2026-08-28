@@ -23,9 +23,6 @@ importers:
       '@orpc/arktype':
         specifier: workspace:*
         version: link:packages/arktype
-      '@orpc/cache':
-        specifier: workspace:*
-        version: link:packages/cache
       '@orpc/client':
         specifier: workspace:*
         version: link:packages/client
@@ -35,6 +32,9 @@ importers:
       '@orpc/evlog':
         specifier: workspace:*
         version: link:packages/evlog
+      '@orpc/experimental-cache':
+        specifier: workspace:*
+        version: link:packages/cache
       '@orpc/experimental-effect':
         specifier: workspace:*
         version: link:packages/effect
@@ -209,9 +209,6 @@ importers:
       '@orpc/arktype':
         specifier: workspace:*
         version: link:../../packages/arktype
-      '@orpc/cache':
-        specifier: workspace:*
-        version: link:../../packages/cache
       '@orpc/client':
         specifier: workspace:*
         version: link:../../packages/client
@@ -221,6 +218,9 @@ importers:
       '@orpc/evlog':
         specifier: workspace:*
         version: link:../../packages/evlog
+      '@orpc/experimental-cache':
+        specifier: workspace:*
+        version: link:../../packages/cache
       '@orpc/openapi':
         specifier: workspace:*
         version: link:../../packages/openapi
@@ -391,12 +391,12 @@ importers:
 
   packages/cloudflare:
     dependencies:
-      '@orpc/cache':
-        specifier: workspace:*
-        version: link:../cache
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
+      '@orpc/experimental-cache':
+        specifier: workspace:*
+        version: link:../cache
       '@orpc/publisher':
         specifier: workspace:*
         version: link:../publisher

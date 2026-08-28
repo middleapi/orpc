@@ -44,7 +44,7 @@ You can read the documentation [here](https://orpc.dev).
 
 - [@orpc/publisher](https://www.npmjs.com/package/@orpc/publisher): Pub/Sub with memory, Redis, and Upstash adapters.
 - [@orpc/ratelimit](https://www.npmjs.com/package/@orpc/ratelimit): Rate limiting with memory, Redis, and Upstash adapters.
-- [@orpc/cache](https://www.npmjs.com/package/@orpc/cache): Tag-based caching and revalidation with memory, Redis, and Vercel adapters.
+- [@orpc/experimental-cache](https://www.npmjs.com/package/@orpc/experimental-cache): Tag-based caching and revalidation with memory, Redis, and Vercel adapters.
 - [@orpc/hibernation](https://www.npmjs.com/package/@orpc/hibernation): Leverage Hibernation APIs like [Cloudflare's Hibernation WebSocket](https://developers.cloudflare.com/durable-objects/best-practices/websockets/#durable-objects-hibernation-websocket-api).
 - [@orpc/json-schema](https://www.npmjs.com/package/@orpc/json-schema): Smart coercion for OpenAPI requests.
 

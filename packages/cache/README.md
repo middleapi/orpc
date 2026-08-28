@@ -4,8 +4,8 @@
   <a href="https://codecov.io/gh/middleapi/orpc">
     <img alt="codecov" src="https://codecov.io/gh/middleapi/orpc/branch/main/graph/badge.svg">
   </a>
-  <a href="https://www.npmjs.com/package/@orpc/cache">
-    <img alt="weekly downloads" src="https://img.shields.io/npm/dw/%40orpc%2Fcache?logo=npm" />
+  <a href="https://www.npmjs.com/package/@orpc/experimental-cache">
+    <img alt="weekly downloads" src="https://img.shields.io/npm/dw/%40orpc%2Fexperimental-cache?logo=npm" />
   </a>
   <a href="https://app.codspeed.io/middleapi/orpc?utm_source=badge">
     <img alt="CodSpeed" src="https://img.shields.io/endpoint?url=https://codspeed.io/badge.json" />
@@ -44,7 +44,7 @@ You can read the documentation [here](https://orpc.dev).
 
 - [@orpc/publisher](https://www.npmjs.com/package/@orpc/publisher): Pub/Sub with memory, Redis, and Upstash adapters.
 - [@orpc/ratelimit](https://www.npmjs.com/package/@orpc/ratelimit): Rate limiting with memory, Redis, and Upstash adapters.
-- [@orpc/cache](https://www.npmjs.com/package/@orpc/cache): Tag-based caching and revalidation with memory, Redis, and Vercel adapters.
+- [@orpc/experimental-cache](https://www.npmjs.com/package/@orpc/experimental-cache): Tag-based caching and revalidation with memory, Redis, and Vercel adapters.
 - [@orpc/hibernation](https://www.npmjs.com/package/@orpc/hibernation): Leverage Hibernation APIs like [Cloudflare's Hibernation WebSocket](https://developers.cloudflare.com/durable-objects/best-practices/websockets/#durable-objects-hibernation-websocket-api).
 - [@orpc/json-schema](https://www.npmjs.com/package/@orpc/json-schema): Smart coercion for OpenAPI requests.
 

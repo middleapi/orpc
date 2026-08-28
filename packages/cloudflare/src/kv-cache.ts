@@ -1,7 +1,7 @@
-import type { CacheEntry, CacheSetOptions, CacheStore } from '@orpc/cache'
+import type { CacheEntry, CacheSetOptions, CacheStore } from '@orpc/experimental-cache'
 import type { Public } from '@orpc/shared'
-import { encodeCacheKey } from '@orpc/cache'
 import { RPCSerializer } from '@orpc/client'
+import { encodeCacheKey } from '@orpc/experimental-cache'
 import { isAsyncIteratorObject, stringifyJSON, toArray } from '@orpc/shared'
 
 interface KVCacheStoreEnvelope {
@@ -20,7 +20,7 @@ interface KVCacheStoreEnvelope {
   evictAt?: number | undefined
 }
 
-export interface KVCacheStoreOptions {
+export interface experimental_KVCacheStoreOptions {
   /**
    * The KV namespace to store entries in.
    */
@@ -56,12 +56,12 @@ export interface KVCacheStoreOptions {
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
-export class KVCacheStore implements CacheStore {
+export class experimental_KVCacheStore implements CacheStore {
   private readonly kv: KVNamespace
   private readonly prefix: string
   private readonly serializer: Public<RPCSerializer>
 
-  constructor(options: KVCacheStoreOptions) {
+  constructor(options: experimental_KVCacheStoreOptions) {
     this.kv = options.kv
     this.prefix = options.prefix ?? ''
     this.serializer = options.serializer ?? new RPCSerializer()
