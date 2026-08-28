@@ -23,7 +23,7 @@ export interface RedisCacheStoreOptions {
   /**
    * The prefix to use for Redis keys.
    *
-   * @default 'orpc:cache:'
+   * @default undefined
    */
   prefix?: string
 
@@ -53,7 +53,7 @@ export class RedisCacheStore implements CacheStore {
     options: RedisCacheStoreOptions = {},
   ) {
     this.redis = redis
-    this.prefix = options.prefix ?? 'orpc:cache:'
+    this.prefix = options.prefix ?? ''
     this.serializer = options.serializer ?? createRpcJsonOutputSerializer('RedisCacheStore')
   }
 

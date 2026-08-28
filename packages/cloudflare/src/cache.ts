@@ -22,7 +22,7 @@ export interface CloudflareKVCacheStoreOptions {
   /**
    * The prefix to use for KV keys.
    *
-   * @default 'orpc:cache:'
+   * @default undefined
    */
   prefix?: string
 
@@ -58,7 +58,7 @@ export class CloudflareKVCacheStore implements CacheStore {
     options: CloudflareKVCacheStoreOptions = {},
   ) {
     this.kv = kv
-    this.prefix = options.prefix ?? 'orpc:cache:'
+    this.prefix = options.prefix ?? ''
     this.serializer = options.serializer ?? createRpcJsonOutputSerializer('CloudflareKVCacheStore')
   }
 

@@ -64,9 +64,9 @@ const store = new RedisCacheStore(client, {
   /**
    * The prefix to use for Redis keys.
    *
-   * @default 'orpc:cache:'
+   * @default undefined
    */
-  prefix: 'orpc:cache:',
+  prefix: undefined,
 
   /**
    * Serializer for cached outputs. The default preserves Date, BigInt,
@@ -110,9 +110,9 @@ export default {
       /**
        * The prefix to use for KV keys.
        *
-       * @default 'orpc:cache:'
+       * @default undefined
        */
-      prefix: 'orpc:cache:',
+      prefix: undefined,
 
       /**
        * Serializer for cached outputs. The default preserves Date, BigInt,
