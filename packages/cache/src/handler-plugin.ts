@@ -12,7 +12,7 @@ export interface CacheHandlerPluginContext {
      * `ttl` carries the remaining freshness in milliseconds on hits and the
      * resolved fresh lifetime on stores.
      */
-    caches: { procedure: AnyProcedure, path: string[], hit: boolean, stale: boolean, key: string, tags: readonly string[], ttl?: number | undefined, swr?: number | undefined }[]
+    caches: { procedure: AnyProcedure, path: string[], hit: boolean, stale: boolean, key: unknown, tags: readonly string[], ttl?: number | undefined, swr?: number | undefined }[]
 
     /**
      * The tag revalidations committed during this request.

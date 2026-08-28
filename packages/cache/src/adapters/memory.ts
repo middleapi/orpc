@@ -1,5 +1,7 @@
+import type { Public } from '@orpc/shared'
 import type { CacheEntry, CacheSetOptions, CacheStore } from '../types'
-import { toArray } from '@orpc/shared'
+import { RPCSerializer } from '@orpc/client'
+import { deepSortKeys, isAsyncIteratorObject, stringifyJSON, toArray } from '@orpc/shared'
 
 interface MemoryCacheStoreEntry {
   output: unknown
@@ -12,6 +14,15 @@ interface MemoryCacheStoreEntry {
   evictAt: number | undefined
 }
 
+export interface MemoryCacheStoreOptions {
+  /**
+   * Serializer used to encode non-string keys.
+   *
+   * @default RPCSerializer
+   */
+  serializer?: undefined | Public<RPCSerializer>
+}
+
 /**
  * In-memory cache store with tag-based invalidation, intended for
  * development, testing, and single-instance deployments. Expired and
@@ -22,16 +33,21 @@ interface MemoryCacheStoreEntry {
 export class MemoryCacheStore implements CacheStore {
   private readonly entries = new Map<string, MemoryCacheStoreEntry>()
   private readonly tagVersions = new Map<string, number>()
+  private readonly serializer: Public<RPCSerializer>
 
-  async get(key: string): Promise<CacheEntry | undefined> {
-    const entry = this.entries.get(key)
+  constructor(options: MemoryCacheStoreOptions = {}) {
+    this.serializer = options.serializer ?? new RPCSerializer()
+  }
+
+  async get(key: unknown): Promise<CacheEntry | undefined> {
+    const entry = this.entries.get(this.encodeKey(key))
 
     if (!entry) {
       return undefined
     }
 
     if (entry.evictAt !== undefined && Date.now() >= entry.evictAt) {
-      this.entries.delete(key)
+      this.entries.delete(this.encodeKey(key))
       return undefined
     }
 
@@ -40,7 +56,7 @@ export class MemoryCacheStore implements CacheStore {
     )
 
     if (revalidated) {
-      this.entries.delete(key)
+      this.entries.delete(this.encodeKey(key))
       return undefined
     }
 
@@ -51,12 +67,12 @@ export class MemoryCacheStore implements CacheStore {
     }
   }
 
-  async set(key: string, output: unknown, options?: CacheSetOptions): Promise<void> {
+  async set(key: unknown, output: unknown, options?: CacheSetOptions): Promise<void> {
     const tags = options?.tags ?? []
     const expiresAt = options?.ttl !== undefined ? Date.now() + options.ttl : undefined
     const evictAt = expiresAt !== undefined ? expiresAt + (options?.swr ?? 0) : undefined
 
-    this.entries.set(key, {
+    this.entries.set(this.encodeKey(key), {
       output,
       tags,
       tagVersions: tags.map(tag => this.tagVersions.get(tag) ?? 0),
@@ -69,5 +85,19 @@ export class MemoryCacheStore implements CacheStore {
     for (const t of toArray(tag)) {
       this.tagVersions.set(t, (this.tagVersions.get(t) ?? 0) + 1)
     }
+  }
+
+  private encodeKey(key: unknown): string {
+    if (typeof key === 'string') {
+      return key
+    }
+
+    const serialized = this.serializer.serialize(deepSortKeys(key))
+
+    if (serialized instanceof Blob || serialized instanceof FormData || serialized instanceof ReadableStream || isAsyncIteratorObject(serialized)) {
+      throw new TypeError('Cache keys must be serializable to JSON, provide an explicit string key instead')
+    }
+
+    return `${stringifyJSON(serialized)}`
   }
 }

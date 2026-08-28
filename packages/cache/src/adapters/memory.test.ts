@@ -26,6 +26,24 @@ describe('memoryCacheStore', () => {
     await expect(store.get('unknown')).resolves.toBeUndefined()
   })
 
+  it('encodes structurally equal non-string keys to the same entry', async () => {
+    const store = new MemoryCacheStore()
+
+    await store.set([['planet', 'find'], { b: 2, a: 1 }], 'v')
+
+    await expect(store.get([['planet', 'find'], { a: 1, b: 2 }])).resolves.toMatchObject({ output: 'v' })
+    await expect(store.get([['planet', 'find'], { a: 1, b: 3 }])).resolves.toBeUndefined()
+    await expect(store.get([['planet', 'list'], { a: 1, b: 2 }])).resolves.toBeUndefined()
+  })
+
+  it('throws for keys containing blobs', async () => {
+    const store = new MemoryCacheStore()
+
+    await expect(store.get({ file: new Blob(['x']) })).rejects.toThrow(
+      'Cache keys must be serializable to JSON, provide an explicit string key instead',
+    )
+  })
+
   it('returns fresh entries with a future expiresAt, then evicts at ttl without swr', async () => {
     const store = new MemoryCacheStore()
 

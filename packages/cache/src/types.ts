@@ -62,13 +62,15 @@ export interface CacheStore {
   /**
    * Resolves the entry stored under `key`, or `undefined` on miss/evicted/revalidated.
    * Stale entries (past `expiresAt` but within the stale-while-revalidate window) are returned.
+   * Keys may be any serializable value; implementations encode them stably,
+   * so structurally equal keys resolve the same entry.
    */
-  get(key: string): Promise<CacheEntry | undefined>
+  get(key: unknown): Promise<CacheEntry | undefined>
 
   /**
    * Stores `output` under `key`, replacing any previous entry.
    */
-  set(key: string, output: unknown, options?: CacheSetOptions): Promise<void>
+  set(key: unknown, output: unknown, options?: CacheSetOptions): Promise<void>
 
   /**
    * Invalidates every entry associated with one or many tags.

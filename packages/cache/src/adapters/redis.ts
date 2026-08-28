@@ -2,7 +2,7 @@ import type { Public } from '@orpc/shared'
 import type { RedisClientType } from 'redis'
 import type { CacheEntry, CacheSetOptions, CacheStore } from '../types'
 import { RPCSerializer } from '@orpc/client'
-import { isAsyncIteratorObject, stringifyJSON, toArray } from '@orpc/shared'
+import { deepSortKeys, isAsyncIteratorObject, stringifyJSON, toArray } from '@orpc/shared'
 
 interface RedisCacheStoreEnvelope {
   /**
@@ -58,7 +58,7 @@ export class RedisCacheStore implements CacheStore {
     this.serializer = options.serializer ?? new RPCSerializer()
   }
 
-  async get(key: string): Promise<CacheEntry | undefined> {
+  async get(key: unknown): Promise<CacheEntry | undefined> {
     await this.ensureConnection()
 
     const raw = await this.redis.get(this.entryKey(key))
@@ -89,7 +89,7 @@ export class RedisCacheStore implements CacheStore {
     }
   }
 
-  async set(key: string, output: unknown, options?: CacheSetOptions): Promise<void> {
+  async set(key: unknown, output: unknown, options?: CacheSetOptions): Promise<void> {
     const serialized = this.serializer.serialize(output)
 
     // Outputs containing blobs or streaming values cannot be stored, so they are ignored.
@@ -147,8 +147,22 @@ export class RedisCacheStore implements CacheStore {
     await multi.exec()
   }
 
-  private entryKey(key: string): string {
-    return `${this.prefix}entry:${key}`
+  private encodeKey(key: unknown): string {
+    if (typeof key === 'string') {
+      return key
+    }
+
+    const serialized = this.serializer.serialize(deepSortKeys(key))
+
+    if (serialized instanceof Blob || serialized instanceof FormData || serialized instanceof ReadableStream || isAsyncIteratorObject(serialized)) {
+      throw new TypeError('Cache keys must be serializable to JSON, provide an explicit string key instead')
+    }
+
+    return `${stringifyJSON(serialized)}`
+  }
+
+  private entryKey(key: unknown): string {
+    return `${this.prefix}entry:${this.encodeKey(key)}`
   }
 
   private tagKey(tag: string): string {

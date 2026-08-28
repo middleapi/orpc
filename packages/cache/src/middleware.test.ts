@@ -41,10 +41,10 @@ describe('cache', () => {
       await call(procedure, { id: 1 }, { context: { cache: store }, path: ['user', 'find'] })
 
       const keys = store.get.mock.calls.map(([key]) => key)
-      expect(keys.every(key => typeof key === 'string')).toBe(true)
-      expect(keys[0]).toBe(keys[1]) // same path + input
-      expect(keys[0]).not.toBe(keys[2]) // different input
-      expect(keys[0]).not.toBe(keys[3]) // different path
+      expect(keys[0]).toEqual([['planet', 'find'], { id: 1 }]) // the procedure path and input
+      expect(keys[0]).toEqual(keys[1]) // same path + input
+      expect(keys[0]).not.toEqual(keys[2]) // different input
+      expect(keys[0]).not.toEqual(keys[3]) // different path
     })
 
     it('derives the key from non-string key material, and uses string keys verbatim', async () => {
@@ -61,7 +61,7 @@ describe('cache', () => {
       await call(verbatim, undefined, { context: { cache: store } })
 
       const keys = store.get.mock.calls.map(([key]) => key)
-      expect(keys[0]).toBe(keys[1]) // same material despite different inputs
+      expect(keys[0]).toEqual(keys[1]) // same material despite different inputs
       expect(keys[2]).toBe('k')
     })
 
@@ -80,18 +80,7 @@ describe('cache', () => {
       // The middleware only validated `id` at its position, but the key still
       // covers the full input, so different pages never share an entry.
       const keys = store.get.mock.calls.map(([key]) => key)
-      expect(keys[0]).not.toBe(keys[1])
-    })
-
-    it('rejects default keys for inputs containing blobs', async () => {
-      const store = createStore()
-      const procedure = os.$context<CacheContext>().input(type<any>()).use(cache()).handler(() => 'ok')
-
-      await expect(
-        call(procedure, { file: new Blob(['x']) }, { context: { cache: store } }),
-      ).rejects.toThrow('Cache key material must not contain Blob or File values')
-
-      expect(store.get).not.toHaveBeenCalled()
+      expect(keys[0]).not.toEqual(keys[1])
     })
   })
 

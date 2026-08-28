@@ -2,7 +2,7 @@ import type { Public } from '@orpc/shared'
 import type { RuntimeCache } from '@vercel/functions'
 import type { CacheEntry, CacheSetOptions, CacheStore } from '../types'
 import { RPCSerializer } from '@orpc/client'
-import { isAsyncIteratorObject, toArray } from '@orpc/shared'
+import { deepSortKeys, isAsyncIteratorObject, stringifyJSON, toArray } from '@orpc/shared'
 import { getCache } from '@vercel/functions'
 
 interface VercelCacheStoreEnvelope {
@@ -49,15 +49,15 @@ export class VercelCacheStore implements CacheStore {
     this.serializer = options.serializer ?? new RPCSerializer()
   }
 
-  async get(key: string): Promise<CacheEntry | undefined> {
-    const envelope = await this.cache.get(key) as VercelCacheStoreEnvelope | null | undefined
+  async get(key: unknown): Promise<CacheEntry | undefined> {
+    const envelope = await this.cache.get(this.encodeKey(key)) as VercelCacheStoreEnvelope | null | undefined
 
     if (envelope == null) {
       return undefined
     }
 
     if (envelope.evictAt !== undefined && Date.now() >= envelope.evictAt) {
-      await this.cache.delete(key)
+      await this.cache.delete(this.encodeKey(key))
       return undefined
     }
 
@@ -68,7 +68,7 @@ export class VercelCacheStore implements CacheStore {
     }
   }
 
-  async set(key: string, output: unknown, options?: CacheSetOptions): Promise<void> {
+  async set(key: unknown, output: unknown, options?: CacheSetOptions): Promise<void> {
     const serialized = this.serializer.serialize(output)
 
     // Outputs containing blobs or streaming values cannot be stored, so they are ignored.
@@ -88,10 +88,24 @@ export class VercelCacheStore implements CacheStore {
       evictAt,
     }
 
-    await this.cache.set(key, envelope, {
+    await this.cache.set(this.encodeKey(key), envelope, {
       ...(tags.length ? { tags: [...tags] } : {}),
       ...(retention !== undefined ? { ttl: Math.ceil(retention / 1000) } : {}),
     })
+  }
+
+  private encodeKey(key: unknown): string {
+    if (typeof key === 'string') {
+      return key
+    }
+
+    const serialized = this.serializer.serialize(deepSortKeys(key))
+
+    if (serialized instanceof Blob || serialized instanceof FormData || serialized instanceof ReadableStream || isAsyncIteratorObject(serialized)) {
+      throw new TypeError('Cache keys must be serializable to JSON, provide an explicit string key instead')
+    }
+
+    return `${stringifyJSON(serialized)}`
   }
 
   async revalidateTag(tag: string | readonly string[]): Promise<void> {

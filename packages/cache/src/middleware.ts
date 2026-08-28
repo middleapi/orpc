@@ -2,8 +2,7 @@ import type { Context, Middleware, MiddlewareOptions } from '@orpc/server'
 import type { Promisable, Value } from '@orpc/shared'
 import type { CacheHandlerPluginContext } from './handler-plugin'
 import type { CacheContext } from './types'
-import { RPCJsonSerializer } from '@orpc/client'
-import { isAsyncIteratorObject, stringifyJSON, toArray, value } from '@orpc/shared'
+import { isAsyncIteratorObject, toArray, value } from '@orpc/shared'
 import { CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
 
 /**
@@ -20,7 +19,7 @@ export interface CacheMiddlewareOptions<
   /**
    * The key identifying the cache entry, or any serializable value to derive
    * it from. Strings are used verbatim, while any other value is combined
-   * with the procedure path and encoded into a key.
+   * with the procedure path and encoded by the store.
    *
    * @default the procedure path and input
    */
@@ -83,7 +82,7 @@ export function cache<
       return middlewareOptions.next()
     }
 
-    const key = typeof keyMaterial === 'string' ? keyMaterial : encodeCacheKey(middlewareOptions.path, keyMaterial)
+    const key = typeof keyMaterial === 'string' ? keyMaterial : [middlewareOptions.path, keyMaterial]
 
     const { cache: store, waitUntil } = middlewareOptions.context as CacheContext
     const pluginContext = (middlewareOptions.context as CacheHandlerPluginContext)[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]
@@ -181,16 +180,4 @@ export function revalidate<
 
 function isUncacheableOutput(output: unknown): boolean {
   return isAsyncIteratorObject(output) || output instanceof ReadableStream
-}
-
-const cacheKeySerializer = new RPCJsonSerializer()
-
-function encodeCacheKey(path: readonly string[], material: unknown): string {
-  const { json, meta, blobs } = cacheKeySerializer.serialize(material)
-
-  if (blobs?.length) {
-    throw new TypeError('Cache key material must not contain Blob or File values; provide an explicit string key instead')
-  }
-
-  return stringifyJSON({ path, json, meta })
 }

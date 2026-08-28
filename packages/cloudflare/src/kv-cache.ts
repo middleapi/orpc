@@ -1,7 +1,7 @@
 import type { CacheEntry, CacheSetOptions, CacheStore } from '@orpc/cache'
 import type { Public } from '@orpc/shared'
 import { RPCSerializer } from '@orpc/client'
-import { isAsyncIteratorObject, stringifyJSON, toArray } from '@orpc/shared'
+import { deepSortKeys, isAsyncIteratorObject, stringifyJSON, toArray } from '@orpc/shared'
 
 interface KVCacheStoreEnvelope {
   /**
@@ -66,7 +66,7 @@ export class KVCacheStore implements CacheStore {
     this.serializer = options.serializer ?? new RPCSerializer()
   }
 
-  async get(key: string): Promise<CacheEntry | undefined> {
+  async get(key: unknown): Promise<CacheEntry | undefined> {
     const envelope = await this.kv.get<KVCacheStoreEnvelope>(this.entryKey(key), 'json')
 
     if (envelope === null) {
@@ -98,7 +98,7 @@ export class KVCacheStore implements CacheStore {
     }
   }
 
-  async set(key: string, output: unknown, options?: CacheSetOptions): Promise<void> {
+  async set(key: unknown, output: unknown, options?: CacheSetOptions): Promise<void> {
     const serialized = this.serializer.serialize(output)
 
     // Outputs containing blobs or streaming values cannot be stored, so they are ignored.
@@ -146,8 +146,22 @@ export class KVCacheStore implements CacheStore {
     await Promise.all(tags.map(t => this.kv.put(this.tagKey(t), crypto.randomUUID())))
   }
 
-  private entryKey(key: string): string {
-    return `${this.prefix}entry:${key}`
+  private encodeKey(key: unknown): string {
+    if (typeof key === 'string') {
+      return key
+    }
+
+    const serialized = this.serializer.serialize(deepSortKeys(key))
+
+    if (serialized instanceof Blob || serialized instanceof FormData || serialized instanceof ReadableStream || isAsyncIteratorObject(serialized)) {
+      throw new TypeError('Cache keys must be serializable to JSON, provide an explicit string key instead')
+    }
+
+    return `${stringifyJSON(serialized)}`
+  }
+
+  private entryKey(key: unknown): string {
+    return `${this.prefix}entry:${this.encodeKey(key)}`
   }
 
   private tagKey(tag: string): string {
