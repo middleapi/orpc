@@ -157,12 +157,30 @@ export function mergeTwoLevels(first: unknown, second: unknown): unknown {
 
 /**
  * Recursively rebuilds plain objects with their keys in sorted order, so two
- * structurally equal values produce the same serialized form. Arrays are
- * mapped, anything else is returned as-is.
+ * structurally equal values produce the same serialized form. Arrays, Maps,
+ * and Sets are rebuilt with the same treatment while keeping their element
+ * order, since element order is observable in JavaScript. Anything else is
+ * returned as-is.
  */
 export function deepSortKeys(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(deepSortKeys)
+  }
+
+  if (value instanceof Map) {
+    const result = new Map<unknown, unknown>()
+    for (const [key, item] of value) {
+      result.set(deepSortKeys(key), deepSortKeys(item))
+    }
+    return result
+  }
+
+  if (value instanceof Set) {
+    const result = new Set<unknown>()
+    for (const item of value) {
+      result.add(deepSortKeys(item))
+    }
+    return result
   }
 
   if (isPlainObject(value)) {

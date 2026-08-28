@@ -621,12 +621,23 @@ describe('deepSortKeys', () => {
     expect(Object.keys(deepSortKeys({ b: 2, a: 1 }) as object)).toEqual(['a', 'b'])
   })
 
+  it('rebuilds Maps and Sets with sorted contents while keeping their order', () => {
+    const map = new Map<unknown, unknown>([['b', { y: 2, x: 1 }], ['a', 1]])
+    const set = new Set<unknown>([{ y: 2, x: 1 }, 'b', 'a'])
+
+    const sortedMap = deepSortKeys(map) as Map<unknown, unknown>
+    expect([...sortedMap.keys()]).toEqual(['b', 'a']) // order preserved
+    expect(Object.keys(sortedMap.get('b') as object)).toEqual(['x', 'y'])
+
+    const sortedSet = deepSortKeys(set) as Set<unknown>
+    expect([...sortedSet]).toEqual([{ x: 1, y: 2 }, 'b', 'a'])
+    expect(Object.keys([...sortedSet][0] as object)).toEqual(['x', 'y'])
+  })
+
   it('returns non-plain values as-is', () => {
     const date = new Date()
-    const map = new Map([['b', 2], ['a', 1]])
 
     expect(deepSortKeys(date)).toBe(date)
-    expect(deepSortKeys(map)).toBe(map)
     expect(deepSortKeys('str')).toBe('str')
     expect(deepSortKeys(undefined)).toBeUndefined()
   })
