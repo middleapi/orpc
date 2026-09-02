@@ -96,42 +96,54 @@ const install = 'npx skills add middleapi/orpc'
 </section>
 
 <script>
-  const status = document.querySelector<HTMLElement>('[data-copy-status]')
+  // Astro's ClientRouter swaps the page body on soft navigation but runs this
+  // module only once per full load, so listeners bound per button are lost when
+  // the home page is re-entered from another page. A single delegated listener
+  // survives the swap and resolves the button and status node at click time.
+  const resetTimers = new WeakMap<HTMLButtonElement, number>()
 
-  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-copy]')) {
-    let resetTimer = 0
+  document.addEventListener('click', async (event) => {
+    if (!(event.target instanceof Element)) {
+      return
+    }
 
-    button.addEventListener('click', async () => {
-      // A second click inside the reset window would otherwise be cleared early
-      // by the first click's timer, and announce nothing.
-      clearTimeout(resetTimer)
+    const button = event.target.closest<HTMLButtonElement>('button[data-copy]')
 
-      try {
-        await navigator.clipboard.writeText(button.dataset.copy ?? '')
+    if (!button) {
+      return
+    }
+
+    const status = document.querySelector<HTMLElement>('[data-copy-status]')
+
+    // A second click inside the reset window would otherwise be cleared early
+    // by the first click's timer, and announce nothing.
+    clearTimeout(resetTimers.get(button))
+
+    try {
+      await navigator.clipboard.writeText(button.dataset.copy ?? '')
+    }
+    catch {
+      if (status) {
+        status.textContent = 'Copy failed'
       }
-      catch {
-        if (status) {
-          status.textContent = 'Copy failed'
-        }
-        return
-      }
+      return
+    }
 
-      button.classList.add('is-copied')
+    button.classList.add('is-copied')
+
+    if (status) {
+      // Cleared first so a repeat copy is announced again rather than being
+      // treated as unchanged text.
+      status.textContent = ''
+      status.textContent = 'Copied'
+    }
+
+    resetTimers.set(button, window.setTimeout(() => {
+      button.classList.remove('is-copied')
 
       if (status) {
-        // Cleared first so a repeat copy is announced again rather than being
-        // treated as unchanged text.
         status.textContent = ''
-        status.textContent = 'Copied'
       }
-
-      resetTimer = window.setTimeout(() => {
-        button.classList.remove('is-copied')
-
-        if (status) {
-          status.textContent = ''
-        }
-      }, 1600)
-    })
-  }
+    }, 1600))
+  })
 </script>
