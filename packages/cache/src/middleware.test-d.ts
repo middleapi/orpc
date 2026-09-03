@@ -5,7 +5,7 @@ import { cache, revalidate } from './middleware'
 describe('cache', () => {
   it('can infer context & input types', () => {
     os
-      .$context<{ userId: string, cache: CacheStore }>()
+      .$context<{ 'userId': string, 'cache/store': CacheStore }>()
       .input(type<{ id: number }>())
       .use(({ next }) => {
         return next({
@@ -20,7 +20,7 @@ describe('cache', () => {
             expectTypeOf(input.id).toBeNumber()
             expectTypeOf(context.userId).toBeString()
             expectTypeOf(context.db).toBeString()
-            expectTypeOf(context.cache).toEqualTypeOf<CacheStore>()
+            expectTypeOf(context['cache/store']).toEqualTypeOf<CacheStore>()
 
             return `planet:${input.id}`
           },
@@ -52,7 +52,7 @@ describe('cache', () => {
         }),
       )
       .handler(({ context, input }) => {
-        expectTypeOf(context.cache).toEqualTypeOf<CacheStore>()
+        expectTypeOf(context['cache/store']).toEqualTypeOf<CacheStore>()
         expectTypeOf(context.userId).toBeString()
         expectTypeOf(context.db).toBeString()
         expectTypeOf(input.id).toBeNumber()
@@ -61,7 +61,7 @@ describe('cache', () => {
       })
   })
 
-  it('key is optional and accepts non-string material', () => {
+  it('key is optional and accepts any material', () => {
     const base = os.$context<CacheContext>().input(type<{ id: number }>())
 
     void base.use(cache())
@@ -81,19 +81,21 @@ describe('cache', () => {
 describe('revalidate', () => {
   it('can infer context & input types', () => {
     os
-      .$context<{ userId: string, cache: CacheStore }>()
+      .$context<{ 'userId': string, 'cache/store': CacheStore }>()
       .input(type<{ id: number }>())
       .use(
-        revalidate(async ({ context }, input) => {
-          expectTypeOf(input.id).toBeNumber()
-          expectTypeOf(context.userId).toBeString()
-          expectTypeOf(context.cache).toEqualTypeOf<CacheStore>()
+        revalidate({
+          tags: async ({ context }, input) => {
+            expectTypeOf(input.id).toBeNumber()
+            expectTypeOf(context.userId).toBeString()
+            expectTypeOf(context['cache/store']).toEqualTypeOf<CacheStore>()
 
-          return `planet:${input.id}`
+            return [`planet:${input.id}`]
+          },
         }),
       )
       .handler(({ context, input }) => {
-        expectTypeOf(context.cache).toEqualTypeOf<CacheStore>()
+        expectTypeOf(context['cache/store']).toEqualTypeOf<CacheStore>()
         expectTypeOf(context.userId).toBeString()
         expectTypeOf(input.id).toBeNumber()
 
@@ -101,21 +103,28 @@ describe('revalidate', () => {
       })
   })
 
-  it('accepts a single tag, a non-empty tag list, but rejects an empty one', () => {
+  it('requires a non-empty tag list, but a function may decline', () => {
     const base = os.$context<CacheContext>()
 
-    void base.use(revalidate('planets'))
-    void base.use(revalidate(['planets', 'planet:1']))
-    void base.use(revalidate(() => ['planets']))
+    void base.use(revalidate({ tags: ['planets', 'planet:1'] }))
+    void base.use(revalidate({ tags: () => ['planets'] }))
+    void base.use(revalidate({ tags: () => undefined }))
+    void base.use(revalidate({ tags: () => null }))
+
+    // @ts-expect-error - tags is required
+    void base.use(revalidate({}))
 
     // @ts-expect-error - tags must not be empty
-    void base.use(revalidate([]))
+    void base.use(revalidate({ tags: [] }))
+
+    // @ts-expect-error - tags must be a list
+    void base.use(revalidate({ tags: 'planets' }))
   })
 
   it('requires the cache store to be declared in the initial context', () => {
-    void os.$context<CacheContext>().use(revalidate('t'))
+    void os.$context<CacheContext>().use(revalidate({ tags: ['t'] }))
 
     // @ts-expect-error - initial context must provide the cache store
-    void os.use(revalidate('t'))
+    void os.use(revalidate({ tags: ['t'] }))
   })
 })

@@ -1,21 +1,21 @@
-import type { CacheEntry, CacheSetOptions, CacheStore } from '@orpc/experimental-cache'
+import type { CacheEntry, CacheRevalidateOptions, CacheSetOptions, CacheStore } from '@orpc/experimental-cache'
 import type { Public } from '@orpc/shared'
-import { RPCSerializer } from '@orpc/client'
+import { RPCJsonSerializer, RPCSerializer } from '@orpc/client'
 import { encodeCacheKey } from '@orpc/experimental-cache'
-import { isAsyncIteratorObject, stringifyJSON, toArray } from '@orpc/shared'
+import { nowInSeconds, stringifyJSON } from '@orpc/shared'
 
 interface KVCacheStoreEnvelope {
   /**
    * The cached output, encoded with the store's serializer.
    */
   output: unknown
-  tags: readonly string[]
+  tags?: readonly string[]
   /**
    * Tag tokens snapshotted at set time. A tag's live token changes on every
    * revalidation, so a mismatch (or a token appearing/disappearing) means
    * the entry is invalid.
    */
-  tagTokens: Record<string, string | null>
+  tagTokens?: Record<string, string | null>
   expiresAt?: number | undefined
   evictAt?: number | undefined
 }
@@ -46,8 +46,7 @@ export interface experimental_KVCacheStoreOptions {
  * Tags are tracked with random tokens rewritten on every revalidation, so no
  * atomic operations are required. Entries are retained for `ttl + swr` via
  * `expirationTtl`, clamped to KV's 60 second minimum; the exact bounds are
- * still enforced on `get`. Outputs containing Blob or File values are
- * ignored and never stored.
+ * still enforced on `get`.
  *
  * @remarks
  * **Note**: KV is [eventually consistent](https://developers.cloudflare.com/kv/concepts/how-kv-works/#consistency):
@@ -60,6 +59,12 @@ export class experimental_KVCacheStore implements CacheStore {
   private readonly kv: KVNamespace
   private readonly prefix: string
   private readonly serializer: Public<RPCSerializer>
+
+  /**
+   * Key encoding has no serializer option, so one is built here rather than
+   * per call by {@link encodeCacheKey}.
+   */
+  private readonly keySerializer = new RPCJsonSerializer()
 
   constructor(options: experimental_KVCacheStoreOptions) {
     this.kv = options.kv
@@ -75,16 +80,16 @@ export class experimental_KVCacheStore implements CacheStore {
       return undefined
     }
 
-    if (envelope.evictAt !== undefined && Date.now() >= envelope.evictAt) {
+    if (envelope.evictAt !== undefined && nowInSeconds() >= envelope.evictAt) {
       await this.kv.delete(entryKey)
       return undefined
     }
 
-    if (envelope.tags.length) {
+    if (envelope.tags?.length) {
       const tokens = await Promise.all(envelope.tags.map(tag => this.kv.get(this.tagKey(tag))))
 
       const revalidated = envelope.tags.some(
-        (tag, index) => tokens[index] !== (envelope.tagTokens[tag] ?? null),
+        (tag, index) => tokens[index] !== (envelope.tagTokens?.[tag] ?? null),
       )
 
       if (revalidated) {
@@ -103,24 +108,20 @@ export class experimental_KVCacheStore implements CacheStore {
   async set(key: unknown, output: unknown, options?: CacheSetOptions): Promise<void> {
     const serialized = this.serializer.serialize(output)
 
-    // Outputs containing blobs or streaming values cannot be stored, so they are ignored.
-    if (serialized instanceof Blob || serialized instanceof FormData || serialized instanceof ReadableStream || isAsyncIteratorObject(serialized)) {
-      return
-    }
+    const tags = options?.tags
 
-    const tags = options?.tags ?? []
-
-    const tagTokens: Record<string, string | null> = {}
-    if (tags.length) {
+    let tagTokens: Record<string, string | null> | undefined
+    if (tags?.length) {
       const tokens = await Promise.all(tags.map(tag => this.kv.get(this.tagKey(tag))))
+      tagTokens = {}
       tags.forEach((tag, index) => {
-        tagTokens[tag] = tokens[index] ?? null
+        tagTokens![tag] = tokens[index] ?? null
       })
     }
 
     const retention = options?.ttl !== undefined ? options.ttl + (options.swr ?? 0) : undefined
-    const expiresAt = options?.ttl !== undefined ? Date.now() + options.ttl : undefined
-    const evictAt = retention !== undefined ? Date.now() + retention : undefined
+    const expiresAt = options?.ttl !== undefined ? nowInSeconds() + options.ttl : undefined
+    const evictAt = retention !== undefined ? nowInSeconds() + retention : undefined
 
     const envelope: KVCacheStoreEnvelope = {
       output: serialized,
@@ -134,22 +135,16 @@ export class experimental_KVCacheStore implements CacheStore {
       this.entryKey(key),
       stringifyJSON(envelope),
       // KV rejects expirations under 60 seconds; evictAt still enforces the exact bound on get.
-      retention !== undefined ? { expirationTtl: Math.max(60, Math.ceil(retention / 1000)) } : {},
+      retention !== undefined ? { expirationTtl: Math.max(60, retention) } : {},
     )
   }
 
-  async revalidateTag(tag: string | readonly string[]): Promise<void> {
-    const tags = toArray(tag)
-
-    if (!tags.length) {
-      return
-    }
-
-    await Promise.all(tags.map(t => this.kv.put(this.tagKey(t), crypto.randomUUID())))
+  async revalidate({ tags }: CacheRevalidateOptions): Promise<void> {
+    await Promise.all(tags.map(tag => this.kv.put(this.tagKey(tag), crypto.randomUUID())))
   }
 
   private entryKey(key: unknown): string {
-    return `${this.prefix}entry:${encodeCacheKey(key)}`
+    return `${this.prefix}entry:${encodeCacheKey(key, this.keySerializer)}`
   }
 
   private tagKey(tag: string): string {

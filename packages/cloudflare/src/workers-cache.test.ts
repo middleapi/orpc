@@ -19,28 +19,10 @@ describe('experimental_WorkersCacheStore', () => {
     const purger = createPurger()
     const store = new experimental_WorkersCacheStore({ cache: purger })
 
-    await store.revalidateTag(['planets', 'a,b'])
+    await store.revalidate({ tags: ['planets', 'a,b'] })
 
     expect(purger.purge).toHaveBeenCalledTimes(1)
     expect(purger.purge).toHaveBeenCalledWith({ tags: ['planets', 'a%2Cb'] })
-  })
-
-  it('accepts a single tag', async () => {
-    const purger = createPurger()
-    const store = new experimental_WorkersCacheStore({ cache: purger })
-
-    await store.revalidateTag('planets')
-
-    expect(purger.purge).toHaveBeenCalledWith({ tags: ['planets'] })
-  })
-
-  it('skips purging when no tags are given', async () => {
-    const purger = createPurger()
-    const store = new experimental_WorkersCacheStore({ cache: purger })
-
-    await store.revalidateTag([])
-
-    expect(purger.purge).not.toHaveBeenCalled()
   })
 
   it('throws a bare error when the purge fails without messages', async () => {
@@ -49,7 +31,7 @@ describe('experimental_WorkersCacheStore', () => {
     }
     const store = new experimental_WorkersCacheStore({ cache: purger })
 
-    await expect(store.revalidateTag('planets')).rejects.toThrow(
+    await expect(store.revalidate({ tags: ['planets'] })).rejects.toThrow(
       'experimental_WorkersCacheStore failed to purge tags',
     )
   })
@@ -60,7 +42,7 @@ describe('experimental_WorkersCacheStore', () => {
     }
     const store = new experimental_WorkersCacheStore({ cache: purger })
 
-    await expect(store.revalidateTag('planets')).rejects.toThrow(
+    await expect(store.revalidate({ tags: ['planets'] })).rejects.toThrow(
       'experimental_WorkersCacheStore failed to purge tags: Rate limited',
     )
   })

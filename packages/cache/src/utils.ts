@@ -11,12 +11,14 @@ import { deepSortKeys, stringifyJSON } from '@orpc/shared'
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
-export function encodeCacheKey(key: unknown, serializer: Public<RPCJsonSerializer> = new RPCJsonSerializer()): string {
+export function encodeCacheKey(key: unknown, serializer?: Public<RPCJsonSerializer>): string {
   if (typeof key === 'string') {
     return key
   }
 
-  const { json, meta } = serializer.serialize(key)
+  // Built here rather than as a default parameter, which would construct one
+  // on every call, string keys included.
+  const { json, meta } = (serializer ?? new RPCJsonSerializer()).serialize(key)
 
-  return `${stringifyJSON(deepSortKeys([json, meta?.map(entry => stringifyJSON(entry)).sort()]))}`
+  return `${stringifyJSON([deepSortKeys(json), meta?.map(entry => stringifyJSON(entry)).sort()])}`
 }

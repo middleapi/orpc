@@ -1,6 +1,5 @@
-import type { CacheEntry, CacheSetOptions, CacheStore } from '@orpc/experimental-cache'
-import { encodeCacheTagHeader } from '@orpc/experimental-cache'
-import { toArray } from '@orpc/shared'
+import type { CacheEntry, CacheRevalidateOptions, CacheSetOptions, CacheStore } from '@orpc/experimental-cache'
+import { encodeCacheTagHeader, toArray } from '@orpc/shared'
 
 /**
  * The purge surface of Cloudflare Workers Caching, satisfied by both
@@ -24,7 +23,7 @@ export interface experimental_WorkersCacheStoreOptions {
  * Purge-only cache store for Cloudflare Workers Caching. Responses are cached
  * in front of the Worker through `Cache-Control` and `Cache-Tag` headers (see
  * the `CacheHandlerPlugin` `headers` option), so `get` always misses and
- * `set` stores nothing; `revalidateTag` purges the tags through Workers
+ * `set` stores nothing; `revalidate` purges the tags through Workers
  * Caching.
  *
  * @remarks
@@ -49,16 +48,10 @@ export class experimental_WorkersCacheStore implements CacheStore {
     // Storage happens at the response layer, driven by the reflected headers.
   }
 
-  async revalidateTag(tag: string | readonly string[]): Promise<void> {
-    const tags = toArray(tag)
-
-    if (!tags.length) {
-      return
-    }
-
+  async revalidate({ tags }: CacheRevalidateOptions): Promise<void> {
     const result = await this.cache.purge({
       // Tags must match the reflected Cache-Tag header, so each one is encoded the same way.
-      tags: tags.map(t => encodeCacheTagHeader([t])),
+      tags: tags.map(tag => encodeCacheTagHeader([tag])),
     })
 
     if (!result.success) {

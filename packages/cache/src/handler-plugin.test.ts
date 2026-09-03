@@ -1,274 +1,256 @@
+import type { AnyProcedure } from '@orpc/server'
+import type { StandardHandlerPlugin } from '@orpc/server/standard'
+import type { StandardHeaders } from '@standardserver/core'
+import type { CacheHandlerPluginContext, CacheHandlerPluginHeader } from './handler-plugin'
 import type { CacheContext } from './types'
 import { call, ORPCError, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
+import { decodeCacheTagHeader, toArray } from '@orpc/shared'
 import { MemoryCacheStore } from './adapters/memory'
-import {
-  CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL,
-  CACHE_TAG_HEADER,
-  CACHE_TAG_INVALIDATION_HEADER,
-  CacheHandlerPlugin,
-  decodeCacheTagHeader,
-  encodeCacheTagHeader,
-} from './handler-plugin'
+import { CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL, CacheHandlerPlugin } from './handler-plugin'
 import { cache, revalidate } from './middleware'
 
-describe('cacheHandlerPlugin', () => {
+type RecordedChecks = Exclude<CacheHandlerPluginContext[typeof CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL], undefined>
+type PartialCheck = Partial<RecordedChecks['caches'][number]> & { tags: readonly string[] }
+
+/**
+ * Sets response headers from inside the cache plugin's interceptor, standing
+ * in for a handler or inner plugin that set its own.
+ */
+function presetHeadersPlugin(preset: StandardHeaders): StandardHandlerPlugin<any> {
+  return {
+    name: '~preset-headers',
+    init: options => ({
+      ...options,
+      interceptors: [...toArray(options.interceptors), async (interceptorOptions) => {
+        const response = await interceptorOptions.next()
+        return { ...response, headers: { ...response.headers, ...preset } }
+      }],
+    }),
+  }
+}
+
+function createTestingHandler(headers?: readonly CacheHandlerPluginHeader[], preset?: StandardHeaders) {
   const handlerFn = vi.fn()
-  const procedure = os.handler(handlerFn)
-  const handler = new RPCHandler(procedure, {
-    allowMethods: ['GET'], // tests below send GET requests
+  const handler = new RPCHandler(os.handler(handlerFn), {
+    allowMethods: ['GET', 'POST'],
     plugins: [
-      new CacheHandlerPlugin({ headers: [CACHE_TAG_HEADER, CACHE_TAG_INVALIDATION_HEADER] }),
+      new CacheHandlerPlugin({ headers: headers ?? [] }),
+      // Registered last so its interceptor runs innermost, before the plugin looks.
+      ...preset ? [presetHeadersPlugin(preset)] : [],
     ],
   })
 
-  afterEach(() => {
-    handlerFn.mockReset()
-  })
+  return {
+    handlerFn,
 
-  it('does nothing by default', async () => {
-    const defaultHandler = new RPCHandler(procedure, {
-      allowMethods: ['GET'],
-      plugins: [new CacheHandlerPlugin()],
-    })
+    /**
+     * Records checks against the called procedure and path, as the
+     * middlewares do, then runs `then` inside the same handler call. Each
+     * check may override either field to simulate a nested call.
+     */
+    record(checks: { caches?: PartialCheck[], revalidations?: PartialCheck[] }, then?: () => void) {
+      handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
+        const recorded: RecordedChecks = context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]
+        recorded.caches.push(...toArray(checks.caches).map(check => ({ path, procedure, ...check })))
+        recorded.revalidations.push(...toArray(checks.revalidations).map(check => ({ path, procedure, ...check })))
+        then?.()
+      })
+    },
 
+    async handle(init?: RequestInit): Promise<Response> {
+      const { response } = await handler.handle(new Request('http://localhost:3000', init))
+      return response!
+    },
+  }
+}
+
+const POST = {
+  method: 'POST',
+  body: JSON.stringify({}),
+  headers: { 'content-type': 'application/json' },
+} satisfies RequestInit
+
+describe('cacheHandlerPlugin', () => {
+  it('does nothing until headers are configured', async () => {
+    const { handlerFn, handle } = createTestingHandler()
     handlerFn.mockImplementationOnce(({ context }) => {
       expect(context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]).toBeUndefined()
     })
 
-    const { response } = await defaultHandler.handle(new Request('http://localhost:3000'))
+    const response = await handle()
 
     expect(handlerFn).toHaveBeenCalledTimes(1)
-    expect(response!.headers.get(CACHE_TAG_HEADER)).toBe(null)
-    expect(response!.headers.get(CACHE_TAG_INVALIDATION_HEADER)).toBe(null)
+    expect(response.headers.get('orpc-cache-tag')).toBe(null)
   })
 
-  it('reflects cache tags from the first check of the called procedure', async () => {
-    handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
-      context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL].caches.push(
-        { path, procedure, hit: false, stale: false, key: 'k', tags: ['planets', 'planet:1'] },
-        { path, procedure, hit: true, stale: false, key: 'k2', tags: ['ignored'] },
-      )
+  describe('orpc-cache-tag & orpc-cache-tag-invalidation', () => {
+    const headers = ['orpc-cache-tag', 'orpc-cache-tag-invalidation'] as const
+
+    it('reflects the first check of each kind belonging to the called procedure', async () => {
+      const { record, handle } = createTestingHandler(headers)
+      record({
+        caches: [{ tags: ['planets', 'planet:1'] }, { tags: ['ignored'] }],
+        revalidations: [{ tags: ['revalidated'] }, { tags: ['ignored'] }],
+      })
+
+      const response = await handle()
+
+      expect(response.headers.get('orpc-cache-tag')).toBe('planets,planet:1')
+      expect(response.headers.get('orpc-cache-tag-invalidation')).toBe('revalidated')
     })
 
-    const { response } = await handler.handle(new Request('http://localhost:3000'))
+    it('sets each header only when its own kind of check ran', async () => {
+      const cacheOnly = createTestingHandler(headers)
+      cacheOnly.record({ caches: [{ tags: ['a'] }] })
+      const first = await cacheOnly.handle()
 
-    expect(response!.headers.get(CACHE_TAG_HEADER)).toBe('planets,planet:1')
-    expect(response!.headers.get(CACHE_TAG_INVALIDATION_HEADER)).toBe(null)
+      expect(first.headers.get('orpc-cache-tag')).toBe('a')
+      expect(first.headers.get('orpc-cache-tag-invalidation')).toBe(null)
+
+      const revalidationOnly = createTestingHandler(headers)
+      revalidationOnly.record({ revalidations: [{ tags: ['b'] }] })
+      const second = await revalidationOnly.handle()
+
+      expect(second.headers.get('orpc-cache-tag')).toBe(null)
+      expect(second.headers.get('orpc-cache-tag-invalidation')).toBe('b')
+    })
+
+    it('ignores checks recorded for other procedures or paths', async () => {
+      const other = os.handler(() => 'other')
+      const { record, handle } = createTestingHandler(headers)
+      record({
+        caches: [
+          { procedure: other as AnyProcedure, tags: ['other-procedure'] },
+          { path: ['nested'], tags: ['other-path'] },
+        ],
+        revalidations: [{ procedure: other as AnyProcedure, tags: ['other-procedure'] }],
+      })
+
+      const response = await handle()
+
+      expect(response.headers.get('orpc-cache-tag')).toBe(null)
+      expect(response.headers.get('orpc-cache-tag-invalidation')).toBe(null)
+    })
+
+    it('skips headers when no check ran, or its tags are empty', async () => {
+      const noChecks = await createTestingHandler(headers).handle()
+
+      expect(noChecks.headers.get('orpc-cache-tag')).toBe(null)
+      expect(noChecks.headers.get('orpc-cache-tag-invalidation')).toBe(null)
+
+      const emptyTags = createTestingHandler(headers)
+      emptyTags.record({ caches: [{ tags: [] }], revalidations: [{ tags: [] }] })
+      const response = await emptyTags.handle()
+
+      expect(response.headers.get('orpc-cache-tag')).toBe(null)
+      expect(response.headers.get('orpc-cache-tag-invalidation')).toBe(null)
+    })
+
+    it('skips headers on error responses', async () => {
+      const { record, handle } = createTestingHandler(headers)
+      record({ caches: [{ tags: ['planets'] }] }, () => {
+        throw new ORPCError('INTERNAL_SERVER_ERROR')
+      })
+
+      const response = await handle()
+
+      expect(response.status).toBe(500)
+      expect(response.headers.get('orpc-cache-tag')).toBe(null)
+    })
+
+    it('percent-encodes tags containing special characters', async () => {
+      const { record, handle } = createTestingHandler(headers)
+      record({ caches: [{ tags: ['a,b', 'tiếng việt'] }] })
+
+      const header = (await handle()).headers.get('orpc-cache-tag')!
+
+      expect(header).toBe('a%2Cb,ti%E1%BA%BFng%20vi%E1%BB%87t')
+      expect(decodeCacheTagHeader(header)).toEqual(['a,b', 'tiếng việt'])
+    })
   })
 
-  it('reflects invalidation tags from the first revalidation of the called procedure', async () => {
-    handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
-      context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL].revalidations.push(
-        { path, procedure, tags: ['planets'] },
-      )
+  describe('cache-control & cache-tag', () => {
+    const headers = ['cache-control', 'cache-tag'] as const
+
+    it('reflects the root check, leaving unconfigured headers alone', async () => {
+      const { record, handle } = createTestingHandler(headers)
+      record({ caches: [{ tags: ['planets', 'a,b'], ttl: 2, swr: 1 }] })
+
+      const response = await handle()
+
+      expect(response.headers.get('orpc-cache-tag')).toBe(null) // only configured headers are set
+      expect(response.headers.get('cache-tag')).toBe('planets,a%2Cb')
+      expect(response.headers.get('cache-control')).toBe('public, max-age=2, stale-while-revalidate=1')
     })
 
-    const { response } = await handler.handle(new Request('http://localhost:3000'))
+    it('holds entries without a ttl for a year, and skips Cache-Tag without tags', async () => {
+      const { record, handle } = createTestingHandler(headers)
+      record({ caches: [{ tags: [] }] })
 
-    expect(response!.headers.get(CACHE_TAG_HEADER)).toBe(null)
-    expect(response!.headers.get(CACHE_TAG_INVALIDATION_HEADER)).toBe('planets')
+      const response = await handle()
+
+      expect(response.headers.get('cache-tag')).toBe(null)
+      expect(response.headers.get('cache-control')).toBe('public, max-age=31536000')
+    })
+
+    it('reflects the root check whatever the request method', async () => {
+      const { record, handle } = createTestingHandler(headers)
+      record({ caches: [{ tags: ['planets'], ttl: 2 }] })
+
+      const response = await handle(POST)
+
+      expect(response.headers.get('cache-tag')).toBe('planets')
+      expect(response.headers.get('cache-control')).toBe('public, max-age=2')
+    })
+
+    it('skips HTTP caching headers without a root cache check', async () => {
+      const { record, handle } = createTestingHandler(headers)
+      record({ revalidations: [{ tags: ['planets'] }] })
+
+      const response = await handle()
+
+      expect(response.headers.get('cache-tag')).toBe(null)
+      expect(response.headers.get('cache-control')).toBe(null)
+    })
   })
 
-  it('reflects both headers when both kinds of checks ran', async () => {
-    handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
-      context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL].caches.push(
-        { path, procedure, hit: true, stale: false, key: 'k', tags: ['a'] },
-      )
-      context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL].revalidations.push(
-        { path, procedure, tags: ['b'] },
-      )
-    })
+  it('sets its headers over ones the response already carries', async () => {
+    const { record, handle } = createTestingHandler(
+      ['orpc-cache-tag', 'cache-control'],
+      { 'orpc-cache-tag': 'preset', 'cache-control': 'private, no-store' },
+    )
+    record({ caches: [{ tags: ['planets'], ttl: 60 }] })
 
-    const { response } = await handler.handle(new Request('http://localhost:3000'))
+    const response = await handle()
 
-    expect(response!.headers.get(CACHE_TAG_HEADER)).toBe('a')
-    expect(response!.headers.get(CACHE_TAG_INVALIDATION_HEADER)).toBe('b')
-  })
-
-  it('ignores checks recorded for other procedures or paths', async () => {
-    const other = os.handler(() => 'other')
-
-    handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
-      context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL].caches.push(
-        { path, procedure: other, hit: false, stale: false, key: 'k', tags: ['other-procedure'] },
-        { path: [...path, 'nested'], procedure, hit: false, stale: false, key: 'k', tags: ['other-path'] },
-      )
-      context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL].revalidations.push(
-        { path, procedure: other, tags: ['other-procedure'] },
-      )
-    })
-
-    const { response } = await handler.handle(new Request('http://localhost:3000'))
-
-    expect(response!.headers.get(CACHE_TAG_HEADER)).toBe(null)
-    expect(response!.headers.get(CACHE_TAG_INVALIDATION_HEADER)).toBe(null)
-  })
-
-  it('skips headers when no checks ran or tags are empty', async () => {
-    const { response: noChecks } = await handler.handle(new Request('http://localhost:3000'))
-
-    expect(noChecks!.headers.get(CACHE_TAG_HEADER)).toBe(null)
-    expect(noChecks!.headers.get(CACHE_TAG_INVALIDATION_HEADER)).toBe(null)
-
-    handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
-      context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL].caches.push(
-        { path, procedure, hit: false, stale: false, key: 'k', tags: [] },
-      )
-      context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL].revalidations.push(
-        { path, procedure, tags: [] },
-      )
-    })
-
-    const { response: emptyTags } = await handler.handle(new Request('http://localhost:3000'))
-
-    expect(emptyTags!.headers.get(CACHE_TAG_HEADER)).toBe(null)
-    expect(emptyTags!.headers.get(CACHE_TAG_INVALIDATION_HEADER)).toBe(null)
-  })
-
-  it('skips headers on error responses', async () => {
-    handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
-      context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL].caches.push(
-        { path, procedure, hit: false, stale: false, key: 'k', tags: ['planets'] },
-      )
-
-      throw new ORPCError('INTERNAL_SERVER_ERROR')
-    })
-
-    const { response } = await handler.handle(new Request('http://localhost:3000'))
-
-    expect(response!.status).toBe(500)
-    expect(response!.headers.get(CACHE_TAG_HEADER)).toBe(null)
-  })
-
-  it('percent-encodes tags containing special characters', async () => {
-    handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
-      context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL].caches.push(
-        { path, procedure, hit: false, stale: false, key: 'k', tags: ['a,b', 'tiếng việt'] },
-      )
-    })
-
-    const { response } = await handler.handle(new Request('http://localhost:3000'))
-
-    const header = response!.headers.get(CACHE_TAG_HEADER)!
-    expect(header).toBe('a%2Cb,ti%E1%BA%BFng%20vi%E1%BB%87t')
-    expect(decodeCacheTagHeader(header)).toEqual(['a,b', 'tiếng việt'])
+    expect(response.headers.get('orpc-cache-tag')).toBe('planets')
+    expect(response.headers.get('cache-control')).toBe('public, max-age=60')
   })
 
   it('only reflects the tags of the procedure the client called in nested calls', async () => {
-    const store = new MemoryCacheStore()
-
     const inner = os
       .$context<CacheContext>()
       .use(cache({ key: 'inner', tags: ['inner-tag'] }))
-      .use(revalidate('inner-revalidated'))
+      .use(revalidate({ tags: ['inner-revalidated'] }))
       .handler(() => 'inner')
 
     const outer = os
       .$context<CacheContext>()
       .use(cache({ key: 'outer', tags: ['outer-tag'] }))
-      .use(revalidate('outer-revalidated'))
+      .use(revalidate({ tags: ['outer-revalidated'] }))
       .handler(async ({ context }) => `outer:${await call(inner, undefined, { context })}`)
 
-    const nestedHandler = new RPCHandler({ outer, inner }, {
+    const handler = new RPCHandler({ outer, inner }, {
       allowMethods: ['GET'],
-      plugins: [new CacheHandlerPlugin({ headers: [CACHE_TAG_HEADER, CACHE_TAG_INVALIDATION_HEADER] })],
+      plugins: [new CacheHandlerPlugin({ headers: ['orpc-cache-tag', 'orpc-cache-tag-invalidation'] })],
     })
 
-    const { response } = await nestedHandler.handle(new Request('http://localhost:3000/outer'), {
-      context: { cache: store },
+    const { response } = await handler.handle(new Request('http://localhost:3000/outer'), {
+      context: { 'cache/store': new MemoryCacheStore() },
     })
 
-    expect(response!.headers.get(CACHE_TAG_HEADER)).toBe('outer-tag')
-    expect(response!.headers.get(CACHE_TAG_INVALIDATION_HEADER)).toBe('outer-revalidated')
-  })
-})
-
-describe('cacheHandlerPlugin cache-control and cache-tag headers', () => {
-  const handlerFn = vi.fn()
-  const procedure = os.handler(handlerFn)
-  const handler = new RPCHandler(procedure, {
-    allowMethods: ['GET', 'POST'],
-    plugins: [
-      new CacheHandlerPlugin({ headers: ['cache-control', 'cache-tag'] }),
-    ],
-  })
-
-  afterEach(() => {
-    handlerFn.mockReset()
-  })
-
-  it('reflects the root cache check into Cache-Tag and Cache-Control on GET responses', async () => {
-    handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
-      context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL].caches.push(
-        { path, procedure, hit: false, stale: false, key: 'k', tags: ['planets', 'a,b'], ttl: 1500, swr: 500 },
-      )
-    })
-
-    const { response } = await handler.handle(new Request('http://localhost:3000'))
-
-    expect(response!.headers.get(CACHE_TAG_HEADER)).toBe(null) // only configured headers are set
-    expect(response!.headers.get('cache-tag')).toBe('planets,a%2Cb')
-    expect(response!.headers.get('cache-control')).toBe('public, s-maxage=2, stale-while-revalidate=1')
-  })
-
-  it('holds entries without a ttl for a year, and skips Cache-Tag without tags', async () => {
-    handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
-      context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL].caches.push(
-        { path, procedure, hit: false, stale: false, key: 'k', tags: [] },
-      )
-    })
-
-    const { response } = await handler.handle(new Request('http://localhost:3000'))
-
-    expect(response!.headers.get('cache-tag')).toBe(null)
-    expect(response!.headers.get('cache-control')).toBe('public, s-maxage=31536000')
-  })
-
-  it('skips HTTP caching headers on non-GET requests', async () => {
-    handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
-      context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL].caches.push(
-        { path, procedure, hit: false, stale: false, key: 'k', tags: ['planets'], ttl: 1500 },
-      )
-    })
-
-    const { response } = await handler.handle(new Request('http://localhost:3000', {
-      method: 'POST',
-      body: JSON.stringify({}),
-      headers: { 'content-type': 'application/json' },
-    }))
-
-    expect(response!.headers.get('cache-tag')).toBe(null)
-    expect(response!.headers.get('cache-control')).toBe(null)
-  })
-
-  it('skips HTTP caching headers without a root cache check', async () => {
-    handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
-      context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL].revalidations.push(
-        { path, procedure, tags: ['planets'] },
-      )
-    })
-
-    const { response } = await handler.handle(new Request('http://localhost:3000'))
-
-    expect(response!.headers.get('cache-tag')).toBe(null)
-    expect(response!.headers.get('cache-control')).toBe(null)
-  })
-})
-
-describe('encodeCacheTagHeader & decodeCacheTagHeader', () => {
-  it('round-trips tags with commas, percents, uppercase, and unicode', () => {
-    const tags = ['plain', 'a,b', '100%', 'CamelCase', 'tiếng việt', 'sp ace']
-
-    expect(decodeCacheTagHeader(encodeCacheTagHeader(tags))).toEqual(tags)
-  })
-
-  it('percent-encodes uppercase letters so case-insensitive caches keep tags distinct', () => {
-    expect(encodeCacheTagHeader(['Planets'])).toBe('%50lanets')
-    expect(encodeCacheTagHeader(['Planets'])).not.toBe(encodeCacheTagHeader(['planets']))
-  })
-
-  it('decodes empty headers to no tags', () => {
-    expect(decodeCacheTagHeader('')).toEqual([])
+    expect(response!.headers.get('orpc-cache-tag')).toBe('outer-tag')
+    expect(response!.headers.get('orpc-cache-tag-invalidation')).toBe('outer-revalidated')
   })
 })

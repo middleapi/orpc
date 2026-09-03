@@ -1,7 +1,7 @@
-import type { RPCJsonSerializer } from '@orpc/client'
 import type { Public } from '@orpc/shared'
-import type { CacheEntry, CacheSetOptions, CacheStore } from '../types'
-import { toArray } from '@orpc/shared'
+import type { CacheEntry, CacheRevalidateOptions, CacheSetOptions, CacheStore } from '../types'
+import { RPCJsonSerializer } from '@orpc/client'
+import { nowInSeconds } from '@orpc/shared'
 import { encodeCacheKey } from '../utils'
 
 export interface MemoryCacheStoreOptions {
@@ -15,11 +15,12 @@ export interface MemoryCacheStoreOptions {
 
 interface MemoryCacheStoreEntry {
   output: unknown
-  tags: readonly string[]
   /**
-   * Tag version counters snapshotted at set time, index-aligned with `tags`.
+   * The tags, and the version counter each had at set time, index-aligned.
+   * Both are absent together when the entry has no tags.
    */
-  tagVersions: number[]
+  tags?: readonly string[]
+  tagVersions?: readonly number[]
   expiresAt: number | undefined
   evictAt: number | undefined
 }
@@ -34,10 +35,10 @@ interface MemoryCacheStoreEntry {
 export class MemoryCacheStore implements CacheStore {
   private readonly entries = new Map<string, MemoryCacheStoreEntry>()
   private readonly tagVersions = new Map<string, number>()
-  private readonly serializer: Public<RPCJsonSerializer> | undefined
+  private readonly serializer: Public<RPCJsonSerializer>
 
   constructor(options: MemoryCacheStoreOptions = {}) {
-    this.serializer = options.serializer
+    this.serializer = options.serializer ?? new RPCJsonSerializer()
   }
 
   async get(key: unknown): Promise<CacheEntry | undefined> {
@@ -48,13 +49,13 @@ export class MemoryCacheStore implements CacheStore {
       return undefined
     }
 
-    if (entry.evictAt !== undefined && Date.now() >= entry.evictAt) {
+    if (entry.evictAt !== undefined && nowInSeconds() >= entry.evictAt) {
       this.entries.delete(encodedKey)
       return undefined
     }
 
-    const revalidated = entry.tags.some(
-      (tag, index) => (this.tagVersions.get(tag) ?? 0) !== entry.tagVersions[index],
+    const revalidated = entry.tags?.some(
+      (tag, index) => (this.tagVersions.get(tag) ?? 0) !== entry.tagVersions?.[index],
     )
 
     if (revalidated) {
@@ -70,22 +71,22 @@ export class MemoryCacheStore implements CacheStore {
   }
 
   async set(key: unknown, output: unknown, options?: CacheSetOptions): Promise<void> {
-    const tags = options?.tags ?? []
-    const expiresAt = options?.ttl !== undefined ? Date.now() + options.ttl : undefined
+    const tags = options?.tags
+    const expiresAt = options?.ttl !== undefined ? nowInSeconds() + options.ttl : undefined
     const evictAt = expiresAt !== undefined ? expiresAt + (options?.swr ?? 0) : undefined
 
     this.entries.set(encodeCacheKey(key, this.serializer), {
       output,
       tags,
-      tagVersions: tags.map(tag => this.tagVersions.get(tag) ?? 0),
+      tagVersions: tags?.map(tag => this.tagVersions.get(tag) ?? 0),
       expiresAt,
       evictAt,
     })
   }
 
-  async revalidateTag(tag: string | readonly string[]): Promise<void> {
-    for (const t of toArray(tag)) {
-      this.tagVersions.set(t, (this.tagVersions.get(t) ?? 0) + 1)
+  async revalidate({ tags }: CacheRevalidateOptions): Promise<void> {
+    for (const tag of tags) {
+      this.tagVersions.set(tag, (this.tagVersions.get(tag) ?? 0) + 1)
     }
   }
 }

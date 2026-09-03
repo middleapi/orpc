@@ -1,6 +1,7 @@
 import type { CacheHandlerPluginContext } from './handler-plugin'
 import type { CacheContext, CacheEntry, CacheStore } from './types'
 import { call, os, type } from '@orpc/server'
+import { nowInSeconds } from '@orpc/shared'
 import { CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
 import { cache, revalidate } from './middleware'
 
@@ -8,7 +9,7 @@ function createStore(entry?: CacheEntry) {
   return {
     get: vi.fn<CacheStore['get']>().mockResolvedValue(entry),
     set: vi.fn<CacheStore['set']>().mockResolvedValue(undefined),
-    revalidateTag: vi.fn<CacheStore['revalidateTag']>().mockResolvedValue(undefined),
+    revalidate: vi.fn<CacheStore['revalidate']>().mockResolvedValue(undefined),
   }
 }
 
@@ -18,16 +19,16 @@ describe('cache', () => {
     const handlerFn = vi.fn().mockReturnValue('fresh')
     const procedure = os
       .$context<CacheContext>()
-      .use(cache({ key: 'k', tags: ['t1', 't2'], ttl: 1000, swr: 500 }))
+      .use(cache({ key: 'k', tags: ['t1', 't2'], ttl: 60, swr: 30 }))
       .handler(handlerFn)
 
     await expect(
-      call(procedure, undefined, { context: { cache: store } }),
+      call(procedure, undefined, { context: { 'cache/store': store } }),
     ).resolves.toBe('fresh')
 
     expect(handlerFn).toHaveBeenCalledTimes(1)
     expect(store.get).toHaveBeenCalledWith('k')
-    expect(store.set).toHaveBeenCalledWith('k', 'fresh', { tags: ['t1', 't2'], ttl: 1000, swr: 500 })
+    expect(store.set).toHaveBeenCalledWith('k', 'fresh', { tags: ['t1', 't2'], ttl: 60, swr: 30 })
   })
 
   describe('key derivation', () => {
@@ -35,10 +36,10 @@ describe('cache', () => {
       const store = createStore()
       const procedure = os.$context<CacheContext>().input(type<any>()).use(cache()).handler(() => 'ok')
 
-      await call(procedure, { id: 1 }, { context: { cache: store }, path: ['planet', 'find'] })
-      await call(procedure, { id: 1 }, { context: { cache: store }, path: ['planet', 'find'] })
-      await call(procedure, { id: 2 }, { context: { cache: store }, path: ['planet', 'find'] })
-      await call(procedure, { id: 1 }, { context: { cache: store }, path: ['user', 'find'] })
+      await call(procedure, { id: 1 }, { context: { 'cache/store': store }, path: ['planet', 'find'] })
+      await call(procedure, { id: 1 }, { context: { 'cache/store': store }, path: ['planet', 'find'] })
+      await call(procedure, { id: 2 }, { context: { 'cache/store': store }, path: ['planet', 'find'] })
+      await call(procedure, { id: 1 }, { context: { 'cache/store': store }, path: ['user', 'find'] })
 
       const keys = store.get.mock.calls.map(([key]) => key)
       expect(keys[0]).toEqual([['planet', 'find'], { id: 1 }]) // the procedure path and input
@@ -47,7 +48,7 @@ describe('cache', () => {
       expect(keys[0]).not.toEqual(keys[3]) // different path
     })
 
-    it('derives the key from non-string key material, and uses string keys verbatim', async () => {
+    it('uses a provided key as-is, whatever its type', async () => {
       const store = createStore()
       const material = os
         .$context<CacheContext>()
@@ -56,11 +57,12 @@ describe('cache', () => {
         .handler(() => 'ok')
       const verbatim = os.$context<CacheContext>().use(cache({ key: 'k' })).handler(() => 'ok')
 
-      await call(material, { id: 1, page: 1 }, { context: { cache: store }, path: ['planet', 'find'] })
-      await call(material, { id: 1, page: 2 }, { context: { cache: store }, path: ['planet', 'find'] })
-      await call(verbatim, undefined, { context: { cache: store } })
+      await call(material, { id: 1, page: 1 }, { context: { 'cache/store': store }, path: ['planet', 'find'] })
+      await call(material, { id: 1, page: 2 }, { context: { 'cache/store': store }, path: ['planet', 'find'] })
+      await call(verbatim, undefined, { context: { 'cache/store': store } })
 
       const keys = store.get.mock.calls.map(([key]) => key)
+      expect(keys[0]).toEqual({ id: 1 }) // the resolved material, not combined with the path
       expect(keys[0]).toEqual(keys[1]) // same material despite different inputs
       expect(keys[2]).toBe('k')
     })
@@ -74,8 +76,8 @@ describe('cache', () => {
         .input(type<{ page: number }>(raw => ({ page: (raw as any).page })))
         .handler(() => 'ok')
 
-      await call(procedure, { id: 1, page: 1 } as any, { context: { cache: store } })
-      await call(procedure, { id: 1, page: 2 } as any, { context: { cache: store } })
+      await call(procedure, { id: 1, page: 1 } as any, { context: { 'cache/store': store } })
+      await call(procedure, { id: 1, page: 2 } as any, { context: { 'cache/store': store } })
 
       // The middleware only validated `id` at its position, but the key still
       // covers the full input, so different pages never share an entry.
@@ -84,49 +86,29 @@ describe('cache', () => {
     })
   })
 
-  it('short-circuits the handler on fresh hit', async () => {
-    const store = createStore({ output: 'cached', tags: ['t'], expiresAt: Date.now() + 1000 })
+  it.each<[string, CacheEntry, unknown]>([
+    ['a fresh entry', { output: 'cached', tags: ['t'], expiresAt: nowInSeconds() + 60 }, 'cached'],
+    ['an entry that never expires', { output: 'cached', tags: [] }, 'cached'],
+    ['a cached undefined output', { output: undefined, tags: [] }, undefined],
+  ])('serves %s without running the handler', async (_, entry, expected) => {
+    const store = createStore(entry)
     const handlerFn = vi.fn().mockReturnValue('fresh')
     const procedure = os.$context<CacheContext>().use(cache({ key: 'k' })).handler(handlerFn)
 
     await expect(
-      call(procedure, undefined, { context: { cache: store } }),
-    ).resolves.toBe('cached')
+      call(procedure, undefined, { context: { 'cache/store': store } }),
+    ).resolves.toBe(expected)
 
     expect(handlerFn).not.toHaveBeenCalled()
     expect(store.set).not.toHaveBeenCalled()
-  })
-
-  it('treats entries without expiresAt as always fresh', async () => {
-    const store = createStore({ output: 'cached', tags: [] })
-    const handlerFn = vi.fn()
-    const procedure = os.$context<CacheContext>().use(cache({ key: 'k' })).handler(handlerFn)
-
-    await expect(
-      call(procedure, undefined, { context: { cache: store } }),
-    ).resolves.toBe('cached')
-
-    expect(handlerFn).not.toHaveBeenCalled()
-  })
-
-  it('serves cached undefined outputs', async () => {
-    const store = createStore({ output: undefined, tags: [] })
-    const handlerFn = vi.fn().mockReturnValue('fresh')
-    const procedure = os.$context<CacheContext>().use(cache({ key: 'k' })).handler(handlerFn)
-
-    await expect(
-      call(procedure, undefined, { context: { cache: store } }),
-    ).resolves.toBeUndefined()
-
-    expect(handlerFn).not.toHaveBeenCalled()
   })
 
   it('key, tags, ttl, swr, enabled can be async functions', async () => {
     const store = createStore()
     const keyFn = vi.fn().mockResolvedValueOnce('k')
     const tagsFn = vi.fn().mockResolvedValueOnce(['t'])
-    const ttlFn = vi.fn().mockResolvedValueOnce(1000)
-    const swrFn = vi.fn().mockResolvedValueOnce(500)
+    const ttlFn = vi.fn().mockResolvedValueOnce(60)
+    const swrFn = vi.fn().mockResolvedValueOnce(30)
     const enabledFn = vi.fn().mockResolvedValueOnce(true)
     const mw = cache({ key: keyFn, tags: tagsFn, ttl: ttlFn, swr: swrFn, enabled: enabledFn })
     const procedure = os
@@ -136,10 +118,10 @@ describe('cache', () => {
       .handler(() => 'ok')
 
     await expect(
-      call(procedure, '__input__', { context: { cache: store, __context__: true }, path: ['__path__'] }),
+      call(procedure, '__input__', { context: { 'cache/store': store, '__context__': true }, path: ['__path__'] }),
     ).resolves.toBe('ok')
 
-    expect(store.set).toHaveBeenCalledWith('k', 'ok', { tags: ['t'], ttl: 1000, swr: 500 })
+    expect(store.set).toHaveBeenCalledWith('k', 'ok', { tags: ['t'], ttl: 60, swr: 30 })
 
     for (const fn of [keyFn, tagsFn, ttlFn, swrFn, enabledFn]) {
       expect(fn).toHaveBeenCalledTimes(1)
@@ -156,30 +138,11 @@ describe('cache', () => {
     const procedure = os.$context<CacheContext>().use(cache({ key: 'k', enabled: () => false })).handler(handlerFn)
 
     await expect(
-      call(procedure, undefined, { context: { cache: store } }),
+      call(procedure, undefined, { context: { 'cache/store': store } }),
     ).resolves.toBe('fresh')
 
     expect(store.get).not.toHaveBeenCalled()
     expect(store.set).not.toHaveBeenCalled()
-  })
-
-  it.each<[string, () => any]>([
-    ['async iterator', () => (async function* () {})()],
-    ['readable stream', () => new ReadableStream()],
-  ])('never stores %s outputs and records no check', async (_, handlerFn) => {
-    const store = createStore()
-    const pluginContext = { caches: [], revalidations: [] }
-    const procedure = os
-      .$context<CacheContext & CacheHandlerPluginContext>()
-      .use(cache({ key: 'k', tags: ['t'] }))
-      .handler(handlerFn)
-
-    await call(procedure, undefined, {
-      context: { cache: store, [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext },
-    })
-
-    expect(store.set).not.toHaveBeenCalled()
-    expect(pluginContext.caches).toEqual([])
   })
 
   it('records misses into the handler plugin context with option tags', async () => {
@@ -191,17 +154,17 @@ describe('cache', () => {
       .handler(() => 'ok')
 
     await call(procedure, undefined, {
-      context: { cache: store, [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext },
+      context: { 'cache/store': store, [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext },
       path: ['__path__'],
     })
 
     expect(pluginContext.caches).toEqual([
-      { procedure, path: ['__path__'], hit: false, stale: false, key: 'k', tags: ['t'] },
+      { procedure, path: ['__path__'], tags: ['t'] },
     ])
   })
 
   it('records hits into the handler plugin context with the stored entry tags', async () => {
-    const store = createStore({ output: 'cached', tags: ['stored'], expiresAt: Date.now() + 1000 })
+    const store = createStore({ output: 'cached', tags: ['stored'], expiresAt: nowInSeconds() + 60 })
     const pluginContext: Exclude<CacheHandlerPluginContext[typeof CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL], undefined> = { caches: [], revalidations: [] }
     const procedure = os
       .$context<CacheContext & CacheHandlerPluginContext>()
@@ -209,29 +172,19 @@ describe('cache', () => {
       .handler(() => 'ok')
 
     await call(procedure, undefined, {
-      context: { cache: store, [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext },
+      context: { 'cache/store': store, [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext },
       path: ['__path__'],
     })
 
     expect(pluginContext.caches).toEqual([
-      expect.objectContaining({ procedure, path: ['__path__'], hit: true, stale: false, key: 'k', tags: ['stored'] }),
+      expect.objectContaining({ procedure, path: ['__path__'], tags: ['stored'] }),
     ])
     expect(pluginContext.caches[0]!.ttl).toBeGreaterThan(0) // the entry's remaining freshness
   })
 
-  it('propagates store.get failures', async () => {
+  it.each(['get', 'set'] as const)('propagates store.%s failures and records no check', async (method) => {
     const store = createStore()
-    store.get.mockRejectedValueOnce(new Error('store down'))
-    const procedure = os.$context<CacheContext>().use(cache({ key: 'k' })).handler(() => 'ok')
-
-    await expect(
-      call(procedure, undefined, { context: { cache: store } }),
-    ).rejects.toThrow('store down')
-  })
-
-  it('propagates store.set failures and records no check', async () => {
-    const store = createStore()
-    store.set.mockRejectedValueOnce(new Error('store down'))
+    store[method].mockRejectedValueOnce(new Error('store down'))
     const pluginContext = { caches: [], revalidations: [] }
     const procedure = os
       .$context<CacheContext & CacheHandlerPluginContext>()
@@ -240,7 +193,7 @@ describe('cache', () => {
 
     await expect(
       call(procedure, undefined, {
-        context: { cache: store, [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext },
+        context: { 'cache/store': store, [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext },
       }),
     ).rejects.toThrow('store down')
 
@@ -249,69 +202,73 @@ describe('cache', () => {
 
   describe('stale-while-revalidate', () => {
     it('serves stale output and refreshes in the background via waitUntil', async () => {
-      const store = createStore({ output: 'stale', tags: ['t'], expiresAt: Date.now() - 1 })
+      const store = createStore({ output: 'stale', tags: ['t'], expiresAt: nowInSeconds() - 1 })
       const handlerFn = vi.fn().mockReturnValue('fresh')
       const waitUntil = vi.fn()
       const pluginContext = { caches: [], revalidations: [] }
       const procedure = os
         .$context<CacheContext & CacheHandlerPluginContext>()
-        .use(cache({ key: 'k', tags: ['t'], ttl: 1000, swr: 500 }))
+        .use(cache({ key: 'k', tags: ['t'], ttl: 60, swr: 30 }))
         .handler(handlerFn)
 
       await expect(
         call(procedure, undefined, {
-          context: { cache: store, waitUntil, [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext },
+          context: { 'cache/store': store, 'cache/waitUntil': waitUntil, [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext },
           path: ['__path__'],
         }),
       ).resolves.toBe('stale')
 
       expect(pluginContext.caches).toEqual([
-        { procedure, path: ['__path__'], hit: true, stale: true, key: 'k', tags: ['t'], ttl: 0, swr: 500 },
+        { procedure, path: ['__path__'], tags: ['t'], ttl: 0, swr: 30 },
       ])
 
       expect(waitUntil).toHaveBeenCalledTimes(1)
       await waitUntil.mock.calls[0]![0]
 
       expect(handlerFn).toHaveBeenCalledTimes(1)
-      expect(store.set).toHaveBeenCalledWith('k', 'fresh', { tags: ['t'], ttl: 1000, swr: 500 })
+      expect(store.set).toHaveBeenCalledWith('k', 'fresh', { tags: ['t'], ttl: 60, swr: 30 })
     })
 
     it('refreshes in the background without waitUntil', async () => {
-      const store = createStore({ output: 'stale', tags: [], expiresAt: Date.now() - 1 })
+      const store = createStore({ output: 'stale', tags: [], expiresAt: nowInSeconds() - 1 })
       const procedure = os.$context<CacheContext>().use(cache({ key: 'k' })).handler(() => 'fresh')
 
       await expect(
-        call(procedure, undefined, { context: { cache: store } }),
+        call(procedure, undefined, { context: { 'cache/store': store } }),
       ).resolves.toBe('stale')
 
-      await vi.waitFor(() => expect(store.set).toHaveBeenCalledWith('k', 'fresh', { tags: [], ttl: undefined, swr: undefined }))
+      await vi.waitFor(() => expect(store.set).toHaveBeenCalledWith('k', 'fresh', { tags: undefined, ttl: undefined, swr: undefined }))
     })
 
-    it('swallows background refresh failures', async () => {
-      const store = createStore({ output: 'stale', tags: [], expiresAt: Date.now() - 1 })
+    it('hands background refresh failures to waitUntil', async () => {
+      const store = createStore({ output: 'stale', tags: [], expiresAt: nowInSeconds() - 1 })
       const waitUntil = vi.fn()
       const procedure = os.$context<CacheContext>().use(cache({ key: 'k' })).handler(() => {
         throw new Error('handler down')
       })
 
       await expect(
-        call(procedure, undefined, { context: { cache: store, waitUntil } }),
+        call(procedure, undefined, { context: { 'cache/store': store, 'cache/waitUntil': waitUntil } }),
       ).resolves.toBe('stale')
 
-      await expect(waitUntil.mock.calls[0]![0]).resolves.toBeUndefined()
+      // The raw refresh is handed over, so the runtime can report the failure.
+      await expect(waitUntil.mock.calls[0]![0]).rejects.toThrow('handler down')
       expect(store.set).not.toHaveBeenCalled()
     })
 
-    it('never stores streaming outputs from background refreshes', async () => {
-      const store = createStore({ output: 'stale', tags: [], expiresAt: Date.now() - 1 })
-      const waitUntil = vi.fn()
-      const procedure = os.$context<CacheContext>().use(cache({ key: 'k' })).handler(() => (async function* () {})())
+    it('ignores background refresh failures without waitUntil', async () => {
+      const store = createStore({ output: 'stale', tags: [], expiresAt: nowInSeconds() - 1 })
+      const handlerFn = vi.fn(() => {
+        throw new Error('handler down')
+      })
+      const procedure = os.$context<CacheContext>().use(cache({ key: 'k' })).handler(handlerFn)
 
       await expect(
-        call(procedure, undefined, { context: { cache: store, waitUntil } }),
+        call(procedure, undefined, { context: { 'cache/store': store } }),
       ).resolves.toBe('stale')
 
-      await waitUntil.mock.calls[0]![0]
+      // Nothing owns the refresh, so its rejection must not reach the process.
+      await vi.waitFor(() => expect(handlerFn).toHaveBeenCalledTimes(1))
       expect(store.set).not.toHaveBeenCalled()
     })
   })
@@ -323,29 +280,20 @@ describe('revalidate', () => {
     const pluginContext = { caches: [], revalidations: [] }
     const procedure = os
       .$context<CacheContext & CacheHandlerPluginContext>()
-      .use(revalidate('planets'))
+      .use(revalidate({ tags: ['planets'] }))
       .handler(() => 'ok')
 
     await expect(
       call(procedure, undefined, {
-        context: { cache: store, [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext },
+        context: { 'cache/store': store, [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext },
         path: ['__path__'],
       }),
     ).resolves.toBe('ok')
 
-    expect(store.revalidateTag).toHaveBeenCalledWith(['planets'])
+    expect(store.revalidate).toHaveBeenCalledWith({ tags: ['planets'] })
     expect(pluginContext.revalidations).toEqual([
       { procedure, path: ['__path__'], tags: ['planets'] },
     ])
-  })
-
-  it('accepts an array of tags', async () => {
-    const store = createStore()
-    const procedure = os.$context<CacheContext>().use(revalidate(['a', 'b'])).handler(() => 'ok')
-
-    await call(procedure, undefined, { context: { cache: store } })
-
-    expect(store.revalidateTag).toHaveBeenCalledWith(['a', 'b'])
   })
 
   it('tags can be an async function', async () => {
@@ -354,11 +302,12 @@ describe('revalidate', () => {
     const procedure = os
       .$context<CacheContext & { __context__: boolean }>()
       .input(type<any>())
-      .use(revalidate(tagsFn))
+      .use(revalidate({ tags: tagsFn }))
       .handler(() => 'ok')
 
-    await call(procedure, '__input__', { context: { cache: store, __context__: true }, path: ['__path__'] })
+    await call(procedure, '__input__', { context: { 'cache/store': store, '__context__': true }, path: ['__path__'] })
 
+    expect(store.revalidate).toHaveBeenCalledWith({ tags: ['t'] })
     expect(tagsFn).toHaveBeenCalledTimes(1)
     expect(tagsFn).toHaveBeenCalledWith(
       expect.objectContaining({ procedure, path: ['__path__'], context: expect.objectContaining({ __context__: true }) }),
@@ -368,30 +317,33 @@ describe('revalidate', () => {
 
   it('skips the revalidation when the handler throws', async () => {
     const store = createStore()
-    const procedure = os.$context<CacheContext>().use(revalidate('planets')).handler(() => {
+    const procedure = os.$context<CacheContext>().use(revalidate({ tags: ['planets'] })).handler(() => {
       throw new Error('handler down')
     })
 
     await expect(
-      call(procedure, undefined, { context: { cache: store } }),
+      call(procedure, undefined, { context: { 'cache/store': store } }),
     ).rejects.toThrow('handler down')
 
-    expect(store.revalidateTag).not.toHaveBeenCalled()
+    expect(store.revalidate).not.toHaveBeenCalled()
   })
 
-  it('skips the revalidation and recording when tags resolve to empty', async () => {
+  it.each([
+    ['undefined', undefined],
+    ['null', null],
+  ])('skips the revalidation and recording when tags resolve to %s', async (_, tags) => {
     const store = createStore()
     const pluginContext = { caches: [], revalidations: [] }
     const procedure = os
       .$context<CacheContext & CacheHandlerPluginContext>()
-      .use(revalidate(() => [] as unknown as [string, ...string[]]))
+      .use(revalidate({ tags: () => tags }))
       .handler(() => 'ok')
 
     await call(procedure, undefined, {
-      context: { cache: store, [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext },
+      context: { 'cache/store': store, [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext },
     })
 
-    expect(store.revalidateTag).not.toHaveBeenCalled()
+    expect(store.revalidate).not.toHaveBeenCalled()
     expect(pluginContext.revalidations).toEqual([])
   })
 })
@@ -402,21 +354,21 @@ describe('cache + revalidate combined', () => {
     const procedure = os
       .$context<CacheContext>()
       .use(cache({ key: 'k', tags: ['t'] }))
-      .use(revalidate('t'))
+      .use(revalidate({ tags: ['t'] }))
       .handler(() => 'ok')
 
-    await call(procedure, undefined, { context: { cache: store } })
+    await call(procedure, undefined, { context: { 'cache/store': store } })
 
-    expect(store.revalidateTag).toHaveBeenCalledTimes(1)
+    expect(store.revalidate).toHaveBeenCalledTimes(1)
     expect(store.set).toHaveBeenCalledTimes(1)
-    expect(store.revalidateTag.mock.invocationCallOrder[0]!).toBeLessThan(store.set.mock.invocationCallOrder[0]!)
+    expect(store.revalidate.mock.invocationCallOrder[0]!).toBeLessThan(store.set.mock.invocationCallOrder[0]!)
 
     store.get.mockResolvedValueOnce({ output: 'cached', tags: ['t'] })
 
     await expect(
-      call(procedure, undefined, { context: { cache: store } }),
+      call(procedure, undefined, { context: { 'cache/store': store } }),
     ).resolves.toBe('cached')
 
-    expect(store.revalidateTag).toHaveBeenCalledTimes(1)
+    expect(store.revalidate).toHaveBeenCalledTimes(1)
   })
 })

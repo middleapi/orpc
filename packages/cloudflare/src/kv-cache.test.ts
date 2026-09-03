@@ -1,5 +1,6 @@
 import type { experimental_KVCacheStoreOptions } from './kv-cache'
 import { RPCSerializer } from '@orpc/client'
+import { nowInSeconds } from '@orpc/shared'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
 import { experimental_KVCacheStore } from './kv-cache'
@@ -10,23 +11,20 @@ describe('experimental_KVCacheStore', () => {
     return { store: new experimental_KVCacheStore({ kv: env.CACHE_KV, prefix, ...options }), prefix }
   }
 
-  it('round-trips outputs with tags and expiresAt, including undefined', async () => {
+  // The cross-package tsconfig rootDir keeps the shared store contract out of
+  // reach here, so the shared behavior is asserted again against real KV.
+  it('round-trips outputs with their tags and expiresAt, including undefined', async () => {
     const { store } = createTestingStore()
 
-    await store.set('k', { nested: [1, 2] }, { tags: ['t'], ttl: 120_000 })
+    await store.set('k', { nested: [1, 2] }, { tags: ['t'], ttl: 120 })
 
     const entry = await store.get('k')
     expect(entry!.output).toEqual({ nested: [1, 2] })
     expect(entry!.tags).toEqual(['t'])
-    expect(entry!.expiresAt).toBeGreaterThan(Date.now())
+    expect(entry!.expiresAt).toBeGreaterThan(nowInSeconds())
 
     await store.set('u', undefined)
-    await expect(store.get('u')).resolves.toEqual({ output: undefined, tags: [], expiresAt: undefined })
-  })
-
-  it('misses on unknown keys', async () => {
-    const { store } = createTestingStore()
-
+    await expect(store.get('u')).resolves.toEqual({ output: undefined, tags: undefined, expiresAt: undefined })
     await expect(store.get('unknown')).resolves.toBeUndefined()
   })
 
@@ -40,16 +38,22 @@ describe('experimental_KVCacheStore', () => {
     }
 
     await store.set('k', output)
-
     await expect(store.get('k')).resolves.toMatchObject({ output })
   })
 
-  it('ignores outputs containing blobs', async () => {
+  it('invalidates entries by any of their tags, and keeps ones set afterwards', async () => {
     const { store } = createTestingStore()
 
-    await store.set('k', { file: new Blob(['x']) })
+    await store.set('multi', 'v', { tags: ['a', 'b'] })
+    await store.set('other', 'v', { tags: ['c'] })
 
-    await expect(store.get('k')).resolves.toBeUndefined()
+    await store.revalidate({ tags: ['a', 'b'] })
+
+    await expect(store.get('multi')).resolves.toBeUndefined()
+    await expect(store.get('other')).resolves.toBeDefined()
+
+    await store.set('multi', 'new', { tags: ['a'] })
+    await expect(store.get('multi')).resolves.toMatchObject({ output: 'new' })
   })
 
   it('supports a custom serializer', async () => {
@@ -65,49 +69,6 @@ describe('experimental_KVCacheStore', () => {
     expect(deserializeSpy).toHaveBeenCalled()
   })
 
-  it('invalidates entries by any of their tags', async () => {
-    const { store } = createTestingStore()
-
-    await store.set('multi', 'v', { tags: ['a', 'b'] })
-    await store.set('other', 'v', { tags: ['c'] })
-
-    await store.revalidateTag('a')
-
-    await expect(store.get('multi')).resolves.toBeUndefined()
-    await expect(store.get('other')).resolves.toBeDefined()
-  })
-
-  it('skips revalidation when no tags are given', async () => {
-    const { store } = createTestingStore()
-
-    await store.set('k', 'v', { tags: ['t'] })
-    await store.revalidateTag([])
-
-    await expect(store.get('k')).resolves.toBeDefined()
-  })
-
-  it('revalidates many tags at once', async () => {
-    const { store } = createTestingStore()
-
-    await store.set('a', 'v', { tags: ['a'] })
-    await store.set('b', 'v', { tags: ['b'] })
-
-    await store.revalidateTag(['a', 'b'])
-
-    await expect(store.get('a')).resolves.toBeUndefined()
-    await expect(store.get('b')).resolves.toBeUndefined()
-  })
-
-  it('entries set after a revalidation remain valid', async () => {
-    const { store } = createTestingStore()
-
-    await store.set('k', 'old', { tags: ['t'] })
-    await store.revalidateTag('t')
-    await store.set('k', 'new', { tags: ['t'] })
-
-    await expect(store.get('k')).resolves.toMatchObject({ output: 'new' })
-  })
-
   it('serves stale entries within the swr window, then evicts at the exact bound', async () => {
     const { store, prefix } = createTestingStore()
 
@@ -120,12 +81,12 @@ describe('experimental_KVCacheStore', () => {
       evictAt,
     })
 
-    await env.CACHE_KV.put(`${prefix}entry:stale`, envelope(Date.now() - 1000, Date.now() + 60_000))
-    await env.CACHE_KV.put(`${prefix}entry:evicted`, envelope(Date.now() - 2000, Date.now() - 1000))
+    await env.CACHE_KV.put(`${prefix}entry:stale`, envelope(nowInSeconds() - 1, nowInSeconds() + 60))
+    await env.CACHE_KV.put(`${prefix}entry:evicted`, envelope(nowInSeconds() - 2, nowInSeconds() - 1))
 
     const stale = await store.get('stale')
     expect(stale!.output).toBe('v')
-    expect(stale!.expiresAt).toBeLessThanOrEqual(Date.now())
+    expect(stale!.expiresAt).toBeLessThanOrEqual(nowInSeconds())
 
     await expect(store.get('evicted')).resolves.toBeUndefined()
     await expect(env.CACHE_KV.get(`${prefix}entry:evicted`)).resolves.toBeNull()
@@ -145,7 +106,7 @@ describe('experimental_KVCacheStore', () => {
     const { store, prefix } = createTestingStore()
 
     await store.set('k', 'v', { tags: ['t'] })
-    await store.revalidateTag('t')
+    await store.revalidate({ tags: ['t'] })
 
     await expect(env.CACHE_KV.get(`${prefix}entry:k`)).resolves.toBeTypeOf('string')
     await expect(env.CACHE_KV.get(`${prefix}tag:t`)).resolves.toBeTypeOf('string')

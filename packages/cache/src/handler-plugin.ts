@@ -1,65 +1,24 @@
 import type { AnyProcedure, Context } from '@orpc/server'
 import type { StandardHandlerInterceptor, StandardHandlerOptions, StandardHandlerPlugin } from '@orpc/server/standard'
 import type { StandardHeaders } from '@standardserver/core'
-import { isDeepEqual, toArray, tryDecodeURIComponent } from '@orpc/shared'
+import { encodeCacheTagHeader, isDeepEqual, toArray } from '@orpc/shared'
 
 export const CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_CACHE_HANDLER_PLUGIN_CONTEXT')
 
 export interface CacheHandlerPluginContext {
   [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]?: {
     /**
-     * The cache lookups performed during this request, both hits and stores.
-     * `ttl` carries the remaining freshness in milliseconds on hits and the
+     * The cache lookups performed during this request, in the order they ran.
+     * `ttl` carries the remaining freshness in seconds on hits and the
      * resolved fresh lifetime on stores.
      */
-    caches: { procedure: AnyProcedure, path: string[], hit: boolean, stale: boolean, key: unknown, tags: readonly string[], ttl?: number | undefined, swr?: number | undefined }[]
+    caches: { procedure: AnyProcedure, path: readonly string[], tags?: readonly string[] | undefined, ttl?: number | undefined, swr?: number | undefined }[]
 
     /**
-     * The tag revalidations committed during this request.
+     * The tag revalidations committed during this request, in the order they ran.
      */
-    revalidations: { procedure: AnyProcedure, path: string[], tags: readonly string[] }[]
+    revalidations: { procedure: AnyProcedure, path: readonly string[], tags: readonly string[] }[]
   }
-}
-
-/**
- * The response header carrying the tags the cached response depends on.
- *
- * @see {@link https://orpc.dev/docs/helpers/cache#handler-plugin | Cache Helpers - Handler Plugin}
- */
-export const CACHE_TAG_HEADER = 'orpc-cache-tag'
-
-/**
- * The response header carrying the tags revalidated by the request,
- * useful for invalidating tagged data in client caches.
- *
- * @see {@link https://orpc.dev/docs/helpers/cache#handler-plugin | Cache Helpers - Handler Plugin}
- */
-export const CACHE_TAG_INVALIDATION_HEADER = 'orpc-cache-tag-invalidation'
-
-/**
- * Encodes cache tags into a header value: tags are joined with commas, and
- * only `%`, `,`, uppercase letters, and characters that cannot appear in a
- * header value (whitespace, control characters, non-ASCII) are
- * percent-encoded, so typical tags stay readable. Uppercase letters are
- * encoded because caches like Cloudflare Workers Caching match tags
- * case-insensitively; the encoded form stays unambiguous under case folding.
- *
- * @see {@link https://orpc.dev/docs/helpers/cache#handler-plugin | Cache Helpers - Handler Plugin}
- */
-export function encodeCacheTagHeader(tags: readonly string[]): string {
-  return tags.map(tag => tag.replace(
-    /[^\x21-\x7E]|[%,A-Z]/gu,
-    c => /[A-Z]/.test(c) ? `%${c.charCodeAt(0).toString(16).toUpperCase()}` : encodeURIComponent(c),
-  )).join(',')
-}
-
-/**
- * Decodes a header value produced by {@link encodeCacheTagHeader} back into tags.
- *
- * @see {@link https://orpc.dev/docs/helpers/cache#handler-plugin | Cache Helpers - Handler Plugin}
- */
-export function decodeCacheTagHeader(header: string): string[] {
-  return header.split(',').filter(Boolean).map(tryDecodeURIComponent)
 }
 
 /**
@@ -68,12 +27,12 @@ export function decodeCacheTagHeader(header: string): string[] {
  * @see {@link https://orpc.dev/docs/helpers/cache#handler-plugin | Cache Helpers - Handler Plugin}
  */
 export type CacheHandlerPluginHeader
-  = | typeof CACHE_TAG_HEADER
-    | typeof CACHE_TAG_INVALIDATION_HEADER
+  = | 'orpc-cache-tag'
+    | 'orpc-cache-tag-invalidation'
     | 'cache-control'
     | 'cache-tag'
 
-export interface CacheHandlerPluginOptions {
+export interface CacheHandlerPluginOptions<_T extends Context> {
   /**
    * The response headers to set from the root procedure's cache activity;
    * only listed headers are set. `orpc-cache-tag` carries the tags the
@@ -85,7 +44,7 @@ export interface CacheHandlerPluginOptions {
    *
    * @default []
    */
-  headers?: readonly CacheHandlerPluginHeader[]
+  headers: readonly CacheHandlerPluginHeader[]
 }
 
 /**
@@ -102,7 +61,7 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
   private readonly headers: Set<CacheHandlerPluginHeader>
 
-  constructor(options: CacheHandlerPluginOptions = {}) {
+  constructor(options: CacheHandlerPluginOptions<T>) {
     this.headers = new Set(options.headers)
   }
 
@@ -122,46 +81,45 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
         } satisfies CacheHandlerPluginContext,
       })
 
-      const rootCache = pluginContext.caches.find(
-        check => check.procedure === interceptorOptions.procedure && isDeepEqual(check.path, interceptorOptions.path),
-      )
-      const rootRevalidation = pluginContext.revalidations.find(
-        check => check.procedure === interceptorOptions.procedure && isDeepEqual(check.path, interceptorOptions.path),
-      )
+      const isRoot = (check: { procedure: AnyProcedure, path: readonly string[] }) =>
+        check.procedure === interceptorOptions.procedure && isDeepEqual(check.path, interceptorOptions.path)
 
-      const method = interceptorOptions.request.method.toUpperCase()
-      const isHttpCacheable = rootCache !== undefined && (method === 'GET' || method === 'HEAD')
+      const rootCache = pluginContext.caches.find(isRoot)
+      const rootRevalidation = pluginContext.revalidations.find(isRoot)
 
-      const headers: StandardHeaders = { ...response.headers }
-      let changed = false
+      const headers: StandardHeaders = {}
 
-      if (this.headers.has(CACHE_TAG_HEADER) && rootCache?.tags.length) {
-        headers[CACHE_TAG_HEADER] = encodeCacheTagHeader(rootCache.tags)
-        changed = true
+      const cacheTag = rootCache?.tags?.length ? encodeCacheTagHeader(rootCache.tags) : undefined
+
+      if (cacheTag !== undefined && this.headers.has('orpc-cache-tag')) {
+        headers['orpc-cache-tag'] = cacheTag
       }
 
-      if (this.headers.has(CACHE_TAG_INVALIDATION_HEADER) && rootRevalidation?.tags.length) {
-        headers[CACHE_TAG_INVALIDATION_HEADER] = encodeCacheTagHeader(rootRevalidation.tags)
-        changed = true
+      if (rootRevalidation?.tags.length && this.headers.has('orpc-cache-tag-invalidation')) {
+        headers['orpc-cache-tag-invalidation'] = encodeCacheTagHeader(rootRevalidation.tags)
       }
 
-      if (this.headers.has('cache-tag') && isHttpCacheable && rootCache.tags.length && headers['cache-tag'] === undefined) {
-        headers['cache-tag'] = encodeCacheTagHeader(rootCache.tags)
-        changed = true
+      if (cacheTag !== undefined && this.headers.has('cache-tag')) {
+        headers['cache-tag'] = cacheTag
       }
 
-      if (this.headers.has('cache-control') && isHttpCacheable && headers['cache-control'] === undefined) {
+      if (rootCache !== undefined && this.headers.has('cache-control')) {
         /**
-         * Entries without a ttl stay valid until revalidated, so front caches
-         * hold them for a year and rely on tag purges.
+         * `max-age` rather than `s-maxage`, which carries `proxy-revalidate`
+         * semantics ([RFC 9111](https://www.rfc-editor.org/rfc/rfc9111#section-5.2.2.10))
+         * and so forbids the stale reuse `stale-while-revalidate` grants.
+         * Entries without a ttl stay valid until revalidated, so caches hold
+         * them for a year and rely on tag purges.
          */
-        const sMaxAge = rootCache.ttl !== undefined ? Math.ceil(rootCache.ttl / 1000) : 31536000
-        const staleWhileRevalidate = rootCache.swr !== undefined && rootCache.swr > 0 ? `, stale-while-revalidate=${Math.ceil(rootCache.swr / 1000)}` : ''
-        headers['cache-control'] = `public, s-maxage=${sMaxAge}${staleWhileRevalidate}`
-        changed = true
+        const maxAge = rootCache.ttl ?? 31536000
+        const staleWhileRevalidate = rootCache.swr ? `, stale-while-revalidate=${rootCache.swr}` : ''
+        headers['cache-control'] = `public, max-age=${maxAge}${staleWhileRevalidate}`
       }
 
-      return changed ? { ...response, headers } : response
+      return {
+        ...response,
+        headers: { ...response.headers, ...headers },
+      }
     }
 
     return {

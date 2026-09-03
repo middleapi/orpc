@@ -1,4 +1,6 @@
 import {
+  decodeCacheTagHeader,
+  encodeCacheTagHeader,
   isCompressibleContentType,
   isNoTransformCacheControl,
   matchesHttpPath,
@@ -246,5 +248,52 @@ describe('isNoTransformCacheControl', () => {
 
   it('does not match a directive that merely contains the token', () => {
     expect(isNoTransformCacheControl('no-transform-extension')).toBe(false)
+  })
+})
+
+describe('encodeCacheTagHeader & decodeCacheTagHeader', () => {
+  it.each([
+    ['leaves plain tags alone', 'planets', 'planets'],
+    ['leaves other printable ASCII alone', 'a1!~*\'()-_.:/?', 'a1!~*\'()-_.:/?'],
+    ['escapes the comma separator', 'a,b', 'a%2Cb'],
+    ['escapes the percent escape', '100%', '100%25'],
+    ['escapes uppercase letters by code point', 'Planets', '%50lanets'],
+    ['escapes spaces', 'sp ace', 'sp%20ace'],
+    ['escapes control characters', 'a\nb', 'a%0Ab'],
+    ['escapes delete', 'a\x7Fb', 'a%7Fb'],
+    ['escapes non-ASCII as UTF-8', 'tiếng việt', 'ti%E1%BA%BFng%20vi%E1%BB%87t'],
+    ['escapes astral characters as UTF-8', 'a😀', 'a%F0%9F%98%80'],
+  ])('%s', (_, tag, encoded) => {
+    expect(encodeCacheTagHeader([tag])).toBe(encoded)
+    expect(decodeCacheTagHeader(encoded)).toEqual([tag])
+  })
+
+  it('joins tags with commas, and round-trips the whole list', () => {
+    const tags = ['plain', 'a,b', '100%', 'CamelCase', 'tiếng việt', 'sp ace']
+
+    expect(encodeCacheTagHeader(['a', 'b'])).toBe('a,b')
+    expect(decodeCacheTagHeader(encodeCacheTagHeader(tags))).toEqual(tags)
+  })
+
+  it('keeps case-folded tags distinct', () => {
+    expect(encodeCacheTagHeader(['Planets'])).not.toBe(encodeCacheTagHeader(['planets']))
+    expect(encodeCacheTagHeader(['Planets']).toLowerCase()).not.toBe(encodeCacheTagHeader(['planets']).toLowerCase())
+  })
+
+  it('keeps empty tags instead of dropping them', () => {
+    expect(encodeCacheTagHeader(['a', '', 'b'])).toBe('a,,b')
+    expect(decodeCacheTagHeader('a,,b')).toEqual(['a', '', 'b'])
+    expect(decodeCacheTagHeader('')).toEqual([''])
+  })
+
+  it('encodes identically across calls, since the pattern is shared', () => {
+    const tags = ['A,B%C', 'tiếng việt']
+
+    expect(encodeCacheTagHeader(tags)).toBe(encodeCacheTagHeader(tags))
+    expect(encodeCacheTagHeader(tags)).toBe('%41%2C%42%25%43,ti%E1%BA%BFng%20vi%E1%BB%87t')
+  })
+
+  it('decodes malformed escapes as-is', () => {
+    expect(decodeCacheTagHeader('%zz')).toEqual(['%zz'])
   })
 })

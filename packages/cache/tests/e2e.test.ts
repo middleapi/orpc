@@ -2,7 +2,7 @@ import type { CacheContext } from '../src'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { z } from 'zod'
-import { cache, CACHE_TAG_HEADER, CACHE_TAG_INVALIDATION_HEADER, CacheHandlerPlugin, revalidate } from '../src'
+import { cache, CacheHandlerPlugin, revalidate } from '../src'
 import { MemoryCacheStore } from '../src/adapters/memory'
 
 it('works', async () => {
@@ -24,7 +24,7 @@ it('works', async () => {
         .$context<CacheContext>()
         .input(z.object({ id: z.number(), name: z.string() }))
         .use(
-          revalidate((_, input) => ['planets', `planet:${input.id}`]),
+          revalidate({ tags: (_, input) => ['planets', `planet:${input.id}`] }),
         )
         .handler(({ input }) => input),
     },
@@ -32,7 +32,7 @@ it('works', async () => {
 
   const handler = new RPCHandler(router, {
     plugins: [
-      new CacheHandlerPlugin({ headers: [CACHE_TAG_HEADER, CACHE_TAG_INVALIDATION_HEADER] }),
+      new CacheHandlerPlugin({ headers: ['orpc-cache-tag', 'orpc-cache-tag-invalidation'] }),
     ],
   })
 
@@ -47,7 +47,7 @@ it('works', async () => {
   })
 
   const find = () => handler.handle(request('planet/find', { id: 1 }), {
-    context: { cache: store },
+    context: { 'cache/store': store },
   })
 
   // miss: the handler runs and the response carries the cache tags
@@ -65,7 +65,7 @@ it('works', async () => {
 
   // update: revalidates the tags and reflects them in the invalidation header
   const update = await handler.handle(request('planet/update', { id: 1, name: 'Mars' }), {
-    context: { cache: store },
+    context: { 'cache/store': store },
   })
   expect(update.response?.status).toBe(200)
   expect(update.response?.headers.get('orpc-cache-tag-invalidation')).toBe('planets,planet:1')

@@ -1,6 +1,7 @@
 import { RPCSerializer } from '@orpc/client'
-import { sleep } from '@orpc/shared'
+import { nowInSeconds, sleep } from '@orpc/shared'
 import { createClient } from 'redis'
+import { describeCacheStoreContract } from '../../tests/__shared__/store-contract'
 import { RedisCacheStore } from './redis'
 
 const REDIS_URL = process.env.REDIS_URL
@@ -24,44 +25,7 @@ describe.concurrent('redis cache store integration', {
     return { store: new RedisCacheStore({ redis, prefix, ...options }), prefix }
   }
 
-  it('round-trips outputs with tags and expiresAt', async () => {
-    const { store } = createTestingStore()
-
-    await store.set('k', { nested: [1, 2] }, { tags: ['t'], ttl: 10_000 })
-
-    const entry = await store.get('k')
-    expect(entry!.output).toEqual({ nested: [1, 2] })
-    expect(entry!.tags).toEqual(['t'])
-    expect(entry!.expiresAt).toBeGreaterThan(Date.now())
-  })
-
-  it('misses on unknown keys', async () => {
-    const { store } = createTestingStore()
-
-    await expect(store.get('unknown')).resolves.toBeUndefined()
-  })
-
-  it('preserves Date, Map, Set, and BigInt outputs', async () => {
-    const { store } = createTestingStore()
-    const output = {
-      date: new Date('2026-01-02T03:04:05.678Z'),
-      map: new Map([['a', 1]]),
-      set: new Set([1, 2]),
-      big: 123n,
-    }
-
-    await store.set('k', output)
-
-    await expect(store.get('k')).resolves.toMatchObject({ output })
-  })
-
-  it('ignores outputs containing blobs', async () => {
-    const { store } = createTestingStore()
-
-    await store.set('k', { file: new Blob(['x']) })
-
-    await expect(store.get('k')).resolves.toBeUndefined()
-  })
+  describeCacheStoreContract(() => createTestingStore().store)
 
   it('supports a custom serializer', async () => {
     const serializer = new RPCSerializer()
@@ -79,57 +43,23 @@ describe.concurrent('redis cache store integration', {
   it('evicts at ttl without swr, and serves stale within the swr window', async () => {
     const { store } = createTestingStore()
 
-    await store.set('no-swr', 'v', { ttl: 300 })
-    await store.set('swr', 'v', { ttl: 300, swr: 10_000 })
+    await store.set('no-swr', 'v', { ttl: 1 })
+    await store.set('swr', 'v', { ttl: 1, swr: 10 })
 
-    await sleep(500)
+    await sleep(1500)
 
     await expect(store.get('no-swr')).resolves.toBeUndefined()
 
     const stale = await store.get('swr')
     expect(stale!.output).toBe('v')
-    expect(stale!.expiresAt).toBeLessThanOrEqual(Date.now())
-  })
-
-  it('invalidates entries by any of their tags', async () => {
-    const { store } = createTestingStore()
-
-    await store.set('multi', 'v', { tags: ['a', 'b'] })
-    await store.set('other', 'v', { tags: ['c'] })
-
-    await store.revalidateTag('a')
-
-    await expect(store.get('multi')).resolves.toBeUndefined()
-    await expect(store.get('other')).resolves.toBeDefined()
-  })
-
-  it('revalidates many tags at once', async () => {
-    const { store } = createTestingStore()
-
-    await store.set('a', 'v', { tags: ['a'] })
-    await store.set('b', 'v', { tags: ['b'] })
-
-    await store.revalidateTag(['a', 'b'])
-
-    await expect(store.get('a')).resolves.toBeUndefined()
-    await expect(store.get('b')).resolves.toBeUndefined()
-  })
-
-  it('entries set after a revalidation remain valid', async () => {
-    const { store } = createTestingStore()
-
-    await store.set('k', 'old', { tags: ['t'] })
-    await store.revalidateTag('t')
-    await store.set('k', 'new', { tags: ['t'] })
-
-    await expect(store.get('k')).resolves.toMatchObject({ output: 'new' })
+    expect(stale!.expiresAt).toBeLessThanOrEqual(nowInSeconds())
   })
 
   it('stores entries and tag counters under the prefixed key families', async () => {
     const { store, prefix } = createTestingStore()
 
     await store.set('k', 'v', { tags: ['t'] })
-    await store.revalidateTag('t')
+    await store.revalidate({ tags: ['t'] })
 
     await expect(redis.exists(`${prefix}entry:k`)).resolves.toBe(1)
     await expect(redis.exists(`${prefix}tag:t`)).resolves.toBe(1)
@@ -193,17 +123,17 @@ describe('redis cache store with a mocked client', () => {
     expect(redis.connect).toHaveBeenCalledTimes(1)
   })
 
-  it('stores envelopes with snapshotted tag versions and PX retention', async () => {
+  it('stores envelopes with snapshotted tag versions and EX retention', async () => {
     const { store, redis } = createMockedStore()
     redis.mGet.mockResolvedValueOnce(['2'])
 
-    await store.set('k', { a: 1 }, { tags: ['t'], ttl: 1000, swr: 500 })
+    await store.set('k', { a: 1 }, { tags: ['t'], ttl: 1, swr: 1 })
 
     expect(redis.mGet).toHaveBeenCalledWith(['p:tag:t'])
     expect(redis.set).toHaveBeenCalledWith(
       'p:entry:k',
       expect.stringContaining('"tagVersions":{"t":2}'),
-      { expiration: { type: 'PX', value: 1500 } },
+      { expiration: { type: 'EX', value: 2 } },
     )
   })
 
@@ -216,21 +146,13 @@ describe('redis cache store with a mocked client', () => {
     expect(redis.set).toHaveBeenCalledWith('p:entry:k', expect.any(String), undefined)
   })
 
-  it('ignores outputs containing blobs', async () => {
-    const { store, redis } = createMockedStore()
-
-    await store.set('k', { file: new Blob(['x']) })
-
-    expect(redis.set).not.toHaveBeenCalled()
-  })
-
   it('round-trips stored envelopes, skipping tag reads for untagged entries', async () => {
     const { store, redis } = createMockedStore()
 
     await store.set('k', { a: 1 })
     redis.get.mockResolvedValueOnce(redis.set.mock.calls[0]![1])
 
-    await expect(store.get('k')).resolves.toEqual({ output: { a: 1 }, tags: [], expiresAt: undefined })
+    await expect(store.get('k')).resolves.toEqual({ output: { a: 1 }, tags: undefined, expiresAt: undefined })
     expect(redis.mGet).not.toHaveBeenCalled()
   })
 
@@ -238,7 +160,7 @@ describe('redis cache store with a mocked client', () => {
     const { store, redis } = createMockedStore()
     redis.mGet.mockResolvedValue(['2'])
 
-    await store.set('k', 'v', { tags: ['t'], ttl: 1000 })
+    await store.set('k', 'v', { tags: ['t'], ttl: 1 })
     redis.get.mockResolvedValueOnce(redis.set.mock.calls[0]![1])
 
     const entry = await store.get('k')
@@ -262,16 +184,12 @@ describe('redis cache store with a mocked client', () => {
   it('revalidates a single tag with one INCR, and many atomically', async () => {
     const { store, redis, multi } = createMockedStore()
 
-    await store.revalidateTag('t')
+    await store.revalidate({ tags: ['t'] })
     expect(redis.incr).toHaveBeenCalledWith('p:tag:t')
 
-    await store.revalidateTag(['a', 'b'])
+    await store.revalidate({ tags: ['a', 'b'] })
     expect(multi.incr).toHaveBeenCalledWith('p:tag:a')
     expect(multi.incr).toHaveBeenCalledWith('p:tag:b')
-    expect(multi.exec).toHaveBeenCalledTimes(1)
-
-    await store.revalidateTag([])
-    expect(redis.incr).toHaveBeenCalledTimes(1)
     expect(multi.exec).toHaveBeenCalledTimes(1)
   })
 
@@ -282,12 +200,12 @@ describe('redis cache store with a mocked client', () => {
     const store = new RedisCacheStore({ redis: redis as any })
 
     redis.mGet.mockResolvedValueOnce([null])
-    await store.set('k', 'v', { tags: ['t'], ttl: 1000 })
+    await store.set('k', 'v', { tags: ['t'], ttl: 1 })
 
     expect(redis.set).toHaveBeenCalledWith(
       'entry:k',
       expect.stringContaining('"tagVersions":{"t":0}'),
-      { expiration: { type: 'PX', value: 1000 } },
+      { expiration: { type: 'EX', value: 1 } },
     )
 
     const customStore = new RedisCacheStore({ redis: redis as any, serializer })

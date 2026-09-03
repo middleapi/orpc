@@ -1,8 +1,3 @@
-/**
- * A cached procedure output alongside its metadata.
- *
- * @see {@link https://orpc.dev/docs/helpers/cache#basic-usage | Cache Helpers - Basic Usage}
- */
 export interface CacheEntry {
   /**
    * The cached procedure output.
@@ -10,22 +5,17 @@ export interface CacheEntry {
   output: unknown
 
   /**
-   * The tags recorded when the entry was stored.
+   * The tags recorded when the entry was stored, absent when it has none.
    */
-  tags: readonly string[]
+  tags?: readonly string[] | undefined
 
   /**
-   * The time (unix timestamp in milliseconds) when the entry stops being fresh.
+   * The time (unix timestamp in seconds) when the entry stops being fresh.
    * `undefined` means the entry never becomes stale.
    */
   expiresAt?: number | undefined
 }
 
-/**
- * Options accepted by {@link CacheStore.set}.
- *
- * @see {@link https://orpc.dev/docs/helpers/cache#basic-usage | Cache Helpers - Basic Usage}
- */
 export interface CacheSetOptions {
   /**
    * Tags associated with the entry. Revalidating any of them invalidates the entry.
@@ -35,14 +25,14 @@ export interface CacheSetOptions {
   tags?: readonly string[]
 
   /**
-   * Fresh lifetime in milliseconds. `undefined` means the entry never expires by time.
+   * Fresh lifetime in seconds. `undefined` means the entry never expires by time.
    *
    * @default undefined
    */
   ttl?: number
 
   /**
-   * Extra stale-while-revalidate window in milliseconds after `ttl`.
+   * Extra stale-while-revalidate window in seconds after `ttl`.
    * During this window the store still returns the entry with a past `expiresAt`.
    * Ignored when `ttl` is `undefined`.
    *
@@ -51,9 +41,16 @@ export interface CacheSetOptions {
   swr?: number
 }
 
+export interface CacheRevalidateOptions {
+  /**
+   * The tags to revalidate.
+   */
+  tags: readonly [string, ...string[]]
+}
+
 /**
  * Storage contract used by the cache middleware. Implementations own
- * expiry and tag tracking: `set` records tags, `revalidateTag` invalidates
+ * expiry and tag tracking: `set` records tags, `revalidate` invalidates
  * every entry associated with them.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#basic-usage | Cache Helpers - Basic Usage}
@@ -73,9 +70,9 @@ export interface CacheStore {
   set(key: unknown, output: unknown, options?: CacheSetOptions): Promise<void>
 
   /**
-   * Invalidates every entry associated with one or many tags.
+   * Invalidates every entry associated with any of the given tags.
    */
-  revalidateTag(tag: string | readonly [string, ...string[]]): Promise<void>
+  revalidate(options: CacheRevalidateOptions): Promise<void>
 }
 
 /**
@@ -87,12 +84,14 @@ export interface CacheContext {
   /**
    * The cache store shared by every cached procedure behind one handler.
    */
-  cache: CacheStore
+  'cache/store': CacheStore
 
   /**
-   * Extends the request lifetime for background work such as
-   * stale-while-revalidate refreshes. Required on runtimes that kill pending
-   * work once the response is sent, like Cloudflare Workers (`ctx.waitUntil`).
+   * Takes ownership of background work such as stale-while-revalidate
+   * refreshes. Required on runtimes that kill pending work once the response
+   * is sent, like Cloudflare Workers (`ctx.waitUntil`). The promise rejects
+   * when the refresh fails, so this is also where such failures are reported;
+   * without it they are ignored.
    */
-  waitUntil?: (promise: Promise<unknown>) => void
+  'cache/waitUntil'?: (promise: Promise<unknown>) => void
 }

@@ -1,77 +1,69 @@
-import type { Context, Middleware, MiddlewareOptions } from '@orpc/server'
+import type { Middleware, MiddlewareOptions } from '@orpc/server'
 import type { Promisable, Value } from '@orpc/shared'
 import type { CacheHandlerPluginContext } from './handler-plugin'
 import type { CacheContext } from './types'
-import { isAsyncIteratorObject, toArray, value } from '@orpc/shared'
+import { nowInSeconds, value } from '@orpc/shared'
 import { CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
 
-/**
- * A cache key, or any serializable value to derive one from.
- * Kept as a wide union instead of `unknown` so callback parameters
- * stay contextually typed.
- */
-export type CacheKeyMaterial = string | number | bigint | boolean | object | null | undefined
-
 export interface CacheMiddlewareOptions<
-  TInContext extends Context,
+  TInContext extends CacheContext,
   TInput,
 > {
   /**
    * The key identifying the cache entry, or any serializable value to derive
-   * it from. Strings are used verbatim, while any other value is combined
-   * with the procedure path and encoded by the store.
+   * it from. Used as given, so procedures sharing a key share an entry.
    *
    * @default the procedure path and input
    */
-  key?: Value<Promisable<CacheKeyMaterial>, [options: MiddlewareOptions<TInContext & CacheContext, unknown, Record<never, never>>, input: TInput]>
+  // Spelled out instead of `unknown`, which absorbs the function form and drops its contextual typing.
+  key?: Value<Promisable<string | number | bigint | boolean | object | null | undefined>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
 
   /**
    * Tags associated with the entry. Revalidating any of them invalidates the entry.
    *
    * @default []
    */
-  tags?: Value<Promisable<readonly string[]>, [options: MiddlewareOptions<TInContext & CacheContext, unknown, Record<never, never>>, input: TInput]>
+  tags?: Value<Promisable<readonly string[]>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
 
   /**
-   * Fresh lifetime in milliseconds. `undefined` means the entry never expires by time.
+   * Fresh lifetime in seconds. `undefined` means the entry never expires by time.
    *
    * @default undefined
    */
-  ttl?: Value<Promisable<number | undefined>, [options: MiddlewareOptions<TInContext & CacheContext, unknown, Record<never, never>>, input: TInput]>
+  ttl?: Value<Promisable<number | undefined>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
 
   /**
-   * Extra stale-while-revalidate window in milliseconds after `ttl`.
+   * Extra stale-while-revalidate window in seconds after `ttl`.
    * Stale entries are served immediately while the procedure re-executes in the background.
    *
    * @default 0
    */
-  swr?: Value<Promisable<number | undefined>, [options: MiddlewareOptions<TInContext & CacheContext, unknown, Record<never, never>>, input: TInput]>
+  swr?: Value<Promisable<number | undefined>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
 
   /**
    * When resolved to `false`, skips both the cache lookup and the store for this request.
    *
    * @default true
    */
-  enabled?: Value<Promisable<boolean>, [options: MiddlewareOptions<TInContext & CacheContext, unknown, Record<never, never>>, input: TInput]>
+  enabled?: Value<Promisable<boolean>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
 }
 
 /**
- * Creates a middleware that caches procedure output in the `context.cache` store,
+ * Creates a middleware that caches procedure output in the context's `cache/store`,
  * with tag-based revalidation and optional stale-while-revalidate.
  * By default the key is derived from the procedure path and input.
- * Streaming outputs (event iterators, readable streams) are never cached.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#cache-middleware | Cache Helpers - Cache Middleware}
  */
 export function cache<
-  TInContext extends Context,
+  TInContext extends CacheContext,
   TInput,
 >(
   options: CacheMiddlewareOptions<TInContext, TInput> = {},
-): Middleware<TInContext & CacheContext, object, TInput, any, object> {
+): Middleware<TInContext, object, TInput, any, object> {
   return async function cache(middlewareOptions, input, done) {
-    const [keyMaterial, tags = [], ttl, swr, enabled = true] = await Promise.all([
-      options.key !== undefined ? value(options.key, middlewareOptions, input) : input,
+    const [keyMaterial, tags, ttl, swr, enabled = true] = await Promise.all([
+      value(options.key, middlewareOptions, input),
       value(options.tags, middlewareOptions, input),
       value(options.ttl, middlewareOptions, input),
       value(options.swr, middlewareOptions, input),
@@ -82,41 +74,41 @@ export function cache<
       return middlewareOptions.next()
     }
 
-    const key = typeof keyMaterial === 'string' ? keyMaterial : [middlewareOptions.path, keyMaterial]
+    const key = 'key' in options ? keyMaterial : [middlewareOptions.path, input]
 
-    const { cache: store, waitUntil } = middlewareOptions.context as CacheContext
+    const store = middlewareOptions.context['cache/store']
     const pluginContext = (middlewareOptions.context as CacheHandlerPluginContext)[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]
 
     const entry = await store.get(key)
 
     if (entry) {
-      const stale = entry.expiresAt !== undefined && Date.now() >= entry.expiresAt
+      /**
+       * The entry's remaining freshness, so reflected HTTP caching headers never
+       * outlive the store entry. `0` means the entry is stale.
+       */
+      const remainingTtl = entry.expiresAt !== undefined ? Math.max(0, entry.expiresAt - nowInSeconds()) : undefined
 
-      if (stale) {
+      if (remainingTtl === 0) {
         const refresh = Promise.resolve(middlewareOptions.next())
-          .then(async (result) => {
-            if (!isUncacheableOutput(result.output)) {
-              await store.set(key, result.output, { tags, ttl, swr })
-            }
-          })
-          .catch(() => {
-            // A background refresh failure cannot affect the already-served
-            // response; the next stale hit retries.
-          })
+          .then(result => store.set(key, result.output, { tags, ttl, swr }))
 
-        waitUntil?.(refresh)
+        const waitUntil = middlewareOptions.context['cache/waitUntil']
+
+        if (waitUntil !== undefined) {
+          // The runtime owns the refresh from here, failures included.
+          waitUntil(refresh)
+        }
+        else {
+          // Nothing owns it instead, and Node exits on an unhandled rejection.
+          refresh.catch(() => {})
+        }
       }
 
       pluginContext?.caches.push({
         procedure: middlewareOptions.procedure,
         path: middlewareOptions.path,
-        hit: true,
-        stale,
-        key,
         tags: entry.tags,
-        // The entry's remaining freshness, so reflected HTTP caching headers never
-        // outlive the store entry.
-        ttl: entry.expiresAt !== undefined ? Math.max(0, entry.expiresAt - Date.now()) : undefined,
+        ttl: remainingTtl,
         swr,
       })
 
@@ -125,18 +117,11 @@ export function cache<
 
     const result = await middlewareOptions.next()
 
-    if (isUncacheableOutput(result.output)) {
-      return result
-    }
-
     await store.set(key, result.output, { tags, ttl, swr })
 
     pluginContext?.caches.push({
       procedure: middlewareOptions.procedure,
       path: middlewareOptions.path,
-      hit: false,
-      stale: false,
-      key,
       tags,
       ttl,
       swr,
@@ -146,38 +131,45 @@ export function cache<
   }
 }
 
+export interface RevalidateMiddlewareOptions<
+  TInContext extends CacheContext,
+  TInput,
+> {
+  /**
+   * The tags to revalidate. Resolving to `null` or `undefined` skips the revalidation.
+   */
+  tags: Value<Promisable<readonly [string, ...string[]] | null | undefined>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
+}
+
 /**
- * Creates a middleware that revalidates cache tags in the `context.cache` store
+ * Creates a middleware that revalidates cache tags in the context's `cache/store`
  * after the procedure succeeds, typically on mutations. Errors skip the revalidation entirely.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#revalidate-middleware | Cache Helpers - Revalidate Middleware}
  */
 export function revalidate<
-  TInContext extends Context,
+  TInContext extends CacheContext,
   TInput,
 >(
-  tags: Value<Promisable<string | readonly [string, ...string[]]>, [options: MiddlewareOptions<TInContext & CacheContext, unknown, Record<never, never>>, input: TInput]>,
-): Middleware<TInContext & CacheContext, object, TInput, any, object> {
+  options: RevalidateMiddlewareOptions<TInContext, TInput>,
+): Middleware<TInContext, object, TInput, any, object> {
   return async function revalidate(middlewareOptions, input) {
     const result = await middlewareOptions.next()
 
-    const resolvedTags = toArray(await value(tags, middlewareOptions, input))
+    const tags = await value(options.tags, middlewareOptions, input)
 
-    if (resolvedTags.length) {
-      await (middlewareOptions.context as CacheContext).cache.revalidateTag(resolvedTags as [string, ...string[]])
+    if (tags) {
+      const store = middlewareOptions.context['cache/store']
+      await store.revalidate({ tags })
 
       const pluginContext = (middlewareOptions.context as CacheHandlerPluginContext)[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]
       pluginContext?.revalidations.push({
         procedure: middlewareOptions.procedure,
         path: middlewareOptions.path,
-        tags: resolvedTags,
+        tags,
       })
     }
 
     return result
   }
-}
-
-function isUncacheableOutput(output: unknown): boolean {
-  return isAsyncIteratorObject(output) || output instanceof ReadableStream
 }
