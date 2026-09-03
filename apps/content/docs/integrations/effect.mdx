@@ -1,6 +1,6 @@
 ---
 title: "Effect Integration"
-description: "Write effectful oRPC handlers with Effect generators, provide services through context, and use Effect Schema for input and output validation."
+description: "Write effectful oRPC handlers with Effect generators, call oRPC clients as effects, provide services through context, and use Effect Schema for input and output validation."
 sidebar:
   label: "Effect"
 ---
@@ -203,6 +203,63 @@ const handled = program.pipe(
 
 :::info
 All utilities support data-first `catchORPCError(program, handler)` and data-last `program.pipe(catchORPCError(handler))` styles.
+:::
+
+## Effectful Middleware
+
+`middlewareGen` allows you to write effectful middleware using generator functions. Inside the generator, you can yield Effect operations and `yield* next()` to continue the chain. Downstream failures land in the error channel of `next`, so you can recover from them with Effect.
+
+```ts twoslash
+import { os } from '@orpc/server'
+// ---cut---
+import { middlewareGen } from '@orpc/experimental-effect'
+import { Effect } from 'effect'
+
+const procedure = os
+  .$context<{ auth: boolean }>()
+  .use(middlewareGen(function* ({ context, next }) {
+    const startedAt = yield* Effect.sync(() => Date.now())
+    return yield* next({ context: { startedAt } })
+  }))
+  .handler(({ context }) => context.startedAt)
+```
+
+## Client Calls
+
+`createEffectClient` wraps any oRPC client, whether [server-side](/docs/client/server-side) or [client-side](/docs/client/client-side), so every procedure returns a lazy Effect instead of a promise, ready to `yield*` inside Effect generators. The output becomes the success value, and errors land in the error channel with their original types preserved, ready for utilities like `catchORPCErrorCodes`:
+
+```ts
+import { catchORPCErrorCodes, createEffectClient } from '@orpc/experimental-effect'
+import { Effect } from 'effect'
+
+const effectClient = createEffectClient(client)
+
+const program = Effect.gen(function* () {
+  const planet = yield* effectClient.planet.find({ id: 1 })
+  return planet.name
+}).pipe(
+  catchORPCErrorCodes({
+    NOT_FOUND: error => Effect.succeed('unknown'),
+  }),
+)
+```
+
+You can also combine `Effect.catchIf` with [isInferableError](/docs/client/error-handling#using-safe-and-isinferableerror) to recover from every inferable error in a typesafe way:
+
+```ts
+import { isInferableError } from '@orpc/client'
+import { Effect } from 'effect'
+
+const recovered = effectClient.planet.find({ id: 1 }).pipe(
+  Effect.catchIf(isInferableError, (error) => {
+    // error is fully typed here
+    return Effect.succeed(null)
+  }),
+)
+```
+
+:::info
+The effects are lazy: the client is invoked each time the effect runs, so they work naturally with `Effect.retry`. Interrupting the effect aborts the underlying call.
 :::
 
 ## Effect Schema

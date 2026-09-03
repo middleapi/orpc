@@ -1,7 +1,7 @@
 {
   "name": "@orpc/cloudflare",
   "type": "module",
-  "version": "2.0.0-beta.31",
+  "version": "2.0.0-beta.32",
   "description": "oRPC adapters for Cloudflare Workers",
   "license": "MIT",
   "funding": [
@@ -45,7 +45,7 @@
   ],
   "scripts": {
     "prepare": "wrangler types",
-    "build": "unbuild",
+    "prepack": "unbuild",
     "type:check": "wrangler types && tsc -b",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"

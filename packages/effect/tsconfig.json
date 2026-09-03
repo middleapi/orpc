@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.lib.json",
   "references": [
+    { "path": "../client" },
     { "path": "../contract" },
     { "path": "../server" },
     { "path": "../json-schema" },

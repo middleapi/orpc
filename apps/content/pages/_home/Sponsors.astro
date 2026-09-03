@@ -11,14 +11,35 @@ const PAST_SPONSORS_URL = 'https://htmlpreview.github.io/?https://github.com/mid
 
 const tiers = sponsorTiers()
 
-// The top tiers get a named card each (the first one double-width, so rank reads
-// at a glance); everything below joins the avatar wall, where a larger avatar
-// still marks the higher tier.
+// The top tiers get a named card each, with rank marked by size: special
+// sponsors take a full row each, while the tiers below share tier-weighted
+// grid columns. Everything below joins the avatar wall, where a larger avatar
+// still marks the higher tier. Specials span 0 columns because col-span-full
+// takes them out of the shared-column math.
+const highlightCard = (level: number) =>
+  level >= 5
+    ? { li: 'col-span-full', link: 'gap-4 p-4', avatar: 'size-14', avatarPx: 56, span: 0 }
+    : level >= 4
+      ? { li: 'lg:col-span-3', link: 'gap-4 p-4', avatar: 'size-12', avatarPx: 48, span: 3 }
+      : { li: 'lg:col-span-2', link: 'gap-3 p-3', avatar: 'size-10', avatarPx: 40, span: 2 }
+
 const highlights = tiers
   .filter(tier => tier.level >= 3)
-  .flatMap(tier => tier.sponsors.map(sponsor => ({ ...sponsor, tier: tier.title })))
+  .flatMap(tier => tier.sponsors.map(sponsor => ({
+    ...sponsor,
+    // The narrow low-tier cards can't fit labels like "Organization Sponsor",
+    // and every card here is a sponsor anyway.
+    tier: tier.level >= 4 ? tier.title : tier.title.replace(/ sponsor$/i, ''),
+    card: highlightCard(tier.level),
+  })))
 
 const wall = tiers.filter(tier => tier.level < 3).flatMap(tier => tier.sponsors)
+
+// The shared row's column count is the sum of its members' spans, so the row
+// always fills exactly as sponsors come and go. Capped to keep cards from
+// getting too narrow once enough sponsors join (extras wrap), floored at 1 so
+// `repeat()` stays valid when only specials exist.
+const highlightCols = Math.min(Math.max(highlights.reduce((total, { card }) => total + card.span, 0), 1), 12)
 
 const past = pastSponsors()
 ---
@@ -53,23 +74,29 @@ const past = pastSponsors()
         </div>
 
         {highlights.length > 0 && (
-          <ul class="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {highlights.map((sponsor, index) => (
-              <li class:list={[index === 0 && 'sm:col-span-2']}>
+          <ul
+            class="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(var(--highlight-cols),minmax(0,1fr))]"
+            style={`--highlight-cols: ${highlightCols}`}
+          >
+            {highlights.map(sponsor => (
+              <li class={sponsor.card.li}>
                 <a
-                  class="flex h-full items-center gap-4 rounded-blume border border-border p-4 transition-colors hover:bg-muted"
+                  class:list={[
+                    'flex h-full items-center rounded-blume border border-border transition-colors hover:bg-muted',
+                    sponsor.card.link,
+                  ]}
                   href={sponsor.link}
                   rel={relAttribute(sponsor.rel)}
                   target="_blank"
                 >
                   <img
                     alt=""
-                    class="size-12 flex-none rounded-blume object-cover"
+                    class:list={['flex-none rounded-blume object-cover', sponsor.card.avatar]}
                     data-no-zoom
-                    height="48"
+                    height={sponsor.card.avatarPx}
                     loading="lazy"
                     src={sponsor.avatar}
-                    width="48"
+                    width={sponsor.card.avatarPx}
                   />
                   <span class="min-w-0">
                     <span class="font-display block truncate text-sm font-semibold tracking-tight">

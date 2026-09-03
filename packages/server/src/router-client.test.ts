@@ -105,5 +105,7 @@ describe('createRouterClient', () => {
     expect((client as any).invalid).toBeUndefined()
     expect((client as any)[Symbol.for('something')]).toBeUndefined()
     expect((client as any).lazy.then).toBeUndefined()
+    expect((client as any).lazy.call).toBe(Function.prototype.call)
+    expect((client as any).lazy.apply).toBe(Function.prototype.apply)
   })
 })

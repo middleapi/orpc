@@ -16,6 +16,18 @@ export default [
     }
   },
   {
+    "position": 2,
+    "name": "Yuzu",
+    "description": "We're hiring NYC based engineers",
+    "logo": "https://avatars.githubusercontent.com/u/102488956?v=4",
+    "href": "https://yuzu.health/careers?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "rel": "sponsored",
+    "background": {
+      "light": "#fdf5f3",
+      "dark": "#3d302e"
+    }
+  },
+  {
     "position": 4,
     "name": "MisskeyHQ",
     "description": "Decentralized microblogging SNS born on Earth",

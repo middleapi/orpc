@@ -1,5 +1,5 @@
 import type { AnyORPCError, Context, ORPCErrorConstructorMap, ProcedureHandler, ProcedureHandlerOptions } from '@orpc/server'
-import type { WithEffectContext } from './context'
+import type { InferEffectServices, WithEffectContext } from './context'
 import { ORPCError } from '@orpc/server'
 import { Effect, Context as EffectContext } from 'effect'
 import { runPromise } from './runtime'
@@ -9,11 +9,7 @@ export type InferYieldError<Eff> = [Eff] extends [never] ? never : [Eff] extends
 export interface HandlerGen<
   TCurrentContext extends Context,
   TInput,
-  TYield extends Effect.Effect<
-    any,
-    any,
-    TCurrentContext extends WithEffectContext<infer S> ? S : never
-  >,
+  TYield extends Effect.Effect<any, any, InferEffectServices<TCurrentContext>>,
   TReturn,
   TErrorConstructorMap extends ORPCErrorConstructorMap<any>,
 > {
@@ -40,11 +36,7 @@ export function handlerGen<
   TCurrentContext extends Context,
   TInput,
   TErrorConstructorMap extends ORPCErrorConstructorMap<any>,
-  TYield extends Effect.Effect<
-    any,
-    any,
-    TCurrentContext extends WithEffectContext<infer S> ? S : never
-  >,
+  TYield extends Effect.Effect<any, any, InferEffectServices<TCurrentContext>>,
   TReturn,
 >(
   handler: HandlerGen<TCurrentContext, TInput, TYield, TReturn, TErrorConstructorMap>,

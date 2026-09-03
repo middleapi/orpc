@@ -30,7 +30,7 @@ const link = new RPCLink({
        *
        * @default 1024 (1KB)
        */
-      threshold: 1024
+      threshold: 1024,
     }),
   ],
 })
@@ -39,6 +39,29 @@ const link = new RPCLink({
 :::info
 The `link` can be any supported oRPC link, such as [RPCLink](/docs/rpc/link), [OpenAPILink](/docs/openapi/link), or a custom one.
 :::
+
+### Customize Compressible Content Types
+
+For binary transfers (streams, files, and file form-data parts), the plugin only compresses content types that benefit from compression. Override the check with `isCompressibleContentType`:
+
+```ts
+import { RequestCompressionLinkPlugin } from '@orpc/client/plugins'
+
+const link = new RPCLink({
+  plugins: [
+    new RequestCompressionLinkPlugin({
+      /**
+       * Also receives the transport interceptor options for per-request decisions.
+       *
+       * @default isCompressibleContentType (covers common text-based formats)
+       */
+      isCompressibleContentType: (contentType, { path }) => {
+        return /^application\/x-custom-format(?:[;\s]|$)/i.test(contentType ?? '') && path[0] !== 'uploads'
+      },
+    }),
+  ],
+})
+```
 
 ## Server
 

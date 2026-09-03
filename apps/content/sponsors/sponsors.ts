@@ -13,6 +13,15 @@ export default [
     "tierLevel": 5
   },
   {
+    "name": "Yuzu",
+    "login": "yuzu-health",
+    "avatar": "https://avatars.githubusercontent.com/u/102488956?v=4",
+    "link": "https://yuzu.health/careers?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "rel": "sponsored",
+    "tierTitle": "Premium Sponsor",
+    "tierLevel": 4
+  },
+  {
     "name": "MisskeyHQ",
     "login": "SanMurakami",
     "avatar": "https://github.com/MisskeyIO.png",
@@ -193,6 +202,15 @@ export default [
     "tierLevel": 1
   },
   {
+    "name": "IPv4Addr",
+    "login": "IPv4Addr",
+    "avatar": "https://avatars.githubusercontent.com/u/100147665?u=59996b72f69bb53063cb7e9ff8b8f898616cd94d&v=4",
+    "link": "https://github.com/IPv4Addr?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "rel": "sponsored",
+    "tierTitle": "Backer",
+    "tierLevel": 1
+  },
+  {
     "name": "Robbe Vaes",
     "login": "Robbe95",
     "avatar": "https://avatars.githubusercontent.com/u/44748019?u=e0232402c045ad4eac7cbd217f1f47e083103b89&v=4",
@@ -304,7 +322,7 @@ export default [
     "name": "Kelly Peilin Chan",
     "login": "mr-kelly",
     "avatar": "https://avatars.githubusercontent.com/u/520852?u=6b0f7105f694e7b5cacf410a3f04c7044b469dc8&v=4",
-    "link": "https://bika.ai/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "link": "https://kellychan.im/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
     "tierLevel": 1
@@ -314,6 +332,15 @@ export default [
     "login": "guyariely",
     "avatar": "https://avatars.githubusercontent.com/u/42813496?u=edb6b7f563bf28e160a290832e7da57c0506f8ca&v=4",
     "link": "https://guyariely.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "rel": "sponsored",
+    "tierTitle": "Backer",
+    "tierLevel": 1
+  },
+  {
+    "name": "PaulSenon",
+    "login": "PaulSenon",
+    "avatar": "https://avatars.githubusercontent.com/u/19531087?u=6385741eb91d200b8c513ec6045482e301767ca6&v=4",
+    "link": "https://paulsenon.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
     "tierLevel": 1
@@ -341,15 +368,6 @@ export default [
     "login": "MrMaxie",
     "avatar": "https://avatars.githubusercontent.com/u/3857836?u=5e6b57973d4385d655663ffdd836e487856f2984&v=4",
     "link": "https://maxie.dev/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
-    "rel": "sponsored",
-    "tierTitle": "Past Sponsor",
-    "tierLevel": 0
-  },
-  {
-    "name": "IPV4Address",
-    "login": "IPV4Addressv4",
-    "avatar": "https://avatars.githubusercontent.com/u/100147665?u=176f2ad09630c8ce556fec161f9fe622ed08f60f&v=4",
-    "link": "https://github.com/IPV4Addressv4?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
     "tierLevel": 0

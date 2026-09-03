@@ -1,7 +1,7 @@
 {
   "name": "@orpc/zod",
   "type": "module",
-  "version": "2.0.0-beta.31",
+  "version": "2.0.0-beta.32",
   "description": "Zod integration for oRPC: convert Zod schemas into JSON Schema for OpenAPI generation",
   "license": "MIT",
   "funding": [
@@ -42,17 +42,17 @@
     "dist"
   ],
   "scripts": {
-    "build": "unbuild",
+    "prepack": "unbuild",
     "type:check": "tsc -b"
   },
   "peerDependencies": {
-    "zod": ">=4.3.5"
+    "zod": ">=4.5.0"
   },
   "dependencies": {
     "@orpc/json-schema": "workspace:*",
     "json-schema-typed": "^8.0.2"
   },
   "devDependencies": {
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   }
 }

@@ -16,7 +16,7 @@ pnpm type:check              # tsc across all packages — this is also what run
 pnpm lint                    # eslint (also the formatter — @antfu/eslint-config)
 pnpm lint:fix
 pnpm bench                   # vitest bench
-pnpm --filter @orpc/server build   # build one package (unbuild); builds are NOT needed for dev/tests
+pnpm --filter @orpc/server prepack # build one package (unbuild, runs automatically on pack/publish); builds are NOT needed for dev/tests
 ```
 
 - Root vitest config (`vitest.config.ts`) runs all `*.test.ts` with `globals: true`, plus a jsdom project for `*.test.tsx` in `packages/next` and `packages/tanstack-query`.

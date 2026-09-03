@@ -117,6 +117,24 @@ describe('createRouterUtils', () => {
     expect(utils.nonExistent).toBe(undefined)
   })
 
+  it('resolves call/apply from the utils instead of recursing', () => {
+    const utils = createRouterUtils(client) as any
+    const call = vi.mocked(ProcedureUtils).mock.results[0]?.value.call
+
+    expect(utils.call).toBe(call)
+    expect(utils.apply).toBeUndefined()
+    expect(ProcedureUtils).toHaveBeenCalledTimes(1) // only the root utils
+
+    // .call.call() invokes the same underlying function as .call()
+    expect(utils.call.call).toBe(Function.prototype.call)
+    utils.call('direct')
+    utils.call.call(undefined, 'via-call')
+    utils.call.apply(undefined, ['via-apply'])
+    expect(call).toHaveBeenNthCalledWith(1, 'direct')
+    expect(call).toHaveBeenNthCalledWith(2, 'via-call')
+    expect(call).toHaveBeenNthCalledWith(3, 'via-apply')
+  })
+
   it('stops recursive on symbol & RECURSIVE_CLIENT_UNWRAP_KEYS inside conflicted utils', () => {
     client.key.bind = vi.fn()
 

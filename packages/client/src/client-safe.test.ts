@@ -63,4 +63,17 @@ describe('createSafeClient', () => {
     expect(safeClient[Symbol('test')]).toEqual(undefined)
     expect(safeClient.nested[Symbol('test')]).toEqual(undefined)
   })
+
+  it('not recursive on unwrap keys', async () => {
+    expect(safeClient.then).toBeUndefined()
+    expect(await safeClient).toBe(safeClient)
+    expect(safeClient.call).toBe(Function.prototype.call)
+    expect(safeClient.apply).toBe(Function.prototype.apply)
+
+    client.ping.mockResolvedValue(42)
+    const result = await safeClient.ping.call(undefined, 'input')
+    expect(result.error).toBeNull()
+    expect(result.data).toBe(42)
+    expect(client.ping).toHaveBeenCalledWith('input')
+  })
 })

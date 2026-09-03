@@ -278,7 +278,7 @@ describe('openAPIHandlerCodec', () => {
         })
       })
 
-      it('returns a primitive body as-is when it cannot be merged with path params', async () => {
+      it('returns only path params when a primitive body cannot be merged', async () => {
         const serializer = {
           serialize: vi.fn(),
           deserialize: vi.fn()
@@ -300,7 +300,7 @@ describe('openAPIHandlerCodec', () => {
 
         expect(result).toBeDefined()
 
-        await expect(result!.decodeInput()).resolves.toBe('raw-body')
+        await expect(result!.decodeInput()).resolves.toEqual({ id: '24' })
         expect(serializer.deserialize).toHaveBeenNthCalledWith(1, expect.any(URLSearchParams))
         expect(serializer.deserialize).toHaveBeenCalledWith('__body__')
       })
@@ -332,7 +332,7 @@ describe('openAPIHandlerCodec', () => {
         expect(resolveBody).toHaveBeenCalledWith(undefined)
       })
 
-      it('returns an array body as-is even when path params exist', async () => {
+      it('returns only path params when an array body cannot be merged', async () => {
         const serializer = {
           serialize: vi.fn(),
           deserialize: vi.fn()
@@ -355,7 +355,59 @@ describe('openAPIHandlerCodec', () => {
         expect(result).toBeDefined()
         expect(result!.procedure).toBe(procedure)
 
-        await expect(result!.decodeInput()).resolves.toEqual(['first', 'second'])
+        await expect(result!.decodeInput()).resolves.toEqual({ id: '24' })
+      })
+
+      it('returns only path params when a binary body cannot be merged', async () => {
+        const blob = new Blob(['raw-bytes'])
+        const serializer = {
+          serialize: vi.fn(),
+          deserialize: vi.fn()
+            .mockReturnValueOnce(undefined)
+            .mockReturnValueOnce(blob),
+        } as any
+
+        const codec = new OpenAPIHandlerCodec(
+          os.meta(openapi({ method: 'POST', path: '/{id}' })).handler(vi.fn()),
+          { serializer },
+        )
+        const resolveBody = vi.fn().mockResolvedValueOnce(blob)
+
+        const result = await codec.resolveProcedure(createRequest({
+          method: 'POST',
+          url: '/24',
+          resolveBody,
+        }), options as any)
+
+        expect(result).toBeDefined()
+
+        await expect(result!.decodeInput()).resolves.toEqual({ id: '24' })
+      })
+
+      it('returns a binary body as-is when there are no path params', async () => {
+        const blob = new Blob(['raw-bytes'])
+        const serializer = {
+          serialize: vi.fn(),
+          deserialize: vi.fn()
+            .mockReturnValueOnce(undefined)
+            .mockReturnValueOnce(blob),
+        } as any
+
+        const codec = new OpenAPIHandlerCodec(
+          os.meta(openapi({ method: 'POST', path: '/submit' })).handler(vi.fn()),
+          { serializer },
+        )
+        const resolveBody = vi.fn().mockResolvedValueOnce(blob)
+
+        const result = await codec.resolveProcedure(createRequest({
+          method: 'POST',
+          url: '/submit',
+          resolveBody,
+        }), options as any)
+
+        expect(result).toBeDefined()
+
+        await expect(result!.decodeInput()).resolves.toBe(blob)
       })
     })
 

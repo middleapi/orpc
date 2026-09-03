@@ -19,6 +19,16 @@ export const RECURSIVE_CLIENT_UNWRAP_KEYS = new Set([
    */
   'bind',
   /**
+   * Commonly used by libraries to invoke functions with a specific `this`
+   * context.
+   */
+  'call',
+  /**
+   * Commonly used by libraries to invoke functions with a specific `this`
+   * context and an arguments array.
+   */
+  'apply',
+  /**
    * Commonly accessed during primitive conversion, inspection, and logging.
    */
   'valueOf',

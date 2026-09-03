@@ -1,7 +1,7 @@
 {
   "name": "@orpc/trpc",
   "type": "module",
-  "version": "2.0.0-beta.31",
+  "version": "2.0.0-beta.32",
   "description": "tRPC interop for oRPC: reuse existing tRPC routers with oRPC clients and OpenAPI",
   "license": "MIT",
   "funding": [
@@ -43,7 +43,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "unbuild",
+    "prepack": "unbuild",
     "type:check": "tsc -b"
   },
   "peerDependencies": {
@@ -57,6 +57,6 @@
   "devDependencies": {
     "@orpc/openapi": "workspace:*",
     "@trpc/server": "^11.12.0",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   }
 }

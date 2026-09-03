@@ -1,7 +1,7 @@
 {
   "name": "@orpc/ai-sdk",
   "type": "module",
-  "version": "2.0.0-beta.31",
+  "version": "2.0.0-beta.32",
   "description": "AI SDK integration for oRPC: turn contracts and procedures into typesafe AI SDK tools",
   "license": "MIT",
   "funding": [
@@ -43,7 +43,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "unbuild",
+    "prepack": "unbuild",
     "type:check": "tsc -b"
   },
   "peerDependencies": {
@@ -58,6 +58,6 @@
   },
   "devDependencies": {
     "ai": "^7.0.70",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   }
 }

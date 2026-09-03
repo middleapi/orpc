@@ -213,27 +213,37 @@ const blogJsonLd = {
 </PageLayout>
 
 <script>
-  const buttons = document.querySelectorAll<HTMLButtonElement>('[data-blog-filter]')
-  const cards = document.querySelectorAll<HTMLElement>('[data-blog-card]')
+  // Astro's ClientRouter swaps the page body on soft navigation but runs this
+  // module only once per full load, so the buttons are re-resolved in `init`,
+  // which runs again after every swap.
+  function init(): void {
+    const buttons = document.querySelectorAll<HTMLButtonElement>('[data-blog-filter]')
+    const cards = document.querySelectorAll<HTMLElement>('[data-blog-card]')
 
-  for (const button of buttons) {
-    button.addEventListener('click', () => {
-      const active = button.dataset.blogFilter ?? ''
+    for (const button of buttons) {
+      button.addEventListener('click', () => {
+        const active = button.dataset.blogFilter ?? ''
 
-      for (const other of buttons) {
-        const isActive = other === button
-        other.classList.toggle('border-foreground', isActive)
-        other.classList.toggle('font-medium', isActive)
-        other.classList.toggle('text-foreground', isActive)
-        other.classList.toggle('border-transparent', !isActive)
-        other.classList.toggle('text-muted-foreground', !isActive)
-      }
+        for (const other of buttons) {
+          const isActive = other === button
+          other.classList.toggle('border-foreground', isActive)
+          other.classList.toggle('font-medium', isActive)
+          other.classList.toggle('text-foreground', isActive)
+          other.classList.toggle('border-transparent', !isActive)
+          other.classList.toggle('text-muted-foreground', !isActive)
+        }
 
-      for (const card of cards) {
-        const cardTags = (card.dataset.tags ?? '').split('|')
-        const visible = !active || cardTags.includes(active)
-        card.style.display = visible ? '' : 'none'
-      }
-    })
+        for (const card of cards) {
+          const cardTags = (card.dataset.tags ?? '').split('|')
+          const visible = !active || cardTags.includes(active)
+          card.style.display = visible ? '' : 'none'
+        }
+      })
+    }
   }
+
+  init()
+  // Fires once the new body is in place and before any page scripts, so it
+  // covers every re-entry; on pages without the filter `init` finds nothing.
+  document.addEventListener('astro:after-swap', init)
 </script>

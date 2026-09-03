@@ -164,10 +164,7 @@ describe('openAPIGenerator e2e: crud api', () => {
           description: 'OK',
           content: {
             'application/json': {
-              schema: expect.objectContaining({
-                type: 'object',
-                required: ['id', 'name'],
-              }),
+              schema: { $ref: '#/components/schemas/Planet' },
             },
           },
         },

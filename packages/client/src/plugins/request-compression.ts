@@ -1,5 +1,5 @@
 import type { StandardBodyHint } from '@standardserver/core'
-import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor } from '../adapters/standard'
+import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
 import type { ClientContext } from '../types'
 import { isAsyncIteratorObject, isCompressibleContentType, stringifyJSON, toArray } from '@orpc/shared'
 import { flattenStandardHeader, generateContentDisposition } from '@standardserver/core'
@@ -8,7 +8,7 @@ import { flattenStandardHeader, generateContentDisposition } from '@standardserv
 // occasional multi-byte characters increase the average.
 const AVG_BYTES_PER_CHAR = 1.2
 
-export interface RequestCompressionLinkPluginOptions<_T extends ClientContext> {
+export interface RequestCompressionLinkPluginOptions<T extends ClientContext> {
   /**
    * The compression scheme to use for request compression.
    *
@@ -24,6 +24,15 @@ export interface RequestCompressionLinkPluginOptions<_T extends ClientContext> {
    * @default 1024 (1KB)
    */
   threshold?: number
+
+  /**
+   * Determines whether a request with the given Content-Type should be compressed.
+   * Only consulted for binary transfers (streams, files, and file form-data parts).
+   * Also receives the transport interceptor options for per-request decisions.
+   *
+   * @default isCompressibleContentType (covers common text-based formats)
+   */
+  isCompressibleContentType?: (contentType: string | null | undefined, options: StandardLinkTransportInterceptorOptions<T>) => boolean
 }
 
 /**
@@ -42,10 +51,12 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
 
   private readonly encoding: Exclude<RequestCompressionLinkPluginOptions<T>['encoding'], undefined>
   private readonly threshold: Exclude<RequestCompressionLinkPluginOptions<T>['threshold'], undefined>
+  private readonly isCompressibleContentType: Exclude<RequestCompressionLinkPluginOptions<T>['isCompressibleContentType'], undefined>
 
   constructor(options: RequestCompressionLinkPluginOptions<T> = {}) {
     this.encoding = options.encoding ?? 'gzip'
     this.threshold = options.threshold ?? 1024
+    this.isCompressibleContentType = options.isCompressibleContentType ?? isCompressibleContentType
   }
 
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
@@ -62,7 +73,7 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
 
         if (
           (!Number.isFinite(contentLength) || contentLength >= this.threshold)
-          && isCompressibleContentType(flattenStandardHeader(request.headers['content-type']))
+          && this.isCompressibleContentType(flattenStandardHeader(request.headers['content-type']), interceptorOptions)
         ) {
           const compressedStream = request.body.pipeThrough(new CompressionStream(this.encoding))
 
@@ -85,7 +96,7 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
       else if (request.body instanceof Blob) {
         if (
           (!Number.isFinite(request.body.size) || request.body.size >= this.threshold)
-          && isCompressibleContentType(request.body.type)
+          && this.isCompressibleContentType(request.body.type, interceptorOptions)
         ) {
           const compressedStream = request.body.stream().pipeThrough(new CompressionStream(this.encoding))
           const contentDisposition = request.headers['content-disposition'] ?? generateContentDisposition(
@@ -119,7 +130,7 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
 
           if (value instanceof Blob) {
             if (!Number.isFinite(value.size)) { // Bun-s3 can use NaN for size
-              if (!isCompressibleContentType(value.type)) {
+              if (!this.isCompressibleContentType(value.type, interceptorOptions)) {
                 // Unknown non-compressible part size makes the estimate unreliable
                 contentLength = -Infinity
                 break
@@ -129,7 +140,7 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
               contentLength = Infinity
             }
             else {
-              contentLength += isCompressibleContentType(value.type)
+              contentLength += this.isCompressibleContentType(value.type, interceptorOptions)
                 ? value.size
                 : -value.size
             }

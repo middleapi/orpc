@@ -1,5 +1,5 @@
 import type { StandardBodyHint } from '@standardserver/core'
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard'
+import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
 import { isAsyncIteratorObject, isCompressibleContentType, isNoTransformCacheControl, parseAcceptEncodingQualities, stringifyJSON, toArray, varyByAcceptEncoding } from '@orpc/shared'
 import { flattenStandardHeader, generateContentDisposition } from '@standardserver/core'
@@ -8,7 +8,7 @@ import { flattenStandardHeader, generateContentDisposition } from '@standardserv
 // occasional multi-byte characters increase the average.
 const AVG_BYTES_PER_CHAR = 1.2
 
-export interface ResponseCompressionHandlerPluginOptions<_T extends Context> {
+export interface ResponseCompressionHandlerPluginOptions<T extends Context> {
   /**
    * The compression schemes to use for response compression.
    * Schemes are prioritized by their order in this array and
@@ -26,6 +26,15 @@ export interface ResponseCompressionHandlerPluginOptions<_T extends Context> {
    * @default 1024 (1KB)
    */
   threshold?: number
+
+  /**
+   * Determines whether a response with the given Content-Type should be compressed.
+   * Only consulted for binary transfers (streams, files, and file form-data parts).
+   * Also receives the routing interceptor options for per-request decisions.
+   *
+   * @default isCompressibleContentType (covers common text-based formats)
+   */
+  isCompressibleContentType?: (contentType: string | null | undefined, options: StandardHandlerRoutingInterceptorOptions<T>) => boolean
 }
 
 /**
@@ -45,10 +54,12 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
 
   private readonly encodings: Exclude<ResponseCompressionHandlerPluginOptions<T>['encodings'], undefined>
   private readonly threshold: Exclude<ResponseCompressionHandlerPluginOptions<T>['threshold'], undefined>
+  private readonly isCompressibleContentType: Exclude<ResponseCompressionHandlerPluginOptions<T>['isCompressibleContentType'], undefined>
 
   constructor(options: ResponseCompressionHandlerPluginOptions<T> = {}) {
     this.encodings = options.encodings ?? ['gzip', 'deflate']
     this.threshold = options.threshold ?? 1024
+    this.isCompressibleContentType = options.isCompressibleContentType ?? isCompressibleContentType
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
@@ -96,7 +107,7 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
 
         if (
           (!Number.isFinite(contentLength) || contentLength >= this.threshold)
-          && isCompressibleContentType(flattenStandardHeader(headers['content-type']))
+          && this.isCompressibleContentType(flattenStandardHeader(headers['content-type']), interceptorOptions)
         ) {
           return {
             ...result,
@@ -118,7 +129,7 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
       else if (body instanceof Blob) {
         if (
           (!Number.isFinite(body.size) || body.size >= this.threshold)
-          && isCompressibleContentType(body.type)
+          && this.isCompressibleContentType(body.type, interceptorOptions)
         ) {
           const contentDisposition = headers['content-disposition'] ?? generateContentDisposition(
             body instanceof File ? body.name : 'blob',
@@ -152,7 +163,7 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
 
           if (value instanceof Blob) {
             if (!Number.isFinite(value.size)) { // Bun-s3 can use NaN for size
-              if (!isCompressibleContentType(value.type)) {
+              if (!this.isCompressibleContentType(value.type, interceptorOptions)) {
                 // Unknown non-compressible part size makes the estimate unreliable
                 contentLength = -Infinity
                 break
@@ -162,7 +173,7 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
               contentLength = Infinity
             }
             else {
-              contentLength += isCompressibleContentType(value.type)
+              contentLength += this.isCompressibleContentType(value.type, interceptorOptions)
                 ? value.size
                 : -value.size
             }

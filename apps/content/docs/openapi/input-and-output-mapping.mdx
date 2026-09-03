@@ -31,7 +31,7 @@ For `GET /planets/earth?q=life`, the procedure receives:
 ```
 
 :::info
-Some requests cannot be merged into a single object. For example, `POST /planets/earth` with a non-object body cannot be merged. In that case, the full input becomes the body. Use [detailed input structure](#detailed-input-structure) if you also need path params.
+Some requests cannot be merged into a single object. For example, `POST /planets/earth` with a non-object body cannot be merged. In that case, the input contains only the path params and the body is ignored. Use [detailed input structure](#detailed-input-structure) if you also need the body.
 :::
 
 ### Detailed Input Structure

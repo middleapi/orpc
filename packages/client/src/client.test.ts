@@ -197,5 +197,20 @@ describe('createORPCClient', () => {
     expect(await client).toBe(client)
     expect(client.bind).toBe(client.bind)
     expect(client.toString).toBe(client.toString)
+    expect(client.call).toBe(Function.prototype.call)
+    expect(client.apply).toBe(Function.prototype.apply)
+  })
+
+  it('supports invoking procedures via call/apply/bind', async () => {
+    const client = createORPCClient(mockedLink) as any
+
+    expect(await client.ping.call(undefined, { value: 'call' })).toEqual('__mocked__')
+    expect(mockedLink.call).toHaveBeenLastCalledWith(['ping'], { value: 'call' }, { context: {} })
+
+    expect(await client.nested.pong.apply(undefined, [{ value: 'apply' }])).toEqual('__mocked__')
+    expect(mockedLink.call).toHaveBeenLastCalledWith(['nested', 'pong'], { value: 'apply' }, { context: {} })
+
+    expect(await client.ping.bind(undefined)({ value: 'bind' })).toEqual('__mocked__')
+    expect(mockedLink.call).toHaveBeenLastCalledWith(['ping'], { value: 'bind' }, { context: {} })
   })
 })

@@ -12,6 +12,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@orpc/next-playground", "dev"],
       "port": 3000
+    },
+    {
+      "name": "nest-playground",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@orpc/nest-playground", "dev"],
+      "port": 3000
     }
   ]
 }

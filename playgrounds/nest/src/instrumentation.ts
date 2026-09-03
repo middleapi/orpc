@@ -1,8 +1,6 @@
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http'
 import { registerInstrumentations } from '@opentelemetry/instrumentation'
-import { ExpressInstrumentation } from '@opentelemetry/instrumentation-express'
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http'
-import { NestInstrumentation } from '@opentelemetry/instrumentation-nestjs-core'
 import { resourceFromAttributes } from '@opentelemetry/resources'
 import { BatchSpanProcessor, NodeTracerProvider } from '@opentelemetry/sdk-trace-node'
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions'
@@ -25,8 +23,6 @@ provider.register()
 registerInstrumentations({
   instrumentations: [
     new HttpInstrumentation(),
-    new ExpressInstrumentation(),
-    new NestInstrumentation(),
     new ORPCInstrumentation(),
   ],
 })

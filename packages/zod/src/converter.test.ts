@@ -142,31 +142,6 @@ describe('zodToJsonSchemaConverter', () => {
         },
       }, false])
     })
-
-    it('avoids overwriting existing $defs when the root id collides', () => {
-      const schema = z.string().meta({ id: 'root' })
-
-      vi.mocked(toJSONSchema).mockReturnValueOnce({
-        $defs: {
-          root: {
-            type: 'number',
-          },
-        },
-        type: 'string',
-      } as any)
-
-      expect(converter.convert(schema, 'input')).toEqual([{
-        $ref: '#/$defs/root__0',
-        $defs: {
-          root: {
-            type: 'number',
-          },
-          root__0: {
-            type: 'string',
-          },
-        },
-      }, false])
-    })
   })
 
   describe('optionality', () => {

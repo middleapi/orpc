@@ -1,7 +1,7 @@
 import type { AnySchema, JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
 import type { $ZodType, ToJSONSchemaParams, JSONSchema as ZodJsonSchema } from 'zod/v4/core'
-import { encodeJsonPointerSegment, JsonSchemaFormat, JsonSchemaXNativeType } from '@orpc/json-schema'
-import { globalRegistry, toJSONSchema } from 'zod/v4/core'
+import { JsonSchemaFormat, JsonSchemaXNativeType } from '@orpc/json-schema'
+import { toJSONSchema } from 'zod/v4/core'
 import { JSON_SCHEMA_INPUT_REGISTRY, JSON_SCHEMA_OUTPUT_REGISTRY, JSON_SCHEMA_REGISTRY } from './registries'
 
 export interface ZodToJsonSchemaConverterOptions extends Omit<ToJSONSchemaParams, 'target' | 'io'> {
@@ -127,27 +127,6 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
     // Since the default oRPC format is always draft/2020-12,
     // `$schema` can be safely omitted here.
     const { $schema, ...rest } = jsonSchema
-
-    // workaround until https://github.com/colinhacks/zod/issues/6026 is merged
-    const registry = this.toJSONSchemaParams.metadata ?? globalRegistry
-    const { id } = registry.get(schema) || {}
-    if (typeof id === 'string' && rest.$ref === undefined) {
-      const { $defs = {}, ...restWithoutDefs } = rest
-
-      let defName = id
-      let index = 0
-      while (defName in $defs) {
-        defName = `${defName}__${index++}`
-      }
-
-      return {
-        $ref: `#/$defs/${encodeJsonPointerSegment(defName)}`,
-        $defs: {
-          ...$defs,
-          [defName]: restWithoutDefs,
-        },
-      }
-    }
 
     return rest
   }

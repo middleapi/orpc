@@ -672,4 +672,48 @@ describe('requestCompressionLinkPlugin', () => {
       ).resolves.toEqual(await largeBlob.text())
     })
   })
+
+  describe('isCompressibleContentType option', () => {
+    it('compresses a normally non-compressible content-type when the custom check allows it', async () => {
+      const { link, fetch } = createLink({
+        pluginOptions: {
+          threshold: 100,
+          isCompressibleContentType: (contentType, interceptorOptions) => {
+            expect(interceptorOptions.path).toEqual(['test'])
+            expect(interceptorOptions.request).toBeDefined()
+            return contentType === 'application/octet-stream'
+          },
+        },
+      })
+      const binaryBlob = new Blob(['large content'.repeat(100)], { type: 'application/octet-stream' })
+
+      await expect(link.call(['test'], binaryBlob, { context: {} })).resolves.toEqual('OK')
+
+      expect(fetch).toHaveBeenCalledTimes(1)
+      const [, init] = fetch.mock.calls[0]!
+      expect(init.body).toBeInstanceOf(ReadableStream)
+      expect(init.headers?.get('content-encoding')).toBe('gzip')
+
+      await expect(
+        decompressStream(init.body as ReadableStream, 'gzip'),
+      ).resolves.toEqual(await binaryBlob.text())
+    })
+
+    it('does not compress a normally compressible content-type when the custom check rejects it', async () => {
+      const { link, fetch } = createLink({
+        pluginOptions: {
+          threshold: 100,
+          isCompressibleContentType: () => false,
+        },
+      })
+      const textBlob = new Blob(['large content'.repeat(100)], { type: 'text/plain' })
+
+      await expect(link.call(['test'], textBlob, { context: {} })).resolves.toEqual('OK')
+
+      expect(fetch).toHaveBeenCalledTimes(1)
+      const [, init] = fetch.mock.calls[0]!
+      expect(init.body).toBe(textBlob)
+      expect(init.headers?.get('content-encoding')).toBeNull()
+    })
+  })
 })

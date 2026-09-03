@@ -46,6 +46,29 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 A [batch](/docs/plugins/batch) response might be left uncompressed here, depending on the shape it takes. On Node.js, add the [Batch Response Compression Plugin](/docs/plugins/batch-response-compression) to fully cover them, when you know your batch responses are all compressible.
 :::
 
+### Customize Compressible Content Types
+
+For binary transfers (streams, files, and file form-data parts), the plugin only compresses content types that benefit from compression. Override the check with `isCompressibleContentType`:
+
+```ts handler
+import { ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
+
+const handler = new RPCHandler(router, {
+  plugins: [
+    new ResponseCompressionHandlerPlugin({
+      /**
+       * Also receives the routing interceptor options for per-request decisions.
+       *
+       * @default isCompressibleContentType (covers common text-based formats)
+       */
+      isCompressibleContentType: (contentType, { request }) => {
+        return /^application\/x-custom-format(?:[;\s]|$)/i.test(contentType ?? '') && request.headers['x-no-compression'] === undefined
+      },
+    }),
+  ],
+})
+```
+
 ## Client
 
 Use `ResponseCompressionLinkPlugin` to advertise supported encodings via [Accept-Encoding header](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Accept-Encoding) and automatically decompress response bodies based on the [Content-Encoding header](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Encoding):

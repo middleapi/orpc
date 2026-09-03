@@ -78,6 +78,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - run: pnpm --filter='./packages/*' run -r build
-
       - run: pnpm --filter='./packages/*' publish -r --provenance --access=public --tag=${{ github.event.inputs.tag || steps.version.outputs.preid || 'latest' }} ${{ github.event.inputs.skip_git_check == 'true' && '--no-git-checks' || '' }}

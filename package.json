@@ -1,9 +1,9 @@
 {
   "name": "@orpc/monorepo",
   "type": "module",
-  "version": "2.0.0-beta.31",
+  "version": "2.0.0-beta.32",
   "private": true,
-  "packageManager": "pnpm@11.18.0",
+  "packageManager": "pnpm@12.0.0",
   "scripts": {
     "prepare": "simple-git-hooks",
     "type:check": "pnpm run -r type:check && tsc",
@@ -77,7 +77,7 @@
     "vite": "^8.2.2",
     "vitest": "^4.1.11",
     "ws": "^8.21.3",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm lint-staged"

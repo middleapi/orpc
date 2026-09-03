@@ -1229,6 +1229,65 @@ describe('responseCompressionHandlerPlugin', () => {
     })
   })
 
+  describe('isCompressibleContentType option', () => {
+    it('compresses a normally non-compressible content-type when the custom check allows it', async () => {
+      const binaryBlob = new Blob(['large content'.repeat(100)], { type: 'application/octet-stream' })
+      const handler = new RPCHandler(os.handler(() => binaryBlob), {
+        plugins: [
+          new ResponseCompressionHandlerPlugin({
+            threshold: 100,
+            isCompressibleContentType: (contentType, interceptorOptions) => {
+              expect(interceptorOptions.request).toBeDefined()
+              expect(interceptorOptions.context).toEqual({})
+              return contentType === 'application/octet-stream'
+            },
+          }),
+        ],
+      })
+
+      const { matched, response } = await handler.handle(new Request('http://localhost', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'accept-encoding': 'gzip',
+        },
+        body: JSON.stringify({ json: null }),
+      }))
+
+      expect(matched).toBe(true)
+      expect(response!.headers.get('content-encoding')).toBe('gzip')
+
+      await expect(
+        decompressStream(response!.body!, 'gzip'),
+      ).resolves.toEqual(await binaryBlob.text())
+    })
+
+    it('does not compress a normally compressible content-type when the custom check rejects it', async () => {
+      const textBlob = new Blob(['large content'.repeat(100)], { type: 'text/plain' })
+      const handler = new RPCHandler(os.handler(() => textBlob), {
+        plugins: [
+          new ResponseCompressionHandlerPlugin({
+            threshold: 100,
+            isCompressibleContentType: () => false,
+          }),
+        ],
+      })
+
+      const { matched, response } = await handler.handle(new Request('http://localhost', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'accept-encoding': 'gzip',
+        },
+        body: JSON.stringify({ json: null }),
+      }))
+
+      expect(matched).toBe(true)
+      expect(response!.headers.has('content-encoding')).toBe(false)
+      await expect(response!.text()).resolves.toBe(await textBlob.text())
+    })
+  })
+
   describe('node adapter', () => {
     it('should work with Node.js adapter', async () => {
       const largeText = 'x'.repeat(2000)

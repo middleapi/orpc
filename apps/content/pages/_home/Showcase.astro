@@ -440,11 +440,15 @@ it('finds a planet', async () => {
 </div>
 
 <script>
+  // Astro's ClientRouter swaps the page body on soft navigation but runs this
+  // module only once per full load, so everything bound to the showcase's own
+  // elements is re-resolved in `init`, which runs again after every swap.
+  let tabs: HTMLButtonElement[] = []
+  let panels: HTMLElement[] = []
+  let tablist: HTMLElement | null = null
+
   // WAI-ARIA tabs pattern: one tab stop for the whole list, arrows move between
   // tabs and select as they go (https://www.w3.org/WAI/ARIA/apg/patterns/tabs/).
-  const tabs = [...document.querySelectorAll<HTMLButtonElement>('[data-tab]')]
-  const panels = [...document.querySelectorAll<HTMLElement>('[data-panel]')]
-
   function select(tab: HTMLButtonElement): void {
     for (const other of tabs) {
       const isActive = other === tab
@@ -460,8 +464,6 @@ it('finds a planet', async () => {
   // The strip hides its scrollbar, so a fade marks the edge that still has tabs
   // behind it. Flagging each side separately keeps the hint honest: it clears
   // once you reach that end, and never shows at all when everything fits.
-  const tablist = document.querySelector<HTMLElement>('.orpc-tablist')
-
   function syncOverflowHints(): void {
     if (!tablist) {
       return
@@ -475,62 +477,78 @@ it('finds a planet', async () => {
     tablist.dataset.overflowEnd = String(tablist.scrollLeft < max - slack)
   }
 
-  if (tablist) {
-    syncOverflowHints()
-    tablist.addEventListener('scroll', syncOverflowHints, { passive: true })
-    new ResizeObserver(syncOverflowHints).observe(tablist)
+  const overflowObserver = new ResizeObserver(syncOverflowHints)
 
-    // A trackpad swipes sideways and a touchscreen drags, but a plain mouse has
-    // no way to reach the tabs past the fold. Translate a vertical wheel into
-    // horizontal scroll, and only while the strip can still move that way — at
-    // either end the event is left alone so the page scrolls as usual.
-    tablist.addEventListener('wheel', (event) => {
-      if (event.deltaY === 0 || Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
-        return
-      }
+  function init(): void {
+    tabs = [...document.querySelectorAll<HTMLButtonElement>('[data-tab]')]
+    panels = [...document.querySelectorAll<HTMLElement>('[data-panel]')]
+    tablist = document.querySelector<HTMLElement>('.orpc-tablist')
 
-      const max = tablist.scrollWidth - tablist.clientWidth
-      const next = Math.min(Math.max(tablist.scrollLeft + event.deltaY, 0), max)
+    // The previous strip left with the old body; watch the current one only.
+    overflowObserver.disconnect()
 
-      if (next === tablist.scrollLeft) {
-        return
-      }
+    if (tablist) {
+      syncOverflowHints()
+      tablist.addEventListener('scroll', syncOverflowHints, { passive: true })
+      overflowObserver.observe(tablist)
 
-      event.preventDefault()
-      tablist.scrollLeft = next
-    })
-  }
+      // A trackpad swipes sideways and a touchscreen drags, but a plain mouse has
+      // no way to reach the tabs past the fold. Translate a vertical wheel into
+      // horizontal scroll, and only while the strip can still move that way — at
+      // either end the event is left alone so the page scrolls as usual.
+      tablist.addEventListener('wheel', (event) => {
+        if (!tablist || event.deltaY === 0 || Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+          return
+        }
 
-  for (const [index, tab] of tabs.entries()) {
-    tab.addEventListener('click', () => {
-      select(tab)
-      // Keeps the active pill in view when the strip scrolls on narrow screens.
-      tab.scrollIntoView({
-        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-        block: 'nearest',
-        inline: 'nearest',
+        const max = tablist.scrollWidth - tablist.clientWidth
+        const next = Math.min(Math.max(tablist.scrollLeft + event.deltaY, 0), max)
+
+        if (next === tablist.scrollLeft) {
+          return
+        }
+
+        event.preventDefault()
+        tablist.scrollLeft = next
       })
-    })
+    }
 
-    tab.addEventListener('keydown', (event) => {
-      // Horizontal only: the strip lays out as a row at every width, so
-      // ArrowUp/ArrowDown must stay with the page for scrolling.
-      const offset = { ArrowRight: 1, ArrowLeft: -1 }[event.key]
-      const next = offset !== undefined
-        ? tabs[(index + offset + tabs.length) % tabs.length]
-        : event.key === 'Home'
-          ? tabs[0]
-          : event.key === 'End'
-            ? tabs.at(-1)
-            : undefined
+    for (const [index, tab] of tabs.entries()) {
+      tab.addEventListener('click', () => {
+        select(tab)
+        // Keeps the active pill in view when the strip scrolls on narrow screens.
+        tab.scrollIntoView({
+          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+          block: 'nearest',
+          inline: 'nearest',
+        })
+      })
 
-      if (!next) {
-        return
-      }
+      tab.addEventListener('keydown', (event) => {
+        // Horizontal only: the strip lays out as a row at every width, so
+        // ArrowUp/ArrowDown must stay with the page for scrolling.
+        const offset = { ArrowRight: 1, ArrowLeft: -1 }[event.key]
+        const next = offset !== undefined
+          ? tabs[(index + offset + tabs.length) % tabs.length]
+          : event.key === 'Home'
+            ? tabs[0]
+            : event.key === 'End'
+              ? tabs.at(-1)
+              : undefined
 
-      event.preventDefault()
-      select(next)
-      next.focus()
-    })
+        if (!next) {
+          return
+        }
+
+        event.preventDefault()
+        select(next)
+        next.focus()
+      })
+    }
   }
+
+  init()
+  // Fires once the new body is in place and before any page scripts, so it
+  // covers every re-entry; on pages without the showcase `init` finds nothing.
+  document.addEventListener('astro:after-swap', init)
 </script>

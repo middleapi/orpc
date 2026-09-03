@@ -1,4 +1,4 @@
-import type { AnyProcedure } from '@orpc/server'
+import type { AnyProcedure, Context } from '@orpc/server'
 import type { Effect, Context as EffectContext } from 'effect'
 
 /**
@@ -53,3 +53,10 @@ export interface WithEffectContext<Services> {
     opts: { path: string[], procedure: AnyProcedure, signal?: undefined | AbortSignal },
   ) => Effect.Effect<A, E>
 }
+
+/**
+ * Infers the Effect services available in an oRPC context that extends `WithEffectContext`.
+ *
+ * @see {@link https://orpc.dev/docs/integrations/effect#effect-services | Effect Integration - Effect Services}
+ */
+export type InferEffectServices<T extends Context> = T extends WithEffectContext<infer Services> ? Services : never

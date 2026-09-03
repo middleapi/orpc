@@ -266,7 +266,18 @@ describe('createRouterUtils', () => {
     const utils = createRouterUtils(client) as any
     expect(utils.undefined).toBe(undefined)
     const call = utils.route.call
+    expect(call).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.call)
     expect(call.bind).toBe(call.bind)
     expect(call[Symbol('undefined')]).toBeUndefined()
+    expect(utils.route.apply).toBeUndefined()
+
+    // .call.call() invokes the same underlying function as .call()
+    expect(call.call).toBe(Function.prototype.call)
+    utils.route.call('direct')
+    utils.route.call.call(undefined, 'via-call')
+    utils.route.call.apply(undefined, ['via-apply'])
+    expect(call).toHaveBeenNthCalledWith(1, 'direct')
+    expect(call).toHaveBeenNthCalledWith(2, 'via-call')
+    expect(call).toHaveBeenNthCalledWith(3, 'via-apply')
   })
 })

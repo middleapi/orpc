@@ -12,6 +12,7 @@ Most of your code keeps working: many v1 names still compile through deprecated 
 - The RPC serializer format and the error response format changed, so v1 [RPC Link](/docs/rpc/link) and [OpenAPI Link](/docs/openapi/link) clients cannot talk to a v2 server. Deploy the upgraded server and client together. See [Wire Format Changes](#wire-format-changes).
 - Automatic middleware deduplication was removed. Middleware applied at both router and procedure level now runs twice. See [Middleware](#middleware).
 - The Batch Plugin replaced `exclude` with `filter`, which has the opposite meaning. In most cases you can simply remove `exclude`. See [Batch Plugin](#batch-plugin).
+- A prefix now applies to every procedure, not only the ones that define a `path`, so procedures relying on the router-derived path move under the prefix. See [Routing Moved to OpenAPI Metadata](#routing-moved-to-openapi-metadata).
 
 :::
 
@@ -107,6 +108,32 @@ const listPlanet = os
   .handler(async () => [])
 ```
 
+:::
+
+:::warning[Prefixes now apply to every procedure]
+In v1, `.prefix` only applied to procedures that defined a `path` and left the rest untouched. In v2, `prefix` applies to every procedure, including those that fall back to the [router-derived path](/docs/openapi/routing#basic-routing), so those endpoints move under the prefix:
+
+<CodeGroup>
+
+```ts v2
+const router = os.meta(openapi({ prefix: '/api/v2' })).router({
+  planet: {
+    // POST /api/v2/planet/create
+    create: os.handler(async () => ({})),
+  },
+})
+```
+
+```ts v1
+const router = os.prefix('/api/v2').router({
+  planet: {
+    // POST /planet/create
+    create: os.handler(async () => ({})),
+  },
+})
+```
+
+</CodeGroup>
 :::
 
 The same applies to lazy routers with a prefix:

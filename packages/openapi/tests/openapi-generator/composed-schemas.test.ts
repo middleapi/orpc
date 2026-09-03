@@ -64,7 +64,7 @@ describe('openAPIGenerator e2e: composed schemas', () => {
     }))
   })
 
-  it('documents intersection inputs as query parameters and intersection outputs as allOf', async () => {
+  it('documents intersection inputs as query parameters and intersection outputs as a merged object', async () => {
     const doc = await generator.generate({
       searchPlanets: oc
         .meta(openapi({ method: 'GET', path: '/planets' }))
@@ -87,12 +87,10 @@ describe('openAPIGenerator e2e: composed schemas', () => {
         200: expect.objectContaining({
           content: {
             'application/json': {
-              schema: {
-                allOf: [
-                  expect.objectContaining({ required: ['items'] }),
-                  expect.objectContaining({ required: ['total'] }),
-                ],
-              },
+              schema: expect.objectContaining({
+                type: 'object',
+                required: ['items', 'total'],
+              }),
             },
           },
         }),

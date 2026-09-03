@@ -80,15 +80,16 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
         return data
       }
 
-      if (isPlainObject(data)) {
-        return {
-          ...data,
-          ...params,
-        }
+      // Non-object data (primitive, array, Blob, ReadableStream, ...) cannot be merged with params.
+      // Prefer params to stay consistent with the OpenAPI generator, which only describes path params here.
+      if (!isPlainObject(data)) {
+        return params
       }
 
-      // data can be Blob, AsyncIteratorObject, ReadableStream, ...
-      return data
+      return {
+        ...data,
+        ...params,
+      }
     }
 
     return {
