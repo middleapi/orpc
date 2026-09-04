@@ -34,8 +34,7 @@ export interface CacheMiddlewareOptions<
 
   /**
    * Extra stale-while-revalidate window in seconds after `ttl`.
-   * Stale entries are served while the procedure re-executes to refresh the entry,
-   * in the background through `cache/waitUntil` or before returning without it.
+   * Stale entries are served immediately while the procedure re-executes in the background.
    *
    * @default 0
    */
@@ -93,16 +92,7 @@ export function cache<
         const refresh = Promise.resolve(middlewareOptions.next())
           .then(result => store.set(key, result.output, { tags, ttl, swr }))
 
-        const waitUntil = middlewareOptions.context['cache/waitUntil']
-
-        if (waitUntil !== undefined) {
-          // The runtime owns the refresh from here, failures included.
-          waitUntil(refresh)
-        }
-        else {
-          // Nothing else can own it, so the request waits for it; the stale output still stands if it fails.
-          await refresh.catch(() => {})
-        }
+        middlewareOptions.context['cache/waitUntil']?.(refresh)
       }
 
       pluginContext?.caches.push({
