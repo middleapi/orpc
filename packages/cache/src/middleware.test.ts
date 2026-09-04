@@ -2,6 +2,7 @@ import type { CacheHandlerPluginContext } from './handler-plugin'
 import type { CacheContext, CacheEntry, CacheStore } from './types'
 import { call, os, type } from '@orpc/server'
 import { nowInSeconds } from '@orpc/shared'
+import { MemoryCacheStore } from './adapters/memory'
 import { CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
 import { cache, revalidate } from './middleware'
 
@@ -270,6 +271,39 @@ describe('cache', () => {
       // Nothing owns the refresh, so its rejection must not reach the process.
       await vi.waitFor(() => expect(handlerFn).toHaveBeenCalledTimes(1))
       expect(store.set).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('concurrency', () => {
+    it('runs the handler once per concurrent miss, then serves the stored output', async () => {
+      const store = new MemoryCacheStore()
+      const handlerFn = vi.fn(() => 'fresh')
+      const procedure = os.$context<CacheContext>().use(cache({ key: 'k' })).handler(handlerFn)
+      const run = () => call(procedure, undefined, { context: { 'cache/store': store } })
+
+      await expect(Promise.all([run(), run()])).resolves.toEqual(['fresh', 'fresh'])
+      expect(handlerFn).toHaveBeenCalledTimes(2) // misses are not coalesced
+
+      await expect(run()).resolves.toBe('fresh')
+      expect(handlerFn).toHaveBeenCalledTimes(2)
+    })
+
+    it('serves every concurrent stale hit immediately, refreshing once per hit', async () => {
+      const store = new MemoryCacheStore()
+      await store.set('k', 'stale', { ttl: 0, swr: 60 })
+
+      const handlerFn = vi.fn(() => 'fresh')
+      const waitUntil = vi.fn()
+      const procedure = os.$context<CacheContext>().use(cache({ key: 'k', ttl: 60 })).handler(handlerFn)
+      const run = () => call(procedure, undefined, { context: { 'cache/store': store, 'cache/waitUntil': waitUntil } })
+
+      await expect(Promise.all([run(), run()])).resolves.toEqual(['stale', 'stale'])
+      expect(handlerFn).toHaveBeenCalledTimes(2) // refreshes are not coalesced either
+
+      await Promise.all(waitUntil.mock.calls.map(([refresh]) => refresh))
+
+      await expect(run()).resolves.toBe('fresh')
+      expect(handlerFn).toHaveBeenCalledTimes(2)
     })
   })
 })

@@ -1,3 +1,4 @@
+import { cache } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
 import { experimental_WorkersCacheStore } from './workers-cache'
 
@@ -8,7 +9,7 @@ describe('experimental_WorkersCacheStore', () => {
 
   it('always misses and stores nothing', async () => {
     const purger = createPurger()
-    const store = new experimental_WorkersCacheStore({ cache: purger })
+    const store = new experimental_WorkersCacheStore(purger)
 
     await store.set('k', 'v', { tags: ['t'], ttl: 1000 })
     await expect(store.get('k')).resolves.toBeUndefined()
@@ -17,7 +18,7 @@ describe('experimental_WorkersCacheStore', () => {
 
   it('purges encoded tags through workers caching', async () => {
     const purger = createPurger()
-    const store = new experimental_WorkersCacheStore({ cache: purger })
+    const store = new experimental_WorkersCacheStore(purger)
 
     await store.revalidate({ tags: ['planets', 'a,b'] })
 
@@ -25,11 +26,16 @@ describe('experimental_WorkersCacheStore', () => {
     expect(purger.purge).toHaveBeenCalledWith({ tags: ['planets', 'a%2Cb'] })
   })
 
+  it('defaults to the cache exported by cloudflare:workers', () => {
+    const store = new experimental_WorkersCacheStore()
+
+    expect((store as any).cache).toBe(cache)
+  })
+
   it('throws a bare error when the purge fails without messages', async () => {
-    const purger = {
+    const store = new experimental_WorkersCacheStore({
       purge: vi.fn(async () => ({ success: false })),
-    }
-    const store = new experimental_WorkersCacheStore({ cache: purger })
+    })
 
     await expect(store.revalidate({ tags: ['planets'] })).rejects.toThrow(
       'experimental_WorkersCacheStore failed to purge tags',
@@ -37,10 +43,9 @@ describe('experimental_WorkersCacheStore', () => {
   })
 
   it('throws when the purge fails, including error messages', async () => {
-    const purger = {
+    const store = new experimental_WorkersCacheStore({
       purge: vi.fn(async () => ({ success: false, errors: [{ code: 429, message: 'Rate limited' }] })),
-    }
-    const store = new experimental_WorkersCacheStore({ cache: purger })
+    })
 
     await expect(store.revalidate({ tags: ['planets'] })).rejects.toThrow(
       'experimental_WorkersCacheStore failed to purge tags: Rate limited',

@@ -1,5 +1,6 @@
 import type { CacheEntry, CacheRevalidateOptions, CacheSetOptions, CacheStore } from '@orpc/experimental-cache'
 import { encodeCacheTag, toArray } from '@orpc/shared'
+import * as workers from 'cloudflare:workers'
 
 /**
  * The purge surface of Cloudflare Workers Caching, satisfied by both
@@ -9,14 +10,6 @@ import { encodeCacheTag, toArray } from '@orpc/shared'
  */
 export interface experimental_WorkersCachePurger {
   purge(options: { tags: string[] }): Promise<{ success: boolean, errors?: { code?: number, message?: string }[] }>
-}
-
-export interface experimental_WorkersCacheStoreOptions {
-  /**
-   * The Workers Caching purge surface: `ctx.cache` or `cache` imported
-   * from `cloudflare:workers`.
-   */
-  cache: experimental_WorkersCachePurger
 }
 
 /**
@@ -36,8 +29,12 @@ export interface experimental_WorkersCacheStoreOptions {
 export class experimental_WorkersCacheStore implements CacheStore {
   private readonly cache: experimental_WorkersCachePurger
 
-  constructor(options: experimental_WorkersCacheStoreOptions) {
-    this.cache = options.cache
+  /**
+   * @param cache The Workers Caching purge surface, such as `ctx.cache`.
+   *   Defaults to `cache` imported from `cloudflare:workers`.
+   */
+  constructor(cache?: experimental_WorkersCachePurger) {
+    this.cache = cache ?? workers.cache
   }
 
   async get(_key: unknown): Promise<CacheEntry | undefined> {

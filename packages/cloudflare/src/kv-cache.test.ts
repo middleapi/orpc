@@ -3,12 +3,13 @@ import { RPCSerializer } from '@orpc/client'
 import { nowInSeconds } from '@orpc/shared'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
+import { holdResult } from '../tests/__shared__/utils'
 import { experimental_KVCacheStore } from './kv-cache'
 
 describe('experimental_KVCacheStore', () => {
   function createTestingStore(options: Partial<experimental_KVCacheStoreOptions> = {}) {
     const prefix = `orpc-kv-cache-store-${crypto.randomUUID()}:`
-    return { store: new experimental_KVCacheStore({ kv: env.CACHE_KV, prefix, ...options }), prefix }
+    return { store: new experimental_KVCacheStore(env.CACHE_KV, { prefix, ...options }), prefix }
   }
 
   // The cross-package tsconfig rootDir keeps the shared store contract out of
@@ -81,24 +82,24 @@ describe('experimental_KVCacheStore', () => {
       evictAt,
     })
 
-    await env.CACHE_KV.put(`${prefix}entry:stale`, envelope(nowInSeconds() - 1, nowInSeconds() + 60))
-    await env.CACHE_KV.put(`${prefix}entry:evicted`, envelope(nowInSeconds() - 2, nowInSeconds() - 1))
+    await env.CACHE_KV.put(`${prefix}e:stale`, envelope(nowInSeconds() - 1, nowInSeconds() + 60))
+    await env.CACHE_KV.put(`${prefix}e:evicted`, envelope(nowInSeconds() - 2, nowInSeconds() - 1))
 
     const stale = await store.get('stale')
     expect(stale!.output).toBe('v')
     expect(stale!.expiresAt).toBeLessThanOrEqual(nowInSeconds())
 
     await expect(store.get('evicted')).resolves.toBeUndefined()
-    await expect(env.CACHE_KV.get(`${prefix}entry:evicted`)).resolves.toBeNull()
+    await expect(env.CACHE_KV.get(`${prefix}e:evicted`)).resolves.toBeNull()
   })
 
   it('defaults to no prefix', async () => {
-    const store = new experimental_KVCacheStore({ kv: env.CACHE_KV })
+    const store = new experimental_KVCacheStore(env.CACHE_KV)
     const key = crypto.randomUUID()
 
     await store.set(key, 'v')
 
-    await expect(env.CACHE_KV.get(`entry:${key}`)).resolves.toBeTypeOf('string')
+    await expect(env.CACHE_KV.get(`e:${key}`)).resolves.toBeTypeOf('string')
     await expect(store.get(key)).resolves.toMatchObject({ output: 'v' })
   })
 
@@ -108,7 +109,21 @@ describe('experimental_KVCacheStore', () => {
     await store.set('k', 'v', { tags: ['t'] })
     await store.revalidate({ tags: ['t'] })
 
-    await expect(env.CACHE_KV.get(`${prefix}entry:k`)).resolves.toBeTypeOf('string')
-    await expect(env.CACHE_KV.get(`${prefix}tag:t`)).resolves.toBeTypeOf('string')
+    await expect(env.CACHE_KV.get(`${prefix}e:k`)).resolves.toBeTypeOf('string')
+    await expect(env.CACHE_KV.get(`${prefix}t:t`)).resolves.toBeTypeOf('string')
+  })
+
+  it('drops an entry whose tag tokens were read before a racing revalidation', async () => {
+    const { client: kv, release } = holdResult(env.CACHE_KV, 'get')
+    const prefix = `orpc-kv-cache-store-${crypto.randomUUID()}:`
+    const store = new experimental_KVCacheStore(kv, { prefix })
+
+    const set = store.set('k', 'v', { tags: ['t'] }) // tokens read now, entry written after release
+    await store.revalidate({ tags: ['t'] })
+    release()
+    await set
+
+    await expect(store.get('k')).resolves.toBeUndefined()
+    await expect(env.CACHE_KV.get(`${prefix}e:k`)).resolves.toBeNull()
   })
 })

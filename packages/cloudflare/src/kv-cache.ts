@@ -22,11 +22,6 @@ interface KVCacheStoreEnvelope {
 
 export interface experimental_KVCacheStoreOptions {
   /**
-   * The KV namespace to store entries in.
-   */
-  kv: KVNamespace
-
-  /**
    * The prefix to use for KV keys.
    *
    * @default undefined
@@ -56,7 +51,6 @@ export interface experimental_KVCacheStoreOptions {
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
 export class experimental_KVCacheStore implements CacheStore {
-  private readonly kv: KVNamespace
   private readonly prefix: string
   private readonly serializer: Public<RPCSerializer>
 
@@ -66,8 +60,10 @@ export class experimental_KVCacheStore implements CacheStore {
    */
   private readonly keySerializer = new RPCJsonSerializer()
 
-  constructor(options: experimental_KVCacheStoreOptions) {
-    this.kv = options.kv
+  constructor(
+    private readonly kv: KVNamespace,
+    options: experimental_KVCacheStoreOptions = {},
+  ) {
     this.prefix = options.prefix ?? ''
     this.serializer = options.serializer ?? new RPCSerializer()
   }
@@ -144,10 +140,10 @@ export class experimental_KVCacheStore implements CacheStore {
   }
 
   private entryKey(key: unknown): string {
-    return `${this.prefix}entry:${encodeCacheKey(key, this.keySerializer)}`
+    return `${this.prefix}e:${encodeCacheKey(key, this.keySerializer)}`
   }
 
   private tagKey(tag: string): string {
-    return `${this.prefix}tag:${tag}`
+    return `${this.prefix}t:${tag}`
   }
 }

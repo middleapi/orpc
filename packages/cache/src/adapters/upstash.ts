@@ -1,11 +1,11 @@
 import type { Public } from '@orpc/shared'
-import type { RedisClientType } from 'redis'
+import type { Redis } from '@upstash/redis'
 import type { CacheEntry, CacheRevalidateOptions, CacheSetOptions, CacheStore } from '../types'
 import { RPCJsonSerializer, RPCSerializer } from '@orpc/client'
 import { nowInSeconds, stringifyJSON } from '@orpc/shared'
 import { encodeCacheKey } from '../utils'
 
-interface RedisCacheStoreEnvelope {
+interface UpstashCacheStoreEnvelope {
   /**
    * The cached output, encoded with the store's serializer.
    */
@@ -18,7 +18,7 @@ interface RedisCacheStoreEnvelope {
   expiresAt?: number | undefined
 }
 
-export interface RedisCacheStoreOptions {
+export interface UpstashCacheStoreOptions {
   /**
    * The prefix to use for Redis keys.
    *
@@ -35,14 +35,15 @@ export interface RedisCacheStoreOptions {
 }
 
 /**
- * Cache store adapter for Redis with tag-based invalidation. Entries are
- * retained for `ttl + swr` via `EX` expiry; tag counters have no expiry
- * since expiring one would resurrect stale entries. Revalidated entries
- * are removed lazily on the next `get` of their key.
+ * Cache store adapter for Upstash Redis with tag-based invalidation. Shares
+ * its key and envelope format with `RedisCacheStore`, so both can serve the
+ * same database. Entries are retained for `ttl + swr` via `EX` expiry; tag
+ * counters have no expiry since expiring one would resurrect stale entries.
+ * Revalidated entries are removed lazily on the next `get` of their key.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
-export class RedisCacheStore implements CacheStore {
+export class UpstashCacheStore implements CacheStore {
   private readonly prefix: string
   private readonly serializer: Public<RPCSerializer>
 
@@ -52,31 +53,27 @@ export class RedisCacheStore implements CacheStore {
    */
   private readonly keySerializer = new RPCJsonSerializer()
 
-  /**
-   * @param redis The Redis client to store entries in. Connected lazily when needed.
-   */
   constructor(
-    private readonly redis: RedisClientType<any, any, any, any, any>,
-    options: RedisCacheStoreOptions = {},
+    private readonly redis: Redis,
+    options: UpstashCacheStoreOptions = {},
   ) {
     this.prefix = options.prefix ?? ''
     this.serializer = options.serializer ?? new RPCSerializer()
   }
 
   async get(key: unknown): Promise<CacheEntry | undefined> {
-    await this.ensureConnection()
-
     const entryKey = this.entryKey(key)
-    const raw = await this.redis.get(entryKey)
+    // The client parses JSON responses by default; a string means that is turned off.
+    const raw = await this.redis.get<string | UpstashCacheStoreEnvelope>(entryKey)
 
     if (raw === null) {
       return undefined
     }
 
-    const envelope = JSON.parse(raw.toString()) as RedisCacheStoreEnvelope
+    const envelope = typeof raw === 'string' ? JSON.parse(raw) as UpstashCacheStoreEnvelope : raw
 
     if (envelope.tags?.length) {
-      const versions = await this.redis.mGet(envelope.tags.map(tag => this.tagKey(tag)))
+      const versions = await this.redis.mget<(string | number | null)[]>(envelope.tags.map(tag => this.tagKey(tag)))
 
       const revalidated = envelope.tags.some(
         (tag, index) => Number(versions[index] ?? 0) !== (envelope.tagVersions?.[tag] ?? 0),
@@ -98,13 +95,11 @@ export class RedisCacheStore implements CacheStore {
   async set(key: unknown, output: unknown, options?: CacheSetOptions): Promise<void> {
     const serialized = this.serializer.serialize(output)
 
-    await this.ensureConnection()
-
     const tags = options?.tags
 
     let tagVersions: Record<string, number> | undefined
     if (tags?.length) {
-      const versions = await this.redis.mGet(tags.map(tag => this.tagKey(tag)))
+      const versions = await this.redis.mget<(string | number | null)[]>(tags.map(tag => this.tagKey(tag)))
       tagVersions = {}
       tags.forEach((tag, index) => {
         tagVersions![tag] = Number(versions[index] ?? 0)
@@ -114,7 +109,7 @@ export class RedisCacheStore implements CacheStore {
     const expiresAt = options?.ttl !== undefined ? nowInSeconds() + options.ttl : undefined
     const retention = options?.ttl !== undefined ? options.ttl + (options.swr ?? 0) : undefined
 
-    const envelope: RedisCacheStoreEnvelope = {
+    const envelope: UpstashCacheStoreEnvelope = {
       output: serialized,
       tags,
       tagVersions,
@@ -124,13 +119,11 @@ export class RedisCacheStore implements CacheStore {
     await this.redis.set(
       this.entryKey(key),
       stringifyJSON(envelope),
-      retention !== undefined ? { expiration: { type: 'EX', value: retention } } : undefined,
+      retention !== undefined ? { ex: retention } : undefined,
     )
   }
 
   async revalidate({ tags }: CacheRevalidateOptions): Promise<void> {
-    await this.ensureConnection()
-
     if (tags.length === 1) {
       await this.redis.incr(this.tagKey(tags[0]))
       return
@@ -149,11 +142,5 @@ export class RedisCacheStore implements CacheStore {
 
   private tagKey(tag: string): string {
     return `${this.prefix}t:${tag}`
-  }
-
-  private async ensureConnection(): Promise<void> {
-    if (!this.redis.isOpen) {
-      await this.redis.connect()
-    }
   }
 }

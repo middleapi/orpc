@@ -85,3 +85,38 @@ describe('memoryCacheStore', () => {
     await expect(store.get('k')).resolves.toEqual({ output: 'new', tags: ['new'], expiresAt: undefined })
   })
 })
+
+describe('memoryCacheStore concurrency', () => {
+  it('applies concurrent sets and revalidations in call order', async () => {
+    const store = new MemoryCacheStore()
+
+    await Promise.all([
+      store.set('before', 'v', { tags: ['t'] }),
+      store.revalidate({ tags: ['t'] }),
+      store.set('after', 'v', { tags: ['t'] }),
+    ])
+
+    await expect(store.get('before')).resolves.toBeUndefined()
+    await expect(store.get('after')).resolves.toMatchObject({ output: 'v' })
+  })
+
+  it('misses consistently across concurrent gets of an invalidated entry', async () => {
+    const store = new MemoryCacheStore()
+
+    await store.set('k', 'v', { tags: ['t'] })
+    await store.revalidate({ tags: ['t'] })
+
+    await expect(Promise.all([store.get('k'), store.get('k'), store.get('k')])).resolves.toEqual([undefined, undefined, undefined])
+  })
+
+  it('keeps the last of concurrent sets to the same key', async () => {
+    const store = new MemoryCacheStore()
+
+    await Promise.all([
+      store.set('k', 'first', { ttl: 1 }),
+      store.set('k', 'last', { tags: ['t'] }),
+    ])
+
+    await expect(store.get('k')).resolves.toEqual({ output: 'last', tags: ['t'], expiresAt: undefined })
+  })
+})

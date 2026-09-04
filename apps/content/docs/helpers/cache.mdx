@@ -34,11 +34,13 @@ An entry stays fresh for `ttl` seconds and is retained for an extra `swr` window
 
 ## Adapters
 
-| Name                | Adapter for                                                                                |
-| ------------------- | ------------------------------------------------------------------------------------------ |
-| `MemoryCacheStore`  | In-memory storage                                                                          |
-| `RedisCacheStore`   | [Redis](https://github.com/redis/redis)                                                    |
-| `VercelCacheStore`  | [Vercel Runtime Cache](https://vercel.com/docs/caching/runtime-cache)                      |
+| Name                             | Adapter for                                                                                |
+| -------------------------------- | ------------------------------------------------------------------------------------------ |
+| `MemoryCacheStore`               | In-memory storage                                                                          |
+| `RedisCacheStore`                | [Redis](https://github.com/redis/redis)                                                    |
+| `UpstashCacheStore`              | [Upstash Redis](https://github.com/upstash/redis-js)                                       |
+| `BunRedisCacheStore`             | [Bun's Redis](https://bun.com/docs/runtime/redis)                                          |
+| `VercelCacheStore`               | [Vercel Runtime Cache](https://vercel.com/docs/caching/runtime-cache)                      |
 | `experimental_KVCacheStore`      | [Cloudflare Workers KV](https://developers.cloudflare.com/kv/)                             |
 | `experimental_WorkersCacheStore` | [Cloudflare Workers Caching](https://developers.cloudflare.com/workers/cache/), purge only |
 
@@ -71,12 +73,55 @@ const client = createClient({ url: 'redis://localhost:6379' })
 // You can still call `client.connect()` manually, but it is optional.
 await client.connect()
 
-const store = new RedisCacheStore({
+const store = new RedisCacheStore(client, {
   /**
-   * The Redis client to store entries in. Connected lazily when needed.
+   * The prefix to use for Redis keys.
+   *
+   * @default undefined
    */
-  redis: client,
+  prefix: undefined,
 
+  /**
+   * Serializer for cached outputs.
+   *
+   * @default RPCSerializer
+   */
+  serializer: undefined,
+})
+```
+
+```ts upstash
+import { UpstashCacheStore } from '@orpc/experimental-cache/upstash'
+import { Redis } from '@upstash/redis'
+
+const redis = Redis.fromEnv()
+
+// Shares its key and envelope format with RedisCacheStore,
+// so both can serve the same database.
+const store = new UpstashCacheStore(redis, {
+  /**
+   * The prefix to use for Redis keys.
+   *
+   * @default undefined
+   */
+  prefix: undefined,
+
+  /**
+   * Serializer for cached outputs.
+   *
+   * @default RPCSerializer
+   */
+  serializer: undefined,
+})
+```
+
+```ts bun
+import { BunRedisCacheStore } from '@orpc/bun'
+import { redis } from 'bun'
+
+// Shares its key and envelope format with RedisCacheStore,
+// so both can serve the same database.
+const store = new BunRedisCacheStore(redis, {
   /**
    * The prefix to use for Redis keys.
    *
@@ -122,12 +167,7 @@ export default {
   async fetch(request, env) {
     // KV is eventually consistent: writes and revalidations may take
     // 60 seconds or more to be visible in other locations.
-    const store = new KVCacheStore({
-      /**
-       * The KV namespace to store entries in.
-       */
-      kv: env.CACHE_KV,
-
+    const store = new KVCacheStore(env.CACHE_KV, {
       /**
        * The prefix to use for KV keys.
        *
@@ -149,19 +189,17 @@ export default {
 ```ts cloudflare-workers-caching
 import { experimental_WorkersCacheStore as WorkersCacheStore } from '@orpc/cloudflare'
 
-export default {
-  async fetch(request, env, ctx) {
-    // Workers Caching caches whole responses in front of the Worker via the
-    // `cache-control` and `cache-tag` plugin headers; this store only purges
-    // tags on revalidation. Requires `"cache": { "enabled": true }` in your
-    // wrangler configuration. Purges are scoped to the calling entrypoint,
-    // tags match case-insensitively, and purge calls always use the Free
-    // tier rate limits regardless of your plan.
-    const store = new WorkersCacheStore({ cache: ctx.cache })
-  },
-}
+// Workers Caching caches whole responses in front of the Worker via the
+// `cache-control` and `cache-tag` plugin headers; this store only purges
+// tags on revalidation. Requires `"cache": { "enabled": true }` in your
+// wrangler configuration. Purges are scoped to the calling entrypoint,
+// tags match case-insensitively, and purge calls always use the Free
+// tier rate limits regardless of your plan.
+//
+// Purges through `cache` from `cloudflare:workers` by default; pass
+// a purger such as `ctx.cache` to use another one.
+const store = new WorkersCacheStore()
 ```
-
 </CodeGroup>
 
 ## Cache Middleware

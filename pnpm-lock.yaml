@@ -426,6 +426,9 @@ importers:
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
+      '@orpc/experimental-cache':
+        specifier: workspace:*
+        version: link:../cache
       '@orpc/publisher':
         specifier: workspace:*
         version: link:../publisher
@@ -464,6 +467,9 @@ importers:
         specifier: ^0.8.2
         version: 0.8.2
     devDependencies:
+      '@upstash/redis':
+        specifier: ^1.38.2
+        version: 1.38.3
       '@vercel/functions':
         specifier: ^3.9.5
         version: 3.9.5(ws@8.21.3)
@@ -16007,7 +16013,7 @@ snapshots:
     dependencies:
       quansync: 1.0.0
 
-  '@redis/bloom@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))':
+  '@redis/bloom@6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))':
     dependencies:
       '@redis/client': 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
@@ -16018,15 +16024,15 @@ snapshots:
       '@node-rs/xxhash': 1.7.7
       '@opentelemetry/api': 1.9.1
 
-  '@redis/json@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))':
+  '@redis/json@6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))':
     dependencies:
       '@redis/client': 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
-  '@redis/search@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))':
+  '@redis/search@6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))':
     dependencies:
       '@redis/client': 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
-  '@redis/time-series@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))':
+  '@redis/time-series@6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))':
     dependencies:
       '@redis/client': 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
@@ -23735,11 +23741,11 @@ snapshots:
 
   redis@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1):
     dependencies:
-      '@redis/bloom': 6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))
+      '@redis/bloom': 6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))
       '@redis/client': 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
-      '@redis/json': 6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))
-      '@redis/search': 6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))
-      '@redis/time-series': 6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))
+      '@redis/json': 6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))
+      '@redis/search': 6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))
+      '@redis/time-series': 6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))
     transitivePeerDependencies:
       - '@node-rs/xxhash'
       - '@opentelemetry/api'
