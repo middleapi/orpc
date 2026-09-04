@@ -1,5 +1,5 @@
 import type { CacheEntry, CacheRevalidateOptions, CacheSetOptions, CacheStore } from '@orpc/experimental-cache'
-import { encodeCacheTagHeader, toArray } from '@orpc/shared'
+import { encodeCacheTag, toArray } from '@orpc/shared'
 
 /**
  * The purge surface of Cloudflare Workers Caching, satisfied by both
@@ -51,7 +51,7 @@ export class experimental_WorkersCacheStore implements CacheStore {
   async revalidate({ tags }: CacheRevalidateOptions): Promise<void> {
     const result = await this.cache.purge({
       // Tags must match the reflected Cache-Tag header, so each one is encoded the same way.
-      tags: tags.map(tag => encodeCacheTagHeader([tag])),
+      tags: tags.map(tag => encodeCacheTag(tag)),
     })
 
     if (!result.success) {

@@ -1,5 +1,6 @@
 import {
   decodeCacheTagHeader,
+  encodeCacheTag,
   encodeCacheTagHeader,
   isCompressibleContentType,
   isNoTransformCacheControl,
@@ -11,6 +12,7 @@ import {
   pathToHttpPath,
   varyByAcceptEncoding,
 } from './http'
+import { tryDecodeURIComponent } from './uri'
 
 describe('pathToHttpPath', () => {
   it('produces a leading slash', () => {
@@ -251,7 +253,7 @@ describe('isNoTransformCacheControl', () => {
   })
 })
 
-describe('encodeCacheTagHeader & decodeCacheTagHeader', () => {
+describe('encodeCacheTag', () => {
   it.each([
     ['leaves plain tags alone', 'planets', 'planets'],
     ['leaves other printable ASCII alone', 'a1!~*\'()-_.:/?', 'a1!~*\'()-_.:/?'],
@@ -264,33 +266,34 @@ describe('encodeCacheTagHeader & decodeCacheTagHeader', () => {
     ['escapes non-ASCII as UTF-8', 'tiếng việt', 'ti%E1%BA%BFng%20vi%E1%BB%87t'],
     ['escapes astral characters as UTF-8', 'a😀', 'a%F0%9F%98%80'],
   ])('%s', (_, tag, encoded) => {
-    expect(encodeCacheTagHeader([tag])).toBe(encoded)
-    expect(decodeCacheTagHeader(encoded)).toEqual([tag])
-  })
-
-  it('joins tags with commas, and round-trips the whole list', () => {
-    const tags = ['plain', 'a,b', '100%', 'CamelCase', 'tiếng việt', 'sp ace']
-
-    expect(encodeCacheTagHeader(['a', 'b'])).toBe('a,b')
-    expect(decodeCacheTagHeader(encodeCacheTagHeader(tags))).toEqual(tags)
+    expect(encodeCacheTag(tag)).toBe(encoded)
+    expect(tryDecodeURIComponent(encoded)).toBe(tag)
   })
 
   it('keeps case-folded tags distinct', () => {
-    expect(encodeCacheTagHeader(['Planets'])).not.toBe(encodeCacheTagHeader(['planets']))
-    expect(encodeCacheTagHeader(['Planets']).toLowerCase()).not.toBe(encodeCacheTagHeader(['planets']).toLowerCase())
+    expect(encodeCacheTag('Planets')).not.toBe(encodeCacheTag('planets'))
+    expect(encodeCacheTag('Planets').toLowerCase()).not.toBe(encodeCacheTag('planets').toLowerCase())
+  })
+
+  it('encodes identically across calls, since the pattern is shared', () => {
+    expect(encodeCacheTag('A,B%C')).toBe(encodeCacheTag('A,B%C'))
+    expect(encodeCacheTag('A,B%C')).toBe('%41%2C%42%25%43')
+  })
+})
+
+describe('encodeCacheTagHeader & decodeCacheTagHeader', () => {
+  it('joins encoded tags with commas, and round-trips the list', () => {
+    const tags = ['plain', 'a,b', '100%', 'CamelCase', 'tiếng việt', 'sp ace']
+
+    expect(encodeCacheTagHeader(['a', 'b'])).toBe('a,b')
+    expect(encodeCacheTagHeader(tags)).toBe(tags.map(tag => encodeCacheTag(tag)).join(','))
+    expect(decodeCacheTagHeader(encodeCacheTagHeader(tags))).toEqual(tags)
   })
 
   it('keeps empty tags instead of dropping them', () => {
     expect(encodeCacheTagHeader(['a', '', 'b'])).toBe('a,,b')
     expect(decodeCacheTagHeader('a,,b')).toEqual(['a', '', 'b'])
     expect(decodeCacheTagHeader('')).toEqual([''])
-  })
-
-  it('encodes identically across calls, since the pattern is shared', () => {
-    const tags = ['A,B%C', 'tiếng việt']
-
-    expect(encodeCacheTagHeader(tags)).toBe(encodeCacheTagHeader(tags))
-    expect(encodeCacheTagHeader(tags)).toBe('%41%2C%42%25%43,ti%E1%BA%BFng%20vi%E1%BB%87t')
   })
 
   it('decodes malformed escapes as-is', () => {
