@@ -29,45 +29,55 @@ You can read the documentation [here](https://orpc.dev).
 
 **Core**
 
-- [@orpc/contract](https://www.npmjs.com/package/@orpc/contract): Define API contract as the single source of truth.
-- [@orpc/server](https://www.npmjs.com/package/@orpc/server): Build APIs or implement contracts.
-- [@orpc/client](https://www.npmjs.com/package/@orpc/client): Consume APIs with end-to-end type safety.
-- [@orpc/openapi](https://www.npmjs.com/package/@orpc/openapi): Add OpenAPI compatibility to APIs.
+| Package                                                        | Purpose                                            | Docs                                                                                                                                                                                                                                                                     |
+| -------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [@orpc/contract](https://www.npmjs.com/package/@orpc/contract) | Define API contract as the single source of truth. | [Procedure Contract](https://orpc.dev/docs/contract/procedure), [Contract Router](https://orpc.dev/docs/contract/router), [Implementation](https://orpc.dev/docs/contract/implementation), [Generate from OpenAPI](https://orpc.dev/docs/contract/generate-from-openapi) |
+| [@orpc/server](https://www.npmjs.com/package/@orpc/server)     | Build APIs or implement contracts.                 | [Procedure](https://orpc.dev/docs/procedure), [Router](https://orpc.dev/docs/router), [Middleware](https://orpc.dev/docs/middleware), [Context](https://orpc.dev/docs/context), [RPC Handler](https://orpc.dev/docs/rpc/handler)                                         |
+| [@orpc/client](https://www.npmjs.com/package/@orpc/client)     | Consume APIs with end-to-end type safety.          | [Client-Side Clients](https://orpc.dev/docs/client/client-side), [Server-Side Clients](https://orpc.dev/docs/client/server-side), [RPC Link](https://orpc.dev/docs/rpc/link), [Error Handling](https://orpc.dev/docs/client/error-handling)                              |
+| [@orpc/openapi](https://www.npmjs.com/package/@orpc/openapi)   | Add OpenAPI compatibility to APIs.                 | [OpenAPI Handler](https://orpc.dev/docs/openapi/handler), [OpenAPI Link](https://orpc.dev/docs/openapi/link), [Specification](https://orpc.dev/docs/openapi/specification), [Scalar](https://orpc.dev/docs/openapi/scalar)                                               |
 
 **Schema validation**
 
-- [@orpc/zod](https://www.npmjs.com/package/@orpc/zod): Integrate with [Zod](https://zod.dev/).
-- [@orpc/valibot](https://www.npmjs.com/package/@orpc/valibot): Integrate with [Valibot](https://valibot.dev/).
-- [@orpc/arktype](https://www.npmjs.com/package/@orpc/arktype): Integrate with [ArkType](https://arktype.io/).
+| Package                                                      | Purpose                                         | Docs                                                  |
+| ------------------------------------------------------------ | ----------------------------------------------- | ----------------------------------------------------- |
+| [@orpc/zod](https://www.npmjs.com/package/@orpc/zod)         | Integrate with [Zod](https://zod.dev/).         | [Zod](https://orpc.dev/docs/integrations/zod)         |
+| [@orpc/valibot](https://www.npmjs.com/package/@orpc/valibot) | Integrate with [Valibot](https://valibot.dev/). | [Valibot](https://orpc.dev/docs/integrations/valibot) |
+| [@orpc/arktype](https://www.npmjs.com/package/@orpc/arktype) | Integrate with [ArkType](https://arktype.io/).  | [ArkType](https://orpc.dev/docs/integrations/arktype) |
 
 **Built-in features**
 
-- [@orpc/publisher](https://www.npmjs.com/package/@orpc/publisher): Pub/Sub with memory, Redis, and Upstash adapters.
-- [@orpc/ratelimit](https://www.npmjs.com/package/@orpc/ratelimit): Rate limiting with memory, Redis, and Upstash adapters.
-- [@orpc/experimental-cache](https://www.npmjs.com/package/@orpc/experimental-cache): Tag-based caching and revalidation with memory, Redis, Upstash, and Vercel adapters.
-- [@orpc/hibernation](https://www.npmjs.com/package/@orpc/hibernation): Leverage Hibernation APIs like [Cloudflare's Hibernation WebSocket](https://developers.cloudflare.com/durable-objects/best-practices/websockets/#durable-objects-hibernation-websocket-api).
-- [@orpc/json-schema](https://www.npmjs.com/package/@orpc/json-schema): Smart coercion for OpenAPI requests.
+| Package                                                                            | Purpose                                                                                                                                                                                      | Docs                                                           |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| [@orpc/publisher](https://www.npmjs.com/package/@orpc/publisher)                   | Pub/Sub with memory, Redis, and Upstash adapters.                                                                                                                                            | [Publisher](https://orpc.dev/docs/helpers/publisher)           |
+| [@orpc/ratelimit](https://www.npmjs.com/package/@orpc/ratelimit)                   | Rate limiting with memory, Redis, and Upstash adapters.                                                                                                                                      | [Rate Limit](https://orpc.dev/docs/helpers/ratelimit)          |
+| [@orpc/experimental-cache](https://www.npmjs.com/package/@orpc/experimental-cache) | Tag-based caching and revalidation with memory, Redis, Upstash, and Vercel adapters.                                                                                                         | [Cache](https://orpc.dev/docs/helpers/cache)                   |
+| [@orpc/hibernation](https://www.npmjs.com/package/@orpc/hibernation)               | Leverage Hibernation APIs like [Cloudflare's Hibernation WebSocket](https://developers.cloudflare.com/durable-objects/best-practices/websockets/#durable-objects-hibernation-websocket-api). | [Hibernation](https://orpc.dev/docs/integrations/hibernation)  |
+| [@orpc/json-schema](https://www.npmjs.com/package/@orpc/json-schema)               | Smart coercion for OpenAPI requests.                                                                                                                                                         | [Smart Coercion](https://orpc.dev/docs/plugins/smart-coercion) |
 
 **Framework & ecosystem integrations**
 
-- [@orpc/next](https://www.npmjs.com/package/@orpc/next): Integrate with [Next.js Server Functions](https://nextjs.org/docs/app/getting-started/mutating-data).
-- [@orpc/ai-sdk](https://www.npmjs.com/package/@orpc/ai-sdk): Turn contracts and procedures into [AI SDK](https://ai-sdk.dev/) tools.
-- [@orpc/tanstack-query](https://www.npmjs.com/package/@orpc/tanstack-query): Integrate with [TanStack Query](https://tanstack.com/query/latest).
-- [@orpc/pinia-colada](https://www.npmjs.com/package/@orpc/pinia-colada): Integrate with [Pinia Colada](https://pinia-colada.esm.dev/).
-- [@orpc/swr](https://www.npmjs.com/package/@orpc/swr): Integrate with [SWR](https://swr.vercel.app/).
-- [@orpc/experimental-msw](https://www.npmjs.com/package/@orpc/experimental-msw): Mock procedures with [Mock Service Worker](https://mswjs.io/).
-- [@orpc/experimental-effect](https://www.npmjs.com/package/@orpc/experimental-effect): Integrate with [Effect](https://effect.website/).
-- [@orpc/nest](https://www.npmjs.com/package/@orpc/nest): Implement your contract with [NestJS](https://nestjs.com/).
-- [@orpc/node](https://www.npmjs.com/package/@orpc/node): [Node.js](https://nodejs.org/) plugins for static file serving and large uploads.
-- [@orpc/bun](https://www.npmjs.com/package/@orpc/bun): Adapters for [Bun's Redis](https://bun.sh/).
-- [@orpc/cloudflare](https://www.npmjs.com/package/@orpc/cloudflare): Adapters for [Cloudflare Workers](https://developers.cloudflare.com/workers/).
-- [@orpc/trpc](https://www.npmjs.com/package/@orpc/trpc): Reuse existing [tRPC](https://trpc.io/) routers within oRPC.
+| Package                                                                              | Purpose                                                                                               | Docs                                                                                                                                                                                                               |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [@orpc/next](https://www.npmjs.com/package/@orpc/next)                               | Integrate with [Next.js Server Functions](https://nextjs.org/docs/app/getting-started/mutating-data). | [Next.js](https://orpc.dev/docs/integrations/next)                                                                                                                                                                 |
+| [@orpc/ai-sdk](https://www.npmjs.com/package/@orpc/ai-sdk)                           | Turn contracts and procedures into [AI SDK](https://ai-sdk.dev/) tools.                               | [AI SDK](https://orpc.dev/docs/integrations/ai-sdk)                                                                                                                                                                |
+| [@orpc/tanstack-query](https://www.npmjs.com/package/@orpc/tanstack-query)           | Integrate with [TanStack Query](https://tanstack.com/query/latest).                                   | [TanStack Query](https://orpc.dev/docs/integrations/tanstack-query)                                                                                                                                                |
+| [@orpc/pinia-colada](https://www.npmjs.com/package/@orpc/pinia-colada)               | Integrate with [Pinia Colada](https://pinia-colada.esm.dev/).                                         | [Pinia Colada](https://orpc.dev/docs/integrations/pinia-colada)                                                                                                                                                    |
+| [@orpc/swr](https://www.npmjs.com/package/@orpc/swr)                                 | Integrate with [SWR](https://swr.vercel.app/).                                                        | [SWR](https://orpc.dev/docs/integrations/swr)                                                                                                                                                                      |
+| [@orpc/experimental-msw](https://www.npmjs.com/package/@orpc/experimental-msw)       | Mock procedures with [Mock Service Worker](https://mswjs.io/).                                        | [MSW](https://orpc.dev/docs/integrations/msw)                                                                                                                                                                      |
+| [@orpc/experimental-effect](https://www.npmjs.com/package/@orpc/experimental-effect) | Integrate with [Effect](https://effect.website/).                                                     | [Effect](https://orpc.dev/docs/integrations/effect)                                                                                                                                                                |
+| [@orpc/nest](https://www.npmjs.com/package/@orpc/nest)                               | Implement your contract with [NestJS](https://nestjs.com/).                                           | [NestJS](https://orpc.dev/docs/integrations/nest)                                                                                                                                                                  |
+| [@orpc/node](https://www.npmjs.com/package/@orpc/node)                               | [Node.js](https://nodejs.org/) plugins for static file serving and large uploads.                     | [Static File](https://orpc.dev/docs/plugins/static-file), [Tmp File Upload](https://orpc.dev/docs/plugins/tmp-file-upload), [Batch Response Compression](https://orpc.dev/docs/plugins/batch-response-compression) |
+| [@orpc/bun](https://www.npmjs.com/package/@orpc/bun)                                 | Adapters for [Bun's Redis](https://bun.sh/).                                                          | [Cache](https://orpc.dev/docs/helpers/cache), [Publisher](https://orpc.dev/docs/helpers/publisher), [Rate Limit](https://orpc.dev/docs/helpers/ratelimit)                                                          |
+| [@orpc/cloudflare](https://www.npmjs.com/package/@orpc/cloudflare)                   | Adapters for [Cloudflare Workers](https://developers.cloudflare.com/workers/).                        | [Cache](https://orpc.dev/docs/helpers/cache), [Publisher](https://orpc.dev/docs/helpers/publisher), [Rate Limit](https://orpc.dev/docs/helpers/ratelimit)                                                          |
+| [@orpc/trpc](https://www.npmjs.com/package/@orpc/trpc)                               | Reuse existing [tRPC](https://trpc.io/) routers within oRPC.                                          | [tRPC](https://orpc.dev/docs/integrations/trpc)                                                                                                                                                                    |
 
 **Observability**
 
-- [@orpc/opentelemetry](https://www.npmjs.com/package/@orpc/opentelemetry): Integrate with [OpenTelemetry](https://opentelemetry.io/) for distributed tracing.
-- [@orpc/pino](https://www.npmjs.com/package/@orpc/pino): Integrate with [Pino](https://getpino.io/) for logging.
-- [@orpc/evlog](https://www.npmjs.com/package/@orpc/evlog): Integrate with [Evlog](https://evlog.dev/) for logging.
+| Package                                                                  | Purpose                                                                            | Docs                                                              |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [@orpc/opentelemetry](https://www.npmjs.com/package/@orpc/opentelemetry) | Integrate with [OpenTelemetry](https://opentelemetry.io/) for distributed tracing. | [OpenTelemetry](https://orpc.dev/docs/integrations/opentelemetry) |
+| [@orpc/pino](https://www.npmjs.com/package/@orpc/pino)                   | Integrate with [Pino](https://getpino.io/) for logging.                            | [Pino](https://orpc.dev/docs/integrations/pino)                   |
+| [@orpc/evlog](https://www.npmjs.com/package/@orpc/evlog)                 | Integrate with [Evlog](https://evlog.dev/) for logging.                            | [Evlog](https://orpc.dev/docs/integrations/evlog)                 |
 
 ## Sponsors
 
