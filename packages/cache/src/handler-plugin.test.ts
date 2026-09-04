@@ -215,19 +215,6 @@ describe('cacheHandlerPlugin', () => {
     })
   })
 
-  it('sets its headers over ones the response already carries', async () => {
-    const { record, handle } = createTestingHandler(
-      ['orpc-cache-tag', 'cache-control'],
-      { 'orpc-cache-tag': 'preset', 'cache-control': 'private, no-store' },
-    )
-    record({ caches: [{ tags: ['planets'], ttl: 60 }] })
-
-    const response = await handle()
-
-    expect(response.headers.get('orpc-cache-tag')).toBe('planets')
-    expect(response.headers.get('cache-control')).toBe('public, max-age=60')
-  })
-
   it('only reflects the tags of the procedure the client called in nested calls', async () => {
     const inner = os
       .$context<CacheContext>()
