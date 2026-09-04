@@ -39,8 +39,10 @@ export interface CacheHandlerPluginOptions<_T extends Context> {
    * response depends on and `orpc-cache-tag-invalidation` the tags
    * revalidated by the request, for client-side revalidation. `cache-tag`
    * and `cache-control` are their standard HTTP counterparts for response
-   * caches in front, such as CDNs or Cloudflare Workers Caching: they are
-   * only set on GET and HEAD responses and never override existing headers.
+   * caches in front, such as CDNs or Cloudflare Workers Caching. All are set
+   * over anything already on the response whenever the called procedure ran
+   * the cache middleware; standard HTTP caches only store GET and HEAD
+   * responses, so the last two mainly benefit OpenAPI routes.
    *
    * @default []
    */
