@@ -1,40 +1,40 @@
-import type { CacheStore } from '@orpc/experimental-cache'
-import { RedisCacheStore } from '@orpc/experimental-cache/redis'
+import type { CacheStore } from '../src'
 import { nowInSeconds, sleep } from '@orpc/shared'
-import { RedisClient } from 'bun'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { Redis } from '@upstash/redis'
 import { createClient } from 'redis'
-import { BunRedisCacheStore } from '../src/redis-cache'
+import { RedisCacheStore } from '../src/adapters/redis'
+import { UpstashCacheStore } from '../src/adapters/upstash'
 
-const REDIS_URL = Bun.env.REDIS_URL
+const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL
+const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
 
 /**
- * These tests require a real Redis server. Set `REDIS_URL` before running them.
+ * These tests require a real Upstash Redis server.
+ * Set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` before running them.
  *
  * When adding new tests, always use unique keys to avoid conflicts with other cases.
  *
  * All adapters must connect to the same server.
  */
-describe.concurrent('cache redis adapters compatibility', async () => {
+describe.concurrent('cache redis adapters compatibility', { timeout: 20_000 }, () => {
   const stores: Array<{ name: string, store: CacheStore }> = []
   const prefix = `redis-adapters:${crypto.randomUUID()}:`
 
-  if (REDIS_URL) {
-    const redis = createClient({ url: REDIS_URL })
+  if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
+    const redis = createClient({ url: `rediss://default:${UPSTASH_REDIS_REST_TOKEN}@${new URL(UPSTASH_REDIS_REST_URL).host}:6379` })
 
     afterAll(() => {
       redis.close()
     })
 
     stores.push({ name: 'redis', store: new RedisCacheStore(redis, { prefix }) })
+  }
 
-    const bunRedis = new RedisClient(REDIS_URL)
+  // TODO: Upstash is not compatible with Node 26 yet — temporarily disable these tests and revisit in the future.
+  if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN && !process.versions.node.startsWith('26.')) {
+    const upstashRedis = new Redis({ url: UPSTASH_REDIS_REST_URL, token: UPSTASH_REDIS_REST_TOKEN })
 
-    afterAll(() => {
-      bunRedis.close()
-    })
-
-    stores.push({ name: 'bun redis', store: new BunRedisCacheStore(bunRedis, { prefix }) })
+    stores.push({ name: 'upstash', store: new UpstashCacheStore(upstashRedis, { prefix }) })
   }
 
   describe.skipIf(stores.length < 2)('cross-adapter compatibility', () => {
@@ -60,7 +60,7 @@ describe.concurrent('cache redis adapters compatibility', async () => {
           await target.store.revalidate({ tags: [tag] })
 
           await expect(source.store.get([['planet', 'find'], { b: 2, id }])).resolves.toBeUndefined()
-        }, { timeout: 20_000 })
+        })
 
         it(`shares tag counters: ${source.name} → ${target.name}`, async () => {
           const key = `counter:${crypto.randomUUID()}`
@@ -76,7 +76,7 @@ describe.concurrent('cache redis adapters compatibility', async () => {
 
           await source.store.revalidate({ tags: [tag] })
           await expect(target.store.get(key)).resolves.toBeUndefined()
-        }, { timeout: 20_000 })
+        })
 
         it(`shares retention: ${source.name} → ${target.name}`, async () => {
           const noSwr = `no-swr:${crypto.randomUUID()}`
@@ -92,7 +92,7 @@ describe.concurrent('cache redis adapters compatibility', async () => {
           const stale = await target.store.get(swr)
           expect(stale!.output).toBe('v')
           expect(stale!.expiresAt).toBeLessThanOrEqual(nowInSeconds())
-        }, { timeout: 20_000 })
+        })
       }
     }
   })

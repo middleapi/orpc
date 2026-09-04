@@ -13,7 +13,8 @@ const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
  * `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` envs.
  */
 describe.concurrent('upstash cache store integration', {
-  skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_REDIS_REST_TOKEN,
+  // TODO: Upstash is not compatible with Node 26 yet — temporarily disable these tests and revisit in the future.
+  skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_REDIS_REST_TOKEN || process.versions.node.startsWith('26.'),
   timeout: 20_000,
 }, () => {
   const redis = new Redis({
@@ -105,10 +106,11 @@ describe.concurrent('upstash cache store integration', {
   })
 
   it('drops an entry whose tag versions were read before a racing revalidation', async () => {
-    const { client, release } = holdResult(redis, 'mget')
+    const { client, read, release } = holdResult(redis, 'mget')
     const { store, prefix } = createTestingStore({}, client)
 
-    const set = store.set('k', 'v', { tags: ['t'] }) // versions read now, entry written after release
+    const set = store.set('k', 'v', { tags: ['t'] }) // entry written after release
+    await read // versions are read by now
     await store.revalidate({ tags: ['t'] })
     release()
     await set

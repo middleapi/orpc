@@ -114,11 +114,12 @@ describe('experimental_KVCacheStore', () => {
   })
 
   it('drops an entry whose tag tokens were read before a racing revalidation', async () => {
-    const { client: kv, release } = holdResult(env.CACHE_KV, 'get')
+    const { client: kv, read, release } = holdResult(env.CACHE_KV, 'get')
     const prefix = `orpc-kv-cache-store-${crypto.randomUUID()}:`
     const store = new experimental_KVCacheStore(kv, { prefix })
 
-    const set = store.set('k', 'v', { tags: ['t'] }) // tokens read now, entry written after release
+    const set = store.set('k', 'v', { tags: ['t'] }) // entry written after release
+    await read // tokens are read by now
     await store.revalidate({ tags: ['t'] })
     release()
     await set

@@ -223,10 +223,11 @@ describe('redis cache store with a mocked client', () => {
 
   it('drops an entry whose tag versions were read before a racing revalidation', async () => {
     const { redis } = createMockedRedis()
-    const { client, release } = holdResult(redis, 'mGet')
+    const { client, read, release } = holdResult(redis, 'mGet')
     const store = new RedisCacheStore(client as any, { prefix: 'p:' })
 
-    const set = store.set('k', 'v', { tags: ['t'] }) // versions read now, entry written after release
+    const set = store.set('k', 'v', { tags: ['t'] }) // entry written after release
+    await read // versions are read by now
     await store.revalidate({ tags: ['t'] })
     release()
     await set

@@ -133,10 +133,11 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
   })
 
   it('drops an entry whose tag versions were read before a racing revalidation', async () => {
-    const { client, release } = holdResult(redis, 'mget')
+    const { client, read, release } = holdResult(redis, 'mget')
     const { store, prefix } = createTestingStore({}, client)
 
-    const set = store.set('k', 'v', { tags: ['t'] }) // versions read now, entry written after release
+    const set = store.set('k', 'v', { tags: ['t'] }) // entry written after release
+    await read // versions are read by now
     await store.revalidate({ tags: ['t'] })
     release()
     await set
