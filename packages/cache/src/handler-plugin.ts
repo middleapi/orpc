@@ -41,8 +41,7 @@ export interface CacheHandlerPluginOptions<_T extends Context> {
    * and `cache-control` are their standard HTTP counterparts for response
    * caches in front, such as CDNs or Cloudflare Workers Caching. All are set
    * over anything already on the response whenever the called procedure ran
-   * the cache middleware; standard HTTP caches only store GET and HEAD
-   * responses, so the last two mainly benefit OpenAPI routes.
+   * the cache middleware;
    *
    * @default []
    */
