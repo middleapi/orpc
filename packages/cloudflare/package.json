@@ -22,7 +22,6 @@
     "ratelimit",
     "pubsub",
     "cache",
-    "kv",
     "typescript"
   ],
   "sideEffects": false,

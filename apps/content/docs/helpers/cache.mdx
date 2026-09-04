@@ -41,7 +41,6 @@ An entry stays fresh for `ttl` seconds and is retained for an extra `swr` window
 | `UpstashCacheStore`              | [Upstash Redis](https://github.com/upstash/redis-js)                                       |
 | `BunRedisCacheStore`             | [Bun's Redis](https://bun.com/docs/runtime/redis)                                          |
 | `VercelCacheStore`               | [Vercel Runtime Cache](https://vercel.com/docs/caching/runtime-cache)                      |
-| `experimental_KVCacheStore`      | [Cloudflare Workers KV](https://developers.cloudflare.com/kv/)                             |
 | `experimental_WorkersCacheStore` | [Cloudflare Workers Caching](https://developers.cloudflare.com/workers/cache/), purge only |
 
 Every duration is in seconds, matching what the underlying caches accept.
@@ -158,32 +157,6 @@ const store = new VercelCacheStore({
    */
   serializer: undefined,
 })
-```
-
-```ts cloudflare-kv
-import { experimental_KVCacheStore as KVCacheStore } from '@orpc/cloudflare'
-
-export default {
-  async fetch(request, env) {
-    // KV is eventually consistent: writes and revalidations may take
-    // 60 seconds or more to be visible in other locations.
-    const store = new KVCacheStore(env.CACHE_KV, {
-      /**
-       * The prefix to use for KV keys.
-       *
-       * @default undefined
-       */
-      prefix: undefined,
-
-      /**
-       * Serializer for cached outputs.
-       *
-       * @default RPCSerializer
-       */
-      serializer: undefined,
-    })
-  },
-}
 ```
 
 ```ts cloudflare-workers-caching

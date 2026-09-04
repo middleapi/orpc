@@ -2,12 +2,6 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "compatibility_date": "2026-07-01",
   "main": "./tests/__shared__/main.ts",
-  "kv_namespaces": [
-    {
-      "binding": "CACHE_KV",
-      "id": "cache-kv-test"
-    }
-  ],
   "ratelimits": [
     {
       "name": "RATELIMIT_3_10S",
