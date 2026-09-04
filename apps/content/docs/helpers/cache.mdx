@@ -244,9 +244,9 @@ A cached entry is shared by everyone using the same key. If output depends on th
 
 ### Stale While Revalidate
 
-When an entry is past `ttl` but within the `swr` window, the middleware returns the stale output immediately and re-executes the procedure in the background to refresh the entry. Concurrent stale hits may each trigger a refresh; the cache never serves anything older than `ttl + swr`.
+When an entry is past `ttl` but within the `swr` window, the middleware serves the stale output and re-executes the procedure to refresh the entry. Concurrent stale hits may each trigger a refresh; the cache never serves anything older than `ttl + swr`.
 
-On runtimes that stop pending work once the response is sent, such as Cloudflare Workers, provide `cache/waitUntil` through the context so background refreshes can finish:
+Provide `cache/waitUntil` through the context, such as `ctx.waitUntil` on Cloudflare Workers, to run refreshes in the background after the response is sent:
 
 ```ts
 export default {
@@ -263,7 +263,7 @@ export default {
 }
 ```
 
-The promise it receives rejects when a refresh fails, so `cache/waitUntil` is also where those failures are reported. Without it the refresh still runs, but its failures are ignored and the next stale hit retries.
+The promise it receives rejects when a refresh fails, so `cache/waitUntil` is also where those failures are reported. Without it, the refresh completes before the stale output is returned, and its failures are ignored so the next stale hit retries.
 
 ## Revalidate Middleware
 

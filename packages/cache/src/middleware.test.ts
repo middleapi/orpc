@@ -1,7 +1,7 @@
 import type { CacheHandlerPluginContext } from './handler-plugin'
 import type { CacheContext, CacheEntry, CacheStore } from './types'
 import { call, os, type } from '@orpc/server'
-import { nowInSeconds } from '@orpc/shared'
+import { nowInSeconds, sleep } from '@orpc/shared'
 import { MemoryCacheStore } from './adapters/memory'
 import { CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
 import { cache, revalidate } from './middleware'
@@ -230,15 +230,26 @@ describe('cache', () => {
       expect(store.set).toHaveBeenCalledWith('k', 'fresh', { tags: ['t'], ttl: 60, swr: 30 })
     })
 
-    it('refreshes in the background without waitUntil', async () => {
+    it('waits for the refresh before returning without waitUntil', async () => {
       const store = createStore({ output: 'stale', tags: [], expiresAt: nowInSeconds() - 1 })
-      const procedure = os.$context<CacheContext>().use(cache({ key: 'k' })).handler(() => 'fresh')
+      let finishRefresh!: (output: string) => void
+      const procedure = os.$context<CacheContext>().use(cache({ key: 'k' })).handler(
+        () => new Promise<string>((resolve) => {
+          finishRefresh = resolve
+        }),
+      )
 
-      await expect(
-        call(procedure, undefined, { context: { 'cache/store': store } }),
-      ).resolves.toBe('stale')
+      const settled = vi.fn()
+      const result = call(procedure, undefined, { context: { 'cache/store': store } }).then(settled)
 
-      await vi.waitFor(() => expect(store.set).toHaveBeenCalledWith('k', 'fresh', { tags: undefined, ttl: undefined, swr: undefined }))
+      await sleep(10)
+      expect(settled).not.toHaveBeenCalled()
+
+      finishRefresh('fresh')
+
+      await result
+      expect(settled).toHaveBeenCalledWith('stale')
+      expect(store.set).toHaveBeenCalledWith('k', 'fresh', { tags: undefined, ttl: undefined, swr: undefined })
     })
 
     it('hands background refresh failures to waitUntil', async () => {
@@ -257,7 +268,7 @@ describe('cache', () => {
       expect(store.set).not.toHaveBeenCalled()
     })
 
-    it('ignores background refresh failures without waitUntil', async () => {
+    it('serves stale output when the awaited refresh fails without waitUntil', async () => {
       const store = createStore({ output: 'stale', tags: [], expiresAt: nowInSeconds() - 1 })
       const handlerFn = vi.fn(() => {
         throw new Error('handler down')
@@ -268,8 +279,7 @@ describe('cache', () => {
         call(procedure, undefined, { context: { 'cache/store': store } }),
       ).resolves.toBe('stale')
 
-      // Nothing owns the refresh, so its rejection must not reach the process.
-      await vi.waitFor(() => expect(handlerFn).toHaveBeenCalledTimes(1))
+      expect(handlerFn).toHaveBeenCalledTimes(1)
       expect(store.set).not.toHaveBeenCalled()
     })
   })

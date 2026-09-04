@@ -34,7 +34,8 @@ export interface CacheMiddlewareOptions<
 
   /**
    * Extra stale-while-revalidate window in seconds after `ttl`.
-   * Stale entries are served immediately while the procedure re-executes in the background.
+   * Stale entries are served while the procedure re-executes to refresh the entry,
+   * in the background through `cache/waitUntil` or before returning without it.
    *
    * @default 0
    */
@@ -99,8 +100,8 @@ export function cache<
           waitUntil(refresh)
         }
         else {
-          // Nothing owns it instead, and Node exits on an unhandled rejection.
-          refresh.catch(() => {})
+          // Nothing else can own it, so the request waits for it; the stale output still stands if it fails.
+          await refresh.catch(() => {})
         }
       }
 

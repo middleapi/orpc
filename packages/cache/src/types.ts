@@ -88,10 +88,10 @@ export interface CacheContext {
 
   /**
    * Takes ownership of background work such as stale-while-revalidate
-   * refreshes. Required on runtimes that kill pending work once the response
-   * is sent, like Cloudflare Workers (`ctx.waitUntil`). The promise rejects
-   * when the refresh fails, so this is also where such failures are reported;
-   * without it they are ignored.
+   * refreshes, like `ctx.waitUntil` on Cloudflare Workers. The promise rejects
+   * when the refresh fails, so this is also where such failures are reported.
+   * Without it, the refresh completes before the stale output is returned and
+   * its failures are ignored.
    */
   'cache/waitUntil'?: (promise: Promise<unknown>) => void
 }
