@@ -2,9 +2,9 @@ import type { Public } from '@orpc/shared'
 import type { RuntimeCache } from '@vercel/functions'
 import type { CacheEntry, CacheRevalidateOptions, CacheSetOptions, CacheStore } from '../types'
 import { RPCJsonSerializer, RPCSerializer } from '@orpc/client'
-import { nowInSeconds } from '@orpc/shared'
+import { MemoryLock, nowInSeconds } from '@orpc/shared'
 import { getCache } from '@vercel/functions'
-import { encodeCacheKey, MemoryLock } from '../utils'
+import { encodeCacheKey } from '../utils'
 
 interface VercelCacheStoreEnvelope {
   /**

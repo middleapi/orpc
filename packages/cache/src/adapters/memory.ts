@@ -1,8 +1,8 @@
 import type { Public } from '@orpc/shared'
 import type { CacheEntry, CacheRevalidateOptions, CacheSetOptions, CacheStore } from '../types'
 import { RPCJsonSerializer } from '@orpc/client'
-import { nowInSeconds } from '@orpc/shared'
-import { encodeCacheKey, MemoryLock } from '../utils'
+import { MemoryLock, nowInSeconds } from '@orpc/shared'
+import { encodeCacheKey } from '../utils'
 
 export interface MemoryCacheStoreOptions {
   /**

@@ -47,7 +47,7 @@ Every duration is in seconds, matching what the underlying caches accept.
 
 Keys may be any serializable value. Strings are used verbatim, while anything else is encoded with `encodeCacheKey`: serialized first, so complex values like Date, Map, or Set become plain JSON, then canonicalized, so structurally equal keys resolve the same entry regardless of property order. Reuse it when implementing your own store.
 
-Every adapter except `experimental_WorkersCacheStore` implements `lock`. The Redis, Upstash, and Bun stores hold it in Redis with `SET NX`, so it spans processes and is released when the holder finishes, or after `lockTtl` if it never does. The memory and Vercel stores hold it within the process; `MemoryLock` is exported for stores of your own.
+Every adapter except `experimental_WorkersCacheStore` implements `lock`. The Redis, Upstash, and Bun stores hold it in Redis with `SET NX`, so it spans processes and is released when the holder finishes, or after `lockTtl` if it never does. The memory and Vercel stores hold it within the process through `MemoryLock` from `@orpc/shared`, which suits stores of your own too.
 
 <CodeGroup>
 
