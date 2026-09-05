@@ -73,6 +73,14 @@ export interface CacheStore {
    * Invalidates every entry associated with any of the given tags.
    */
   revalidate(options: CacheRevalidateOptions): Promise<void>
+
+  /**
+   * Runs `fn` for one caller at a time per key, so a miss is filled once
+   * rather than once per concurrent caller. `waited` is `true` when another
+   * caller held the lock first, so the entry may exist by now. Stores without
+   * it let every caller fill.
+   */
+  lock?<T>(key: unknown, fn: (waited: boolean) => Promise<T>): Promise<T>
 }
 
 /**

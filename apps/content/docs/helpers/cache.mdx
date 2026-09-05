@@ -13,7 +13,7 @@ npm install @orpc/experimental-cache@beta
 
 ## Basic Usage
 
-The core concept is the `CacheStore` interface, which defines a standard way to store, look up, and invalidate cached output by tags. You can create your own custom store or use one of the provided adapters. A router shares a single store, provided through the request context under the `cache/store` key, as defined by the `CacheContext` interface.
+The core concept is the `CacheStore` interface, which defines a standard way to store, look up, and invalidate cached output by tags. Stores may also implement `lock`, which runs a callback for one caller at a time per key so concurrent misses fill an entry once. You can create your own custom store or use one of the provided adapters. A router shares a single store, provided through the request context under the `cache/store` key, as defined by the `CacheContext` interface.
 
 ```ts twoslash
 import { MemoryCacheStore } from '@orpc/experimental-cache/memory'
@@ -46,6 +46,8 @@ An entry stays fresh for `ttl` seconds and is retained for an extra `swr` window
 Every duration is in seconds, matching what the underlying caches accept.
 
 Keys may be any serializable value. Strings are used verbatim, while anything else is encoded with `encodeCacheKey`: serialized first, so complex values like Date, Map, or Set become plain JSON, then canonicalized, so structurally equal keys resolve the same entry regardless of property order. Reuse it when implementing your own store.
+
+Every adapter except `experimental_WorkersCacheStore` implements `lock`. The Redis, Upstash, and Bun stores hold it in Redis with `SET NX`, so it spans processes and is released when the holder finishes, or after `lockTtl` if it never does. The memory and Vercel stores hold it within the process; `MemoryLock` is exported for stores of your own.
 
 <CodeGroup>
 
@@ -86,6 +88,13 @@ const store = new RedisCacheStore(client, {
    * @default RPCSerializer
    */
   serializer: undefined,
+
+  /**
+   * How long a lock may be held, in seconds, so a crashed holder frees its waiters.
+   *
+   * @default 10
+   */
+  lockTtl: 10,
 })
 ```
 
@@ -111,6 +120,13 @@ const store = new UpstashCacheStore(redis, {
    * @default RPCSerializer
    */
   serializer: undefined,
+
+  /**
+   * How long a lock may be held, in seconds, so a crashed holder frees its waiters.
+   *
+   * @default 10
+   */
+  lockTtl: 10,
 })
 ```
 
@@ -134,6 +150,13 @@ const store = new BunRedisCacheStore(redis, {
    * @default RPCSerializer
    */
   serializer: undefined,
+
+  /**
+   * How long a lock may be held, in seconds, so a crashed holder frees its waiters.
+   *
+   * @default 10
+   */
+  lockTtl: 10,
 })
 ```
 
@@ -177,7 +200,7 @@ const store = new WorkersCacheStore()
 
 ## Cache Middleware
 
-The `cache` helper creates middleware that caches the output of [procedures](/docs/procedure). On a hit it returns the cached output without executing the handler, and on a miss it executes the handler and stores the result. The `key`, `tags`, `ttl`, `swr`, and `enabled` options accept static values or functions of the middleware options and input.
+The `cache` helper creates middleware that caches the output of [procedures](/docs/procedure). On a hit it returns the cached output without executing the handler, and on a miss it executes the handler and stores the result. When the store implements `lock`, concurrent misses for one key run the handler once and the rest are served from the entry it stores. The `key`, `tags`, `ttl`, `swr`, and `enabled` options accept static values or functions of the middleware options and input.
 
 The `key` is optional: by default it is derived from the procedure path and input. When provided, it is used as given, so procedures sharing a key also share an entry.
 
@@ -217,7 +240,7 @@ A cached entry is shared by everyone using the same key. If output depends on th
 
 ### Stale While Revalidate
 
-When an entry is past `ttl` but within the `swr` window, the middleware returns the stale output immediately and re-executes the procedure in the background to refresh the entry. Concurrent stale hits may each trigger a refresh; the cache never serves anything older than `ttl + swr`.
+When an entry is past `ttl` but within the `swr` window, the middleware returns the stale output immediately and re-executes the procedure in the background to refresh the entry. Concurrent stale hits refresh once when the store implements `lock`, and once each otherwise; the cache never serves anything older than `ttl + swr`.
 
 On runtimes that stop pending work once the response is sent, such as Cloudflare Workers, provide `cache/waitUntil` through the context so background refreshes can finish:
 

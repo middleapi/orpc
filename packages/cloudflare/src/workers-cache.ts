@@ -2,14 +2,13 @@ import type { CacheEntry, CacheRevalidateOptions, CacheSetOptions, CacheStore } 
 import { encodeCacheTag, toArray } from '@orpc/shared'
 import * as workers from 'cloudflare:workers'
 
-/**
- * The purge surface of Cloudflare Workers Caching, satisfied by both
- * `ctx.cache` and `cache` imported from `cloudflare:workers`.
- *
- * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
- */
-export interface experimental_WorkersCachePurger {
-  purge(options: { tags: string[] }): Promise<{ success: boolean, errors?: { code?: number, message?: string }[] }>
+export interface experimental_WorkersCacheStoreOptions {
+  /**
+   * The Workers Caching purge surface, such as `ctx.cache`.
+   *
+   * @default cache from `cloudflare:workers`
+   */
+  cache?: CacheContext
 }
 
 /**
@@ -19,22 +18,13 @@ export interface experimental_WorkersCachePurger {
  * `set` stores nothing; `revalidate` purges the tags through Workers
  * Caching.
  *
- * @remarks
- * **Note**: Purges are scoped to the calling entrypoint, tags are matched
- * case-insensitively, and purge calls always use the Free tier rate limits
- * regardless of your plan.
- *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
 export class experimental_WorkersCacheStore implements CacheStore {
-  private readonly cache: experimental_WorkersCachePurger
+  private readonly cache: CacheContext
 
-  /**
-   * @param cache The Workers Caching purge surface, such as `ctx.cache`.
-   *   Defaults to `cache` imported from `cloudflare:workers`.
-   */
-  constructor(cache?: experimental_WorkersCachePurger) {
-    this.cache = cache ?? workers.cache
+  constructor(options: experimental_WorkersCacheStoreOptions = {}) {
+    this.cache = options.cache ?? workers.cache
   }
 
   async get(_key: unknown): Promise<CacheEntry | undefined> {

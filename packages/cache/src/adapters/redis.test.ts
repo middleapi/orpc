@@ -99,6 +99,36 @@ describe.concurrent('redis cache store integration', {
 
     await expect(Promise.all(keys.map(key => store.get(key)))).resolves.toEqual(keys.map(() => undefined))
   })
+
+  it('frees waiters after lockTtl and leaves a lock taken over that way alone', async () => {
+    const { store, prefix } = createTestingStore({ lockTtl: 1 })
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let takenOver!: () => void
+    const takeover = new Promise<void>((resolve) => {
+      takenOver = resolve
+    })
+
+    // Holds past its ttl, until the waiter has taken the lock over.
+    const holder = store.lock('k', () => takeover)
+    await vi.waitFor(() => expect(redis.exists(`${prefix}l:k`)).resolves.toBe(1), { timeout: 5000 })
+
+    const waiter = store.lock('k', async (waited) => {
+      takenOver()
+      await held
+      return waited
+    })
+
+    await holder
+    // The holder's release must leave the waiter's lock alone.
+    await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(1)
+
+    release()
+    await expect(waiter).resolves.toBe(true)
+    await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(0)
+  })
 })
 
 describe('redis cache store with a mocked client', () => {
@@ -130,9 +160,20 @@ describe('redis cache store with a mocked client', () => {
         redis.isOpen = true
       }),
       get: vi.fn(async (key: string): Promise<string | null> => data.get(key) ?? null),
-      set: vi.fn(async (key: string, value: string, _options?: unknown) => {
+      set: vi.fn(async (key: string, value: string, options?: { condition?: 'NX' }) => {
+        if (options?.condition === 'NX' && data.has(key)) {
+          return null
+        }
         data.set(key, value)
         return 'OK'
+      }),
+      eval: vi.fn(async (_script: string, options: { keys: string[], arguments: string[] }) => {
+        // The release script: delete only while the key still holds the token.
+        if (data.get(options.keys[0]!) !== options.arguments[0]) {
+          return 0
+        }
+        data.delete(options.keys[0]!)
+        return 1
       }),
       del: vi.fn(async (key: string) => (data.delete(key) ? 1 : 0)),
       incr: vi.fn(async (key: string) => incr(key)),
@@ -285,5 +326,39 @@ describe('redis cache store with a mocked client', () => {
 
     expect(redis.get.mock.calls[0]![0]).toBe(redis.get.mock.calls[1]![0])
     expect(redis.get.mock.calls[0]![0]).toMatch(/^p:e:\[/)
+  })
+
+  it('holds locks under the prefixed key for lockTtl and releases them with their token', async () => {
+    const { redis } = createMockedRedis()
+    const store = new RedisCacheStore(redis as any, { prefix: 'p:', lockTtl: 2 })
+
+    await store.lock('k', async (waited) => {
+      expect(waited).toBe(false)
+      expect(redis.set).toHaveBeenCalledWith('p:l:k', expect.any(String), { condition: 'NX', expiration: { type: 'PX', value: 2000 } })
+      await expect(redis.get('p:l:k')).resolves.toEqual(expect.any(String))
+    })
+
+    const token = redis.set.mock.calls[0]![1]
+    expect(redis.eval).toHaveBeenCalledWith(expect.stringContaining('DEL'), { keys: ['p:l:k'], arguments: [token] })
+    await expect(redis.get('p:l:k')).resolves.toBeNull()
+  })
+
+  it('polls a held lock every 50ms with a 10 second ttl by default', async () => {
+    const { store, redis } = createMockedStore()
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+
+    const first = store.lock('k', () => held)
+    await vi.waitFor(() => expect(redis.set).toHaveBeenCalledWith('p:l:k', expect.any(String), { condition: 'NX', expiration: { type: 'PX', value: 10_000 } }))
+    const second = store.lock('k', async waited => waited)
+
+    await sleep(120)
+    expect(redis.set.mock.calls.filter(([key]) => key === 'p:l:k').length).toBeGreaterThan(2)
+
+    release()
+    await first
+    await expect(second).resolves.toBe(true)
   })
 })

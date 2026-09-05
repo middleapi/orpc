@@ -93,6 +93,37 @@ describe.concurrent('cache redis adapters compatibility', { timeout: 20_000 }, (
           expect(stale!.output).toBe('v')
           expect(stale!.expiresAt).toBeLessThanOrEqual(nowInSeconds())
         })
+
+        it(`shares locks: ${source.name} → ${target.name}`, async () => {
+          const key = `lock:${crypto.randomUUID()}`
+          let release!: () => void
+          const held = new Promise<void>((resolve) => {
+            release = resolve
+          })
+          let acquired!: () => void
+          const holding = new Promise<void>((resolve) => {
+            acquired = resolve
+          })
+
+          const holder = source.store.lock!(key, async () => {
+            acquired()
+            await held
+          })
+          await holding
+
+          let settled = false
+          const waiter = target.store.lock!(key, async waited => waited).then((waited) => {
+            settled = true
+            return waited
+          })
+
+          await sleep(300)
+          expect(settled).toBe(false)
+
+          release()
+          await holder
+          await expect(waiter).resolves.toBe(true)
+        })
       }
     }
   })

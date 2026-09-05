@@ -118,4 +118,34 @@ describe.concurrent('upstash cache store integration', {
     await expect(store.get('k')).resolves.toBeUndefined()
     await expect(redis.exists(`${prefix}e:k`)).resolves.toBe(0)
   })
+
+  it('frees waiters after lockTtl and leaves a lock taken over that way alone', async () => {
+    const { store, prefix } = createTestingStore({ lockTtl: 1 })
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let takenOver!: () => void
+    const takeover = new Promise<void>((resolve) => {
+      takenOver = resolve
+    })
+
+    // Holds past its ttl, until the waiter has taken the lock over.
+    const holder = store.lock('k', () => takeover)
+    await vi.waitFor(() => expect(redis.exists(`${prefix}l:k`)).resolves.toBe(1), { timeout: 5000 })
+
+    const waiter = store.lock('k', async (waited) => {
+      takenOver()
+      await held
+      return waited
+    })
+
+    await holder
+    // The holder's release must leave the waiter's lock alone.
+    await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(1)
+
+    release()
+    await expect(waiter).resolves.toBe(true)
+    await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(0)
+  })
 })

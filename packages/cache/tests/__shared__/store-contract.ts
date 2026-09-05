@@ -1,5 +1,5 @@
 import type { CacheStore } from '../../src'
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 
 /**
  * The behavior every {@link CacheStore} must share, run against one adapter.
@@ -68,5 +68,61 @@ export function describeCacheStoreContract(createStore: () => CacheStore): void 
     await store.set('k', 'new', { tags: ['t'] })
 
     await expect(store.get('k')).resolves.toMatchObject({ output: 'new' })
+  })
+
+  it('runs lock callbacks one key at a time, telling later callers they waited', async () => {
+    const store = createStore()
+    const order: string[] = []
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+
+    const first = store.lock!('k', async (waited) => {
+      order.push(`first:${waited}`)
+      await held
+      return 'first'
+    })
+    await vi.waitFor(() => expect(order).toEqual(['first:false']), { timeout: 5000 })
+
+    const second = store.lock!('k', async (waited) => {
+      order.push(`second:${waited}`)
+      return 'second'
+    })
+
+    // Other keys are independent of the held one.
+    await expect(store.lock!('other', async waited => waited)).resolves.toBe(false)
+    expect(order).toEqual(['first:false'])
+
+    release()
+
+    await expect(first).resolves.toBe('first')
+    await expect(second).resolves.toBe('second')
+    expect(order).toEqual(['first:false', 'second:true'])
+  })
+
+  it('hands the lock on when the holder throws', async () => {
+    const store = createStore()
+    let fail!: (error: Error) => void
+    let acquired!: () => void
+    const holding = new Promise<void>((resolve) => {
+      acquired = resolve
+    })
+
+    const first = store.lock!('k', async () => {
+      acquired()
+      await new Promise<never>((_, reject) => {
+        fail = reject
+      })
+    })
+    await holding
+
+    const second = store.lock!('k', async waited => waited)
+
+    fail(new Error('boom'))
+
+    await expect(first).rejects.toThrow('boom')
+    await expect(second).resolves.toBe(true)
+    await expect(store.lock!('k', async waited => waited)).resolves.toBe(false)
   })
 }

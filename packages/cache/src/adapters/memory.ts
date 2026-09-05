@@ -2,7 +2,7 @@ import type { Public } from '@orpc/shared'
 import type { CacheEntry, CacheRevalidateOptions, CacheSetOptions, CacheStore } from '../types'
 import { RPCJsonSerializer } from '@orpc/client'
 import { nowInSeconds } from '@orpc/shared'
-import { encodeCacheKey } from '../utils'
+import { encodeCacheKey, MemoryLock } from '../utils'
 
 export interface MemoryCacheStoreOptions {
   /**
@@ -29,6 +29,7 @@ interface MemoryCacheStoreEntry {
  * In-memory cache store with tag-based invalidation, intended for
  * development, testing, and single-instance deployments. Expired and
  * revalidated entries are removed lazily on the next `get` of their key.
+ * Locks are held within the process.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
@@ -36,6 +37,7 @@ export class MemoryCacheStore implements CacheStore {
   private readonly entries = new Map<string, MemoryCacheStoreEntry>()
   private readonly tagVersions = new Map<string, number>()
   private readonly serializer: Public<RPCJsonSerializer>
+  private readonly memoryLock = new MemoryLock()
 
   constructor(options: MemoryCacheStoreOptions = {}) {
     this.serializer = options.serializer ?? new RPCJsonSerializer()
@@ -88,5 +90,9 @@ export class MemoryCacheStore implements CacheStore {
     for (const tag of tags) {
       this.tagVersions.set(tag, (this.tagVersions.get(tag) ?? 0) + 1)
     }
+  }
+
+  async lock<T>(key: unknown, fn: (waited: boolean) => Promise<T>): Promise<T> {
+    return this.memoryLock.run(encodeCacheKey(key, this.serializer), fn)
   }
 }

@@ -5,11 +5,11 @@ import { experimental_WorkersCacheStore } from './workers-cache'
 describe('experimental_WorkersCacheStore', () => {
   const createPurger = () => ({
     purge: vi.fn(async () => ({ success: true })),
-  })
+  }) as any
 
   it('always misses and stores nothing', async () => {
     const purger = createPurger()
-    const store = new experimental_WorkersCacheStore(purger)
+    const store = new experimental_WorkersCacheStore({ cache: purger })
 
     await store.set('k', 'v', { tags: ['t'], ttl: 1000 })
     await expect(store.get('k')).resolves.toBeUndefined()
@@ -18,7 +18,7 @@ describe('experimental_WorkersCacheStore', () => {
 
   it('purges encoded tags through workers caching', async () => {
     const purger = createPurger()
-    const store = new experimental_WorkersCacheStore(purger)
+    const store = new experimental_WorkersCacheStore({ cache: purger })
 
     await store.revalidate({ tags: ['planets', 'a,b'] })
 
@@ -34,7 +34,9 @@ describe('experimental_WorkersCacheStore', () => {
 
   it('throws a bare error when the purge fails without messages', async () => {
     const store = new experimental_WorkersCacheStore({
-      purge: vi.fn(async () => ({ success: false })),
+      cache: {
+        purge: vi.fn(async () => ({ success: false })) as any,
+      },
     })
 
     await expect(store.revalidate({ tags: ['planets'] })).rejects.toThrow(
@@ -44,7 +46,9 @@ describe('experimental_WorkersCacheStore', () => {
 
   it('throws when the purge fails, including error messages', async () => {
     const store = new experimental_WorkersCacheStore({
-      purge: vi.fn(async () => ({ success: false, errors: [{ code: 429, message: 'Rate limited' }] })),
+      cache: {
+        purge: vi.fn(async () => ({ success: false, errors: [{ code: 429, message: 'Rate limited' }] })),
+      },
     })
 
     await expect(store.revalidate({ tags: ['planets'] })).rejects.toThrow(

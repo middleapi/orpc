@@ -2,8 +2,19 @@ import type { Public } from '@orpc/shared'
 import type { Redis } from '@upstash/redis'
 import type { CacheEntry, CacheRevalidateOptions, CacheSetOptions, CacheStore } from '../types'
 import { RPCJsonSerializer, RPCSerializer } from '@orpc/client'
-import { nowInSeconds, stringifyJSON } from '@orpc/shared'
+import { nowInSeconds, sleep, stringifyJSON } from '@orpc/shared'
 import { encodeCacheKey } from '../utils'
+
+/**
+ * Deletes the lock only while it still holds the caller's token, leaving one
+ * that expired and was taken over alone.
+ */
+const RELEASE_LOCK_SCRIPT = `
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('DEL', KEYS[1])
+end
+return 0
+`
 
 interface UpstashCacheStoreEnvelope {
   /**
@@ -32,6 +43,14 @@ export interface UpstashCacheStoreOptions {
    * @default RPCSerializer
    */
   serializer?: undefined | Public<RPCSerializer>
+
+  /**
+   * How long a lock may be held, in seconds, so a crashed holder frees its
+   * waiters. A fill outlasting it lets the next waiter fill as well.
+   *
+   * @default 10
+   */
+  lockTtl?: number
 }
 
 /**
@@ -40,12 +59,14 @@ export interface UpstashCacheStoreOptions {
  * same database. Entries are retained for `ttl + swr` via `EX` expiry; tag
  * counters have no expiry since expiring one would resurrect stale entries.
  * Revalidated entries are removed lazily on the next `get` of their key.
+ * Locks are held in Redis with `SET NX`, so they span processes.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
 export class UpstashCacheStore implements CacheStore {
   private readonly prefix: string
   private readonly serializer: Public<RPCSerializer>
+  private readonly lockTtl: number
 
   /**
    * Key encoding has no serializer option, so one is built here rather than
@@ -59,6 +80,7 @@ export class UpstashCacheStore implements CacheStore {
   ) {
     this.prefix = options.prefix ?? ''
     this.serializer = options.serializer ?? new RPCSerializer()
+    this.lockTtl = options.lockTtl ?? 10
   }
 
   async get(key: unknown): Promise<CacheEntry | undefined> {
@@ -136,11 +158,33 @@ export class UpstashCacheStore implements CacheStore {
     await multi.exec()
   }
 
+  async lock<T>(key: unknown, fn: (waited: boolean) => Promise<T>): Promise<T> {
+    const lockKey = this.lockKey(key)
+    const token = crypto.randomUUID()
+    let waited = false
+
+    while (await this.redis.set(lockKey, token, { nx: true, px: this.lockTtl * 1000 }) === null) {
+      waited = true
+      await sleep(50) // until the holder releases, or its ttl passes
+    }
+
+    try {
+      return await fn(waited)
+    }
+    finally {
+      await this.redis.eval(RELEASE_LOCK_SCRIPT, [lockKey], [token])
+    }
+  }
+
   private entryKey(key: unknown): string {
     return `${this.prefix}e:${encodeCacheKey(key, this.keySerializer)}`
   }
 
   private tagKey(tag: string): string {
     return `${this.prefix}t:${tag}`
+  }
+
+  private lockKey(key: unknown): string {
+    return `${this.prefix}l:${encodeCacheKey(key, this.keySerializer)}`
   }
 }

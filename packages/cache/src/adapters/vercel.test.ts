@@ -24,6 +24,36 @@ describe('vercelCacheStore', () => {
     })
   })
 
+  describe('locking', () => {
+    it('locks per key within the process, handing on after failures', async () => {
+      const store = new VercelCacheStore()
+      const order: string[] = []
+      let release!: () => void
+      const held = new Promise<void>((resolve) => {
+        release = resolve
+      })
+
+      const first = store.lock('k', async (waited) => {
+        order.push(`first:${waited}`)
+        await held
+      })
+      const second = store.lock('k', async (waited) => {
+        order.push(`second:${waited}`)
+      })
+      await expect(store.lock('other', async waited => waited)).resolves.toBe(false)
+      expect(order).toEqual(['first:false'])
+
+      release()
+      await Promise.all([first, second])
+      expect(order).toEqual(['first:false', 'second:true'])
+
+      await expect(store.lock('k', async () => {
+        throw new Error('boom')
+      })).rejects.toThrow('boom')
+      await expect(store.lock('k', async waited => waited)).resolves.toBe(false)
+    })
+  })
+
   describe('against a mocked runtime cache', () => {
     function createMockedCache() {
       const values = new Map<string, unknown>()

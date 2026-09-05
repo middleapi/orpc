@@ -2,7 +2,7 @@ import { RPCSerializer } from '@orpc/client'
 import { nowInSeconds, sleep } from '@orpc/shared'
 import { RedisClient } from 'bun'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
-import { holdResult } from '../tests/__shared__/utils'
+import { holdResult, waitFor } from '../tests/__shared__/utils'
 import { BunRedisCacheStore } from './redis-cache'
 
 const REDIS_URL = Bun.env.REDIS_URL
@@ -168,4 +168,67 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
 
     await expect(Promise.all(keys.map(key => store.get(key)))).resolves.toEqual(keys.map(() => undefined))
   })
+
+  it('runs lock callbacks one key at a time, handing on after failures', async () => {
+    const { store } = createTestingStore()
+    const order: string[] = []
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+
+    const first = store.lock('k', async (waited) => {
+      order.push(`first:${waited}`)
+      await held
+      return 'first'
+    })
+    await waitFor(() => expect(order).toEqual(['first:false']), { timeout: 5000 })
+
+    const second = store.lock('k', async (waited) => {
+      order.push(`second:${waited}`)
+      return 'second'
+    })
+    await expect(store.lock('other', async waited => waited)).resolves.toBe(false)
+    expect(order).toEqual(['first:false'])
+
+    release()
+    await expect(first).resolves.toBe('first')
+    await expect(second).resolves.toBe('second')
+    expect(order).toEqual(['first:false', 'second:true'])
+
+    await expect(store.lock('k', async () => {
+      throw new Error('boom')
+    })).rejects.toThrow('boom')
+    await expect(store.lock('k', async waited => waited)).resolves.toBe(false)
+  })
+
+  it('frees waiters after lockTtl and leaves a lock taken over that way alone', async () => {
+    const { store, prefix } = createTestingStore({ lockTtl: 1 })
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let takenOver!: () => void
+    const takeover = new Promise<void>((resolve) => {
+      takenOver = resolve
+    })
+
+    // Holds past its ttl, until the waiter has taken the lock over.
+    const holder = store.lock('k', () => takeover)
+    await waitFor(async () => expect(await redis.exists(`${prefix}l:k`)).toBe(true), { timeout: 5000 })
+
+    const waiter = store.lock('k', async (waited) => {
+      takenOver()
+      await held
+      return waited
+    })
+
+    await holder
+    // The holder's release must leave the waiter's lock alone.
+    await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(true)
+
+    release()
+    await expect(waiter).resolves.toBe(true)
+    await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(false)
+  }, { timeout: 20_000 })
 })

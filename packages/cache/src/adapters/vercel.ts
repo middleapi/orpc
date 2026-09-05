@@ -4,7 +4,7 @@ import type { CacheEntry, CacheRevalidateOptions, CacheSetOptions, CacheStore } 
 import { RPCJsonSerializer, RPCSerializer } from '@orpc/client'
 import { nowInSeconds } from '@orpc/shared'
 import { getCache } from '@vercel/functions'
-import { encodeCacheKey } from '../utils'
+import { encodeCacheKey, MemoryLock } from '../utils'
 
 interface VercelCacheStoreEnvelope {
   /**
@@ -36,7 +36,8 @@ export interface VercelCacheStoreOptions {
  * Cache store adapter for the Vercel Runtime Cache. Tags are expired
  * natively via `expireTag`, and entries are retained for `ttl + swr`.
  * Outside Vercel, the default `getCache()` falls back to an in-memory
- * cache.
+ * cache. Locks are held within the process, since the Runtime Cache has no
+ * atomic primitive.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
@@ -49,6 +50,7 @@ export class VercelCacheStore implements CacheStore {
    * per call by {@link encodeCacheKey}.
    */
   private readonly keySerializer = new RPCJsonSerializer()
+  private readonly memoryLock = new MemoryLock()
 
   constructor(options: VercelCacheStoreOptions = {}) {
     this.cache = options.cache ?? getCache()
@@ -98,5 +100,9 @@ export class VercelCacheStore implements CacheStore {
 
   async revalidate({ tags }: CacheRevalidateOptions): Promise<void> {
     await this.cache.expireTag([...tags])
+  }
+
+  async lock<T>(key: unknown, fn: (waited: boolean) => Promise<T>): Promise<T> {
+    return this.memoryLock.run(encodeCacheKey(key, this.keySerializer), fn)
   }
 }

@@ -6,13 +6,19 @@ import { MemoryCacheStore } from './adapters/memory'
 import { CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
 import { cache, revalidate } from './middleware'
 
-function createStore(entry?: CacheEntry) {
+function createStore(entry?: CacheEntry, lock?: CacheStore['lock']) {
   return {
     get: vi.fn<CacheStore['get']>().mockResolvedValue(entry),
     set: vi.fn<CacheStore['set']>().mockResolvedValue(undefined),
     revalidate: vi.fn<CacheStore['revalidate']>().mockResolvedValue(undefined),
+    lock,
   }
 }
+
+/**
+ * A lock that always reports waiting, to reach the re-read paths directly.
+ */
+const alwaysWaitedLock: CacheStore['lock'] = (_key, fn) => fn(true)
 
 describe('cache', () => {
   it('runs the handler and stores the output on miss', async () => {
@@ -280,35 +286,136 @@ describe('cache', () => {
   })
 
   describe('concurrency', () => {
-    it('runs the handler once per concurrent miss, then serves the stored output', async () => {
+    it('fills once for concurrent misses when the store locks, serving the rest from the entry', async () => {
       const store = new MemoryCacheStore()
+      let finish!: (output: string) => void
+      const handlerFn = vi.fn(() => new Promise<string>((resolve) => {
+        finish = resolve
+      }))
+      const pluginContext = { caches: [], revalidations: [] }
+      const procedure = os
+        .$context<CacheContext & CacheHandlerPluginContext>()
+        .use(cache({ key: 'k', tags: ['t'], ttl: 60 }))
+        .handler(handlerFn)
+      const run = () => call(procedure, undefined, {
+        context: { 'cache/store': store, [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext },
+        path: ['__path__'],
+      })
+
+      const results = Promise.all([run(), run(), run()])
+      await vi.waitFor(() => expect(handlerFn).toHaveBeenCalledTimes(1))
+      finish('fresh')
+
+      await expect(results).resolves.toEqual(['fresh', 'fresh', 'fresh'])
+      expect(handlerFn).toHaveBeenCalledTimes(1)
+      // One miss, then two hits served from the entry it filled.
+      expect(pluginContext.caches).toHaveLength(3)
+      expect(pluginContext.caches).toContainEqual({ procedure, path: ['__path__'], tags: ['t'], ttl: 60, swr: undefined })
+    })
+
+    it('fills once per caller when the store has no lock', async () => {
+      const store = createStore()
       const handlerFn = vi.fn(() => 'fresh')
       const procedure = os.$context<CacheContext>().use(cache({ key: 'k' })).handler(handlerFn)
       const run = () => call(procedure, undefined, { context: { 'cache/store': store } })
 
       await expect(Promise.all([run(), run()])).resolves.toEqual(['fresh', 'fresh'])
-      expect(handlerFn).toHaveBeenCalledTimes(2) // misses are not coalesced
-
-      await expect(run()).resolves.toBe('fresh')
       expect(handlerFn).toHaveBeenCalledTimes(2)
     })
 
-    it('serves every concurrent stale hit immediately, refreshing once per hit', async () => {
+    it('lets a waiter fill when the holder failed to', async () => {
+      const store = new MemoryCacheStore()
+      let fail!: (error: Error) => void
+      const handlerFn = vi.fn()
+        .mockImplementationOnce(() => new Promise<string>((_, reject) => {
+          fail = reject
+        }))
+        .mockReturnValue('fresh')
+      const procedure = os.$context<CacheContext>().use(cache({ key: 'k' })).handler(handlerFn)
+      const run = () => call(procedure, undefined, { context: { 'cache/store': store } })
+
+      const first = run()
+      await vi.waitFor(() => expect(handlerFn).toHaveBeenCalledTimes(1))
+      const second = run()
+      fail(new Error('handler down'))
+
+      await expect(first).rejects.toThrow('handler down')
+      await expect(second).resolves.toBe('fresh')
+      expect(handlerFn).toHaveBeenCalledTimes(2)
+    })
+
+    it('fills when a waiter re-reads a still missing entry', async () => {
+      const store = createStore(undefined, alwaysWaitedLock)
+      const handlerFn = vi.fn(() => 'fresh')
+      const procedure = os.$context<CacheContext>().use(cache({ key: 'k' })).handler(handlerFn)
+
+      await expect(
+        call(procedure, undefined, { context: { 'cache/store': store } }),
+      ).resolves.toBe('fresh')
+
+      expect(store.get).toHaveBeenCalledTimes(2)
+      expect(handlerFn).toHaveBeenCalledTimes(1)
+      expect(store.set).toHaveBeenCalledWith('k', 'fresh', { tags: undefined, ttl: undefined, swr: undefined })
+    })
+
+    it('refreshes once for concurrent stale hits when the store locks', async () => {
       const store = new MemoryCacheStore()
       await store.set('k', 'stale', { ttl: 0, swr: 60 })
 
-      const handlerFn = vi.fn(() => 'fresh')
+      let finish!: (output: string) => void
+      const handlerFn = vi.fn(() => new Promise<string>((resolve) => {
+        finish = resolve
+      }))
       const waitUntil = vi.fn()
       const procedure = os.$context<CacheContext>().use(cache({ key: 'k', ttl: 60 })).handler(handlerFn)
       const run = () => call(procedure, undefined, { context: { 'cache/store': store, 'cache/waitUntil': waitUntil } })
 
       await expect(Promise.all([run(), run()])).resolves.toEqual(['stale', 'stale'])
-      expect(handlerFn).toHaveBeenCalledTimes(2) // refreshes are not coalesced either
+      expect(waitUntil).toHaveBeenCalledTimes(2)
 
+      finish('fresh')
       await Promise.all(waitUntil.mock.calls.map(([refresh]) => refresh))
+      expect(handlerFn).toHaveBeenCalledTimes(1)
 
       await expect(run()).resolves.toBe('fresh')
+    })
+
+    it('lets a waiter refresh when the holder failed to', async () => {
+      const store = new MemoryCacheStore()
+      await store.set('k', 'stale', { ttl: 0, swr: 60 })
+
+      let fail!: (error: Error) => void
+      const handlerFn = vi.fn()
+        .mockImplementationOnce(() => new Promise<string>((_, reject) => {
+          fail = reject
+        }))
+        .mockReturnValue('fresh')
+      const waitUntil = vi.fn()
+      const procedure = os.$context<CacheContext>().use(cache({ key: 'k', ttl: 60 })).handler(handlerFn)
+      const run = () => call(procedure, undefined, { context: { 'cache/store': store, 'cache/waitUntil': waitUntil } })
+
+      await expect(Promise.all([run(), run()])).resolves.toEqual(['stale', 'stale'])
+      fail(new Error('handler down'))
+
+      await expect(waitUntil.mock.calls[0]![0]).rejects.toThrow('handler down')
+      await waitUntil.mock.calls[1]![0]
       expect(handlerFn).toHaveBeenCalledTimes(2)
+
+      await expect(run()).resolves.toBe('fresh')
+    })
+
+    it('refreshes when a waiter re-reads an evicted entry', async () => {
+      const store = createStore(undefined, alwaysWaitedLock)
+      store.get.mockResolvedValueOnce({ output: 'stale', tags: [], expiresAt: nowInSeconds() - 1 })
+      const waitUntil = vi.fn()
+      const procedure = os.$context<CacheContext>().use(cache({ key: 'k' })).handler(() => 'fresh')
+
+      await expect(
+        call(procedure, undefined, { context: { 'cache/store': store, 'cache/waitUntil': waitUntil } }),
+      ).resolves.toBe('stale')
+
+      await waitUntil.mock.calls[0]![0]
+      expect(store.set).toHaveBeenCalledWith('k', 'fresh', { tags: undefined, ttl: undefined, swr: undefined })
     })
   })
 })
