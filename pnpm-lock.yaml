@@ -133,6 +133,9 @@ importers:
       '@orpc/evlog':
         specifier: workspace:*
         version: link:packages/evlog
+      '@orpc/experimental-cache':
+        specifier: workspace:*
+        version: link:packages/cache
       '@orpc/experimental-effect':
         specifier: workspace:*
         version: link:packages/effect
@@ -316,6 +319,9 @@ importers:
       '@orpc/evlog':
         specifier: workspace:*
         version: link:../../packages/evlog
+      '@orpc/experimental-cache':
+        specifier: workspace:*
+        version: link:../../packages/cache
       '@orpc/openapi':
         specifier: workspace:*
         version: link:../../packages/openapi
@@ -420,6 +426,9 @@ importers:
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
+      '@orpc/experimental-cache':
+        specifier: workspace:*
+        version: link:../cache
       '@orpc/publisher':
         specifier: workspace:*
         version: link:../publisher
@@ -441,7 +450,32 @@ importers:
         version: 1.4.0
       redis:
         specifier: ^6.2.1
-        version: 6.2.1(@opentelemetry/api@1.9.1)
+        version: 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
+
+  packages/cache:
+    dependencies:
+      '@orpc/client':
+        specifier: workspace:*
+        version: link:../client
+      '@orpc/server':
+        specifier: workspace:*
+        version: link:../server
+      '@orpc/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@standardserver/core':
+        specifier: ^0.8.2
+        version: 0.8.2
+    devDependencies:
+      '@upstash/redis':
+        specifier: ^1.38.2
+        version: 1.38.3
+      '@vercel/functions':
+        specifier: ^3.9.5
+        version: 3.9.5(ws@8.21.3)
+      redis:
+        specifier: ^6.2.1
+        version: 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
   packages/client:
     dependencies:
@@ -467,6 +501,9 @@ importers:
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
+      '@orpc/experimental-cache':
+        specifier: workspace:*
+        version: link:../cache
       '@orpc/publisher':
         specifier: workspace:*
         version: link:../publisher
@@ -858,7 +895,7 @@ importers:
         version: 1.38.3
       redis:
         specifier: ^6.2.1
-        version: 6.2.1(@opentelemetry/api@1.9.1)
+        version: 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
   packages/ratelimit:
     dependencies:
@@ -880,7 +917,7 @@ importers:
         version: 1.38.3
       redis:
         specifier: ^6.2.1
-        version: 6.2.1(@opentelemetry/api@1.9.1)
+        version: 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
   packages/server:
     dependencies:
@@ -15976,27 +16013,28 @@ snapshots:
     dependencies:
       quansync: 1.0.0
 
-  '@redis/bloom@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))':
+  '@redis/bloom@6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))':
     dependencies:
-      '@redis/client': 6.2.1(@opentelemetry/api@1.9.1)
+      '@redis/client': 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
-  '@redis/client@6.2.1(@opentelemetry/api@1.9.1)':
+  '@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)':
     dependencies:
       cluster-key-slot: 1.1.2
     optionalDependencies:
+      '@node-rs/xxhash': 1.7.7
       '@opentelemetry/api': 1.9.1
 
-  '@redis/json@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))':
+  '@redis/json@6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))':
     dependencies:
-      '@redis/client': 6.2.1(@opentelemetry/api@1.9.1)
+      '@redis/client': 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
-  '@redis/search@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))':
+  '@redis/search@6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))':
     dependencies:
-      '@redis/client': 6.2.1(@opentelemetry/api@1.9.1)
+      '@redis/client': 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
-  '@redis/time-series@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))':
+  '@redis/time-series@6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))':
     dependencies:
-      '@redis/client': 6.2.1(@opentelemetry/api@1.9.1)
+      '@redis/client': 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
   '@replit/codemirror-css-color-picker@6.3.0(@codemirror/language@6.12.4)(@codemirror/state@6.7.1)(@codemirror/view@6.43.9)':
     dependencies:
@@ -23701,13 +23739,13 @@ snapshots:
       unified: 11.0.5
       vfile: 6.0.3
 
-  redis@6.2.1(@opentelemetry/api@1.9.1):
+  redis@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1):
     dependencies:
-      '@redis/bloom': 6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))
-      '@redis/client': 6.2.1(@opentelemetry/api@1.9.1)
-      '@redis/json': 6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))
-      '@redis/search': 6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))
-      '@redis/time-series': 6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))
+      '@redis/bloom': 6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))
+      '@redis/client': 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
+      '@redis/json': 6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))
+      '@redis/search': 6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))
+      '@redis/time-series': 6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))
     transitivePeerDependencies:
       - '@node-rs/xxhash'
       - '@opentelemetry/api'

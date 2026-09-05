@@ -17,6 +17,7 @@
     "@orpc/client": "workspace:*",
     "@orpc/contract": "workspace:*",
     "@orpc/evlog": "workspace:*",
+    "@orpc/experimental-cache": "workspace:*",
     "@orpc/openapi": "workspace:*",
     "@orpc/opentelemetry": "workspace:*",
     "@orpc/pino": "workspace:*",

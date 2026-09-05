@@ -17,6 +17,7 @@ export default antfu({
   rules: {
     'ts/consistent-type-definitions': 'off',
     'ts/method-signature-style': ['off'],
+    'new-cap': ['error', { capIsNew: false, newIsCapExceptionPattern: '^experimental_', properties: true }],
     'ban/ban': [
       'error',
       {

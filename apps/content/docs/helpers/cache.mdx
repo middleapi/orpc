@@ -1,0 +1,329 @@
+---
+title: "Cache Helpers"
+description: "Cache oRPC procedure output with tag-based revalidation, stale-while-revalidate, storage adapters, and a handler plugin that reflects cache tags in HTTP headers."
+sidebar:
+  label: "Cache"
+---
+
+## Installation
+
+```package-install
+npm install @orpc/experimental-cache@beta
+```
+
+## Basic Usage
+
+The core concept is the `CacheStore` interface, which defines a standard way to store, look up, and invalidate cached output by tags. Stores may also implement `lock`, which runs a callback for one caller at a time per key so concurrent misses fill an entry once. You can create your own custom store or use one of the provided adapters. A router shares a single store, provided through the request context under the `cache/store` key, as defined by the `CacheContext` interface.
+
+```ts twoslash
+import { MemoryCacheStore } from '@orpc/experimental-cache/memory'
+// ---cut---
+const store = new MemoryCacheStore()
+
+await store.set('planet:1', { id: 1, name: 'Earth' }, {
+  tags: ['planets', 'planet:1'],
+  ttl: 60,
+})
+
+const entry = await store.get('planet:1')
+
+await store.revalidate({ tags: ['planets'] }) // now `get` misses
+```
+
+An entry stays fresh for `ttl` seconds and is retained for an extra `swr` window afterward, during which `get` still returns it with a past `expiresAt` so callers can serve it stale while refreshing. Revalidating a tag invalidates every entry associated with it, fresh or stale.
+
+## Adapters
+
+| Name                             | Adapter for                                                                                |
+| -------------------------------- | ------------------------------------------------------------------------------------------ |
+| `MemoryCacheStore`               | In-memory storage                                                                          |
+| `RedisCacheStore`                | [Redis](https://github.com/redis/redis)                                                    |
+| `UpstashCacheStore`              | [Upstash Redis](https://github.com/upstash/redis-js)                                       |
+| `BunRedisCacheStore`             | [Bun's Redis](https://bun.com/docs/runtime/redis)                                          |
+| `VercelCacheStore`               | [Vercel Runtime Cache](https://vercel.com/docs/caching/runtime-cache)                      |
+| `experimental_WorkersCacheStore` | [Cloudflare Workers Caching](https://developers.cloudflare.com/workers/cache/), purge only |
+
+Every duration is in seconds, matching what the underlying caches accept.
+
+Keys may be any serializable value. Strings are used verbatim, while anything else is encoded with `encodeCacheKey`: serialized first, so complex values like Date, Map, or Set become plain JSON, then canonicalized, so structurally equal keys resolve the same entry regardless of property order. Reuse it when implementing your own store.
+
+Every adapter except `experimental_WorkersCacheStore` implements `lock`. The Redis, Upstash, and Bun stores hold it in Redis with `SET NX`, so it spans processes and is released when the holder finishes, or after `lockTtl` if it never does. The memory and Vercel stores hold it within the process through `MemoryLock` from `@orpc/shared`, which suits stores of your own too.
+
+<CodeGroup>
+
+```ts memory
+import { MemoryCacheStore } from '@orpc/experimental-cache/memory'
+
+const store = new MemoryCacheStore({
+  /**
+   * Serializer used to encode non-string keys.
+   *
+   * @default RPCJsonSerializer
+   */
+  serializer: undefined,
+})
+```
+
+```ts redis
+import { RedisCacheStore } from '@orpc/experimental-cache/redis'
+import { createClient } from 'redis'
+
+const client = createClient({ url: 'redis://localhost:6379' })
+
+// RedisCacheStore lazily connects to Redis when needed.
+// You can still call `client.connect()` manually, but it is optional.
+await client.connect()
+
+const store = new RedisCacheStore(client, {
+  /**
+   * The prefix to use for Redis keys.
+   *
+   * @default undefined
+   */
+  prefix: undefined,
+
+  /**
+   * Serializer for cached outputs.
+   *
+   * @default RPCSerializer
+   */
+  serializer: undefined,
+
+  /**
+   * How long a lock may be held, in seconds, so a crashed holder frees its waiters.
+   *
+   * @default 10
+   */
+  lockTtl: 10,
+})
+```
+
+```ts upstash
+import { UpstashCacheStore } from '@orpc/experimental-cache/upstash'
+import { Redis } from '@upstash/redis'
+
+const redis = Redis.fromEnv()
+
+// Shares its key and envelope format with RedisCacheStore,
+// so both can serve the same database.
+const store = new UpstashCacheStore(redis, {
+  /**
+   * The prefix to use for Redis keys.
+   *
+   * @default undefined
+   */
+  prefix: undefined,
+
+  /**
+   * Serializer for cached outputs.
+   *
+   * @default RPCSerializer
+   */
+  serializer: undefined,
+
+  /**
+   * How long a lock may be held, in seconds, so a crashed holder frees its waiters.
+   *
+   * @default 10
+   */
+  lockTtl: 10,
+})
+```
+
+```ts bun
+import { BunRedisCacheStore } from '@orpc/bun'
+import { redis } from 'bun'
+
+// Shares its key and envelope format with RedisCacheStore,
+// so both can serve the same database.
+const store = new BunRedisCacheStore(redis, {
+  /**
+   * The prefix to use for Redis keys.
+   *
+   * @default undefined
+   */
+  prefix: undefined,
+
+  /**
+   * Serializer for cached outputs.
+   *
+   * @default RPCSerializer
+   */
+  serializer: undefined,
+
+  /**
+   * How long a lock may be held, in seconds, so a crashed holder frees its waiters.
+   *
+   * @default 10
+   */
+  lockTtl: 10,
+})
+```
+
+```ts vercel
+import { VercelCacheStore } from '@orpc/experimental-cache/vercel'
+import { getCache } from '@vercel/functions'
+
+const store = new VercelCacheStore({
+  /**
+   * The Vercel Runtime Cache to use. Outside Vercel,
+   * it falls back to an in-memory cache.
+   *
+   * @default getCache()
+   */
+  cache: getCache(),
+
+  /**
+   * Serializer for cached outputs.
+   *
+   * @default RPCSerializer
+   */
+  serializer: undefined,
+})
+```
+
+```ts cloudflare-workers-caching
+import { experimental_WorkersCacheStore as WorkersCacheStore } from '@orpc/cloudflare'
+
+// Workers Caching caches whole responses in front of the Worker via the
+// `cache-control` and `cache-tag` plugin headers; this store only purges
+// tags on revalidation. Requires `"cache": { "enabled": true }` in your
+// wrangler configuration. Purges are scoped to the calling entrypoint,
+// tags match case-insensitively, and purge calls always use the Free
+// tier rate limits regardless of your plan.
+//
+// Purges through `cache` from `cloudflare:workers` by default; pass
+// a purger such as `ctx.cache` to use another one.
+const store = new WorkersCacheStore()
+```
+</CodeGroup>
+
+## Cache Middleware
+
+The `cache` helper creates middleware that caches the output of [procedures](/docs/procedure). On a hit it returns the cached output without executing the handler, and on a miss it executes the handler and stores the result. When the store implements `lock`, concurrent misses for one key run the handler once and the rest are served from the entry it stores. The `key`, `tags`, `ttl`, `swr`, and `enabled` options accept static values or functions of the middleware options and input.
+
+The `key` is optional: by default it is derived from the procedure path and input. When provided, it is used as given, so procedures sharing a key also share an entry.
+
+```ts
+import { cache, CacheContext } from '@orpc/experimental-cache'
+import { MemoryCacheStore } from '@orpc/experimental-cache/memory'
+
+const findPlanet = os
+  .$context<CacheContext>()
+  .input(z.object({ id: z.number() }))
+  .use(
+    cache({
+      key: (_, input) => `planet:${input.id}`,
+      tags: (_, input) => ['planets', `planet:${input.id}`],
+      ttl: 60, // Optional fresh lifetime in seconds, default is no expiry
+      swr: 300, // Optional stale-while-revalidate window in seconds, default is 0
+    }),
+  )
+  .handler(({ input }) => {
+    return { id: input.id, name: `Planet ${input.id}` }
+  })
+
+const result = await call(
+  findPlanet,
+  { id: 1 },
+  { context: { 'cache/store': new MemoryCacheStore() } },
+)
+```
+
+:::warning
+Entries are stored only when the handler succeeds, and stores pass output straight to their serializer. Values it cannot represent, such as [AsyncIteratorObject](/docs/async-iterator-object), readable streams, Blob, and File, will not survive the round trip, so do not cache procedures returning them.
+:::
+
+:::warning
+A cached entry is shared by everyone using the same key. If output depends on the requester, include the distinguishing part in `key`, or resolve `enabled` to `false` to bypass caching for that request.
+:::
+
+### Stale While Revalidate
+
+When an entry is past `ttl` but within the `swr` window, the middleware returns the stale output immediately and re-executes the procedure in the background to refresh the entry. Concurrent stale hits refresh once when the store implements `lock`, and once each otherwise; the cache never serves anything older than `ttl + swr`.
+
+On runtimes that stop pending work once the response is sent, such as Cloudflare Workers, provide `cache/waitUntil` through the context so background refreshes can finish:
+
+```ts
+export default {
+  async fetch(request, env, ctx) {
+    const { response } = await handler.handle(request, {
+      context: {
+        'cache/store': store,
+        'cache/waitUntil': ctx.waitUntil.bind(ctx),
+      },
+    })
+
+    return response ?? new Response('Not Found', { status: 404 })
+  },
+}
+```
+
+The promise it receives rejects when a refresh fails, so `cache/waitUntil` is also where those failures are handled. Without it they surface as unhandled rejections, so on other runtimes provide one that reports them, for example `promise => promise.catch(console.error)`.
+
+## Revalidate Middleware
+
+The `revalidate` helper creates middleware that revalidates tags after the procedure succeeds, typically on mutations. The required `tags` option accepts a non-empty list of tags or a function of the middleware options and input. If the procedure throws, or `tags` resolves to `null` or `undefined`, the revalidation is skipped.
+
+```ts
+import { revalidate } from '@orpc/experimental-cache'
+
+const updatePlanet = os
+  .$context<CacheContext>()
+  .input(z.object({ id: z.number(), name: z.string() }))
+  .use(
+    revalidate({ tags: (_, input) => ['planets', `planet:${input.id}`] }),
+  )
+  .handler(({ input }) => {
+    return input
+  })
+```
+
+## Handler Plugin
+
+The `CacheHandlerPlugin` reflects the cache activity of [Cache Middleware](#cache-middleware) and [Revalidate Middleware](#revalidate-middleware) into response headers. It does nothing by default; only the headers you list are set:
+
+- `orpc-cache-tag` carries the tags the response depends on.
+- `orpc-cache-tag-invalidation` carries the tags revalidated by the request, useful for invalidating tagged data in client caches.
+- `cache-control` and `cache-tag` are the standard HTTP counterparts for response caches in front, such as CDNs or Cloudflare Workers Caching.
+
+The plugin sets these over anything already on the response. To override them, set your own afterwards with [ResponseHeadersPlugin](/docs/plugins/response-headers).
+
+Tags are joined with commas. Only `%`, `,`, uppercase letters, and characters that cannot appear in a header value are percent-encoded, so typical tags stay readable. Uppercase letters are encoded because caches like Cloudflare Workers Caching match tags case-insensitively; the encoded form stays unambiguous under case folding. Use `decodeCacheTagHeader` from `@orpc/shared` to parse a header back into tags.
+
+```ts
+import { CacheHandlerPlugin } from '@orpc/experimental-cache'
+
+const handler = new RPCHandler(router, {
+  plugins: [
+    new CacheHandlerPlugin({
+      headers: ['orpc-cache-tag', 'orpc-cache-tag-invalidation'],
+    }),
+  ],
+})
+```
+
+:::info[Response Caches in Front]
+With `cache-control` and `cache-tag` configured, a response cache in front serves cached responses without invoking your server at all. Pair it with a purge-capable store, such as `experimental_WorkersCacheStore`, so revalidations also purge the front cache. The plugin sets these whenever the called procedure ran the cache middleware, but standard HTTP caches only store GET and HEAD responses, so this mainly benefits [OpenAPIHandler](/docs/openapi/handler) routes; RPC requests use POST.
+
+`cache-control` uses `max-age`, not `s-maxage`, because [`s-maxage` carries `proxy-revalidate` semantics](https://www.rfc-editor.org/rfc/rfc9111#section-5.2.2.10) that forbid the stale reuse `swr` asks for. It therefore reaches browser caches too, which no tag purge can invalidate. Set your own `cache-control` when you need responses kept out of them.
+:::
+
+:::info
+When a procedure calls other procedures, only the first cache check and the first revalidation of the procedure the client called are reflected. Nested procedures never leak their tags into the response. Headers appear only on successful responses.
+:::
+
+:::tip[Cross-Origin Clients]
+The headers use oRPC-specific names on purpose: CDN-facing conventions like `Cache-Tag` can be consumed and stripped by intermediaries before reaching the browser, while these always arrive intact for client-side revalidation. For cross-origin browser clients, list them in [CORSPlugin](/docs/plugins/cors)'s `exposeHeaders` so client code can read them:
+
+```ts
+new CORSPlugin({
+  exposeHeaders: ['orpc-cache-tag', 'orpc-cache-tag-invalidation'],
+})
+```
+
+:::
+
+:::info
+The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
+:::
