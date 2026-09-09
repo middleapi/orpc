@@ -16,11 +16,11 @@ export interface BaseKeyValueCacheStoreOptions {
 /**
  * Cache store over a key-value backend without an atomic primitive, so
  * concurrent callers of one key are coalesced within the process. Subclasses
- * read and write entries by their encoded key.
+ * read entries by their encoded key and fill the missing ones.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
-export abstract class BaseKeyValueCacheStore<TSnapshot = undefined> implements CacheStore {
+export abstract class BaseKeyValueCacheStore implements CacheStore {
   private readonly pending = new Map<string, Promise<unknown>>()
   protected readonly serializer: Public<RPCJsonSerializer>
 
@@ -35,13 +35,7 @@ export abstract class BaseKeyValueCacheStore<TSnapshot = undefined> implements C
     if (entry === undefined) {
       return this.coalesce(encodedKey, async (waited) => {
         const current = waited ? await this.read(encodedKey) : undefined
-
-        if (current !== undefined) {
-          return current
-        }
-
-        const snapshot = await this.snapshot(options)
-        return this.write(encodedKey, await fill(), options, snapshot)
+        return current ?? this.fill(encodedKey, fill, options)
       })
     }
 
@@ -50,8 +44,7 @@ export abstract class BaseKeyValueCacheStore<TSnapshot = undefined> implements C
         const current = waited ? await this.read(encodedKey) : undefined
 
         if (current === undefined || isCacheEntryStale(current)) {
-          const snapshot = await this.snapshot(options)
-          await this.write(encodedKey, await fill(), options, snapshot)
+          await this.fill(encodedKey, fill, options)
         }
       })
 
@@ -66,12 +59,10 @@ export abstract class BaseKeyValueCacheStore<TSnapshot = undefined> implements C
   protected abstract read(encodedKey: string): Promisable<CacheEntry | undefined>
 
   /**
-   * Captures the tag state a fill starts from, so a revalidation that lands
-   * while the fill runs still invalidates what it stores.
+   * Runs `fill` and stores its output. Tag state captured before `fill` runs
+   * lets a revalidation that lands during it still invalidate the entry.
    */
-  protected abstract snapshot(options: CacheFetchOptions): Promisable<TSnapshot>
-
-  protected abstract write(encodedKey: string, output: unknown, options: CacheFetchOptions, snapshot: TSnapshot): Promisable<CacheEntry>
+  protected abstract fill(encodedKey: string, fill: () => Promise<unknown>, options: CacheFetchOptions): Promise<CacheEntry>
 
   /**
    * Runs `fn` once the key is free, in call order. `waited` is `true` when

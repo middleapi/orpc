@@ -9,7 +9,7 @@ export type MemoryCacheStoreOptions = BaseKeyValueCacheStoreOptions
 interface MemoryCacheStoreEntry {
   output: unknown
   /**
-   * The tags, and the version counter each had at set time, index-aligned.
+   * The tags, and the version counter each had when the fill started, index-aligned.
    * Both are absent together when the entry has no tags.
    */
   tags?: readonly string[]
@@ -25,7 +25,7 @@ interface MemoryCacheStoreEntry {
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
-export class MemoryCacheStore extends BaseKeyValueCacheStore<readonly number[] | undefined> {
+export class MemoryCacheStore extends BaseKeyValueCacheStore {
   private readonly entries = new Map<string, MemoryCacheStoreEntry>()
   private readonly tagVersions = new Map<string, number>()
 
@@ -68,12 +68,10 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore<readonly number[] |
     }
   }
 
-  protected snapshot({ tags }: CacheFetchOptions): readonly number[] | undefined {
-    return tags?.map(tag => this.tagVersions.get(tag) ?? 0)
-  }
-
-  protected write(encodedKey: string, output: unknown, options: CacheFetchOptions, tagVersions: readonly number[] | undefined): CacheEntry {
+  protected async fill(encodedKey: string, fill: () => Promise<unknown>, options: CacheFetchOptions): Promise<CacheEntry> {
     const tags = options.tags
+    const tagVersions = tags?.map(tag => this.tagVersions.get(tag) ?? 0)
+    const output = await fill()
     const { expiresAt, evictAt } = resolveCacheExpiry(options)
 
     this.entries.set(encodedKey, { output, tags, tagVersions, expiresAt, evictAt })

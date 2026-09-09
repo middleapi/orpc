@@ -65,11 +65,8 @@ export class VercelCacheStore extends BaseKeyValueCacheStore {
     }
   }
 
-  protected snapshot(): undefined {
-    return undefined
-  }
-
-  protected async write(encodedKey: string, output: unknown, options: CacheFetchOptions): Promise<CacheEntry> {
+  protected async fill(encodedKey: string, fill: () => Promise<unknown>, options: CacheFetchOptions): Promise<CacheEntry> {
+    const output = await fill()
     const tags = options.tags
     const { expiresAt, evictAt, retention } = resolveCacheExpiry(options)
     const { json, meta } = this.serializer.serialize(output)
