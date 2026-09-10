@@ -1,4 +1,4 @@
-import type { CacheEntry, CacheFetchOptions, CacheRevalidateOptions } from '../types'
+import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions } from '../types'
 import type { BaseKeyValueCacheStoreOptions } from './base-key-value'
 import { nowInSeconds } from '@orpc/shared'
 import { resolveCacheExpiry } from '../utils'
@@ -21,7 +21,7 @@ interface MemoryCacheStoreEntry {
 /**
  * In-memory cache store with tag-based invalidation, intended for
  * development, testing, and single-instance deployments. Expired and
- * revalidated entries are removed lazily on the next `fetch` of their key.
+ * revalidated entries are removed lazily on the next `getOrSet` of their key.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
@@ -68,7 +68,7 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
     }
   }
 
-  protected async fill(encodedKey: string, fill: () => Promise<unknown>, options: CacheFetchOptions): Promise<CacheEntry> {
+  protected async fill(encodedKey: string, fill: () => Promise<unknown>, options: CacheGetOrSetOptions): Promise<CacheEntry> {
     const tags = options.tags
     const tagVersions = tags?.map(tag => this.tagVersions.get(tag) ?? 0)
     const output = await fill()

@@ -13,7 +13,7 @@ npm install @orpc/experimental-cache@beta
 
 ## Basic Usage
 
-Everything builds on the `CacheStore` interface: `fetch` returns the entry under a key and fills it when there is none, and `revalidate` invalidates entries by tag. A router shares one store, passed through the request context as `cache/store`, as the `CacheContext` interface describes. Use one of these adapters or write your own:
+Everything builds on the `CacheStore` interface: `getOrSet` returns the entry under a key and fills it when there is none, and `revalidate` invalidates entries by tag. A router shares one store, passed through the request context as `cache/store`, as the `CacheContext` interface describes. Use one of these adapters or write your own:
 
 | Name                                                             | Adapter for                                                                                |
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -29,15 +29,15 @@ import { MemoryCacheStore } from '@orpc/experimental-cache/memory'
 // ---cut---
 const store = new MemoryCacheStore()
 
-const entry = await store.fetch('planet:1', async () => ({ id: 1, name: 'Earth' }), {
+const entry = await store.getOrSet('planet:1', async () => ({ id: 1, name: 'Earth' }), {
   tags: ['planets', 'planet:1'],
   ttl: 60,
 })
 
-await store.revalidate({ tags: ['planets'] }) // the next `fetch` fills again
+await store.revalidate({ tags: ['planets'] }) // the next `getOrSet` fills again
 ```
 
-An entry is fresh for `ttl` seconds and kept for a further `swr` window, during which `fetch` still returns it with a past `expiresAt` while one caller refreshes it in the background. Revalidating a tag invalidates every entry carrying it, fresh or stale. Durations are in seconds throughout.
+An entry is fresh for `ttl` seconds and kept for a further `swr` window, during which `getOrSet` still returns it with a past `expiresAt` while one caller refreshes it in the background. Revalidating a tag invalidates every entry carrying it, fresh or stale. Durations are in seconds throughout.
 
 ## Cache Middleware
 
@@ -317,7 +317,7 @@ const store = new VercelCacheStore({
 
 ### Cloudflare Workers Caching
 
-A purge-only store from `@orpc/cloudflare`. [Workers Caching](https://developers.cloudflare.com/workers/cache/) caches whole responses in front of the Worker through the `cache-control` and `cache-tag` headers of the [Handler Plugin](#handler-plugin), so every `fetch` runs the procedure and stores nothing, and `revalidate` purges the tags from the front cache.
+A purge-only store from `@orpc/cloudflare`. [Workers Caching](https://developers.cloudflare.com/workers/cache/) caches whole responses in front of the Worker through the `cache-control` and `cache-tag` headers of the [Handler Plugin](#handler-plugin), so every `getOrSet` runs the procedure and stores nothing, and `revalidate` purges the tags from the front cache.
 
 It requires `"cache": { "enabled": true }` in your wrangler configuration. Purges are scoped to the calling entrypoint, tags match case-insensitively, and purge calls use the Free tier rate limits regardless of your plan.
 

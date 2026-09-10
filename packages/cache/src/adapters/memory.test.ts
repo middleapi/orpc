@@ -17,22 +17,22 @@ describe('memoryCacheStore', () => {
   it('encodes structurally equal non-string keys to the same entry', async () => {
     const store = new MemoryCacheStore()
 
-    await store.fetch([['planet', 'find'], { b: 2, a: 1 }], async () => 'v')
+    await store.getOrSet([['planet', 'find'], { b: 2, a: 1 }], async () => 'v')
 
-    await expect(store.fetch([['planet', 'find'], { a: 1, b: 2 }], async () => 'other')).resolves.toMatchObject({ output: 'v' })
-    await expect(store.fetch([['planet', 'find'], { a: 1, b: 3 }], async () => 'other')).resolves.toMatchObject({ output: 'other' })
-    await expect(store.fetch([['planet', 'list'], { a: 1, b: 2 }], async () => 'other')).resolves.toMatchObject({ output: 'other' })
+    await expect(store.getOrSet([['planet', 'find'], { a: 1, b: 2 }], async () => 'other')).resolves.toMatchObject({ output: 'v' })
+    await expect(store.getOrSet([['planet', 'find'], { a: 1, b: 3 }], async () => 'other')).resolves.toMatchObject({ output: 'other' })
+    await expect(store.getOrSet([['planet', 'list'], { a: 1, b: 2 }], async () => 'other')).resolves.toMatchObject({ output: 'other' })
   })
 
   it('encodes complex key values, ignoring unsupported ones like blobs', async () => {
     const store = new MemoryCacheStore()
 
-    await store.fetch({ date: new Date(1), big: 1n }, async () => 'v')
-    await expect(store.fetch({ big: 1n, date: new Date(1) }, async () => 'other')).resolves.toMatchObject({ output: 'v' })
-    await expect(store.fetch({ big: 2n, date: new Date(1) }, async () => 'other')).resolves.toMatchObject({ output: 'other' })
+    await store.getOrSet({ date: new Date(1), big: 1n }, async () => 'v')
+    await expect(store.getOrSet({ big: 1n, date: new Date(1) }, async () => 'other')).resolves.toMatchObject({ output: 'v' })
+    await expect(store.getOrSet({ big: 2n, date: new Date(1) }, async () => 'other')).resolves.toMatchObject({ output: 'other' })
 
-    await store.fetch({ file: new Blob(['a']), id: 1 }, async () => 'blobbed')
-    await expect(store.fetch({ file: new Blob(['b']), id: 1 }, async () => 'other')).resolves.toMatchObject({ output: 'blobbed' })
+    await store.getOrSet({ file: new Blob(['a']), id: 1 }, async () => 'blobbed')
+    await expect(store.getOrSet({ file: new Blob(['b']), id: 1 }, async () => 'other')).resolves.toMatchObject({ output: 'blobbed' })
   })
 
   it('supports a custom key serializer', async () => {
@@ -40,27 +40,27 @@ describe('memoryCacheStore', () => {
     const serializeSpy = vi.spyOn(serializer, 'serialize')
     const store = new MemoryCacheStore({ serializer })
 
-    await store.fetch({ id: 1 }, async () => 'v')
+    await store.getOrSet({ id: 1 }, async () => 'v')
 
-    await expect(store.fetch({ id: 1 }, async () => 'other')).resolves.toMatchObject({ output: 'v' })
+    await expect(store.getOrSet({ id: 1 }, async () => 'other')).resolves.toMatchObject({ output: 'v' })
     expect(serializeSpy).toHaveBeenCalled()
   })
 
   it('returns fresh entries with a future expiresAt, then fills again at ttl without swr', async () => {
     const store = new MemoryCacheStore()
 
-    await expect(store.fetch('k', async () => 'v', { ttl: 1 })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1, evictAt: 1 })
+    await expect(store.getOrSet('k', async () => 'v', { ttl: 1 })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1, evictAt: 1 })
 
     vi.setSystemTime(999)
-    await expect(store.fetch('k', async () => 'other', { ttl: 1 })).resolves.toMatchObject({ output: 'v' })
+    await expect(store.getOrSet('k', async () => 'other', { ttl: 1 })).resolves.toMatchObject({ output: 'v' })
 
     vi.setSystemTime(1000)
-    await expect(store.fetch('k', async () => 'other', { ttl: 1 })).resolves.toEqual({ output: 'other', tags: undefined, expiresAt: 2, evictAt: 2 })
+    await expect(store.getOrSet('k', async () => 'other', { ttl: 1 })).resolves.toEqual({ output: 'other', tags: undefined, expiresAt: 2, evictAt: 2 })
   })
 
   it('serves stale entries within swr while one caller refreshes them in the background', async () => {
     const store = new MemoryCacheStore()
-    await store.fetch('k', async () => 'v', { ttl: 1, swr: 1 })
+    await store.getOrSet('k', async () => 'v', { ttl: 1, swr: 1 })
 
     vi.setSystemTime(1200) // past ttl, within swr
     let finish!: (output: string) => void
@@ -69,20 +69,20 @@ describe('memoryCacheStore', () => {
     }))
     const waitUntil = vi.fn()
 
-    await expect(store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1, evictAt: 2 })
-    await expect(store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1, evictAt: 2 })
+    await expect(store.getOrSet('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1, evictAt: 2 })
+    await expect(store.getOrSet('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1, evictAt: 2 })
     expect(waitUntil).toHaveBeenCalledTimes(2)
 
     finish('fresh')
     await Promise.all(waitUntil.mock.calls.map(([refresh]) => refresh))
     expect(fill).toHaveBeenCalledTimes(1) // the second stale hit found the refreshed entry
 
-    await expect(store.fetch('k', fill, { ttl: 1, swr: 1 })).resolves.toEqual({ output: 'fresh', tags: undefined, expiresAt: 2, evictAt: 3 })
+    await expect(store.getOrSet('k', fill, { ttl: 1, swr: 1 })).resolves.toEqual({ output: 'fresh', tags: undefined, expiresAt: 2, evictAt: 3 })
   })
 
   it('leaves a failed refresh to waitUntil and keeps serving the stale entry', async () => {
     const store = new MemoryCacheStore()
-    await store.fetch('k', async () => 'v', { ttl: 1, swr: 1 })
+    await store.getOrSet('k', async () => 'v', { ttl: 1, swr: 1 })
 
     vi.setSystemTime(1200)
     const waitUntil = vi.fn()
@@ -90,17 +90,17 @@ describe('memoryCacheStore', () => {
       throw new Error('handler down')
     })
 
-    await expect(store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toMatchObject({ output: 'v' })
+    await expect(store.getOrSet('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toMatchObject({ output: 'v' })
     await expect(waitUntil.mock.calls[0]![0]).rejects.toThrow('handler down')
 
-    await expect(store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toMatchObject({ output: 'v' })
+    await expect(store.getOrSet('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toMatchObject({ output: 'v' })
     await expect(waitUntil.mock.calls[1]![0]).rejects.toThrow('handler down')
     expect(fill).toHaveBeenCalledTimes(2)
   })
 
   it('lets a waiting refresh fill when the first one failed', async () => {
     const store = new MemoryCacheStore()
-    await store.fetch('k', async () => 'v', { ttl: 1, swr: 1 })
+    await store.getOrSet('k', async () => 'v', { ttl: 1, swr: 1 })
 
     vi.setSystemTime(1200)
     let fail!: (error: Error) => void
@@ -111,15 +111,15 @@ describe('memoryCacheStore', () => {
       .mockResolvedValue('fresh')
     const waitUntil = vi.fn()
 
-    await store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })
-    await store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })
+    await store.getOrSet('k', fill, { ttl: 1, swr: 1, waitUntil })
+    await store.getOrSet('k', fill, { ttl: 1, swr: 1, waitUntil })
     fail(new Error('handler down'))
 
     await expect(waitUntil.mock.calls[0]![0]).rejects.toThrow('handler down')
     await waitUntil.mock.calls[1]![0]
     expect(fill).toHaveBeenCalledTimes(2)
 
-    await expect(store.fetch('k', fill, { ttl: 1, swr: 1 })).resolves.toMatchObject({ output: 'fresh' })
+    await expect(store.getOrSet('k', fill, { ttl: 1, swr: 1 })).resolves.toMatchObject({ output: 'fresh' })
   })
 
   it('drops output computed before a revalidation that landed during its fill', async () => {
@@ -130,7 +130,7 @@ describe('memoryCacheStore', () => {
       started = resolve
     })
 
-    const first = store.fetch('k', () => {
+    const first = store.getOrSet('k', () => {
       started()
       return new Promise<string>((resolve) => {
         finish = resolve
@@ -141,43 +141,43 @@ describe('memoryCacheStore', () => {
     finish('outdated')
 
     await expect(first).resolves.toMatchObject({ output: 'outdated' })
-    await expect(store.fetch('k', async () => 'fresh', { tags: ['t'] })).resolves.toMatchObject({ output: 'fresh' })
+    await expect(store.getOrSet('k', async () => 'fresh', { tags: ['t'] })).resolves.toMatchObject({ output: 'fresh' })
   })
 
   it('drops a refresh computed before a revalidation that landed during it', async () => {
     const store = new MemoryCacheStore()
-    await store.fetch('k', async () => 'v', { tags: ['t'], ttl: 1, swr: 10 })
+    await store.getOrSet('k', async () => 'v', { tags: ['t'], ttl: 1, swr: 10 })
 
     vi.setSystemTime(1500)
     let finish!: (output: string) => void
     const waitUntil = vi.fn()
 
-    await store.fetch('k', () => new Promise<string>((resolve) => {
+    await store.getOrSet('k', () => new Promise<string>((resolve) => {
       finish = resolve
     }), { tags: ['t'], ttl: 1, swr: 10, waitUntil })
     await store.revalidate({ tags: ['t'] })
     finish('outdated')
     await waitUntil.mock.calls[0]![0]
 
-    await expect(store.fetch('k', async () => 'fresh', { tags: ['t'] })).resolves.toMatchObject({ output: 'fresh' })
+    await expect(store.getOrSet('k', async () => 'fresh', { tags: ['t'] })).resolves.toMatchObject({ output: 'fresh' })
   })
 
   it('evicts past ttl + swr, and revalidation drops stale entries too', async () => {
     const store = new MemoryCacheStore()
 
-    await store.fetch('evicted', async () => 'v', { ttl: 1, swr: 1 })
-    await store.fetch('stale', async () => 'v', { tags: ['a'], ttl: 1, swr: 1 })
-    await store.fetch('k', async () => 'old', { tags: ['old'], ttl: 1 })
+    await store.getOrSet('evicted', async () => 'v', { ttl: 1, swr: 1 })
+    await store.getOrSet('stale', async () => 'v', { tags: ['a'], ttl: 1, swr: 1 })
+    await store.getOrSet('k', async () => 'old', { tags: ['old'], ttl: 1 })
 
     vi.setSystemTime(1000) // 'k' expired without swr, so it is filled again with new tags
-    await expect(store.fetch('k', async () => 'new', { tags: ['new'] })).resolves.toEqual({ output: 'new', tags: ['new'], expiresAt: undefined })
+    await expect(store.getOrSet('k', async () => 'new', { tags: ['new'] })).resolves.toEqual({ output: 'new', tags: ['new'], expiresAt: undefined })
 
     vi.setSystemTime(1200) // 'stale' and 'evicted' are stale
     await store.revalidate({ tags: ['a', 'old'] })
-    await expect(store.fetch('stale', async () => 'refilled', { tags: ['a'] })).resolves.toMatchObject({ output: 'refilled' })
-    await expect(store.fetch('k', async () => 'refilled', { tags: ['new'] })).resolves.toMatchObject({ output: 'new' })
+    await expect(store.getOrSet('stale', async () => 'refilled', { tags: ['a'] })).resolves.toMatchObject({ output: 'refilled' })
+    await expect(store.getOrSet('k', async () => 'refilled', { tags: ['new'] })).resolves.toMatchObject({ output: 'new' })
 
     vi.setSystemTime(2000) // past ttl + swr
-    await expect(store.fetch('evicted', async () => 'refilled')).resolves.toMatchObject({ output: 'refilled' })
+    await expect(store.getOrSet('evicted', async () => 'refilled')).resolves.toMatchObject({ output: 'refilled' })
   })
 })

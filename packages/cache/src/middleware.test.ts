@@ -11,7 +11,7 @@ import { cache, revalidate } from './middleware'
  */
 function createStore(entry?: CacheEntry) {
   return {
-    fetch: vi.fn<CacheStore['fetch']>(async (_key, fill, options) => entry ?? {
+    getOrSet: vi.fn<CacheStore['getOrSet']>(async (_key, fill, options) => entry ?? {
       output: await fill(),
       tags: options?.tags,
       expiresAt: options?.ttl !== undefined ? nowInSeconds() + options.ttl : undefined,
@@ -35,7 +35,7 @@ describe('cache', () => {
     ).resolves.toBe('fresh')
 
     expect(handlerFn).toHaveBeenCalledTimes(1)
-    expect(store.fetch).toHaveBeenCalledWith('k', expect.any(Function), { tags: ['t1', 't2'], ttl: 60, swr: 30, waitUntil: undefined })
+    expect(store.getOrSet).toHaveBeenCalledWith('k', expect.any(Function), { tags: ['t1', 't2'], ttl: 60, swr: 30, waitUntil: undefined })
   })
 
   describe('key derivation', () => {
@@ -48,7 +48,7 @@ describe('cache', () => {
       await call(procedure, { id: 2 }, { context: { 'cache/store': store }, path: ['planet', 'find'] })
       await call(procedure, { id: 1 }, { context: { 'cache/store': store }, path: ['user', 'find'] })
 
-      const keys = store.fetch.mock.calls.map(([key]) => key)
+      const keys = store.getOrSet.mock.calls.map(([key]) => key)
       expect(keys[0]).toEqual([['planet', 'find'], { id: 1 }]) // the procedure path and input
       expect(keys[0]).toEqual(keys[1]) // same path + input
       expect(keys[0]).not.toEqual(keys[2]) // different input
@@ -68,7 +68,7 @@ describe('cache', () => {
       await call(material, { id: 1, page: 2 }, { context: { 'cache/store': store }, path: ['planet', 'find'] })
       await call(verbatim, undefined, { context: { 'cache/store': store } })
 
-      const keys = store.fetch.mock.calls.map(([key]) => key)
+      const keys = store.getOrSet.mock.calls.map(([key]) => key)
       expect(keys[0]).toEqual({ id: 1 }) // the resolved material, not combined with the path
       expect(keys[0]).toEqual(keys[1]) // same material despite different inputs
       expect(keys[2]).toBe('k')
@@ -88,7 +88,7 @@ describe('cache', () => {
 
       // The middleware only validated `id` at its position, but the key still
       // covers the full input, so different pages never share an entry.
-      const keys = store.fetch.mock.calls.map(([key]) => key)
+      const keys = store.getOrSet.mock.calls.map(([key]) => key)
       expect(keys[0]).not.toEqual(keys[1])
     })
   })
@@ -127,7 +127,7 @@ describe('cache', () => {
       expect(fn).toHaveBeenCalledTimes(1)
       expect(fn).toHaveBeenCalledWith(expect.objectContaining({ context: expect.any(Object) }), { id: 1 })
     }
-    expect(store.fetch).toHaveBeenCalledWith('k', expect.any(Function), { tags: ['t'], ttl: 60, swr: 30, waitUntil: undefined })
+    expect(store.getOrSet).toHaveBeenCalledWith('k', expect.any(Function), { tags: ['t'], ttl: 60, swr: 30, waitUntil: undefined })
   })
 
   it('skips the store when enabled resolves to false', async () => {
@@ -140,7 +140,7 @@ describe('cache', () => {
     ).resolves.toBe('fresh')
 
     expect(handlerFn).toHaveBeenCalledTimes(1)
-    expect(store.fetch).not.toHaveBeenCalled()
+    expect(store.getOrSet).not.toHaveBeenCalled()
   })
 
   it('hands cache/waitUntil to the store', async () => {
@@ -150,7 +150,7 @@ describe('cache', () => {
 
     await call(procedure, undefined, { context: { 'cache/store': store, 'cache/waitUntil': waitUntil } })
 
-    expect(store.fetch).toHaveBeenCalledWith('k', expect.any(Function), expect.objectContaining({ waitUntil }))
+    expect(store.getOrSet).toHaveBeenCalledWith('k', expect.any(Function), expect.objectContaining({ waitUntil }))
   })
 
   it('records the entry into the handler plugin context with its remaining ttl and swr', async () => {
@@ -179,7 +179,7 @@ describe('cache', () => {
 
   it('propagates store failures and records no check', async () => {
     const store = createStore()
-    store.fetch.mockRejectedValueOnce(new Error('store down'))
+    store.getOrSet.mockRejectedValueOnce(new Error('store down'))
     const pluginContext = { caches: [], revalidations: [] }
     const procedure = os.$context<CacheContext & CacheHandlerPluginContext>().use(cache({ key: 'k' })).handler(() => 'fresh')
 
@@ -210,7 +210,7 @@ describe('cache', () => {
 
     it('serves concurrent stale hits immediately and refreshes once through waitUntil', async () => {
       const store = new MemoryCacheStore()
-      await store.fetch('k', async () => 'stale', { ttl: 0, swr: 60 })
+      await store.getOrSet('k', async () => 'stale', { ttl: 0, swr: 60 })
 
       let finish!: (output: string) => void
       const handlerFn = vi.fn(() => new Promise<string>((resolve) => {
@@ -245,7 +245,7 @@ describe('cache', () => {
       })
 
       const store = new MemoryCacheStore()
-      await store.fetch('k', async () => 'stale', { ttl: 0, swr: 60 })
+      await store.getOrSet('k', async () => 'stale', { ttl: 0, swr: 60 })
       const procedure = os.$context<CacheContext>().use(cache({ key: 'k' })).handler(() => {
         throw new Error('handler down')
       })

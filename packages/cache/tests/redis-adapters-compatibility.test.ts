@@ -49,45 +49,45 @@ describe.concurrent('cache redis adapters compatibility', { timeout: 20_000 }, (
           const tag = `tag:${crypto.randomUUID()}`
           const output = { date: new Date('2026-01-02T03:04:05.678Z'), big: 123n }
 
-          await source.store.fetch([['planet', 'find'], { b: 2, id }], async () => output, { tags: [tag], ttl: 60 })
+          await source.store.getOrSet([['planet', 'find'], { b: 2, id }], async () => output, { tags: [tag], ttl: 60 })
 
-          const entry = await target.store.fetch([['planet', 'find'], { id, b: 2 }], async () => 'refilled', { tags: [tag], ttl: 60 })
+          const entry = await target.store.getOrSet([['planet', 'find'], { id, b: 2 }], async () => 'refilled', { tags: [tag], ttl: 60 })
           expect(entry.output).toEqual(output)
           expect(entry.tags).toEqual([tag])
           expect(entry.expiresAt).toBeGreaterThan(nowInSeconds())
 
           await target.store.revalidate({ tags: [tag] })
 
-          await expect(source.store.fetch([['planet', 'find'], { b: 2, id }], async () => 'refilled', { tags: [tag] })).resolves.toMatchObject({ output: 'refilled' })
+          await expect(source.store.getOrSet([['planet', 'find'], { b: 2, id }], async () => 'refilled', { tags: [tag] })).resolves.toMatchObject({ output: 'refilled' })
         })
 
         it(`shares tag counters: ${source.name} → ${target.name}`, async () => {
           const key = `counter:${crypto.randomUUID()}`
           const tag = `tag:${crypto.randomUUID()}`
 
-          await source.store.fetch(key, async () => 'v1', { tags: [tag] })
+          await source.store.getOrSet(key, async () => 'v1', { tags: [tag] })
           await target.store.revalidate({ tags: [tag] })
 
-          await expect(target.store.fetch(key, async () => 'v2', { tags: [tag] })).resolves.toMatchObject({ output: 'v2' })
-          await expect(source.store.fetch(key, async () => 'v3', { tags: [tag] })).resolves.toMatchObject({ output: 'v2' })
+          await expect(target.store.getOrSet(key, async () => 'v2', { tags: [tag] })).resolves.toMatchObject({ output: 'v2' })
+          await expect(source.store.getOrSet(key, async () => 'v3', { tags: [tag] })).resolves.toMatchObject({ output: 'v2' })
 
           await source.store.revalidate({ tags: [tag] })
-          await expect(target.store.fetch(key, async () => 'v4', { tags: [tag] })).resolves.toMatchObject({ output: 'v4' })
+          await expect(target.store.getOrSet(key, async () => 'v4', { tags: [tag] })).resolves.toMatchObject({ output: 'v4' })
         })
 
         it(`shares retention: ${source.name} → ${target.name}`, async () => {
           const noSwr = `no-swr:${crypto.randomUUID()}`
           const swr = `swr:${crypto.randomUUID()}`
 
-          await source.store.fetch(noSwr, async () => 'v', { ttl: 1 })
-          await source.store.fetch(swr, async () => 'v', { ttl: 1, swr: 10 })
+          await source.store.getOrSet(noSwr, async () => 'v', { ttl: 1 })
+          await source.store.getOrSet(swr, async () => 'v', { ttl: 1, swr: 10 })
 
           await sleep(1500)
 
-          await expect(target.store.fetch(noSwr, async () => 'refilled', { ttl: 1 })).resolves.toMatchObject({ output: 'refilled' })
+          await expect(target.store.getOrSet(noSwr, async () => 'refilled', { ttl: 1 })).resolves.toMatchObject({ output: 'refilled' })
 
           const waitUntil = (_promise: Promise<unknown>) => {}
-          const stale = await target.store.fetch(swr, async () => 'refilled', { ttl: 1, swr: 10, waitUntil })
+          const stale = await target.store.getOrSet(swr, async () => 'refilled', { ttl: 1, swr: 10, waitUntil })
           expect(stale.output).toBe('v')
           expect(stale.expiresAt).toBeLessThanOrEqual(nowInSeconds())
         })
@@ -103,7 +103,7 @@ describe.concurrent('cache redis adapters compatibility', { timeout: 20_000 }, (
             acquired = resolve
           })
 
-          const holder = source.store.fetch(key, async () => {
+          const holder = source.store.getOrSet(key, async () => {
             acquired()
             await held
             return 'held'
@@ -111,7 +111,7 @@ describe.concurrent('cache redis adapters compatibility', { timeout: 20_000 }, (
           await holding
 
           let settled = false
-          const waiter = target.store.fetch(key, async () => 'refilled').then((entry) => {
+          const waiter = target.store.getOrSet(key, async () => 'refilled').then((entry) => {
             settled = true
             return entry
           })

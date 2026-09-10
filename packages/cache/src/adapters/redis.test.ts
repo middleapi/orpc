@@ -35,13 +35,13 @@ describe.concurrent('redis cache store integration', {
     const scriptShas = Reflect.get(store, 'scriptShas') as Map<string, string>
     const unknownSha = '0'.repeat(40)
 
-    await store.fetch('k', async () => 'v')
+    await store.getOrSet('k', async () => 'v')
     for (const script of scriptShas.keys()) {
       scriptShas.set(script, unknownSha)
     }
 
-    await expect(store.fetch('k', async () => 'other')).resolves.toMatchObject({ output: 'v' })
-    await expect(store.fetch('k2', async () => 'w')).resolves.toMatchObject({ output: 'w' })
+    await expect(store.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'v' })
+    await expect(store.getOrSet('k2', async () => 'w')).resolves.toMatchObject({ output: 'w' })
     expect([...scriptShas.values()]).not.toContain(unknownSha)
   })
 
@@ -50,7 +50,7 @@ describe.concurrent('redis cache store integration', {
     const store = new RedisCacheStore(lazyRedis)
 
     expect(lazyRedis.isOpen).toBe(false)
-    await expect(store.fetch(crypto.randomUUID(), async () => 'v')).resolves.toMatchObject({ output: 'v' })
+    await expect(store.getOrSet(crypto.randomUUID(), async () => 'v')).resolves.toMatchObject({ output: 'v' })
     expect(lazyRedis.isOpen).toBe(true)
 
     await lazyRedis.destroy()

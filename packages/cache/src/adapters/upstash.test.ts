@@ -42,14 +42,14 @@ describe.concurrent('upstash cache store integration', {
     })
     const { store } = createTestingStore({}, rawRedis)
 
-    await store.fetch('k', async () => ({ a: 1 }), { tags: ['t'], ttl: 60 })
+    await store.getOrSet('k', async () => ({ a: 1 }), { tags: ['t'], ttl: 60 })
 
-    const entry = await store.fetch('k', async () => 'other', { tags: ['t'], ttl: 60 })
+    const entry = await store.getOrSet('k', async () => 'other', { tags: ['t'], ttl: 60 })
     expect(entry.output).toEqual({ a: 1 })
     expect(entry.tags).toEqual(['t'])
     expect(entry.expiresAt).toBeGreaterThan(nowInSeconds())
 
     await store.revalidate({ tags: ['t'] })
-    await expect(store.fetch('k', async () => 'refilled', { tags: ['t'] })).resolves.toMatchObject({ output: 'refilled' })
+    await expect(store.getOrSet('k', async () => 'refilled', { tags: ['t'] })).resolves.toMatchObject({ output: 'refilled' })
   })
 })

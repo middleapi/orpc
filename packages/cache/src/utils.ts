@@ -1,6 +1,6 @@
 import type { RPCJsonSerializer } from '@orpc/client'
 import type { Public } from '@orpc/shared'
-import type { CacheEntry, CacheFetchOptions } from './types'
+import type { CacheEntry, CacheGetOrSetOptions } from './types'
 import { deepSortKeys, nowInSeconds, stringifyJSON } from '@orpc/shared'
 
 /**
@@ -42,7 +42,7 @@ export function isCacheEntryStale(entry: CacheEntry): boolean {
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
-export function resolveCacheExpiry({ ttl, swr }: CacheFetchOptions): { expiresAt: number | undefined, evictAt: number | undefined, retention: number | undefined } {
+export function resolveCacheExpiry({ ttl, swr }: CacheGetOrSetOptions): { expiresAt: number | undefined, evictAt: number | undefined, retention: number | undefined } {
   if (ttl === undefined) {
     return { expiresAt: undefined, evictAt: undefined, retention: undefined }
   }

@@ -18,9 +18,9 @@ describe('vercelCacheStore', () => {
       const store = new VercelCacheStore()
       const key = crypto.randomUUID()
 
-      await store.fetch(key, async () => 'v')
+      await store.getOrSet(key, async () => 'v')
 
-      await expect(store.fetch(key, async () => 'other')).resolves.toMatchObject({ output: 'v' })
+      await expect(store.getOrSet(key, async () => 'other')).resolves.toMatchObject({ output: 'v' })
     })
   })
 
@@ -55,7 +55,7 @@ describe('vercelCacheStore', () => {
       const cache = createMockedCache()
       const store = new VercelCacheStore({ cache })
 
-      await store.fetch('k', async () => 'v', { tags: ['t'], ttl: 1, swr: 1 })
+      await store.getOrSet('k', async () => 'v', { tags: ['t'], ttl: 1, swr: 1 })
 
       expect(cache.set).toHaveBeenCalledWith('k', expect.objectContaining({ tags: ['t'], expiresAt: 1, evictAt: 2 }), { tags: ['t'], ttl: 2 })
     })
@@ -64,7 +64,7 @@ describe('vercelCacheStore', () => {
       const cache = createMockedCache()
       const store = new VercelCacheStore({ cache })
 
-      await store.fetch('k', async () => 'v', { ttl: 1 })
+      await store.getOrSet('k', async () => 'v', { ttl: 1 })
 
       expect(cache.set).toHaveBeenCalledWith('k', expect.objectContaining({ expiresAt: 1, evictAt: 1 }), { ttl: 1 })
     })
@@ -73,7 +73,7 @@ describe('vercelCacheStore', () => {
       const cache = createMockedCache()
       const store = new VercelCacheStore({ cache })
 
-      await store.fetch('k', async () => 'v')
+      await store.getOrSet('k', async () => 'v')
 
       expect(cache.set).toHaveBeenCalledWith('k', expect.objectContaining({ tags: undefined }), {})
     })
@@ -82,24 +82,24 @@ describe('vercelCacheStore', () => {
       const cache = createMockedCache()
       const store = new VercelCacheStore({ cache })
 
-      await store.fetch('k', async () => 'v', { ttl: 1, swr: 1 })
+      await store.getOrSet('k', async () => 'v', { ttl: 1, swr: 1 })
 
       vi.setSystemTime(1200) // past ttl, within swr
       const waitUntil = vi.fn()
-      await expect(store.fetch('k', async () => {
+      await expect(store.getOrSet('k', async () => {
         throw new Error('handler down')
       }, { ttl: 1, swr: 1, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1, evictAt: 2 })
       await expect(waitUntil.mock.calls[0]![0]).rejects.toThrow('handler down')
 
       vi.setSystemTime(2000) // past ttl + swr, backend has not evicted yet
-      await expect(store.fetch('k', async () => 'refilled', { ttl: 1, swr: 1 })).resolves.toMatchObject({ output: 'refilled' })
+      await expect(store.getOrSet('k', async () => 'refilled', { ttl: 1, swr: 1 })).resolves.toMatchObject({ output: 'refilled' })
       expect(cache.delete).toHaveBeenCalledWith('k')
     })
 
     it('refreshes once for concurrent stale hits, and again when the first refresh failed', async () => {
       const cache = createMockedCache()
       const store = new VercelCacheStore({ cache })
-      await store.fetch('k', async () => 'v', { ttl: 1, swr: 1 })
+      await store.getOrSet('k', async () => 'v', { ttl: 1, swr: 1 })
 
       vi.setSystemTime(1200)
       let finish!: (output: string) => void
@@ -108,12 +108,12 @@ describe('vercelCacheStore', () => {
       }))
       const waitUntil = vi.fn()
 
-      await store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })
-      await store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })
+      await store.getOrSet('k', fill, { ttl: 1, swr: 1, waitUntil })
+      await store.getOrSet('k', fill, { ttl: 1, swr: 1, waitUntil })
       finish('fresh')
       await Promise.all(waitUntil.mock.calls.map(([refresh]) => refresh))
       expect(fill).toHaveBeenCalledTimes(1)
-      await expect(store.fetch('k', fill, { ttl: 1, swr: 1 })).resolves.toMatchObject({ output: 'fresh' })
+      await expect(store.getOrSet('k', fill, { ttl: 1, swr: 1 })).resolves.toMatchObject({ output: 'fresh' })
 
       vi.setSystemTime(2400) // stale again
       let fail!: (error: Error) => void
@@ -124,14 +124,14 @@ describe('vercelCacheStore', () => {
         .mockResolvedValue('fresher')
       const waitUntilAgain = vi.fn()
 
-      await store.fetch('k', failingFill, { ttl: 1, swr: 1, waitUntil: waitUntilAgain })
-      await store.fetch('k', failingFill, { ttl: 1, swr: 1, waitUntil: waitUntilAgain })
+      await store.getOrSet('k', failingFill, { ttl: 1, swr: 1, waitUntil: waitUntilAgain })
+      await store.getOrSet('k', failingFill, { ttl: 1, swr: 1, waitUntil: waitUntilAgain })
       fail(new Error('handler down'))
 
       await expect(waitUntilAgain.mock.calls[0]![0]).rejects.toThrow('handler down')
       await waitUntilAgain.mock.calls[1]![0]
       expect(failingFill).toHaveBeenCalledTimes(2)
-      await expect(store.fetch('k', failingFill, { ttl: 1, swr: 1 })).resolves.toMatchObject({ output: 'fresher' })
+      await expect(store.getOrSet('k', failingFill, { ttl: 1, swr: 1 })).resolves.toMatchObject({ output: 'fresher' })
     })
 
     it('supports a custom serializer', async () => {
@@ -141,9 +141,9 @@ describe('vercelCacheStore', () => {
       const deserializeSpy = vi.spyOn(serializer, 'deserialize')
       const store = new VercelCacheStore({ cache, serializer })
 
-      await store.fetch('k', async () => ({ a: 1 }))
+      await store.getOrSet('k', async () => ({ a: 1 }))
 
-      await expect(store.fetch('k', async () => 'other')).resolves.toMatchObject({ output: { a: 1 } })
+      await expect(store.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: { a: 1 } })
       expect(serializeSpy).toHaveBeenCalled()
       expect(deserializeSpy).toHaveBeenCalled()
     })

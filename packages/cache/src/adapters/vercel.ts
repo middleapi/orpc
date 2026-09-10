@@ -1,6 +1,6 @@
 import type { RPCJsonSerialization } from '@orpc/client'
 import type { RuntimeCache } from '@vercel/functions'
-import type { CacheEntry, CacheFetchOptions, CacheRevalidateOptions } from '../types'
+import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions } from '../types'
 import type { BaseKeyValueCacheStoreOptions } from './base-key-value'
 import { nowInSeconds } from '@orpc/shared'
 import { getCache } from '@vercel/functions'
@@ -65,7 +65,7 @@ export class VercelCacheStore extends BaseKeyValueCacheStore {
     }
   }
 
-  protected async fill(encodedKey: string, fill: () => Promise<unknown>, options: CacheFetchOptions): Promise<CacheEntry> {
+  protected async fill(encodedKey: string, fill: () => Promise<unknown>, options: CacheGetOrSetOptions): Promise<CacheEntry> {
     const output = await fill()
     const tags = options.tags
     const { expiresAt, evictAt, retention } = resolveCacheExpiry(options)

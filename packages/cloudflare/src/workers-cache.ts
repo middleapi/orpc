@@ -1,4 +1,4 @@
-import type { CacheEntry, CacheFetchOptions, CacheRevalidateOptions, CacheStore } from '@orpc/experimental-cache'
+import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions, CacheStore } from '@orpc/experimental-cache'
 import { resolveCacheExpiry } from '@orpc/experimental-cache'
 import { encodeCacheTag, toArray } from '@orpc/shared'
 import * as workers from 'cloudflare:workers'
@@ -15,7 +15,7 @@ export interface experimental_WorkersCacheStoreOptions {
 /**
  * Purge-only cache store for Cloudflare Workers Caching. Responses are cached
  * in front of the Worker through `Cache-Control` and `Cache-Tag` headers (see
- * the `CacheHandlerPlugin` `headers` option), so `fetch` always fills and
+ * the `CacheHandlerPlugin` `headers` option), so `getOrSet` always fills and
  * stores nothing; `revalidate` purges the tags through Workers Caching.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
@@ -27,7 +27,7 @@ export class experimental_WorkersCacheStore implements CacheStore {
     this.cache = options.cache ?? workers.cache
   }
 
-  async fetch(_key: unknown, fill: () => Promise<unknown>, options: CacheFetchOptions = {}): Promise<CacheEntry> {
+  async getOrSet(_key: unknown, fill: () => Promise<unknown>, options: CacheGetOrSetOptions = {}): Promise<CacheEntry> {
     const output = await fill()
     const { expiresAt, evictAt } = resolveCacheExpiry(options)
 

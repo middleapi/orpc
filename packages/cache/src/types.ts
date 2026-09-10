@@ -23,7 +23,7 @@ export interface CacheEntry {
   evictAt?: number | undefined
 }
 
-export interface CacheFetchOptions {
+export interface CacheGetOrSetOptions {
   /**
    * Tags associated with the entry. Revalidating any of them invalidates the entry.
    *
@@ -78,7 +78,7 @@ export interface CacheStore {
    * serializable value; implementations encode them stably, so structurally
    * equal keys resolve the same entry.
    */
-  fetch(key: unknown, fill: () => Promise<unknown>, options?: CacheFetchOptions): Promise<CacheEntry>
+  getOrSet(key: unknown, fill: () => Promise<unknown>, options?: CacheGetOrSetOptions): Promise<CacheEntry>
 
   /**
    * Invalidates every entry associated with any of the given tags.

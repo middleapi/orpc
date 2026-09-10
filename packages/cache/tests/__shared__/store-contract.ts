@@ -10,21 +10,21 @@ export function describeCacheStoreContract(createStore: () => CacheStore): void 
     const store = createStore()
     const fill = vi.fn(async () => ({ nested: [1, 2] }))
 
-    await expect(store.fetch('k', fill, { tags: ['t'] })).resolves.toEqual({ output: { nested: [1, 2] }, tags: ['t'], expiresAt: undefined })
-    await expect(store.fetch('k', fill, { tags: ['t'] })).resolves.toEqual({ output: { nested: [1, 2] }, tags: ['t'], expiresAt: undefined })
+    await expect(store.getOrSet('k', fill, { tags: ['t'] })).resolves.toEqual({ output: { nested: [1, 2] }, tags: ['t'], expiresAt: undefined })
+    await expect(store.getOrSet('k', fill, { tags: ['t'] })).resolves.toEqual({ output: { nested: [1, 2] }, tags: ['t'], expiresAt: undefined })
     expect(fill).toHaveBeenCalledTimes(1)
 
-    await store.fetch('u', async () => undefined)
-    await expect(store.fetch('u', async () => 'refilled')).resolves.toEqual({ output: undefined, tags: undefined, expiresAt: undefined })
+    await store.getOrSet('u', async () => undefined)
+    await expect(store.getOrSet('u', async () => 'refilled')).resolves.toEqual({ output: undefined, tags: undefined, expiresAt: undefined })
   })
 
   it('fills each key separately', async () => {
     const store = createStore()
 
-    await store.fetch('a', async () => 'a')
+    await store.getOrSet('a', async () => 'a')
 
-    await expect(store.fetch('b', async () => 'b')).resolves.toMatchObject({ output: 'b' })
-    await expect(store.fetch('a', async () => 'refilled')).resolves.toMatchObject({ output: 'a' })
+    await expect(store.getOrSet('b', async () => 'b')).resolves.toMatchObject({ output: 'b' })
+    await expect(store.getOrSet('a', async () => 'refilled')).resolves.toMatchObject({ output: 'a' })
   })
 
   it('preserves Date, Map, Set, and BigInt outputs', async () => {
@@ -36,43 +36,43 @@ export function describeCacheStoreContract(createStore: () => CacheStore): void 
       big: 123n,
     }
 
-    await store.fetch('k', async () => output)
+    await store.getOrSet('k', async () => output)
 
-    await expect(store.fetch('k', async () => 'refilled')).resolves.toMatchObject({ output })
+    await expect(store.getOrSet('k', async () => 'refilled')).resolves.toMatchObject({ output })
   })
 
   it('invalidates entries by any of their tags, leaving others alone', async () => {
     const store = createStore()
 
-    await store.fetch('multi', async () => 'v', { tags: ['a', 'b'] })
-    await store.fetch('other', async () => 'v', { tags: ['c'] })
+    await store.getOrSet('multi', async () => 'v', { tags: ['a', 'b'] })
+    await store.getOrSet('other', async () => 'v', { tags: ['c'] })
 
     await store.revalidate({ tags: ['a'] })
 
-    await expect(store.fetch('multi', async () => 'refilled', { tags: ['a', 'b'] })).resolves.toMatchObject({ output: 'refilled' })
-    await expect(store.fetch('other', async () => 'refilled', { tags: ['c'] })).resolves.toMatchObject({ output: 'v' })
+    await expect(store.getOrSet('multi', async () => 'refilled', { tags: ['a', 'b'] })).resolves.toMatchObject({ output: 'refilled' })
+    await expect(store.getOrSet('other', async () => 'refilled', { tags: ['c'] })).resolves.toMatchObject({ output: 'v' })
   })
 
   it('revalidates many tags at once', async () => {
     const store = createStore()
 
-    await store.fetch('a', async () => 'v', { tags: ['a'] })
-    await store.fetch('b', async () => 'v', { tags: ['b'] })
+    await store.getOrSet('a', async () => 'v', { tags: ['a'] })
+    await store.getOrSet('b', async () => 'v', { tags: ['b'] })
 
     await store.revalidate({ tags: ['a', 'b'] })
 
-    await expect(store.fetch('a', async () => 'refilled', { tags: ['a'] })).resolves.toMatchObject({ output: 'refilled' })
-    await expect(store.fetch('b', async () => 'refilled', { tags: ['b'] })).resolves.toMatchObject({ output: 'refilled' })
+    await expect(store.getOrSet('a', async () => 'refilled', { tags: ['a'] })).resolves.toMatchObject({ output: 'refilled' })
+    await expect(store.getOrSet('b', async () => 'refilled', { tags: ['b'] })).resolves.toMatchObject({ output: 'refilled' })
   })
 
   it('keeps entries filled after a revalidation', async () => {
     const store = createStore()
 
-    await store.fetch('k', async () => 'old', { tags: ['t'] })
+    await store.getOrSet('k', async () => 'old', { tags: ['t'] })
     await store.revalidate({ tags: ['t'] })
-    await store.fetch('k', async () => 'new', { tags: ['t'] })
+    await store.getOrSet('k', async () => 'new', { tags: ['t'] })
 
-    await expect(store.fetch('k', async () => 'newer', { tags: ['t'] })).resolves.toMatchObject({ output: 'new' })
+    await expect(store.getOrSet('k', async () => 'newer', { tags: ['t'] })).resolves.toMatchObject({ output: 'new' })
   })
 
   it('fills once for concurrent callers of one key', async () => {
@@ -82,11 +82,11 @@ export function describeCacheStoreContract(createStore: () => CacheStore): void 
       finish = resolve
     }))
 
-    const fetches = Promise.all([store.fetch('k', fill), store.fetch('k', fill), store.fetch('k', fill)])
+    const pending = Promise.all([store.getOrSet('k', fill), store.getOrSet('k', fill), store.getOrSet('k', fill)])
     await vi.waitFor(() => expect(fill).toHaveBeenCalledTimes(1), { timeout: 5000 })
     finish('v')
 
-    const entries = await fetches
+    const entries = await pending
     expect(entries.map(entry => entry.output)).toEqual(['v', 'v', 'v'])
     expect(fill).toHaveBeenCalledTimes(1)
   })
@@ -99,7 +99,7 @@ export function describeCacheStoreContract(createStore: () => CacheStore): void 
       started = resolve
     })
 
-    const first = store.fetch('k', () => {
+    const first = store.getOrSet('k', () => {
       started()
       return new Promise<never>((_, reject) => {
         fail = reject
@@ -107,7 +107,7 @@ export function describeCacheStoreContract(createStore: () => CacheStore): void 
     })
     await holding
 
-    const second = store.fetch('k', async () => 'fresh')
+    const second = store.getOrSet('k', async () => 'fresh')
     fail(new Error('handler down'))
 
     await expect(first).rejects.toThrow('handler down')

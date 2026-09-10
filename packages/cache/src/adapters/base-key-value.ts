@@ -1,5 +1,5 @@
 import type { Promisable, Public } from '@orpc/shared'
-import type { CacheEntry, CacheFetchOptions, CacheRevalidateOptions, CacheStore } from '../types'
+import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions, CacheStore } from '../types'
 import { RPCJsonSerializer } from '@orpc/client'
 import { encodeCacheKey, isCacheEntryStale } from '../utils'
 
@@ -28,7 +28,7 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
     this.serializer = options.serializer ?? new RPCJsonSerializer()
   }
 
-  async fetch(key: unknown, fill: () => Promise<unknown>, options: CacheFetchOptions = {}): Promise<CacheEntry> {
+  async getOrSet(key: unknown, fill: () => Promise<unknown>, options: CacheGetOrSetOptions = {}): Promise<CacheEntry> {
     const encodedKey = encodeCacheKey(key, this.serializer)
     const entry = await this.read(encodedKey)
 
@@ -62,7 +62,7 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
    * Runs `fill` and stores its output. Tag state captured before `fill` runs
    * lets a revalidation that lands during it still invalidate the entry.
    */
-  protected abstract fill(encodedKey: string, fill: () => Promise<unknown>, options: CacheFetchOptions): Promise<CacheEntry>
+  protected abstract fill(encodedKey: string, fill: () => Promise<unknown>, options: CacheGetOrSetOptions): Promise<CacheEntry>
 
   /**
    * Runs `fn` once the key is free, in call order. `waited` is `true` when

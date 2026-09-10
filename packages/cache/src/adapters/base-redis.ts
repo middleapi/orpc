@@ -1,6 +1,6 @@
 import type { RPCJsonSerialization } from '@orpc/client'
 import type { Public } from '@orpc/shared'
-import type { CacheEntry, CacheFetchOptions, CacheRevalidateOptions, CacheStore } from '../types'
+import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions, CacheStore } from '../types'
 import { RPCJsonSerializer } from '@orpc/client'
 import { nowInSeconds, sleep, stringifyJSON } from '@orpc/shared'
 import { encodeCacheKey, resolveCacheExpiry } from '../utils'
@@ -12,7 +12,7 @@ import { encodeCacheKey, resolveCacheExpiry } from '../utils'
  * got it, and `snapshot` then carries the versions of the tags it will fill
  * with, captured before the fill so a revalidation during it still counts.
  */
-const FETCH_SCRIPT = `
+const GET_SCRIPT = `
 local token, lockPx, tagPrefix, now, fillTags = ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5]
 local fields = redis.call('HMGET', KEYS[1], 'output', 'tags', 'tagVersions', 'expiresAt', 'evictAt')
 local output, tags, versions, expiresAt, evictAt = fields[1], fields[2], fields[3], fields[4], fields[5]
@@ -148,7 +148,7 @@ export interface BaseRedisCacheStoreOptions {
  * Cache store for Redis-compatible databases, driven by Lua scripts so a hit
  * is one round trip and a miss two. Entries are hashes retained for
  * `ttl + swr`; tag counters have no expiry since expiring one would resurrect
- * stale entries. Revalidated entries are removed lazily on the next `fetch`
+ * stale entries. Revalidated entries are removed lazily on the next `getOrSet`
  * of their key. Concurrent callers of one key are coalesced through a lock
  * taken in the same script that reads the entry, so it spans processes.
  * Subclasses only run the scripts through their client.
@@ -171,7 +171,7 @@ export abstract class BaseRedisCacheStore implements CacheStore {
     this.serializer = options.serializer ?? new RPCJsonSerializer()
   }
 
-  async fetch(key: unknown, fill: () => Promise<unknown>, options: CacheFetchOptions = {}): Promise<CacheEntry> {
+  async getOrSet(key: unknown, fill: () => Promise<unknown>, options: CacheGetOrSetOptions = {}): Promise<CacheEntry> {
     const encodedKey = encodeCacheKey(key, this.serializer)
     const entryKey = this.entryPrefix + encodedKey
     const lockKey = this.lockPrefix + encodedKey
@@ -181,7 +181,7 @@ export abstract class BaseRedisCacheStore implements CacheStore {
     while (true) {
       const now = nowInSeconds()
       const [output, tags, expiresAt, evictAt, shouldFill, snapshot] = await this.run(
-        FETCH_SCRIPT,
+        GET_SCRIPT,
         [entryKey, lockKey],
         [token, this.lockPx, this.tagPrefix, String(now), fillTags],
       ) as [unknown, unknown, unknown, unknown, unknown, unknown]
@@ -220,7 +220,7 @@ export abstract class BaseRedisCacheStore implements CacheStore {
    */
   protected abstract run(script: string, keys: string[], args: string[]): Promise<unknown>
 
-  private async store(entryKey: string, lockKey: string, token: string, fill: () => Promise<unknown>, options: CacheFetchOptions, snapshot: unknown, startedAt: number): Promise<CacheEntry> {
+  private async store(entryKey: string, lockKey: string, token: string, fill: () => Promise<unknown>, options: CacheGetOrSetOptions, snapshot: unknown, startedAt: number): Promise<CacheEntry> {
     let output: unknown
     let serialized: string
 

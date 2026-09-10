@@ -77,7 +77,7 @@ export function cache<
     const store = middlewareOptions.context['cache/store']
     const pluginContext = (middlewareOptions.context as CacheHandlerPluginContext)[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]
 
-    const entry = await store.fetch(key, async () => (await middlewareOptions.next()).output, {
+    const entry = await store.getOrSet(key, async () => (await middlewareOptions.next()).output, {
       tags,
       ttl,
       swr,
