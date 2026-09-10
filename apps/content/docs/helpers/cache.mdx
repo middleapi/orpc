@@ -22,6 +22,7 @@ Everything builds on the `CacheStore` interface: `getOrSet` returns the entry un
 | [`UpstashCacheStore`](#upstash)                                  | [Upstash Redis](https://github.com/upstash/redis-js)                                       |
 | [`experimental_BunRedisCacheStore`](#bun)                        | [Bun's Redis](https://bun.com/docs/runtime/redis)                                          |
 | [`VercelCacheStore`](#vercel)                                    | [Vercel Runtime Cache](https://vercel.com/docs/caching/runtime-cache)                      |
+| [`BentoCacheStore`](#bentocache)                                 | [BentoCache](https://bentocache.dev)                                                       |
 | [`experimental_WorkersCacheStore`](#cloudflare-workers-caching)  | [Cloudflare Workers Caching](https://developers.cloudflare.com/workers/cache/), purge only |
 
 ```ts twoslash
@@ -306,6 +307,32 @@ const store = new VercelCacheStore({
    */
   cache: getCache(),
 
+  /**
+   * Serializer for keys and cached outputs.
+   *
+   * @default RPCJsonSerializer
+   */
+  serializer: undefined,
+})
+```
+
+### BentoCache
+
+Stores entries through any [BentoCache](https://bentocache.dev) setup, from a memory tier to a multi-tier store, using its own `getOrSet` and deleting tags natively through `deleteByTag`. `swr` maps to its grace period, so BentoCache refreshes stale entries in the background itself, and a revalidated entry is served once more while it refreshes. Pass a namespace to keep entries apart from the rest of the cache.
+
+```ts
+import { BentoCacheStore } from '@orpc/experimental-cache/bentocache'
+import { BentoCache, bentostore } from 'bentocache'
+import { memoryDriver } from 'bentocache/drivers/memory'
+
+const bento = new BentoCache({
+  default: 'cache',
+  stores: {
+    cache: bentostore().useL1Layer(memoryDriver()),
+  },
+})
+
+const store = new BentoCacheStore(bento.namespace('orpc'), {
   /**
    * Serializer for keys and cached outputs.
    *

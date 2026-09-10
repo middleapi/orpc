@@ -4,7 +4,7 @@ import { MemoryCacheStore } from './memory'
 
 describe('memoryCacheStore', () => {
   beforeEach(() => {
-    vi.useFakeTimers()
+    vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(0)
   })
 

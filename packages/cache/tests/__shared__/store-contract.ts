@@ -1,4 +1,5 @@
 import type { CacheStore } from '../../src'
+import { sleep } from '@orpc/shared'
 import { expect, it, vi } from 'vitest'
 
 /**
@@ -70,6 +71,7 @@ export function describeCacheStoreContract(createStore: () => CacheStore): void 
 
     await store.getOrSet('k', async () => 'old', { tags: ['t'] })
     await store.revalidate({ tags: ['t'] })
+    await sleep(1) // stores like BentoCache keep invalidation time to the millisecond
     await store.getOrSet('k', async () => 'new', { tags: ['t'] })
 
     await expect(store.getOrSet('k', async () => 'newer', { tags: ['t'] })).resolves.toMatchObject({ output: 'new' })
