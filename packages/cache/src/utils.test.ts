@@ -6,6 +6,15 @@ describe('encodeCacheKey', () => {
 
   it('uses string keys verbatim', () => {
     expect(encodeCacheKey('planet:1', serializer)).toBe('planet:1')
+    expect(encodeCacheKey('{', serializer)).toBe('{')
+  })
+
+  it('serializes strings shaped like a serialized key, so they never collide with one', () => {
+    const encoded = encodeCacheKey({ a: 1 }, serializer)
+
+    expect(encoded).toMatch(/^\{.*\}$/)
+    expect(encodeCacheKey(encoded, serializer)).not.toBe(encoded)
+    expect(encodeCacheKey('{}', serializer)).not.toBe('{}')
   })
 
   it('encodes structurally equal keys identically, regardless of property order', () => {

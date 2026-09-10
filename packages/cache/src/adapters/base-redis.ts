@@ -59,31 +59,37 @@ return { output or false, tags or false, expiresAt or false, evictAt or false, a
 
 /**
  * Stores the entry with the tag versions captured when its fill started,
- * then releases the caller's lock.
+ * then releases the caller's lock. An entry from a fill that started later
+ * is kept instead, since a holder whose lock expired can finish after the
+ * caller that took over.
  */
 const STORE_SCRIPT = `
-local token, output, tags, tagVersions, expiresAt, evictAt = ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5], ARGV[6]
-local fields = { 'output', output }
+local token, output, tags, tagVersions, expiresAt, evictAt, startedAt = ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5], ARGV[6], ARGV[7]
+local current = redis.call('HGET', KEYS[1], 'startedAt')
 
-if tags ~= '' then
-  fields[#fields + 1] = 'tags'
-  fields[#fields + 1] = tags
-  fields[#fields + 1] = 'tagVersions'
-  fields[#fields + 1] = tagVersions
-end
+if not current or tonumber(current) <= tonumber(startedAt) then
+  local fields = { 'output', output, 'startedAt', startedAt }
 
-if expiresAt ~= '' then
-  fields[#fields + 1] = 'expiresAt'
-  fields[#fields + 1] = expiresAt
-  fields[#fields + 1] = 'evictAt'
-  fields[#fields + 1] = evictAt
-end
+  if tags ~= '' then
+    fields[#fields + 1] = 'tags'
+    fields[#fields + 1] = tags
+    fields[#fields + 1] = 'tagVersions'
+    fields[#fields + 1] = tagVersions
+  end
 
-redis.call('DEL', KEYS[1])
-redis.call('HSET', KEYS[1], unpack(fields))
+  if expiresAt ~= '' then
+    fields[#fields + 1] = 'expiresAt'
+    fields[#fields + 1] = expiresAt
+    fields[#fields + 1] = 'evictAt'
+    fields[#fields + 1] = evictAt
+  end
 
-if evictAt ~= '' then
-  redis.call('PEXPIREAT', KEYS[1], tonumber(evictAt) * 1000)
+  redis.call('DEL', KEYS[1])
+  redis.call('HSET', KEYS[1], unpack(fields))
+
+  if evictAt ~= '' then
+    redis.call('PEXPIREAT', KEYS[1], tonumber(evictAt) * 1000)
+  end
 end
 
 if redis.call('GET', KEYS[2]) == token then
@@ -173,10 +179,11 @@ export abstract class BaseRedisCacheStore implements CacheStore {
     const fillTags = options.tags?.length ? stringifyJSON(options.tags) : ''
 
     while (true) {
+      const now = nowInSeconds()
       const [output, tags, expiresAt, evictAt, shouldFill, snapshot] = await this.run(
         FETCH_SCRIPT,
         [entryKey, lockKey],
-        [token, this.lockPx, this.tagPrefix, String(nowInSeconds()), fillTags],
+        [token, this.lockPx, this.tagPrefix, String(now), fillTags],
       ) as [unknown, unknown, unknown, unknown, unknown, unknown]
 
       if (output !== null) {
@@ -188,7 +195,7 @@ export abstract class BaseRedisCacheStore implements CacheStore {
         }
 
         if (shouldFill) {
-          const refresh = this.store(entryKey, lockKey, token, fill, options, snapshot)
+          const refresh = this.store(entryKey, lockKey, token, fill, options, snapshot, now)
           options.waitUntil?.(refresh)
         }
 
@@ -196,7 +203,7 @@ export abstract class BaseRedisCacheStore implements CacheStore {
       }
 
       if (shouldFill) {
-        return this.store(entryKey, lockKey, token, fill, options, snapshot)
+        return this.store(entryKey, lockKey, token, fill, options, snapshot, now)
       }
 
       await sleep(50)
@@ -213,7 +220,7 @@ export abstract class BaseRedisCacheStore implements CacheStore {
    */
   protected abstract run(script: string, keys: string[], args: string[]): Promise<unknown>
 
-  private async store(entryKey: string, lockKey: string, token: string, fill: () => Promise<unknown>, options: CacheFetchOptions, snapshot: unknown): Promise<CacheEntry> {
+  private async store(entryKey: string, lockKey: string, token: string, fill: () => Promise<unknown>, options: CacheFetchOptions, snapshot: unknown, startedAt: number): Promise<CacheEntry> {
     let output: unknown
     let serialized: string
 
@@ -237,6 +244,7 @@ export abstract class BaseRedisCacheStore implements CacheStore {
       snapshot === null ? '' : typeof snapshot === 'string' ? snapshot : stringifyJSON(snapshot as object),
       expiresAt !== undefined ? String(expiresAt) : '',
       evictAt !== undefined ? String(evictAt) : '',
+      String(startedAt),
     ])
 
     return { output, tags, expiresAt, evictAt }

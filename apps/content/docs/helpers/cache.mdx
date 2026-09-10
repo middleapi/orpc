@@ -190,7 +190,7 @@ const store = new MemoryCacheStore({
 
 ### Redis
 
-Stores entries as Redis hashes and drives every operation through Lua scripts, so a hit costs one round trip and a miss two. The lock taken on a miss is released when the fill finishes, or after `lockTtl` if it never does. The client is connected lazily when needed.
+Stores entries as Redis hashes and drives every operation through Lua scripts, so a hit costs one round trip and a miss two. The lock taken on a miss is released when the fill finishes, or after `lockTtl` if it never does. When a fill outlives its lock and another caller takes over, the entry of the fill that started last is kept, whichever finishes first. The client is connected lazily when needed.
 
 ```ts
 import { RedisCacheStore } from '@orpc/experimental-cache/redis'

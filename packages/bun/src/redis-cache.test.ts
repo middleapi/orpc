@@ -248,4 +248,26 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
     await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(false)
     await expect(holderStore.fetch('k', async () => 'other')).resolves.toMatchObject({ output: 'waiter' })
   }, { timeout: 20_000 })
+
+  it('keeps the entry of the fill that took over when the original holder finishes later', async () => {
+    const { store: holderStore, prefix } = createTestingStore({ lockTtl: 1 })
+    const waiterStore = new BunRedisCacheStore(redis, { prefix })
+    let takenOver!: () => void
+    const takeover = new Promise<void>((resolve) => {
+      takenOver = resolve
+    })
+
+    const holder = holderStore.fetch('k', async () => {
+      await takeover
+      return 'holder'
+    })
+    await waitFor(async () => expect(await redis.exists(`${prefix}l:k`)).toBe(true), { timeout: 5000 })
+
+    await expect(waiterStore.fetch('k', async () => 'waiter')).resolves.toMatchObject({ output: 'waiter' })
+    takenOver()
+    await expect(holder).resolves.toMatchObject({ output: 'holder' })
+
+    await expect(waiterStore.fetch('k', async () => 'other')).resolves.toMatchObject({ output: 'waiter' })
+    await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(false)
+  }, { timeout: 20_000 })
 })

@@ -8,18 +8,22 @@ import { deepSortKeys, nowInSeconds, stringifyJSON } from '@orpc/shared'
  * any other value is serialized with the RPC JSON serializer first, so
  * complex values become plain JSON, then canonicalized by sorting object
  * keys and meta entries. Structurally equal keys always encode identically,
- * and unsupported values like blobs are ignored.
+ * and unsupported values like blobs are ignored. A string shaped like a
+ * serialized key is serialized too, so the two never collide.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
 export function encodeCacheKey(key: unknown, serializer: Public<RPCJsonSerializer>): string {
-  if (typeof key === 'string') {
+  if (typeof key === 'string' && (!key.startsWith('{') || !key.endsWith('}'))) {
     return key
   }
 
   const { json, meta } = serializer.serialize(key)
 
-  return stringifyJSON([deepSortKeys(json), meta?.map(entry => stringifyJSON(entry)).sort()])
+  return stringifyJSON({
+    j: deepSortKeys(json),
+    m: meta?.map(entry => stringifyJSON(entry)).sort(),
+  })
 }
 
 /**

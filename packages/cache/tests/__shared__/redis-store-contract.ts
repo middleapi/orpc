@@ -166,4 +166,26 @@ export function describeRedisCacheStoreContract(
     await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(0)
     await expect(holderStore.fetch('k', async () => 'other')).resolves.toMatchObject({ output: 'waiter' })
   })
+
+  it('keeps the entry of the fill that took over when the original holder finishes later', async () => {
+    const { store: holderStore, prefix } = createStore({ lockTtl: 1 })
+    const { store: waiterStore } = createStore({ prefix })
+    let takenOver!: () => void
+    const takeover = new Promise<void>((resolve) => {
+      takenOver = resolve
+    })
+
+    const holder = holderStore.fetch('k', async () => {
+      await takeover
+      return 'holder'
+    })
+    await vi.waitFor(() => expect(redis.exists(`${prefix}l:k`)).resolves.toBe(1), { timeout: 5000 })
+
+    await expect(waiterStore.fetch('k', async () => 'waiter')).resolves.toMatchObject({ output: 'waiter' })
+    takenOver()
+    await expect(holder).resolves.toMatchObject({ output: 'holder' })
+
+    await expect(waiterStore.fetch('k', async () => 'other')).resolves.toMatchObject({ output: 'waiter' })
+    await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(0)
+  })
 }

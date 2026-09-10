@@ -28,9 +28,10 @@ export class experimental_WorkersCacheStore implements CacheStore {
   }
 
   async fetch(_key: unknown, fill: () => Promise<unknown>, options: CacheFetchOptions = {}): Promise<CacheEntry> {
+    const output = await fill()
     const { expiresAt, evictAt } = resolveCacheExpiry(options)
 
-    return { output: await fill(), tags: options.tags, expiresAt, evictAt }
+    return { output, tags: options.tags, expiresAt, evictAt }
   }
 
   async revalidate({ tags }: CacheRevalidateOptions): Promise<void> {

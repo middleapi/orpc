@@ -23,6 +23,19 @@ describe('experimental_WorkersCacheStore', () => {
     expect(purger.purge).not.toHaveBeenCalled()
   })
 
+  it('measures expiry from when the fill finishes', async () => {
+    const store = new experimental_WorkersCacheStore({ cache: createPurger() })
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000_000_000)
+
+    const entry = await store.fetch('k', async () => {
+      now.mockReturnValue(1_000_000_005_000)
+      return 'v'
+    }, { ttl: 10 })
+
+    expect(entry.expiresAt).toBe(1_000_000_015)
+    now.mockRestore()
+  })
+
   it('purges encoded tags through workers caching', async () => {
     const purger = createPurger()
     const store = new experimental_WorkersCacheStore({ cache: purger })
