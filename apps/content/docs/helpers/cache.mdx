@@ -130,7 +130,7 @@ The `CacheHandlerPlugin` reflects the activity of [Cache Middleware](#cache-midd
 
 The plugin sets these over anything already on the response. To override them, set your own afterwards with [ResponseHeadersPlugin](/docs/plugins/response-headers).
 
-Tags are joined with commas. Only `%`, `,`, uppercase letters, and characters that cannot appear in a header value are percent-encoded, so typical tags stay readable, and a lone surrogate becomes U+FFFD first since it has no UTF-8 form. Uppercase letters are encoded because caches like Cloudflare Workers Caching match tags case-insensitively, and the encoded form stays unambiguous under case folding. `decodeCacheTagHeader` from `@orpc/shared` parses a header back into tags.
+Tags are joined with commas. Only `%`, `,`, uppercase letters, and characters that cannot appear in a header value are percent-encoded, so typical tags stay readable. Uppercase letters are encoded because caches like Cloudflare Workers Caching match tags case-insensitively, and the encoded form stays unambiguous under case folding. `decodeCacheTagHeader` from `@orpc/shared` parses a header back into tags.
 
 ```ts
 import { CacheHandlerPlugin } from '@orpc/experimental-cache'
