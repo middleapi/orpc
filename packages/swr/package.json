@@ -1,7 +1,7 @@
 {
   "name": "@orpc/swr",
   "type": "module",
-  "version": "2.0.0-beta.34",
+  "version": "2.0.0-beta.35",
   "description": "SWR integration for oRPC: typesafe React data fetching hooks",
   "license": "MIT",
   "funding": [

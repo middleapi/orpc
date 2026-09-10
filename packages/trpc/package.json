@@ -1,7 +1,7 @@
 {
   "name": "@orpc/trpc",
   "type": "module",
-  "version": "2.0.0-beta.34",
+  "version": "2.0.0-beta.35",
   "description": "tRPC interop for oRPC: reuse existing tRPC routers with oRPC clients and OpenAPI",
   "license": "MIT",
   "funding": [

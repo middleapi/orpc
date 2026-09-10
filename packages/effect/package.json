@@ -1,7 +1,7 @@
 {
   "name": "@orpc/experimental-effect",
   "type": "module",
-  "version": "2.0.0-beta.34",
+  "version": "2.0.0-beta.35",
   "description": "Effect integration for oRPC: build typesafe procedures with Effect",
   "license": "MIT",
   "funding": [

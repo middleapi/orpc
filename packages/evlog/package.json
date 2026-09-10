@@ -1,7 +1,7 @@
 {
   "name": "@orpc/evlog",
   "type": "module",
-  "version": "2.0.0-beta.34",
+  "version": "2.0.0-beta.35",
   "description": "Evlog integration for oRPC: wide-event logging for typesafe APIs",
   "license": "MIT",
   "funding": [

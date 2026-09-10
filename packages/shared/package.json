@@ -1,7 +1,7 @@
 {
   "name": "@orpc/shared",
   "type": "module",
-  "version": "2.0.0-beta.34",
+  "version": "2.0.0-beta.35",
   "description": "Internal utilities shared across oRPC packages",
   "license": "MIT",
   "funding": [

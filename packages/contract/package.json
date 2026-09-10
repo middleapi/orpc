@@ -1,7 +1,7 @@
 {
   "name": "@orpc/contract",
   "type": "module",
-  "version": "2.0.0-beta.34",
+  "version": "2.0.0-beta.35",
   "description": "Define typesafe API contracts as the single source of truth for oRPC, powered by Standard Schema",
   "license": "MIT",
   "funding": [

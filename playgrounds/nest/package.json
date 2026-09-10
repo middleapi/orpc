@@ -1,7 +1,7 @@
 {
   "name": "@orpc/nest-playground",
   "type": "module",
-  "version": "2.0.0-beta.34",
+  "version": "2.0.0-beta.35",
   "private": true,
   "scripts": {
     "dev": "nest start --watch --exec \"node --import @swc-node/register/esm-register\"",

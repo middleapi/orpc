@@ -1,7 +1,7 @@
 {
   "name": "@orpc/pinia-colada",
   "type": "module",
-  "version": "2.0.0-beta.34",
+  "version": "2.0.0-beta.35",
   "description": "Pinia Colada integration for oRPC: typesafe queries and mutations for Vue",
   "license": "MIT",
   "funding": [
