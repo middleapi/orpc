@@ -6,11 +6,12 @@ import { nowInSeconds, sleep, stringifyJSON } from '@orpc/shared'
 import { encodeCacheKey, resolveCacheExpiry } from '../utils'
 
 /**
- * Reads the entry as `[output, tags, expiresAt, evictAt, shouldFill, snapshot]`,
+ * Reads the entry as `[output, tags, expiresAt, evictAt, generation, snapshot]`,
  * dropping it when a tag was revalidated since it was stored. A missing or
- * stale entry also takes the lock; `shouldFill` reports whether this caller
- * got it, and `snapshot` then carries the versions of the tags it will fill
- * with, captured before the fill so a revalidation during it still counts.
+ * stale entry also takes the lock; `generation` is then the number the fill
+ * must still hold to store, and `snapshot` carries the versions of the tags
+ * it will fill with, captured before the fill so a revalidation during it
+ * still counts.
  */
 const GET_SCRIPT = `
 local token, lockPx, tagPrefix, now, fillTags = ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5]
@@ -35,11 +36,13 @@ if output and tags then
 end
 
 local stale = output and expiresAt and tonumber(expiresAt) <= tonumber(now)
-local acquired = false
+local generation = false
 local snapshot = false
 if not output or stale then
-  acquired = redis.call('SET', KEYS[2], token, 'NX', 'PX', lockPx) and true or false
-  if acquired and fillTags ~= '' then
+  if redis.call('SET', KEYS[2], token, 'NX', 'PX', lockPx) then
+    generation = redis.call('INCR', KEYS[3])
+  end
+  if generation and fillTags ~= '' then
     local names = cjson.decode(fillTags)
     local keys = {}
     for i, name in ipairs(names) do
@@ -54,21 +57,21 @@ if not output or stale then
   end
 end
 
-return { output or false, tags or false, expiresAt or false, evictAt or false, acquired, snapshot }
+return { output or false, tags or false, expiresAt or false, evictAt or false, generation, snapshot }
 `
 
 /**
  * Stores the entry with the tag versions captured when its fill started,
- * then releases the caller's lock. An entry from a fill that started later
- * is kept instead, since a holder whose lock expired can finish after the
- * caller that took over.
+ * then releases the caller's lock. The write is fenced by the generation
+ * the lock handed out: a holder whose lock expired and was taken over stores
+ * nothing, and the generation is deleted once the latest fill stored, so it
+ * only exists while a fill is in flight.
  */
 const STORE_SCRIPT = `
-local token, output, tags, tagVersions, expiresAt, evictAt, startedAt = ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5], ARGV[6], ARGV[7]
-local current = redis.call('HGET', KEYS[1], 'startedAt')
+local token, output, tags, tagVersions, expiresAt, evictAt, generation = ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5], ARGV[6], ARGV[7]
 
-if not current or tonumber(current) <= tonumber(startedAt) then
-  local fields = { 'output', output, 'startedAt', startedAt }
+if redis.call('GET', KEYS[3]) == generation then
+  local fields = { 'output', output }
 
   if tags ~= '' then
     fields[#fields + 1] = 'tags'
@@ -90,6 +93,8 @@ if not current or tonumber(current) <= tonumber(startedAt) then
   if evictAt ~= '' then
     redis.call('PEXPIREAT', KEYS[1], tonumber(evictAt) * 1000)
   end
+
+  redis.call('DEL', KEYS[3])
 end
 
 if redis.call('GET', KEYS[2]) == token then
@@ -98,12 +103,16 @@ end
 `
 
 /**
- * Deletes the lock only while it still holds the caller's token, leaving one
- * that expired and was taken over alone.
+ * Deletes the lock and the generation only while they are still the
+ * caller's, leaving ones that expired and were taken over alone.
  */
-const RELEASE_LOCK_SCRIPT = `
+const RELEASE_SCRIPT = `
 if redis.call('GET', KEYS[1]) == ARGV[1] then
   redis.call('DEL', KEYS[1])
+end
+
+if redis.call('GET', KEYS[2]) == ARGV[2] then
+  redis.call('DEL', KEYS[2])
 end
 `
 
@@ -158,6 +167,7 @@ export interface BaseRedisCacheStoreOptions {
 export abstract class BaseRedisCacheStore implements CacheStore {
   private readonly entryPrefix: string
   private readonly lockPrefix: string
+  private readonly generationPrefix: string
   private readonly tagPrefix: string
   private readonly lockPx: string
   private readonly serializer: Public<RPCJsonSerializer>
@@ -166,6 +176,7 @@ export abstract class BaseRedisCacheStore implements CacheStore {
     const prefix = options.prefix ?? ''
     this.entryPrefix = `${prefix}e:`
     this.lockPrefix = `${prefix}l:`
+    this.generationPrefix = `${prefix}g:`
     this.tagPrefix = `${prefix}t:`
     this.lockPx = String((options.lockTtl ?? 10) * 1000)
     this.serializer = options.serializer ?? new RPCJsonSerializer()
@@ -173,17 +184,15 @@ export abstract class BaseRedisCacheStore implements CacheStore {
 
   async getOrSet(key: unknown, fill: () => Promise<unknown>, options: CacheGetOrSetOptions = {}): Promise<CacheEntry> {
     const encodedKey = encodeCacheKey(key, this.serializer)
-    const entryKey = this.entryPrefix + encodedKey
-    const lockKey = this.lockPrefix + encodedKey
+    const keys = [this.entryPrefix + encodedKey, this.lockPrefix + encodedKey, this.generationPrefix + encodedKey]
     const token = crypto.randomUUID()
     const fillTags = options.tags?.length ? stringifyJSON(options.tags) : ''
 
     while (true) {
-      const now = nowInSeconds()
-      const [output, tags, expiresAt, evictAt, shouldFill, snapshot] = await this.run(
+      const [output, tags, expiresAt, evictAt, generation, snapshot] = await this.run(
         GET_SCRIPT,
-        [entryKey, lockKey],
-        [token, this.lockPx, this.tagPrefix, String(now), fillTags],
+        keys,
+        [token, this.lockPx, this.tagPrefix, String(nowInSeconds()), fillTags],
       ) as [unknown, unknown, unknown, unknown, unknown, unknown]
 
       if (output !== null) {
@@ -194,16 +203,16 @@ export abstract class BaseRedisCacheStore implements CacheStore {
           evictAt: evictAt === null ? undefined : Number(evictAt),
         }
 
-        if (shouldFill) {
-          const refresh = this.store(entryKey, lockKey, token, fill, options, snapshot, now)
+        if (generation !== null) {
+          const refresh = this.store(keys, token, String(generation), fill, options, snapshot)
           options.waitUntil?.(refresh)
         }
 
         return entry
       }
 
-      if (shouldFill) {
-        return this.store(entryKey, lockKey, token, fill, options, snapshot, now)
+      if (generation !== null) {
+        return this.store(keys, token, String(generation), fill, options, snapshot)
       }
 
       await sleep(50)
@@ -220,7 +229,7 @@ export abstract class BaseRedisCacheStore implements CacheStore {
    */
   protected abstract run(script: string, keys: string[], args: string[]): Promise<unknown>
 
-  private async store(entryKey: string, lockKey: string, token: string, fill: () => Promise<unknown>, options: CacheGetOrSetOptions, snapshot: unknown, startedAt: number): Promise<CacheEntry> {
+  private async store(keys: string[], token: string, generation: string, fill: () => Promise<unknown>, options: CacheGetOrSetOptions, snapshot: unknown): Promise<CacheEntry> {
     let output: unknown
     let serialized: string
 
@@ -230,21 +239,21 @@ export abstract class BaseRedisCacheStore implements CacheStore {
       serialized = stringifyJSON({ json, meta })
     }
     catch (error) {
-      await this.run(RELEASE_LOCK_SCRIPT, [lockKey], [token])
+      await this.run(RELEASE_SCRIPT, keys.slice(1), [token, generation])
       throw error
     }
 
     const tags = options.tags?.length ? options.tags : undefined
     const { expiresAt, evictAt } = resolveCacheExpiry(options)
 
-    await this.run(STORE_SCRIPT, [entryKey, lockKey], [
+    await this.run(STORE_SCRIPT, keys, [
       token,
       serialized,
       tags !== undefined ? stringifyJSON(tags) : '',
       snapshot === null ? '' : typeof snapshot === 'string' ? snapshot : stringifyJSON(snapshot as object),
       expiresAt !== undefined ? String(expiresAt) : '',
       evictAt !== undefined ? String(evictAt) : '',
-      String(startedAt),
+      generation,
     ])
 
     return { output, tags, expiresAt, evictAt }

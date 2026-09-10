@@ -270,6 +270,11 @@ describe('encodeCacheTag', () => {
     expect(tryDecodeURIComponent(encoded)).toBe(tag)
   })
 
+  it('replaces lone surrogates, which have no UTF-8 form, instead of throwing', () => {
+    expect(encodeCacheTag('a\uD800b\uDC00')).toBe('a%EF%BF%BDb%EF%BF%BD')
+    expect(encodeCacheTag(JSON.parse('"\\ud800"'))).toBe('%EF%BF%BD')
+  })
+
   it('keeps case-folded tags distinct', () => {
     expect(encodeCacheTag('Planets')).not.toBe(encodeCacheTag('planets'))
     expect(encodeCacheTag('Planets').toLowerCase()).not.toBe(encodeCacheTag('planets').toLowerCase())

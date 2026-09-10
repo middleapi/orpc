@@ -31,6 +31,7 @@ describe.concurrent('upstash cache store integration', {
     exists: key => redis.exists(key),
     type: key => redis.type(key),
     hset: (key, fields) => redis.hset(key, fields),
+    del: key => redis.del(key),
     scriptFlush: () => redis.scriptFlush(),
   })
 

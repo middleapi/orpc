@@ -8,6 +8,7 @@ export interface RedisCacheStoreContractClient {
   exists: (key: string) => Promise<number>
   type: (key: string) => Promise<string>
   hset: (key: string, fields: Record<string, string>) => Promise<unknown>
+  del: (key: string) => Promise<unknown>
   scriptFlush: () => Promise<unknown>
 }
 
@@ -187,5 +188,30 @@ export function describeRedisCacheStoreContract(
 
     await expect(waiterStore.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'waiter' })
     await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(0)
+    await expect(redis.exists(`${prefix}g:k`)).resolves.toBe(0)
+  })
+
+  it('stores nothing from a holder that lost its lock, even once the takeover entry is gone', async () => {
+    const { store: holderStore, prefix } = createStore({ lockTtl: 1 })
+    const { store: waiterStore } = createStore({ prefix })
+    let takenOver!: () => void
+    const takeover = new Promise<void>((resolve) => {
+      takenOver = resolve
+    })
+
+    const holder = holderStore.getOrSet('k', async () => {
+      await takeover
+      return 'holder'
+    })
+    await vi.waitFor(() => expect(redis.exists(`${prefix}l:k`)).resolves.toBe(1), { timeout: 5000 })
+
+    await expect(waiterStore.getOrSet('k', async () => 'waiter')).resolves.toMatchObject({ output: 'waiter' })
+    await redis.del(`${prefix}e:k`)
+
+    takenOver()
+    await expect(holder).resolves.toMatchObject({ output: 'holder' })
+
+    await expect(redis.exists(`${prefix}e:k`)).resolves.toBe(0)
+    await expect(waiterStore.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'other' })
   })
 }

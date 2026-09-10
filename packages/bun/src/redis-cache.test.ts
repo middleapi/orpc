@@ -269,5 +269,30 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
 
     await expect(waiterStore.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'waiter' })
     await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(false)
+    await expect(redis.exists(`${prefix}g:k`)).resolves.toBe(false)
+  }, { timeout: 20_000 })
+
+  it('stores nothing from a holder that lost its lock, even once the takeover entry is gone', async () => {
+    const { store: holderStore, prefix } = createTestingStore({ lockTtl: 1 })
+    const waiterStore = new BunRedisCacheStore(redis, { prefix })
+    let takenOver!: () => void
+    const takeover = new Promise<void>((resolve) => {
+      takenOver = resolve
+    })
+
+    const holder = holderStore.getOrSet('k', async () => {
+      await takeover
+      return 'holder'
+    })
+    await waitFor(async () => expect(await redis.exists(`${prefix}l:k`)).toBe(true), { timeout: 5000 })
+
+    await expect(waiterStore.getOrSet('k', async () => 'waiter')).resolves.toMatchObject({ output: 'waiter' })
+    await redis.send('DEL', [`${prefix}e:k`])
+
+    takenOver()
+    await expect(holder).resolves.toMatchObject({ output: 'holder' })
+
+    await expect(redis.exists(`${prefix}e:k`)).resolves.toBe(false)
+    await expect(waiterStore.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'other' })
   }, { timeout: 20_000 })
 })

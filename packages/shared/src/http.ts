@@ -142,6 +142,13 @@ export function isCompressibleContentType(contentType: string | null | undefined
 const UNSAFE_CACHE_TAG_CHARS = /[^\x21-\x7E]|[%,A-Z]/gu
 
 /**
+ * Matches lone surrogates only, since a well-formed pair is one code point
+ * under the `u` flag. They have no UTF-8 form, so `encodeURIComponent` throws
+ * on them.
+ */
+const LONE_SURROGATES = /[\uD800-\uDFFF]/gu
+
+/**
  * Percent-encodes only {@link UNSAFE_CACHE_TAG_CHARS} in a cache tag, so
  * typical tags stay readable. Uppercase letters are encoded because caches
  * like Cloudflare Workers Caching match tags case-insensitively; the encoded
@@ -154,7 +161,7 @@ export function encodeCacheTag(tag: string): string {
   // encodeURIComponent emits the UTF-8 bytes a percent escape needs, but leaves
   // the URI unreserved set alone, so the uppercase letters in it are escaped by
   // hand. Those are single-byte ASCII, so the code point is the byte.
-  return tag.replace(
+  return tag.replace(LONE_SURROGATES, '\uFFFD').replace(
     UNSAFE_CACHE_TAG_CHARS,
     char => char >= 'A' && char <= 'Z'
       ? `%${char.charCodeAt(0).toString(16).toUpperCase()}`
