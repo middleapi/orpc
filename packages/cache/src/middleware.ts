@@ -76,6 +76,7 @@ export function cache<
 
     const store = middlewareOptions.context['cache/store']
     const pluginContext = (middlewareOptions.context as CacheHandlerPluginContext)[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]
+    const lookupIndex = pluginContext?.caches.length ?? 0
 
     const entry = await store.getOrSet(key, async () => (await middlewareOptions.next()).output, {
       tags,
@@ -86,7 +87,7 @@ export function cache<
 
     const now = nowInSeconds()
 
-    pluginContext?.caches.push({
+    pluginContext?.caches.splice(lookupIndex, 0, {
       procedure: middlewareOptions.procedure,
       path: middlewareOptions.path,
       tags: entry.tags,

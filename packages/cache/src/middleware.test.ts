@@ -177,6 +177,23 @@ describe('cache', () => {
     expect(pluginContext.caches.map(({ tags }) => tags)).toEqual([['stored'], ['stored'], ['t']])
   })
 
+  it('records stacked caches in lookup order, on misses and hits alike', async () => {
+    const store = new MemoryCacheStore()
+    const pluginContext: Exclude<CacheHandlerPluginContext[typeof CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL], undefined> = { caches: [], revalidations: [] }
+    const procedure = os
+      .$context<CacheContext & CacheHandlerPluginContext>()
+      .use(cache({ key: 'outer', tags: ['outer'] }))
+      .use(cache({ key: 'inner', tags: ['inner'] }))
+      .handler(() => 'v')
+    const context = { 'cache/store': store, [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext }
+
+    await call(procedure, undefined, { context })
+    expect(pluginContext.caches.map(({ tags }) => tags)).toEqual([['outer'], ['inner']])
+
+    await call(procedure, undefined, { context })
+    expect(pluginContext.caches.map(({ tags }) => tags)).toEqual([['outer'], ['inner'], ['outer']])
+  })
+
   it('propagates store failures and records no check', async () => {
     const store = createStore()
     store.getOrSet.mockRejectedValueOnce(new Error('store down'))
