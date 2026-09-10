@@ -170,6 +170,22 @@ new CORSPlugin({
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
 :::
 
+## Tiered Store
+
+`TieredCacheStore` layers several stores front to back, such as a memory store in front of a Redis one. A miss in one tier fills from the next, so only the last tier runs the procedure, and a revalidation reaches every tier. Each tier measures `ttl` from when it stored its copy, so cap it on front tiers to bound how long they may outlive the entry behind them.
+
+```ts
+import { TieredCacheStore } from '@orpc/experimental-cache'
+import { MemoryCacheStore } from '@orpc/experimental-cache/memory'
+import { RedisCacheStore } from '@orpc/experimental-cache/redis'
+import { createClient } from 'redis'
+
+const store = new TieredCacheStore([
+  { store: new MemoryCacheStore(), ttl: 5 },
+  { store: new RedisCacheStore(createClient({ url: process.env.REDIS_URL })) },
+])
+```
+
 ## Adapters
 
 ### Memory
