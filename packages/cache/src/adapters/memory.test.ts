@@ -162,6 +162,27 @@ describe('memoryCacheStore', () => {
     await expect(store.getOrSet('k', async () => 'fresh', { tags: ['t'] })).resolves.toMatchObject({ output: 'fresh' })
   })
 
+  it('sweeps expired and revalidated entries on a later write, without reading them', async () => {
+    const store = new MemoryCacheStore()
+    const entries = Reflect.get(store, 'entries') as Map<string, unknown>
+
+    await store.getOrSet('expiring', async () => 'v', { ttl: 10 })
+    await store.getOrSet('tagged', async () => 'v', { tags: ['t'] })
+    await store.getOrSet('kept', async () => 'v', { ttl: 100 })
+
+    vi.setSystemTime(5000)
+    await store.getOrSet('before', async () => 'v')
+    expect([...entries.keys()]).toEqual(['expiring', 'tagged', 'kept', 'before'])
+
+    vi.setSystemTime(10_000)
+    await store.getOrSet('at', async () => 'v')
+    expect([...entries.keys()]).toEqual(['tagged', 'kept', 'before', 'at'])
+
+    await store.revalidate({ tags: ['t'] })
+    await store.getOrSet('after', async () => 'v')
+    expect([...entries.keys()]).toEqual(['kept', 'before', 'at', 'after'])
+  })
+
   it('evicts past ttl + swr, and revalidation drops stale entries too', async () => {
     const store = new MemoryCacheStore()
 

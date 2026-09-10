@@ -21,13 +21,15 @@ interface MemoryCacheStoreEntry {
 /**
  * In-memory cache store with tag-based invalidation, intended for
  * development, testing, and single-instance deployments. Expired and
- * revalidated entries are removed lazily on the next `getOrSet` of their key.
+ * revalidated entries are dropped when their key is read again, and otherwise
+ * swept on the next write once an eviction time or a revalidation has passed.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
 export class MemoryCacheStore extends BaseKeyValueCacheStore {
   private readonly entries = new Map<string, MemoryCacheStoreEntry>()
   private readonly tagVersions = new Map<string, number>()
+  private nextSweepAt = Infinity
 
   constructor(options: MemoryCacheStoreOptions = {}) {
     super(options)
@@ -37,6 +39,8 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
     for (const tag of tags) {
       this.tagVersions.set(tag, (this.tagVersions.get(tag) ?? 0) + 1)
     }
+
+    this.nextSweepAt = 0
   }
 
   protected read(encodedKey: string): CacheEntry | undefined {
@@ -46,16 +50,7 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
       return undefined
     }
 
-    if (entry.evictAt !== undefined && nowInSeconds() >= entry.evictAt) {
-      this.entries.delete(encodedKey)
-      return undefined
-    }
-
-    const revalidated = entry.tags?.some(
-      (tag, index) => (this.tagVersions.get(tag) ?? 0) !== entry.tagVersions?.[index],
-    )
-
-    if (revalidated) {
+    if (this.shouldEvict(entry, nowInSeconds())) {
       this.entries.delete(encodedKey)
       return undefined
     }
@@ -74,8 +69,41 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
     const output = await fill()
     const { expiresAt, evictAt } = resolveCacheExpiry(options)
 
+    this.sweep()
     this.entries.set(encodedKey, { output, tags, tagVersions, expiresAt, evictAt })
 
+    if (evictAt !== undefined) {
+      this.nextSweepAt = Math.min(this.nextSweepAt, evictAt)
+    }
+
     return { output, tags, expiresAt, evictAt }
+  }
+
+  private shouldEvict(entry: MemoryCacheStoreEntry, now: number): boolean {
+    return (entry.evictAt !== undefined && now >= entry.evictAt)
+      || (entry.tags?.some((tag, index) => (this.tagVersions.get(tag) ?? 0) !== entry.tagVersions?.[index]) ?? false)
+  }
+
+  /**
+   * Drops every entry due for eviction once the earliest eviction time or a
+   * revalidation has passed, so entries never read again still leave the store.
+   */
+  private sweep(): void {
+    const now = nowInSeconds()
+
+    if (now < this.nextSweepAt) {
+      return
+    }
+
+    this.nextSweepAt = Infinity
+
+    for (const [encodedKey, entry] of this.entries) {
+      if (this.shouldEvict(entry, now)) {
+        this.entries.delete(encodedKey)
+      }
+      else if (entry.evictAt !== undefined) {
+        this.nextSweepAt = Math.min(this.nextSweepAt, entry.evictAt)
+      }
+    }
   }
 }
