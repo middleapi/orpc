@@ -2,7 +2,7 @@ import type { BaseRedisCacheStoreOptions } from '@orpc/experimental-cache/base-r
 import type { RedisClient } from 'bun'
 import { BaseRedisCacheStore } from '@orpc/experimental-cache/base-redis'
 
-export type BunRedisCacheStoreOptions = BaseRedisCacheStoreOptions
+export type experimental_BunRedisCacheStoreOptions = BaseRedisCacheStoreOptions
 
 /**
  * Cache store adapter for Bun's built-in Redis client. Shares its key and
@@ -12,12 +12,12 @@ export type BunRedisCacheStoreOptions = BaseRedisCacheStoreOptions
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
-export class BunRedisCacheStore extends BaseRedisCacheStore {
+export class experimental_BunRedisCacheStore extends BaseRedisCacheStore {
   private readonly scriptShas = new Map<string, string>()
 
   constructor(
     private readonly redis: RedisClient,
-    options: BunRedisCacheStoreOptions = {},
+    options: experimental_BunRedisCacheStoreOptions = {},
   ) {
     super(options)
   }

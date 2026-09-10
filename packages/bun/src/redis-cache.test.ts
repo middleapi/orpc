@@ -3,7 +3,7 @@ import { nowInSeconds, sleep } from '@orpc/shared'
 import { RedisClient } from 'bun'
 import { beforeAll, describe, expect, it, mock, spyOn } from 'bun:test'
 import { waitFor } from '../tests/__shared__/utils'
-import { BunRedisCacheStore } from './redis-cache'
+import { experimental_BunRedisCacheStore } from './redis-cache'
 
 const REDIS_URL = Bun.env.REDIS_URL
 
@@ -15,9 +15,9 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
     await redis.connect()
   })
 
-  function createTestingStore(options: ConstructorParameters<typeof BunRedisCacheStore>[1] = {}) {
+  function createTestingStore(options: ConstructorParameters<typeof experimental_BunRedisCacheStore>[1] = {}) {
     const prefix = `orpc-bun-redis-cache-store-${crypto.randomUUID()}:`
-    return { store: new BunRedisCacheStore(redis, { prefix, ...options }), prefix }
+    return { store: new experimental_BunRedisCacheStore(redis, { prefix, ...options }), prefix }
   }
 
   it('fills a miss once, then serves the entry with its tags and expiresAt', async () => {
@@ -111,7 +111,7 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
     await expect(redis.exists(`${prefix}t:t`)).resolves.toBe(true)
     await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(false)
 
-    const unprefixed = new BunRedisCacheStore(redis)
+    const unprefixed = new experimental_BunRedisCacheStore(redis)
     const key = crypto.randomUUID()
     await unprefixed.getOrSet(key, async () => 'v')
     await expect(redis.exists(`e:${key}`)).resolves.toBe(true)
@@ -218,7 +218,7 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
 
   it('frees waiters after lockTtl and leaves a lock taken over that way alone', async () => {
     const { store: holderStore, prefix } = createTestingStore({ lockTtl: 1 })
-    const waiterStore = new BunRedisCacheStore(redis, { prefix })
+    const waiterStore = new experimental_BunRedisCacheStore(redis, { prefix })
     let release!: () => void
     const held = new Promise<void>((resolve) => {
       release = resolve
@@ -251,7 +251,7 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
 
   it('keeps the entry of the fill that took over when the original holder finishes later', async () => {
     const { store: holderStore, prefix } = createTestingStore({ lockTtl: 1 })
-    const waiterStore = new BunRedisCacheStore(redis, { prefix })
+    const waiterStore = new experimental_BunRedisCacheStore(redis, { prefix })
     let takenOver!: () => void
     const takeover = new Promise<void>((resolve) => {
       takenOver = resolve
@@ -274,7 +274,7 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
 
   it('stores nothing from a holder that lost its lock, even once the takeover entry is gone', async () => {
     const { store: holderStore, prefix } = createTestingStore({ lockTtl: 1 })
-    const waiterStore = new BunRedisCacheStore(redis, { prefix })
+    const waiterStore = new experimental_BunRedisCacheStore(redis, { prefix })
     let takenOver!: () => void
     const takeover = new Promise<void>((resolve) => {
       takenOver = resolve

@@ -4,7 +4,7 @@ import { nowInSeconds, sleep } from '@orpc/shared'
 import { RedisClient } from 'bun'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { createClient } from 'redis'
-import { BunRedisCacheStore } from '../src/redis-cache'
+import { experimental_BunRedisCacheStore } from '../src/redis-cache'
 
 const REDIS_URL = Bun.env.REDIS_URL
 
@@ -28,7 +28,7 @@ if (REDIS_URL) {
   })
 
   stores.push({ name: 'redis', store: new RedisCacheStore(redis, { prefix }) })
-  stores.push({ name: 'bun redis', store: new BunRedisCacheStore(bunRedis, { prefix }) })
+  stores.push({ name: 'bun redis', store: new experimental_BunRedisCacheStore(bunRedis, { prefix }) })
 }
 
 describe('cache redis adapters compatibility', () => {

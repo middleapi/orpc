@@ -20,7 +20,7 @@ Everything builds on the `CacheStore` interface: `getOrSet` returns the entry un
 | [`MemoryCacheStore`](#memory)                                    | In-memory storage                                                                          |
 | [`RedisCacheStore`](#redis)                                      | [Redis](https://github.com/redis/redis)                                                    |
 | [`UpstashCacheStore`](#upstash)                                  | [Upstash Redis](https://github.com/upstash/redis-js)                                       |
-| [`BunRedisCacheStore`](#bun)                                     | [Bun's Redis](https://bun.com/docs/runtime/redis)                                          |
+| [`experimental_BunRedisCacheStore`](#bun)                        | [Bun's Redis](https://bun.com/docs/runtime/redis)                                          |
 | [`VercelCacheStore`](#vercel)                                    | [Vercel Runtime Cache](https://vercel.com/docs/caching/runtime-cache)                      |
 | [`experimental_WorkersCacheStore`](#cloudflare-workers-caching)  | [Cloudflare Workers Caching](https://developers.cloudflare.com/workers/cache/), purge only |
 
@@ -263,10 +263,10 @@ const store = new UpstashCacheStore(redis, {
 The [Redis](#redis) adapter for Bun's built-in Redis client, from `@orpc/bun`. It shares the key and entry format with `RedisCacheStore`, so both can serve the same database.
 
 ```ts
-import { BunRedisCacheStore } from '@orpc/bun'
+import { experimental_BunRedisCacheStore } from '@orpc/bun'
 import { redis } from 'bun'
 
-const store = new BunRedisCacheStore(redis, {
+const store = new experimental_BunRedisCacheStore(redis, {
   /**
    * The prefix to use for Redis keys.
    *
