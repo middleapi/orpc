@@ -1,7 +1,7 @@
 import * as a from 'arktype'
 import * as v from 'valibot'
 import z from 'zod'
-import { bindMethods, clone, findDeepMatches, get, getConstructor, getConstructors, getOwn, isPlainObject, isPropertyKey, mergeTwoLevels, NullProtoObj, omit, set } from './object'
+import { bindMethods, clone, deepSortKeys, findDeepMatches, get, getConstructor, getConstructors, getOwn, isPlainObject, isPropertyKey, mergeTwoLevels, NullProtoObj, omit, set } from './object'
 
 it('findDeepMatches', () => {
   const { maps, values } = findDeepMatches(v => typeof v === 'string', {
@@ -645,5 +645,31 @@ describe('bindMethods', () => {
     expect(methods.getValue).toBe(Base.prototype.getValue)
     expect(methods.getValue.call({ value: 5 })).toBe(5)
     expect(methods.double()).toBe(246)
+  })
+})
+
+describe('deepSortKeys', () => {
+  it('sorts plain object keys recursively, including inside arrays', () => {
+    expect(deepSortKeys({ b: 2, a: { d: 4, c: 3 }, list: [{ y: 1, x: 0 }] }))
+      .toEqual({ a: { c: 3, d: 4 }, b: 2, list: [{ x: 0, y: 1 }] })
+
+    expect(Object.keys(deepSortKeys({ b: 2, a: 1 }) as object)).toEqual(['a', 'b'])
+  })
+
+  it('keeps an own __proto__ key as data', () => {
+    const sorted = deepSortKeys(JSON.parse('{"b": 1, "__proto__": {"x": 1}}')) as Record<string, unknown>
+
+    expect(Object.keys(sorted)).toEqual(['__proto__', 'b'])
+    expect(JSON.stringify(sorted)).toBe('{"__proto__":{"x":1},"b":1}')
+  })
+
+  it('returns non-plain values as-is', () => {
+    const date = new Date()
+    const map = new Map([['b', 2], ['a', 1]])
+
+    expect(deepSortKeys(date)).toBe(date)
+    expect(deepSortKeys(map)).toBe(map)
+    expect(deepSortKeys('str')).toBe('str')
+    expect(deepSortKeys(undefined)).toBeUndefined()
   })
 })

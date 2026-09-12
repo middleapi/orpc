@@ -31,6 +31,7 @@
     "@orpc/client": "workspace:*",
     "@orpc/contract": "workspace:*",
     "@orpc/evlog": "workspace:*",
+    "@orpc/experimental-cache": "workspace:*",
     "@orpc/experimental-effect": "workspace:*",
     "@orpc/experimental-msw": "workspace:*",
     "@orpc/hibernation": "workspace:*",

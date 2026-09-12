@@ -1,0 +1,121 @@
+{
+  "name": "@orpc/experimental-cache",
+  "type": "module",
+  "version": "2.0.0-beta.35",
+  "description": "Tag-based caching and revalidation for oRPC procedures, with memory, Redis, Upstash, Vercel, and BentoCache adapters",
+  "license": "MIT",
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
+  ],
+  "homepage": "https://orpc.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/middleapi/orpc.git",
+    "directory": "packages/cache"
+  },
+  "keywords": [
+    "orpc",
+    "cache",
+    "caching",
+    "revalidation",
+    "stale-while-revalidate",
+    "redis",
+    "upstash",
+    "vercel",
+    "bentocache",
+    "middleware",
+    "api",
+    "typescript"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "./base-redis": {
+        "types": "./dist/adapters/base-redis.d.mts",
+        "import": "./dist/adapters/base-redis.mjs",
+        "default": "./dist/adapters/base-redis.mjs"
+      },
+      "./bentocache": {
+        "types": "./dist/adapters/bentocache.d.mts",
+        "import": "./dist/adapters/bentocache.mjs",
+        "default": "./dist/adapters/bentocache.mjs"
+      },
+      "./memory": {
+        "types": "./dist/adapters/memory.d.mts",
+        "import": "./dist/adapters/memory.mjs",
+        "default": "./dist/adapters/memory.mjs"
+      },
+      "./redis": {
+        "types": "./dist/adapters/redis.d.mts",
+        "import": "./dist/adapters/redis.mjs",
+        "default": "./dist/adapters/redis.mjs"
+      },
+      "./upstash": {
+        "types": "./dist/adapters/upstash.d.mts",
+        "import": "./dist/adapters/upstash.mjs",
+        "default": "./dist/adapters/upstash.mjs"
+      },
+      "./vercel": {
+        "types": "./dist/adapters/vercel.d.mts",
+        "import": "./dist/adapters/vercel.mjs",
+        "default": "./dist/adapters/vercel.mjs"
+      }
+    }
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./base-redis": "./src/adapters/base-redis.ts",
+    "./bentocache": "./src/adapters/bentocache.ts",
+    "./memory": "./src/adapters/memory.ts",
+    "./redis": "./src/adapters/redis.ts",
+    "./upstash": "./src/adapters/upstash.ts",
+    "./vercel": "./src/adapters/vercel.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "prepack": "unbuild",
+    "type:check": "tsc -b"
+  },
+  "peerDependencies": {
+    "@upstash/redis": ">=1.35.6",
+    "@vercel/functions": ">=2.1.0",
+    "bentocache": ">=1.6.1",
+    "redis": ">=6.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@upstash/redis": {
+      "optional": true
+    },
+    "@vercel/functions": {
+      "optional": true
+    },
+    "bentocache": {
+      "optional": true
+    },
+    "redis": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@orpc/client": "workspace:*",
+    "@orpc/server": "workspace:*",
+    "@orpc/shared": "workspace:*",
+    "@standard-server/core": "~0.9.0"
+  },
+  "devDependencies": {
+    "@upstash/redis": "^1.38.2",
+    "@vercel/functions": "^3.9.5",
+    "bentocache": "^1.6.1",
+    "redis": "^6.2.1"
+  }
+}

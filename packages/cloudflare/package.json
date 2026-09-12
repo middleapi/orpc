@@ -2,7 +2,7 @@
   "name": "@orpc/cloudflare",
   "type": "module",
   "version": "2.0.0-beta.35",
-  "description": "Cloudflare integration for oRPC: Durable Object pub/sub, Workers rate limiting, and Workers Traces adapters",
+  "description": "Cloudflare integration for oRPC: Durable Object pub/sub, Workers rate limiting, Workers Caching, and Workers Traces adapters",
   "license": "MIT",
   "funding": [
     "https://github.com/sponsors/dinwwwh",
@@ -21,6 +21,7 @@
     "durable-objects",
     "ratelimit",
     "pubsub",
+    "cache",
     "tracing",
     "observability",
     "typescript"
@@ -52,6 +53,7 @@
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
+    "@orpc/experimental-cache": "workspace:*",
     "@orpc/publisher": "workspace:*",
     "@orpc/ratelimit": "workspace:*",
     "@orpc/shared": "workspace:*",
