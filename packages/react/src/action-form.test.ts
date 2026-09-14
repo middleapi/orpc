@@ -42,6 +42,19 @@ describe('createFormAction', () => {
     expect(handler).toHaveBeenCalledTimes(0)
   })
 
+  it.each([
+    [undefined],
+    [null],
+    ['user[age]=18'],
+    [{ user: { age: '18' } }],
+    [[['user[age]', '18']]],
+    [new URLSearchParams('user[age]=18')],
+  ])('on non-FormData input (%o)', async (input) => {
+    await expect((action as any)(input)).rejects.toThrow(TypeError)
+
+    expect(handler).toHaveBeenCalledTimes(0)
+  })
+
   it('on fallback-able http next error', async () => {
     const form = new FormData()
     form.append('user[age]', '18')
