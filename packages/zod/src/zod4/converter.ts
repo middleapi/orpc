@@ -4,16 +4,15 @@ import type { Interceptor } from '@orpc/shared'
 import type {
   $ZodArray,
   $ZodCatch,
+  $ZodCheck,
   $ZodDefault,
   $ZodEnum,
-  $ZodFile,
   $ZodIntersection,
   $ZodLazy,
   $ZodLiteral,
   $ZodMap,
   $ZodNonOptional,
   $ZodNullable,
-  $ZodNumber,
   $ZodObject,
   $ZodOptional,
   $ZodPipe,
@@ -21,17 +20,18 @@ import type {
   $ZodReadonly,
   $ZodRecord,
   $ZodSet,
-  $ZodString,
   $ZodTemplateLiteral,
   $ZodTuple,
   $ZodType,
   $ZodUnion,
 } from 'zod/v4/core'
 import { JsonSchemaXNativeType } from '@orpc/json-schema'
-import { JSONSchemaContentEncoding, JSONSchemaFormat } from '@orpc/openapi'
-import { intercept, toArray } from '@orpc/shared'
+import { JSONSchemaFormat } from '@orpc/openapi'
+import { guard, intercept, toArray } from '@orpc/shared'
 import {
   globalRegistry,
+  registry,
+  toJSONSchema,
 } from 'zod/v4/core'
 import {
   JSON_SCHEMA_INPUT_REGISTRY,
@@ -150,83 +150,11 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
 
         switch (schema._zod.def.type) {
           case 'string': {
-            const string = schema as $ZodString
-            const json: JSONSchema & { allOf?: JSONSchema[] } = { type: 'string' }
-
-            const { minimum, maximum, format, patterns, contentEncoding } = string._zod.bag
-
-            if (typeof minimum === 'number') {
-              json.minLength = minimum
-            }
-
-            if (typeof maximum === 'number') {
-              json.maxLength = maximum
-            }
-
-            if (typeof contentEncoding === 'string') {
-              json.contentEncoding = this.#handleContentEncoding(contentEncoding)
-            }
-
-            /**
-             * JSON Schema's "regex" format means the string _is_ a regex pattern.
-             * Zod's regex expects the string _to match_ a pattern.
-             * These differ, so we ignore the "regex" format here.
-             */
-            if (typeof format === 'string' && format !== 'regex' && json.contentEncoding === undefined) {
-              json.format = this.#handleStringFormat(format)
-            }
-
-            if (patterns instanceof Set && json.contentEncoding === undefined && json.format === undefined) {
-              for (const pattern of patterns) {
-                if (json.pattern === undefined) {
-                  json.pattern = pattern.source
-                }
-                else {
-                  json.allOf ??= []
-                  json.allOf.push({ pattern: pattern.source })
-                }
-              }
-            }
-
-            // Add a pattern for JWT if it's missing (acts as a polyfill for Zod v4)
-            if (format === 'jwt' && json.contentEncoding === undefined && json.format === undefined && json.pattern === undefined) {
-              json.pattern = /^[\w-]+\.[\w-]+\.[\w-]+$/.source
-            }
-
-            return [true, json]
+            return [true, { type: 'string', ...nativeJsonSchema(schema, options.strategy) }]
           }
 
           case 'number': {
-            const number = schema as $ZodNumber
-            const json: JSONSchema = { type: 'number' }
-
-            const { minimum, maximum, format, multipleOf, exclusiveMaximum, exclusiveMinimum } = number._zod.bag
-
-            if (typeof format === 'string' && format?.includes('int')) {
-              json.type = 'integer'
-            }
-
-            if (typeof minimum === 'number') {
-              json.minimum = minimum
-            }
-
-            if (typeof maximum === 'number') {
-              json.maximum = maximum
-            }
-
-            if (typeof exclusiveMinimum === 'number') {
-              json.exclusiveMinimum = exclusiveMinimum
-            }
-
-            if (typeof exclusiveMaximum === 'number') {
-              json.exclusiveMaximum = exclusiveMaximum
-            }
-
-            if (typeof multipleOf === 'number') {
-              json.multipleOf = multipleOf
-            }
-
-            return [true, json]
+            return [true, { type: 'number', ...nativeJsonSchema(schema, options.strategy) }]
           }
 
           case 'boolean': {
@@ -272,17 +200,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
 
           case 'array': {
             const array = schema as $ZodArray
-            const json: JSONSchema = { type: 'array' }
-
-            const { minimum, maximum } = array._zod.bag
-
-            if (typeof minimum === 'number') {
-              json.minItems = minimum
-            }
-
-            if (typeof maximum === 'number') {
-              json.maxItems = maximum
-            }
+            const json: JSONSchema = { type: 'array', ...itemBounds(array, options.strategy) }
 
             json.items = this.#handleArrayItemJsonSchema(this.#convert(array._zod.def.element, options, lazyDepth, structureDepth + 1), options)
 
@@ -377,17 +295,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
               json.items = this.#handleArrayItemJsonSchema(this.#convert(tuple._zod.def.rest, options, lazyDepth, structureDepth + 1), options)
             }
 
-            const { minimum, maximum } = tuple._zod.bag
-
-            if (typeof minimum === 'number') {
-              json.minItems = minimum
-            }
-
-            if (typeof maximum === 'number') {
-              json.maxItems = maximum
-            }
-
-            return [true, json]
+            return [true, { ...json, ...itemBounds(tuple, options.strategy) }]
           }
 
           case 'record': {
@@ -468,18 +376,15 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
           }
 
           case 'file': {
-            const file = schema as $ZodFile
             const oneOf: Exclude<JSONSchema, boolean>[] = []
 
-            const { mime } = file._zod.bag
+            const mime = rawMimeTypes(schema)
 
-            if (mime === undefined || (Array.isArray(mime) && mime.every(m => typeof m === 'string'))) {
-              for (const type of mime ?? ['*/*']) {
-                oneOf.push({
-                  type: 'string',
-                  contentMediaType: type,
-                })
-              }
+            for (const type of mime ?? ['*/*']) {
+              oneOf.push({
+                type: 'string',
+                contentMediaType: type,
+              })
             }
 
             return [true, oneOf.length === 1 ? oneOf[0]! : { anyOf: oneOf }]
@@ -574,7 +479,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
           }
 
           default: {
-            const _unsupported: 'function' | 'int' | 'symbol' | 'promise' | 'custom' = schema._zod.def.type
+            const _unsupported: 'function' | 'int' | 'symbol' | 'promise' | 'custom' | 'properties' = schema._zod.def.type
             return [true, this.unsupportedJsonSchema]
           }
         }
@@ -622,30 +527,6 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
       ],
     }
   }
-
-  #handleStringFormat(format: string): string | undefined {
-    if (format === 'guid') {
-      return JSONSchemaFormat.UUID
-    }
-
-    if (format === 'url') {
-      return JSONSchemaFormat.URI
-    }
-
-    if (format === 'datetime') {
-      return JSONSchemaFormat.DateTime
-    }
-
-    return Object.values(JSONSchemaFormat).includes(format as any)
-      ? format
-      : undefined
-  }
-
-  #handleContentEncoding(contentEncoding: string): Exclude<JSONSchema, boolean>['contentEncoding'] | undefined {
-    return Object.values(JSONSchemaContentEncoding).includes(contentEncoding as any)
-      ? contentEncoding as any
-      : undefined
-  }
 }
 
 type EnumValue = string | number // | bigint | boolean | symbol;
@@ -659,4 +540,59 @@ function getEnumValues(entries: EnumLike): EnumValue[] {
     .filter(([k, _]) => !numericValues.includes(+k))
     .map(([_, v]) => v)
   return values
+}
+
+/**
+ * Metadata is looked up in an empty registry so Zod's output carries only what the checks say:
+ * oRPC applies titles and descriptions itself, and an `id` would turn the schema into a `$ref`
+ * into `$defs` that carries none of its own keywords.
+ */
+const NO_METADATA = registry<Record<string, any>>()
+
+/**
+ * The JSON Schema Zod itself derives from a schema, the source of truth for what its checks say.
+ */
+function nativeJsonSchema(schema: $ZodType, strategy: SchemaConvertOptions['strategy']): Record<string, any> {
+  // Zod refuses some schemas outright, those go without constraints
+  const native = guard(() => toJSONSchema(schema, {
+    target: 'draft-2020-12',
+    io: strategy,
+    unrepresentable: 'any',
+    metadata: NO_METADATA,
+  }))
+
+  // oRPC's documents are always draft/2020-12, so the dialect is left off every schema in them
+  const { $schema, ...json } = native ?? {}
+
+  return json
+}
+
+/**
+ * The length Zod's checks put on an array or a tuple.
+ */
+function itemBounds(schema: $ZodType, strategy: SchemaConvertOptions['strategy']): { minItems?: number, maxItems?: number } {
+  const { minItems, maxItems } = nativeJsonSchema(schema, strategy)
+
+  return {
+    ...typeof minItems === 'number' ? { minItems } : {},
+    ...typeof maxItems === 'number' ? { maxItems } : {},
+  }
+}
+
+/**
+ * The media types a file schema accepts. Zod folds repeated `.mime()` calls by intersecting them,
+ * which oRPC's `anyOf` branches cannot express, so the last one wins here as it always has.
+ */
+function rawMimeTypes(schema: $ZodType): string[] | undefined {
+  let mime: string[] | undefined
+
+  for (const check of toArray((schema._zod.def as { checks?: $ZodCheck[] }).checks)) {
+    const def = check._zod.def as { check?: string, mime?: unknown }
+
+    if (def.check === 'mime_type' && Array.isArray(def.mime)) {
+      mime = def.mime
+    }
+  }
+
+  return mime
 }

@@ -43,12 +43,12 @@ testSchemaConverter([
   {
     name: 'tuple([z.enum(["a", "b"])])',
     schema: z.tuple([z.enum(['a', 'b'])]),
-    input: [true, { type: 'array', prefixItems: [{ type: 'string', enum: ['a', 'b'] }] }],
+    input: [true, { type: 'array', prefixItems: [{ type: 'string', enum: ['a', 'b'] }], minItems: 1, maxItems: 1 }],
   },
   {
     name: 'tuple([z.enum(["a", "b"])], z.string())',
     schema: z.tuple([z.enum(['a', 'b'])], z.string()),
-    input: [true, { type: 'array', prefixItems: [{ type: 'string', enum: ['a', 'b'] }], items: { type: 'string' } }],
+    input: [true, { type: 'array', prefixItems: [{ type: 'string', enum: ['a', 'b'] }], items: { type: 'string' }, minItems: 1 }],
   },
   {
     name: 'zm.tuple([zm.enum(["a", "b"])], zm.string()).check(zm.minLength(4), zm.maxLength(10))',
@@ -99,7 +99,7 @@ testSchemaConverter([
   {
     name: 'record(z.iso.date(), z.string())',
     schema: z.record(z.iso.date(), z.string()),
-    input: [true, { type: 'object', additionalProperties: { type: 'string' }, propertyNames: { type: 'string', format: 'date' } }],
+    input: [true, { type: 'object', additionalProperties: { type: 'string' }, propertyNames: { type: 'string', format: 'date', pattern: '^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$' } }],
   },
   {
     name: 'record(z.string(), z.number().optional())',
