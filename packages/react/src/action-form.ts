@@ -55,6 +55,10 @@ export function createFormAction<
   const bracketNotation = new StandardBracketNotationSerializer()
 
   return async (form) => {
+    if (!(form instanceof FormData)) {
+      throw new TypeError('[createFormAction] Form action expects a FormData instance.')
+    }
+
     const input = bracketNotation.deserialize([...form])
     await client(input as any)
   }
