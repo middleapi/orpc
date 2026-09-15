@@ -216,7 +216,14 @@ export class JsonSchemaCoercer {
 
             const propertySchemas: Record<string, JsonSchema> = schema.properties ?? {}
 
-            for (const [key, value] of Object.entries(coerced)) {
+            for (const key in coerced) {
+              // hot path: the own-key guard avoids the per-object array `Object.entries`/`Object.keys` allocate.
+              if (!Object.hasOwn(coerced, key)) {
+                continue
+              }
+
+              const value = coerced[key]
+
               const subSchema = getOwn(propertySchemas, key)
                 ?? patternProperties.find(([pattern]) => pattern.test(key))?.[1]
                 ?? schema.additionalProperties

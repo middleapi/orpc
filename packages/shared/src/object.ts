@@ -20,8 +20,13 @@ export function findDeepMatches(
     })
   }
   else if (isPlainObject(payload)) {
-    for (const [key, value] of Object.entries(payload)) {
-      findDeepMatches(check, value, [...segments, key], maps, values)
+    for (const key in payload) {
+      // hot path: the own-key guard avoids the per-object array `Object.entries`/`Object.keys` allocate.
+      if (!Object.hasOwn(payload, key)) {
+        continue
+      }
+
+      findDeepMatches(check, payload[key], [...segments, key], maps, values)
     }
   }
 
@@ -211,8 +216,13 @@ function cloneWithVisited(value: unknown, visited: WeakMap<object, unknown>): un
     visited.set(value, result)
 
     // Use setOwn so special keys like __proto__ don't re-parent the result.
-    for (const [key, item] of Object.entries(value)) {
-      setOwn(result, key, cloneWithVisited(item, visited))
+    for (const key in value) {
+      // hot path: the own-key guard avoids the per-object array `Object.entries`/`Object.keys` allocate.
+      if (!Object.hasOwn(value, key)) {
+        continue
+      }
+
+      setOwn(result, key, cloneWithVisited(value[key], visited))
     }
 
     for (const sym of Object.getOwnPropertySymbols(value)) {
