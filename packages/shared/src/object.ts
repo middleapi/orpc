@@ -282,3 +282,19 @@ export function bindMethods<T extends object>(
 
   return methods as any
 }
+
+export function deepSortKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(deepSortKeys)
+  }
+
+  if (isPlainObject(value)) {
+    const sorted: Record<PropertyKey, unknown> = new NullProtoObj()
+    for (const key of Object.keys(value).sort()) {
+      sorted[key] = deepSortKeys(value[key])
+    }
+    return sorted
+  }
+
+  return value
+}
