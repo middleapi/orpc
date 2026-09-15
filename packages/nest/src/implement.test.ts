@@ -47,9 +47,10 @@ describe('requirements', () => {
     vi.doMock('@nestjs/common', async (importOriginal) => {
       const actual = await importOriginal<typeof import('@nestjs/common')>()
 
+      // Namespace imports resolve a missing CJS export to undefined (unlike a static named import,
+      // which throws SyntaxError at link time). Explicit undefined matches that runtime behavior.
       return {
         ...actual,
-        // Simulate NestJS < 11.2 where QueryMethod is not exported
         QueryMethod: undefined,
       }
     })
