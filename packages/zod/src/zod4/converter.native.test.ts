@@ -137,4 +137,9 @@ testSchemaConverter([
       ],
     }],
   },
+  {
+    name: 'file().mime(["image/png"]).mime(["image/png", "image/jpeg"])',
+    schema: z.file().mime(['image/png']).mime(['image/png', 'image/jpeg']),
+    input: [true, { type: 'string', contentMediaType: 'image/png' }],
+  },
 ])

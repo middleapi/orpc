@@ -746,7 +746,7 @@ function aggregateChecks(schema: $ZodType): ZodCheckConstraints {
 
       case 'number_format': {
         constraints.format = def.format
-        const [minimum, maximum] = util.NUMBER_FORMAT_RANGES[def.format] ?? []
+        const [minimum, maximum] = util.NUMBER_FORMAT_RANGES[def.format]
         narrowMin('minimum', minimum)
         narrowMax('maximum', maximum)
         break

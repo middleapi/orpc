@@ -48,6 +48,11 @@ testSchemaConverter([
     input: [true, { type: 'string', minLength: 6, maxLength: 6 }],
   },
   {
+    name: 'string.min(8).length(5)',
+    schema: z.string().min(8).length(5),
+    input: [true, { type: 'string', minLength: 8, maxLength: 5 }],
+  },
+  {
     name: 'string.includes("a\\")',
     schema: z.string().includes('a\\'),
     input: [true, { type: 'string', pattern: 'a\\\\' }],
