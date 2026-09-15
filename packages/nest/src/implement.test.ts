@@ -3,6 +3,7 @@ import type { Request as ExpressRequest } from 'express'
 import type { FastifyReply } from 'fastify'
 import type { NestStandardLazyRequest } from './module'
 import { Buffer } from 'node:buffer'
+import { request as httpRequest } from 'node:http'
 import FastifyCookie from '@fastify/cookie'
 import { Controller, HttpException, Req, Res, SetMetadata, StreamableFile, UseGuards, UseInterceptors } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
@@ -41,21 +42,139 @@ describe('requirements', () => {
     }).toThrow(/openapi\.path/)
   })
 
-  it('should throw if @Implement uses the QUERY HTTP method', () => {
-    const contract = oc.meta(openapi({
-      path: '/procedure',
-      method: 'QUERY',
-    }))
+  it('should throw if @Implement uses the QUERY HTTP method when QueryMethod is not available (NestJS < 11.2)', async () => {
+    vi.resetModules()
+    vi.doMock('@nestjs/common', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('@nestjs/common')>()
 
-    expect(() => {
-      @Controller()
-      class ImplController {
-        @Implement(contract)
-        procedure() {
-          return implement(contract).handler(() => {})
-        }
+      return {
+        ...actual,
+        // Simulate NestJS < 11.2 where QueryMethod is not exported
+        QueryMethod: undefined,
       }
-    }).toThrow(/does not support the 'QUERY' HTTP method/)
+    })
+
+    try {
+      const { Implement: ImplementWithoutQueryMethod } = await import('./implement')
+
+      const contract = oc.meta(openapi({
+        path: '/procedure',
+        method: 'QUERY',
+      }))
+
+      expect(() => {
+        @Controller()
+        class ImplController {
+          @ImplementWithoutQueryMethod(contract)
+          procedure() {
+            return implement(contract).handler(() => {})
+          }
+        }
+
+        void ImplController
+      }).toThrow(/does not support the 'QUERY' HTTP method/)
+    }
+    finally {
+      vi.doUnmock('@nestjs/common')
+      vi.resetModules()
+    }
+  })
+
+  it('should support the QUERY HTTP method when QueryMethod is available (NestJS 11.2+)', async () => {
+    const contract = oc
+      .meta(openapi({
+        path: '/query-route',
+        method: 'QUERY',
+      }))
+      .input(z.object({ search: z.string() }))
+
+    @Controller()
+    class QueryController {
+      @Implement(contract)
+      queryRoute() {
+        return implement(contract).handler(({ input }) => `query: ${input.search}`)
+      }
+    }
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [QueryController],
+    }).compile()
+
+    const app = moduleRef.createNestApplication()
+    await app.init()
+    await app.listen(0)
+
+    try {
+      const server = app.getHttpServer()
+      const port = (server.address() as { port: number }).port
+      const payload = JSON.stringify({ search: 'earth' })
+
+      const res = await new Promise<{ statusCode: number, body: unknown }>((resolve, reject) => {
+        const req = httpRequest({
+          hostname: '127.0.0.1',
+          port,
+          path: '/query-route',
+          method: 'QUERY',
+          headers: {
+            'content-type': 'application/json',
+            'content-length': Buffer.byteLength(payload),
+          },
+        }, (response) => {
+          let data = ''
+          response.on('data', (chunk: Buffer) => {
+            data += chunk
+          })
+          response.on('end', () => resolve({ statusCode: response.statusCode!, body: JSON.parse(data) }))
+        })
+
+        req.on('error', reject)
+        req.write(payload)
+        req.end()
+      })
+
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual('query: earth')
+    }
+    finally {
+      await app.close()
+    }
+  })
+
+  it('should support the QUERY HTTP method with the Fastify adapter', async () => {
+    const contract = oc
+      .meta(openapi({
+        path: '/query-route',
+        method: 'QUERY',
+      }))
+      .input(z.object({ search: z.string() }))
+
+    @Controller()
+    class QueryController {
+      @Implement(contract)
+      queryRoute() {
+        return implement(contract).handler(({ input }) => `query: ${input.search}`)
+      }
+    }
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [QueryController],
+    }).compile()
+
+    const app = moduleRef.createNestApplication(new FastifyAdapter())
+    await app.init()
+    await app.getHttpAdapter().getInstance().ready()
+
+    const res = await app.getHttpAdapter().getInstance().inject({
+      method: 'QUERY',
+      url: '/query-route',
+      headers: { 'content-type': 'application/json' },
+      payload: { search: 'earth' },
+    })
+
+    expect(res.statusCode).toEqual(200)
+    expect(JSON.parse(res.body)).toEqual('query: earth')
+
+    await app.close()
   })
 
   it('should error if implemented method return invalid procedure', async () => {
