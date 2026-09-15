@@ -161,18 +161,39 @@ describe('createORPCErrorFromJson', () => {
 })
 
 describe('createORPCErrorFromMalformedResponse', () => {
-  it('creates a MALFORMED_ORPC_RESPONSE error with the response as data and a MalformedResponseError cause', () => {
+  it('creates a MALFORMED_ORPC_RESPONSE error with a MalformedResponseError cause and no data', () => {
     const response = { status: 500, headers: { 'x-header': 'value' }, body: { something: 'unexpected' } }
     const error = createORPCErrorFromMalformedResponse({ response })
 
     expect(error).toBeInstanceOf(ORPCError)
     expect(error.code).toBe('MALFORMED_ORPC_RESPONSE')
     expect(error.defined).toBe(false)
-    expect(error.data).toBe(response)
+    expect(error.data).toBeUndefined()
     expect(error.cause).toBeInstanceOf(MalformedResponseError)
     expect((error.cause as MalformedResponseError).name).toBe('MalformedResponseError')
     expect((error.cause as MalformedResponseError).response).toBe(response)
     expect((error.cause as MalformedResponseError).message).toBe(error.message)
+  })
+
+  it('keeps the upstream response out of the serialized payload', () => {
+    const response = {
+      status: 502,
+      headers: { 'set-cookie': ['INTERNAL_SESSION=secret'], 'x-internal-upstream': 'orders-svc.internal:8081' },
+      body: 'internal stack trace',
+    }
+
+    const error = createORPCErrorFromMalformedResponse({ message: 'Invalid RPC response format.', response })
+
+    expect(error.toJSON()).toEqual({
+      defined: false,
+      code: 'MALFORMED_ORPC_RESPONSE',
+      message: 'Invalid RPC response format.',
+      data: undefined,
+    })
+    expect(JSON.stringify(error.toJSON())).not.toContain('INTERNAL_SESSION')
+
+    // still reachable locally, just not over the wire
+    expect((error.cause as MalformedResponseError).response).toBe(response)
   })
 
   it('supports overriding the message and forwarding a cause to the MalformedResponseError', () => {

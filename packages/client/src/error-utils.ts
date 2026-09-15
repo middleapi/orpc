@@ -58,13 +58,17 @@ export function createORPCErrorFromJson<TCode extends ORPCErrorCode, TData>(
  * the message is inferred from the response body or status. The `cause` is a
  * `MalformedResponseError` carrying the resolved response.
  *
+ * The response is deliberately exposed only through `cause`, never through `data`:
+ * `data` is serialized by `ORPCError.toJSON()`, so a link used inside a server would
+ * forward the upstream response headers and body on to its own callers. `cause` lives
+ * on `Error`'s non-enumerable slot and is never serialized.
+ *
  * @see {@link https://orpc.dev/docs/rpc/link#malformed-responses | RPC Link - Malformed Responses}
  * @see {@link https://orpc.dev/docs/openapi/link#malformed-responses | OpenAPI Link - Malformed Responses}
  */
-export function createORPCErrorFromMalformedResponse(options: MalformedResponseErrorOptions): ORPCError<'MALFORMED_ORPC_RESPONSE', StandardResponse> {
-  const error = new ORPCError('MALFORMED_ORPC_RESPONSE', {
+export function createORPCErrorFromMalformedResponse(options: MalformedResponseErrorOptions): ORPCError<'MALFORMED_ORPC_RESPONSE', undefined> {
+  const error = new ORPCError<'MALFORMED_ORPC_RESPONSE', undefined>('MALFORMED_ORPC_RESPONSE', {
     message: options.message ?? inferMalformedResponseMessage(options.response),
-    data: options.response,
   })
 
   error.cause = new MalformedResponseError({ ...options, message: error.message })

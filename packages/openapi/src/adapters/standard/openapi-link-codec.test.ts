@@ -743,10 +743,10 @@ describe('openAPILinkCodec', () => {
 
       expectORPCErrorResult(result, 'MALFORMED_ORPC_RESPONSE', {
         message: 'Service Unavailable',
-        data: { status: 503, headers: {}, body: { detail: 'service unavailable' } },
       })
+      expect((result as any).error.data).toBeUndefined()
       expect((result as any).error.cause).toBeInstanceOf(MalformedResponseError)
-      expect((result as any).error.cause.response).toBe((result as any).error.data)
+      expect((result as any).error.cause.response).toEqual({ status: 503, headers: {}, body: { detail: 'service unavailable' } })
     })
 
     it('infers MALFORMED_ORPC_RESPONSE message from the response body', async () => {
@@ -800,9 +800,9 @@ describe('openAPILinkCodec', () => {
       expect(error).toBeInstanceOf(ORPCError)
       expect(error.code).toBe('MALFORMED_ORPC_RESPONSE')
       expect(error.message).toBe('Invalid OpenAPI response format.')
-      expect(error.data).toEqual({ status: 200, headers: {}, body: 'raw' })
+      expect(error.data).toBeUndefined()
       expect(error.cause).toBeInstanceOf(MalformedResponseError)
-      expect(error.cause.response).toBe(error.data)
+      expect(error.cause.response).toEqual({ status: 200, headers: {}, body: 'raw' })
       expect(error.cause.cause).toEqual(new Error('bad format'))
     })
 

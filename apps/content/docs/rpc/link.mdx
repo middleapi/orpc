@@ -312,6 +312,10 @@ const link = new RPCLink({
 })
 ```
 
+:::info
+The response is exposed only through `cause`, never through the error's `data`. `data` is serialized by `ORPCError.toJSON()`, so a link used inside a server would otherwise forward the upstream response headers and body on to its own callers.
+:::
+
 ## Event Stream Options
 
 Configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed to the server. Available options depend on the adapter. For example, the fetch adapter supports:
