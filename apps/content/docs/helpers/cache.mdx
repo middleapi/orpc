@@ -207,10 +207,11 @@ const store = new MemoryCacheStore({
 
 ### Redis
 
-Stores entries as Redis hashes and drives every operation through Lua scripts, so a hit costs one round trip and a miss two. The lock taken on a miss is released when the fill finishes, or after `lockTtl` if it never does. When a fill outlives its lock and another caller takes over, the entry of the fill that started last is kept, whichever finishes first. The client is connected lazily when needed.
+Stores entries as JSON strings retained for `ttl + swr`, and one counter per tag that revalidation increments, using single-key commands only, so it works with standalone servers and Redis Cluster alike. A hit costs one round trip when the lookup's tags match the entry's, and a miss three. Fills are coalesced by the `locker`, within the process by default; a [`RedisLocker`](/docs/helpers/lock) on the same server coalesces them across processes. The client is connected lazily when needed.
 
 ```ts
 import { RedisCacheStore } from '@orpc/experimental-cache/redis'
+import { RedisLocker } from '@orpc/experimental-lock/redis'
 import { createClient } from 'redis'
 
 const client = createClient({ url: 'redis://localhost:6379' })
@@ -231,22 +232,23 @@ const store = new RedisCacheStore(client, {
   serializer: undefined,
 
   /**
-   * How long a lock may be held, in seconds, so a crashed holder frees its waiters.
+   * Coalesces concurrent fills of one key. A caller that times out waiting fills on its own.
    *
-   * @default 10
+   * @default new MemoryLocker()
    */
-  lockTtl: 10,
+  locker: new RedisLocker(client, { prefix: 'cache-lock:', ttl: 10_000 }),
 })
 ```
 
-The Redis, Upstash, and Bun stores share `BaseRedisCacheStore` from `@orpc/experimental-cache/base-redis`, which holds the scripts and the flow. A store for another Redis-compatible client only has to run a script.
+The Redis, Upstash, and Bun stores share `BaseRedisCacheStore` from `@orpc/experimental-cache/base-redis`, which holds the key layout and the flow. A store for another Redis-compatible client only has to implement five commands.
 
 ### Upstash
 
-The [Redis](#redis) adapter for Upstash's REST client. It shares the key and entry format with `RedisCacheStore`, so both can serve the same database.
+The [Redis](#redis) adapter for Upstash's REST client. It shares the key and entry format with `RedisCacheStore`, so both can serve the same database, and pairs with the [`UpstashLocker`](/docs/helpers/lock) to coalesce fills across instances.
 
 ```ts
 import { UpstashCacheStore } from '@orpc/experimental-cache/upstash'
+import { UpstashLocker } from '@orpc/experimental-lock/upstash'
 import { Redis } from '@upstash/redis'
 
 const redis = Redis.fromEnv()
@@ -267,20 +269,20 @@ const store = new UpstashCacheStore(redis, {
   serializer: undefined,
 
   /**
-   * How long a lock may be held, in seconds, so a crashed holder frees its waiters.
+   * Coalesces concurrent fills of one key. A caller that times out waiting fills on its own.
    *
-   * @default 10
+   * @default new MemoryLocker()
    */
-  lockTtl: 10,
+  locker: new UpstashLocker(redis, { prefix: 'cache-lock:', ttl: 10_000 }),
 })
 ```
 
 ### Bun
 
-The [Redis](#redis) adapter for Bun's built-in Redis client, from `@orpc/bun`. It shares the key and entry format with `RedisCacheStore`, so both can serve the same database.
+The [Redis](#redis) adapter for Bun's built-in Redis client, from `@orpc/bun`. It shares the key and entry format with `RedisCacheStore`, so both can serve the same database, and pairs with the [`experimental_BunRedisLocker`](/docs/helpers/lock) to coalesce fills across processes.
 
 ```ts
-import { experimental_BunRedisCacheStore } from '@orpc/bun'
+import { experimental_BunRedisCacheStore, experimental_BunRedisLocker } from '@orpc/bun'
 import { redis } from 'bun'
 
 const store = new experimental_BunRedisCacheStore(redis, {
@@ -299,11 +301,11 @@ const store = new experimental_BunRedisCacheStore(redis, {
   serializer: undefined,
 
   /**
-   * How long a lock may be held, in seconds, so a crashed holder frees its waiters.
+   * Coalesces concurrent fills of one key. A caller that times out waiting fills on its own.
    *
-   * @default 10
+   * @default new MemoryLocker()
    */
-  lockTtl: 10,
+  locker: new experimental_BunRedisLocker(redis, { prefix: 'cache-lock:', ttl: 10_000 }),
 })
 ```
 
@@ -329,6 +331,13 @@ const store = new VercelCacheStore({
    * @default RPCJsonSerializer
    */
   serializer: undefined,
+
+  /**
+   * Coalesces concurrent fills of one key within the process. A caller that times out waiting fills on its own.
+   *
+   * @default new MemoryLocker()
+   */
+  locker: undefined,
 })
 ```
 

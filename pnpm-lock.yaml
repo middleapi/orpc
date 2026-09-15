@@ -523,6 +523,9 @@ importers:
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
+      '@orpc/experimental-lock':
+        specifier: workspace:*
+        version: link:../lock
       '@orpc/server':
         specifier: workspace:*
         version: link:../server

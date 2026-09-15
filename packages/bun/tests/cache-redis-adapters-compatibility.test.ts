@@ -1,10 +1,12 @@
 import type { CacheStore } from '@orpc/experimental-cache'
 import { RedisCacheStore } from '@orpc/experimental-cache/redis'
+import { RedisLocker } from '@orpc/experimental-lock/redis'
 import { nowInSeconds, sleep } from '@orpc/shared'
 import { RedisClient } from 'bun'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { createClient } from 'redis'
 import { experimental_BunRedisCacheStore } from '../src/redis-cache'
+import { experimental_BunRedisLocker } from '../src/redis-lock'
 
 const REDIS_URL = Bun.env.REDIS_URL
 
@@ -17,6 +19,7 @@ const REDIS_URL = Bun.env.REDIS_URL
  */
 const stores: Array<{ name: string, store: CacheStore }> = []
 const prefix = `redis-adapters:${crypto.randomUUID()}:`
+const lockPrefix = `${prefix}lock:`
 
 if (REDIS_URL) {
   const redis = createClient({ url: REDIS_URL })
@@ -27,8 +30,8 @@ if (REDIS_URL) {
     bunRedis.close()
   })
 
-  stores.push({ name: 'redis', store: new RedisCacheStore(redis, { prefix }) })
-  stores.push({ name: 'bun redis', store: new experimental_BunRedisCacheStore(bunRedis, { prefix }) })
+  stores.push({ name: 'redis', store: new RedisCacheStore(redis, { prefix, locker: new RedisLocker(redis, { prefix: lockPrefix, ttl: 10_000 }) }) })
+  stores.push({ name: 'bun redis', store: new experimental_BunRedisCacheStore(bunRedis, { prefix, locker: new experimental_BunRedisLocker(bunRedis, { prefix: lockPrefix, ttl: 10_000 }) }) })
 }
 
 describe('cache redis adapters compatibility', () => {

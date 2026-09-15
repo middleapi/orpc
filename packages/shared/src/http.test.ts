@@ -12,7 +12,7 @@ import {
   pathToHttpPath,
   varyByAcceptEncoding,
 } from './http'
-import { tryDecodeURIComponent } from './uri'
+import { safeDecodeURIComponent } from './uri'
 
 describe('pathToHttpPath', () => {
   it('produces a leading slash', () => {
@@ -267,7 +267,7 @@ describe('encodeCacheTag', () => {
     ['escapes astral characters as UTF-8', 'a😀', 'a%F0%9F%98%80'],
   ])('%s', (_, tag, encoded) => {
     expect(encodeCacheTag(tag)).toBe(encoded)
-    expect(tryDecodeURIComponent(encoded)).toBe(tag)
+    expect(safeDecodeURIComponent(encoded)).toBe(tag)
   })
 
   it('keeps case-folded tags distinct', () => {

@@ -1,3 +1,4 @@
+import { UpstashLocker } from '@orpc/experimental-lock/upstash'
 import { nowInSeconds } from '@orpc/shared'
 import { Redis } from '@upstash/redis'
 import { describeRedisCacheStoreContract } from '../../tests/__shared__/redis-store-contract'
@@ -30,9 +31,8 @@ describe.concurrent('upstash cache store integration', {
   describeRedisCacheStoreContract(createTestingStore, {
     exists: key => redis.exists(key),
     type: key => redis.type(key),
-    hset: (key, fields) => redis.hset(key, fields),
-    del: key => redis.del(key),
-    scriptFlush: () => redis.scriptFlush(),
+    set: (key, value) => redis.set(key, value),
+    createLocker: options => new UpstashLocker(redis, options),
   })
 
   it('reads entries when the client does not parse JSON replies', async () => {

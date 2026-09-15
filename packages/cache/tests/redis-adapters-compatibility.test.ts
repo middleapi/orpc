@@ -1,4 +1,6 @@
 import type { CacheStore } from '../src'
+import { RedisLocker } from '@orpc/experimental-lock/redis'
+import { UpstashLocker } from '@orpc/experimental-lock/upstash'
 import { nowInSeconds, sleep } from '@orpc/shared'
 import { Redis } from '@upstash/redis'
 import { createClient } from 'redis'
@@ -19,6 +21,7 @@ const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
 describe.concurrent('cache redis adapters compatibility', { timeout: 20_000 }, () => {
   const stores: Array<{ name: string, store: CacheStore }> = []
   const prefix = `redis-adapters:${crypto.randomUUID()}:`
+  const lockPrefix = `${prefix}lock:`
 
   if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
     const redis = createClient({ url: `rediss://default:${UPSTASH_REDIS_REST_TOKEN}@${new URL(UPSTASH_REDIS_REST_URL).host}:6379` })
@@ -27,14 +30,14 @@ describe.concurrent('cache redis adapters compatibility', { timeout: 20_000 }, (
       redis.close()
     })
 
-    stores.push({ name: 'redis', store: new RedisCacheStore(redis, { prefix }) })
+    stores.push({ name: 'redis', store: new RedisCacheStore(redis, { prefix, locker: new RedisLocker(redis, { prefix: lockPrefix, ttl: 10_000 }) }) })
   }
 
   // TODO: Upstash is not compatible with Node 26 yet — temporarily disable these tests and revisit in the future.
   if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN && !process.versions.node.startsWith('26.')) {
     const upstashRedis = new Redis({ url: UPSTASH_REDIS_REST_URL, token: UPSTASH_REDIS_REST_TOKEN })
 
-    stores.push({ name: 'upstash', store: new UpstashCacheStore(upstashRedis, { prefix }) })
+    stores.push({ name: 'upstash', store: new UpstashCacheStore(upstashRedis, { prefix, locker: new UpstashLocker(upstashRedis, { prefix: lockPrefix, ttl: 10_000 }) }) })
   }
 
   describe.skipIf(stores.length < 2)('cross-adapter compatibility', () => {

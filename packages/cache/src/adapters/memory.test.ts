@@ -1,4 +1,5 @@
 import { RPCJsonSerializer } from '@orpc/client'
+import { MemoryLocker } from '@orpc/experimental-lock/memory'
 import { describeCacheStoreContract } from '../../tests/__shared__/store-contract'
 import { MemoryCacheStore } from './memory'
 
@@ -160,6 +161,43 @@ describe('memoryCacheStore', () => {
     await waitUntil.mock.calls[0]![0]
 
     await expect(store.getOrSet('k', async () => 'fresh', { tags: ['t'] })).resolves.toMatchObject({ output: 'fresh' })
+  })
+
+  it('lets a waiter fill on its own once waiting for the lock times out, and leaves a timed-out refresh to the holder', async () => {
+    const store = new MemoryCacheStore({ locker: new MemoryLocker({ timeout: 50 }) })
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const fill = vi.fn(async () => {
+      await held
+      return 'held'
+    })
+
+    const holder = store.getOrSet('k', fill)
+    await expect(store.getOrSet('k', async () => 'waiter')).resolves.toMatchObject({ output: 'waiter' })
+    release()
+    await expect(holder).resolves.toMatchObject({ output: 'held' })
+
+    await store.getOrSet('stale', async () => 'v', { ttl: 1, swr: 10 })
+    vi.setSystemTime(2000)
+    const refreshFill = vi.fn(() => new Promise<string>(() => {}))
+    const waitUntil = vi.fn()
+    await store.getOrSet('stale', refreshFill, { ttl: 1, swr: 10, waitUntil })
+    await store.getOrSet('stale', async () => 'other', { ttl: 1, swr: 10, waitUntil })
+    await expect(waitUntil.mock.calls[1]![0]).resolves.toBeUndefined()
+    expect(refreshFill).toHaveBeenCalledTimes(1)
+  })
+
+  it('rethrows other lock errors', async () => {
+    const locker = {
+      lock: vi.fn(async () => {
+        throw new Error('locker down')
+      }),
+    }
+    const store = new MemoryCacheStore({ locker })
+
+    await expect(store.getOrSet('k', async () => 'v')).rejects.toThrow('locker down')
   })
 
   it('sweeps expired and revalidated entries on a later write, without reading them', async () => {

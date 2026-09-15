@@ -108,6 +108,7 @@
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
+    "@orpc/experimental-lock": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
     "@standard-server/core": "~0.9.0"

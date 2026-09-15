@@ -1,9 +1,10 @@
 import { RPCJsonSerializer } from '@orpc/client'
-import { nowInSeconds, sleep } from '@orpc/shared'
+import { nowInSeconds, sleep, stringifyJSON } from '@orpc/shared'
 import { RedisClient } from 'bun'
 import { beforeAll, describe, expect, it, mock, spyOn } from 'bun:test'
 import { waitFor } from '../tests/__shared__/utils'
 import { experimental_BunRedisCacheStore } from './redis-cache'
+import { experimental_BunRedisLocker } from './redis-lock'
 
 const REDIS_URL = Bun.env.REDIS_URL
 
@@ -16,8 +17,12 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
   })
 
   function createTestingStore(options: ConstructorParameters<typeof experimental_BunRedisCacheStore>[1] = {}) {
-    const prefix = `orpc-bun-redis-cache-store-${crypto.randomUUID()}:`
-    return { store: new experimental_BunRedisCacheStore(redis, { prefix, ...options }), prefix }
+    const prefix = options.prefix ?? `orpc-bun-redis-cache-store-${crypto.randomUUID()}:`
+    return { store: new experimental_BunRedisCacheStore(redis, { ...options, prefix }), prefix }
+  }
+
+  function createLocker(options: { prefix: string, ttl: number, timeout: number }) {
+    return new experimental_BunRedisLocker(redis, options)
   }
 
   it('fills a miss once, then serves the entry with its tags and expiresAt', async () => {
@@ -33,7 +38,7 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
     expect(fill).toHaveBeenCalledTimes(1)
 
     await store.getOrSet('u', async () => undefined)
-    await expect(store.getOrSet('u', async () => 'refilled')).resolves.toEqual({ output: undefined, tags: undefined, expiresAt: undefined })
+    await expect(store.getOrSet('u', async () => 'refilled')).resolves.toEqual({ output: undefined, tags: undefined, expiresAt: undefined, evictAt: undefined })
   }, { timeout: 20_000 })
 
   it('preserves Date, Map, Set, and BigInt outputs', async () => {
@@ -98,18 +103,15 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
     expect(fresh.expiresAt).toBeGreaterThan(stale.expiresAt!)
   }, { timeout: 20_000 })
 
-  it('stores entries as hashes and tag counters under the prefixed key families, locking while filling', async () => {
+  it('stores entries as strings and tag counters under the prefixed key families', async () => {
     const { store, prefix } = createTestingStore()
 
-    await store.getOrSet('k', async () => {
-      await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(true)
-      return 'v'
-    }, { tags: ['t'] })
-    await store.revalidate({ tags: ['t'] })
+    await store.getOrSet('k', async () => 'v', { tags: ['t'] })
+    await expect(redis.send('TYPE', [`${prefix}e:k`])).resolves.toBe('string')
+    await expect(redis.exists(`${prefix}t:t`)).resolves.toBe(false)
 
-    await expect(redis.send('TYPE', [`${prefix}e:k`])).resolves.toBe('hash')
-    await expect(redis.exists(`${prefix}t:t`)).resolves.toBe(true)
-    await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(false)
+    await store.revalidate({ tags: ['t'] })
+    await expect(redis.send('TYPE', [`${prefix}t:t`])).resolves.toBe('string')
 
     const unprefixed = new experimental_BunRedisCacheStore(redis)
     const key = crypto.randomUUID()
@@ -117,38 +119,31 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
     await expect(redis.exists(`e:${key}`)).resolves.toBe(true)
   }, { timeout: 20_000 })
 
-  it('treats tags missing from the snapshot as version zero', async () => {
+  it('validates against the tags stored with the entry, treating tags missing from the snapshot as version zero', async () => {
     const { store, prefix } = createTestingStore()
 
-    await redis.send('HSET', [`${prefix}e:k`, 'output', JSON.stringify({ json: 'v' }), 'tags', '["t"]', 'tagVersions', '{}'])
+    await redis.set(`${prefix}e:k`, stringifyJSON({ output: { json: 'v' }, tags: ['stored'] })!)
 
-    await expect(store.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'v' })
+    await expect(store.getOrSet('k', async () => 'other', { tags: ['other'] })).resolves.toMatchObject({ output: 'v', tags: ['stored'] })
+
+    await store.revalidate({ tags: ['stored'] })
+    await expect(store.getOrSet('k', async () => 'refilled', { tags: ['other'] })).resolves.toMatchObject({ output: 'refilled', tags: ['other'] })
   }, { timeout: 20_000 })
 
-  it('reloads scripts the server dropped, and rethrows other script errors', async () => {
+  it('evicts entries past evictAt that the server still holds', async () => {
     const { store, prefix } = createTestingStore()
 
-    await store.getOrSet('k', async () => 'v')
-    await redis.send('SCRIPT', ['FLUSH'])
-    await expect(store.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'v' })
+    await redis.set(`${prefix}e:k`, stringifyJSON({ output: { json: 'v' }, expiresAt: 1, evictAt: 1 })!)
 
-    await redis.send('HSET', [`${prefix}e:broken`, 'output', '{}', 'tags', 'not json', 'tagVersions', '{}'])
+    await expect(store.getOrSet('k', async () => 'refilled')).resolves.toMatchObject({ output: 'refilled', expiresAt: undefined })
+  }, { timeout: 20_000 })
+
+  it('rejects entries it cannot parse', async () => {
+    const { store, prefix } = createTestingStore()
+
+    await redis.set(`${prefix}e:broken`, 'not json')
+
     await expect(store.getOrSet('broken', async () => 'v')).rejects.toThrow()
-  }, { timeout: 20_000 })
-
-  it('reloads a script once the server answers NOSCRIPT for its cached sha', async () => {
-    const { store } = createTestingStore()
-    const scriptShas = Reflect.get(store, 'scriptShas') as Map<string, string>
-    const unknownSha = '0'.repeat(40)
-
-    await store.getOrSet('k', async () => 'v')
-    for (const script of scriptShas.keys()) {
-      scriptShas.set(script, unknownSha)
-    }
-
-    await expect(store.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'v' })
-    await expect(store.getOrSet('k2', async () => 'w')).resolves.toMatchObject({ output: 'w' })
-    expect([...scriptShas.values()]).not.toContain(unknownSha)
   }, { timeout: 20_000 })
 
   it('encodes non-string keys stably', async () => {
@@ -216,83 +211,37 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
     await expect(store.getOrSet('k', async () => 'fresh', { tags: ['t'] })).resolves.toMatchObject({ output: 'fresh' })
   }, { timeout: 20_000 })
 
-  it('frees waiters after lockTtl and leaves a lock taken over that way alone', async () => {
-    const { store: holderStore, prefix } = createTestingStore({ lockTtl: 1 })
-    const waiterStore = new experimental_BunRedisCacheStore(redis, { prefix })
+  it('coalesces fills across stores sharing a locker, and lets a waiter fill once its wait times out', async () => {
+    const lockPrefix = `${crypto.randomUUID()}:`
+    const { store: first, prefix } = createTestingStore({ locker: createLocker({ prefix: lockPrefix, ttl: 5000, timeout: 5000 }) })
+    const { store: second } = createTestingStore({ prefix, locker: createLocker({ prefix: lockPrefix, ttl: 5000, timeout: 300 }) })
+    const { store: third } = createTestingStore({ prefix, locker: createLocker({ prefix: lockPrefix, ttl: 5000, timeout: 5000 }) })
     let release!: () => void
     const held = new Promise<void>((resolve) => {
       release = resolve
     })
-    let takenOver!: () => void
-    const takeover = new Promise<void>((resolve) => {
-      takenOver = resolve
-    })
-
-    const holder = holderStore.getOrSet('k', async () => {
-      await takeover
-      return 'holder'
-    })
-    await waitFor(async () => expect(await redis.exists(`${prefix}l:k`)).toBe(true), { timeout: 5000 })
-
-    const waiter = waiterStore.getOrSet('k', async () => {
-      takenOver()
+    const fill = mock(async () => {
       await held
-      return 'waiter'
+      return 'held'
     })
 
-    await expect(holder).resolves.toMatchObject({ output: 'holder' })
-    await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(true)
+    const holder = first.getOrSet('k', fill)
+    await waitFor(() => expect(fill).toHaveBeenCalledTimes(1), { timeout: 5000 })
+
+    let settled = false
+    const timedOut = second.getOrSet('k', async () => 'waiter').then((entry) => {
+      settled = true
+      return entry
+    })
+    const waiterFill = mock(async () => 'third')
+    const waiter = third.getOrSet('k', waiterFill)
+    await sleep(100)
+    expect(settled).toBe(false)
+    await expect(timedOut).resolves.toMatchObject({ output: 'waiter' })
 
     release()
-    await expect(waiter).resolves.toMatchObject({ output: 'waiter' })
-    await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(false)
-    await expect(holderStore.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'waiter' })
-  }, { timeout: 20_000 })
-
-  it('keeps the entry of the fill that took over when the original holder finishes later', async () => {
-    const { store: holderStore, prefix } = createTestingStore({ lockTtl: 1 })
-    const waiterStore = new experimental_BunRedisCacheStore(redis, { prefix })
-    let takenOver!: () => void
-    const takeover = new Promise<void>((resolve) => {
-      takenOver = resolve
-    })
-
-    const holder = holderStore.getOrSet('k', async () => {
-      await takeover
-      return 'holder'
-    })
-    await waitFor(async () => expect(await redis.exists(`${prefix}l:k`)).toBe(true), { timeout: 5000 })
-
-    await expect(waiterStore.getOrSet('k', async () => 'waiter')).resolves.toMatchObject({ output: 'waiter' })
-    takenOver()
-    await expect(holder).resolves.toMatchObject({ output: 'holder' })
-
-    await expect(waiterStore.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'waiter' })
-    await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(false)
-    await expect(redis.exists(`${prefix}g:k`)).resolves.toBe(false)
-  }, { timeout: 20_000 })
-
-  it('stores nothing from a holder that lost its lock, even once the takeover entry is gone', async () => {
-    const { store: holderStore, prefix } = createTestingStore({ lockTtl: 1 })
-    const waiterStore = new experimental_BunRedisCacheStore(redis, { prefix })
-    let takenOver!: () => void
-    const takeover = new Promise<void>((resolve) => {
-      takenOver = resolve
-    })
-
-    const holder = holderStore.getOrSet('k', async () => {
-      await takeover
-      return 'holder'
-    })
-    await waitFor(async () => expect(await redis.exists(`${prefix}l:k`)).toBe(true), { timeout: 5000 })
-
-    await expect(waiterStore.getOrSet('k', async () => 'waiter')).resolves.toMatchObject({ output: 'waiter' })
-    await redis.send('DEL', [`${prefix}e:k`])
-
-    takenOver()
-    await expect(holder).resolves.toMatchObject({ output: 'holder' })
-
-    await expect(redis.exists(`${prefix}e:k`)).resolves.toBe(false)
-    await expect(waiterStore.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'other' })
+    await expect(holder).resolves.toMatchObject({ output: 'held' })
+    await expect(waiter).resolves.toMatchObject({ output: 'held' })
+    expect(waiterFill).not.toHaveBeenCalled()
   }, { timeout: 20_000 })
 })

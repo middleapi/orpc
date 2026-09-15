@@ -178,5 +178,5 @@ export function encodeCacheTagHeader(tags: readonly string[]): string {
  * @see {@link https://orpc.dev/docs/helpers/cache#handler-plugin | Cache Helpers - Handler Plugin}
  */
 export function decodeCacheTagHeader(header: string): string[] {
-  return header.split(',').map(tryDecodeURIComponent)
+  return header.split(',').map(safeDecodeURIComponent)
 }

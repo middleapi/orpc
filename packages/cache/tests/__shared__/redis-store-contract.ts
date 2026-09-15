@@ -1,3 +1,4 @@
+import type { Locker } from '@orpc/experimental-lock'
 import type { CacheStore } from '../../src'
 import type { BaseRedisCacheStoreOptions } from '../../src/adapters/base-redis'
 import { RPCJsonSerializer } from '@orpc/client'
@@ -7,9 +8,11 @@ import { expect, it, vi } from 'vitest'
 export interface RedisCacheStoreContractClient {
   exists: (key: string) => Promise<number>
   type: (key: string) => Promise<string>
-  hset: (key: string, fields: Record<string, string>) => Promise<unknown>
-  del: (key: string) => Promise<unknown>
-  scriptFlush: () => Promise<unknown>
+  set: (key: string, value: string) => Promise<unknown>
+  /**
+   * A locker sharing locks under `prefix` across stores, as `RedisLocker` does.
+   */
+  createLocker: (options: { prefix: string, ttl: number, timeout: number }) => Locker
 }
 
 /**
@@ -57,18 +60,15 @@ export function describeRedisCacheStoreContract(
     expect(fresh.expiresAt).toBeGreaterThan(stale.expiresAt!)
   })
 
-  it('stores entries as hashes and tag counters under the prefixed key families, locking while filling', async () => {
+  it('stores entries as strings and tag counters under the prefixed key families', async () => {
     const { store, prefix } = createStore()
 
-    await store.getOrSet('k', async () => {
-      await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(1)
-      return 'v'
-    }, { tags: ['t'] })
-    await store.revalidate({ tags: ['t'] })
+    await store.getOrSet('k', async () => 'v', { tags: ['t'] })
+    await expect(redis.type(`${prefix}e:k`)).resolves.toBe('string')
+    await expect(redis.exists(`${prefix}t:t`)).resolves.toBe(0)
 
-    await expect(redis.type(`${prefix}e:k`)).resolves.toBe('hash')
-    await expect(redis.exists(`${prefix}t:t`)).resolves.toBe(1)
-    await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(0)
+    await store.revalidate({ tags: ['t'] })
+    await expect(redis.type(`${prefix}t:t`)).resolves.toBe('string')
   })
 
   it('defaults to no prefix', async () => {
@@ -81,22 +81,30 @@ export function describeRedisCacheStoreContract(
     await expect(store.getOrSet(key, async () => 'other')).resolves.toMatchObject({ output: 'v' })
   })
 
-  it('treats tags missing from the snapshot as version zero', async () => {
+  it('validates against the tags stored with the entry, treating tags missing from the snapshot as version zero', async () => {
     const { store, prefix } = createStore()
 
-    await redis.hset(`${prefix}e:k`, { output: stringifyJSON({ json: 'v' }), tags: '["t"]', tagVersions: '{}' })
+    await redis.set(`${prefix}e:k`, stringifyJSON({ output: { json: 'v' }, tags: ['stored'] })!)
 
-    await expect(store.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'v' })
+    await expect(store.getOrSet('k', async () => 'other', { tags: ['other'] })).resolves.toMatchObject({ output: 'v', tags: ['stored'] })
+
+    await store.revalidate({ tags: ['stored'] })
+    await expect(store.getOrSet('k', async () => 'refilled', { tags: ['other'] })).resolves.toMatchObject({ output: 'refilled', tags: ['other'] })
   })
 
-  it('reloads scripts the server dropped, and rethrows other script errors', async () => {
+  it('evicts entries past evictAt that the server still holds', async () => {
     const { store, prefix } = createStore()
 
-    await store.getOrSet('k', async () => 'v')
-    await redis.scriptFlush()
-    await expect(store.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'v' })
+    await redis.set(`${prefix}e:k`, stringifyJSON({ output: { json: 'v' }, expiresAt: 1, evictAt: 1 })!)
 
-    await redis.hset(`${prefix}e:broken`, { output: '{}', tags: 'not json', tagVersions: '{}' })
+    await expect(store.getOrSet('k', async () => 'refilled')).resolves.toMatchObject({ output: 'refilled', expiresAt: undefined })
+  })
+
+  it('rejects entries it cannot parse', async () => {
+    const { store, prefix } = createStore()
+
+    await redis.set(`${prefix}e:broken`, 'not json')
+
     await expect(store.getOrSet('broken', async () => 'v')).rejects.toThrow()
   })
 
@@ -135,83 +143,65 @@ export function describeRedisCacheStoreContract(
     expect(entries.map(entry => entry.output)).toEqual(keys)
   })
 
-  it('frees waiters after lockTtl and leaves a lock taken over that way alone', async () => {
-    const { store: holderStore, prefix } = createStore({ lockTtl: 1 })
-    const { store: waiterStore } = createStore({ prefix })
+  it('coalesces fills across stores sharing a locker, and lets a waiter fill once its wait times out', async () => {
+    const { store: holderStore, prefix } = createStore({ locker: redis.createLocker({ prefix: `${crypto.randomUUID()}:`, ttl: 5000, timeout: 5000 }) })
+    const { store: waiterStore } = createStore({ prefix, locker: redis.createLocker({ prefix: `${crypto.randomUUID()}:`, ttl: 5000, timeout: 5000 }) })
+    const lockPrefix = `${crypto.randomUUID()}:`
+    const { store: first } = createStore({ prefix, locker: redis.createLocker({ prefix: lockPrefix, ttl: 5000, timeout: 5000 }) })
+    const { store: second } = createStore({ prefix, locker: redis.createLocker({ prefix: lockPrefix, ttl: 5000, timeout: 300 }) })
     let release!: () => void
     const held = new Promise<void>((resolve) => {
       release = resolve
     })
-    let takenOver!: () => void
-    const takeover = new Promise<void>((resolve) => {
-      takenOver = resolve
-    })
-
-    const holder = holderStore.getOrSet('k', async () => {
-      await takeover
-      return 'holder'
-    })
-    await vi.waitFor(() => expect(redis.exists(`${prefix}l:k`)).resolves.toBe(1), { timeout: 5000 })
-
-    const waiter = waiterStore.getOrSet('k', async () => {
-      takenOver()
+    const fill = vi.fn(async () => {
       await held
-      return 'waiter'
+      return 'held'
     })
 
-    await expect(holder).resolves.toMatchObject({ output: 'holder' })
-    await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(1)
+    // Separate lockers never wait for each other.
+    const unshared = holderStore.getOrSet('unshared', fill)
+    await vi.waitFor(() => expect(fill).toHaveBeenCalledTimes(1))
+    await expect(waiterStore.getOrSet('unshared', async () => 'waiter')).resolves.toMatchObject({ output: 'waiter' })
+
+    // A shared locker makes the second store wait, then fill itself once its timeout passes.
+    const holder = first.getOrSet('shared', fill)
+    await vi.waitFor(() => expect(fill).toHaveBeenCalledTimes(2))
+    let settled = false
+    const waiter = second.getOrSet('shared', async () => 'waiter').then((entry) => {
+      settled = true
+      return entry
+    })
+    await sleep(100)
+    expect(settled).toBe(false)
+    await expect(waiter).resolves.toMatchObject({ output: 'waiter' })
 
     release()
-    await expect(waiter).resolves.toMatchObject({ output: 'waiter' })
-    await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(0)
-    await expect(holderStore.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'waiter' })
+    await expect(unshared).resolves.toMatchObject({ output: 'held' })
+    await expect(holder).resolves.toMatchObject({ output: 'held' })
   })
 
-  it('keeps the entry of the fill that took over when the original holder finishes later', async () => {
-    const { store: holderStore, prefix } = createStore({ lockTtl: 1 })
-    const { store: waiterStore } = createStore({ prefix })
-    let takenOver!: () => void
-    const takeover = new Promise<void>((resolve) => {
-      takenOver = resolve
+  it('serves a shared-locker waiter the entry the holder stored', async () => {
+    const lockPrefix = `${crypto.randomUUID()}:`
+    const { store: first, prefix } = createStore({ locker: redis.createLocker({ prefix: lockPrefix, ttl: 5000, timeout: 5000 }) })
+    const { store: second } = createStore({ prefix, locker: redis.createLocker({ prefix: lockPrefix, ttl: 5000, timeout: 5000 }) })
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const fill = vi.fn(async () => {
+      await held
+      return 'held'
     })
 
-    const holder = holderStore.getOrSet('k', async () => {
-      await takeover
-      return 'holder'
-    })
-    await vi.waitFor(() => expect(redis.exists(`${prefix}l:k`)).resolves.toBe(1), { timeout: 5000 })
+    const holder = first.getOrSet('k', fill)
+    await vi.waitFor(() => expect(fill).toHaveBeenCalledTimes(1))
+    const waiterFill = vi.fn(async () => 'waiter')
+    const waiter = second.getOrSet('k', waiterFill)
+    await sleep(100)
 
-    await expect(waiterStore.getOrSet('k', async () => 'waiter')).resolves.toMatchObject({ output: 'waiter' })
-    takenOver()
-    await expect(holder).resolves.toMatchObject({ output: 'holder' })
-
-    await expect(waiterStore.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'waiter' })
-    await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(0)
-    await expect(redis.exists(`${prefix}g:k`)).resolves.toBe(0)
-  })
-
-  it('stores nothing from a holder that lost its lock, even once the takeover entry is gone', async () => {
-    const { store: holderStore, prefix } = createStore({ lockTtl: 1 })
-    const { store: waiterStore } = createStore({ prefix })
-    let takenOver!: () => void
-    const takeover = new Promise<void>((resolve) => {
-      takenOver = resolve
-    })
-
-    const holder = holderStore.getOrSet('k', async () => {
-      await takeover
-      return 'holder'
-    })
-    await vi.waitFor(() => expect(redis.exists(`${prefix}l:k`)).resolves.toBe(1), { timeout: 5000 })
-
-    await expect(waiterStore.getOrSet('k', async () => 'waiter')).resolves.toMatchObject({ output: 'waiter' })
-    await redis.del(`${prefix}e:k`)
-
-    takenOver()
-    await expect(holder).resolves.toMatchObject({ output: 'holder' })
-
-    await expect(redis.exists(`${prefix}e:k`)).resolves.toBe(0)
-    await expect(waiterStore.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'other' })
+    release()
+    await expect(holder).resolves.toMatchObject({ output: 'held' })
+    await expect(waiter).resolves.toMatchObject({ output: 'held' })
+    expect(waiterFill).not.toHaveBeenCalled()
   })
 }

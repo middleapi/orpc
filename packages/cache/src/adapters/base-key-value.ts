@@ -1,6 +1,9 @@
+import type { Locker } from '@orpc/experimental-lock'
 import type { Promisable, Public } from '@orpc/shared'
 import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions, CacheStore } from '../types'
 import { RPCJsonSerializer } from '@orpc/client'
+import { LockTimeoutError } from '@orpc/experimental-lock'
+import { MemoryLocker } from '@orpc/experimental-lock/memory'
 import { encodeCacheKey, isCacheEntryStale } from '../utils'
 
 export interface BaseKeyValueCacheStoreOptions {
@@ -11,43 +14,44 @@ export interface BaseKeyValueCacheStoreOptions {
    * @default RPCJsonSerializer
    */
   serializer?: undefined | Public<RPCJsonSerializer>
+
+  /**
+   * Coalesces concurrent fills of one key, so a miss runs the fill once. The
+   * default shares locks within the process; a shared locker such as
+   * `RedisLocker` from `@orpc/experimental-lock` shares them across
+   * processes. A caller that times out waiting fills on its own.
+   *
+   * @default new MemoryLocker()
+   */
+  locker?: undefined | Locker
 }
 
 /**
- * Cache store over a key-value backend without an atomic primitive, so
- * concurrent callers of one key are coalesced within the process. Subclasses
- * read entries by their encoded key and fill the missing ones.
+ * Cache store over a key-value backend, coalescing concurrent fills of one
+ * key through a locker. Subclasses read entries by their encoded key and
+ * fill the missing ones.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
 export abstract class BaseKeyValueCacheStore implements CacheStore {
-  private readonly pending = new Map<string, Promise<unknown>>()
   protected readonly serializer: Public<RPCJsonSerializer>
+  protected readonly locker: Locker
 
   constructor(options: BaseKeyValueCacheStoreOptions = {}) {
     this.serializer = options.serializer ?? new RPCJsonSerializer()
+    this.locker = options.locker ?? new MemoryLocker()
   }
 
   async getOrSet(key: unknown, fill: () => Promise<unknown>, options: CacheGetOrSetOptions = {}): Promise<CacheEntry> {
     const encodedKey = encodeCacheKey(key, this.serializer)
-    const entry = await this.read(encodedKey)
+    const entry = await this.read(encodedKey, options)
 
     if (entry === undefined) {
-      return this.coalesce(encodedKey, async (waited) => {
-        const current = waited ? await this.read(encodedKey) : undefined
-        return current ?? this.fill(encodedKey, fill, options)
-      })
+      return (await this.fillOnce(encodedKey, fill, options, false))!
     }
 
     if (isCacheEntryStale(entry)) {
-      const refresh = this.coalesce(encodedKey, async (waited) => {
-        const current = waited ? await this.read(encodedKey) : undefined
-
-        if (current === undefined || isCacheEntryStale(current)) {
-          await this.fill(encodedKey, fill, options)
-        }
-      })
-
+      const refresh = this.fillOnce(encodedKey, fill, options, true)
       options.waitUntil?.(refresh)
     }
 
@@ -56,7 +60,12 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
 
   abstract revalidate(options: CacheRevalidateOptions): Promise<void>
 
-  protected abstract read(encodedKey: string): Promisable<CacheEntry | undefined>
+  /**
+   * Reads the entry under `encodedKey`, dropping it when it was revalidated.
+   * `options` are those of the lookup, so a backend can fetch what it needs
+   * to validate the entry alongside it.
+   */
+  protected abstract read(encodedKey: string, options: CacheGetOrSetOptions): Promisable<CacheEntry | undefined>
 
   /**
    * Runs `fill` and stores its output. Tag state captured before `fill` runs
@@ -65,23 +74,28 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
   protected abstract fill(encodedKey: string, fill: () => Promise<unknown>, options: CacheGetOrSetOptions): Promise<CacheEntry>
 
   /**
-   * Runs `fn` once the key is free, in call order. `waited` is `true` when
-   * another caller held it first.
+   * Fills under the key's lock, unless a caller that held it first already
+   * stored what was needed. On a miss, a caller that timed out waiting fills
+   * on its own; a refresh that timed out is left to the holder.
    */
-  private async coalesce<T>(encodedKey: string, fn: (waited: boolean) => Promise<T>): Promise<T> {
-    const previous = this.pending.get(encodedKey)
-    const run = () => fn(previous !== undefined)
-    const current = previous?.then(run, run) ?? run()
-
-    this.pending.set(encodedKey, current)
-
+  private async fillOnce(encodedKey: string, fill: () => Promise<unknown>, options: CacheGetOrSetOptions, refresh: boolean): Promise<CacheEntry | undefined> {
     try {
-      return await current
+      return await this.locker.lock(encodedKey, async ({ waited }) => {
+        const current = waited ? await this.read(encodedKey, options) : undefined
+
+        if (current === undefined || (refresh && isCacheEntryStale(current))) {
+          return this.fill(encodedKey, fill, options)
+        }
+
+        return current
+      })
     }
-    finally {
-      if (this.pending.get(encodedKey) === current) {
-        this.pending.delete(encodedKey)
+    catch (error) {
+      if (error instanceof LockTimeoutError) {
+        return refresh ? undefined : this.fill(encodedKey, fill, options)
       }
+
+      throw error
     }
   }
 }
