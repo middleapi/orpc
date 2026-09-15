@@ -2,7 +2,7 @@
   "name": "@orpc/experimental-cache",
   "type": "module",
   "version": "2.0.0-beta.35",
-  "description": "Tag-based caching and revalidation for oRPC procedures, with memory, Redis, Upstash, Vercel, and BentoCache adapters",
+  "description": "Tag-based caching and revalidation for oRPC procedures, with memory, Redis, Upstash, Vercel, BentoCache, and Cacheable adapters",
   "license": "MIT",
   "funding": [
     "https://github.com/sponsors/dinwwwh",
@@ -24,6 +24,7 @@
     "upstash",
     "vercel",
     "bentocache",
+    "cacheable",
     "middleware",
     "api",
     "typescript"
@@ -46,6 +47,11 @@
         "types": "./dist/adapters/bentocache.d.mts",
         "import": "./dist/adapters/bentocache.mjs",
         "default": "./dist/adapters/bentocache.mjs"
+      },
+      "./cacheable": {
+        "types": "./dist/adapters/cacheable.d.mts",
+        "import": "./dist/adapters/cacheable.mjs",
+        "default": "./dist/adapters/cacheable.mjs"
       },
       "./memory": {
         "types": "./dist/adapters/memory.d.mts",
@@ -74,6 +80,7 @@
     ".": "./src/index.ts",
     "./base-redis": "./src/adapters/base-redis.ts",
     "./bentocache": "./src/adapters/bentocache.ts",
+    "./cacheable": "./src/adapters/cacheable.ts",
     "./memory": "./src/adapters/memory.ts",
     "./redis": "./src/adapters/redis.ts",
     "./upstash": "./src/adapters/upstash.ts",
@@ -90,6 +97,7 @@
     "@upstash/redis": ">=1.35.6",
     "@vercel/functions": ">=2.1.0",
     "bentocache": ">=1.6.1",
+    "cacheable": ">=2.5.0",
     "redis": ">=6.0.0"
   },
   "peerDependenciesMeta": {
@@ -100,6 +108,9 @@
       "optional": true
     },
     "bentocache": {
+      "optional": true
+    },
+    "cacheable": {
       "optional": true
     },
     "redis": {
@@ -117,6 +128,7 @@
     "@upstash/redis": "^1.38.2",
     "@vercel/functions": "^3.9.5",
     "bentocache": "^1.6.1",
+    "cacheable": "^2.5.0",
     "redis": "^6.2.1"
   }
 }

@@ -23,6 +23,7 @@ Everything builds on the `CacheStore` interface: `getOrSet` returns the entry un
 | [`experimental_BunRedisCacheStore`](#bun)                        | [Bun's Redis](https://bun.com/docs/runtime/redis)                                          |
 | [`VercelCacheStore`](#vercel)                                    | [Vercel Runtime Cache](https://vercel.com/docs/caching/runtime-cache)                      |
 | [`BentoCacheStore`](#bentocache)                                 | [BentoCache](https://bentocache.dev)                                                       |
+| [`CacheableCacheStore`](#cacheable)                              | [Cacheable](https://cacheable.org)                                                         |
 | [`experimental_WorkersCacheStore`](#cloudflare-workers-caching)  | [Cloudflare Workers Caching](https://developers.cloudflare.com/workers/cache/), purge only |
 
 ```ts twoslash
@@ -364,6 +365,35 @@ const store = new BentoCacheStore(bento.namespace('orpc'), {
    * @default RPCJsonSerializer
    */
   serializer: undefined,
+})
+```
+
+### Cacheable
+
+Stores entries through a [Cacheable](https://cacheable.org) instance, so its primary and secondary stores back the cache, such as a memory tier in front of any Keyv store. Tags are invalidated natively through its tag service, which the store enables.
+
+```ts
+import { CacheableCacheStore } from '@orpc/experimental-cache/cacheable'
+import { Cacheable, Keyv } from 'cacheable'
+
+const cacheable = new Cacheable({
+  secondary: new Keyv('redis://localhost:6379'),
+})
+
+const store = new CacheableCacheStore(cacheable, {
+  /**
+   * Serializer for keys and cached outputs.
+   *
+   * @default RPCJsonSerializer
+   */
+  serializer: undefined,
+
+  /**
+   * Coalesces concurrent fills of one key within the process. A caller that times out waiting fills on its own.
+   *
+   * @default new MemoryLocker()
+   */
+  locker: undefined,
 })
 ```
 
