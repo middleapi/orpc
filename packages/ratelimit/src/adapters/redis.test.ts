@@ -122,23 +122,7 @@ describe.concurrent('redis rate limiter integration', {
     })
   })
 
-  it('reloads the script when Redis returns NOSCRIPT for the cached sha', async () => {
-    const limiter = await createTestingRateLimiter()
-    const invalidScriptSha = 'f'.repeat(40)
-    ; (limiter as any).scriptSha = invalidScriptSha
-
-    await expect(
-      limiter.limit('noscript'),
-    ).resolves.toMatchObject({
-      success: true,
-      limit: 3,
-      remaining: 2,
-    })
-
-    expect((limiter as any).scriptSha).not.toEqual(invalidScriptSha)
-  })
-
-  it('rethrows non-NOSCRIPT client errors', async () => {
+  it('propagates client errors', async () => {
     const disconnectedRedis = createClient({
       url: 'rediss://invalid',
     })

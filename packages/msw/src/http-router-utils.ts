@@ -43,8 +43,8 @@ function createHTTPUtilsInternal(
 
   const utils: Record<string, unknown> = {}
 
-  for (const key in contract) {
-    utils[key] = createHTTPUtilsInternal(contract[key] as RouterContract, options, [...path, key])
+  for (const [key, child] of Object.entries(contract)) {
+    utils[key] = createHTTPUtilsInternal(child, options, [...path, key])
   }
 
   return utils

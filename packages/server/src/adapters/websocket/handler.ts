@@ -1,8 +1,7 @@
 import type { Arrayable, MaybeOptionalOptions } from '@orpc/shared'
 import type { DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standard-server/peer'
 import type { Context } from '../../context'
-import type { StandardHandler } from '../standard'
-import type { StandardPeerRequestHandlerOptions } from '../standard-peer'
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
 import { loadBytes, resolveMaybeOptionalOptions, sequential, toStringOrBytes } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
 import { createStandardPeerRequestHandler } from '../standard-peer'
@@ -55,7 +54,7 @@ export class WebSocketHandler<T extends Context> {
   async message(
     ws: WebSocketLike,
     data: Arrayable<string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>>,
-    ...rest: MaybeOptionalOptions<StandardPeerRequestHandlerOptions<T>>
+    ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): Promise<{ matched: boolean }> {
     let peer = this.peers.get(ws)
 
@@ -104,7 +103,7 @@ export class WebSocketHandler<T extends Context> {
    */
   upgrade(
     ws: Pick<WebSocket, 'send' | 'addEventListener' | 'removeEventListener'>,
-    ...rest: MaybeOptionalOptions<StandardPeerRequestHandlerOptions<T>>
+    ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): void {
     /**
      * Message order is important: loading -> decode -> .message.

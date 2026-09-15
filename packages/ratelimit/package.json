@@ -33,6 +33,11 @@
         "import": "./dist/index.mjs",
         "default": "./dist/index.mjs"
       },
+      "./base-redis": {
+        "types": "./dist/adapters/base-redis.d.mts",
+        "import": "./dist/adapters/base-redis.mjs",
+        "default": "./dist/adapters/base-redis.mjs"
+      },
       "./memory": {
         "types": "./dist/adapters/memory.d.mts",
         "import": "./dist/adapters/memory.mjs",
@@ -53,6 +58,7 @@
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts",
+    "./base-redis": "./src/adapters/base-redis.ts",
     "./memory": "./src/adapters/memory.ts",
     "./redis": "./src/adapters/redis.ts",
     "./upstash": "./src/adapters/upstash.ts"

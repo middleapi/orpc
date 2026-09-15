@@ -35,7 +35,7 @@ const handler = new RPCHandler(router, {
 export const rpc = awslambda.streamifyResponse<APIGatewayProxyEventV2>(async (event, responseStream, context) => {
   const { matched } = await handler.handle(event, responseStream, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed
+    context: {} // Provide initial context if needed, can be an async function
   })
 
   if (matched) {
@@ -72,7 +72,7 @@ const handler = new OpenAPIHandler(router, {
 export const api = awslambda.streamifyResponse<APIGatewayProxyEventV2>(async (event, responseStream, context) => {
   const { matched } = await handler.handle(event, responseStream, {
     prefix: '/api',
-    context: {} // Provide initial context if needed
+    context: {} // Provide initial context if needed, can be an async function
   })
 
   if (matched) {

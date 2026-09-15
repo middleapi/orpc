@@ -13,7 +13,17 @@ npm install @orpc/ratelimit@beta
 
 ## Basic Usage
 
-The core concept is the `RateLimiter` interface, which defines a standard way to check and enforce rate limits. You can create your own custom limiter or use one of the provided adapters for popular storage backends. The `limit` method accepts a key and an optional `weight` value, which defaults to `1`, so a single request can consume multiple points.
+The core concept is the `RateLimiter` interface, which defines a standard way to check and enforce rate limits. You can create your own custom limiter or use one of the provided [adapters](#adapters):
+
+| Name                                   | Blocking Mode | Adapter for                                                                                               |
+| -------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------- |
+| [`MemoryRateLimiter`](#memory)         | ✅            | In-memory storage                                                                                         |
+| [`RedisRateLimiter`](#redis)           | ✅            | [Redis](https://github.com/redis/redis)                                                                   |
+| [`UpstashRateLimiter`](#upstash)       | ✅            | [Upstash Rate Limit](https://www.npmjs.com/package/@upstash/ratelimit)                                    |
+| [`BunRedisRateLimiter`](#bun-redis)    | ✅            | [Bun's Redis](https://bun.com/docs/runtime/redis)                                                         |
+| [`CloudflareRateLimiter`](#cloudflare) | ❌            | [Cloudflare's Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) |
+
+The `limit` method accepts a key and an optional `weight` value, which defaults to `1`, so a single request can consume multiple points.
 
 ```ts twoslash
 import { MemoryRateLimiter } from '@orpc/ratelimit/memory'
@@ -37,195 +47,6 @@ if (!result.success) {
   })
 }
 ```
-
-## Adapters
-
-The package includes adapters for multiple storage backends and runtimes.
-Each adapter might require `maxRequests` and `window` to configure the limit, along with adapter specific options.
-
-| Name                    | Blocking Mode | Adapter for                                                                                               |
-| ----------------------- | ------------- | --------------------------------------------------------------------------------------------------------- |
-| `MemoryRateLimiter`     | ✅            | In-memory storage                                                                                         |
-| `RedisRateLimiter`      | ✅            | [Redis](https://github.com/redis/redis)                                                                   |
-| `UpstashRateLimiter`    | ✅            | [Upstash Rate Limit](https://www.npmjs.com/package/@upstash/ratelimit)                                    |
-| `BunRedisRateLimiter`   | ✅            | [Bun's Redis](https://bun.com/docs/runtime/redis)                                                         |
-| `CloudflareRateLimiter` | ❌            | [Cloudflare's Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) |
-
-<CodeGroup>
-
-```ts memory
-import { MemoryRateLimiter } from '@orpc/ratelimit/memory'
-
-const limiter = new MemoryRateLimiter({
-  /**
-   * Maximum number of requests allowed within the window.
-   */
-  maxRequests: 10,
-
-  /**
-   * The duration of the fixed window in milliseconds.
-   */
-  window: 60000,
-
-  blockingUntilReady: {
-    /**
-     * Block until the request may pass or timeout is reached.
-     *
-     * @default false
-     */
-    enabled: false,
-
-    /**
-     * milliseconds
-     */
-    timeout: 5000
-  },
-})
-```
-
-```ts redis
-import { RedisRateLimiter } from '@orpc/ratelimit/redis'
-import { createClient } from 'redis'
-
-const client = createClient({ url: 'redis://localhost:6379' })
-
-// RedisRateLimiter lazily connects to Redis when needed.
-// You can still call `client.connect()` manually, but it is optional.
-await client.connect()
-
-const limiter = new RedisRateLimiter(client, {
-  /**
-   * The prefix to use for Redis keys.
-   *
-   * @default ''
-   */
-  prefix: '',
-
-  /**
-   * Maximum number of requests allowed within the window.
-   */
-  maxRequests: 10,
-
-  /**
-   * The duration of the fixed window in milliseconds.
-   */
-  window: 60000,
-
-  blockingUntilReady: {
-    /**
-     * Block until the request may pass or timeout is reached.
-     *
-     * @default false
-     */
-    enabled: false,
-
-    /**
-     * milliseconds
-     */
-    timeout: 5000
-  },
-})
-```
-
-````ts upstash
-import { Ratelimit } from '@upstash/ratelimit'
-import { Redis } from '@upstash/redis'
-import { UpstashRateLimiter } from '@orpc/ratelimit/upstash'
-
-const redis = Redis.fromEnv()
-const ratelimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(10, '60 s'),
-  prefix: 'orpc:', // Optional key prefix
-})
-
-const limiter = new UpstashRateLimiter(ratelimit, {
-  blockingUntilReady: {
-    /**
-     * Block until the request may pass or timeout is reached.
-     *
-     * @default false
-     */
-    enabled: false,
-
-    /**
-     * milliseconds
-     */
-    timeout: 5000
-  },
-
-  /**
-   * For the MultiRegion setup we do some synchronizing in the background, after returning the current limit.
-   * Or when analytics is enabled, we send the analytics asynchronously after returning the limit.
-   * In most case you can simply ignore this.
-   *
-   * On Vercel Edge or Cloudflare workers, you might need `.bind` before assign:
-   * ```ts
-   * const ratelimiter = new UpstashRateLimiter(ratelimit, {
-   *   waitUntil: ctx.waitUntil.bind(ctx),
-   * })
-   * ```
-   */
-  waitUntil: undefined
-})
-````
-
-```ts bun
-import { BunRedisRateLimiter } from '@orpc/bun'
-import { redis } from 'bun'
-
-const limiter = new BunRedisRateLimiter(redis, {
-  /**
-   * The prefix to use for Redis keys.
-   *
-   * @default ''
-   */
-  prefix: '',
-
-  /**
-   * Maximum number of requests allowed within the window.
-   */
-  maxRequests: 10,
-
-  /**
-   * The duration of the fixed window in milliseconds.
-   */
-  window: 60000,
-
-  blockingUntilReady: {
-    /**
-     * Block until the request may pass or timeout is reached.
-     *
-     * @default false
-     */
-    enabled: false,
-
-    /**
-     * milliseconds
-     */
-    timeout: 5000
-  },
-})
-```
-
-```ts cloudflare
-import { CloudflareRateLimiter } from '@orpc/cloudflare'
-
-export default {
-  async fetch(request, env) {
-    const limiter = new CloudflareRateLimiter(env.MY_RATE_LIMITER, {
-      /**
-       * The prefix to use for cloudflare ratelimit.
-       *
-       * @default ''
-       */
-      prefix: ''
-    })
-  }
-}
-```
-
-</CodeGroup>
 
 ### Blocking Mode
 
@@ -327,3 +148,198 @@ You can combine this plugin with [Retry After Plugin](/docs/plugins/retry-after)
 :::info
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
 :::
+
+## Adapters
+
+### Memory
+
+Keeps counters in the memory of the current process, so limits are not shared between instances. A good fit for development, tests, and single-process servers.
+
+```ts
+import { MemoryRateLimiter } from '@orpc/ratelimit/memory'
+
+const limiter = new MemoryRateLimiter({
+  /**
+   * Maximum number of requests allowed within the window.
+   */
+  maxRequests: 10,
+
+  /**
+   * The duration of the fixed window in milliseconds.
+   */
+  window: 60000,
+
+  blockingUntilReady: {
+    /**
+     * Block until the request may pass or timeout is reached.
+     *
+     * @default false
+     */
+    enabled: false,
+
+    /**
+     * milliseconds
+     */
+    timeout: 5000
+  },
+})
+```
+
+### Redis
+
+Stores counters in Redis, so every instance using the same server enforces the same limits. Works with both standalone and cluster clients.
+
+```ts
+import { RedisRateLimiter } from '@orpc/ratelimit/redis'
+import { createClient } from 'redis'
+
+// Both standalone (`createClient`) and cluster (`createCluster`) clients are supported.
+const client = createClient({ url: 'redis://localhost:6379' })
+
+// RedisRateLimiter lazily connects to Redis when needed.
+// You can still call `client.connect()` manually, but it is optional.
+await client.connect()
+
+const limiter = new RedisRateLimiter(client, {
+  /**
+   * The prefix to use for Redis keys.
+   *
+   * @default ''
+   */
+  prefix: '',
+
+  /**
+   * Maximum number of requests allowed within the window.
+   */
+  maxRequests: 10,
+
+  /**
+   * The duration of the fixed window in milliseconds.
+   */
+  window: 60000,
+
+  blockingUntilReady: {
+    /**
+     * Block until the request may pass or timeout is reached.
+     *
+     * @default false
+     */
+    enabled: false,
+
+    /**
+     * milliseconds
+     */
+    timeout: 5000
+  },
+})
+```
+
+### Upstash
+
+Delegates to an `@upstash/ratelimit` instance, so the algorithm and limits are configured there. A good fit for serverless and edge runtimes.
+
+````ts
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis } from '@upstash/redis'
+import { UpstashRateLimiter } from '@orpc/ratelimit/upstash'
+
+const redis = Redis.fromEnv()
+const ratelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(10, '60 s'),
+  prefix: 'orpc:', // Optional key prefix
+})
+
+const limiter = new UpstashRateLimiter(ratelimit, {
+  blockingUntilReady: {
+    /**
+     * Block until the request may pass or timeout is reached.
+     *
+     * @default false
+     */
+    enabled: false,
+
+    /**
+     * milliseconds
+     */
+    timeout: 5000
+  },
+
+  /**
+   * For the MultiRegion setup we do some synchronizing in the background, after returning the current limit.
+   * Or when analytics is enabled, we send the analytics asynchronously after returning the limit.
+   * In most case you can simply ignore this.
+   *
+   * On Vercel Edge or Cloudflare workers, you might need `.bind` before assign:
+   * ```ts
+   * const ratelimiter = new UpstashRateLimiter(ratelimit, {
+   *   waitUntil: ctx.waitUntil.bind(ctx),
+   * })
+   * ```
+   */
+  waitUntil: undefined
+})
+````
+
+### Bun Redis
+
+The Redis adapter for Bun's built-in Redis client, with no extra dependency. It shares counters with `RedisRateLimiter`.
+
+```ts
+import { BunRedisRateLimiter } from '@orpc/bun'
+import { redis } from 'bun'
+
+const limiter = new BunRedisRateLimiter(redis, {
+  /**
+   * The prefix to use for Redis keys.
+   *
+   * @default ''
+   */
+  prefix: '',
+
+  /**
+   * Maximum number of requests allowed within the window.
+   */
+  maxRequests: 10,
+
+  /**
+   * The duration of the fixed window in milliseconds.
+   */
+  window: 60000,
+
+  blockingUntilReady: {
+    /**
+     * Block until the request may pass or timeout is reached.
+     *
+     * @default false
+     */
+    enabled: false,
+
+    /**
+     * milliseconds
+     */
+    timeout: 5000
+  },
+})
+```
+
+### Cloudflare
+
+Uses the Workers Rate Limiting binding, so limits are configured in your Worker settings rather than in the adapter.
+
+```ts
+import { CloudflareRateLimiter } from '@orpc/cloudflare'
+
+export default {
+  async fetch(request, env) {
+    const limiter = new CloudflareRateLimiter(env.MY_RATE_LIMITER, {
+      /**
+       * The prefix to use for cloudflare ratelimit.
+       *
+       * @default ''
+       */
+      prefix: ''
+    })
+  }
+}
+```

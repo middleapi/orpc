@@ -122,38 +122,6 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
     })
   }, { timeout: 20_000 })
 
-  it('reloads the script when Redis returns NOSCRIPT for the cached sha', async () => {
-    const limiter = await createTestingRateLimiter()
-    const invalidScriptSha = 'f'.repeat(40)
-    ; (limiter as any).scriptSha = invalidScriptSha
-
-    await expect(
-      limiter.limit('noscript'),
-    ).resolves.toMatchObject({
-      success: true,
-      limit: 3,
-      remaining: 2,
-    })
-
-    expect((limiter as any).scriptSha).not.toEqual(invalidScriptSha)
-  }, { timeout: 20_000 })
-
-  it('rethrows non-NOSCRIPT client errors', async () => {
-    const limiter = await createTestingRateLimiter()
-    const errorScriptSha = await redis.send('SCRIPT', [
-      'LOAD',
-      'return redis.error_reply("something went wrong")',
-    ]) as string
-    ; (limiter as any).scriptSha = errorScriptSha
-
-    await expect(
-      limiter.limit('non-noscript'),
-    ).rejects.toThrow('something went wrong')
-
-    // the sha must not be reset, proving the NOSCRIPT reload path was not taken
-    expect((limiter as any).scriptSha).toEqual(errorScriptSha)
-  }, { timeout: 20_000 })
-
   it('rejects invalid weights', async () => {
     const limiter = await createTestingRateLimiter()
     const key = 'invalid-weight'

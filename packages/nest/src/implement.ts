@@ -102,7 +102,7 @@ function implementRouterContract(
   propertyKey: string,
   descriptor: TypedPropertyDescriptor<(...args: any[]) => any>,
 ): void {
-  for (const key in contract) {
+  for (const [key, childContract] of Object.entries(contract)) {
     let methodName = `${propertyKey}_${key}`
 
     let i = 0
@@ -127,7 +127,6 @@ function implementRouterContract(
       }
     })
 
-    const childContract = (contract as any)[key]
     const childDescriptor = Object.getOwnPropertyDescriptor(target, methodName)!
 
     if (childContract instanceof ProcedureContract) {
@@ -220,8 +219,7 @@ export class ImplementInterceptor implements NestInterceptor {
 
         httpAdapter.status(res, result.response.status)
 
-        for (const key in result.response.headers) {
-          const value = result.response.headers[key]
+        for (const [key, value] of Object.entries(result.response.headers)) {
           if (typeof value === 'string') {
             httpAdapter.setHeader(res, key, value)
           }

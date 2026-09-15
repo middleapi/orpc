@@ -159,6 +159,60 @@ describe('standardHandler', () => {
     })
   })
 
+  describe('context resolution', () => {
+    it('resolves a sync context function with the request before routing', async () => {
+      const routingInterceptor = vi.fn(({ next }) => next())
+      handler = new StandardHandler(codec as any, { routingInterceptors: [routingInterceptor] })
+      setupHappyPath()
+
+      const request = makeRequest()
+      const context = vi.fn(() => ({ db: 'postgres' }))
+
+      const result = await handler.handle(request, { context, prefix: '/api/v1' })
+
+      expect(result).toEqual({ matched: true, response: OK_RESPONSE })
+      expect(context).toHaveBeenCalledTimes(1)
+      expect(context).toHaveBeenCalledWith(request)
+      expect(routingInterceptor).toHaveBeenCalledWith(expect.objectContaining({ context: { db: 'postgres' } }))
+      expect(codec.resolveProcedure).toHaveBeenCalledWith(request, { context: { db: 'postgres' }, prefix: '/api/v1' })
+      expect(createProcedureClient).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ context: { db: 'postgres' } }))
+      expect(codec.encodeOutput).toHaveBeenCalledWith('__output__', expect.anything(), ['ping'], { context: { db: 'postgres' }, prefix: '/api/v1' })
+    })
+
+    it('resolves an async context function', async () => {
+      setupHappyPath()
+      const request = makeRequest()
+      const context = vi.fn(async () => ({ db: 'postgres' }))
+
+      await handler.handle(request, { context, prefix: '/api/v1' })
+
+      expect(context).toHaveBeenCalledTimes(1)
+      expect(context).toHaveBeenCalledWith(request)
+      expect(codec.resolveProcedure).toHaveBeenCalledWith(request, { context: { db: 'postgres' }, prefix: '/api/v1' })
+    })
+
+    it('does not run the context function when the prefix does not match', async () => {
+      const context = vi.fn(() => ({ db: 'postgres' }))
+
+      const result = await handler.handle(makeRequest({ url: '/other/ping' }), { context, prefix: '/api/v1' })
+
+      expect(result).toEqual({ matched: false })
+      expect(context).not.toHaveBeenCalled()
+      expect(codec.resolveProcedure).not.toHaveBeenCalled()
+    })
+
+    it('rejects when the context function throws and skips routing', async () => {
+      const error = new Error('context failed')
+      const context = vi.fn(() => {
+        throw error
+      })
+
+      await expect(handler.handle(makeRequest(), { context, prefix: '/api/v1' })).rejects.toBe(error)
+      expect(codec.resolveProcedure).not.toHaveBeenCalled()
+      expect(codec.encodeError).not.toHaveBeenCalled()
+    })
+  })
+
   describe('procedure resolution', () => {
     it('returns unmatched when codec resolves no procedure', async () => {
       codec.resolveProcedure.mockResolvedValue(undefined)

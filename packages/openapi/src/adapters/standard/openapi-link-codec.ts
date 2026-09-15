@@ -7,7 +7,7 @@ import type { OpenAPIMeta } from '../../meta'
 import { createORPCErrorFromJson, createORPCErrorFromMalformedResponse, isORPCErrorJson } from '@orpc/client'
 import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import { unlazy } from '@orpc/server'
-import { isTypescriptObject, mergeHttpPath, pathToHttpPath, stringifyJSON, value } from '@orpc/shared'
+import { isTypescriptObject, mergeHttpPath, pathToHttpPath, safeEncodeURIComponent, stringifyJSON, value } from '@orpc/shared'
 import { mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
 import { toStandardHeaders } from '@standard-server/fetch'
 import {
@@ -205,14 +205,14 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       encoded = val
         .map(val => this.serializer.serialize(val))
         .filter(val => val !== undefined && val !== null)
-        .map(val => encodeURIComponent(String(val)))
+        .map(val => safeEncodeURIComponent(String(val)))
         .join(',')
     }
     else if (style === 'comma-delimited-object' && isTypescriptObject(val)) {
       encoded = Object.entries(val)
         .map(([key, val]) => [key, this.serializer.serialize(val)])
         .filter(([, val]) => val !== undefined && val !== null)
-        .map(([key, val]) => `${encodeURIComponent(String(key))},${encodeURIComponent(String(val))}`)
+        .map(([key, val]) => `${safeEncodeURIComponent(String(key))},${safeEncodeURIComponent(String(val))}`)
         .join(',')
     }
     else {
@@ -220,10 +220,10 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
       if (serialized !== undefined && serialized !== null) {
         if (param.allowsSlash) {
-          encoded = String(serialized).split('/').map(encodeURIComponent).join('/')
+          encoded = String(serialized).split('/').map(safeEncodeURIComponent).join('/')
         }
         else {
-          encoded = encodeURIComponent(String(serialized))
+          encoded = safeEncodeURIComponent(String(serialized))
         }
       }
     }
@@ -482,7 +482,7 @@ function isValidDetailedInput(
 
 /**
  * Encode a query parameter value using URLSearchParams semantics.
- * Prefer this over encodeURIComponent for query-string values.
+ * Prefer this over safeEncodeURIComponent for query-string values.
  */
 function encodeURLSearchParamComponent(value: string): string {
   return new URLSearchParams({ '': value }).toString().slice(1)

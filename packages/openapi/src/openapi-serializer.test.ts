@@ -1,4 +1,4 @@
-import { ORPCError } from '@orpc/client'
+import { createORPCErrorFromJson, ORPCError } from '@orpc/client'
 import { isAsyncIteratorObject } from '@orpc/shared'
 import { ErrorEvent } from '@standard-server/core'
 import { OpenAPISerializer } from './openapi-serializer'
@@ -128,10 +128,11 @@ describe('openAPISerializer', () => {
 
         await expect(result.next()).rejects.toSatisfy((e: any) => {
           expect(e).toBeInstanceOf(ErrorEvent)
-          expect(e.data).toEqual({
-            cause: error,
-            data: error.toJSON(),
-          })
+          expect(e.data).toEqual(error.toJSON())
+          expect(Object.keys(e.data)).toEqual(['defined', 'code', 'message', 'data'])
+          // `cause` belongs on Error's own non-enumerable slot, never on the payload the transport writes
+          expect(e.cause).toBe(error)
+          expect(JSON.parse(JSON.stringify(e.data))).toEqual(error.toJSON())
 
           return true
         })
@@ -145,14 +146,13 @@ describe('openAPISerializer', () => {
 
         await expect(result.next()).rejects.toSatisfy((e: any) => {
           expect(e).toBeInstanceOf(ErrorEvent)
-          expect(e.data).toMatchObject({
-            cause: error,
-            data: {
-              code: 'INTERNAL_SERVER_ERROR',
-              defined: false,
-              message: 'Internal Server Error',
-            },
+          expect(e.data).toEqual({
+            defined: false,
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Internal Server Error',
+            data: undefined,
           })
+          expect(e.cause).toBe(error)
 
           return true
         })
@@ -256,6 +256,41 @@ describe('openAPISerializer', () => {
           expect(e.code).toBe('BAD_GATEWAY')
           expect(e.data).toEqual({ reason: 'upstream' })
           expect(e.cause).toBe(error)
+
+          return true
+        })
+      })
+
+      it('round-trips a mid-stream ORPCError thrown through serialize back into a typed ORPCError', async () => {
+        const error = createORPCErrorFromJson({
+          defined: true,
+          code: 'BAD_GATEWAY',
+          message: 'Upstream failed',
+          data: { reason: 'upstream' },
+        })
+
+        const serialized = serializer.serialize((async function* () {
+          throw error
+        })()) as AsyncIteratorObject<unknown>
+
+        const event = await serialized.next().then(
+          () => { throw new Error('expected the iterator to reject') },
+          (e: unknown) => e as ErrorEvent,
+        )
+
+        // the transport writes `JSON.stringify(event.data)` onto the wire, and the client parses it back
+        const overWire = (async function* () {
+          throw new ErrorEvent(JSON.parse(JSON.stringify(event.data)))
+        })()
+
+        const result = serializer.deserialize(overWire) as AsyncIteratorObject<unknown>
+
+        await expect(result.next()).rejects.toSatisfy((e: any) => {
+          expect(e).toBeInstanceOf(ORPCError)
+          expect(e.defined).toBe(true)
+          expect(e.code).toBe('BAD_GATEWAY')
+          expect(e.message).toBe('Upstream failed')
+          expect(e.data).toEqual({ reason: 'upstream' })
 
           return true
         })

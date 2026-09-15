@@ -2,8 +2,7 @@ import type { MaybeOptionalOptions } from '@orpc/shared'
 import type { DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standard-server/peer'
 import type { Message, Peer } from 'crossws'
 import type { Context } from '../../context'
-import type { StandardHandler } from '../standard'
-import type { StandardPeerRequestHandlerOptions } from '../standard-peer'
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
 import { createStandardPeerRequestHandler } from '../standard-peer'
@@ -47,7 +46,7 @@ export class experimental_CrosswsHandler<T extends Context> {
   async message(
     ws: CrosswsPeerLike,
     message: CrosswsMessageLike,
-    ...rest: MaybeOptionalOptions<StandardPeerRequestHandlerOptions<T>>
+    ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): Promise<{ matched: boolean }> {
     let peer = this.peers.get(ws)
 

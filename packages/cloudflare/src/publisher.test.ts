@@ -1,9 +1,8 @@
+import type { DurablePublisherOptions } from './publisher'
 import { RPCJsonSerializer } from '@orpc/client'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
-import { sleep } from '@standard-server/shared'
-import { reset } from 'cloudflare:test'
 import { env } from 'cloudflare:workers'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { DurablePublisher } from './publisher'
 
 type MockSocket = WebSocket & EventTarget & {
@@ -38,14 +37,15 @@ function makeSocket(): MockSocket {
   return socket
 }
 
-beforeEach(async () => {
-  await reset()
-  vi.clearAllMocks()
-})
-
 describe('durable publisher', () => {
+  function createTestingPublisher(namespace: DurableObjectNamespace<any>, options: DurablePublisherOptions = {}) {
+    const prefix = `${crypto.randomUUID()}:`
+
+    return { prefix, publisher: new DurablePublisher(namespace, { ...options, prefix }) }
+  }
+
   it('sends live messages without resume', async () => {
-    const publisher = new DurablePublisher(env.PUBLISHER_DON)
+    const { publisher } = createTestingPublisher(env.PUBLISHER_DON)
 
     const live = vi.fn()
     const stopLive = await publisher.subscribe('message', live)
@@ -78,14 +78,19 @@ describe('durable publisher', () => {
       lastEventId: '0',
     })
 
-    await sleep(100)
-    expect(resume).toHaveBeenCalledTimes(0)
+    await publisher.publish('message', { text: 'live only' })
+
+    await vi.waitFor(() => {
+      expect(resume).toHaveBeenCalledTimes(1)
+    })
+
+    expect(resume).toHaveBeenCalledWith({ text: 'live only' })
 
     await stopResume()
   })
 
   it('sends live messages and resumes missed ones', async () => {
-    const publisher = new DurablePublisher(env.PUBLISHER_RESUME3S_DON)
+    const { publisher } = createTestingPublisher(env.PUBLISHER_RESUME3S_DON)
 
     const live = vi.fn()
     const stopLive = await publisher.subscribe('message', live)
@@ -128,7 +133,7 @@ describe('durable publisher', () => {
   })
 
   it('resumes old messages before new ones', { repeats: 5 }, async () => {
-    const publisher = new DurablePublisher(env.PUBLISHER_RESUME3S_DON)
+    const { publisher } = createTestingPublisher(env.PUBLISHER_RESUME3S_DON)
 
     await publisher.publish('timeline', { order: 1 })
     await publisher.publish('timeline', { order: 2 })
@@ -169,8 +174,7 @@ describe('durable publisher', () => {
     })
 
     const getStubByName = vi.fn((namespace, event) => namespace.getByName(event))
-    const publisher = new DurablePublisher<any>(env.PUBLISHER_DON, {
-      prefix: 'prefix:',
+    const { prefix, publisher } = createTestingPublisher(env.PUBLISHER_DON, {
       serializer,
       getStubByName,
     })
@@ -182,8 +186,8 @@ describe('durable publisher', () => {
     await publisher.publish('message', person)
 
     expect(getStubByName).toHaveBeenCalledTimes(2)
-    expect(getStubByName).toHaveBeenNthCalledWith(1, env.PUBLISHER_DON, `prefix:message`)
-    expect(getStubByName).toHaveBeenNthCalledWith(2, env.PUBLISHER_DON, `prefix:message`)
+    expect(getStubByName).toHaveBeenNthCalledWith(1, env.PUBLISHER_DON, `${prefix}message`)
+    expect(getStubByName).toHaveBeenNthCalledWith(2, env.PUBLISHER_DON, `${prefix}message`)
 
     await vi.waitFor(() => {
       expect(listener).toHaveBeenCalledTimes(1)

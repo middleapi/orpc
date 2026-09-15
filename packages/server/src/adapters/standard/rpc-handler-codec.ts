@@ -4,7 +4,7 @@ import type { StandardLazyRequest, StandardResponse } from '@standard-server/cor
 import type { Context } from '../../context'
 import type { AnyProcedure } from '../../procedure'
 import type { AnyRouter } from '../../router'
-import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure, StandardHandlerHandleOptions } from '../standard'
+import type { ResolvedStandardHandlerHandleOptions, StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '../standard'
 import type { RPCMatcherOptions } from './rpc-matcher'
 import { COMMON_ERROR_STATUS_MAP, RPCSerializer } from '@orpc/client'
 import { getOwn, parseEmptyableJSON, value } from '@orpc/shared'
@@ -26,7 +26,7 @@ export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOpt
    *
    * @default DEFAULT_SUCCESS_STATUS (200)
    */
-  outputStatus?: Value<number | undefined | null, [output: unknown, procedure: AnyProcedure, path: string[], options: StandardHandlerHandleOptions<T>]>
+  outputStatus?: Value<number | undefined | null, [output: unknown, procedure: AnyProcedure, path: string[], options: ResolvedStandardHandlerHandleOptions<T>]>
 
   /**
    * Mapping ORPCError Code -> HTTP Status Code
@@ -50,7 +50,7 @@ export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<
     this.outputStatus = options.outputStatus
   }
 
-  async resolveProcedure(request: StandardLazyRequest, options: StandardHandlerHandleOptions<T>): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
+  async resolveProcedure(request: StandardLazyRequest, options: ResolvedStandardHandlerHandleOptions<T>): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
     const [pathname, query] = parseStandardUrl(request.url)
 
     const matched = await this.matcher.match(request.method, pathname, options.prefix)
@@ -73,7 +73,7 @@ export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<
     }
   }
 
-  encodeOutput(output: unknown, procedure: AnyProcedure, path: string[], options: StandardHandlerHandleOptions<T>): Promisable<StandardResponse> {
+  encodeOutput(output: unknown, procedure: AnyProcedure, path: string[], options: ResolvedStandardHandlerHandleOptions<T>): Promisable<StandardResponse> {
     return {
       headers: {},
       status: value(this.outputStatus, output, procedure, path, options) ?? DEFAULT_SUCCESS_STATUS,
@@ -81,7 +81,7 @@ export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<
     }
   }
 
-  encodeError(error: AnyORPCError, _procedure: AnyProcedure, _path: string[], _options: StandardHandlerHandleOptions<T>): Promisable<StandardResponse> {
+  encodeError(error: AnyORPCError, _procedure: AnyProcedure, _path: string[], _options: ResolvedStandardHandlerHandleOptions<T>): Promisable<StandardResponse> {
     const status = getOwn(this.errorStatusMap, error.code) ?? DEFAULT_ERROR_STATUS
 
     return {

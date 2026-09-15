@@ -49,6 +49,18 @@ export async function fetch(request: Request) {
 
 :::
 
+:::tip
+`context` also accepts an sync or async function, that receives the standard request. The handler only calls it once the request matches `prefix`, so work such as loading a session is skipped for requests that other routes serve:
+
+```ts
+const { matched, response } = await handler.handle(request, {
+  prefix: '/api',
+  context: async () => ({ session: await getSession(request) }),
+})
+```
+
+:::
+
 :::warning
 To better support `Blob`, `File`, and `ReadableStream<Uint8Array>` at the root level in cross-origin scenarios,
 extend your [CORS allowlist](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_response_header) to allow clients to send and receive the `Content-Disposition` and `Standard-Server` headers. Learn more in the [Standard Server documentation](https://github.com/middleapi/standard-server#how-body-parsing-works). If you use the [CORS Plugin](/docs/plugins/cors), include them in `allowHeaders` and `exposeHeaders`:

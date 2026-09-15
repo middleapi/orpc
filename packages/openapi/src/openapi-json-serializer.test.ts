@@ -296,6 +296,30 @@ describe('openAPIJsonSerializer', () => {
       expect(Object.hasOwn(result, '__proto__')).toBe(true)
       expect(result.__proto__.file).toBe(blob)
     })
+
+    it('restores a blob stored directly under an own __proto__ key', () => {
+      const blob = new Blob(['x'])
+      const result = serializer.deserialize({
+        json: JSON.parse('{"__proto__": null}'),
+        maps: [['__proto__']],
+        blobs: [blob],
+      }) as any
+
+      expect(Object.hasOwn(result, '__proto__')).toBe(true)
+      expect(result.__proto__).toBe(blob)
+      expect(Object.getPrototypeOf(result)).toBe(Object.prototype)
+    })
+
+    it('walks an own constructor/prototype chain without reaching the real Object.prototype', () => {
+      const blob = new Blob(['x'])
+      const result = serializer.deserialize({
+        json: JSON.parse('{"constructor": {"prototype": {"polluted": null}}}'),
+        maps: [['constructor', 'prototype', 'polluted']],
+        blobs: [blob],
+      }) as any
+
+      expect(result.constructor.prototype.polluted).toBe(blob)
+    })
     /* eslint-enable no-proto, no-restricted-properties */
   })
 })

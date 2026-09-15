@@ -34,6 +34,22 @@ describe('createServerFormFunction', () => {
     })
   })
 
+  it.each([
+    undefined,
+    null,
+    'name=alice',
+    { name: 'alice' },
+    new URLSearchParams({ name: 'alice' }),
+  ])('throws when not receive form data: %s', async (value) => {
+    const client = vi.fn().mockResolvedValue(undefined)
+    createProcedureClientSpy.mockReturnValueOnce(client)
+
+    const serverFn = createServerFormFunction(procedure)
+
+    await expect(serverFn(value as any)).rejects.toThrow(TypeError)
+    expect(client).not.toHaveBeenCalled()
+  })
+
   it('rethrow client errors', async () => {
     const error = new Error('TEST')
     const client = vi.fn().mockRejectedValueOnce(error)

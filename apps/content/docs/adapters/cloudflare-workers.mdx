@@ -31,7 +31,7 @@ export default {
   async fetch(request, env, ctx) {
     const { matched, response } = await handler.handle(request, {
       prefix: '/rpc',
-      context: { env, ctx } // Provide initial context if needed
+      context: { env, ctx } // Provide initial context if needed, can be an async function
     })
 
     if (matched) {
@@ -63,7 +63,7 @@ export default {
   async fetch(request, env, ctx) {
     const { matched, response } = await handler.handle(request, {
       prefix: '/api',
-      context: { env, ctx } // Provide initial context if needed
+      context: { env, ctx } // Provide initial context if needed, can be an async function
     })
 
     if (matched) {

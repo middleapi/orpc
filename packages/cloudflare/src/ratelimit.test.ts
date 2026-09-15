@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { CloudflareRateLimiter } from './ratelimit'
 
 describe('cloudflareRateLimiter', () => {
+  const PERIOD_MS = 10_000
+
   function createTestingLimiter(opts: CloudflareRateLimiterOptions = {}) {
     return new CloudflareRateLimiter(env.RATELIMIT_3_10S, {
       prefix: crypto.randomUUID(),
@@ -11,21 +13,41 @@ describe('cloudflareRateLimiter', () => {
     })
   }
 
+  async function spendWithinOneWindow(spend: (key: string) => Promise<void>): Promise<void> {
+    for (let remaining = 5; ; remaining--) {
+      const started = Date.now()
+
+      try {
+        await spend(`user:${crypto.randomUUID()}`)
+        return
+      }
+      catch (error) {
+        if (remaining === 1 || Math.floor(started / PERIOD_MS) === Math.floor(Date.now() / PERIOD_MS)) {
+          throw error
+        }
+      }
+    }
+  }
+
   it('allows requests up to the limit and denies the next one', async () => {
     const limiter = createTestingLimiter()
 
-    expect(await limiter.limit('user:123')).toEqual({ success: true })
-    expect(await limiter.limit('user:123')).toEqual({ success: true })
-    expect(await limiter.limit('user:123')).toEqual({ success: true })
-    expect(await limiter.limit('user:123')).toEqual({ success: false })
+    await spendWithinOneWindow(async (key) => {
+      expect(await limiter.limit(key)).toEqual({ success: true })
+      expect(await limiter.limit(key)).toEqual({ success: true })
+      expect(await limiter.limit(key)).toEqual({ success: true })
+      expect(await limiter.limit(key)).toEqual({ success: false })
+    })
   })
 
   it('deducts multiple tokens when a weight is provided', async () => {
     const limiter = createTestingLimiter()
 
-    expect(await limiter.limit('user:123', { weight: 2 })).toEqual({ success: true })
-    expect(await limiter.limit('user:123', { weight: 1 })).toEqual({ success: true })
-    expect(await limiter.limit('user:123', { weight: 1 })).toEqual({ success: false })
+    await spendWithinOneWindow(async (key) => {
+      expect(await limiter.limit(key, { weight: 2 })).toEqual({ success: true })
+      expect(await limiter.limit(key, { weight: 1 })).toEqual({ success: true })
+      expect(await limiter.limit(key, { weight: 1 })).toEqual({ success: false })
+    })
   })
 
   it('throws a TypeError when weight is zero, negative, or non-integer', async () => {

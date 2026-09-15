@@ -410,6 +410,27 @@ describe('bracket notation serializer', () => {
       expect(result.constructor.prototype.polluted).toBe('x')
       expect(result.a.constructor.prototype.polluted).toBe('y')
     })
+
+    it('can prevent prototype pollution attack through object values', () => {
+      /* eslint-disable no-proto, no-restricted-properties */
+      const result = serializer.deserialize([
+        ['a', {}],
+        ['a[__proto__][polluted]', '1'],
+        ['b', { c: '2' }],
+        ['b[constructor][prototype][polluted]', '3'],
+      ]) as any
+
+      expect(({} as any).polluted).toBeUndefined()
+      expect((Object.prototype as any).polluted).toBeUndefined()
+
+      // dangerous keys are stored as plain data on the object value, not as real prototype links
+      expect(result.a.__proto__).toEqual({ polluted: '1' })
+      expect(result.a.polluted).toBeUndefined()
+      expect(result.b.c).toBe('2')
+      expect(result.b.constructor.prototype.polluted).toBe('3')
+      expect(result.b.polluted).toBeUndefined()
+      /* eslint-enable no-proto, no-restricted-properties */
+    })
   })
 
   it.each([

@@ -1,6 +1,6 @@
 import type { AnyORPCError } from '@orpc/client'
 import type { AnyProcedure, AnyRouter, Context } from '@orpc/server'
-import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure, StandardHandlerHandleOptions } from '@orpc/server/standard'
+import type { ResolvedStandardHandlerHandleOptions, StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '@orpc/server/standard'
 import type { Promisable, Public } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { OpenAPIMeta } from '../../meta'
@@ -259,7 +259,7 @@ export class OpenAPIHandlerCodec<T extends Context> extends OpenAPIHandlerCodecC
     this.matcher = new OpenAPIMatcher(router, options)
   }
 
-  async resolveProcedure(request: StandardLazyRequest, options: StandardHandlerHandleOptions<T>): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
+  async resolveProcedure(request: StandardLazyRequest, options: ResolvedStandardHandlerHandleOptions<T>): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
     const [pathname] = parseStandardUrl(request.url)
 
     const matched = await this.matcher.match(request.method, pathname, options.prefix)

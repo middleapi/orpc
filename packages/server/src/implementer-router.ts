@@ -1,5 +1,5 @@
 import type { ErrorMap, InferRouterContractErrorMap, RouterContract } from '@orpc/contract'
-import type { AnyFunction, IntersectPick, Public } from '@orpc/shared'
+import type { IntersectPick, Public } from '@orpc/shared'
 import type { Context, MergedContext, MergedInitialContext } from './context'
 import type { AnyMiddleware, Middleware } from './middleware'
 import type { DecoratedMiddleware } from './middleware-decorated'
@@ -239,16 +239,13 @@ function createRouterImplementerInternal<
 
   const implementer: Record<string, any> = {}
 
-  for (const key in contract) {
-    const child = contract[key] as RouterContract
-    implementer[key] = createRouterImplementerInternal(child, config, middlewares)
+  for (const [key, child] of Object.entries(contract)) {
+    implementer[key] = createRouterImplementerInternal(child as RouterContract, config, middlewares)
   }
 
   const shared = bindMethods(SharedRouterImplementer.create(contract, config, middlewares))
 
-  for (const key in shared) {
-    const method = (shared as any)[key] as AnyFunction
-
+  for (const [key, method] of Object.entries(shared)) {
     if (key in implementer) {
       const child = implementer[key]
 

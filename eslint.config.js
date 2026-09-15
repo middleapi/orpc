@@ -11,6 +11,7 @@ export default antfu({
     'pnpm/yaml-enforce-settings': 'off',
     'yaml/sort-keys': 'off',
     'jsdoc/no-defaults': 'off',
+    'guard-for-in': 'error',
   },
 }, {
   plugins: { ban: pluginBan },
@@ -27,10 +28,6 @@ export default antfu({
       {
         name: ['*', 'bytes'],
         message: 'Request/Blob/Response/... .bytes is not widely supported, use readAsBuffer instead',
-      },
-      {
-        name: 'decodeURIComponent',
-        message: 'decodeURIComponent can throw an error, use tryDecodeURIComponent instead',
       },
       {
         name: ['AbortSignal', 'any'],
@@ -63,6 +60,12 @@ export default antfu({
     }, {
       name: 'AbortSignal',
       message: 'AbortSignal is not a global in every runtime, read it only behind a typeof guard',
+    }, {
+      name: 'encodeURIComponent',
+      message: 'encodeURIComponent throws on lone surrogates, use safeEncodeURIComponent from @orpc/shared instead',
+    }, {
+      name: 'decodeURIComponent',
+      message: 'decodeURIComponent throws on malformed input, use safeDecodeURIComponent from @orpc/shared instead',
     }],
   },
 }, {

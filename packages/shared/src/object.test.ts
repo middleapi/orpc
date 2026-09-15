@@ -1,7 +1,7 @@
 import * as a from 'arktype'
 import * as v from 'valibot'
 import z from 'zod'
-import { bindMethods, clone, deepSortKeys, findDeepMatches, get, getConstructor, getConstructors, getOwn, isPlainObject, isPropertyKey, mergeTwoLevels, NullProtoObj, omit, set } from './object'
+import { bindMethods, clone, deepSortKeys, findDeepMatches, get, getConstructor, getConstructors, getOwn, isPlainObject, isPropertyKey, mergeTwoLevels, NullProtoObj, omit, set, setOwn } from './object'
 
 it('findDeepMatches', () => {
   const { maps, values } = findDeepMatches(v => typeof v === 'string', {
@@ -16,6 +16,7 @@ it('findDeepMatches', () => {
         'v4',
       ],
     },
+    ignored: 42,
   })
 
   expect(maps).toEqual([
@@ -236,6 +237,84 @@ describe('set', () => {
     expect(Object.hasOwn(root, '__proto__')).toBe(true)
     // eslint-disable-next-line no-proto, no-restricted-properties
     expect((root as any).__proto__).toBe('value')
+  })
+})
+
+describe('setOwn', () => {
+  it('sets a value', () => {
+    const root: Record<string, unknown> = {}
+    setOwn(root, 'a', 1)
+    expect(root).toEqual({ a: 1 })
+  })
+
+  it('overwrites an existing value', () => {
+    const root: Record<string, unknown> = { a: 1 }
+    setOwn(root, 'a', 2)
+    expect(root).toEqual({ a: 2 })
+  })
+
+  it('supports symbol and number keys', () => {
+    const root: Record<PropertyKey, unknown> = {}
+    const sym = Symbol('key')
+
+    setOwn(root, sym, 'sym-value')
+    setOwn(root, 0, 'number-value')
+
+    expect(root[sym]).toBe('sym-value')
+    expect(root[0]).toBe('number-value')
+  })
+
+  it('writes through to an array index', () => {
+    const root: unknown[] = []
+    setOwn(root, 0, 'value')
+
+    expect(root).toEqual(['value'])
+    expect(root.length).toBe(1)
+  })
+
+  it('sets __proto__ as an own property instead of changing the prototype', () => {
+    const root: Record<string, unknown> = {}
+    setOwn(root, '__proto__', 'value')
+
+    expect(Object.getPrototypeOf(root)).toBe(Object.prototype)
+    expect(getOwn(root, '__proto__')).toBe('value')
+    // eslint-disable-next-line no-proto, no-restricted-properties
+    expect((root as any).__proto__).toBe('value')
+  })
+
+  it('does not pollute the prototype via __proto__', () => {
+    const root: Record<string, unknown> = {}
+    setOwn(root, '__proto__', { polluted: 'yes' })
+
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+    expect((Object.prototype as any).polluted).toBeUndefined()
+    expect(Object.getPrototypeOf(root)).toBe(Object.prototype)
+    expect(root.polluted).toBeUndefined()
+  })
+
+  it('sets __proto__ on a null prototype object', () => {
+    const root = new NullProtoObj<Record<string, unknown>>()
+    setOwn(root, '__proto__', 'value')
+
+    expect(Object.getPrototypeOf(root)).toBe(Object.getPrototypeOf(new NullProtoObj()))
+    expect(getOwn(root, '__proto__')).toBe('value')
+  })
+
+  it('defines __proto__ as a writable, enumerable and configurable property', () => {
+    const root: Record<string, unknown> = {}
+    setOwn(root, '__proto__', 'value')
+
+    expect(Object.getOwnPropertyDescriptor(root, '__proto__')).toEqual({
+      value: 'value',
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    })
+
+    expect(Object.keys(root)).toEqual(['__proto__'])
+
+    setOwn(root, '__proto__', 'updated')
+    expect(getOwn(root, '__proto__')).toBe('updated')
   })
 })
 

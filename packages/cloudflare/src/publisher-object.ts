@@ -89,25 +89,24 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
     }
 
     for (const ws of this.ctx.getWebSockets()) {
-      try {
-        ws.send(stringifiedPayload)
+      if (ws.readyState !== WebSocket.OPEN) {
+        continue
       }
-      catch (e) {
-        console.error('Failed to send message to websocket:', e)
-      }
+
+      ws.send(stringifiedPayload)
     }
 
     return new Response(null, { status: 204 })
   }
 
   private async handleSubscribe(request: Request): Promise<Response> {
+    const lastEventId = request.headers.get('last-event-id')
+    const payloads = lastEventId === null ? undefined : this.resumeStorage.getAfter(lastEventId)
+
     const { '0': client, '1': server } = new WebSocketPair()
     this.ctx.acceptWebSocket(server)
 
-    const lastEventId = request.headers.get('last-event-id')
-    if (lastEventId !== null) {
-      const payloads = this.resumeStorage.getAfter(lastEventId)
-
+    if (payloads) {
       for (const payload of payloads) {
         server.send(payload)
       }

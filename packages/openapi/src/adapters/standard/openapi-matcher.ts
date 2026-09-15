@@ -2,7 +2,7 @@ import type { AnyProcedureContract } from '@orpc/contract'
 import type { AnyProcedure, AnyRouter, WalkProcedureContractsLazyResult } from '@orpc/server'
 import type { Value } from '@orpc/shared'
 import { createContractProcedure, getRouter, Procedure, unlazy, walkProcedureContractsSync } from '@orpc/server'
-import { mergeHttpPath, normalizeHttpPath, pathToHttpPath, tryDecodeURIComponent, value } from '@orpc/shared'
+import { mergeHttpPath, normalizeHttpPath, pathToHttpPath, safeDecodeURIComponent, value } from '@orpc/shared'
 import { addRoute, createRouter, findRoute, routeToRegExp } from 'rou3'
 import { DEFAULT_OPENAPI_METHOD } from '../../constants'
 import { getOpenAPIMeta } from '../../meta'
@@ -214,5 +214,5 @@ function toRou3PrefixMatcher(path: `/${string}`): RegExp {
 }
 
 function decodeParams(params: Record<string, string>): Record<string, string> {
-  return Object.fromEntries(Object.entries(params).map(([key, val]) => [key, tryDecodeURIComponent(val)]))
+  return Object.fromEntries(Object.entries(params).map(([key, val]) => [key, safeDecodeURIComponent(val)]))
 }

@@ -1,20 +1,14 @@
-import type { Promisable, Value } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { Context } from '../../context'
-import type { StandardHandler, StandardHandlerHandleOptions } from '../standard'
-import { value } from '@orpc/shared'
-
-export type StandardPeerRequestHandlerOptions<T extends Context>
-  = & Omit<StandardHandlerHandleOptions<T>, 'context'>
-    & (Record<never, never> extends T ? { context?: Value<Promisable<T>, [request: StandardLazyRequest]> } : { context: Value<Promisable<T>, [request: StandardLazyRequest]> })
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
+import { resolveFriendlyStandardHandlerHandleOptions } from '../standard'
 
 export function createStandardPeerRequestHandler<T extends Context>(
   handler: StandardHandler<T>,
-  options: StandardPeerRequestHandlerOptions<T>,
+  options: FriendlyStandardHandlerHandleOptions<T>,
 ): (request: StandardLazyRequest) => Promise<StandardResponse> {
   return async (request) => {
-    const context = await value(options.context ?? {} as T, request) as T
-    const { response } = await handler.handle(request, { ...options, context })
+    const { response } = await handler.handle(request, resolveFriendlyStandardHandlerHandleOptions(options))
     return response ?? { status: 404, headers: {}, body: 'No procedure matched' }
   }
 }

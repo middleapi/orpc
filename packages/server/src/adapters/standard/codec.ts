@@ -3,7 +3,7 @@ import type { Promisable } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { Context } from '../../context'
 import type { AnyProcedure } from '../../procedure'
-import type { StandardHandlerHandleOptions } from './handler'
+import type { ResolvedStandardHandlerHandleOptions } from './handler'
 
 export interface StandardHandlerCodecResolvedProcedure {
   path: string[]
@@ -14,20 +14,20 @@ export interface StandardHandlerCodecResolvedProcedure {
 export interface StandardHandlerCodec<T extends Context> {
   resolveProcedure(
     request: StandardLazyRequest,
-    options: StandardHandlerHandleOptions<T>
+    options: ResolvedStandardHandlerHandleOptions<T>
   ): Promisable<StandardHandlerCodecResolvedProcedure | undefined>
 
   encodeOutput(
     output: unknown,
     procedure: AnyProcedure,
     path: string[],
-    options: StandardHandlerHandleOptions<T>
+    options: ResolvedStandardHandlerHandleOptions<T>
   ): Promisable<StandardResponse>
 
   encodeError(
     error: AnyORPCError,
     procedure: AnyProcedure,
     path: string[],
-    options: StandardHandlerHandleOptions<T>
+    options: ResolvedStandardHandlerHandleOptions<T>
   ): Promisable<StandardResponse>
 }

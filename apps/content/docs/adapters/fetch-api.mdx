@@ -28,7 +28,7 @@ const handler = new RPCHandler(router, {
 export async function fetch(request: Request): Promise<Response> {
   const { matched, response } = await handler.handle(request, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed
+    context: {} // Provide initial context if needed, can be an async function
   })
 
   if (matched) {
@@ -58,7 +58,7 @@ const handler = new OpenAPIHandler(router, {
 export async function fetch(request: Request): Promise<Response> {
   const { matched, response } = await handler.handle(request, {
     prefix: '/api',
-    context: {} // Provide initial context if needed
+    context: {} // Provide initial context if needed, can be an async function
   })
 
   if (matched) {

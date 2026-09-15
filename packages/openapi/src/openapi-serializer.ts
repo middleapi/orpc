@@ -72,12 +72,10 @@ export class OpenAPISerializer {
 
             return { done: result.done, value: this.serializeValue(result.value, false, false) }
           },
-          mapError: (e) => {
-            return new ErrorEvent({
-              data: this.serializeValue(toORPCError(e).toJSON(), false, false),
-              cause: e,
-            })
-          },
+          mapError: e => new ErrorEvent(
+            this.serializeValue(toORPCError(e).toJSON(), false, false),
+            { cause: e },
+          ),
         })
       }
     }

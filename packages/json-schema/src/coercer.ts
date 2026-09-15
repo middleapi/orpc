@@ -1,5 +1,5 @@
 import type { JsonSchema } from './types'
-import { get, isPlainObject, toArray, tryOrUndefined } from '@orpc/shared'
+import { get, getOwn, isPlainObject, toArray, tryOrUndefined } from '@orpc/shared'
 import { decodeJsonPointerSegment } from './ref-utils'
 import { JsonSchemaXNativeType } from './types'
 
@@ -214,13 +214,10 @@ export class JsonSchemaCoercer {
                 return pattern ? [[pattern, value] as const] : []
               })
 
-            const propertySchemas = schema.properties
+            const propertySchemas: Record<string, JsonSchema> = schema.properties ?? {}
 
-            for (const key in coerced) {
-              const value = coerced[key]
-
-              // `properties[key]` alone would resolve keys like `__proto__` to `Object.prototype`
-              const subSchema = (propertySchemas !== undefined && Object.hasOwn(propertySchemas, key) ? propertySchemas[key] : undefined)
+            for (const [key, value] of Object.entries(coerced)) {
+              const subSchema = getOwn(propertySchemas, key)
                 ?? patternProperties.find(([pattern]) => pattern.test(key))?.[1]
                 ?? schema.additionalProperties
 

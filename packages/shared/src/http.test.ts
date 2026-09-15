@@ -49,7 +49,7 @@ describe('normalizeHttpPath', () => {
   })
 
   it('handles malformed percent sequences gracefully', () => {
-    // tryDecodeURIComponent falls back to the raw string on failure
+    // safeDecodeURIComponent falls back to the raw string on failure
     expect(normalizeHttpPath('/bad%GGvalue')).toBe('/bad%25GGvalue')
   })
 

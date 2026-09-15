@@ -70,7 +70,7 @@ describe('createStandardPeerRequestHandler', () => {
     expect(handler.handle).toHaveBeenCalledWith(lazyRequest, { context: {} })
   })
 
-  it('context can be async function', async () => {
+  it('forwards a context function unresolved so the handler resolves it after its prefix check', async () => {
     const handler = {
       handle: vi.fn(async () => ({ matched: false, response: undefined })),
     } as any
@@ -87,9 +87,8 @@ describe('createStandardPeerRequestHandler', () => {
     } as const
     await handleRequest(lazyRequest)
 
-    expect(context).toHaveBeenCalledTimes(1)
-    expect(context).toHaveBeenCalledWith(lazyRequest)
+    expect(context).not.toHaveBeenCalled()
     expect(handler.handle).toHaveBeenCalledTimes(1)
-    expect(handler.handle).toHaveBeenCalledWith(lazyRequest, { context: { db: 'postgres' } })
+    expect(handler.handle).toHaveBeenCalledWith(lazyRequest, { context })
   })
 })

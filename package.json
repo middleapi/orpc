@@ -3,7 +3,13 @@
   "type": "module",
   "version": "2.0.0-beta.35",
   "private": true,
-  "packageManager": "pnpm@12.0.0",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^12.4.1",
+      "onFail": "download"
+    }
+  },
   "scripts": {
     "prepare": "simple-git-hooks",
     "type:check": "pnpm run -r type:check && tsc",
@@ -27,6 +33,7 @@
     "@orpc/evlog": "workspace:*",
     "@orpc/experimental-cache": "workspace:*",
     "@orpc/experimental-effect": "workspace:*",
+    "@orpc/experimental-lock": "workspace:*",
     "@orpc/experimental-msw": "workspace:*",
     "@orpc/hibernation": "workspace:*",
     "@orpc/json-schema": "workspace:*",
@@ -73,7 +80,7 @@
     "supertest": "^7.2.2",
     "typescript": "^6.0.3",
     "unbuild": "^3.6.1",
-    "valibot": "^1.4.1",
+    "valibot": "^1.5.0",
     "vite": "^8.2.2",
     "vitest": "^4.1.11",
     "ws": "^8.21.3",

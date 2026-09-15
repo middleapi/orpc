@@ -1,29 +1,41 @@
 import type { ErrorMap, Schema } from '@orpc/contract'
-import type { Interceptor } from '@orpc/shared'
+import type { Interceptor, Promisable, Value } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { Context } from '../../context'
 import type { ProcedureClientInterceptor } from '../../procedure-client'
 import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from './codec'
 import type { StandardHandlerPlugin } from './plugin'
 import { ORPCError, toORPCError } from '@orpc/client'
-import { getTracer, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, ORPC_NAME, override, recordSpanError, runWithSpan, toArray, traceAsyncIterator, traceReadableStream } from '@orpc/shared'
+import { getTracer, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, ORPC_NAME, override, recordSpanError, runWithSpan, toArray, traceAsyncIterator, traceReadableStream, value } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { createProcedureClient } from '../../procedure-client'
 import { CompositeStandardHandlerPlugin } from './plugin'
 
 export interface StandardHandlerHandleOptions<T extends Context> {
   prefix?: `/${string}` | undefined
+  /**
+   * The initial context, or a function (sync or async) that receives the request and returns it.
+   * The function only runs once the request passes the prefix check.
+   */
+  context: Value<Promisable<T>, [request: StandardLazyRequest]>
+}
+
+/**
+ * `StandardHandlerHandleOptions` after the context has been resolved,
+ * this is what interceptors and codecs receive.
+ */
+export interface ResolvedStandardHandlerHandleOptions<T extends Context> extends Omit<StandardHandlerHandleOptions<T>, 'context'> {
   context: T
 }
 
 export type StandardHandlerHandleResult = { matched: true, response: StandardResponse } | { matched: false, response?: undefined }
 
-export interface StandardHandlerInterceptorOptions<T extends Context> extends StandardHandlerCodecResolvedProcedure, StandardHandlerHandleOptions<T> {
+export interface StandardHandlerInterceptorOptions<T extends Context> extends StandardHandlerCodecResolvedProcedure, ResolvedStandardHandlerHandleOptions<T> {
   request: StandardLazyRequest
 }
 export type StandardHandlerInterceptor<T extends Context> = Interceptor<StandardHandlerInterceptorOptions<T>, Promise<StandardResponse>>
 
-export interface StandardHandlerRoutingInterceptorOptions<T extends Context> extends StandardHandlerHandleOptions<T> {
+export interface StandardHandlerRoutingInterceptorOptions<T extends Context> extends ResolvedStandardHandlerHandleOptions<T> {
   request: StandardLazyRequest
 }
 export type StandardHandlerRoutingInterceptor<T extends Context> = Interceptor<StandardHandlerRoutingInterceptorOptions<T>, Promise<StandardHandlerHandleResult>>
@@ -74,10 +86,14 @@ export class StandardHandler<T extends Context> {
     this.clientInterceptors = options.clientInterceptors
   }
 
-  async handle(request: StandardLazyRequest, { context, prefix }: StandardHandlerHandleOptions<T>): Promise<StandardHandlerHandleResult> {
+  async handle(request: StandardLazyRequest, options: StandardHandlerHandleOptions<T>): Promise<StandardHandlerHandleResult> {
+    const { prefix } = options
+
     if (prefix && !matchesHttpPathPrefix(request.url, prefix)) {
       return { matched: false, response: undefined }
     }
+
+    const context = await value(options.context, request) as T
 
     return intercept(
       this.routingInterceptors,

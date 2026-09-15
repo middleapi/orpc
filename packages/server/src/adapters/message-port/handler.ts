@@ -2,8 +2,7 @@ import type { SupportedMessagePort } from '@orpc/client/message-port'
 import type { MaybeOptionalOptions, Promisable, Value } from '@orpc/shared'
 import type { ClientPeerSendMessage, DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standard-server/peer'
 import type { Context } from '../../context'
-import type { StandardHandler } from '../standard'
-import type { StandardPeerRequestHandlerOptions } from '../standard-peer'
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
 import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from '@orpc/client/message-port'
 import { resolveMaybeOptionalOptions, value } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, isPeerMessage, ServerPeer } from '@standard-server/peer'
@@ -59,7 +58,7 @@ export class MessagePortHandler<T extends Context> {
    */
   upgrade(
     port: SupportedMessagePort,
-    ...rest: MaybeOptionalOptions<StandardPeerRequestHandlerOptions<T>>
+    ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): void {
     /**
      * Message order is important: loading -> decode -> .message.
@@ -77,7 +76,7 @@ export class MessagePortHandler<T extends Context> {
   async message(
     port: SupportedMessagePort,
     data: unknown,
-    ...rest: MaybeOptionalOptions<StandardPeerRequestHandlerOptions<T>>
+    ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): Promise<{ matched: boolean }> {
     let peer = this.peers.get(port)
 

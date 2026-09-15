@@ -20,8 +20,8 @@ export function findDeepMatches(
     })
   }
   else if (isPlainObject(payload)) {
-    for (const key in payload) {
-      findDeepMatches(check, payload[key], [...segments, key], maps, values)
+    for (const [key, value] of Object.entries(payload)) {
+      findDeepMatches(check, value, [...segments, key], maps, values)
     }
   }
 
@@ -81,11 +81,11 @@ export function get(object: unknown, path: readonly PropertyKey[]): unknown {
   let current: unknown = object
 
   for (const key of path) {
-    if (!isTypescriptObject(current) || !Object.hasOwn(current, key)) {
+    if (!isTypescriptObject(current)) {
       return undefined
     }
 
-    current = current[key]
+    current = getOwn(current, key)
   }
 
   return current
@@ -103,7 +103,7 @@ export function set(
 
   for (let i = 0; i < path.length - 1; i++) {
     const key = path[i]!
-    const next = Object.hasOwn(current, key) ? (current as Record<PropertyKey, unknown>)[key] : undefined
+    const next = getOwn(current, key)
 
     if (!isTypescriptObject(next)) {
       const child = {}
@@ -121,7 +121,7 @@ export function set(
 /**
  * Sets `object[key]`, defining `__proto__` as an own property instead of re-parenting the object.
  */
-function setOwn(object: object, key: PropertyKey, value: unknown): void {
+export function setOwn(object: object, key: PropertyKey, value: unknown): void {
   if (key === '__proto__') {
     Object.defineProperty(object, key, {
       value,
@@ -211,8 +211,8 @@ function cloneWithVisited(value: unknown, visited: WeakMap<object, unknown>): un
     visited.set(value, result)
 
     // Use setOwn so special keys like __proto__ don't re-parent the result.
-    for (const key in value) {
-      setOwn(result, key, cloneWithVisited(value[key], visited))
+    for (const [key, item] of Object.entries(value)) {
+      setOwn(result, key, cloneWithVisited(item, visited))
     }
 
     for (const sym of Object.getOwnPropertySymbols(value)) {

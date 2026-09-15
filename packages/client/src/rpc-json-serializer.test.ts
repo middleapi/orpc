@@ -453,5 +453,33 @@ describe('rpcJsonSerializer: security', () => {
     expect(Object.hasOwn(restored, '__proto__')).toBe(true)
     expect(restored.__proto__).toBeInstanceOf(Date)
   })
+
+  it('walks an own constructor/prototype chain without reaching the real Object.prototype', () => {
+    const blob = new Blob(['x'])
+
+    const restored = serializer.deserialize({
+      json: JSON.parse('{"constructor": {"prototype": {"when": "2023-01-01T00:00:00.000Z", "polluted": null}}}'),
+      meta: [['date', 'constructor', 'prototype', 'when']],
+      maps: [['constructor', 'prototype', 'polluted']],
+      blobs: [blob],
+    }) as any
+
+    expect(restored.constructor.prototype.when).toBeInstanceOf(Date)
+    expect(restored.constructor.prototype.polluted).toBe(blob)
+  })
+
+  it('restores a blob stored directly under an own __proto__ key', () => {
+    const blob = new Blob(['x'])
+
+    const restored = serializer.deserialize({
+      json: JSON.parse('{"__proto__": null}'),
+      maps: [['__proto__']],
+      blobs: [blob],
+    }) as any
+
+    expect(Object.hasOwn(restored, '__proto__')).toBe(true)
+    expect(restored.__proto__).toBe(blob)
+    expect(Object.getPrototypeOf(restored)).toBe(Object.prototype)
+  })
   /* eslint-enable no-proto, no-restricted-properties */
 })

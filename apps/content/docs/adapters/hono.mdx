@@ -27,7 +27,7 @@ const handler = new RPCHandler(router, {
 app.use('/rpc/*', async (c, next) => {
   const { matched, response } = await handler.handle(c.req.raw, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed
+    context: {} // Provide initial context if needed, can be an async function
   })
 
   if (matched) {
@@ -64,7 +64,7 @@ app.use('/rpc/*', async (c, next) => {
 
   const { matched, response } = await handler.handle(request, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed
+    context: {} // Provide initial context if needed, can be an async function
   })
 
   if (matched) {

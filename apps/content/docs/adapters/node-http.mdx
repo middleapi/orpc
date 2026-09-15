@@ -29,7 +29,7 @@ const handler = new RPCHandler(router, {
 const server = createServer(async (req, res) => {
   const { matched } = await handler.handle(req, res, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed
+    context: {} // Provide initial context if needed, can be an async function
   })
 
   if (matched) {
@@ -63,7 +63,7 @@ const handler = new OpenAPIHandler(router, {
 const server = createServer(async (req, res) => {
   const { matched } = await handler.handle(req, res, {
     prefix: '/api',
-    context: {} // Provide initial context if needed
+    context: {} // Provide initial context if needed, can be an async function
   })
 
   if (matched) {

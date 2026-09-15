@@ -1,3 +1,4 @@
+import { experimental_DurableLockObject as DurableLockObject } from '../../src/lock-object'
 import { DurablePublisherObject } from '../../src/publisher-object'
 
 export class PublisherDO extends DurablePublisherObject {
@@ -14,4 +15,7 @@ export class PublisherResume3sDO extends DurablePublisherObject {
       },
     })
   }
+}
+
+export class LockDO extends DurableLockObject {
 }

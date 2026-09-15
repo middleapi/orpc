@@ -29,7 +29,12 @@ app.whenReady().then(() => {
     const [serverPort] = event.ports
 
     handler.upgrade(serverPort, {
-      context: {} // Provide initial context if needed
+      /**
+       * Provide initial context if needed. The context can be an async function
+       * that receives the per-call request as its first argument, and is **not**
+       * related to the initial upgrade request.
+       */
+      context: request => ({}),
     })
 
     serverPort.start()

@@ -13,6 +13,15 @@ export default [
     "tierLevel": 5
   },
   {
+    "name": "Guillermo Rauch",
+    "login": "rauchg",
+    "avatar": "https://avatars.githubusercontent.com/u/13041?u=1ee8d111657cdd02ff6d253df00978d17ee6d722&v=4",
+    "link": "http://twitter.com/rauchg?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "rel": "sponsored",
+    "tierTitle": "Special Sponsor",
+    "tierLevel": 5
+  },
+  {
     "name": "Yuzu",
     "login": "yuzu-health",
     "avatar": "https://avatars.githubusercontent.com/u/102488956?v=4",
@@ -529,7 +538,7 @@ export default [
     "name": "grim",
     "login": "ripgrim",
     "avatar": "https://avatars.githubusercontent.com/u/75869731?u=b17c42ec2309552fdb822a86b25a2f99146a4d72&v=4",
-    "link": "https://tripwire.sh/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "link": "https://github.com/ripgrim?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
     "tierLevel": 0

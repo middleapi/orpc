@@ -55,7 +55,7 @@ export function populateRouterContractOpenAPIPaths<T extends RouterContract>(
 
   const populated: Record<string, any> = {}
 
-  for (const key in router) {
+  for (const key of Object.keys(router)) {
     populated[key] = populateRouterContractOpenAPIPaths(
       router[key]!,
       { ...options, path: [...path, key] },

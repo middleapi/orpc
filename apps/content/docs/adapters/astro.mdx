@@ -27,7 +27,7 @@ export const prerender = false
 export const ALL: APIRoute = async ({ request }) => {
   const { response } = await handler.handle(request, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed
+    context: {} // Provide initial context if needed, can be an async function
   })
 
   return response ?? new Response('Not found', { status: 404 })
@@ -86,7 +86,7 @@ export const client: RouterClient<typeof router> = globalThis.$client ?? createO
 import { createRouterClient } from '@orpc/server'
 
 globalThis.$client = createRouterClient(router, {
-  context: {} // Provide initial context if needed
+  context: {} // Provide initial context if needed, can be an async function
 })
 ```
 

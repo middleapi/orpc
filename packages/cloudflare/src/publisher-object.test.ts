@@ -1,5 +1,5 @@
 import { sleep } from '@standard-server/shared'
-import { evictDurableObject, reset, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test'
+import { evictDurableObject, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test'
 import { env } from 'cloudflare:workers'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -71,8 +71,7 @@ async function closeSocket(socket: OpenSocket): Promise<void> {
   await sleep(0)
 }
 
-beforeEach(async () => {
-  await reset()
+beforeEach(() => {
   vi.clearAllMocks()
 })
 
@@ -102,6 +101,34 @@ describe('durable publisher object', () => {
     await sleep(100)
     expect(resumedSubscriber.messages).toHaveLength(0)
     await closeSocket(resumedSubscriber)
+  })
+
+  it('skips websockets that are already closing', async () => {
+    const stub = env.PUBLISHER_DON.getByName(crypto.randomUUID())
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    // a closing websocket stays listed until its peer completes the handshake,
+    // and this peer is never accepted, so it stays listed for the whole test
+    await runInDurableObject(stub, async (_, state) => {
+      const { '1': server } = new WebSocketPair()
+      state.acceptWebSocket(server)
+      server.close(1000, 'closed by the durable object')
+      expect(state.getWebSockets()).toHaveLength(1)
+    })
+
+    const subscriber = await openSocket(stub)
+
+    // the closing socket is still listed alongside the healthy one when publishing
+    await runInDurableObject(stub, async (_, state) => {
+      const readyStates = state.getWebSockets().map(websocket => websocket.readyState)
+      expect(readyStates.sort()).toEqual([WebSocket.OPEN, WebSocket.CLOSING])
+    })
+
+    expect((await publish(stub, { data: { text: 'live event' } })).status).toBe(204)
+    expect((await readMessages(subscriber, 1))[0]).toEqual({ data: { text: 'live event' } })
+    expect(consoleError).not.toHaveBeenCalled()
+
+    await closeSocket(subscriber)
   })
 
   it('resumes missed messages and gives them new ids', async () => {
@@ -256,36 +283,6 @@ describe('durable publisher object', () => {
     })
   })
 
-  it('still sends when one socket fails', async () => {
-    const stub = env.PUBLISHER_DON.getByName(crypto.randomUUID())
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    const healthySubscriber = await openSocket(stub)
-
-    await runInDurableObject(stub, async (instance) => {
-      const ctx = (instance as unknown as { ctx: DurableObjectState }).ctx
-      const originalGetWebSockets = ctx.getWebSockets.bind(ctx)
-
-      Object.defineProperty(ctx, 'getWebSockets', {
-        configurable: true,
-        value: () => [
-          { send: () => { throw new Error('forced live send failure') } } as unknown as WebSocket,
-          ...originalGetWebSockets(),
-        ],
-      })
-    })
-
-    expect((await publish(stub, { data: { text: 'still delivered' } })).status).toBe(204)
-    expect((await readMessages(healthySubscriber, 1))[0]).toEqual({
-      data: { text: 'still delivered' },
-    })
-
-    await sleep(0)
-    expect(consoleError).toHaveBeenCalled()
-
-    await closeSocket(healthySubscriber)
-  })
-
   it('returns 400 for bad resume data and still works after', async () => {
     const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -307,32 +304,20 @@ describe('durable publisher object', () => {
     await closeSocket(subscriber)
   })
 
-  it('reject subscribe request when resume send fails', async ({ onTestFinished }) => {
+  it('rejects subscribe without accepting a websocket when reading stored events fails', async () => {
     const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
     expect((await publish(stub, { data: { text: 'stored resume' } })).status).toBe(204)
 
-    await runInDurableObject(stub, async () => {
-      const globalObject = globalThis as typeof globalThis & {
-        __originalWebSocketPair__?: typeof WebSocketPair
-        WebSocketPair: typeof WebSocketPair
-      }
-
-      const OriginalWebSocketPair = globalObject.WebSocketPair
-      globalObject.WebSocketPair = function ThrowingWebSocketPair() {
-        const pair = new OriginalWebSocketPair()
-        pair[1].send = () => {
-          throw new Error('forced resume send failure')
-        }
-
-        return pair
-      } as unknown as typeof WebSocketPair
-
-      onTestFinished(() => {
-        globalObject.WebSocketPair = OriginalWebSocketPair
-      })
+    await runInDurableObject(stub, async (_, state) => {
+      state.storage.sql.exec(`UPDATE "prefix:events" SET payload = 'not json'`)
     })
 
-    await expect(openSocket(stub, '0')).rejects.toThrow('forced resume send failure')
+    await expect(openSocket(stub, '0')).rejects.toThrow('is not valid JSON')
+
+    // an accepted websocket would linger in the durable object with nobody
+    // on the other end, making it look active forever
+    const websockets = await runInDurableObject(stub, async (_, state) => state.getWebSockets().length)
+    expect(websockets).toBe(0)
   })
 
   it('keeps a cleanup alarm that is already far enough out', async () => {

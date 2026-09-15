@@ -31,7 +31,7 @@ const app = Fastify()
 app.all('/rpc/*', async (req, reply) => {
   const { matched } = await handler.handle(req, reply, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed
+    context: {} // Provide initial context if needed, can be an async function
   })
 
   if (matched) {
@@ -66,7 +66,7 @@ const app = Fastify()
 app.all('/api/*', async (req, reply) => {
   const { matched } = await handler.handle(req, reply, {
     prefix: '/api',
-    context: {} // Provide initial context if needed
+    context: {} // Provide initial context if needed, can be an async function
   })
 
   if (matched) {

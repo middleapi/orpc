@@ -5,7 +5,7 @@ import type { Stats } from 'node:fs'
 import { createReadStream } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
-import { getTracer, isCompressibleContentType, matchesHttpPathPrefix, mergeHttpPath, parseAcceptEncodingQualities, toArray, tryDecodeURIComponent } from '@orpc/shared'
+import { getTracer, isCompressibleContentType, matchesHttpPathPrefix, mergeHttpPath, parseAcceptEncodingQualities, safeDecodeURIComponent, safeEncodeURIComponent, toArray } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { toWebReadableStream } from '@standard-server/node'
 import mime from 'mime'
@@ -268,7 +268,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     const segments: string[] = []
 
     for (const rawSegment of pathname.slice(base.length).split('/')) {
-      const segment = rawSegment.includes('%') ? tryDecodeURIComponent(rawSegment) : rawSegment
+      const segment = safeDecodeURIComponent(rawSegment)
 
       if (segment === '' || segment === '.') {
         continue
@@ -334,7 +334,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
            * so the location can never be protocol relative or carry dot segments.
            * Redirected so relative links inside the index file resolve correctly.
            */
-          const location = `${base === '/' ? '' : base}${segments.map(segment => `/${encodeURIComponent(segment)}`).join('')}/`
+          const location = `${base === '/' ? '' : base}${segments.map(segment => `/${safeEncodeURIComponent(segment)}`).join('')}/`
 
           return {
             status: 301,

@@ -198,8 +198,7 @@ export class RPCJsonSerializer {
     let inlineBuiltInHandlers = true
     let handlerEntries: [string, RPCJsonSerializerHandler][] = []
 
-    for (const key in customHandlers) {
-      const handler = customHandlers[key]
+    for (const [key, handler] of Object.entries(customHandlers)) {
       this.handlers[key] = handler
 
       if (inlineBuiltInHandlers && key in DEFAULT_RPC_JSON_SERIALIZER_HANDLERS) {
@@ -213,8 +212,7 @@ export class RPCJsonSerializer {
 
     if (!inlineBuiltInHandlers) {
       handlerEntries = []
-      for (const key in this.handlers) {
-        const handler = this.handlers[key]
+      for (const [key, handler] of Object.entries(this.handlers)) {
         if (handler !== undefined) {
           handlerEntries.push([key, handler])
         }
@@ -346,8 +344,7 @@ export class RPCJsonSerializer {
     if (isPlainObject(data)) {
       const json: Record<string, unknown> = new NullProtoObj()
 
-      for (const k in data) {
-        const v = data[k]
+      for (const [k, v] of Object.entries(data)) {
         /**
          * Skip custom toJSON methods to avoid JSON.stringify invoking them,
          * which could cause meta and serialized data mismatches during deserialization.

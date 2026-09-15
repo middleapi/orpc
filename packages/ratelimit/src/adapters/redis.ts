@@ -1,60 +1,8 @@
-import type { RedisClientType } from 'redis'
-import type { RateLimiter, RateLimitOptions, RateLimitResult } from '../types'
-import { sleep } from '@orpc/shared'
+import type { RedisClientType, RedisClusterType } from 'redis'
+import type { BaseRedisRateLimiterOptions } from './base-redis'
+import { BaseRedisRateLimiter } from './base-redis'
 
-const FIXED_WINDOW_RATELIMIT_SCRIPT = `
-local key = KEYS[1]
-local weight = tonumber(ARGV[1])
-local window = tonumber(ARGV[2])
-
-local current = redis.call('INCRBY', key, weight)
-
-if current == weight then
-  redis.call('PEXPIRE', key, window)
-end
-
-local ttl = redis.call('PTTL', key)
-
-return { current, ttl }
-`
-
-export interface RedisRateLimiterOptions {
-  /**
-   * The prefix to use for Redis keys.
-   *
-   * @default ''
-   */
-  prefix?: string
-
-  /**
-   * Maximum number of requests allowed within the window.
-   */
-  maxRequests: number
-
-  /**
-   * The duration of the fixed window in milliseconds.
-   */
-  window: number
-
-  /**
-   * Block until the request may pass or timeout is reached.
-   *
-   * @default { enabled: false }
-   */
-  blockingUntilReady?: {
-    /**
-     * Block until the request may pass or timeout is reached.
-     *
-     * @default false
-     */
-    enabled: boolean
-
-    /**
-     * milliseconds
-     */
-    timeout: number
-  }
-}
+export interface RedisRateLimiterOptions extends BaseRedisRateLimiterOptions {}
 
 /**
  * Rate limiter adapter for Redis. Enforces a fixed-window limit using a
@@ -62,99 +10,19 @@ export interface RedisRateLimiterOptions {
  *
  * @see {@link https://orpc.dev/docs/helpers/ratelimit#adapters | Rate Limit Helpers - Adapters}
  */
-export class RedisRateLimiter implements RateLimiter {
-  private readonly redis: RedisClientType<any, any, any, any, any>
-  private readonly prefix: string
-  private readonly maxRequests: number
-  private readonly window: number
-  private readonly blockingUntilReady: RedisRateLimiterOptions['blockingUntilReady']
-
-  private scriptSha: undefined | Awaited<ReturnType<typeof this.redis.scriptLoad>>
-
+export class RedisRateLimiter extends BaseRedisRateLimiter {
   constructor(
-    redis: RedisClientType<any, any, any, any, any>,
+    private readonly redis: RedisClientType<any, any, any, any, any> | RedisClusterType<any, any, any, any, any>,
     options: RedisRateLimiterOptions,
   ) {
-    this.redis = redis
-    this.prefix = options.prefix ?? ''
-    this.maxRequests = options.maxRequests
-    this.window = options.window
-    this.blockingUntilReady = options.blockingUntilReady
+    super(options)
   }
 
-  async limit(key: string, options?: RateLimitOptions): Promise<Required<RateLimitResult>> {
-    key = `${this.prefix}${key}`
-    const weight = this.resolveWeight(options)
-
+  protected async evalScript(script: string, keys: string[], args: string[]): Promise<unknown> {
     if (!this.redis.isOpen) {
       await this.redis.connect()
     }
 
-    return this.blockingUntilReady?.enabled
-      ? this.blockUntilReady(key, this.blockingUntilReady.timeout, weight)
-      : this.checkLimit(key, weight)
-  }
-
-  private async checkLimit(key: string, weight: number): Promise<Required<RateLimitResult>> {
-    const [used, ttl] = await this.executeScript(key, weight)
-
-    return {
-      success: used <= this.maxRequests,
-      limit: this.maxRequests,
-      remaining: Math.max(0, this.maxRequests - used),
-      reset: Date.now() + ttl,
-    }
-  }
-
-  private async blockUntilReady(key: string, timeoutMs: number, weight: number): Promise<Required<RateLimitResult>> {
-    const deadlineAtMs = Date.now() + timeoutMs
-
-    while (true) {
-      const result = await this.checkLimit(key, weight)
-
-      if (result.success || result.reset > deadlineAtMs) {
-        return result
-      }
-
-      await sleep(result.reset - Date.now())
-    }
-  }
-
-  private async executeScript(key: string, weight: number): Promise<[used: number, ttl: number]> {
-    try {
-      return await this.evalSha(key, weight)
-    }
-    catch (error) {
-      if (error instanceof Error && error.message.startsWith('NOSCRIPT')) {
-        this.scriptSha = undefined
-        return await this.evalSha(key, weight)
-      }
-
-      throw error
-    }
-  }
-
-  private async evalSha(key: string, weight: number): Promise<[used: number, ttl: number]> {
-    this.scriptSha ??= await this.redis.scriptLoad(FIXED_WINDOW_RATELIMIT_SCRIPT)
-
-    return await this.redis.evalSha(this.scriptSha, {
-      keys: [key],
-      arguments: [
-        String(weight),
-        String(this.window),
-      ],
-    }) as [number, number]
-  }
-
-  private resolveWeight(options?: RateLimitOptions): number {
-    const weight = options?.weight ?? 1
-
-    if (!Number.isInteger(weight) || weight <= 0) {
-      throw new TypeError(
-        'Rate limit weight must be an integer greater than 0',
-      )
-    }
-
-    return weight
+    return await this.redis.eval(script, { keys, arguments: args })
   }
 }

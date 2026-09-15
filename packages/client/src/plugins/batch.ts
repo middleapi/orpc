@@ -3,7 +3,7 @@ import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUr
 import type { ClientPeerSendMessage } from '@standard-server/peer'
 import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
 import type { ClientContext } from '../types'
-import { defer, isAsyncIteratorObject, loadBytes, once, splitInHalf, stringifyJSON, toArray, value } from '@orpc/shared'
+import { defer, isAsyncIteratorObject, loadBytes, once, safeEncodeURIComponent, splitInHalf, stringifyJSON, toArray, value } from '@orpc/shared'
 import { parseStandardUrl } from '@standard-server/core'
 import { ClientPeer, decodePeerMessage, isServerPeerSendMessage } from '@standard-server/peer'
 
@@ -287,7 +287,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
 
             if (method === 'GET') {
               const [pathname, search, hash] = parseStandardUrl(url)
-              const dataParam = `data=${encodeURIComponent(stringifyJSON(pendingMessages))}`
+              const dataParam = `data=${safeEncodeURIComponent(stringifyJSON(pendingMessages))}`
               const newUrl: StandardUrl = search
                 ? `${pathname}${search}&${dataParam}${hash ?? ''}`
                 : `${pathname}?${dataParam}${hash ?? ''}`

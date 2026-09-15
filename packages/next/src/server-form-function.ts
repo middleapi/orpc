@@ -35,6 +35,10 @@ export function createServerFormFunction<
   const serializer = new BracketNotationSerializer()
 
   return async (form) => {
+    if (!(form instanceof FormData)) {
+      throw new TypeError('Server form function expects FormData.')
+    }
+
     const input = serializer.deserialize([...form])
     await client(input as any)
   }

@@ -125,8 +125,8 @@ export function augmentRouter<
 
   const enhanced = {} as Record<string, any>
 
-  for (const key in router) {
-    enhanced[key] = augmentRouter((router as Record<string, AnyRouter>)[key]!, options)
+  for (const [key, child] of Object.entries(router as Record<string, AnyRouter>)) {
+    enhanced[key] = augmentRouter(child, options)
   }
 
   return enhanced as any
@@ -176,8 +176,8 @@ export function augmentImplementedRouter<
 
   const enhanced = {} as Record<string, any>
 
-  for (const key in router) {
-    enhanced[key] = augmentImplementedRouter((router as Record<string, AnyRouter>)[key]!, options)
+  for (const [key, child] of Object.entries(router as Record<string, AnyRouter>)) {
+    enhanced[key] = augmentImplementedRouter(child, options)
   }
 
   return enhanced as any
@@ -265,9 +265,7 @@ function walkProcedureContractsSyncInternal(
     return
   }
 
-  for (const key in router) {
-    const value = (router as any)[key]
-
+  for (const [key, value] of Object.entries(router)) {
     path.push(key)
 
     if (value instanceof Lazy) {
@@ -300,9 +298,7 @@ export async function walkProcedureContractsAsync(
     return
   }
 
-  for (const key in router) {
-    const value = (router as any)[key]
-
+  for (const [key, value] of Object.entries(router)) {
     if (value instanceof Lazy) {
       const { default: router } = await unlazy(value)
       await walkProcedureContractsAsync(router, callback, [...path, key])
@@ -337,7 +333,7 @@ export async function unlazyRouter<T extends AnyRouter>(router: T): Promise<Unla
 
   const unlazied = {} as Record<string, any>
 
-  for (const key in router) {
+  for (const key of Object.keys(router)) {
     const item: Lazyable<AnyRouter> = router[key]!
 
     const { default: unlaziedRouter } = await unlazy(item)

@@ -19,7 +19,7 @@ describe.concurrent('ratelimit redis adapters compatibility', async () => {
     })
 
     limiters.push({
-      name: 'bun redis',
+      name: 'redis',
       limiter: new RedisRateLimiter(redis, {
         window: 60_000,
         maxRequests: 3,

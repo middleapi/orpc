@@ -31,7 +31,12 @@ const handler = new RPCHandler(router, {
 
 browser.runtime.onConnect.addListener((port) => {
   handler.upgrade(port, {
-    context: {} // Provide initial context if needed
+    /**
+     * Provide initial context if needed. The context can be an async function
+     * that receives the per-call request as its first argument, and is **not**
+     * related to the initial upgrade request.
+     */
+    context: request => ({}),
   })
 })
 ```
@@ -73,7 +78,12 @@ const handler = new RPCHandler(router, {
 window.addEventListener('message', (event) => {
   if (event.data instanceof MessagePort) {
     handler.upgrade(event.data, {
-      context: {} // Provide initial context if needed
+      /**
+       * Provide initial context if needed. The context can be an async function
+       * that receives the per-call request as its first argument, and is **not**
+       * related to the initial upgrade request.
+       */
+      context: request => ({}),
     })
 
     event.data.start()
@@ -149,7 +159,12 @@ const handler = new RPCHandler(router, {
 
 browser.runtime.onConnect.addListener((port) => {
   handler.upgrade(port, {
-    context: {} // Provide initial context if needed
+    /**
+     * Provide initial context if needed. The context can be an async function
+     * that receives the per-call request as its first argument, and is **not**
+     * related to the initial upgrade request.
+     */
+    context: request => ({}),
   })
 })
 ```

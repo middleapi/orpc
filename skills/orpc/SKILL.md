@@ -232,6 +232,6 @@ Doc map, all under `https://orpc.dev/docs/`:
 - `rpc/*`, `openapi/*`: protocol details, handlers, links; `contract/*`: contract-first (the `orpc-contract` skill)
 - `client/*`: server- and client-side clients, error handling, `DynamicLink`
 - `adapters/*`: per-runtime serving quirks (fetch-api, node-http, aws-lambda, fastify, websocket, message-port, expo)
-- `plugins/*`: twenty handler/link plugins; `helpers/*`: cookie, encryption, form-data, publisher, ratelimit, signing, base64url
+- `plugins/*`: twenty handler/link plugins; `helpers/*`: cookie, encryption, form-data, lock, publisher, ratelimit, signing, base64url
 - `integrations/*`: framework glue; `recipes/*`: guidance (testing, SSR, monorepos, validation)
 - `migrations/from-v1`, `migrations/from-trpc`: upgrades (use the `orpc-migrate` skill)

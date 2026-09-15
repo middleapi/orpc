@@ -1,7 +1,7 @@
-import { tryDecodeURIComponent } from './uri'
+import { safeDecodeURIComponent, safeEncodeURIComponent } from './uri'
 
 export function pathToHttpPath(path: readonly string[]): `/${string}` {
-  return `/${path.map(encodeURIComponent).join('/')}`
+  return `/${path.map(safeEncodeURIComponent).join('/')}`
 }
 
 export function normalizeHttpPath(path: string): `/${string}` {
@@ -11,7 +11,7 @@ export function normalizeHttpPath(path: string): `/${string}` {
     paths.shift()
   }
 
-  return pathToHttpPath(paths.map(tryDecodeURIComponent))
+  return pathToHttpPath(paths.map(safeDecodeURIComponent))
 }
 
 export function mergeHttpPath(a: `/${string}`, b: `/${string}`): `/${string}` {
@@ -158,7 +158,7 @@ export function encodeCacheTag(tag: string): string {
     UNSAFE_CACHE_TAG_CHARS,
     char => char >= 'A' && char <= 'Z'
       ? `%${char.charCodeAt(0).toString(16).toUpperCase()}`
-      : encodeURIComponent(char),
+      : safeEncodeURIComponent(char),
   )
 }
 

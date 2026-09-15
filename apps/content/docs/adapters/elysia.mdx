@@ -26,7 +26,7 @@ const app = new Elysia()
   .all('/rpc*', async ({ request }: { request: Request }) => {
     const { response } = await handler.handle(request, {
       prefix: '/rpc',
-      context: {} // Provide initial context if needed
+      context: {} // Provide initial context if needed, can be an async function
     })
 
     return response ?? new Response('Not found', { status: 404 })

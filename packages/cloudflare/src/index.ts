@@ -1,3 +1,5 @@
+export * from './lock'
+export * from './lock-object'
 export * from './publisher'
 export * from './publisher-object'
 export * from './ratelimit'
