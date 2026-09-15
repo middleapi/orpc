@@ -20,6 +20,6 @@
     "nuxt": "^4.4.2",
     "vue": "latest",
     "vue-router": "latest",
-    "zod": "^4.3.6"
+    "zod": "^4.6.2"
   }
 }

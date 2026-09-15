@@ -23,6 +23,11 @@ testSchemaConverter([
     input: [true, { type: 'number', minimum: 0, maximum: 100 }],
   },
   {
+    name: 'number.min(0).max(23).int()',
+    schema: z.number().min(0).max(23).int(),
+    input: [true, { type: 'integer', minimum: 0, maximum: 23 }],
+  },
+  {
     name: 'number.multipleOf(5)',
     schema: z.number().multipleOf(5),
     input: [true, { type: 'number', multipleOf: 5 }],

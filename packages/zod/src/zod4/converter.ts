@@ -4,6 +4,16 @@ import type { Interceptor } from '@orpc/shared'
 import type {
   $ZodArray,
   $ZodCatch,
+  $ZodCheck,
+  $ZodCheckGreaterThanDef,
+  $ZodCheckLengthEqualsDef,
+  $ZodCheckLessThanDef,
+  $ZodCheckMaxLengthDef,
+  $ZodCheckMimeTypeDef,
+  $ZodCheckMinLengthDef,
+  $ZodCheckMultipleOfDef,
+  $ZodCheckNumberFormatDef,
+  $ZodCheckStringFormatDef,
   $ZodDefault,
   $ZodEnum,
   $ZodFile,
@@ -32,6 +42,7 @@ import { JSONSchemaContentEncoding, JSONSchemaFormat } from '@orpc/openapi'
 import { intercept, toArray } from '@orpc/shared'
 import {
   globalRegistry,
+  util,
 } from 'zod/v4/core'
 import {
   JSON_SCHEMA_INPUT_REGISTRY,
@@ -153,7 +164,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
             const string = schema as $ZodString
             const json: JSONSchema & { allOf?: JSONSchema[] } = { type: 'string' }
 
-            const { minimum, maximum, format, patterns, contentEncoding } = string._zod.bag
+            const { minimum, maximum, format, patterns, contentEncoding } = aggregateChecks(string)
 
             if (typeof minimum === 'number') {
               json.minLength = minimum
@@ -200,7 +211,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
             const number = schema as $ZodNumber
             const json: JSONSchema = { type: 'number' }
 
-            const { minimum, maximum, format, multipleOf, exclusiveMaximum, exclusiveMinimum } = number._zod.bag
+            const { minimum, maximum, format, multipleOf, exclusiveMaximum, exclusiveMinimum } = aggregateChecks(number)
 
             if (typeof format === 'string' && format?.includes('int')) {
               json.type = 'integer'
@@ -274,7 +285,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
             const array = schema as $ZodArray
             const json: JSONSchema = { type: 'array' }
 
-            const { minimum, maximum } = array._zod.bag
+            const { minimum, maximum } = aggregateChecks(array)
 
             if (typeof minimum === 'number') {
               json.minItems = minimum
@@ -377,7 +388,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
               json.items = this.#handleArrayItemJsonSchema(this.#convert(tuple._zod.def.rest, options, lazyDepth, structureDepth + 1), options)
             }
 
-            const { minimum, maximum } = tuple._zod.bag
+            const { minimum, maximum } = aggregateChecks(tuple)
 
             if (typeof minimum === 'number') {
               json.minItems = minimum
@@ -471,7 +482,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
             const file = schema as $ZodFile
             const oneOf: Exclude<JSONSchema, boolean>[] = []
 
-            const { mime } = file._zod.bag
+            const { mime } = aggregateChecks(file)
 
             if (mime === undefined || (Array.isArray(mime) && mime.every(m => typeof m === 'string'))) {
               for (const type of mime ?? ['*/*']) {
@@ -574,7 +585,7 @@ export class ZodToJsonSchemaConverter implements ConditionalSchemaConverter {
           }
 
           default: {
-            const _unsupported: 'function' | 'int' | 'symbol' | 'promise' | 'custom' = schema._zod.def.type
+            const _unsupported: 'function' | 'int' | 'symbol' | 'promise' | 'custom' | 'properties' = schema._zod.def.type
             return [true, this.unsupportedJsonSchema]
           }
         }
@@ -659,4 +670,127 @@ function getEnumValues(entries: EnumLike): EnumValue[] {
     .filter(([k, _]) => !numericValues.includes(+k))
     .map(([_, v]) => v)
   return values
+}
+
+interface ZodCheckConstraints {
+  minimum?: number
+  maximum?: number
+  exclusiveMinimum?: number
+  exclusiveMaximum?: number
+  multipleOf?: number
+  format?: string
+  patterns?: Set<RegExp>
+  contentEncoding?: string
+  mime?: string[]
+}
+
+type ZodCheckDef
+  = | $ZodCheckGreaterThanDef
+    | $ZodCheckLessThanDef
+    | $ZodCheckMultipleOfDef
+    | $ZodCheckNumberFormatDef
+    | $ZodCheckMinLengthDef
+    | $ZodCheckMaxLengthDef
+    | $ZodCheckLengthEqualsDef
+    | $ZodCheckStringFormatDef
+    | $ZodCheckMimeTypeDef
+
+/**
+ * Folds a schema's checks into the constraints JSON Schema can express,
+ * the same way zod's own `toJSONSchema` does.
+ *
+ * Zod < 4.6 wrote these into `schema._zod.bag` while attaching each check,
+ * Zod >= 4.6 leaves the bag empty and folds `schema._zod.def.checks` on demand instead.
+ * https://github.com/colinhacks/zod/pull/6554
+ */
+function aggregateChecks(schema: $ZodType): ZodCheckConstraints {
+  const constraints: ZodCheckConstraints = {}
+
+  const narrowMin = (key: 'minimum' | 'exclusiveMinimum', value: unknown) => {
+    if (typeof value === 'number' && (constraints[key] === undefined || value > constraints[key])) {
+      constraints[key] = value
+    }
+  }
+
+  const narrowMax = (key: 'maximum' | 'exclusiveMaximum', value: unknown) => {
+    if (typeof value === 'number' && (constraints[key] === undefined || value < constraints[key])) {
+      constraints[key] = value
+    }
+  }
+
+  // a format schema (z.email(), z.int(), ...) is its own first check
+  const checks: $ZodCheck[] = schema._zod.traits.has('$ZodCheck')
+    ? [schema as unknown as $ZodCheck, ...schema._zod.def.checks ?? []]
+    : [...schema._zod.def.checks ?? []]
+
+  for (const check of checks) {
+    const def = check._zod.def as ZodCheckDef
+
+    switch (def.check) {
+      case 'greater_than': {
+        narrowMin(def.inclusive ? 'minimum' : 'exclusiveMinimum', def.value)
+        break
+      }
+
+      case 'less_than': {
+        narrowMax(def.inclusive ? 'maximum' : 'exclusiveMaximum', def.value)
+        break
+      }
+
+      case 'multiple_of': {
+        if (typeof def.value === 'number') {
+          constraints.multipleOf ??= def.value
+        }
+        break
+      }
+
+      case 'number_format': {
+        constraints.format = def.format
+        const [minimum, maximum] = util.NUMBER_FORMAT_RANGES[def.format] ?? []
+        narrowMin('minimum', minimum)
+        narrowMax('maximum', maximum)
+        break
+      }
+
+      case 'min_length': {
+        narrowMin('minimum', def.minimum)
+        break
+      }
+
+      case 'max_length': {
+        narrowMax('maximum', def.maximum)
+        break
+      }
+
+      case 'length_equals': {
+        narrowMin('minimum', def.length)
+        narrowMax('maximum', def.length)
+        break
+      }
+
+      case 'string_format': {
+        constraints.format = def.format
+
+        if (def.pattern) {
+          constraints.patterns ??= new Set()
+          constraints.patterns.add(def.pattern)
+        }
+
+        if (def.format === 'base64' || def.format === 'base64url') {
+          constraints.contentEncoding = def.format
+        }
+
+        break
+      }
+
+      case 'mime_type': {
+        constraints.mime = constraints.mime
+          ? constraints.mime.filter(m => def.mime.includes(m as any))
+          : [...def.mime]
+        break
+      }
+    }
+  }
+
+  return constraints
 }

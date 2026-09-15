@@ -48,6 +48,6 @@
   "devDependencies": {
     "@tanstack/react-query": "^5.90.21",
     "react": "^19.2.4",
-    "zod": "^4.3.6"
+    "zod": "^4.6.2"
   }
 }
