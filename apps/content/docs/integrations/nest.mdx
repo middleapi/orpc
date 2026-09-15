@@ -48,6 +48,10 @@ const contract = populateRouterContractOpenAPIPaths({
 
 To implement your contract in NestJS, use the `@Implement` decorator and the `implement` function. The `@Implement` very similar to NestJS built-in HTTP method decorators (e.g., `@Get`, `@Post`) and can be used to implement either a single procedure contract or an [router contract](/docs/contract/router) or combine with other NestJS decorators.
 
+:::info
+Contracts that use the HTTP [`QUERY`](/docs/openapi/routing) method are supported when NestJS provides `@QueryMethod` (NestJS v11.2+). On older NestJS versions, `@Implement` throws a `TypeError` for `QUERY` contracts — use `GET` instead.
+:::
+
 ```ts
 import { Implement } from '@orpc/nest'
 import { implement, ORPCError } from '@orpc/server'
