@@ -25,7 +25,7 @@ testSchemaConverter([
   {
     name: 'cuid',
     schema: z.cuid(),
-    input: [true, { type: 'string', pattern: '^[cC][^\\s-]{8,}$' }],
+    input: [true, { type: 'string', pattern: '^[cC][0-9a-z]{6,}$' }],
   },
   {
     name: 'email',
@@ -48,6 +48,11 @@ testSchemaConverter([
     input: [true, { type: 'string', minLength: 6, maxLength: 6 }],
   },
   {
+    name: 'string.min(8).length(5)',
+    schema: z.string().min(8).length(5),
+    input: [true, { type: 'string', minLength: 8, maxLength: 5 }],
+  },
+  {
     name: 'string.includes("a\\")',
     schema: z.string().includes('a\\'),
     input: [true, { type: 'string', pattern: 'a\\\\' }],
@@ -65,7 +70,7 @@ testSchemaConverter([
   {
     name: 'emoji',
     schema: z.emoji(),
-    input: [true, { type: 'string', pattern: '^(\\p{Extended_Pictographic}|\\p{Emoji_Component})+$' }],
+    input: [true, { type: 'string', pattern: '^(?=[\\s\\S]*[\\p{Extended_Pictographic}\\p{Regional_Indicator}\\u20E3])[\\p{Extended_Pictographic}\\p{Emoji_Component}]+$' }],
   },
   {
     name: 'uuid',
@@ -92,7 +97,7 @@ testSchemaConverter([
     schema: z.ulid(),
     input: [true, {
       type: 'string',
-      pattern: '^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$',
+      pattern: '^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$',
     }],
   },
   {

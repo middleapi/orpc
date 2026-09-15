@@ -107,10 +107,10 @@ importers:
     devDependencies:
       '@ai-sdk/google':
         specifier: ^3.0.43
-        version: 3.0.43(zod@4.3.6)
+        version: 3.0.43(zod@4.6.2)
       '@ai-sdk/react':
         specifier: ^3.0.118
-        version: 3.0.118(react@19.2.4)(zod@4.3.6)
+        version: 3.0.118(react@19.2.4)(zod@4.6.2)
       '@opentelemetry/instrumentation':
         specifier: ^0.213.0
         version: 0.213.0(@opentelemetry/api@1.9.0)
@@ -200,7 +200,7 @@ importers:
         version: 22.19.7
       ai:
         specifier: ^6.0.116
-        version: 6.0.116(zod@4.3.6)
+        version: 6.0.116(zod@4.6.2)
       markdown-it-task-lists:
         specifier: ^2.1.1
         version: 2.1.1
@@ -209,7 +209,7 @@ importers:
         version: 11.13.0
       openai:
         specifier: ^6.27.0
-        version: 6.27.0(ws@8.19.0)(zod@4.3.6)
+        version: 6.27.0(ws@8.19.0)(zod@4.6.2)
       pinia:
         specifier: ^3.0.4
         version: 3.0.4(typescript@5.8.3)(vue@3.5.30(typescript@5.8.3))
@@ -238,8 +238,8 @@ importers:
         specifier: ^3.5.30
         version: 3.5.30(typescript@5.8.3)
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   packages/ai-sdk:
     dependencies:
@@ -258,10 +258,10 @@ importers:
     devDependencies:
       ai:
         specifier: ^6.0.116
-        version: 6.0.116(zod@4.3.6)
+        version: 6.0.116(zod@4.6.2)
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   packages/arktype:
     dependencies:
@@ -279,8 +279,8 @@ importers:
         specifier: ^2.2.0
         version: 2.2.0
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   packages/client:
     dependencies:
@@ -298,8 +298,8 @@ importers:
         version: link:../standard-server-peer
     devDependencies:
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   packages/contract:
     dependencies:
@@ -323,8 +323,8 @@ importers:
         specifier: ^1.2.0
         version: 1.2.0(typescript@5.8.3)
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   packages/durable-iterator:
     dependencies:
@@ -401,8 +401,8 @@ importers:
         version: 8.0.2
     devDependencies:
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   packages/nest:
     dependencies:
@@ -463,7 +463,7 @@ importers:
         version: 11.1.16(@nestjs/common@11.1.16(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.16)(@nestjs/platform-express@11.1.16)
       '@ts-rest/core':
         specifier: ^3.52.1
-        version: 3.52.1(@types/node@25.6.0)(zod@4.3.6)
+        version: 3.52.1(@types/node@25.6.0)(zod@4.6.2)
       '@types/express':
         specifier: ^5.0.6
         version: 5.0.6
@@ -483,8 +483,8 @@ importers:
         specifier: ^7.1.4
         version: 7.2.2
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   packages/openapi:
     dependencies:
@@ -520,8 +520,8 @@ importers:
         specifier: ^5.8.3
         version: 5.8.3
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   packages/openapi-client:
     dependencies:
@@ -662,8 +662,8 @@ importers:
         specifier: ^19.2.4
         version: 19.2.4
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   packages/react-query:
     dependencies:
@@ -684,8 +684,8 @@ importers:
         specifier: ^19.2.4
         version: 19.2.4
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   packages/react-swr:
     dependencies:
@@ -758,8 +758,8 @@ importers:
         specifier: ^8.18.3
         version: 8.19.0
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   packages/shared:
     dependencies:
@@ -780,8 +780,8 @@ importers:
         specifier: ^1.2.0
         version: 1.2.0(typescript@5.8.3)
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   packages/solid-query:
     dependencies:
@@ -802,8 +802,8 @@ importers:
         specifier: ^5.90.26
         version: 5.90.26(solid-js@1.9.11)
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   packages/standard-server:
     dependencies:
@@ -924,8 +924,8 @@ importers:
         specifier: ^6.1.0
         version: 6.1.0(svelte@5.53.11)
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   packages/tanstack-query:
     dependencies:
@@ -964,8 +964,8 @@ importers:
         specifier: ^3.5.30
         version: 3.5.30(typescript@5.8.3)
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   packages/trpc:
     dependencies:
@@ -983,8 +983,8 @@ importers:
         specifier: ^11.12.0
         version: 11.12.0(typescript@5.8.3)
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   packages/valibot:
     dependencies:
@@ -1005,8 +1005,8 @@ importers:
         specifier: ^1.2.0
         version: 1.2.0(typescript@5.8.3)
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   packages/vue-colada:
     dependencies:
@@ -1071,8 +1071,8 @@ importers:
         version: 5.1.4
     devDependencies:
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   playgrounds/astro:
     devDependencies:
@@ -1125,8 +1125,8 @@ importers:
         specifier: ~5.8.3
         version: 5.8.3
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   playgrounds/browser-extension:
     devDependencies:
@@ -1173,8 +1173,8 @@ importers:
         specifier: ^0.20.18
         version: 0.20.18(@types/node@25.6.0)(eslint@9.39.2(jiti@2.6.1))(jiti@2.6.1)(rollup@4.60.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   playgrounds/bun-websocket-otel:
     devDependencies:
@@ -1236,8 +1236,8 @@ importers:
         specifier: ^19.2.4
         version: 19.2.4(react@19.2.4)
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   playgrounds/cloudflare-worker:
     devDependencies:
@@ -1302,8 +1302,8 @@ importers:
         specifier: ^4.73.0
         version: 4.73.0(@cloudflare/workers-types@4.20260313.1)
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   playgrounds/contract-first:
     devDependencies:
@@ -1341,8 +1341,8 @@ importers:
         specifier: ~5.8.3
         version: 5.8.3
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   playgrounds/electron:
     devDependencies:
@@ -1404,8 +1404,8 @@ importers:
         specifier: ^7.3.1
         version: 7.3.1(@types/node@22.19.7)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   playgrounds/nest:
     devDependencies:
@@ -1491,8 +1491,8 @@ importers:
         specifier: ^3.6.1
         version: 3.6.1(typescript@5.8.3)(vue@3.5.32(typescript@5.8.3))
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   playgrounds/next:
     devDependencies:
@@ -1545,8 +1545,8 @@ importers:
         specifier: ~5.8.3
         version: 5.8.3
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   playgrounds/nuxt:
     devDependencies:
@@ -1581,8 +1581,8 @@ importers:
         specifier: latest
         version: 5.0.4(@pinia/colada@0.21.7(pinia@3.0.4(typescript@5.8.3)(vue@3.5.32(typescript@5.8.3)))(vue@3.5.32(typescript@5.8.3)))(@vue/compiler-sfc@3.5.32)(pinia@3.0.4(typescript@5.8.3)(vue@3.5.32(typescript@5.8.3)))(vue@3.5.32(typescript@5.8.3))
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   playgrounds/solid-start:
     devDependencies:
@@ -1623,8 +1623,8 @@ importers:
         specifier: ^1.6.0
         version: 1.6.0(@swc/helpers@0.5.21)(rollup@4.57.0)(vite@7.3.1(@types/node@25.6.0)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   playgrounds/svelte-kit:
     devDependencies:
@@ -1671,8 +1671,8 @@ importers:
         specifier: ^7.3.1
         version: 7.3.1(@types/node@25.6.0)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
   playgrounds/tanstack-start:
     devDependencies:
@@ -1740,8 +1740,8 @@ importers:
         specifier: ^6.1.1
         version: 6.1.1(typescript@5.8.3)(vite@7.3.1(@types/node@22.19.7)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.6.2
+        version: 4.6.2
 
 packages:
 
@@ -15822,8 +15822,8 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
-  zod@4.3.6:
-    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+  zod@4.6.2:
+    resolution: {integrity: sha512-lh5RCAGFa1Cm2hjtNwLQhSs/AsqdWnTQaBER9fEwN/88pSh7KOtJavtBx/0VlkN/uFd61SwYmljLMDAsHlvzBQ==}
 
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
@@ -15857,39 +15857,39 @@ snapshots:
 
   '@adobe/css-tools@4.4.4': {}
 
-  '@ai-sdk/gateway@3.0.13(zod@4.3.6)':
+  '@ai-sdk/gateway@3.0.13(zod@4.6.2)':
     dependencies:
       '@ai-sdk/provider': 3.0.2
-      '@ai-sdk/provider-utils': 4.0.5(zod@4.3.6)
+      '@ai-sdk/provider-utils': 4.0.5(zod@4.6.2)
       '@vercel/oidc': 3.1.0
-      zod: 4.3.6
+      zod: 4.6.2
 
-  '@ai-sdk/gateway@3.0.66(zod@4.3.6)':
+  '@ai-sdk/gateway@3.0.66(zod@4.6.2)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
-      '@ai-sdk/provider-utils': 4.0.19(zod@4.3.6)
+      '@ai-sdk/provider-utils': 4.0.19(zod@4.6.2)
       '@vercel/oidc': 3.1.0
-      zod: 4.3.6
+      zod: 4.6.2
 
-  '@ai-sdk/google@3.0.43(zod@4.3.6)':
+  '@ai-sdk/google@3.0.43(zod@4.6.2)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
-      '@ai-sdk/provider-utils': 4.0.19(zod@4.3.6)
-      zod: 4.3.6
+      '@ai-sdk/provider-utils': 4.0.19(zod@4.6.2)
+      zod: 4.6.2
 
-  '@ai-sdk/provider-utils@4.0.19(zod@4.3.6)':
+  '@ai-sdk/provider-utils@4.0.19(zod@4.6.2)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.0.6
-      zod: 4.3.6
+      zod: 4.6.2
 
-  '@ai-sdk/provider-utils@4.0.5(zod@4.3.6)':
+  '@ai-sdk/provider-utils@4.0.5(zod@4.6.2)':
     dependencies:
       '@ai-sdk/provider': 3.0.2
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.0.6
-      zod: 4.3.6
+      zod: 4.6.2
 
   '@ai-sdk/provider@3.0.2':
     dependencies:
@@ -15899,20 +15899,20 @@ snapshots:
     dependencies:
       json-schema: 0.4.0
 
-  '@ai-sdk/react@3.0.118(react@19.2.4)(zod@4.3.6)':
+  '@ai-sdk/react@3.0.118(react@19.2.4)(zod@4.6.2)':
     dependencies:
-      '@ai-sdk/provider-utils': 4.0.19(zod@4.3.6)
-      ai: 6.0.116(zod@4.3.6)
+      '@ai-sdk/provider-utils': 4.0.19(zod@4.6.2)
+      ai: 6.0.116(zod@4.6.2)
       react: 19.2.4
       swr: 2.4.1(react@19.2.4)
       throttleit: 2.1.0
     transitivePeerDependencies:
       - zod
 
-  '@ai-sdk/vue@3.0.33(vue@3.5.32(typescript@5.8.3))(zod@4.3.6)':
+  '@ai-sdk/vue@3.0.33(vue@3.5.32(typescript@5.8.3))(zod@4.6.2)':
     dependencies:
-      '@ai-sdk/provider-utils': 4.0.5(zod@4.3.6)
-      ai: 6.0.33(zod@4.3.6)
+      '@ai-sdk/provider-utils': 4.0.5(zod@4.6.2)
+      ai: 6.0.33(zod@4.6.2)
       swrv: 1.1.0(vue@3.5.32(typescript@5.8.3))
       vue: 3.5.32(typescript@5.8.3)
     transitivePeerDependencies:
@@ -20549,7 +20549,7 @@ snapshots:
 
   '@scalar/agent-chat@0.9.7(change-case@5.4.4)(tailwindcss@4.1.17)(typescript@5.8.3)':
     dependencies:
-      '@ai-sdk/vue': 3.0.33(vue@3.5.32(typescript@5.8.3))(zod@4.3.6)
+      '@ai-sdk/vue': 3.0.33(vue@3.5.32(typescript@5.8.3))(zod@4.6.2)
       '@scalar/api-client': 2.37.0(change-case@5.4.4)(tailwindcss@4.1.17)(typescript@5.8.3)
       '@scalar/components': 0.20.7(typescript@5.8.3)
       '@scalar/helpers': 0.4.1
@@ -20561,12 +20561,12 @@ snapshots:
       '@scalar/use-toasts': 0.10.0(typescript@5.8.3)
       '@scalar/workspace-store': 0.40.0(typescript@5.8.3)
       '@vueuse/core': 13.9.0(vue@3.5.32(typescript@5.8.3))
-      ai: 6.0.33(zod@4.3.6)
+      ai: 6.0.33(zod@4.6.2)
       neverpanic: 0.0.5(typescript@5.8.3)
       truncate-json: 3.0.1
       vue: 3.5.32(typescript@5.8.3)
       whatwg-mimetype: 4.0.0
-      zod: 4.3.6
+      zod: 4.6.2
     transitivePeerDependencies:
       - '@vue/composition-api'
       - async-validator
@@ -20585,7 +20585,7 @@ snapshots:
 
   '@scalar/analytics-client@1.1.0':
     dependencies:
-      zod: 4.3.6
+      zod: 4.6.2
 
   '@scalar/api-client@2.37.0(change-case@5.4.4)(tailwindcss@4.1.17)(typescript@5.8.3)':
     dependencies:
@@ -20631,7 +20631,7 @@ snapshots:
       vue-router: 4.6.2(vue@3.5.32(typescript@5.8.3))
       whatwg-mimetype: 4.0.0
       yaml: 2.8.2
-      zod: 4.3.6
+      zod: 4.6.2
     transitivePeerDependencies:
       - '@vue/composition-api'
       - async-validator
@@ -20797,7 +20797,7 @@ snapshots:
       type-fest: 5.5.0
       vue: 3.5.32(typescript@5.8.3)
       yaml: 2.8.2
-      zod: 4.3.6
+      zod: 4.6.2
     transitivePeerDependencies:
       - supports-color
       - typescript
@@ -20824,7 +20824,7 @@ snapshots:
 
   '@scalar/openapi-types@0.6.0':
     dependencies:
-      zod: 4.3.6
+      zod: 4.6.2
 
   '@scalar/openapi-upgrader@0.2.0':
     dependencies:
@@ -20866,7 +20866,7 @@ snapshots:
       '@scalar/helpers': 0.4.1
       nanoid: 5.1.6
       type-fest: 5.4.4
-      zod: 4.3.6
+      zod: 4.6.2
 
   '@scalar/use-codemirror@0.14.7(typescript@5.8.3)':
     dependencies:
@@ -20898,7 +20898,7 @@ snapshots:
       cva: 1.0.0-beta.2(typescript@5.8.3)
       tailwind-merge: 3.4.0
       vue: 3.5.32(typescript@5.8.3)
-      zod: 4.3.6
+      zod: 4.6.2
     transitivePeerDependencies:
       - typescript
 
@@ -21750,10 +21750,10 @@ snapshots:
     dependencies:
       typescript: 5.8.3
 
-  '@ts-rest/core@3.52.1(@types/node@25.6.0)(zod@4.3.6)':
+  '@ts-rest/core@3.52.1(@types/node@25.6.0)(zod@4.6.2)':
     optionalDependencies:
       '@types/node': 25.6.0
-      zod: 4.3.6
+      zod: 4.6.2
 
   '@tsconfig/node10@1.0.12': {}
 
@@ -23125,21 +23125,21 @@ snapshots:
       clean-stack: 2.2.0
       indent-string: 4.0.0
 
-  ai@6.0.116(zod@4.3.6):
+  ai@6.0.116(zod@4.6.2):
     dependencies:
-      '@ai-sdk/gateway': 3.0.66(zod@4.3.6)
+      '@ai-sdk/gateway': 3.0.66(zod@4.6.2)
       '@ai-sdk/provider': 3.0.8
-      '@ai-sdk/provider-utils': 4.0.19(zod@4.3.6)
+      '@ai-sdk/provider-utils': 4.0.19(zod@4.6.2)
       '@opentelemetry/api': 1.9.0
-      zod: 4.3.6
+      zod: 4.6.2
 
-  ai@6.0.33(zod@4.3.6):
+  ai@6.0.33(zod@4.6.2):
     dependencies:
-      '@ai-sdk/gateway': 3.0.13(zod@4.3.6)
+      '@ai-sdk/gateway': 3.0.13(zod@4.6.2)
       '@ai-sdk/provider': 3.0.2
-      '@ai-sdk/provider-utils': 4.0.5(zod@4.3.6)
+      '@ai-sdk/provider-utils': 4.0.5(zod@4.6.2)
       '@opentelemetry/api': 1.9.0
-      zod: 4.3.6
+      zod: 4.6.2
 
   ajv-draft-04@1.0.0(ajv@8.18.0):
     optionalDependencies:
@@ -27268,7 +27268,7 @@ snapshots:
       typescript: 5.8.3
       unbash: 2.2.0
       yaml: 2.8.2
-      zod: 4.3.6
+      zod: 4.6.2
 
   knitwork@1.3.0: {}
 
@@ -28826,10 +28826,10 @@ snapshots:
       is-docker: 2.2.1
       is-wsl: 2.2.0
 
-  openai@6.27.0(ws@8.19.0)(zod@4.3.6):
+  openai@6.27.0(ws@8.19.0)(zod@4.6.2):
     optionalDependencies:
       ws: 8.19.0
-      zod: 4.3.6
+      zod: 4.6.2
 
   openapi-types@12.1.3: {}
 
@@ -29614,7 +29614,7 @@ snapshots:
       jsonwebtoken: 9.0.3
       listr2: 10.2.1
       ofetch: 1.5.1
-      zod: 4.3.6
+      zod: 4.6.2
 
   pump@3.0.3:
     dependencies:
@@ -31798,7 +31798,7 @@ snapshots:
       unenv: 1.10.0
       unstorage: 1.17.4(@upstash/redis@1.37.0)(db0@0.3.4(better-sqlite3@12.6.2))(ioredis@5.10.0)
       vite: 6.4.1(@types/node@25.6.0)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
-      zod: 4.3.6
+      zod: 4.6.2
     transitivePeerDependencies:
       - '@azure/app-configuration'
       - '@azure/cosmos'
@@ -32858,6 +32858,6 @@ snapshots:
 
   zod@3.25.76: {}
 
-  zod@4.3.6: {}
+  zod@4.6.2: {}
 
   zwitch@2.0.4: {}

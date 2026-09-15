@@ -48,6 +48,6 @@
   "devDependencies": {
     "arktype": "2.2.0",
     "valibot": "^1.2.0",
-    "zod": "^4.3.6"
+    "zod": "^4.6.2"
   }
 }
