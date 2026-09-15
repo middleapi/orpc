@@ -32,10 +32,6 @@ export class experimental_BunRedisCacheStore extends BaseRedisCacheStore {
       : this.redis.send('SET', [key, value, 'PX', String(px)])
   }
 
-  protected delete(key: string): Promise<unknown> {
-    return this.redis.del(key)
-  }
-
   protected increment(key: string): Promise<unknown> {
     return this.redis.incr(key)
   }

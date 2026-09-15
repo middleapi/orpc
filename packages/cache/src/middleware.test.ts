@@ -1,7 +1,6 @@
 import type { CacheHandlerPluginContext } from './handler-plugin'
 import type { CacheContext, CacheEntry, CacheStore } from './types'
 import { call, os, type } from '@orpc/server'
-import { nowInSeconds } from '@orpc/shared'
 import { MemoryCacheStore } from './adapters/memory'
 import { CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
 import { cache, revalidate } from './middleware'
@@ -14,8 +13,8 @@ function createStore(entry?: CacheEntry) {
     getOrSet: vi.fn<CacheStore['getOrSet']>(async (_key, fill, options) => entry ?? {
       output: await fill(),
       tags: options?.tags,
-      expiresAt: options?.ttl !== undefined ? nowInSeconds() + options.ttl : undefined,
-      evictAt: options?.ttl !== undefined ? nowInSeconds() + options.ttl + (options.swr ?? 0) : undefined,
+      expiresAt: options?.ttl !== undefined ? Date.now() + options.ttl : undefined,
+      evictAt: options?.ttl !== undefined ? Date.now() + options.ttl + (options.swr ?? 0) : undefined,
     }),
     revalidate: vi.fn<CacheStore['revalidate']>().mockResolvedValue(undefined),
   }
@@ -27,7 +26,7 @@ describe('cache', () => {
     const handlerFn = vi.fn().mockReturnValue('fresh')
     const procedure = os
       .$context<CacheContext>()
-      .use(cache({ key: 'k', tags: ['t1', 't2'], ttl: 60, swr: 30 }))
+      .use(cache({ key: 'k', tags: ['t1', 't2'], ttl: 60_000, swr: 30_000 }))
       .handler(handlerFn)
 
     await expect(
@@ -35,7 +34,7 @@ describe('cache', () => {
     ).resolves.toBe('fresh')
 
     expect(handlerFn).toHaveBeenCalledTimes(1)
-    expect(store.getOrSet).toHaveBeenCalledWith('k', expect.any(Function), { tags: ['t1', 't2'], ttl: 60, swr: 30, waitUntil: undefined })
+    expect(store.getOrSet).toHaveBeenCalledWith('k', expect.any(Function), { tags: ['t1', 't2'], ttl: 60_000, swr: 30_000, waitUntil: undefined })
   })
 
   describe('key derivation', () => {
@@ -94,7 +93,7 @@ describe('cache', () => {
   })
 
   it.each<[string, CacheEntry, unknown]>([
-    ['a fresh entry', { output: 'cached', tags: ['t'], expiresAt: nowInSeconds() + 60 }, 'cached'],
+    ['a fresh entry', { output: 'cached', tags: ['t'], expiresAt: Date.now() + 60_000 }, 'cached'],
     ['an entry that never expires', { output: 'cached', tags: [] }, 'cached'],
     ['a cached undefined output', { output: undefined, tags: [] }, undefined],
   ])('serves %s without running the handler', async (_, entry, expected) => {
@@ -113,8 +112,8 @@ describe('cache', () => {
     const store = createStore()
     const keyFn = vi.fn().mockResolvedValueOnce('k')
     const tagsFn = vi.fn().mockResolvedValueOnce(['t'])
-    const ttlFn = vi.fn().mockResolvedValueOnce(60)
-    const swrFn = vi.fn().mockResolvedValueOnce(30)
+    const ttlFn = vi.fn().mockResolvedValueOnce(60_000)
+    const swrFn = vi.fn().mockResolvedValueOnce(30_000)
     const enabledFn = vi.fn().mockResolvedValueOnce(true)
     const mw = cache({ key: keyFn, tags: tagsFn, ttl: ttlFn, swr: swrFn, enabled: enabledFn })
     const procedure = os.$context<CacheContext>().input(type<{ id: number }>()).use(mw).handler(() => 'fresh')
@@ -127,7 +126,7 @@ describe('cache', () => {
       expect(fn).toHaveBeenCalledTimes(1)
       expect(fn).toHaveBeenCalledWith(expect.objectContaining({ context: expect.any(Object) }), { id: 1 })
     }
-    expect(store.getOrSet).toHaveBeenCalledWith('k', expect.any(Function), { tags: ['t'], ttl: 60, swr: 30, waitUntil: undefined })
+    expect(store.getOrSet).toHaveBeenCalledWith('k', expect.any(Function), { tags: ['t'], ttl: 60_000, swr: 30_000, waitUntil: undefined })
   })
 
   it('skips the store when enabled resolves to false', async () => {
@@ -154,27 +153,29 @@ describe('cache', () => {
   })
 
   it('records the entry into the handler plugin context with its remaining ttl and swr', async () => {
-    const now = nowInSeconds()
-    const stale = createStore({ output: 'stale', tags: ['stored'], expiresAt: now - 10, evictAt: now + 20 })
-    const fresh = createStore({ output: 'fresh', tags: ['stored'], expiresAt: now + 60, evictAt: now + 90 })
+    const now = Date.now()
+    const stale = createStore({ output: 'stale', tags: ['stored'], expiresAt: now - 10_000, evictAt: now + 20_000 })
+    const fresh = createStore({ output: 'fresh', tags: ['stored'], expiresAt: now + 60_000, evictAt: now + 90_000 })
     const pluginContext: Exclude<CacheHandlerPluginContext[typeof CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL], undefined> = { caches: [], revalidations: [] }
     const procedure = os
       .$context<CacheContext & CacheHandlerPluginContext>()
-      .use(cache({ key: 'k', tags: ['t'], swr: 30 }))
+      .use(cache({ key: 'k', tags: ['t'], swr: 30_000 }))
       .handler(() => 'filled')
     const context = { [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext }
 
     await call(procedure, undefined, { context: { 'cache/store': stale, ...context }, path: ['__path__'] })
     await call(procedure, undefined, { context: { 'cache/store': fresh, ...context }, path: ['__path__'] })
     await call(procedure, undefined, { context: { 'cache/store': createStore(), ...context }, path: ['__path__'] })
+    await call(procedure, undefined, { context: { 'cache/store': createStore({ output: 'fresh', tags: ['stored'], expiresAt: now + 60_000 }), ...context }, path: ['__path__'] })
 
     // Only what is left of each window is reflected, so headers never outlive the entry.
     expect(pluginContext.caches.map(({ ttl, swr }) => ({ ttl, swr }))).toEqual([
-      { ttl: 0, swr: expect.closeTo(20, -1) },
-      { ttl: expect.closeTo(60, -1), swr: 30 },
+      { ttl: 0, swr: expect.closeTo(20_000, -3) },
+      { ttl: expect.closeTo(60_000, -3), swr: 30_000 },
       { ttl: undefined, swr: undefined },
+      { ttl: expect.closeTo(60_000, -3), swr: undefined },
     ])
-    expect(pluginContext.caches.map(({ tags }) => tags)).toEqual([['stored'], ['stored'], ['t']])
+    expect(pluginContext.caches.map(({ tags }) => tags)).toEqual([['stored'], ['stored'], ['t'], ['stored']])
   })
 
   it('records stacked caches in lookup order, on misses and hits alike', async () => {
@@ -227,14 +228,14 @@ describe('cache', () => {
 
     it('serves concurrent stale hits immediately and refreshes once through waitUntil', async () => {
       const store = new MemoryCacheStore()
-      await store.getOrSet('k', async () => 'stale', { ttl: 0, swr: 60 })
+      await store.getOrSet('k', async () => 'stale', { ttl: 0, swr: 60_000 })
 
       let finish!: (output: string) => void
       const handlerFn = vi.fn(() => new Promise<string>((resolve) => {
         finish = resolve
       }))
       const waitUntil = vi.fn()
-      const procedure = os.$context<CacheContext>().use(cache({ key: 'k', ttl: 60 })).handler(handlerFn)
+      const procedure = os.$context<CacheContext>().use(cache({ key: 'k', ttl: 60_000 })).handler(handlerFn)
       const run = () => call(procedure, undefined, { context: { 'cache/store': store, 'cache/waitUntil': waitUntil } })
 
       await expect(Promise.all([run(), run()])).resolves.toEqual(['stale', 'stale'])
@@ -262,7 +263,7 @@ describe('cache', () => {
       })
 
       const store = new MemoryCacheStore()
-      await store.getOrSet('k', async () => 'stale', { ttl: 0, swr: 60 })
+      await store.getOrSet('k', async () => 'stale', { ttl: 0, swr: 60_000 })
       const procedure = os.$context<CacheContext>().use(cache({ key: 'k' })).handler(() => {
         throw new Error('handler down')
       })

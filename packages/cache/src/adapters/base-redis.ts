@@ -1,19 +1,13 @@
-import type { RPCJsonSerialization } from '@orpc/client'
 import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions } from '../types'
-import type { BaseKeyValueCacheStoreOptions } from './base-key-value'
-import { nowInSeconds, stringifyJSON } from '@orpc/shared'
-import { resolveCacheExpiry } from '../utils'
+import type { BaseKeyValueCacheStoreOptions, CacheEnvelope } from './base-key-value'
+import { parseEmptyableJSON, stringifyJSON } from '@orpc/shared'
 import { BaseKeyValueCacheStore } from './base-key-value'
 
-interface BaseRedisCacheStoreEnvelope {
-  output: RPCJsonSerialization
+interface BaseRedisCacheStoreEnvelope extends CacheEnvelope {
   /**
-   * The tags, and the version counter each had when the fill started, index-aligned.
+   * The version each tag had when the fill started, index-aligned with `tags`.
    */
-  tags?: readonly string[]
-  tagVersions?: readonly number[]
-  expiresAt?: number | undefined
-  evictAt?: number | undefined
+  tagVersions?: readonly number[] | undefined
 }
 
 /**
@@ -74,11 +68,6 @@ export abstract class BaseRedisCacheStore extends BaseKeyValueCacheStore {
   protected abstract set(key: string, value: string, px: number | undefined): Promise<unknown>
 
   /**
-   * Deletes a key (`DEL key`).
-   */
-  protected abstract delete(key: string): Promise<unknown>
-
-  /**
    * Increments a counter key (`INCR key`).
    */
   protected abstract increment(key: string): Promise<unknown>
@@ -88,62 +77,42 @@ export abstract class BaseRedisCacheStore extends BaseKeyValueCacheStore {
   }
 
   protected async read(encodedKey: string, options: CacheGetOrSetOptions): Promise<CacheEntry | undefined> {
-    const entryKey = this.entryPrefix + encodedKey
     const expectedTags = options.tags ?? []
-    const [raw, expectedVersions] = await Promise.all([this.get(entryKey), this.versions(expectedTags)])
+    const [raw, expectedVersions] = await Promise.all([this.get(this.entryPrefix + encodedKey), this.versions(expectedTags)])
+    const envelope = (typeof raw === 'string' ? parseEmptyableJSON(raw) : raw) as BaseRedisCacheStoreEnvelope | null | undefined
 
-    if (raw === null || raw === undefined) {
-      return undefined
-    }
-
-    const envelope = (typeof raw === 'string' ? JSON.parse(raw) : raw) as BaseRedisCacheStoreEnvelope
-
-    if (envelope.evictAt !== undefined && nowInSeconds() >= envelope.evictAt) {
-      await this.delete(entryKey)
+    if (envelope == null) {
       return undefined
     }
 
     if (envelope.tags?.length) {
-      const versions = new Map(expectedTags.map((tag, index) => [tag, expectedVersions[index]]))
-      const missing = envelope.tags.filter(tag => !versions.has(tag))
+      const { tags } = envelope
+      const versions = tags.length === expectedTags.length && tags.every((tag, index) => tag === expectedTags[index])
+        ? expectedVersions
+        : await this.versions(tags)
 
-      if (missing.length) {
-        const fetched = await this.versions(missing)
-        missing.forEach((tag, index) => versions.set(tag, fetched[index]))
-      }
+      const stored = envelope.tagVersions ?? []
 
-      if (envelope.tags.some((tag, index) => versions.get(tag) !== (envelope.tagVersions?.[index] ?? 0))) {
-        await this.delete(entryKey)
+      if (tags.some((_, index) => versions[index] !== (stored[index] ?? 0))) {
         return undefined
       }
     }
 
-    return {
-      output: this.serializer.deserialize(envelope.output),
-      tags: envelope.tags,
-      expiresAt: envelope.expiresAt,
-      evictAt: envelope.evictAt,
-    }
+    return this.decode(envelope)
   }
 
-  protected async fill(encodedKey: string, fill: () => Promise<unknown>, options: CacheGetOrSetOptions): Promise<CacheEntry> {
-    const tags = options.tags?.length ? options.tags : undefined
-    const tagVersions = tags === undefined ? undefined : await this.versions(tags)
-    const output = await fill()
-    const { expiresAt, evictAt, retention } = resolveCacheExpiry(options)
-    const { json, meta } = this.serializer.serialize(output)
+  protected async fill(encodedKey: string, compute: () => Promise<unknown>, options: CacheGetOrSetOptions): Promise<CacheEntry> {
+    const tagVersions = options.tags?.length ? await this.versions(options.tags) : undefined
+    const output = await compute()
+    const { envelope, entry, retention } = this.encode(output, options)
 
-    const envelope: BaseRedisCacheStoreEnvelope = {
-      output: { json, meta },
-      tags,
-      tagVersions,
-      expiresAt,
-      evictAt,
-    }
+    await this.set(
+      this.entryPrefix + encodedKey,
+      stringifyJSON({ ...envelope, tagVersions } satisfies BaseRedisCacheStoreEnvelope),
+      retention,
+    )
 
-    await this.set(this.entryPrefix + encodedKey, stringifyJSON(envelope), retention === undefined ? undefined : retention * 1000)
-
-    return { output, tags, expiresAt, evictAt }
+    return entry
   }
 
   private async versions(tags: readonly string[]): Promise<number[]> {

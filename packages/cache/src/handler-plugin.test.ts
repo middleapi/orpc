@@ -175,7 +175,7 @@ describe('cacheHandlerPlugin', () => {
 
     it('reflects the root check, leaving unconfigured headers alone', async () => {
       const { record, handle } = createTestingHandler(headers)
-      record({ caches: [{ tags: ['planets', 'a,b'], ttl: 2, swr: 1 }] })
+      record({ caches: [{ tags: ['planets', 'a,b'], ttl: 2000, swr: 1000 }] })
 
       const response = await handle()
 
@@ -196,7 +196,7 @@ describe('cacheHandlerPlugin', () => {
 
     it('sets its headers over ones already on the response', async () => {
       const { record, handle } = createTestingHandler(headers, { 'cache-control': 'private, no-store', 'cache-tag': 'stale' })
-      record({ caches: [{ tags: ['planets'], ttl: 2 }] })
+      record({ caches: [{ tags: ['planets'], ttl: 2000 }] })
 
       const response = await handle()
 
@@ -206,7 +206,7 @@ describe('cacheHandlerPlugin', () => {
 
     it('reflects the root check whatever the request method', async () => {
       const { record, handle } = createTestingHandler(headers)
-      record({ caches: [{ tags: ['planets'], ttl: 2 }] })
+      record({ caches: [{ tags: ['planets'], ttl: 2000 }] })
 
       const response = await handle(POST)
 

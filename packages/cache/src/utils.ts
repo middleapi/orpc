@@ -1,7 +1,7 @@
 import type { RPCJsonSerializer } from '@orpc/client'
 import type { Public } from '@orpc/shared'
 import type { CacheEntry, CacheGetOrSetOptions } from './types'
-import { deepSortKeys, nowInSeconds, stringifyJSON } from '@orpc/shared'
+import { deepSortKeys, stringifyJSON } from '@orpc/shared'
 
 /**
  * Encodes a cache key into a stable string: strings are used verbatim, while
@@ -32,13 +32,22 @@ export function encodeCacheKey(key: unknown, serializer: Public<RPCJsonSerialize
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
 export function isCacheEntryStale(entry: CacheEntry): boolean {
-  return entry.expiresAt !== undefined && nowInSeconds() >= entry.expiresAt
+  return entry.expiresAt !== undefined && Date.now() >= entry.expiresAt
+}
+
+/**
+ * Whether the entry is past the window it may still be served in.
+ *
+ * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
+ */
+export function isCacheEntryEvicted(entry: Pick<CacheEntry, 'evictAt'>): boolean {
+  return entry.evictAt !== undefined && Date.now() >= entry.evictAt
 }
 
 /**
  * The entry lifetime an option set describes: when it stops being fresh,
- * when it may be evicted (both unix timestamps in seconds), and how long it
- * is retained in seconds. All `undefined` when it never expires.
+ * when it may be evicted (both unix timestamps in milliseconds), and how long
+ * it is retained in milliseconds. All `undefined` when it never expires.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
@@ -47,7 +56,7 @@ export function resolveCacheExpiry({ ttl, swr }: CacheGetOrSetOptions): { expire
     return { expiresAt: undefined, evictAt: undefined, retention: undefined }
   }
 
-  const expiresAt = nowInSeconds() + ttl
+  const expiresAt = Date.now() + ttl
 
   return { expiresAt, evictAt: expiresAt + (swr ?? 0), retention: ttl + (swr ?? 0) }
 }

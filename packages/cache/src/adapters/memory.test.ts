@@ -50,18 +50,18 @@ describe('memoryCacheStore', () => {
   it('returns fresh entries with a future expiresAt, then fills again at ttl without swr', async () => {
     const store = new MemoryCacheStore()
 
-    await expect(store.getOrSet('k', async () => 'v', { ttl: 1 })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1, evictAt: 1 })
+    await expect(store.getOrSet('k', async () => 'v', { ttl: 1000 })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1000, evictAt: 1000 })
 
     vi.setSystemTime(999)
-    await expect(store.getOrSet('k', async () => 'other', { ttl: 1 })).resolves.toMatchObject({ output: 'v' })
+    await expect(store.getOrSet('k', async () => 'other', { ttl: 1000 })).resolves.toMatchObject({ output: 'v' })
 
     vi.setSystemTime(1000)
-    await expect(store.getOrSet('k', async () => 'other', { ttl: 1 })).resolves.toEqual({ output: 'other', tags: undefined, expiresAt: 2, evictAt: 2 })
+    await expect(store.getOrSet('k', async () => 'other', { ttl: 1000 })).resolves.toEqual({ output: 'other', tags: undefined, expiresAt: 2000, evictAt: 2000 })
   })
 
   it('serves stale entries within swr while one caller refreshes them in the background', async () => {
     const store = new MemoryCacheStore()
-    await store.getOrSet('k', async () => 'v', { ttl: 1, swr: 1 })
+    await store.getOrSet('k', async () => 'v', { ttl: 1000, swr: 1000 })
 
     vi.setSystemTime(1200) // past ttl, within swr
     let finish!: (output: string) => void
@@ -70,20 +70,20 @@ describe('memoryCacheStore', () => {
     }))
     const waitUntil = vi.fn()
 
-    await expect(store.getOrSet('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1, evictAt: 2 })
-    await expect(store.getOrSet('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1, evictAt: 2 })
+    await expect(store.getOrSet('k', fill, { ttl: 1000, swr: 1000, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1000, evictAt: 2000 })
+    await expect(store.getOrSet('k', fill, { ttl: 1000, swr: 1000, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1000, evictAt: 2000 })
     expect(waitUntil).toHaveBeenCalledTimes(2)
 
     finish('fresh')
     await Promise.all(waitUntil.mock.calls.map(([refresh]) => refresh))
     expect(fill).toHaveBeenCalledTimes(1) // the second stale hit found the refreshed entry
 
-    await expect(store.getOrSet('k', fill, { ttl: 1, swr: 1 })).resolves.toEqual({ output: 'fresh', tags: undefined, expiresAt: 2, evictAt: 3 })
+    await expect(store.getOrSet('k', fill, { ttl: 1000, swr: 1000 })).resolves.toEqual({ output: 'fresh', tags: undefined, expiresAt: 2200, evictAt: 3200 })
   })
 
   it('leaves a failed refresh to waitUntil and keeps serving the stale entry', async () => {
     const store = new MemoryCacheStore()
-    await store.getOrSet('k', async () => 'v', { ttl: 1, swr: 1 })
+    await store.getOrSet('k', async () => 'v', { ttl: 1000, swr: 1000 })
 
     vi.setSystemTime(1200)
     const waitUntil = vi.fn()
@@ -91,17 +91,17 @@ describe('memoryCacheStore', () => {
       throw new Error('handler down')
     })
 
-    await expect(store.getOrSet('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toMatchObject({ output: 'v' })
+    await expect(store.getOrSet('k', fill, { ttl: 1000, swr: 1000, waitUntil })).resolves.toMatchObject({ output: 'v' })
     await expect(waitUntil.mock.calls[0]![0]).rejects.toThrow('handler down')
 
-    await expect(store.getOrSet('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toMatchObject({ output: 'v' })
+    await expect(store.getOrSet('k', fill, { ttl: 1000, swr: 1000, waitUntil })).resolves.toMatchObject({ output: 'v' })
     await expect(waitUntil.mock.calls[1]![0]).rejects.toThrow('handler down')
     expect(fill).toHaveBeenCalledTimes(2)
   })
 
   it('lets a waiting refresh fill when the first one failed', async () => {
     const store = new MemoryCacheStore()
-    await store.getOrSet('k', async () => 'v', { ttl: 1, swr: 1 })
+    await store.getOrSet('k', async () => 'v', { ttl: 1000, swr: 1000 })
 
     vi.setSystemTime(1200)
     let fail!: (error: Error) => void
@@ -112,15 +112,15 @@ describe('memoryCacheStore', () => {
       .mockResolvedValue('fresh')
     const waitUntil = vi.fn()
 
-    await store.getOrSet('k', fill, { ttl: 1, swr: 1, waitUntil })
-    await store.getOrSet('k', fill, { ttl: 1, swr: 1, waitUntil })
+    await store.getOrSet('k', fill, { ttl: 1000, swr: 1000, waitUntil })
+    await store.getOrSet('k', fill, { ttl: 1000, swr: 1000, waitUntil })
     fail(new Error('handler down'))
 
     await expect(waitUntil.mock.calls[0]![0]).rejects.toThrow('handler down')
     await waitUntil.mock.calls[1]![0]
     expect(fill).toHaveBeenCalledTimes(2)
 
-    await expect(store.getOrSet('k', fill, { ttl: 1, swr: 1 })).resolves.toMatchObject({ output: 'fresh' })
+    await expect(store.getOrSet('k', fill, { ttl: 1000, swr: 1000 })).resolves.toMatchObject({ output: 'fresh' })
   })
 
   it('drops output computed before a revalidation that landed during its fill', async () => {
@@ -147,7 +147,7 @@ describe('memoryCacheStore', () => {
 
   it('drops a refresh computed before a revalidation that landed during it', async () => {
     const store = new MemoryCacheStore()
-    await store.getOrSet('k', async () => 'v', { tags: ['t'], ttl: 1, swr: 10 })
+    await store.getOrSet('k', async () => 'v', { tags: ['t'], ttl: 1000, swr: 10_000 })
 
     vi.setSystemTime(1500)
     let finish!: (output: string) => void
@@ -155,7 +155,7 @@ describe('memoryCacheStore', () => {
 
     await store.getOrSet('k', () => new Promise<string>((resolve) => {
       finish = resolve
-    }), { tags: ['t'], ttl: 1, swr: 10, waitUntil })
+    }), { tags: ['t'], ttl: 1000, swr: 10_000, waitUntil })
     await store.revalidate({ tags: ['t'] })
     finish('outdated')
     await waitUntil.mock.calls[0]![0]
@@ -179,12 +179,12 @@ describe('memoryCacheStore', () => {
     release()
     await expect(holder).resolves.toMatchObject({ output: 'held' })
 
-    await store.getOrSet('stale', async () => 'v', { ttl: 1, swr: 10 })
+    await store.getOrSet('stale', async () => 'v', { ttl: 1000, swr: 10_000 })
     vi.setSystemTime(2000)
     const refreshFill = vi.fn(() => new Promise<string>(() => {}))
     const waitUntil = vi.fn()
-    await store.getOrSet('stale', refreshFill, { ttl: 1, swr: 10, waitUntil })
-    await store.getOrSet('stale', async () => 'other', { ttl: 1, swr: 10, waitUntil })
+    await store.getOrSet('stale', refreshFill, { ttl: 1000, swr: 10_000, waitUntil })
+    await store.getOrSet('stale', async () => 'other', { ttl: 1000, swr: 10_000, waitUntil })
     await expect(waitUntil.mock.calls[1]![0]).resolves.toBeUndefined()
     expect(refreshFill).toHaveBeenCalledTimes(1)
   })
@@ -204,9 +204,9 @@ describe('memoryCacheStore', () => {
     const store = new MemoryCacheStore()
     const entries = Reflect.get(store, 'entries') as Map<string, unknown>
 
-    await store.getOrSet('expiring', async () => 'v', { ttl: 10 })
+    await store.getOrSet('expiring', async () => 'v', { ttl: 10_000 })
     await store.getOrSet('tagged', async () => 'v', { tags: ['t'] })
-    await store.getOrSet('kept', async () => 'v', { ttl: 100 })
+    await store.getOrSet('kept', async () => 'v', { ttl: 100_000 })
 
     vi.setSystemTime(5000)
     await store.getOrSet('before', async () => 'v')
@@ -224,9 +224,9 @@ describe('memoryCacheStore', () => {
   it('evicts past ttl + swr, and revalidation drops stale entries too', async () => {
     const store = new MemoryCacheStore()
 
-    await store.getOrSet('evicted', async () => 'v', { ttl: 1, swr: 1 })
-    await store.getOrSet('stale', async () => 'v', { tags: ['a'], ttl: 1, swr: 1 })
-    await store.getOrSet('k', async () => 'old', { tags: ['old'], ttl: 1 })
+    await store.getOrSet('evicted', async () => 'v', { ttl: 1000, swr: 1000 })
+    await store.getOrSet('stale', async () => 'v', { tags: ['a'], ttl: 1000, swr: 1000 })
+    await store.getOrSet('k', async () => 'old', { tags: ['old'], ttl: 1000 })
 
     vi.setSystemTime(1000) // 'k' expired without swr, so it is filled again with new tags
     await expect(store.getOrSet('k', async () => 'new', { tags: ['new'] })).resolves.toEqual({ output: 'new', tags: ['new'], expiresAt: undefined })

@@ -1,6 +1,5 @@
 import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions } from '../types'
 import type { BaseKeyValueCacheStoreOptions } from './base-key-value'
-import { nowInSeconds } from '@orpc/shared'
 import { resolveCacheExpiry } from '../utils'
 import { BaseKeyValueCacheStore } from './base-key-value'
 
@@ -31,10 +30,6 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
   private readonly tagVersions = new Map<string, number>()
   private nextSweepAt = Infinity
 
-  constructor(options: MemoryCacheStoreOptions = {}) {
-    super(options)
-  }
-
   async revalidate({ tags }: CacheRevalidateOptions): Promise<void> {
     for (const tag of tags) {
       this.tagVersions.set(tag, (this.tagVersions.get(tag) ?? 0) + 1)
@@ -50,7 +45,7 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
       return undefined
     }
 
-    if (this.shouldEvict(entry, nowInSeconds())) {
+    if (this.shouldEvict(entry, Date.now())) {
       this.entries.delete(encodedKey)
       return undefined
     }
@@ -63,10 +58,10 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
     }
   }
 
-  protected async fill(encodedKey: string, fill: () => Promise<unknown>, options: CacheGetOrSetOptions): Promise<CacheEntry> {
-    const tags = options.tags
+  protected async fill(encodedKey: string, compute: () => Promise<unknown>, options: CacheGetOrSetOptions): Promise<CacheEntry> {
+    const tags = options.tags?.length ? options.tags : undefined
     const tagVersions = tags?.map(tag => this.tagVersions.get(tag) ?? 0)
-    const output = await fill()
+    const output = await compute()
     const { expiresAt, evictAt } = resolveCacheExpiry(options)
 
     this.sweep()
@@ -89,7 +84,7 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
    * revalidation has passed, so entries never read again still leave the store.
    */
   private sweep(): void {
-    const now = nowInSeconds()
+    const now = Date.now()
 
     if (now < this.nextSweepAt) {
       return

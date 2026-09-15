@@ -2,7 +2,7 @@ import type { Locker } from '@orpc/experimental-lock'
 import type { CacheStore } from '../../src'
 import type { BaseRedisCacheStoreOptions } from '../../src/adapters/base-redis'
 import { RPCJsonSerializer } from '@orpc/client'
-import { nowInSeconds, sleep, stringifyJSON } from '@orpc/shared'
+import { sleep, stringifyJSON } from '@orpc/shared'
 import { expect, it, vi } from 'vitest'
 
 export interface RedisCacheStoreContractClient {
@@ -40,22 +40,22 @@ export function describeRedisCacheStoreContract(
   it('fills again at ttl without swr, and serves stale within the swr window while refreshing', async () => {
     const { store } = createStore()
 
-    await store.getOrSet('no-swr', async () => 'v', { ttl: 1 })
-    await store.getOrSet('swr', async () => 'v', { ttl: 1, swr: 10 })
+    await store.getOrSet('no-swr', async () => 'v', { ttl: 1000 })
+    await store.getOrSet('swr', async () => 'v', { ttl: 1000, swr: 10_000 })
 
     await sleep(1500)
 
-    await expect(store.getOrSet('no-swr', async () => 'refilled', { ttl: 1 })).resolves.toMatchObject({ output: 'refilled' })
+    await expect(store.getOrSet('no-swr', async () => 'refilled', { ttl: 1000 })).resolves.toMatchObject({ output: 'refilled' })
 
     const waitUntil = vi.fn()
-    const stale = await store.getOrSet('swr', async () => 'fresh', { ttl: 1, swr: 10, waitUntil })
+    const stale = await store.getOrSet('swr', async () => 'fresh', { ttl: 1000, swr: 10_000, waitUntil })
     expect(stale.output).toBe('v')
-    expect(stale.expiresAt).toBeLessThanOrEqual(nowInSeconds())
+    expect(stale.expiresAt).toBeLessThanOrEqual(Date.now())
 
     expect(waitUntil).toHaveBeenCalledTimes(1)
     await waitUntil.mock.calls[0]![0]
 
-    const fresh = await store.getOrSet('swr', async () => 'other', { ttl: 1, swr: 10 })
+    const fresh = await store.getOrSet('swr', async () => 'other', { ttl: 1000, swr: 10_000 })
     expect(fresh.output).toBe('fresh')
     expect(fresh.expiresAt).toBeGreaterThan(stale.expiresAt!)
   })
@@ -86,6 +86,7 @@ export function describeRedisCacheStoreContract(
 
     await redis.set(`${prefix}e:k`, stringifyJSON({ output: { json: 'v' }, tags: ['stored'] })!)
 
+    await expect(store.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'v', tags: ['stored'] })
     await expect(store.getOrSet('k', async () => 'other', { tags: ['other'] })).resolves.toMatchObject({ output: 'v', tags: ['stored'] })
 
     await store.revalidate({ tags: ['stored'] })

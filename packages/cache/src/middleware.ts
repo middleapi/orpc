@@ -1,8 +1,8 @@
 import type { Middleware, MiddlewareOptions } from '@orpc/server'
 import type { Promisable, Value } from '@orpc/shared'
 import type { CacheHandlerPluginContext } from './handler-plugin'
-import type { CacheContext } from './types'
-import { nowInSeconds, value } from '@orpc/shared'
+import type { CacheContext, CacheEntry } from './types'
+import { value } from '@orpc/shared'
 import { CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
 
 export interface CacheMiddlewareOptions<
@@ -27,14 +27,14 @@ export interface CacheMiddlewareOptions<
   tags?: Value<Promisable<readonly string[]>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
 
   /**
-   * Fresh lifetime in seconds. `undefined` means the entry never expires by time.
+   * Fresh lifetime in milliseconds. `undefined` means the entry never expires by time.
    *
    * @default undefined
    */
   ttl?: Value<Promisable<number | undefined>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
 
   /**
-   * Extra stale-while-revalidate window in seconds after `ttl`.
+   * Extra stale-while-revalidate window in milliseconds after `ttl`.
    * Stale entries are served immediately while the procedure re-executes in the background.
    *
    * @default 0
@@ -85,16 +85,12 @@ export function cache<
       waitUntil: middlewareOptions.context['cache/waitUntil'],
     })
 
-    const now = nowInSeconds()
-
+    // Recorded at its lookup position rather than appended, so the plugin finds the outermost of stacked caches first.
     pluginContext?.caches.splice(lookupIndex, 0, {
       procedure: middlewareOptions.procedure,
       path: middlewareOptions.path,
       tags: entry.tags,
-      ttl: entry.expiresAt === undefined ? undefined : Math.max(0, entry.expiresAt - now),
-      swr: entry.expiresAt === undefined || entry.evictAt === undefined
-        ? undefined
-        : Math.max(0, entry.evictAt - Math.max(now, entry.expiresAt)),
+      ...remainingLifetime(entry),
     })
 
     return done({ output: entry.output })
@@ -141,5 +137,21 @@ export function revalidate<
     }
 
     return result
+  }
+}
+
+/**
+ * What is left of the entry's fresh lifetime and swr window, in milliseconds.
+ */
+function remainingLifetime(entry: CacheEntry): { ttl: number | undefined, swr: number | undefined } {
+  if (entry.expiresAt === undefined) {
+    return { ttl: undefined, swr: undefined }
+  }
+
+  const now = Date.now()
+
+  return {
+    ttl: Math.max(0, entry.expiresAt - now),
+    swr: entry.evictAt === undefined ? undefined : Math.max(0, entry.evictAt - Math.max(now, entry.expiresAt)),
   }
 }

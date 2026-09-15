@@ -32,13 +32,13 @@ const store = new MemoryCacheStore()
 
 const entry = await store.getOrSet('planet:1', async () => ({ id: 1, name: 'Earth' }), {
   tags: ['planets', 'planet:1'],
-  ttl: 60,
+  ttl: 60_000,
 })
 
 await store.revalidate({ tags: ['planets'] }) // the next `getOrSet` fills again
 ```
 
-An entry is fresh for `ttl` seconds and kept for a further `swr` window, during which `getOrSet` still returns it with a past `expiresAt` while one caller refreshes it in the background. Revalidating a tag invalidates every entry carrying it, fresh or stale. Durations are in seconds throughout.
+An entry is fresh for `ttl` milliseconds and kept for a further `swr` window, during which `getOrSet` still returns it with a past `expiresAt` while one caller refreshes it in the background. Revalidating a tag invalidates every entry carrying it, fresh or stale. Durations are in milliseconds throughout.
 
 ## Cache Middleware
 
@@ -57,8 +57,8 @@ const findPlanet = os
     cache({
       key: (_, input) => `planet:${input.id}`,
       tags: (_, input) => ['planets', `planet:${input.id}`],
-      ttl: 60, // Optional fresh lifetime in seconds, default is no expiry
-      swr: 300, // Optional stale-while-revalidate window in seconds, default is 0
+      ttl: 60_000, // Optional fresh lifetime in milliseconds, default is no expiry
+      swr: 300_000, // Optional stale-while-revalidate window in milliseconds, default is 0
     }),
   )
   .handler(({ input }) => {
@@ -181,7 +181,7 @@ import { RedisCacheStore } from '@orpc/experimental-cache/redis'
 import { createClient } from 'redis'
 
 const store = new TieredCacheStore([
-  { store: new MemoryCacheStore(), ttl: 5 },
+  { store: new MemoryCacheStore(), ttl: 5_000 },
   { store: new RedisCacheStore(createClient({ url: process.env.REDIS_URL })) },
 ])
 ```

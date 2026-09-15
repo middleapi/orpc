@@ -1,23 +1,42 @@
 import type { AnyProcedure, Context } from '@orpc/server'
 import type { StandardHandlerInterceptor, StandardHandlerOptions, StandardHandlerPlugin } from '@orpc/server/standard'
 import type { StandardHeaders } from '@standard-server/core'
-import { encodeCacheTagHeader, isDeepEqual, toArray } from '@orpc/shared'
+import { encodeCacheTagHeader, toArray } from '@orpc/shared'
 
 export const CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_CACHE_HANDLER_PLUGIN_CONTEXT')
+
+/**
+ * A cache lookup performed during a request. `ttl` carries the remaining
+ * freshness in milliseconds on hits and the resolved fresh lifetime on stores.
+ */
+export interface CacheHandlerPluginLookup {
+  procedure: AnyProcedure
+  path: readonly string[]
+  tags?: readonly string[] | undefined
+  ttl?: number | undefined
+  swr?: number | undefined
+}
+
+/**
+ * A tag revalidation committed during a request.
+ */
+export interface CacheHandlerPluginRevalidation {
+  procedure: AnyProcedure
+  path: readonly string[]
+  tags: readonly string[]
+}
 
 export interface CacheHandlerPluginContext {
   [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]?: {
     /**
      * The cache lookups performed during this request, in the order they ran.
-     * `ttl` carries the remaining freshness in seconds on hits and the
-     * resolved fresh lifetime on stores.
      */
-    caches: { procedure: AnyProcedure, path: readonly string[], tags?: readonly string[] | undefined, ttl?: number | undefined, swr?: number | undefined }[]
+    caches: CacheHandlerPluginLookup[]
 
     /**
      * The tag revalidations committed during this request, in the order they ran.
      */
-    revalidations: { procedure: AnyProcedure, path: readonly string[], tags: readonly string[] }[]
+    revalidations: CacheHandlerPluginRevalidation[]
   }
 }
 
@@ -78,8 +97,9 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
         } satisfies CacheHandlerPluginContext,
       })
 
-      const isRoot = (check: { procedure: AnyProcedure, path: readonly string[] }) =>
-        check.procedure === interceptorOptions.procedure && isDeepEqual(check.path, interceptorOptions.path)
+      const { procedure, path } = interceptorOptions
+      const isRoot = (check: CacheHandlerPluginRevalidation | CacheHandlerPluginLookup) =>
+        check.procedure === procedure && check.path.length === path.length && check.path.every((segment, index) => segment === path[index])
 
       const rootCache = pluginContext.caches.find(isRoot)
       const rootRevalidation = pluginContext.revalidations.find(isRoot)
@@ -89,20 +109,16 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
       }
 
       const headers: StandardHeaders = {}
+      const set = (name: CacheHandlerPluginHeader, value: string | undefined) => {
+        if (value !== undefined && this.headers.has(name)) {
+          headers[name] = value
+        }
+      }
 
       const cacheTag = rootCache?.tags?.length ? encodeCacheTagHeader(rootCache.tags) : undefined
-
-      if (cacheTag !== undefined && this.headers.has('orpc-cache-tag')) {
-        headers['orpc-cache-tag'] = cacheTag
-      }
-
-      if (rootRevalidation?.tags.length && this.headers.has('orpc-cache-tag-invalidation')) {
-        headers['orpc-cache-tag-invalidation'] = encodeCacheTagHeader(rootRevalidation.tags)
-      }
-
-      if (cacheTag !== undefined && this.headers.has('cache-tag')) {
-        headers['cache-tag'] = cacheTag
-      }
+      set('orpc-cache-tag', cacheTag)
+      set('cache-tag', cacheTag)
+      set('orpc-cache-tag-invalidation', rootRevalidation?.tags.length ? encodeCacheTagHeader(rootRevalidation.tags) : undefined)
 
       if (rootCache !== undefined && this.headers.has('cache-control')) {
         /**
@@ -112,9 +128,9 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
          * Entries without a ttl stay valid until revalidated, so caches hold
          * them for a year and rely on tag purges.
          */
-        const maxAge = rootCache.ttl ?? 31536000
-        const staleWhileRevalidate = rootCache.swr ? `, stale-while-revalidate=${rootCache.swr}` : ''
-        headers['cache-control'] = `public, max-age=${maxAge}${staleWhileRevalidate}`
+        const maxAge = rootCache.ttl === undefined ? 31536000 : Math.floor(rootCache.ttl / 1000)
+        const staleWhileRevalidate = Math.floor((rootCache.swr ?? 0) / 1000)
+        headers['cache-control'] = `public, max-age=${maxAge}${staleWhileRevalidate ? `, stale-while-revalidate=${staleWhileRevalidate}` : ''}`
       }
 
       return {

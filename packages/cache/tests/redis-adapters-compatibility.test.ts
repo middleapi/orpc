@@ -1,7 +1,7 @@
 import type { CacheStore } from '../src'
 import { RedisLocker } from '@orpc/experimental-lock/redis'
 import { UpstashLocker } from '@orpc/experimental-lock/upstash'
-import { nowInSeconds, sleep } from '@orpc/shared'
+import { sleep } from '@orpc/shared'
 import { Redis } from '@upstash/redis'
 import { createClient } from 'redis'
 import { RedisCacheStore } from '../src/adapters/redis'
@@ -52,12 +52,12 @@ describe.concurrent('cache redis adapters compatibility', { timeout: 20_000 }, (
           const tag = `tag:${crypto.randomUUID()}`
           const output = { date: new Date('2026-01-02T03:04:05.678Z'), big: 123n }
 
-          await source.store.getOrSet([['planet', 'find'], { b: 2, id }], async () => output, { tags: [tag], ttl: 60 })
+          await source.store.getOrSet([['planet', 'find'], { b: 2, id }], async () => output, { tags: [tag], ttl: 60_000 })
 
-          const entry = await target.store.getOrSet([['planet', 'find'], { id, b: 2 }], async () => 'refilled', { tags: [tag], ttl: 60 })
+          const entry = await target.store.getOrSet([['planet', 'find'], { id, b: 2 }], async () => 'refilled', { tags: [tag], ttl: 60_000 })
           expect(entry.output).toEqual(output)
           expect(entry.tags).toEqual([tag])
-          expect(entry.expiresAt).toBeGreaterThan(nowInSeconds())
+          expect(entry.expiresAt).toBeGreaterThan(Date.now())
 
           await target.store.revalidate({ tags: [tag] })
 
@@ -82,17 +82,17 @@ describe.concurrent('cache redis adapters compatibility', { timeout: 20_000 }, (
           const noSwr = `no-swr:${crypto.randomUUID()}`
           const swr = `swr:${crypto.randomUUID()}`
 
-          await source.store.getOrSet(noSwr, async () => 'v', { ttl: 1 })
-          await source.store.getOrSet(swr, async () => 'v', { ttl: 1, swr: 10 })
+          await source.store.getOrSet(noSwr, async () => 'v', { ttl: 1000 })
+          await source.store.getOrSet(swr, async () => 'v', { ttl: 1000, swr: 10_000 })
 
           await sleep(1500)
 
-          await expect(target.store.getOrSet(noSwr, async () => 'refilled', { ttl: 1 })).resolves.toMatchObject({ output: 'refilled' })
+          await expect(target.store.getOrSet(noSwr, async () => 'refilled', { ttl: 1000 })).resolves.toMatchObject({ output: 'refilled' })
 
           const waitUntil = (_promise: Promise<unknown>) => {}
-          const stale = await target.store.getOrSet(swr, async () => 'refilled', { ttl: 1, swr: 10, waitUntil })
+          const stale = await target.store.getOrSet(swr, async () => 'refilled', { ttl: 1000, swr: 10_000, waitUntil })
           expect(stale.output).toBe('v')
-          expect(stale.expiresAt).toBeLessThanOrEqual(nowInSeconds())
+          expect(stale.expiresAt).toBeLessThanOrEqual(Date.now())
         })
 
         it(`shares locks: ${source.name} → ${target.name}`, async () => {

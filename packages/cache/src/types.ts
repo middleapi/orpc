@@ -10,13 +10,13 @@ export interface CacheEntry {
   tags?: readonly string[] | undefined
 
   /**
-   * The time (unix timestamp in seconds) when the entry stops being fresh.
+   * The time (unix timestamp in milliseconds) when the entry stops being fresh.
    * `undefined` means the entry never becomes stale.
    */
   expiresAt?: number | undefined
 
   /**
-   * The time (unix timestamp in seconds) after which the entry is no longer
+   * The time (unix timestamp in milliseconds) after which the entry is no longer
    * served, once its stale-while-revalidate window has passed. `undefined`
    * means the entry never expires.
    */
@@ -32,14 +32,14 @@ export interface CacheGetOrSetOptions {
   tags?: readonly string[]
 
   /**
-   * Fresh lifetime in seconds. `undefined` means the entry never expires by time.
+   * Fresh lifetime in milliseconds. `undefined` means the entry never expires by time.
    *
    * @default undefined
    */
   ttl?: number
 
   /**
-   * Extra stale-while-revalidate window in seconds after `ttl`.
+   * Extra stale-while-revalidate window in milliseconds after `ttl`.
    * During this window the store still returns the entry with a past `expiresAt`.
    * Ignored when `ttl` is `undefined`.
    *
@@ -99,9 +99,7 @@ export interface CacheContext {
 
   /**
    * Takes ownership of background work such as stale-while-revalidate
-   * refreshes, like `ctx.waitUntil` on Cloudflare Workers. The promise rejects
-   * when the refresh fails, so this is also where such failures are handled;
-   * without it they surface as unhandled rejections.
+   * refreshes, passed to the store as {@link CacheGetOrSetOptions.waitUntil}.
    */
   'cache/waitUntil'?: (promise: Promise<unknown>) => void
 }

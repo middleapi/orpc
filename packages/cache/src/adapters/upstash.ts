@@ -33,10 +33,6 @@ export class UpstashCacheStore extends BaseRedisCacheStore {
       : this.redis.set(key, value, { px })
   }
 
-  protected delete(key: string): Promise<unknown> {
-    return this.redis.del(key)
-  }
-
   protected increment(key: string): Promise<unknown> {
     return this.redis.incr(key)
   }

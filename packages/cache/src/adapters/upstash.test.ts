@@ -1,5 +1,4 @@
 import { UpstashLocker } from '@orpc/experimental-lock/upstash'
-import { nowInSeconds } from '@orpc/shared'
 import { Redis } from '@upstash/redis'
 import { describeRedisCacheStoreContract } from '../../tests/__shared__/redis-store-contract'
 import { describeCacheStoreContract } from '../../tests/__shared__/store-contract'
@@ -43,12 +42,12 @@ describe.concurrent('upstash cache store integration', {
     })
     const { store } = createTestingStore({}, rawRedis)
 
-    await store.getOrSet('k', async () => ({ a: 1 }), { tags: ['t'], ttl: 60 })
+    await store.getOrSet('k', async () => ({ a: 1 }), { tags: ['t'], ttl: 60_000 })
 
-    const entry = await store.getOrSet('k', async () => 'other', { tags: ['t'], ttl: 60 })
+    const entry = await store.getOrSet('k', async () => 'other', { tags: ['t'], ttl: 60_000 })
     expect(entry.output).toEqual({ a: 1 })
     expect(entry.tags).toEqual(['t'])
-    expect(entry.expiresAt).toBeGreaterThan(nowInSeconds())
+    expect(entry.expiresAt).toBeGreaterThan(Date.now())
 
     await store.revalidate({ tags: ['t'] })
     await expect(store.getOrSet('k', async () => 'refilled', { tags: ['t'] })).resolves.toMatchObject({ output: 'refilled' })

@@ -1,17 +1,7 @@
-import type { RPCJsonSerialization } from '@orpc/client'
 import type { Cacheable } from 'cacheable'
 import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions } from '../types'
-import type { BaseKeyValueCacheStoreOptions } from './base-key-value'
-import { nowInSeconds } from '@orpc/shared'
-import { resolveCacheExpiry } from '../utils'
+import type { BaseKeyValueCacheStoreOptions, CacheEnvelope } from './base-key-value'
 import { BaseKeyValueCacheStore } from './base-key-value'
-
-interface CacheableCacheStoreEnvelope {
-  output: RPCJsonSerialization
-  tags?: readonly string[]
-  expiresAt?: number | undefined
-  evictAt?: number | undefined
-}
 
 export type CacheableCacheStoreOptions = BaseKeyValueCacheStoreOptions
 
@@ -39,43 +29,19 @@ export class CacheableCacheStore extends BaseKeyValueCacheStore {
   }
 
   protected async read(encodedKey: string): Promise<CacheEntry | undefined> {
-    const envelope = await this.cacheable.get<CacheableCacheStoreEnvelope>(encodedKey)
+    const envelope = await this.cacheable.get<CacheEnvelope>(encodedKey)
 
-    if (envelope === undefined) {
-      return undefined
-    }
-
-    if (envelope.evictAt !== undefined && nowInSeconds() >= envelope.evictAt) {
-      await this.cacheable.delete(encodedKey)
-      return undefined
-    }
-
-    return {
-      output: this.serializer.deserialize(envelope.output),
-      tags: envelope.tags,
-      expiresAt: envelope.expiresAt,
-      evictAt: envelope.evictAt,
-    }
+    return envelope === undefined ? undefined : this.decode(envelope)
   }
 
-  protected async fill(encodedKey: string, fill: () => Promise<unknown>, options: CacheGetOrSetOptions): Promise<CacheEntry> {
-    const output = await fill()
-    const tags = options.tags
-    const { expiresAt, evictAt, retention } = resolveCacheExpiry(options)
-    const { json, meta } = this.serializer.serialize(output)
-
-    const envelope: CacheableCacheStoreEnvelope = {
-      output: { json, meta },
-      tags,
-      expiresAt,
-      evictAt,
-    }
+  protected async fill(encodedKey: string, compute: () => Promise<unknown>, options: CacheGetOrSetOptions): Promise<CacheEntry> {
+    const { envelope, entry, retention } = this.encode(await compute(), options)
 
     await this.cacheable.set(encodedKey, envelope, {
-      ...(tags?.length ? { tags: [...tags] } : {}),
-      ...(retention !== undefined ? { ttl: retention * 1000 } : {}),
+      ...(envelope.tags ? { tags: [...envelope.tags] } : {}),
+      ...(retention !== undefined ? { ttl: retention } : {}),
     })
 
-    return { output, tags, expiresAt, evictAt }
+    return entry
   }
 }

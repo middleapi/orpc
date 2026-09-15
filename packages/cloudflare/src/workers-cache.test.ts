@@ -1,4 +1,3 @@
-import { nowInSeconds } from '@orpc/shared'
 import { cache } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
 import { experimental_WorkersCacheStore } from './workers-cache'
@@ -16,7 +15,7 @@ describe('experimental_WorkersCacheStore', () => {
     const entry = await store.getOrSet('k', fill, { tags: ['t'], ttl: 1000 })
     expect(entry.output).toBe('v')
     expect(entry.tags).toEqual(['t'])
-    expect(entry.expiresAt).toBeGreaterThan(nowInSeconds())
+    expect(entry.expiresAt).toBeGreaterThan(Date.now())
 
     await expect(store.getOrSet('k', fill)).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: undefined })
     expect(fill).toHaveBeenCalledTimes(2)
@@ -30,9 +29,9 @@ describe('experimental_WorkersCacheStore', () => {
     const entry = await store.getOrSet('k', async () => {
       now.mockReturnValue(1_000_000_005_000)
       return 'v'
-    }, { ttl: 10 })
+    }, { ttl: 10_000 })
 
-    expect(entry.expiresAt).toBe(1_000_000_015)
+    expect(entry.expiresAt).toBe(1_000_000_015_000)
     now.mockRestore()
   })
 

@@ -55,18 +55,18 @@ describe('vercelCacheStore', () => {
       const cache = createMockedCache()
       const store = new VercelCacheStore({ cache })
 
-      await store.getOrSet('k', async () => 'v', { tags: ['t'], ttl: 1, swr: 1 })
+      await store.getOrSet('k', async () => 'v', { tags: ['t'], ttl: 1000, swr: 1000 })
 
-      expect(cache.set).toHaveBeenCalledWith('k', expect.objectContaining({ tags: ['t'], expiresAt: 1, evictAt: 2 }), { tags: ['t'], ttl: 2 })
+      expect(cache.set).toHaveBeenCalledWith('k', expect.objectContaining({ tags: ['t'], expiresAt: 1000, evictAt: 2000 }), { tags: ['t'], ttl: 2 })
     })
 
     it('maps a ttl without swr to its exact retention', async () => {
       const cache = createMockedCache()
       const store = new VercelCacheStore({ cache })
 
-      await store.getOrSet('k', async () => 'v', { ttl: 1 })
+      await store.getOrSet('k', async () => 'v', { ttl: 1000 })
 
-      expect(cache.set).toHaveBeenCalledWith('k', expect.objectContaining({ expiresAt: 1, evictAt: 1 }), { ttl: 1 })
+      expect(cache.set).toHaveBeenCalledWith('k', expect.objectContaining({ expiresAt: 1000, evictAt: 1000 }), { ttl: 1 })
     })
 
     it('omits ttl and tags options when unset', async () => {
@@ -82,24 +82,23 @@ describe('vercelCacheStore', () => {
       const cache = createMockedCache()
       const store = new VercelCacheStore({ cache })
 
-      await store.getOrSet('k', async () => 'v', { ttl: 1, swr: 1 })
+      await store.getOrSet('k', async () => 'v', { ttl: 1000, swr: 1000 })
 
       vi.setSystemTime(1200) // past ttl, within swr
       const waitUntil = vi.fn()
       await expect(store.getOrSet('k', async () => {
         throw new Error('handler down')
-      }, { ttl: 1, swr: 1, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1, evictAt: 2 })
+      }, { ttl: 1000, swr: 1000, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1000, evictAt: 2000 })
       await expect(waitUntil.mock.calls[0]![0]).rejects.toThrow('handler down')
 
       vi.setSystemTime(2000) // past ttl + swr, backend has not evicted yet
-      await expect(store.getOrSet('k', async () => 'refilled', { ttl: 1, swr: 1 })).resolves.toMatchObject({ output: 'refilled' })
-      expect(cache.delete).toHaveBeenCalledWith('k')
+      await expect(store.getOrSet('k', async () => 'refilled', { ttl: 1000, swr: 1000 })).resolves.toMatchObject({ output: 'refilled' })
     })
 
     it('refreshes once for concurrent stale hits, and again when the first refresh failed', async () => {
       const cache = createMockedCache()
       const store = new VercelCacheStore({ cache })
-      await store.getOrSet('k', async () => 'v', { ttl: 1, swr: 1 })
+      await store.getOrSet('k', async () => 'v', { ttl: 1000, swr: 1000 })
 
       vi.setSystemTime(1200)
       let finish!: (output: string) => void
@@ -108,12 +107,12 @@ describe('vercelCacheStore', () => {
       }))
       const waitUntil = vi.fn()
 
-      await store.getOrSet('k', fill, { ttl: 1, swr: 1, waitUntil })
-      await store.getOrSet('k', fill, { ttl: 1, swr: 1, waitUntil })
+      await store.getOrSet('k', fill, { ttl: 1000, swr: 1000, waitUntil })
+      await store.getOrSet('k', fill, { ttl: 1000, swr: 1000, waitUntil })
       finish('fresh')
       await Promise.all(waitUntil.mock.calls.map(([refresh]) => refresh))
       expect(fill).toHaveBeenCalledTimes(1)
-      await expect(store.getOrSet('k', fill, { ttl: 1, swr: 1 })).resolves.toMatchObject({ output: 'fresh' })
+      await expect(store.getOrSet('k', fill, { ttl: 1000, swr: 1000 })).resolves.toMatchObject({ output: 'fresh' })
 
       vi.setSystemTime(2400) // stale again
       let fail!: (error: Error) => void
@@ -124,14 +123,14 @@ describe('vercelCacheStore', () => {
         .mockResolvedValue('fresher')
       const waitUntilAgain = vi.fn()
 
-      await store.getOrSet('k', failingFill, { ttl: 1, swr: 1, waitUntil: waitUntilAgain })
-      await store.getOrSet('k', failingFill, { ttl: 1, swr: 1, waitUntil: waitUntilAgain })
+      await store.getOrSet('k', failingFill, { ttl: 1000, swr: 1000, waitUntil: waitUntilAgain })
+      await store.getOrSet('k', failingFill, { ttl: 1000, swr: 1000, waitUntil: waitUntilAgain })
       fail(new Error('handler down'))
 
       await expect(waitUntilAgain.mock.calls[0]![0]).rejects.toThrow('handler down')
       await waitUntilAgain.mock.calls[1]![0]
       expect(failingFill).toHaveBeenCalledTimes(2)
-      await expect(store.getOrSet('k', failingFill, { ttl: 1, swr: 1 })).resolves.toMatchObject({ output: 'fresher' })
+      await expect(store.getOrSet('k', failingFill, { ttl: 1000, swr: 1000 })).resolves.toMatchObject({ output: 'fresher' })
     })
 
     it('supports a custom serializer', async () => {

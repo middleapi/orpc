@@ -1,10 +1,24 @@
+import type { RPCJsonSerialization } from '@orpc/client'
 import type { Locker } from '@orpc/experimental-lock'
 import type { Promisable, Public } from '@orpc/shared'
 import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions, CacheStore } from '../types'
 import { RPCJsonSerializer } from '@orpc/client'
 import { LockTimeoutError } from '@orpc/experimental-lock'
 import { MemoryLocker } from '@orpc/experimental-lock/memory'
-import { encodeCacheKey, isCacheEntryStale } from '../utils'
+import { encodeCacheKey, isCacheEntryEvicted, isCacheEntryStale, resolveCacheExpiry } from '../utils'
+
+/**
+ * What a backend stores for an entry: the output serialized for JSON, the
+ * tags, and the lifetime.
+ *
+ * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
+ */
+export interface CacheEnvelope {
+  output: RPCJsonSerialization
+  tags?: readonly string[] | undefined
+  expiresAt?: number | undefined
+  evictAt?: number | undefined
+}
 
 export interface BaseKeyValueCacheStoreOptions {
   /**
@@ -29,7 +43,8 @@ export interface BaseKeyValueCacheStoreOptions {
 /**
  * Cache store over a key-value backend, coalescing concurrent fills of one
  * key through a locker. Subclasses read entries by their encoded key and
- * fill the missing ones.
+ * fill the missing ones, encoding outputs as envelopes where the backend
+ * stores them serialized.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
@@ -42,16 +57,29 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
     this.locker = options.locker ?? new MemoryLocker()
   }
 
-  async getOrSet(key: unknown, fill: () => Promise<unknown>, options: CacheGetOrSetOptions = {}): Promise<CacheEntry> {
+  async getOrSet(key: unknown, compute: () => Promise<unknown>, options: CacheGetOrSetOptions = {}): Promise<CacheEntry> {
     const encodedKey = encodeCacheKey(key, this.serializer)
     const entry = await this.read(encodedKey, options)
 
-    if (entry === undefined) {
-      return (await this.fillOnce(encodedKey, fill, options, false))!
+    if (entry === undefined || isCacheEntryEvicted(entry)) {
+      return this.lock(encodedKey, async (waited) => {
+        const current = waited ? await this.read(encodedKey, options) : undefined
+
+        return current === undefined || isCacheEntryEvicted(current)
+          ? this.fill(encodedKey, compute, options)
+          : current
+      }, () => this.fill(encodedKey, compute, options))
     }
 
     if (isCacheEntryStale(entry)) {
-      const refresh = this.fillOnce(encodedKey, fill, options, true)
+      const refresh = this.lock(encodedKey, async (waited) => {
+        const current = waited ? await this.read(encodedKey, options) : undefined
+
+        if (current === undefined || isCacheEntryStale(current)) {
+          await this.fill(encodedKey, compute, options)
+        }
+      }, () => undefined)
+
       options.waitUntil?.(refresh)
     }
 
@@ -68,31 +96,49 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
   protected abstract read(encodedKey: string, options: CacheGetOrSetOptions): Promisable<CacheEntry | undefined>
 
   /**
-   * Runs `fill` and stores its output. Tag state captured before `fill` runs
+   * Runs `compute` and stores its output. Tag state captured before it runs
    * lets a revalidation that lands during it still invalidate the entry.
    */
-  protected abstract fill(encodedKey: string, fill: () => Promise<unknown>, options: CacheGetOrSetOptions): Promise<CacheEntry>
+  protected abstract fill(encodedKey: string, compute: () => Promise<unknown>, options: CacheGetOrSetOptions): Promise<CacheEntry>
 
   /**
-   * Fills under the key's lock, unless a caller that held it first already
-   * stored what was needed. On a miss, a caller that timed out waiting fills
-   * on its own; a refresh that timed out is left to the holder.
+   * Restores the entry a backend stored as an envelope.
    */
-  private async fillOnce(encodedKey: string, fill: () => Promise<unknown>, options: CacheGetOrSetOptions, refresh: boolean): Promise<CacheEntry | undefined> {
+  protected decode(envelope: CacheEnvelope): CacheEntry {
+    return {
+      output: this.serializer.deserialize(envelope.output),
+      tags: envelope.tags,
+      expiresAt: envelope.expiresAt,
+      evictAt: envelope.evictAt,
+    }
+  }
+
+  /**
+   * Builds the envelope storing `output`, with the entry to return and how
+   * long to retain it in milliseconds, `undefined` when it never expires.
+   */
+  protected encode(output: unknown, options: CacheGetOrSetOptions): { envelope: CacheEnvelope, entry: CacheEntry, retention: number | undefined } {
+    const tags = options.tags?.length ? options.tags : undefined
+    const { expiresAt, evictAt, retention } = resolveCacheExpiry(options)
+    const { json, meta } = this.serializer.serialize(output)
+
+    return {
+      envelope: { output: { json, meta }, tags, expiresAt, evictAt },
+      entry: { output, tags, expiresAt, evictAt },
+      retention,
+    }
+  }
+
+  /**
+   * Runs `fn` under the key's lock, or `onTimeout` once waiting for it timed out.
+   */
+  private async lock<T>(encodedKey: string, fn: (waited: boolean) => Promise<T>, onTimeout: () => Promisable<T>): Promise<T> {
     try {
-      return await this.locker.lock(encodedKey, async ({ waited }) => {
-        const current = waited ? await this.read(encodedKey, options) : undefined
-
-        if (current === undefined || (refresh && isCacheEntryStale(current))) {
-          return this.fill(encodedKey, fill, options)
-        }
-
-        return current
-      })
+      return await this.locker.lock(encodedKey, ({ waited }) => fn(waited))
     }
     catch (error) {
       if (error instanceof LockTimeoutError) {
-        return refresh ? undefined : this.fill(encodedKey, fill, options)
+        return onTimeout()
       }
 
       throw error

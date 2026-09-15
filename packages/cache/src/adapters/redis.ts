@@ -21,40 +21,32 @@ export class RedisCacheStore extends BaseRedisCacheStore {
   }
 
   protected async get(key: string): Promise<unknown> {
-    await this.connectIfNeeded()
-
-    return this.redis.get(key)
+    return (await this.client()).get(key)
   }
 
   protected async getMany(keys: string[]): Promise<unknown[]> {
-    await this.connectIfNeeded()
+    const client = await this.client()
 
-    return Promise.all(keys.map(key => this.redis.get(key)))
+    return Promise.all(keys.map(key => client.get(key)))
   }
 
   protected async set(key: string, value: string, px: number | undefined): Promise<unknown> {
-    await this.connectIfNeeded()
+    const client = await this.client()
 
     return px === undefined
-      ? this.redis.set(key, value)
-      : this.redis.set(key, value, { expiration: { type: 'PX', value: px } })
-  }
-
-  protected async delete(key: string): Promise<unknown> {
-    await this.connectIfNeeded()
-
-    return this.redis.del(key)
+      ? client.set(key, value)
+      : client.set(key, value, { expiration: { type: 'PX', value: px } })
   }
 
   protected async increment(key: string): Promise<unknown> {
-    await this.connectIfNeeded()
-
-    return this.redis.incr(key)
+    return (await this.client()).incr(key)
   }
 
-  private async connectIfNeeded(): Promise<void> {
+  private async client(): Promise<typeof this.redis> {
     if (!this.redis.isOpen) {
       await this.redis.connect()
     }
+
+    return this.redis
   }
 }

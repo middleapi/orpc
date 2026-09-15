@@ -9,7 +9,7 @@ export interface experimental_WorkersCacheStoreOptions {
    *
    * @default cache from `cloudflare:workers`
    */
-  cache?: CacheContext
+  cache?: typeof workers.cache
 }
 
 /**
@@ -21,7 +21,7 @@ export interface experimental_WorkersCacheStoreOptions {
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
 export class experimental_WorkersCacheStore implements CacheStore {
-  private readonly cache: CacheContext
+  private readonly cache: typeof workers.cache
 
   constructor(options: experimental_WorkersCacheStoreOptions = {}) {
     this.cache = options.cache ?? workers.cache

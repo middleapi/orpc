@@ -29,7 +29,7 @@ describe('cacheableCacheStore', () => {
     const set = vi.spyOn(cacheable, 'set')
     const store = new CacheableCacheStore(cacheable)
 
-    await store.getOrSet('k', async () => 'v', { tags: ['t'], ttl: 1, swr: 1 })
+    await store.getOrSet('k', async () => 'v', { tags: ['t'], ttl: 1000, swr: 1000 })
     expect(set).toHaveBeenCalledWith('k', expect.objectContaining({ tags: ['t'] }), { tags: ['t'], ttl: 2000 })
 
     await store.getOrSet('forever', async () => 'v')
@@ -42,10 +42,8 @@ describe('cacheableCacheStore', () => {
     await store.getOrSet('k', async () => 'v')
 
     vi.spyOn(cacheable, 'get').mockResolvedValueOnce({ output: { json: 'v' }, expiresAt: 1, evictAt: 1 })
-    const del = vi.spyOn(cacheable, 'delete')
 
     await expect(store.getOrSet('k', async () => 'refilled')).resolves.toMatchObject({ output: 'refilled' })
-    expect(del).toHaveBeenCalledWith('k')
   })
 
   it('supports a custom serializer', async () => {

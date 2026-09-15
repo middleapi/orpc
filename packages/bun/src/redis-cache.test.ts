@@ -1,5 +1,5 @@
 import { RPCJsonSerializer } from '@orpc/client'
-import { nowInSeconds, sleep, stringifyJSON } from '@orpc/shared'
+import { sleep, stringifyJSON } from '@orpc/shared'
 import { RedisClient } from 'bun'
 import { beforeAll, describe, expect, it, mock, spyOn } from 'bun:test'
 import { waitFor } from '../tests/__shared__/utils'
@@ -29,12 +29,12 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
     const { store } = createTestingStore()
     const fill = mock(async () => ({ nested: [1, 2] }))
 
-    const first = await store.getOrSet('k', fill, { tags: ['t'], ttl: 120 })
+    const first = await store.getOrSet('k', fill, { tags: ['t'], ttl: 120_000 })
     expect(first.output).toEqual({ nested: [1, 2] })
     expect(first.tags).toEqual(['t'])
-    expect(first.expiresAt).toBeGreaterThan(nowInSeconds())
+    expect(first.expiresAt).toBeGreaterThan(Date.now())
 
-    await expect(store.getOrSet('k', fill, { tags: ['t'], ttl: 120 })).resolves.toEqual(first)
+    await expect(store.getOrSet('k', fill, { tags: ['t'], ttl: 120_000 })).resolves.toEqual(first)
     expect(fill).toHaveBeenCalledTimes(1)
 
     await store.getOrSet('u', async () => undefined)
@@ -83,22 +83,22 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
   it('fills again at ttl without swr, and serves stale within the swr window while refreshing', async () => {
     const { store } = createTestingStore()
 
-    await store.getOrSet('no-swr', async () => 'v', { ttl: 1 })
-    await store.getOrSet('swr', async () => 'v', { ttl: 1, swr: 10 })
+    await store.getOrSet('no-swr', async () => 'v', { ttl: 1000 })
+    await store.getOrSet('swr', async () => 'v', { ttl: 1000, swr: 10_000 })
 
     await sleep(1500)
 
-    await expect(store.getOrSet('no-swr', async () => 'refilled', { ttl: 1 })).resolves.toMatchObject({ output: 'refilled' })
+    await expect(store.getOrSet('no-swr', async () => 'refilled', { ttl: 1000 })).resolves.toMatchObject({ output: 'refilled' })
 
     const waitUntil = mock((_promise: Promise<unknown>) => {})
-    const stale = await store.getOrSet('swr', async () => 'fresh', { ttl: 1, swr: 10, waitUntil })
+    const stale = await store.getOrSet('swr', async () => 'fresh', { ttl: 1000, swr: 10_000, waitUntil })
     expect(stale.output).toBe('v')
-    expect(stale.expiresAt).toBeLessThanOrEqual(nowInSeconds())
+    expect(stale.expiresAt).toBeLessThanOrEqual(Date.now())
 
     expect(waitUntil).toHaveBeenCalledTimes(1)
     await waitUntil.mock.calls[0]![0]
 
-    const fresh = await store.getOrSet('swr', async () => 'other', { ttl: 1, swr: 10 })
+    const fresh = await store.getOrSet('swr', async () => 'other', { ttl: 1000, swr: 10_000 })
     expect(fresh.output).toBe('fresh')
     expect(fresh.expiresAt).toBeGreaterThan(stale.expiresAt!)
   }, { timeout: 20_000 })
@@ -124,6 +124,7 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
 
     await redis.set(`${prefix}e:k`, stringifyJSON({ output: { json: 'v' }, tags: ['stored'] })!)
 
+    await expect(store.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'v', tags: ['stored'] })
     await expect(store.getOrSet('k', async () => 'other', { tags: ['other'] })).resolves.toMatchObject({ output: 'v', tags: ['stored'] })
 
     await store.revalidate({ tags: ['stored'] })
