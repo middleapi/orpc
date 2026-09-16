@@ -189,7 +189,11 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
               matched: true,
               response: {
                 ...result.response,
-                body: wrapReadableStream(body, { onFinish: () => tmpFiles.cleanup() }),
+                /**
+                 * @warning
+                 * Remember use `override` for ReadableStream to remain other special properties
+                 */
+                body: override(body, wrapReadableStream(body, { onFinish: () => tmpFiles.cleanup() })),
               },
             }
           }
