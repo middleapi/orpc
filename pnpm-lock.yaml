@@ -190,6 +190,9 @@ importers:
       '@orpc/evlog':
         specifier: workspace:*
         version: link:packages/evlog
+      '@orpc/experimental-cache':
+        specifier: workspace:*
+        version: link:packages/cache
       '@orpc/experimental-effect':
         specifier: workspace:*
         version: link:packages/effect
@@ -376,6 +379,9 @@ importers:
       '@orpc/evlog':
         specifier: workspace:*
         version: link:../../packages/evlog
+      '@orpc/experimental-cache':
+        specifier: workspace:*
+        version: link:../../packages/cache
       '@orpc/experimental-lock':
         specifier: workspace:*
         version: link:../../packages/lock
@@ -423,7 +429,7 @@ importers:
         version: 26.4.0
       blume:
         specifier: ^1.5.3
-        version: 1.5.3(@astrojs/cloudflare@14.2.5(@types/node@26.4.0)(astro@7.2.8(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(wrangler@4.129.1)(yaml@2.9.0))(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@types/node@26.4.0)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(esbuild@0.28.2)(supports-color@10.2.2)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(terser@5.51.1)(vite@8.2.2(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(vue@3.5.42(typescript@6.0.3))(ws@8.21.3)(yaml@2.9.0)
+        version: 1.5.3(3d73391e37eb1d8a704453efacb9694b)
       effect:
         specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112
@@ -483,6 +489,9 @@ importers:
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
+      '@orpc/experimental-cache':
+        specifier: workspace:*
+        version: link:../cache
       '@orpc/experimental-lock':
         specifier: workspace:*
         version: link:../lock
@@ -507,7 +516,38 @@ importers:
         version: 1.4.2
       redis:
         specifier: ^6.2.1
-        version: 6.2.1(@opentelemetry/api@1.9.1)
+        version: 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
+
+  packages/cache:
+    dependencies:
+      '@orpc/client':
+        specifier: workspace:*
+        version: link:../client
+      '@orpc/experimental-lock':
+        specifier: workspace:*
+        version: link:../lock
+      '@orpc/server':
+        specifier: workspace:*
+        version: link:../server
+      '@orpc/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@standard-server/core':
+        specifier: ~0.9.0
+        version: 0.9.0
+    devDependencies:
+      '@upstash/redis':
+        specifier: ^1.38.2
+        version: 1.38.3
+      '@vercel/functions':
+        specifier: ^3.9.5
+        version: 3.9.5(ws@8.21.3)
+      cacheable:
+        specifier: ^2.5.0
+        version: 2.5.0
+      redis:
+        specifier: ^6.2.1
+        version: 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
   packages/client:
     dependencies:
@@ -533,6 +573,9 @@ importers:
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
+      '@orpc/experimental-cache':
+        specifier: workspace:*
+        version: link:../cache
       '@orpc/experimental-lock':
         specifier: workspace:*
         version: link:../lock
@@ -682,7 +725,7 @@ importers:
         version: 1.38.3
       redis:
         specifier: ^6.2.1
-        version: 6.2.1(@opentelemetry/api@1.9.1)
+        version: 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
   packages/msw:
     dependencies:
@@ -949,7 +992,7 @@ importers:
         version: 1.38.3
       redis:
         specifier: ^6.2.1
-        version: 6.2.1(@opentelemetry/api@1.9.1)
+        version: 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
   packages/ratelimit:
     dependencies:
@@ -971,7 +1014,7 @@ importers:
         version: 1.38.3
       redis:
         specifier: ^6.2.1
-        version: 6.2.1(@opentelemetry/api@1.9.1)
+        version: 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
   packages/server:
     dependencies:
@@ -2027,6 +2070,12 @@ packages:
     resolution: {integrity: sha512-5Kw9ZAtTGS8WHizyn+CJhjjfIQrw+7jcZodpmpXJjefnO15M8UexIi6JR2E5thyvsmHyhL6ZDDMUNR4bKJPd4g==}
     cpu: [x64]
     os: [win32]
+
+  '@cacheable/memory@2.2.0':
+    resolution: {integrity: sha512-CTLKqLItRCEixEAewD3/j9DB3/o96gpTPD4eJ1v+DGOlxZRZncRQkGYqqnAGCscYd6RNeXfGeiuCphsPtqyIfQ==}
+
+  '@cacheable/utils@2.5.0':
+    resolution: {integrity: sha512-buipgOVDkkPXNR5+xBpDw7Zk2n1EvU7qBJCNUcL7rhQ//kfpOXPAvQ511Os0vpLYJ1pZnvudNytkQt2hst3wqA==}
 
   '@capsizecss/unpack@4.0.1':
     resolution: {integrity: sha512-CuNiSqg7+e1cO/GjffyMOm5Tt2jUF9CWHHnvQ/UkqvtkGfHdgwEC0wpmq7fkN3gxwpRnrAN0WzO3vREKmNolMQ==}
@@ -3452,6 +3501,15 @@ packages:
     engines: {node: '>= 10.16.0'}
     peerDependencies:
       jsep: ^0.4.0||^1.0.0
+
+  '@keyv/bigmap@1.3.1':
+    resolution: {integrity: sha512-WbzE9sdmQtKy8vrNPa9BRnwZh5UF4s1KTmSK0KUVLo3eff5BlQNNWDnFOouNpKfPKDnms9xynJjsMYjMaT/aFQ==}
+    engines: {node: '>= 18'}
+    peerDependencies:
+      keyv: ^5.6.0
+
+  '@keyv/serialize@1.1.1':
+    resolution: {integrity: sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA==}
 
   '@lezer/common@1.5.2':
     resolution: {integrity: sha512-sxQE460fPZyU3sdc8lafxiPwJHBzZRy/udNFynGQky1SePYBdhkBl1kOagA9uT3pxR8K09bOrmTUqA9wb/PjSQ==}
@@ -7048,6 +7106,9 @@ packages:
     resolution: {integrity: sha512-tixWYgm5ZoOD+3g6UTea91eow5z6AAHaho3g0V9CNSNb45gM8SmflpAc+GRd1InC4AqN/07Unrgp56Y94N9hJQ==}
     engines: {node: '>=20.19.0'}
 
+  cacheable@2.5.0:
+    resolution: {integrity: sha512-60cyAOytib/OzBw1JNSoSV/boK1AtHryDIjvVBk7XbN4ugfkM3+Sry7fEjNgPMGgOjuaZPAp8ruZ0Cxafwyq9g==}
+
   call-bind-apply-helpers@1.0.2:
     resolution: {integrity: sha512-Sp1ablJ0ivDkSzjcaJdxEunN5/XvksFJ2sMBFfq6x0ryhQV/2b/KwFe21cMpmHtPOSij8K99/wSfoEuTObmuMQ==}
     engines: {node: '>= 0.4'}
@@ -8708,6 +8769,10 @@ packages:
     resolution: {integrity: sha512-NqADB8VjPFLM2V0VvHUewwwsw0ZWBaIdgo+ieHtK3hasLz4qeCRjYcqfB6AQrBggRKppKF8L52/VqdVsO47Dlw==}
     engines: {node: '>= 0.4'}
 
+  hashery@1.5.1:
+    resolution: {integrity: sha512-iZyKG96/JwPz1N55vj2Ie2vXbhu440zfUfJvSwEqEbeLluk7NnapfGqa7LH0mOsnDxTF85Mx8/dyR6HfqcbmbQ==}
+    engines: {node: '>=20'}
+
   hasown@2.0.4:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
@@ -8795,6 +8860,12 @@ packages:
 
   hookable@6.1.1:
     resolution: {integrity: sha512-U9LYDy1CwhMCnprUfeAZWZGByVbhd54hwepegYTK7Pi5NvqEj63ifz5z+xukznehT7i6NIZRu89Ay1AZmRsLEQ==}
+
+  hookified@1.15.1:
+    resolution: {integrity: sha512-MvG/clsADq1GPM2KGo2nyfaWVyn9naPiXrqIe4jYjXNZQt238kWyOGrsyc/DmRAQ+Re6yeo6yX/yoNCG5KAEVg==}
+
+  hookified@2.2.0:
+    resolution: {integrity: sha512-p/LgFzRN5FeoD3DLS6bkUapeye6E4SI6yJs6KetENd18S+FBthqYq2amJUWpt5z0EQwwHemidjY5OqJGEKm5uA==}
 
   html-encoding-sniffer@6.0.0:
     resolution: {integrity: sha512-CV9TW3Y3f8/wT0BRFc1/KAVQ3TUHiXmaAb6VW9vtiMFf7SLoMd1PdAc4W3KFOFETBJUb90KatHqlsZMWV+R9Gg==}
@@ -9335,6 +9406,9 @@ packages:
 
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
+
+  keyv@5.6.0:
+    resolution: {integrity: sha512-CYDD3SOtsHtyXeEORYRx2qBtpDJFjRTGXUtmNEMGyzYOKj1TE3tycdlho7kA1Ufx9OYWZzg52QFBGALTirzDSw==}
 
   khroma@2.1.0:
     resolution: {integrity: sha512-Ls993zuzfayK269Svk9hzpeGUKob/sIgZzyHYdjQoAdQetRKpOLj+k/QQQ/6Qi0Yz65mlROrfd+Ev+1+7dz9Kw==}
@@ -10803,6 +10877,10 @@ packages:
 
   pure-rand@8.4.2:
     resolution: {integrity: sha512-vvuOGgcuPJAirlHvuQw1TrOiw7ptaIXXmIbNuiNOY6lNGJJH49PQ1Kj4nd783nPdQhQdicgOjVI2yI/9BD6/Ng==}
+
+  qified@0.10.1:
+    resolution: {integrity: sha512-+Owyggi9IxT1ePKGafcI87ubSmxol6smwJ+RAHDQlx9+9cPwFWDiKFFCPuWhr9ignlGpZ9vDQLw67N4dcTVFEA==}
+    engines: {node: '>=20'}
 
   qs@6.15.3:
     resolution: {integrity: sha512-O9gl3zCl5h5blw1KGUzQKhA5oUXSl8rwUIM5o0S3nCXMliSvy5Dzx7/DJcI+SwgICv+IneSZwhBh1oSyEHA71A==}
@@ -12971,9 +13049,9 @@ snapshots:
 
   '@asamuzakjp/nwsapi@2.3.9': {}
 
-  '@astrojs/check@0.9.10(typescript@6.0.3)':
+  '@astrojs/check@0.9.10(prettier@3.9.6)(typescript@6.0.3)':
     dependencies:
-      '@astrojs/language-server': 2.16.15(typescript@6.0.3)
+      '@astrojs/language-server': 2.16.15(prettier@3.9.6)(typescript@6.0.3)
       chokidar: 4.0.3
       kleur: 4.1.5
       typescript: 6.0.3
@@ -13074,7 +13152,7 @@ snapshots:
       smol-toml: 1.8.0
       unified: 11.0.5
 
-  '@astrojs/language-server@2.16.15(typescript@6.0.3)':
+  '@astrojs/language-server@2.16.15(prettier@3.9.6)(typescript@6.0.3)':
     dependencies:
       '@astrojs/compiler': 2.13.1
       '@astrojs/yaml2ts': 0.2.4
@@ -13088,12 +13166,14 @@ snapshots:
       volar-service-css: 0.0.71(@volar/language-service@2.4.28(typescript@6.0.3))
       volar-service-emmet: 0.0.71(@volar/language-service@2.4.28(typescript@6.0.3))
       volar-service-html: 0.0.71(@volar/language-service@2.4.28(typescript@6.0.3))
-      volar-service-prettier: 0.0.71(@volar/language-service@2.4.28(typescript@6.0.3))
+      volar-service-prettier: 0.0.71(@volar/language-service@2.4.28(typescript@6.0.3))(prettier@3.9.6)
       volar-service-typescript: 0.0.71(@volar/language-service@2.4.28(typescript@6.0.3))(typescript@6.0.3)
       volar-service-typescript-twoslash-queries: 0.0.71(@volar/language-service@2.4.28(typescript@6.0.3))(typescript@6.0.3)
       volar-service-yaml: 0.0.71(@volar/language-service@2.4.28(typescript@6.0.3))
       vscode-html-languageservice: 5.6.2
       vscode-uri: 3.2.0
+    optionalDependencies:
+      prettier: 3.9.6
     transitivePeerDependencies:
       - typescript
 
@@ -13196,12 +13276,12 @@ snapshots:
 
   '@astrojs/underscore-redirects@1.0.4': {}
 
-  '@astrojs/vercel@11.0.8(astro@7.2.8(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(react@19.2.8)(supports-color@10.2.2)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))(ws@8.21.3)':
+  '@astrojs/vercel@11.0.8(astro@7.2.8(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(next@16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(rollup@4.63.0)(supports-color@10.2.2)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))(ws@8.21.3)':
     dependencies:
       '@astrojs/internal-helpers': 0.10.4
-      '@vercel/analytics': 1.6.1(react@19.2.8)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))
+      '@vercel/analytics': 1.6.1(next@16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))
       '@vercel/functions': 3.9.5(ws@8.21.3)
-      '@vercel/nft': 1.11.0(supports-color@10.2.2)
+      '@vercel/nft': 1.11.0(rollup@4.63.0)(supports-color@10.2.2)
       '@vercel/routing-utils': 5.3.3
       astro: 7.2.8(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0)
       esbuild: 0.28.2
@@ -13458,6 +13538,18 @@ snapshots:
 
   '@bruits/satteri-win32-x64-msvc@0.9.5':
     optional: true
+
+  '@cacheable/memory@2.2.0':
+    dependencies:
+      '@cacheable/utils': 2.5.0
+      '@keyv/bigmap': 1.3.1(keyv@5.6.0)
+      hookified: 1.15.1
+      keyv: 5.6.0
+
+  '@cacheable/utils@2.5.0':
+    dependencies:
+      hashery: 1.5.1
+      keyv: 5.6.0
 
   '@capsizecss/unpack@4.0.1':
     dependencies:
@@ -14621,6 +14713,14 @@ snapshots:
   '@jsep-plugin/ternary@1.1.4(jsep@1.4.0)':
     dependencies:
       jsep: 1.4.0
+
+  '@keyv/bigmap@1.3.1(keyv@5.6.0)':
+    dependencies:
+      hashery: 1.5.1
+      hookified: 1.15.1
+      keyv: 5.6.0
+
+  '@keyv/serialize@1.1.1': {}
 
   '@lezer/common@1.5.2': {}
 
@@ -15854,10 +15954,10 @@ snapshots:
 
   '@phosphor-icons/core@2.1.1': {}
 
-  '@pierre/diffs@1.3.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@pierre/diffs@1.3.6(@shikijs/themes@4.4.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@pierre/theme': 2.0.0
-      '@pierre/theming': 1.0.1(@pierre/theme@2.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(shiki@4.4.3)
+      '@pierre/theming': 1.0.1(@pierre/theme@2.0.0)(@shikijs/themes@4.4.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(shiki@4.4.3)
       '@shikijs/transformers': 4.4.3
       diff: 9.0.0
       hast-util-to-html: 9.0.5
@@ -15870,9 +15970,10 @@ snapshots:
 
   '@pierre/theme@2.0.0': {}
 
-  '@pierre/theming@1.0.1(@pierre/theme@2.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(shiki@4.4.3)':
+  '@pierre/theming@1.0.1(@pierre/theme@2.0.0)(@shikijs/themes@4.4.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(shiki@4.4.3)':
     optionalDependencies:
       '@pierre/theme': 2.0.0
+      '@shikijs/themes': 4.4.3
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
       shiki: 4.4.3
@@ -15926,27 +16027,28 @@ snapshots:
     dependencies:
       quansync: 1.0.0
 
-  '@redis/bloom@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))':
+  '@redis/bloom@6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))':
     dependencies:
-      '@redis/client': 6.2.1(@opentelemetry/api@1.9.1)
+      '@redis/client': 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
-  '@redis/client@6.2.1(@opentelemetry/api@1.9.1)':
+  '@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)':
     dependencies:
       cluster-key-slot: 1.1.2
     optionalDependencies:
+      '@node-rs/xxhash': 1.7.7
       '@opentelemetry/api': 1.9.1
 
-  '@redis/json@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))':
+  '@redis/json@6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))':
     dependencies:
-      '@redis/client': 6.2.1(@opentelemetry/api@1.9.1)
+      '@redis/client': 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
-  '@redis/search@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))':
+  '@redis/search@6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))':
     dependencies:
-      '@redis/client': 6.2.1(@opentelemetry/api@1.9.1)
+      '@redis/client': 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
-  '@redis/time-series@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))':
+  '@redis/time-series@6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))':
     dependencies:
-      '@redis/client': 6.2.1(@opentelemetry/api@1.9.1)
+      '@redis/client': 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
 
   '@replit/codemirror-css-color-picker@6.3.0(@codemirror/language@6.12.4)(@codemirror/state@6.7.1)(@codemirror/view@6.43.9)':
     dependencies:
@@ -17394,7 +17496,7 @@ snapshots:
   '@takumi-rs/core-win32-x64-msvc@2.12.0':
     optional: true
 
-  '@takumi-rs/core@2.12.0(react@19.2.8)':
+  '@takumi-rs/core@2.12.0(csstype@3.2.3)(react@19.2.8)':
     dependencies:
       '@takumi-rs/helpers': 2.12.0(react@19.2.8)
     optionalDependencies:
@@ -17406,6 +17508,7 @@ snapshots:
       '@takumi-rs/core-linux-x64-musl': 2.12.0
       '@takumi-rs/core-win32-arm64-msvc': 2.12.0
       '@takumi-rs/core-win32-x64-msvc': 2.12.0
+      csstype: 3.2.3
     transitivePeerDependencies:
       - preact
       - react
@@ -17414,9 +17517,11 @@ snapshots:
     optionalDependencies:
       react: 19.2.8
 
-  '@takumi-rs/wasm@2.12.0(react@19.2.8)':
+  '@takumi-rs/wasm@2.12.0(csstype@3.2.3)(react@19.2.8)':
     dependencies:
       '@takumi-rs/helpers': 2.12.0(react@19.2.8)
+    optionalDependencies:
+      csstype: 3.2.3
     transitivePeerDependencies:
       - preact
       - react
@@ -18016,14 +18121,16 @@ snapshots:
     dependencies:
       valibot: 1.5.0(typescript@6.0.3)
 
-  '@vercel/analytics@1.6.1(react@19.2.8)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))':
+  '@vercel/analytics@1.6.1(next@16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))':
     optionalDependencies:
+      next: 16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react: 19.2.8
       svelte: 5.56.10(@typescript-eslint/types@8.68.0)
       vue: 3.5.42(typescript@6.0.3)
 
-  '@vercel/analytics@2.0.1(react@19.2.8)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))':
+  '@vercel/analytics@2.0.1(next@16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))':
     optionalDependencies:
+      next: 16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react: 19.2.8
       svelte: 5.56.10(@typescript-eslint/types@8.68.0)
       vue: 3.5.42(typescript@6.0.3)
@@ -18043,7 +18150,7 @@ snapshots:
     optionalDependencies:
       ws: 8.21.3
 
-  '@vercel/nft@1.11.0(supports-color@10.2.2)':
+  '@vercel/nft@1.11.0(rollup@4.63.0)(supports-color@10.2.2)':
     dependencies:
       '@mapbox/node-pre-gyp': 2.0.3(supports-color@10.2.2)
       '@rollup/pluginutils': 5.4.0(rollup@4.63.0)
@@ -18826,14 +18933,14 @@ snapshots:
 
   blake3-wasm@2.1.5: {}
 
-  blume@1.5.3(@astrojs/cloudflare@14.2.5(@types/node@26.4.0)(astro@7.2.8(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(wrangler@4.129.1)(yaml@2.9.0))(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@types/node@26.4.0)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(esbuild@0.28.2)(supports-color@10.2.2)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(terser@5.51.1)(vite@8.2.2(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(vue@3.5.42(typescript@6.0.3))(ws@8.21.3)(yaml@2.9.0):
+  blume@1.5.3(3d73391e37eb1d8a704453efacb9694b):
     dependencies:
-      '@astrojs/check': 0.9.10(typescript@6.0.3)
+      '@astrojs/check': 0.9.10(prettier@3.9.6)(typescript@6.0.3)
       '@astrojs/markdown-satteri': 0.3.8
       '@astrojs/mdx': 7.0.8(@astrojs/markdown-satteri@0.3.8)(astro@7.2.8(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(supports-color@10.2.2)
       '@astrojs/node': 11.1.4(astro@7.2.8(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(supports-color@10.2.2)
       '@astrojs/react': 6.0.4(@types/node@26.4.0)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(esbuild@0.28.2)(jiti@2.7.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(terser@5.51.1)(yaml@2.9.0)
-      '@astrojs/vercel': 11.0.8(astro@7.2.8(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(react@19.2.8)(supports-color@10.2.2)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))(ws@8.21.3)
+      '@astrojs/vercel': 11.0.8(astro@7.2.8(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(next@16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(rollup@4.63.0)(supports-color@10.2.2)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))(ws@8.21.3)
       '@asyncapi/converter': 2.0.2
       '@clack/prompts': 1.7.0
       '@iconify-json/lucide': 1.2.126
@@ -18841,7 +18948,7 @@ snapshots:
       '@iconify/utils': 3.1.4
       '@modelcontextprotocol/sdk': 1.30.0(supports-color@10.2.2)(zod@4.5.4)
       '@orama/orama': 3.1.18
-      '@pierre/diffs': 1.3.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@pierre/diffs': 1.3.6(@shikijs/themes@4.4.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@scalar/astro': 0.4.16(astro@7.2.8(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))
       '@scalar/openapi-parser': 0.28.16
       '@scalar/openapi-types': 0.9.5
@@ -18850,7 +18957,7 @@ snapshots:
       '@tailwindcss/typography': 0.5.20(tailwindcss@4.3.3)
       '@tailwindcss/vite': 4.3.3(vite@8.2.2(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))
       '@types/mdast': 4.0.4
-      '@vercel/analytics': 2.0.1(react@19.2.8)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))
+      '@vercel/analytics': 2.0.1(next@16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))
       ai: 7.0.83(zod@4.5.4)
       astro: 7.2.8(@astrojs/markdown-remark@7.2.4(supports-color@10.2.2))(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0)
       babel-plugin-react-compiler: 1.0.0
@@ -18899,7 +19006,7 @@ snapshots:
       simple-icons: 13.21.0
       string-width: 8.2.2
       tailwindcss: 4.3.3
-      takumi-js: 2.12.0(react@19.2.8)
+      takumi-js: 2.12.0(csstype@3.2.3)(react@19.2.8)
       tinyglobby: 0.2.17
       twoslash: 0.3.9(supports-color@10.2.2)(typescript@6.0.3)
       typescript: 6.0.3
@@ -19072,6 +19179,14 @@ snapshots:
       rc9: 3.0.1
 
   cac@7.0.0: {}
+
+  cacheable@2.5.0:
+    dependencies:
+      '@cacheable/memory': 2.2.0
+      '@cacheable/utils': 2.5.0
+      hookified: 1.15.1
+      keyv: 5.6.0
+      qified: 0.10.1
 
   call-bind-apply-helpers@1.0.2:
     dependencies:
@@ -21017,6 +21132,10 @@ snapshots:
     dependencies:
       has-symbols: 1.1.0
 
+  hashery@1.5.1:
+    dependencies:
+      hookified: 1.15.1
+
   hasown@2.0.4:
     dependencies:
       function-bind: 1.1.2
@@ -21212,6 +21331,10 @@ snapshots:
   hookable@5.5.3: {}
 
   hookable@6.1.1: {}
+
+  hookified@1.15.1: {}
+
+  hookified@2.2.0: {}
 
   html-encoding-sniffer@6.0.0(@noble/hashes@1.8.0):
     dependencies:
@@ -21720,6 +21843,10 @@ snapshots:
   keyv@4.5.4:
     dependencies:
       json-buffer: 3.0.1
+
+  keyv@5.6.0:
+    dependencies:
+      '@keyv/serialize': 1.1.1
 
   khroma@2.1.0: {}
 
@@ -23465,6 +23592,10 @@ snapshots:
 
   pure-rand@8.4.2: {}
 
+  qified@0.10.1:
+    dependencies:
+      hookified: 2.2.0
+
   qs@6.15.3:
     dependencies:
       es-define-property: 1.0.1
@@ -23651,13 +23782,13 @@ snapshots:
       unified: 11.0.5
       vfile: 6.0.3
 
-  redis@6.2.1(@opentelemetry/api@1.9.1):
+  redis@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1):
     dependencies:
-      '@redis/bloom': 6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))
-      '@redis/client': 6.2.1(@opentelemetry/api@1.9.1)
-      '@redis/json': 6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))
-      '@redis/search': 6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))
-      '@redis/time-series': 6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))
+      '@redis/bloom': 6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))
+      '@redis/client': 6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
+      '@redis/json': 6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))
+      '@redis/search': 6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))
+      '@redis/time-series': 6.2.1(@redis/client@6.2.1(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1))
     transitivePeerDependencies:
       - '@node-rs/xxhash'
       - '@opentelemetry/api'
@@ -24723,11 +24854,11 @@ snapshots:
 
   tailwindcss@4.3.3: {}
 
-  takumi-js@2.12.0(react@19.2.8):
+  takumi-js@2.12.0(csstype@3.2.3)(react@19.2.8):
     dependencies:
-      '@takumi-rs/core': 2.12.0(react@19.2.8)
+      '@takumi-rs/core': 2.12.0(csstype@3.2.3)(react@19.2.8)
       '@takumi-rs/helpers': 2.12.0(react@19.2.8)
-      '@takumi-rs/wasm': 2.12.0(react@19.2.8)
+      '@takumi-rs/wasm': 2.12.0(csstype@3.2.3)(react@19.2.8)
     transitivePeerDependencies:
       - csstype
       - preact
@@ -25310,11 +25441,12 @@ snapshots:
     optionalDependencies:
       '@volar/language-service': 2.4.28(typescript@6.0.3)
 
-  volar-service-prettier@0.0.71(@volar/language-service@2.4.28(typescript@6.0.3)):
+  volar-service-prettier@0.0.71(@volar/language-service@2.4.28(typescript@6.0.3))(prettier@3.9.6):
     dependencies:
       vscode-uri: 3.2.0
     optionalDependencies:
       '@volar/language-service': 2.4.28(typescript@6.0.3)
+      prettier: 3.9.6
 
   volar-service-typescript-twoslash-queries@0.0.71(@volar/language-service@2.4.28(typescript@6.0.3))(typescript@6.0.3):
     dependencies:
