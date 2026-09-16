@@ -1,46 +1,3 @@
-<script lang="ts" setup>
-import { computed } from 'vue'
-import { sponsors } from '../sponsors'
-
-const activeSponsors = computed(() =>
-  sponsors.filter(s => s.tierLevel > 0 && s.amount > 0),
-)
-
-const pastSponsors = computed(() =>
-  sponsors.filter(s => s.tierLevel <= 0 || s.amount <= 0),
-)
-
-const tierGroups = computed(() => {
-  const grouped = new Map<number, typeof sponsors>()
-
-  for (const sponsor of activeSponsors.value) {
-    const group = grouped.get(sponsor.tierLevel)
-    if (group) {
-      group.push(sponsor)
-    }
-    else {
-      grouped.set(sponsor.tierLevel, [sponsor])
-    }
-  }
-
-  const tierLevels = [...grouped.keys()].sort((a, b) => b - a)
-
-  return tierLevels.map((level) => {
-    const tierSponsors = grouped.get(level)!
-    const rank = tierLevels.indexOf(level)
-    const columns = [3, 4, 5, 6, 7, 8]
-    const cols = columns[Math.min(rank, columns.length - 1)] ?? 6
-
-    return {
-      level,
-      title: tierSponsors[0]?.tierTitle ?? `Tier ${level}`,
-      sponsors: tierSponsors,
-      cols,
-    }
-  })
-})
-</script>
-
 <template>
   <div :class="$style['full-sponsors-container']">
     <h2 :class="$style['sponsored-by']">
@@ -51,38 +8,23 @@ const tierGroups = computed(() => {
       <a href="https://github.com/sponsors/dinwwwh" target="_blank" rel="noopener">GitHub Sponsors</a>
     </p>
 
-    <div v-for="tier in tierGroups" :key="tier.level" :class="$style['tier-section']">
-      <h3 :class="$style['tier-title']">
-        {{ tier.title }}
-      </h3>
-      <div :class="$style['tier-grid']" :style="{ '--cols': tier.cols }">
-        <div
-          v-for="sponsor in tier.sponsors"
-          :key="sponsor.login"
-          :class="$style['tier-grid-item']"
-        >
-          <a
-            :href="sponsor.link"
-            target="_blank"
-            rel="sponsored noopener"
-            :title="sponsor.name || sponsor.login"
-            :class="$style['sponsor-link']"
-          >
-            <img
-              :src="sponsor.avatar"
-              :alt="sponsor.name || sponsor.login"
-              loading="lazy"
-            >
-            <span :class="$style['sponsor-name']">{{ sponsor.name || sponsor.login }}</span>
-          </a>
-        </div>
-      </div>
-    </div>
-
-    <p v-if="pastSponsors.length > 0" :class="$style['past-sponsors-note']">
-      With thanks to {{ pastSponsors.length }}
-      {{ pastSponsors.length === 1 ? 'past sponsor who' : 'past sponsors who' }} helped get oRPC here.
-    </p>
+    <!--
+      The wall is generated upstream (middleapi/static) and served as a single
+      SVG, so nothing here needs syncing. Links baked into the SVG are inert
+      inside an <img>, hence the wrapping anchor to the interactive preview.
+    -->
+    <a
+      :class="$style['sponsors-wall']"
+      href="https://htmlpreview.github.io/?https://github.com/middleapi/static/blob/main/sponsors.svg"
+      target="_blank"
+      rel="noopener"
+    >
+      <img
+        src="https://cdn.jsdelivr.net/gh/middleapi/static/sponsors.svg"
+        alt="oRPC sponsors"
+        loading="lazy"
+      >
+    </a>
   </div>
 </template>
 
@@ -119,71 +61,12 @@ const tierGroups = computed(() => {
   text-decoration: underline;
 }
 
-.tier-section {
+.sponsors-wall {
   width: 100%;
-  margin-bottom: 16px;
 }
 
-.tier-title {
-  font-size: 18px;
-  font-weight: 600;
-  margin-top: 16px;
-  margin-bottom: 8px;
-  color: var(--vp-c-text-1);
-}
-
-.tier-grid {
-  display: grid;
-  grid-template-columns: repeat(min(var(--cols, 6), 2), 1fr);
-}
-
-.tier-grid-item {
-  display: flex;
-  justify-content: center;
-  align-items: start;
-  padding: 12px;
-  text-align: center;
-  border: 1px solid var(--vp-c-divider);
-  margin: -1px 0 0 -1px;
-}
-
-.tier-grid-item img {
+.sponsors-wall img {
   width: 100%;
   height: auto;
-}
-
-@media (min-width: 640px) {
-  .tier-grid {
-    grid-template-columns: repeat(min(var(--cols, 6), 3), 1fr);
-  }
-}
-
-@media (min-width: 768px) {
-  .tier-grid {
-    grid-template-columns: repeat(var(--cols, 6), 1fr);
-  }
-}
-
-.sponsor-link {
-  text-decoration: none;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.sponsor-link:hover {
-  opacity: 0.8;
-}
-
-.sponsor-name {
-  font-size: 13px;
-  color: var(--vp-c-text-2);
-}
-
-.past-sponsors-note {
-  width: 100%;
-  margin-top: 24px;
-  font-size: 14px;
-  color: var(--vp-c-text-2);
 }
 </style>

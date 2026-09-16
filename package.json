@@ -20,7 +20,6 @@
     "sherif:fix": "pnpm run sherif --fix",
     "knip": "knip --production",
     "knip:fix": "pnpm run knip --fix --allow-remove-files",
-    "sponsors:sync": "node scripts/sync-sponsor.ts && eslint --max-warnings=0 --fix **/README.md apps/content/.vitepress/theme/sponsors.ts",
     "packages:publish:commit": "pnpm run build:packages && pkg-pr-new publish './packages/*' --pnpm --compact --template './playgrounds/*'"
   },
   "devDependencies": {

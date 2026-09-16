@@ -21,7 +21,6 @@
   ],
   "include": [
     "playground",
-    "scripts",
     "tests",
     "*",
 
