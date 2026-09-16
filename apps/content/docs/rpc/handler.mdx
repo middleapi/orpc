@@ -52,7 +52,7 @@ export async function fetch(request: Request) {
 :::
 
 :::tip
-`context` also accepts an sync or async function, that receives the standard request. The handler only calls it once the request matches `prefix`, so work such as loading a session is skipped for requests that other routes serve:
+`context` also accepts a sync or async function that receives the standard request. The handler only calls it once the request matches `prefix`, so work such as loading a session is skipped for requests that other routes serve:
 
 ```ts
 const { matched, response } = await handler.handle(request, {
@@ -60,6 +60,27 @@ const { matched, response } = await handler.handle(request, {
   context: async () => ({ session: await getSession(request) }),
 })
 ```
+
+Two things to keep in mind when you pass a function:
+
+- If it throws, `handle` rejects instead of returning a response. It runs before routing, so no
+  procedure is matched and neither the [routing interceptors](#routing-interceptors), the plugins,
+  nor the codec's error encoding ever see the error. Handle it yourself, or keep the work that can
+  fail inside a [middleware](/docs/middleware) so it is encoded like any other error.
+- Adapter-level interceptors receive `context` exactly as you passed it, so spreading it
+  (`{ ...options.context }`) silently yields `{}` when it is a function. Compose it instead:
+
+  ```ts
+  const { context } = options
+
+  return next({
+    ...options,
+    context: async request => ({
+      ...(typeof context === 'function' ? await context(request) : context),
+      requestId,
+    }),
+  })
+  ```
 
 :::
 
