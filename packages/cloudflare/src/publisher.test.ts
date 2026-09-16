@@ -84,9 +84,13 @@ describe('durable publisher', () => {
       expect(resume).toHaveBeenCalledTimes(1)
     })
 
-    expect(resume).toHaveBeenCalledWith({ text: 'live only' })
-
     await stopResume()
+
+    /**
+     * Asserted after unsubscribing so a replay that lost the race to the live message
+     * still fails the test: this publisher must not resend the two earlier messages.
+     */
+    expect(resume).toHaveBeenCalledExactlyOnceWith({ text: 'live only' })
   })
 
   it('sends live messages and resumes missed ones', async () => {
