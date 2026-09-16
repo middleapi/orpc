@@ -77,10 +77,12 @@ export class StandardHandler<T extends Context> {
     options: StandardHandlerOptions<T>,
   ) {
     /**
-     * `~tracing` must stay first: `sortPlugins` walks the array in order, so a plugin at
-     * index 0 is always initialized first no matter how the user listed their own plugins.
-     * Appending it instead makes it hoist to just before the first plugin that declares
-     * `after: ['~tracing']`, which leaves the span nesting dependent on that listing order.
+     * `~tracing` must stay first. `sortPlugins` visits index 0 before anything else, so a
+     * plugin there is initialized ahead of every plugin that does not explicitly ask to run
+     * before it (`before: ['~tracing']`, as `~evlog` and `~pino` do) — which side of the span
+     * each plugin lands on stops depending on the order the user listed them in.
+     * Appending it instead makes it hoist to just before the first plugin declaring
+     * `after: ['~tracing']`, and that position does depend on the listing order.
      */
     options = new CompositeStandardHandlerPlugin([
       new TracingHandlerPlugin(),
@@ -315,8 +317,8 @@ export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
                 response: {
                   ...result.response,
                   /**
-                   * @remarks
-                   * **Warning**: Remember use `override` for remaining special properties
+                   * @warning
+                   * Remember use `override` for remaining special properties
                    */
                   body: isIterator
                     ? override(body, wrapAsyncIterator(body, wrapOptions))

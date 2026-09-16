@@ -579,6 +579,18 @@ describe('standardHandler', () => {
         expect(span.recordException).toHaveBeenCalledExactlyOnceWith('error', expect.objectContaining({ message: 'body failure' }))
         expect(span.end).toHaveBeenCalledTimes(1)
       })
+
+      it('records a client going away mid-stream at info level', async () => {
+        const wrapped = await handleBody(toBody((async function* () {
+          yield 'a'
+          throw new DOMException('client gone', 'AbortError')
+        })()))
+
+        await expect(drain(wrapped)).rejects.toThrow('client gone')
+
+        expect(span.recordException).toHaveBeenCalledExactlyOnceWith('info', expect.objectContaining({ message: 'client gone' }))
+        expect(span.end).toHaveBeenCalledTimes(1)
+      })
     })
 
     it('does not record ErrorEvent failures of an async iterator body on the request span', async () => {
@@ -709,9 +721,12 @@ describe('standardHandler', () => {
       const optOut = { name: '~opt-out', after: ['~tracing'] }
 
       let activeSpan: unknown
+      const startedNames: string[] = []
+
       sharedExperimental.setTracer({
         startSpan: vi.fn(),
-        startActiveSpan: vi.fn(async (_name: string, _parent: unknown, fn: (span: unknown) => Promise<unknown>) => {
+        startActiveSpan: vi.fn(async (name: string, _parent: unknown, fn: (span: unknown) => Promise<unknown>) => {
+          startedNames.push(name)
           const started = { setAttribute: vi.fn(), updateName: vi.fn(), addEvent: vi.fn(), recordException: vi.fn(), end: vi.fn() }
           const previous = activeSpan
           activeSpan = started
@@ -736,14 +751,21 @@ describe('standardHandler', () => {
       ]
 
       for (const [plugins, seen] of listings) {
+        const listing = `listing order: ${plugins.map(p => p.name).join(', ')}`
+
         codec = makeCodec()
         setupHappyPath()
+        startedNames.length = 0
+
         const pluginHandler = new StandardHandler(codec as any, { plugins })
         await pluginHandler.handle(makeRequest(), OPTIONS)
-        expect(seen, `listing order: ${plugins.map(p => p.name).join(', ')}`).toHaveLength(1)
+
+        expect(seen, listing).toHaveLength(1)
+        // Equality below would hold vacuously if `~tracing` stopped starting a request span.
+        expect(startedNames, listing).toContain('POST /api/v1/ping')
       }
 
-      expect(probeFirst).toEqual(probeLast)
+      expect(probeLast).toEqual(probeFirst)
     })
   })
 })
