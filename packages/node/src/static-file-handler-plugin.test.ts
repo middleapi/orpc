@@ -931,6 +931,7 @@ describe('staticFileHandlerPlugin', () => {
       const span = { updateName: vi.fn(), setAttribute: vi.fn(), recordException: vi.fn(), end: vi.fn() }
       const spy = vi.spyOn(sharedModule, 'getTracer').mockReturnValue({
         startSpan: () => span,
+        startActiveSpan: (_name: string, _parent: unknown, fn: (span: unknown) => unknown) => fn(span),
         withActiveSpan: (_: unknown, fn: () => unknown) => fn(),
         getActiveSpan: () => span,
       } as any)

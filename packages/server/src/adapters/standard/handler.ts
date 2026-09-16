@@ -1,5 +1,5 @@
 import type { ErrorMap, Schema } from '@orpc/contract'
-import type { Interceptor, Promisable, Value } from '@orpc/shared'
+import type { Interceptor, Promisable, ThrowableError, Value } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { Context } from '../../context'
 import type { ProcedureClientInterceptor } from '../../procedure-client'
@@ -76,9 +76,15 @@ export class StandardHandler<T extends Context> {
     private readonly codec: StandardHandlerCodec<T>,
     options: StandardHandlerOptions<T>,
   ) {
+    /**
+     * `~tracing` must stay first: `sortPlugins` walks the array in order, so a plugin at
+     * index 0 is always initialized first no matter how the user listed their own plugins.
+     * Appending it instead makes it hoist to just before the first plugin that declares
+     * `after: ['~tracing']`, which leaves the span nesting dependent on that listing order.
+     */
     options = new CompositeStandardHandlerPlugin([
-      ...toArray(options.plugins),
       new TracingHandlerPlugin(),
+      ...toArray(options.plugins),
     ]).init(options)
 
     this.routingInterceptors = options.routingInterceptors
@@ -223,85 +229,110 @@ export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
            */
           const [pathname] = parseStandardUrl(request.url)
 
-          const span = tracer.startSpan(`${request.method} ${pathname}`, parent)
+          /**
+           * `startActiveSpan` is used instead of `startSpan` + `withActiveSpan` because some
+           * backends can only activate a span they started themselves. It does not end the
+           * span, so a streamed body can still keep it open after the callback returns.
+           */
+          return tracer.startActiveSpan(`${request.method} ${pathname}`, parent, async (span) => {
+            let isEnded = false
 
-          let result: StandardHandlerHandleResult
-          try {
-            result = await tracer.withActiveSpan(span, next)
-          }
-          catch (e) {
             /**
-             * Any error here is internal (interceptor/framework), not business logic.
-             * Always recorded as an error, even when it is an abort error.
+             * Several paths can finish the request, so all of them end the span through here:
+             * it is never ended twice and nothing is recorded on an already ended span.
              */
-            span.recordException('error', toTracingException(e))
-            span.end()
-            throw e
-          }
+            const endSpan = (): void => {
+              if (!isEnded) {
+                isEnded = true
+                span.end()
+              }
+            }
 
-          if (!result.matched) {
-            span.end()
+            let result: StandardHandlerHandleResult
+            try {
+              result = await next()
+            }
+            catch (e) {
+              /**
+               * Any error here is internal (interceptor/framework), not business logic.
+               * Always recorded as an error, even when it is an abort error.
+               */
+              span.recordException('error', toTracingException(e))
+              endSpan()
+              throw e
+            }
+
+            if (!result.matched) {
+              endSpan()
+              return result
+            }
+
+            const body = result.response.body
+            const isIterator = isAsyncIteratorObject(body)
+
+            if (isIterator || body instanceof ReadableStream) {
+              const signal = request.signal
+
+              /**
+               * An adapter can drop a streamed body without reading or cancelling it;
+               * `@standard-server/peer` does when the request aborts before it transmits.
+               * The signal is the last resort that keeps the span from staying open forever.
+               */
+              if (signal?.aborted) {
+                endSpan()
+              }
+              else {
+                signal?.addEventListener('abort', endSpan, { once: true })
+              }
+
+              const wrapOptions = {
+                /**
+                 * Every pull runs with the request span active, so nested calls and the lazy
+                 * `consume_*_output` spans stay inside the same trace. Best effort: backends
+                 * that cannot activate an existing span run the pull as is.
+                 */
+                runWith: <T>(run: () => Promise<T>) => tracer.withActiveSpan(span, run),
+                onError(error: ThrowableError) {
+                  /**
+                   * Errors here are internal (interceptor/framework) failures,
+                   * except `ErrorEvent`: a business error the protocol delivers
+                   * inside the event stream, already logged by the client interceptor.
+                   * A client disconnecting mid-stream surfaces as an abort instead, which
+                   * `recordSpanError` keeps out of the error level.
+                   */
+                  if (!isEnded && !(error instanceof ErrorEvent)) {
+                    recordSpanError(span, error)
+                  }
+                },
+                onFinish() {
+                  signal?.removeEventListener('abort', endSpan)
+                  endSpan()
+                },
+              }
+
+              return {
+                ...result,
+                response: {
+                  ...result.response,
+                  /**
+                   * @remarks
+                   * **Warning**: Remember use `override` for remaining special properties
+                   */
+                  body: isIterator
+                    ? override(body, wrapAsyncIterator(body, wrapOptions))
+                    : override(body, wrapReadableStream(body, wrapOptions)),
+                },
+              }
+            }
+
+            /**
+             * A body the adapter sends in one piece (json, `Blob`, `FormData`, ...) is not
+             * observable from here, so the span ends before the adapter transmits it. Only a
+             * streamed body can hold the span open until its last chunk.
+             */
+            endSpan()
             return result
-          }
-
-          const body = result.response.body
-          if (isAsyncIteratorObject(body)) {
-            return {
-              ...result,
-              response: {
-                ...result.response,
-                /**
-                 * @remarks
-                 * **Warning**: Remember use `override` for remaining special properties
-                 */
-                body: override(body, wrapAsyncIterator(body, {
-                  runWith: fn => tracer.withActiveSpan(span, fn),
-                  onError(error) {
-                    /**
-                     * Errors here are internal (interceptor/framework) failures,
-                     * except `ErrorEvent`: a business error the protocol delivers
-                     * inside the event stream, already logged by the client interceptor.
-                     */
-                    if (!(error instanceof ErrorEvent)) {
-                      span.recordException('error', toTracingException(error))
-                    }
-                  },
-                  onFinish() {
-                    span.end()
-                  },
-                })),
-              },
-            }
-          }
-
-          if (body instanceof ReadableStream) {
-            return {
-              ...result,
-              response: {
-                ...result.response,
-                /**
-                 * @remarks
-                 * **Warning**: Remember use `override` for remaining special properties
-                 */
-                body: override(body, wrapReadableStream(body, {
-                  runWith: fn => tracer.withActiveSpan(span, fn),
-                  onError(error) {
-                    /**
-                     * Any error here is internal (interceptor/framework), not business logic.
-                     * Indicates unexpected handler failure.
-                     */
-                    span.recordException('error', toTracingException(error))
-                  },
-                  onFinish() {
-                    span.end()
-                  },
-                })),
-              },
-            }
-          }
-
-          span.end()
-          return result
+          })
         },
         ...toArray(options.routingInterceptors),
       ],

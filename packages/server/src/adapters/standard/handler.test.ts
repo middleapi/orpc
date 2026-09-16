@@ -431,9 +431,23 @@ describe('standardHandler', () => {
 
     beforeEach(() => {
       span = createSpan()
+
+      /**
+       * The request span is the first one started, every later one
+       * (`find_procedure`, `decode_input`, ...) is a child and gets its own.
+       */
+      let isRequestSpanStarted = false
+
       tracer = {
-        startSpan: vi.fn(() => span),
-        startActiveSpan: vi.fn((_name, _parent, fn) => fn(createSpan())),
+        startSpan: vi.fn(() => createSpan()),
+        startActiveSpan: vi.fn((_name, _parent, fn) => {
+          if (isRequestSpanStarted) {
+            return fn(createSpan())
+          }
+
+          isRequestSpanStarted = true
+          return fn(span)
+        }),
         withActiveSpan: vi.fn((_span, fn) => fn()),
         getActiveSpan: () => span,
         extract: vi.fn(),
@@ -476,9 +490,11 @@ describe('standardHandler', () => {
       await expect(handler.handle(request, OPTIONS)).resolves.toEqual({ matched: false })
 
       expect(tracer.extract).toHaveBeenCalledWith(request.headers)
-      expect(tracer.startSpan).toHaveBeenCalledExactlyOnceWith('POST /api/v1/ping', parent)
-      expect(tracer.withActiveSpan).toHaveBeenCalledExactlyOnceWith(span, expect.any(Function))
+      expect(tracer.startSpan).not.toHaveBeenCalled()
+      expect(tracer.startActiveSpan).toHaveBeenNthCalledWith(1, 'POST /api/v1/ping', parent, expect.any(Function))
       expect(tracer.startActiveSpan).toHaveBeenCalledWith('find_procedure', undefined, expect.any(Function))
+      // Only a streamed body needs the span re-activated after the handler returns.
+      expect(tracer.withActiveSpan).not.toHaveBeenCalled()
       expect(span.updateName).toHaveBeenCalledWith('orpc_no_match')
       expect(span.recordException).not.toHaveBeenCalled()
       expect(span.end).toHaveBeenCalledTimes(1)
@@ -490,7 +506,7 @@ describe('standardHandler', () => {
 
       await handler.handle(makeRequest(), OPTIONS)
 
-      expect(tracer.startSpan).toHaveBeenCalledExactlyOnceWith('POST /api/v1/ping', undefined)
+      expect(tracer.startActiveSpan).toHaveBeenNthCalledWith(1, 'POST /api/v1/ping', undefined, expect.any(Function))
     })
 
     it('ends the request span right away for a non-streaming body', async () => {
@@ -576,6 +592,158 @@ describe('standardHandler', () => {
 
       expect(span.recordException).not.toHaveBeenCalled()
       expect(span.end).toHaveBeenCalledTimes(1)
+    })
+
+    it('activates the request span on backends that cannot activate a span they did not start', async () => {
+      const requestSpan = createSpan()
+
+      /**
+       * Mirrors `experimental_CloudflareTracer`: `withActiveSpan` cannot activate an existing
+       * span, so the request span is only ever active because the tracer started it itself.
+       */
+      let activeSpan: ReturnType<typeof createSpan> | undefined
+      let isRequestSpanStarted = false
+
+      sharedExperimental.setTracer({
+        startSpan: vi.fn(() => createSpan()),
+        startActiveSpan: vi.fn(async (_name: string, _parent: unknown, fn: (span: unknown) => Promise<unknown>) => {
+          const started = isRequestSpanStarted ? createSpan() : requestSpan
+          isRequestSpanStarted = true
+
+          const previous = activeSpan
+          activeSpan = started
+          try {
+            return await fn(started)
+          }
+          finally {
+            activeSpan = previous
+          }
+        }),
+        withActiveSpan: vi.fn((_span: unknown, fn: () => unknown) => fn()),
+        getActiveSpan: () => activeSpan,
+      } as any)
+
+      setupHappyPath()
+      await handler.handle(makeRequest(), OPTIONS)
+
+      expect(requestSpan.updateName).toHaveBeenCalledWith('orpc.ping')
+      expect(requestSpan.setAttribute).toHaveBeenCalledWith('rpc.system', 'orpc')
+      expect(requestSpan.setAttribute).toHaveBeenCalledWith('rpc.method', 'ping')
+      expect(requestSpan.end).toHaveBeenCalledTimes(1)
+    })
+
+    describe('streamed body an adapter never reads', () => {
+      function iterate() {
+        return (async function* () {
+          yield 'a'
+          throw new Error('body failure')
+        })()
+      }
+
+      it('ends the request span when the request is already aborted as the body is wrapped', async () => {
+        const controller = new AbortController()
+        setupHappyPath()
+        codec.encodeOutput.mockImplementation(async () => {
+          controller.abort()
+          return { status: 200, headers: {}, body: iterate() }
+        })
+
+        await handler.handle(makeRequest({ signal: controller.signal }), OPTIONS)
+
+        expect(span.end).toHaveBeenCalledTimes(1)
+      })
+
+      it('ends the request span when the request aborts after the body is returned', async () => {
+        const controller = new AbortController()
+        setupHappyPath()
+        codec.encodeOutput.mockResolvedValue({ status: 200, headers: {}, body: iterate() })
+
+        await handler.handle(makeRequest({ signal: controller.signal }), OPTIONS)
+        expect(span.end).not.toHaveBeenCalled()
+
+        controller.abort()
+        expect(span.end).toHaveBeenCalledTimes(1)
+      })
+
+      it('does not record a later body failure on the already ended request span', async () => {
+        const controller = new AbortController()
+        setupHappyPath()
+        codec.encodeOutput.mockResolvedValue({ status: 200, headers: {}, body: iterate() })
+
+        const result = await handler.handle(makeRequest({ signal: controller.signal }), OPTIONS)
+        controller.abort()
+
+        await expect(drain(result.response!.body as any)).rejects.toThrow('body failure')
+
+        expect(span.recordException).not.toHaveBeenCalled()
+        expect(span.end).toHaveBeenCalledTimes(1)
+      })
+    })
+  })
+
+  describe('plugin ordering', () => {
+    /**
+     * `~tracing` must land in the same place whichever order the user listed their plugins in.
+     * A plugin that opts out of the request span (`after: ['~tracing']`, like `~batch` and
+     * `~cors`) used to drag `~tracing` past every plugin listed before it.
+     */
+    it('nests the request span the same way whichever order plugins are listed in', async ({ onTestFinished }) => {
+      function makeProbe(seen: boolean[]) {
+        return {
+          name: '~probe',
+          init(options: any) {
+            return {
+              ...options,
+              routingInterceptors: [
+                async ({ next }: any) => {
+                  seen.push(sharedExperimental.getTracer()?.getActiveSpan() !== undefined)
+                  return next()
+                },
+                ...(options.routingInterceptors ?? []),
+              ],
+            }
+          },
+        }
+      }
+
+      const optOut = { name: '~opt-out', after: ['~tracing'] }
+
+      let activeSpan: unknown
+      sharedExperimental.setTracer({
+        startSpan: vi.fn(),
+        startActiveSpan: vi.fn(async (_name: string, _parent: unknown, fn: (span: unknown) => Promise<unknown>) => {
+          const started = { setAttribute: vi.fn(), updateName: vi.fn(), addEvent: vi.fn(), recordException: vi.fn(), end: vi.fn() }
+          const previous = activeSpan
+          activeSpan = started
+          try {
+            return await fn(started)
+          }
+          finally {
+            activeSpan = previous
+          }
+        }),
+        withActiveSpan: vi.fn((_span: unknown, fn: () => unknown) => fn()),
+        getActiveSpan: () => activeSpan,
+      } as any)
+      onTestFinished(() => sharedExperimental.setTracer(undefined))
+
+      const probeFirst: boolean[] = []
+      const probeLast: boolean[] = []
+
+      const listings: Array<[plugins: any[], seen: boolean[]]> = [
+        [[makeProbe(probeFirst), optOut], probeFirst],
+        [[optOut, makeProbe(probeLast)], probeLast],
+      ]
+
+      for (const [plugins, seen] of listings) {
+        codec = makeCodec()
+        setupHappyPath()
+        const pluginHandler = new StandardHandler(codec as any, { plugins })
+        await pluginHandler.handle(makeRequest(), OPTIONS)
+        expect(seen, `listing order: ${plugins.map(p => p.name).join(', ')}`).toHaveLength(1)
+      }
+
+      expect(probeFirst).toEqual(probeLast)
     })
   })
 })
