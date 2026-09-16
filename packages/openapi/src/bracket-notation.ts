@@ -41,8 +41,12 @@ export class BracketNotationSerializer {
     }
 
     else if (isPlainObject(data)) {
-      for (const [key, value] of Object.entries(data)) {
-        this.internalSerialize(value, isRoot ? key : `${path}[${key}]`, false, result)
+      for (const key in data) {
+        if (!Object.hasOwn(data, key)) {
+          continue
+        }
+
+        this.internalSerialize(data[key], isRoot ? key : `${path}[${key}]`, false, result)
       }
     }
 

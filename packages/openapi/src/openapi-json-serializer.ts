@@ -280,7 +280,13 @@ export class OpenAPIJsonSerializer {
     if (isPlainObject(data)) {
       const json: Record<string, unknown> = new NullProtoObj()
 
-      for (const [k, v] of Object.entries(data)) {
+      for (const k in data) {
+        if (!Object.hasOwn(data, k)) {
+          continue
+        }
+
+        const v = data[k]
+
         /**
          * Skip custom toJSON methods to avoid JSON.stringify invoking them,
          * which could cause meta and serialized data mismatches during deserialization.
