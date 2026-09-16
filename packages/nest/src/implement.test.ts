@@ -165,17 +165,20 @@ describe('requirements', () => {
     await app.init()
     await app.getHttpAdapter().getInstance().ready()
 
-    const res = await app.getHttpAdapter().getInstance().inject({
-      method: 'QUERY',
-      url: '/query-route',
-      headers: { 'content-type': 'application/json' },
-      payload: { search: 'earth' },
-    })
+    try {
+      const res = await app.getHttpAdapter().getInstance().inject({
+        method: 'QUERY',
+        url: '/query-route',
+        headers: { 'content-type': 'application/json' },
+        payload: { search: 'earth' },
+      })
 
-    expect(res.statusCode).toEqual(200)
-    expect(JSON.parse(res.body)).toEqual('query: earth')
-
-    await app.close()
+      expect(res.statusCode).toEqual(200)
+      expect(JSON.parse(res.body)).toEqual('query: earth')
+    }
+    finally {
+      await app.close()
+    }
   })
 
   it('should error if implemented method return invalid procedure', async () => {
