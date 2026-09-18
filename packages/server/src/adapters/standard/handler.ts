@@ -76,11 +76,7 @@ export class StandardHandler<T extends Context> {
     private readonly codec: StandardHandlerCodec<T>,
     options: StandardHandlerOptions<T>,
   ) {
-    /**
-     * Appended last so its interceptor wraps every plugin that does not order itself against
-     * it: plugins prepend their routing interceptor, so the one initialized last is outermost.
-     * `after: ['~tracing']` opts a plugin out of the span, `before: ['~tracing']` keeps it in.
-     */
+    // Plugins prepend their routing interceptor, so the one initialized last is the outermost.
     options = new CompositeStandardHandlerPlugin([
       ...toArray(options.plugins),
       new TracingHandlerPlugin(),

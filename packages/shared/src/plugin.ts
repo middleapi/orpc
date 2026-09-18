@@ -11,9 +11,6 @@ export interface OrderablePlugin {
 
 /**
  * Sorts plugins based on their `before` and `after` dependencies.
- *
- * The sort is stable: plugins the constraints leave unordered keep their original relative
- * order, so where a plugin lands never depends on where an unrelated plugin sits in the array.
  */
 export function sortPlugins<T extends OrderablePlugin>(
   plugins: T[],
@@ -34,91 +31,65 @@ export function sortPlugins<T extends OrderablePlugin>(
     }
   }
 
-  /** Every index that must be emitted before this one, shrinking as they are emitted. */
-  const dependencies: Array<Set<number>> = Array.from({ length: pluginCount }, () => new Set<number>())
-  /** Every index waiting on this one. */
-  const dependents: Array<number[]> = Array.from({ length: pluginCount }, () => [])
-
-  function addEdge(before: number, after: number): void {
-    if (dependencies[after]!.has(before)) {
-      return
-    }
-
-    dependencies[after]!.add(before)
-    dependents[before]!.push(after)
-  }
+  const dependencies: number[][] = Array.from({ length: pluginCount }, () => [])
 
   for (let i = 0; i < pluginCount; i++) {
     const plugin = plugins[i]!
 
-    for (const beforeId of plugin.before ?? []) {
-      for (const beforeIndex of pluginIdToIndices.get(beforeId) ?? []) {
-        addEdge(i, beforeIndex)
+    if (plugin.before !== undefined) {
+      for (const beforeId of plugin.before) {
+        const beforeIndices = pluginIdToIndices.get(beforeId)
+
+        if (beforeIndices !== undefined) {
+          for (const beforeIndex of beforeIndices) {
+            dependencies[beforeIndex]!.push(i)
+          }
+        }
       }
     }
 
-    for (const afterId of plugin.after ?? []) {
-      for (const afterIndex of pluginIdToIndices.get(afterId) ?? []) {
-        addEdge(afterIndex, i)
+    if (plugin.after !== undefined) {
+      for (const afterId of plugin.after) {
+        const afterIndices = pluginIdToIndices.get(afterId)
+
+        if (afterIndices !== undefined) {
+          for (const afterIndex of afterIndices) {
+            dependencies[i]!.push(afterIndex)
+          }
+        }
       }
     }
   }
 
-  /** Insertion order is ascending and deletions preserve it, so iterating yields the lowest index first. */
-  const remaining = new Set<number>(Array.from({ length: pluginCount }, (_, i) => i))
   const sorted: T[] = []
+  const placed = new Set<number>()
 
   while (sorted.length < pluginCount) {
-    let next: number | undefined
+    const next = plugins.findIndex((_, i) => !placed.has(i) && dependencies[i]!.every(dependency => placed.has(dependency)))
 
-    for (const index of remaining) {
-      if (dependencies[index]!.size === 0) {
-        next = index
-        break
-      }
+    if (next === -1) {
+      throw new Error(`Circular dependency detected involving plugin "${findCyclicPlugin(plugins, dependencies, placed).name}"`)
     }
 
-    if (next === undefined) {
-      const pluginId = plugins[findCycleMember(dependencies, remaining)]?.name ?? 'unknown'
-      throw new Error(`Circular dependency detected involving plugin "${pluginId}"`)
-    }
-
-    remaining.delete(next)
+    placed.add(next)
     sorted.push(plugins[next]!)
-
-    for (const dependent of dependents[next]!) {
-      dependencies[dependent]!.delete(next)
-    }
   }
 
   return sorted
 }
 
-/**
- * Every plugin left unready still has an unmet dependency, so walking dependency edges from
- * any of them always reaches a cycle.
- */
-function findCycleMember(dependencies: Array<Set<number>>, remaining: Set<number>): number {
+function findCyclicPlugin<T extends OrderablePlugin>(
+  plugins: T[],
+  dependencies: number[][],
+  placed: Set<number>,
+): T {
   const seen = new Set<number>()
-  let current = remaining.values().next().value!
+  let current = plugins.findIndex((_, i) => !placed.has(i))
 
   while (!seen.has(current)) {
     seen.add(current)
-
-    let next: number | undefined
-    for (const dependency of dependencies[current]!) {
-      if (remaining.has(dependency)) {
-        next = dependency
-        break
-      }
-    }
-
-    if (next === undefined) {
-      break
-    }
-
-    current = next
+    current = dependencies[current]!.find(dependency => !placed.has(dependency))!
   }
 
-  return current
+  return plugins[current]!
 }
