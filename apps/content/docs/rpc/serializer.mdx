@@ -17,7 +17,6 @@ description: "Learn how RPC Serializers encode data between client and server, s
 | **undefined**                    | `undefined` | Ignore `undefined` properties        |
 | **Date**                         | `date`      | Includes `Invalid Date`.             |
 | **BigInt**                       | `bigint`    |                                      |
-| **RegExp**                       | `regexp`    |                                      |
 | **URL**                          | `url`       |                                      |
 | **Record (object)**              |             | `toJSON` methods are ignored         |
 | **Array**                        |             |                                      |
@@ -39,6 +38,45 @@ const cors = new CORSHandlerPlugin({
 })
 ```
 
+:::
+
+## RegExp Support
+
+`RegExp` is **not** supported by default. Deserializing one compiles an attacker-controlled
+pattern, and every later use of that pattern runs an attacker-controlled matcher — both are
+unbounded work on a handler that runs before your middleware. A short pattern is enough:
+`^(a+)+$` takes over a second to test a 28-character string.
+
+If both ends of your connection are trusted, add the handler back:
+
+```ts twoslash
+import { RPCSerializer } from '@orpc/client'
+// ---cut---
+const REGEXP_STRING_PATTERN = /^\/([\s\S]*)\/([a-z]*)$/
+
+const serializer = new RPCSerializer({
+  handlers: {
+    regexp: {
+      condition: v => v instanceof RegExp,
+      serialize: (v: RegExp) => v.toString(),
+      deserialize: (v: string) => {
+        const match = typeof v === 'string' ? v.match(REGEXP_STRING_PATTERN) : null
+
+        if (!match) {
+          throw new TypeError('Invalid serialized RegExp')
+        }
+
+        return new RegExp(match[1]!, match[2])
+      },
+      isTerminal: true,
+    },
+  },
+})
+```
+
+:::warning
+Only add this to an `RPCHandler` if every client is trusted. On an `RPCLink` it only exposes
+you to your own server, which is usually fine.
 :::
 
 ## Custom Serializers

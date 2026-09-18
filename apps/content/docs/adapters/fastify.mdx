@@ -94,6 +94,21 @@ app.addContentTypeParser('*', (request, payload, done) => {
 })
 ```
 
+Fastify's default 1 MiB [`bodyLimit`](https://fastify.dev/docs/latest/Reference/Server/#bodylimit)
+is enforced by the parsers you just removed, so it no longer applies — oRPC reads the body
+itself, before any middleware runs. Restore a limit with the
+[Request Limit Plugin](/docs/plugins/request-limit):
+
+```ts
+import { RequestLimitHandlerPlugin } from '@orpc/server/plugins'
+
+const handler = new RPCHandler(router, {
+  plugins: [
+    new RequestLimitHandlerPlugin({ maxBodySize: 1024 * 1024 }),
+  ],
+})
+```
+
 :::
 
 :::warning

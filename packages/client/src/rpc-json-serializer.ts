@@ -21,7 +21,19 @@ export interface RPCJsonSerializerHandler {
   isTerminal?: boolean
 }
 
-const REGEX_STRING_PATTERN = /^\/([\s\S]*)\/([a-z]*)$/
+/**
+ * Every built-in `deserialize` asserts the serialized value still has the exact shape its
+ * `serialize` produces. Besides rejecting corrupted payloads, this bounds the work a request
+ * can ask for: a converted value no longer has the serialized shape, so a `meta` array that
+ * names the same path many times fails on the second entry instead of rebuilding the value
+ * once per entry. Without it, work grows with (elements × meta entries) while the body only
+ * grows with (elements + meta entries).
+ */
+function assertSerializedShape(condition: boolean, type: string): asserts condition {
+  if (!condition) {
+    throw new Error(`Security error: Invalid serialized data. Value is not a valid "${type}" payload.`)
+  }
+}
 
 const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHandler> = {
   undefined: {
@@ -44,6 +56,7 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
       return data.toString()
     },
     deserialize(serialized: string): bigint {
+      assertSerializedShape(typeof serialized === 'string', 'bigint')
       return BigInt(serialized)
     },
     isTerminal: true,
@@ -60,6 +73,7 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
       return data.toISOString()
     },
     deserialize(serialized: string | null): Date {
+      assertSerializedShape(serialized === null || typeof serialized === 'string', 'date')
       return new Date(serialized ?? 'Invalid Date')
     },
     isTerminal: true,
@@ -84,20 +98,8 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
       return data.toString()
     },
     deserialize(serialized: string): URL {
+      assertSerializedShape(typeof serialized === 'string', 'url')
       return new URL(serialized)
-    },
-    isTerminal: true,
-  },
-  regexp: {
-    condition(data: unknown): boolean {
-      return data instanceof RegExp
-    },
-    serialize(data: RegExp): string {
-      return data.toString()
-    },
-    deserialize(serialized: string): RegExp {
-      const [, pattern, flags] = serialized.match(REGEX_STRING_PATTERN)!
-      return new RegExp(pattern!, flags)
     },
     isTerminal: true,
   },
@@ -109,6 +111,7 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
       return Array.from(data)
     },
     deserialize(serialized: unknown[]): Set<unknown> {
+      assertSerializedShape(Array.isArray(serialized), 'set')
       return new Set(serialized)
     },
   },
@@ -120,6 +123,7 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
       return Array.from(data.entries())
     },
     deserialize(serialized: [unknown, unknown][]): Map<unknown, unknown> {
+      assertSerializedShape(Array.isArray(serialized), 'map')
       return new Map(serialized)
     },
   },
@@ -158,10 +162,33 @@ export interface RPCJsonSerializerOptions {
    *
    * **Disabling:** Set a key to `undefined` to remove a built-in handler:
    * ```ts
-   * handlers: { regexp: undefined }
+   * handlers: { date: undefined }
    * ```
    *
-   * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `url`, `regexp`, `set`, `map`.
+   * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `url`, `set`, `map`.
+   *
+   * @remarks
+   * `RegExp` is not supported by default: rebuilding one from request input compiles an
+   * attacker-controlled pattern, and every later use of it runs an attacker-controlled
+   * matcher. Add it back only where the input is trusted:
+   * ```ts
+   * const REGEXP_STRING_PATTERN = /^\/([\s\S]*)\/([a-z]*)$/
+   *
+   * handlers: {
+   *   regexp: {
+   *     condition: v => v instanceof RegExp,
+   *     serialize: (v: RegExp) => v.toString(),
+   *     deserialize: (s: string) => {
+   *       const match = typeof s === 'string' ? s.match(REGEXP_STRING_PATTERN) : null
+   *       if (!match) {
+   *         throw new Error('Invalid serialized RegExp')
+   *       }
+   *       return new RegExp(match[1]!, match[2])
+   *     },
+   *     isTerminal: true,
+   *   },
+   * }
+   * ```
    */
   handlers?: Record<string, undefined | RPCJsonSerializerHandler> | undefined
 
@@ -278,10 +305,6 @@ export class RPCJsonSerializer {
           }
           if (data instanceof URL) {
             meta.push(['url', ...segments])
-            return data.toString()
-          }
-          if (data instanceof RegExp) {
-            meta.push(['regexp', ...segments])
             return data.toString()
           }
           if (data instanceof Set) {

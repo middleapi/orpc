@@ -37,8 +37,8 @@ const customSupportedDataTypes: { name: string, value: unknown, expected: unknow
   },
   {
     name: 'person - 2',
-    value: new Person2('dinwwwh - 2', [{ nested: new Date('2023-01-02') }, /uic/gi]),
-    expected: new Person2('dinwwwh - 2', [{ nested: new Date('2023-01-02') }, /uic/gi]),
+    value: new Person2('dinwwwh - 2', [{ nested: new Date('2023-01-02') }, new URL('https://dinwwwh.com')]),
+    expected: new Person2('dinwwwh - 2', [{ nested: new Date('2023-01-02') }, new URL('https://dinwwwh.com')]),
   },
   {
     name: 'should not resolve toJSON',
@@ -110,7 +110,6 @@ describe.each([
   it('complex', () => {
     assert({
       'date': new Date('2023-01-01'),
-      'regexp': /uic/gi,
       'url': new URL('https://dinwwwh.com'),
       '!@#$%^^&()[]>?<~_<:"~+!_': value,
       'list': [value],
@@ -121,7 +120,6 @@ describe.each([
       },
     }, {
       'date': new Date('2023-01-01'),
-      'regexp': /uic/gi,
       'url': new URL('https://dinwwwh.com'),
       '!@#$%^^&()[]>?<~_<:"~+!_': expected,
       'list': [expected],
@@ -143,7 +141,6 @@ describe('rpcJsonSerializer: wire format', () => {
       createdAt: new Date('2023-01-01T00:00:00.000Z'),
       tags: new Set(['a']),
       scores: new Map([['x', 1]]),
-      pattern: /^a$/i,
       homepage: new URL('https://orpc.dev'),
       missing: Number.NaN,
     })
@@ -153,7 +150,6 @@ describe('rpcJsonSerializer: wire format', () => {
       createdAt: '2023-01-01T00:00:00.000Z',
       tags: ['a'],
       scores: [['x', 1]],
-      pattern: '/^a$/i',
       homepage: 'https://orpc.dev/',
       missing: null,
     })
@@ -163,11 +159,10 @@ describe('rpcJsonSerializer: wire format', () => {
       ['date', 'createdAt'],
       ['set', 'tags'],
       ['map', 'scores'],
-      ['regexp', 'pattern'],
       ['url', 'homepage'],
       ['nan', 'missing'],
     ]))
-    expect(meta).toHaveLength(7)
+    expect(meta).toHaveLength(6)
   })
 
   it('omits meta entirely for pure JSON payloads', () => {
@@ -337,7 +332,6 @@ describe('rpcJsonSerializer: custom handlers', () => {
       invalidDate: new Date('Invalid'),
       nan: Number.NaN,
       url: new URL('https://orpc.dev'),
-      regexp: /uic/gi,
       set: new Set([1, 2]),
       map: new Map([['a', 1]]),
       bigint: 123n,
@@ -418,8 +412,12 @@ describe('rpcJsonSerializer: security', () => {
   })
 
   it('throws instead of producing garbage for corrupted built-in payloads', () => {
-    expect(() => serializer.deserialize({ json: 'not-a-regexp', meta: [['regexp']] })).toThrow()
     expect(() => serializer.deserialize({ json: 'not-a-bigint', meta: [['bigint']] })).toThrow()
+    expect(() => serializer.deserialize({ json: 'not-an-array', meta: [['set']] })).toThrow('not a valid "set" payload')
+    expect(() => serializer.deserialize({ json: 'not-an-array', meta: [['map']] })).toThrow('not a valid "map" payload')
+    expect(() => serializer.deserialize({ json: 1, meta: [['url']] })).toThrow('not a valid "url" payload')
+    expect(() => serializer.deserialize({ json: 1, meta: [['bigint']] })).toThrow('not a valid "bigint" payload')
+    expect(() => serializer.deserialize({ json: 1, meta: [['date']] })).toThrow('not a valid "date" payload')
   })
 
   /* eslint-disable no-proto, no-restricted-properties */
@@ -482,4 +480,67 @@ describe('rpcJsonSerializer: security', () => {
     expect(Object.getPrototypeOf(restored)).toBe(Object.prototype)
   })
   /* eslint-enable no-proto, no-restricted-properties */
+
+  describe('keeps deserialization work linear in the body size', () => {
+    /**
+     * A `meta` array may name the same path many times. Rebuilding the value once per entry
+     * would cost (elements x meta entries) while the body only grows with (elements + meta
+     * entries), so a small request could block the event loop for seconds.
+     */
+    it.each([
+      ['set', [1, 2, 3]],
+      ['map', [['a', 1], ['b', 2]]],
+      ['url', 'https://orpc.dev/'],
+      ['bigint', '7'],
+      ['date', '2023-01-01T00:00:00.000Z'],
+    ])('rejects a repeated "%s" entry for the same path', (type, json) => {
+      expect(() => serializer.deserialize({ json, meta: [[type]] })).not.toThrow()
+      expect(
+        () => serializer.deserialize({ json, meta: [[type], [type]] }),
+      ).toThrow(`not a valid "${type}" payload`)
+    })
+
+    it('stays fast for a payload built to repeat conversions', () => {
+      const json = Array.from({ length: 80_000 }, (_, i) => i)
+      const meta = Array.from({ length: 16_000 }, () => ['set'] as [string])
+
+      const started = performance.now()
+      expect(() => serializer.deserialize({ json, meta })).toThrow('not a valid "set" payload')
+      expect(performance.now() - started).toBeLessThan(1000)
+    })
+  })
+
+  it('still applies two meta entries that legitimately share one path', () => {
+    /**
+     * A non-terminal handler whose `serialize` returns a built-in container makes the
+     * serializer emit both entries at the same path, so rejecting repeated paths outright
+     * would break this. The shape assertions bound the work instead.
+     */
+    class Tags {
+      constructor(public items: string[]) {}
+    }
+
+    const custom = new RPCJsonSerializer({
+      handlers: {
+        tags: {
+          condition: (v: unknown) => v instanceof Tags,
+          serialize: (v: Tags) => new Set(v.items),
+          deserialize: (v: Set<string>) => new Tags([...v]),
+        },
+      },
+    })
+
+    expect(custom.serialize({ a: new Tags(['x', 'y']) }).meta).toEqual([['set', 'a'], ['tags', 'a']])
+
+    const restored = roundTripThroughWire(custom, { a: new Tags(['x', 'y']) }) as any
+    expect(restored.a).toBeInstanceOf(Tags)
+    expect(restored.a.items).toEqual(['x', 'y'])
+  })
+
+  it('does not rebuild a RegExp from serialized input', () => {
+    // Compiling an attacker-supplied pattern is expensive, and every later use of the
+    // compiled matcher is attacker-controlled too, so `regexp` is opt-in.
+    expect(() => serializer.deserialize({ json: '/^a$/i', meta: [['regexp']] })).toThrow()
+    expect(serializer.serialize(/^a$/i).meta).toBeUndefined()
+  })
 })

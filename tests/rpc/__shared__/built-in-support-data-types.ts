@@ -65,16 +65,6 @@ export const builtInRPCSupportDataTypes: { name: string, value: unknown, expecte
     expected: 99999999999999999999999999999n,
   },
   {
-    name: 'regex without flags',
-    value: /npa|npb/,
-    expected: /npa|npb/,
-  },
-  {
-    name: 'regex with flags',
-    value: /uic/gi,
-    expected: /uic/gi,
-  },
-  {
     name: 'URL',
     value: new URL('https://dinwwwh.com'),
     expected: new URL('https://dinwwwh.com'),
