@@ -157,6 +157,30 @@ describe('sortPlugins', () => {
     expect(() => sortPlugins(selfReference)).toThrow(/circular dependency/i)
   })
 
+  it('should not depend on where an unrelated plugin sits in the array', () => {
+    /**
+     * How the standard handler composes: `~tracing` is appended last so it wraps every plugin
+     * that does not order itself against it, and a plugin opting out declares `after`.
+     */
+    const tracing = { name: 'tracing' }
+    const optOut = { name: 'opt-out', after: ['tracing'] }
+    const plain = { name: 'plain' }
+
+    expect(sortPlugins([plain, optOut, tracing]).map(p => p.name)).toEqual(['plain', 'tracing', 'opt-out'])
+    expect(sortPlugins([optOut, plain, tracing]).map(p => p.name)).toEqual(['plain', 'tracing', 'opt-out'])
+  })
+
+  it('should name a plugin that is part of the cycle, not one merely waiting on it', () => {
+    const plugins = [
+      { name: 'bystander', after: ['a'] },
+      { name: 'a', before: ['b'] },
+      { name: 'b', before: ['a'] },
+    ]
+
+    expect(() => sortPlugins(plugins)).toThrow(/"a"|"b"/)
+    expect(() => sortPlugins(plugins)).not.toThrow(/bystander/)
+  })
+
   it('should detect subtle circular dependencies', () => {
     const plugins = [
       { name: 'a', before: ['b'], after: ['c'] },

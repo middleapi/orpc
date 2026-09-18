@@ -683,11 +683,12 @@ describe('standardHandler', () => {
 
   describe('plugin ordering', () => {
     /**
-     * `~tracing` must land in the same place whichever order the user listed their plugins in.
-     * A plugin that opts out of the request span (`after: ['~tracing']`, like `~batch` and
-     * `~cors`) used to drag `~tracing` past every plugin listed before it.
+     * A plugin that declares no order runs inside the request span, and a plugin that opts out
+     * with `after: ['~tracing']` (like `~batch` and `~cors`) runs outside it — whichever order
+     * the user listed them in. The opt-out plugin used to drag `~tracing` past every plugin
+     * listed before it, so the listing order decided which side of the span they landed on.
      */
-    it('nests the request span the same way whichever order plugins are listed in', async ({ onTestFinished }) => {
+    it('wraps a plugin that declares no order whichever order plugins are listed in', async ({ onTestFinished }) => {
       function makeProbe(seen: boolean[]) {
         return {
           name: '~probe',
@@ -748,8 +749,8 @@ describe('standardHandler', () => {
         const pluginHandler = new StandardHandler(codec as any, { plugins })
         await pluginHandler.handle(makeRequest(), OPTIONS)
 
-        expect(seen, listing).toHaveLength(1)
-        // Equality below would hold vacuously if `~tracing` stopped starting a request span.
+        // A plugin with no `before`/`after` sees the request span, so `~tracing` wrapped it.
+        expect(seen, listing).toEqual([true])
         expect(startedNames, listing).toContain('POST /api/v1/ping')
       }
 

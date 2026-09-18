@@ -11,6 +11,10 @@ export interface OrderablePlugin {
 
 /**
  * Sorts plugins based on their `before` and `after` dependencies.
+ *
+ * The sort is stable: plugins the constraints leave unordered keep their original relative
+ * order, so where a plugin lands never depends on where an unrelated plugin happens to sit
+ * in the array. A plugin appended last therefore runs last unless something asks to follow it.
  */
 export function sortPlugins<T extends OrderablePlugin>(
   plugins: T[],
@@ -31,82 +35,91 @@ export function sortPlugins<T extends OrderablePlugin>(
     }
   }
 
-  const graph: Array<Set<number>> = Array.from(
-    { length: pluginCount },
-    () => new Set<number>(),
-  )
+  /** Every index that must be emitted before this one, shrinking as they are emitted. */
+  const dependencies: Array<Set<number>> = Array.from({ length: pluginCount }, () => new Set<number>())
+  /** Every index waiting on this one. */
+  const dependents: Array<number[]> = Array.from({ length: pluginCount }, () => [])
+
+  function addEdge(before: number, after: number): void {
+    if (dependencies[after]!.has(before)) {
+      return
+    }
+
+    dependencies[after]!.add(before)
+    dependents[before]!.push(after)
+  }
 
   for (let i = 0; i < pluginCount; i++) {
     const plugin = plugins[i]!
 
-    const beforeList = plugin.before
-    if (beforeList !== undefined) {
-      for (const beforeId of beforeList) {
-        const beforeIndices = pluginIdToIndices.get(beforeId)
-        if (beforeIndices === undefined)
-          continue
-
-        for (const beforeIndex of beforeIndices) {
-          const beforeGraph = graph[beforeIndex]
-          if (beforeGraph !== undefined) {
-            beforeGraph.add(i)
-          }
-        }
+    for (const beforeId of plugin.before ?? []) {
+      for (const beforeIndex of pluginIdToIndices.get(beforeId) ?? []) {
+        addEdge(i, beforeIndex)
       }
     }
 
-    const afterList = plugin.after
-    if (afterList !== undefined) {
-      const currentGraph = graph[i]
-      if (currentGraph !== undefined) {
-        for (const afterId of afterList) {
-          const afterIndices = pluginIdToIndices.get(afterId)
-          if (afterIndices === undefined)
-            continue
-
-          for (const afterIndex of afterIndices) {
-            currentGraph.add(afterIndex)
-          }
-        }
+    for (const afterId of plugin.after ?? []) {
+      for (const afterIndex of pluginIdToIndices.get(afterId) ?? []) {
+        addEdge(afterIndex, i)
       }
     }
   }
 
+  /** Insertion order is ascending and deletions preserve it, so iterating yields the lowest index first. */
+  const remaining = new Set<number>(Array.from({ length: pluginCount }, (_, i) => i))
   const sorted: T[] = []
-  const visiting = new Set<number>()
-  const visited = new Set<number>()
 
-  function visit(index: number): void {
-    if (visited.has(index))
-      return
+  while (sorted.length < pluginCount) {
+    let next: number | undefined
 
-    if (visiting.has(index)) {
-      const plugin = plugins[index]
-      const pluginId = plugin !== undefined ? plugin.name : 'unknown'
+    for (const index of remaining) {
+      if (dependencies[index]!.size === 0) {
+        next = index
+        break
+      }
+    }
+
+    if (next === undefined) {
+      const pluginId = plugins[findCycleMember(dependencies, remaining)]?.name ?? 'unknown'
       throw new Error(`Circular dependency detected involving plugin "${pluginId}"`)
     }
 
-    visiting.add(index)
+    remaining.delete(next)
+    sorted.push(plugins[next]!)
 
-    const deps = graph[index]
-    if (deps !== undefined) {
-      for (const depIndex of deps) {
-        visit(depIndex)
-      }
+    for (const dependent of dependents[next]!) {
+      dependencies[dependent]!.delete(next)
     }
-
-    visiting.delete(index)
-    visited.add(index)
-
-    const plugin = plugins[index]
-    if (plugin !== undefined) {
-      sorted.push(plugin)
-    }
-  }
-
-  for (let i = 0; i < pluginCount; i++) {
-    visit(i)
   }
 
   return sorted
+}
+
+/**
+ * Walks dependency edges among the plugins that never became ready until one repeats.
+ * Every one of them still has an unmet dependency, so the walk always reaches a cycle.
+ */
+function findCycleMember(dependencies: Array<Set<number>>, remaining: Set<number>): number {
+  const seen = new Set<number>()
+  let current = remaining.values().next().value!
+
+  while (!seen.has(current)) {
+    seen.add(current)
+
+    let next: number | undefined
+    for (const dependency of dependencies[current]!) {
+      if (remaining.has(dependency)) {
+        next = dependency
+        break
+      }
+    }
+
+    if (next === undefined) {
+      break
+    }
+
+    current = next
+  }
+
+  return current
 }

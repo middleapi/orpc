@@ -77,16 +77,16 @@ export class StandardHandler<T extends Context> {
     options: StandardHandlerOptions<T>,
   ) {
     /**
-     * `~tracing` must stay first. `sortPlugins` visits index 0 before anything else, so a
-     * plugin there is initialized ahead of every plugin that does not explicitly ask to run
-     * before it (`before: ['~tracing']`, as `~evlog` and `~pino` do) — which side of the span
-     * each plugin lands on stops depending on the order the user listed them in.
-     * Appending it instead makes it hoist to just before the first plugin declaring
-     * `after: ['~tracing']`, and that position does depend on the listing order.
+     * `~tracing` goes last so its interceptor wraps every plugin that does not order itself
+     * against it: each plugin prepends its routing interceptor, so the plugin initialized
+     * last ends up outermost. A plugin opts out by declaring `after: ['~tracing']`, which
+     * `~batch` and `~cors` do, and `before: ['~tracing']` puts one inside the span instead.
+     * `sortPlugins` is stable, so this position does not depend on how the user ordered
+     * their own plugins.
      */
     options = new CompositeStandardHandlerPlugin([
-      new TracingHandlerPlugin(),
       ...toArray(options.plugins),
+      new TracingHandlerPlugin(),
     ]).init(options)
 
     this.routingInterceptors = options.routingInterceptors
