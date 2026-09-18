@@ -8,7 +8,7 @@ import { StandardLink } from '@orpc/client/standard'
 import { OpenAPILinkCodec } from '../standard'
 
 export interface OpenAPILinkOptions<T extends ClientContext>
-  extends Omit<StandardLinkOptions<T>, 'plugins'>, FetchLinkTransportOptions<T>, OpenAPILinkCodecOptions<T> {
+  extends StandardLinkOptions<T>, FetchLinkTransportOptions<T>, OpenAPILinkCodecOptions<T> {
 }
 
 /**

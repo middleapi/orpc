@@ -159,11 +159,11 @@ describe('handler', () => {
 
   it('serves mocks through the provided handler, e.g. with plugins', async () => {
     const factory = vi.fn((router: AnyRouter) => new RPCHandler(router, {
-      fetchInterceptors: [async ({ next }) => {
+      routingInterceptors: [async ({ next }) => {
         const result = await next()
 
         if (result.matched) {
-          result.response.headers.set('x-mocked', '1')
+          result.response.headers['x-mocked'] = '1'
         }
 
         return result

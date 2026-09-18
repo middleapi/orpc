@@ -7,7 +7,7 @@ import { StandardHandler } from '@orpc/server/standard'
 import { OpenAPIHandlerCodec } from '../standard'
 
 export interface OpenAPIHandlerOptions<T extends Context>
-  extends FastifyHandlerOptions<T>, Omit<StandardHandlerOptions<T>, 'plugins'>, OpenAPIHandlerCodecOptions<T> {}
+  extends FastifyHandlerOptions<T>, StandardHandlerOptions<T>, OpenAPIHandlerCodecOptions<T> {}
 
 /**
  * Serves oRPC procedures over the OpenAPI (RESTful) protocol as part of a Fastify server.

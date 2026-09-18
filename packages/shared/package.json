@@ -1,7 +1,7 @@
 {
   "name": "@orpc/shared",
   "type": "module",
-  "version": "2.0.0-beta.35",
+  "version": "2.0.0-beta.36",
   "description": "Internal utilities shared across oRPC packages",
   "license": "MIT",
   "funding": [
@@ -40,7 +40,7 @@
     "type:check": "tsc -b"
   },
   "dependencies": {
-    "@standard-server/shared": "~0.9.0",
+    "@standard-server/shared": "~0.9.1",
     "radash": "^12.1.1",
     "type-fest": "^5.3.1"
   },

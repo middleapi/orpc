@@ -1,7 +1,7 @@
 {
   "name": "@orpc/ratelimit",
   "type": "module",
-  "version": "2.0.0-beta.35",
+  "version": "2.0.0-beta.36",
   "description": "Rate limiting for oRPC procedures, with memory, Redis, and Upstash adapters",
   "license": "MIT",
   "funding": [
@@ -85,7 +85,7 @@
   "dependencies": {
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.9.0"
+    "@standard-server/core": "~0.9.1"
   },
   "devDependencies": {
     "@upstash/ratelimit": "^2.0.8",

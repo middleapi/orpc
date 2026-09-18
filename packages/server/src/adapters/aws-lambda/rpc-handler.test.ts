@@ -1,5 +1,5 @@
 import type { APIGatewayProxyEventV2, AwsLambdaGlobal, HttpResponseStream } from '@standard-server/aws-lambda'
-import type { AwsLambdaHandlerPlugin } from './plugin'
+import type { StandardHandlerPlugin } from '../standard'
 import { Buffer } from 'node:buffer'
 import { Writable } from 'node:stream'
 import { os } from '../../builder'
@@ -85,18 +85,14 @@ describe('rpcHandler', () => {
     expect(mismatchStream.text).toBe('')
   })
 
-  it('supports aws lambda handler plugin', async () => {
-    const plugin: AwsLambdaHandlerPlugin<any> = {
+  it('supports standard handler plugins', async () => {
+    const plugin: StandardHandlerPlugin<any> = {
       name: 'test',
-      initAwsLambdaHandlerOptions(options) {
+      init(options) {
         return {
           ...options,
-          awsLambdaInterceptors: [
-            async ({ responseStream }) => {
-              responseStream.end('intercepted')
-
-              return { matched: true }
-            },
+          routingInterceptors: [
+            async () => ({ matched: true, response: { status: 200, headers: {}, body: 'intercepted' } }),
           ],
         }
       },
@@ -108,7 +104,7 @@ describe('rpcHandler', () => {
     const result = await handler.handle(createEvent({ requestContext: { http: { method: 'GET' } }, body: undefined }), responseStream)
 
     expect(result.matched).toBe(true)
-    expect(responseStream.text).toBe('intercepted')
+    expect(responseStream.text).toBe('"intercepted"')
   })
 
   it('treats GET requests as unmatched by default', async () => {

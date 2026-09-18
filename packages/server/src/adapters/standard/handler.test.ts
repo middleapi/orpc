@@ -432,22 +432,10 @@ describe('standardHandler', () => {
     beforeEach(() => {
       span = createSpan()
 
-      /**
-       * The request span is the first one started, every later one
-       * (`find_procedure`, `decode_input`, ...) is a child and gets its own.
-       */
-      let isRequestSpanStarted = false
-
       tracer = {
-        startSpan: vi.fn(() => createSpan()),
-        startActiveSpan: vi.fn((_name, _parent, fn) => {
-          if (isRequestSpanStarted) {
-            return fn(createSpan())
-          }
-
-          isRequestSpanStarted = true
-          return fn(span)
-        }),
+        startSpan: vi.fn(() => span),
+        // the request span is the first active span started
+        startActiveSpan: vi.fn((_name, _parent, fn) => fn(createSpan())).mockImplementationOnce((_name, _parent, fn) => fn(span)),
         withActiveSpan: vi.fn((_span, fn) => fn()),
         getActiveSpan: () => span,
         extract: vi.fn(),
@@ -490,11 +478,11 @@ describe('standardHandler', () => {
       await expect(handler.handle(request, OPTIONS)).resolves.toEqual({ matched: false })
 
       expect(tracer.extract).toHaveBeenCalledWith(request.headers)
-      expect(tracer.startSpan).not.toHaveBeenCalled()
       expect(tracer.startActiveSpan).toHaveBeenNthCalledWith(1, 'POST /api/v1/ping', parent, expect.any(Function))
-      expect(tracer.startActiveSpan).toHaveBeenCalledWith('find_procedure', undefined, expect.any(Function))
+      expect(tracer.startSpan).not.toHaveBeenCalled()
       // Only a streamed body needs the span re-activated after the handler returns.
       expect(tracer.withActiveSpan).not.toHaveBeenCalled()
+      expect(tracer.startActiveSpan).toHaveBeenCalledWith('find_procedure', undefined, expect.any(Function))
       expect(span.updateName).toHaveBeenCalledWith('orpc_no_match')
       expect(span.recordException).not.toHaveBeenCalled()
       expect(span.end).toHaveBeenCalledTimes(1)

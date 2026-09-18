@@ -1,7 +1,7 @@
 {
   "name": "@orpc/openapi",
   "type": "module",
-  "version": "2.0.0-beta.35",
+  "version": "2.0.0-beta.36",
   "description": "Generate OpenAPI specs from oRPC routers and serve OpenAPI-compliant APIs with end-to-end type safety",
   "license": "MIT",
   "funding": [
@@ -122,13 +122,13 @@
     "@orpc/json-schema": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.9.0",
-    "@standard-server/fetch": "~0.9.0",
+    "@standard-server/core": "~0.9.1",
+    "@standard-server/fetch": "~0.9.1",
     "rou3": "^0.9.1"
   },
   "devDependencies": {
     "@scalar/api-reference": "^1.65.1",
-    "@standard-server/aws-lambda": "~0.9.0",
+    "@standard-server/aws-lambda": "~0.9.1",
     "@types/swagger-ui": "^5.32.0",
     "fastify": "^5.12.1",
     "swagger-ui": "^5.32.14",

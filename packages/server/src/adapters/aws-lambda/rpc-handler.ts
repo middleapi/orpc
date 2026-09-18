@@ -6,7 +6,7 @@ import { RPCHandlerCodec, StandardHandler } from '../standard'
 import { AwsLambdaHandler } from './handler'
 
 export interface RPCHandlerOptions<T extends Context>
-  extends AwsLambdaHandlerOptions<T>, Omit<StandardHandlerOptions<T>, 'plugins'>, RPCHandlerCodecOptions<T> {}
+  extends AwsLambdaHandlerOptions<T>, StandardHandlerOptions<T>, RPCHandlerCodecOptions<T> {}
 
 /**
  * Serves an oRPC router over the RPC protocol on AWS Lambda,

@@ -1,7 +1,7 @@
 {
   "name": "@orpc/server",
   "type": "module",
-  "version": "2.0.0-beta.35",
+  "version": "2.0.0-beta.36",
   "description": "Build typesafe APIs with oRPC: RPC and OpenAPI support, middleware, and adapters for Node.js, Bun, Deno, Fetch, Fastify, WebSocket, AWS Lambda, and more",
   "license": "MIT",
   "funding": [
@@ -142,12 +142,12 @@
     "@orpc/client": "workspace:*",
     "@orpc/contract": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/aws-lambda": "~0.9.0",
-    "@standard-server/core": "~0.9.0",
-    "@standard-server/fastify": "~0.9.0",
-    "@standard-server/fetch": "~0.9.0",
-    "@standard-server/node": "~0.9.0",
-    "@standard-server/peer": "~0.9.0",
+    "@standard-server/aws-lambda": "~0.9.1",
+    "@standard-server/core": "~0.9.1",
+    "@standard-server/fastify": "~0.9.1",
+    "@standard-server/fetch": "~0.9.1",
+    "@standard-server/node": "~0.9.1",
+    "@standard-server/peer": "~0.9.1",
     "cookie": "^2.0.1"
   },
   "devDependencies": {

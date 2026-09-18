@@ -1,4 +1,4 @@
-import type { FetchHandlerPlugin } from '@orpc/server/fetch'
+import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import { os } from '@orpc/server'
 import { openapi } from '../../meta'
 import { OpenAPIHandler } from './openapi-handler'
@@ -48,14 +48,14 @@ describe('openapiHandler', () => {
     expect(misMatchPrefixResult.response).toBeUndefined()
   })
 
-  it('support fetch handler plugin', async () => {
-    const plugin: FetchHandlerPlugin<any> = {
+  it('supports standard handler plugins', async () => {
+    const plugin: StandardHandlerPlugin<any> = {
       name: 'test',
-      initFetchHandlerOptions(options) {
+      init(options) {
         return {
           ...options,
-          fetchInterceptors: [
-            async () => ({ matched: true, response: new Response('intercepted') }),
+          routingInterceptors: [
+            async () => ({ matched: true, response: { status: 200, headers: {}, body: 'intercepted' } }),
           ],
         }
       },
@@ -68,6 +68,6 @@ describe('openapiHandler', () => {
     expect(matched).toBe(true)
     expect(response).toBeInstanceOf(Response)
     expect(response!.status).toBe(200)
-    return expect(response!.text()).resolves.toBe('intercepted')
+    return expect(response!.text()).resolves.toBe('"intercepted"')
   })
 })

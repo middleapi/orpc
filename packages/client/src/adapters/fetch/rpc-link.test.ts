@@ -186,7 +186,7 @@ describe('rpcLink', () => {
     )
   })
 
-  it('supports transport interceptors and toFetchBodyOptions', async () => {
+  it('supports custom fetch and toFetchRequest options', async () => {
     const fetch = vi.fn(async () => {
       return new Response(JSON.stringify({ json: 'pong' }), {
         status: 200,
@@ -196,31 +196,26 @@ describe('rpcLink', () => {
       })
     })
 
-    const fetchInterceptor = vi.fn(({ next }) => next())
-
     const toFetchRequestOptions = { eventStream: { keepAlive: { enabled: true, comment: 'ok' } } }
 
     const orpc = createORPCClient(new RPCLink({
       fetch,
       origin: 'http://api.example.com',
-      fetchInterceptors: [fetchInterceptor],
       toFetchRequest: toFetchRequestOptions,
     })) as any
 
     await expect(orpc.ping('input')).resolves.toEqual('pong')
 
-    expect(fetchInterceptor).toHaveBeenCalledOnce()
-    expect(fetchInterceptor).toHaveBeenCalledWith(expect.objectContaining({
-      context: {},
-      path: ['ping'],
-      url: 'http://api.example.com/ping',
-      init: expect.objectContaining({
+    expect(fetch).toHaveBeenCalledOnce()
+    expect(fetch).toHaveBeenCalledWith(
+      'http://api.example.com/ping',
+      expect.objectContaining({
         method: 'POST',
         redirect: 'manual',
       }),
-    }))
-
-    expect(fetch).toHaveBeenCalledOnce()
+      expect.objectContaining({ context: {} }),
+      ['ping'],
+    )
     expect(toFetchBody).toHaveBeenCalledWith({ json: 'input' }, {}, toFetchRequestOptions)
   })
 

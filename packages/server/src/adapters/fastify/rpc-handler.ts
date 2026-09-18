@@ -6,7 +6,7 @@ import { RPCHandlerCodec, StandardHandler } from '../standard'
 import { FastifyHandler } from './handler'
 
 export interface RPCHandlerOptions<T extends Context>
-  extends FastifyHandlerOptions<T>, Omit<StandardHandlerOptions<T>, 'plugins'>, RPCHandlerCodecOptions<T> {}
+  extends FastifyHandlerOptions<T>, StandardHandlerOptions<T>, RPCHandlerCodecOptions<T> {}
 
 /**
  * Serves an oRPC router over the RPC protocol inside a Fastify server.

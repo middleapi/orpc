@@ -1,7 +1,7 @@
 {
   "name": "@orpc/cloudflare",
   "type": "module",
-  "version": "2.0.0-beta.35",
+  "version": "2.0.0-beta.36",
   "description": "Cloudflare integration for oRPC: Durable Object pub/sub and locking, Workers rate limiting, and Workers Traces adapters",
   "license": "MIT",
   "funding": [
@@ -57,7 +57,7 @@
     "@orpc/publisher": "workspace:*",
     "@orpc/ratelimit": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.9.0"
+    "@standard-server/core": "~0.9.1"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.22.0",

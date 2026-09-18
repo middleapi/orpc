@@ -250,9 +250,79 @@ export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
               }
             }
 
-            let result: StandardHandlerHandleResult
             try {
-              result = await next()
+              const result = await next()
+
+              if (!result.matched) {
+                endSpan()
+                return result
+              }
+
+              const body = result.response.body
+              const isIterator = isAsyncIteratorObject(body)
+
+              if (isIterator || body instanceof ReadableStream) {
+                const signal = request.signal
+
+                /**
+                 * An adapter can drop a streamed body without reading or cancelling it;
+                 * `@standard-server/peer` does when the request aborts before it transmits.
+                 * The signal is the last resort that keeps the span from staying open forever.
+                 */
+                if (signal?.aborted) {
+                  endSpan()
+                }
+                else {
+                  signal?.addEventListener('abort', endSpan, { once: true })
+                }
+
+                const wrapOptions = {
+                  /**
+                   * Every pull runs with the request span active, so nested calls and the lazy
+                   * `consume_*_output` spans stay inside the same trace. Best effort: backends
+                   * that cannot activate an existing span run the pull as is.
+                   */
+                  runWith: <T>(run: () => Promise<T>) => tracer.withActiveSpan(span, run),
+                  onError(error: ThrowableError) {
+                    /**
+                     * Errors here are internal (interceptor/framework) failures,
+                     * except `ErrorEvent`: a business error the protocol delivers
+                     * inside the event stream, already logged by the client interceptor.
+                     * A client disconnecting mid-stream surfaces as an abort instead, which
+                     * `recordSpanError` keeps out of the error level.
+                     */
+                    if (!isEnded && !(error instanceof ErrorEvent)) {
+                      recordSpanError(span, error)
+                    }
+                  },
+                  onFinish() {
+                    signal?.removeEventListener('abort', endSpan)
+                    endSpan()
+                  },
+                }
+
+                return {
+                  ...result,
+                  response: {
+                    ...result.response,
+                    /**
+                     * @warning
+                     * Remember use `override` for remaining special properties
+                     */
+                    body: isIterator
+                      ? override(body, wrapAsyncIterator(body, wrapOptions))
+                      : override(body, wrapReadableStream(body, wrapOptions)),
+                  },
+                }
+              }
+
+              /**
+               * A body the adapter sends in one piece (json, `Blob`, `FormData`, ...) is not
+               * observable from here, so the span ends before the adapter transmits it. Only a
+               * streamed body can hold the span open until its last chunk.
+               */
+              endSpan()
+              return result
             }
             catch (e) {
               /**
@@ -263,77 +333,6 @@ export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
               endSpan()
               throw e
             }
-
-            if (!result.matched) {
-              endSpan()
-              return result
-            }
-
-            const body = result.response.body
-            const isIterator = isAsyncIteratorObject(body)
-
-            if (isIterator || body instanceof ReadableStream) {
-              const signal = request.signal
-
-              /**
-               * An adapter can drop a streamed body without reading or cancelling it;
-               * `@standard-server/peer` does when the request aborts before it transmits.
-               * The signal is the last resort that keeps the span from staying open forever.
-               */
-              if (signal?.aborted) {
-                endSpan()
-              }
-              else {
-                signal?.addEventListener('abort', endSpan, { once: true })
-              }
-
-              const wrapOptions = {
-                /**
-                 * Every pull runs with the request span active, so nested calls and the lazy
-                 * `consume_*_output` spans stay inside the same trace. Best effort: backends
-                 * that cannot activate an existing span run the pull as is.
-                 */
-                runWith: <T>(run: () => Promise<T>) => tracer.withActiveSpan(span, run),
-                onError(error: ThrowableError) {
-                  /**
-                   * Errors here are internal (interceptor/framework) failures,
-                   * except `ErrorEvent`: a business error the protocol delivers
-                   * inside the event stream, already logged by the client interceptor.
-                   * A client disconnecting mid-stream surfaces as an abort instead, which
-                   * `recordSpanError` keeps out of the error level.
-                   */
-                  if (!isEnded && !(error instanceof ErrorEvent)) {
-                    recordSpanError(span, error)
-                  }
-                },
-                onFinish() {
-                  signal?.removeEventListener('abort', endSpan)
-                  endSpan()
-                },
-              }
-
-              return {
-                ...result,
-                response: {
-                  ...result.response,
-                  /**
-                   * @warning
-                   * Remember use `override` for remaining special properties
-                   */
-                  body: isIterator
-                    ? override(body, wrapAsyncIterator(body, wrapOptions))
-                    : override(body, wrapReadableStream(body, wrapOptions)),
-                },
-              }
-            }
-
-            /**
-             * A body the adapter sends in one piece (json, `Blob`, `FormData`, ...) is not
-             * observable from here, so the span ends before the adapter transmits it. Only a
-             * streamed body can hold the span open until its last chunk.
-             */
-            endSpan()
-            return result
           })
         },
         ...toArray(options.routingInterceptors),

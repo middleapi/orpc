@@ -5,7 +5,7 @@ import { RPCLinkCodec, StandardLink } from '../standard'
 import { FetchLinkTransport } from './transport'
 
 export interface RPCLinkOptions<T extends ClientContext>
-  extends Omit<StandardLinkOptions<T>, 'plugins'>, FetchLinkTransportOptions<T>, RPCLinkCodecOptions<T> {
+  extends StandardLinkOptions<T>, FetchLinkTransportOptions<T>, RPCLinkCodecOptions<T> {
 }
 
 /**

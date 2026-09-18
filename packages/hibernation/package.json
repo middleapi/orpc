@@ -1,7 +1,7 @@
 {
   "name": "@orpc/hibernation",
   "type": "module",
-  "version": "2.0.0-beta.35",
+  "version": "2.0.0-beta.36",
   "description": "Hibernation API support for oRPC, including Cloudflare Durable Objects' WebSocket Hibernation",
   "license": "MIT",
   "funding": [
@@ -48,7 +48,7 @@
     "@orpc/client": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.9.0",
-    "@standard-server/peer": "~0.9.0"
+    "@standard-server/core": "~0.9.1",
+    "@standard-server/peer": "~0.9.1"
   }
 }

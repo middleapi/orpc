@@ -100,7 +100,8 @@ Most v1 names still compile through deprecated aliases (strike-through hints, no
    - `RPCLink`: the single `url` split into `origin` plus a path-only `url`.
    - Errors: `status` was removed from `ORPCError` and `.errors` definitions; map codes to HTTP status with `errorStatusMap` on the handler.
    - `safe()`: the third tuple element is now the typed error itself (or `null`) and a fourth `isSuccess` element was added.
-   - Option renames, scoped: handler `rootInterceptors` to `routingInterceptors` (handler `clientInterceptors` still exists, unchanged); link `clientInterceptors` to `transportInterceptors`; on both, `adapterInterceptors` is renamed after the adapter, e.g. `fetchInterceptors` on the fetch adapter. Flat `eventIterator*` options moved under the adapter's request/response mapping: `toFetchResponse.eventStream` on the fetch handler, `sendStandardResponse.eventStream` on Node, `toFetchRequest.eventStream` on the link.
+   - Option renames, scoped: handler `rootInterceptors` to `routingInterceptors` (handler `clientInterceptors` still exists, unchanged); link `clientInterceptors` to `transportInterceptors`. Flat `eventIterator*` options moved under the adapter's request/response mapping: `toFetchResponse.eventStream` on the fetch handler, `sendStandardResponse.eventStream` on Node, `toFetchRequest.eventStream` on the link.
+   - `adapterInterceptors` was removed from handlers and links, because regular interceptors can now customize body parsing behavior.
 3. **Audit silent behavior changes** (compile fine, behave differently):
    - **Wire format changed:** a v1 link cannot talk to a v2 server, in either direction. Deploy the upgraded server and clients together.
    - **Automatic middleware deduplication removed:** middleware applied at both router and procedure level now runs twice, with no warning. Guard shared middleware with the context-flag pattern from the dedupe-middleware recipe.

@@ -569,21 +569,19 @@ The v2 [GET Method CSRF Protection Plugin](/docs/plugins/get-method-csrf-protect
 
 ### Interceptor options renamed
 
-`rootInterceptors` is now `routingInterceptors`, and `adapterInterceptors` is now named after the adapter (for example `fetchInterceptors` on the fetch adapter). See [RPC Handler](/docs/rpc/handler).
+`rootInterceptors` is now `routingInterceptors`. `adapterInterceptors` was removed, because regular interceptors can now customize body parsing behavior. See [RPC Handler](/docs/rpc/handler).
 
 <CodeGroup>
 
 ```ts v2
 const handler = new RPCHandler(router, {
   routingInterceptors: [/* ... */],
-  fetchInterceptors: [/* ... */],
 })
 ```
 
 ```ts v1
 const handler = new RPCHandler(router, {
   rootInterceptors: [/* ... */],
-  adapterInterceptors: [/* ... */],
 })
 ```
 
@@ -831,7 +829,7 @@ const link = new RPCLink({
 
 ### Link interceptors renamed
 
-`clientInterceptors` is now `transportInterceptors`, and `adapterInterceptors` is now `fetchInterceptors` on the fetch adapter. Event stream options moved under `toFetchRequest.eventStream`, mirroring the handler-side change. See [RPC Link](/docs/rpc/link).
+`clientInterceptors` is now `transportInterceptors`. `adapterInterceptors` was removed, mirroring the handler-side change. Event stream options moved under `toFetchRequest.eventStream`. See [RPC Link](/docs/rpc/link).
 
 ### Typed clients for contracts
 

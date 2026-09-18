@@ -231,7 +231,8 @@ export class ImplementInterceptor implements NestInterceptor {
 
         httpAdapter.status(res, result.response.status)
 
-        for (const [key, value] of Object.entries(result.response.headers)) {
+        for (const key of Object.keys(result.response.headers)) {
+          const value = result.response.headers[key]
           if (typeof value === 'string') {
             httpAdapter.setHeader(res, key, value)
           }

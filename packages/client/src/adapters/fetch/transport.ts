@@ -1,12 +1,10 @@
-import type { Interceptor, Promisable, Value } from '@orpc/shared'
+import type { Promisable, Value } from '@orpc/shared'
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { ToFetchBodyOptions } from '@standard-server/fetch'
 import type { ClientContext, ClientOptions } from '../../types'
 import type { StandardLinkTransport } from '../standard'
-import type { FetchLinkTransportPlugin } from './plugin'
-import { intercept, once, value } from '@orpc/shared'
+import { once, value } from '@orpc/shared'
 import { toFetchBody, toFetchHeaders, toStandardLazyResponse } from '@standard-server/fetch'
-import { CompositeFetchLinkTransportPlugin } from './plugin'
 
 const GET_SUPPORTED_DUPLEX_MODE = once(() => {
   // TODO: Try `duplex: 'full'` when it is widely supported.
@@ -32,13 +30,6 @@ const GET_SUPPORTED_DUPLEX_MODE = once(() => {
   }
 })
 
-export interface FetchLinkTransportFetchInterceptorOptions<T extends ClientContext> extends ClientOptions<T> {
-  path: string[]
-  url: string
-  init: RequestInit
-}
-export type FetchLinkTransportFetchInterceptor<T extends ClientContext> = Interceptor<FetchLinkTransportFetchInterceptorOptions<T>, Promise<Response>>
-
 export interface FetchLinkTransportOptions<T extends ClientContext> {
   /**
    * The origin to prepend to all request URLs, useful for CORS requests.
@@ -59,30 +50,19 @@ export interface FetchLinkTransportOptions<T extends ClientContext> {
    * @default (url, init) => globalThis.fetch(url, init)
    */
   fetch?(url: string, init: RequestInit, options: ClientOptions<T>, path: string[]): Promise<Response>
-
-  /**
-   * Interceptors that execute before the actual fetch call, useful for modifying the fetch parameters, adding logging, etc.
-   */
-  fetchInterceptors?: FetchLinkTransportFetchInterceptor<T>[]
-
-  plugins?: FetchLinkTransportPlugin<T>[]
 }
 
 export class FetchLinkTransport<T extends ClientContext> implements StandardLinkTransport<T> {
   private readonly origin: FetchLinkTransportOptions<T>['origin']
   private readonly fetch: Exclude<FetchLinkTransportOptions<T>['fetch'], undefined>
   private readonly toFetchRequestOptions: FetchLinkTransportOptions<T>['toFetchRequest']
-  private readonly fetchInterceptors: FetchLinkTransportOptions<T>['fetchInterceptors']
 
   constructor(options: FetchLinkTransportOptions<T>) {
-    options = new CompositeFetchLinkTransportPlugin(options.plugins).initFetchLinkTransportOptions(options)
-
     this.origin = options.origin
     // Resolve `globalThis.fetch` lazily so interception tools (msw, undici MockAgent, etc.)
     // that patch it after this transport is constructed still take effect.
     this.fetch = options.fetch ?? ((url, init) => (globalThis.fetch)(url, init))
     this.toFetchRequestOptions = options.toFetchRequest
-    this.fetchInterceptors = options.fetchInterceptors
   }
 
   async send(standardRequest: StandardRequest, path: string[], options: ClientOptions<T>): Promise<StandardLazyResponse> {
@@ -109,11 +89,7 @@ export class FetchLinkTransport<T extends ClientContext> implements StandardLink
       }
     }
 
-    const response = await intercept(
-      this.fetchInterceptors,
-      { ...options, url, path, init },
-      ({ url, path, init, ...options }) => this.fetch(url, init, options, path),
-    )
+    const response = await this.fetch(url, init, options, path)
 
     const standardResponse = toStandardLazyResponse(response)
 

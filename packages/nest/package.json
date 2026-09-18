@@ -1,7 +1,7 @@
 {
   "name": "@orpc/nest",
   "type": "module",
-  "version": "2.0.0-beta.35",
+  "version": "2.0.0-beta.36",
   "description": "NestJS integration for oRPC: implement typesafe contracts in NestJS controllers",
   "license": "MIT",
   "funding": [
@@ -67,8 +67,8 @@
     "@orpc/openapi": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.9.0",
-    "@standard-server/node": "~0.9.0"
+    "@standard-server/core": "~0.9.1",
+    "@standard-server/node": "~0.9.1"
   },
   "devDependencies": {
     "@fastify/cookie": "^11.0.2",

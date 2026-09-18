@@ -1,4 +1,4 @@
-import type { AnyProcedureContract, AnySchema, ErrorMap } from '@orpc/contract'
+import type { AnyProcedureContract, AnySchema } from '@orpc/contract'
 import type { JsonObjectSchemaEntry, JsonSchema, JsonSchemaConverterDirection } from '@orpc/json-schema'
 import type { Value } from '@orpc/shared'
 import type { OpenAPIMeta } from './meta'
@@ -452,7 +452,8 @@ export function buildErrorResponse(
 ): void {
   const definitionsByStatus = new Map<number, OpenAPIErrorBodyDefinition[]>()
 
-  for (const [code, config] of Object.entries(def.errorMap as ErrorMap)) {
+  for (const code of Object.keys(def.errorMap)) {
+    const config = def.errorMap[code]
     if (!config) {
       continue
     }

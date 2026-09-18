@@ -27,8 +27,8 @@ const link = new OpenAPILink(contract, {
   plugins: [
     new RetryAfterLinkPlugin(),
   ],
-  fetch: (request, init) => { // <- only available in fetch adapter
-    return globalThis.fetch(request, {
+  fetch: (url, init) => { // <- only available in fetch adapter
+    return globalThis.fetch(url, {
       ...init,
       credentials: 'include', // Include cookies on cross-origin requests
     })
@@ -198,32 +198,6 @@ const link = new OpenAPILink(contract, {
 })
 ```
 
-### Adapter Interceptors
-
-Some `OpenAPILink` implementations also support adapter-specific interceptors. The fetch adapter exposes `fetchInterceptors`, which run right before `fetch` and give you access to the final `url` and `RequestInit`.
-
-```ts
-const link = new OpenAPILink(contract, {
-  fetchInterceptors: [
-    async (options) => {
-      const response = await options.next({
-        ...options,
-        init: {
-          ...options.init,
-          credentials: 'include',
-        },
-      })
-
-      return response
-    },
-  ],
-})
-```
-
-:::info
-This example uses the fetch adapter. For other adapters, refer to their JSDoc or adapter-specific documentation.
-:::
-
 ## Plugins
 
 Plugins package reusable interceptors. For example, [Retry After Plugin](/docs/plugins/retry-after) adds retry behavior based on the `retry-after` response header.
@@ -358,7 +332,6 @@ sequenceDiagram
   L ->> L: encode request
   Note over L: transportInterceptors
   L ->> Transport: standard request
-  Note over Transport: adapter interceptors (e.g. fetchInterceptors)
   Transport ->> Server: request
   Server ->> Transport: response
   Transport ->> L: standard response

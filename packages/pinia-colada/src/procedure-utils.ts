@@ -186,7 +186,6 @@ export function isProcedureUtilsOptions(value: unknown): value is ProcedureUtils
     return false
   }
 
-  // Own keys only: an inherited enumerable key must not decide what this options object is.
   for (const key of Object.keys(value)) {
     if (value[key] === undefined) {
       continue

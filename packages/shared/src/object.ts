@@ -20,8 +20,8 @@ export function findDeepMatches(
     })
   }
   else if (isPlainObject(payload)) {
-    for (const [key, value] of Object.entries(payload)) {
-      findDeepMatches(check, value, [...segments, key], maps, values)
+    for (const key of Object.keys(payload)) {
+      findDeepMatches(check, payload[key], [...segments, key], maps, values)
     }
   }
 
@@ -157,7 +157,7 @@ export function mergeTwoLevels(first: unknown, second: unknown): unknown {
     const secondValue = second[key]
 
     if (isPlainObject(firstValue) && isPlainObject(secondValue)) {
-      setOwn(result, key, { ...firstValue, ...secondValue })
+      result[key] = { ...firstValue, ...secondValue }
     }
   }
 
@@ -212,8 +212,8 @@ function cloneWithVisited(value: unknown, visited: WeakMap<object, unknown>): un
     visited.set(value, result)
 
     // Use setOwn so special keys like __proto__ don't re-parent the result.
-    for (const [key, item] of Object.entries(value)) {
-      setOwn(result, key, cloneWithVisited(item, visited))
+    for (const key of Object.keys(value)) {
+      setOwn(result, key, cloneWithVisited(value[key], visited))
     }
 
     for (const sym of Object.getOwnPropertySymbols(value)) {

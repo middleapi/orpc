@@ -160,7 +160,9 @@ export class OpenAPIJsonSerializer {
     let inlineBuiltInHandlers = true
     let handlerEntries: OpenAPIJsonSerializerHandler[] = []
 
-    for (const [key, handler] of Object.entries(customHandlers)) {
+    for (const key of Object.keys(customHandlers)) {
+      const handler = customHandlers[key]
+
       if (inlineBuiltInHandlers && key in DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS) {
         inlineBuiltInHandlers = false
         break
@@ -280,13 +282,8 @@ export class OpenAPIJsonSerializer {
     if (isPlainObject(data)) {
       const json: Record<string, unknown> = new NullProtoObj()
 
-      for (const k in data) {
-        if (!Object.hasOwn(data, k)) {
-          continue
-        }
-
+      for (const k of Object.keys(data)) {
         const v = data[k]
-
         /**
          * Skip custom toJSON methods to avoid JSON.stringify invoking them,
          * which could cause meta and serialized data mismatches during deserialization.

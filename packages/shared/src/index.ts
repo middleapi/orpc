@@ -18,7 +18,6 @@ export * from './signal'
 export * from './stream'
 export * from './tracing'
 export * from './types'
-export * from './uri'
 export * from './value'
 
 export {
@@ -28,6 +27,8 @@ export {
   isAsyncIteratorObject,
   isTypescriptObject,
   parseEmptyableJSON,
+  safeDecodeURIComponent,
+  safeEncodeURIComponent,
   sequential,
   SequentialIdGenerator,
   sleep,

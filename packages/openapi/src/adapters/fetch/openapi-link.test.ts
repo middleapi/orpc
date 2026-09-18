@@ -1,4 +1,4 @@
-import type { FetchLinkTransportPlugin } from '@orpc/client/fetch'
+import type { StandardLinkPlugin } from '@orpc/client/standard'
 import { createORPCClient } from '@orpc/client'
 import { os } from '@orpc/server'
 import { openapi } from '../../meta'
@@ -176,8 +176,8 @@ describe('openapiLink', () => {
     })
   })
 
-  it('supports fetch transport plugins', async () => {
-    const plugin: FetchLinkTransportPlugin<any> = {
+  it('supports standard link plugins', async () => {
+    const plugin: StandardLinkPlugin<any> = {
       name: 'test',
       init() {
         return {

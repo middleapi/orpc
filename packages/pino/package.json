@@ -1,7 +1,7 @@
 {
   "name": "@orpc/pino",
   "type": "module",
-  "version": "2.0.0-beta.35",
+  "version": "2.0.0-beta.36",
   "description": "Pino integration for oRPC: structured logging for typesafe APIs",
   "license": "MIT",
   "funding": [
@@ -51,7 +51,7 @@
     "@orpc/client": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.9.0"
+    "@standard-server/core": "~0.9.1"
   },
   "devDependencies": {
     "pino": "^10.3.1"

@@ -7,7 +7,7 @@ import { StandardHandler } from '@orpc/server/standard'
 import { OpenAPIHandlerCodec } from '../standard'
 
 export interface OpenAPIHandlerOptions<T extends Context>
-  extends NodeHttpHandlerOptions<T>, Omit<StandardHandlerOptions<T>, 'plugins'>, OpenAPIHandlerCodecOptions<T> {}
+  extends NodeHttpHandlerOptions<T>, StandardHandlerOptions<T>, OpenAPIHandlerCodecOptions<T> {}
 
 /**
  * Serves oRPC procedures over the OpenAPI (RESTful) protocol using Node.js built-in HTTP request/response.

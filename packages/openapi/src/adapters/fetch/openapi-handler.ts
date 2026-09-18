@@ -7,7 +7,7 @@ import { StandardHandler } from '@orpc/server/standard'
 import { OpenAPIHandlerCodec } from '../standard'
 
 export interface OpenAPIHandlerOptions<T extends Context>
-  extends FetchHandlerOptions<T>, Omit<StandardHandlerOptions<T>, 'plugins'>, OpenAPIHandlerCodecOptions<T> {}
+  extends FetchHandlerOptions<T>, StandardHandlerOptions<T>, OpenAPIHandlerCodecOptions<T> {}
 
 /**
  * Serves oRPC procedures over the OpenAPI (RESTful) protocol using the Fetch API `Request`/`Response`.

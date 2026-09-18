@@ -1,4 +1,4 @@
-import { safeDecodeURIComponent, safeEncodeURIComponent } from './uri'
+import { safeDecodeURIComponent, safeEncodeURIComponent } from '@standard-server/shared'
 
 export function pathToHttpPath(path: readonly string[]): `/${string}` {
   return `/${path.map(safeEncodeURIComponent).join('/')}`
