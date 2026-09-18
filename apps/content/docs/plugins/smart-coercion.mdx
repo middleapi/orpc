@@ -66,11 +66,10 @@ The plugin coerces values safely by following these rules:
 5. **Deep conversion:** Applies recursively inside nested objects and arrays
 
 :::info
-JSON Schema does not natively represent `BigInt`, `Date`, `RegExp`, `URL`, `Set`, or `Map`. For these types, oRPC relies on `x-native-type` metadata in your schema:
+JSON Schema does not natively represent `BigInt`, `Date`, `URL`, `Set`, or `Map`. For these types, oRPC relies on `x-native-type` metadata in your schema:
 
 - `x-native-type: 'bigint'` for BigInt
 - `x-native-type: 'date'` for Date
-- `x-native-type: 'regexp'` for RegExp
 - `x-native-type: 'url'` for URL
 - `x-native-type: 'set'` for Set
 - `x-native-type: 'map'` for Map
@@ -115,13 +114,6 @@ Supports ISO 8601 date and datetime strings:
 - `'2020-01-01T06:15:00Z'` → `new Date('2020-01-01T06:15:00Z')`
 - `'2020-01-01T06:15:00.123Z'` → `new Date('2020-01-01T06:15:00.123Z')`
 - `'2020-01-01T06:15:00-07:00'` → `new Date('2020-01-01T06:15:00-07:00')`
-
-### String → RegExp
-
-Supports valid regular expression strings:
-
-- `'/^\\d+$/i'` → `new RegExp('^\\d+$', 'i')`
-- `'/abc/'` → `new RegExp('abc')`
 
 ### String → URL
 

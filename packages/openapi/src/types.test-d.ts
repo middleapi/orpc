@@ -25,7 +25,6 @@ describe('JsonifiedValue', () => {
     expectTypeOf<JsonifiedValue<undefined>>().toEqualTypeOf<undefined>()
     expectTypeOf<JsonifiedValue<Date>>().toEqualTypeOf<string>()
     expectTypeOf<JsonifiedValue<bigint>>().toEqualTypeOf<string>()
-    expectTypeOf<JsonifiedValue<RegExp>>().toEqualTypeOf<string>()
     expectTypeOf<JsonifiedValue<URL>>().toEqualTypeOf<string>()
     expectTypeOf<JsonifiedValue<File>>().toEqualTypeOf<File>()
     expectTypeOf<JsonifiedValue<Blob>>().toEqualTypeOf<Blob>()

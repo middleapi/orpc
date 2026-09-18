@@ -69,15 +69,6 @@ const DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS: Record<string, OpenAPIJsonSeria
     },
     isTerminal: true,
   },
-  regexp: {
-    condition(data: unknown): boolean {
-      return data instanceof RegExp
-    },
-    serialize(data: RegExp): string {
-      return data.toString()
-    },
-    isTerminal: true,
-  },
   set: {
     condition(data: unknown): boolean {
       return data instanceof Set
@@ -127,10 +118,10 @@ export interface OpenAPIJsonSerializerOptions {
    *
    * **Disabling:** Set a key to `undefined` to remove a built-in handler:
    * ```ts
-   * handlers: { regexp: undefined }
+   * handlers: { url: undefined }
    * ```
    *
-   * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `url`, `regexp`, `set`, `map`.
+   * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `url`, `set`, `map`.
    */
   handlers?: Record<string, undefined | OpenAPIJsonSerializerHandler> | undefined
 
@@ -224,9 +215,6 @@ export class OpenAPIJsonSerializer {
             return Number.isNaN(data.getTime()) ? null : data.toISOString()
           }
           if (data instanceof URL) {
-            return data.toString()
-          }
-          if (data instanceof RegExp) {
             return data.toString()
           }
           if (data instanceof Set) {

@@ -646,6 +646,38 @@ const link = new RPCLink({ url: '...', customJsonSerializers: [userSerializer] }
 
 </CodeGroup>
 
+### `RegExp` is no longer a built-in type
+
+The [RPC Serializer](/docs/rpc/serializer) and [OpenAPI Serializer](/docs/openapi/serializer) no longer serialize `RegExp` values, and the [Smart Coercion Plugin](/docs/plugins/smart-coercion) no longer recognizes `x-native-type: 'regexp'`. A `RegExp` now serializes like any other class instance, as an empty object. If you send regular expressions over the wire, register a handler to restore the previous behavior:
+
+```ts
+import { RPCSerializer } from '@orpc/client'
+
+const REGEXP_PATTERN = /^\/([\s\S]*)\/([a-z]*)$/
+
+const serializer = new RPCSerializer({
+  handlers: {
+    regexp: {
+      condition: data => data instanceof RegExp,
+      serialize: (data: RegExp) => data.toString(),
+      deserialize: (data: string) => {
+        const [, pattern, flags] = data.match(REGEXP_PATTERN)!
+        return new RegExp(pattern!, flags)
+      },
+      isTerminal: true,
+    },
+  },
+})
+```
+
+:::warning
+Only register this on an `RPCHandler` if every client is trusted. Deserializing a `RegExp`
+compiles an attacker-controlled pattern, and every later use of it runs an attacker-controlled
+matcher — `^(a+)+$` is eight characters and takes over a second to test a 28-character string.
+This runs before your middleware, so authentication cannot gate it. On an `RPCLink` it only
+exposes you to your own server, which is usually fine.
+:::
+
 ### Event stream options nested under the response mapping
 
 The flat `eventIterator*` handler options moved under the adapter's response option, and the keep-alive default changed from 5 to 15 seconds. See [RPC Handler](/docs/rpc/handler).

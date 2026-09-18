@@ -52,10 +52,6 @@ describe('openAPIJsonSerializer', () => {
       expect(serializer.serialize(new URL('https://dinwwwh.com')).json).toBe('https://dinwwwh.com/')
     })
 
-    it('serializes RegExp to string', () => {
-      expect(serializer.serialize(/uic/gi).json).toBe('/uic/gi')
-    })
-
     it('serializes Set to array and Map to entries, converting nested values', () => {
       expect(serializer.serialize(new Set([1, 2, 3])).json).toEqual([1, 2, 3])
       expect(serializer.serialize(new Map([['a', 1]])).json).toEqual([['a', 1]])
@@ -207,7 +203,6 @@ describe('openAPIJsonSerializer', () => {
         invalidDate: new Date('Invalid'),
         nan: Number.NaN,
         url: new URL('https://orpc.dev'),
-        regexp: /uic/gi,
         set: new Set([1, 2]),
         map: new Map([['a', 1]]),
         bigint: 123n,
@@ -218,7 +213,6 @@ describe('openAPIJsonSerializer', () => {
         invalidDate: null,
         nan: null,
         url: 'https://orpc.dev/',
-        regexp: '/uic/gi',
         set: [1, 2],
         map: [['a', 1]],
         bigint: '123',

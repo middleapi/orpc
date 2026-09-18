@@ -286,17 +286,6 @@ export class JsonSchemaCoercer {
 
           break
         }
-        case JsonSchemaXNativeType.RegExp: {
-          if (typeof coerced === 'string') {
-            coerced = stringToRegExp(coerced)
-          }
-
-          if (!(coerced instanceof RegExp)) {
-            satisfied = UNSATISFIED
-          }
-
-          break
-        }
         case JsonSchemaXNativeType.Url: {
           if (typeof coerced === 'string') {
             coerced = stringToURL(coerced)
@@ -464,18 +453,6 @@ function stringToDate(value: string): Date | string {
   }
 
   return date
-}
-
-const REGEXP_PATTERN = /^\/([\s\S]*)\/([a-z]*)$/
-function stringToRegExp(value: string): RegExp | string {
-  const match = value.match(REGEXP_PATTERN)
-
-  if (match) {
-    const [, pattern, flags] = match
-    return tryOrUndefined(() => new RegExp(pattern!, flags)) ?? value
-  }
-
-  return value
 }
 
 function stringToURL(value: string): URL | string {

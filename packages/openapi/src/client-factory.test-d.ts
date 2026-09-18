@@ -7,7 +7,7 @@ const contract = {
   ping: oc,
   nested: {
     pong: oc
-      .errors({ BAD_GATEWAY: { data: type<string, RegExp>(vi.fn()) } })
+      .errors({ BAD_GATEWAY: { data: type<string, URL>(vi.fn()) } })
       .input(type<string, boolean>(vi.fn()))
       .output(type<number, Date>(vi.fn())),
   },

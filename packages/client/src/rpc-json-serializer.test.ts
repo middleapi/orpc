@@ -37,8 +37,8 @@ const customSupportedDataTypes: { name: string, value: unknown, expected: unknow
   },
   {
     name: 'person - 2',
-    value: new Person2('dinwwwh - 2', [{ nested: new Date('2023-01-02') }, new URL('https://dinwwwh.com')]),
-    expected: new Person2('dinwwwh - 2', [{ nested: new Date('2023-01-02') }, new URL('https://dinwwwh.com')]),
+    value: new Person2('dinwwwh - 2', [{ nested: new Date('2023-01-02') }, new URL('https://orpc.dev')]),
+    expected: new Person2('dinwwwh - 2', [{ nested: new Date('2023-01-02') }, new URL('https://orpc.dev')]),
   },
   {
     name: 'should not resolve toJSON',

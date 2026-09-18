@@ -13,13 +13,12 @@ function coerce(schema: JsonSchema | Record<string, unknown>, value: unknown, op
 
 /**
  * Native type schemas as `ZodToJsonSchemaConverter` emits them, so the tests stay tied to
- * payloads that really reach the plugins. `url` and `regexp` come from custom converters,
- * because no built-in converter maps a validator to them yet.
+ * payloads that really reach the plugins. `url` comes from custom converters,
+ * because no built-in converter maps a validator to it yet.
  */
 const DATE_SCHEMA = { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' }
 const BIGINT_SCHEMA = { 'type': 'string', 'pattern': '^-?[0-9]+$', 'x-native-type': 'bigint' }
 const URL_SCHEMA = { 'type': 'string', 'format': 'uri', 'x-native-type': 'url' }
-const REGEXP_SCHEMA = { 'type': 'string', 'x-native-type': 'regexp' }
 
 function setSchema(items: Record<string, unknown>) {
   return { 'type': 'array', 'uniqueItems': true, items, 'x-native-type': 'set' }
@@ -172,7 +171,7 @@ describe('jsonSchemaCoercer', () => {
     })
   })
 
-  describe('urls and regexps', () => {
+  describe('urls', () => {
     it('coerces url strings', () => {
       expect(coerce(URL_SCHEMA, 'https://example.com')).toEqual(new URL('https://example.com'))
       expect(coerce(URL_SCHEMA, 'invalid')).toBe('invalid')
@@ -180,23 +179,6 @@ describe('jsonSchemaCoercer', () => {
 
       const url = new URL('https://example.com')
       expect(coerce(URL_SCHEMA, url)).toBe(url)
-    })
-
-    it('coerces regexp literals', () => {
-      expect(coerce(REGEXP_SCHEMA, '/^[a-z0-9-]+$/i')).toEqual(/^[a-z0-9-]+$/i)
-      expect(coerce(REGEXP_SCHEMA, '/^\\d+$/')).toEqual(/^\d+$/)
-      expect(coerce(REGEXP_SCHEMA, '/abc/')).toEqual(/abc/)
-      const newline = '\n'
-      expect(coerce(REGEXP_SCHEMA, `/a${newline}b/`)).toEqual(new RegExp(`a${newline}b`))
-      expect(coerce(REGEXP_SCHEMA, '/nested\\/slash/')).toEqual(/nested\/slash/)
-
-      expect(coerce(REGEXP_SCHEMA, '/abc/invalid')).toBe('/abc/invalid')
-      expect(coerce(REGEXP_SCHEMA, '/(unclosed/')).toBe('/(unclosed/')
-      expect(coerce(REGEXP_SCHEMA, 'abc')).toBe('abc')
-      expect(coerce(REGEXP_SCHEMA, [])).toEqual([])
-
-      const regexp = /abc/i
-      expect(coerce(REGEXP_SCHEMA, regexp)).toBe(regexp)
     })
   })
 

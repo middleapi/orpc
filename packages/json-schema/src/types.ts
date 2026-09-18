@@ -52,7 +52,6 @@ export enum JsonSchemaFormat {
 
 export enum JsonSchemaXNativeType {
   BigInt = 'bigint',
-  RegExp = 'regexp',
   Date = 'date',
   Url = 'url',
   Set = 'set',

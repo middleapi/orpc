@@ -162,33 +162,10 @@ export interface RPCJsonSerializerOptions {
    *
    * **Disabling:** Set a key to `undefined` to remove a built-in handler:
    * ```ts
-   * handlers: { date: undefined }
+   * handlers: { url: undefined }
    * ```
    *
    * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `url`, `set`, `map`.
-   *
-   * @remarks
-   * `RegExp` is not supported by default: rebuilding one from request input compiles an
-   * attacker-controlled pattern, and every later use of it runs an attacker-controlled
-   * matcher. Add it back only where the input is trusted:
-   * ```ts
-   * const REGEXP_STRING_PATTERN = /^\/([\s\S]*)\/([a-z]*)$/
-   *
-   * handlers: {
-   *   regexp: {
-   *     condition: v => v instanceof RegExp,
-   *     serialize: (v: RegExp) => v.toString(),
-   *     deserialize: (s: string) => {
-   *       const match = typeof s === 'string' ? s.match(REGEXP_STRING_PATTERN) : null
-   *       if (!match) {
-   *         throw new Error('Invalid serialized RegExp')
-   *       }
-   *       return new RegExp(match[1]!, match[2])
-   *     },
-   *     isTerminal: true,
-   *   },
-   * }
-   * ```
    */
   handlers?: Record<string, undefined | RPCJsonSerializerHandler> | undefined
 
