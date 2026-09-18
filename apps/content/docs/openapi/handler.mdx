@@ -59,12 +59,6 @@ const { matched, response } = await handler.handle(request, {
 })
 ```
 
-If the function throws, `handle` rejects instead of returning a response. It runs before routing,
-so no procedure is matched and neither the [routing interceptors](#routing-interceptors), the
-plugins, nor the codec's error encoding ever see the error, which means nothing turns it into a
-response. Handle it yourself, or keep the work that can fail inside a
-[middleware](/docs/middleware) so it is encoded like any other error.
-
 :::
 
 :::warning
