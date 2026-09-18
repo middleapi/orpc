@@ -6,7 +6,7 @@ import type { ProcedureClientInterceptor } from '../../procedure-client'
 import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from './codec'
 import type { StandardHandlerPlugin } from './plugin'
 import { ORPCError, toORPCError } from '@orpc/client'
-import { getTracer, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, once, ORPC_NAME, override, recordSpanError, runWithSpan, toArray, toTracingException, traceAsyncIterator, traceReadableStream, value, wrapAsyncIterator, wrapReadableStream } from '@orpc/shared'
+import { getTracer, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, ORPC_NAME, override, recordSpanError, runWithSpan, toArray, toTracingException, traceAsyncIterator, traceReadableStream, value, wrapAsyncIterator, wrapReadableStream } from '@orpc/shared'
 import { ErrorEvent, flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { createProcedureClient } from '../../procedure-client'
 import { CompositeStandardHandlerPlugin } from './plugin'
@@ -225,13 +225,11 @@ export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
           const [pathname] = parseStandardUrl(request.url)
 
           return tracer.startActiveSpan(`${request.method} ${pathname}`, parent, async (span) => {
-            const endSpan = once(() => span.end())
-
             try {
               const result = await next()
 
               if (!result.matched) {
-                endSpan()
+                span.end()
                 return result
               }
 
@@ -240,6 +238,7 @@ export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
 
               if (isIterator || body instanceof ReadableStream) {
                 const signal = request.signal
+                const endSpan = () => span.end()
 
                 /**
                  * `@standard-server/peer` drops a streamed body without reading or cancelling
@@ -247,7 +246,7 @@ export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
                  * the span.
                  */
                 if (signal?.aborted) {
-                  endSpan()
+                  span.end()
                 }
                 else {
                   signal?.addEventListener('abort', endSpan, { once: true })
@@ -263,7 +262,7 @@ export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
                   },
                   onFinish() {
                     signal?.removeEventListener('abort', endSpan)
-                    endSpan()
+                    span.end()
                   },
                 }
 
@@ -283,7 +282,7 @@ export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
               }
 
               // A one-piece body (json, `Blob`, `FormData`, ...) transmits where this cannot observe it.
-              endSpan()
+              span.end()
               return result
             }
             catch (e) {
@@ -292,7 +291,7 @@ export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
                * Always recorded as an error, even when it is an abort error.
                */
               span.recordException('error', toTracingException(e))
-              endSpan()
+              span.end()
               throw e
             }
           })
