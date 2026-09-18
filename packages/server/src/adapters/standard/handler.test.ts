@@ -567,18 +567,6 @@ describe('standardHandler', () => {
         expect(span.recordException).toHaveBeenCalledExactlyOnceWith('error', expect.objectContaining({ message: 'body failure' }))
         expect(span.end).toHaveBeenCalledTimes(1)
       })
-
-      it('records a client going away mid-stream at info level', async () => {
-        const wrapped = await handleBody(toBody((async function* () {
-          yield 'a'
-          throw new DOMException('client gone', 'AbortError')
-        })()))
-
-        await expect(drain(wrapped)).rejects.toThrow('client gone')
-
-        expect(span.recordException).toHaveBeenCalledExactlyOnceWith('info', expect.objectContaining({ message: 'client gone' }))
-        expect(span.end).toHaveBeenCalledTimes(1)
-      })
     })
 
     it('does not record ErrorEvent failures of an async iterator body on the request span', async () => {
@@ -630,53 +618,6 @@ describe('standardHandler', () => {
       expect(requestSpan.setAttribute).toHaveBeenCalledWith('rpc.system', 'orpc')
       expect(requestSpan.setAttribute).toHaveBeenCalledWith('rpc.method', 'ping')
       expect(requestSpan.end).toHaveBeenCalledTimes(1)
-    })
-
-    describe('streamed body an adapter never reads', () => {
-      function iterate() {
-        return (async function* () {
-          yield 'a'
-          throw new Error('body failure')
-        })()
-      }
-
-      it('ends the request span when the request is already aborted as the body is wrapped', async () => {
-        const controller = new AbortController()
-        setupHappyPath()
-        codec.encodeOutput.mockImplementation(async () => {
-          controller.abort()
-          return { status: 200, headers: {}, body: iterate() }
-        })
-
-        await handler.handle(makeRequest({ signal: controller.signal }), OPTIONS)
-
-        expect(span.end).toHaveBeenCalledTimes(1)
-      })
-
-      it('ends the request span when the request aborts after the body is returned', async () => {
-        const controller = new AbortController()
-        setupHappyPath()
-        codec.encodeOutput.mockResolvedValue({ status: 200, headers: {}, body: iterate() })
-
-        await handler.handle(makeRequest({ signal: controller.signal }), OPTIONS)
-        expect(span.end).not.toHaveBeenCalled()
-
-        controller.abort()
-        expect(span.end).toHaveBeenCalledTimes(1)
-      })
-
-      it('ends the request span when the request aborts and the body then fails', async () => {
-        const controller = new AbortController()
-        setupHappyPath()
-        codec.encodeOutput.mockResolvedValue({ status: 200, headers: {}, body: iterate() })
-
-        const result = await handler.handle(makeRequest({ signal: controller.signal }), OPTIONS)
-        controller.abort()
-
-        await expect(drain(result.response!.body as any)).rejects.toThrow('body failure')
-
-        expect(span.end).toHaveBeenCalled()
-      })
     })
   })
 
