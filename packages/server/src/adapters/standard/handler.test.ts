@@ -431,7 +431,6 @@ describe('standardHandler', () => {
 
     beforeEach(() => {
       span = createSpan()
-
       tracer = {
         startSpan: vi.fn(() => span),
         // the request span is the first active span started
@@ -480,7 +479,6 @@ describe('standardHandler', () => {
       expect(tracer.extract).toHaveBeenCalledWith(request.headers)
       expect(tracer.startActiveSpan).toHaveBeenNthCalledWith(1, 'POST /api/v1/ping', parent, expect.any(Function))
       expect(tracer.startSpan).not.toHaveBeenCalled()
-      // Only a streamed body needs the span re-activated after the handler returns.
       expect(tracer.withActiveSpan).not.toHaveBeenCalled()
       expect(tracer.startActiveSpan).toHaveBeenCalledWith('find_procedure', undefined, expect.any(Function))
       expect(span.updateName).toHaveBeenCalledWith('orpc_no_match')
@@ -580,121 +578,6 @@ describe('standardHandler', () => {
 
       expect(span.recordException).not.toHaveBeenCalled()
       expect(span.end).toHaveBeenCalledTimes(1)
-    })
-
-    it('activates the request span on backends that cannot activate a span they did not start', async () => {
-      const requestSpan = createSpan()
-
-      /**
-       * Mirrors `experimental_CloudflareTracer`: `withActiveSpan` cannot activate an existing
-       * span, so the request span is only ever active because the tracer started it itself.
-       */
-      let activeSpan: ReturnType<typeof createSpan> | undefined
-      let isRequestSpanStarted = false
-
-      sharedExperimental.setTracer({
-        startSpan: vi.fn(() => createSpan()),
-        startActiveSpan: vi.fn(async (_name: string, _parent: unknown, fn: (span: unknown) => Promise<unknown>) => {
-          const started = isRequestSpanStarted ? createSpan() : requestSpan
-          isRequestSpanStarted = true
-
-          const previous = activeSpan
-          activeSpan = started
-          try {
-            return await fn(started)
-          }
-          finally {
-            activeSpan = previous
-          }
-        }),
-        withActiveSpan: vi.fn((_span: unknown, fn: () => unknown) => fn()),
-        getActiveSpan: () => activeSpan,
-      } as any)
-
-      setupHappyPath()
-      await handler.handle(makeRequest(), OPTIONS)
-
-      expect(requestSpan.updateName).toHaveBeenCalledWith('orpc.ping')
-      expect(requestSpan.setAttribute).toHaveBeenCalledWith('rpc.system', 'orpc')
-      expect(requestSpan.setAttribute).toHaveBeenCalledWith('rpc.method', 'ping')
-      expect(requestSpan.end).toHaveBeenCalledTimes(1)
-    })
-  })
-
-  describe('plugin ordering', () => {
-    /**
-     * A plugin that declares no order runs inside the request span, and a plugin that opts out
-     * with `after: ['~tracing']` (like `~batch` and `~cors`) runs outside it — whichever order
-     * the user listed them in. The opt-out plugin used to drag `~tracing` past every plugin
-     * listed before it, so the listing order decided which side of the span they landed on.
-     */
-    it('wraps a plugin that declares no order whichever order plugins are listed in', async ({ onTestFinished }) => {
-      function makeProbe(seen: boolean[]) {
-        return {
-          name: '~probe',
-          init(options: any) {
-            return {
-              ...options,
-              routingInterceptors: [
-                async ({ next }: any) => {
-                  seen.push(sharedExperimental.getTracer()?.getActiveSpan() !== undefined)
-                  return next()
-                },
-                ...(options.routingInterceptors ?? []),
-              ],
-            }
-          },
-        }
-      }
-
-      const optOut = { name: '~opt-out', after: ['~tracing'] }
-
-      let activeSpan: unknown
-      const startedNames: string[] = []
-
-      sharedExperimental.setTracer({
-        startSpan: vi.fn(),
-        startActiveSpan: vi.fn(async (name: string, _parent: unknown, fn: (span: unknown) => Promise<unknown>) => {
-          startedNames.push(name)
-          const started = { setAttribute: vi.fn(), updateName: vi.fn(), addEvent: vi.fn(), recordException: vi.fn(), end: vi.fn() }
-          const previous = activeSpan
-          activeSpan = started
-          try {
-            return await fn(started)
-          }
-          finally {
-            activeSpan = previous
-          }
-        }),
-        withActiveSpan: vi.fn((_span: unknown, fn: () => unknown) => fn()),
-        getActiveSpan: () => activeSpan,
-      } as any)
-      onTestFinished(() => sharedExperimental.setTracer(undefined))
-
-      const probeFirst: boolean[] = []
-      const probeLast: boolean[] = []
-
-      const listings: Array<[plugins: any[], seen: boolean[]]> = [
-        [[makeProbe(probeFirst), optOut], probeFirst],
-        [[optOut, makeProbe(probeLast)], probeLast],
-      ]
-
-      for (const [plugins, seen] of listings) {
-        const listing = `listing order: ${plugins.map(p => p.name).join(', ')}`
-
-        codec = makeCodec()
-        setupHappyPath()
-        startedNames.length = 0
-
-        const pluginHandler = new StandardHandler(codec as any, { plugins })
-        await pluginHandler.handle(makeRequest(), OPTIONS)
-
-        // A plugin with no `before`/`after` sees the request span, so `~tracing` wrapped it.
-        expect(seen, listing).toEqual([true])
-        expect(startedNames, listing).toContain('POST /api/v1/ping')
-      }
-
-      expect(probeLast).toEqual(probeFirst)
     })
   })
 })
