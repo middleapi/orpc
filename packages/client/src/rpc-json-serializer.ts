@@ -9,6 +9,18 @@ export type RPCJsonSerialization
 export interface RPCJsonSerializerHandler {
   condition(value: unknown): boolean
   serialize(value: any): unknown
+  /**
+   * Must reject any value `serialize` would not produce, rather than converting it anyway.
+   *
+   * A request's `meta` array may name one path many times, and oRPC applies every entry. If
+   * `deserialize` accepts its own output, each extra entry re-converts the value: work grows
+   * with (value size × meta entries) while the body only grows with (value size + meta
+   * entries), so a small body can block the event loop for seconds. Deserialization runs
+   * before the procedure client exists, so no middleware can gate it.
+   *
+   * Validating the shape closes this: a converted value no longer looks serialized, so the
+   * second entry throws instead of doing the work again. The built-in handlers all do this.
+   */
   deserialize(serialized: any): unknown
   /**
    * If false, the result of this serializer will not be further processed by other serializers,
@@ -136,13 +148,19 @@ export interface RPCJsonSerializerOptions {
    * Each key is a unique type identifier (e.g. `"date"`, `"bigint"`) and maps to a handler
    * that defines how to detect, serialize, and deserialize values of that type.
    *
-   * **Extending:** Add new keys to support custom types:
+   * **Extending:** Add new keys to support custom types. Note how `deserialize` rejects
+   * anything `serialize` would not produce — see {@link RPCJsonSerializerHandler.deserialize}:
    * ```ts
    * handlers: {
    *   buffer: {
    *     condition: (v) => v instanceof Buffer,
    *     serialize: (v: Buffer) => v.toString('base64'),
-   *     deserialize: (s: string) => Buffer.from(s, 'base64'),
+   *     deserialize: (s: string) => {
+   *       if (typeof s !== 'string') {
+   *         throw new TypeError('Invalid serialized Buffer')
+   *       }
+   *       return Buffer.from(s, 'base64')
+   *     },
    *     isTerminal: true,
    *   }
    * }

@@ -70,6 +70,29 @@ const serializer = new RPCSerializer({
 })
 ```
 
+:::warning[Validate what `deserialize` accepts]
+A request's `meta` array may name one path many times, and oRPC applies every entry. If
+`deserialize` accepts its own output, each extra entry re-converts the value — work grows with
+(value size x meta entries) while the body only grows with (value size + meta entries), so a
+small body can block the event loop for seconds. This runs before your middleware, so
+authentication cannot gate it.
+
+Reject anything `serialize` would not produce, and the second entry throws instead of repeating
+the work:
+
+```ts
+deserialize: (v) => {
+  if (typeof v !== 'string') { // <- a converted value no longer looks serialized
+    throw new TypeError('Invalid serialized Person')
+  }
+
+  return Person.fromString(v)
+}
+```
+
+The built-in handlers all do this.
+:::
+
 :::info[Use a custom serializer with RPCHandler and RPCLink]
 
 ```ts

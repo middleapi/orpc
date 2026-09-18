@@ -510,31 +510,64 @@ describe('rpcJsonSerializer: security', () => {
     })
   })
 
-  it('still applies two meta entries that legitimately share one path', () => {
+  describe('meta entries that legitimately share one path', () => {
     /**
-     * A non-terminal handler whose `serialize` returns a built-in container makes the
-     * serializer emit both entries at the same path, so rejecting repeated paths outright
-     * would break this. The shape assertions bound the work instead.
+     * Composing non-terminal handlers makes the serializer emit several entries for one
+     * path, so the work is bounded by asserting shapes rather than by rejecting repeated
+     * paths, which would break both cases below. Built-in handlers alone never repeat a
+     * path: their serialized forms match no other handler's condition.
      */
-    class Tags {
-      constructor(public items: string[]) {}
-    }
+    it('applies two entries of different types', () => {
+      class Tags {
+        constructor(public items: string[]) {}
+      }
 
-    const custom = new RPCJsonSerializer({
-      handlers: {
-        tags: {
-          condition: (v: unknown) => v instanceof Tags,
-          serialize: (v: Tags) => new Set(v.items),
-          deserialize: (v: Set<string>) => new Tags([...v]),
+      const custom = new RPCJsonSerializer({
+        handlers: {
+          tags: {
+            condition: (v: unknown) => v instanceof Tags,
+            serialize: (v: Tags) => new Set(v.items),
+            deserialize: (v: Set<string>) => new Tags([...v]),
+          },
         },
-      },
+      })
+
+      expect(custom.serialize({ a: new Tags(['x', 'y']) }).meta).toEqual([['set', 'a'], ['tags', 'a']])
+
+      const restored = roundTripThroughWire(custom, { a: new Tags(['x', 'y']) }) as any
+      expect(restored.a).toBeInstanceOf(Tags)
+      expect(restored.a.items).toEqual(['x', 'y'])
     })
 
-    expect(custom.serialize({ a: new Tags(['x', 'y']) }).meta).toEqual([['set', 'a'], ['tags', 'a']])
+    it('applies repeated entries of the same type, for a type nested in itself', () => {
+      class Wrapper {
+        constructor(public inner: unknown) {}
+      }
 
-    const restored = roundTripThroughWire(custom, { a: new Tags(['x', 'y']) }) as any
-    expect(restored.a).toBeInstanceOf(Tags)
-    expect(restored.a.items).toEqual(['x', 'y'])
+      const custom = new RPCJsonSerializer({
+        handlers: {
+          wrap: {
+            condition: (v: unknown) => v instanceof Wrapper,
+            serialize: (v: Wrapper) => v.inner,
+            deserialize: (v: unknown) => new Wrapper(v),
+          },
+        },
+      })
+
+      const value = { a: new Wrapper(new Wrapper(new Wrapper(5))) }
+      expect(custom.serialize(value).meta).toEqual([['wrap', 'a'], ['wrap', 'a'], ['wrap', 'a']])
+      expect(roundTripThroughWire(custom, value)).toEqual(value)
+    })
+
+    it('never repeats a path when only built-in handlers are used', () => {
+      const { meta } = serializer.serialize({
+        s: new Set([new Date(0), 1n]),
+        m: new Map([['k', new URL('https://orpc.dev')]]),
+      })
+
+      const paths = meta!.map(([, ...path]) => JSON.stringify(path))
+      expect(new Set(paths).size).toBe(paths.length)
+    })
   })
 
   it('does not rebuild a RegExp from serialized input', () => {
