@@ -355,6 +355,20 @@ describe('mergeTwoLevels', () => {
     expect(mergeTwoLevels({ a: undefined }, { a: { b: 1 } })).toEqual({ a: { b: 1 } })
   })
 
+  it('does not merge a key the second object only inherits', () => {
+    // `isPlainObject` accepts a prototype without a `constructor`, such as a `NullProtoObj`
+    const proto: any = new NullProtoObj()
+    proto.user = { polluted: true }
+
+    const second: any = Object.create(proto)
+    second.other = 1
+
+    expect(mergeTwoLevels({ user: { name: 'NAME' } }, second)).toEqual({
+      user: { name: 'NAME' },
+      other: 1,
+    })
+  })
+
   it('returns a new object', () => {
     const first = { a: { b: 1 } }
     const merged = mergeTwoLevels(first, { a: { c: 2 } }) as any

@@ -13,8 +13,7 @@ export interface OrderablePlugin {
  * Sorts plugins based on their `before` and `after` dependencies.
  *
  * The sort is stable: plugins the constraints leave unordered keep their original relative
- * order, so where a plugin lands never depends on where an unrelated plugin happens to sit
- * in the array. A plugin appended last therefore runs last unless something asks to follow it.
+ * order, so where a plugin lands never depends on where an unrelated plugin sits in the array.
  */
 export function sortPlugins<T extends OrderablePlugin>(
   plugins: T[],
@@ -96,8 +95,8 @@ export function sortPlugins<T extends OrderablePlugin>(
 }
 
 /**
- * Walks dependency edges among the plugins that never became ready until one repeats.
- * Every one of them still has an unmet dependency, so the walk always reaches a cycle.
+ * Every plugin left unready still has an unmet dependency, so walking dependency edges from
+ * any of them always reaches a cycle.
  */
 function findCycleMember(dependencies: Array<Set<number>>, remaining: Set<number>): number {
   const seen = new Set<number>()

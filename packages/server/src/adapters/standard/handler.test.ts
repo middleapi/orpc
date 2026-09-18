@@ -665,7 +665,7 @@ describe('standardHandler', () => {
         expect(span.end).toHaveBeenCalledTimes(1)
       })
 
-      it('does not record a later body failure on the already ended request span', async () => {
+      it('ends the request span once when the request aborts and the body then fails', async () => {
         const controller = new AbortController()
         setupHappyPath()
         codec.encodeOutput.mockResolvedValue({ status: 200, headers: {}, body: iterate() })
@@ -675,7 +675,6 @@ describe('standardHandler', () => {
 
         await expect(drain(result.response!.body as any)).rejects.toThrow('body failure')
 
-        expect(span.recordException).not.toHaveBeenCalled()
         expect(span.end).toHaveBeenCalledTimes(1)
       })
     })

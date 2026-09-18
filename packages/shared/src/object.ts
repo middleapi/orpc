@@ -147,7 +147,6 @@ export function mergeTwoLevels(first: unknown, second: unknown): unknown {
   // Spread keeps special keys like __proto__ as own properties instead of re-parenting the result.
   const result: Record<PropertyKey, unknown> = { ...first, ...second }
 
-  // Own keys only: an inherited enumerable key is not part of the spread above either.
   for (const key of Object.keys(second)) {
     if (!Object.hasOwn(first, key)) {
       continue

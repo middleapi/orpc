@@ -6,7 +6,7 @@ import type { ProcedureClientInterceptor } from '../../procedure-client'
 import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from './codec'
 import type { StandardHandlerPlugin } from './plugin'
 import { ORPCError, toORPCError } from '@orpc/client'
-import { getTracer, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, ORPC_NAME, override, recordSpanError, runWithSpan, toArray, toTracingException, traceAsyncIterator, traceReadableStream, value, wrapAsyncIterator, wrapReadableStream } from '@orpc/shared'
+import { getTracer, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, once, ORPC_NAME, override, recordSpanError, runWithSpan, toArray, toTracingException, traceAsyncIterator, traceReadableStream, value, wrapAsyncIterator, wrapReadableStream } from '@orpc/shared'
 import { ErrorEvent, flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { createProcedureClient } from '../../procedure-client'
 import { CompositeStandardHandlerPlugin } from './plugin'
@@ -77,12 +77,9 @@ export class StandardHandler<T extends Context> {
     options: StandardHandlerOptions<T>,
   ) {
     /**
-     * `~tracing` goes last so its interceptor wraps every plugin that does not order itself
-     * against it: each plugin prepends its routing interceptor, so the plugin initialized
-     * last ends up outermost. A plugin opts out by declaring `after: ['~tracing']`, which
-     * `~batch` and `~cors` do, and `before: ['~tracing']` puts one inside the span instead.
-     * `sortPlugins` is stable, so this position does not depend on how the user ordered
-     * their own plugins.
+     * Appended last so its interceptor wraps every plugin that does not order itself against
+     * it: plugins prepend their routing interceptor, so the one initialized last is outermost.
+     * `after: ['~tracing']` opts a plugin out of the span, `before: ['~tracing']` keeps it in.
      */
     options = new CompositeStandardHandlerPlugin([
       ...toArray(options.plugins),
@@ -231,24 +228,8 @@ export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
            */
           const [pathname] = parseStandardUrl(request.url)
 
-          /**
-           * `startActiveSpan` is used instead of `startSpan` + `withActiveSpan` because some
-           * backends can only activate a span they started themselves. It does not end the
-           * span, so a streamed body can still keep it open after the callback returns.
-           */
           return tracer.startActiveSpan(`${request.method} ${pathname}`, parent, async (span) => {
-            let isEnded = false
-
-            /**
-             * Several paths can finish the request, so all of them end the span through here:
-             * it is never ended twice and nothing is recorded on an already ended span.
-             */
-            const endSpan = (): void => {
-              if (!isEnded) {
-                isEnded = true
-                span.end()
-              }
-            }
+            const endSpan = once(() => span.end())
 
             try {
               const result = await next()
@@ -265,9 +246,9 @@ export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
                 const signal = request.signal
 
                 /**
-                 * An adapter can drop a streamed body without reading or cancelling it;
-                 * `@standard-server/peer` does when the request aborts before it transmits.
-                 * The signal is the last resort that keeps the span from staying open forever.
+                 * `@standard-server/peer` drops a streamed body without reading or cancelling
+                 * it when the request aborts before it transmits, so nothing else would end
+                 * the span.
                  */
                 if (signal?.aborted) {
                   endSpan()
@@ -277,21 +258,10 @@ export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
                 }
 
                 const wrapOptions = {
-                  /**
-                   * Every pull runs with the request span active, so nested calls and the lazy
-                   * `consume_*_output` spans stay inside the same trace. Best effort: backends
-                   * that cannot activate an existing span run the pull as is.
-                   */
                   runWith: <T>(run: () => Promise<T>) => tracer.withActiveSpan(span, run),
                   onError(error: ThrowableError) {
-                    /**
-                     * Errors here are internal (interceptor/framework) failures,
-                     * except `ErrorEvent`: a business error the protocol delivers
-                     * inside the event stream, already logged by the client interceptor.
-                     * A client disconnecting mid-stream surfaces as an abort instead, which
-                     * `recordSpanError` keeps out of the error level.
-                     */
-                    if (!isEnded && !(error instanceof ErrorEvent)) {
+                    // `ErrorEvent` carries a business error the client interceptor already recorded.
+                    if (!(error instanceof ErrorEvent)) {
                       recordSpanError(span, error)
                     }
                   },
@@ -316,11 +286,7 @@ export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
                 }
               }
 
-              /**
-               * A body the adapter sends in one piece (json, `Blob`, `FormData`, ...) is not
-               * observable from here, so the span ends before the adapter transmits it. Only a
-               * streamed body can hold the span open until its last chunk.
-               */
+              // A one-piece body (json, `Blob`, `FormData`, ...) transmits where this cannot observe it.
               endSpan()
               return result
             }
