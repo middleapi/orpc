@@ -29,6 +29,8 @@ export interface StandardRPCJsonSerializerOptions {
   customJsonSerializers?: readonly StandardRPCCustomJsonSerializer[]
 }
 
+const BUILT_IN_TYPES: ReadonlySet<number> = new Set(Object.values(STANDARD_RPC_JSON_SERIALIZER_BUILT_IN_TYPES))
+
 const SERIALIZED_REGEXP_FORMAT = /^\/(.*)\/([a-z]*)$/
 
 function invalidSerializedData(detail: string): TypeError {
@@ -170,6 +172,15 @@ export class StandardRPCJsonSerializer {
 
     for (const item of meta) {
       const type = item[0]
+      const custom = this.customSerializers.find(custom => custom.type === type)
+
+      /**
+       * Unknown types are ignored so a receiver without a custom serializer still gets plain data.
+       * Skipping them before the path walk means no untrusted path is dereferenced for them.
+       */
+      if (custom === undefined && !BUILT_IN_TYPES.has(type)) {
+        continue
+      }
 
       let currentRef: any = ref
       let preSegment: string | number = 'data'
@@ -182,8 +193,6 @@ export class StandardRPCJsonSerializer {
           throw invalidSerializedData(`segment "${preSegment}" does not exist.`)
         }
       }
-
-      const custom = this.customSerializers.find(custom => custom.type === type)
 
       if (custom !== undefined) {
         currentRef[preSegment] = custom.deserialize(currentRef[preSegment])

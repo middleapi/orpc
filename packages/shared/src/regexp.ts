@@ -19,33 +19,68 @@ export function isValidRegExpFlags(flags: string): boolean {
  * The returned value passes `instanceof RegExp` and forwards every property access and
  * method call to the compiled RegExp. A syntax error in `pattern` is thrown on first use,
  * not here.
+ *
+ * Reads that a fresh RegExp could answer without its pattern never compile: `lastIndex`
+ * (0 until written), and properties that do not exist on a RegExp such as `then`, `toJSON`
+ * or inspection symbols. So awaiting, `JSON.stringify` and logging the value are free.
+ *
+ * Known differences from a native RegExp: it has no own properties
+ * (`Object.hasOwn(value, 'lastIndex')` is false), `Object.freeze` is not supported,
+ * `structuredClone` rejects it, and Node's `util.types.isRegExp` returns false.
  */
 export function createLazyRegExp(pattern: string, flags: string): RegExp {
   let compiled: RegExp | undefined
+  let lastIndex: unknown = 0
 
-  const compile = (): RegExp => compiled ??= new RegExp(pattern, flags)
+  const compile = (): RegExp => {
+    if (compiled === undefined) {
+      compiled = new RegExp(pattern, flags)
+      compiled.lastIndex = lastIndex as number
+    }
+
+    return compiled
+  }
 
   /**
-   * The placeholder target only supplies the prototype (so `instanceof RegExp` holds)
-   * and default own-property shape; every read and write goes to the compiled RegExp.
+   * The target has no own properties, so nothing can be read through it by
+   * `Object.hasOwn` style checks; it only supplies the prototype for `instanceof`.
    */
-  return new Proxy(/^/, {
+  return new Proxy(Object.create(RegExp.prototype) as RegExp, {
     get(_, prop) {
       if (prop === Symbol.toStringTag) {
         return 'RegExp'
       }
 
+      if (compiled === undefined) {
+        if (prop === 'lastIndex') {
+          return lastIndex
+        }
+
+        if (!(prop in RegExp.prototype)) {
+          return undefined
+        }
+      }
+
       const target = compile()
       const value = Reflect.get(target, prop, target)
 
-      return typeof value === 'function' ? value.bind(target) : value
+      return typeof value === 'function' && prop !== 'constructor' ? value.bind(target) : value
     },
     set(_, prop, value) {
+      if (compiled === undefined && prop === 'lastIndex') {
+        lastIndex = value
+        return true
+      }
+
       const target = compile()
       return Reflect.set(target, prop, value, target)
     },
     has(_, prop) {
-      return Reflect.has(compile(), prop)
+      if (compiled === undefined) {
+        return prop === 'lastIndex' || prop in RegExp.prototype
+      }
+
+      return Reflect.has(compiled, prop)
     },
   })
 }

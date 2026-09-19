@@ -27,7 +27,7 @@ Other adapters may remove or change options to keep things simple.
 - **undefined**
 - **Date** (including `Invalid Date`)
 - **BigInt**
-- **RegExp** (compiled lazily on first use, so an invalid pattern throws a `SyntaxError` when the value is used, not when the request is decoded)
+- **RegExp** (compiled lazily on first use, so an invalid pattern throws a `SyntaxError` when the value is used, not when the request is decoded; the value has no own properties, cannot be frozen, and is not recognised by `structuredClone`)
 - **URL**
 - **Record (object)**
 - **Array**

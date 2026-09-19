@@ -40,6 +40,33 @@ describe('createLazyRegExp', () => {
     expect(spy).toHaveBeenCalledTimes(compiled)
   })
 
+  it('answers reads a fresh RegExp could answer without compiling', () => {
+    const spy = vi.spyOn(globalThis, 'RegExp')
+    const regexp = createLazyRegExp('uic', 'g')
+
+    expect(regexp.lastIndex).toBe(0)
+    expect((regexp as any).then).toBeUndefined()
+    expect((regexp as any).toJSON).toBeUndefined()
+    expect((regexp as any)[Symbol.for('nodejs.util.inspect.custom')]).toBeUndefined()
+    expect(JSON.stringify({ regexp })).toBe('{"regexp":{}}')
+    expect('lastIndex' in regexp).toBe(true)
+    expect('exec' in regexp).toBe(true)
+    expect('then' in regexp).toBe(false)
+    expect(Object.hasOwn(regexp, 'lastIndex')).toBe(false)
+
+    regexp.lastIndex = 2
+    expect(regexp.lastIndex).toBe(2)
+    expect(spy).not.toHaveBeenCalledWith('uic', 'g')
+
+    expect(regexp.exec('uicuic')?.index).toBe(3)
+    expect(spy).toHaveBeenCalledWith('uic', 'g')
+    expect(regexp.lastIndex).toBe(6)
+  })
+
+  it('keeps constructor identity', () => {
+    expect(createLazyRegExp('a', '').constructor).toBe(RegExp)
+  })
+
   it('behaves like the compiled RegExp', () => {
     const regexp = createLazyRegExp('a(b)', 'g')
 

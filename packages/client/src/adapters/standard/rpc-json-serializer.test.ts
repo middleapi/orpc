@@ -269,6 +269,28 @@ describe('standardRPCJsonSerializer: untrusted serialized values', () => {
     expect(spy).toHaveBeenCalledWith(expect.stringContaining('RGI_Emoji'), 'v')
   })
 
+  it('does not compile a regexp when a later meta entry probes it', () => {
+    const spy = vi.spyOn(globalThis, 'RegExp')
+    const pattern = `/${'[\\p{RGI_Emoji}--\\q{x}]'.repeat(90)}/v`
+
+    // unknown type: ignored before the path is walked
+    expect(serializer.deserialize([pattern], [[REGEXP, 0], [999, 0, 'lastIndex']])).toHaveLength(1)
+    // built-in type aimed at a property: the lazy RegExp owns nothing, so the path walk fails first
+    expect(() => serializer.deserialize([pattern], [[REGEXP, 0], [BIGINT, 0, 'lastIndex']]))
+      .toThrow('Invalid RPC serialized data: segment "lastIndex" does not exist.')
+    expect(() => serializer.deserialize([pattern], [[REGEXP, 0], [999, 0, 'source']]))
+      .not
+      .toThrow()
+    expect(() => serializer.deserialize([pattern], [[REGEXP, 0], [BIGINT, 0, 'source']]))
+      .toThrow('Invalid RPC serialized data: segment "source" does not exist.')
+
+    expect(spy).not.toHaveBeenCalledWith(expect.stringContaining('RGI_Emoji'), 'v')
+  })
+
+  it('ignores unknown types without walking their path', () => {
+    expect(() => serializer.deserialize({ a: 1 }, [[999, 'does', 'not', 'exist']])).not.toThrow()
+  })
+
   it('defers regexp syntax errors to first use', () => {
     for (const flags of ['', 'gi', 'u', 'v', 'iv']) {
       const { value } = serializer.deserialize({ value: `/(/${flags}` }, [[REGEXP, 'value']]) as { value: RegExp }
