@@ -15,6 +15,7 @@ Extend native types by creating your own `StandardRPCCustomJsonSerializer` and a
 
    ```ts twoslash
    import type { StandardRPCCustomJsonSerializer } from '@orpc/client/standard'
+   import * as z from 'zod'
 
    export class User {
      constructor(
@@ -34,16 +35,30 @@ Extend native types by creating your own `StandardRPCCustomJsonSerializer` and a
      }
    }
 
+   const UserSchema = z.object({
+     id: z.string(),
+     name: z.string(),
+     email: z.string(),
+     age: z.number(),
+   })
+
    export const userSerializer: StandardRPCCustomJsonSerializer = {
      type: 21,
      condition: data => data instanceof User,
      serialize: data => data.toJSON(),
-     deserialize: data => new User(data.id, data.name, data.email, data.age),
+     deserialize: (data) => {
+       const { id, name, email, age } = UserSchema.parse(data)
+       return new User(id, name, email, age)
+     },
    }
    ```
 
    ::: warning
    Ensure the `type` is unique and greater than `20` to avoid conflicts with [built-in types](/docs/advanced/rpc-protocol#supported-types) in the future.
+   :::
+
+   ::: warning
+   `deserialize` receives untrusted input. A malicious client controls `meta` and can point any `type` at any JSON value, so never assume `deserialize` receives what `serialize` produced. Validate the value and throw when it does not match. Built-in types do the same, and [RPC Handler](/docs/rpc-handler) turns these errors into a `BAD_REQUEST` response.
    :::
 
 2. **Use Your Custom Serializer**
@@ -82,3 +97,5 @@ export const undefinedSerializer: StandardRPCCustomJsonSerializer = {
   deserialize: data => undefined,
 }
 ```
+
+A custom serializer that matches a built-in `type` fully replaces it: the built-in `deserialize` no longer runs on that value, so your `deserialize` must validate the input itself.

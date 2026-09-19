@@ -27,7 +27,7 @@ Other adapters may remove or change options to keep things simple.
 - **undefined**
 - **Date** (including `Invalid Date`)
 - **BigInt**
-- **RegExp**
+- **RegExp** (compiled lazily on first use, so an invalid pattern throws a `SyntaxError` when the value is used, not when the request is decoded)
 - **URL**
 - **Record (object)**
 - **Array**
