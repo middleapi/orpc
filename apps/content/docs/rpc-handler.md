@@ -27,7 +27,7 @@ Other adapters may remove or change options to keep things simple.
 - **undefined**
 - **Date** (including `Invalid Date`)
 - **BigInt**
-- **RegExp**
+- **RegExp** (lazy: compiled on first use)
 - **URL**
 - **Record (object)**
 - **Array**

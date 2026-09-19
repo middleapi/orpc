@@ -1,5 +1,14 @@
 import { supportedDataTypes } from '../../../tests/shared'
-import { StandardRPCJsonSerializer } from './rpc-json-serializer'
+import { STANDARD_RPC_JSON_SERIALIZER_BUILT_IN_TYPES, StandardRPCJsonSerializer } from './rpc-json-serializer'
+
+/**
+ * `vi.spyOn(globalThis, 'RegExp')` swaps the global, so `instanceof RegExp` must use the original.
+ */
+const OriginalRegExp = RegExp
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 class Person {
   constructor(
@@ -182,31 +191,168 @@ describe('standardRPCJsonSerializer: custom serializers', () => {
     }).toThrow('Custom serializer type must be unique.')
   })
 
-  it.each(['nonExist', '__proto__', 'constructor'])('should throw when accessing non-existent path during deserialization: %s', (segment) => {
+  it.each(['nonExist', '__proto__', 'constructor', 'prototype'])('should throw when accessing non-existent path during deserialization: %s', (segment) => {
     const serializer = new StandardRPCJsonSerializer()
 
     expect(
       () => serializer.deserialize({ a: 1 }, [[1, segment]]),
-    ).toThrow(`Security error: accessing non-existent path during deserialization. Path segment: ${segment}`)
+    ).toThrow(`Invalid RPC serialized data: segment "${segment}" does not exist.`)
 
     expect(
       () => serializer.deserialize({ a: 1 }, [[1, 'a', segment]]),
-    ).toThrow(`Security error: accessing non-existent path during deserialization. Path segment: ${segment}`)
+    ).toThrow(`Invalid RPC serialized data: segment "${segment}" does not exist.`)
 
     expect(
       () => serializer.deserialize({ a: 1 }, [[1, segment, 'role']]),
-    ).toThrow(`Security error: accessing non-existent path during deserialization. Path segment: ${segment}`)
+    ).toThrow(`Invalid RPC serialized data: segment "${segment}" does not exist.`)
 
     expect(
       () => serializer.deserialize({ a: 1 }, [], [[segment]], () => new Blob([])),
-    ).toThrow(`Security error: accessing non-existent path during deserialization. Path segment: ${segment}`)
+    ).toThrow(`Invalid RPC serialized data: segment "${segment}" does not exist.`)
 
     expect(
       () => serializer.deserialize({ a: 1 }, [], [['a', segment]], () => new Blob([])),
-    ).toThrow(`Security error: accessing non-existent path during deserialization. Path segment: ${segment}`)
+    ).toThrow(`Invalid RPC serialized data: segment "${segment}" does not exist.`)
 
     expect(
       () => serializer.deserialize({ a: 1 }, [], [[segment, 'role']], () => new Blob([])),
-    ).toThrow(`Security error: accessing non-existent path during deserialization. Path segment: ${segment}`)
+    ).toThrow(`Invalid RPC serialized data: segment "${segment}" does not exist.`)
+  })
+})
+
+describe('standardRPCJsonSerializer: untrusted serialized values', () => {
+  const serializer = new StandardRPCJsonSerializer()
+  const { BIGINT, DATE, NAN, UNDEFINED, URL: URL_TYPE, REGEXP, SET, MAP } = STANDARD_RPC_JSON_SERIALIZER_BUILT_IN_TYPES
+
+  it.each([
+    [BIGINT, 'bigint', 'a string', [null, 1, true, [], {}]],
+    [DATE, 'date', 'a string or null', [1, true, [], {}]],
+    [NAN, 'nan', 'null', ['text', 1, true, [], {}]],
+    [UNDEFINED, 'undefined', 'null', ['text', 1, true, [], {}]],
+    [URL_TYPE, 'url', 'a string', [null, 1, true, [], {}]],
+    [REGEXP, 'regexp', 'a string', [null, 1, true, [], {}]],
+    [SET, 'set', 'an array', [null, 'text', 1, true, {}]],
+    [MAP, 'map', 'an array', [null, 'text', 1, true, {}]],
+  ])('type %i (%s) rejects mistyped serialized values', (type, name, expected, rejected) => {
+    for (const value of rejected) {
+      expect(() => serializer.deserialize({ value }, [[type, 'value']]))
+        .toThrow(`Invalid RPC serialized data: type ${type} (${name}) expects ${expected}.`)
+    }
+  })
+
+  it('rejects regexp strings that are not in "/pattern/flags" form or carry invalid flags', () => {
+    for (const value of ['uic', '/uic', 'uic/gi', '/uic/GI', '', '/uic/x', '/uic/gg', '/uic/uv']) {
+      expect(() => serializer.deserialize({ value }, [[REGEXP, 'value']]))
+        .toThrow(`Invalid RPC serialized data: type ${REGEXP} (regexp) expects a "/pattern/flags" string.`)
+    }
+  })
+
+  it('does not compile regexp patterns until they are used', () => {
+    const spy = vi.spyOn(globalThis, 'RegExp')
+    const patterns = [
+      // V8: unicode property escapes materialize code point sets while parsing
+      ...Array.from({ length: 440 }, (_, i) => `/${'[\\p{RGI_Emoji}--\\q{x}]'.repeat(90)}${i}/v`),
+      // JavaScriptCore: named capture groups parse quadratically, no flag needed
+      `/${Array.from({ length: 20000 }, (_, j) => `(?<n${j}>a)`).join('')}/`,
+    ]
+
+    const start = performance.now()
+    const result = serializer.deserialize(patterns, patterns.map((_, i) => [REGEXP, i])) as RegExp[]
+
+    expect(performance.now() - start).toBeLessThan(200)
+    expect(spy).not.toHaveBeenCalledWith(expect.stringContaining('RGI_Emoji'), 'v')
+    expect(spy).not.toHaveBeenCalledWith(expect.stringContaining('(?<n0>'), '')
+    expect(result[0]).toBeInstanceOf(OriginalRegExp)
+    expect(result.at(-1)).toBeInstanceOf(OriginalRegExp)
+
+    expect(result[0]!.flags).toBe('v')
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('RGI_Emoji'), 'v')
+  })
+
+  it('does not compile a regexp when a later meta entry probes it', () => {
+    const spy = vi.spyOn(globalThis, 'RegExp')
+    const pattern = `/${'[\\p{RGI_Emoji}--\\q{x}]'.repeat(90)}/v`
+
+    // unknown type: ignored before the path is walked
+    expect(serializer.deserialize([pattern], [[REGEXP, 0], [999, 0, 'lastIndex']])).toHaveLength(1)
+    // built-in type aimed at a property: the lazy RegExp owns nothing, so the path walk fails first
+    expect(() => serializer.deserialize([pattern], [[REGEXP, 0], [BIGINT, 0, 'lastIndex']]))
+      .toThrow('Invalid RPC serialized data: segment "lastIndex" does not exist.')
+    expect(() => serializer.deserialize([pattern], [[REGEXP, 0], [999, 0, 'source']]))
+      .not
+      .toThrow()
+    expect(() => serializer.deserialize([pattern], [[REGEXP, 0], [BIGINT, 0, 'source']]))
+      .toThrow('Invalid RPC serialized data: segment "source" does not exist.')
+
+    expect(spy).not.toHaveBeenCalledWith(expect.stringContaining('RGI_Emoji'), 'v')
+  })
+
+  it('ignores unknown types without walking their path', () => {
+    expect(() => serializer.deserialize({ a: 1 }, [[999, 'does', 'not', 'exist']])).not.toThrow()
+  })
+
+  it('defers regexp syntax errors to first use', () => {
+    for (const flags of ['', 'gi', 'u', 'v', 'iv']) {
+      const { value } = serializer.deserialize({ value: `/(/${flags}` }, [[REGEXP, 'value']]) as { value: RegExp }
+      expect(value).toBeInstanceOf(RegExp)
+      expect(() => value.test('')).toThrow(SyntaxError)
+    }
+  })
+
+  it('does not expand a string into a Set or Map of its characters', () => {
+    expect(() => serializer.deserialize('x'.repeat(1000), [[SET]]))
+      .toThrow(`Invalid RPC serialized data: type ${SET} (set) expects an array.`)
+    expect(() => serializer.deserialize({ value: 'x'.repeat(1000) }, [[MAP, 'value']]))
+      .toThrow(`Invalid RPC serialized data: type ${MAP} (map) expects an array.`)
+  })
+
+  it('rejects a value already restored by an earlier meta entry', () => {
+    expect(() => serializer.deserialize({ value: '1' }, [[BIGINT, 'value'], [URL_TYPE, 'value']]))
+      .toThrow(`Invalid RPC serialized data: type ${URL_TYPE} (url) expects a string.`)
+
+    const json = Array.from({ length: 1000 }, (_, i) => i)
+    expect(() => serializer.deserialize(json, Array.from({ length: 1000 }, () => [SET])))
+      .toThrow(`Invalid RPC serialized data: type ${SET} (set) expects an array.`)
+    expect(() => serializer.deserialize(json.map(i => [i, i]), Array.from({ length: 1000 }, () => [MAP])))
+      .toThrow(`Invalid RPC serialized data: type ${MAP} (map) expects an array.`)
+  })
+
+  it('still restores well-formed built-in values', () => {
+    expect(serializer.deserialize({ value: '1' }, [[BIGINT, 'value']])).toEqual({ value: 1n })
+    expect(serializer.deserialize({ value: '2023-01-01T00:00:00.000Z' }, [[DATE, 'value']])).toEqual({ value: new Date('2023-01-01') })
+    expect((serializer.deserialize({ value: null }, [[DATE, 'value']]) as any).value.getTime()).toBeNaN()
+    expect(serializer.deserialize({ value: null }, [[NAN, 'value']])).toEqual({ value: Number.NaN })
+    expect(serializer.deserialize([null], [[UNDEFINED, 0]])).toEqual([undefined])
+    expect(serializer.deserialize({ value: 'https://orpc.dev/' }, [[URL_TYPE, 'value']])).toEqual({ value: new URL('https://orpc.dev') })
+    expect(serializer.deserialize({ value: '/uic/gi' }, [[REGEXP, 'value']])).toEqual({ value: /uic/gi })
+    expect(serializer.deserialize({ value: [1, 2] }, [[SET, 'value']])).toEqual({ value: new Set([1, 2]) })
+    expect(serializer.deserialize({ value: [[1, 2]] }, [[MAP, 'value']])).toEqual({ value: new Map([[1, 2]]) })
+  })
+
+  it('ignores unknown meta types so subscribers without a custom serializer still receive plain data', () => {
+    expect(serializer.deserialize({ value: { name: 'Alice' } }, [[100, 'value']])).toEqual({ value: { name: 'Alice' } })
+  })
+
+  it('lets a custom serializer replace a built-in type without running the built-in restore', () => {
+    const dateSerializer = new StandardRPCJsonSerializer({
+      customJsonSerializers: [{
+        type: DATE,
+        condition: data => data instanceof Date,
+        serialize: (data: Date) => data.getTime(),
+        deserialize: (data: any) => {
+          if (typeof data !== 'number') {
+            throw new TypeError('expected a timestamp')
+          }
+
+          return new Date(data)
+        },
+      }],
+    })
+
+    const date = new Date('2023-01-01')
+    const [json, meta] = dateSerializer.serialize({ date })
+    expect(json).toEqual({ date: date.getTime() })
+    expect(dateSerializer.deserialize(json, meta)).toEqual({ date })
+    expect(() => dateSerializer.deserialize({ date: '2023-01-01' }, [[DATE, 'date']])).toThrow('expected a timestamp')
   })
 })
