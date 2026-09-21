@@ -94,6 +94,44 @@ export function get(object: unknown, path: readonly PropertyKey[]): unknown {
   return current
 }
 
+export function setOwn(object: object, key: PropertyKey, value: unknown): void {
+  if (key === '__proto__') {
+    Object.defineProperty(object, key, {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    })
+  }
+  else {
+    (object as Record<PropertyKey, unknown>)[key] = value
+  }
+}
+
+export function copyOnWrite(parent: object, key: PropertyKey, original: unknown): unknown {
+  const value = (parent as Record<PropertyKey, unknown>)[key]
+
+  if (value !== original) {
+    return value
+  }
+
+  let copy: object
+
+  if (Array.isArray(value)) {
+    copy = value.slice()
+  }
+  else if (isObject(value)) {
+    copy = { ...value }
+  }
+  else {
+    return value
+  }
+
+  setOwn(parent, key, copy)
+
+  return copy
+}
+
 export function isPropertyKey(value: unknown): value is PropertyKey {
   const type = typeof value
   return type === 'string' || type === 'number' || type === 'symbol'

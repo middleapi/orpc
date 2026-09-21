@@ -1,7 +1,7 @@
 import { type } from 'arktype'
 import * as v from 'valibot'
 import * as z from 'zod/v4'
-import { clone, findDeepMatches, get, getConstructor, isObject, isPropertyKey, isTypescriptObject, NullProtoObj } from './object'
+import { clone, copyOnWrite, findDeepMatches, get, getConstructor, isObject, isPropertyKey, isTypescriptObject, NullProtoObj, setOwn } from './object'
 
 it('findDeepMatches', () => {
   const { maps, values } = findDeepMatches(v => typeof v === 'string', {
@@ -139,4 +139,50 @@ it('nullProtoObj', () => {
   // eslint-disable-next-line no-restricted-properties, no-proto
   expect(clone.__proto__).toBe(2)
   expect(clone.a).toBe(1)
+})
+
+it('setOwn', () => {
+  const object: Record<string, unknown> = {}
+
+  setOwn(object, 'a', 1)
+  setOwn(object, '__proto__', { b: 2 })
+
+  expect(object.a).toBe(1)
+  expect(Object.getOwnPropertyDescriptor(object, '__proto__')?.value).toEqual({ b: 2 })
+  expect(Object.getPrototypeOf(object)).toBe(Object.prototype)
+})
+
+describe('copyOnWrite', () => {
+  it('copies arrays and plain objects still held by the input, returns everything else as is', () => {
+    const child = { a: 1 }
+    const list = [1]
+    const parent = { child, list, date: new Date(), none: null }
+
+    const childCopy = copyOnWrite(parent, 'child', child)
+    expect(childCopy).toEqual(child)
+    expect(childCopy).not.toBe(child)
+    expect(parent.child).toBe(childCopy)
+    expect(copyOnWrite(parent, 'child', child)).toBe(childCopy)
+
+    const listCopy = copyOnWrite(parent, 'list', list)
+    expect(listCopy).toEqual(list)
+    expect(listCopy).not.toBe(list)
+    expect(parent.list).toBe(listCopy)
+
+    expect(copyOnWrite(parent, 'date', parent.date)).toBe(parent.date)
+    expect(copyOnWrite(parent, 'none', null)).toBeNull()
+  })
+
+  it('keeps __proto__ an own property on the parent and the copy', () => {
+    const parent = JSON.parse('{"__proto__": {"a": 1}}')
+    const original = Object.getOwnPropertyDescriptor(parent, '__proto__')?.value
+
+    const copy = copyOnWrite(parent, '__proto__', original) as any
+
+    expect(Object.getPrototypeOf(parent)).toBe(Object.prototype)
+    expect(Object.getPrototypeOf(copy)).toBe(Object.prototype)
+    expect(Object.getOwnPropertyDescriptor(parent, '__proto__')?.value).toBe(copy)
+    expect(copy).toEqual({ a: 1 })
+    expect(({} as any).a).toBeUndefined()
+  })
 })
