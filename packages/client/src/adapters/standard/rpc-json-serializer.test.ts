@@ -220,6 +220,27 @@ describe('standardRPCJsonSerializer: custom serializers', () => {
   })
 })
 
+describe('standardRPCJsonSerializer: deserialize', () => {
+  const serializer = new StandardRPCJsonSerializer()
+
+  it.each([
+    ['json', { count: 10n, list: [{ tags: new Set(['a']), nested: [new Date('2023-01-01'), new URL('https://orpc.dev')] }] }],
+    ['blobs', { files: [new Blob(['hello'])], map: new Map([[1n, new Set(['a'])]]) }],
+  ])('does not mutate the input and can deserialize repeatedly: %s', (_, value) => {
+    // https://github.com/middleapi/orpc/issues/2053
+    const [json, meta, maps, blobs] = serializer.serialize(value)
+    const snapshot = JSON.stringify({ json, meta, maps })
+
+    const deserialize = () => blobs.length
+      ? serializer.deserialize(json, meta, maps, i => blobs[i]!)
+      : serializer.deserialize(json, meta)
+
+    expect(deserialize()).toEqual(value)
+    expect(deserialize()).toEqual(value)
+    expect(JSON.stringify({ json, meta, maps })).toBe(snapshot)
+  })
+})
+
 describe('standardRPCJsonSerializer: untrusted serialized values', () => {
   const serializer = new StandardRPCJsonSerializer()
   const { BIGINT, DATE, NAN, UNDEFINED, URL: URL_TYPE, REGEXP, SET, MAP } = STANDARD_RPC_JSON_SERIALIZER_BUILT_IN_TYPES

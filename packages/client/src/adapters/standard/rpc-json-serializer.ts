@@ -1,5 +1,5 @@
 import type { Segment } from '@orpc/shared'
-import { createLazyRegExp, isObject, isValidRegExpFlags } from '@orpc/shared'
+import { copyOnWrite, createLazyRegExp, isObject, isValidRegExpFlags } from '@orpc/shared'
 
 export const STANDARD_RPC_JSON_SERIALIZER_BUILT_IN_TYPES = {
   BIGINT: 0,
@@ -151,14 +151,21 @@ export class StandardRPCJsonSerializer {
 
   deserialize(json: unknown, meta: readonly StandardRPCJsonSerializedMetaItem[], maps?: readonly Segment[][], getBlob?: (index: number) => Blob): unknown {
     const ref = { data: json }
+    /**
+     * `input` is never written to, so `copyOnWrite` can tell a container still shared with
+     * the caller's `json` from one already copied for a restored value.
+     */
+    const input = { data: json }
 
     if (maps && getBlob) {
       maps.forEach((segments, i) => {
+        let original: any = input
         let currentRef: any = ref
         let preSegment: string | number = 'data'
 
         segments.forEach((segment) => {
-          currentRef = currentRef[preSegment]
+          original = original[preSegment]
+          currentRef = copyOnWrite(currentRef, preSegment, original)
           preSegment = segment
 
           if (!Object.hasOwn(currentRef, preSegment)) {
@@ -182,11 +189,13 @@ export class StandardRPCJsonSerializer {
         continue
       }
 
+      let original: any = input
       let currentRef: any = ref
       let preSegment: string | number = 'data'
 
       for (let i = 1; i < item.length; i++) {
-        currentRef = currentRef[preSegment]
+        original = original[preSegment]
+        currentRef = copyOnWrite(currentRef, preSegment, original)
         preSegment = item[i]!
 
         if (!Object.hasOwn(currentRef, preSegment)) {
