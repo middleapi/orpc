@@ -1,7 +1,9 @@
 import { oc } from '@orpc/contract'
+import { os } from '@orpc/server'
 import * as arktype from 'arktype'
 import z from 'zod'
 import { testSchema, testSchemaConverter, zodJsonSchemaConverter } from '../tests/__shared__/schema'
+import { OpenAPIHandler } from './adapters/fetch/openapi-handler'
 import { openapi } from './meta'
 import { OpenAPIGenerator, OpenAPIGeneratorError } from './openapi-generator'
 
@@ -587,6 +589,47 @@ describe('openAPIGenerator version', () => {
       PenguinNameBanned: { title: 'PENGUIN_NAME_BANNED' },
       PenguinColonyFull: { title: 'PENGUIN_COLONY_FULL' },
       UndefinedError: { title: 'UndefinedError' },
+    })
+  })
+
+  describe.each(['3.2.0', '3.1.0', '3.0.3'] as const)('error response bodies in OpenAPI %s', (version) => {
+    it.each(['defined', 'undefined'] as const)('matches the default handler for %s errors', async (kind) => {
+      const router = {
+        defined: os.meta(openapi({ method: 'GET', path: '/defined' }))
+          .errors({ NOT_FOUND: { message: 'Missing item', data: z.object({ status: z.string() }) } })
+          .handler(({ errors }) => { throw errors.NOT_FOUND({ data: { status: 'archived' } }) }),
+        undefined: os.meta(openapi({ method: 'GET', path: '/undefined' }))
+          .errors({ INTERNAL_SERVER_ERROR: {} })
+          .handler(() => { throw new Error('Internal failure') }),
+      }
+      const errorStatusMap = { NOT_FOUND: 404, INTERNAL_SERVER_ERROR: 500 }
+      const document = await generator.generate(router, { version, errorStatusMap })
+      const { matched, response } = await new OpenAPIHandler(router, { errorStatusMap })
+        .handle(new Request(`https://example.com/${kind}`))
+
+      const status = kind === 'defined' ? '404' : '500'
+      const schemaName = kind === 'defined' ? 'NotFound' : 'UndefinedError'
+      const schema = document.components?.schemas?.[schemaName]
+      const body = await response!.json()
+
+      expect(matched).toBe(true)
+      expect(response!.status).toBe(Number(status))
+      const expectedBody = kind === 'defined'
+        ? { defined: true, code: 'NOT_FOUND', message: 'Missing item', data: { status: 'archived' } }
+        : { defined: false, code: 'INTERNAL_SERVER_ERROR', message: 'Internal Server Error' }
+      expect(body).toEqual(expectedBody)
+      expect(document.paths?.[`/${kind}`]?.get?.responses?.[status]).toMatchObject({
+        content: {
+          'application/json': {
+            schema: { oneOf: expect.arrayContaining([{ $ref: `#/components/schemas/${schemaName}` }]) },
+          },
+        },
+      })
+      expect(schema).toHaveProperty('required', Object.keys(expectedBody))
+      expect(schema).not.toHaveProperty('properties.status')
+      if (kind === 'defined') {
+        expect(schema).toHaveProperty('properties.data.properties.status')
+      }
     })
   })
 

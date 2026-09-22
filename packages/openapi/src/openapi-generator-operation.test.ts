@@ -704,11 +704,10 @@ describe('openAPIGenerator operation builders', () => {
         properties: {
           defined: { const: true },
           code: { const: 'BAD_REQUEST' },
-          status: { const: 400 },
           message: { type: 'string', default: undefined },
           data: { type: 'object', properties: { field: { type: 'string' } }, required: ['field'] },
         },
-        required: ['defined', 'code', 'status', 'message', 'data'],
+        required: ['defined', 'code', 'message', 'data'],
       })
       expect(doc.components?.schemas?.BadRequest2).toEqual({
         title: 'BAD_REQUEST_2',
@@ -716,11 +715,10 @@ describe('openAPIGenerator operation builders', () => {
         properties: {
           defined: { const: true },
           code: { const: 'BAD_REQUEST_2' },
-          status: { const: 400 },
           message: { type: 'string', default: undefined },
           data: { },
         },
-        required: ['defined', 'code', 'status', 'message'],
+        required: ['defined', 'code', 'message'],
       })
       expect(doc.components?.schemas?.UndefinedError).toEqual({
         title: 'UndefinedError',
@@ -728,11 +726,10 @@ describe('openAPIGenerator operation builders', () => {
         properties: {
           defined: { const: false },
           code: { type: 'string' },
-          status: { type: 'number' },
           message: { type: 'string' },
           data: {},
         },
-        required: ['defined', 'code', 'status', 'message'],
+        required: ['defined', 'code', 'message'],
       })
     })
 
@@ -820,11 +817,10 @@ describe('openAPIGenerator operation builders', () => {
         properties: {
           defined: { const: true },
           code: { const: 'FORBIDDEN' },
-          status: { const: 403 },
           message: { type: 'string', default: undefined },
           data: { type: 'object', properties: { reason: { type: 'string' } }, required: ['reason'] },
         },
-        required: ['defined', 'code', 'status', 'message', 'data'],
+        required: ['defined', 'code', 'message', 'data'],
       })
     })
 
