@@ -480,11 +480,10 @@ export function buildErrorResponse(
     properties: {
       defined: { const: false },
       code: { type: 'string' },
-      status: { type: 'number' },
       message: { type: 'string' },
       data: {},
     },
-    required: ['defined', 'code', 'status', 'message'],
+    required: ['defined', 'code', 'message'],
   })
 
   for (const [status, definitions] of definitionsByStatus.entries()) {
@@ -501,7 +500,6 @@ export function buildErrorResponse(
           ...combineJsonObjectSchemaEntries([
             ['defined', { const: true }, false],
             ['code', { const: code }, false],
-            ['status', { const: status }, false],
             // avoid using the defaultMessage here to improve component reusability
             ['message', { type: 'string' }, false],
             ['data', ctx.registry.hoistDefs(dataJsonSchema, 'output'), dataOptional],
