@@ -356,7 +356,7 @@ describe('standardRPCJsonSerializer: untrusted serialized values', () => {
         .toThrow('Invalid RPC serialized data: blob 0 is not a Blob.')
     }
 
-    const blobs = [new Blob()]
+    const blobs = [new Blob([])]
     expect(() => serializer.deserialize([null, null], [], [[0], [1]], i => blobs[i]!))
       .toThrow('Invalid RPC serialized data: blob 1 is not a Blob.')
   })
