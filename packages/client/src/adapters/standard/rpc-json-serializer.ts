@@ -159,6 +159,12 @@ export class StandardRPCJsonSerializer {
 
     if (maps && getBlob) {
       maps.forEach((segments, i) => {
+        const blob: unknown = getBlob(i)
+
+        if (!(blob instanceof Blob)) {
+          throw invalidSerializedData(`blob ${i} is not a Blob.`)
+        }
+
         let original: any = input
         let currentRef: any = ref
         let preSegment: string | number = 'data'
@@ -173,7 +179,7 @@ export class StandardRPCJsonSerializer {
           }
         })
 
-        currentRef[preSegment] = getBlob(i)
+        currentRef[preSegment] = blob
       })
     }
 

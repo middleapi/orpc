@@ -194,6 +194,36 @@ describe('standardRPCSerializer: event iterator', async () => {
   })
 })
 
+describe('standardRPCSerializer: untrusted form data', () => {
+  const serializer = new StandardRPCSerializer(new StandardRPCJsonSerializer())
+
+  it('rejects string fields in place of blobs', () => {
+    // would otherwise resize the array to 2 ** 32 - 1 empty slots for `set` to iterate
+    const form = new FormData()
+    form.set('data', JSON.stringify({ json: [1], meta: [[6]], maps: [['length']] }))
+    form.set('0', '4294967295')
+
+    expect(() => serializer.deserialize(form)).toThrow('Invalid RPC serialized data: blob 0 is not a Blob.')
+  })
+
+  it('rejects maps without a matching blob field', () => {
+    const form = new FormData()
+    form.set('data', JSON.stringify({ json: [null, null], maps: [[0], [1]] }))
+    form.set('0', new Blob(['x']))
+
+    expect(() => serializer.deserialize(form)).toThrow('Invalid RPC serialized data: blob 1 is not a Blob.')
+  })
+
+  it('cannot resize an array through blob maps', () => {
+    const form = new FormData()
+    form.set('data', JSON.stringify({ json: [1], meta: [[6]], maps: [['length']] }))
+    form.set('0', new Blob(['x']))
+
+    // only a Blob can land there, and the spec rejects it as an array length
+    expect(() => serializer.deserialize(form)).toThrow(RangeError)
+  })
+})
+
 it('standardRPCSerializer support deserialize undefined data', () => {
   const serializer = new StandardRPCSerializer(new StandardRPCJsonSerializer())
   expect(serializer.deserialize(undefined)).toEqual(undefined)
