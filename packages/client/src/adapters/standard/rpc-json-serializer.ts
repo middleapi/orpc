@@ -159,10 +159,6 @@ export class StandardRPCJsonSerializer {
 
     if (maps && getBlob) {
       maps.forEach((segments, i) => {
-        /**
-         * `getBlob` hands back whatever the peer sent, such as a string FormData field.
-         * A string like "4294967295" written to an array's `length` would resize it for later meta to iterate.
-         */
         const blob: unknown = getBlob(i)
 
         if (!(blob instanceof Blob)) {
