@@ -350,6 +350,17 @@ describe('standardRPCJsonSerializer: untrusted serialized values', () => {
     expect(serializer.deserialize({ value: [[1, 2]] }, [[MAP, 'value']])).toEqual({ value: new Map([[1, 2]]) })
   })
 
+  it('rejects blob entries that are not a Blob', () => {
+    for (const value of [4294967295, '4294967295', null, undefined, {}, []]) {
+      expect(() => serializer.deserialize([null], [], [[0]], () => value as any))
+        .toThrow('Invalid RPC serialized data: blob 0 is not a Blob.')
+    }
+
+    const blobs = [new Blob()]
+    expect(() => serializer.deserialize([null, null], [], [[0], [1]], i => blobs[i]!))
+      .toThrow('Invalid RPC serialized data: blob 1 is not a Blob.')
+  })
+
   it('ignores unknown meta types so subscribers without a custom serializer still receive plain data', () => {
     expect(serializer.deserialize({ value: { name: 'Alice' } }, [[100, 'value']])).toEqual({ value: { name: 'Alice' } })
   })
