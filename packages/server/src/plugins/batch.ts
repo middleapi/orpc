@@ -224,6 +224,25 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       }
 
+      const runSubrequests = async (peer: ServerPeer): Promise<void> => {
+        const promise = Promise.all(messages.map(msg => peer.message(msg, handleIndividualRequest)))
+        const signal = interceptorOptions.request.signal
+        const closePeer = () => peer.close(signal?.reason)
+
+        if (signal?.aborted) {
+          closePeer()
+        }
+
+        signal?.addEventListener('abort', closePeer)
+
+        try {
+          await promise
+        }
+        finally {
+          signal?.removeEventListener('abort', closePeer)
+        }
+      }
+
       const status = await value(this.successStatus, interceptorOptions)
       const headers = await value(this.headers, interceptorOptions)
 
@@ -233,7 +252,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
           responseMessages.push(message)
         })
 
-        await Promise.all(messages.map(msg => peer.message(msg, handleIndividualRequest)))
+        await runSubrequests(peer)
         await peer.close()
 
         if (responseMessages.some(msg => msg.binary !== undefined)) {
@@ -298,16 +317,6 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }, this.keepAliveInterval)
       }
 
-      const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
-        start(controller) {
-          streamController = controller
-          scheduleKeepAlive()
-        },
-        cancel() {
-          clearKeepAlive()
-        },
-      })
-
       const peer = new ServerPeer(async (message) => {
         const encoded = await encodePeerMessage(message)
         const bytes = typeof encoded === 'string' ? new TextEncoder().encode(encoded) : encoded
@@ -319,8 +328,19 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         scheduleKeepAlive() // reset idle timer
       })
 
+      const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
+        start(controller) {
+          streamController = controller
+          scheduleKeepAlive()
+        },
+        async cancel(reason) {
+          clearKeepAlive()
+          await peer.close(reason)
+        },
+      })
+
       // DO NOT await here to block streaming response
-      Promise.all(messages.map(msg => peer.message(msg, handleIndividualRequest)))
+      runSubrequests(peer)
         .then(async () => {
           clearKeepAlive()
           streamController.close()
