@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { AsyncIteratorClass, sleep } from '@standard-server/shared'
 import { consumeAsyncIterator, replicateAsyncIterator, traceAsyncIterator, wrapAsyncIterator } from './iterator'
+import { promiseWithResolvers } from './promise'
 import * as Tracing from './tracing'
 
 const runInSpanContextSpy = vi.spyOn(Tracing, 'runInSpanContext')
@@ -264,9 +265,10 @@ describe('traceAsyncIterator', () => {
 
   it('can be cancelled while an iteration is pending', async () => {
     const cleanup = vi.fn()
+    const pull = promiseWithResolvers<void>()
     const iterator = new AsyncIteratorClass(
       async () => {
-        await sleep(100)
+        await pull.promise
         return { done: true, value: 'done' }
       },
       cleanup,
@@ -276,13 +278,12 @@ describe('traceAsyncIterator', () => {
 
     const nextPromise = withSpan.next()
     await sleep(10)
-    const start = Date.now()
-    await withSpan.return()
-    expect(Date.now() - start).toBeLessThan(10)
+    await withSpan.return() // would hang if it waited for the pending pull
 
     expect(cleanup).toHaveBeenCalledTimes(1)
     expect(cleanup).toHaveBeenCalledWith({ kind: 'cancelled' })
 
+    pull.resolve()
     await expect(nextPromise).resolves.toEqual({ done: true, value: 'done' })
   })
 })
