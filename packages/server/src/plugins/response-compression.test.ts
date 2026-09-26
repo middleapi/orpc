@@ -275,6 +275,72 @@ describe('responseCompressionHandlerPlugin', () => {
     })
   })
 
+  describe('validators', () => {
+    function createHandler(extraHeaders: Record<string, string>) {
+      return new RPCHandler(os.handler(() => 'x'.repeat(2000)), {
+        plugins: [
+          {
+            name: 'set-validators',
+            init(options) {
+              return {
+                ...options,
+                routingInterceptors: [
+                  async ({ next, ...interceptorOptions }) => {
+                    const result = await next(interceptorOptions)
+                    if (!result.matched) {
+                      return result
+                    }
+                    return {
+                      ...result,
+                      response: {
+                        ...result.response,
+                        headers: { ...result.response.headers, ...extraHeaders },
+                      },
+                    }
+                  },
+                  ...options.routingInterceptors ?? [],
+                ],
+              }
+            },
+          },
+          new ResponseCompressionHandlerPlugin({ threshold: 100 }),
+        ],
+      })
+    }
+
+    function createRequest(acceptEncoding: string) {
+      return new Request('http://localhost', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'accept-encoding': acceptEncoding,
+        },
+        body: JSON.stringify({ json: null }),
+      })
+    }
+
+    it.each([
+      ['weakens a strong etag', '"abc"', 'W/"abc"'],
+      ['keeps a weak etag', 'W/"abc"', 'W/"abc"'],
+      ['adds no etag when there is none', undefined, null],
+    ])('%s and drops accept-ranges on a compressed response', async (_label, etag, expected) => {
+      const { response } = await createHandler({ ...etag === undefined ? {} : { etag }, 'accept-ranges': 'bytes' }).handle(createRequest('gzip'))
+
+      expect(response!.headers.get('content-encoding')).toBe('gzip')
+      // A strong tag shared with the identity bytes would let If-Range splice them into compressed ones
+      expect(response!.headers.get('etag')).toBe(expected)
+      expect(response!.headers.has('accept-ranges')).toBe(false)
+    })
+
+    it('keeps validators on a response it does not compress', async () => {
+      const { response } = await createHandler({ 'etag': '"abc"', 'accept-ranges': 'bytes' }).handle(createRequest('identity'))
+
+      expect(response!.headers.has('content-encoding')).toBe(false)
+      expect(response!.headers.get('etag')).toBe('"abc"')
+      expect(response!.headers.get('accept-ranges')).toBe('bytes')
+    })
+  })
+
   describe('partial responses', () => {
     it.each([
       ['a 206 status', 206, {}],

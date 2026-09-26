@@ -1,4 +1,4 @@
-import type { StandardBodyHint } from '@standard-server/core'
+import type { StandardBodyHint, StandardHeaders } from '@standard-server/core'
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
 import { isAcceptableEncoding, isAsyncIteratorObject, isCompressibleContentType, isNoTransformCacheControl, parseAcceptEncodingQualities, stringifyJSON, toArray, varyByAcceptEncoding } from '@orpc/shared'
@@ -115,11 +115,8 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
               ...response,
               body: body.pipeThrough(new CompressionStream(encoding)),
               headers: {
-                ...headers,
+                ...toCompressedHeaders(headers, encoding),
                 'standard-server': 'octet-stream' satisfies StandardBodyHint,
-                'content-length': [],
-                'content-encoding': encoding,
-                'vary': varyByAcceptEncoding(flattenStandardHeader(headers.vary)),
               },
             },
           }
@@ -141,13 +138,10 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
               ...response,
               body: body.stream().pipeThrough(new CompressionStream(encoding)),
               headers: {
-                ...headers,
+                ...toCompressedHeaders(headers, encoding),
                 'standard-server': 'file' satisfies StandardBodyHint,
                 'content-type': body.type,
-                'content-length': [],
                 'content-disposition': contentDisposition,
-                'content-encoding': encoding,
-                'vary': varyByAcceptEncoding(flattenStandardHeader(headers.vary)),
               },
             },
           }
@@ -193,12 +187,9 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
               ...response,
               body: compressedStream,
               headers: {
-                ...headers,
+                ...toCompressedHeaders(headers, encoding),
                 'standard-server': [],
                 'content-type': res.headers.get('content-type')!,
-                'content-length': [],
-                'content-encoding': encoding,
-                'vary': varyByAcceptEncoding(flattenStandardHeader(headers.vary)),
               },
             },
           }
@@ -214,12 +205,9 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
               ...response,
               body: new Blob([string]).stream().pipeThrough(new CompressionStream(encoding)),
               headers: {
-                ...headers,
+                ...toCompressedHeaders(headers, encoding),
                 'standard-server': [],
                 'content-type': 'application/x-www-form-urlencoded',
-                'content-length': [],
-                'content-encoding': encoding,
-                'vary': varyByAcceptEncoding(flattenStandardHeader(headers.vary)),
               },
             },
           }
@@ -235,12 +223,9 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
               ...response,
               body: new Blob([string]).stream().pipeThrough(new CompressionStream(encoding)),
               headers: {
-                ...headers,
+                ...toCompressedHeaders(headers, encoding),
                 'standard-server': [],
                 'content-type': 'application/json',
-                'content-length': [],
-                'content-encoding': encoding,
-                'vary': varyByAcceptEncoding(flattenStandardHeader(headers.vary)),
               },
             },
           }
@@ -258,4 +243,25 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
       ],
     }
   }
+}
+
+function toCompressedHeaders(headers: StandardHeaders, encoding: string): StandardHeaders {
+  return {
+    ...headers,
+    'content-length': [],
+    'content-encoding': encoding,
+    'vary': varyByAcceptEncoding(flattenStandardHeader(headers.vary)),
+    /**
+     * A strong tag shared with the identity bytes would let `If-Range` splice them after compressed ones.
+     * A weak tag still revalidates through `If-None-Match`, and the compressed body serves no ranges.
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc9110.html#name-etag
+     */
+    'etag': weakenEtag(flattenStandardHeader(headers.etag)),
+    'accept-ranges': [],
+  }
+}
+
+function weakenEtag(etag: string | undefined): string | undefined {
+  return etag === undefined || etag.startsWith('W/') ? etag : `W/${etag}`
 }

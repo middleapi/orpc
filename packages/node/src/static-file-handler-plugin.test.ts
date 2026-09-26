@@ -11,6 +11,7 @@ import { brotliCompressSync, gzipSync } from 'node:zlib'
 import { os } from '@orpc/server'
 import { RPCHandler as FetchRPCHandler } from '@orpc/server/fetch'
 import { RPCHandler } from '@orpc/server/node'
+import { ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 import * as sharedModule from '@orpc/shared'
 import request from 'supertest'
 import { StaticFileHandlerPlugin } from './static-file-handler-plugin'
@@ -907,6 +908,26 @@ describe('staticFileHandlerPlugin', () => {
       expect(res.headers.vary).toBeUndefined()
       expect(res.body).toEqual(Buffer.from('binary identity'))
     })
+  })
+
+  it('restarts a download resumed through response compression instead of splicing identity bytes into compressed ones', async () => {
+    const agent = createAgent(new RPCHandler({}, {
+      plugins: [new StaticFileHandlerPlugin({ rootDir }), new ResponseCompressionHandlerPlugin({ threshold: 0 })],
+    }))
+
+    const first = await agent.get('/hello.txt').set('accept-encoding', 'gzip')
+    expect(first.headers['content-encoding']).toBe('gzip')
+    expect(first.headers.etag).toBe(`W/${helloEtag}`)
+    expect(first.headers['accept-ranges']).toBeUndefined()
+
+    // The weak tag cannot satisfy if-range, so the full compressed body comes back instead of a 206
+    const resumed = await agent.get('/hello.txt').set('accept-encoding', 'gzip').set('range', 'bytes=5-').set('if-range', first.headers.etag!)
+    expect(resumed.status).toBe(200)
+    expect(resumed.headers['content-encoding']).toBe('gzip')
+    expect(resumed.text).toBe('hello world')
+
+    const revalidated = await agent.get('/hello.txt').set('accept-encoding', 'gzip').set('if-none-match', first.headers.etag!)
+    expect(revalidated.status).toBe(304)
   })
 
   describe('fallback file', () => {
