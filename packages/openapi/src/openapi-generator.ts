@@ -7,7 +7,7 @@ import type { OpenAPIErrorBodyDefinition, OpenAPIOperationContext } from './open
 import type { OpenAPIDocument, OpenAPIV3_2, OpenAPIVersion } from './types'
 import { downgradeSpecV31ToV30, downgradeSpecV32ToV31 } from '@openapi-spec/downgrader'
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
-import { combineJsonSchemasWithComposition, DelegatingJsonSchemaConverter, StandardJsonSchemaConverter } from '@orpc/json-schema'
+import { combineJsonSchemasWithComposition, DelegatingJsonSchemaConverter, hoistRecursiveRefToDef, StandardJsonSchemaConverter } from '@orpc/json-schema'
 import { walkProcedureContractsAsync } from '@orpc/server'
 import { clone, mergeHttpPath, pathToHttpPath, toArray, value } from '@orpc/shared'
 import { DEFAULT_OPENAPI_METHOD } from './constants'
@@ -201,7 +201,9 @@ export class OpenAPIGenerator {
 
   private convertSchema(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): [JsonSchema, boolean] {
     const [jsonSchema, optional] = this.converter.convert(schema as any, direction)
-    return [strip$schemaField(jsonSchema), optional]
+    // composing or hoisting would retarget root-relative refs (`#`, `#/properties/...`),
+    // so move a schema that points into itself under a def first
+    return [hoistRecursiveRefToDef(strip$schemaField(jsonSchema)), optional]
   }
 
   private convertSchemas(schemas: AnySchema[] | undefined, direction: JsonSchemaConverterDirection): [JsonSchema, boolean] {

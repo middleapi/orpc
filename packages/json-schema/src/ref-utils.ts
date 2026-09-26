@@ -104,25 +104,25 @@ export function hoistRecursiveRefToDef(schema: JsonSchema): JsonSchema {
     return schema
   }
 
-  let defName: string | undefined
+  const isRootRef = (ref: string) => ref === '#'
+    || (ref.startsWith('#/') && !ref.startsWith('#/$defs/') && get(schema, ref.slice(2).split('/').map(decodeJsonPointerSegment)) !== undefined)
 
-  const rewritten = mapJsonSchemaRefs(schema, (ref) => {
-    if (ref === '#' || (ref.startsWith('#/') && !ref.startsWith('#/$defs/') && get(schema, ref.slice(2).split('/').map(decodeJsonPointerSegment)) !== undefined)) {
-      defName ??= findRecursiveJsonSchemaDefName(schema.$defs)
-      return `#/$defs/${encodeJsonPointerSegment(defName)}${ref.slice(1)}`
-    }
-
-    return ref
+  // most schemas have no root ref, so detect one without copying the schema
+  let hasRootRef = false
+  visitJsonSchemaRefs(schema, (ref) => {
+    hasRootRef ||= isRootRef(ref)
   })
 
-  if (defName === undefined) {
+  if (!hasRootRef) {
     return schema
   }
 
-  const { $defs, ...rest } = rewritten as Exclude<typeof rewritten, boolean>
+  const defName = findRecursiveJsonSchemaDefName(schema.$defs)
+  const defRef = `#/$defs/${encodeJsonPointerSegment(defName)}`
+  const { $defs, ...rest } = mapJsonSchemaRefs(schema, ref => isRootRef(ref) ? `${defRef}${ref.slice(1)}` : ref) as Exclude<JsonSchema, boolean>
 
   return {
-    $ref: `#/$defs/${encodeJsonPointerSegment(defName)}`,
+    $ref: defRef,
     $defs: {
       ...$defs,
       [defName]: rest,

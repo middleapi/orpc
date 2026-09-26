@@ -273,7 +273,7 @@ describe('openAPIComponentRegistry', () => {
         },
       },
       {
-        name: 'refs resolved against nested local defs',
+        name: 'local refs into nested defs by exact ref equality',
         schema: {
           type: 'object',
           properties: { x: { $ref: '#/$defs/Inner' } },
@@ -292,7 +292,7 @@ describe('openAPIComponentRegistry', () => {
       expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['Wrapped'])
     })
 
-    it('compares refs to components hoisted in earlier calls by exact ref equality', () => {
+    it('reuses components whose refs point at components hoisted in earlier calls', () => {
       const { doc, registry } = createRegistry()
 
       registry.hoistDefs({ $ref: '#/$defs/Data', $defs: { Data: { type: 'string' } } })
@@ -340,6 +340,29 @@ describe('openAPIComponentRegistry', () => {
 
       expect(result).toEqual({ $ref: `#/components/schemas/${expected}` })
       expect(Object.keys(doc.components?.schemas ?? {}).sort()).toEqual(Object.keys(schemas).sort())
+    })
+
+    it('compares a ref to a sibling by its own body when the sibling reuses another def name', () => {
+      const { doc, registry } = createRegistry({
+        schemas: {
+          Post2: { type: 'string' },
+          Other: { type: 'boolean' },
+          Wrapper: { items: { $ref: '#/components/schemas/Other' } },
+        },
+      })
+
+      const result = registry.hoistDefs({
+        $ref: '#/$defs/Wrapper',
+        $defs: {
+          // reuses the existing Post2, while the def named Post2 (equal to Other) is minted as Post22
+          Post: { type: 'string' },
+          Post2: { type: 'boolean' },
+          Wrapper: { items: { $ref: '#/$defs/Post' } },
+        },
+      })
+
+      expect(result).toEqual({ $ref: '#/components/schemas/Wrapper2' })
+      expect(doc.components?.schemas?.Wrapper2).toEqual({ items: { $ref: '#/components/schemas/Post2' } })
     })
 
     it('reuses mutually recursive sibling defs', () => {
