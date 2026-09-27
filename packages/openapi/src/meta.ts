@@ -177,7 +177,7 @@ export interface OpenAPIMeta {
   /**
    * Hint for how to parse the incoming request body.
    *
-   * Note: The `standard-server` `Content-Type` header takes priority over this option.
+   * Note: This option takes priority over the `standard-server` and `Content-Type` headers.
    * `form-data` and `url-search-params` are decoded using bracket notation,
    * so the resulting value will be an object or array.
    *
@@ -188,7 +188,8 @@ export interface OpenAPIMeta {
   /**
    * Hint for how to parse the response body.
    *
-   * Note: The `standard-server` `Content-Type` header takes priority over this option.
+   * Note: This option takes priority over the `standard-server` and `Content-Type` headers,
+   * except for error responses that declare a `Content-Type`, which are parsed by their headers.
    * `form-data` and `url-search-params` are decoded using bracket notation,
    * so the resulting value will be an object or array.
    *

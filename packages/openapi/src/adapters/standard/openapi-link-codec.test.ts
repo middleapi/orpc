@@ -800,6 +800,99 @@ describe('openAPILinkCodec', () => {
       expectORPCErrorResult(result, 'MALFORMED_ORPC_RESPONSE', { message: 'upstream exploded' })
     })
 
+    it('does not apply responseBodyHint to error responses that declare a content type', async () => {
+      const codec = new OpenAPILinkCodec({
+        download: oc.meta(openapi({ responseBodyHint: 'file' })),
+      }, { serializer })
+
+      const error = new ORPCError('NOT_FOUND', { message: 'Missing file' })
+      const resolveBody = vi.fn(async () => error.toJSON())
+
+      const result = await codec.decodeResponse({
+        status: 404,
+        headers: { 'content-type': 'application/json' },
+        resolveBody,
+      }, ['download'], { context: {} })
+
+      expectORPCErrorResult(result, 'NOT_FOUND', { message: 'Missing file' })
+      expect(resolveBody).toHaveBeenCalledWith(undefined)
+    })
+
+    it('applies responseBodyHint to error responses without a content type', async () => {
+      const codec = new OpenAPILinkCodec({
+        ping: oc.meta(openapi({ responseBodyHint: 'json' })),
+      }, { serializer })
+
+      const resolveBody = vi.fn(async () => new ORPCError('NOT_FOUND').toJSON())
+
+      const result = await codec.decodeResponse({
+        status: 404,
+        headers: {},
+        resolveBody,
+      }, ['ping'], { context: {} })
+
+      expectORPCErrorResult(result, 'NOT_FOUND')
+      expect(resolveBody).toHaveBeenCalledWith('json')
+    })
+
+    it.each([
+      'application/problem+json',
+      'application/vnd.api+json; charset=utf-8',
+      'Application/Merge-Patch+JSON',
+    ])('parses structured syntax suffix %s as json', async (contentType) => {
+      const codec = new OpenAPILinkCodec({
+        ping: oc.meta(openapi({})),
+      }, { serializer })
+
+      const resolveBody = vi.fn(async () => ({ ok: true }))
+
+      await codec.decodeResponse({
+        status: 200,
+        headers: { 'content-type': contentType },
+        resolveBody,
+      }, ['ping'], { context: {} })
+
+      expect(resolveBody).toHaveBeenCalledWith('json')
+    })
+
+    it('decodes application/problem+json error responses', async () => {
+      const codec = new OpenAPILinkCodec({
+        ping: oc.meta(openapi({ responseBodyHint: 'file' })),
+      }, { serializer })
+
+      const resolveBody = vi.fn(async () => new ORPCError('NOT_FOUND', { message: 'Missing' }).toJSON())
+
+      const result = await codec.decodeResponse({
+        status: 404,
+        headers: { 'content-type': 'application/problem+json' },
+        resolveBody,
+      }, ['ping'], { context: {} })
+
+      expectORPCErrorResult(result, 'NOT_FOUND', { message: 'Missing' })
+      expect(resolveBody).toHaveBeenCalledWith('json')
+    })
+
+    it.each([
+      [{ 'content-type': 'application/vnd.api+json', 'standard-server': 'file' }],
+      [{ 'content-type': 'application/xml' }],
+      [{ 'content-type': 'application/jsonx' }],
+      [{ 'content-type': 'text/plain+json' }],
+    ])('leaves body parsing to the response headers for %o', async (headers) => {
+      const codec = new OpenAPILinkCodec({
+        ping: oc.meta(openapi({})),
+      }, { serializer })
+
+      const resolveBody = vi.fn(async () => undefined)
+
+      await codec.decodeResponse({
+        status: 200,
+        headers,
+        resolveBody,
+      }, ['ping'], { context: {} })
+
+      expect(resolveBody).toHaveBeenCalledWith(undefined)
+    })
+
     it('rethrows the original error when the response body cannot be read', async () => {
       const codec = new OpenAPILinkCodec({
         ping: oc.meta(openapi({})),

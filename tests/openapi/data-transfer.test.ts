@@ -108,6 +108,26 @@ describe.each([
         })
       }),
     customSerializer: os.input(z.any()).handler(({ input }) => ({ client: input, server: new Person('server', 12) })),
+    download: os
+      .input(z.object({ id: z.string() }))
+      .meta(openapi({
+        method: 'GET',
+        path: '/downloads/{id}',
+        responseBodyHint: 'file',
+      }))
+      .handler(({ input }) => {
+        if (input.id === 'missing') {
+          throw new ORPCError('NOT_FOUND', { message: 'Missing file' })
+        }
+
+        return new File(['{"id":1}'], 'data.json', { type: 'application/vnd.api+json' })
+      }),
+    jsonSuffixFile: os
+      .meta(openapi({
+        method: 'GET',
+        path: '/json-suffix-file',
+      }))
+      .handler(() => new File(['{"id":1}'], 'data.json', { type: 'application/vnd.api+json' })),
   }
 
   const client = createClientServer(router, {
@@ -315,6 +335,24 @@ describe.each([
       message: 'Missing item',
       data: { id: 'missing-item' },
     })
+  })
+
+  it('decodes error responses by their content type when responseBodyHint is set', async () => {
+    const file = await client.download({ id: '1' })
+    expect(file).toBeInstanceOf(File)
+    expect(await file.text()).toBe('{"id":1}')
+
+    await expect(client.download({ id: 'missing' })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Missing file',
+    })
+  })
+
+  it('keeps files with a +json media type as files', async () => {
+    const file = await client.jsonSuffixFile()
+    expect(file).toBeInstanceOf(File)
+    expect(file.name).toBe('data.json')
+    expect(await file.text()).toBe('{"id":1}')
   })
 
   it('propagates typesafe errors with the defined flag', async () => {

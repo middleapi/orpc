@@ -227,7 +227,9 @@ const redirect = os
 
 ## Body Hints
 
-The body parser normally uses `Content-Type`, `Content-Length`, `Content-Disposition`, and `Standard-Server` headers to decide how to parse the body. If that information is missing or misleading, use `requestBodyHint` to tell [OpenAPI Handler](/docs/openapi/handler) how to parse the request body. Likewise, use `responseBodyHint` to tell [OpenAPI Link](/docs/openapi/link) how to parse the response body.
+The body parser normally uses `Content-Type`, `Content-Length`, `Content-Disposition`, and `Standard-Server` headers to decide how to parse the body. If that information is missing or misleading, use `requestBodyHint` to tell [OpenAPI Handler](/docs/openapi/handler) how to parse the request body. Likewise, use `responseBodyHint` to tell [OpenAPI Link](/docs/openapi/link) how to parse the response body. Error responses that declare a `Content-Type` ignore `responseBodyHint`, so errors keep decoding as JSON.
+
+[OpenAPI Link](/docs/openapi/link) also parses JSON-based media types such as `application/problem+json` as JSON.
 
 ```ts
 const uploadLargeFile = os

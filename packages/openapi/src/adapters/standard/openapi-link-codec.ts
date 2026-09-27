@@ -2,13 +2,13 @@ import type { AnyORPCError, ClientContext, ClientOptions } from '@orpc/client'
 import type { StandardLinkCodec, StandardLinkCodecDecodedResponse } from '@orpc/client/standard'
 import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
 import type { Promisable, Public, Value } from '@orpc/shared'
-import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standard-server/core'
+import type { StandardBodyHint, StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standard-server/core'
 import type { OpenAPIMeta } from '../../meta'
 import { createORPCErrorFromJson, createORPCErrorFromMalformedResponse, isORPCErrorJson } from '@orpc/client'
 import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import { unlazy } from '@orpc/server'
 import { isTypescriptObject, mergeHttpPath, pathToHttpPath, safeEncodeURIComponent, stringifyJSON, value } from '@orpc/shared'
-import { mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
+import { flattenStandardHeader, mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
 import { toStandardHeaders } from '@standard-server/fetch'
 import {
   DEFAULT_OPENAPI_INPUT_STRUCTURE,
@@ -372,7 +372,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     const procedure = await this.resolveProcedure(path)
     const meta = getOpenAPIMeta(procedure)
 
-    const body = await response.resolveBody(meta?.responseBodyHint)
+    const body = await response.resolveBody(resolveResponseBodyHint(response, isOk, meta?.responseBodyHint))
 
     const deserialized = await (async () => {
       try {
@@ -443,6 +443,39 @@ function combineSearch(baseSearch: `?${string}` | undefined, additionalSearch: s
   }
 
   return `${baseSearch}&${additionalSearch}` as `?${string}`
+}
+
+const JSON_SUFFIX_MEDIA_TYPE_REGEX = /^application\/[^/]+\+json$/
+
+function resolveResponseBodyHint(
+  response: StandardLazyResponse,
+  isOk: boolean,
+  hint: StandardBodyHint | undefined,
+): StandardBodyHint | undefined {
+  const contentType = flattenStandardHeader(response.headers['content-type'])
+
+  /**
+   * `responseBodyHint` describes the success body, so it must not override
+   * the declared content type of an error response (usually JSON).
+   */
+  if (hint !== undefined && (isOk || contentType === undefined)) {
+    return hint
+  }
+
+  /**
+   * The body parser only recognizes `application/json`, so structured syntax
+   * suffix types (e.g. `application/problem+json`) are hinted explicitly.
+   * `standard-server` header still takes priority (e.g. a `File` with such type).
+   */
+  if (
+    response.headers['standard-server'] === undefined
+    && contentType !== undefined
+    && JSON_SUFFIX_MEDIA_TYPE_REGEX.test(contentType.split(';')[0]!.trim().toLowerCase())
+  ) {
+    return 'json'
+  }
+
+  return undefined
 }
 
 function toResolvedStandardHeaders(headers: Headers | StandardHeaders): StandardHeaders {
