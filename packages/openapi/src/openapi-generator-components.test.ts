@@ -192,6 +192,36 @@ describe('openAPIComponentRegistry', () => {
       })
     })
 
+    it('rewrites refs pointing inside a def, keeping the rest of the pointer', () => {
+      const { doc, registry } = createRegistry({
+        customComponentName: name => name === 'Shared' ? 'SharedRenamed' : undefined,
+      })
+
+      const result = registry.hoistDefs({
+        type: 'object',
+        properties: {
+          y: { $ref: '#/$defs/Shared/properties/y' },
+          z: { $ref: '#/$defs/domain~1Planet/items' },
+        },
+        $defs: {
+          'Shared': { type: 'object', properties: { y: { type: 'number' }, self: { $ref: '#/$defs/Shared/properties/y' } } },
+          'domain/Planet': { type: 'array', items: { type: 'string' } },
+        },
+      })
+
+      expect(result).toEqual({
+        type: 'object',
+        properties: {
+          y: { $ref: '#/components/schemas/SharedRenamed/properties/y' },
+          z: { $ref: '#/components/schemas/domain~1Planet/items' },
+        },
+      })
+      expect(doc.components?.schemas).toEqual({
+        'SharedRenamed': { type: 'object', properties: { y: { type: 'number' }, self: { $ref: '#/components/schemas/SharedRenamed/properties/y' } } },
+        'domain/Planet': { type: 'array', items: { type: 'string' } },
+      })
+    })
+
     it('hoists a def named __proto__ as an own component', () => {
       const { doc, registry } = createRegistry()
 

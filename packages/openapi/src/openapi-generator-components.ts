@@ -300,18 +300,22 @@ function areSchemaRefsEquivalentForReuse(candidateRef: string, existingRef: stri
 
 function rewriteComponentSchemaRefs(schema: JsonSchema, renameMap: ReadonlyMap<string, string>): JsonSchema {
   return mapJsonSchemaRefs(schema, (ref) => {
-    const refName = parseRefName(ref, DEFS_REF_PREFIX)
-
-    if (refName === undefined) {
+    if (!ref.startsWith(DEFS_REF_PREFIX)) {
       return ref
     }
 
-    const renamedName = renameMap.get(refName)
+    // Only the first segment names the def, the rest points inside it (e.g. `#/$defs/Planet/properties/id`)
+    const pointer = ref.slice(DEFS_REF_PREFIX.length)
+    const slashIndex = pointer.indexOf('/')
+    const encodedName = slashIndex === -1 ? pointer : pointer.slice(0, slashIndex)
+    const innerPointer = slashIndex === -1 ? '' : pointer.slice(slashIndex)
+
+    const renamedName = renameMap.get(decodeJsonPointerSegment(encodedName))
 
     if (renamedName === undefined) {
       return ref
     }
 
-    return COMPONENTS_REF_PREFIX + encodeJsonPointerSegment(renamedName)
+    return COMPONENTS_REF_PREFIX + encodeJsonPointerSegment(renamedName) + innerPointer
   })
 }
