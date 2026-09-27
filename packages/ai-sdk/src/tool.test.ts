@@ -413,6 +413,17 @@ describe('createToolFactory', () => {
     await expect(tool.execute?.({ name: 'Alice' }, { abortSignal } as any)).rejects.toThrow('Output validation failed')
   })
 
+  it('resolves to the output schema output since output is validated', async () => {
+    const procedure = os
+      .input(inputSchema)
+      .output(z.object({ count: z.string().transform(Number) }))
+      .handler(() => ({ count: '42' }))
+
+    const tool = createToolFactory()(procedure)
+
+    await expect(tool.execute?.({ name: 'Alice' }, { abortSignal } as any)).resolves.toEqual({ count: 42 })
+  })
+
   describe('async iterator output', () => {
     const yieldSchema = z.object({ message: z.string() })
     const returnSchema = z.object({ count: z.number() })

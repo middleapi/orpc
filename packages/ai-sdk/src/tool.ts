@@ -210,8 +210,8 @@ export type CreateToolFactoryOptions<TInitialContext extends Context>
 export interface ToolFactory<TInitialContext extends Context> {
   <TInputSchema extends AnySchema, TOutputSchema extends AnySchema>(
     procedure: Procedure<TInitialContext, any, TInputSchema, TOutputSchema, any>,
-    ...rest: MaybeOptionalOptions<Omit<FunctionTool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaInput<TOutputSchema>>>, 'inputSchema' | 'outputSchema' | 'execute'>>
-  ): Tool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaInput<TOutputSchema>>>
+    ...rest: MaybeOptionalOptions<Omit<FunctionTool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaOutput<TOutputSchema>>>, 'inputSchema' | 'outputSchema' | 'execute'>>
+  ): Tool<InferSchemaOutput<TInputSchema>, ToolOutput<InferSchemaOutput<TOutputSchema>>>
 }
 
 /**
