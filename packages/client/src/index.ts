@@ -21,6 +21,7 @@ export type {
   AsyncIteratorClassNextFn,
   MaybeOptionalOptions,
   PromiseWithError,
+  Public,
   Registry,
   ThrowableError,
 } from '@orpc/shared'
