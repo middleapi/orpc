@@ -51,7 +51,7 @@
     "type:check": "tsc -b"
   },
   "peerDependencies": {
-    "@tanstack/query-core": ">=5.80.2"
+    "@tanstack/query-core": ">=5.89.0"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
