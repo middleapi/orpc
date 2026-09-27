@@ -311,6 +311,41 @@ describe('openAPIGenerator operation builders', () => {
       expect((operation.parameters![2] as any).description).toBeUndefined()
     })
 
+    it.each([
+      ['json', 'application/json'],
+      ['form-data', 'multipart/form-data'],
+      ['url-search-params', 'application/x-www-form-urlencoded'],
+    ] as const)('documents the request body with the media type forced by requestBodyHint %s', (requestBodyHint, mediaType) => {
+      const { ctx, operation } = createContext()
+
+      buildRequest(ctx, operation, testDef({
+        inputs: [testSchema({
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            avatar: { type: 'string', contentMediaType: 'image/png' },
+          },
+          required: ['name'],
+        })],
+      }), { method: 'POST', requestBodyHint }, undefined)
+
+      expect(operation.requestBody).toEqual({
+        required: true,
+        content: {
+          [mediaType]: {
+            schema: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                avatar: { type: 'string', contentMediaType: 'image/png' },
+              },
+              required: ['name'],
+            },
+          },
+        },
+      })
+    })
+
     it('maps HEAD inputs to query parameters like GET', () => {
       const { ctx, operation } = createContext()
       const path = '/planets/{id}' as const

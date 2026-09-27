@@ -27,6 +27,15 @@ import {
 } from './constants'
 import { isBodylessMethod } from './utils'
 
+/**
+ * `requestBodyHint` makes the handler parse the body in this format regardless of `Content-Type`.
+ */
+const REQUEST_BODY_HINT_MEDIA_TYPES: Partial<Record<NonNullable<OpenAPIMeta['requestBodyHint']>, string>> = {
+  'json': 'application/json',
+  'form-data': 'multipart/form-data',
+  'url-search-params': 'application/x-www-form-urlencoded',
+}
+
 export type DynamicPathParam = NonNullable<ReturnType<typeof getDynamicPathParams>>[number]
 
 export class OpenAPIGeneratorError extends TypeError { }
@@ -125,9 +134,15 @@ export function buildRequest(
   renderHeaderParameters(ctx, operation, parts.headersEntries)
 
   if (parts.bodySchema !== undefined) {
+    const hintedMediaType = meta?.requestBodyHint !== undefined
+      ? REQUEST_BODY_HINT_MEDIA_TYPES[meta.requestBodyHint]
+      : undefined
+
     operation.requestBody = {
       required: parts.bodyOptional ? undefined : true,
-      content: toBodyContent(ctx, 'input', parts.bodySchema),
+      content: hintedMediaType !== undefined
+        ? { [hintedMediaType]: { schema: ctx.registry.toOpenAPISchema(parts.bodySchema, 'input') } }
+        : toBodyContent(ctx, 'input', parts.bodySchema),
     }
   }
 }
