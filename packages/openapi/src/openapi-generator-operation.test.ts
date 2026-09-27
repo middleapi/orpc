@@ -267,6 +267,50 @@ describe('openAPIGenerator operation builders', () => {
       ])
     })
 
+    it('hoists description and deprecated from the schema to path, query, and header parameters', () => {
+      const { ctx, operation } = createContext()
+      const path = '/users/{id}' as const
+
+      buildRequest(ctx, operation, testDef({
+        inputs: [testSchema({
+          type: 'object',
+          properties: {
+            params: {
+              type: 'object',
+              properties: { id: { type: 'string', description: 'The user id' } },
+              required: ['id'],
+            },
+            query: {
+              type: 'object',
+              properties: {
+                search: { type: 'string', description: 'Search term' },
+                legacy: { type: 'string', deprecated: true },
+                status: { $ref: '#/$defs/Status' },
+              },
+            },
+            headers: {
+              type: 'object',
+              properties: { 'x-tenant': { type: 'string', description: 'Tenant id' } },
+            },
+          },
+          required: ['params'],
+          $defs: {
+            Status: { enum: ['active'], description: 'Status filter' },
+          },
+        })],
+      }), { method: 'GET', path, inputStructure: 'detailed' }, getDynamicPathParams(path))
+
+      expect(operation.parameters).toEqual([
+        expect.objectContaining({ in: 'path', name: 'id', description: 'The user id', schema: { type: 'string', description: 'The user id' } }),
+        expect.objectContaining({ in: 'query', name: 'search', description: 'Search term' }),
+        expect.objectContaining({ in: 'query', name: 'legacy', deprecated: true }),
+        expect.objectContaining({ in: 'query', name: 'status', description: 'Status filter' }),
+        expect.objectContaining({ in: 'header', name: 'x-tenant', description: 'Tenant id' }),
+      ])
+      expect((operation.parameters![1] as any).deprecated).toBeUndefined()
+      expect((operation.parameters![2] as any).description).toBeUndefined()
+    })
+
     it('maps HEAD inputs to query parameters like GET', () => {
       const { ctx, operation } = createContext()
       const path = '/planets/{id}' as const

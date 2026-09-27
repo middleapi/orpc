@@ -233,6 +233,7 @@ function renderPathParameters(
       required: true,
       name,
       schema: ctx.registry.toOpenAPISchema(entry[1], 'input'),
+      ...toParameterAnnotations(entry[1]),
     }
 
     if (style === 'comma-delimited-array' || style === 'comma-delimited-object') {
@@ -260,6 +261,7 @@ function renderQueryParameters(
       in: 'query',
       name,
       schema: ctx.registry.toOpenAPISchema(schema, 'input'),
+      ...toParameterAnnotations(schema),
       allowEmptyValue: true,
       allowReserved: true,
     }
@@ -310,6 +312,27 @@ function isResolvedJsonPrimitiveSchema(schema: JsonSchema): boolean {
   return isJsonPrimitiveSchema(resolveJsonSchemaRootLocalRef(schema))
 }
 
+/**
+ * Tools like Swagger UI only read `description` and `deprecated` from the Parameter Object,
+ * so copy them from the parameter schema.
+ */
+function toParameterAnnotations(schema: JsonSchema): Pick<OpenAPIV3_2.ParameterObject, 'description' | 'deprecated'> {
+  const resolved = resolveJsonSchemaRootLocalRef(schema)
+  const annotations: Pick<OpenAPIV3_2.ParameterObject, 'description' | 'deprecated'> = {}
+
+  if (typeof resolved === 'object') {
+    if (typeof resolved.description === 'string') {
+      annotations.description = resolved.description
+    }
+
+    if (resolved.deprecated === true) {
+      annotations.deprecated = true
+    }
+  }
+
+  return annotations
+}
+
 function renderHeaderParameters(
   ctx: OpenAPIOperationContext,
   operation: OpenAPIV3_2.OperationObject,
@@ -322,6 +345,7 @@ function renderHeaderParameters(
       name,
       required: optional ? undefined : true,
       schema: ctx.registry.toOpenAPISchema(schema, 'input'),
+      ...toParameterAnnotations(schema),
     })
   }
 }
