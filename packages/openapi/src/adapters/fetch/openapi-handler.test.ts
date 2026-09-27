@@ -48,6 +48,28 @@ describe('openapiHandler', () => {
     expect(misMatchPrefixResult.response).toBeUndefined()
   })
 
+  it('sends no body for null body statuses', async () => {
+    const handler = new OpenAPIHandler({
+      remove: os
+        .meta(openapi({ method: 'DELETE', path: '/items/{id}', successStatus: 204 }))
+        .handler(() => ({ ok: true })),
+      notModified: os
+        .meta(openapi({ method: 'GET', path: '/items', outputStructure: 'detailed' }))
+        .handler(() => ({ status: 304, headers: { etag: '"1"' }, body: null })),
+    })
+
+    const removed = await handler.handle(new Request('https://example.com/items/1', { method: 'DELETE' }))
+
+    expect(removed.response!.status).toBe(204)
+    expect(removed.response!.body).toBe(null)
+
+    const notModified = await handler.handle(new Request('https://example.com/items'))
+
+    expect(notModified.response!.status).toBe(304)
+    expect(notModified.response!.body).toBe(null)
+    expect(notModified.response!.headers.get('etag')).toBe('"1"')
+  })
+
   it('supports standard handler plugins', async () => {
     const plugin: StandardHandlerPlugin<any> = {
       name: 'test',

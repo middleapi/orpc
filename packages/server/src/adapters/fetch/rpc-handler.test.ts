@@ -69,6 +69,30 @@ describe('rpcHandler', () => {
     return expect(response!.text()).resolves.toBe('"intercepted"')
   })
 
+  it.each([204, 205, 304])('drops the body for null body status %i', async (status) => {
+    const plugin: StandardHandlerPlugin<any> = {
+      name: 'test',
+      init(options) {
+        return {
+          ...options,
+          routingInterceptors: [
+            async () => ({ matched: true, response: { status, headers: { 'x-custom': '1' }, body: { ok: true } } }),
+          ],
+        }
+      },
+    }
+
+    const handler = new RPCHandler({}, { plugins: [plugin] })
+
+    const { matched, response } = await handler.handle(new Request('https://example.com/test'))
+
+    expect(matched).toBe(true)
+    expect(response!.status).toBe(status)
+    expect(response!.body).toBe(null)
+    expect(response!.headers.get('content-type')).toBe(null)
+    expect(response!.headers.get('x-custom')).toBe('1')
+  })
+
   it('treats GET requests as unmatched by default', async () => {
     const handler = new RPCHandler({
       ping: os.handler(() => 'pong'),

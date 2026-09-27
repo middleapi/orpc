@@ -15,6 +15,12 @@ export interface FetchHandlerOptions<_T extends Context> {
   toFetchResponse?: undefined | ToFetchResponseOptions
 }
 
+/**
+ * The Fetch `Response` constructor throws when these statuses carry a body,
+ * while Node silently drops it, so drop it here too.
+ */
+const NULL_BODY_STATUSES = new Set([204, 205, 304])
+
 export class FetchHandler<T extends Context> {
   private readonly toFetchResponseOptions: FetchHandlerOptions<T>['toFetchResponse']
 
@@ -40,9 +46,13 @@ export class FetchHandler<T extends Context> {
       return result
     }
 
+    const standardResponse = NULL_BODY_STATUSES.has(result.response.status)
+      ? { ...result.response, body: undefined }
+      : result.response
+
     return {
       matched: true,
-      response: toFetchResponse(result.response, this.toFetchResponseOptions),
+      response: toFetchResponse(standardResponse, this.toFetchResponseOptions),
     }
   }
 }
