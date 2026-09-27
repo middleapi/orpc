@@ -15,6 +15,7 @@ import {
   isJsonPrimitiveSchema,
   isUnconstrainedSchema,
   matchArrayableJsonSchema,
+  resolveJsonSchemaRootLocalRef,
 } from '@orpc/json-schema'
 import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '@orpc/server'
 import { findDeepMatches, isPlainObject, stringifyJSON, value } from '@orpc/shared'
@@ -283,10 +284,10 @@ function renderQueryParameters(
       delete parameter.schema
     }
     else if (style === undefined) {
-      if (flattenJsonUnionSchema(schema).some(s => !isJsonPrimitiveSchema(s))) {
+      if (flattenJsonUnionSchema(schema).some(s => !isResolvedJsonPrimitiveSchema(s))) {
         const arrayable = matchArrayableJsonSchema(schema)
 
-        if (!arrayable || flattenJsonUnionSchema(arrayable[0]).some(s => !isJsonPrimitiveSchema(s))) {
+        if (!arrayable || flattenJsonUnionSchema(arrayable[0]).some(s => !isResolvedJsonPrimitiveSchema(s))) {
           parameter.style = 'deepObject'
           parameter.explode = true
         }
@@ -299,6 +300,14 @@ function renderQueryParameters(
     operation.parameters ??= []
     operation.parameters.push(parameter)
   }
+}
+
+/**
+ * `flattenJsonUnionSchema` keeps a single `$ref` as is, so resolve it
+ * to avoid treating a referenced primitive (e.g. an enum component) as an object.
+ */
+function isResolvedJsonPrimitiveSchema(schema: JsonSchema): boolean {
+  return isJsonPrimitiveSchema(resolveJsonSchemaRootLocalRef(schema))
 }
 
 function renderHeaderParameters(

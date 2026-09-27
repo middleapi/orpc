@@ -239,6 +239,34 @@ describe('openAPIGenerator operation builders', () => {
       expect(operation.requestBody).toBeUndefined()
     })
 
+    it('only applies deepObject style to query parameters whose $ref resolves to a non-primitive', () => {
+      const { ctx, operation } = createContext()
+
+      buildRequest(ctx, operation, testDef({
+        inputs: [testSchema({
+          type: 'object',
+          properties: {
+            status: { $ref: '#/$defs/Status' },
+            arrayable: { anyOf: [{ $ref: '#/$defs/Status' }, { type: 'array', items: { $ref: '#/$defs/Status' } }] },
+            nullable: { anyOf: [{ $ref: '#/$defs/Status' }, { type: 'null' }] },
+            filter: { $ref: '#/$defs/Filter' },
+          },
+          required: ['status', 'arrayable', 'nullable', 'filter'],
+          $defs: {
+            Status: { enum: ['active', 'archived'] },
+            Filter: { type: 'object', properties: { q: { type: 'string' } } },
+          },
+        })],
+      }), { method: 'GET' }, undefined)
+
+      expect(operation.parameters?.map(p => [(p as any).name, (p as any).style])).toEqual([
+        ['status', undefined],
+        ['arrayable', undefined],
+        ['nullable', undefined],
+        ['filter', 'deepObject'],
+      ])
+    })
+
     it('maps HEAD inputs to query parameters like GET', () => {
       const { ctx, operation } = createContext()
       const path = '/planets/{id}' as const
