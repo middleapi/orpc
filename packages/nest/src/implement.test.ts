@@ -418,6 +418,12 @@ describe('routing', () => {
 
         expect(res.statusCode).toEqual(404)
       })
+
+      it('should return 404 instead of matching a dynamic param with an empty value', async () => {
+        const res = await supertest(httpServer).get('/dynamic/')
+
+        expect(res.statusCode).toEqual(404)
+      })
     })
   })
 

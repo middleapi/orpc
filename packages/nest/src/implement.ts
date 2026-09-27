@@ -9,7 +9,7 @@ import type { Observable } from 'rxjs'
 import type { NestStandardLazyRequest, ORPCModuleConfig } from './module'
 import { Readable } from 'node:stream'
 import * as NestCommon from '@nestjs/common'
-import { applyDecorators, Delete, Get, Head, HttpCode, HttpException, Inject, Injectable, Optional, Options, Patch, Post, Put, StreamableFile, UseInterceptors } from '@nestjs/common'
+import { applyDecorators, Delete, Get, Head, HttpCode, HttpException, Inject, Injectable, NotFoundException, Optional, Options, Patch, Post, Put, StreamableFile, UseInterceptors } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { getPathMeta, ProcedureContract } from '@orpc/contract'
 import { DEFAULT_OPENAPI_METHOD, getDynamicPathParams, getOpenAPIMeta } from '@orpc/openapi'
@@ -203,6 +203,7 @@ export class ImplementInterceptor implements NestInterceptor {
         const res: ExpressResponse | FastifyReply = ctx.switchToHttp().getResponse()
 
         const standardRequest = this.toNestStandardLazyRequest(req, res)
+        const params = toORPCOpenAPIParams(procedure, standardRequest.params)
 
         const handler = new StandardHandler({
           resolveProcedure: request => Promise.resolve({
@@ -210,7 +211,7 @@ export class ImplementInterceptor implements NestInterceptor {
             procedure,
             decodeInput: () => this.codec.decodeInput({
               procedure,
-              params: toORPCOpenAPIParams(procedure, standardRequest.params),
+              params,
             }, request),
           }),
           encodeError: this.codec.encodeError.bind(this.codec),
@@ -355,6 +356,14 @@ function toORPCOpenAPIParams(contract: AnyProcedureContract, params: NestStandar
 
         continue
       }
+    }
+
+    /**
+     * Fastify matches an empty segment as a param (e.g. `/planets/` against `/planets/:id`),
+     * while oRPC never matches an empty dynamic param, so treat it as an unmatched route.
+     */
+    if (value === '') {
+      throw new NotFoundException()
     }
 
     orpcParams[key] = flattenParamValue(value)

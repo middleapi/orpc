@@ -94,6 +94,17 @@ export class PlanetController {
 When you use the `@Implement` decorator with a router contract, under the hood it creates a corresponding NestJS method for each procedure contract. All decorators applied to the original method are reflected on these methods.
 :::
 
+:::warning
+NestJS strips trailing slashes from route paths, while the Fastify adapter matches them strictly by default. A request to a contract path that ends with `/` (e.g. `/planets/`) therefore returns 404 on Fastify. Enable `ignoreTrailingSlash` to match both forms:
+
+```ts
+const app = await NestFactory.create(
+  AppModule,
+  new FastifyAdapter({ routerOptions: { ignoreTrailingSlash: true } }),
+)
+```
+:::
+
 ## Error Handling
 
 By default, errors thrown in implemented procedures are caught and handled by oRPC, which then rethrows a generic `HttpException` to NestJS. If you want NestJS to catch the original error instead of `HttpException`, use the [Rethrow Plugin](/docs/plugins/rethrow) to bypass oRPC error handling and let NestJS handle the error directly.
