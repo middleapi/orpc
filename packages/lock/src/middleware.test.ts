@@ -1,5 +1,7 @@
 import type { Locker } from './types'
 import { call, ORPCError, os, type } from '@orpc/server'
+import { promiseWithResolvers, sleep } from '@orpc/shared'
+import { MemoryLocker } from './adapters/memory'
 import { LockTimeoutError } from './error'
 import { lock, LOCK_MIDDLEWARE_CONTEXT_SYMBOL } from './middleware'
 
@@ -197,6 +199,237 @@ describe('lock', () => {
         { context: {} },
       )
       expect(locker.lock).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('streaming outputs', () => {
+    const isLocked = (locker: Locker, key: string) => locker.lock(key, () => false, { timeout: 0 }).catch((error) => {
+      if (error instanceof LockTimeoutError) {
+        return true
+      }
+
+      throw error
+    })
+
+    it('never runs async iterator outputs with the same key concurrently', async () => {
+      const locker = new MemoryLocker()
+      let running = 0
+      let maxRunning = 0
+
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(async function* ({ context }) {
+        running++
+        maxRunning = Math.max(maxRunning, running)
+        await sleep(20)
+        yield context['lock/waited']
+        await sleep(20)
+        running--
+      })
+
+      const consume = async () => {
+        const values: boolean[] = []
+
+        for await (const value of await call(procedure, undefined, { context: {} })) {
+          values.push(value)
+        }
+
+        return values
+      }
+
+      await expect(Promise.all([consume(), consume()])).resolves.toEqual([[false], [true]])
+      expect(maxRunning).toBe(1)
+      await expect(isLocked(locker, 'k')).resolves.toBe(false)
+    })
+
+    it('holds the lock until an async iterator output is fully consumed', async () => {
+      const locker = new MemoryLocker()
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(async function* () {
+        yield 1
+        return 'done'
+      })
+
+      const iterator = await call(procedure, undefined, { context: {} })
+      await expect(isLocked(locker, 'k')).resolves.toBe(true)
+
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+      await expect(isLocked(locker, 'k')).resolves.toBe(true)
+
+      await expect(iterator.next()).resolves.toEqual({ done: true, value: 'done' })
+      await expect(isLocked(locker, 'k')).resolves.toBe(false)
+    })
+
+    it('releases the lock once an async iterator output is returned early, after the generator stops', async () => {
+      const locker = new MemoryLocker()
+      const { promise: waiting, resolve: markWaiting } = promiseWithResolvers<void>()
+      const { promise: gate, resolve: openGate } = promiseWithResolvers<void>()
+      const cleanup = vi.fn()
+
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(async function* () {
+        try {
+          yield 1
+          markWaiting()
+          await gate
+          yield 2
+        }
+        finally {
+          cleanup()
+        }
+      })
+
+      const iterator = await call(procedure, undefined, { context: {} })
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+
+      const pending = iterator.next()
+      await waiting
+      const returned = iterator.return?.()
+
+      // The generator is still running, so the lock must stay held
+      await sleep(10)
+      expect(cleanup).not.toHaveBeenCalled()
+      await expect(isLocked(locker, 'k')).resolves.toBe(true)
+
+      openGate()
+      await returned
+
+      expect(cleanup).toHaveBeenCalledTimes(1)
+      await expect(isLocked(locker, 'k')).resolves.toBe(false)
+      await expect(pending).resolves.toEqual({ done: true, value: undefined })
+    })
+
+    it('releases the lock when an async iterator output throws', async () => {
+      const locker = new MemoryLocker()
+      const error = new Error('boom')
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(async function* () {
+        yield 1
+        throw error
+      })
+
+      const iterator = await call(procedure, undefined, { context: {} })
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+      await expect(iterator.next()).rejects.toBe(error)
+      await expect(isLocked(locker, 'k')).resolves.toBe(false)
+    })
+
+    it('releases the lock when an async iterator output stops on abort', async () => {
+      const locker = new MemoryLocker()
+      const controller = new AbortController()
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(async function* ({ signal }) {
+        yield 1
+        await sleep(10_000, { signal })
+      })
+
+      const iterator = await call(procedure, undefined, { context: {}, signal: controller.signal })
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+
+      const pending = iterator.next()
+      controller.abort(new Error('aborted'))
+
+      await expect(pending).rejects.toThrow('aborted')
+      await expect(isLocked(locker, 'k')).resolves.toBe(false)
+    })
+
+    it('surfaces release errors of an async iterator output to its consumer', async () => {
+      const error = new Error('release failed')
+      const locker: Locker = {
+        lock: async (_key, fn) => {
+          await fn({ waited: false })
+          throw error
+        },
+      }
+
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(async function* () {
+        yield 1
+      })
+
+      const iterator = await call(procedure, undefined, { context: {} })
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+      await expect(iterator.next()).rejects.toBe(error)
+    })
+
+    it('never runs ReadableStream outputs with the same key concurrently', async () => {
+      const locker = new MemoryLocker()
+      let running = 0
+      let maxRunning = 0
+
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(() => {
+        let count = 0
+
+        return new ReadableStream<number>({
+          async pull(controller) {
+            if (count === 0) {
+              running++
+              maxRunning = Math.max(maxRunning, running)
+            }
+
+            await sleep(10)
+
+            if (count++ < 2) {
+              controller.enqueue(count)
+            }
+            else {
+              running--
+              controller.close()
+            }
+          },
+        })
+      })
+
+      const consume = async () => {
+        const stream = await call(procedure, undefined, { context: {} })
+        expect(stream).toBeInstanceOf(ReadableStream)
+
+        const chunks: number[] = []
+
+        for await (const chunk of stream) {
+          chunks.push(chunk)
+        }
+
+        return chunks
+      }
+
+      await expect(Promise.all([consume(), consume()])).resolves.toEqual([[1, 2], [1, 2]])
+      expect(maxRunning).toBe(1)
+
+      await sleep(0)
+      await expect(isLocked(locker, 'k')).resolves.toBe(false)
+    })
+
+    it('releases the lock when a ReadableStream output is cancelled', async () => {
+      const locker = new MemoryLocker()
+      const cancel = vi.fn()
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(() => new ReadableStream<number>({
+        pull(controller) {
+          controller.enqueue(1)
+        },
+        cancel,
+      }))
+
+      const stream = await call(procedure, undefined, { context: {} })
+      const reader = stream.getReader()
+
+      await expect(reader.read()).resolves.toEqual({ done: false, value: 1 })
+      await expect(isLocked(locker, 'k')).resolves.toBe(true)
+
+      await reader.cancel('reason')
+
+      expect(cancel).toHaveBeenCalledWith('reason')
+      await expect(isLocked(locker, 'k')).resolves.toBe(false)
+    })
+
+    it('releases the lock when a ReadableStream output errors', async () => {
+      const locker = new MemoryLocker()
+      const error = new Error('boom')
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(() => new ReadableStream<number>({
+        pull(controller) {
+          controller.error(error)
+        },
+      }))
+
+      const stream = await call(procedure, undefined, { context: {} })
+
+      await expect(stream.getReader().read()).rejects.toBe(error)
+
+      await sleep(0)
+      await expect(isLocked(locker, 'k')).resolves.toBe(false)
     })
   })
 })

@@ -107,6 +107,10 @@ const result = await call(
 )
 ```
 
+:::info[Streaming Outputs]
+When a procedure returns an [`AsyncIteratorObject`](/docs/async-iterator-object) or a [`ReadableStream`](/docs/binary-data), the lock is held until the stream finishes, errors, or is cancelled, not just until the handler returns. oRPC handlers cancel the stream when the client disconnects. When you consume the output yourself, for example with `call`, read it to the end or cancel it (`break`, `return()`, or `cancel()`), otherwise the lock stays held until its `ttl` expires, if one is set. Keep the `ttl` longer than your streams run, since an expired lock no longer prevents concurrent calls.
+:::
+
 :::info[Automatic Deduplication]
 When the same `locker` and `key` combination is used multiple times in a single request chain, the `lock` middleware acquires the lock only once, so a procedure never waits for a lock it already holds. This behavior follows the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe. To disable deduplication, set `dedupe: false`.
 :::
