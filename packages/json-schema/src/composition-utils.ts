@@ -8,7 +8,7 @@ import type { JsonArraySchema, JsonObjectSchema } from './utils'
 import { get, isDeepEqual, omit, toArray } from '@orpc/shared'
 import { JSON_SCHEMA_LOGIC_KEYWORDS } from './constants'
 import { decodeJsonPointerSegment, encodeJsonPointerSegment, hoistRecursiveRefToDef, mapJsonSchemaRefs, resolveJsonSchemaRootLocalRef } from './ref-utils'
-import { ensureJsonSchemaObject, isJsonArraySchema } from './utils'
+import { ensureJsonSchemaObject, isJsonArraySchema, isUnconstrainedSchema } from './utils'
 
 /**
  * Moves a schema's `$defs` into the shared root map, renaming only the names whose bodies
@@ -307,6 +307,87 @@ function extractJsonObjectSchemaEntriesInternal(
     }),
     objectLike,
   }
+}
+
+/**
+ * Parses the schema that properties outside of `properties` must match (`additionalProperties`),
+ * following refs and compositions like {@link extractJsonObjectSchemaEntries}.
+ *
+ * @returns `false` when extra properties are forbidden, or `undefined` when no schema declares them.
+ */
+export function extractJsonObjectSchemaAdditionalProperties(schema: JsonSchema): JsonSchema | undefined {
+  schema = hoistRecursiveRefToDef(schema)
+  if (typeof schema !== 'object') {
+    return undefined
+  }
+
+  const result = extractJsonObjectSchemaAdditionalPropertiesInternal(omit(schema, ['$defs']), schema.$defs, new Set())
+
+  return result === undefined ? undefined : withRootDefs(result, schema.$defs)
+}
+
+function extractJsonObjectSchemaAdditionalPropertiesInternal(
+  schema: JsonSchema,
+  $defs: Exclude<JsonSchema, boolean>['$defs'],
+  resolvingRefs: Set<string>,
+): JsonSchema | undefined {
+  if (typeof schema !== 'object') {
+    return undefined
+  }
+
+  if (typeof schema.$ref === 'string') {
+    if (resolvingRefs.has(schema.$ref)) {
+      return undefined
+    }
+
+    const resolved = resolveJsonSchemaRootLocalRef(schema, $defs)
+
+    if (resolved !== schema) {
+      return extractJsonObjectSchemaAdditionalPropertiesInternal(resolved, $defs, new Set(resolvingRefs).add(schema.$ref))
+    }
+  }
+
+  const extract = (branch: JsonSchema) => extractJsonObjectSchemaAdditionalPropertiesInternal(branch, $defs, resolvingRefs)
+
+  // keywords on the same schema all apply, so they intersect like allOf branches
+  return intersectAdditionalProperties([
+    schema.additionalProperties,
+    schema.allOf && intersectAdditionalProperties(schema.allOf.map(extract)),
+    schema.anyOf && unionAdditionalProperties(schema.anyOf.map(extract)),
+    schema.oneOf && unionAdditionalProperties(schema.oneOf.map(extract)),
+  ])
+}
+
+/**
+ * Extra properties must satisfy every declaring schema, and any `false` forbids them.
+ */
+function intersectAdditionalProperties(schemas: Array<JsonSchema | undefined>): JsonSchema | undefined {
+  const declared = schemas.filter(schema => schema !== undefined)
+
+  if (declared.includes(false)) {
+    return false
+  }
+
+  const constrained = deduplicateJsonSchemas(declared.filter(schema => !isUnconstrainedSchema(schema)))
+
+  if (constrained.length === 0) {
+    return declared[0]
+  }
+
+  return constrained.length === 1 ? constrained[0] : { allOf: constrained }
+}
+
+/**
+ * Extra properties are allowed when any branch allows them, and forbidden only when every branch forbids them.
+ */
+function unionAdditionalProperties(schemas: Array<JsonSchema | undefined>): JsonSchema | undefined {
+  const allowed = deduplicateJsonSchemas(schemas.filter(schema => schema !== undefined && schema !== false))
+
+  if (allowed.length === 0) {
+    return schemas.length > 0 && schemas.every(schema => schema === false) ? false : undefined
+  }
+
+  return allowed.find(isUnconstrainedSchema) ?? (allowed.length === 1 ? allowed[0] : { anyOf: allowed })
 }
 
 /**

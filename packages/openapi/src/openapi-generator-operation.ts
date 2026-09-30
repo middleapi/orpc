@@ -9,6 +9,7 @@ import { getAsyncIteratorObjectSchemaDetails } from '@orpc/contract'
 import {
   combineJsonObjectSchemaEntries,
   combineJsonSchemasWithComposition,
+  extractJsonObjectSchemaAdditionalProperties,
   extractJsonObjectSchemaEntries,
   flattenJsonUnionSchema,
   isJsonFileSchema,
@@ -29,6 +30,11 @@ import { isBodylessMethod } from './utils'
 export type DynamicPathParam = NonNullable<ReturnType<typeof getDynamicPathParams>>[number]
 
 export class OpenAPIGeneratorError extends TypeError { }
+
+/**
+ * Names the query parameter that documents the keys an input accepts beyond its fixed properties.
+ */
+const FREE_FORM_QUERY_PARAMETER_NAME = 'additionalQueryParams'
 
 export interface OpenAPIErrorBodyDefinition {
   code: string
@@ -75,6 +81,10 @@ export function toOpenAPIPath(path: `/${string}`, dynamicPathParams: DynamicPath
 interface RequestParts {
   paramsEntries: JsonObjectSchemaEntry[] | undefined
   queryEntries: JsonObjectSchemaEntry[] | undefined
+  /**
+   * The schema of query keys outside of `queryEntries`, `false` or `undefined` when none are documented.
+   */
+  queryAdditionalProperties: JsonSchema | undefined
   headersEntries: JsonObjectSchemaEntry[] | undefined
   bodySchema: JsonSchema | undefined
   bodyOptional: boolean | undefined
@@ -120,7 +130,7 @@ export function buildRequest(
     : extractDetailedRequestParts(schema)
 
   renderPathParameters(ctx, operation, dynamicParams, parts.paramsEntries, meta?.paramsStyles)
-  renderQueryParameters(ctx, operation, parts.queryEntries, meta?.queryStyles)
+  renderQueryParameters(ctx, operation, parts.queryEntries, parts.queryAdditionalProperties, meta?.queryStyles)
   renderHeaderParameters(ctx, operation, parts.headersEntries)
 
   if (parts.bodySchema !== undefined) {
@@ -162,6 +172,7 @@ function extractCompactRequestParts(
   return {
     paramsEntries,
     queryEntries: isBodylessMethod(method) ? restEntries : undefined,
+    queryAdditionalProperties: isBodylessMethod(method) ? extractJsonObjectSchemaAdditionalProperties(schema) : undefined,
     headersEntries: undefined,
     bodySchema,
     bodyOptional: !dynamicParams?.length ? optional : restEntries?.every(([,,optional]) => optional),
@@ -179,10 +190,12 @@ function extractDetailedRequestParts(schema: JsonSchema): RequestParts {
   }
 
   const section = (name: string) => entries.find(([entryName]) => entryName === name)
+  const querySchema = section('query')?.[1] ?? false
 
   return {
     paramsEntries: extractJsonObjectSchemaEntries(section('params')?.[1] ?? false),
-    queryEntries: extractJsonObjectSchemaEntries(section('query')?.[1] ?? false),
+    queryEntries: extractJsonObjectSchemaEntries(querySchema),
+    queryAdditionalProperties: extractJsonObjectSchemaAdditionalProperties(querySchema),
     headersEntries: extractJsonObjectSchemaEntries(section('headers')?.[1] ?? false),
     bodySchema: section('body')?.[1],
     bodyOptional: section('body')?.[2],
@@ -251,6 +264,7 @@ function renderQueryParameters(
   ctx: OpenAPIOperationContext,
   operation: OpenAPIV3_2.OperationObject,
   queryEntries: JsonObjectSchemaEntry[] | undefined,
+  queryAdditionalProperties: JsonSchema | undefined,
   queryStyles: OpenAPIMeta['queryStyles'],
 ): void {
   for (const [name, schema, optional] of queryEntries ?? []) {
@@ -299,6 +313,30 @@ function renderQueryParameters(
     operation.parameters ??= []
     operation.parameters.push(parameter)
   }
+
+  if (queryAdditionalProperties === undefined || queryAdditionalProperties === false) {
+    return
+  }
+
+  // An exploded form object sends each entry as a top-level `key=value` pair and never its own name.
+  // `allowReserved` is left off, otherwise clients would send `&`, `=` or `+` inside values unencoded.
+  let name = FREE_FORM_QUERY_PARAMETER_NAME
+  for (let i = 2; queryEntries?.some(([entryName]) => entryName === name); i++) {
+    name = `${FREE_FORM_QUERY_PARAMETER_NAME}${i}`
+  }
+
+  operation.parameters ??= []
+  operation.parameters.push({
+    in: 'query',
+    name,
+    description: 'Additional query parameters, each sent as its own `key=value` pair.',
+    style: 'form',
+    explode: true,
+    schema: {
+      type: 'object',
+      additionalProperties: ctx.registry.toOpenAPISchema(queryAdditionalProperties, 'input'),
+    },
+  })
 }
 
 function renderHeaderParameters(

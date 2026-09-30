@@ -4,6 +4,7 @@ import {
   combineJsonObjectSchemaEntries,
   combineJsonSchemasWithComposition,
   deduplicateJsonSchemas,
+  extractJsonObjectSchemaAdditionalProperties,
   extractJsonObjectSchemaEntries,
   flattenJsonUnionSchema,
   matchArrayableJsonSchema,
@@ -581,6 +582,151 @@ describe('extractJsonObjectSchemaEntries', () => {
     })).toEqual([
       ['shared', { allOf: [{ type: 'string' }, { type: 'number' }] }, true],
     ])
+  })
+})
+
+describe('extractJsonObjectSchemaAdditionalProperties', () => {
+  it('returns undefined when additional properties are not declared', () => {
+    expect(extractJsonObjectSchemaAdditionalProperties(true)).toBeUndefined()
+    expect(extractJsonObjectSchemaAdditionalProperties(false)).toBeUndefined()
+    expect(extractJsonObjectSchemaAdditionalProperties({ type: 'string' })).toBeUndefined()
+    expect(extractJsonObjectSchemaAdditionalProperties({ type: 'object' })).toBeUndefined()
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      type: 'object',
+      properties: { a: { type: 'string' } },
+      required: ['a'],
+    })).toBeUndefined()
+    expect(extractJsonObjectSchemaAdditionalProperties({ $ref: '#/$defs/Missing', $defs: {} })).toBeUndefined()
+  })
+
+  it('returns false when additional properties are forbidden', () => {
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      type: 'object',
+      properties: { a: { type: 'string' } },
+      additionalProperties: false,
+    })).toBe(false)
+  })
+
+  it('returns the direct additional properties schema and preserves root $defs', () => {
+    expect(extractJsonObjectSchemaAdditionalProperties({ type: 'object', additionalProperties: true })).toBe(true)
+    expect(extractJsonObjectSchemaAdditionalProperties({ type: 'object', additionalProperties: {} })).toEqual({})
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      type: 'object',
+      propertyNames: { type: 'string' },
+      additionalProperties: { type: 'string' },
+    })).toEqual({ type: 'string' })
+
+    const schema: JsonObjectSchema = {
+      type: 'object',
+      additionalProperties: { $ref: '#/$defs/Value' },
+      $defs: { Value: { type: 'number' } },
+    }
+
+    expect(extractJsonObjectSchemaAdditionalProperties(schema)).toEqual({ $ref: '#/$defs/Value', $defs: schema.$defs })
+  })
+
+  it('resolves local refs, including recursive ones', () => {
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      $ref: '#/$defs/Record',
+      $defs: {
+        Record: { type: 'object', additionalProperties: { type: 'string' } },
+      },
+    })).toEqual({
+      type: 'string',
+      $defs: {
+        Record: { type: 'object', additionalProperties: { type: 'string' } },
+      },
+    })
+
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      type: 'object',
+      additionalProperties: { $ref: '#' },
+    })).toEqual({
+      $ref: '#/$defs/__schema0',
+      $defs: {
+        __schema0: { type: 'object', additionalProperties: { $ref: '#/$defs/__schema0' } },
+      },
+    })
+
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      $ref: '#/$defs/Loop',
+      $defs: {
+        Loop: { allOf: [{ $ref: '#/$defs/Loop' }, { additionalProperties: { type: 'string' } }] },
+      },
+    })).toEqual({
+      type: 'string',
+      $defs: {
+        Loop: { allOf: [{ $ref: '#/$defs/Loop' }, { additionalProperties: { type: 'string' } }] },
+      },
+    })
+  })
+
+  it('requires every allOf branch to allow additional properties', () => {
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      allOf: [
+        { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+        { type: 'object', propertyNames: { type: 'string' }, additionalProperties: { type: 'number' } },
+      ],
+    })).toEqual({ type: 'number' })
+
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      allOf: [
+        { type: 'object', additionalProperties: { type: 'number' } },
+        { type: 'object', additionalProperties: { minimum: 1 } },
+        { type: 'object', additionalProperties: true },
+      ],
+    })).toEqual({ allOf: [{ type: 'number' }, { minimum: 1 }] })
+
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      allOf: [
+        { type: 'object', additionalProperties: { type: 'number' } },
+        { type: 'object', additionalProperties: false },
+      ],
+    })).toBe(false)
+
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      type: 'object',
+      additionalProperties: false,
+      anyOf: [{ type: 'object', additionalProperties: { type: 'string' } }],
+    })).toBe(false)
+  })
+
+  it('allows additional properties when any anyOf or oneOf branch does', () => {
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      anyOf: [
+        { type: 'object', properties: { a: { type: 'string' } }, additionalProperties: false },
+        { type: 'object', additionalProperties: { type: 'string' } },
+      ],
+    })).toEqual({ type: 'string' })
+
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      oneOf: [
+        { type: 'object', additionalProperties: { type: 'string' } },
+        { type: 'object', additionalProperties: { type: 'number' } },
+        { type: 'object', additionalProperties: { type: 'string' } },
+      ],
+    })).toEqual({ anyOf: [{ type: 'string' }, { type: 'number' }] })
+
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      anyOf: [
+        { type: 'object', additionalProperties: { type: 'string' } },
+        { type: 'object', additionalProperties: {} },
+      ],
+    })).toEqual({})
+
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      anyOf: [
+        { type: 'object', additionalProperties: false },
+        { type: 'object', additionalProperties: false },
+      ],
+    })).toBe(false)
+
+    expect(extractJsonObjectSchemaAdditionalProperties({
+      anyOf: [
+        { type: 'object', additionalProperties: false },
+        { type: 'object', properties: { a: { type: 'string' } } },
+      ],
+    })).toBeUndefined()
   })
 })
 

@@ -308,6 +308,204 @@ describe('openAPIGenerator operation builders', () => {
       })
     })
 
+    describe('free-form query parameters', () => {
+      function freeFormQueryParameter(additionalProperties: unknown, name = 'additionalQueryParams') {
+        return {
+          in: 'query',
+          name,
+          description: 'Additional query parameters, each sent as its own `key=value` pair.',
+          style: 'form',
+          explode: true,
+          schema: { type: 'object', additionalProperties },
+        }
+      }
+
+      it('documents the keys of a record input as a free-form query parameter', () => {
+        const { ctx, operation } = createContext()
+
+        buildRequest(ctx, operation, testDef({
+          inputs: [testSchema({
+            type: 'object',
+            propertyNames: { type: 'string' },
+            additionalProperties: { type: 'string' },
+          })],
+        }), { method: 'GET' }, undefined)
+
+        expect(operation.parameters).toEqual([
+          {
+            in: 'query',
+            name: 'additionalQueryParams',
+            description: 'Additional query parameters, each sent as its own `key=value` pair.',
+            style: 'form',
+            explode: true,
+            schema: { type: 'object', additionalProperties: { type: 'string' } },
+          },
+        ])
+        expect(operation.requestBody).toBeUndefined()
+      })
+
+      it('keeps fixed query and path parameters alongside the free-form query parameter', () => {
+        const { ctx, operation } = createContext()
+        const path = '/planets/{id}' as const
+
+        buildRequest(ctx, operation, testDef({
+          inputs: [testSchema({
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              a: { type: 'number' },
+            },
+            required: ['id', 'a'],
+            additionalProperties: { type: 'string' },
+          })],
+        }), { method: 'GET', path }, getDynamicPathParams(path))
+
+        expect(operation.parameters).toEqual([
+          { in: 'path', required: true, name: 'id', schema: { type: 'string' } },
+          { in: 'query', name: 'a', required: true, allowEmptyValue: true, allowReserved: true, schema: { type: 'number' } },
+          freeFormQueryParameter({ type: 'string' }),
+        ])
+      })
+
+      it('documents the extra keys of a detailed query section', () => {
+        const { ctx, operation } = createContext()
+        const path = '/planets/{id}' as const
+
+        buildRequest(ctx, operation, testDef({
+          inputs: [testSchema({
+            type: 'object',
+            properties: {
+              params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+              query: {
+                type: 'object',
+                properties: { expand: { type: 'boolean' } },
+                additionalProperties: { type: 'string' },
+              },
+              headers: { type: 'object', additionalProperties: { type: 'string' } },
+            },
+            required: ['params', 'query'],
+          })],
+        }), { method: 'GET', path, inputStructure: 'detailed' }, getDynamicPathParams(path))
+
+        expect(operation.parameters).toEqual([
+          { in: 'path', required: true, name: 'id', schema: { type: 'string' } },
+          { in: 'query', name: 'expand', allowEmptyValue: true, allowReserved: true, schema: { type: 'boolean' } },
+          freeFormQueryParameter({ type: 'string' }),
+        ])
+      })
+
+      it('skips the free-form query parameter when extra keys are forbidden or undeclared', () => {
+        for (const additionalProperties of [false, undefined]) {
+          const { ctx, operation } = createContext()
+
+          buildRequest(ctx, operation, testDef({
+            inputs: [testSchema({
+              type: 'object',
+              properties: { a: { type: 'string' } },
+              ...(additionalProperties === undefined ? {} : { additionalProperties }),
+            })],
+          }), { method: 'GET' }, undefined)
+
+          expect(operation.parameters, String(additionalProperties)).toEqual([
+            { in: 'query', name: 'a', allowEmptyValue: true, allowReserved: true, schema: { type: 'string' } },
+          ])
+        }
+      })
+
+      it('leaves compact request bodies untouched', () => {
+        const { ctx, operation } = createContext()
+
+        buildRequest(ctx, operation, testDef({
+          inputs: [testSchema({ type: 'object', additionalProperties: { type: 'string' } })],
+        }), { method: 'POST' }, undefined)
+
+        expect(operation.parameters).toBeUndefined()
+        expect(operation.requestBody).toEqual({
+          required: true,
+          content: {
+            'application/json': {
+              schema: { type: 'object', additionalProperties: { type: 'string' } },
+            },
+          },
+        })
+      })
+
+      it('resolves compositions and refs, hoisting defs into components', () => {
+        const { doc, ctx, operation } = createContext()
+
+        buildRequest(ctx, operation, testDef({
+          inputs: [testSchema({
+            allOf: [
+              { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+              { $ref: '#/$defs/Labels' },
+            ],
+            $defs: {
+              Labels: { type: 'object', additionalProperties: { $ref: '#/$defs/Label' } },
+              Label: { type: 'string', maxLength: 32 },
+            },
+          })],
+        }), { method: 'GET' }, undefined)
+
+        expect(operation.parameters).toEqual([
+          { in: 'query', name: 'a', required: true, allowEmptyValue: true, allowReserved: true, schema: { type: 'string' } },
+          freeFormQueryParameter({ $ref: '#/components/schemas/Label' }),
+        ])
+        expect(doc.components?.schemas).toEqual({
+          Labels: { type: 'object', additionalProperties: { $ref: '#/components/schemas/Label' } },
+          Label: { type: 'string', maxLength: 32 },
+        })
+      })
+
+      it('keeps deepObject detection and query styles scoped to the fixed keys', () => {
+        const { ctx, operation } = createContext()
+
+        buildRequest(ctx, operation, testDef({
+          inputs: [testSchema({
+            type: 'object',
+            properties: {
+              filter: { type: 'object' },
+              tags: { type: 'array' },
+            },
+            additionalProperties: { type: 'object', additionalProperties: { type: 'string' } },
+          })],
+        }), {
+          method: 'GET',
+          queryStyles: {
+            tags: 'comma-delimited-array',
+            // styles an extra key that happens to share the free-form parameter name
+            additionalQueryParams: 'json',
+          },
+        }, undefined)
+
+        expect(operation.parameters).toEqual([
+          { in: 'query', name: 'filter', style: 'deepObject', explode: true, allowEmptyValue: true, allowReserved: true, schema: { type: 'object' } },
+          { in: 'query', name: 'tags', explode: false, allowEmptyValue: true, allowReserved: true, schema: { type: 'array' } },
+          freeFormQueryParameter({ type: 'object', additionalProperties: { type: 'string' } }),
+        ])
+      })
+
+      it('renames the free-form query parameter when a fixed query key already uses its name', () => {
+        const { ctx, operation } = createContext()
+
+        buildRequest(ctx, operation, testDef({
+          inputs: [testSchema({
+            type: 'object',
+            properties: {
+              additionalQueryParams: { type: 'string' },
+              additionalQueryParams2: { type: 'string' },
+            },
+            additionalProperties: { type: 'number' },
+          })],
+        }), { method: 'GET' }, undefined)
+
+        expect(operation.parameters).toEqual([
+          { in: 'query', name: 'additionalQueryParams', allowEmptyValue: true, allowReserved: true, schema: { type: 'string' } },
+          { in: 'query', name: 'additionalQueryParams2', allowEmptyValue: true, allowReserved: true, schema: { type: 'string' } },
+          freeFormQueryParameter({ type: 'number' }, 'additionalQueryParams3'),
+        ])
+      })
+    })
+
     it('maps AsyncIteratorObject inputs to an SSE request body', () => {
       const { ctx, operation } = createContext()
 

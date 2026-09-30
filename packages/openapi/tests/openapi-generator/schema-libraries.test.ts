@@ -78,6 +78,56 @@ describe('openAPIGenerator e2e: schema library agnosticism', () => {
     ])
   })
 
+  it('documents the extra keys of zod and arktype record inputs as free-form query parameters', async () => {
+    const freeFormQueryParameter = (additionalProperties: unknown) => ({
+      in: 'query',
+      name: 'additionalQueryParams',
+      description: expect.any(String),
+      style: 'form',
+      explode: true,
+      schema: { type: 'object', additionalProperties },
+    })
+
+    const router = {
+      zodRecord: oc
+        .meta(openapi({ method: 'GET', path: '/zod-record' }))
+        .input(z.record(z.string(), z.string())),
+      zodCatchall: oc
+        .meta(openapi({ method: 'GET', path: '/zod-catchall' }))
+        .input(z.object({ a: z.string() }).catchall(z.string())),
+      zodDetailed: oc
+        .meta(openapi({ method: 'GET', path: '/zod-detailed', inputStructure: 'detailed' }))
+        .input(z.object({ query: z.record(z.string(), z.string()) })),
+      zodStrict: oc
+        .meta(openapi({ method: 'GET', path: '/zod-strict' }))
+        .input(z.strictObject({ a: z.string() })),
+      arktypeRecord: oc
+        .meta(openapi({ method: 'GET', path: '/arktype-record' }))
+        .input(arktype.type({ '[string]': 'string' })),
+    }
+
+    for (const version of ['3.2.0', '3.0.4'] as const) {
+      const doc = await generator.generate(router, { version })
+
+      expect(doc.paths?.['/zod-record']?.get?.parameters, version).toEqual([
+        freeFormQueryParameter({ type: 'string' }),
+      ])
+      expect(doc.paths?.['/zod-catchall']?.get?.parameters, version).toEqual([
+        { in: 'query', name: 'a', required: true, allowEmptyValue: true, allowReserved: true, schema: { type: 'string' } },
+        freeFormQueryParameter({ type: 'string' }),
+      ])
+      expect(doc.paths?.['/zod-detailed']?.get?.parameters, version).toEqual([
+        freeFormQueryParameter({ type: 'string' }),
+      ])
+      expect(doc.paths?.['/zod-strict']?.get?.parameters, version).toEqual([
+        { in: 'query', name: 'a', required: true, allowEmptyValue: true, allowReserved: true, schema: { type: 'string' } },
+      ])
+      expect(doc.paths?.['/arktype-record']?.get?.parameters, version).toEqual([
+        freeFormQueryParameter({ type: 'string' }),
+      ])
+    }
+  })
+
   it('supports plain JSON schemas with $defs, hoisting them into components', async () => {
     const doc = await generator.generate({
       createPlanet: oc

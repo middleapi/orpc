@@ -115,6 +115,14 @@ describe('openAPIGenerator e2e: composed schemas', () => {
         allowReserved: true,
         schema: expect.objectContaining({ type: 'string' }),
       },
+      // loose objects accept any other key too
+      expect.objectContaining({
+        name: 'additionalQueryParams',
+        in: 'query',
+        style: 'form',
+        explode: true,
+        schema: { type: 'object', additionalProperties: {} },
+      }),
     ])
   })
 
