@@ -448,7 +448,8 @@ describe('evlogHandlerPlugin', () => {
       request: createRequest('/ping'),
     })).rejects.toThrow(businessError)
 
-    expect(logger.error).toHaveBeenCalledWith(businessError)
+    expect(logger.error).toHaveBeenCalledWith(expect.objectContaining({ name: 'ORPCError', code: 'UNAUTHORIZED' }))
+    expect(logger.set).toHaveBeenCalledWith({ error: { defined: false, issues: undefined } })
     expect(logger.setLevel).toHaveBeenCalledWith('warn')
 
     logger.error.mockClear()
@@ -531,7 +532,7 @@ describe('evlogHandlerPlugin', () => {
     })).rejects.toThrow(businessError)
 
     expect(procedureErrorLevel).toHaveBeenCalledWith(businessError, 'warn')
-    expect(logger.error).toHaveBeenCalledWith(businessError)
+    expect(logger.error).toHaveBeenCalledWith(expect.objectContaining({ code: 'UNAUTHORIZED' }))
     expect(logger.setLevel).toHaveBeenCalledWith('debug')
 
     logger.error.mockClear()

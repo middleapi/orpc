@@ -3,7 +3,8 @@ import type { StandardHandlerInterceptor, StandardHandlerOptions, StandardHandle
 import type { StandardRequest } from '@standard-server/core'
 import type { LogLevel, RequestLogger } from 'evlog'
 import type { BaseEvlogOptions, FrameworkIntegrationHelpers, FrameworkIntegrationSpec } from 'evlog/toolkit'
-import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
+import { cloneORPCError, ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
+import { ValidationError } from '@orpc/server'
 import { isAbortError, isAsyncIteratorObject, ORPC_NAME, override, sleep, toArray, wrapReadableStream } from '@orpc/shared'
 import { ErrorEvent, flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { defineFrameworkIntegration } from 'evlog/toolkit'
@@ -276,13 +277,104 @@ function logProcedureError(
     return
   }
 
-  logger.error(toErrorOrString(error))
+  const loggable = toLoggableError(error)
+
+  logger.error(toErrorOrString(loggable))
+
+  if (loggable instanceof ORPCError) {
+    /**
+     * Evlog only copies well-known error fields like `code`.
+     */
+    const { defined, issues } = loggable as LoggableORPCError
+    logger.set({ error: { defined, issues } })
+  }
 
   const level = procedureErrorLevel(error, defaultProcedureErrorLevel(error))
 
   if (level !== 'error') {
     logger.setLevel(level)
   }
+}
+
+type LoggableORPCError = ORPCError<string, unknown> & { issues?: ReturnType<typeof toLoggableIssues> }
+
+/**
+ * Validation errors can carry the raw input or output, in `ValidationError.invalidData`
+ * and in the issues themselves (Valibot and ArkType attach the parent object to them),
+ * so only the message and path of each issue are kept.
+ *
+ * An ORPCError is a rejection delivered to the client, so it is reduced to its code, message,
+ * `defined` and the issues of the validation error it wraps: its `data` and `cause` are dropped.
+ * INTERNAL_SERVER_ERROR and non-ORPC errors are internal failures and keep their full details,
+ * except that a validation error in the cause of an INTERNAL_SERVER_ERROR
+ * (as thrown when output validation fails) is still reduced.
+ */
+function toLoggableError(error: unknown): unknown {
+  if (error instanceof ValidationError) {
+    return copyError(error, { issues: toLoggableIssues(error.issues) })
+  }
+
+  if (!(error instanceof ORPCError)) {
+    return error
+  }
+
+  if (error.code === 'INTERNAL_SERVER_ERROR') {
+    const cause = toLoggableError(error.cause)
+
+    if (cause === error.cause) {
+      return error
+    }
+
+    const cloned = cloneORPCError(error)
+    cloned.cause = cause
+    return cloned
+  }
+
+  const issues = findValidationError(error.cause)?.issues
+
+  return copyError(error, {
+    code: error.code,
+    defined: error.defined,
+    ...(issues && { issues: toLoggableIssues(issues) }),
+  })
+}
+
+/**
+ * Copies an error with its class, name, message and stack, and `fields` as its only other properties.
+ */
+function copyError(error: Error, fields: Record<string, unknown>): Error {
+  const copy: Error = Object.create(Object.getPrototypeOf(error), {
+    message: { value: error.message, writable: true, configurable: true },
+    stack: { value: error.stack, writable: true, configurable: true },
+  })
+
+  return Object.assign(copy, { name: error.name }, fields)
+}
+
+function findValidationError(error: unknown): ValidationError | undefined {
+  const seen = new Set<unknown>()
+
+  for (let current = error; current instanceof Error && !seen.has(current); current = current.cause) {
+    if (current instanceof ValidationError) {
+      return current
+    }
+
+    seen.add(current)
+  }
+
+  return undefined
+}
+
+function toLoggableIssues(issues: ValidationError['issues']) {
+  return issues.map(issue => ({
+    message: issue.message,
+    path: issue.path?.map((segment) => {
+      const key: unknown = typeof segment === 'object' ? segment.key : segment
+
+      // Valibot map and set path items can hold any value as key
+      return typeof key === 'string' || typeof key === 'number' || typeof key === 'symbol' ? key : `[${typeof key}]`
+    }),
+  }))
 }
 
 function defaultProcedureErrorLevel(error: unknown): LogLevel {

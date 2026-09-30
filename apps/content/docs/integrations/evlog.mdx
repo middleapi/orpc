@@ -56,6 +56,31 @@ const plugin = new EvlogHandlerPlugin({
 })
 ```
 
+## Logged Error Details
+
+An `ORPCError` thrown from a procedure is a rejection delivered to the client, so only its `code`, `message`, `defined`, and the `message` and `path` of each validation issue are recorded in the wide event. Its `data` and `cause` are omitted because they can contain the raw input, such as a password. For example, a failed input validation is recorded as:
+
+```json
+{
+  "status": 400,
+  "level": "warn",
+  "error": {
+    "name": "ORPCError",
+    "message": "Input validation failed",
+    "stack": "ORPCError: Input validation failed\nat ...",
+    "code": "BAD_REQUEST",
+    "defined": false,
+    "issues": [{ "message": "Too small: expected string to have >=12 characters", "path": ["newPassword"] }]
+  }
+}
+```
+
+An `ORPCError` with the `INTERNAL_SERVER_ERROR` code, or any other error, signals a server-side failure, so it is recorded in full. The exception is a validation error in the cause of an `INTERNAL_SERVER_ERROR`, such as the one oRPC throws when output validation fails: it is reduced to its issues, so the invalid output is never recorded.
+
+:::warning
+Issue messages come from your schema library, and some libraries, such as Valibot and ArkType, include the rejected value in them. Set a custom message on fields that may hold sensitive values.
+:::
+
 ## Using the Logger in Your Code
 
 This plugin supports using [AsyncLocalStorage](https://nodejs.org/api/async_context.html#class-asynclocalstorage) to access the logger throughout a request and enrich the final [wide event](https://www.evlog.dev/learn/wide-events#uselogger-retrieving-the-request-logger). It is the most convenient way to use Evlog's full feature set. If your runtime does not support AsyncLocalStorage, you can still [access the logger from the context](#without-asynclocalstorage).
