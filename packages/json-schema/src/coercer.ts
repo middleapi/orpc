@@ -103,7 +103,45 @@ export class JsonSchemaCoercer {
       }
     }
 
-    if (schema.type) {
+    const nativeType = 'x-native-type' in schema && typeof schema['x-native-type'] === 'string'
+      ? schema['x-native-type']
+      : undefined
+
+    /**
+     * Converters describe a native type with the JSON type of its serialized form, like a bigint as `type: 'string'`,
+     * which the converted value never matches and the raw value may not either (a number for a bigint).
+     * So scalars are converted before the `type` check, and a value already of the native type skips it.
+     */
+    switch (nativeType) {
+      case JsonSchemaXNativeType.Date: {
+        if (typeof coerced === 'string') {
+          coerced = stringToDate(coerced)
+        }
+
+        break
+      }
+      case JsonSchemaXNativeType.BigInt: {
+        switch (typeof coerced) {
+          case 'string':
+            coerced = stringToBigInt(coerced)
+            break
+          case 'number':
+            coerced = numberToBigInt(coerced)
+            break
+        }
+
+        break
+      }
+      case JsonSchemaXNativeType.Url: {
+        if (typeof coerced === 'string') {
+          coerced = stringToURL(coerced)
+        }
+
+        break
+      }
+    }
+
+    if (schema.type && !isNativeTypeValue(nativeType, coerced)) {
       switch (schema.type) {
         case 'null': {
           if (coerced !== null) {
@@ -257,69 +295,16 @@ export class JsonSchemaCoercer {
       }
     }
 
-    if ('x-native-type' in schema && typeof schema['x-native-type'] === 'string') {
-      switch (schema['x-native-type']) {
-        case JsonSchemaXNativeType.Date: {
-          if (typeof coerced === 'string') {
-            coerced = stringToDate(coerced)
-          }
+    // sets and maps are converted after the `type` check, which coerces their items first
+    if (nativeType === JsonSchemaXNativeType.Set && Array.isArray(coerced)) {
+      coerced = arrayToSet(coerced)
+    }
+    else if (nativeType === JsonSchemaXNativeType.Map && Array.isArray(coerced)) {
+      coerced = arrayToMap(coerced)
+    }
 
-          if (!(coerced instanceof Date)) {
-            satisfied = UNSATISFIED
-          }
-
-          break
-        }
-        case JsonSchemaXNativeType.BigInt: {
-          switch (typeof coerced) {
-            case 'string':
-              coerced = stringToBigInt(coerced)
-              break
-            case 'number':
-              coerced = numberToBigInt(coerced)
-              break
-          }
-
-          if (typeof coerced !== 'bigint') {
-            satisfied = UNSATISFIED
-          }
-
-          break
-        }
-        case JsonSchemaXNativeType.Url: {
-          if (typeof coerced === 'string') {
-            coerced = stringToURL(coerced)
-          }
-
-          if (!(coerced instanceof URL)) {
-            satisfied = UNSATISFIED
-          }
-
-          break
-        }
-        case JsonSchemaXNativeType.Set: {
-          if (Array.isArray(coerced)) {
-            coerced = arrayToSet(coerced)
-          }
-
-          if (!(coerced instanceof Set)) {
-            satisfied = UNSATISFIED
-          }
-
-          break
-        }
-        case JsonSchemaXNativeType.Map: {
-          if (Array.isArray(coerced)) {
-            coerced = arrayToMap(coerced)
-          }
-
-          if (!(coerced instanceof Map)) {
-            satisfied = UNSATISFIED
-          }
-
-          break
-        }
-      }
+    if (isNativeTypeValue(nativeType, coerced) === false) {
+      satisfied = UNSATISFIED
     }
 
     if (schema.allOf) {
@@ -376,6 +361,26 @@ export class JsonSchemaCoercer {
     }
 
     return [satisfied, coerced]
+  }
+}
+
+/**
+ * Whether the value already has the native type, or `undefined` for an unknown native type.
+ */
+function isNativeTypeValue(nativeType: string | undefined, value: unknown): boolean | undefined {
+  switch (nativeType) {
+    case JsonSchemaXNativeType.Date:
+      return value instanceof Date
+    case JsonSchemaXNativeType.BigInt:
+      return typeof value === 'bigint'
+    case JsonSchemaXNativeType.Url:
+      return value instanceof URL
+    case JsonSchemaXNativeType.Set:
+      return value instanceof Set
+    case JsonSchemaXNativeType.Map:
+      return value instanceof Map
+    default:
+      return undefined
   }
 }
 

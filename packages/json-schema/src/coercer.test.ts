@@ -421,6 +421,37 @@ describe('jsonSchemaCoercer', () => {
       expect(coerce({ anyOf: [{ type: 'number' }, { type: 'null' }] }, undefined, true)).toBeUndefined()
     })
 
+    it('coerces a number into a bigint inside a union', () => {
+      // z.bigint().nullable(): the bigint branch is `type: 'string'`, which a number never matches
+      const schema = { anyOf: [BIGINT_SCHEMA, { type: 'null' }] }
+
+      expect(coerce(schema, 123)).toBe(123n)
+      expect(coerce(schema, '123')).toBe(123n)
+      expect(coerce(schema, null)).toBeNull()
+      expect(coerce(schema, 4.5)).toBe(4.5)
+
+      // z.object({ id: z.bigint() }).nullable()
+      expect(coerce({
+        anyOf: [
+          { type: 'object', properties: { id: BIGINT_SCHEMA }, required: ['id'] },
+          { type: 'null' },
+        ],
+      }, { id: 123 })).toEqual({ id: 123n })
+    })
+
+    it('accepts a value already of the native type, so the rest of the branch is still coerced', () => {
+      // z.object({ at: z.date(), count: z.number() }).nullable()
+      const schema = {
+        anyOf: [
+          { type: 'object', properties: { at: DATE_SCHEMA, count: { type: 'number' } }, required: ['at', 'count'] },
+          { type: 'null' },
+        ],
+      }
+
+      const at = new Date('2020-01-01T00:00:00.000Z')
+      expect(coerce(schema, { at, count: '1' })).toEqual({ at, count: 1 })
+    })
+
     it('handles the nullable form', () => {
       expect(coerce({ type: ['integer', 'null'] }, '5')).toBe(5)
       expect(coerce({ type: ['integer', 'null'] }, null)).toBeNull()
