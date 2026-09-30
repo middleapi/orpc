@@ -3,7 +3,7 @@ import type { CreateBatchClientServerTest } from './client-server'
 import { serve } from '@hono/node-server'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
-import { BatchLinkPlugin } from '@orpc/client/plugins'
+import { BatchLinkPlugin, ResponseCompressionLinkPlugin } from '@orpc/client/plugins'
 import { BatchResponseCompressionHandlerPlugin } from '@orpc/node'
 import { RPCHandler } from '@orpc/server/fetch'
 import { BatchHandlerPlugin } from '@orpc/server/plugins'
@@ -70,8 +70,9 @@ export const createCompressionHonoFetchBatchClientServerTest: CreateBatchClientS
     fetch: fetchSpy,
     plugins: [
       new BatchLinkPlugin({ groups: [defaultBatchGroup], mode }),
-      // fetch already automatically decompresses response
-      // new ResponseCompressionLinkPlugin(),
+      // fetch already decompresses the response but keeps its content-encoding header, so this
+      // covers the plugin passing that body through (the node-http client-server leaves it out)
+      new ResponseCompressionLinkPlugin(),
     ],
   })
 

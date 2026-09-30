@@ -95,8 +95,12 @@ const link = new RPCLink({
 The `link` can be any supported oRPC link, such as [RPCLink](/docs/rpc/link), [OpenAPILink](/docs/openapi/link), or a custom one.
 :::
 
-:::warning
-When using the fetch adapter, this plugin is usually unnecessary because most fetch implementations automatically set the `Accept-Encoding` header and decompress response bodies.
+:::tip
+The plugin is meant for adapters that deliver response bodies as they were sent, such as [WebSocket](/docs/adapters/websocket) and [Message Port](/docs/adapters/message-port). With the [Fetch API adapter](/docs/adapters/fetch-api) it is usually unnecessary: fetch implementations decompress response bodies themselves, and browsers ignore the `Accept-Encoding` header set by the plugin.
+:::
+
+:::info
+Fetch implementations keep the `Content-Encoding` header on bodies they have already decompressed. So the plugin only decompresses a body that starts with the signature of its last applied encoding, and passes any other body through untouched, which keeps it safe to use with the fetch adapter. `deflate-raw` has no signature, but it is not a standard HTTP content coding, so fetch never decompresses it and the plugin always does.
 :::
 
 ## Learn More

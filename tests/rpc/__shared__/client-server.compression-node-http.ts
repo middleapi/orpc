@@ -3,7 +3,7 @@ import type { CreateClientServerTest } from './client-server'
 import * as http from 'node:http'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
-import { RequestCompressionLinkPlugin } from '@orpc/client/plugins'
+import { RequestCompressionLinkPlugin, ResponseCompressionLinkPlugin } from '@orpc/client/plugins'
 import { RPCHandler } from '@orpc/server/node'
 import { RequestCompressionHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 import { defaultSerializer } from './client-server'
@@ -52,8 +52,9 @@ export const createCompressionNodeHttpClientServerTest: CreateClientServerTest =
         // for testing purpose, we set threshold to 0 to ensure compression is always applied
         threshold: 0,
       }),
-      // fetch already automatically decompresses response
-      // new ResponseCompressionLinkPlugin(),
+      // fetch already decompresses the response but keeps its content-encoding header, so this
+      // covers the plugin passing that body through (the hono-fetch client-server leaves it out)
+      new ResponseCompressionLinkPlugin(),
     ],
   })
 
