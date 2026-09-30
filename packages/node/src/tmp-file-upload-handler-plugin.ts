@@ -35,7 +35,8 @@ export interface TmpFileUploadHandlerPluginMaxBodySize {
    * The maximum total size in bytes of a request body that is consumed as a
    * stream: event streams and raw binary streams. Enforced while the stream is
    * consumed, so an oversized stream fails at the reader. Usually the highest
-   * of the three limits, because this content is consumed on the fly.
+   * of the three limits, but keep it finite so no client can stream
+   * indefinitely.
    */
   stream: number
 }

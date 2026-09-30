@@ -234,6 +234,7 @@ const handler = new OpenAPIHandler(router, {
 | TIMEOUT                |              408 |
 | CONFLICT               |              409 |
 | GONE                   |              410 |
+| LENGTH_REQUIRED        |              411 |
 | PRECONDITION_FAILED    |              412 |
 | PAYLOAD_TOO_LARGE      |              413 |
 | UNSUPPORTED_MEDIA_TYPE |              415 |
@@ -296,13 +297,6 @@ const handler = new OpenAPIHandler(router, {
          */
         comment: '',
       },
-      /**
-       * If true, a `close` event is sent even when the iterator completes with `undefined`.
-       * When the iterator returns a value, a `close` event is always emitted regardless of this setting.
-       *
-       * @default true
-       */
-      emptyCloseEventEnabled: true,
     },
   },
 })

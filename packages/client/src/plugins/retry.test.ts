@@ -384,7 +384,7 @@ describe('retryLinkPlugin', () => {
       const iterator = await link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 1, retryDelay: 50 } }) as AsyncIterator<any>
 
       const nextPromise = iterator.next()
-      const nextExpectation = expect(nextPromise).rejects.toThrow('ITER_FAIL')
+      const nextExpectation = expect(nextPromise).resolves.toEqual({ done: true, value: undefined })
 
       await vi.advanceTimersByTimeAsync(1)
 

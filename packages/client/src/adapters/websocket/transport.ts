@@ -233,6 +233,10 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
         await peer.close(closeReason)
       })
 
+      // EventEmitter-based implementations like `ws` throw an unhandled `error` event,
+      // so a refused connection or malformed frame would crash the process. `close` always follows and handles cleanup.
+      websocket.addEventListener('error', () => {})
+
       await connectingResolvers?.promise
 
       if (closeReason) {

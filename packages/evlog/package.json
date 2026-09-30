@@ -57,7 +57,7 @@
     "@orpc/client": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.9.2"
+    "@standard-server/core": "~0.10.0"
   },
   "devDependencies": {
     "evlog": "^2.26.0"

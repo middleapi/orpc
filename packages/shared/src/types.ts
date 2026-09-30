@@ -1,6 +1,11 @@
 export type IntersectPick<T, U> = Pick<T, keyof T & keyof U>
 
 /**
+ * Like `Omit`, but distributes over unions and keeps known keys beside index signatures.
+ */
+export type DistributiveOmit<T, K extends PropertyKey> = { [P in keyof T as P extends K ? never : P]: T[P] }
+
+/**
  * Remove protected/private properties/methods
  */
 export type Public<T> = Pick<T, keyof T>

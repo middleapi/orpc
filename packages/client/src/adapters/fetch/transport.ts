@@ -89,7 +89,9 @@ export class FetchLinkTransport<T extends ClientContext> implements StandardLink
       }
     }
 
-    const response = await this.fetch(url, init, options, path)
+    // Call without a receiver: browsers throw "Illegal invocation" when native `fetch` is called on a non-global `this`.
+    const fetch = this.fetch
+    const response = await fetch(url, init, options, path)
 
     const standardResponse = toStandardLazyResponse(response)
 

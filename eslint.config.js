@@ -32,6 +32,10 @@ export default antfu({
         name: ['AbortSignal', 'any'],
         message: 'Use anyAbortSignal instead',
       },
+      {
+        name: ['*', 'throwIfAborted'],
+        message: 'React Native\'s AbortSignal polyfill has no throwIfAborted, use throwIfAborted from @orpc/shared instead',
+      },
     ],
     'no-restricted-imports': ['error', {
       patterns: [{

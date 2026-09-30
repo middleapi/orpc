@@ -186,6 +186,26 @@ describe('rpcLink', () => {
     )
   })
 
+  it('calls custom fetch without a receiver so native browser fetch can be passed directly', async () => {
+    const fetch = vi.fn(async () => {
+      return new Response(JSON.stringify({ json: 'pong' }), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+        },
+      })
+    })
+
+    const orpc = createORPCClient(new RPCLink({
+      fetch,
+      origin: 'http://api.example.com',
+    })) as any
+
+    await expect(orpc.ping('input')).resolves.toEqual('pong')
+
+    expect(fetch.mock.contexts).toEqual([undefined])
+  })
+
   it('supports custom fetch and toFetchRequest options', async () => {
     const fetch = vi.fn(async () => {
       return new Response(JSON.stringify({ json: 'pong' }), {

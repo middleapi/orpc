@@ -1,4 +1,4 @@
-import type { IntersectPick, PromiseWithError, Public } from './types'
+import type { DistributiveOmit, IntersectPick, PromiseWithError, Public } from './types'
 
 interface Empty {}
 
@@ -6,6 +6,13 @@ it('IntersectPick', () => {
   expectTypeOf<IntersectPick<{ a: number }, { a: number, b: number }>>().toEqualTypeOf<{ a: number }>()
   expectTypeOf<IntersectPick<{ a: number, b: number }, { b: number }>>().toEqualTypeOf<{ b: number }>()
   expectTypeOf<IntersectPick<{ a: number }, { b: number }>>().toEqualTypeOf<Empty>()
+})
+
+it('DistributiveOmit', () => {
+  expectTypeOf<DistributiveOmit<{ a: number, b: number }, 'b'>>().toEqualTypeOf<{ a: number }>()
+  expectTypeOf<DistributiveOmit<{ readonly a?: number, b: number }, 'b'>>().toEqualTypeOf<{ readonly a?: number }>()
+  expectTypeOf<DistributiveOmit<{ kind: 'a', a: number, c: number } | { kind: 'b', b: number, c: number }, 'c'>>().toEqualTypeOf<{ kind: 'a', a: number } | { kind: 'b', b: number }>()
+  expectTypeOf<DistributiveOmit<{ [k: string]: unknown, a: number, b: number }, 'b'>>().toEqualTypeOf<{ [k: string]: unknown, a: number }>()
 })
 
 it('PromiseWithError', () => {

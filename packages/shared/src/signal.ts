@@ -1,3 +1,4 @@
+import { throwIfAborted } from '@standard-server/shared'
 import { promiseWithResolvers } from './promise'
 
 /**
@@ -80,7 +81,7 @@ export async function runWithSignal<T>(signal: AbortSignal | undefined, fn: () =
     return fn()
   }
 
-  signal.throwIfAborted()
+  throwIfAborted(signal)
   const { promise, reject, resolve } = promiseWithResolvers<T>()
   let abortListener
   signal.addEventListener('abort', abortListener = () => {

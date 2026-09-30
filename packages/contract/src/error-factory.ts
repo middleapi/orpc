@@ -156,7 +156,7 @@ export type ORPCErrorConstructorMap<T extends ErrorMap> = {
 export function createORPCErrorConstructorMap<T extends ErrorMap>(errorMap: T): ORPCErrorConstructorMap<T> {
   const proxy = new Proxy(errorMap, {
     get(target, code) {
-      if (typeof code !== 'string') {
+      if (typeof code !== 'string' || code === 'then') {
         return Reflect.get(target, code)
       }
 

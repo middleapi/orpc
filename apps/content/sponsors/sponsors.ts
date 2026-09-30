@@ -124,18 +124,6 @@ export default [
     "type": "Organization"
   },
   {
-    "name": "Dexter Miguel",
-    "login": "divmgl",
-    "avatar": "https://avatars.githubusercontent.com/u/5452298?u=645993204be8696c085ecf0d228c3062efe2ed65&v=4",
-    "link": "https://github.com/divmgl?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
-    "rel": "sponsored",
-    "tierTitle": "Sponsor",
-    "tierLevel": 2,
-    "amount": 10,
-    "createdAt": "2025-05-02T03:29:29Z",
-    "type": "User"
-  },
-  {
     "name": "herrfugbaum",
     "login": "herrfugbaum",
     "avatar": "https://avatars.githubusercontent.com/u/12859776?u=644dc1666d0220bc0468eb0de3c56b919f635b16&v=4",
@@ -496,6 +484,18 @@ export default [
     "type": "User"
   },
   {
+    "name": "Shotaro Nakamura",
+    "login": "nakasyou",
+    "avatar": "https://avatars.githubusercontent.com/u/79000684?u=f644df3f29f0e8677a90967115774564f1d9d6ab&v=4",
+    "link": "https://nakasyou.how/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "rel": "sponsored",
+    "tierTitle": "Backer",
+    "tierLevel": 1,
+    "amount": 5,
+    "createdAt": "2026-09-28T15:56:34Z",
+    "type": "User"
+  },
+  {
     "name": "Alex",
     "login": "piscis",
     "avatar": "https://avatars.githubusercontent.com/u/326163?u=b245f368bd940cf51d08c0b6bf55f8257f359437&v=4",
@@ -565,6 +565,18 @@ export default [
     "tierLevel": 0,
     "amount": -1,
     "createdAt": "2025-05-02T01:10:38Z",
+    "type": "User"
+  },
+  {
+    "name": "Dexter Miguel",
+    "login": "divmgl",
+    "avatar": "https://avatars.githubusercontent.com/u/5452298?u=645993204be8696c085ecf0d228c3062efe2ed65&v=4",
+    "link": "https://github.com/divmgl?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "rel": "sponsored",
+    "tierTitle": "Past Sponsor",
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-05-02T03:29:29Z",
     "type": "User"
   },
   {
@@ -702,7 +714,7 @@ export default [
   {
     "name": "Yu-Sabo",
     "login": "YuSabo90002",
-    "avatar": "https://avatars.githubusercontent.com/u/13120582?v=4",
+    "avatar": "https://avatars.githubusercontent.com/u/13120582?u=992c15f5438a3120e01f0497d45efb9e85c4994d&v=4",
     "link": "https://github.com/YuSabo90002?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
@@ -949,6 +961,18 @@ export default [
     "tierLevel": 0,
     "amount": -1,
     "createdAt": "2026-06-28T20:17:54Z",
+    "type": "User"
+  },
+  {
+    "name": "Laduni",
+    "login": "laduni",
+    "avatar": "https://images.opencollective.com/laduni/avatar/460.png",
+    "link": "https://opencollective.com/laduni?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "rel": "sponsored",
+    "tierTitle": "Past Sponsor",
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2026-09-28T14:22:45.552Z",
     "type": "User"
   }
 ]

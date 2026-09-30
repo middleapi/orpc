@@ -284,7 +284,7 @@ describe('traceAsyncIterator', () => {
     expect(cleanup).toHaveBeenCalledWith({ kind: 'cancelled' })
 
     pull.resolve()
-    await expect(nextPromise).resolves.toEqual({ done: true, value: 'done' })
+    await expect(nextPromise).resolves.toEqual({ done: true, value: undefined })
   })
 })
 

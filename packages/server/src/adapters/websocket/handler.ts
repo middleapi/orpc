@@ -97,7 +97,7 @@ export class WebSocketHandler<T extends Context> {
   }
 
   /**
-   * Attaches message and close event listeners to a WebSocket.
+   * Attaches message, close, and error event listeners to a WebSocket.
    *
    * Prefer this over calling `.message()` and `.close()` manually.
    */
@@ -118,5 +118,9 @@ export class WebSocketHandler<T extends Context> {
       this.message(ws, data, ...rest)
     }))
     ws.addEventListener('close', () => this.close(ws))
+
+    // EventEmitter-based implementations like `ws` throw an unhandled `error` event,
+    // so a single malformed frame would crash the process. `close` always follows and handles cleanup.
+    ws.addEventListener('error', () => {})
   }
 }

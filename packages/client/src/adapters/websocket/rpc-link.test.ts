@@ -1,5 +1,8 @@
+import type { IncomingMessage } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { AbortError, promiseWithResolvers } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
+import { WebSocketServer, WebSocket as WsWebSocket } from 'ws'
 import { createORPCClient } from '../../client'
 import { RPCLink } from './rpc-link'
 
@@ -54,6 +57,10 @@ describe('rpcLink', () => {
 
         if (event === 'close') {
           closeListeners.add(callback)
+          return
+        }
+
+        if (event === 'error') {
           return
         }
 
@@ -588,5 +595,64 @@ describe('rpcLink', () => {
     await vi.advanceTimersByTimeAsync(10_000)
 
     expect(connect).toHaveBeenCalledTimes(3)
+  })
+
+  // `ws` is EventEmitter-based, so an `error` event without a listener throws and crashes the process
+  describe('with ws', () => {
+    const listen = (onConnection: (ws: WsWebSocket, request: IncomingMessage) => void) => {
+      const wss = new WebSocketServer({ port: 0 })
+      wss.on('connection', onConnection)
+      onTestFinished(() => {
+        wss.clients.forEach(ws => ws.terminate())
+        wss.close()
+      })
+      return `ws://localhost:${(wss.address() as AddressInfo).port}`
+    }
+
+    const getRefusedUrl = async () => {
+      const wss = new WebSocketServer({ port: 0 })
+      const url = `ws://localhost:${(wss.address() as AddressInfo).port}`
+      await new Promise(resolve => wss.close(resolve))
+      return url
+    }
+
+    it('rejects calls instead of crashing when the connection is refused', async () => {
+      const url = await getRefusedUrl()
+      const orpc = createORPCClient(new RPCLink({ connect: () => new WsWebSocket(url) })) as any
+
+      await expect(orpc.ping('input')).rejects.toThrow(new AbortError('WebSocket closed (code 1006: )'))
+    })
+
+    it('reconnects instead of crashing when the connection is refused', async () => {
+      const refusedUrl = await getRefusedUrl()
+      const url = listen((ws) => {
+        ws.on('message', async (data) => {
+          const request = decodeRequest(data.toString())
+          ws.send(await createResponseMessage({ id: request.message.id }))
+        })
+      })
+
+      const connect = vi.fn(({ attempt }) => new WsWebSocket(attempt === 1 ? refusedUrl : url))
+      const orpc = createORPCClient(new RPCLink({
+        connect,
+        reconnect: { enabled: true, delay: () => 0 },
+      })) as any
+
+      await expect(orpc.ping('input')).resolves.toEqual('pong')
+      expect(connect).toHaveBeenCalledTimes(2)
+    })
+
+    it('rejects pending calls instead of crashing when the server sends a malformed frame', async () => {
+      const url = listen((ws, request) => {
+        ws.on('message', () => {
+          // RSV1 set without a negotiated permessage-deflate extension
+          request.socket.write(new Uint8Array([0xC1, 0x00]))
+        })
+      })
+
+      const orpc = createORPCClient(new RPCLink({ connect: () => new WsWebSocket(url) })) as any
+
+      await expect(orpc.ping('input')).rejects.toThrow(new AbortError('WebSocket closed (code 1006: )'))
+    })
   })
 })

@@ -3,7 +3,7 @@ import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUr
 import type { ClientPeerSendMessage } from '@standard-server/peer'
 import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
 import type { ClientContext } from '../types'
-import { defer, isAsyncIteratorObject, loadBytes, once, safeEncodeURIComponent, splitInHalf, stringifyJSON, toArray, value } from '@orpc/shared'
+import { defer, isAsyncIteratorObject, loadBytes, once, promiseWithResolvers, safeEncodeURIComponent, splitInHalf, stringifyJSON, toArray, value } from '@orpc/shared'
 import { parseStandardUrl } from '@standard-server/core'
 import { ClientPeer, decodePeerMessage, isServerPeerSendMessage } from '@standard-server/peer'
 
@@ -284,123 +284,31 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
       const controller = new AbortController()
       const pendingMessages: ClientPeerSendMessage[] = []
       const subrequests = groupItems.map(([subOptions]) => this.mapSubrequest(subOptions, { url, headers }))
-      const sentRequestIds = new Set<string>()
       let batchResponse: StandardLazyResponse
-
-      /**
-       * The batch is sent once every subrequest has either sent its request or been aborted before it.
-       * The peer sends nothing for an already aborted subrequest, and only a cancel for one aborted
-       * while its body is encoding, so waiting for one request per subrequest could wait forever.
-       */
-      let unsentCount = subrequests.filter(subrequest => !subrequest.signal?.aborted).length
-      let activeCount = unsentCount
+      let activeCount = subrequests.length
+      let markRequestSent: (() => void) | undefined
 
       const peer = new ClientPeer(async (message) => {
-        const isUnsentCancel = message.kind === 'cancel' && !sentRequestIds.has(message.id)
-
-        if (!isUnsentCancel) {
-          pendingMessages.push(message)
-        }
+        pendingMessages.push(message)
 
         if (message.kind === 'request') {
-          sentRequestIds.add(message.id)
+          markRequestSent?.()
         }
 
         if (message.kind === 'cancel' && --activeCount === 0) {
           controller.abort()
         }
-
-        if ((message.kind === 'request' || isUnsentCancel) && --unsentCount === 0 && activeCount > 0) {
-          // DON'T await this to avoid blocking the peer's message sending process.
-          ;(async () => {
-            try {
-              const request: StandardRequest = {
-                url,
-                method,
-                headers: { ...headers, 'orpc-batch': mode },
-                signal: controller.signal,
-              }
-
-              if (method === 'GET') {
-                const [pathname, search, hash] = parseStandardUrl(url)
-                const dataParam = `data=${safeEncodeURIComponent(stringifyJSON(pendingMessages))}`
-                const newUrl: StandardUrl = search
-                  ? `${pathname}${search}&${dataParam}${hash ?? ''}`
-                  : `${pathname}?${dataParam}${hash ?? ''}`
-
-                const maxUrlLength = await value(this.maxUrlLength, subOptionsList)
-                if (newUrl.length > maxUrlLength) {
-                  const [first, second] = splitInHalf(groupItems)
-                  suppressErrorFromCurrentBatch = true
-
-                  await Promise.all([
-                    this.executeBatch(method, group, first),
-                    this.executeBatch(method, group, second),
-                    peer.close(),
-                  ])
-
-                  return
-                }
-
-                request.url = newUrl
-              }
-              else {
-                request.body = pendingMessages
-              }
-
-              batchResponse = await groupItems[0]![0]!.next({
-                ...subOptionsList[0],
-                context: value(group.context, subOptionsList) as T,
-                path: value(group.path, subOptionsList) ?? [],
-                request,
-                signal: controller.signal,
-              })
-
-              /**
-               * An error response is not a batch response, so forward it as-is to every subrequest
-               * instead of failing to parse it.
-               */
-              if (batchResponse.status >= 400) {
-                const resolveBody = once(() => batchResponse.resolveBody())
-                const errorResponse: StandardLazyResponse = { ...batchResponse, resolveBody }
-
-                groupItems.forEach(([subOptions, resolve]) => {
-                  resolve(this.mapSubresponse(errorResponse, batchResponse, subOptions))
-                })
-
-                suppressErrorFromCurrentBatch = true
-                await peer.close()
-
-                return
-              }
-
-              const body = await batchResponse.resolveBody()
-
-              if (Array.isArray(body) && body.every(v => isServerPeerSendMessage(v))) {
-                for (const message of body) {
-                  await peer.message(message)
-                }
-              }
-              else if (body instanceof Blob) {
-                await decodeLengthPrefixedBlob(body, peer)
-              }
-              else if (body instanceof ReadableStream) {
-                await decodeLengthPrefixedStream(body, peer)
-              }
-              else {
-                throw new TypeError('Invalid batch response format.')
-              }
-
-              await peer.close(new TypeError('Batch response is incomplete.'))
-            }
-            catch (error) {
-              await peer.close(error)
-            }
-          })()
-        }
       })
 
-      groupItems.forEach(([subOptions, resolve, reject], index) => {
+      /**
+       * Subrequests go to the peer one at a time, so a request message always belongs to the current one.
+       * A subrequest aborted before the peer starts sending its request message sends nothing, not even a
+       * cancel, so one that settles without a request message is no longer active.
+       */
+      for (const [index, [subOptions, resolve, reject]] of groupItems.entries()) {
+        const sent = promiseWithResolvers<boolean>()
+        markRequestSent = () => sent.resolve(true)
+
         peer
           .request(subrequests[index]!)
           .then(subResponse => resolve(this.mapSubresponse(subResponse, batchResponse, subOptions)))
@@ -409,7 +317,100 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
               reject(error)
             }
           })
-      })
+          .then(() => sent.resolve(false))
+
+        if (!await sent.promise) {
+          activeCount--
+        }
+      }
+
+      if (activeCount === 0) {
+        return
+      }
+
+      try {
+        const request: StandardRequest = {
+          url,
+          method,
+          headers: { ...headers, 'orpc-batch': mode },
+          signal: controller.signal,
+        }
+
+        if (method === 'GET') {
+          const [pathname, search, hash] = parseStandardUrl(url)
+          const dataParam = `data=${safeEncodeURIComponent(stringifyJSON(pendingMessages))}`
+          const newUrl: StandardUrl = search
+            ? `${pathname}${search}&${dataParam}${hash ?? ''}`
+            : `${pathname}?${dataParam}${hash ?? ''}`
+
+          const maxUrlLength = await value(this.maxUrlLength, subOptionsList)
+          if (newUrl.length > maxUrlLength) {
+            const [first, second] = splitInHalf(groupItems)
+            suppressErrorFromCurrentBatch = true
+
+            await Promise.all([
+              this.executeBatch(method, group, first),
+              this.executeBatch(method, group, second),
+              peer.close(),
+            ])
+
+            return
+          }
+
+          request.url = newUrl
+        }
+        else {
+          request.body = pendingMessages
+        }
+
+        batchResponse = await groupItems[0]![0]!.next({
+          ...subOptionsList[0],
+          context: value(group.context, subOptionsList) as T,
+          path: value(group.path, subOptionsList) ?? [],
+          request,
+          signal: controller.signal,
+        })
+
+        /**
+         * An error response is not a batch response, so forward it as-is to every subrequest
+         * instead of failing to parse it.
+         */
+        if (batchResponse.status >= 400) {
+          const resolveBody = once(() => batchResponse.resolveBody())
+          const errorResponse: StandardLazyResponse = { ...batchResponse, resolveBody }
+
+          groupItems.forEach(([subOptions, resolve]) => {
+            resolve(this.mapSubresponse(errorResponse, batchResponse, subOptions))
+          })
+
+          suppressErrorFromCurrentBatch = true
+          await peer.close()
+
+          return
+        }
+
+        const body = await batchResponse.resolveBody()
+
+        if (Array.isArray(body) && body.every(v => isServerPeerSendMessage(v))) {
+          for (const message of body) {
+            await peer.message(message)
+          }
+        }
+        else if (body instanceof Blob) {
+          await decodeLengthPrefixedBlob(body, peer)
+        }
+        else if (body instanceof ReadableStream) {
+          await decodeLengthPrefixedStream(body, peer)
+        }
+        else {
+          throw new TypeError('Invalid batch response format.')
+        }
+
+        await peer.close(new TypeError('Batch response is incomplete.'))
+      }
+      catch (error) {
+        await peer.close(error)
+      }
     }
     catch (error) {
       groupItems.forEach(([, , reject]) => reject(error))

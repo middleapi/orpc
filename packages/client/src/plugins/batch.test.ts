@@ -691,8 +691,32 @@ describe('batchLinkPlugin', () => {
       await expect(promise3).resolves.toBe('result-1')
       expect(transport.send).toHaveBeenCalledTimes(1)
 
-      // The cancel of the never-sent subrequest is not forwarded
+      // The never-sent subrequest adds no message, not even a cancel
       expect(extractBatchMessagesFromRequest(vi.mocked(transport.send).mock.calls[0]![0]).map(m => m.kind)).toEqual(['request', 'request'])
+    })
+
+    it('sends no batch request when every subrequest is aborted before the peer sends it', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+      const controller = new AbortController()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({
+          groups: [defaultGroup],
+          mode: 'buffered',
+          mapSubrequest: ({ request }) => {
+            queueMicrotask(() => controller.abort(new Error('TEST_ABORT')))
+            return request
+          },
+        })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {}, signal: controller.signal })).rejects.toThrow('TEST_ABORT'),
+        expect(link.call(['b'], {}, { context: {}, signal: controller.signal })).rejects.toThrow('TEST_ABORT'),
+      ])
+
+      expect(transport.send).not.toHaveBeenCalled()
     })
 
     it('aborts the batch request once every subrequest is aborted, including ones aborted before sending', async () => {

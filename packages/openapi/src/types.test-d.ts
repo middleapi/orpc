@@ -31,6 +31,10 @@ describe('JsonifiedValue', () => {
     expectTypeOf<JsonifiedValue<Map<string, number>>>().toEqualTypeOf<[string, number][]>()
     expectTypeOf<JsonifiedValue<Set<number>>>().toEqualTypeOf<number[]>()
     expectTypeOf<JsonifiedValue<Array<number>>>().toEqualTypeOf<number[]>()
+    expectTypeOf<JsonifiedValue<ReadonlyMap<string, Date>>>().toEqualTypeOf<[string, string][]>()
+    expectTypeOf<JsonifiedValue<ReadonlySet<Date>>>().toEqualTypeOf<string[]>()
+    expectTypeOf<JsonifiedValue<readonly Date[]>>().toEqualTypeOf<string[]>()
+    expectTypeOf<JsonifiedValue<readonly [Date, undefined]>>().toEqualTypeOf<[string, null]>()
     expectTypeOf<JsonifiedValue<{ a: number, b: Date }>>().toEqualTypeOf<{ a: number, b: string }>()
     expectTypeOf<JsonifiedValue<AsyncIteratorClass<Date, Date>>>().toEqualTypeOf<AsyncIteratorClass<string, string>>()
     expectTypeOf<JsonifiedValue<AsyncGenerator<Date, Date>>>().toEqualTypeOf<AsyncGenerator<string, string>>()
@@ -46,6 +50,18 @@ describe('JsonifiedValue', () => {
       { a: number, b: string, c: [string, 1, 2, 3, ...string[]], g: unknown }[]
     >()
   })
+
+  it('interface', () => {
+    interface User { id: number, createdAt: Date, tags?: Set<string> }
+    interface Callable { (): void, a: number }
+
+    expectTypeOf<JsonifiedValue<User>>().toEqualTypeOf<{ id: number, createdAt: string, tags?: string[] }>()
+    expectTypeOf<JsonifiedValue<{ user: User, users: User[] }>>().toEqualTypeOf<{
+      user: { id: number, createdAt: string, tags?: string[] }
+      users: { id: number, createdAt: string, tags?: string[] }[]
+    }>()
+    expectTypeOf<JsonifiedValue<Callable>>().toEqualTypeOf<unknown>()
+  })
 })
 
 describe('JsonifiedClient', () => {
@@ -54,6 +70,16 @@ describe('JsonifiedClient', () => {
       Client<{ cache?: boolean }, { now: Date }, { b: Set<Date> }, Error | ORPCError<string, { a: Date }>>
     >>().toEqualTypeOf<
       Client<{ cache?: boolean }, { now: Date }, { b: string[] }, Error | ORPCError<string, { a: string }>>
+    >()
+  })
+
+  it('interface output', () => {
+    interface Output { now: Date }
+
+    expectTypeOf<JsonifiedClient<
+      Client<{ cache?: boolean }, { now: Date }, Output, Error>
+    >>().toEqualTypeOf<
+      Client<{ cache?: boolean }, { now: Date }, { now: string }, Error>
     >()
   })
 

@@ -1,5 +1,5 @@
 import type { ThrowableError } from '@orpc/shared'
-import { AsyncIteratorClass } from '@orpc/shared'
+import { AsyncIteratorClass, throwIfAborted } from '@orpc/shared'
 
 export interface PublisherOptions {
   /**
@@ -113,7 +113,7 @@ export abstract class Publisher<T extends Record<string, object>> {
     const signal = listenerOrOptions?.signal
     const maxBufferedEvents = listenerOrOptions?.maxBufferedEvents ?? this.maxBufferedEvents
 
-    signal?.throwIfAborted()
+    throwIfAborted(signal)
 
     const resuming = listenerOrOptions?.lastEventId !== undefined
     const bufferedEvents = new Queue<T[K]>()

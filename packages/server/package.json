@@ -142,18 +142,19 @@
     "@orpc/client": "workspace:*",
     "@orpc/contract": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/aws-lambda": "~0.9.2",
-    "@standard-server/core": "~0.9.2",
-    "@standard-server/fastify": "~0.9.2",
-    "@standard-server/fetch": "~0.9.2",
-    "@standard-server/node": "~0.9.2",
-    "@standard-server/peer": "~0.9.2",
+    "@standard-server/aws-lambda": "~0.10.0",
+    "@standard-server/core": "~0.10.0",
+    "@standard-server/fastify": "~0.10.0",
+    "@standard-server/fetch": "~0.10.0",
+    "@standard-server/node": "~0.10.0",
+    "@standard-server/peer": "~0.10.0",
     "cookie": "^2.0.1"
   },
   "devDependencies": {
     "crossws": "^0.4.6",
     "fastify": "^5.12.1",
     "supertest": "^7.2.2",
+    "ws": "^8.21.3",
     "zod": "^4.5.4"
   }
 }
