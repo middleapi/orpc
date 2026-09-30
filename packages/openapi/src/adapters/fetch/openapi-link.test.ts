@@ -176,6 +176,62 @@ describe('openapiLink', () => {
     })
   })
 
+  it('rejects dot-segment path params instead of letting URL parsing retarget the request', async () => {
+    const removeOrg = vi.fn(() => 'removeOrg')
+    const removeMember = vi.fn(() => 'removeMember')
+
+    const router = {
+      removeOrg: os
+        .meta(openapi({ path: '/orgs/{orgId}/remove' }))
+        .handler(removeOrg),
+      removeMember: os
+        .meta(openapi({ path: '/orgs/{orgId}/members/{memberId}/remove' }))
+        .handler(removeMember),
+      file: os
+        .meta(openapi({ path: '/orgs/{orgId}/files/{+path}' }))
+        .handler(({ input }) => input),
+    }
+
+    const handler = new OpenAPIHandler(router)
+
+    const fetch = vi.fn(async (url: string, init: RequestInit) => {
+      const request = new Request(url, init)
+      const { matched, response } = await handler.handle(request, {
+        prefix: '/api',
+      })
+
+      if (!matched || !response) {
+        throw new Error('No procedure match')
+      }
+
+      return response
+    })
+
+    const client = createORPCClient(new OpenAPILink(router, {
+      fetch,
+      origin: 'http://localhost:3000',
+      url: '/api',
+    })) as any
+
+    await expect(client.removeMember({ orgId: 'acme', memberId: '..' })).rejects.toThrow(
+      'Path param "memberId" cannot contain "." or ".." segments in call to procedure (removeMember).',
+    )
+    await expect(client.removeMember({ orgId: 'acme', memberId: '.' })).rejects.toThrow(
+      'Path param "memberId" cannot contain "." or ".." segments in call to procedure (removeMember).',
+    )
+    await expect(client.file({ orgId: 'acme', path: 'a/../../../remove' })).rejects.toThrow(
+      'Path param "path" cannot contain "." or ".." segments in call to procedure (file).',
+    )
+
+    expect(fetch).not.toHaveBeenCalled()
+    expect(removeOrg).not.toHaveBeenCalled()
+    expect(removeMember).not.toHaveBeenCalled()
+
+    await expect(client.removeMember({ orgId: 'acme', memberId: '...' })).resolves.toBe('removeMember')
+    await expect(client.file({ orgId: 'acme', path: 'a/.../b' })).resolves.toEqual({ orgId: 'acme', path: 'a/.../b' })
+    expect(removeOrg).not.toHaveBeenCalled()
+  })
+
   it('supports standard link plugins', async () => {
     const plugin: StandardLinkPlugin<any> = {
       name: 'test',
