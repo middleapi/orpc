@@ -1,8 +1,13 @@
 import type { StandardLazyRequest } from '@standard-server/core'
-import { ORPCError, os } from '@orpc/server'
+import { ORPCError, os, ValidationError } from '@orpc/server'
+import { RPCHandler } from '@orpc/server/fetch'
 import { StandardHandler } from '@orpc/server/standard'
 import { AbortError } from '@orpc/shared'
+import { type } from 'arktype'
+import pino from 'pino'
+import * as v from 'valibot'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import * as z from 'zod'
 import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
 import { PinoHandlerPlugin } from './handler-plugin'
 
@@ -166,7 +171,7 @@ describe('pinoHandlerPlugin', () => {
     const result1 = await handler1.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
 
     expect(result1.matched).toBe(true)
-    expect(globalSpies.warn).toHaveBeenCalledWith(businessError)
+    expect(globalSpies.warn).toHaveBeenCalledWith(expect.objectContaining({ name: 'ORPCError', code: 'UNAUTHORIZED', defined: false }))
     expect(globalSpies.error).not.toHaveBeenCalled()
 
     vi.clearAllMocks()
@@ -234,7 +239,7 @@ describe('pinoHandlerPlugin', () => {
     await handler1.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
 
     expect(procedureErrorLevel).toHaveBeenCalledWith(businessError, 'warn')
-    expect(globalSpies.debug).toHaveBeenCalledWith(businessError)
+    expect(globalSpies.debug).toHaveBeenCalledWith(expect.objectContaining({ code: 'UNAUTHORIZED' }))
     expect(globalSpies.warn).not.toHaveBeenCalled()
 
     vi.clearAllMocks()
@@ -250,7 +255,7 @@ describe('pinoHandlerPlugin', () => {
 
     expect(procedureErrorLevel).toHaveBeenCalledWith(otherError, 'warn')
     expect(globalSpies.debug).not.toHaveBeenCalled()
-    expect(globalSpies.warn).toHaveBeenCalledWith(otherError)
+    expect(globalSpies.warn).toHaveBeenCalledWith(expect.objectContaining({ code: 'CONFLICT' }))
   })
 
   it('logs internal errors', async () => {
@@ -445,6 +450,162 @@ describe('pinoHandlerPlugin', () => {
 
       // @ts-expect-error accessing private property for test
       expect(plugin.logger).toBeDefined()
+    })
+  })
+
+  describe('validation errors', () => {
+    const SECRET = 'hunter2-SUPER-SECRET'
+
+    function createPino(options: pino.LoggerOptions = {}) {
+      const lines: string[] = []
+      const logger = pino(options, {
+        write: (chunk: string) => {
+          lines.push(chunk)
+        },
+      })
+
+      return { lines, logger }
+    }
+
+    async function call(router: any, logger: pino.Logger, path: string, json: unknown, options: { logLifecycle?: boolean } = {}) {
+      const handler = new RPCHandler(router, {
+        plugins: [new PinoHandlerPlugin({ logger, ...options })],
+      })
+
+      const { response } = await handler.handle(new Request(`http://localhost/rpc/${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ json }),
+      }), { prefix: '/rpc' })
+
+      return response
+    }
+
+    it('does not log raw input when valibot input validation fails', async () => {
+      const { lines, logger } = createPino()
+      const router = {
+        login: os
+          .input(v.object({ email: v.pipe(v.string(), v.email()), password: v.string() }))
+          .handler(() => 'ok'),
+      }
+
+      const response = await call(router, logger, 'login', { email: 'nope', password: SECRET }, { logLifecycle: true })
+
+      expect(response?.status).toBe(400)
+      expect(lines.join('')).not.toContain(SECRET)
+
+      const errorLog = lines.map(line => JSON.parse(line)).find(log => log.err)
+      expect(errorLog.level).toBe(40)
+      expect(errorLog.msg).toBe('Input validation failed')
+      expect(errorLog.err).toEqual({
+        type: 'ORPCError',
+        name: 'ORPCError',
+        message: 'Input validation failed',
+        stack: expect.stringContaining('ORPCError: Input validation failed'),
+        code: 'BAD_REQUEST',
+        defined: false,
+        issues: [{ message: expect.any(String), path: ['email'] }],
+      })
+
+      const handledLog = lines.map(line => JSON.parse(line)).find(log => log.msg === 'request handled')
+      expect(handledLog.res.status).toBe(400)
+    })
+
+    it('does not log the parent object that arktype attaches to issues', async () => {
+      const { lines, logger } = createPino()
+      const router = {
+        login: os
+          .input(type({ 'email': 'string.email', 'password': 'string', '+': 'reject' }))
+          .handler(() => 'ok'),
+      }
+
+      const response = await call(router, logger, 'login', { password: SECRET, extra: SECRET })
+
+      expect(response?.status).toBe(400)
+      expect(lines.join('')).not.toContain(SECRET)
+
+      const errorLog = lines.map(line => JSON.parse(line)).find(log => log.err)
+      expect(errorLog.err.code).toBe('BAD_REQUEST')
+      expect(errorLog.err.issues).toEqual(expect.arrayContaining([
+        { message: expect.any(String), path: ['email'] },
+        { message: expect.any(String), path: ['extra'] },
+      ]))
+    })
+
+    it('does not log raw output when output validation fails, even with a cause-aware serializer', async () => {
+      const { lines, logger } = createPino({ serializers: { err: pino.stdSerializers.errWithCause } })
+      const router = {
+        me: os
+          .output(z.object({ id: z.string() }))
+          .handler(() => ({ id: 1, passwordHash: SECRET }) as any),
+      }
+
+      const response = await call(router, logger, 'me', undefined)
+
+      expect(response?.status).toBe(500)
+      expect(lines.join('')).not.toContain(SECRET)
+
+      const errorLog = lines.map(line => JSON.parse(line)).find(log => log.err)
+      expect(errorLog.level).toBe(50)
+      expect(errorLog.err).toMatchObject({
+        type: 'ORPCError',
+        message: 'Output validation failed',
+        code: 'INTERNAL_SERVER_ERROR',
+        defined: false,
+        cause: {
+          type: 'ValidationError',
+          message: 'Output validation failed',
+          issues: [{ message: expect.any(String), path: ['id'] }],
+        },
+      })
+      expect(errorLog.err.cause).not.toHaveProperty('invalidData')
+    })
+
+    it('does not log raw input when a custom validation error wraps the original one', async () => {
+      const { lines, logger } = createPino({ serializers: { err: pino.stdSerializers.errWithCause } })
+      const router = {
+        changePassword: os
+          .input(z.object({ currentPassword: z.string(), newPassword: z.string().min(12) }))
+          .handler(() => 'ok'),
+      }
+
+      const handler = new RPCHandler(router, {
+        plugins: [new PinoHandlerPlugin({ logger })],
+        clientInterceptors: [
+          async ({ next }) => {
+            try {
+              return await next()
+            }
+            catch (error) {
+              if (error instanceof ORPCError && error.cause instanceof ValidationError) {
+                throw new ORPCError('INPUT_VALIDATION_FAILED', {
+                  data: { fields: error.cause.issues.map(issue => ({ ...issue })) },
+                  cause: error,
+                })
+              }
+
+              throw error
+            }
+          },
+        ],
+      })
+
+      await handler.handle(new Request('http://localhost/rpc/changePassword', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ json: { currentPassword: SECRET, newPassword: 'short' } }),
+      }), { prefix: '/rpc' })
+
+      expect(lines.join('')).not.toContain(SECRET)
+
+      const errorLog = lines.map(line => JSON.parse(line)).find(log => log.err)
+      expect(errorLog.err).toMatchObject({
+        type: 'ORPCError',
+        code: 'INPUT_VALIDATION_FAILED',
+        issues: [{ message: expect.any(String), path: ['newPassword'] }],
+      })
+      expect(errorLog.err).not.toHaveProperty('data')
+      expect(errorLog.err).not.toHaveProperty('cause')
     })
   })
 })

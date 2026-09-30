@@ -69,6 +69,31 @@ const plugin = new PinoHandlerPlugin({
 })
 ```
 
+## Logged Error Details
+
+An `ORPCError` thrown from a procedure is a rejection delivered to the client, so only its `code`, `message`, `defined`, and the `message` and `path` of each validation issue are logged. Its `data` and `cause` are omitted because they can contain the raw input, such as a password. For example, a failed input validation is logged as:
+
+```json
+{
+  "err": {
+    "type": "ORPCError",
+    "name": "ORPCError",
+    "message": "Input validation failed",
+    "stack": "ORPCError: Input validation failed\n    at ...",
+    "code": "BAD_REQUEST",
+    "defined": false,
+    "issues": [{ "message": "Too small: expected string to have >=12 characters", "path": ["newPassword"] }]
+  },
+  "msg": "Input validation failed"
+}
+```
+
+An `ORPCError` with the `INTERNAL_SERVER_ERROR` code, or any other error, signals a server-side failure, so it is logged in full. The exception is a validation error in the cause of an `INTERNAL_SERVER_ERROR`, such as the one oRPC throws when output validation fails: it is reduced to its issues, so the invalid output is never logged.
+
+:::warning
+Issue messages come from your schema library, and some libraries, such as Valibot and ArkType, include the rejected value in them. Set a custom message on fields that may hold sensitive values.
+:::
+
 ## Using the Logger in Your Code
 
 You can access the logger from the context object using the `getLogger` function:
