@@ -137,11 +137,12 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   /** `rootDir` with a trailing separator, precomputed for the lexical containment check. */
   private readonly rootDirPrefix: string
   /**
-   * `rootDir` with its own symbolic links resolved, paired with its trailing separator form.
-   * Resolved once, so a symlinked `rootDir` keeps working and platform links like the macOS
-   * `/var` to `/private/var` do not reject every file.
+   * `rootDir` with its own symbolic links resolved, paired with its trailing separator form,
+   * so a symlinked `rootDir` keeps working and platform links like the macOS `/var` to
+   * `/private/var` do not reject every file. Resolved on first use and kept only once it
+   * succeeds, so a `rootDir` created after startup is picked up.
    */
-  private readonly rootDirRealPaths: Promise<[rootDirReal: string, rootDirRealPrefix: string]>
+  private rootDirRealPaths: Promise<RootDirRealPaths | undefined> | undefined
   private readonly path: Exclude<StaticFileHandlerPluginOptions['path'], undefined>
   private readonly indexFile: Exclude<StaticFileHandlerPluginOptions['indexFile'], undefined>
   private readonly fallbackFile: StaticFileHandlerPluginOptions['fallbackFile']
@@ -154,9 +155,6 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   constructor(options: StaticFileHandlerPluginOptions) {
     this.rootDir = path.resolve(options.rootDir)
     this.rootDirPrefix = this.rootDir.endsWith(path.sep) ? this.rootDir : this.rootDir + path.sep
-    this.rootDirRealPaths = realpath(this.rootDir)
-      .catch(() => this.rootDir)
-      .then(rootDirReal => [rootDirReal, rootDirReal.endsWith(path.sep) ? rootDirReal : rootDirReal + path.sep])
     this.path = stripTrailingSlash(options.path ?? '/')
     this.indexFile = options.indexFile ?? 'index.html'
     this.fallbackFile = options.fallbackFile
@@ -222,11 +220,49 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       return filePath
     }
 
-    const [rootDirReal, rootDirRealPrefix] = await this.rootDirRealPaths
-    // An empty string is contained by no root, so an unresolvable path is simply not contained
-    const realPath = await realpath(filePath).catch(() => '')
+    const rootDirRealPaths = this.resolveRootDirRealPaths()
+    const realPath = await realpath(filePath).catch(() => undefined)
 
-    return realPath === rootDirReal || realPath.startsWith(rootDirRealPrefix) ? realPath : undefined
+    // An unresolvable path does not exist, whichever directory the root resolves to
+    if (realPath === undefined) {
+      return undefined
+    }
+
+    if (isContainedIn(realPath, await rootDirRealPaths)) {
+      return realPath
+    }
+
+    /**
+     * The cached root may be stale, like a release symlink re-pointed since it was resolved, so
+     * the root is resolved again. Containment is still checked against the root's real path.
+     */
+    return isContainedIn(realPath, await this.resolveRootDirRealPaths(rootDirRealPaths)) ? realPath : undefined
+  }
+
+  /**
+   * Resolves `rootDir` to its real path, reusing the cached resolution unless it is `stale`,
+   * so concurrent requests that find the same cache stale share one new resolution.
+   */
+  private resolveRootDirRealPaths(stale?: Promise<RootDirRealPaths | undefined>): Promise<RootDirRealPaths | undefined> {
+    if (this.rootDirRealPaths !== undefined && this.rootDirRealPaths !== stale) {
+      return this.rootDirRealPaths
+    }
+
+    const resolving: Promise<RootDirRealPaths | undefined> = realpath(this.rootDir).then(
+      rootDirReal => [rootDirReal, rootDirReal.endsWith(path.sep) ? rootDirReal : rootDirReal + path.sep],
+      () => {
+        // A root that cannot be resolved contains nothing, and is retried by the next request
+        if (this.rootDirRealPaths === resolving) {
+          this.rootDirRealPaths = undefined
+        }
+
+        return undefined
+      },
+    )
+
+    this.rootDirRealPaths = resolving
+
+    return resolving
   }
 
   private resolveContentType(filePath: string): string {
@@ -474,6 +510,12 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
 
     return { status, headers, body }
   }
+}
+
+type RootDirRealPaths = [rootDirReal: string, rootDirRealPrefix: string]
+
+function isContainedIn(realPath: string, rootDirRealPaths: RootDirRealPaths | undefined): boolean {
+  return rootDirRealPaths !== undefined && (realPath === rootDirRealPaths[0] || realPath.startsWith(rootDirRealPaths[1]))
 }
 
 function stripTrailingSlash(path: `/${string}`): `/${string}` {
