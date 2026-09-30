@@ -18,6 +18,27 @@ import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standar
  */
 export const BATCH_CONTENT_TYPE = 'application/vnd.orpc.batch'
 
+/**
+ * Lowercases header names, merging the values of names that only differ in casing.
+ */
+function toLowerCaseStandardHeaders(headers: StandardHeaders): StandardHeaders {
+  const lowercased = new Map<string, string | string[] | undefined>()
+
+  for (const [name, value] of Object.entries(headers)) {
+    const key = name.toLowerCase()
+    const existing = lowercased.get(key)
+
+    lowercased.set(key, existing === undefined || value === undefined
+      ? existing ?? value
+      : [...toArray(existing), ...toArray(value)])
+  }
+
+  /**
+   * `Object.fromEntries` defines own properties, so a `__proto__` header stays a plain header.
+   */
+  return Object.fromEntries(lowercased)
+}
+
 export interface BatchHandlerPluginOptions<T extends Context> {
   /**
    * The max size of the batch allowed.
@@ -28,6 +49,7 @@ export interface BatchHandlerPluginOptions<T extends Context> {
 
   /**
    * Map each subrequest in the batch before it is processed.
+   * Subrequest header names are already lowercased, like the batch request ones.
    *
    * @default merges the batch request headers into the subrequest, giving them priority over
    * the subrequest headers, and removes the `orpc-batch` header to prevent nested batching
@@ -109,6 +131,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
          * The batch request headers win over the subrequest ones. They are the only ones the
          * transport actually saw, so headers the browser injects on its own, such as `cookie`
          * or `origin`, cannot be overridden by a subrequest, which is just request payload.
+         * Both sides use lowercase header names, so this also holds for `Cookie` or `Origin`.
          */
         ...batchRequest.headers,
         'orpc-batch': undefined, // useful in case batch plugin is used multiple times
@@ -200,6 +223,17 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
           response: { status: 413, headers: {}, body: 'Batch request size exceeds the maximum allowed size' },
         }
       }
+
+      /**
+       * Subrequest headers come from the batch payload with arbitrary casing, whereas adapters
+       * always produce lowercase header names. Lowercase them so a subrequest cannot slip past
+       * the batch request headers with a differently cased duplicate (e.g. `X-Forwarded-For`
+       * alongside `x-forwarded-for`), and so body decoding and plugins find them where expected.
+       */
+      messages = messages.map(message => message.kind === 'request' && message.json.headers !== undefined
+        ? { ...message, json: { ...message.json, headers: toLowerCaseStandardHeaders(message.json.headers) } }
+        : message,
+      )
 
       const handleIndividualRequest = async (request: StandardLazyRequest): Promise<StandardResponse> => {
         try {

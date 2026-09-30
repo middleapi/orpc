@@ -1,6 +1,9 @@
+import type { StandardLazyRequest } from '@standard-server/core'
 import type { AnyRouter } from '../router'
+import type { BatchHandlerPluginOptions } from './batch'
 import { ORPCError } from '@orpc/client'
 import { promiseWithResolvers } from '@orpc/shared'
+import { toFetchHeaders } from '@standard-server/fetch'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { os } from '../builder'
 import { BatchHandlerPlugin } from './batch'
@@ -489,11 +492,11 @@ describe('batchHandlerPlugin', () => {
   })
 
   describe('sub-request headers', () => {
-    function createHeaderCapturingHandler() {
+    function createHeaderCapturingHandler(options?: BatchHandlerPluginOptions<Record<never, never>>) {
       const seenHeaders: Record<string, string | string[] | undefined>[] = []
 
       const handler = new RPCHandler(router, {
-        plugins: [new BatchHandlerPlugin()],
+        plugins: [new BatchHandlerPlugin(options)],
         interceptors: [({ next, request }) => {
           seenHeaders.push(request.headers)
           return next()
@@ -538,6 +541,56 @@ describe('batchHandlerPlugin', () => {
       ))
 
       expect(seenHeaders[0]!.authorization).toEqual('Bearer real')
+    })
+
+    it('prevents a sub-request from spoofing a header the batch request already carries with different casing', async () => {
+      const { handler, seenHeaders } = createHeaderCapturingHandler()
+
+      await handler.handle(createBatchRequestWithHeaders(
+        { 'x-forwarded-for': '10.0.0.9', 'authorization': 'Bearer real' },
+        { 'X-Forwarded-For': '127.0.0.1', 'AUTHORIZATION': 'Bearer spoofed' },
+      ))
+
+      expect(seenHeaders[0]).not.toHaveProperty('X-Forwarded-For')
+      expect(seenHeaders[0]).not.toHaveProperty('AUTHORIZATION')
+      expect(seenHeaders[0]).toMatchObject({
+        'x-forwarded-for': '10.0.0.9',
+        'authorization': 'Bearer real',
+      })
+
+      const fetchHeaders = toFetchHeaders(seenHeaders[0]!)
+      expect(fetchHeaders.get('x-forwarded-for')).toEqual('10.0.0.9')
+      expect(fetchHeaders.get('authorization')).toEqual('Bearer real')
+    })
+
+    it('lowercases sub-request header names and merges values that only differ in casing', async () => {
+      const { handler, seenHeaders } = createHeaderCapturingHandler()
+
+      await handler.handle(createBatchRequestWithHeaders(
+        {},
+        { 'X-Custom': 'first', 'x-custom': 'second', 'X-Single': 'single' },
+      ))
+
+      expect(seenHeaders[0]).not.toHaveProperty('X-Custom')
+      expect(seenHeaders[0]).not.toHaveProperty('X-Single')
+      expect(seenHeaders[0]).toMatchObject({
+        'x-custom': ['first', 'second'],
+        'x-single': 'single',
+      })
+    })
+
+    it('passes lowercased sub-request header names to a custom mapSubrequest', async () => {
+      const mapSubrequest = vi.fn((subrequest: StandardLazyRequest) => subrequest)
+      const { handler, seenHeaders } = createHeaderCapturingHandler({ mapSubrequest })
+
+      await handler.handle(createBatchRequestWithHeaders(
+        {},
+        { 'X-Forwarded-For': '127.0.0.1' },
+      ))
+
+      expect(mapSubrequest).toHaveBeenCalledTimes(1)
+      expect(mapSubrequest.mock.calls[0]![0].headers).toEqual({ 'x-forwarded-for': '127.0.0.1' })
+      expect(seenHeaders[0]).toEqual({ 'x-forwarded-for': '127.0.0.1' })
     })
   })
 
