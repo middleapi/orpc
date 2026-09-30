@@ -879,6 +879,21 @@ describe('openAPIHandlerCodec', () => {
         expect(Object.keys(response.headers)).not.toContain('x-undefined')
       })
 
+      it('lowercases header names and merges names that differ only in casing', () => {
+        const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
+        const codec = new OpenAPIHandlerCodec(procedure)
+
+        const response = codec.encodeOutput({
+          headers: { 'Content-Type': 'text/plain', 'X-Multi': 'a', 'x-multi': 'b' },
+          body: 'hello',
+        }, procedure, []) as any
+
+        expect(response.headers).toEqual({
+          'content-type': 'text/plain',
+          'x-multi': ['a', 'b'],
+        })
+      })
+
       it('prevents prototype injection via header keys', () => {
         const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)

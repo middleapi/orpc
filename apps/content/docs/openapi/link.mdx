@@ -111,7 +111,7 @@ Use `origin`, `url`, and `headers` to control request destination and headers.
 
 - `origin`: Server protocol and domain. Omit in the browser to use the current origin.
 - `url`: Usually a path prefix like `/api`. May include query params that are added to every request.
-- `headers`: Headers sent with every request, such as auth or trace IDs. Keys should be lowercase.
+- `headers`: Headers sent with every request, such as auth or trace IDs. Names are case-insensitive and normalized to lowercase.
 
 ```ts
 const link = new OpenAPILink(contract, {

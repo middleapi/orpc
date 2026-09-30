@@ -9,7 +9,6 @@ import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import { unlazy } from '@orpc/server'
 import { isTypescriptObject, mergeHttpPath, pathToHttpPath, safeEncodeURIComponent, stringifyJSON, value } from '@orpc/shared'
 import { mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
-import { toStandardHeaders } from '@standard-server/fetch'
 import {
   DEFAULT_OPENAPI_INPUT_STRUCTURE,
   DEFAULT_OPENAPI_METHOD,
@@ -18,7 +17,7 @@ import {
 import { getOpenAPIMeta } from '../../meta'
 import { OpenAPISerializer } from '../../openapi-serializer'
 import { getDynamicPathParams, isBodylessMethod } from '../../utils'
-import { serializeHeaders } from './utils'
+import { serializeHeaders, toResolvedStandardHeaders } from './utils'
 
 export interface OpenAPILinkCodecOptions<T extends ClientContext> {
   /**
@@ -443,19 +442,6 @@ function combineSearch(baseSearch: `?${string}` | undefined, additionalSearch: s
   }
 
   return `${baseSearch}&${additionalSearch}` as `?${string}`
-}
-
-function toResolvedStandardHeaders(headers: Headers | StandardHeaders): StandardHeaders {
-  /**
-   * Headers class might not be available in some environments,
-   * so we check for the existence of `forEach` and `get`
-   * methods to determine if it's a Headers instance.
-   */
-  if (typeof headers.forEach === 'function') {
-    return toStandardHeaders(headers as Headers)
-  }
-
-  return headers as StandardHeaders
 }
 
 function isValidDetailedInput(

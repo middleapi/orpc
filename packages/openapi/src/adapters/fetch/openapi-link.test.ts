@@ -17,6 +17,9 @@ describe('openapiLink', () => {
     query: os
       .meta(openapi({ method: 'QUERY', path: '/query' }))
       .handler(({ input }) => input),
+    detailed: os
+      .meta(openapi({ method: 'PATCH', path: '/detailed', inputStructure: 'detailed' }))
+      .handler(({ input }) => input),
   }
 
   const handler = new OpenAPIHandler(router)
@@ -173,6 +176,65 @@ describe('openapiLink', () => {
         arr: ['3', date.toISOString()],
       },
       blob: expect.any(File),
+    })
+  })
+
+  describe('header names', () => {
+    const requests: Request[] = []
+
+    const client = createORPCClient(new OpenAPILink(router, {
+      origin: 'http://localhost:3000',
+      url: '/api',
+      fetch: async (url, init) => {
+        const request = new Request(url, init)
+        requests.push(request)
+
+        const { matched, response } = await handler.handle(request, {
+          prefix: '/api',
+        })
+
+        if (!matched || !response) {
+          throw new Error('No procedure match')
+        }
+
+        return response
+      },
+    })) as any
+
+    beforeEach(() => {
+      requests.length = 0
+    })
+
+    it('lets the JSON body decide content-type when detailed headers use a different casing', async () => {
+      const output = await client.detailed({
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: { data: { type: 'planets' } },
+      })
+
+      expect(requests[0]!.headers.get('content-type')).toBe('application/json')
+      expect(output.headers['content-type']).toBe('application/json')
+      expect(output.body).toEqual({ data: { type: 'planets' } })
+    })
+
+    it('lets fetch set the multipart boundary when detailed headers use a different casing', async () => {
+      const output = await client.detailed({
+        headers: { 'Content-Type': 'multipart/form-data' },
+        body: { file: new File(['hello'], 'hello.txt', { type: 'text/plain' }) },
+      })
+
+      expect(requests[0]!.headers.get('content-type')).toMatch(/^multipart\/form-data; boundary=/)
+      expect(output.body).toEqual({ file: expect.any(File) })
+      await expect(output.body.file.text()).resolves.toBe('hello')
+    })
+
+    it('sends headers from a Headers instance in detailed input', async () => {
+      const output = await client.detailed({
+        headers: new Headers({ 'X-Token': 'abc' }),
+        body: { a: 1 },
+      })
+
+      expect(requests[0]!.headers.get('x-token')).toBe('abc')
+      expect(output.headers['x-token']).toBe('abc')
     })
   })
 

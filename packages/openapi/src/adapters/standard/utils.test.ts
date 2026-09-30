@@ -69,6 +69,35 @@ describe('serializeHeaders', () => {
     expect(Object.keys(serialized)).toEqual(['x-array'])
   })
 
+  it('lowercases header names and merges names that differ only in casing', () => {
+    const serialized = serializeHeaders({
+      'Content-Type': 'multipart/form-data',
+      'X-Multi': 'a',
+      'x-multi': ['b', 'c'],
+      'X-MULTI': 1,
+      'X-Null': 'keep',
+      'x-null': null,
+    }, serializer)
+
+    expect(serialized).toEqual({
+      'content-type': 'multipart/form-data',
+      'x-multi': ['a', 'b', 'c', '1'],
+      'x-null': 'keep',
+    })
+    expect(Object.keys(serialized)).toEqual(['content-type', 'x-multi', 'x-null'])
+  })
+
+  it('accepts Headers instances', () => {
+    const headers = new Headers({ 'X-Token': 'abc' })
+    headers.append('Set-Cookie', 'a=1')
+    headers.append('Set-Cookie', 'b=2')
+
+    expect(serializeHeaders(headers, serializer)).toEqual({
+      'x-token': 'abc',
+      'set-cookie': ['a=1', 'b=2'],
+    })
+  })
+
   it('prevents prototype injection via header keys', () => {
     const serialized = serializeHeaders(JSON.parse(
       '{"__proto__": { "polluted": "yes" }, "constructor": "c", "toString": "t"}',
@@ -79,6 +108,6 @@ describe('serializeHeaders', () => {
     // dangerous keys become plain own properties, not prototype-chain mutations
     expect(Object.getOwnPropertyDescriptor(serialized, '__proto__')?.value).toBe('polluted,yes')
     expect(Object.getOwnPropertyDescriptor(serialized, 'constructor')?.value).toBe('c')
-    expect(Object.getOwnPropertyDescriptor(serialized, 'toString')?.value).toBe('t')
+    expect(Object.getOwnPropertyDescriptor(serialized, 'tostring')?.value).toBe('t')
   })
 })

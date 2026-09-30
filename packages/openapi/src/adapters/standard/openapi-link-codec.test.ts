@@ -212,6 +212,44 @@ describe('openAPILinkCodec', () => {
         expect(Object.keys(request.headers)).not.toContain('x-undefined')
       })
 
+      it('lowercases detailed and base header names so they merge with each other', async () => {
+        const codec = new OpenAPILinkCodec({
+          ping: oc.meta(openapi({ method: 'PATCH', inputStructure: 'detailed' })),
+        }, {
+          url: '/api',
+          headers: { 'X-Multi': 'base', 'Authorization': 'Bearer token' },
+          serializer,
+        })
+
+        const request = await codec.encodeInput({
+          headers: { 'Content-Type': 'application/vnd.api+json', 'x-multi': 'input' },
+          body: { data: { type: 'planets' } },
+        }, ['ping'], { context: {} })
+
+        expect(request.headers).toEqual({
+          'authorization': 'Bearer token',
+          'content-type': 'application/vnd.api+json',
+          'x-multi': ['base', 'input'],
+        })
+      })
+
+      it('accepts Headers instances for detailed input headers', async () => {
+        const codec = new OpenAPILinkCodec({
+          ping: oc.meta(openapi({ method: 'PATCH', inputStructure: 'detailed' })),
+        }, {
+          url: '/api',
+          headers: { 'x-base': '1' },
+          serializer,
+        })
+
+        const request = await codec.encodeInput({
+          headers: new Headers({ 'X-Token': 'abc' }),
+          body: { title: 'Hello' },
+        }, ['ping'], { context: {} })
+
+        expect(request.headers).toEqual({ 'x-base': '1', 'x-token': 'abc' })
+      })
+
       it('omits the body for GET requests while still serializing the query', async () => {
         const codec = new OpenAPILinkCodec({
           search: oc.meta(openapi({
@@ -621,6 +659,22 @@ describe('openAPILinkCodec', () => {
         const request = await codec.encodeInput('input', ['ping'], { context: {} })
 
         expect(request.headers['x-token']).toBe('abc')
+      })
+
+      it('lowercases base header names and merges names that differ only in casing', async () => {
+        const codec = new OpenAPILinkCodec({
+          ping: oc.meta(openapi({})),
+        }, {
+          headers: { 'X-Token': 'a', 'x-token': ['b', 'c'], 'X-TOKEN': undefined, 'Last-Event-ID': '1' },
+          serializer,
+        })
+
+        const request = await codec.encodeInput('input', ['ping'], { context: {}, lastEventId: '2' })
+
+        expect(request.headers).toEqual({
+          'x-token': ['a', 'b', 'c'],
+          'last-event-id': ['1', '2'],
+        })
       })
 
       it('rejects unresolved procedure paths', async () => {

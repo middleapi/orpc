@@ -1,12 +1,35 @@
 import type { StandardHeaders } from '@standard-server/core'
 import type { OpenAPISerializer } from '../../openapi-serializer'
-import { isTypescriptObject, NullProtoObj } from '@orpc/shared'
+import { isTypescriptObject, NullProtoObj, toArray } from '@orpc/shared'
+import { toStandardHeaders } from '@standard-server/fetch'
+
+/**
+ * Converts link headers into standard headers with lowercase names,
+ * so they merge with other headers and `content-type` is recognized by the fetch adapter.
+ */
+export function toResolvedStandardHeaders(headers: Headers | StandardHeaders): StandardHeaders {
+  if (isHeadersInstance(headers)) {
+    return toStandardHeaders(headers)
+  }
+
+  const result = new NullProtoObj<Record<string, string | string[] | undefined>>()
+
+  for (const key of Object.keys(headers)) {
+    appendHeader(result, key, headers[key])
+  }
+
+  return result
+}
 
 export function serializeHeaders(
   headers: object,
   serializer: Pick<OpenAPISerializer, 'serialize'>,
 ): StandardHeaders {
-  const result = new NullProtoObj<Record<string, string | string[]>>()
+  if (isHeadersInstance(headers)) {
+    return toStandardHeaders(headers)
+  }
+
+  const result = new NullProtoObj<Record<string, string | string[] | undefined>>()
 
   for (const [key, value] of Object.entries(headers)) {
     /**
@@ -25,18 +48,38 @@ export function serializeHeaders(
         }
       }
 
-      result[key] = lines
+      appendHeader(result, key, lines)
       continue
     }
 
     const line = serializeHeaderValue(value, serializer)
 
     if (line !== undefined) {
-      result[key] = line
+      appendHeader(result, key, line)
     }
   }
 
   return result
+}
+
+/**
+ * Headers class might not be available in some environments,
+ * so we check for the existence of `forEach` method to determine if it's a Headers instance.
+ */
+function isHeadersInstance(headers: object): headers is Headers {
+  return typeof (headers as Partial<Headers>).forEach === 'function'
+}
+
+/**
+ * Lowercases the header name and merges its value into the existing one the same way `mergeStandardHeaders` does.
+ */
+function appendHeader(headers: StandardHeaders, name: string, value: StandardHeaders[string]): void {
+  const key = name.toLowerCase()
+  const current = headers[key]
+
+  headers[key] = current === undefined || value === undefined
+    ? current ?? value
+    : [...toArray(current), ...toArray(value)]
 }
 
 function serializeHeaderValue(
