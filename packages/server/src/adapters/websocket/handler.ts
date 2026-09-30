@@ -1,4 +1,4 @@
-import type { Arrayable, MaybeOptionalOptions } from '@orpc/shared'
+import type { Arrayable, MaybeOptionalOptions, ThrowableError } from '@orpc/shared'
 import type { DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standard-server/peer'
 import type { Context } from '../../context'
 import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
@@ -24,12 +24,22 @@ export interface WebSocketHandlerOptions<_T extends Context> {
    * Options for decoding peer messages. such as `prefix` for distinguishing messages on the same channel..
    */
   decodePeerMessage?: DecodePeerMessageOptions | undefined
+
+  /**
+   * Receives errors from `.upgrade()` that cannot be sent to the client, such as a throwing
+   * context function or an error rethrown by the Rethrow Handler Plugin.
+   * The client only receives a cancellation for the affected request.
+   *
+   * By default these errors are ignored, rather than crashing the process as unhandled rejections.
+   */
+  onUnhandledError?: ((error: ThrowableError) => void) | undefined
 }
 
 export class WebSocketHandler<T extends Context> {
   private readonly peers = new WeakMap<WebSocketLike, ServerPeer>()
   private readonly encodePeerMessageOptions: WebSocketHandlerOptions<T>['encodePeerMessage']
   private readonly decodePeerMessageOptions: WebSocketHandlerOptions<T>['decodePeerMessage']
+  private readonly onUnhandledError: Exclude<WebSocketHandlerOptions<T>['onUnhandledError'], undefined>
 
   constructor(
     private readonly handler: StandardHandler<T>,
@@ -37,6 +47,7 @@ export class WebSocketHandler<T extends Context> {
   ) {
     this.encodePeerMessageOptions = options.encodePeerMessage
     this.decodePeerMessageOptions = options.decodePeerMessage
+    this.onUnhandledError = options.onUnhandledError ?? (() => {})
   }
 
   /**
@@ -105,19 +116,34 @@ export class WebSocketHandler<T extends Context> {
     ws: Pick<WebSocket, 'send' | 'addEventListener' | 'removeEventListener'>,
     ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): void {
+    // `close` is not queued behind pending Blob loads, so a message that finishes loading
+    // after it must be dropped, or it would create a new peer that is never closed.
+    let closed = false
+
     /**
      * Message order is important: loading -> decode -> .message.
      * This flow must stay synchronous, or we need to use `sequential` helper
      */
-    ws.addEventListener('message', sequential(async (event) => {
+    const onMessage = sequential(async (event: MessageEvent) => {
       // For better compatibility avoid control or depend on websocket.binaryType
       const data = event.data instanceof Blob ? await loadBytes(event.data) : event.data
 
+      if (closed) {
+        return
+      }
+
       // Not awaited: `this.message` runs business logic that may be slow,
       // and awaiting it would block decoding of subsequent messages.
-      this.message(ws, data, ...rest)
-    }))
-    ws.addEventListener('close', () => this.close(ws))
+      // ServerPeer cancels the request for the client before rejecting, so the error is only reported.
+      this.message(ws, data, ...rest).catch(this.onUnhandledError)
+    })
+
+    ws.addEventListener('message', event => onMessage(event).catch(this.onUnhandledError))
+
+    ws.addEventListener('close', () => {
+      closed = true
+      this.close(ws).catch(this.onUnhandledError)
+    })
 
     // EventEmitter-based implementations like `ws` throw an unhandled `error` event,
     // so a single malformed frame would crash the process. `close` always follows and handles cleanup.

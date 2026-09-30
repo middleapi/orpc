@@ -64,6 +64,10 @@ clientPort.start()
 The examples above only show how to configure the link. For examples of creating a typesafe client, see [RPC Link](/docs/rpc/link#typesafe-clients).
 :::
 
+:::info
+When the context function throws, or an error escapes oRPC's error handling (for example through the [Rethrow Handler Plugin](/docs/plugins/rethrow)), the client only receives a cancellation for that request. `.upgrade()` passes such errors to the `onUnhandledError` handler option, which ignores them by default, while `.message()` rejects with them.
+:::
+
 ## Transfer
 
 By default, oRPC serializes request/response messages to string/binary data before sending over message port. If needed, you can define the `transfer` option to utilize full power of [MessagePort: postMessage() method](https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage), such as transferring ownership of objects to the other side or support unserializable objects like `OffscreenCanvas`.

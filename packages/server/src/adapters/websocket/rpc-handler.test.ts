@@ -1,8 +1,10 @@
 import type { AddressInfo } from 'node:net'
 import { once } from 'node:events'
+import { promiseWithResolvers } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
 import WebSocket, { WebSocketServer } from 'ws'
 import { os } from '../../builder'
+import { RethrowHandlerPlugin } from '../../plugins'
 import { RPCHandler } from './rpc-handler'
 
 describe('rpcHandler', () => {
@@ -25,6 +27,16 @@ describe('rpcHandler', () => {
     addEventListener: vi.fn(),
     send: vi.fn(() => undefined),
   })
+
+  const listen = (onConnection: (ws: WebSocket) => void) => {
+    const wss = new WebSocketServer({ port: 0 })
+    wss.on('connection', onConnection)
+    onTestFinished(() => {
+      wss.clients.forEach(ws => ws.terminate())
+      wss.close()
+    })
+    return `ws://localhost:${(wss.address() as AddressInfo).port}`
+  }
 
   const createRequestMessage = async ({
     prefix,
@@ -241,5 +253,96 @@ describe('rpcHandler', () => {
     expect(decoded.matched).toBe(true)
     expect(decoded.message.kind).toBe('response')
     expect(decoded.message.json.status).toBe(undefined)
+  })
+
+  describe('errors via upgrade', () => {
+    const error = new Error('Something went wrong')
+
+    it.each([
+      ['a throwing context function', () => ({
+        handler: createHandler(),
+        context: () => {
+          throw error
+        },
+      })],
+      ['an error rethrown by RethrowHandlerPlugin', () => ({
+        handler: new RPCHandler({
+          ping: os.handler(() => {
+            throw error
+          }),
+        }, {
+          plugins: [new RethrowHandlerPlugin({ filter: () => true })],
+        }),
+        context: {},
+      })],
+    ])('cancels the request instead of crashing on %s', async (_, setup) => {
+      const { handler, context } = setup()
+      const url = listen(ws => handler.upgrade(ws, { context }))
+
+      const client = new WebSocket(url)
+      await once(client, 'open')
+      client.send(await createRequestMessage())
+
+      const [data] = await once(client, 'message')
+      expect(decodePeerMessage(data.toString())).toEqual({ matched: true, message: { id: '19', kind: 'cancel' } })
+    })
+
+    it('reports the error to onUnhandledError', async () => {
+      const onUnhandledError = vi.fn()
+      const handler = createHandler({ onUnhandledError })
+      const url = listen(ws => handler.upgrade(ws, {
+        context: () => {
+          throw error
+        },
+      }))
+
+      const client = new WebSocket(url)
+      await once(client, 'open')
+      client.send(await createRequestMessage())
+      await once(client, 'message')
+
+      expect(onUnhandledError).toHaveBeenCalledExactlyOnceWith(error)
+    })
+  })
+
+  it('drops a Blob message that finishes loading after close via upgrade', async () => {
+    const ping = vi.fn(() => 'pong')
+    const handler = new RPCHandler({ ping: os.handler(ping) })
+
+    // Hold the Blob read until the socket has closed
+    const { promise: canLoad, resolve: allowLoad } = promiseWithResolvers<void>()
+    const { bytes } = Blob.prototype
+    let loading: ReturnType<Blob['bytes']> | undefined
+    const bytesSpy = vi.spyOn(Blob.prototype, 'bytes').mockImplementation(function (this: Blob) {
+      return loading = canLoad.then(() => bytes.call(this))
+    })
+    onTestFinished(() => bytesSpy.mockRestore())
+
+    let serverWs: WebSocket | undefined
+    const url = listen((ws) => {
+      // @ts-expect-error `ws` supports 'blob' but its types do not list it yet
+      ws.binaryType = 'blob'
+      serverWs = ws
+      handler.upgrade(ws)
+    })
+
+    const client = new WebSocket(url)
+    await once(client, 'open')
+    client.send(new TextEncoder().encode(await createRequestMessage() as string))
+
+    await vi.waitFor(() => {
+      expect(loading).toBeDefined()
+    })
+
+    const send = vi.spyOn(serverWs!, 'send')
+    client.close()
+    await once(serverWs!, 'close')
+
+    allowLoad()
+    await loading
+    await new Promise(resolve => setTimeout(resolve, 20))
+
+    expect(ping).not.toHaveBeenCalled()
+    expect(send).not.toHaveBeenCalled()
   })
 })

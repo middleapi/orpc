@@ -234,6 +234,10 @@ const app = App()
 
 </CodeGroup>
 
+:::info
+When the context function throws, or an error escapes oRPC's error handling (for example through the [Rethrow Handler Plugin](/docs/plugins/rethrow)), the client only receives a cancellation for that request. `.upgrade()` passes such errors to the `onUnhandledError` handler option, which ignores them by default, while `.message()` rejects with them.
+:::
+
 ## Client Adapters
 
 | Adapter     | Target                                                                          |

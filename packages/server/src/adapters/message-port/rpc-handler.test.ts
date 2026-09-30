@@ -1,5 +1,6 @@
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
 import { os } from '../../builder'
+import { RethrowHandlerPlugin } from '../../plugins'
 import { RPCHandler } from './rpc-handler'
 
 describe('rpcHandler', () => {
@@ -293,5 +294,90 @@ describe('rpcHandler', () => {
     const { serverPort } = createPort()
     const result = await handler.message(serverPort as any, { invalid: true })
     expect(result.matched).toBe(false)
+  })
+
+  describe('errors via upgrade', () => {
+    const error = new Error('Something went wrong')
+
+    const sendRequest = async (clientPort: MessagePort) => {
+      const response = new Promise<unknown>((resolve) => {
+        clientPort.addEventListener('message', event => resolve(decodePeerMessage(event.data)), { once: true })
+      })
+      clientPort.start()
+      clientPort.postMessage(await createRequestMessage())
+      return response
+    }
+
+    it.each([
+      ['a throwing context function', () => ({
+        handler: createHandler(),
+        context: () => {
+          throw error
+        },
+      })],
+      ['an error rethrown by RethrowHandlerPlugin', () => ({
+        handler: new RPCHandler({
+          ping: os.handler(() => {
+            throw error
+          }),
+        }, {
+          plugins: [new RethrowHandlerPlugin({ filter: () => true })],
+        }),
+        context: {},
+      })],
+    ])('cancels the request instead of crashing on %s', async (_, setup) => {
+      const { handler, context } = setup()
+      const { clientPort, serverPort } = createPort()
+      onTestFinished(() => clientPort.close())
+      handler.upgrade(serverPort, { context })
+
+      await expect(sendRequest(clientPort)).resolves.toEqual({ matched: true, message: { id: '19', kind: 'cancel' } })
+    })
+
+    it('reports the error to onUnhandledError', async () => {
+      const onUnhandledError = vi.fn()
+      const handler = createHandler({ onUnhandledError })
+      const { clientPort, serverPort } = createPort()
+      onTestFinished(() => clientPort.close())
+      handler.upgrade(serverPort, {
+        context: () => {
+          throw error
+        },
+      })
+
+      await sendRequest(clientPort)
+
+      expect(onUnhandledError).toHaveBeenCalledExactlyOnceWith(error)
+    })
+  })
+
+  it('drops messages delivered after close via upgrade', async () => {
+    let onMessage: ((event: { data: string }) => void) | undefined
+    let onClose: (() => void) | undefined
+
+    const ping = vi.fn(() => 'pong')
+    const handler = new RPCHandler({ ping: os.handler(ping) })
+
+    const port = {
+      addEventListener: vi.fn((event: string, callback: any) => {
+        if (event === 'message') {
+          onMessage = callback
+        }
+
+        if (event === 'close') {
+          onClose = callback
+        }
+      }),
+      postMessage: vi.fn(),
+    }
+
+    handler.upgrade(port as any)
+
+    onClose?.()
+    onMessage?.({ data: await createRequestMessage() as string })
+    await new Promise(resolve => setTimeout(resolve, 20))
+
+    expect(ping).not.toHaveBeenCalled()
+    expect(port.postMessage).not.toHaveBeenCalled()
   })
 })

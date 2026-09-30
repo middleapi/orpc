@@ -1,5 +1,5 @@
 import type { SupportedMessagePort } from '@orpc/client/message-port'
-import type { MaybeOptionalOptions, Promisable, Value } from '@orpc/shared'
+import type { MaybeOptionalOptions, Promisable, ThrowableError, Value } from '@orpc/shared'
 import type { ClientPeerSendMessage, DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standard-server/peer'
 import type { Context } from '../../context'
 import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
@@ -34,6 +34,15 @@ export interface MessagePortHandlerOptions<_T extends Context> {
    * Options for decoding peer messages. such as `prefix` for distinguishing messages on the same channel..
    */
   decodePeerMessage?: DecodePeerMessageOptions | undefined
+
+  /**
+   * Receives errors from `.upgrade()` that cannot be sent to the client, such as a throwing
+   * context function or an error rethrown by the Rethrow Handler Plugin.
+   * The client only receives a cancellation for the affected request.
+   *
+   * By default these errors are ignored, rather than crashing the process as unhandled rejections.
+   */
+  onUnhandledError?: ((error: ThrowableError) => void) | undefined
 }
 
 export class MessagePortHandler<T extends Context> {
@@ -41,6 +50,7 @@ export class MessagePortHandler<T extends Context> {
   private readonly transfer: MessagePortHandlerOptions<T>['experimental_transfer']
   private readonly encodePeerMessageOptions: MessagePortHandlerOptions<T>['encodePeerMessage']
   private readonly decodePeerMessageOptions: MessagePortHandlerOptions<T>['decodePeerMessage']
+  private readonly onUnhandledError: Exclude<MessagePortHandlerOptions<T>['onUnhandledError'], undefined>
 
   constructor(
     private readonly handler: StandardHandler<T>,
@@ -49,6 +59,7 @@ export class MessagePortHandler<T extends Context> {
     this.transfer = options.experimental_transfer
     this.encodePeerMessageOptions = options.encodePeerMessage
     this.decodePeerMessageOptions = options.decodePeerMessage
+    this.onUnhandledError = options.onUnhandledError ?? (() => {})
   }
 
   /**
@@ -60,12 +71,26 @@ export class MessagePortHandler<T extends Context> {
     port: SupportedMessagePort,
     ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): void {
+    // A message delivered after `close` would create a new peer that is never closed.
+    let closed = false
+
     /**
      * Message order is important: loading -> decode -> .message.
      * This flow must stay synchronous, or we need to use `sequential` helper
      */
-    onMessagePortMessage(port, message => this.message(port, message, ...rest))
-    onMessagePortClose(port, () => this.close(port))
+    onMessagePortMessage(port, (message) => {
+      if (closed) {
+        return
+      }
+
+      // ServerPeer cancels the request for the client before rejecting, so the error is only reported.
+      this.message(port, message, ...rest).catch(this.onUnhandledError)
+    })
+
+    onMessagePortClose(port, () => {
+      closed = true
+      this.close(port).catch(this.onUnhandledError)
+    })
   }
 
   /**
