@@ -67,6 +67,22 @@ describe('valibotToJsonSchemaConverter', () => {
     expect(converter.convert(schema, 'input')).toEqual([{ type: 'string' }, false])
   })
 
+  it('does not leak a rejection when async standard validation fails while checking optionality', async ({ onTestFinished }) => {
+    const unhandledRejectionHandler = vi.fn()
+    process.on('unhandledRejection', unhandledRejectionHandler)
+
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejectionHandler)
+    })
+
+    const schema = v.pipeAsync(v.optional(v.string()), v.transformAsync(async value => value!.trim()))
+
+    expect(converter.convert(schema, 'input')).toEqual([{ type: 'string' }, false])
+
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(unhandledRejectionHandler).not.toHaveBeenCalled()
+  })
+
   describe('optionality', () => {
     it.each([
       ['defaulted input schema', v.optional(v.string(), 'fallback'), 'input', {

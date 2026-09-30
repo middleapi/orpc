@@ -93,7 +93,10 @@ export class ArkTypeToJsonSchemaConverter implements JsonSchemaConverter {
     let optional = false
     try {
       const result = arkTypeSchema['~standard'].validate(undefined)
-      if (!(result instanceof Promise) && !result.issues) {
+      if (result instanceof Promise) {
+        result.catch(() => {})
+      }
+      else if (!result.issues) {
         optional = direction === 'input' ? true : result.value === undefined
       }
     }
