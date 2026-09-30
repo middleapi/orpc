@@ -3,7 +3,7 @@ import type { Interceptor, PromiseWithError } from '@orpc/shared'
 import type { ServerFunction, ServerFunctionError } from '../server-function'
 import { createORPCErrorFromJson, safe } from '@orpc/client'
 import { intercept, toArray } from '@orpc/shared'
-import { useCallback, useMemo, useRef, useState, useTransition } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react'
 
 export interface UserSeverFunctionOptions<TInput, TOutput, TError> {
   interceptors?: Interceptor<{ input: TInput }, PromiseWithError<TOutput, TError>>[]
@@ -126,6 +126,15 @@ export function useServerFunction<TInput, TOutput, TError extends AnyORPCErrorJS
     setState({ ...INITIAL_STATE })
   }, [])
 
+  /**
+   * Read options at execute time so `execute` keeps a fixed-size deps array
+   * no matter how many interceptors are passed.
+   */
+  const optionsRef = useRef(options)
+  useLayoutEffect(() => {
+    optionsRef.current = options
+  })
+
   const execute = useCallback(async (input: TInput, executeOptions: UseServerFunctionExecuteOptions<TInput, TOutput, ServerFunctionError<TError>> = {}) => {
     const executedAt = new Date()
     executedAtRef.current = executedAt
@@ -134,8 +143,12 @@ export function useServerFunction<TInput, TOutput, TError extends AnyORPCErrorJS
 
     return new Promise((resolve) => {
       startTransition(async () => {
-        const result = await safe(intercept(
-          [...toArray(options.interceptors), ...toArray(executeOptions.interceptors)],
+        /**
+         * Wrapped in an async function so interceptors that throw synchronously
+         * become a rejection handled by `safe` instead of escaping the transition.
+         */
+        const result = await safe((async () => intercept(
+          [...toArray(optionsRef.current.interceptors), ...toArray(executeOptions.interceptors)],
           { input: input as TInput },
           async ({ input }) => fn(input).then(([error, data]) => {
             if (error) {
@@ -144,7 +157,7 @@ export function useServerFunction<TInput, TOutput, TError extends AnyORPCErrorJS
 
             return data as TOutput
           }),
-        ))
+        ))())
 
         /**
          * If multiple execute calls are made in parallel, only the last one will be effective.
@@ -155,16 +168,16 @@ export function useServerFunction<TInput, TOutput, TError extends AnyORPCErrorJS
             error: result.error as any,
             isIdle: false,
             isPending: false,
-            isSuccess: !result.error,
-            isError: !!result.error,
-            status: !result.error ? 'success' : 'error',
+            isSuccess: result.isSuccess,
+            isError: !result.isSuccess,
+            status: result.isSuccess ? 'success' : 'error',
           })
         }
 
         resolve(result)
       })
     })
-  }, [fn, ...toArray(options.interceptors)])
+  }, [fn])
 
   const result = useMemo(() => {
     const currentState = isPending && executedAtRef.current !== undefined

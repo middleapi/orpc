@@ -221,6 +221,102 @@ describe('useServerFunction', () => {
     })
   })
 
+  it('interceptor throws synchronously', async () => {
+    const { result } = renderHook(() => useServerFunction(fn, {
+      interceptors: [
+        ({ input, next }) => {
+          if (!input) {
+            throw new Error('invalid')
+          }
+
+          return next()
+        },
+      ],
+    }))
+
+    let promise: Promise<any>
+
+    act(() => {
+      promise = result.current.execute(undefined)
+    })
+
+    await waitFor(() => expect(result.current.status).toBe('error'))
+    expect(result.current.isSuccess).toBe(false)
+    expect(result.current.isError).toBe(true)
+    expect(result.current.data).toBe(undefined)
+    expect(result.current.error).toBeInstanceOf(Error)
+    expect(result.current.error!.message).toBe('invalid')
+
+    await act(async () => {
+      const [error, data, , isSuccess] = await promise!
+      expect(error).toBeInstanceOf(Error)
+      expect(error.message).toBe('invalid')
+      expect(data).toBe(undefined)
+      expect(isSuccess).toBe(false)
+    })
+
+    expect(handler).toHaveBeenCalledTimes(0)
+  })
+
+  it.each([undefined, null, 0, ''])('on falsy rejection (%j)', async (reason) => {
+    const { result } = renderHook(() => useServerFunction(fn, {
+      interceptors: [
+        () => Promise.reject(reason),
+      ],
+    }))
+
+    let promise: Promise<any>
+
+    act(() => {
+      promise = result.current.execute({ input: 123 })
+    })
+
+    await waitFor(() => expect(result.current.isPending).toBe(false))
+    expect(result.current.status).toBe('error')
+    expect(result.current.isSuccess).toBe(false)
+    expect(result.current.isError).toBe(true)
+    expect(result.current.data).toBe(undefined)
+    expect(result.current.error).toBe(reason)
+
+    await act(async () => {
+      const [error, data, , isSuccess] = await promise!
+      expect(error).toBe(reason)
+      expect(data).toBe(undefined)
+      expect(isSuccess).toBe(false)
+    })
+  })
+
+  it('uses the latest interceptors when their count changes between renders', async () => {
+    const consoleError = vi.spyOn(console, 'error')
+    const log = vi.fn(({ next }) => next())
+
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useServerFunction(fn, { interceptors: enabled ? [log] : [] }),
+      { initialProps: { enabled: false } },
+    )
+
+    rerender({ enabled: true })
+
+    await act(async () => {
+      await result.current.execute({ input: 123 })
+    })
+
+    expect(log).toHaveBeenCalledTimes(1)
+    expect(result.current.status).toBe('success')
+
+    rerender({ enabled: false })
+
+    await act(async () => {
+      await result.current.execute({ input: 456 })
+    })
+
+    expect(log).toHaveBeenCalledTimes(1)
+    expect(result.current.data).toEqual({ output: '456' })
+
+    expect(consoleError.mock.calls.flat().join('\n')).not.toContain('changed size between renders')
+    consoleError.mockRestore()
+  })
+
   it('multiple execute calls', async () => {
     const { result } = renderHook(() => useServerFunction(fn))
 
