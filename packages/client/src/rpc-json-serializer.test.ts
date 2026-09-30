@@ -143,6 +143,8 @@ describe('rpcJsonSerializer: wire format', () => {
       scores: new Map([['x', 1]]),
       homepage: new URL('https://orpc.dev'),
       missing: Number.NaN,
+      max: Number.POSITIVE_INFINITY,
+      min: Number.NEGATIVE_INFINITY,
     })
 
     expect(json).toEqual({
@@ -152,6 +154,8 @@ describe('rpcJsonSerializer: wire format', () => {
       scores: [['x', 1]],
       homepage: 'https://orpc.dev/',
       missing: null,
+      max: 'Infinity',
+      min: '-Infinity',
     })
 
     expect(meta).toEqual(expect.arrayContaining([
@@ -161,8 +165,10 @@ describe('rpcJsonSerializer: wire format', () => {
       ['map', 'scores'],
       ['url', 'homepage'],
       ['nan', 'missing'],
+      ['infinity', 'max'],
+      ['infinity', 'min'],
     ]))
-    expect(meta).toHaveLength(6)
+    expect(meta).toHaveLength(8)
   })
 
   it('omits meta entirely for pure JSON payloads', () => {
@@ -331,6 +337,8 @@ describe('rpcJsonSerializer: custom handlers', () => {
       date: new Date('2023-01-01'),
       invalidDate: new Date('Invalid'),
       nan: Number.NaN,
+      infinity: Number.POSITIVE_INFINITY,
+      negativeInfinity: Number.NEGATIVE_INFINITY,
       url: new URL('https://orpc.dev'),
       set: new Set([1, 2]),
       map: new Map([['a', 1]]),
@@ -340,6 +348,31 @@ describe('rpcJsonSerializer: custom handlers', () => {
     }
 
     expect(roundTripThroughWire(serializer, value)).toEqual(value)
+  })
+
+  it.each([
+    ['-0', -0],
+    ['a string', 'text'],
+    ['a boolean', true],
+    ['null', null],
+  ])('runs custom handlers for %s without customizing a built-in handler', (_, target) => {
+    const serializer = new RPCJsonSerializer({
+      handlers: {
+        target: {
+          condition: data => Object.is(data, target),
+          serialize: () => 'target',
+          deserialize: () => target,
+          isTerminal: true,
+        },
+      },
+    })
+
+    const serialized = serializer.serialize({ value: target, other: 1 })
+    expect(serialized.json).toEqual({ value: 'target', other: 1 })
+    expect(serialized.meta).toEqual([['target', 'value']])
+
+    const restored = roundTripThroughWire(serializer, { value: target }) as any
+    expect(Object.is(restored.value, target)).toBe(true)
   })
 
   it('collects blobs returned by terminal custom handlers', () => {
@@ -446,6 +479,7 @@ describe('rpcJsonSerializer: security', () => {
   it.each([
     ['undefined', 'null', ['text', 1, true, [], {}]],
     ['nan', 'null', ['text', 1, true, [], {}]],
+    ['infinity', '"Infinity" or "-Infinity"', [null, 'text', 'infinity', 1, true, [], {}]],
     ['bigint', 'a string', [null, 1, true, [], {}]],
     ['url', 'a string', [null, 1, true, [], {}]],
     ['date', 'a string or null', [1, true, [], {}]],

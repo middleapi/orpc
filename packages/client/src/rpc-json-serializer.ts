@@ -91,6 +91,19 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
     },
     isTerminal: true,
   },
+  infinity: {
+    condition(data: unknown): boolean {
+      return data === Number.POSITIVE_INFINITY || data === Number.NEGATIVE_INFINITY
+    },
+    serialize(data: number): string {
+      return data > 0 ? 'Infinity' : '-Infinity'
+    },
+    deserialize(serialized: string): number {
+      assertSerializedType(serialized === 'Infinity' || serialized === '-Infinity', 'infinity', '"Infinity" or "-Infinity"')
+      return serialized === 'Infinity' ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY
+    },
+    isTerminal: true,
+  },
   url: {
     condition(data: unknown): boolean {
       return data instanceof URL
@@ -166,7 +179,7 @@ export interface RPCJsonSerializerOptions {
    * handlers: { url: undefined }
    * ```
    *
-   * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `url`, `set`, `map`.
+   * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `infinity`, `url`, `set`, `map`.
    */
   handlers?: Record<string, undefined | RPCJsonSerializerHandler> | undefined
 
@@ -201,33 +214,32 @@ export class RPCJsonSerializer {
     }
 
     let inlineBuiltInHandlers = true
-    let handlerEntries: [string, RPCJsonSerializerHandler][] = []
 
     for (const key of Object.keys(customHandlers)) {
       const handler = customHandlers[key]
       this.handlers[key] = handler
 
-      if (inlineBuiltInHandlers && key in DEFAULT_RPC_JSON_SERIALIZER_HANDLERS) {
+      /**
+       * The inlined built-in handlers return primitives before any other handler runs,
+       * so they only apply when no handler is added or overridden.
+       */
+      if (handler !== undefined || key in DEFAULT_RPC_JSON_SERIALIZER_HANDLERS) {
         inlineBuiltInHandlers = false
-      }
-
-      if (inlineBuiltInHandlers && handler !== undefined) {
-        handlerEntries.push([key, handler])
       }
     }
 
+    this.inlineBuiltInHandlers = inlineBuiltInHandlers
+
     if (!inlineBuiltInHandlers) {
-      handlerEntries = []
+      const handlerEntries: [string, RPCJsonSerializerHandler][] = []
       for (const key of Object.keys(this.handlers)) {
         const handler = this.handlers[key]
         if (handler !== undefined) {
           handlerEntries.push([key, handler])
         }
       }
+      this.handlerEntries = handlerEntries
     }
-
-    this.inlineBuiltInHandlers = inlineBuiltInHandlers
-    this.handlerEntries = handlerEntries
   }
 
   serialize(data: unknown): RPCJsonSerialization {
@@ -262,11 +274,15 @@ export class RPCJsonSerializer {
         case 'boolean':
           return data
         case 'number':
+          if (Number.isFinite(data)) {
+            return data
+          }
           if (Number.isNaN(data)) {
             meta.push(['nan', ...segments])
             return null
           }
-          return data
+          meta.push(['infinity', ...segments])
+          return data > 0 ? 'Infinity' : '-Infinity'
         case 'undefined':
           meta.push(['undefined', ...segments])
           return null
