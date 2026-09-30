@@ -145,6 +145,42 @@ describe('memoryLocker', () => {
       await holder
     })
 
+    it('waits until released when timeout is Infinity', async () => {
+      const locker = new MemoryLocker({ timeout: Number.POSITIVE_INFINITY })
+      const { promise: release, resolve } = promiseWithResolvers<void>()
+      const holder = locker.lock('key', () => release)
+      const fn = vi.fn(() => 'ok')
+      const waiter = locker.lock('key', fn)
+
+      await vi.advanceTimersByTimeAsync(2 ** 32)
+      expect(fn).not.toHaveBeenCalled()
+      expect(vi.getTimerCount()).toBe(0)
+
+      resolve()
+      await holder
+      await expect(waiter).resolves.toBe('ok')
+      expect(fn).toHaveBeenCalledWith({ waited: true })
+    })
+
+    it('does not time out early when timeout exceeds the maximum timer delay', async () => {
+      const timeout = 2 ** 31 + 1000 // setTimeout fires after ~1ms for delays above 2^31-1
+      const locker = new MemoryLocker({ timeout })
+      const { promise: release, resolve } = promiseWithResolvers<void>()
+      const holder = locker.lock('key', () => release)
+      const waiter = locker.lock('key', vi.fn())
+      const settled = vi.fn()
+      waiter.then(settled, settled)
+
+      await vi.advanceTimersByTimeAsync(timeout - 1)
+      expect(settled).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(1)
+      await expect(waiter).rejects.toBeInstanceOf(LockTimeoutError)
+
+      resolve()
+      await holder
+    })
+
     it('still hands the lock over to later waiters after an earlier waiter timed out', async () => {
       const locker = new MemoryLocker({ timeout: 1000 })
       const { promise: release, resolve } = promiseWithResolvers<void>()
@@ -231,6 +267,35 @@ describe('memoryLocker', () => {
       await holder2
       await expect(third).resolves.toBe('ok')
       expect(fn).toHaveBeenCalledWith({ waited: true })
+    })
+
+    it('does not expire locks when ttl is Infinity', async () => {
+      const locker = new MemoryLocker({ ttl: Number.POSITIVE_INFINITY })
+      const { promise: release, resolve } = promiseWithResolvers<void>()
+      const holder = locker.lock('key', () => release)
+
+      await vi.advanceTimersByTimeAsync(2 ** 32)
+      expect(vi.getTimerCount()).toBe(0)
+      await expect(locker.lock('key', vi.fn(), { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
+
+      resolve()
+      await holder
+    })
+
+    it('does not expire locks early when ttl exceeds the maximum timer delay', async () => {
+      const ttl = 2 ** 31 + 1000 // setTimeout fires after ~1ms for delays above 2^31-1
+      const locker = new MemoryLocker({ ttl })
+      const { promise: release, resolve } = promiseWithResolvers<void>()
+      const holder = locker.lock('key', () => release)
+
+      await vi.advanceTimersByTimeAsync(ttl - 1)
+      await expect(locker.lock('key', vi.fn(), { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
+
+      await vi.advanceTimersByTimeAsync(1)
+      await expect(locker.lock('key', () => 'ok', { timeout: 0 })).resolves.toBe('ok')
+
+      resolve()
+      await holder
     })
 
     it('per-call ttl overrides the default', async () => {

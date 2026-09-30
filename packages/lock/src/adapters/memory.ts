@@ -15,11 +15,40 @@ export interface MemoryLockerOptions {
 
   /**
    * How long to wait for a lock to become available, in milliseconds.
+   * Use `Infinity` to wait until the lock is released.
    * Can be overridden per call.
    *
    * @default 10000
    */
   timeout?: number
+}
+
+/**
+ * Timers fire after about 1ms for delays above this (about 24.8 days).
+ */
+const MAX_TIMER_DELAY = 2_147_483_647
+
+/**
+ * Like `setTimeout`, but never fires for non-finite delays like `Infinity`,
+ * and waits in chunks for delays above MAX_TIMER_DELAY instead of firing right away.
+ * Returns a function that cancels the timer.
+ */
+function setLongTimeout(callback: () => void, delay: number): () => void {
+  if (!Number.isFinite(delay)) {
+    return () => {}
+  }
+
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  const schedule = (remaining: number) => {
+    timer = remaining > MAX_TIMER_DELAY
+      ? setTimeout(schedule, MAX_TIMER_DELAY, remaining - MAX_TIMER_DELAY)
+      : setTimeout(callback, remaining)
+  }
+
+  schedule(delay)
+
+  return () => clearTimeout(timer)
 }
 
 interface MemoryLockWaiter {
@@ -29,7 +58,7 @@ interface MemoryLockWaiter {
 
 interface MemoryLockEntry {
   holder: object
-  expiry?: ReturnType<typeof setTimeout>
+  cancelExpiry?: () => void
   waiters: Set<MemoryLockWaiter>
 }
 
@@ -69,7 +98,7 @@ export class MemoryLocker implements Locker {
     }
 
     if (ttl !== undefined) {
-      entry.expiry = setTimeout(() => this.release(key, token), ttl)
+      entry.cancelExpiry = setLongTimeout(() => this.release(key, token), ttl)
     }
 
     try {
@@ -94,12 +123,12 @@ export class MemoryLocker implements Locker {
       reject(reason)
     }
 
-    const timer = setTimeout(() => fail(new LockTimeoutError(key)), timeout)
+    const cancelTimer = setLongTimeout(() => fail(new LockTimeoutError(key)), timeout)
     const abortListener = () => fail(signal?.reason)
     signal?.addEventListener('abort', abortListener, { once: true })
 
     return promise.finally(() => {
-      clearTimeout(timer)
+      cancelTimer()
       signal?.removeEventListener('abort', abortListener)
     })
   }
@@ -111,7 +140,7 @@ export class MemoryLocker implements Locker {
       return
     }
 
-    clearTimeout(entry.expiry)
+    entry.cancelExpiry?.()
 
     const [next] = entry.waiters
 
