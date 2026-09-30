@@ -5,11 +5,11 @@ import type { Lazyable } from './lazy'
 import type { AnyMiddleware } from './middleware'
 import type { AnyProcedure, ProcedureConfig } from './procedure'
 import type { AnyRouter } from './router'
-import { mergeErrorMap, ProcedureContract, resolveMetaPlugins } from '@orpc/contract'
+import { augmentContractRouter, mergeErrorMap, ProcedureContract, resolveMetaPlugins } from '@orpc/contract'
 import { getOwn, isTypescriptObject, omit } from '@orpc/shared'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
-import { getHiddenRouterContract } from './router-hidden'
+import { getHiddenRouterContract, withHiddenRouterContract } from './router-hidden'
 
 export type AugmentedRouter<
   T extends AnyRouter,
@@ -129,6 +129,12 @@ export function augmentRouter<
     enhanced[key] = augmentRouter(child, options)
   }
 
+  // keep the contract as the source of truth, augmented the same way as its procedures
+  const hiddenContract = getHiddenRouterContract(router)
+  if (hiddenContract !== undefined) {
+    return withHiddenRouterContract(enhanced, augmentContractRouter(hiddenContract, options)) as any
+  }
+
   return enhanced as any
 }
 
@@ -178,6 +184,11 @@ export function augmentImplementedRouter<
 
   for (const [key, child] of Object.entries(router as Record<string, AnyRouter>)) {
     enhanced[key] = augmentImplementedRouter(child, options)
+  }
+
+  const hiddenContract = getHiddenRouterContract(router)
+  if (hiddenContract !== undefined) {
+    return withHiddenRouterContract(enhanced, hiddenContract) as any
   }
 
   return enhanced as any
@@ -339,6 +350,11 @@ export async function unlazyRouter<T extends AnyRouter>(router: T): Promise<Unla
     const { default: unlaziedRouter } = await unlazy(item)
 
     unlazied[key] = await unlazyRouter(unlaziedRouter)
+  }
+
+  const hiddenContract = getHiddenRouterContract(router)
+  if (hiddenContract !== undefined) {
+    return withHiddenRouterContract(unlazied, hiddenContract) as any
   }
 
   return unlazied as any

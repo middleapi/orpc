@@ -1,5 +1,12 @@
+import type { AnyProcedureContract } from '@orpc/contract'
+import type { Lazyable } from '../../lazy'
+import type { AnyRouter } from '../../router'
 import type { StandardHandlerPlugin } from '../standard'
+import { oc, type } from '@orpc/contract'
 import { os } from '../../builder'
+import { implement } from '../../implementer'
+import { unlazy } from '../../lazy'
+import { getHiddenRouterContract } from '../../router-hidden'
 import { RPCHandler } from './rpc-handler'
 
 describe('rpcHandler', () => {
@@ -146,5 +153,82 @@ describe('rpcHandler', () => {
 
     expect(blocked.matched).toBe(false)
     expect(allowMethods).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('rpcHandler with an implemented router wrapped by the builder', () => {
+  const contract = { ping: oc.errors({ NOT_FOUND: {} }) }
+
+  const ping = os
+    .errors({ NOT_FOUND: {}, INTERNAL_DEBUG: { data: type<{ sql: string }>() } })
+    .handler(({ errors }) => {
+      throw errors.INTERNAL_DEBUG({ data: { sql: 'SELECT secret' } })
+    })
+
+  const implRouter = implement(contract).router({ ping })
+
+  async function callError(router: AnyRouter, path: string, context: Record<string, unknown> = {}) {
+    const { response } = await new RPCHandler(router).handle(
+      new Request(`https://example.com${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ json: null }),
+      }),
+      { context },
+    )
+
+    const body = await response!.json() as { json: unknown }
+
+    return body.json
+  }
+
+  function getHiddenPingErrorMap(router: Lazyable<AnyRouter>) {
+    const hiddenContract = getHiddenRouterContract(router) as Record<string, AnyProcedureContract> | undefined
+
+    return hiddenContract?.ping?.['~orpc'].errorMap
+  }
+
+  it('applies the contract when served directly', async () => {
+    await expect(callError(implRouter, '/ping')).resolves.toMatchObject({ defined: false, code: 'INTERNAL_DEBUG' })
+  })
+
+  it('applies the contract through .router', async () => {
+    const router = os.router(implRouter)
+
+    expect(getHiddenPingErrorMap(router)).toEqual({ NOT_FOUND: {} })
+    await expect(callError(router, '/ping')).resolves.toMatchObject({ defined: false, code: 'INTERNAL_DEBUG' })
+  })
+
+  it('applies the contract through a nested .router', async () => {
+    const router = os.router({ sub: implRouter })
+
+    expect(getHiddenPingErrorMap(router.sub)).toEqual({ NOT_FOUND: {} })
+    await expect(callError(router, '/sub/ping')).resolves.toMatchObject({ defined: false, code: 'INTERNAL_DEBUG' })
+  })
+
+  it('applies the contract through .use().router and keeps the builder errors', async () => {
+    const router = os
+      .$context<{ deny?: boolean }>()
+      .errors({ UNAUTHORIZED: {} })
+      .use(({ context, errors, next }) => {
+        if (context.deny) {
+          throw errors.UNAUTHORIZED()
+        }
+
+        return next()
+      })
+      .router(implRouter)
+
+    expect(getHiddenPingErrorMap(router)).toEqual({ UNAUTHORIZED: {}, NOT_FOUND: {} })
+    await expect(callError(router, '/ping')).resolves.toMatchObject({ defined: false, code: 'INTERNAL_DEBUG' })
+    await expect(callError(router, '/ping', { deny: true })).resolves.toMatchObject({ defined: true, code: 'UNAUTHORIZED' })
+  })
+
+  it('applies the contract through .lazy', async () => {
+    const router = { sub: os.lazy(async () => ({ default: implRouter })) }
+
+    const { default: loaded } = await unlazy(router.sub)
+    expect(getHiddenPingErrorMap(loaded)).toEqual({ NOT_FOUND: {} })
+    await expect(callError(router, '/sub/ping')).resolves.toMatchObject({ defined: false, code: 'INTERNAL_DEBUG' })
   })
 })

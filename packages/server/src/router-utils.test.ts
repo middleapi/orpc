@@ -2,12 +2,13 @@ import * as ContractModule from '@orpc/contract'
 import { z } from 'zod'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
-import { withHiddenRouterContract } from './router-hidden'
+import { getHiddenRouterContract, withHiddenRouterContract } from './router-hidden'
 import { augmentImplementedRouter, augmentRouter, getRouter, unlazyRouter, walkProcedureContractsAsync, walkProcedureContractsSync } from './router-utils'
 
 const oc = ContractModule.oc
 const resolveMetaPluginsSpy = vi.spyOn(ContractModule, 'resolveMetaPlugins')
 const mergeErrorMapSpy = vi.spyOn(ContractModule, 'mergeErrorMap')
+const augmentContractRouterSpy = vi.spyOn(ContractModule, 'augmentContractRouter')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -212,6 +213,33 @@ describe('augmentRouter', () => {
     expect(mergeErrorMapSpy).not.toHaveBeenCalled()
     expect(resolveMetaPluginsSpy).not.toHaveBeenCalled()
   })
+
+  it('carries the hidden contract over, augmented with the same options', () => {
+    const options = createAugmentOptions()
+    const contract = { p1: oc.errors({ BAD_GATEWAY: {} }) }
+    const augmented = augmentRouter(withHiddenRouterContract(router, contract), options)
+
+    expect(augmentContractRouterSpy).toHaveBeenCalledOnce()
+    expect(augmentContractRouterSpy).toHaveBeenCalledWith(contract, options)
+    expect(getHiddenRouterContract(augmented)).toBe(augmentContractRouterSpy.mock.results[0]?.value)
+    expect(augmented.p1).toBeInstanceOf(Procedure)
+    expect(augmented.p1).not.toBe(router.p1)
+  })
+
+  it('carries the hidden contract of a lazily loaded router over', async () => {
+    const options = createAugmentOptions()
+    const contract = { p1: oc.errors({ BAD_GATEWAY: {} }) }
+    const lazy = new Lazy({
+      loader: async () => ({ default: withHiddenRouterContract({ p1: procedure1 }, contract) }),
+      meta: {},
+    })
+
+    const augmented = await unlazyDefault(augmentRouter({ lazy }, options).lazy)
+
+    expect(augmentContractRouterSpy).toHaveBeenCalledOnce()
+    expect(augmentContractRouterSpy).toHaveBeenCalledWith(contract, options)
+    expect(getHiddenRouterContract(augmented)).toBe(augmentContractRouterSpy.mock.results[0]?.value)
+  })
 })
 
 describe('augmentImplementedRouter', () => {
@@ -298,6 +326,15 @@ describe('augmentImplementedRouter', () => {
     const invalid = 'invalid' as any
 
     expect(augmentImplementedRouter(invalid, options)).toBe(invalid)
+  })
+
+  it('carries the hidden contract over', () => {
+    const options = createImplementedOptions()
+    const contract = { p1: oc.errors({ BAD_GATEWAY: {} }) }
+    const augmented = augmentImplementedRouter(withHiddenRouterContract(router, contract), options)
+
+    expect(getHiddenRouterContract(augmented)).toBe(contract)
+    expectImplementedProcedure(augmented.p1, router.p1, options)
   })
 })
 
@@ -494,5 +531,20 @@ describe('unlazyRouter', () => {
   it('returns procedures and non-object values as-is', async () => {
     expect(await unlazyRouter(router.p1)).toBe(router.p1)
     expect(await unlazyRouter('invalid' as any)).toBe('invalid')
+  })
+
+  it('carries the hidden contract over', async () => {
+    const contract = { p1: oc.errors({ BAD_GATEWAY: {} }) }
+    const lazyRouter = {
+      p1: new Lazy({
+        loader: async () => ({ default: procedure1 }),
+        meta: {},
+      }),
+    }
+
+    const unlazied = await unlazyRouter(withHiddenRouterContract(lazyRouter, contract))
+
+    expect(unlazied).toEqual({ p1: procedure1 })
+    expect(getHiddenRouterContract(unlazied)).toBe(contract)
   })
 })
