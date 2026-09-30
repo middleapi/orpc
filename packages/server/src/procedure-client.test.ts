@@ -430,6 +430,7 @@ describe('createProcedureClient', () => {
           expect(error.cause).toBeInstanceOf(ValidationError)
           expect(error.cause.issues).toBe(inputSchema1ValidationSpy.mock.results[0]!.value.issues)
           expect(error.cause.invalidData).toEqual(invalidInput)
+          expect(error.data).toEqual({ issues: [{ message: expect.any(String), path: ['inputSchema1'] }] })
 
           return true
         })
@@ -457,6 +458,7 @@ describe('createProcedureClient', () => {
           expect(error.cause).toBeInstanceOf(ValidationError)
           expect(error.cause.issues).toBe(inputSchema2ValidationSpy.mock.results[0]!.value.issues)
           expect(error.cause.invalidData).toEqual(invalidInput)
+          expect(error.data).toEqual({ issues: [{ message: expect.any(String), path: ['inputSchema2'] }] })
 
           return true
         })
@@ -485,6 +487,7 @@ describe('createProcedureClient', () => {
           expect(error.cause).toBeInstanceOf(ValidationError)
           expect(error.cause.issues).toBe(inputSchema3ValidationSpy.mock.results[0]!.value.issues)
           expect(error.cause.invalidData).toEqual(invalidInput)
+          expect(error.data).toEqual({ issues: [{ message: expect.any(String), path: ['inputSchema3'] }] })
 
           return true
         })

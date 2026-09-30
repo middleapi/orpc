@@ -58,3 +58,36 @@ export function isSchemaIssue(issue: unknown): issue is SchemaIssue {
 
   return true
 }
+
+/**
+ * Reduces issues to their `message` and `path`, with each path segment reduced to its key.
+ * A path stops at the first segment whose key is not a property key.
+ *
+ * @remarks
+ * Some schema libraries (e.g. Valibot, ArkType) embed the validated value, and even its parents,
+ * in their issues. Use this before sending issues to a client, so they cannot echo unrelated input
+ * such as request headers.
+ *
+ * @see {@link https://orpc.dev/docs/recipes/validation-customization#input-validation-errors | Validation Customization - Input Validation Errors}
+ */
+export function sanitizeSchemaIssues(issues: readonly SchemaIssue[]): SchemaIssue[] {
+  return issues.map((issue) => {
+    if (issue.path === undefined) {
+      return { message: issue.message }
+    }
+
+    const path: PropertyKey[] = []
+
+    for (const segment of issue.path) {
+      const key: unknown = isTypescriptObject(segment) ? segment.key : segment
+
+      if (!isPropertyKey(key)) {
+        break
+      }
+
+      path.push(key)
+    }
+
+    return { message: issue.message, path }
+  })
+}

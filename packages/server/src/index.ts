@@ -85,6 +85,7 @@ export {
   error,
   eventIterator,
   reconcileORPCError,
+  sanitizeSchemaIssues,
   type,
   ValidationError,
 } from '@orpc/contract'

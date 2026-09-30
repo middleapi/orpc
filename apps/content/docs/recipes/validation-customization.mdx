@@ -46,6 +46,24 @@ z.object({
 If runtime validation is disabled, the transformation is skipped. As a result, the server returns a `number` while the client expects a `string`, leading to unexpected behavior.
 :::
 
+## Input Validation Errors
+
+When input validation fails, oRPC throws an `ORPCError` with the `BAD_REQUEST` code. Its `data.issues` holds only each issue's `message` and `path`, with path segments reduced to their keys:
+
+```json
+{
+  "issues": [
+    { "message": "Invalid type: Expected string but received 123", "path": ["body", "name"] }
+  ]
+}
+```
+
+The raw issues from your schema library stay on the server, as `error.cause.issues` on the [`ValidationError`](#custom-validation-errors) cause.
+
+:::warning
+Some schema libraries, such as Valibot and ArkType, embed the validated input in their raw issues, including values unrelated to the failing field, like every request header with the [detailed input structure](/docs/openapi/input-and-output-mapping#detailed-input-structure). If you build a custom error from `error.cause.issues`, pass them through `sanitizeSchemaIssues` from `@orpc/server` or pick only the fields you need. Messages still come from your schema library, and some include the invalid value itself.
+:::
+
 ## Custom Validation Errors
 
 You can catch validation errors with [interceptors](/docs/rpc/handler#interceptors), [client interceptors](/docs/rpc/handler#client-interceptors), or [middleware](/docs/middleware) applied before `.input` or `.output` and then throw a custom error. This is useful if you want to change the error message or shape.

@@ -209,4 +209,13 @@ describe('requestValidationLinkPlugin', () => {
     expect(codec.encodeInput).not.toHaveBeenCalled()
     expect(transport.send).not.toHaveBeenCalled()
   })
+
+  it('keeps only message and path in data.issues and raw issues in the cause', async () => {
+    await expect(link.call(['nested', 'chainedProcedure'], 0, { context: {} })).rejects.toSatisfy((error: any) => {
+      expect(error.data).toEqual({ issues: [{ message: expect.any(String), path: [] }] })
+      expect(error.cause).toBeInstanceOf(ValidationError)
+      expect(error.cause.issues).toEqual([expect.objectContaining({ code: expect.any(String) })])
+      return true
+    })
+  })
 })
