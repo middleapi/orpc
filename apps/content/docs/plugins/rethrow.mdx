@@ -32,3 +32,22 @@ catch (error) {
 :::info
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
 :::
+
+## Batch Requests
+
+The [Batch Plugin](/docs/plugins/batch) sends one response for several requests, so an error rethrown for one of them cannot fail `handler.handle` without failing the others. Instead, that request gets a `500` response and the error is passed to the batch plugin's [`onError`](/docs/plugins/batch#error-handling) option. Report it there, the same way your framework reports errors:
+
+```ts
+const handler = new RPCHandler(router, {
+  plugins: [
+    new BatchHandlerPlugin({
+      onError: (error) => {
+        logger.error(error)
+      },
+    }),
+    new RethrowHandlerPlugin({
+      filter: error => !(error instanceof ORPCError),
+    }),
+  ],
+})
+```

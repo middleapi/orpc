@@ -210,6 +210,46 @@ describe.each([
     expect(fetchSpy).toHaveBeenCalledTimes(1) // ensure batch was used
   })
 
+  it('fails an endless stream in a buffered batch without failing the rest of the batch', async () => {
+    const finished = vi.fn()
+
+    const router = {
+      echo: os.input(z.string()).handler(({ input }) => `echo:${input}`),
+      endless: os.handler(async function* () {
+        try {
+          while (true) {
+            yield 'x'.repeat(1024 * 1024)
+          }
+        }
+        finally {
+          finished()
+        }
+      }),
+    }
+
+    const { client, fetchSpy } = createClientServer(router, { mode: 'buffered' })
+
+    const [echo, endless] = await Promise.all([
+      client.echo('alpha'),
+      client.endless(),
+    ])
+
+    expect(echo).toBe('echo:alpha')
+
+    let received = 0
+    await expect((async () => {
+      for await (const _ of endless) {
+        received++
+      }
+    })()).rejects.toThrow('Server canceled the request')
+
+    // The default limit is 10MB of streamed data per buffered batch.
+    expect(received).toBeGreaterThan(0)
+    expect(received).toBeLessThanOrEqual(10)
+    expect(finished).toHaveBeenCalledTimes(1)
+    expect(fetchSpy).toHaveBeenCalledTimes(1) // ensure batch was used
+  })
+
   it('sends file uploads outside the batch', async () => {
     const router = {
       upload: os.input(z.object({ file: z.file() })).handler(({ input }) => input.file.text()),

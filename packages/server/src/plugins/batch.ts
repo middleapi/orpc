@@ -1,11 +1,11 @@
 import type { BatchLinkPluginMode } from '@orpc/client/plugins'
-import type { Promisable, Value } from '@orpc/shared'
+import type { Promisable, ThrowableError, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-server/peer'
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
 import { ORPCError } from '@orpc/client'
-import { toArray, value } from '@orpc/shared'
+import { promiseWithResolvers, stringifyJSON, toArray, value } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
 
@@ -17,6 +17,8 @@ import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standar
  * so it only serves to describe the payload to logs, proxies, and dev tools.
  */
 export const BATCH_CONTENT_TYPE = 'application/vnd.orpc.batch'
+
+const textEncoder = new TextEncoder()
 
 export interface BatchHandlerPluginOptions<T extends Context> {
   /**
@@ -35,6 +37,16 @@ export interface BatchHandlerPluginOptions<T extends Context> {
   mapSubrequest?: (subrequest: StandardLazyRequest, batchOptions: StandardHandlerRoutingInterceptorOptions<T>) => StandardLazyRequest
 
   /**
+   * Called when a subrequest throws instead of returning a response, for example when
+   * `mapSubrequest` or a routing interceptor throws, or when the Rethrow Handler Plugin
+   * rethrows an error. The subrequest still gets a 500 response, since the batch response
+   * is shared with the other subrequests and cannot be failed for one of them.
+   *
+   * Errors thrown by this callback are ignored.
+   */
+  onError?: (error: ThrowableError, subrequest: StandardLazyRequest, batchOptions: StandardHandlerRoutingInterceptorOptions<T>) => Promisable<void>
+
+  /**
    * Success batch response status code.
    *
    * @default 207
@@ -47,6 +59,18 @@ export interface BatchHandlerPluginOptions<T extends Context> {
    * @default {}
    */
   headers?: Value<Promisable<StandardHeaders>, [batchOptions: StandardHandlerRoutingInterceptorOptions<T>]>
+
+  /**
+   * The max total size (in bytes) of streamed subresponses a buffered batch holds in memory.
+   *
+   * Buffered mode sends nothing until every subrequest finishes, so a subresponse that is an
+   * event iterator or a `ReadableStream` is kept in memory until it ends. A stream that would
+   * exceed this limit is cancelled, and its client call fails. Streaming mode is not limited,
+   * since it only reads a subresponse as fast as the client reads the batch response.
+   *
+   * @default 10485760 (10MB)
+   */
+  maxBufferedStreamSize?: Value<Promisable<number>, [batchOptions: StandardHandlerRoutingInterceptorOptions<T>]>
 
   /**
    * Keep-alive settings for streaming batch responses.
@@ -93,8 +117,10 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
   private readonly maxSize: Exclude<BatchHandlerPluginOptions<T>['maxSize'], undefined>
   private readonly mapSubrequest: Exclude<BatchHandlerPluginOptions<T>['mapSubrequest'], undefined>
+  private readonly onError: BatchHandlerPluginOptions<T>['onError']
   private readonly successStatus: Exclude<BatchHandlerPluginOptions<T>['successStatus'], undefined>
   private readonly headers: Exclude<BatchHandlerPluginOptions<T>['headers'], undefined>
+  private readonly maxBufferedStreamSize: Exclude<BatchHandlerPluginOptions<T>['maxBufferedStreamSize'], undefined>
   private readonly keepAliveEnabled: boolean
   private readonly keepAliveInterval: number
 
@@ -115,8 +141,10 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       },
     }))
 
+    this.onError = options.onError
     this.successStatus = options.successStatus ?? 207
     this.headers = options.headers ?? {}
+    this.maxBufferedStreamSize = options.maxBufferedStreamSize ?? 10 * 1024 * 1024
     this.keepAliveEnabled = options.keepAlive?.enabled ?? true
     this.keepAliveInterval = options.keepAlive?.interval ?? 15_000
   }
@@ -201,9 +229,9 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       }
 
-      const handleIndividualRequest = async (request: StandardLazyRequest): Promise<StandardResponse> => {
+      const handleIndividualRequest = async (subrequest: StandardLazyRequest): Promise<StandardResponse> => {
         try {
-          request = this.mapSubrequest(request, interceptorOptions)
+          const request = this.mapSubrequest(subrequest, interceptorOptions)
           const { matched, response } = await interceptorOptions.next({ ...interceptorOptions, request })
 
           if (!matched) {
@@ -212,13 +240,18 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
           return response
         }
-        catch (err) {
+        catch (error) {
           /**
-           * Errors should not occur at the routing interceptor level.
-           * Reject the promise so it can be handled by the unhandledRejection handler
-           * for global logging or error handling.
+           * The error cannot propagate: the batch response is shared with the other subrequests,
+           * and in streaming mode it has already been returned. Report it through `onError` instead
+           * of leaving an unhandled rejection, which would terminate Node.js and Deno processes.
            */
-          Promise.reject(err)
+          try {
+            await this.onError?.(error as ThrowableError, subrequest, interceptorOptions)
+          }
+          catch {
+            // Ignored, see `onError`
+          }
 
           return { status: 500, headers: {}, body: 'Internal server error' }
         }
@@ -247,8 +280,25 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       const headers = await value(this.headers, interceptorOptions)
 
       if (mode === 'buffered') {
+        const maxBufferedStreamSize = await value(this.maxBufferedStreamSize, interceptorOptions)
+        let bufferedStreamSize = 0
+
         const responseMessages: ServerPeerSendMessage[] = []
         const peer = new ServerPeer(async (message) => {
+          if (message.kind === 'event-stream' || message.kind === 'octet-stream') {
+            const size = bufferedStreamSize + getStreamMessageSize(message)
+
+            if (size > maxBufferedStreamSize) {
+              /**
+               * Throwing makes the peer cancel the stream and send a `cancel` message for the
+               * subrequest, so an endless subresponse cannot grow the buffer without bound.
+               */
+              throw new Error('Buffered batch response exceeds the maximum allowed stream size')
+            }
+
+            bufferedStreamSize = size
+          }
+
           responseMessages.push(message)
         })
 
@@ -259,15 +309,8 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
           const chunks: Uint8Array<ArrayBuffer>[] = []
 
           for (const message of responseMessages) {
-            const encoded = await encodePeerMessage(message)
-            const bytes = typeof encoded === 'string'
-              ? new TextEncoder().encode(encoded)
-              : encoded
-
-            const lengthBuffer = new ArrayBuffer(4)
-            new DataView(lengthBuffer).setUint32(0, bytes.byteLength, false)
-            chunks.push(new Uint8Array(lengthBuffer))
-            chunks.push(bytes)
+            const bytes = await encodeBatchMessage(message)
+            chunks.push(encodeLengthPrefix(bytes.byteLength), bytes)
           }
 
           return {
@@ -287,67 +330,126 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       }
 
       // streaming mode — binary length-prefixed ReadableStream
-      let streamController: ReadableStreamDefaultController<Uint8Array>
-      let keepAliveTimer: ReturnType<typeof setInterval> | undefined
+      const signal = interceptorOptions.request.signal
+      const keepAliveEnabled = this.keepAliveEnabled
+      const keepAliveInterval = this.keepAliveInterval
 
-      const clearKeepAlive = () => {
-        if (keepAliveTimer !== undefined) {
-          clearInterval(keepAliveTimer)
-          keepAliveTimer = undefined
-        }
+      let streamController: ReadableStreamDefaultController<Uint8Array<ArrayBuffer>>
+      let isStreamDone = false
+      let lastSentAt = Date.now()
+      let keepAliveTimer: ReturnType<typeof setTimeout> | undefined
+      let pulled: ReturnType<typeof promiseWithResolvers<void>> | undefined
+
+      /**
+       * Wakes up senders waiting for the consumer, see the peer below.
+       */
+      const releaseSenders = () => {
+        pulled?.resolve()
+        pulled = undefined
       }
 
-      const scheduleKeepAlive = () => {
-        if (!this.keepAliveEnabled) {
-          return
-        }
+      const clearKeepAlive = () => {
+        clearTimeout(keepAliveTimer)
+        keepAliveTimer = undefined
+      }
 
+      /**
+       * A single timer instead of one per message: when it fires, it only sends
+       * a keep-alive frame if nothing was sent during the last interval.
+       */
+      const scheduleKeepAlive = (delay: number) => {
+        keepAliveTimer = setTimeout(() => {
+          const idle = Date.now() - lastSentAt
+
+          if (idle < keepAliveInterval) {
+            scheduleKeepAlive(keepAliveInterval - idle)
+            return
+          }
+
+          /**
+           * Skip the frame while earlier data is still queued: the connection is not idle,
+           * and frames must not pile up behind a response the client does not read.
+           */
+          if (streamController.desiredSize! > 0) {
+            try {
+              // Zero-length length-prefixed frame = keep-alive (ignored by clients)
+              streamController.enqueue(encodeLengthPrefix(0))
+              lastSentAt = Date.now()
+            }
+            catch {
+              // Stream may already be closed or errored.
+              clearKeepAlive()
+              return
+            }
+          }
+
+          scheduleKeepAlive(keepAliveInterval)
+        }, delay)
+      }
+
+      /**
+       * Whether the consumer has not read what is already queued yet. Waiting is pointless
+       * once the stream is done or the batch request is aborted, since nobody reads anymore.
+       */
+      const shouldWaitForConsumer = () => !isStreamDone && !signal?.aborted && streamController.desiredSize! <= 0
+
+      const finish = () => {
+        isStreamDone = true
         clearKeepAlive()
-        keepAliveTimer = setInterval(() => {
-          try {
-            // Zero-length length-prefixed frame = keep-alive (ignored by clients)
-            const lengthBuffer = new ArrayBuffer(4)
-            new DataView(lengthBuffer).setUint32(0, 0, false)
-            streamController.enqueue(new Uint8Array(lengthBuffer))
-          }
-          catch {
-            // Stream may already be closed or errored.
-            clearKeepAlive()
-          }
-        }, this.keepAliveInterval)
+        releaseSenders()
+        signal?.removeEventListener('abort', releaseSenders)
       }
 
       const peer = new ServerPeer(async (message) => {
-        const encoded = await encodePeerMessage(message)
-        const bytes = typeof encoded === 'string' ? new TextEncoder().encode(encoded) : encoded
+        const bytes = await encodeBatchMessage(message)
 
-        const lengthBuffer = new ArrayBuffer(4)
-        new DataView(lengthBuffer).setUint32(0, bytes.byteLength, false)
-        streamController.enqueue(new Uint8Array(lengthBuffer))
+        /**
+         * Backpressure: wait until the consumer reads what is already queued, so a subresponse
+         * (e.g. an endless stream) is only read as fast as the client reads the batch response.
+         * No `await` between this check and the enqueue, so concurrent senders cannot overshoot.
+         */
+        while (shouldWaitForConsumer()) {
+          pulled ??= promiseWithResolvers()
+          await pulled.promise
+        }
+
+        streamController.enqueue(encodeLengthPrefix(bytes.byteLength))
         streamController.enqueue(bytes)
-        scheduleKeepAlive() // reset idle timer
+        lastSentAt = Date.now()
       })
 
       const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
         start(controller) {
           streamController = controller
-          scheduleKeepAlive()
+
+          if (keepAliveEnabled) {
+            scheduleKeepAlive(keepAliveInterval)
+          }
+        },
+        pull() {
+          releaseSenders()
         },
         async cancel(reason) {
-          clearKeepAlive()
+          finish()
           await peer.close(reason)
         },
       })
 
+      /**
+       * Once aborted, nobody reads the response anymore,
+       * so senders must stop waiting for the consumer to let the peer settle.
+       */
+      signal?.addEventListener('abort', releaseSenders)
+
       // DO NOT await here to block streaming response
       runSubrequests(peer)
         .then(async () => {
-          clearKeepAlive()
+          finish()
           streamController.close()
           await peer.close()
         })
         .catch(async (error) => {
-          clearKeepAlive()
+          finish()
           streamController.error(error)
           await peer.close(error)
         })
@@ -367,4 +469,23 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       routingInterceptors: [routingInterceptor, ...toArray(options.routingInterceptors)],
     }
   }
+}
+
+async function encodeBatchMessage(message: ServerPeerSendMessage): Promise<Uint8Array<ArrayBuffer>> {
+  const encoded = await encodePeerMessage(message)
+  return typeof encoded === 'string' ? textEncoder.encode(encoded) : encoded
+}
+
+function encodeLengthPrefix(length: number): Uint8Array<ArrayBuffer> {
+  const prefix = new Uint8Array(4)
+  new DataView(prefix.buffer).setUint32(0, length, false)
+  return prefix
+}
+
+function getStreamMessageSize(message: Extract<ServerPeerSendMessage, { kind: 'event-stream' | 'octet-stream' }>): number {
+  if (message.binary !== undefined) {
+    return message.binary instanceof Blob ? message.binary.size : message.binary.byteLength
+  }
+
+  return stringifyJSON(message.json).length
 }

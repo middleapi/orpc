@@ -58,7 +58,7 @@ const cors = new CORSHandlerPlugin({
 
 ## Response Modes
 
-By default, the plugin uses `streaming` mode. Responses are sent as soon as they are ready, so one slow request does not block the rest of the batch.
+By default, the plugin uses `streaming` mode. Responses are sent as soon as they are ready, so one slow request does not block the rest of the batch. The server reads each response only as fast as the client reads the batch, so a slow client or an endless [AsyncIteratorObject](/docs/async-iterator-object) does not pile up in server memory.
 
 If your environment does not support streaming responses, such as some serverless platforms or older browsers, switch to `buffered` mode instead. In this mode, all responses are collected and sent together.
 
@@ -105,6 +105,49 @@ const handler = new RPCHandler(router, {
   ],
 })
 ```
+
+### Buffered Stream Limit
+
+In **buffered** mode, nothing is sent until every request in the batch finishes, so a response that is an [AsyncIteratorObject](/docs/async-iterator-object) or a `ReadableStream` is held in server memory until it ends. `maxBufferedStreamSize` caps the total size of these streams in one batch. A stream that would exceed it is cancelled, and its call fails on the client.
+
+```ts
+const handler = new RPCHandler(router, {
+  plugins: [
+    new BatchHandlerPlugin({
+      /**
+       * The max total size (in bytes) of streamed subresponses a buffered batch holds in memory.
+       *
+       * @default 10485760 (10MB)
+       */
+      maxBufferedStreamSize: 10 * 1024 * 1024,
+    }),
+  ],
+})
+```
+
+:::tip
+Keep subscriptions and other long-lived streams out of buffered batches with [`filter`](#filtering-requests), or use `streaming` mode for them.
+:::
+
+## Error Handling
+
+An error thrown by a procedure becomes an error response for that request, the same as without batching. A request in the batch can also fail before it has a response, for example when `mapSubrequest` or a routing interceptor throws, or when the [Rethrow Handler Plugin](/docs/plugins/rethrow) rethrows an error. That error cannot reach `handler.handle`, since the batch response is shared with the other requests and, in `streaming` mode, is already being sent. The request gets a `500` response instead, and the error is passed to `onError`:
+
+```ts
+const handler = new RPCHandler(router, {
+  plugins: [
+    new BatchHandlerPlugin({
+      onError: (error, subrequest, { context }) => {
+        logger.error({ err: error, url: subrequest.url }, 'batch subrequest failed')
+      },
+    }),
+  ],
+})
+```
+
+:::info
+Without `onError`, these errors are not reported anywhere. Errors thrown by `onError` itself are ignored.
+:::
 
 ## Compression
 

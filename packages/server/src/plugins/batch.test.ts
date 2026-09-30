@@ -6,6 +6,7 @@ import { os } from '../builder'
 import { BatchHandlerPlugin } from './batch'
 import { RequestCompressionHandlerPlugin } from './request-compression'
 import { RequestLimitHandlerPlugin } from './request-limit'
+import { RethrowHandlerPlugin } from './rethrow'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -43,6 +44,58 @@ function createBatchRequest(options: {
     body: JSON.stringify(options.messages),
     signal: options.signal,
   })
+}
+
+function decodeFrames(buffer: Uint8Array) {
+  const messages: any[] = []
+
+  for (let offset = 0; offset < buffer.byteLength;) {
+    const length = new DataView(buffer.buffer, buffer.byteOffset + offset, 4).getUint32(0, false)
+    const payload = new TextDecoder().decode(buffer.subarray(offset + 4, offset + 4 + length))
+    messages.push(JSON.parse(payload.split('\xFF')[0]!))
+    offset += 4 + length
+  }
+
+  return messages
+}
+
+function waitForMacrotasks(ms = 20) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function createEndlessStream() {
+  const state = { pulls: 0, cancelled: false }
+  const chunk = new Uint8Array(64 * 1024)
+
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      state.pulls++
+      controller.enqueue(chunk)
+    },
+    cancel() {
+      state.cancelled = true
+    },
+  })
+
+  return { state, stream }
+}
+
+function createEndlessIterator() {
+  const state = { yields: 0, finished: false }
+
+  async function* iterator() {
+    try {
+      while (true) {
+        state.yields++
+        yield 'x'.repeat(1024)
+      }
+    }
+    finally {
+      state.finished = true
+    }
+  }
+
+  return { state, iterator }
 }
 
 function readLengthPrefixedChunk(buffer: Uint8Array) {
@@ -214,18 +267,168 @@ describe('batchHandlerPlugin', () => {
       expect(handlerFn).toHaveBeenCalledTimes(0)
     })
 
-    it('returns 500 sub-response when mapSubrequest throws', async ({ onTestFinished }) => {
-      const rejectSpy = vi.spyOn(Promise, 'reject')
-        .mockImplementation(() => new Promise(() => {}) as Promise<never>)
-
-      onTestFinished(() => {
-        rejectSpy.mockRestore()
+    it('cancels streamed sub-responses that exceed maxBufferedStreamSize', async () => {
+      const endless = createEndlessIterator()
+      const handler = createHandler(new BatchHandlerPlugin({ maxBufferedStreamSize: 10 * 1024 }), {
+        ping: os.handler(() => 'pong'),
+        subscribe: os.handler(endless.iterator),
       })
 
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: [makePeerRequestMessage(0, '/subscribe'), makePeerRequestMessage(1, '/ping')],
+      }))
+
+      expect(response!.status).toBe(207)
+      expect(endless.state.finished).toBe(true)
+      expect(endless.state.yields).toBeLessThanOrEqual(11)
+
+      const body = await response!.json() as any[]
+      const events = body.filter(message => message.id === 0 && message.kind === 'event-stream')
+      expect(events.length).toBeGreaterThan(0)
+      expect(events.length).toBeLessThanOrEqual(10)
+      expect(body.at(-1)).toEqual({ id: 0, kind: 'cancel' })
+      expect(body).toContainEqual(expect.objectContaining({ id: 1, kind: 'response', json: expect.objectContaining({ body: { json: 'pong' } }) }))
+    })
+
+    it('limits streamed sub-responses to 10MB by default', async () => {
+      const endless = createEndlessStream()
+      const handler = createHandler(new BatchHandlerPlugin(), {
+        download: os.handler(() => endless.stream),
+      })
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: [makePeerRequestMessage(0, '/download')],
+      }))
+
+      expect(response!.status).toBe(207)
+      expect(endless.state.cancelled).toBe(true)
+      // 10MB of 64KB chunks, plus the chunks the stream queued ahead
+      expect(endless.state.pulls).toBeGreaterThanOrEqual(160)
+      expect(endless.state.pulls).toBeLessThanOrEqual(165)
+    })
+
+    it('resolves maxBufferedStreamSize per batch request', async () => {
+      const maxBufferedStreamSize = vi.fn(() => 0)
+      const handler = createHandler(new BatchHandlerPlugin({ maxBufferedStreamSize }), {
+        subscribe: os.handler(async function* () {
+          yield 'too large'
+        }),
+      })
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: [makePeerRequestMessage(0, '/subscribe')],
+      }))
+
+      expect(maxBufferedStreamSize).toHaveBeenCalledTimes(1)
+      expect(maxBufferedStreamSize).toHaveBeenCalledWith(expect.objectContaining({ request: expect.any(Object) }))
+
+      const body = await response!.json() as any[]
+      expect(body.map(message => message.kind)).toEqual(['response', 'cancel'])
+    })
+
+    it('does not limit streamed sub-responses in streaming mode', async () => {
+      const handler = createHandler(new BatchHandlerPlugin({ maxBufferedStreamSize: 0 }), {
+        subscribe: os.handler(async function* () {
+          yield 'a'
+          yield 'b'
+        }),
+      })
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [makePeerRequestMessage(0, '/subscribe')],
+      }))
+
+      const messages = decodeFrames(new Uint8Array(await response!.arrayBuffer()))
+      expect(messages.map(message => message.kind)).toEqual(['response', 'event-stream', 'event-stream', 'event-stream'])
+    })
+  })
+
+  describe('sub-request errors', () => {
+    const router = {
+      fail: os.handler(() => {
+        throw new Error('db down')
+      }),
+      ping: os.handler(() => 'pong'),
+    }
+
+    const messages = [makePeerRequestMessage(0, '/fail'), makePeerRequestMessage(1, '/ping')]
+
+    async function readSubResponses(mode: 'buffered' | 'streaming', response: Response) {
+      const body = mode === 'buffered'
+        ? await response.json() as any[]
+        : decodeFrames(new Uint8Array(await response.arrayBuffer()))
+
+      return body.sort((a, b) => a.id - b.id)
+    }
+
+    function captureUnhandledRejections(onTestFinished: (fn: () => void) => void) {
+      const listener = vi.fn()
+      process.on('unhandledRejection', listener)
+      onTestFinished(() => {
+        process.off('unhandledRejection', listener)
+      })
+      return listener
+    }
+
+    it.for(['buffered', 'streaming'] as const)('reports errors the rethrow plugin rethrows to onError in %s mode', async (mode, { onTestFinished }) => {
+      const unhandledRejection = captureUnhandledRejections(onTestFinished)
+      const onError = vi.fn()
+
+      const handler = new RPCHandler(router, {
+        plugins: [
+          new BatchHandlerPlugin({ onError }),
+          new RethrowHandlerPlugin({ filter: error => !(error instanceof ORPCError) }),
+        ],
+      })
+
+      const { response } = await handler.handle(createBatchRequest({ mode, messages }))
+
+      expect(response!.status).toBe(207)
+
+      const [failed, succeeded] = await readSubResponses(mode, response!)
+      expect(failed).toMatchObject({ id: 0, kind: 'response', json: { status: 500, body: 'Internal server error' } })
+      expect(succeeded).toMatchObject({ id: 1, kind: 'response', json: { body: { json: 'pong' } } })
+
+      expect(onError).toHaveBeenCalledTimes(1)
+      expect(onError).toHaveBeenCalledWith(
+        new Error('db down'),
+        expect.objectContaining({ url: '/fail' }),
+        expect.objectContaining({ request: expect.objectContaining({ method: 'POST' }) }),
+      )
+
+      await waitForMacrotasks()
+      expect(unhandledRejection).not.toHaveBeenCalled()
+    })
+
+    it.for(['buffered', 'streaming'] as const)('does not leave an unhandled rejection without onError in %s mode', async (mode, { onTestFinished }) => {
+      const unhandledRejection = captureUnhandledRejections(onTestFinished)
+
+      const handler = new RPCHandler(router, {
+        plugins: [
+          new BatchHandlerPlugin(),
+          new RethrowHandlerPlugin({ filter: error => !(error instanceof ORPCError) }),
+        ],
+      })
+
+      const { response } = await handler.handle(createBatchRequest({ mode, messages }))
+      const [failed] = await readSubResponses(mode, response!)
+      expect(failed).toMatchObject({ id: 0, json: { status: 500 } })
+
+      await waitForMacrotasks()
+      expect(unhandledRejection).not.toHaveBeenCalled()
+    })
+
+    it('returns 500 sub-response and reports the error when mapSubrequest throws', async () => {
+      const onError = vi.fn()
       const handler = createHandler(new BatchHandlerPlugin({
         mapSubrequest: () => {
           throw new Error('boom')
         },
+        onError,
       }))
 
       const { response } = await handler.handle(createBatchRequest({
@@ -238,7 +441,34 @@ describe('batchHandlerPlugin', () => {
       const body = await response!.json() as any
       expect(body[0].json.status).toBe(500)
       expect(body[0].json.body).toBe('Internal server error')
-      expect(rejectSpy).toHaveBeenCalledTimes(1)
+      expect(onError).toHaveBeenCalledWith(new Error('boom'), expect.objectContaining({ url: '/ping' }), expect.any(Object))
+      expect(handlerFn).not.toHaveBeenCalled()
+    })
+
+    it.for([
+      ['sync', () => {
+        throw new Error('onError failed')
+      }],
+      ['async', async () => {
+        throw new Error('onError failed')
+      }],
+    ] as const)('ignores errors thrown by a %s onError', async ([, onError], { onTestFinished }) => {
+      const unhandledRejection = captureUnhandledRejections(onTestFinished)
+
+      const handler = new RPCHandler(router, {
+        plugins: [
+          new BatchHandlerPlugin({ onError }),
+          new RethrowHandlerPlugin({ filter: error => !(error instanceof ORPCError) }),
+        ],
+      })
+
+      const { response } = await handler.handle(createBatchRequest({ mode: 'buffered', messages }))
+      const [failed, succeeded] = await readSubResponses('buffered', response!)
+      expect(failed).toMatchObject({ id: 0, json: { status: 500 } })
+      expect(succeeded).toMatchObject({ id: 1, json: { body: { json: 'pong' } } })
+
+      await waitForMacrotasks()
+      expect(unhandledRejection).not.toHaveBeenCalled()
     })
   })
 
@@ -292,6 +522,103 @@ describe('batchHandlerPlugin', () => {
       const { messageLength, payload } = readLengthPrefixedChunk(buffer)
       expect(messageLength).toBe(payload.length)
       expect(new TextDecoder().decode(payload)).toContain('__TEST__')
+    })
+  })
+
+  describe('streaming backpressure', () => {
+    it('only pulls a stream sub-response as fast as the batch response is read', async () => {
+      const endless = createEndlessStream()
+      const handler = createHandler(new BatchHandlerPlugin(), {
+        download: os.handler(() => endless.stream),
+      })
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [makePeerRequestMessage(0, '/download')],
+      }))
+
+      await waitForMacrotasks()
+      const unreadPulls = endless.state.pulls
+      expect(unreadPulls).toBeLessThanOrEqual(5)
+
+      await waitForMacrotasks()
+      expect(endless.state.pulls).toBe(unreadPulls)
+
+      const reader = response!.body!.getReader()
+      for (let i = 0; i < 10; i++) {
+        await reader.read()
+      }
+
+      await waitForMacrotasks()
+      expect(endless.state.pulls).toBeGreaterThan(unreadPulls)
+      expect(endless.state.pulls).toBeLessThanOrEqual(unreadPulls + 6)
+
+      await reader.cancel()
+      expect(endless.state.cancelled).toBe(true)
+    })
+
+    it('only pulls an event iterator sub-response as fast as the batch response is read', async () => {
+      const endless = createEndlessIterator()
+      const handler = createHandler(new BatchHandlerPlugin(), {
+        subscribe: os.handler(endless.iterator),
+      })
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [makePeerRequestMessage(0, '/subscribe')],
+      }))
+
+      await waitForMacrotasks()
+      const unreadYields = endless.state.yields
+      expect(unreadYields).toBeLessThanOrEqual(3)
+
+      await waitForMacrotasks()
+      expect(endless.state.yields).toBe(unreadYields)
+
+      await response!.body!.cancel()
+      expect(endless.state.finished).toBe(true)
+    })
+
+    it('bounds the buffer across concurrent stream sub-responses', async () => {
+      const streams = [createEndlessStream(), createEndlessStream(), createEndlessStream()]
+      const handler = createHandler(new BatchHandlerPlugin(), {
+        a: os.handler(() => streams[0]!.stream),
+        b: os.handler(() => streams[1]!.stream),
+        c: os.handler(() => streams[2]!.stream),
+      })
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [makePeerRequestMessage(0, '/a'), makePeerRequestMessage(1, '/b'), makePeerRequestMessage(2, '/c')],
+      }))
+
+      await waitForMacrotasks()
+      const totalPulls = streams.reduce((sum, { state }) => sum + state.pulls, 0)
+      expect(totalPulls).toBeLessThanOrEqual(15)
+
+      await response!.body!.cancel()
+      expect(streams.every(({ state }) => state.cancelled)).toBe(true)
+    })
+
+    it('settles sub-requests waiting on an unread response when the batch request is aborted', async () => {
+      const endless = createEndlessIterator()
+      const handler = createHandler(new BatchHandlerPlugin(), {
+        subscribe: os.handler(endless.iterator),
+      })
+
+      const controller = new AbortController()
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [makePeerRequestMessage(0, '/subscribe')],
+        signal: controller.signal,
+      }))
+
+      await waitForMacrotasks()
+      controller.abort()
+
+      await vi.waitFor(() => expect(endless.state.finished).toBe(true))
+      // the stream closes once every sub-request settled
+      await expect(response!.arrayBuffer()).resolves.toBeInstanceOf(ArrayBuffer)
     })
   })
 
@@ -620,6 +947,88 @@ describe('batchHandlerPlugin', () => {
       expect(vi.getTimerCount()).toBe(0)
     })
 
+    it('sends a keep-alive frame only after a full interval without messages', async () => {
+      const { promise: gate, resolve } = promiseWithResolvers<void>()
+
+      const handler = createHandler(new BatchHandlerPlugin({
+        keepAlive: { enabled: true, interval: 100 },
+      }), {
+        wait: os.handler(async () => {
+          await gate
+          return 'done'
+        }),
+        hang: os.handler(() => new Promise(() => {})),
+      })
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [makePeerRequestMessage(0, '/wait'), makePeerRequestMessage(1, '/hang')],
+      }))
+
+      const reader = (response!.body as ReadableStream<Uint8Array>).getReader()
+
+      // The `/wait` response is sent at t=60.
+      await vi.advanceTimersByTimeAsync(60)
+      resolve()
+      const prefix = await reader.read()
+      const message = await reader.read()
+      expect(readLengthPrefixedChunk(prefix.value!).messageLength).toBe(message.value!.byteLength)
+
+      let keepAlive: Uint8Array | undefined
+      void reader.read().then(({ value }) => {
+        keepAlive = value
+      })
+
+      // At t=100 the stream has only been idle for 40ms.
+      await vi.advanceTimersByTimeAsync(40)
+      expect(keepAlive).toBeUndefined()
+
+      await vi.advanceTimersByTimeAsync(60)
+      expect(keepAlive).toEqual(new Uint8Array([0, 0, 0, 0]))
+      expect(vi.getTimerCount()).toBe(1)
+
+      await reader.cancel()
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('does not queue keep-alive frames behind unread data', async () => {
+      const handler = createHandler(new BatchHandlerPlugin({
+        keepAlive: { enabled: true, interval: 100 },
+      }), {
+        ping: os.handler(() => 'pong'),
+        hang: os.handler(() => new Promise(() => {})),
+      })
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [makePeerRequestMessage(0, '/ping'), makePeerRequestMessage(1, '/hang')],
+      }))
+
+      // The `/ping` response sits unread for ten intervals.
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(vi.getTimerCount()).toBe(1)
+
+      const reader = (response!.body as ReadableStream<Uint8Array>).getReader()
+      const prefix = await reader.read()
+      const message = await reader.read()
+      expect(readLengthPrefixedChunk(prefix.value!).messageLength).toBe(message.value!.byteLength)
+
+      let keepAlive: Uint8Array | undefined
+      void reader.read().then(({ value }) => {
+        keepAlive = value
+      })
+
+      // Nothing else was queued behind it, the next keep-alive only comes on the next tick.
+      await vi.advanceTimersByTimeAsync(0)
+      expect(keepAlive).toBeUndefined()
+
+      await vi.advanceTimersByTimeAsync(100)
+      expect(keepAlive).toEqual(new Uint8Array([0, 0, 0, 0]))
+
+      await reader.cancel()
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
     it('does not schedule a keep-alive timer when disabled', async () => {
       const handler = createHandler(new BatchHandlerPlugin({
         keepAlive: { enabled: false },
@@ -711,7 +1120,7 @@ describe('batchHandlerPlugin', () => {
         messages: [makePeerRequestMessage(0, '/ping')],
       }))
 
-      // One keep-alive setInterval is scheduled while the stream is idle.
+      // One keep-alive timer is scheduled while the stream is idle.
       expect(vi.getTimerCount()).toBe(1)
 
       await vi.advanceTimersByTimeAsync(50)
