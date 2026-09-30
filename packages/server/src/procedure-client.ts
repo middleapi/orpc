@@ -6,7 +6,7 @@ import type { Lazyable } from './lazy'
 import type { MiddlewareDone } from './middleware'
 import type { AnyProcedure, Procedure, ProcedureHandlerOptions } from './procedure'
 import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
-import { createORPCErrorConstructorMap, reconcileORPCError, ValidationError } from '@orpc/contract'
+import { createORPCErrorConstructorMap, reconcileORPCError, validateStackedInput, ValidationError } from '@orpc/contract'
 import { getTracer, intercept, isAsyncIteratorObject, mergeTwoLevels, override, resolveMaybeOptionalOptions, runWithSpan, toArray, traceAsyncIterator, traceReadableStream, value } from '@orpc/shared'
 import { unlazy } from './lazy'
 
@@ -156,7 +156,7 @@ async function validateInput(i: number, schema: AnySchema, input: unknown): Prom
       })
     }
 
-    return result.value
+    return result
   })
 }
 
@@ -211,22 +211,19 @@ async function executeProcedureInternal(procedure: AnyProcedure, options: Proced
       ? inputSchemas.length
       : orderedMiddlewares[midIndex]!.inputSchemasLengthAtUse ?? 0
 
-    /**
-     * Each schema after the first validates the original input with the results so far applied, then
-     * its result is merged in, so no schema loses a field an earlier one stripped. Values that are not
-     * plain objects stay piped, which keeps schemas like `asyncIteratorObject` wrapping each other.
-     */
     if (!procedure['~orpc'].disableInputValidation) {
-      for (let i = startInputIndex; i < endInputIndex; i++) {
-        const validated = await validateInput(
-          i,
-          inputSchemas[i]!,
-          i !== 0 ? mergeTwoLevels(options.input, currentInput) : currentInput,
-        )
+      if (startInputIndex < endInputIndex) {
+        const validated = await validateStackedInput(inputSchemas, options.input, currentInput, {
+          start: startInputIndex,
+          end: endInputIndex,
+          // throws inside the schema's span, so the span records the validation error
+          validate: (schema, value, i) => validateInput(i, schema, value),
+        })
 
-        currentInput = i !== 0 ? mergeTwoLevels(currentInput, validated) : validated
+        currentInput = validated.value
       }
 
+      // A middleware between schemas receives what the next schema validates
       middlewareInput = endInputIndex > 0 && endInputIndex < inputSchemas.length
         ? mergeTwoLevels(options.input, currentInput)
         : currentInput

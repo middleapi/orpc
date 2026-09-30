@@ -5,10 +5,10 @@ import type { Context, ProcedureClientOptions } from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
 import type { FlexibleSchema, Tool } from 'ai'
 import type { FunctionTool } from './tool-meta'
-import { getAsyncIteratorObjectSchemaDetails } from '@orpc/contract'
+import { getAsyncIteratorObjectSchemaDetails, validateStackedInput } from '@orpc/contract'
 import { combineJsonSchemasWithComposition } from '@orpc/json-schema'
 import { call, Procedure } from '@orpc/server'
-import { isAsyncGeneratorFunction, mergeTwoLevels, ORPC_NAME, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
+import { isAsyncGeneratorFunction, ORPC_NAME, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
 import { tool } from 'ai'
 import { getAiSdkToolMeta } from './tool-meta'
 
@@ -68,18 +68,22 @@ function combineSchemas(schemas: AnySchema[], merge: boolean): undefined | Flexi
       vendor: ORPC_NAME,
       version: 1,
       async validate(value: unknown) {
+        if (merge) {
+          const result = await validateStackedInput(schemas, value, value)
+          return result.issues ? { issues: result.issues } : { value: result.value }
+        }
+
+        // Output schemas stay piped
         let current = value
 
-        // Mirrors the server's stacked input validation, output schemas stay piped.
-        for (const [index, schema] of schemas.entries()) {
-          const merging = merge && index !== 0
-          const result = await schema['~standard'].validate(merging ? mergeTwoLevels(value, current) : current)
+        for (const schema of schemas) {
+          const result = await schema['~standard'].validate(current)
 
           if (result.issues) {
             return result
           }
 
-          current = merging ? mergeTwoLevels(current, result.value) : result.value
+          current = result.value
         }
 
         return { value: current }
