@@ -22,6 +22,30 @@ function minSatisfaction(a: Satisfaction, b: Satisfaction): Satisfaction {
   return a < b ? a : b
 }
 
+/**
+ * Values derived from a schema object, cached so they are not rebuilt for every coerced value.
+ * Schemas must not be mutated after they are first used for coercion.
+ */
+const typeUnionCache = new WeakMap<object, JsonSchema>()
+const patternPropertiesCache = new WeakMap<object, readonly (readonly [RegExp, JsonSchema])[]>()
+
+function getPatternProperties(schema: Exclude<JsonSchema, boolean>): readonly (readonly [RegExp, JsonSchema])[] {
+  let patternProperties = patternPropertiesCache.get(schema)
+
+  if (patternProperties === undefined) {
+    patternProperties = Object.entries(schema.patternProperties ?? {})
+      .flatMap(([key, value]) => {
+        // an invalid pattern is a schema mistake, it should not break coercion of the other keys
+        const pattern = tryOrUndefined(() => new RegExp(key))
+        return pattern ? [[pattern, value] as const] : []
+      })
+
+    patternPropertiesCache.set(schema, patternProperties)
+  }
+
+  return patternProperties
+}
+
 export class JsonSchemaCoercer {
   coerce([schema, optional]: [schema: JsonSchema, optional: boolean], value: unknown): unknown {
     if (optional && value === undefined) {
@@ -47,12 +71,14 @@ export class JsonSchemaCoercer {
     }
 
     if (Array.isArray(schema.type)) {
-      return this.coerceInternal(
-        rootSchema,
-        { anyOf: schema.type.map(type => ({ ...schema, type })) },
-        value,
-        appliedRefs,
-      )
+      let typeUnion = typeUnionCache.get(schema)
+
+      if (typeUnion === undefined) {
+        typeUnion = { anyOf: schema.type.map(type => ({ ...schema, type })) }
+        typeUnionCache.set(schema, typeUnion)
+      }
+
+      return this.coerceInternal(rootSchema, typeUnion, value, appliedRefs)
     }
 
     let coerced = value
@@ -203,17 +229,10 @@ export class JsonSchemaCoercer {
           }
 
           if (isPlainObject(coerced)) {
-            let shouldUseCoercedItems = false
-            // copy here so special keys like `__proto__` are kept as own properties
-            const coercedItems = { ...coerced }
+            // only created once a value changes
+            let coercedItems: Record<PropertyKey, unknown> | undefined
 
-            const patternProperties = Object.entries(schema.patternProperties ?? {})
-              .flatMap(([key, value]) => {
-                // an invalid pattern is a schema mistake, it should not break coercion of the other keys
-                const pattern = tryOrUndefined(() => new RegExp(key))
-                return pattern ? [[pattern, value] as const] : []
-              })
-
+            const patternProperties = getPatternProperties(schema)
             const propertySchemas: Record<string, JsonSchema> = schema.properties ?? {}
 
             for (const key of Object.keys(coerced)) {
@@ -229,22 +248,23 @@ export class JsonSchemaCoercer {
                 }
                 else {
                   const [subSatisfied, subCoerced] = this.coerceInternal(rootSchema, subSchema, value)
-                  coercedItems[key] = subCoerced
 
                   satisfied = minSatisfaction(satisfied, subSatisfied)
 
                   if (subCoerced !== value) {
-                    shouldUseCoercedItems = true
+                    // copy here so special keys like `__proto__` are kept as own properties
+                    coercedItems ??= { ...coerced }
+                    coercedItems[key] = subCoerced
                   }
                 }
               }
             }
 
-            if (schema.required?.some(key => !Object.hasOwn(coercedItems, key))) {
+            if (schema.required?.some(key => !Object.hasOwn(coerced as object, key))) {
               satisfied = UNSATISFIED
             }
 
-            if (shouldUseCoercedItems) {
+            if (coercedItems) {
               coerced = coercedItems
             }
           }

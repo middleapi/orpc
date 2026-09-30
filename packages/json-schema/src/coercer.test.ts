@@ -670,6 +670,24 @@ describe('jsonSchemaCoercer', () => {
       expect(coerce(schema, { total: '3', n1: '1', other: 'x' })).toEqual({ total: 3, n1: 1, other: 'x' })
     })
 
+    it('coerces many values with the same schema object', () => {
+      const schema = {
+        type: ['object', 'null'],
+        properties: { total: { type: 'integer' } },
+        patternProperties: { '^at': DATE_SCHEMA },
+        required: ['total'],
+      }
+
+      const untouched = { total: 1, other: 'x' }
+
+      expect(coerce(schema, { total: '3', atCreated: '2020-01-01' })).toEqual({ total: 3, atCreated: new Date('2020-01-01') })
+      expect(coerce(schema, untouched)).toBe(untouched)
+      expect(coerce(schema, null)).toBeNull()
+      // missing the required key, so no branch matches
+      expect(coerce(schema, { atUpdated: '2020-01-02' })).toEqual({ atUpdated: '2020-01-02' })
+      expect(coerce(schema, { total: '4', note: '5' })).toEqual({ total: 4, note: '5' })
+    })
+
     it('accepts boolean schemas for properties and items', () => {
       const value = { free: ['anything', 1], never: 'kept' }
 
