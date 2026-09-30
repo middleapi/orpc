@@ -5,11 +5,11 @@ import type { Lazyable } from './lazy'
 import type { AnyMiddleware } from './middleware'
 import type { AnyProcedure, ProcedureConfig } from './procedure'
 import type { AnyRouter } from './router'
-import { mergeErrorMap, ProcedureContract, resolveMetaPlugins } from '@orpc/contract'
+import { augmentContractRouter, mergeErrorMap, ProcedureContract, resolveMetaPlugins } from '@orpc/contract'
 import { getOwn, isTypescriptObject, omit } from '@orpc/shared'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
-import { getHiddenRouterContract } from './router-hidden'
+import { getHiddenRouterContract, withHiddenRouterContract } from './router-hidden'
 
 export type AugmentedRouter<
   T extends AnyRouter,
@@ -77,6 +77,23 @@ export function augmentRouter<
   router: T,
   options: AugmentRouterOptions<TErrorMap>,
 ): AugmentedRouter<T, TErrorMap> | AugmentedRouterWithMiddlewares<T, TInitialContext, TCurrentContext, TErrorMap> {
+  const enhanced = augmentRouterIgnoringHiddenContract(router, options)
+
+  const hiddenContract = isTypescriptObject(router) ? getHiddenRouterContract(router) : undefined
+
+  if (hiddenContract === undefined) {
+    return enhanced as any
+  }
+
+  // the augmented router is a copy without the contract hidden by `implement(contract).router(...)`,
+  // so re-attach that contract, augmented the same way as the router
+  return withHiddenRouterContract(enhanced, augmentContractRouter(hiddenContract, options)) as any
+}
+
+function augmentRouterIgnoringHiddenContract(
+  router: Lazyable<AnyRouter>,
+  options: AugmentRouterOptions<ErrorMap>,
+): Lazyable<AnyRouter> {
   if (router instanceof Lazy) {
     const [meta, metaPlugins] = resolveMetaPlugins(
       options.meta,
@@ -341,5 +358,12 @@ export async function unlazyRouter<T extends AnyRouter>(router: T): Promise<Unla
     unlazied[key] = await unlazyRouter(unlaziedRouter)
   }
 
-  return unlazied as any
+  const hiddenContract = getHiddenRouterContract(router)
+
+  if (hiddenContract === undefined) {
+    return unlazied as any
+  }
+
+  // the unlazied router is a copy without the contract hidden by `implement(contract).router(...)`
+  return withHiddenRouterContract(unlazied, hiddenContract) as any
 }

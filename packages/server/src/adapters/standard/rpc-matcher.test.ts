@@ -1,6 +1,7 @@
 import { oc } from '@orpc/contract'
 import { z } from 'zod'
 import { os } from '../../builder'
+import { implement } from '../../implementer'
 import { Lazy } from '../../lazy'
 import * as ProcedureUtils from '../../procedure-utils'
 import { withHiddenRouterContract } from '../../router-hidden'
@@ -411,6 +412,36 @@ describe('rpcMatcher', () => {
 
       const matcher = new RPCMatcher(withHiddenRouterContract(router, contract))
       await expect(matcher.match('POST', '/missing', undefined)).rejects.toThrowError('[Contract-First] Missing or invalid implementation for procedure at path: "missing"')
+    })
+
+    describe('implemented router mounted in another router', () => {
+      const contract = oc.router({ ping: oc.input(z.any()) })
+      const implemented = implement(contract).router({
+        ping: os.input(z.any()).errors({ SECRET: { data: z.object({ sql: z.string() }) } }).handler(() => {}),
+      })
+      const mid = os.middleware(({ next }) => next())
+
+      it.each([
+        ['directly', { sub: implemented }],
+        ['through os.router', os.router({ sub: implemented })],
+        ['through os.use().router', os.use(mid).router({ sub: implemented })],
+        ['through os.lazy', { sub: os.lazy(async () => ({ default: implemented })) }],
+      ])('applies the contract when mounted %s', async (_, router) => {
+        const matcher = new RPCMatcher(router)
+        const result = await matcher.match('POST', '/sub/ping', undefined)
+
+        expect(result).toBeDefined()
+        expect(result!.path).toEqual(['sub', 'ping'])
+        expect(result!.procedure['~orpc'].errorMap).toEqual({})
+      })
+
+      it('keeps errors added by the builder that mounts it', async () => {
+        const matcher = new RPCMatcher(os.errors({ UNAUTHORIZED: {} }).use(mid).router({ sub: implemented }))
+        const result = await matcher.match('POST', '/sub/ping', undefined)
+
+        expect(result).toBeDefined()
+        expect(result!.procedure['~orpc'].errorMap).toEqual({ UNAUTHORIZED: {} })
+      })
     })
   })
 

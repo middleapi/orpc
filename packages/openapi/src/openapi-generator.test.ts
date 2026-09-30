@@ -1,4 +1,5 @@
 import { oc } from '@orpc/contract'
+import { implement, os } from '@orpc/server'
 import * as arktype from 'arktype'
 import z from 'zod'
 import { testSchema, testSchemaConverter, zodJsonSchemaConverter } from '../tests/__shared__/schema'
@@ -310,6 +311,33 @@ describe('openAPIGenerator basic & options', () => {
           expect.objectContaining({ name: 'id', in: 'path', required: true }),
         ],
       }),
+    })
+  })
+
+  describe('implemented router mounted in another router', () => {
+    const contract = {
+      ping: oc.meta(openapi({ method: 'DELETE', path: '/contract' })),
+    }
+    const implemented = implement(contract).router({
+      ping: os
+        .meta(openapi({ method: 'GET', path: '/implementation' }))
+        .handler(() => 'pong'),
+    })
+    const mid = os.middleware(({ next }) => next())
+
+    it.each([
+      ['directly', { sub: implemented }],
+      ['through os.router', os.router({ sub: implemented })],
+      ['through os.use().router', os.use(mid).router({ sub: implemented })],
+      ['through os.lazy', { sub: os.lazy(async () => ({ default: implemented })) }],
+    ])('generates from the contract when mounted %s', async (_, router) => {
+      const doc = await generator.generate(router)
+
+      expect(doc.paths).toEqual({
+        '/contract': {
+          delete: expect.objectContaining({ operationId: 'sub.ping' }),
+        },
+      })
     })
   })
 

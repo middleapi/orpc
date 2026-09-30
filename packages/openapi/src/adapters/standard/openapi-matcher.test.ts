@@ -1,5 +1,5 @@
 import { oc } from '@orpc/contract'
-import { os, withHiddenRouterContract } from '@orpc/server'
+import { implement, os, withHiddenRouterContract } from '@orpc/server'
 import { getOpenAPIMeta, openapi } from '../../meta'
 import { OpenAPIMatcher } from './openapi-matcher'
 
@@ -448,6 +448,38 @@ describe('openAPIMatcher', () => {
       await expect(matcher.match('GET', '/missing', undefined)).rejects.toThrowError(
         '[Contract-First] Missing or invalid implementation for procedure at path: "missing"',
       )
+    })
+
+    describe('implemented router mounted in another router', () => {
+      const contract = {
+        ping: oc.meta(openapi({ method: 'DELETE', path: '/contract' })),
+      }
+      const implemented = implement(contract).router({
+        ping: os
+          .meta(openapi({ method: 'GET', path: '/implementation' }))
+          .handler(() => 'pong'),
+      })
+      const mid = os.middleware(({ next }) => next())
+
+      it.each([
+        ['directly', { sub: implemented }],
+        ['through os.router', os.router({ sub: implemented })],
+        ['through os.use().router', os.use(mid).router({ sub: implemented })],
+        ['through os.lazy', { sub: os.lazy(async () => ({ default: implemented })) }],
+      ])('applies the contract when mounted %s', async (_, router) => {
+        const matcher = new OpenAPIMatcher(router)
+
+        await expect(matcher.match('GET', '/implementation', undefined)).resolves.toBeUndefined()
+
+        const result = await matcher.match('DELETE', '/contract', undefined)
+
+        expect(result).toBeDefined()
+        expect(result!.path).toEqual(['sub', 'ping'])
+        expect(getOpenAPIMeta(result!.procedure)).toMatchObject({
+          method: 'DELETE',
+          path: '/contract',
+        })
+      })
     })
   })
 })
