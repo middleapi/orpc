@@ -59,14 +59,29 @@ describe('effectSchemaToJsonSchemaConverter', () => {
       expect(optional1).toBe(true)
     })
 
-    it('keeps converting and marks as required if standard validation throws', () => {
+    it('reads optionality from the encoded and decoded sides of a transformation', () => {
+      const schema = toStandardSchema(Effect.Schema.UndefinedOr(Effect.Schema.String).pipe(
+        Effect.Schema.decodeTo(Effect.Schema.String, Effect.SchemaTransformation.transform<string, string | undefined>({
+          decode: value => value ?? 'fallback',
+          encode: value => value,
+        })),
+      ))
+
+      expect(converter.convert(schema, 'input')[1]).toBe(true)
+      expect(converter.convert(schema, 'output')[1]).toBe(false)
+    })
+
+    it('does not run standard validation to check optionality', () => {
       const schema = toStandardSchema(Effect.Schema.Unknown)
-      ;(schema as any)['~standard'].validate = () => {
+      const validate = vi.fn(() => {
         throw new Error('test')
-      }
+      })
+      ;(schema as any)['~standard'].validate = validate
+
       const [jsonSchema, optional] = converter.convert(schema, 'input')
       expect(jsonSchema).toEqual(expect.any(Object))
-      expect(optional).toBe(false)
+      expect(optional).toBe(true)
+      expect(validate).not.toHaveBeenCalled()
     })
   })
 })
