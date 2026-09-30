@@ -35,6 +35,12 @@ describe('openAPIJsonSerializer', () => {
       expect(serializer.serialize(Number.NaN).json).toBeNull()
     })
 
+    it('passes Infinity through, so JSON turns it into null', () => {
+      const { json } = serializer.serialize({ max: Number.POSITIVE_INFINITY, min: Number.NEGATIVE_INFINITY })
+      expect(json).toEqual({ max: Number.POSITIVE_INFINITY, min: Number.NEGATIVE_INFINITY })
+      expect(JSON.parse(JSON.stringify(json))).toEqual({ max: null, min: null })
+    })
+
     it('serializes Date to ISO string', () => {
       expect(serializer.serialize(new Date('2023-01-01')).json).toBe('2023-01-01T00:00:00.000Z')
     })
@@ -228,6 +234,26 @@ describe('openAPIJsonSerializer', () => {
         list: [null],
         plain: 'text',
       })
+    })
+
+    it.each([
+      ['Infinity', Number.POSITIVE_INFINITY],
+      ['-0', -0],
+      ['a string', 'text'],
+      ['a boolean', true],
+      ['null', null],
+    ])('runs custom handlers for %s without customizing a built-in handler', (_, target) => {
+      const custom = new OpenAPIJsonSerializer({
+        handlers: {
+          target: {
+            condition: data => Object.is(data, target),
+            serialize: () => 'target',
+            isTerminal: true,
+          },
+        },
+      })
+
+      expect(custom.serialize({ value: target, other: 1 }).json).toEqual({ value: 'target', other: 1 })
     })
 
     it('collects blobs returned by terminal custom handlers', () => {

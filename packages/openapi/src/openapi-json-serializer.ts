@@ -149,32 +149,29 @@ export class OpenAPIJsonSerializer {
     }
 
     let inlineBuiltInHandlers = true
-    let handlerEntries: OpenAPIJsonSerializerHandler[] = []
 
     for (const key of Object.keys(customHandlers)) {
-      const handler = customHandlers[key]
-
-      if (inlineBuiltInHandlers && key in DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS) {
+      /**
+       * The inlined built-in handlers return primitives before any other handler runs,
+       * so they only apply when no handler is added or overridden.
+       */
+      if (customHandlers[key] !== undefined || key in DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS) {
         inlineBuiltInHandlers = false
         break
       }
-
-      if (handler !== undefined) {
-        handlerEntries.push(handler)
-      }
     }
 
+    this.inlineBuiltInHandlers = inlineBuiltInHandlers
+
     if (!inlineBuiltInHandlers) {
-      handlerEntries = []
+      const handlerEntries: OpenAPIJsonSerializerHandler[] = []
       for (const handler of Object.values({ ...DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS, ...customHandlers })) {
         if (handler !== undefined) {
           handlerEntries.push(handler)
         }
       }
+      this.handlerEntries = handlerEntries
     }
-
-    this.inlineBuiltInHandlers = inlineBuiltInHandlers
-    this.handlerEntries = handlerEntries
   }
 
   serialize(data: unknown): OpenAPIJsonSerialization {

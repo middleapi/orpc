@@ -12,6 +12,7 @@ description: "Learn how OpenAPI Serializer performs one-way serialization of com
 | **string**                       |             |                    |                                      |
 | **number**                       |             |                    |                                      |
 | **NaN**                          | `nan`       | `null`             |                                      |
+| **Infinity**, **-Infinity**      |             |                    | `null` in JSON bodies                |
 | **boolean**                      |             |                    |                                      |
 | **null**                         |             |                    |                                      |
 | **undefined**                    | `undefined` | `null`             | Ignore `undefined` properties        |
