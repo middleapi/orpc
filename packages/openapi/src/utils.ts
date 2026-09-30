@@ -63,3 +63,28 @@ export function getDynamicPathParams(path: `/${string}`): {
 
   return params
 }
+
+/**
+ * A slash-allowing param (`{+name}`) matches the rest of the path, so any segment after it could never match.
+ *
+ * @returns why the path is invalid, or `undefined` when it is valid
+ */
+export function validateDynamicPathParams(
+  path: `/${string}`,
+  params: ReturnType<typeof getDynamicPathParams>,
+): string | undefined {
+  for (const param of params ?? []) {
+    if (!param.allowsSlash) {
+      continue
+    }
+
+    const rest = path.slice(param.startIndex + param.segment.length)
+
+    // a trailing slash is ignored when matching, so it does not count as another segment
+    if (rest !== '' && rest !== '/') {
+      return `The "${param.segment}" param must be the last segment of path "${path}", because it matches the rest of the path.`
+    }
+  }
+
+  return undefined
+}

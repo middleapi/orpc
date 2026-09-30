@@ -21,7 +21,7 @@ import {
   toOpenAPIPath,
 } from './openapi-generator-operation'
 import { OpenAPISerializer } from './openapi-serializer'
-import { getDynamicPathParams } from './utils'
+import { getDynamicPathParams, validateDynamicPathParams } from './utils'
 
 export { OpenAPIGeneratorError } from './openapi-generator-operation'
 export type { OpenAPIErrorBodyDefinition } from './openapi-generator-operation'
@@ -152,6 +152,12 @@ export class OpenAPIGenerator {
         const postPath = meta?.path ?? pathToHttpPath(path)
         const httpPath = meta?.prefix ? mergeHttpPath(meta.prefix, postPath) : postPath
         const dynamicPathParams = getDynamicPathParams(httpPath)
+
+        const invalidPathReason = validateDynamicPathParams(httpPath, dynamicPathParams)
+        if (invalidPathReason !== undefined) {
+          throw new OpenAPIGeneratorError(invalidPathReason)
+        }
+
         const openApiPath = toOpenAPIPath(httpPath, dynamicPathParams)
 
         let operation: OpenAPIV3_2.OperationObject

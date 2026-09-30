@@ -469,6 +469,26 @@ describe('openAPIGenerator basic & options', () => {
     expect(root.message).toContain('Procedure at (root):')
   })
 
+  it('rejects a slash-allowing path param that is not the last segment', async () => {
+    const error = await generator.generate({
+      meta: oc.meta(openapi({ method: 'GET', path: '/files/{+path}/meta' })),
+      prefixed: oc.meta(openapi({ method: 'GET', prefix: '/files/{+path}', path: '/content' })),
+      valid: oc.meta(openapi({ method: 'GET', path: '/files/{+path}' })).input(z.object({ path: z.string() })),
+    }).then(
+      () => { throw new Error('expected generate to reject') },
+      e => e,
+    )
+
+    expect(error).toBeInstanceOf(OpenAPIGeneratorError)
+    expect(error.message).toContain('Failed to generate the OpenAPI document (2 errors)')
+    expect(error.message).toContain(
+      'Procedure at meta: The "{+path}" param must be the last segment of path "/files/{+path}/meta", because it matches the rest of the path.',
+    )
+    expect(error.message).toContain(
+      'Procedure at prefixed: The "{+path}" param must be the last segment of path "/files/{+path}/content"',
+    )
+  })
+
   it('rethrows non-generator errors immediately without wrapping', async () => {
     const generator = new OpenAPIGenerator({
       converters: [{

@@ -37,7 +37,7 @@ const getPlanet = os
   .input(z.object({ id: z.string() }))
 ```
 
-For catch-all path segments that may include `/`, use `{+name}`:
+For catch-all path segments that may include `/`, use `{+name}`. It matches the rest of the path, so it must be the last segment:
 
 ```ts
 const getFile = os

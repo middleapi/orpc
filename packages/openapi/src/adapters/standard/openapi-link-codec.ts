@@ -17,7 +17,7 @@ import {
 } from '../../constants'
 import { getOpenAPIMeta } from '../../meta'
 import { OpenAPISerializer } from '../../openapi-serializer'
-import { getDynamicPathParams, isBodylessMethod } from '../../utils'
+import { getDynamicPathParams, isBodylessMethod, validateDynamicPathParams } from '../../utils'
 import { serializeHeaders } from './utils'
 
 export interface OpenAPILinkCodecOptions<T extends ClientContext> {
@@ -50,6 +50,11 @@ export interface OpenAPILinkCodecOptions<T extends ClientContext> {
 }
 
 const END_SLASH_REGEX = /\/$/
+
+/**
+ * Matches a "." or ".." segment, which fetch resolves (even when percent-encoded) before sending the request.
+ */
+const DOT_SEGMENT_REGEX = /(?:^|\/)\.{1,2}(?:\/|$)/
 
 export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCodec<T> {
   private readonly baseUrl: Exclude<OpenAPILinkCodecOptions<T>['url'], undefined>
@@ -86,6 +91,11 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
     const [basePathname, baseSearch, baseHash] = parseStandardUrl(baseUrl)
     const dynamicParams = getDynamicPathParams(pathname)
+
+    const invalidPathReason = validateDynamicPathParams(pathname, dynamicParams)
+    if (invalidPathReason !== undefined) {
+      throw new TypeError(`Invalid OpenAPI path in call to procedure (${path.join('.')}). ${invalidPathReason}`)
+    }
 
     if (inputStructure === 'compact') {
       let data = input
@@ -230,6 +240,10 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
     if (!encoded) {
       throw new TypeError(`Path param "${param.parameterName}" cannot be empty in call to procedure (${path.join('.')}).`)
+    }
+
+    if (DOT_SEGMENT_REGEX.test(encoded)) {
+      throw new TypeError(`Path param "${param.parameterName}" cannot be or contain a "." or ".." segment in call to procedure (${path.join('.')}).`)
     }
 
     return encoded

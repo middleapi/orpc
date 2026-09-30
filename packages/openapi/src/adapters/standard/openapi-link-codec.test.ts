@@ -609,6 +609,81 @@ describe('openAPILinkCodec', () => {
       })
     })
 
+    describe('path validation', () => {
+      it('rejects a slash-allowing param that is not the last segment', async () => {
+        const codec = new OpenAPILinkCodec({
+          meta: oc.meta(openapi({ method: 'GET', path: '/files/{+path}/meta' })),
+          prefixed: oc.meta(openapi({ method: 'GET', prefix: '/files/{+path}', path: '/content' })),
+          trailing: oc.meta(openapi({ method: 'GET', path: '/files/{+path}/' })),
+        }, { serializer })
+
+        await expect(codec.encodeInput({ path: 'a/b' }, ['meta'], { context: {} })).rejects.toThrow(
+          'Invalid OpenAPI path in call to procedure (meta). '
+          + 'The "{+path}" param must be the last segment of path "/files/{+path}/meta", because it matches the rest of the path.',
+        )
+
+        await expect(codec.encodeInput({ path: 'a/b' }, ['prefixed'], { context: {} })).rejects.toThrow(
+          'The "{+path}" param must be the last segment of path "/files/{+path}/content"',
+        )
+
+        const request = await codec.encodeInput({ path: 'a/b' }, ['trailing'], { context: {} })
+        expect(request.url).toBe('/files/a/b/')
+      })
+
+      it('rejects path params that would become "." or ".." segments', async () => {
+        const codec = new OpenAPILinkCodec({
+          member: oc.meta(openapi({ method: 'DELETE', path: '/orgs/{orgId}/members/{memberId}' })),
+          detailed: oc.meta(openapi({ method: 'DELETE', path: '/orgs/{orgId}/members/{memberId}', inputStructure: 'detailed' })),
+          file: oc.meta(openapi({ method: 'GET', path: '/files/{+path}' })),
+          tags: oc.meta(openapi({ method: 'GET', path: '/tags/{ids}', paramsStyles: { ids: 'comma-delimited-array' } })),
+        }, { serializer })
+
+        for (const memberId of ['.', '..']) {
+          await expect(codec.encodeInput({ orgId: 'acme', memberId }, ['member'], { context: {} })).rejects.toThrow(
+            'Path param "memberId" cannot be or contain a "." or ".." segment in call to procedure (member).',
+          )
+
+          await expect(codec.encodeInput({ params: { orgId: 'acme', memberId } }, ['detailed'], { context: {} })).rejects.toThrow(
+            'Path param "memberId" cannot be or contain a "." or ".." segment in call to procedure (detailed).',
+          )
+        }
+
+        for (const path of ['..', '../admin', 'a/../../admin', 'a/./b', 'a/..', '.']) {
+          await expect(codec.encodeInput({ path }, ['file'], { context: {} })).rejects.toThrow(
+            'Path param "path" cannot be or contain a "." or ".." segment in call to procedure (file).',
+          )
+        }
+
+        await expect(codec.encodeInput({ ids: ['..'] }, ['tags'], { context: {} })).rejects.toThrow(
+          'Path param "ids" cannot be or contain a "." or ".." segment in call to procedure (tags).',
+        )
+      })
+
+      it('keeps path params that only contain dots within a segment', async () => {
+        const codec = new OpenAPILinkCodec({
+          member: oc.meta(openapi({ method: 'DELETE', path: '/orgs/{orgId}/members/{memberId}' })),
+          file: oc.meta(openapi({ method: 'GET', path: '/files/{+path}' })),
+          tags: oc.meta(openapi({ method: 'GET', path: '/tags/{ids}', paramsStyles: { ids: 'comma-delimited-array' } })),
+        }, { serializer })
+
+        await expect(codec.encodeInput({ orgId: 'acme', memberId: '...' }, ['member'], { context: {} }))
+          .resolves
+          .toMatchObject({ url: '/orgs/acme/members/...' })
+
+        await expect(codec.encodeInput({ orgId: 'acme', memberId: '../x' }, ['member'], { context: {} }))
+          .resolves
+          .toMatchObject({ url: '/orgs/acme/members/..%2Fx' })
+
+        await expect(codec.encodeInput({ path: '.config/a..b/v1.0' }, ['file'], { context: {} }))
+          .resolves
+          .toMatchObject({ url: '/files/.config/a..b/v1.0' })
+
+        await expect(codec.encodeInput({ ids: ['..', '.'] }, ['tags'], { context: {} }))
+          .resolves
+          .toMatchObject({ url: '/tags/..,.' })
+      })
+    })
+
     describe('option handling', () => {
       it('accepts Headers instances for base headers', async () => {
         const codec = new OpenAPILinkCodec({

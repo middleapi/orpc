@@ -1,4 +1,4 @@
-import { getDynamicPathParams, isBodylessMethod } from './utils'
+import { getDynamicPathParams, isBodylessMethod, validateDynamicPathParams } from './utils'
 
 describe('isBodylessMethod', () => {
   it('treats GET and HEAD as bodyless', () => {
@@ -112,5 +112,27 @@ describe('getDynamicPathParams', () => {
       { segment: '{m}', parameterName: 'm', startIndex: 9, allowsSlash: false },
       { segment: '{+b}', parameterName: 'b', startIndex: 15, allowsSlash: true },
     ])
+  })
+})
+
+describe('validateDynamicPathParams', () => {
+  const validate = (path: `/${string}`) => validateDynamicPathParams(path, getDynamicPathParams(path))
+
+  it('accepts paths whose slash-allowing param is the last segment', () => {
+    expect(validate('/static/path')).toBeUndefined()
+    expect(validate('/users/{id}/posts/{postId}')).toBeUndefined()
+    expect(validate('/files/{+path}')).toBeUndefined()
+    expect(validate('/files/{+path}/')).toBeUndefined()
+    expect(validate('/{+path}')).toBeUndefined()
+    expect(validate('/orgs/{orgId}/files/{+path}')).toBeUndefined()
+  })
+
+  it('rejects a slash-allowing param followed by another segment', () => {
+    expect(validate('/files/{+path}/meta')).toBe(
+      'The "{+path}" param must be the last segment of path "/files/{+path}/meta", because it matches the rest of the path.',
+    )
+    expect(validate('/files/{+path}/{id}')).toContain('The "{+path}" param must be the last segment')
+    expect(validate('/{+a}/{+b}')).toContain('The "{+a}" param must be the last segment')
+    expect(validate('/files/{+path}//')).toContain('The "{+path}" param must be the last segment')
   })
 })

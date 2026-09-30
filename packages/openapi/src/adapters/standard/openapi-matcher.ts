@@ -2,11 +2,11 @@ import type { AnyProcedureContract } from '@orpc/contract'
 import type { AnyProcedure, AnyRouter, WalkProcedureContractsLazyResult } from '@orpc/server'
 import type { Value } from '@orpc/shared'
 import { createContractProcedure, getRouter, Procedure, unlazy, walkProcedureContractsSync } from '@orpc/server'
-import { mergeHttpPath, normalizeHttpPath, pathToHttpPath, safeDecodeURIComponent, value } from '@orpc/shared'
+import { mergeHttpPath, pathToHttpPath, safeDecodeURIComponent, safeEncodeURIComponent, value } from '@orpc/shared'
 import { addRoute, createRouter, findRoute, routeToRegExp } from 'rou3'
 import { DEFAULT_OPENAPI_METHOD } from '../../constants'
 import { getOpenAPIMeta } from '../../meta'
-import { getDynamicPathParams } from '../../utils'
+import { getDynamicPathParams, validateDynamicPathParams } from '../../utils'
 
 export interface OpenAPIMatcherOptions {
   /**
@@ -52,7 +52,14 @@ export class OpenAPIMatcher {
       const method = meta?.method ?? DEFAULT_OPENAPI_METHOD
       const postHttpPath = meta?.path ?? pathToHttpPath(path)
       const openapiPath = meta?.prefix ? mergeHttpPath(meta.prefix, postHttpPath) : postHttpPath
-      const rou3Path = toRou3Pattern(openapiPath)
+      const params = getDynamicPathParams(openapiPath)
+
+      const invalidReason = validateDynamicPathParams(openapiPath, params)
+      if (invalidReason !== undefined) {
+        throw new TypeError(`[OpenAPIMatcher] Invalid OpenAPI path for procedure at path: "${path.join('.')}". ${invalidReason}`)
+      }
+
+      const rou3Path = toRou3Pattern(openapiPath, params)
 
       addRoute(this.tree, method, rou3Path, {
         path,
@@ -102,29 +109,17 @@ export class OpenAPIMatcher {
       }
     }
 
+    // Routes are stored in canonical form, so requests that encode the same path differently
+    // (e.g. "a%62c" vs "abc", or "users:batchGet" vs "users%3AbatchGet") match the same entry.
+    pathname = toCanonicalPath(pathname)
+
     // most requests `await undefined` so conditionally await it to save a microtask turn
     const loading = this.resolvePendingLazyRouters(pathname)
     if (loading !== undefined) {
       await loading
     }
 
-    let match = findRoute(this.tree, method, pathname)
-
-    if (match === undefined && pathname.includes('%')) {
-      // Retry with a normalized path: users may percent-encode characters that
-      // we store unencoded (e.g. "a%62c" vs "abc"), so normalization lets us
-      // handle those requests without storing duplicate entries.
-
-      const normalizedPathname = normalizeHttpPath(pathname)
-
-      // most requests `await undefined` so conditionally await it to save a microtask turn
-      const normalizedLoading = this.resolvePendingLazyRouters(normalizedPathname)
-      if (normalizedLoading !== undefined) {
-        await normalizedLoading
-      }
-
-      match = findRoute(this.tree, method, normalizedPathname)
-    }
+    const match = findRoute(this.tree, method, pathname)
 
     if (match === undefined) {
       return undefined
@@ -192,20 +187,52 @@ export class OpenAPIMatcher {
   }
 }
 
-function toRou3Pattern(path: `/${string}`): `/${string}` {
-  const params = getDynamicPathParams(path)
+/**
+ * Static segments are stored in canonical form, which never contains rou3 syntax
+ * (`:`, `*`, `(`, `)`, `{`, `}`), so literal text in a path cannot be read as a pattern.
+ */
+function toRou3Pattern(
+  path: `/${string}`,
+  params: ReturnType<typeof getDynamicPathParams> = getDynamicPathParams(path),
+): `/${string}` {
+  let pattern = ''
+  let index = 0
 
-  if (!params?.length) {
+  for (const param of params ?? []) {
+    pattern += toCanonicalPath(path.slice(index, param.startIndex))
+    pattern += param.allowsSlash ? `**:${param.parameterName}` : `:${param.parameterName}`
+    index = param.startIndex + param.segment.length
+  }
+
+  pattern += toCanonicalPath(path.slice(index))
+
+  return pattern as `/${string}`
+}
+
+/**
+ * Paths made only of these characters are already canonical, so most requests skip the work below.
+ */
+const CANONICAL_PATH_REGEX = /^[\w\-.!~'/]*$/
+
+/**
+ * Characters `encodeURIComponent` keeps as is but rou3 reads as pattern syntax.
+ */
+const ROU3_SYNTAX_REGEX = /[*()]/g
+
+/**
+ * Decode then re-encode every segment the same way {@link pathToHttpPath} does, and also
+ * percent-encode the characters rou3 would read as pattern syntax.
+ */
+function toCanonicalPath<T extends string>(path: T): T {
+  if (CANONICAL_PATH_REGEX.test(path)) {
     return path
   }
 
-  for (let i = params.length - 1; i >= 0; i--) {
-    const param = params[i]!
-    const pattern = param.allowsSlash ? `**:${param.parameterName}` : `:${param.parameterName}`
-    path = path.slice(0, param.startIndex) + pattern + path.slice(param.startIndex + param.segment.length)
-  }
-
   return path
+    .split('/')
+    .map(segment => safeEncodeURIComponent(safeDecodeURIComponent(segment)))
+    .join('/')
+    .replace(ROU3_SYNTAX_REGEX, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`) as T
 }
 
 function toRou3PrefixMatcher(path: `/${string}`): RegExp {
