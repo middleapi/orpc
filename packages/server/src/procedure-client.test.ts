@@ -173,6 +173,29 @@ describe('createProcedureClient', () => {
     )
   })
 
+  it('reuses one errors constructor map per error map across calls', async () => {
+    const errorMap = {
+      UNAUTHENTICATED: { message: '__UNAUTHENTICATED__' },
+    }
+
+    const seen: unknown[] = []
+    const procedure = os.errors(errorMap).handler(({ errors }) => {
+      seen.push(errors)
+    })
+    const client = createProcedureClient(procedure)
+
+    await client()
+    await client()
+
+    expect(createORPCErrorConstructorMapSpy).toHaveBeenCalledTimes(1)
+    expect(seen).toHaveLength(2)
+    expect(seen[1]).toBe(seen[0])
+
+    const error = (seen[0] as any).UNAUTHENTICATED()
+    expect(error.defined).toBe(true)
+    expect(error.message).toBe('__UNAUTHENTICATED__')
+  })
+
   it('interceptor can change input/output/signal/procedure', async () => {
     const signal = new AbortController().signal
 

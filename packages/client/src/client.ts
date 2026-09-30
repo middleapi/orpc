@@ -57,12 +57,13 @@ export function createORPCClient<T extends AnyNestedClient>(
   link: ClientLink<InferClientContext<T>>,
   { path = [], ...options }: NoInfer<ORPCClientOptions<T>> = {},
 ): T {
+  const interceptors = [
+    ...toArray(options.interceptors),
+    ...toArray(options.scoped?.interceptors) as ORPCClientInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[],
+  ]
+
   const procedureClient: Client<InferClientContext<T>, unknown, unknown, InferClientError<T>> = (...rest) => {
     const [input, callOptions] = resolveClientRest(rest)
-    const interceptors = [
-      ...toArray(options.interceptors),
-      ...toArray(options.scoped?.interceptors) as ORPCClientInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[],
-    ]
 
     return intercept(
       interceptors,

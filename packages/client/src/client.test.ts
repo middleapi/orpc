@@ -1,5 +1,8 @@
 import type { ClientContext, ClientLink } from './types'
+import * as SharedModule from '@orpc/shared'
 import { createORPCClient } from './client'
+
+const interceptSpy = vi.spyOn(SharedModule, 'intercept')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -177,6 +180,20 @@ describe('createORPCClient', () => {
       { value: 'pong scoped' },
       { context: { requestId: 'request_2', rootPath: 'nested.pong', procedure: 'nested.pong' } },
     )
+  })
+
+  it('builds the interceptors list once per procedure client', async () => {
+    const client = createORPCClient(mockedLink, {
+      interceptors: [vi.fn(({ next }) => next())],
+      scoped: { ping: { interceptors: [vi.fn(({ next }) => next())] } },
+    } as any) as any
+
+    await client.ping()
+    await client.ping()
+
+    expect(interceptSpy).toHaveBeenCalledTimes(2)
+    expect(interceptSpy.mock.calls[0]![0]).toHaveLength(2)
+    expect(interceptSpy.mock.calls[1]![0]).toBe(interceptSpy.mock.calls[0]![0])
   })
 
   it('returns strictly equal client on repeated access', async () => {

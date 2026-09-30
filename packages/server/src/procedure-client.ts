@@ -72,7 +72,7 @@ export function createProcedureClient<
     const clientContext = callerOptions?.context ?? {} as TClientContext
     // options.context can be undefined when all field is optional
     const context = await value(options.context, clientContext) as TInitialContext | undefined ?? {} as TInitialContext
-    const errors = createORPCErrorConstructorMap(procedure['~orpc'].errorMap)
+    const errors = getErrorConstructorMap(procedure['~orpc'].errorMap)
 
     const reconcileError = async (e: ThrowableError) => {
       if (e instanceof ORPCError) {
@@ -134,6 +134,22 @@ export function createProcedureClient<
       throw await reconcileError(e as ThrowableError)
     }
   }
+}
+
+/**
+ * The constructor map reads the error map on every access, so one per error map is enough.
+ */
+const errorConstructorMapCache = new WeakMap<ErrorMap, ORPCErrorConstructorMap<any>>()
+
+function getErrorConstructorMap<T extends ErrorMap>(errorMap: T): ORPCErrorConstructorMap<T> {
+  let errors = errorConstructorMapCache.get(errorMap)
+
+  if (errors === undefined) {
+    errors = createORPCErrorConstructorMap(errorMap)
+    errorConstructorMapCache.set(errorMap, errors)
+  }
+
+  return errors
 }
 
 async function validateInput(i: number, schema: AnySchema, input: unknown): Promise<any> {
