@@ -1,5 +1,5 @@
 import type { EventMeta } from '@standard-server/core'
-import { stringifyJSON } from '@orpc/shared'
+import { isPlainObject, stringifyJSON } from '@orpc/shared'
 import { DurableObject } from 'cloudflare:workers'
 
 export interface DurablePublisherObjectResumeOptions {
@@ -8,6 +8,8 @@ export interface DurablePublisherObjectResumeOptions {
    *
    * When enabled, published events are temporarily stored so new
    * subscribers can resume from a previous position using `lastEventId`.
+   * Each stored event must fit within 2 MB, the Durable Object SQLite row limit,
+   * so publishing a larger one fails.
    *
    * @default false
    */
@@ -35,8 +37,8 @@ export interface DurablePublisherObjectResumeOptions {
   cleanupIntervalSeconds?: number
 
   /**
-   * Prefix for the resume storage table schema.
-   * Used to avoid naming conflicts with other tables in the same Durable Object.
+   * Prefix for the resume storage table schema and storage keys.
+   * Used to avoid naming conflicts with other tables and keys in the same Durable Object.
    *
    * @default 'orpc:'
    */
@@ -85,6 +87,11 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
     }
     catch (e) {
       console.error('Failed to store published event:', e)
+
+      if (e instanceof PayloadTooLargeError) {
+        return new Response('Event payload too large', { status: 413 })
+      }
+
       return new Response('Invalid or unprocessable event payload', { status: 400 })
     }
 
@@ -101,18 +108,25 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
 
   private async handleSubscribe(request: Request): Promise<Response> {
     const lastEventId = request.headers.get('last-event-id')
-    const payloads = lastEventId === null ? undefined : this.resumeStorage.getAfter(lastEventId)
+    const payloads = lastEventId === null ? [] : this.resumeStorage.getAfter(lastEventId)
 
     const { '0': client, '1': server } = new WebSocketPair()
     this.ctx.acceptWebSocket(server)
 
-    if (payloads) {
-      for (const payload of payloads) {
-        server.send(payload)
-      }
+    for (const payload of payloads) {
+      server.send(payload)
     }
 
-    return new Response(null, { status: 101, webSocket: client })
+    /**
+     * Replayed events are the first messages on the socket, since nothing runs between
+     * reading them and sending them. `DurablePublisher` waits for this many messages before
+     * resolving the subscription, so the whole backlog is delivered by then.
+     */
+    return new Response(null, {
+      status: 101,
+      webSocket: client,
+      headers: { 'orpc-replayed-events': String(payloads.length) },
+    })
   }
 
   override webSocketClose(_ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): void | Promise<void> {
@@ -125,8 +139,17 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
 
 interface SerializedPayload {
   data: unknown
-  meta?: EventMeta
+  meta?: EventMeta | null
 }
+
+/**
+ * Durable Object SQLite rejects strings and rows larger than 2 MB.
+ *
+ * @see https://developers.cloudflare.com/durable-objects/platform/limits/
+ */
+const MAX_STORED_PAYLOAD_BYTES = 2_000_000
+
+class PayloadTooLargeError extends Error {}
 
 class ResumeStorage {
   private readonly enabled: boolean
@@ -137,6 +160,12 @@ class ResumeStorage {
   private isInitedSchema = false
   private isInitedAlarm = false
   private lastCleanupTime: number | undefined
+
+  /**
+   * Prefixes every event id. It changes whenever the events table is recreated, which
+   * restarts AUTOINCREMENT, so an id from before that is recognized as stale.
+   */
+  private generation: string | undefined
 
   constructor(
     private readonly ctx: DurableObjectState,
@@ -152,15 +181,24 @@ class ResumeStorage {
   /**
    * Store an event and return the updated serialized message with an assigned ID.
    *
-   * @throws if `stringified` is not valid JSON, or if the insert fails after
-   * a schema reset retry.
+   * @throws {PayloadTooLargeError} if `stringifiedPayload` is too large to store.
+   * @throws if `stringifiedPayload` is not a JSON object with an optional object `meta`,
+   * or if the insert fails, even after a schema reset retry.
    */
   store(stringifiedPayload: string): string {
     if (!this.enabled) {
       return stringifiedPayload
     }
 
-    const payload: SerializedPayload = JSON.parse(stringifiedPayload)
+    if (exceedsUtf8ByteLength(stringifiedPayload, MAX_STORED_PAYLOAD_BYTES)) {
+      throw new PayloadTooLargeError(`Event payload exceeds ${MAX_STORED_PAYLOAD_BYTES} bytes`)
+    }
+
+    const payload: unknown = JSON.parse(stringifiedPayload)
+
+    if (!isSerializedPayload(payload)) {
+      throw new TypeError('Event payload must be a JSON object with an optional object `meta`')
+    }
 
     this.ensureSchemaAndCleanup()
 
@@ -174,24 +212,31 @@ class ResumeStorage {
         stringifiedPayload,
       )
 
-      const row = result.one()
-      return stringifyJSON(this.attachEventId(payload, row.id as string))
+      return result.one().id as string
     }
 
+    let id: string
     try {
-      return insertEvent()
+      id = insertEvent()
     }
     catch (e) {
+      if (!isUnusableTableError(e)) {
+        throw e
+      }
+
       /**
-       * On error (disk full, ID overflow, corrupted table, etc.), reset
-       * schema and retry once. May cause data loss, but prevents total
-       * failure. If the retry also fails, the error propagates to the
+       * The table cannot take more events (ID overflow, disk full, corruption, or a
+       * mismatched schema), so drop it and retry once. Stored events are lost, and
+       * the new generation makes clients resuming from an older id replay the new
+       * events from the start. If the retry also fails, the error propagates to the
        * caller so it can be surfaced as a clean error response.
        */
       console.error('Failed to insert event, resetting resume storage schema.', e)
       this.resetSchema()
-      return insertEvent()
+      id = insertEvent()
     }
+
+    return stringifyJSON(this.attachEventId(payload, id))
   }
 
   /**
@@ -206,6 +251,13 @@ class ResumeStorage {
     this.ensureSchemaAndCleanup()
 
     /**
+     * An id from another generation (or not issued here at all) predates the current
+     * table, so every stored event is newer than it.
+     */
+    const match = /^([\da-f]+)-(\d+)$/.exec(lastEventId)
+    const afterId = match !== null && match[1] === this.generation ? match[2]! : '0'
+
+    /**
      * SQLite INTEGER can exceed JavaScript's safe integer range,
      * so we cast to TEXT for safe resume ID comparison.
      */
@@ -214,7 +266,7 @@ class ResumeStorage {
       FROM "${this.schemaPrefix}events"
       WHERE id > ?
       ORDER BY id ASC
-    `, lastEventId)
+    `, afterId)
 
     const events: string[] = []
     for (const record of result.toArray()) {
@@ -284,9 +336,24 @@ class ResumeStorage {
         CREATE INDEX IF NOT EXISTS "${this.schemaPrefix}idx_events_stored_at" ON "${this.schemaPrefix}events" (stored_at)
       `)
 
+      const isNewTable = initTableResult.rowsWritten > 0
+
+      /**
+       * A new table restarts AUTOINCREMENT at 1, whether it is the first one or replaces
+       * a dropped or wiped one, so it always gets a new generation. The generation is
+       * stored so it survives evictions, and `deleteAll` clears it along with the table.
+       */
+      const generationKey = `${this.schemaPrefix}generation`
+      let generation = isNewTable ? undefined : this.ctx.storage.kv.get<string>(generationKey)
+      if (generation === undefined) {
+        generation = createGeneration()
+        this.ctx.storage.kv.put(generationKey, generation)
+      }
+
+      this.generation = generation
       this.isInitedSchema = true
 
-      if (initTableResult.rowsWritten > 0) {
+      if (isNewTable) {
         this.lastCleanupTime = Date.now() // schema just created, nothing to cleanup
       }
     }
@@ -335,7 +402,42 @@ class ResumeStorage {
   private attachEventId(message: SerializedPayload, id: string): SerializedPayload {
     return {
       ...message,
-      meta: { ...message.meta, id },
+      meta: { ...message.meta, id: `${this.generation}-${id}` },
     }
   }
+}
+
+function isSerializedPayload(value: unknown): value is SerializedPayload {
+  return isPlainObject(value) && (value.meta === undefined || value.meta === null || isPlainObject(value.meta))
+}
+
+/**
+ * Whether `value` takes more than `maxBytes` bytes as UTF-8, which is how SQLite stores TEXT.
+ */
+function exceedsUtf8ByteLength(value: string, maxBytes: number): boolean {
+  // Each UTF-16 code unit takes 1 to 3 bytes, so most payloads skip encoding
+  if (value.length * 3 <= maxBytes) {
+    return false
+  }
+
+  if (value.length > maxBytes) {
+    return true
+  }
+
+  return new TextEncoder().encode(value).byteLength > maxBytes
+}
+
+/**
+ * Whether an insert failed because the events table itself is unusable, rather than
+ * because of the event: an exhausted id range or a full database (`SQLITE_FULL`),
+ * corruption, or a table that was dropped or has a different schema.
+ */
+function isUnusableTableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+
+  return /SQLITE_(?:FULL|CORRUPT|NOTADB)|no such table|no such column|has no column named/.test(message)
+}
+
+function createGeneration(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(8)), byte => byte.toString(16).padStart(2, '0')).join('')
 }

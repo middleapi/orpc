@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 interface OpenSocket {
   socket: WebSocket
   messages: string[]
+  replayedEvents: string | null
 }
 
 function toText(data: unknown): string {
@@ -44,7 +45,7 @@ async function openSocket(stub: DurableObjectStub, lastEventId?: string): Promis
 
   socket.accept()
 
-  return { socket, messages }
+  return { socket, messages, replayedEvents: response.headers.get('orpc-replayed-events') }
 }
 
 async function publish(stub: DurableObjectStub, payload: object | string): Promise<Response> {
@@ -64,6 +65,16 @@ async function readMessages<T>(socket: OpenSocket, count: number): Promise<T[]> 
 
 async function getAlarm(stub: DurableObjectStub): Promise<number | null> {
   return runInDurableObject(stub, async (_, state) => state.storage.getAlarm())
+}
+
+async function getGeneration(stub: DurableObjectStub): Promise<string> {
+  const generation = await runInDurableObject(stub, async (_, state) => state.storage.kv.get<string>('prefix:generation'))
+  expect(generation).toMatch(/^[\da-f]{16}$/)
+  return generation!
+}
+
+async function getStoredPayloads(stub: DurableObjectStub): Promise<unknown[]> {
+  return runInDurableObject(stub, async (_, state) => state.storage.sql.exec('SELECT payload FROM "prefix:events" ORDER BY id').toArray().map(row => row.payload))
 }
 
 async function closeSocket(socket: OpenSocket): Promise<void> {
@@ -144,22 +155,26 @@ describe('durable publisher object', () => {
     expect((await publish(stub, { data: { text: 'third' } })).status).toBe(204)
 
     const liveMessages = await readMessages(liveSubscriber, 3)
+    const generation = await getGeneration(stub)
 
     expect(liveMessages).toEqual([
-      { data: { text: 'first' }, meta: { id: '1' } },
-      { data: { text: 'second' }, meta: { id: '2', comments: ['keep me'] } },
-      { data: { text: 'third' }, meta: { id: '3' } },
+      { data: { text: 'first' }, meta: { id: `${generation}-1` } },
+      { data: { text: 'second' }, meta: { id: `${generation}-2`, comments: ['keep me'] } },
+      { data: { text: 'third' }, meta: { id: `${generation}-3` } },
     ])
+    expect(liveSubscriber.replayedEvents).toBe('0')
 
-    const resumeSubscriber = await openSocket(stub, '2')
+    const resumeSubscriber = await openSocket(stub, `${generation}-2`)
     const resumedMessages = await readMessages(resumeSubscriber, 1)
 
     expect(resumedMessages).toEqual([liveMessages[2]])
+    expect(resumeSubscriber.replayedEvents).toBe('1')
 
-    const tailSubscriber = await openSocket(stub, '3')
+    const tailSubscriber = await openSocket(stub, `${generation}-3`)
 
     await sleep(2)
     expect(tailSubscriber.messages).toHaveLength(0)
+    expect(tailSubscriber.replayedEvents).toBe('0')
 
     await closeSocket(liveSubscriber)
     await closeSocket(resumeSubscriber)
@@ -182,6 +197,8 @@ describe('durable publisher object', () => {
     const messages = await readMessages<{ data: { order: number } }>(subscriber, 4)
 
     expect(messages.map(message => message.data.order)).toEqual([1, 2, 3, 4])
+    // events published while subscribing are either replayed or sent live, and the count says which
+    expect(['2', '3', '4']).toContain(subscriber.replayedEvents)
 
     await closeSocket(subscriber)
   })
@@ -298,7 +315,7 @@ describe('durable publisher object', () => {
     expect((await publish(stub, { data: { text: 'after-error' } })).status).toBe(204)
     expect((await readMessages(subscriber, 1))[0]).toEqual({
       data: { text: 'after-error' },
-      meta: { id: '1' },
+      meta: { id: `${await getGeneration(stub)}-1` },
     })
 
     await closeSocket(subscriber)
@@ -362,16 +379,152 @@ describe('durable publisher object', () => {
         JSON.stringify({ data: { text: 'before-overflow' } }),
       )
     })
+    const oldGeneration = await getGeneration(stub)
 
     expect((await publish(stub, { data: { text: 'recovered' } })).status).toBe(204)
     expect(consoleError).toHaveBeenCalled()
 
-    const resumeSubscriber = await openSocket(stub, '0')
+    const newGeneration = await getGeneration(stub)
+    expect(newGeneration).not.toBe(oldGeneration)
 
-    expect((await readMessages(resumeSubscriber, 1))[0]).toEqual({
+    // the recreated table restarts ids at 1, so the last id seen before the reset must not hide it
+    const resumeSubscriber = await openSocket(stub, `${oldGeneration}-9223372036854775807`)
+
+    expect(await readMessages(resumeSubscriber, 1)).toEqual([{
       data: { text: 'recovered' },
-      meta: { id: '1' },
+      meta: { id: `${newGeneration}-1` },
+    }])
+
+    await closeSocket(resumeSubscriber)
+  })
+
+  it('recreates the events table when it disappears under a running object', async () => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    expect((await publish(stub, { data: { text: 'initial' } })).status).toBe(204)
+    const oldGeneration = await getGeneration(stub)
+
+    await runInDurableObject(stub, async (_, state) => {
+      state.storage.sql.exec('DROP TABLE "prefix:events"')
     })
+
+    expect((await publish(stub, { data: { text: 'recovered' } })).status).toBe(204)
+    expect(consoleError).toHaveBeenCalledTimes(1)
+    expect(consoleError.mock.calls[0]![1].message).toContain('no such table')
+
+    const newGeneration = await getGeneration(stub)
+    expect(newGeneration).not.toBe(oldGeneration)
+
+    const resumeSubscriber = await openSocket(stub, `${oldGeneration}-1`)
+
+    expect(await readMessages(resumeSubscriber, 1)).toEqual([{
+      data: { text: 'recovered' },
+      meta: { id: `${newGeneration}-1` },
+    }])
+
+    await closeSocket(resumeSubscriber)
+  })
+
+  it('keeps the id generation across evictions and replays everything for foreign ids', async () => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
+
+    expect((await publish(stub, { data: { text: 'first' } })).status).toBe(204)
+    const generation = await getGeneration(stub)
+
+    await evictDurableObject(stub)
+
+    expect((await publish(stub, { data: { text: 'second' } })).status).toBe(204)
+    expect(await getGeneration(stub)).toBe(generation)
+
+    const resumeSubscriber = await openSocket(stub, `${generation}-1`)
+    expect(await readMessages(resumeSubscriber, 1)).toEqual([
+      { data: { text: 'second' }, meta: { id: `${generation}-2` } },
+    ])
+
+    for (const lastEventId of ['0', '1', 'not-an-id', `${generation}-`, `${generation}-x`, `0123456789abcdef-1`]) {
+      const subscriber = await openSocket(stub, lastEventId)
+      expect(subscriber.replayedEvents).toBe('2')
+      expect((await readMessages<{ data: { text: string } }>(subscriber, 2)).map(message => message.data.text)).toEqual(['first', 'second'])
+      await closeSocket(subscriber)
+    }
+
+    await closeSocket(resumeSubscriber)
+  })
+
+  it('rejects payloads it cannot store without dropping stored events', async () => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const kept = JSON.stringify({ data: { text: 'kept' } })
+    expect((await publish(stub, kept)).status).toBe(204)
+
+    const wrapperBytes = JSON.stringify({ data: '' }).length
+    const rejected: [payload: string, status: number][] = [
+      ['null', 400],
+      ['[]', 400],
+      ['"text"', 400],
+      ['42', 400],
+      ['{"data":1,"meta":"text"}', 400],
+      ['{"data":1,"meta":[]}', 400],
+      // one byte over the limit, counted as UTF-8 like SQLite does
+      [JSON.stringify({ data: 'a'.repeat(2_000_000 - wrapperBytes + 1) }), 413],
+      [JSON.stringify({ data: '\u00E9'.repeat(Math.ceil((2_000_000 - wrapperBytes + 1) / 2)) }), 413], // 2 bytes each
+      // more than SQLite accepts
+      [JSON.stringify({ data: 'a'.repeat(3_000_000) }), 413],
+    ]
+
+    for (const [payload, status] of rejected) {
+      const response = await publish(stub, payload)
+      expect(response.status).toBe(status)
+      expect(await response.text()).toBe(status === 413 ? 'Event payload too large' : 'Invalid or unprocessable event payload')
+      expect(await getStoredPayloads(stub)).toEqual([kept])
+    }
+
+    expect(consoleError).toHaveBeenCalledTimes(rejected.length)
+
+    // the largest allowed payload fits in a row
+    const largest = JSON.stringify({ data: 'a'.repeat(2_000_000 - wrapperBytes) })
+    expect((await publish(stub, largest)).status).toBe(204)
+
+    const generation = await getGeneration(stub)
+    const resumeSubscriber = await openSocket(stub, '0')
+    const messages = await readMessages<{ data: string, meta: { id: string } }>(resumeSubscriber, 2)
+
+    expect(messages[0]).toEqual({ data: { text: 'kept' }, meta: { id: `${generation}-1` } })
+    expect(messages[1]!.data).toHaveLength(2_000_000 - wrapperBytes)
+    expect(messages[1]!.meta).toEqual({ id: `${generation}-2` })
+
+    await closeSocket(resumeSubscriber)
+  })
+
+  it('keeps stored events when an insert fails for a reason other than the table', async () => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const kept = JSON.stringify({ data: { text: 'kept' } })
+    expect((await publish(stub, kept)).status).toBe(204)
+
+    await runInDurableObject(stub, async (_, state) => {
+      state.storage.sql.exec(`
+        CREATE TRIGGER "prefix:reject" BEFORE INSERT ON "prefix:events"
+        BEGIN SELECT RAISE(ABORT, 'rejected by trigger'); END
+      `)
+    })
+
+    expect((await publish(stub, { data: { text: 'rejected' } })).status).toBe(400)
+    expect(await getStoredPayloads(stub)).toEqual([kept])
+    expect(consoleError).toHaveBeenCalledTimes(1)
+    expect(consoleError.mock.calls[0]![1].message).toContain('rejected by trigger')
+
+    await runInDurableObject(stub, async (_, state) => {
+      state.storage.sql.exec('DROP TRIGGER "prefix:reject"')
+    })
+
+    expect((await publish(stub, { data: { text: 'after' } })).status).toBe(204)
+
+    const resumeSubscriber = await openSocket(stub, '0')
+    expect((await readMessages<{ data: { text: string } }>(resumeSubscriber, 2)).map(message => message.data.text)).toEqual(['kept', 'after'])
 
     await closeSocket(resumeSubscriber)
   })
@@ -386,7 +539,7 @@ describe('durable publisher object', () => {
     expect((await publish(stub, { data: { text: 'after-alarm' } })).status).toBe(204)
     expect((await readMessages(subscriber, 1))[0]).toEqual({
       data: { text: 'after-alarm' },
-      meta: { id: '1' },
+      meta: { id: `${await getGeneration(stub)}-1` },
     })
 
     await runDurableObjectAlarm(stub)
@@ -404,10 +557,11 @@ describe('durable publisher object', () => {
     expect(await getAlarm(stub)).not.toBeNull()
 
     const beforeExpirySubscriber = await openSocket(stub, '0')
+    const oldGeneration = await getGeneration(stub)
 
     expect((await readMessages(beforeExpirySubscriber, 1))[0]).toEqual({
       data: { text: 'fresh resume event' },
-      meta: { id: '1' },
+      meta: { id: `${oldGeneration}-1` },
     })
 
     await closeSocket(beforeExpirySubscriber)
@@ -429,11 +583,21 @@ describe('durable publisher object', () => {
     const newLiveSubscriber = await openSocket(stub)
 
     expect((await publish(stub, { data: { text: 'after cleanup' } })).status).toBe(204)
-    expect((await readMessages(newLiveSubscriber, 1))[0]).toEqual({
+
+    const newGeneration = await getGeneration(stub)
+    expect(newGeneration).not.toBe(oldGeneration)
+
+    const afterCleanupMessage = {
       data: { text: 'after cleanup' },
-      meta: { id: '1' },
-    })
+      meta: { id: `${newGeneration}-1` },
+    }
+    expect(await readMessages(newLiveSubscriber, 1)).toEqual([afterCleanupMessage])
+
+    // cleanup restarts ids at 1, so the last id seen before it must not hide the new events
+    const staleSubscriber = await openSocket(stub, `${oldGeneration}-1`)
+    expect(await readMessages(staleSubscriber, 1)).toEqual([afterCleanupMessage])
 
     await closeSocket(newLiveSubscriber)
+    await closeSocket(staleSubscriber)
   })
 })

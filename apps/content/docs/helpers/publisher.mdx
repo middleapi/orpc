@@ -261,6 +261,8 @@ export class PublisherDO extends DurablePublisherObject {
          *
          * When enabled, published events are temporarily stored so new
          * subscribers can resume from a previous position using `lastEventId`.
+         * Each stored event must fit within 2 MB, the Durable Object SQLite row limit,
+         * so publishing a larger one fails.
          *
          * @default false
          */
@@ -288,8 +290,8 @@ export class PublisherDO extends DurablePublisherObject {
         cleanupIntervalSeconds: 6 * 60 * 60,
 
         /**
-         * Prefix for the resume storage table schema.
-         * Used to avoid naming conflicts with other tables in the same Durable Object.
+         * Prefix for the resume storage table schema and storage keys.
+         * Used to avoid naming conflicts with other tables and keys in the same Durable Object.
          *
          * @default 'orpc:'
          */
