@@ -5,7 +5,7 @@ import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-ser
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
 import { ORPCError } from '@orpc/client'
-import { toArray, value } from '@orpc/shared'
+import { NullProtoObj, toArray, value } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
 
@@ -80,7 +80,11 @@ export interface BatchHandlerPluginOptions<T extends Context> {
  * @remarks
  * **Note**: HTTP/2 and later already multiplex requests over a single connection, which often makes this plugin unnecessary.
  *
+ * **Cookies**: subresponse `set-cookie` headers never go into the batch body. Buffered mode sets them
+ * on the batch response, while streaming mode drops them.
+ *
  * @see {@link https://orpc.dev/docs/plugins/batch | Batch Plugin}
+ * @see {@link https://orpc.dev/docs/plugins/batch#cookies | Batch Plugin - Cookies}
  */
 export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
   name = '~batch'
@@ -201,7 +205,16 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       }
 
-      const handleIndividualRequest = async (request: StandardLazyRequest): Promise<StandardResponse> => {
+      /**
+       * Subresponse headers travel in the batch body, where `set-cookie` must never end up:
+       * script can read the body, which defeats `HttpOnly`, and browsers only apply cookies
+       * from real response headers. Buffered mode moves it onto the batch response, while
+       * streaming mode drops it, since the batch response headers are sent before any subresponse is ready.
+       * Indexed by message so cookies are applied in request order, not completion order.
+       */
+      const subresponseSetCookies: string[][] = []
+
+      const handleIndividualRequest = async (request: StandardLazyRequest, index: number): Promise<StandardResponse> => {
         try {
           request = this.mapSubrequest(request, interceptorOptions)
           const { matched, response } = await interceptorOptions.next({ ...interceptorOptions, request })
@@ -210,7 +223,10 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
             return { status: 404, headers: {}, body: 'No procedure matched' }
           }
 
-          return response
+          const [headers, setCookie] = extractSetCookie(response.headers)
+          subresponseSetCookies[index] = setCookie
+
+          return { ...response, headers }
         }
         catch (err) {
           /**
@@ -225,7 +241,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       }
 
       const runSubrequests = async (peer: ServerPeer): Promise<void> => {
-        const promise = Promise.all(messages.map(msg => peer.message(msg, handleIndividualRequest)))
+        const promise = Promise.all(messages.map((msg, index) => peer.message(msg, request => handleIndividualRequest(request, index))))
         const signal = interceptorOptions.request.signal
         const closePeer = () => peer.close(signal?.reason)
 
@@ -255,6 +271,10 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         await runSubrequests(peer)
         await peer.close()
 
+        const [batchHeaders, batchSetCookie] = extractSetCookie(headers)
+        const setCookie = [...batchSetCookie, ...subresponseSetCookies.flat()]
+        const responseHeaders = setCookie.length ? { ...batchHeaders, 'set-cookie': setCookie } : headers
+
         if (responseMessages.some(msg => msg.binary !== undefined)) {
           const chunks: Uint8Array<ArrayBuffer>[] = []
 
@@ -274,7 +294,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
             matched: true,
             response: {
               status,
-              headers,
+              headers: responseHeaders,
               body: new Blob(chunks, { type: BATCH_CONTENT_TYPE }),
             },
           }
@@ -282,7 +302,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
         return {
           matched: true,
-          response: { status, headers, body: responseMessages },
+          response: { status, headers: responseHeaders, body: responseMessages },
         }
       }
 
@@ -367,4 +387,23 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       routingInterceptors: [routingInterceptor, ...toArray(options.routingInterceptors)],
     }
   }
+}
+
+/**
+ * Splits the `set-cookie` header, matched case-insensitively, from the rest of the headers.
+ */
+function extractSetCookie(headers: StandardHeaders): [rest: StandardHeaders, setCookie: string[]] {
+  const rest = new NullProtoObj<Record<string, string | string[] | undefined>>()
+  const setCookie: string[] = []
+
+  for (const key of Object.keys(headers)) {
+    if (key.toLowerCase() === 'set-cookie') {
+      setCookie.push(...toArray(headers[key]))
+    }
+    else {
+      rest[key] = headers[key]
+    }
+  }
+
+  return [rest, setCookie]
 }

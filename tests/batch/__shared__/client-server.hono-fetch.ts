@@ -5,7 +5,7 @@ import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { BatchLinkPlugin } from '@orpc/client/plugins'
 import { RPCHandler } from '@orpc/server/fetch'
-import { BatchHandlerPlugin } from '@orpc/server/plugins'
+import { BatchHandlerPlugin, ResponseHeadersHandlerPlugin } from '@orpc/server/plugins'
 import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server'
 
 export const createHonoFetchBatchClientServerTest: CreateBatchClientServerTest = (
@@ -20,7 +20,7 @@ export const createHonoFetchBatchClientServerTest: CreateBatchClientServerTest =
   const handler = new RPCHandler(router, {
     serializer,
     allowMethods: ['GET', 'POST', 'QUERY'],
-    plugins: [new BatchHandlerPlugin()],
+    plugins: [new BatchHandlerPlugin(), new ResponseHeadersHandlerPlugin()],
   })
 
   const server = serve({

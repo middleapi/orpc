@@ -1,4 +1,6 @@
+import type { ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
 import { ORPCError, os } from '@orpc/server'
+import { setCookie } from '@orpc/server/helpers'
 import { promiseWithResolvers } from '@orpc/shared'
 import { sleep } from '@standard-server/shared'
 import { z } from 'zod'
@@ -225,6 +227,47 @@ describe.each([
     ])
 
     expect(fetchSpy).toHaveBeenCalledTimes(2) // the upload plus one batch for both echoes
+  })
+
+  describe('cookies', () => {
+    const router = {
+      login: os
+        .$context<ResponseHeadersHandlerPluginContext>()
+        .input(z.string())
+        .handler(({ context, input }) => {
+          setCookie(context.resHeaders, input, 'SECRET', { httpOnly: true })
+          return input
+        }),
+    }
+
+    it('sets the cookies of buffered calls on the batch response', async () => {
+      const { client, fetchSpy } = createClientServer(router, { mode: 'buffered' })
+
+      await Promise.all([
+        expect(client.login('a')).resolves.toBe('a'),
+        expect(client.login('b')).resolves.toBe('b'),
+      ])
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1) // ensure batch was used
+      const response = await fetchSpy.mock.results[0]!.value
+      expect(response.headers.getSetCookie()).toEqual([
+        'a=SECRET; Path=/; HttpOnly',
+        'b=SECRET; Path=/; HttpOnly',
+      ])
+    })
+
+    it('drops the cookies of streamed calls since the batch response headers are already sent', async () => {
+      const { client, fetchSpy } = createClientServer(router, { mode: 'streaming' })
+
+      await Promise.all([
+        expect(client.login('a')).resolves.toBe('a'),
+        expect(client.login('b')).resolves.toBe('b'),
+      ])
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1) // ensure batch was used
+      const response = await fetchSpy.mock.results[0]!.value
+      expect(response.headers.getSetCookie()).toEqual([])
+    })
   })
 })
 

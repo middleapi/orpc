@@ -6,7 +6,7 @@ import { RPCLink } from '@orpc/client/fetch'
 import { BatchLinkPlugin } from '@orpc/client/plugins'
 import { BatchResponseCompressionHandlerPlugin } from '@orpc/node'
 import { RPCHandler } from '@orpc/server/fetch'
-import { BatchHandlerPlugin } from '@orpc/server/plugins'
+import { BatchHandlerPlugin, ResponseHeadersHandlerPlugin } from '@orpc/server/plugins'
 import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server'
 
 /**
@@ -27,6 +27,7 @@ export const createCompressionHonoFetchBatchClientServerTest: CreateBatchClientS
     allowMethods: ['GET', 'POST', 'QUERY'],
     plugins: [
       new BatchHandlerPlugin(),
+      new ResponseHeadersHandlerPlugin(),
       new BatchResponseCompressionHandlerPlugin({
         // always compress for testing
         threshold: 0,

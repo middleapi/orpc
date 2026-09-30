@@ -54,6 +54,10 @@ const handler = new RPCHandler(router, {
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
 :::
 
+:::warning
+With the [Batch Plugin](/docs/plugins/batch), headers set on a batched call are sent inside the batch body rather than as HTTP headers, except `set-cookie`, which is set on the batch response in buffered mode and dropped in streaming mode. See [Batch Plugin Cookies](/docs/plugins/batch#cookies).
+:::
+
 ## Learn More
 
 For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/response-headers.ts).

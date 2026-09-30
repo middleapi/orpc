@@ -1,11 +1,14 @@
 import type { AnyRouter } from '../router'
+import type { ResponseHeadersHandlerPluginContext } from './response-headers'
 import { ORPCError } from '@orpc/client'
 import { promiseWithResolvers } from '@orpc/shared'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { os } from '../builder'
+import { deleteCookie, setCookie } from '../helpers/cookie'
 import { BatchHandlerPlugin } from './batch'
 import { RequestCompressionHandlerPlugin } from './request-compression'
 import { RequestLimitHandlerPlugin } from './request-limit'
+import { ResponseHeadersHandlerPlugin } from './response-headers'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -538,6 +541,153 @@ describe('batchHandlerPlugin', () => {
       ))
 
       expect(seenHeaders[0]!.authorization).toEqual('Bearer real')
+    })
+  })
+
+  describe('sub-response set-cookie', () => {
+    const cookieRouter = {
+      login: os.$context<ResponseHeadersHandlerPluginContext>().handler(({ context }) => {
+        setCookie(context.resHeaders, 'sid', 'SECRET', { httpOnly: true })
+        return 'ok'
+      }),
+      logout: os.$context<ResponseHeadersHandlerPluginContext>().handler(({ context }) => {
+        deleteCookie(context.resHeaders, 'refresh')
+        return 'ok'
+      }),
+      file: os.$context<ResponseHeadersHandlerPluginContext>().handler(({ context }) => {
+        setCookie(context.resHeaders, 'sid', 'SECRET', { httpOnly: true })
+        return new Blob(['__FILE__'], { type: 'application/octet-stream' })
+      }),
+      ping: os.handler(() => 'pong'),
+    }
+
+    const createCookieHandler = (plugin = new BatchHandlerPlugin()) => new RPCHandler(cookieRouter, {
+      plugins: [plugin, new ResponseHeadersHandlerPlugin()],
+    })
+
+    it('moves set-cookie onto the buffered batch response instead of the body', async () => {
+      const handler = createCookieHandler()
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: [makePeerRequestMessage(0, '/login'), makePeerRequestMessage(1, '/ping')],
+      }))
+
+      expect(response!.status).toBe(207)
+      expect(response!.headers.getSetCookie()).toEqual(['sid=SECRET; Path=/; HttpOnly'])
+
+      const text = await response!.text()
+      expect(text).not.toContain('SECRET')
+      expect(text.toLowerCase()).not.toContain('set-cookie')
+      expect(JSON.parse(text)).toHaveLength(2)
+    })
+
+    it('moves set-cookie onto the buffered batch response when the body is binary', async () => {
+      const handler = createCookieHandler()
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: [makePeerRequestMessage(0, '/file')],
+      }))
+
+      expect(response!.headers.get('content-type')).toEqual('application/vnd.orpc.batch')
+      expect(response!.headers.getSetCookie()).toEqual(['sid=SECRET; Path=/; HttpOnly'])
+
+      const text = await response!.text()
+      expect(text).toContain('__FILE__')
+      expect(text).not.toContain('SECRET')
+      expect(text.toLowerCase()).not.toContain('set-cookie')
+    })
+
+    it('applies cookies in request order after the batch response ones', async () => {
+      const handler = new RPCHandler({
+        slow: os.$context<ResponseHeadersHandlerPluginContext>().handler(async ({ context }) => {
+          await new Promise(resolve => setTimeout(resolve, 10))
+          setCookie(context.resHeaders, 'slow', '1')
+        }),
+        fast: os.$context<ResponseHeadersHandlerPluginContext>().handler(({ context }) => {
+          setCookie(context.resHeaders, 'fast', '1')
+          setCookie(context.resHeaders, 'fast', '2')
+        }),
+      }, {
+        plugins: [
+          new BatchHandlerPlugin({ headers: { 'Set-Cookie': 'batch=1' } }),
+          new ResponseHeadersHandlerPlugin(),
+        ],
+      })
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: [makePeerRequestMessage(0, '/slow'), makePeerRequestMessage(1, '/fast')],
+      }))
+
+      expect(response!.headers.getSetCookie()).toEqual([
+        'batch=1',
+        'slow=1; Path=/',
+        'fast=1; Path=/',
+        'fast=2; Path=/',
+      ])
+    })
+
+    it('moves a deleted cookie onto the buffered batch response', async () => {
+      const handler = createCookieHandler()
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: [makePeerRequestMessage(0, '/logout')],
+      }))
+
+      expect(response!.headers.getSetCookie()).toEqual(['refresh=; Max-Age=0; Path=/'])
+      expect((await response!.text()).toLowerCase()).not.toContain('set-cookie')
+    })
+
+    it('matches set-cookie case-insensitively', async () => {
+      const handler = new RPCHandler(router, {
+        plugins: [new BatchHandlerPlugin()],
+        routingInterceptors: [async ({ next }) => {
+          const result = await next()
+
+          return result.matched
+            ? { ...result, response: { ...result.response, headers: { 'Set-Cookie': 'sid=SECRET', 'x-kept': 'kept' } } }
+            : result
+        }],
+      })
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: [makePeerRequestMessage(0, '/ping')],
+      }))
+
+      expect(response!.headers.getSetCookie()).toEqual(['sid=SECRET'])
+
+      const body = await response!.json() as any
+      expect(body[0].json.headers).toEqual({ 'x-kept': 'kept' })
+    })
+
+    it('drops set-cookie in streaming mode since the batch response headers are already sent', async () => {
+      const handler = createCookieHandler()
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [makePeerRequestMessage(0, '/login'), makePeerRequestMessage(1, '/file')],
+      }))
+
+      expect(response!.headers.getSetCookie()).toEqual([])
+
+      const text = await response!.text()
+      expect(text).toContain('__FILE__')
+      expect(text).not.toContain('SECRET')
+      expect(text.toLowerCase()).not.toContain('set-cookie')
+    })
+
+    it('keeps set-cookie of a non-batch request on its response', async () => {
+      const handler = createCookieHandler()
+
+      const { response } = await handler.handle(new Request('https://example.com/login', {
+        method: 'POST',
+      }))
+
+      expect(response!.headers.getSetCookie()).toEqual(['sid=SECRET; Path=/; HttpOnly'])
     })
   })
 

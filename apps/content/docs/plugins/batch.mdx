@@ -106,6 +106,32 @@ const handler = new RPCHandler(router, {
 })
 ```
 
+## Cookies
+
+Each batched call gets its own response, but only the batch response is a real HTTP response. Headers of the individual responses travel inside the batch body, where script can read them and browsers do not apply them. For this reason, `set-cookie` headers, such as those set with the [Response Headers Plugin](/docs/plugins/response-headers) and [Cookie Helpers](/docs/helpers/cookie), are never included there:
+
+- In **buffered** mode, they are moved onto the batch response, so the browser stores them and `HttpOnly` cookies stay out of reach of script.
+- In **streaming** mode, the batch response headers are sent before any call finishes, so they are **dropped**.
+
+If you use streaming mode, keep calls that set or delete cookies, such as login, token refresh, and logout, out of the batch with [`filter`](#filtering-requests):
+
+```ts
+const link = new RPCLink({
+  url: '/rpc',
+  plugins: [
+    new BatchLinkPlugin({
+      filter: ({ path }) => path[0] !== 'auth',
+      groups: [
+        {
+          condition: () => true,
+          context: {},
+        },
+      ],
+    }),
+  ],
+})
+```
+
 ## Compression
 
 A batch response might be left uncompressed by the [Response Compression Plugin](/docs/plugins/response-compression), depending on the shape it takes. On Node.js, add the [Batch Response Compression Plugin](/docs/plugins/batch-response-compression) when you know your batch responses are all compressible. It covers every one of them, without giving up streaming:
