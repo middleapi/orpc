@@ -1,4 +1,4 @@
-import type { JsonSchema as ArkJsonSchema, ToJsonSchema } from '@ark/schema'
+import type { JsonSchema as ArkJsonSchema, BaseRoot, ToJsonSchema } from '@ark/schema'
 import type { AnySchema, JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
 import type { Type } from 'arktype'
 import { JsonSchemaFormat, JsonSchemaXNativeType } from '@orpc/json-schema'
@@ -90,24 +90,42 @@ export class ArkTypeToJsonSchemaConverter implements JsonSchemaConverter {
   private convertUncached(arkTypeSchema: Type, direction: JsonSchemaConverterDirection): [jsonSchema: JsonSchema, optional: boolean] {
     const jsonSchema = this.convertArkType(arkTypeSchema, direction)
 
-    let optional = false
-    try {
-      const result = arkTypeSchema['~standard'].validate(undefined)
-      if (!(result instanceof Promise) && !result.issues) {
-        optional = direction === 'input' ? true : result.value === undefined
-      }
-    }
-    catch {}
-
-    return [jsonSchema as JsonSchema, optional]
+    return [jsonSchema as JsonSchema, isOptional(arkTypeSchema.internal, direction)]
   }
 
-  private convertArkType(schema: Type, _direction: JsonSchemaConverterDirection): ArkJsonSchema {
-    const jsonSchema = schema.toJsonSchema(this.toJsonSchemaOptions)
+  private convertArkType(schema: Type, direction: JsonSchemaConverterDirection): ArkJsonSchema {
+    // `schema.in` drops property defaults, while converting the whole schema already
+    // describes the input side, since the fallback keeps the input of each morph.
+    const jsonSchema = direction === 'input'
+      ? schema.toJsonSchema(this.toJsonSchemaOptions)
+      : schema.out.toJsonSchema(this.toJsonSchemaOptions)
 
     // Since the default oRPC format is always draft/2020-12,
     // `$schema` can be safely omitted here.
     const { $schema, ...rest } = jsonSchema
     return rest
   }
+}
+
+/**
+ * Reads optionality from the schema structure instead of validating `undefined`,
+ * which would run morphs and narrows.
+ */
+function isOptional(node: BaseRoot, direction: JsonSchemaConverterDirection): boolean {
+  return node.branches.some((branch) => {
+    if (!branch.hasKind('morph')) {
+      return allowsUndefined(branch, true)
+    }
+
+    // A morph can only be known to produce `undefined` when its declared output includes it.
+    return allowsUndefined(branch.rawIn, true) && (direction === 'input' || allowsUndefined(branch.rawOut, false))
+  })
+}
+
+function allowsUndefined(node: BaseRoot, allowUnknown: boolean): boolean {
+  return node.branches.some(branch =>
+    branch.hasUnit(undefined)
+    // `unknown` is an intersection without any constraint
+    || (allowUnknown && branch.hasKind('intersection') && branch.children.length === 0),
+  )
 }

@@ -16,19 +16,73 @@ describe('arkTypeToJsonSchemaConverter', () => {
     })
   })
 
-  it('keeps converting when standard validation throws while checking optionality', () => {
-    const schema = type('string')
+  it('does not run standard validation to check optionality', () => {
+    const schema = type('number | undefined')
+    const validate = vi.fn(() => {
+      throw new Error('validate failed')
+    })
 
     Object.defineProperty(schema, '~standard', {
       value: {
         ...schema['~standard'],
-        validate: () => {
-          throw new Error('validate failed')
-        },
+        validate,
       },
     })
 
-    expect(converter.convert(schema, 'input')).toEqual([{ type: 'string' }, false])
+    expect(converter.convert(schema, 'input')).toEqual([{ anyOf: [{ type: 'number' }, {}] }, true])
+    expect(converter.convert(schema, 'output')).toEqual([{ anyOf: [{ type: 'number' }, {}] }, true])
+    expect(validate).not.toHaveBeenCalled()
+  })
+
+  it('does not leak rejections from async morphs', async ({ onTestFinished }) => {
+    const unhandledRejection = vi.fn()
+    process.on('unhandledRejection', unhandledRejection)
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejection)
+    })
+
+    const morph = vi.fn(async () => {
+      throw new Error('boom')
+    })
+
+    const schema = type('undefined').pipe(morph)
+    expect(converter.convert(schema, 'input')).toEqual([{}, true])
+    expect(converter.convert(schema, 'output')).toEqual([{}, false])
+
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(morph).not.toHaveBeenCalled()
+    expect(unhandledRejection).not.toHaveBeenCalled()
+  })
+
+  describe('direction', () => {
+    it('converts the output of morphs and defaults for the output direction', () => {
+      const schema = type({ createdAt: 'string.date.iso.parse', tag: 'string = "x"' })
+
+      expect(converter.convert(schema, 'input')).toEqual([{
+        type: 'object',
+        properties: {
+          createdAt: { type: 'string', pattern: expect.any(String) },
+          tag: { type: 'string', default: 'x' },
+        },
+        required: ['createdAt'],
+      }, false])
+
+      expect(converter.convert(schema, 'output')).toEqual([{
+        type: 'object',
+        properties: {
+          createdAt: { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' },
+          tag: { type: 'string' },
+        },
+        required: ['createdAt', 'tag'],
+      }, false])
+    })
+
+    it('converts the declared output of a morph for the output direction', () => {
+      const schema = type('string.numeric.parse')
+
+      expect(converter.convert(schema, 'input')).toEqual([{ type: 'string', pattern: expect.any(String) }, false])
+      expect(converter.convert(schema, 'output')).toEqual([{ type: 'number' }, false])
+    })
   })
 
   describe('optionality', () => {
@@ -53,6 +107,15 @@ describe('arkTypeToJsonSchemaConverter', () => {
       ['required output schema', type('string'), 'output', {
         type: 'string',
       }, false],
+      ['unknown input schema', type('unknown'), 'input', {}, true],
+      ['unknown output schema', type('unknown'), 'output', {}, true],
+      ['morphed optional input schema', type('string | undefined').pipe(value => value ?? 'fallback'), 'input', {
+        anyOf: [{ type: 'string' }, {}],
+      }, true],
+      ['morphed optional output schema', type('string | undefined').pipe(value => value ?? 'fallback'), 'output', {}, false],
+      ['optional output schema with a morphed branch', type('string.numeric.parse | undefined'), 'output', {
+        anyOf: [{ type: 'number' }, {}],
+      }, true],
     ] as const)('marks %s correctly', (_, schema, direction, jsonSchema, optional) => {
       expect(converter.convert(schema, direction)).toEqual([jsonSchema, optional])
     })
