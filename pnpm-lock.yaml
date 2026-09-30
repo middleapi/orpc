@@ -558,6 +558,9 @@ importers:
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.22.0
         version: 0.22.0(@vitest/runner@4.1.11)(@vitest/snapshot@4.1.11)(vitest@4.1.11)
+      '@orpc/server':
+        specifier: workspace:*
+        version: link:../server
       '@vitest/coverage-istanbul':
         specifier: ^4.1.11
         version: 4.1.11(supports-color@10.2.2)(vitest@4.1.11)

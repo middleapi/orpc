@@ -14,7 +14,8 @@ class CloudflareSpan implements TracingSpan {
   }
 
   updateName(name: string): void {
-    this.span.updateName(name)
+    // Runtimes before workerd 1.20260925.1 cannot rename a span
+    this.span.updateName?.(name)
   }
 
   addEvent(_name: string): void {
@@ -25,7 +26,8 @@ class CloudflareSpan implements TracingSpan {
     this.span.recordException(exception)
 
     if (level === 'error') {
-      this.span.setStatus({ code: 'error', message: exception.message })
+      // Runtimes before workerd 1.20260925.1 have no span status
+      this.span.setStatus?.({ code: 'error', message: exception.message })
     }
   }
 

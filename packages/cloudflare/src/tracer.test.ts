@@ -1,4 +1,6 @@
 import type { Tracer } from '@orpc/shared'
+import { ORPCError, os } from '@orpc/server'
+import { RPCHandler } from '@orpc/server/fetch'
 import { getTracer, setTracer } from '@orpc/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { experimental_CloudflareSpan as CloudflareSpan, experimental_CloudflareTracer as CloudflareTracer } from './tracer'
@@ -15,7 +17,15 @@ function createFakeSpan() {
   }
 }
 
-function createFakeTracing(span = createFakeSpan()) {
+/**
+ * Mirrors runtimes before workerd 1.20260925.1, which have the rest of the tracing api
+ */
+function createFakeSpanWithoutRenameAndStatus() {
+  const { updateName: _updateName, setStatus: _setStatus, ...span } = createFakeSpan()
+  return span
+}
+
+function createFakeTracing(span: ReturnType<typeof createFakeSpanWithoutRenameAndStatus> = createFakeSpan()) {
   return {
     span,
     enterSpan: vi.fn(),
@@ -146,6 +156,74 @@ describe('cloudflareTracer', () => {
 
       expect(fake.recordException).toHaveBeenCalledWith(exception)
       expect(fake.setStatus).not.toHaveBeenCalled()
+    })
+
+    it('skips renames and statuses on runtimes without them', () => {
+      const fake = createFakeSpanWithoutRenameAndStatus()
+      const span = new CloudflareSpan(fake as any)
+      const exception = { name: 'TypeError', message: 'boom' }
+
+      expect(() => span.updateName('renamed')).not.toThrow()
+      expect(() => span.recordException('error', exception)).not.toThrow()
+
+      expect(fake.recordException).toHaveBeenCalledWith(exception)
+    })
+  })
+
+  describe('on runtimes without updateName and setStatus', () => {
+    const handler = new RPCHandler({
+      ping: os.handler(() => 'pong'),
+      fail: os.handler(() => {
+        throw new ORPCError('NOT_FOUND', { message: 'missing' })
+      }),
+    })
+
+    function setup() {
+      const fake = createFakeTracing(createFakeSpanWithoutRenameAndStatus())
+      new CloudflareTracer({ tracing: fake as any }).enable()
+      return fake
+    }
+
+    function request(path: string, body: string = JSON.stringify({ json: null })) {
+      return handler.handle(new Request(`https://example.com/${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+      }))
+    }
+
+    it('handles requests', async () => {
+      const fake = setup()
+
+      const { matched, response } = await request('ping')
+
+      expect(matched).toBe(true)
+      expect(response!.status).toBe(200)
+      await expect(response!.json()).resolves.toEqual({ json: 'pong' })
+      expect(fake.span.recordException).not.toHaveBeenCalled()
+    })
+
+    it('records procedure errors and keeps the original error', async () => {
+      const fake = setup()
+
+      const { matched, response } = await request('fail')
+
+      expect(matched).toBe(true)
+      expect(response!.status).toBe(404)
+      await expect(response!.json()).resolves.toMatchObject({ json: { code: 'NOT_FOUND', message: 'missing' } })
+      expect(fake.span.recordException).toHaveBeenCalledWith(expect.objectContaining({ code: 'NOT_FOUND', message: 'missing' }))
+    })
+
+    it('records protocol errors and keeps the original error', async () => {
+      const fake = setup()
+
+      const { matched, response } = await request('ping', '{invalid')
+
+      expect(matched).toBe(true)
+      expect(response!.status).toBe(400)
+      await expect(response!.json()).resolves.toMatchObject({ json: { code: 'BAD_REQUEST' } })
+      // once by the decode_input span and once by the request span, which share the fake span
+      expect(fake.span.recordException).toHaveBeenCalledTimes(2)
     })
   })
 
