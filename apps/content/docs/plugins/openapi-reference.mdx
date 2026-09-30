@@ -64,16 +64,33 @@ const handler = new OpenAPIHandler(router, {
 ```
 
 :::tip
-To make `providerConfig` typesafe, install the type definitions for your chosen provider:
+`providerConfig` is loosely typed by default, so you don't need the provider's packages installed. To make it typesafe, install the type definitions for your chosen provider and pass them to the matching config type:
 
 <CodeGroup>
 
-```sh scalar
-npm install @scalar/api-reference
+```ts scalar
+// npm install -D @scalar/api-reference
+import type { ApiReferenceConfiguration } from '@scalar/api-reference'
+import type { OpenAPIReferenceHandlerPluginScalarConfig } from '@orpc/openapi/plugins'
+
+new OpenAPIReferenceHandlerPlugin({
+  providerConfig: {
+    theme: 'purple',
+  } satisfies OpenAPIReferenceHandlerPluginScalarConfig<ApiReferenceConfiguration>,
+})
 ```
 
-```sh swagger
-npm install swagger-ui @types/swagger-ui
+```ts swagger
+// npm install -D @types/swagger-ui
+import type { SwaggerUIOptions } from 'swagger-ui'
+import type { OpenAPIReferenceHandlerPluginSwaggerConfig } from '@orpc/openapi/plugins'
+
+new OpenAPIReferenceHandlerPlugin({
+  provider: 'swagger',
+  providerConfig: {
+    deepLinking: false,
+  } satisfies OpenAPIReferenceHandlerPluginSwaggerConfig<SwaggerUIOptions>,
+})
 ```
 
 </CodeGroup>

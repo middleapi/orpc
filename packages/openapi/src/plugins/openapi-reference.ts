@@ -1,36 +1,63 @@
 import type { Context } from '@orpc/server'
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptorOptions } from '@orpc/server/standard'
 import type { Promisable, Value } from '@orpc/shared'
-import type { ApiReferenceConfiguration as ScalarProviderConfig } from '@scalar/api-reference'
 import type { StandardUrl } from '@standard-server/core'
-import type { SwaggerUIOptions } from 'swagger-ui'
 import type { OpenAPIDocument, OpenAPIVersion } from '../types'
 import { getTracer, matchesHttpPath, mergeHttpPath, stringifyJSON, toArray, value } from '@orpc/shared'
 
 export type OpenAPIReferenceHandlerPluginProvider = 'scalar' | 'swagger'
 
-export interface OpenAPIReferenceHandlerPluginScalarConfig extends Partial<ScalarProviderConfig> {
-}
+/**
+ * Scalar configuration, passed to `Scalar.createApiReference` in the browser.
+ *
+ * Loosely typed by default so `@orpc/openapi` does not depend on `@scalar/api-reference`.
+ * For full type safety, install `@scalar/api-reference` and pass its `ApiReferenceConfiguration`:
+ *
+ * ```ts
+ * import type { ApiReferenceConfiguration } from '@scalar/api-reference'
+ *
+ * providerConfig: { theme: 'purple' } satisfies OpenAPIReferenceHandlerPluginScalarConfig<ApiReferenceConfiguration>
+ * ```
+ *
+ * @see {@link https://orpc.dev/docs/plugins/openapi-reference#provider | OpenAPI Reference Plugin (Swagger/Scalar) - Provider}
+ */
+export type OpenAPIReferenceHandlerPluginScalarConfig<TConfig extends object = Record<string, unknown>> = Partial<TConfig>
 
-export interface OpenAPIReferenceHandlerPluginSwaggerConfig extends Partial<Omit<SwaggerUIOptions, 'dom_id' | 'presets' | 'plugins'>> {
-  dom_id?: undefined | never
+/**
+ * Swagger UI configuration, passed to `SwaggerUIBundle` in the browser.
+ *
+ * Loosely typed by default so `@orpc/openapi` does not depend on `swagger-ui`.
+ * For full type safety, install `@types/swagger-ui` and pass its `SwaggerUIOptions`:
+ *
+ * ```ts
+ * import type { SwaggerUIOptions } from 'swagger-ui'
+ *
+ * providerConfig: { deepLinking: false } satisfies OpenAPIReferenceHandlerPluginSwaggerConfig<SwaggerUIOptions>
+ * ```
+ *
+ * @see {@link https://orpc.dev/docs/plugins/openapi-reference#provider | OpenAPI Reference Plugin (Swagger/Scalar) - Provider}
+ */
+export type OpenAPIReferenceHandlerPluginSwaggerConfig<TOptions extends object = Record<string, unknown>>
+  = & Partial<Omit<TOptions, 'dom_id' | 'presets' | 'plugins'>>
+    & {
+      dom_id?: undefined | never
 
-  /**
-   * Paths to global variables holding the presets, resolved in the browser,
-   * e.g. `'SwaggerUIBundle.presets.apis'`. Load custom presets through `docsHead`.
-   *
-   * @default ['SwaggerUIBundle.presets.apis']
-   */
-  presets?: undefined | string[]
+      /**
+       * Paths to global variables holding the presets, resolved in the browser,
+       * e.g. `'SwaggerUIBundle.presets.apis'`. Load custom presets through `docsHead`.
+       *
+       * @default ['SwaggerUIBundle.presets.apis']
+       */
+      presets?: undefined | string[]
 
-  /**
-   * Paths to global variables holding the plugins, resolved in the browser,
-   * e.g. `'SwaggerUIBundle.plugins.DownloadUrl'`. Load custom plugins through `docsHead`.
-   *
-   * @default ['SwaggerUIBundle.plugins.DownloadUrl']
-   */
-  plugins?: undefined | string[]
-}
+      /**
+       * Paths to global variables holding the plugins, resolved in the browser,
+       * e.g. `'SwaggerUIBundle.plugins.DownloadUrl'`. Load custom plugins through `docsHead`.
+       *
+       * @default ['SwaggerUIBundle.plugins.DownloadUrl']
+       */
+      plugins?: undefined | string[]
+    }
 
 export interface OpenAPIReferenceHandlerPluginOptions<T extends Context, TProvider extends OpenAPIReferenceHandlerPluginProvider> {
   /**
@@ -245,9 +272,9 @@ export class OpenAPIReferenceHandlerPlugin<
           else {
             const scriptUrl = this.providerScriptUrl ?? 'https://cdn.jsdelivr.net/npm/@scalar/api-reference'
             const cssUrl = this.providerCssUrl
-            const config: ScalarProviderConfig = {
+            const config = {
               content: stringifyJSON(spec),
-              ...this.providerConfig as any,
+              ...this.providerConfig,
             }
 
             html = `

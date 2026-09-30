@@ -98,22 +98,6 @@
     "prepack": "unbuild",
     "type:check": "tsc -b"
   },
-  "peerDependencies": {
-    "@scalar/api-reference": ">=1.57.2",
-    "@types/swagger-ui": ">=5.32.0",
-    "swagger-ui": ">=5.32.6"
-  },
-  "peerDependenciesMeta": {
-    "@scalar/api-reference": {
-      "optional": true
-    },
-    "@types/swagger-ui": {
-      "optional": true
-    },
-    "swagger-ui": {
-      "optional": true
-    }
-  },
   "dependencies": {
     "@openapi-spec/downgrader": "~0.1.0",
     "@openapi-spec/types": "~0.1.0",
