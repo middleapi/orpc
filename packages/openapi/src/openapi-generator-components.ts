@@ -5,8 +5,9 @@ import {
   encodeJsonPointerSegment,
   ensureJsonSchemaObject,
   mapJsonSchemaRefs,
+  visitJsonSchemaRefs,
 } from '@orpc/json-schema'
-import { getOwn, isDeepEqual, setOwn } from '@orpc/shared'
+import { findDeepMatches, getOwn, isDeepEqual, omit, setOwn } from '@orpc/shared'
 
 const DEFS_REF_PREFIX = '#/$defs/'
 const COMPONENTS_REF_PREFIX = '#/components/schemas/'
@@ -18,6 +19,8 @@ const COMPONENTS_REF_PREFIX = '#/components/schemas/'
  * schemas competing for the same name get direction-suffixed or numbered postfixes.
  */
 export class OpenAPIComponentRegistry {
+  private readonly mintedComponentNames = new Set<string>()
+
   constructor(
     private readonly doc: OpenAPIV3_2.OpenAPIObject,
     private readonly customComponentName: ((defName: string, defSchema: JsonSchema) => string | undefined) | undefined,
@@ -45,8 +48,8 @@ export class OpenAPIComponentRegistry {
   }
 
   /**
-   * Moves a schema's root-level `$defs` into `doc.components.schemas` and rewrites
-   * its refs accordingly.
+   * Moves the root-level `$defs` a schema references, directly or through other defs,
+   * into `doc.components.schemas` and rewrites its refs accordingly. Unreferenced defs are dropped.
    */
   hoistDefs(schema: JsonSchema, direction?: JsonSchemaConverterDirection): JsonSchema {
     if (typeof schema !== 'object' || !schema.$defs) {
@@ -54,18 +57,10 @@ export class OpenAPIComponentRegistry {
     }
 
     const { $defs, ...rest } = schema
-    const defs = new Map<string, Exclude<JsonSchema, boolean>>()
-
-    for (const defName of Object.keys($defs)) {
-      const defSchema = $defs[defName]
-
-      if (defSchema !== undefined) {
-        defs.set(defName, ensureJsonSchemaObject(defSchema))
-      }
-    }
+    const defs = collectReachableDefs(rest, $defs)
 
     if (defs.size === 0) {
-      return schema
+      return rest
     }
 
     this.doc.components ??= {}
@@ -94,6 +89,7 @@ export class OpenAPIComponentRegistry {
 
     for (const { cleanSchema, componentName } of pendingSchemas) {
       setOwn(componentsSchemas, componentName, rewriteComponentSchemaRefs(cleanSchema, renameMap))
+      this.mintedComponentNames.add(componentName)
     }
 
     return rewriteComponentSchemaRefs(rest, renameMap)
@@ -102,6 +98,96 @@ export class OpenAPIComponentRegistry {
   toOpenAPISchema(schema: JsonSchema, direction?: JsonSchemaConverterDirection): OpenAPIV3_2.SchemaObject {
     return ensureJsonSchemaObject(this.hoistDefs(schema, direction))
   }
+
+  /**
+   * Removes the components this registry minted that nothing else in the document references,
+   * directly or through other components. Components it did not mint (e.g. from `base`) are kept,
+   * along with every minted component they reference.
+   */
+  pruneUnreferenced(): void {
+    const components = this.doc.components
+    const componentsSchemas = components?.schemas
+
+    if (!components || !componentsSchemas || this.mintedComponentNames.size === 0) {
+      return
+    }
+
+    const referenced = new Set<string>()
+    const pending: unknown[] = [{
+      ...this.doc,
+      components: { ...components, schemas: omit(componentsSchemas, [...this.mintedComponentNames]) },
+    }]
+
+    while (pending.length) {
+      // any string pointing into components counts, so refs outside `$ref` (e.g. discriminator mappings) keep their target
+      const { values: refs } = findDeepMatches(
+        v => typeof v === 'string' && v.startsWith(COMPONENTS_REF_PREFIX),
+        pending.pop(),
+      )
+
+      for (const ref of refs as string[]) {
+        const componentName = parseRefRootName(ref, COMPONENTS_REF_PREFIX)!
+
+        if (this.mintedComponentNames.has(componentName) && !referenced.has(componentName)) {
+          referenced.add(componentName)
+          pending.push(getOwn(componentsSchemas, componentName))
+        }
+      }
+    }
+
+    for (const componentName of this.mintedComponentNames) {
+      if (!referenced.has(componentName)) {
+        delete componentsSchemas[componentName]
+      }
+    }
+
+    if (Object.keys(componentsSchemas).length === 0) {
+      delete components.schemas
+
+      if (Object.keys(components).length === 0) {
+        delete this.doc.components
+      }
+    }
+  }
+}
+
+/**
+ * Collects the defs `schema` references, directly or through other defs, in `$defs` order.
+ */
+function collectReachableDefs(
+  schema: JsonSchema,
+  $defs: Record<string, JsonSchema>,
+): Map<string, Exclude<JsonSchema, boolean>> {
+  const reachable = new Set<string>()
+  const pending: JsonSchema[] = [schema]
+
+  while (pending.length) {
+    visitJsonSchemaRefs(pending.pop()!, (ref) => {
+      // a ref into a def's subschema (`#/$defs/Planet/properties/id`) still needs the whole def
+      const defName = parseRefRootName(ref, DEFS_REF_PREFIX)
+
+      if (defName === undefined || reachable.has(defName)) {
+        return
+      }
+
+      const defSchema = getOwn($defs, defName)
+
+      if (defSchema !== undefined) {
+        reachable.add(defName)
+        pending.push(defSchema)
+      }
+    })
+  }
+
+  const defs = new Map<string, Exclude<JsonSchema, boolean>>()
+
+  for (const defName of Object.keys($defs)) {
+    if (reachable.has(defName)) {
+      defs.set(defName, ensureJsonSchemaObject($defs[defName]!))
+    }
+  }
+
+  return defs
 }
 
 /**
@@ -256,6 +342,17 @@ function parseRefName(ref: string, prefix: string): string | undefined {
   }
 
   return ref.slice(prefix.length).split('/').map(decodeJsonPointerSegment).join('/')
+}
+
+/**
+ * Returns the name of the def or component a ref points into, e.g. `Planet` for `#/$defs/Planet/properties/id`.
+ */
+function parseRefRootName(ref: string, prefix: string): string | undefined {
+  if (!ref.startsWith(prefix)) {
+    return undefined
+  }
+
+  return decodeJsonPointerSegment(ref.slice(prefix.length).split('/', 1)[0]!)
 }
 
 function resolveNamedRef(

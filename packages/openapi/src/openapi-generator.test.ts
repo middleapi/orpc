@@ -489,6 +489,119 @@ describe('openAPIGenerator basic & options', () => {
   })
 })
 
+describe('openAPIGenerator unreferenced components', () => {
+  const generator = new OpenAPIGenerator({ converters: [zodJsonSchemaConverter] })
+
+  it('leaves out input and output components split entirely into parameters and headers', async () => {
+    const PlanetFilter = z.object({ name: z.string() }).meta({ id: 'PlanetFilter' })
+
+    const doc = await generator.generate({
+      getItem: oc
+        .meta(openapi({ method: 'GET', path: '/items/{id}' }))
+        .input(z.object({ id: z.string(), filter: PlanetFilter.optional() }).meta({ id: 'ListInput' })),
+      updateItem: oc
+        .meta(openapi({ method: 'PATCH', path: '/items/{id}', inputStructure: 'detailed', outputStructure: 'detailed' }))
+        .input(z.object({
+          params: z.object({ id: z.string() }).meta({ id: 'ItemParams' }),
+          query: z.object({ dryRun: z.boolean().optional() }).meta({ id: 'ItemQuery' }),
+          headers: z.object({ 'if-match': z.string() }).meta({ id: 'ItemHeaders' }),
+        }).meta({ id: 'UpdateItemInput' }))
+        .output(z.object({
+          headers: z.object({ etag: z.string() }).meta({ id: 'ItemResponseHeaders' }),
+        }).meta({ id: 'UpdateItemOutput' })),
+    })
+
+    expect(doc.paths?.['/items/{id}']?.get?.parameters).toEqual([
+      { in: 'path', required: true, name: 'id', schema: { type: 'string' } },
+      expect.objectContaining({ in: 'query', name: 'filter', schema: { $ref: '#/components/schemas/PlanetFilter' } }),
+    ])
+    expect(doc.paths?.['/items/{id}']?.patch?.parameters).toEqual([
+      { in: 'path', required: true, name: 'id', schema: { type: 'string' } },
+      expect.objectContaining({ in: 'query', name: 'dryRun', schema: { type: 'boolean' } }),
+      { in: 'header', required: true, name: 'if-match', schema: { type: 'string' } },
+    ])
+    expect(doc.paths?.['/items/{id}']?.patch?.responses?.['200']).toEqual({
+      description: 'OK',
+      headers: { etag: { required: true, schema: { type: 'string' } } },
+    })
+    // only the component a query parameter still points at remains
+    expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['PlanetFilter'])
+  })
+
+  it('does not let a decomposed input component claim the name of a referenced one', async () => {
+    const doc = await generator.generate({
+      getItem: oc
+        .meta(openapi({ method: 'GET', path: '/items/{id}' }))
+        .input(z.object({ id: z.string() }).meta({ id: 'Item' })),
+      createItem: oc
+        .meta(openapi({ method: 'POST', path: '/items' }))
+        .input(z.object({ name: z.string() }).meta({ id: 'Item' })),
+    })
+
+    expect((doc.paths?.['/items']?.post?.requestBody as any).content['application/json'].schema)
+      .toEqual({ $ref: '#/components/schemas/Item' })
+    expect(doc.components?.schemas).toEqual({
+      Item: expect.objectContaining({ required: ['name'] }),
+    })
+  })
+
+  it('leaves out components that a custom error body or an openapi.spec function drops', async () => {
+    const doc = await generator.generate({
+      removePlanet: oc
+        .meta(openapi({ method: 'DELETE', path: '/planets/{id}' }))
+        .input(z.object({ id: z.string() }))
+        .errors({ PLANET_GONE: { data: z.object({ at: z.string() }).meta({ id: 'PlanetGoneData' }) } }),
+      createPlanet: oc
+        .meta(openapi({
+          method: 'POST',
+          path: '/planets',
+          spec: ({ requestBody: _requestBody, ...operation }) => operation,
+        }))
+        .input(z.object({ name: z.string() }).meta({ id: 'PlanetInput' })),
+    }, {
+      errorStatusMap: { PLANET_GONE: 410 },
+      customErrorResponseBodySchema: () => ({ type: 'object', properties: { message: { type: 'string' } } }),
+    })
+
+    expect(doc.paths?.['/planets']?.post?.requestBody).toBeUndefined()
+    expect(doc.components).toBeUndefined()
+  })
+
+  it('keeps base components and the generated components they reference', async () => {
+    const doc = await generator.generate({
+      createPlanet: oc
+        .meta(openapi({
+          method: 'POST',
+          path: '/planets',
+          spec: ({ requestBody: _requestBody, ...operation }) => operation,
+        }))
+        .input(z.object({ name: z.string() }).meta({ id: 'Planet' })),
+      removePlanet: oc
+        .meta(openapi({ method: 'DELETE', path: '/planets/{id}' }))
+        .input(z.object({ id: z.string() }))
+        .errors({ PLANET_GONE: {} }),
+    }, {
+      base: {
+        components: {
+          schemas: {
+            Envelope: { type: 'object', properties: { planet: { $ref: '#/components/schemas/Planet' } } },
+            Standalone: { type: 'boolean' },
+          },
+        },
+      },
+      errorStatusMap: { PLANET_GONE: 410 },
+      customErrorResponseBodySchema: () => ({
+        oneOf: [
+          { type: 'object', properties: { message: { type: 'string' } } },
+          { $ref: '#/components/schemas/UndefinedError' },
+        ],
+      }),
+    })
+
+    expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['Envelope', 'Standalone', 'Planet', 'UndefinedError'])
+  })
+})
+
 describe('openAPIGenerator version', () => {
   const generator = new OpenAPIGenerator({ converters: [testSchemaConverter] })
 

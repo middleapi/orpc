@@ -198,7 +198,7 @@ describe('openAPIGenerator e2e: typed errors', () => {
         },
       },
     })
-    // only the always-available UndefinedError component is registered
-    expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['UndefinedError'])
+    // the custom body references no component, so the unused UndefinedError is left out
+    expect(doc.components).toBeUndefined()
   })
 })

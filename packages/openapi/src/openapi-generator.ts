@@ -53,7 +53,7 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
   base?: Partial<Omit<OpenAPIV3_2.OpenAPIObject, 'openapi'>> | undefined
 
   /**
-   * Root-level `$defs` are always moved into `components.schemas`.
+   * Root-level `$defs` are moved into `components.schemas`, except ones nothing in the document references.
    * Use this to customize the component name of a hoisted def.
    *
    * @remarks
@@ -194,6 +194,8 @@ export class OpenAPIGenerator {
         `[OpenAPIGenerator] Failed to generate the OpenAPI document (${errors.length} error${errors.length === 1 ? '' : 's'}):\n\n${errors.join('\n\n')}`,
       )
     }
+
+    ctx.registry.pruneUnreferenced()
 
     const versioned = toVersionedOpenAPIDocument(doc, version)
     return this.serializer.serialize(versioned, { asFormData: false, useFormDataForBlobFields: false }) as OpenAPIDocument<TVersion>

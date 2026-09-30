@@ -57,6 +57,7 @@ describe('openAPIComponentRegistry', () => {
       const { doc, registry } = createRegistry()
 
       registry.hoistDefs({
+        anyOf: [{ $ref: '#/$defs/Anything' }, { $ref: '#/$defs/Nothing' }, { $ref: '#/$defs/Ghost' }],
         $defs: {
           Anything: true,
           Nothing: false,
@@ -70,16 +71,25 @@ describe('openAPIComponentRegistry', () => {
       })
     })
 
-    it('returns the schema unchanged when every def is undefined', () => {
+    it.each([
+      {
+        name: 'no def is referenced',
+        schema: { type: 'string', $defs: { Input: { type: 'object' } } },
+        expected: { type: 'string' },
+      },
+      {
+        name: 'every referenced def is undefined',
+        schema: { $ref: '#/$defs/Ghost', $defs: { Ghost: undefined } },
+        expected: { $ref: '#/$defs/Ghost' },
+      },
+    ])('strips the defs without creating components when $name', ({ schema, expected }) => {
       const { doc, registry } = createRegistry()
 
-      const schema = { $ref: '#/$defs/Ghost', $defs: { Ghost: undefined } } as any
-
-      expect(registry.hoistDefs(schema)).toBe(schema)
+      expect(registry.hoistDefs(schema as any)).toEqual(expected)
       expect(doc.components).toBeUndefined()
     })
 
-    it('hoists every def, including ones the root schema never references', () => {
+    it('hoists only the defs the root schema reaches, directly or through other defs', () => {
       const { doc, registry } = createRegistry()
 
       const result = registry.hoistDefs({
@@ -88,7 +98,8 @@ describe('openAPIComponentRegistry', () => {
           Root: { type: 'object', properties: { child: { $ref: '#/$defs/Local' } } },
           Local: { type: 'string' },
           Alias: { $ref: '#/$defs/Root' },
-          Unreferenced: { type: 'number' },
+          Unreferenced: { type: 'object', properties: { child: { $ref: '#/$defs/OnlyFromUnreferenced' } } },
+          OnlyFromUnreferenced: { type: 'number' },
         },
       })
 
@@ -97,8 +108,17 @@ describe('openAPIComponentRegistry', () => {
         Root: { type: 'object', properties: { child: { $ref: '#/components/schemas/Local' } } },
         Local: { type: 'string' },
         Alias: { $ref: '#/components/schemas/Root' },
-        Unreferenced: { type: 'number' },
       })
+    })
+
+    it('does not let unreferenced defs claim component names', () => {
+      const { doc, registry } = createRegistry()
+
+      registry.hoistDefs({ type: 'string', $defs: { Planet: { type: 'object' } } })
+
+      expect(registry.hoistDefs({ $ref: '#/$defs/Planet', $defs: { Planet: { type: 'number' } } }))
+        .toEqual({ $ref: '#/components/schemas/Planet' })
+      expect(doc.components?.schemas).toEqual({ Planet: { type: 'number' } })
     })
 
     it('names hoisted defs with customComponentName and rewrites refs to the new names', () => {
@@ -195,9 +215,9 @@ describe('openAPIComponentRegistry', () => {
     it('hoists a def named __proto__ as an own component', () => {
       const { doc, registry } = createRegistry()
 
-      const result = registry.hoistDefs(JSON.parse('{"$ref":"#/$defs/__proto__","$defs":{"__proto__":{"type":"string"},"Planet":{"type":"number"}}}'))
+      const result = registry.hoistDefs(JSON.parse('{"anyOf":[{"$ref":"#/$defs/__proto__"},{"$ref":"#/$defs/Planet"}],"$defs":{"__proto__":{"type":"string"},"Planet":{"type":"number"}}}'))
 
-      expect(result).toEqual({ $ref: '#/components/schemas/__proto__' })
+      expect(result).toEqual({ anyOf: [{ $ref: '#/components/schemas/__proto__' }, { $ref: '#/components/schemas/Planet' }] })
       expect(JSON.stringify(doc.components?.schemas)).toBe('{"__proto__":{"type":"string"},"Planet":{"type":"number"}}')
     })
 
@@ -352,7 +372,7 @@ describe('openAPIComponentRegistry', () => {
       })
 
       const result = registry.hoistDefs({
-        $ref: '#/$defs/Wrapper',
+        anyOf: [{ $ref: '#/$defs/Wrapper' }, { $ref: '#/$defs/Post2' }],
         $defs: {
           // reuses the existing Post2, while the def named Post2 (equal to Other) is minted as Post22
           Post: { type: 'string' },
@@ -361,7 +381,7 @@ describe('openAPIComponentRegistry', () => {
         },
       })
 
-      expect(result).toEqual({ $ref: '#/components/schemas/Wrapper2' })
+      expect(result).toEqual({ anyOf: [{ $ref: '#/components/schemas/Wrapper2' }, { $ref: '#/components/schemas/Post22' }] })
       expect(doc.components?.schemas?.Wrapper2).toEqual({ items: { $ref: '#/components/schemas/Post2' } })
     })
 
@@ -814,6 +834,122 @@ describe('openAPIComponentRegistry', () => {
 
       expect(result).toEqual({ $ref: '#/components/schemas/ApiPlanet' })
       expect(doc.components?.schemas).toEqual({ ApiPlanet: { type: 'object' } })
+    })
+  })
+
+  describe('pruneUnreferenced', () => {
+    it('removes minted components nothing references, keeping the ones reached through other components', () => {
+      const { doc, registry } = createRegistry()
+
+      const used = registry.hoistDefs({
+        $ref: '#/$defs/Wrapper',
+        $defs: {
+          Wrapper: { type: 'object', properties: { planet: { $ref: '#/$defs/Planet' } } },
+          Planet: { type: 'string' },
+        },
+      })
+      registry.hoistDefs({
+        $ref: '#/$defs/Unused',
+        $defs: {
+          Unused: { type: 'object', properties: { moon: { $ref: '#/$defs/Moon' } } },
+          Moon: { type: 'number' },
+        },
+      })
+
+      doc.paths = { '/planets': { get: { responses: { 200: { description: 'OK', content: { 'application/json': { schema: used } } } } } } }
+
+      registry.pruneUnreferenced()
+
+      expect(doc.components?.schemas).toEqual({
+        Wrapper: { type: 'object', properties: { planet: { $ref: '#/components/schemas/Planet' } } },
+        Planet: { type: 'string' },
+      })
+    })
+
+    it('keeps components it did not mint and every minted component they reference', () => {
+      const { doc, registry } = createRegistry({
+        schemas: {
+          Existing: { type: 'object', properties: { planet: { $ref: '#/components/schemas/Planet' } } },
+          Standalone: { type: 'boolean' },
+        },
+      })
+
+      registry.hoistDefs({ $ref: '#/$defs/Planet', $defs: { Planet: { type: 'string' } } })
+      registry.hoistDefs({ $ref: '#/$defs/Moon', $defs: { Moon: { type: 'number' } } })
+
+      registry.pruneUnreferenced()
+
+      expect(doc.components?.schemas).toEqual({
+        Existing: { type: 'object', properties: { planet: { $ref: '#/components/schemas/Planet' } } },
+        Standalone: { type: 'boolean' },
+        Planet: { type: 'string' },
+      })
+    })
+
+    it('counts refs outside $ref, including deep and JSON Pointer encoded ones', () => {
+      const { doc, registry } = createRegistry()
+
+      registry.hoistDefs({
+        anyOf: [{ $ref: '#/$defs/Cat' }, { $ref: '#/$defs/Dog' }, { $ref: '#/$defs/domain~1Planet' }],
+        $defs: {
+          'Cat': { type: 'object' },
+          'Dog': { type: 'object', properties: { name: { type: 'string' } } },
+          'domain/Planet': { type: 'object', properties: { id: { type: 'string' } } },
+        },
+      })
+
+      doc.paths = {
+        '/pets': {
+          get: {
+            responses: {
+              200: {
+                description: 'OK',
+                content: {
+                  'application/json': {
+                    schema: {
+                      discriminator: { propertyName: 'kind', mapping: { cat: '#/components/schemas/Cat' } },
+                      properties: { name: { $ref: '#/components/schemas/Dog/properties/name' } },
+                    },
+                  },
+                },
+              },
+            },
+            parameters: [{ in: 'query', name: 'planet', schema: { $ref: '#/components/schemas/domain~1Planet' } }],
+          },
+        },
+      }
+
+      registry.pruneUnreferenced()
+
+      expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['Cat', 'Dog', 'domain/Planet'])
+    })
+
+    it('drops the components object once every schema in it is pruned', () => {
+      const { doc, registry } = createRegistry()
+
+      registry.hoistDefs({ $ref: '#/$defs/Planet', $defs: { Planet: { type: 'string' } } })
+      registry.pruneUnreferenced()
+
+      expect(doc.components).toBeUndefined()
+    })
+
+    it('keeps other component types when every schema is pruned', () => {
+      const { doc, registry } = createRegistry()
+
+      registry.hoistDefs({ $ref: '#/$defs/Planet', $defs: { Planet: { type: 'string' } } })
+      doc.components!.responses = { NotFound: { description: 'Not found' } }
+
+      registry.pruneUnreferenced()
+
+      expect(doc.components).toEqual({ responses: { NotFound: { description: 'Not found' } } })
+    })
+
+    it('leaves the document untouched when it minted nothing', () => {
+      const { doc, registry } = createRegistry({ schemas: {} })
+
+      registry.pruneUnreferenced()
+
+      expect(doc.components).toEqual({ schemas: {} })
     })
   })
 

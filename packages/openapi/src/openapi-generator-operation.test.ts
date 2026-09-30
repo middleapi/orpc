@@ -614,6 +614,25 @@ describe('openAPIGenerator operation builders', () => {
       })
     })
 
+    it('joins each distinct description of a detailed output status once', () => {
+      const { ctx, operation } = createContext()
+
+      buildSuccessResponse(ctx, operation, testDef({
+        outputs: [testSchema({
+          anyOf: [
+            { type: 'object', properties: { status: { const: 201, description: 'Created' }, body: { type: 'string' } } },
+            { type: 'object', properties: { status: { const: 201, description: 'Created' }, body: { type: 'number' } } },
+            { type: 'object', properties: { status: { const: 201, description: 'Queued' }, body: { type: 'boolean' } } },
+            { type: 'object', properties: { status: { const: 202, description: 'Accepted' } } },
+            { type: 'object', properties: { status: { const: 202, description: 'Accepted' }, headers: { type: 'object' } } },
+          ],
+        })],
+      }), { outputStructure: 'detailed' })
+
+      expect(operation.responses?.['201']?.description).toBe('Created, Queued')
+      expect(operation.responses?.['202']?.description).toBe('Accepted')
+    })
+
     it.each([
       {
         name: 'a detailed output member is not an object',
@@ -731,6 +750,23 @@ describe('openAPIGenerator operation builders', () => {
         },
         required: ['defined', 'code', 'message'],
       })
+    })
+
+    it('joins each distinct default message of errors sharing a status once', () => {
+      const { ctx, operation } = createContext({
+        errorStatusMap: { FIRST: 400, SECOND: 400, THIRD: 400, FOURTH: 400 },
+      })
+
+      buildErrorResponse(ctx, operation, testDef({
+        errors: {
+          FIRST: { message: 'Oops' },
+          SECOND: { message: 'Oops' },
+          THIRD: {},
+          FOURTH: { message: 'Invalid input' },
+        },
+      }))
+
+      expect(operation.responses?.['400']?.description).toBe('Oops, Invalid input')
     })
 
     it('uses the common status map by default and falls back to 500 for unknown codes', () => {

@@ -359,7 +359,7 @@ export function buildSuccessResponse(
 
   for (const [responseStatus, parts] of extractDetailedResponseParts(schema, status)) {
     const responseObject: OpenAPIV3_2.ResponseObject = {
-      description: parts.descriptions.length ? parts.descriptions.join(', ') : description,
+      description: parts.descriptions.size ? Array.from(parts.descriptions).join(', ') : description,
     }
 
     if (parts.bodies.length) {
@@ -396,8 +396,8 @@ function toResponseStatusKey(status: number): `${1 | 2 | 3 | 4 | 5}${string}` {
 function extractDetailedResponseParts(
   schema: JsonSchema,
   defaultStatus: number,
-): Map<number, { descriptions: string[], bodies: JsonSchema[], headers: JsonSchema[] }> {
-  const partsByStatus = new Map<number, { descriptions: string[], bodies: JsonSchema[], headers: JsonSchema[] }>()
+): Map<number, { descriptions: Set<string>, bodies: JsonSchema[], headers: JsonSchema[] }> {
+  const partsByStatus = new Map<number, { descriptions: Set<string>, bodies: JsonSchema[], headers: JsonSchema[] }>()
 
   for (const item of flattenJsonUnionSchema(schema)) {
     const entries = extractJsonObjectSchemaEntries(item)
@@ -423,12 +423,12 @@ function extractDetailedResponseParts(
 
     let parts = partsByStatus.get(status)
     if (!parts) {
-      parts = { descriptions: [], bodies: [], headers: [] }
+      parts = { descriptions: new Set(), bodies: [], headers: [] }
       partsByStatus.set(status, parts)
     }
 
     if (statusSchema?.description !== undefined) {
-      parts.descriptions.push(statusSchema.description)
+      parts.descriptions.add(statusSchema.description)
     }
 
     const headersSchema = entries.find(([name]) => name === 'headers')?.[1]
@@ -487,7 +487,7 @@ export function buildErrorResponse(
   })
 
   for (const [status, definitions] of definitionsByStatus.entries()) {
-    const descriptions = definitions.map(({ defaultMessage }) => defaultMessage).filter(m => m !== undefined)
+    const descriptions = new Set(definitions.map(({ defaultMessage }) => defaultMessage).filter(m => m !== undefined))
     const customBodySchema = value(
       ctx.customErrorResponseBodySchema,
       definitions.map(def => ({ ...def, dataJsonSchema: ctx.registry.hoistDefs(def.dataJsonSchema, 'output') })),
@@ -511,7 +511,7 @@ export function buildErrorResponse(
 
     operation.responses ??= {}
     operation.responses[toResponseStatusKey(status)] = {
-      description: descriptions.length ? descriptions.join(', ') : status.toString(),
+      description: descriptions.size ? Array.from(descriptions).join(', ') : status.toString(),
       content: {
         'application/json': {
           schema: ctx.registry.toOpenAPISchema(responseSchema, 'output'),
