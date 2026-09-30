@@ -28,6 +28,7 @@ export interface BatchHandlerPluginOptions<T extends Context> {
 
   /**
    * Map each subrequest in the batch before it is processed.
+   * Subrequest header names are already lowercased, like the batch request ones.
    *
    * @default merges the batch request headers into the subrequest, giving them priority over
    * the subrequest headers, and removes the `orpc-batch` header to prevent nested batching
@@ -203,7 +204,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
       const handleIndividualRequest = async (request: StandardLazyRequest): Promise<StandardResponse> => {
         try {
-          request = this.mapSubrequest(request, interceptorOptions)
+          request = this.mapSubrequest({ ...request, headers: lowercaseHeaderNames(request.headers) }, interceptorOptions)
           const { matched, response } = await interceptorOptions.next({ ...interceptorOptions, request })
 
           if (!matched) {
@@ -367,4 +368,25 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       routingInterceptors: [routingInterceptor, ...toArray(options.routingInterceptors)],
     }
   }
+}
+
+/**
+ * Subrequest headers are request payload, so their names keep whatever case the sender chose,
+ * while transport adapters always lowercase them. Lowercasing makes a subrequest `Cookie`
+ * collide with (and lose to) the batch `cookie` instead of surviving next to it.
+ */
+function lowercaseHeaderNames(headers: StandardHeaders): StandardHeaders {
+  const lowercased: StandardHeaders = Object.create(null)
+
+  for (const key of Object.keys(headers)) {
+    const name = key.toLowerCase()
+    const value = headers[key]
+    const existing = lowercased[name]
+
+    lowercased[name] = existing === undefined || value === undefined
+      ? existing ?? value
+      : [...toArray(existing), ...toArray(value)]
+  }
+
+  return lowercased
 }

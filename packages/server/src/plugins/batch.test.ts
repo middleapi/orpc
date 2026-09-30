@@ -1,10 +1,13 @@
 import type { AnyRouter } from '../router'
+import type { RequestHeadersHandlerPluginContext } from './request-headers'
 import { ORPCError } from '@orpc/client'
 import { promiseWithResolvers } from '@orpc/shared'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { os } from '../builder'
+import { getCookie } from '../helpers'
 import { BatchHandlerPlugin } from './batch'
 import { RequestCompressionHandlerPlugin } from './request-compression'
+import { RequestHeadersHandlerPlugin } from './request-headers'
 import { RequestLimitHandlerPlugin } from './request-limit'
 
 beforeEach(() => {
@@ -538,6 +541,58 @@ describe('batchHandlerPlugin', () => {
       ))
 
       expect(seenHeaders[0]!.authorization).toEqual('Bearer real')
+    })
+
+    it('prevents a sub-request from spoofing a batch request header with a differently cased name', async () => {
+      const seenSession = vi.fn()
+      const cookieRouter = {
+        ping: os.$context<RequestHeadersHandlerPluginContext>().handler(({ context }) => {
+          seenSession(getCookie(context.reqHeaders, 'session'))
+          return 'pong'
+        }),
+      }
+
+      const handler = new RPCHandler(cookieRouter, {
+        plugins: [new BatchHandlerPlugin(), new RequestHeadersHandlerPlugin()],
+      })
+
+      await handler.handle(createBatchRequestWithHeaders(
+        { cookie: 'session=victim' },
+        { Cookie: 'session=attacker' },
+      ))
+
+      expect(seenSession).toHaveBeenCalledTimes(1)
+      expect(seenSession).toHaveBeenCalledWith('victim')
+    })
+
+    it('lowercases sub-request header names and combines names that only differ in case', async () => {
+      const { handler, seenHeaders } = createHeaderCapturingHandler()
+
+      await handler.handle(createBatchRequestWithHeaders(
+        {},
+        { 'X-Request-Id': '1', 'X-Tag': 'a', 'x-tag': 'b', 'ORPC-Batch': 'buffered' },
+      ))
+
+      expect({ ...seenHeaders[0] }).toMatchObject({
+        'x-request-id': '1',
+        'x-tag': ['a', 'b'],
+        'orpc-batch': undefined,
+      })
+      expect(Object.keys(seenHeaders[0]!).filter(key => key !== key.toLowerCase())).toEqual([])
+    })
+
+    it('passes lowercased sub-request header names to a custom mapSubrequest', async () => {
+      const mapSubrequest = vi.fn(subrequest => subrequest)
+      const handler = createHandler(new BatchHandlerPlugin({ mapSubrequest }))
+
+      await handler.handle(createBatchRequestWithHeaders(
+        {},
+        { Authorization: 'Bearer sub-request' },
+      ))
+
+      expect(mapSubrequest).toHaveBeenCalledTimes(1)
+      expect({ ...mapSubrequest.mock.calls[0]![0].headers }).toEqual({ authorization: 'Bearer sub-request' })
+      expect(handlerFn).toHaveBeenCalledTimes(1)
     })
   })
 
