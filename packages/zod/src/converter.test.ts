@@ -61,18 +61,47 @@ describe('zodToJsonSchemaConverter', () => {
     ])
   })
 
-  it('keeps converting when standard validation throws while checking optionality', () => {
-    const schema = z.string()
+  it('does not run standard validation to check optionality', () => {
+    const schema = z.string().optional()
+    const validate = vi.fn(() => {
+      throw new Error('validate failed')
+    })
 
     Object.defineProperty(schema, '~standard', {
       value: {
         ...schema['~standard'],
-        validate: () => {
-          throw new Error('validate failed')
-        },
+        validate,
       },
     })
+
+    expect(converter.convert(schema, 'input')).toEqual([{ type: 'string' }, true])
+    expect(converter.convert(schema, 'output')).toEqual([{ type: 'string' }, true])
+    expect(validate).not.toHaveBeenCalled()
+  })
+
+  it('does not leak rejections from async refinements', async ({ onTestFinished }) => {
+    const unhandledRejection = vi.fn()
+    process.on('unhandledRejection', unhandledRejection)
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejection)
+    })
+
+    const refine = vi.fn(async () => {
+      throw new Error('boom')
+    })
+
+    const schema = z.string().refine(refine)
     expect(converter.convert(schema, 'input')).toEqual([{ type: 'string' }, false])
+    expect(converter.convert(schema, 'output')).toEqual([{ type: 'string' }, false])
+
+    const optionalSchema = z.object({ email: z.string() }).optional().refine(refine)
+    const optionalJsonSchema = { type: 'object', properties: { email: { type: 'string' } }, required: ['email'] }
+    expect(converter.convert(optionalSchema, 'input')).toEqual([optionalJsonSchema, true])
+    expect(converter.convert(optionalSchema, 'output')).toEqual([{ ...optionalJsonSchema, additionalProperties: false }, true])
+
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(refine).not.toHaveBeenCalled()
+    expect(unhandledRejection).not.toHaveBeenCalled()
   })
 
   describe('supports $ref at root level', () => {
@@ -163,6 +192,29 @@ describe('zodToJsonSchemaConverter', () => {
       ['required output schema', z.string(), 'output', {
         type: 'string',
       }, false],
+      ['optional input schema', z.string().optional(), 'input', {
+        type: 'string',
+      }, true],
+      ['prefaulted input schema', z.string().prefault('fallback'), 'input', {
+        default: 'fallback',
+        type: 'string',
+      }, true],
+      ['prefaulted output schema', z.string().prefault('fallback'), 'output', {
+        type: 'string',
+      }, false],
+      ['nullable optional input schema', z.string().optional().nullable(), 'input', {
+        type: ['string', 'null'],
+      }, true],
+      ['nullable optional output schema', z.string().optional().nullable(), 'output', {
+        type: ['string', 'null'],
+      }, true],
+      ['union with an optional member input schema', z.union([z.string(), z.number().optional()]), 'input', {
+        type: ['string', 'number'],
+      }, true],
+      ['defaulted output schema piped through a transform', z.string().optional().transform(value => value ?? 'fallback'), 'output', {}, false],
+      ['optional input schema piped through a transform', z.string().optional().transform(value => value ?? 'fallback'), 'input', {
+        type: 'string',
+      }, true],
     ] as const)('marks %s correctly', (_, schema, direction, jsonSchema, optional) => {
       expect(converter.convert(schema, direction)).toEqual([jsonSchema, optional])
     })

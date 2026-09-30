@@ -63,14 +63,11 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
   private convertUncached(zodSchema: $ZodType, direction: JsonSchemaConverterDirection): [jsonSchema: JsonSchema, optional: boolean] {
     const jsonSchema = this.convertZod(zodSchema, direction)
 
-    let optional = false
-    try {
-      const result = zodSchema['~standard'].validate(undefined)
-      if (!(result instanceof Promise) && !result.issues) {
-        optional = direction === 'input' ? true : result.value === undefined
-      }
-    }
-    catch {}
+    // Read optionality from the metadata zod uses for optional object keys,
+    // instead of validating `undefined`, which would run refinements and transforms.
+    const optional = direction === 'input'
+      ? zodSchema._zod.optin !== undefined
+      : zodSchema._zod.optout === 'optional'
 
     return [jsonSchema as JsonSchema, optional]
   }
