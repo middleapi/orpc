@@ -69,6 +69,12 @@ export function serializableStreamedQuery<T>(
       }
     }
 
+    // A stream can end without throwing when aborted (e.g. server-side or in-process clients),
+    // so never resolve the partial buffer as the query data after the fetch was cancelled.
+    if (signal.aborted) {
+      throw signal.reason
+    }
+
     return result
   }
 }

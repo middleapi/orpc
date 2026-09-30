@@ -88,6 +88,12 @@ export function serializableStreamedQuery<
       }
     }
 
+    // A stream can end without throwing when aborted (e.g. server-side or in-process clients),
+    // so never write the partial buffer to the cache after the fetch was cancelled.
+    if (context.signal.aborted) {
+      throw context.signal.reason
+    }
+
     if (!shouldUpdateCacheDuringStream) {
       context.client.setQueryData<Array<TQueryFnData>>(context.queryKey, result)
     }

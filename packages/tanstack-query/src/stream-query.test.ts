@@ -504,6 +504,45 @@ describe('serializableStreamedQuery', () => {
       // Should not replace cache when aborted
       expect(queryClient.getQueryData(['abort-replace-test'])).toEqual(['initial1', 'initial2'])
     })
+
+    it('does not write partial buffer when a replace refetch is cancelled and the stream ends without throwing', async () => {
+      const key = ['abort-replace-return-test']
+
+      await queryClient.fetchQuery({
+        queryKey: key,
+        queryFn: serializableStreamedQuery(async function* () {
+          yield 1
+          yield 2
+          yield 3
+        }),
+      })
+
+      expect(queryClient.getQueryData(key)).toEqual([1, 2, 3])
+
+      let chunkConsumed = false
+      let signal: AbortSignal | undefined
+      const queryFn = vi.fn(serializableStreamedQuery<number | string>(async function* (context) {
+        signal = context.signal
+        yield 'a'
+        chunkConsumed = true
+        // like server-side or in-process clients, the stream ends on abort without throwing
+        await new Promise(resolve => signal!.addEventListener('abort', resolve, { once: true }))
+      }, { refetchMode: 'replace' }))
+
+      const refetchPromise = queryClient.fetchQuery({ queryKey: key, queryFn })
+
+      await vi.waitFor(() => expect(chunkConsumed).toBe(true))
+      expect(queryClient.getQueryData(key)).toEqual([1, 2, 3])
+
+      await queryClient.cancelQueries({ queryKey: key })
+
+      await expect(refetchPromise).resolves.toEqual([1, 2, 3])
+
+      const [queryFnResult] = await Promise.allSettled([queryFn.mock.results[0]!.value])
+      expect(queryClient.getQueryData(key)).toEqual([1, 2, 3])
+      expect(queryClient.getQueryState(key)?.status).toBe('success')
+      expect(queryFnResult).toSatisfy(result => result.status === 'rejected' && result.reason === signal!.reason)
+    })
   })
 
   describe('edge cases', () => {

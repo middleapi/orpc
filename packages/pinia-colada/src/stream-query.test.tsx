@@ -1,4 +1,5 @@
 import type { UseQueryOptions } from '@pinia/colada'
+import type { UseQueryFnContext } from './types'
 import { PiniaColada, useQuery, useQueryCache } from '@pinia/colada'
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
@@ -256,5 +257,44 @@ describe('serializableStreamedQuery', () => {
     await vi.waitFor(() => expect(mounted.vm.query.asyncStatus.value).toEqual('idle'))
     expect(mounted.vm.query.data.value).toEqual(['a'])
     expect(mounted.vm.query.error.value).toBeNull()
+  })
+
+  it('never resolves the partial buffer when a replace refetch is cancelled and the stream ends without throwing', async () => {
+    let chunkConsumed = false
+
+    const query = vi.fn(serializableStreamedQuery<number | string>(
+      vi.fn()
+        .mockImplementationOnce(async function* () {
+          yield 1
+          yield 2
+          yield 3
+        })
+        .mockImplementationOnce(async function* ({ signal }: UseQueryFnContext) {
+          yield 'a'
+          chunkConsumed = true
+          // like server-side or in-process clients, the stream ends on abort without throwing
+          await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true }))
+        }),
+      { refetchMode: 'replace' },
+    ))
+
+    const mounted = mountQuery({ key: ['stream'], query })
+
+    await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual([1, 2, 3]))
+
+    const refetching = mounted.vm.query.refetch()
+
+    await vi.waitFor(() => expect(chunkConsumed).toBe(true))
+    expect(mounted.vm.query.data.value).toEqual([1, 2, 3])
+    expect(mounted.vm.query.asyncStatus.value).toEqual('loading')
+
+    const reason = new Error('__cancelled__')
+    mounted.vm.queryCache.cancelQueries({ key: ['stream'] }, reason)
+
+    await expect(query.mock.results[1]!.value).rejects.toBe(reason)
+    await refetching
+    expect(mounted.vm.query.data.value).toEqual([1, 2, 3])
+    expect(mounted.vm.query.error.value).toBeNull()
+    expect(mounted.vm.queryCache.getQueryData(['stream'])).toEqual([1, 2, 3])
   })
 })
