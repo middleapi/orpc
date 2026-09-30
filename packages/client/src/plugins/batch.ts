@@ -447,37 +447,47 @@ async function decodeLengthPrefixedBlob(blob: Blob, peer: ClientPeer): Promise<v
   }
 }
 
-async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array>, peer: ClientPeer): Promise<void> {
+async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array<ArrayBuffer>>, peer: ClientPeer): Promise<void> {
   const reader = stream.getReader()
-  let buffer = new Uint8Array(0)
+  // Unread chunks are kept as-is and only copied once a whole frame has arrived,
+  // so a large frame split into many chunks is not re-copied on every chunk.
+  const chunks: Uint8Array<ArrayBuffer>[] = []
+  let bufferedLength = 0
+  let frameLength: number | undefined
 
   try {
     while (true) {
       const { done, value: chunk } = await reader.read()
 
-      if (chunk) {
-        const newBuffer = new Uint8Array(buffer.length + chunk.length)
-        newBuffer.set(buffer)
-        newBuffer.set(chunk, buffer.length)
-        buffer = newBuffer
+      if (chunk?.length) {
+        chunks.push(chunk)
+        bufferedLength += chunk.length
       }
 
-      while (buffer.length >= 4) {
-        const view = new DataView(buffer.buffer, buffer.byteOffset, 4)
-        const length = view.getUint32(0, false)
+      while (true) {
+        if (frameLength === undefined) {
+          if (bufferedLength < 4) {
+            break
+          }
 
-        // Zero-length frame is a keep-alive ping; skip it.
-        if (length === 0) {
-          buffer = buffer.subarray(4)
-          continue
+          const header = shiftBytes(chunks, 4)
+          bufferedLength -= 4
+          frameLength = new DataView(header.buffer, header.byteOffset, 4).getUint32(0, false)
+
+          // Zero-length frame is a keep-alive ping; skip it.
+          if (frameLength === 0) {
+            frameLength = undefined
+            continue
+          }
         }
 
-        if (buffer.length < 4 + length) {
+        if (bufferedLength < frameLength) {
           break
         }
 
-        const messageBytes = buffer.subarray(4, 4 + length)
-        buffer = buffer.subarray(4 + length)
+        const messageBytes = shiftBytes(chunks, frameLength)
+        bufferedLength -= frameLength
+        frameLength = undefined
 
         const result = decodePeerMessage(messageBytes)
 
@@ -496,4 +506,47 @@ async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array>, pe
   finally {
     reader.releaseLock()
   }
+}
+
+/**
+ * Removes the first `length` bytes from `chunks` and returns them,
+ * copying only when they span more than one chunk.
+ * The caller must ensure `chunks` holds at least `length` bytes.
+ */
+function shiftBytes(chunks: Uint8Array<ArrayBuffer>[], length: number): Uint8Array<ArrayBuffer> {
+  const first = chunks[0]!
+
+  if (first.length >= length) {
+    if (first.length === length) {
+      chunks.shift()
+    }
+    else {
+      chunks[0] = first.subarray(length)
+    }
+
+    return first.subarray(0, length)
+  }
+
+  const bytes = new Uint8Array(length)
+  let offset = 0
+  let consumed = 0
+
+  while (offset < length) {
+    const chunk = chunks[consumed]!
+    const size = Math.min(chunk.length, length - offset)
+
+    bytes.set(size === chunk.length ? chunk : chunk.subarray(0, size), offset)
+    offset += size
+
+    if (size === chunk.length) {
+      consumed++
+    }
+    else {
+      chunks[consumed] = chunk.subarray(size)
+    }
+  }
+
+  chunks.splice(0, consumed)
+
+  return bytes
 }
