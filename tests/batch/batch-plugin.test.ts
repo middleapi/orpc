@@ -210,6 +210,34 @@ describe.each([
     expect(fetchSpy).toHaveBeenCalledTimes(1) // ensure batch was used
   })
 
+  /**
+   * The link hoists a header every call shares onto the batch request and leaves the rest on each
+   * subrequest, spelled however the caller wrote it, for the server to lowercase.
+   */
+  it('delivers per-call headers to each subrequest whatever their case', async () => {
+    const router = {
+      headers: os.$context<{ reqHeaders?: Headers }>().input(z.string()).handler(({ context }) => ({
+        trace: context.reqHeaders?.get('x-trace'),
+        tenant: context.reqHeaders?.get('x-tenant'),
+      })),
+    }
+
+    const { client, fetchSpy } = createClientServer(router, {
+      headers: (_options, _path, input) => ({ 'X-Trace': `trace:${input}`, 'X-Tenant': 'acme' }),
+    })
+
+    await Promise.all([
+      expect(client.headers('alpha')).resolves.toEqual({ trace: 'trace:alpha', tenant: 'acme' }),
+      expect(client.headers('beta')).resolves.toEqual({ trace: 'trace:beta', tenant: 'acme' }),
+    ])
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1) // ensure batch was used
+
+    const batchHeaders = new Headers(fetchSpy.mock.calls[0]![1].headers)
+    expect(batchHeaders.get('x-tenant')).toBe('acme')
+    expect(batchHeaders.get('x-trace')).toBeNull()
+  })
+
   it('sends file uploads outside the batch', async () => {
     const router = {
       upload: os.input(z.object({ file: z.file() })).handler(({ input }) => input.file.text()),

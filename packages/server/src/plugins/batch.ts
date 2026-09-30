@@ -18,6 +18,35 @@ import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standar
  */
 export const BATCH_CONTENT_TYPE = 'application/vnd.orpc.batch'
 
+/**
+ * A header name as defined by RFC 9110: one or more `tchar`.
+ */
+const HTTP_TOKEN_REGEX = /^[\w!#$%&'*+.^`|~-]+$/
+
+/**
+ * Subrequest headers are client-authored JSON, not something a transport parsed, so their names
+ * can be in any case. This lowercases them, the way every adapter delivers the batch request
+ * headers, combining the ones that differ only in case, so a lookup by lowercase name, such as
+ * the batch request headers overriding them, sees every spelling. Names that are not valid header
+ * names are dropped.
+ */
+function normalizeSubrequestHeaders(headers: StandardHeaders): StandardHeaders {
+  // A Map, since names such as `__proto__` or `constructor` are not safe plain object keys.
+  const normalized = new Map<string, string | string[]>()
+
+  for (const [name, value] of Object.entries(headers)) {
+    if (value === undefined || !HTTP_TOKEN_REGEX.test(name)) {
+      continue
+    }
+
+    const key = name.toLowerCase()
+    const existing = normalized.get(key)
+    normalized.set(key, existing === undefined ? value : [...toArray(existing), ...toArray(value)])
+  }
+
+  return Object.fromEntries(normalized)
+}
+
 export interface BatchHandlerPluginOptions<T extends Context> {
   /**
    * The max size of the batch allowed.
@@ -28,6 +57,9 @@ export interface BatchHandlerPluginOptions<T extends Context> {
 
   /**
    * Map each subrequest in the batch before it is processed.
+   *
+   * Subrequest headers are client-authored, like the request body. Their names arrive lowercased,
+   * with the ones that differ only in case combined and the ones that are not valid header names dropped.
    *
    * @default merges the batch request headers into the subrequest, giving them priority over
    * the subrequest headers, and removes the `orpc-batch` header to prevent nested batching
@@ -109,6 +141,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
          * The batch request headers win over the subrequest ones. They are the only ones the
          * transport actually saw, so headers the browser injects on its own, such as `cookie`
          * or `origin`, cannot be overridden by a subrequest, which is just request payload.
+         * Both use lowercase names, so this holds however the subrequest spelled them.
          */
         ...batchRequest.headers,
         'orpc-batch': undefined, // useful in case batch plugin is used multiple times
@@ -203,7 +236,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
       const handleIndividualRequest = async (request: StandardLazyRequest): Promise<StandardResponse> => {
         try {
-          request = this.mapSubrequest(request, interceptorOptions)
+          request = this.mapSubrequest({ ...request, headers: normalizeSubrequestHeaders(request.headers) }, interceptorOptions)
           const { matched, response } = await interceptorOptions.next({ ...interceptorOptions, request })
 
           if (!matched) {

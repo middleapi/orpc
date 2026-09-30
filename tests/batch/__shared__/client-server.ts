@@ -1,4 +1,5 @@
-import type { RPCSerializer } from '@orpc/client'
+import type { ClientContext, RPCSerializer } from '@orpc/client'
+import type { RPCLinkOptions } from '@orpc/client/fetch'
 import type { BatchLinkPluginMode } from '@orpc/client/plugins'
 import type { AnyRouter, Context, RouterClient } from '@orpc/server'
 import type { Public } from '@orpc/shared'
@@ -6,6 +7,7 @@ import { defaultSerializer } from '../../rpc/__shared__/client-server'
 
 export interface BatchClientServerTestOptions {
   context?: Context
+  headers?: RPCLinkOptions<ClientContext>['headers']
   method?: 'GET' | 'POST' | 'QUERY'
   mode?: BatchLinkPluginMode
   serializer?: Public<RPCSerializer>

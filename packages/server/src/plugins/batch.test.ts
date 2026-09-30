@@ -1,3 +1,4 @@
+import type { StandardLazyRequest } from '@standard-server/core'
 import type { AnyRouter } from '../router'
 import { ORPCError } from '@orpc/client'
 import { promiseWithResolvers } from '@orpc/shared'
@@ -5,6 +6,7 @@ import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { os } from '../builder'
 import { BatchHandlerPlugin } from './batch'
 import { RequestCompressionHandlerPlugin } from './request-compression'
+import { RequestHeadersHandlerPlugin } from './request-headers'
 import { RequestLimitHandlerPlugin } from './request-limit'
 
 beforeEach(() => {
@@ -538,6 +540,142 @@ describe('batchHandlerPlugin', () => {
       ))
 
       expect(seenHeaders[0]!.authorization).toEqual('Bearer real')
+    })
+
+    /**
+     * Adapters deliver the batch request header names in lowercase, while sub-request header names
+     * are client-authored JSON, so a case-only difference must not slip a spoofed value past them.
+     */
+    describe.each([
+      ['buffered', 'POST'],
+      ['streaming', 'POST'],
+      ['buffered', 'GET'],
+      ['streaming', 'GET'],
+    ] as const)('%s %s batch', (mode, method) => {
+      async function handleSpoofedBatch(subRequestHeaders: Record<string, string | string[]>) {
+        const seenHeaders: Headers[] = []
+
+        const handler = new RPCHandler({
+          who: os.$context<{ reqHeaders?: Headers }>().handler(({ context }) => {
+            seenHeaders.push(context.reqHeaders!)
+          }),
+        }, {
+          allowMethods: ['GET', 'POST'],
+          plugins: [new BatchHandlerPlugin(), new RequestHeadersHandlerPlugin()],
+        })
+
+        const messages = [
+          { kind: 'request', id: 0, json: { method, url: '/who', headers: subRequestHeaders }, binary: undefined },
+        ]
+
+        const headers = {
+          'orpc-batch': mode,
+          'remote-groups': 'dev',
+          'x-forwarded-for': '203.0.113.9',
+          'cookie': 'session=real',
+        }
+
+        const { response } = await handler.handle(method === 'GET'
+          ? new Request(`https://example.com/__batch__?data=${encodeURIComponent(JSON.stringify(messages))}`, { method, headers })
+          : new Request('https://example.com/__batch__', {
+              method,
+              headers: { ...headers, 'content-type': 'application/json' },
+              body: JSON.stringify(messages),
+            }))
+
+        expect(response!.status).toBe(207)
+        await response!.arrayBuffer()
+
+        expect(seenHeaders).toHaveLength(1)
+        return seenHeaders[0]!
+      }
+
+      it('lets the batch request win over a sub-request header that differs only in case', async () => {
+        const reqHeaders = await handleSpoofedBatch({
+          'Remote-Groups': 'admin',
+          'X-FORWARDED-FOR': '10.0.0.1',
+          'Cookie': 'session=spoofed',
+        })
+
+        expect(reqHeaders.get('remote-groups')).toBe('dev')
+        expect(reqHeaders.get('x-forwarded-for')).toBe('203.0.113.9')
+        expect(reqHeaders.get('cookie')).toBe('session=real')
+      })
+
+      it('lets the batch request win over several case variants of one sub-request header', async () => {
+        const reqHeaders = await handleSpoofedBatch({
+          'Remote-Groups': 'admin',
+          'REMOTE-GROUPS': ['root', 'wheel'],
+          'remote-groups': 'staff',
+        })
+
+        expect(reqHeaders.get('remote-groups')).toBe('dev')
+      })
+    })
+
+    it('lowercases sub-request header names and combines the ones that differ only in case', async () => {
+      const { handler, seenHeaders } = createHeaderCapturingHandler()
+
+      await handler.handle(createBatchRequestWithHeaders(
+        {},
+        { 'X-Trace': 'a', 'x-trace': 'b', 'X-TRACE': 'c', 'X-Tenant': 'acme' },
+      ))
+
+      expect(seenHeaders[0]).toMatchObject({
+        'x-trace': ['a', 'b', 'c'],
+        'x-tenant': 'acme',
+      })
+      expect(Object.keys(seenHeaders[0]!).filter(key => key.toLowerCase() !== key)).toEqual([])
+    })
+
+    it('hands a custom mapSubrequest the lowercased sub-request headers', async () => {
+      const mapSubrequest = vi.fn((subrequest: StandardLazyRequest) => subrequest)
+      const handler = new RPCHandler(router, { plugins: [new BatchHandlerPlugin({ mapSubrequest })] })
+
+      await handler.handle(createBatchRequestWithHeaders(
+        { 'x-trace': 'batch' },
+        { 'X-Trace': 'sub-request', 'X-Tenant': 'acme' },
+      ))
+
+      expect(mapSubrequest).toHaveBeenCalledTimes(1)
+      expect(mapSubrequest.mock.calls[0]![0].headers).toEqual({ 'x-trace': 'sub-request', 'x-tenant': 'acme' })
+    })
+
+    it('drops sub-request header names that are not valid HTTP tokens', async () => {
+      const { handler, seenHeaders } = createHeaderCapturingHandler()
+
+      await handler.handle(createBatchRequestWithHeaders(
+        {},
+        {
+          'x-valid': 'kept',
+          'x-invalid ': 'space',
+          'x-invalid:': 'colon',
+          '': 'empty',
+          '\u212Aey': 'the kelvin sign lowercases to an ascii "k"',
+        },
+      ))
+
+      expect(seenHeaders[0]!['x-valid']).toBe('kept')
+      expect(Object.keys(seenHeaders[0]!)).not.toContain('x-invalid ')
+      expect(Object.keys(seenHeaders[0]!)).not.toContain('x-invalid:')
+      expect(Object.keys(seenHeaders[0]!)).not.toContain('')
+      expect(Object.keys(seenHeaders[0]!)).not.toContain('key')
+    })
+
+    it('does not treat sub-request header names as object prototype keys', async () => {
+      const { handler, seenHeaders } = createHeaderCapturingHandler()
+
+      await handler.handle(new Request('https://example.com/__batch__', {
+        method: 'POST',
+        headers: { 'orpc-batch': 'buffered', 'content-type': 'application/json' },
+        body: `[{"kind":"request","id":0,"json":{"method":"POST","url":"/ping","headers":{"__proto__":"a","Constructor":"b"}}}]`,
+      }))
+
+      expect(Object.getPrototypeOf(seenHeaders[0])).toBe(Object.prototype)
+      expect(Object.entries(seenHeaders[0]!)).toEqual(expect.arrayContaining([
+        ['__proto__', 'a'],
+        ['constructor', 'b'],
+      ]))
     })
   })
 

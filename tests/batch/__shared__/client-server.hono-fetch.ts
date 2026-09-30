@@ -5,13 +5,14 @@ import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { BatchLinkPlugin } from '@orpc/client/plugins'
 import { RPCHandler } from '@orpc/server/fetch'
-import { BatchHandlerPlugin } from '@orpc/server/plugins'
+import { BatchHandlerPlugin, RequestHeadersHandlerPlugin } from '@orpc/server/plugins'
 import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server'
 
 export const createHonoFetchBatchClientServerTest: CreateBatchClientServerTest = (
   router,
   {
     context = defaultBatchClientServerOptions.context,
+    headers,
     method = 'GET',
     mode = defaultBatchClientServerOptions.mode,
     serializer = defaultBatchClientServerOptions.serializer,
@@ -20,7 +21,7 @@ export const createHonoFetchBatchClientServerTest: CreateBatchClientServerTest =
   const handler = new RPCHandler(router, {
     serializer,
     allowMethods: ['GET', 'POST', 'QUERY'],
-    plugins: [new BatchHandlerPlugin()],
+    plugins: [new BatchHandlerPlugin(), new RequestHeadersHandlerPlugin()],
   })
 
   const server = serve({
@@ -47,6 +48,7 @@ export const createHonoFetchBatchClientServerTest: CreateBatchClientServerTest =
     method, // hono-fetch uses GET by default while node-http uses POST for better coverage
     origin: `http://localhost:${addressInfo.port}`,
     serializer,
+    headers,
     fetch: fetchSpy,
     plugins: [new BatchLinkPlugin({ groups: [defaultBatchGroup], mode })],
   })

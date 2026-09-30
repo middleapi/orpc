@@ -6,7 +6,7 @@ import { RPCLink } from '@orpc/client/fetch'
 import { BatchLinkPlugin } from '@orpc/client/plugins'
 import { BatchResponseCompressionHandlerPlugin } from '@orpc/node'
 import { RPCHandler } from '@orpc/server/fetch'
-import { BatchHandlerPlugin } from '@orpc/server/plugins'
+import { BatchHandlerPlugin, RequestHeadersHandlerPlugin } from '@orpc/server/plugins'
 import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server'
 
 /**
@@ -17,6 +17,7 @@ export const createCompressionHonoFetchBatchClientServerTest: CreateBatchClientS
   router,
   {
     context = defaultBatchClientServerOptions.context,
+    headers,
     method = 'GET',
     mode = defaultBatchClientServerOptions.mode,
     serializer = defaultBatchClientServerOptions.serializer,
@@ -27,6 +28,7 @@ export const createCompressionHonoFetchBatchClientServerTest: CreateBatchClientS
     allowMethods: ['GET', 'POST', 'QUERY'],
     plugins: [
       new BatchHandlerPlugin(),
+      new RequestHeadersHandlerPlugin(),
       new BatchResponseCompressionHandlerPlugin({
         // always compress for testing
         threshold: 0,
@@ -67,6 +69,7 @@ export const createCompressionHonoFetchBatchClientServerTest: CreateBatchClientS
     method, // hono-fetch uses GET by default while node-http uses POST for better coverage
     origin: `http://localhost:${addressInfo.port}`,
     serializer,
+    headers,
     fetch: fetchSpy,
     plugins: [
       new BatchLinkPlugin({ groups: [defaultBatchGroup], mode }),

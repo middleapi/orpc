@@ -6,7 +6,7 @@ import { RPCLink } from '@orpc/client/fetch'
 import { BatchLinkPlugin } from '@orpc/client/plugins'
 import { BatchResponseCompressionHandlerPlugin } from '@orpc/node'
 import { RPCHandler } from '@orpc/server/node'
-import { BatchHandlerPlugin } from '@orpc/server/plugins'
+import { BatchHandlerPlugin, RequestHeadersHandlerPlugin } from '@orpc/server/plugins'
 import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server'
 
 /**
@@ -18,6 +18,7 @@ export const createCompressionNodeHttpBatchClientServerTest: CreateBatchClientSe
   router,
   {
     context = defaultBatchClientServerOptions.context,
+    headers,
     method = 'POST',
     mode = defaultBatchClientServerOptions.mode,
     serializer = defaultBatchClientServerOptions.serializer,
@@ -28,6 +29,7 @@ export const createCompressionNodeHttpBatchClientServerTest: CreateBatchClientSe
     allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'QUERY'],
     plugins: [
       new BatchHandlerPlugin(),
+      new RequestHeadersHandlerPlugin(),
       // always compress for testing
       new BatchResponseCompressionHandlerPlugin({ threshold: 0 }),
     ],
@@ -63,6 +65,7 @@ export const createCompressionNodeHttpBatchClientServerTest: CreateBatchClientSe
     origin: `http://localhost:${addressInfo.port}`,
     method,
     serializer,
+    headers,
     fetch: fetchSpy,
     // fetch already automatically decompresses the response
     plugins: [new BatchLinkPlugin({ groups: [defaultBatchGroup], mode })],

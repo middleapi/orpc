@@ -209,6 +209,36 @@ const link = new RPCLink({
 
 The wait starts when the first request is queued, so no request waits longer than `wait`, even while more keep arriving.
 
+## Headers
+
+The client plugin sends the headers that every request in a batch shares on the batch request itself. It keeps the rest on each subrequest, inside the batch payload.
+
+On the server, each subrequest gets the batch request headers merged over its own. Subrequest header names are lowercased first, and names that are not valid HTTP header names are dropped. That way a batch request header wins however a subrequest spells it.
+
+:::warning
+Subrequest headers are written by the client, just like the request body. They never pass through the browser, proxies, or load balancers, so the guarantees those give, such as a proxy setting `x-forwarded-for` or stripping `remote-user`, only hold for headers the batch request itself carries. A subrequest can still add any header that the batch request does not carry.
+
+If your app trusts headers set by infrastructure, make sure it always sets them, or use `mapSubrequest` to keep only the subrequest headers you expect:
+
+```ts
+const handler = new RPCHandler(router, {
+  plugins: [
+    new BatchHandlerPlugin({
+      mapSubrequest: (subrequest, { request }) => ({
+        ...subrequest,
+        headers: {
+          'x-trace-id': subrequest.headers['x-trace-id'],
+          ...request.headers,
+          'orpc-batch': undefined,
+        },
+      }),
+    }),
+  ],
+})
+```
+
+:::
+
 ## Learn More
 
 See the [BatchHandlerPlugin source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/batch.ts) and the [BatchLinkPlugin source code](https://github.com/middleapi/orpc/blob/main/packages/client/src/plugins/batch.ts) for implementation details.

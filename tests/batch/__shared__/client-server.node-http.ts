@@ -5,13 +5,14 @@ import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { BatchLinkPlugin } from '@orpc/client/plugins'
 import { RPCHandler } from '@orpc/server/node'
-import { BatchHandlerPlugin } from '@orpc/server/plugins'
+import { BatchHandlerPlugin, RequestHeadersHandlerPlugin } from '@orpc/server/plugins'
 import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server'
 
 export const createNodeHttpBatchClientServerTest: CreateBatchClientServerTest = (
   router,
   {
     context = defaultBatchClientServerOptions.context,
+    headers,
     method = 'POST',
     mode = defaultBatchClientServerOptions.mode,
     serializer = defaultBatchClientServerOptions.serializer,
@@ -20,7 +21,7 @@ export const createNodeHttpBatchClientServerTest: CreateBatchClientServerTest = 
   const handler = new RPCHandler(router, {
     serializer,
     allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'QUERY'],
-    plugins: [new BatchHandlerPlugin()],
+    plugins: [new BatchHandlerPlugin(), new RequestHeadersHandlerPlugin()],
   })
 
   const server = http.createServer(async (req, res) => {
@@ -44,6 +45,7 @@ export const createNodeHttpBatchClientServerTest: CreateBatchClientServerTest = 
     origin: `http://localhost:${addressInfo.port}`,
     method,
     serializer,
+    headers,
     fetch: fetchSpy,
     plugins: [new BatchLinkPlugin({ groups: [defaultBatchGroup], mode })],
   })
