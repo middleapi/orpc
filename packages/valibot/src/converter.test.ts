@@ -52,19 +52,44 @@ describe('valibotToJsonSchemaConverter', () => {
     ])
   })
 
-  it('keeps converting when standard validation throws while checking optionality', () => {
-    const schema = v.string()
+  it('does not run standard validation to check optionality', () => {
+    const schema = v.optional(v.string())
+    const validate = vi.fn(() => {
+      throw new Error('validate failed')
+    })
 
     Object.defineProperty(schema, '~standard', {
       value: {
         ...schema['~standard'],
-        validate: () => {
-          throw new Error('validate failed')
-        },
+        validate,
       },
     })
 
-    expect(converter.convert(schema, 'input')).toEqual([{ type: 'string' }, false])
+    expect(converter.convert(schema, 'input')).toEqual([{ type: 'string' }, true])
+    expect(converter.convert(schema, 'output')).toEqual([{ type: 'string' }, true])
+    expect(validate).not.toHaveBeenCalled()
+  })
+
+  it('does not leak rejections from async transformations', async ({ onTestFinished }) => {
+    const unhandledRejection = vi.fn()
+    process.on('unhandledRejection', unhandledRejection)
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejection)
+    })
+
+    const transform = vi.fn(async (value: any) => (value as string).split(','))
+
+    const schema = v.pipeAsync(v.unknown(), v.transformAsync(transform))
+    expect(converter.convert(schema, 'input')).toEqual([{}, false])
+    expect(converter.convert(schema, 'output')).toEqual([{}, false])
+
+    const optionalSchema = v.pipeAsync(v.optionalAsync(v.string()), v.transformAsync(transform))
+    expect(converter.convert(optionalSchema, 'input')).toEqual([{ type: 'string' }, true])
+    expect(converter.convert(optionalSchema, 'output')).toEqual([{ type: 'string' }, false])
+
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(transform).not.toHaveBeenCalled()
+    expect(unhandledRejection).not.toHaveBeenCalled()
   })
 
   describe('optionality', () => {
@@ -84,6 +109,41 @@ describe('valibotToJsonSchemaConverter', () => {
         type: 'string',
       }, false],
       ['required output schema', v.string(), 'output', {
+        type: 'string',
+      }, false],
+      ['optional input schema', v.optional(v.string()), 'input', {
+        type: 'string',
+      }, true],
+      ['lazily defaulted output schema', v.optional(v.string(), () => 'fallback'), 'output', {
+        default: 'fallback',
+        type: 'string',
+      }, false],
+      ['nullish input schema', v.nullish(v.string()), 'input', {
+        anyOf: [{ type: 'string' }, { type: 'null' }],
+      }, true],
+      ['nullish output schema', v.nullish(v.string()), 'output', {
+        anyOf: [{ type: 'string' }, { type: 'null' }],
+      }, true],
+      ['null-defaulted nullish output schema', v.nullish(v.string(), null), 'output', {
+        anyOf: [{ type: 'string' }, { type: 'null' }],
+        default: null,
+      }, false],
+      ['exact optional input schema', v.exactOptional(v.string()), 'input', {
+        type: 'string',
+      }, true],
+      ['async optional input schema', v.optionalAsync(v.string()), 'input', {
+        type: 'string',
+      }, true],
+      ['optional input schema piped through a transformation', v.pipe(v.optional(v.string()), v.transform(value => value ?? 'fallback')), 'input', {
+        type: 'string',
+      }, true],
+      ['optional output schema piped through a transformation', v.pipe(v.optional(v.string()), v.transform(value => value ?? 'fallback')), 'output', {
+        type: 'string',
+      }, false],
+      ['optional output schema piped through a check', v.pipe(v.optional(v.string()), v.check(value => value !== '')), 'output', {
+        type: 'string',
+      }, true],
+      ['optional output schema piped through a nested transformation', v.pipe(v.pipe(v.optional(v.string()), v.transform(value => value ?? 'fallback')), v.check(value => value !== '')), 'output', {
         type: 'string',
       }, false],
     ] as const)('marks %s correctly', (_, schema, direction, jsonSchema, optional) => {

@@ -1,6 +1,6 @@
 import type { AnySchema, JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
 import type { ConversionConfig, ConversionContext, OverrideSchemaContext, JsonSchema as ValibotJsonSchema } from '@valibot/to-json-schema'
-import type { BaseSchema, MapSchema, SetSchema } from 'valibot'
+import type { BaseSchema, MapSchema, PipeItem, SetSchema } from 'valibot'
 import { JsonSchemaFormat, JsonSchemaXNativeType } from '@orpc/json-schema'
 import { toJsonSchema } from '@valibot/to-json-schema'
 import { any, tuple } from 'valibot'
@@ -19,6 +19,8 @@ export interface ValibotToJsonSchemaConverterOptions extends Omit<ConversionConf
 }
 
 const NESTED_CONVERSION_SENTINEL = any()
+
+const OPTIONAL_SCHEMA_TYPES = new Set(['optional', 'nullish', 'exact_optional'])
 
 /**
  * Converts Valibot schemas into JSON Schema using Valibot's built-in `toJsonSchema`,
@@ -68,16 +70,7 @@ export class ValibotToJsonSchemaConverter implements JsonSchemaConverter {
     // `$schema` can be safely omitted here.
     const { $schema, ...jsonSchema } = toJsonSchema(valibotSchema, this.createConversionConfig(direction))
 
-    let optional = false
-    try {
-      const result = valibotSchema['~standard'].validate(undefined)
-      if (!(result instanceof Promise) && !result.issues) {
-        optional = direction === 'input' ? true : result.value === undefined
-      }
-    }
-    catch {}
-
-    return [jsonSchema as JsonSchema, optional]
+    return [jsonSchema as JsonSchema, isOptional(valibotSchema, direction)]
   }
 
   private createConversionConfig(direction: JsonSchemaConverterDirection): ConversionConfig {
@@ -147,6 +140,30 @@ export class ValibotToJsonSchemaConverter implements JsonSchemaConverter {
 
     return prefixItems!.slice(1) as ValibotJsonSchema[]
   }
+}
+
+/**
+ * Reads optionality from the schema types `@valibot/to-json-schema` treats as optional object entries,
+ * instead of validating `undefined`, which would run transformations and async actions.
+ */
+function isOptional(schema: BaseSchema<any, any, any>, direction: JsonSchemaConverterDirection): boolean {
+  if (direction === 'output' && 'pipe' in schema) {
+    // The output comes from the last schema or transformation in the pipe,
+    // and a transformation can replace `undefined` with anything.
+    const pipe = schema.pipe as PipeItem<any, any, any>[]
+    for (let i = pipe.length - 1; i >= 0; i--) {
+      const item = pipe[i]!
+      if (item.kind === 'schema') {
+        return isOptional(item as BaseSchema<any, any, any>, direction)
+      }
+      if (item.kind === 'transformation') {
+        return false
+      }
+    }
+  }
+
+  return OPTIONAL_SCHEMA_TYPES.has(schema.type)
+    && (direction === 'input' || (schema as { default?: unknown }).default === undefined)
 }
 
 function mergeConversionContext(target: ConversionContext, source: ConversionContext): void {
