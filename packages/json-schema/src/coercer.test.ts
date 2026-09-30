@@ -452,6 +452,26 @@ describe('jsonSchemaCoercer', () => {
       expect(coerce(schema, { at, count: '1' })).toEqual({ at, count: 1 })
     })
 
+    it('coerces a tuple ending in optional items inside a union', () => {
+      // z.object({ t: z.tuple([z.number(), z.number().optional()]) }).nullable()
+      const schema = {
+        anyOf: [
+          {
+            type: 'object',
+            properties: { t: { type: 'array', prefixItems: [{ type: 'number' }, { type: 'number' }], items: false, minItems: 1, maxItems: 2 } },
+            required: ['t'],
+          },
+          { type: 'null' },
+        ],
+      }
+
+      expect(coerce(schema, { t: ['1'] })).toEqual({ t: [1] })
+      expect(coerce(schema, { t: ['1', '2'] })).toEqual({ t: [1, 2] })
+
+      // shorter than minItems, so no branch matches
+      expect(coerce(schema, { t: [] })).toEqual({ t: [] })
+    })
+
     it('handles the nullable form', () => {
       expect(coerce({ type: ['integer', 'null'] }, '5')).toBe(5)
       expect(coerce({ type: ['integer', 'null'] }, null)).toBeNull()

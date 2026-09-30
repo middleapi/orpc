@@ -222,7 +222,8 @@ export class JsonSchemaCoercer {
               return subCoerced
             })
 
-            if (coercedItems.length < prefixItemSchemas.length) {
+            // a tuple ending in optional items is shorter than its `prefixItems`, only `minItems` sets the least length
+            if (typeof schema.minItems === 'number' && coercedItems.length < schema.minItems) {
               satisfied = UNSATISFIED
             }
 
