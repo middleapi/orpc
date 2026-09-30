@@ -45,6 +45,29 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
     return publisher
   }
 
+  /**
+   * Named so its connection can be found and killed, like a Redis restart would, without
+   * touching the connections of tests running concurrently.
+   */
+  function createKillableSubscriber(onTestFinished: (fn: () => void) => void) {
+    const name = `redis-publisher-test:${crypto.randomUUID()}`
+    const subscriber = createClient({ url: REDIS_URL, name })
+
+    onTestFinished(() => {
+      if (subscriber.isOpen) {
+        subscriber.destroy()
+      }
+    })
+
+    const kill = async () => {
+      const client = (await redis.clientList()).find(client => client.name === name)
+      expect(client).toBeDefined()
+      await redis.clientKill({ filter: 'ID', id: client!.id })
+    }
+
+    return { subscriber, kill }
+  }
+
   it('delivers live events and meta (without resume and without prefix)', async () => {
     const publisher = createTestingPublisher({ prefix: undefined })
     const liveEvent = `${crypto.randomUUID()}live`
@@ -514,5 +537,97 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
     await unsubscribe1()
     await unsubscribe2()
     await unsubscribe3()
+  })
+
+  it('ends iterator subscribers when the subscriber connection is lost, so they can resume with lastEventId', async ({ onTestFinished }) => {
+    const { subscriber, kill } = createKillableSubscriber(onTestFinished)
+    const publisher = createTestingPublisher({ subscriber, resume: { enabled: true, seconds: 10 } })
+    const event = 'lost-connection'
+
+    await publisher.publish(event, { order: 1 })
+
+    // Replayed only once the channel is subscribed, so the connection loss below is observed
+    const iterator = publisher.subscribe(event, { lastEventId: '0' })
+    const first = await iterator.next()
+    expect(first.value).toEqual({ order: 1 })
+
+    await kill()
+    await expect(iterator.next()).rejects.toThrow()
+
+    // An event published while the subscription was down reaches the resumed subscriber
+    await publisher.publish(event, { order: 2 })
+
+    const resumed = publisher.subscribe(event, { lastEventId: getEventMeta(first.value)!.id })
+    expect((await resumed.next()).value).toEqual({ order: 2 })
+
+    await resumed.return()
+  })
+
+  it('reports each subscriber connection loss once to listener subscribers, which keep receiving after node-redis resubscribes', async ({ onTestFinished }) => {
+    const { subscriber, kill } = createKillableSubscriber(onTestFinished)
+    const publisher = createTestingPublisher({ subscriber })
+    const event = 'reconnect'
+    const listener = vi.fn()
+    const onError = vi.fn()
+
+    const unsubscribe = await publisher.subscribe(event, listener, { onError })
+
+    await kill()
+    await vi.waitFor(() => {
+      expect(onError).toHaveBeenCalledTimes(1)
+    })
+    await vi.waitFor(() => {
+      expect(subscriber.isReady).toBe(true)
+    })
+
+    await publisher.publish(event, { order: 1 })
+    await vi.waitFor(() => {
+      expect(listener).toHaveBeenCalledTimes(1)
+    })
+
+    // The error and the reconnection it caused are one loss
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(onError).toHaveBeenCalledWith(expect.any(Error))
+
+    await kill()
+    await vi.waitFor(() => {
+      expect(onError).toHaveBeenCalledTimes(2)
+    })
+
+    await unsubscribe()
+  })
+
+  it('reports a closed subscriber connection', async ({ onTestFinished }) => {
+    const { subscriber } = createKillableSubscriber(onTestFinished)
+    const publisher = createTestingPublisher({ subscriber })
+    const onError = vi.fn()
+
+    await publisher.subscribe('closed', vi.fn(), { onError })
+
+    subscriber.destroy()
+
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(onError).toHaveBeenCalledWith(new Error('The Redis subscriber connection was closed.'))
+  })
+
+  it('shares one set of client listeners across subscriptions and removes it with the last one', async ({ onTestFinished }) => {
+    const { subscriber } = createKillableSubscriber(onTestFinished)
+    const publisher = createTestingPublisher({ subscriber })
+    const clientEvents = ['error', 'reconnecting', 'end', 'ready'] as const
+    const onError = vi.fn()
+
+    const baseline = clientEvents.map(name => subscriber.listenerCount(name))
+
+    const unsubscribes = await Promise.all(Array.from({ length: 20 }, (_, i) => publisher.subscribe(`shared-${i}`, vi.fn(), { onError })))
+
+    expect(clientEvents.map(name => subscriber.listenerCount(name))).toEqual(baseline.map(count => count + 1))
+
+    await Promise.all(unsubscribes.slice(1).map(unsubscribe => unsubscribe()))
+    expect(clientEvents.map(name => subscriber.listenerCount(name))).toEqual(baseline.map(count => count + 1))
+
+    await unsubscribes[0]!()
+    await unsubscribes[0]!()
+    expect(clientEvents.map(name => subscriber.listenerCount(name))).toEqual(baseline)
+    expect(onError).not.toHaveBeenCalled()
   })
 })

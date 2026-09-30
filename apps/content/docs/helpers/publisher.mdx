@@ -379,6 +379,10 @@ const publish = os
 
 :::
 
+:::info
+The Redis adapters end iterator subscriptions with an error when their subscriber connection fails, since events published while it is down never reach them. Clients that reconnect with `lastEventId` then receive those events.
+:::
+
 ### Client Reconnection
 
 On the client, you can use the [Retry Plugin](/docs/plugins/retry), which automatically controls and passes `lastEventId` to the server when reconnecting. Alternatively, you can manage `lastEventId` manually:
