@@ -84,15 +84,8 @@ const example = base
   })
 ```
 
-:::warning
-Only plain objects are merged, and only two levels deep. Deeper values and anything else, like [`asyncIteratorObject`](/docs/async-iterator-object) or a `z.string()` transform, are piped: each schema validates what the previous one returned. Use `z.looseObject` when two schemas define the same object deeper than that:
-
-```ts
-const example = os
-  .input(z.object({ user: z.object({ address: z.looseObject({ city: z.string() }) }) }))
-  .input(z.object({ user: z.object({ address: z.looseObject({ zip: z.string() }) }) }))
-```
-
+:::info
+Plain objects are merged at any depth and arrays item by item, so schemas can define different fields of the same nested object or array items. Anything else, like [`asyncIteratorObject`](/docs/async-iterator-object) or a `z.string()` transform, is piped: each schema validates what the previous one returned. So is an array whose length an earlier schema changed, e.g. with a filtering transform.
 :::
 
 :::warning

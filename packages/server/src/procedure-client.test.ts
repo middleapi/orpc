@@ -708,6 +708,67 @@ describe('createProcedureClient', () => {
         .toEqual({ id: 5, page: 2, name: 'NAME' })
     })
 
+    it('composes fragments inside arrays', async () => {
+      const procedure = os
+        .input(z.object({ items: z.array(z.object({ id: z.string().trim() })) }))
+        .input(z.object({ items: z.array(z.object({ id: z.string(), qty: z.number() })) }))
+        .handler(({ input }) => input)
+
+      const client = createProcedureClient(procedure)
+
+      await expect(client({ items: [{ id: ' a ', qty: 1, unknown: 'UNKNOWN' }, { id: 'b', qty: 2 }] } as any))
+        .resolves
+        .toEqual({ items: [{ id: 'a', qty: 1 }, { id: 'b', qty: 2 }] })
+    })
+
+    it('keeps fields an earlier schema defines inside arrays', async () => {
+      const procedure = os
+        .input(z.object({ items: z.array(z.object({ id: z.coerce.number() })) }))
+        .input(z.object({ items: z.array(z.object({ qty: z.number() })) }))
+        .handler(({ input }) => input)
+
+      const client = createProcedureClient(procedure)
+
+      await expect(client({ items: [{ id: '1', qty: 1 }] } as any))
+        .resolves
+        .toEqual({ items: [{ id: 1, qty: 1 }] })
+    })
+
+    it('composes fragments nested at any depth', async () => {
+      const betweenMid = vi.fn(({ next }) => next())
+
+      const procedure = os
+        .input(z.object({ filter: z.object({ range: z.object({ min: z.coerce.number() }) }) }))
+        .use(betweenMid)
+        .input(z.object({ filter: z.object({ range: z.object({ max: z.number() }) }) }))
+        .handler(({ input }) => input)
+
+      const client = createProcedureClient(procedure)
+
+      await expect(client({ filter: { range: { min: '1', max: 2, unknown: 'UNKNOWN' } } } as any))
+        .resolves
+        .toEqual({ filter: { range: { min: 1, max: 2 } } })
+
+      expect(betweenMid).toHaveBeenCalledWith(
+        expect.any(Object),
+        { filter: { range: { min: 1, max: 2, unknown: 'UNKNOWN' } } },
+        expect.any(Function),
+      )
+    })
+
+    it('keeps earlier transforms at any depth when a later schema passes the raw values through', async () => {
+      const procedure = os
+        .input(z.object({ filter: z.object({ range: z.object({ min: z.coerce.number() }) }), items: z.array(z.object({ id: z.coerce.number() })) }))
+        .input(z.looseObject({ name: z.string() }))
+        .handler(({ input }) => input)
+
+      const client = createProcedureClient(procedure)
+
+      await expect(client({ filter: { range: { min: '1' } }, items: [{ id: '2' }], name: 'NAME' } as any))
+        .resolves
+        .toEqual({ filter: { range: { min: 1 } }, items: [{ id: 2 }], name: 'NAME' })
+    })
+
     it('keeps piping input schemas that do not validate into a plain object', async () => {
       const procedure = os
         .input(ContractModule.asyncIteratorObject(ContractModule.type<string, string>(value => `first__${value}`)))

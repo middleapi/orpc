@@ -1,14 +1,14 @@
 import type { ClientOptions } from '@orpc/client'
-import type { AnySchema, InferSchemaInput, InferSchemaOutput, ProcedureContract, Schema } from '@orpc/contract'
+import type { AnySchema, InferSchemaInput, InferSchemaOutput, ProcedureContract, Schema, SchemaIssue } from '@orpc/contract'
 import type { JsonSchema } from '@orpc/json-schema'
 import type { Context, ProcedureClientOptions } from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
 import type { FlexibleSchema, Tool } from 'ai'
 import type { FunctionTool } from './tool-meta'
-import { getAsyncIteratorObjectSchemaDetails } from '@orpc/contract'
+import { getAsyncIteratorObjectSchemaDetails, validateStackedInput, ValidationError } from '@orpc/contract'
 import { combineJsonSchemasWithComposition } from '@orpc/json-schema'
 import { call, Procedure } from '@orpc/server'
-import { isAsyncGeneratorFunction, mergeTwoLevels, ORPC_NAME, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
+import { isAsyncGeneratorFunction, ORPC_NAME, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
 import { tool } from 'ai'
 import { getAiSdkToolMeta } from './tool-meta'
 
@@ -42,6 +42,35 @@ function combineJsonSchemas(jsonSchemas: Record<string, unknown>[]): Record<stri
   return { $schema, ...combined }
 }
 
+/**
+ * Mirrors the server's stacked input validation, returning the first issues instead of throwing them.
+ */
+async function validateInput(schemas: AnySchema[], value: unknown): Promise<{ value: unknown } | { issues: readonly SchemaIssue[] }> {
+  let issues: readonly SchemaIssue[] | undefined
+
+  try {
+    return {
+      value: await validateStackedInput(schemas, value, async (schema, data) => {
+        const result = await schema['~standard'].validate(data)
+
+        if (result.issues) {
+          issues = result.issues
+          throw new ValidationError({ message: 'Input validation failed', issues, invalidData: data })
+        }
+
+        return result.value
+      }),
+    }
+  }
+  catch (error) {
+    if (issues) {
+      return { issues }
+    }
+
+    throw error
+  }
+}
+
 function combineSchemas(schemas: AnySchema[], merge: boolean): undefined | FlexibleSchema {
   if (schemas.length === 0) {
     return undefined
@@ -68,18 +97,21 @@ function combineSchemas(schemas: AnySchema[], merge: boolean): undefined | Flexi
       vendor: ORPC_NAME,
       version: 1,
       async validate(value: unknown) {
+        if (merge) {
+          return validateInput(schemas, value)
+        }
+
+        // Output schemas are piped.
         let current = value
 
-        // Mirrors the server's stacked input validation, output schemas stay piped.
-        for (const [index, schema] of schemas.entries()) {
-          const merging = merge && index !== 0
-          const result = await schema['~standard'].validate(merging ? mergeTwoLevels(value, current) : current)
+        for (const schema of schemas) {
+          const result = await schema['~standard'].validate(current)
 
           if (result.issues) {
             return result
           }
 
-          current = merging ? mergeTwoLevels(current, result.value) : result.value
+          current = result.value
         }
 
         return { value: current }

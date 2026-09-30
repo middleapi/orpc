@@ -40,6 +40,22 @@ describe('requestValidationLinkPlugin', () => {
     meta: {},
   })
 
+  const deepObjectProcedure = new ProcedureContract({
+    inputSchemas: [
+      z.object({
+        items: z.array(z.object({ id: z.string().trim() })),
+        filter: z.object({ range: z.object({ min: z.coerce.number() }) }),
+      }),
+      z.object({
+        items: z.array(z.object({ id: z.string(), qty: z.number() })),
+        filter: z.object({ range: z.object({ max: z.number() }) }),
+      }),
+    ],
+    outputSchemas: [],
+    errorMap: {},
+    meta: {},
+  })
+
   const withoutInputSchemaProcedure = new ProcedureContract({
     outputSchemas: [],
     errorMap: {},
@@ -50,6 +66,7 @@ describe('requestValidationLinkPlugin', () => {
     chainedProcedure,
     stackedObjectProcedure,
     nestedObjectProcedure,
+    deepObjectProcedure,
     nested: {
       chainedProcedure,
     },
@@ -169,6 +186,46 @@ describe('requestValidationLinkPlugin', () => {
       ['nestedObjectProcedure'],
       { context: {} },
     )
+  })
+
+  it('merges stacked object schema fragments inside arrays and at any depth', async () => {
+    codec.encodeInput.mockResolvedValueOnce({
+      method: 'POST',
+      url: '/deepObjectProcedure',
+      headers: {},
+      body: '__encoded__',
+    })
+    transport.send.mockResolvedValueOnce({
+      status: 200,
+      headers: {},
+      resolveBody: () => Promise.resolve('__body__'),
+    })
+    codec.decodeResponse.mockResolvedValueOnce({ kind: 'output', output: '__output__' })
+
+    const input = {
+      items: [{ id: ' a ', qty: 1, unknown: 'UNKNOWN' }],
+      filter: { range: { min: '1', max: 2, unknown: 'UNKNOWN' } },
+    }
+    const output = await linkUsingValidatedInput.call(['deepObjectProcedure'], input as any, { context: {} })
+
+    expect(output).toBe('__output__')
+    expect(codec.encodeInput).toHaveBeenCalledWith(
+      { items: [{ id: 'a', qty: 1 }], filter: { range: { min: 1, max: 2 } } },
+      ['deepObjectProcedure'],
+      { context: {} },
+    )
+  })
+
+  it('reports what a later stacked schema received when it fails', async () => {
+    const input = { items: [{ id: ' a ' }], filter: { range: { min: '1', max: 2 } } }
+    const error: any = await link.call(['deepObjectProcedure'], input as any, { context: {} }).catch(error => error)
+
+    expect(error).toBeInstanceOf(ORPCError)
+    expect(error.code).toBe('BAD_REQUEST')
+    expect(error.data.issues).toEqual([expect.objectContaining({ path: ['items', 0, 'qty'] })])
+    expect(error.cause).toBeInstanceOf(ValidationError)
+    expect(error.cause.invalidData).toEqual({ items: [{ id: 'a' }], filter: { range: { min: 1, max: 2 } } })
+    expect(codec.encodeInput).not.toHaveBeenCalled()
   })
 
   it('skips validation when the procedure has no input schemas', async () => {

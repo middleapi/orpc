@@ -136,10 +136,22 @@ export function setOwn(object: object, key: PropertyKey, value: unknown): void {
 }
 
 /**
- * Merges two values by copying the second over the first, repeating the merge one level deeper for
- * nested plain objects. Anything that is not a pair of plain objects is replaced by the second one.
+ * Merges two values by copying the second over the first at any depth: plain objects are merged key
+ * by key and arrays of the same length item by item. Anything else, including arrays of different
+ * lengths, is replaced by the second value.
  */
-export function mergeTwoLevels(first: unknown, second: unknown): unknown {
+export function mergeDeep(first: unknown, second: unknown): unknown {
+  // Also stops the recursion on a circular value that both sides share.
+  if (first === second) {
+    return second
+  }
+
+  if (Array.isArray(first) && Array.isArray(second)) {
+    return first.length === second.length
+      ? second.map((item, index) => mergeDeep(first[index], item))
+      : second
+  }
+
   if (!isPlainObject(first) || !isPlainObject(second)) {
     return second
   }
@@ -148,15 +160,8 @@ export function mergeTwoLevels(first: unknown, second: unknown): unknown {
   const result: Record<PropertyKey, unknown> = { ...first, ...second }
 
   for (const key of Object.keys(second)) {
-    if (!Object.hasOwn(first, key)) {
-      continue
-    }
-
-    const firstValue = first[key]
-    const secondValue = second[key]
-
-    if (isPlainObject(firstValue) && isPlainObject(secondValue)) {
-      result[key] = { ...firstValue, ...secondValue }
+    if (Object.hasOwn(first, key)) {
+      setOwn(result, key, mergeDeep(first[key], second[key]))
     }
   }
 

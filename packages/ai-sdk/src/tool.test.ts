@@ -116,6 +116,52 @@ describe('implementToolFactory', () => {
       })
     })
 
+    it('combines input schema fragments inside arrays and at any depth', async () => {
+      const contract = oc
+        .input(z.object({
+          items: z.array(z.object({ id: z.string().trim() })),
+          filter: z.object({ range: z.object({ min: z.coerce.number() }) }),
+        }))
+        .input(z.object({
+          items: z.array(z.object({ id: z.string(), qty: z.number() })),
+          filter: z.object({ range: z.object({ max: z.number() }) }),
+        }))
+
+      const tool = implementToolFactory()(contract)
+      const combined = tool.inputSchema as any
+
+      await expect(
+        combined['~standard'].validate({
+          items: [{ id: ' a ', qty: 1, unknown: true }],
+          filter: { range: { min: '1', max: 2, unknown: true } },
+        }),
+      ).resolves.toEqual({
+        value: {
+          items: [{ id: 'a', qty: 1 }],
+          filter: { range: { min: 1, max: 2 } },
+        },
+      })
+
+      const failed = await combined['~standard'].validate({
+        items: [{ id: 'a' }],
+        filter: { range: { min: '1', max: 2 } },
+      })
+      expect(failed).toEqual({ issues: [expect.objectContaining({ path: ['items', 0, 'qty'] })] })
+    })
+
+    it('rethrows an error a combined input schema throws', async () => {
+      const contract = oc
+        .input(z.object({ name: z.string() }))
+        .input(type(() => {
+          throw new Error('SCHEMA_ERROR')
+        }))
+
+      const tool = implementToolFactory()(contract)
+      const combined = tool.inputSchema as any
+
+      await expect(combined['~standard'].validate({ name: 'NAME' })).rejects.toThrow('SCHEMA_ERROR')
+    })
+
     it('keeps earlier transforms when a later input schema passes the raw values through', async () => {
       const contract = oc
         .input(z.object({ id: z.coerce.number() }))
