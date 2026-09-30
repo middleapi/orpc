@@ -28,22 +28,26 @@ export class StandardJsonSchemaConverter implements JsonSchemaConverter {
         ? schema['~standard'].jsonSchema.input({ target: 'draft-2020-12' })
         : schema['~standard'].jsonSchema.output({ target: 'draft-2020-12' })
 
-      let optional = false
-      try {
-        const result = schema['~standard'].validate(undefined)
-        if (result instanceof Promise) {
-          result.catch(() => {})
-        }
-        else if (!result.issues) {
-          optional = direction === 'input' ? true : result.value === undefined
-        }
-      }
-      catch {}
-
-      return [jsonSchema, optional]
+      return [jsonSchema, isOptional(schema, direction)]
     }
     catch {
       return [{}, true]
     }
   }
+}
+
+/**
+ * Standard Schema does not describe optionality, and validating `undefined` to find out
+ * would run refinements and transforms, so read it from vendors that expose it
+ * and treat other schemas as required.
+ */
+function isOptional(schema: AnySchema, direction: JsonSchemaConverterDirection): boolean {
+  // Zod v4 exposes the optionality it uses for object keys.
+  if (schema['~standard'].vendor === 'zod' && '_zod' in schema && isTypescriptObject(schema._zod)) {
+    return direction === 'input'
+      ? schema._zod.optin !== undefined
+      : schema._zod.optout === 'optional'
+  }
+
+  return false
 }

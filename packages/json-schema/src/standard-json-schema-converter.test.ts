@@ -57,47 +57,68 @@ describe('standardJsonSchemaConverter', () => {
     expect(converter.convert(arktype.type('string | undefined'), 'output')).toEqual([{}, true])
   })
 
-  it('keeps converting when standard validation is async or throws', () => {
-    const asyncSchema = withStandardOverrides(z.string(), {
-      validate: () => Promise.resolve({ value: undefined }),
-    })
-
-    expect(converter.convert(asyncSchema, 'output')).toEqual([
-      expect.objectContaining({ type: 'string' }),
-      false,
-    ])
-
-    const throwingSchema = withStandardOverrides(arktype.type('string'), {
-      validate: () => {
-        throw new Error('validate failed')
-      },
-    })
-
-    expect(converter.convert(throwingSchema, 'input')).toEqual([
-      expect.objectContaining({ type: 'string' }),
-      false,
-    ])
+  it('reads optionality from zod metadata', () => {
+    expect(converter.convert(z.string().optional(), 'input')).toEqual([expect.objectContaining({ type: 'string' }), true])
+    expect(converter.convert(z.string().optional(), 'output')).toEqual([expect.objectContaining({ type: 'string' }), true])
+    expect(converter.convert(z.string().nullable(), 'input')).toEqual([expect.anything(), false])
   })
 
-  it('does not leak a rejection when async standard validation fails on undefined', async ({ onTestFinished }) => {
-    const unhandledRejectionHandler = vi.fn()
-    process.on('unhandledRejection', unhandledRejectionHandler)
+  it('treats schemas from vendors without optionality metadata as required', () => {
+    const schema = withStandardOverrides(z.string().optional(), { vendor: 'custom' })
 
-    onTestFinished(() => {
-      process.off('unhandledRejection', unhandledRejectionHandler)
+    expect(converter.convert(schema, 'input')).toEqual([expect.objectContaining({ type: 'string' }), false])
+    expect(converter.convert(schema, 'output')).toEqual([expect.objectContaining({ type: 'string' }), false])
+  })
+
+  it('does not run standard validation to check optionality', () => {
+    const validate = vi.fn(() => {
+      throw new Error('validate failed')
     })
 
-    const schema = withStandardOverrides(z.string(), {
+    expect(converter.convert(withStandardOverrides(z.string().optional(), { validate }), 'input')).toEqual([
+      expect.objectContaining({ type: 'string' }),
+      true,
+    ])
+
+    expect(converter.convert(withStandardOverrides(arktype.type('string'), { validate }), 'output')).toEqual([
+      expect.objectContaining({ type: 'string' }),
+      false,
+    ])
+
+    expect(validate).not.toHaveBeenCalled()
+  })
+
+  it('does not leak rejections from async refinements', async ({ onTestFinished }) => {
+    const unhandledRejection = vi.fn()
+    process.on('unhandledRejection', unhandledRejection)
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejection)
+    })
+
+    const refine = vi.fn(async () => {
+      throw new Error('boom')
+    })
+
+    expect(converter.convert(z.string().refine(refine), 'input')).toEqual([
+      expect.objectContaining({ type: 'string' }),
+      false,
+    ])
+
+    const optionalSchema = z.object({ email: z.string() }).optional().refine(refine)
+    expect(converter.convert(optionalSchema, 'input')).toEqual([expect.objectContaining({ type: 'object' }), true])
+    expect(converter.convert(optionalSchema, 'output')).toEqual([expect.objectContaining({ type: 'object' }), true])
+
+    const rejectingSchema = withStandardOverrides(z.string(), {
       validate: () => Promise.reject(new Error('validate failed')),
     })
-
-    expect(converter.convert(schema, 'input')).toEqual([
+    expect(converter.convert(rejectingSchema, 'input')).toEqual([
       expect.objectContaining({ type: 'string' }),
       false,
     ])
 
     await new Promise(resolve => setTimeout(resolve, 0))
-    expect(unhandledRejectionHandler).not.toHaveBeenCalled()
+    expect(refine).not.toHaveBeenCalled()
+    expect(unhandledRejection).not.toHaveBeenCalled()
   })
 
   it('falls back to an empty optional schema when json schema generation throws', () => {
