@@ -1,5 +1,7 @@
+import { DelegatingJsonSchemaConverter } from '@orpc/json-schema'
 import * as v from 'valibot'
 import * as z from 'zod'
+import * as z3 from 'zod/v3'
 import { $ZodRegistry, toJSONSchema } from 'zod/v4/core'
 import { ZodToJsonSchemaConverter } from './converter'
 import { JSON_SCHEMA_INPUT_REGISTRY, JSON_SCHEMA_OUTPUT_REGISTRY, JSON_SCHEMA_REGISTRY } from './registries'
@@ -24,9 +26,16 @@ describe('zodToJsonSchemaConverter', () => {
       ['zod input schema', z.string(), 'input', true],
       ['zod output schema', z.string().optional(), 'output', true],
       ['non-zod schema', v.string() as never, 'input', false],
+      ['zod/v3 schema', z3.object({ a: z3.string() }) as never, 'input', false],
       ['undefined schema', undefined, 'output', false],
     ] as const)('matches %s', (_, schema, direction, expected) => {
       expect(converter.condition(schema, direction)).toBe(expected)
+    })
+
+    it('leaves zod/v3 schemas to the next converter instead of crashing', () => {
+      const delegating = new DelegatingJsonSchemaConverter([converter])
+
+      expect(delegating.convert(z3.object({ a: z3.string() }) as never, 'input')).toEqual([{}, true])
     })
   })
 

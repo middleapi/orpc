@@ -38,7 +38,8 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
   }
 
   condition(schema: AnySchema | undefined, _direction: JsonSchemaConverterDirection): boolean {
-    return schema?.['~standard'].vendor === 'zod'
+    // `zod/v3` schemas report the same vendor, but `toJSONSchema` only handles zod v4 (`_zod`) schemas
+    return schema?.['~standard'].vendor === 'zod' && '_zod' in schema
   }
 
   convert(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): [jsonSchema: JsonSchema, optional: boolean] {
