@@ -1,4 +1,23 @@
+import { setFlagsFromString } from 'node:v8'
+import { runInNewContext } from 'node:vm'
 import { intercept, onAsyncIteratorObjectError, onError, onFinish, onReadableStreamError, onStart, onSuccess } from './interceptor'
+import { promiseWithResolvers } from './promise'
+
+/**
+ * Runs full garbage collections until `ref` is cleared, and reports whether it was.
+ */
+async function isGarbageCollected(ref: WeakRef<object>): Promise<boolean> {
+  setFlagsFromString('--expose_gc')
+  const gc = runInNewContext('gc') as () => void
+
+  for (let i = 0; i < 10 && ref.deref() !== undefined; i++) {
+    // A WeakRef target stays alive until the job that last read it ends
+    await new Promise(resolve => setTimeout(resolve, 0))
+    gc()
+  }
+
+  return ref.deref() === undefined
+}
 
 describe('intercept', () => {
   const interceptor1 = vi.fn(({ next }) => next())
@@ -379,6 +398,42 @@ describe('lifecycle interceptors', () => {
     )
 
     expect(onSuccessFn).toHaveBeenCalledTimes(0)
+  })
+})
+
+describe('onFinish', () => {
+  it('passes each call its own state when calls overlap', async () => {
+    const callback = vi.fn()
+    const interceptor = onFinish(callback)
+    const error = new Error('__error__')
+    const slow = promiseWithResolvers<string>()
+
+    const first = interceptor({ next: () => slow.promise })
+    await expect(interceptor({ next: () => Promise.reject(error) })).rejects.toBe(error)
+    slow.resolve('__first__')
+    await expect(first).resolves.toBe('__first__')
+
+    expect(callback).toHaveBeenCalledTimes(2)
+    expect(callback).toHaveBeenNthCalledWith(1, [error, undefined, false], expect.anything())
+    expect(callback).toHaveBeenNthCalledWith(2, [null, '__first__', true], expect.anything())
+  })
+
+  it.each([
+    ['result', (value: object) => Promise.resolve(value)],
+    ['error', (value: object) => Promise.reject(value)],
+  ])('does not keep the last %s reachable once the call ends', async (_label, settle) => {
+    const interceptor = onFinish(() => {})
+
+    // Created in its own scope, so only the interceptor could keep it alive
+    const ref = await (async () => {
+      const value = new Error('__value__')
+      await Promise.allSettled([interceptor({ next: () => settle(value) })])
+      return new WeakRef(value)
+    })()
+
+    await expect(isGarbageCollected(ref)).resolves.toBe(true)
+    // Keeps the interceptor itself alive until after the collection
+    expect(interceptor).toBeTypeOf('function')
   })
 })
 
