@@ -428,6 +428,34 @@ describe('rpcLink', () => {
     expect(connect).toHaveBeenCalledTimes(3)
   })
 
+  it('ends the reconnect cycle with the delay error instead of reconnecting without waiting', async () => {
+    const backoff = [{ ms: 0 }, { ms: 0 }]
+    const delay = vi.fn((info: { attempt: number }) => backoff[info.attempt - 1]!.ms)
+    const connect = vi.fn<() => any>(() => Promise.reject(new Error('temporary outage')))
+    const orpc = createORPCClient(new RPCLink({
+      connect,
+      // bounds the loop if the delay error is swallowed again
+      reconnect: { enabled: true, delay, maxAttempt: 4 },
+    })) as any
+
+    await Promise.all(['first', 'second'].map(input => expect(orpc.ping(input)).rejects.toThrow(TypeError)))
+    expect(delay).toHaveBeenCalledTimes(3)
+    expect(delay).toHaveBeenLastCalledWith({ totalAttempt: 3, attempt: 3 })
+    expect(connect).toHaveBeenCalledTimes(2)
+
+    const recoveredSocket = createWs()
+    connect.mockImplementationOnce(() => recoveredSocket)
+
+    const call = orpc.ping('third')
+
+    await vi.waitFor(() => expect(recoveredSocket.send).toHaveBeenCalledTimes(1))
+    expect(delay).toHaveBeenLastCalledWith({ totalAttempt: 4, attempt: 1 })
+
+    const request = getSentRequest(recoveredSocket)
+    await recoveredSocket.receive(await createResponseMessage({ id: request.message.id, body: { json: 'recovered' } }))
+    await expect(call).resolves.toEqual('recovered')
+  })
+
   it('uses the default reconnect backoff before retrying a transient connection failure', async ({ onTestFinished }) => {
     vi.useFakeTimers()
     onTestFinished(() => {

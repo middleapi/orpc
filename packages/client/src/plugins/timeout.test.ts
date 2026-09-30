@@ -109,7 +109,7 @@ describe('timeoutLinkPlugin', () => {
     }))
   })
 
-  it.each([null, undefined])('should disable timeout when value is %s', async (timeout) => {
+  it.each([null, undefined, Number.POSITIVE_INFINITY, Number.NaN])('should disable timeout when value is %s', async (timeout) => {
     const codec = makeCodec()
     const transport = makeTransport()
 
@@ -130,6 +130,29 @@ describe('timeoutLinkPlugin', () => {
 
     expect(await promise).toBe('success')
     expect(vi.mocked(transport.send).mock.calls[0]![2].signal).toBeUndefined()
+  })
+
+  it('should not abort early when timeout exceeds the maximum timer delay', async () => {
+    const codec = makeCodec()
+    const transport = makeAbortableTransport()
+    const timeout = 2 ** 31 + 1000 // setTimeout fires after ~1ms for delays above 2^31-1
+
+    const link = new StandardLink(codec, transport, {
+      plugins: [new TimeoutLinkPlugin({ timeout })],
+    })
+
+    const promise = link.call(['test'], 'input', { context: {} })
+    const settled = vi.fn()
+    promise.then(settled, settled)
+
+    await vi.advanceTimersByTimeAsync(timeout - 1)
+    expect(settled).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(promise).rejects.toSatisfy(error =>
+      error instanceof AbortError
+      && error.message === `Request timed out after ${timeout}ms`,
+    )
   })
 
   it('should forward abort from the caller signal', async () => {

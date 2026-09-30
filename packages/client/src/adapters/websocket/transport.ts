@@ -40,6 +40,8 @@ export interface WebSocketLinkTransportReconnectOptions {
 
   /**
    * Delay before a (re)connect attempt, in milliseconds.
+   * If it throws, calls waiting for the connection fail with that error,
+   * and the next call starts a new reconnect cycle.
    *
    * @default info => info.attempt === 1 ? 0 : 2_000
    */
@@ -179,13 +181,24 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       throw new AbortError(`WebSocket reconnect stopped after ${this.totalAttempt} total attempt(s)`)
     }
 
+    let delayFailed = false
+
     this.current = (async () => {
       this.totalAttempt += 1
       this.attempt += 1
 
       const info: WebSocketLinkTransportAttemptInfo = { totalAttempt: this.totalAttempt, attempt: this.attempt }
 
-      await sleep(this.reconnectDelay(info))
+      let delay: number
+      try {
+        delay = this.reconnectDelay(info)
+      }
+      catch (error) {
+        delayFailed = true
+        throw error
+      }
+
+      await sleep(delay)
       const websocket = await this.connect(info)
 
       if (websocket.readyState !== WEBSOCKET_CONNECTING && websocket.readyState !== WEBSOCKET_OPEN) {
@@ -255,6 +268,16 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       return { websocket, peer }
     })().catch((error) => {
       if (!this.reconnectEnabled) {
+        throw error
+      }
+
+      /**
+       * A throwing `delay` ends the cycle. Swallowed like a failed attempt, it would skip the sleep,
+       * so attempts would run back to back without yielding and starve the event loop.
+       */
+      if (delayFailed) {
+        this.attempt = 0
+        this.current = undefined
         throw error
       }
 
