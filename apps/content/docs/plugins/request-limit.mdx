@@ -32,6 +32,14 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 When used with [Request Compression](/docs/plugins/request-compression), `maxBodySize` applies to the **decompressed** payload size, not the compressed wire size.
 :::
 
+## Decoded Bodies
+
+Over HTTP, the plugin counts body bytes as they stream in. Some adapters instead hand it a body they have already decoded: [WebSocket](/docs/adapters/websocket) and [Message Port](/docs/adapters/message-port) always do, and so do [Node.js](/docs/adapters/node-http) and [Fastify](/docs/adapters/fastify) when a body parser ran first. The plugin then measures the decoded body: plain data by the size of its JSON encoding, so a JSON body gets the same verdict it would over HTTP, and files and binary data by their byte length. An [AsyncIteratorObject](/docs/async-iterator-object) body is measured value by value as your procedure reads it, and the read that takes the total over `maxBodySize` fails with `PAYLOAD_TOO_LARGE`.
+
+:::warning
+A decoded body is measured only after the adapter has received it in full, and event stream messages wait in memory until your procedure reads them. The plugin keeps oversized input away from your procedures, but it cannot stop a peer from sending it, so also bound message size at the transport, such as with `maxPayload` in [ws](https://github.com/websockets/ws) or `maxPayloadLength` in Bun and uWebSockets.
+:::
+
 ## Learn More
 
 For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/request-limit.ts).

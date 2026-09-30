@@ -100,7 +100,7 @@ const handler = new RPCHandler(router, {
 
 A multipart body splits across the first two limits, fields and part headers against `memory` and file parts against `file`, and as a whole, framing included, it is bounded by the sum of both. A declared [Content-Length](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Length) over the applicable limit rejects immediately, and enforcement continues while the body streams in, so a lying length cannot bypass it.
 
-With all three limits configured, the plugin subsumes the [Request Limit Plugin](/docs/plugins/request-limit). When the [Request Compression Plugin](/docs/plugins/request-compression) is present, limits apply to the decompressed payload rather than the compressed wire size.
+With all three limits configured, the plugin subsumes the [Request Limit Plugin](/docs/plugins/request-limit) for HTTP adapters. Peer adapters such as [WebSocket](/docs/adapters/websocket) hand it bodies they have already decoded, which these limits do not cover, so add the Request Limit Plugin to those handlers. When the [Request Compression Plugin](/docs/plugins/request-compression) is present, limits apply to the decompressed payload rather than the compressed wire size.
 
 ## Per-Request Limits
 

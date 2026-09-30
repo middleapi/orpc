@@ -234,6 +234,10 @@ const app = App()
 
 </CodeGroup>
 
+### Message Size
+
+Each WebSocket message is received in full before oRPC decodes it, so bound its size at the transport, such as with `maxPayload` in `ws` (100 MiB by default) or `maxPayloadLength` in Bun and uWebSockets. The [Request Limit Plugin](/docs/plugins/request-limit#decoded-bodies) works on top of that, rejecting a request whose decoded body exceeds its limit, and an event stream once the values your procedure reads exceed it.
+
 ## Client Adapters
 
 | Adapter     | Target                                                                          |
