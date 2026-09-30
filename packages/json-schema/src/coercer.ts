@@ -440,15 +440,31 @@ function stringToBoolean(value: string): boolean | string {
   return value
 }
 
-const DATE_TIME_PATTERN = /^[+-]?\d{4,6}-\d{1,2}-\d{1,2}(?:[T ].*)?$/
+/**
+ * Month and day must be zero padded, V8 parses `'2020-1-5'` as local time but `'2020-01-05'` as UTC.
+ */
+const DATE_TIME_PATTERN = /^([+-]?\d{4,6})-(\d{2})-(\d{2})(?:[T ].*)?$/
 function stringToDate(value: string): Date | string {
-  if (!DATE_TIME_PATTERN.test(value)) {
+  const match = DATE_TIME_PATTERN.exec(value)
+
+  if (!match) {
     return value
   }
 
   const date = new Date(value)
 
   if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  // `Date` rolls an impossible day over into the next month, `'2020-02-30'` would become March 1
+  const year = Number(match[1])
+  const month = Number(match[2]) - 1
+  const day = Number(match[3])
+  const calendarDate = new Date(0)
+  calendarDate.setUTCFullYear(year, month, day)
+
+  if (calendarDate.getUTCFullYear() !== year || calendarDate.getUTCMonth() !== month || calendarDate.getUTCDate() !== day) {
     return value
   }
 

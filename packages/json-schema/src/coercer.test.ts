@@ -118,6 +118,7 @@ describe('jsonSchemaCoercer', () => {
 
       // the expanded year form `toISOString` emits outside 0000-9999
       expect(coerce(DATE_SCHEMA, '+010000-01-01T00:00:00.000Z')).toEqual(new Date('+010000-01-01T00:00:00.000Z'))
+      expect(coerce(DATE_SCHEMA, '-000001-02-28T00:00:00.000Z')).toEqual(new Date('-000001-02-28T00:00:00.000Z'))
     })
 
     it('coerces datetimes carrying a UTC offset in either direction', () => {
@@ -137,9 +138,29 @@ describe('jsonSchemaCoercer', () => {
       expect(coerce(DATE_SCHEMA, '2020-13-45')).toBe('2020-13-45')
       expect(coerce(DATE_SCHEMA, '2020-01-01T99:99Z')).toBe('2020-01-01T99:99Z')
 
+      // unpadded month or day, which V8 parses as local time while the padded form is UTC
+      expect(coerce(DATE_SCHEMA, '2020-1-5')).toBe('2020-1-5')
+      expect(coerce(DATE_SCHEMA, '2020-01-5')).toBe('2020-01-5')
+      expect(coerce(DATE_SCHEMA, '2020-1-05T06:15Z')).toBe('2020-1-05T06:15Z')
+
       // epoch numbers are ambiguous (seconds or milliseconds)
       expect(coerce(DATE_SCHEMA, 1700000000000)).toBe(1700000000000)
       expect(coerce(DATE_SCHEMA, [])).toEqual([])
+    })
+
+    it('leaves a day the month does not have untouched, instead of rolling it into the next month', () => {
+      expect(coerce(DATE_SCHEMA, '2020-02-30')).toBe('2020-02-30')
+      expect(coerce(DATE_SCHEMA, '2020-04-31')).toBe('2020-04-31')
+      expect(coerce(DATE_SCHEMA, '2021-02-29')).toBe('2021-02-29')
+      expect(coerce(DATE_SCHEMA, '2020-02-30T06:15:00Z')).toBe('2020-02-30T06:15:00Z')
+      expect(coerce(DATE_SCHEMA, '2020-02-30 06:15')).toBe('2020-02-30 06:15')
+      expect(coerce(DATE_SCHEMA, '0050-02-29')).toBe('0050-02-29')
+
+      // real days stay coerced, including a leap day and years below 100
+      expect(coerce(DATE_SCHEMA, '2020-02-29')).toEqual(new Date('2020-02-29'))
+      expect(coerce(DATE_SCHEMA, '0048-02-29')).toEqual(new Date('0048-02-29'))
+      // the offset moves the instant to March 1 in UTC, but the written day is real
+      expect(coerce(DATE_SCHEMA, '2020-02-29T23:00:00-07:00')).toEqual(new Date('2020-03-01T06:00:00Z'))
     })
 
     it('keeps a value that is already a Date', () => {
