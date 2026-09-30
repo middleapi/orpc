@@ -43,7 +43,8 @@ function serializeHeaderValue(
   value: unknown,
   serializer: Pick<OpenAPISerializer, 'serialize'>,
 ): string | undefined {
-  const serialized = serializer.serialize(value)
+  // A header value is never FormData, whatever the serializer's default `asFormData` is
+  const serialized = serializer.serialize(value, { asFormData: false })
 
   if (Array.isArray(serialized)) {
     return serialized

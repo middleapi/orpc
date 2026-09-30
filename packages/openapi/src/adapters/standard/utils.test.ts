@@ -14,6 +14,22 @@ describe('serializeHeaders', () => {
     })
   })
 
+  it('never serializes values as FormData when the serializer defaults to asFormData', () => {
+    const formDataSerializer = new OpenAPISerializer({ serialize: { asFormData: true } })
+
+    expect(serializeHeaders({
+      'x-string': 'value',
+      'x-number': 42,
+      'x-array': ['a', 1],
+      'x-object': { a: 1 },
+    }, formDataSerializer)).toEqual({
+      'x-string': 'value',
+      'x-number': '42',
+      'x-array': ['a', '1'],
+      'x-object': 'a,1',
+    })
+  })
+
   it('serializes non-string values into strings', () => {
     expect(serializeHeaders({
       'x-number': 42,

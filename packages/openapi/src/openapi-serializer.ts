@@ -56,9 +56,17 @@ export class OpenAPISerializer {
   }
 
   serialize(data: unknown, options: OpenAPISerializerSerializeOptions = {}): StandardBody {
+    const useFormDataForBlobFields = options.useFormDataForBlobFields ?? this.defaultSerializeOptions?.useFormDataForBlobFields ?? true
+    const asFormData = options.asFormData ?? this.defaultSerializeOptions?.asFormData ?? false
+
+    // standard body already supports these types without additional serialization.
+    if (!asFormData && (data === undefined || data instanceof Blob)) {
+      return data
+    }
+
+    // Streaming values cannot be represented as FormData, so the default `asFormData` does not apply to them.
     if (!options.asFormData) {
-      // standard body already supports these types without additional serialization.
-      if (data === undefined || data instanceof ReadableStream || data instanceof Blob) {
+      if (data instanceof ReadableStream) {
         return data
       }
 
@@ -80,8 +88,6 @@ export class OpenAPISerializer {
       }
     }
 
-    const useFormDataForBlobFields = options.useFormDataForBlobFields ?? this.defaultSerializeOptions?.useFormDataForBlobFields ?? true
-    const asFormData = options.asFormData ?? this.defaultSerializeOptions?.asFormData ?? false
     return this.serializeValue(data, useFormDataForBlobFields, asFormData)
   }
 

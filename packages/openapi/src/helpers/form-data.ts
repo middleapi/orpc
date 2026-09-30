@@ -94,7 +94,7 @@ export function getIssueMessage(error: unknown, path: string): string | undefine
       return issue.message
     }
 
-    if (path === '' && /(?:0|[1-9]\d*)$/.test(issuePath)) {
+    if (path === '' && /^(?:0|[1-9]\d*)$/.test(issuePath)) {
       return issue.message
     }
   }

@@ -47,4 +47,9 @@ it('getIssueMessage', () => {
   expect(getIssueMessage({ data: { issues: [{ message: 'hi', path: [{ key: '0' }] }] } }, '0')).toBe('hi')
   expect(getIssueMessage({ data: { issues: [{ message: 'hi', path: [{ key: '0' }] }] } }, '')).toBe('hi')
   expect(getIssueMessage({ data: { issues: [{ message: 'hi', path: [{ key: '0' }] }] } }, '1')).toBeUndefined()
+
+  // root path only matches root array items, not fields that end with a digit
+  expect(getIssueMessage({ data: { issues: [{ message: 'hi', path: ['address2'] }] } }, '')).toBeUndefined()
+  expect(getIssueMessage({ data: { issues: [{ message: 'hi', path: ['user', 'phone2'] }] } }, '')).toBeUndefined()
+  expect(getIssueMessage({ data: { issues: [{ message: 'hi', path: [12] }] } }, '')).toBe('hi')
 })

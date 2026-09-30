@@ -87,6 +87,27 @@ describe('openAPISerializer', () => {
       expect(s.serialize({ file: blob }, { asFormData: false, useFormDataForBlobFields: true })).toBeInstanceOf(FormData)
     })
 
+    it('applies the default asFormData to root-level undefined and Blob', () => {
+      const s = new OpenAPISerializer({ serialize: { asFormData: true } })
+
+      expect(s.serialize(undefined)).toBeInstanceOf(FormData)
+
+      const blob = new Blob(['hello'])
+      const form = s.serialize(blob) as FormData
+      expect(form).toBeInstanceOf(FormData)
+      expect(form.get('')).toBeInstanceOf(Blob)
+
+      expect(s.serialize(undefined, { asFormData: false })).toBe(undefined)
+      expect(s.serialize(blob, { asFormData: false })).toBe(blob)
+    })
+
+    it('keeps a root-level ReadableStream as-is when asFormData is only a default', () => {
+      const s = new OpenAPISerializer({ serialize: { asFormData: true } })
+      const stream = new ReadableStream()
+
+      expect(s.serialize(stream)).toBe(stream)
+    })
+
     describe('asyncIteratorObject', () => {
       async function* toAsyncIter<T>(values: T[]) {
         for (const v of values) yield v

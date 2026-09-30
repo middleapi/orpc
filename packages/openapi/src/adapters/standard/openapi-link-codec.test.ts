@@ -609,6 +609,52 @@ describe('openAPILinkCodec', () => {
       })
     })
 
+    describe('with a serializer that defaults to asFormData', () => {
+      const formDataSerializer = new OpenAPISerializer({ serialize: { asFormData: true } })
+
+      it('serializes compact path params as strings', async () => {
+        const codec = new OpenAPILinkCodec({
+          get: oc.meta(openapi({ method: 'GET', path: '/p/{id}' })),
+        }, { serializer: formDataSerializer })
+
+        const request = await codec.encodeInput({ id: 1, q: 'x' }, ['get'], { context: {} })
+
+        expect(request.url).toBe('/p/1?q=x')
+      })
+
+      it('never serializes path params, styled query values, or headers as FormData', async () => {
+        const codec = new OpenAPILinkCodec({
+          upload: oc.meta(openapi({
+            method: 'POST',
+            path: '/upload/{id}/{tags}',
+            inputStructure: 'detailed',
+            paramsStyles: {
+              tags: 'comma-delimited-array',
+            },
+            queryStyles: {
+              single: 'primitive',
+              many: 'array',
+              meta: 'json',
+              list: 'comma-delimited-array',
+              pair: 'pipe-delimited-object',
+            },
+          })),
+        }, { url: '/api', serializer: formDataSerializer })
+
+        const request = await codec.encodeInput({
+          params: { id: 123, tags: ['a', 'b'] },
+          query: { single: 1, many: [2, 3], meta: { enabled: true }, list: [4, 5], pair: { k: 'v' }, rest: 'r' },
+          headers: { 'x-number': 42, 'x-array': [1, 2] },
+          body: { title: 'Hello' },
+        }, ['upload'], { context: {} })
+
+        expect(request.url).toBe('/api/upload/123/a,b?rest=r&single=1&many=2&many=3&meta=%7B%22enabled%22%3Atrue%7D&list=4,5&pair=k%7Cv')
+        expect(request.headers).toEqual({ 'x-number': '42', 'x-array': ['1', '2'] })
+        expect(request.body).toBeInstanceOf(FormData)
+        expect((request.body as FormData).get('title')).toBe('Hello')
+      })
+    })
+
     describe('option handling', () => {
       it('accepts Headers instances for base headers', async () => {
         const codec = new OpenAPILinkCodec({
