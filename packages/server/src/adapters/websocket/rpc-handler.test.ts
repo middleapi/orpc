@@ -27,11 +27,12 @@ describe('rpcHandler', () => {
   })
 
   const createRequestMessage = async ({
+    id = '19',
     prefix,
     url = '/ping',
-  }: { prefix?: string, url?: `/${string}` } = {}) => {
+  }: { id?: string, prefix?: string, url?: `/${string}` } = {}) => {
     return encodePeerMessage({
-      id: '19',
+      id,
       kind: 'request',
       json: {
         url,
@@ -241,5 +242,160 @@ describe('rpcHandler', () => {
     expect(decoded.matched).toBe(true)
     expect(decoded.message.kind).toBe('response')
     expect(decoded.message.json.status).toBe(undefined)
+  })
+
+  it.each([
+    ['async context', () => [createHandler(), { context: async () => { throw new Error('invalid token') } }] as const],
+    ['routing interceptor', () => [createHandler({ routingInterceptors: [() => { throw new Error('interceptor') }] }), { context: {} }] as const],
+    ['lazy router', () => [new RPCHandler({ ping: os.lazy(() => Promise.reject(new Error('import failed'))) }), { context: {} }] as const],
+  ])('does not leak an unhandled rejection when the %s throws via upgrade', async (_type, setup) => {
+    const unhandledRejection = vi.fn()
+    process.on('unhandledRejection', unhandledRejection)
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejection)
+    })
+
+    let onMessage: ((event: { data: string }) => void) | undefined
+
+    const [handler, options] = setup()
+
+    const ws = {
+      addEventListener: vi.fn((event: string, callback: any) => {
+        if (event === 'message') {
+          onMessage = callback
+        }
+      }),
+      send: vi.fn(() => undefined),
+    }
+
+    handler.upgrade(ws as any, options)
+
+    onMessage?.({ data: await createRequestMessage() as string })
+
+    await vi.waitFor(() => {
+      expect(ws.send).toHaveBeenCalledTimes(1)
+    })
+
+    const decoded = decodePeerMessage((ws as any).send.mock.calls[0][0]) as any
+    expect(decoded.message).toEqual({ id: '19', kind: 'cancel' })
+
+    // `unhandledRejection` fires once the microtask queue drains
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(unhandledRejection).not.toHaveBeenCalled()
+  })
+
+  it('does not leak an unhandled rejection when closing fails via upgrade', async () => {
+    const unhandledRejection = vi.fn()
+    process.on('unhandledRejection', unhandledRejection)
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejection)
+    })
+
+    let onMessage: ((event: { data: string }) => void) | undefined
+    let onClose: (() => void) | undefined
+    const cleanup = vi.fn(() => {
+      throw new Error('cleanup failed')
+    })
+
+    const handler = new RPCHandler({
+      ping: os.handler(async function* () {
+        try {
+          while (true) {
+            yield 'pong'
+            await new Promise(resolve => setTimeout(resolve, 10))
+          }
+        }
+        finally {
+          cleanup()
+        }
+      }),
+    })
+
+    const ws = {
+      addEventListener: vi.fn((event: string, callback: any) => {
+        if (event === 'message') {
+          onMessage = callback
+        }
+
+        if (event === 'close') {
+          onClose = callback
+        }
+      }),
+      send: vi.fn(() => undefined),
+    }
+
+    handler.upgrade(ws as any)
+
+    onMessage?.({ data: await createRequestMessage() as string })
+
+    await vi.waitFor(() => {
+      expect(ws.send.mock.calls.length).toBeGreaterThan(1)
+    })
+
+    onClose?.()
+
+    await vi.waitFor(() => {
+      expect(cleanup).toHaveBeenCalledTimes(1)
+    })
+
+    // `unhandledRejection` fires once the microtask queue drains
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(unhandledRejection).not.toHaveBeenCalled()
+  })
+
+  it('drops Blob messages that finish loading after close via upgrade', async () => {
+    let onMessage: ((event: { data: string | Blob }) => void) | undefined
+    let onClose: (() => void) | undefined
+    const signals: AbortSignal[] = []
+
+    const handler = new RPCHandler({
+      ping: os.handler(async ({ signal }) => {
+        signals.push(signal!)
+        await new Promise(resolve => signal!.addEventListener('abort', resolve))
+      }),
+    })
+
+    const ws = {
+      addEventListener: vi.fn((event: string, callback: any) => {
+        if (event === 'message') {
+          onMessage = callback
+        }
+
+        if (event === 'close') {
+          onClose = callback
+        }
+      }),
+      send: vi.fn(() => undefined),
+    }
+
+    handler.upgrade(ws as any)
+
+    onMessage?.({ data: await createRequestMessage({ id: '1' }) as string })
+
+    await vi.waitFor(() => {
+      expect(signals).toHaveLength(1)
+    })
+
+    let finishLoad: (() => void) | undefined
+    const loaded = new Promise<void>(resolve => finishLoad = resolve)
+    const blob = new Blob([await createRequestMessage({ id: '2' }) as string])
+    const arrayBuffer = blob.arrayBuffer.bind(blob)
+    Object.assign(blob, {
+      bytes: undefined,
+      arrayBuffer: async () => {
+        await loaded
+        return arrayBuffer()
+      },
+    })
+
+    onMessage?.({ data: blob })
+    onClose?.()
+    finishLoad!()
+
+    await new Promise(resolve => setTimeout(resolve, 10))
+
+    // the in-flight procedure is aborted, and the late message never starts a new one
+    expect(signals.map(signal => signal.aborted)).toEqual([true])
+    expect(ws.send).not.toHaveBeenCalled()
   })
 })

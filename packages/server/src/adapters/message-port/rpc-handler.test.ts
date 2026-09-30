@@ -288,6 +288,105 @@ describe('rpcHandler', () => {
     expect(ws.send).not.toHaveBeenCalled()
   })
 
+  it('does not leak an unhandled rejection when the handler throws via upgrade', async () => {
+    const unhandledRejection = vi.fn()
+    process.on('unhandledRejection', unhandledRejection)
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejection)
+    })
+
+    let onMessage: ((event: { data: string }) => void) | undefined
+
+    const handler = createHandler()
+
+    const port = {
+      addEventListener: vi.fn((event: string, callback: any) => {
+        if (event === 'message') {
+          onMessage = callback
+        }
+      }),
+      postMessage: vi.fn(),
+    }
+
+    handler.upgrade(port as any, {
+      context: async () => {
+        throw new Error('invalid token')
+      },
+    })
+
+    onMessage?.({ data: await createRequestMessage() as string })
+
+    await vi.waitFor(() => {
+      expect(port.postMessage).toHaveBeenCalledTimes(1)
+    })
+
+    const decoded = decodePeerMessage(port.postMessage.mock.calls[0]![0]) as any
+    expect(decoded.message).toEqual({ id: '19', kind: 'cancel' })
+
+    // `unhandledRejection` fires once the microtask queue drains
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(unhandledRejection).not.toHaveBeenCalled()
+  })
+
+  it('does not leak an unhandled rejection when closing fails via upgrade', async () => {
+    const unhandledRejection = vi.fn()
+    process.on('unhandledRejection', unhandledRejection)
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejection)
+    })
+
+    let onMessage: ((event: { data: string }) => void) | undefined
+    let onClose: (() => void) | undefined
+    const cleanup = vi.fn(() => {
+      throw new Error('cleanup failed')
+    })
+
+    const handler = new RPCHandler({
+      ping: os.handler(async function* () {
+        try {
+          while (true) {
+            yield 'pong'
+            await new Promise(resolve => setTimeout(resolve, 10))
+          }
+        }
+        finally {
+          cleanup()
+        }
+      }),
+    })
+
+    const port = {
+      addEventListener: vi.fn((event: string, callback: any) => {
+        if (event === 'message') {
+          onMessage = callback
+        }
+
+        if (event === 'close') {
+          onClose = callback
+        }
+      }),
+      postMessage: vi.fn(),
+    }
+
+    handler.upgrade(port as any)
+
+    onMessage?.({ data: await createRequestMessage() as string })
+
+    await vi.waitFor(() => {
+      expect(port.postMessage.mock.calls.length).toBeGreaterThan(1)
+    })
+
+    onClose?.()
+
+    await vi.waitFor(() => {
+      expect(cleanup).toHaveBeenCalledTimes(1)
+    })
+
+    // `unhandledRejection` fires once the microtask queue drains
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(unhandledRejection).not.toHaveBeenCalled()
+  })
+
   it('ignore invalid message format', async () => {
     const handler = createHandler()
     const { serverPort } = createPort()

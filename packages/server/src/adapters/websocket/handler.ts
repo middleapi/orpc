@@ -105,6 +105,8 @@ export class WebSocketHandler<T extends Context> {
     ws: Pick<WebSocket, 'send' | 'addEventListener' | 'removeEventListener'>,
     ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): void {
+    let closed = false
+
     /**
      * Message order is important: loading -> decode -> .message.
      * This flow must stay synchronous, or we need to use `sequential` helper
@@ -113,11 +115,23 @@ export class WebSocketHandler<T extends Context> {
       // For better compatibility avoid control or depend on websocket.binaryType
       const data = event.data instanceof Blob ? await loadBytes(event.data) : event.data
 
+      // `close` may fire while a Blob is loading, handling the message afterward
+      // would create a new peer that is never closed, so its request would never abort.
+      if (closed) {
+        return
+      }
+
       // Not awaited: `this.message` runs business logic that may be slow,
       // and awaiting it would block decoding of subsequent messages.
-      this.message(ws, data, ...rest)
+      // Errors are ignored: the peer already cancelled the failed request,
+      // and nothing else awaits this promise, so a rejection would crash the process.
+      this.message(ws, data, ...rest).catch(() => {})
     }))
-    ws.addEventListener('close', () => this.close(ws))
+    ws.addEventListener('close', () => {
+      closed = true
+      // Errors (e.g. from a throwing iterator cleanup) are ignored for the same reason.
+      this.close(ws).catch(() => {})
+    })
 
     // EventEmitter-based implementations like `ws` throw an unhandled `error` event,
     // so a single malformed frame would crash the process. `close` always follows and handles cleanup.
