@@ -7,7 +7,8 @@ function isDeepEqualInternal(
   b: unknown,
   visited: WeakMap<object, WeakSet<object>>,
 ): boolean {
-  if (Object.is(a, b)) {
+  // `===` treats 0 and -0 as equal, `Object.is` treats NaN as equal to itself
+  if (a === b || Object.is(a, b)) {
     return true
   }
 
@@ -21,6 +22,14 @@ function isDeepEqualInternal(
 
   if (b === null || typeof b !== 'object') {
     return false
+  }
+
+  if (a instanceof Date || b instanceof Date) {
+    return a instanceof Date && b instanceof Date && Object.is(a.getTime(), b.getTime())
+  }
+
+  if (a instanceof RegExp || b instanceof RegExp) {
+    return a instanceof RegExp && b instanceof RegExp && a.source === b.source && a.flags === b.flags
   }
 
   const isArray = Array.isArray(a)
@@ -47,6 +56,35 @@ function isDeepEqualInternal(
   }
   else {
     visited.set(a, new WeakSet([b]))
+  }
+
+  // Map keys and Set members are matched by identity (SameValueZero), like `Map#has`
+  if (a instanceof Map || b instanceof Map) {
+    if (!(a instanceof Map) || !(b instanceof Map) || a.size !== b.size) {
+      return false
+    }
+
+    for (const [key, value] of a) {
+      if (!b.has(key) || !isDeepEqualInternal(value, b.get(key), visited)) {
+        return false
+      }
+    }
+
+    return true
+  }
+
+  if (a instanceof Set || b instanceof Set) {
+    if (!(a instanceof Set) || !(b instanceof Set) || a.size !== b.size) {
+      return false
+    }
+
+    for (const value of a) {
+      if (!b.has(value)) {
+        return false
+      }
+    }
+
+    return true
   }
 
   const aKeys = Object.keys(aRecord).filter(k => aRecord[k] !== undefined)

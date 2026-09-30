@@ -231,6 +231,12 @@ export function consumeAsyncIterator<T, TReturn, TError = ThrowableError>(
     }
     catch (error) {
       onFinishState = [error as ThrowableError, undefined, false]
+
+      if (!options.onError && !options.onFinish) {
+        // Nobody handles the error, so surface it as an unhandled rejection
+        throw error
+      }
+
       options.onError?.(error as ThrowableError)
     }
     finally {
@@ -239,6 +245,16 @@ export function consumeAsyncIterator<T, TReturn, TError = ThrowableError>(
   })()
 
   return async () => {
-    await (await iterator)?.return?.()
+    let resolvedIterator: AsyncIterator<T, TReturn>
+
+    try {
+      resolvedIterator = await iterator
+    }
+    catch {
+      // The initial rejection is already reported by the consumer above
+      return
+    }
+
+    await resolvedIterator?.return?.()
   }
 }

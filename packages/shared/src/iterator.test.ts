@@ -628,6 +628,75 @@ describe('consumeAsyncIterator', () => {
     expect(onFinish).toHaveBeenNthCalledWith(1, [null, undefined, true])
   })
 
+  it('throws iteration errors into the unhandled rejection channel when neither onError nor onFinish is provided', async () => {
+    const error = new Error('TEST')
+    const iterator = (async function* () {
+      yield 1
+      throw error
+    }())
+
+    // Detach the test runner's own handler, which would otherwise fail the run
+    const listeners = process.listeners('unhandledRejection')
+    const unhandledRejectionHandler = vi.fn()
+    process.removeAllListeners('unhandledRejection')
+    process.on('unhandledRejection', unhandledRejectionHandler)
+
+    try {
+      const onEvent = vi.fn()
+      const onSuccess = vi.fn()
+
+      void consumeAsyncIterator(iterator, { onEvent, onSuccess })
+
+      await vi.waitFor(() => {
+        expect(unhandledRejectionHandler).toHaveBeenCalledTimes(1)
+      })
+
+      expect(unhandledRejectionHandler).toHaveBeenCalledWith(error, expect.any(Promise))
+      expect(onEvent).toHaveBeenCalledTimes(1)
+      expect(onEvent).toHaveBeenNthCalledWith(1, 1)
+      expect(onSuccess).toHaveBeenCalledTimes(0)
+    }
+    finally {
+      process.off('unhandledRejection', unhandledRejectionHandler)
+      listeners.forEach(listener => process.on('unhandledRejection', listener))
+    }
+  })
+
+  it('does not throw iteration errors when only onFinish is provided', async () => {
+    const error = new Error('TEST')
+    const iterator = (async function* () {
+      throw error
+    }())
+
+    const onFinish = vi.fn()
+
+    void consumeAsyncIterator(iterator, { onEvent: vi.fn(), onFinish })
+
+    await vi.waitFor(() => {
+      expect(onFinish).toHaveBeenCalledTimes(1)
+    })
+
+    expect(onFinish).toHaveBeenNthCalledWith(1, [error, undefined, false])
+  })
+
+  it('unsubscribe does not reject when the iterator promise rejected', async () => {
+    const error = new Error('TEST')
+    const onError = vi.fn()
+
+    const unsubscribe = consumeAsyncIterator(Promise.reject(error), {
+      onEvent: vi.fn(),
+      onError,
+    })
+
+    await expect(unsubscribe()).resolves.toBeUndefined()
+
+    await vi.waitFor(() => {
+      expect(onError).toHaveBeenCalledTimes(1)
+    })
+
+    expect(onError).toHaveBeenNthCalledWith(1, error)
+  })
+
   it('on iterator promise rejection', async () => {
     const error = new Error('TEST')
     const iterator = Promise.reject(error)

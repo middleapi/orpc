@@ -24,19 +24,11 @@ export function toStringOrBytes(source: Arrayable<string | ArrayBuffer | Pick<Ui
     return source
   }
 
-  if (source instanceof ArrayBuffer) {
-    return new Uint8Array(source)
-  }
-
   if (Array.isArray(source)) {
     return concatBytes(source)
   }
 
-  if (source instanceof Uint8Array) {
-    return source as Awaited<ReturnType<Blob['bytes']>>
-  }
-
-  return new Uint8Array(source.buffer, source.byteOffset, source.byteLength)
+  return toBytes(source)
 }
 
 function toBytes(item: string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>): Awaited<ReturnType<Blob['bytes']>> {
@@ -44,7 +36,7 @@ function toBytes(item: string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buf
     return new TextEncoder().encode(item)
   }
 
-  if (item instanceof ArrayBuffer) {
+  if (isArrayBufferLike(item)) {
     return new Uint8Array(item)
   }
 
@@ -53,6 +45,19 @@ function toBytes(item: string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buf
   }
 
   return new Uint8Array(item.buffer, item.byteOffset, item.byteLength)
+}
+
+/**
+ * Matches an ArrayBuffer or SharedArrayBuffer, including ones from other realms
+ * that fail `instanceof ArrayBuffer`.
+ */
+function isArrayBufferLike(value: object): value is ArrayBuffer {
+  if (ArrayBuffer.isView(value)) {
+    return false
+  }
+
+  const tag = Object.prototype.toString.call(value)
+  return tag === '[object ArrayBuffer]' || tag === '[object SharedArrayBuffer]'
 }
 
 function concatBytes(items: Array<string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>>): Uint8Array<ArrayBuffer> {

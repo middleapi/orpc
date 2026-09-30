@@ -1,3 +1,4 @@
+import { runInNewContext } from 'node:vm'
 import { loadBytes, toStringOrBytes } from './buffer'
 
 it('loadBytes', async () => {
@@ -26,6 +27,24 @@ describe('toStringOrBytes', () => {
     const result = toStringOrBytes(input)
     expect(result).toBeInstanceOf(Uint8Array)
     expect(new TextDecoder().decode(result as Uint8Array)).toBe('test')
+  })
+
+  it('sharedArrayBuffer', () => {
+    const input = new SharedArrayBuffer(4)
+    new Uint8Array(input).set([0, 1, 2, 3])
+
+    const result = toStringOrBytes(input as unknown as ArrayBuffer)
+    expect(result).toBeInstanceOf(Uint8Array)
+    expect(result).toEqual(new Uint8Array([0, 1, 2, 3]))
+  })
+
+  it('cross-realm arrayBuffer', () => {
+    const input = runInNewContext('new Uint8Array([0, 1, 2, 3]).buffer') as ArrayBuffer
+    expect(input).not.toBeInstanceOf(ArrayBuffer)
+
+    const result = toStringOrBytes(input)
+    expect(result).toBeInstanceOf(Uint8Array)
+    expect(result).toEqual(new Uint8Array([0, 1, 2, 3]))
   })
 
   it('uint8Array passthrough', () => {
@@ -73,6 +92,16 @@ describe('toStringOrBytes', () => {
       const result = toStringOrBytes([a, b])
       expect(result).toBeInstanceOf(Uint8Array)
       expect(new TextDecoder().decode(result as Uint8Array)).toBe('abcd')
+    })
+
+    it('array of SharedArrayBuffers concatenates to bytes', () => {
+      const a = new SharedArrayBuffer(2)
+      new Uint8Array(a).set([1, 2])
+      const b = new SharedArrayBuffer(2)
+      new Uint8Array(b).set([3, 4])
+
+      const result = toStringOrBytes([a, b] as unknown as ArrayBuffer[])
+      expect(result).toEqual(new Uint8Array([1, 2, 3, 4]))
     })
 
     it('array of Uint8Arrays concatenates to bytes', () => {

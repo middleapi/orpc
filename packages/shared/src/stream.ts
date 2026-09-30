@@ -57,13 +57,24 @@ export function wrapReadableStream<T, TMapped = T>(
   const reader = once(() => stream.getReader())
   const finish = once(async () => onFinish?.())
 
+  const cancelSource = async (reason: unknown) => {
+    try {
+      await runWith(() => reader().cancel(reason))
+    }
+    catch (error) {
+      await onError?.(error as ThrowableError)
+      throw error
+    }
+  }
+
   // TODO:
   return new ReadableStream<TMapped>({
     async pull(controller) {
+      let readResult: ReadableStreamReadResult<T> | undefined
       let result: ReadableStreamReadResult<TMapped>
 
       try {
-        const readResult = await runWith(() => reader().read())
+        readResult = await runWith(() => reader().read())
         result = mapResult ? await mapResult(readResult) : readResult as ReadableStreamReadResult<TMapped>
       }
       catch (error) {
@@ -72,7 +83,17 @@ export function wrapReadableStream<T, TMapped = T>(
           controller.error(mapError ? await mapError(error as ThrowableError) : error)
         }
         finally {
-          await finish()
+          try {
+            // Like wrapAsyncIterator, only cancel the source if it has not finished yet.
+            // A failed read is treated as finished, so only a failed mapResult cancels it.
+            if (readResult && !readResult.done) {
+              await cancelSource(error)
+            }
+          }
+          finally {
+            reader().releaseLock()
+            await finish()
+          }
         }
 
         return
@@ -88,13 +109,7 @@ export function wrapReadableStream<T, TMapped = T>(
     },
     async cancel(reason) {
       try {
-        try {
-          await runWith(() => reader().cancel(reason))
-        }
-        catch (error) {
-          await onError?.(error as ThrowableError)
-          throw error
-        }
+        await cancelSource(reason)
       }
       finally {
         await finish()
