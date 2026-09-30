@@ -1,8 +1,10 @@
 import type { OpenAPIMeta } from '@orpc/openapi'
 import { getOpenAPIMeta } from '@orpc/openapi'
 import { call, createRouterClient, getEventMeta, Lazy, ORPCError, Procedure, unlazy } from '@orpc/server'
+import { RPCHandler } from '@orpc/server/fetch'
 import { isAsyncIteratorObject } from '@orpc/shared'
 import { initTRPC, lazy, tracked, TRPCError } from '@trpc/server'
+import { observable } from '@trpc/server/observable'
 import * as z from 'zod'
 import { toORPCRouter } from './to-orpc-router'
 
@@ -330,6 +332,159 @@ describe('toORPCRouter', () => {
       await expect(output.next()).resolves.toEqual({ done: false, value: { order: 1 } })
       await expect(output.return?.()).resolves.toEqual({ done: true, value: undefined })
       expect(cleanupCalled).toBe(true)
+    })
+  })
+
+  describe('observable subscriptions', () => {
+    it('streams emitted values and ends on complete', async () => {
+      const orpcRouter = toORPCRouter(t.router({
+        subscribe: t.procedure.subscription(() => observable<number>((emit) => {
+          emit.next(1)
+          emit.next(2)
+
+          const timeout = setTimeout(() => {
+            emit.next(3)
+            emit.complete()
+          }, 10)
+
+          return () => clearTimeout(timeout)
+        })),
+      }))
+
+      const output = await call(orpcRouter.subscribe, undefined, { context: { a: 'test' } })
+
+      expect(output).toSatisfy(isAsyncIteratorObject)
+      await expect(output.next()).resolves.toEqual({ done: false, value: 1 })
+      await expect(output.next()).resolves.toEqual({ done: false, value: 2 })
+      await expect(output.next()).resolves.toEqual({ done: false, value: 3 })
+      await expect(output.next()).resolves.toEqual({ done: true, value: undefined })
+      await expect(output.next()).resolves.toEqual({ done: true, value: undefined })
+    })
+
+    it('throws the emitted error after the values emitted before it', async () => {
+      const error = new Error('emitted')
+      const orpcRouter = toORPCRouter(t.router({
+        subscribe: t.procedure.subscription(() => observable<number>((emit) => {
+          emit.next(1)
+          emit.error(error)
+        })),
+      }))
+
+      const output = await call(orpcRouter.subscribe, undefined, { context: { a: 'test' } })
+
+      await expect(output.next()).resolves.toEqual({ done: false, value: 1 })
+      await expect(output.next()).rejects.toBe(error)
+      await expect(output.next()).resolves.toEqual({ done: true, value: undefined })
+    })
+
+    it('subscribes on the first pull and unsubscribes when cancelled', async () => {
+      const subscribe = vi.fn()
+      const teardown = vi.fn()
+
+      const orpcRouter = toORPCRouter(t.router({
+        subscribe: t.procedure.subscription(() => observable<number>((emit) => {
+          subscribe()
+          emit.next(1)
+          return teardown
+        })),
+      }))
+
+      const output = await call(orpcRouter.subscribe, undefined, { context: { a: 'test' } })
+      expect(subscribe).not.toHaveBeenCalled()
+
+      await expect(output.next()).resolves.toEqual({ done: false, value: 1 })
+      expect(subscribe).toHaveBeenCalledTimes(1)
+
+      const waiting = output.next()
+      await expect(output.return()).resolves.toEqual({ done: true, value: undefined })
+      await expect(waiting).resolves.toEqual({ done: true, value: undefined })
+      expect(teardown).toHaveBeenCalledTimes(1)
+    })
+
+    it('unsubscribes and ends when the signal aborts', async () => {
+      const teardown = vi.fn()
+      const controller = new AbortController()
+
+      const orpcRouter = toORPCRouter(t.router({
+        subscribe: t.procedure.subscription(() => observable<number>((emit) => {
+          emit.next(1)
+          return teardown
+        })),
+      }))
+
+      const output = await call(orpcRouter.subscribe, undefined, { context: { a: 'test' }, signal: controller.signal })
+
+      await expect(output.next()).resolves.toEqual({ done: false, value: 1 })
+
+      const waiting = output.next()
+      controller.abort()
+      await expect(waiting).resolves.toEqual({ done: true, value: undefined })
+      expect(teardown).toHaveBeenCalledTimes(1)
+    })
+
+    it('never subscribes when the signal is already aborted', async () => {
+      const subscribe = vi.fn()
+      const controller = new AbortController()
+
+      const orpcRouter = toORPCRouter(t.router({
+        subscribe: t.procedure.subscription(() => observable<number>(() => {
+          subscribe()
+        })),
+      }))
+
+      const output = await call(orpcRouter.subscribe, undefined, { context: { a: 'test' }, signal: controller.signal })
+      controller.abort()
+
+      await expect(output.next()).resolves.toEqual({ done: true, value: undefined })
+      expect(subscribe).not.toHaveBeenCalled()
+    })
+
+    it('can be consumed with for await through the router client', async () => {
+      const orpcRouter = toORPCRouter(t.router({
+        subscribe: t.procedure.subscription(() => observable<{ order: number }>((emit) => {
+          emit.next({ order: 1 })
+          emit.next({ order: 2 })
+          emit.complete()
+        })),
+      }))
+
+      const client = createRouterClient(orpcRouter, { context: { a: 'test' } })
+      const values = []
+
+      for await (const value of await client.subscribe()) {
+        values.push(value)
+      }
+
+      expect(values).toEqual([{ order: 1 }, { order: 2 }])
+    })
+
+    it('is served as an event stream instead of a serialized observable object', async () => {
+      const orpcRouter = toORPCRouter(t.router({
+        subscribe: t.procedure.subscription(() => observable<{ order: number }>((emit) => {
+          emit.next({ order: 1 })
+          emit.complete()
+        })),
+      }))
+
+      const { response } = await new RPCHandler(orpcRouter).handle(
+        new Request('https://example.com/subscribe', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ json: null }),
+        }),
+        { context: { a: 'test' } },
+      )
+
+      expect(response!.headers.get('content-type')).toContain('text/event-stream')
+      await expect(response!.text()).resolves.toContain('data: {"json":{"order":1}}')
+    })
+
+    it('keeps query and mutation outputs with a `subscribe` key as data', async () => {
+      const orpcRouter = toORPCRouter(t.router({
+        query: t.procedure.query(() => ({ subscribe: 'value' })),
+      }))
+
+      await expect(call(orpcRouter.query, undefined, { context: { a: 'test' } })).resolves.toEqual({ subscribe: 'value' })
     })
   })
 })

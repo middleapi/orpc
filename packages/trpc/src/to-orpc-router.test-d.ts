@@ -2,6 +2,7 @@ import type { InferRouterInitialContext, Procedure, Router, Schema } from '@orpc
 import type { AsyncIteratorClass } from '@orpc/shared'
 import type { TrackedData } from '@trpc/server/unstable-core-do-not-import'
 import { initTRPC, lazy, tracked, TRPCError } from '@trpc/server'
+import { observable } from '@trpc/server/observable'
 import * as z from 'zod'
 import { toORPCRouter } from './to-orpc-router'
 
@@ -36,6 +37,12 @@ const trpcRouter = t.router({
       yield 'pong'
       yield tracked('id-1', { order: 1 })
     }),
+
+  observableSubscribe: t.procedure
+    .input(z.object({ u: z.string() }))
+    .subscription(() => observable<{ order: number }>((emit) => {
+      emit.next({ order: 1 })
+    })),
 
   nested: {
     ping: t.procedure
@@ -80,6 +87,10 @@ describe('toORPCRouter', () => {
 
   expectTypeOf(orpcRouter.subscribe).toEqualTypeOf<
     Procedure<TRPCContext, object, Schema<{ u: string }, unknown>, Schema<unknown, AsyncIteratorClass<'pong' | TrackedData<{ order: number }>, void, any>>, object>
+  >()
+
+  expectTypeOf(orpcRouter.observableSubscribe).toEqualTypeOf<
+    Procedure<TRPCContext, object, Schema<{ u: string }, unknown>, Schema<unknown, AsyncIteratorClass<{ order: number }, void, void>>, object>
   >()
 
   expectTypeOf(orpcRouter.nested).toEqualTypeOf<

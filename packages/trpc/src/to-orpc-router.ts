@@ -1,9 +1,10 @@
-import type { AsyncIteratorClass } from '@orpc/shared'
 import type { AnyProcedure, AnyRouter, inferRouterContext } from '@trpc/server'
-import type { Parser, TrackedData } from '@trpc/server/unstable-core-do-not-import'
+import type { Observable, Unsubscribable } from '@trpc/server/observable'
+import type { LegacyObservableSubscriptionProcedure, Parser, TrackedData } from '@trpc/server/unstable-core-do-not-import'
 import * as ORPC from '@orpc/server'
-import { isTypescriptObject, set, wrapAsyncIterator } from '@orpc/shared'
+import { AsyncIteratorClass, isTypescriptObject, set, wrapAsyncIterator } from '@orpc/shared'
 import { isTrackedEnvelope, TRPCError } from '@trpc/server'
+import { isObservable } from '@trpc/server/observable'
 import { isAsyncIterable, isObject } from '@trpc/server/unstable-core-do-not-import'
 
 export type ToORPCOutput<T>
@@ -19,7 +20,9 @@ export type ToORPCRouterResult<TContext extends ORPC.Context, TRecord extends Re
         TContext,
           object,
           ORPC.Schema<TRecord[K]['_def']['$types']['input'], unknown>,
-          ORPC.Schema<unknown, ToORPCOutput<TRecord[K]['_def']['$types']['output']>>,
+          ORPC.Schema<unknown, TRecord[K] extends LegacyObservableSubscriptionProcedure<any>
+            ? AsyncIteratorClass<TRecord[K]['_def']['$types']['output'], void, void>
+            : ToORPCOutput<TRecord[K]['_def']['$types']['output']>>,
           object
       >
       : TRecord[K] extends Record<string, any>
@@ -92,7 +95,7 @@ function toORPCProcedure(procedure: AnyProcedure) {
           ? { ...input, lastEventId }
           : input
 
-        const output = await procedure({
+        const result = await procedure({
           ctx: context,
           signal,
           path: path.join('.'),
@@ -102,6 +105,11 @@ function toORPCProcedure(procedure: AnyProcedure) {
           // TODO: this should infer from context when using oRPC Batch Plugin
           batchIndex: 0,
         })
+
+        // Legacy `observable(...)` subscriptions are streamed like async iterables, as tRPC does
+        const output = procedure._def.type === 'subscription' && isObservable(result)
+          ? observableToAsyncIterator(result, signal)
+          : result
 
         if (isAsyncIterable(output)) {
           return wrapAsyncIterator(output[Symbol.asyncIterator](), {
@@ -151,4 +159,74 @@ function toStandardSchema(schema: undefined | Parser): undefined | ORPC.AnySchem
   }
 
   return schema as any
+}
+
+/**
+ * Converts a tRPC observable into an async iterator, like tRPC's `observableToAsyncIterable`:
+ * values emitted before they are pulled are buffered, an error is thrown once they are consumed,
+ * and cancelling the iterator or aborting `signal` unsubscribes. It subscribes on the first pull,
+ * so an iterator that is never consumed holds no subscription.
+ */
+function observableToAsyncIterator<T>(
+  observable: Observable<T, unknown>,
+  signal: AbortSignal | undefined,
+): AsyncIteratorClass<T, void, void> {
+  const values: T[] = []
+  let end: { kind: 'complete' } | { kind: 'error', error: unknown } | undefined
+  let subscription: Unsubscribable | undefined
+  let wakeUp: (() => void) | undefined
+
+  function stop(reason: Exclude<typeof end, undefined>) {
+    end ??= reason
+    signal?.removeEventListener('abort', onAbort)
+    subscription?.unsubscribe()
+    wakeUp?.()
+  }
+
+  function onAbort() {
+    stop({ kind: 'complete' })
+  }
+
+  return new AsyncIteratorClass<T, void, void>(async () => {
+    if (subscription === undefined && end === undefined) {
+      if (signal?.aborted) {
+        end = { kind: 'complete' }
+      }
+      else {
+        signal?.addEventListener('abort', onAbort, { once: true })
+
+        subscription = observable.subscribe({
+          next: (value) => {
+            if (end === undefined) {
+              values.push(value)
+              wakeUp?.()
+            }
+          },
+          error: error => stop({ kind: 'error', error }),
+          complete: () => stop({ kind: 'complete' }),
+        })
+      }
+    }
+
+    while (true) {
+      if (values.length > 0) {
+        // `T` itself may include `undefined`, so the value is not narrowed with `!`
+        return { done: false, value: values.shift() as T }
+      }
+
+      if (end?.kind === 'error') {
+        throw end.error
+      }
+
+      if (end !== undefined) {
+        return { done: true, value: undefined }
+      }
+
+      await new Promise<void>((resolve) => {
+        wakeUp = resolve
+      })
+
+      wakeUp = undefined
+    }
+  }, async () => stop({ kind: 'complete' }))
 }
