@@ -1,8 +1,8 @@
-import type { Context, Middleware, MiddlewareOptions } from '@orpc/server'
+import type { Context, Middleware, MiddlewareOptions, MiddlewareResult } from '@orpc/server'
 import type { Promisable, Value } from '@orpc/shared'
 import type { Locker } from './types'
 import { ORPCError } from '@orpc/server'
-import { toArray, value } from '@orpc/shared'
+import { isAsyncIteratorObject, override, promiseWithResolvers, toArray, value, wrapAsyncIterator, wrapReadableStream } from '@orpc/shared'
 import { LockTimeoutError } from './error'
 
 export const LOCK_MIDDLEWARE_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_LOCK_MIDDLEWARE_CONTEXT')
@@ -12,7 +12,16 @@ export interface LockMiddlewareContext {
     /**
      * The locks held in this request, mainly for deduplication purposes
      */
-    held: { locker: Locker, key: string, waited: boolean }[]
+    held: {
+      locker: Locker
+      key: string
+      waited: boolean
+      /**
+       * Whether the lock has been released, so work that outlives it
+       * (like a background task) must acquire the lock again.
+       */
+      released: boolean
+    }[]
   }
 }
 
@@ -69,6 +78,9 @@ export interface LockMiddlewareOptions<
  * sharing the same key never run concurrently. Rejects with a `CONFLICT` error
  * when the lock cannot be acquired before the timeout elapses.
  *
+ * When the output is streaming (async iterator object or readable stream),
+ * the lock is held until the stream finishes, errors, or is cancelled.
+ *
  * @see {@link https://orpc.dev/docs/helpers/lock#lock-middleware | Lock Helpers - Lock Middleware}
  */
 export function lock<
@@ -86,7 +98,7 @@ export function lock<
     ])
 
     const middlewareContext = (middlewareOptions.context as LockMiddlewareContext)[LOCK_MIDDLEWARE_CONTEXT_SYMBOL]
-    const held = middlewareContext?.held.find(l => l.key === key && l.locker === locker)
+    const held = middlewareContext?.held.find(l => !l.released && l.key === key && l.locker === locker)
 
     if (dedupe && held) {
       return middlewareOptions.next({
@@ -96,25 +108,74 @@ export function lock<
       })
     }
 
+    type Result = Awaited<MiddlewareResult<LockMiddlewareOutContext, any>>
+
+    /**
+     * Resolves as soon as a streaming output is ready, while the lock stays held until the stream ends.
+     */
+    const streamed = promiseWithResolvers<Result>()
     let acquired = false
 
-    try {
-      return await locker.lock(key, ({ waited }) => {
-        acquired = true
+    const locking = locker.lock(key, async ({ waited }): Promise<Result> => {
+      acquired = true
 
-        return middlewareOptions.next({
+      const current = { locker, key, waited, released: false }
+
+      try {
+        const result = await middlewareOptions.next({
           context: {
             'lock/waited': waited,
             [LOCK_MIDDLEWARE_CONTEXT_SYMBOL]: {
               ...middlewareContext,
               held: [
                 ...toArray(middlewareContext?.held),
-                { locker, key, waited },
+                current,
               ],
             },
           } satisfies LockMiddlewareOutContext & LockMiddlewareContext,
         })
-      }, { ttl, timeout, signal: middlewareOptions.signal })
+
+        const output: unknown = result.output
+        const isIterator = isAsyncIteratorObject(output)
+
+        if (!isIterator && !(output instanceof ReadableStream)) {
+          return result
+        }
+
+        const finished = promiseWithResolvers<void>()
+
+        /**
+         * Waits for the lock to be released, so a finished stream implies a released lock,
+         * and surfaces errors from releasing it.
+         */
+        const onFinish = async () => {
+          finished.resolve()
+          await locking
+        }
+
+        /**
+         * @warning
+         * Remember use `override` for AsyncIteratorObject/ReadableStream to remain other special properties
+         */
+        const wrapped: Result = {
+          ...result,
+          output: isIterator
+            ? override(output, wrapAsyncIterator(output, { onFinish }))
+            : override(output, wrapReadableStream(output as ReadableStream, { onFinish })),
+        }
+
+        streamed.resolve(wrapped)
+        await finished.promise
+
+        return wrapped
+      }
+      finally {
+        current.released = true
+      }
+    }, { ttl, timeout, signal: middlewareOptions.signal })
+
+    try {
+      return await Promise.race([locking, streamed.promise])
     }
     catch (error) {
       if (!acquired && error instanceof LockTimeoutError) {

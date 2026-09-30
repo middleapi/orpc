@@ -1,5 +1,8 @@
 import type { Locker } from './types'
 import { call, ORPCError, os, type } from '@orpc/server'
+import { RPCHandler } from '@orpc/server/fetch'
+import { sleep, stringifyJSON } from '@orpc/shared'
+import { MemoryLocker } from './adapters/memory'
 import { LockTimeoutError } from './error'
 import { lock, LOCK_MIDDLEWARE_CONTEXT_SYMBOL } from './middleware'
 
@@ -127,8 +130,8 @@ describe('lock', () => {
     expect(context0).toEqual(context1)
     expect(context0).toEqual({
       held: [
-        { locker, key: 'k', waited: false },
-        { locker, key: 'k', waited: false },
+        { locker, key: 'k', waited: false, released: true },
+        { locker, key: 'k', waited: false, released: true },
       ],
     })
   })
@@ -188,6 +191,25 @@ describe('lock', () => {
       expect(locker.lock).toHaveBeenCalledTimes(1)
     })
 
+    it('acquires again once the held lock is released', async () => {
+      const locker = createLocker()
+      const mw = lock({ locker, key: 'k' })
+      const inner = os.use(mw).handler(() => 'in')
+
+      let context: any
+      const outer = os.use(mw).handler(({ context: ctx }) => {
+        context = ctx
+        return 'out'
+      })
+
+      await call(outer, undefined, { context: {} })
+      expect(locker.lock).toHaveBeenCalledTimes(1)
+
+      // e.g. background work started by the handler that outlives the lock
+      await call(inner, undefined, { context })
+      expect(locker.lock).toHaveBeenCalledTimes(2)
+    })
+
     it('respects per-instance dedupe', async () => {
       const locker = createLocker()
       await call(
@@ -197,6 +219,328 @@ describe('lock', () => {
         { context: {} },
       )
       expect(locker.lock).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('streaming outputs', () => {
+    /**
+     * Resolves whether `key` is currently held, without waiting for it.
+     */
+    const isLocked = (locker: Locker, key: string) => locker.lock(key, () => false, { timeout: 0 }).catch((error) => {
+      if (error instanceof LockTimeoutError) {
+        return true
+      }
+
+      throw error
+    })
+
+    it('serializes same-key calls over HTTP, for both plain and streaming handlers', async () => {
+      const payouts = async (streaming: boolean) => {
+        let balance = 100
+        const paid: number[] = []
+
+        const withdraw = async (amount: number) => {
+          const current = balance
+          await sleep(30)
+
+          if (current >= amount) {
+            balance = current - amount
+            paid.push(amount)
+          }
+        }
+
+        const base = os
+          .input(type<{ account: string, amount: number }>())
+          .use(lock({ locker: new MemoryLocker(), key: (_, input) => `acct:${input.account}` }))
+
+        const handler = new RPCHandler({
+          withdraw: streaming
+            ? base.handler(async function* ({ input }) {
+                yield 'before'
+                await withdraw(input.amount)
+                yield 'after'
+              })
+            : base.handler(({ input }) => withdraw(input.amount)),
+        })
+
+        await Promise.all(Array.from({ length: 3 }, async () => {
+          const { response } = await handler.handle(new Request('http://localhost/withdraw', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: stringifyJSON({ json: { account: 'a', amount: 100 } }),
+          }))
+
+          expect(response?.status).toBe(200)
+          await response?.text()
+        }))
+
+        return paid
+      }
+
+      await expect(payouts(false)).resolves.toEqual([100])
+      await expect(payouts(true)).resolves.toEqual([100])
+    })
+
+    it('serializes same-key async iterator outputs', async () => {
+      const locker = new MemoryLocker()
+      const events: string[] = []
+      const procedure = os
+        .input(type<string>())
+        .use(lock({ locker, key: 'k' }))
+        .handler(async function* ({ input, context }) {
+          events.push(`${input}:start:${context['lock/waited']}`)
+          await sleep(10)
+          yield input
+          await sleep(10)
+          events.push(`${input}:end`)
+        })
+
+      const consume = async (input: string) => {
+        const values: string[] = []
+
+        for await (const value of await call(procedure, input, { context: {} })) {
+          values.push(value)
+        }
+
+        return values
+      }
+
+      await expect(Promise.all([consume('a'), consume('b')])).resolves.toEqual([['a'], ['b']])
+      expect(events).toEqual(['a:start:false', 'a:end', 'b:start:true', 'b:end'])
+      await expect(isLocked(locker, 'k')).resolves.toBe(false)
+    })
+
+    it('releases the lock once the async iterator finishes', async () => {
+      const locker = new MemoryLocker()
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(async function* () {
+        yield 1
+        yield 2
+      })
+
+      const iterator = await call(procedure, undefined, { context: {} })
+      await expect(isLocked(locker, 'k')).resolves.toBe(true)
+
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 2 })
+      await expect(isLocked(locker, 'k')).resolves.toBe(true)
+
+      await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined })
+      await expect(isLocked(locker, 'k')).resolves.toBe(false)
+    })
+
+    it('releases the lock once the async iterator errors', async () => {
+      const locker = new MemoryLocker()
+      const error = new Error('failed')
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(async function* () {
+        yield 1
+        throw error
+      })
+
+      const iterator = await call(procedure, undefined, { context: {} })
+
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+      await expect(isLocked(locker, 'k')).resolves.toBe(true)
+
+      await expect(iterator.next()).rejects.toBe(error)
+      await expect(isLocked(locker, 'k')).resolves.toBe(false)
+    })
+
+    it('releases the lock once the async iterator is cancelled, after its cleanup ran under the lock', async () => {
+      const locker = new MemoryLocker()
+      let lockedDuringCleanup: boolean | undefined
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(async function* () {
+        try {
+          yield 1
+          yield 2
+        }
+        finally {
+          lockedDuringCleanup = await isLocked(locker, 'k')
+        }
+      })
+
+      const iterator = await call(procedure, undefined, { context: {} })
+
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+      await iterator.return(undefined)
+
+      expect(lockedDuringCleanup).toBe(true)
+      await expect(isLocked(locker, 'k')).resolves.toBe(false)
+    })
+
+    it('releases the lock when an async iterator is cancelled before being consumed', async () => {
+      const locker = new MemoryLocker()
+      const handler = vi.fn()
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(async function* () {
+        handler()
+        yield 1
+      })
+
+      const iterator = await call(procedure, undefined, { context: {} })
+      await expect(isLocked(locker, 'k')).resolves.toBe(true)
+
+      await iterator.return(undefined)
+      await expect(isLocked(locker, 'k')).resolves.toBe(false)
+      expect(handler).not.toHaveBeenCalled()
+    })
+
+    it('holds the lock until a readable stream finishes', async () => {
+      const locker = new MemoryLocker()
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(() => {
+        let count = 0
+
+        return new ReadableStream<number>({
+          async pull(controller) {
+            await sleep(1)
+
+            if (count < 2) {
+              controller.enqueue(count++)
+            }
+            else {
+              controller.close()
+            }
+          },
+        }, { highWaterMark: 0 })
+      })
+
+      const stream = await call(procedure, undefined, { context: {} })
+      expect(stream).toBeInstanceOf(ReadableStream)
+      await expect(isLocked(locker, 'k')).resolves.toBe(true)
+
+      const reader = stream.getReader()
+      await expect(reader.read()).resolves.toEqual({ done: false, value: 0 })
+      await expect(reader.read()).resolves.toEqual({ done: false, value: 1 })
+      await expect(isLocked(locker, 'k')).resolves.toBe(true)
+
+      await expect(reader.read()).resolves.toEqual({ done: true, value: undefined })
+      await vi.waitFor(() => expect(isLocked(locker, 'k')).resolves.toBe(false))
+    })
+
+    it('releases the lock once a readable stream errors', async () => {
+      const locker = new MemoryLocker()
+      const error = new Error('failed')
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(() => {
+        let pulled = false
+
+        return new ReadableStream<number>({
+          async pull(controller) {
+            await sleep(1)
+
+            if (pulled) {
+              controller.error(error)
+            }
+            else {
+              pulled = true
+              controller.enqueue(1)
+            }
+          },
+        }, { highWaterMark: 0 })
+      })
+
+      const stream = await call(procedure, undefined, { context: {} })
+      await expect(isLocked(locker, 'k')).resolves.toBe(true)
+
+      const reader = stream.getReader()
+      await expect(reader.read()).resolves.toEqual({ done: false, value: 1 })
+      await expect(reader.read()).rejects.toBe(error)
+      await vi.waitFor(() => expect(isLocked(locker, 'k')).resolves.toBe(false))
+    })
+
+    it('releases the lock once a readable stream is cancelled', async () => {
+      const locker = new MemoryLocker()
+      const cancel = vi.fn()
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(() => new ReadableStream<number>({
+        pull(controller) {
+          controller.enqueue(1)
+        },
+        cancel,
+      }, { highWaterMark: 0 }))
+
+      const stream = await call(procedure, undefined, { context: {} })
+      const reader = stream.getReader()
+
+      await expect(reader.read()).resolves.toEqual({ done: false, value: 1 })
+      await expect(isLocked(locker, 'k')).resolves.toBe(true)
+
+      await reader.cancel('reason')
+      expect(cancel).toHaveBeenCalledWith('reason')
+      await expect(isLocked(locker, 'k')).resolves.toBe(false)
+    })
+
+    it('rejects with CONFLICT while a stream holds the lock past the timeout', async () => {
+      const locker = new MemoryLocker()
+      const procedure = os.use(lock({ locker, key: 'k', timeout: 10 })).handler(async function* () {
+        yield 1
+        yield 2
+      })
+
+      const iterator = await call(procedure, undefined, { context: {} })
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+
+      await expect(call(procedure, undefined, { context: {} })).rejects.toSatisfy(
+        (error: unknown) => error instanceof ORPCError && error.code === 'CONFLICT' && error.cause instanceof LockTimeoutError,
+      )
+
+      await iterator.return(undefined)
+
+      const next = await call(procedure, undefined, { context: {} })
+      await expect(next.next()).resolves.toEqual({ done: false, value: 1 })
+      await next.return(undefined)
+    })
+
+    it('dedupes nested calls while the stream holds the lock, but not after it is released', async () => {
+      const locker = new MemoryLocker()
+      const lockSpy = vi.spyOn(locker, 'lock')
+      const mw = lock({ locker, key: 'k', timeout: 0 })
+      const inner = os.use(mw).handler(() => 'in')
+
+      let context: any
+      const outer = os.use(mw).handler(async function* ({ context: ctx }) {
+        context = ctx
+        yield await call(inner, undefined, { context })
+      })
+
+      const values: string[] = []
+      for await (const value of await call(outer, undefined, { context: {} })) {
+        values.push(value)
+      }
+
+      expect(values).toEqual(['in'])
+      expect(lockSpy).toHaveBeenCalledTimes(1)
+
+      // e.g. background work started by the stream that outlives the lock
+      await expect(call(inner, undefined, { context })).resolves.toBe('in')
+      expect(lockSpy).toHaveBeenCalledTimes(2)
+    })
+
+    it('surfaces errors from releasing the lock at the end of the stream', async () => {
+      const error = new Error('release failed')
+      const locker: Locker = {
+        async lock(_key, fn) {
+          await fn({ waited: false })
+          throw error
+        },
+      }
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(async function* () {
+        yield 1
+      })
+
+      const iterator = await call(procedure, undefined, { context: {} })
+
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+      await expect(iterator.next()).rejects.toBe(error)
+    })
+
+    it('releases the lock before resolving non-streaming outputs', async () => {
+      const locker = new MemoryLocker()
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(async () => {
+        await expect(isLocked(locker, 'k')).resolves.toBe(true)
+        return { nested: (async function* () {})() }
+      })
+
+      const output = await call(procedure, undefined, { context: {} })
+
+      expect(output).toEqual({ nested: expect.any(Object) })
+      await expect(isLocked(locker, 'k')).resolves.toBe(false)
     })
   })
 })
