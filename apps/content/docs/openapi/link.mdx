@@ -110,7 +110,7 @@ const output = await client.someProcedure(input, {
 Use `origin`, `url`, and `headers` to control request destination and headers.
 
 - `origin`: Server protocol and domain. Omit in the browser to use the current origin.
-- `url`: Usually a path prefix like `/api`. May include query params that are added to every request.
+- `url`: Usually a path prefix like `/api`. May include query params that are added to every request. Cannot start with `//`, use `origin` to target another host.
 - `headers`: Headers sent with every request, such as auth or trace IDs. Keys should be lowercase.
 
 ```ts
@@ -142,6 +142,13 @@ const link = new OpenAPILink<ClientContext>(contract, {
 ```
 
 :::
+
+## Path Parameters
+
+Path parameter values are percent-encoded so each value stays within its own path segment. Values that a URL would resolve as a relative path are handled before the request is sent:
+
+- A `{name}` parameter cannot be `.` or `..`, and a `{+name}` parameter cannot contain a `.` or `..` segment, such as `a/../b`. URLs resolve these segments even when percent-encoded, which would send the request to a different route, so the call throws a `TypeError` instead.
+- In a `{+name}` parameter, a `/` that would create an empty segment (a leading, trailing, or repeated `/`) is sent as `%2F`. [OpenAPI Handler](/docs/openapi/handler) decodes it back, so `/docs/` still arrives as `/docs/`.
 
 ## Interceptors
 

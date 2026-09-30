@@ -198,4 +198,46 @@ describe('openapiLink', () => {
 
     await expect(client.post('ignored')).resolves.toBe('intercepted')
   })
+
+  it('keeps catch-all path params on the same origin and round-trips them', async () => {
+    const router = {
+      file: os
+        .meta(openapi({ method: 'GET', path: '/{+path}' }))
+        .handler(({ input }) => input),
+    }
+
+    const handler = new OpenAPIHandler(router)
+
+    const fetch = vi.fn(async (url: string, init: RequestInit) => {
+      // a browser resolves the URL against the current page when origin is omitted
+      const request = new Request(new URL(url, 'https://app.example.com/page'), init)
+
+      expect(new URL(request.url).origin).toBe('https://app.example.com')
+
+      const { matched, response } = await handler.handle(request)
+
+      if (!matched || !response) {
+        throw new Error('No procedure match')
+      }
+
+      return response
+    })
+
+    const client = createORPCClient(new OpenAPILink(router, {
+      fetch,
+      headers: { authorization: 'Bearer SECRET' },
+    })) as any
+
+    for (const path of ['/evil.example/steal', '//evil.example/steal', '/', '/docs/', 'a//b', 'a/', 'a/b/c', 'docs/v1/read me']) {
+      await expect(client.file({ path })).resolves.toEqual({ path })
+    }
+
+    expect(fetch).toHaveBeenCalledTimes(8)
+
+    await expect(client.file({ path: 'a/../b' })).rejects.toThrow(
+      'Path param "path" cannot contain "." or ".." segments in call to procedure (file).',
+    )
+
+    expect(fetch).toHaveBeenCalledTimes(8)
+  })
 })

@@ -109,7 +109,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
         data = Object.keys(remaining).length > 0 ? remaining : undefined
       }
 
-      pathname = `${basePathname.replace(END_SLASH_REGEX, '')}${pathname}` as `/${string}`
+      pathname = joinBasePathname(basePathname, pathname, path)
 
       if (isBodylessMethod(method)) {
         const queryString = this.serializeQueryString(data, meta?.queryStyles)
@@ -169,7 +169,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       headers = mergeStandardHeaders(headers, serializeHeaders(input.headers, this.serializer))
     }
 
-    pathname = `${basePathname.replace(END_SLASH_REGEX, '')}${pathname}` as `/${string}`
+    pathname = joinBasePathname(basePathname, pathname, path)
     const queryString = this.serializeQueryString(input?.query, meta?.queryStyles)
     const search = combineSearch(baseSearch, queryString)
     const url = `${pathname}${search ?? ''}${baseHash ?? ''}` as StandardUrl
@@ -220,7 +220,26 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
       if (serialized !== undefined && serialized !== null) {
         if (param.allowsSlash) {
-          encoded = String(serialized).split('/').map(safeEncodeURIComponent).join('/')
+          const segments = String(serialized).split('/')
+
+          if (segments.some(isDotSegment)) {
+            throw new TypeError(`Path param "${param.parameterName}" cannot contain "." or ".." segments in call to procedure (${path.join('.')}).`)
+          }
+
+          /**
+           * Keep a slash literal only between two non-empty segments, otherwise encode it as %2F,
+           * so the value never produces an empty path segment (e.g. a leading "//" is parsed as a host).
+           * The server decodes %2F back to "/", so the value still round-trips.
+           */
+          encoded = segments
+            .map((segment, i) => {
+              if (i === 0) {
+                return safeEncodeURIComponent(segment)
+              }
+
+              return `${segments[i - 1] && segment ? '/' : '%2F'}${safeEncodeURIComponent(segment)}`
+            })
+            .join('')
         }
         else {
           encoded = safeEncodeURIComponent(String(serialized))
@@ -230,6 +249,14 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
     if (!encoded) {
       throw new TypeError(`Path param "${param.parameterName}" cannot be empty in call to procedure (${path.join('.')}).`)
+    }
+
+    /**
+     * The URL parser resolves "." and ".." segments (even percent-encoded as %2e),
+     * which would send the request to another route, so they cannot be represented.
+     */
+    if (isDotSegment(encoded)) {
+      throw new TypeError(`Path param "${param.parameterName}" cannot contain "." or ".." segments in call to procedure (${path.join('.')}).`)
     }
 
     return encoded
@@ -443,6 +470,24 @@ function combineSearch(baseSearch: `?${string}` | undefined, additionalSearch: s
   }
 
   return `${baseSearch}&${additionalSearch}` as `?${string}`
+}
+
+function isDotSegment(segment: string): boolean {
+  return segment === '.' || segment === '..'
+}
+
+function joinBasePathname(basePathname: `/${string}`, pathname: `/${string}`, path: string[]): `/${string}` {
+  const joined = `${basePathname.replace(END_SLASH_REGEX, '')}${pathname}` as `/${string}`
+
+  /**
+   * A URL starting with "//" (or "/\") is protocol-relative, so resolving it against the
+   * current origin would send the request, including its headers, to another host.
+   */
+  if (joined[1] === '/' || joined[1] === '\\') {
+    throw new TypeError(`Resolved request path (${joined}) cannot start with "//" or "/\\" in call to procedure (${path.join('.')}).`)
+  }
+
+  return joined
 }
 
 function toResolvedStandardHeaders(headers: Headers | StandardHeaders): StandardHeaders {

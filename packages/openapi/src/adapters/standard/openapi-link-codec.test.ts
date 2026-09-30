@@ -607,6 +607,186 @@ describe('openAPILinkCodec', () => {
           'Path param "filter" cannot be empty in call to procedure (item).',
         )
       })
+
+      it('throws when a path param is a dot segment', async () => {
+        const codec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            method: 'DELETE',
+            path: '/users/{userId}/sessions/{sessionId}',
+          })),
+        }, { serializer })
+
+        for (const sessionId of ['.', '..']) {
+          await expect(codec.encodeInput({ userId: 'victim', sessionId }, ['item'], { context: {} })).rejects.toThrow(
+            'Path param "sessionId" cannot contain "." or ".." segments in call to procedure (item).',
+          )
+        }
+
+        await expect(codec.encodeInput({ userId: 'victim', sessionId: '...' }, ['item'], { context: {} }))
+          .resolves
+          .toMatchObject({ url: '/users/victim/sessions/...' })
+        await expect(codec.encodeInput({ userId: 'victim', sessionId: '../a' }, ['item'], { context: {} }))
+          .resolves
+          .toMatchObject({ url: '/users/victim/sessions/..%2Fa' })
+        await expect(codec.encodeInput({ userId: 'victim', sessionId: '%2e%2e' }, ['item'], { context: {} }))
+          .resolves
+          .toMatchObject({ url: '/users/victim/sessions/%252e%252e' })
+      })
+
+      it('throws when a detailed path param is a dot segment', async () => {
+        const codec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            method: 'DELETE',
+            path: '/users/{userId}/sessions/{sessionId}',
+            inputStructure: 'detailed',
+          })),
+        }, { serializer })
+
+        await expect(codec.encodeInput({ params: { userId: 'victim', sessionId: '..' } }, ['item'], { context: {} })).rejects.toThrow(
+          'Path param "sessionId" cannot contain "." or ".." segments in call to procedure (item).',
+        )
+        await expect(codec.encodeInput({ params: { userId: '.', sessionId: 's1' } }, ['item'], { context: {} })).rejects.toThrow(
+          'Path param "userId" cannot contain "." or ".." segments in call to procedure (item).',
+        )
+      })
+
+      it('throws when a comma-delimited path param is a dot segment', async () => {
+        const arrayCodec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            path: '/items/{ids}',
+            paramsStyles: { ids: 'comma-delimited-array' },
+          })),
+        }, { url: '/api', serializer })
+
+        for (const ids of [['..'], ['.'], [undefined, '..', null], '..']) {
+          await expect(arrayCodec.encodeInput({ ids }, ['item'], { context: {} })).rejects.toThrow(
+            'Path param "ids" cannot contain "." or ".." segments in call to procedure (item).',
+          )
+        }
+
+        await expect(arrayCodec.encodeInput({ ids: ['..', '.'] }, ['item'], { context: {} }))
+          .resolves
+          .toMatchObject({ url: '/api/items/..,.' })
+
+        const catchAllArrayCodec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            path: '/items/{+ids}',
+            paramsStyles: { ids: 'comma-delimited-array' },
+          })),
+        }, { url: '/api', serializer })
+
+        await expect(catchAllArrayCodec.encodeInput({ ids: ['..'] }, ['item'], { context: {} })).rejects.toThrow(
+          'Path param "ids" cannot contain "." or ".." segments in call to procedure (item).',
+        )
+
+        const objectCodec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            path: '/items/{filter}',
+            paramsStyles: { filter: 'comma-delimited-object' },
+          })),
+        }, { url: '/api', serializer })
+
+        await expect(objectCodec.encodeInput({ filter: '..' }, ['item'], { context: {} })).rejects.toThrow(
+          'Path param "filter" cannot contain "." or ".." segments in call to procedure (item).',
+        )
+        await expect(objectCodec.encodeInput({ filter: { '..': '..' } }, ['item'], { context: {} }))
+          .resolves
+          .toMatchObject({ url: '/api/items/..,..' })
+      })
+
+      it('throws when a catch-all path param contains a dot segment', async () => {
+        const codec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            path: '/files/{+path}',
+          })),
+        }, { url: '/api', serializer })
+
+        for (const path of ['.', '..', 'a/../b', './a', 'a/.', 'a/..', '/..', '../', 'a//../b']) {
+          await expect(codec.encodeInput({ path }, ['item'], { context: {} })).rejects.toThrow(
+            'Path param "path" cannot contain "." or ".." segments in call to procedure (item).',
+          )
+        }
+
+        await expect(codec.encodeInput({ path: '.a/b./.../%2e%2e' }, ['item'], { context: {} }))
+          .resolves
+          .toMatchObject({ url: '/api/files/.a/b./.../%252e%252e' })
+
+        const detailedCodec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            path: '/files/{+path}',
+            inputStructure: 'detailed',
+          })),
+        }, { url: '/api', serializer })
+
+        await expect(detailedCodec.encodeInput({ params: { path: 'a/../b' } }, ['item'], { context: {} })).rejects.toThrow(
+          'Path param "path" cannot contain "." or ".." segments in call to procedure (item).',
+        )
+      })
+
+      it('encodes slashes that would create empty segments in catch-all path params', async () => {
+        const codec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            method: 'GET',
+            path: '/{+path}',
+          })),
+        }, { serializer })
+
+        const cases = [
+          ['/evil.example/steal', '/%2Fevil.example/steal'],
+          ['//evil.example/steal', '/%2F%2Fevil.example/steal'],
+          ['///evil.example', '/%2F%2F%2Fevil.example'],
+          ['/', '/%2F'],
+          ['//', '/%2F%2F'],
+          ['a//b', '/a%2F%2Fb'],
+          ['a/', '/a%2F'],
+          ['a/b//', '/a/b%2F%2F'],
+          ['a/b/c', '/a/b/c'],
+        ] as const
+
+        for (const [path, url] of cases) {
+          const request = await codec.encodeInput({ path }, ['item'], { context: {} })
+
+          expect(request.url).toBe(url)
+          expect(new URL(request.url, 'https://app.example.com/page').host).toBe('app.example.com')
+        }
+
+        const detailedCodec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            method: 'GET',
+            path: '/{+path}',
+            inputStructure: 'detailed',
+          })),
+        }, { serializer })
+
+        await expect(detailedCodec.encodeInput({ params: { path: '//evil.example/steal' } }, ['item'], { context: {} }))
+          .resolves
+          .toMatchObject({ url: '/%2F%2Fevil.example/steal' })
+      })
+
+      it('throws when the resolved path is protocol-relative', async () => {
+        const codec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            method: 'GET',
+            path: '/items/{id}',
+          })),
+        }, { url: '//evil.example', serializer })
+
+        await expect(codec.encodeInput({ id: '1' }, ['item'], { context: {} })).rejects.toThrow(
+          'Resolved request path (//evil.example/items/1) cannot start with "//" or "/\\" in call to procedure (item).',
+        )
+
+        const backslashCodec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            method: 'GET',
+            path: '/items/{id}',
+            inputStructure: 'detailed',
+          })),
+        }, { url: '/\\evil.example', serializer })
+
+        await expect(backslashCodec.encodeInput({ params: { id: '1' } }, ['item'], { context: {} })).rejects.toThrow(
+          'Resolved request path (/\\evil.example/items/1) cannot start with "//" or "/\\" in call to procedure (item).',
+        )
+      })
     })
 
     describe('option handling', () => {
