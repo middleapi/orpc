@@ -9,5 +9,8 @@ export function isSubsetOf(subsetKey: unknown, fullKey: unknown): boolean {
         ? Object.keys(subsetKey).every(key => subsetKey[key] === undefined || isSubsetOf(subsetKey[key], fullKey[key]))
         : Array.isArray(subsetKey) && Array.isArray(fullKey)
           ? subsetKey.every((value, index) => isSubsetOf(value, fullKey[index]))
-          : false
+          // SWR hashes dates by value when building cache keys, so equal dates are the same key
+          : subsetKey instanceof Date && fullKey instanceof Date
+            ? Object.is(subsetKey.getTime(), fullKey.getTime())
+            : false
 }

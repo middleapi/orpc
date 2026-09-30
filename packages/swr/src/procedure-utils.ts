@@ -110,6 +110,15 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
             throw new TypeError('.subscriber requires an AsyncIteratorObject output')
           }
 
+          /**
+           * Iterators that ignore the signal keep yielding after unsubscribe, so check it
+           * before every write, or a stale subscription (like a StrictMode double mount) writes too.
+           */
+          if (controller.signal.aborted) {
+            await iterator.return?.()
+            return
+          }
+
           let hasPreviousData = false
 
           if (refetchMode === 'reset') {
@@ -130,6 +139,10 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
           let buffer: unknown[] = []
 
           for await (const event of iterator) {
+            if (controller.signal.aborted) {
+              break
+            }
+
             if (shouldUpdateDataDuringStream) {
               next(undefined, (old) => {
                 const newData = Array.isArray(old) ? [...old, event] : [event]
@@ -150,7 +163,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
             }
           }
 
-          if (!shouldUpdateDataDuringStream) {
+          if (!shouldUpdateDataDuringStream && !controller.signal.aborted) {
             next(undefined, buffer as InferSubscriberOutput<TOutput>)
           }
         }
@@ -204,6 +217,13 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
           }
 
           for await (const event of iterator) {
+            /**
+             * Iterators that ignore the signal keep yielding after unsubscribe.
+             */
+            if (controller.signal.aborted) {
+              break
+            }
+
             next(undefined, event as InferLiveSubscriberOutput<TOutput>)
           }
         }

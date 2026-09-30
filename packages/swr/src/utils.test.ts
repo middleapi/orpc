@@ -35,9 +35,19 @@ describe('isSubsetOf', () => {
     expect(isSubsetOf([1, 2], [2, 3])).toBe(false)
     expect(isSubsetOf([[1]], [[2]])).toBe(false)
 
-    // Different instances
-    const date1 = new Date()
-    const date2 = new Date(date1)
-    expect(isSubsetOf(date1, date2)).toBe(false)
+    // Different dates
+    expect(isSubsetOf(new Date(1), new Date(2))).toBe(false)
+    expect(isSubsetOf(new Date(1), new Date('invalid'))).toBe(false)
+    expect(isSubsetOf(new Date(1), 1)).toBe(false)
+
+    // Different instances of other non-plain objects
+    expect(isSubsetOf(new URL('https://orpc.dev'), new URL('https://orpc.dev'))).toBe(false)
+  })
+
+  it('compares dates by time, like SWR hashes keys', () => {
+    expect(isSubsetOf(new Date(1), new Date(1))).toBe(true)
+    expect(isSubsetOf(new Date('invalid'), new Date('invalid'))).toBe(true)
+    expect(isSubsetOf({ since: new Date(1) }, { since: new Date(1), limit: 10 })).toBe(true)
+    expect(isSubsetOf([new Date(1)], [new Date(1), new Date(2)])).toBe(true)
   })
 })
