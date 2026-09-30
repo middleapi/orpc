@@ -1,7 +1,8 @@
+import type { ModelMessage, ToolSet, UIMessage } from 'ai'
 import { asyncIteratorObject, oc, type } from '@orpc/contract'
 import { os } from '@orpc/server'
-import { generateText } from 'ai'
-import { MockLanguageModelV4 } from 'ai/test'
+import { asSchema, convertToModelMessages, generateText, streamText } from 'ai'
+import { convertArrayToReadableStream, MockLanguageModelV4 } from 'ai/test'
 import z from 'zod'
 import { createToolFactory, implementToolFactory } from './tool'
 import { aiSdkTool } from './tool-meta'
@@ -329,7 +330,7 @@ describe('createToolFactory', () => {
       context: { authToken: 'auth-token' },
     })(procedure)
 
-    expect(tool.inputSchema).toBe(inputSchema)
+    expect(asSchema(tool.inputSchema).jsonSchema).toEqual(asSchema(inputSchema).jsonSchema)
     expect(tool.outputSchema).toBe(outputSchema)
     expect(tool.description).toBe('Greet a person')
 
@@ -387,19 +388,160 @@ describe('createToolFactory', () => {
     expect(tool.metadata).toEqual({ source: 'weather-service' })
   })
 
-  it('disable input validation at oRPC level to avoid validating twice', async () => {
-    const handler = vi.fn(() => ({ greeting: 'Hello!' }))
+  describe('input validation', () => {
+    const usage = {
+      inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
+      outputTokens: { total: 20, text: 20, reasoning: undefined },
+    }
 
-    const procedure = os
-      .input(inputSchema)
-      .output(outputSchema)
-      .handler(handler)
+    function createModel(toolCall?: { toolName: string, input: unknown }) {
+      const content = toolCall
+        ? [{ type: 'tool-call' as const, toolCallId: 'call-1', toolName: toolCall.toolName, input: JSON.stringify(toolCall.input) }]
+        : []
+      const finishReason = { unified: toolCall ? 'tool-calls' as const : 'stop' as const, raw: undefined }
 
-    const tool = createToolFactory()(procedure)
+      return new MockLanguageModelV4({
+        doGenerate: async () => ({ content, finishReason, usage, warnings: [] }),
+        doStream: async () => ({
+          stream: convertArrayToReadableStream([...content, { type: 'finish' as const, finishReason, usage }]),
+        }),
+      })
+    }
 
-    await expect(tool.execute?.('invalid' as any, { abortSignal } as any)).resolves.toEqual({ greeting: 'Hello!' })
+    /**
+     * Without `experimental_toolApprovalSecret`, the client controls this history. The AI SDK only checks
+     * the approved input against the tool's `inputSchema`, then executes the tool with the raw input.
+     */
+    function createApprovedHistory(toolName: string, input: unknown): UIMessage[] {
+      return [
+        { id: 'u1', role: 'user', parts: [{ type: 'text', text: 'Hello' }] },
+        {
+          id: 'a1',
+          role: 'assistant',
+          parts: [{
+            type: `tool-${toolName}`,
+            toolCallId: 'call-1',
+            state: 'approval-responded',
+            input,
+            approval: { id: 'approval-1', approved: true },
+          }],
+        },
+      ]
+    }
 
-    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ input: 'invalid' }), 'invalid')
+    describe.each(['generateText', 'streamText'] as const)('with %s', (api) => {
+      async function run(options: { model: MockLanguageModelV4, tools: ToolSet, messages: ModelMessage[] }) {
+        if (api === 'generateText') {
+          await generateText(options)
+        }
+        else {
+          await streamText(options).consumeStream()
+        }
+      }
+
+      it('validates input of approved tool calls resumed from message history', async () => {
+        const handler = vi.fn(async ({ input }) => input)
+
+        const updateProfile = os
+          .input(z.object({ displayName: z.string().trim().max(20) }))
+          .handler(handler)
+
+        const tools = { updateProfile: createToolFactory()(updateProfile) }
+
+        await run({
+          model: createModel(),
+          tools,
+          messages: await convertToModelMessages(
+            createApprovedHistory('updateProfile', { displayName: '  Mallory  ', role: 'admin' }),
+            { tools },
+          ),
+        })
+
+        expect(handler).toHaveBeenCalledOnce()
+        expect(handler).toHaveBeenCalledWith(
+          expect.objectContaining({ input: { displayName: 'Mallory' } }),
+          { displayName: 'Mallory' },
+        )
+      })
+
+      describe('applies non-idempotent input transforms once', () => {
+        const handler = vi.fn(async ({ input }) => input)
+
+        const procedure = os
+          .input(z.object({ name: z.string().transform(name => `${name}!`) }))
+          .input(z.object({ age: z.number() }))
+          .handler(handler)
+
+        const tools = { greet: createToolFactory()(procedure) }
+        const expected = { name: 'Alice!', age: 18 }
+
+        beforeEach(() => {
+          handler.mockClear()
+        })
+
+        it('on tool calls parsed by the AI SDK', async () => {
+          await run({
+            model: createModel({ toolName: 'greet', input: { name: 'Alice', age: 18, unknown: true } }),
+            tools,
+            messages: [{ role: 'user', content: 'Greet Alice' }],
+          })
+
+          expect(handler).toHaveBeenCalledOnce()
+          expect(handler).toHaveBeenCalledWith(expect.objectContaining({ input: expected }), expected)
+        })
+
+        it('on approved tool calls resumed from message history', async () => {
+          await run({
+            model: createModel(),
+            tools,
+            messages: await convertToModelMessages(
+              createApprovedHistory('greet', { name: 'Alice', age: 18, unknown: true }),
+              { tools },
+            ),
+          })
+
+          expect(handler).toHaveBeenCalledOnce()
+          expect(handler).toHaveBeenCalledWith(expect.objectContaining({ input: expected }), expected)
+        })
+      })
+    })
+
+    it('validates input passed to execute directly', async () => {
+      const handler = vi.fn(() => ({ greeting: 'Hello!' }))
+
+      const tool = createToolFactory()(os.input(inputSchema).output(outputSchema).handler(handler))
+
+      const streamingTool = createToolFactory()(os.input(inputSchema).handler(async function* () {
+        yield handler()
+      }))
+
+      await expect(tool.execute?.({ name: 123 } as any, { abortSignal } as any)).rejects.toThrow('Input validation failed')
+      await expect((streamingTool as any).execute({ name: 123 }, { abortSignal }).next()).rejects.toThrow('Input validation failed')
+
+      expect(handler).not.toHaveBeenCalled()
+    })
+
+    it('does not trust input parsed by another tool', async () => {
+      const handler = vi.fn(async ({ input }) => input)
+
+      const createTool = createToolFactory()
+      const tool1 = createTool(os.input(z.object({ name: z.string() })).handler(handler))
+      const tool2 = createTool(os.input(z.object({ name: z.string().transform(name => `${name}!`) })).handler(handler))
+
+      const parsed = await asSchema(tool1.inputSchema).validate!({ name: 'Alice' })
+      expect(parsed).toEqual({ success: true, value: { name: 'Alice' } })
+
+      await expect(tool2.execute?.((parsed as any).value, { abortSignal } as any)).resolves.toEqual({ name: 'Alice!' })
+    })
+
+    it('keeps the input schema behavior for non-object values', async () => {
+      const handler = vi.fn(async ({ input }) => input)
+
+      const tool = createToolFactory()(os.input(z.string().transform(value => `${value}!`)).handler(handler))
+
+      await expect(asSchema(tool.inputSchema).validate!('Alice')).resolves.toEqual({ success: true, value: 'Alice!' })
+      await expect(asSchema(tool.inputSchema).validate!(123)).resolves.toEqual({ success: false, error: expect.any(Error) })
+    })
   })
 
   it('keeps output validation enabled because the AI SDK does not validate execute results', async () => {

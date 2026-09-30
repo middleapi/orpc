@@ -9,7 +9,7 @@ import { getAsyncIteratorObjectSchemaDetails } from '@orpc/contract'
 import { combineJsonSchemasWithComposition } from '@orpc/json-schema'
 import { call, Procedure } from '@orpc/server'
 import { isAsyncGeneratorFunction, mergeTwoLevels, ORPC_NAME, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
-import { tool } from 'ai'
+import { asSchema, jsonSchema, tool } from 'ai'
 import { getAiSdkToolMeta } from './tool-meta'
 
 const ANY_SCHEMA: FlexibleSchema = {
@@ -263,15 +263,26 @@ export function createToolFactory<TInitialContext extends Context = object>(
     const toolOptions = resolveMaybeOptionalOptions(rest)
 
     /**
-     * The AI SDK already validates input against the tool's `inputSchema`,
-     * so input validation is disabled at the oRPC level to avoid validating twice.
-     * Output validation stays enabled because the AI SDK does not validate
-     * the value returned from `execute` against the tool's `outputSchema`.
+     * Values produced by the tool's `inputSchema`. The AI SDK passes these to `execute` for model tool calls,
+     * so validating them again at the oRPC level would apply transforms twice. But the AI SDK does not
+     * always pass what it parsed: approved tool calls resumed from message history are only checked
+     * against `inputSchema`, then executed with their raw input. So only tracked values skip oRPC input validation.
      */
-    const disabledValidation = new Procedure({
+    const parsedInputs = new WeakSet<object>()
+
+    /**
+     * Runs the procedure for tracked values. Output validation stays enabled because
+     * the AI SDK does not validate the value returned from `execute` against the tool's `outputSchema`.
+     */
+    const parsedInputProcedure = new Procedure({
       ...procedure['~orpc'],
       disableInputValidation: true,
     })
+
+    const callProcedure = (input: unknown, signal: AbortSignal | undefined) => {
+      const isParsed = typeof input === 'object' && input !== null && parsedInputs.has(input)
+      return call(isParsed ? parsedInputProcedure : procedure, input as any, { ...options, signal })
+    }
 
     /**
      * Output schemas are the source of truth, but an `async function*` handler always
@@ -280,7 +291,7 @@ export function createToolFactory<TInitialContext extends Context = object>(
     const isIteratorOutput = getIteratorYieldSchemas(toArray(procedure['~orpc'].outputSchemas)) !== undefined
       || isAsyncGeneratorFunction(procedure['~orpc'].handler)
 
-    return implementTool(procedure, {
+    const implemented = implementTool(procedure, {
       ...toolOptions as any,
       /**
        * For async iterator outputs, the tool streams each event as a
@@ -289,12 +300,34 @@ export function createToolFactory<TInitialContext extends Context = object>(
        */
       execute: isIteratorOutput
         ? async function* (input, callingOptions) {
-          yield* await call(disabledValidation, input as any, { ...options, signal: callingOptions.abortSignal }) as AsyncIterable<any>
+          yield* await callProcedure(input, callingOptions.abortSignal) as AsyncIterable<any>
         }
         : (input, callingOptions) => {
-            return call(disabledValidation, input as any, { ...options, signal: callingOptions.abortSignal })
+            return callProcedure(input, callingOptions.abortSignal)
           },
-    }) as any
+    })
+
+    /**
+     * Wraps the schema the AI SDK would build from `inputSchema`,
+     * so JSON Schema generation and validation behave exactly as before.
+     */
+    const inputSchema = asSchema(implemented.inputSchema)
+
+    return {
+      ...implemented,
+      inputSchema: jsonSchema(() => inputSchema.jsonSchema, {
+        async validate(value) {
+          // Always defined because every schema here is a Standard Schema.
+          const result = await inputSchema.validate!(value)
+
+          if (result.success && typeof result.value === 'object' && result.value !== null) {
+            parsedInputs.add(result.value)
+          }
+
+          return result
+        },
+      }),
+    } as any
   }
 
   return factory

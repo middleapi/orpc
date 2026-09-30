@@ -183,6 +183,14 @@ const getWeatherTool = createTool(getWeatherProcedure, {
 })
 ```
 
+:::info
+Middleware and the handler always receive input parsed by the procedure's input schemas, including for approved tool calls resumed from message history, which the AI SDK executes with their raw input. Input the AI SDK already parsed from a model tool call is not validated a second time, so transforms apply once.
+:::
+
+:::warning
+When `generateText` or `streamText` receives message history from the client, set `experimental_toolApprovalSecret`. Without it, the AI SDK executes any tool call that the history marks as approved, even for tools that do not require [approval](https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling). oRPC still validates the input of such calls, but it cannot tell whether the model produced them.
+:::
+
 ### Streaming Tool Outputs
 
 When a procedure outputs an [AsyncIteratorObject](/docs/async-iterator-object), either validated with `asyncIteratorObject` or produced by an `async function*` handler, the resulting tool streams every event as a [preliminary tool result](https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling#preliminary-tool-results): each event replaces the tool output in the UI, and the last event becomes the final tool result sent to the model.
