@@ -34,6 +34,8 @@ export default defineConfig(({ mode }) => ({
           setupFiles: ['./vitest.javascript.ts'],
           include: ['**/*.test.ts'],
           exclude: [...defaultExclude, '**/.claude/**', './packages/bun/**', './packages/cloudflare/**'],
+          // exposes `gc()` to tests that check a value can be garbage collected
+          execArgv: ['--expose-gc'],
           benchmark: {
             exclude: ['**/**'],
           },
