@@ -173,6 +173,37 @@ describe('signing', () => {
         expect(unsignedValue).toBeUndefined()
       }
     })
+
+    describe('non-canonical signature encodings', () => {
+      const signed = 'user.m0bDSSX1sxl4bVzt5Nxy7XywIGHhUmMDkozt29bCxco'
+      // signature contains both `-` and `_`
+      const signedWithUrlChars = 'value.with.dots-🚀-中文.kMRSELRa3ULkbxo9gB-FOcNVdYmT_7Dv64b7hyhQOPA'
+      const signingSecret = 'compatibility-signing-secret'
+
+      it('should accept the canonical signature', async () => {
+        expect(await unsign(signed, 'secret')).toBe('user')
+        expect(await unsign(signedWithUrlChars, signingSecret)).toBe('value.with.dots-🚀-中文')
+      })
+
+      it.each([
+        ['non-zero unused bits in the last char', 'user.m0bDSSX1sxl4bVzt5Nxy7XywIGHhUmMDkozt29bCxcp'],
+        ['padding', 'user.m0bDSSX1sxl4bVzt5Nxy7XywIGHhUmMDkozt29bCxco='],
+        ['whitespace after the dot', 'user. m0bDSSX1sxl4bVzt5Nxy7XywIGHhUmMDkozt29bCxco'],
+        ['embedded whitespace', 'user.m0bDSSX1sxl4bVzt5 Nxy7XywIGHhUmMDkozt29bCxco'],
+        ['trailing newline', 'user.m0bDSSX1sxl4bVzt5Nxy7XywIGHhUmMDkozt29bCxco\n'],
+      ])('should reject %s', async (_, input) => {
+        expect(await unsign(input, 'secret')).toBeUndefined()
+      })
+
+      it('should reject raw + and / in place of - and _', async () => {
+        const dotIndex = signedWithUrlChars.lastIndexOf('.')
+        const standardBase64 = signedWithUrlChars.slice(0, dotIndex)
+          + signedWithUrlChars.slice(dotIndex).replace(/-/g, '+').replace(/_/g, '/')
+
+        expect(standardBase64).not.toBe(signedWithUrlChars)
+        expect(await unsign(standardBase64, signingSecret)).toBeUndefined()
+      })
+    })
   })
 
   it.each([

@@ -53,4 +53,60 @@ describe('encodeBase64url / decodeBase64url', () => {
     expect(decodeBase64url(undefined)).toBeUndefined()
     expect(decodeBase64url('invalid base64!')).toBeUndefined()
   })
+
+  describe('canonical form', () => {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+
+    it('should decode every character of the alphabet', () => {
+      const decoded = decodeBase64url(alphabet)
+
+      expect(decoded).toBeDefined()
+      expect(encodeBase64url(decoded!)).toBe(alphabet)
+    })
+
+    it.each([
+      ['AB', 'non-zero unused bits (remainder 2)'],
+      ['AP', 'non-zero unused bits (remainder 2)'],
+      ['AAB', 'non-zero unused bits (remainder 3)'],
+      ['AAD', 'non-zero unused bits (remainder 3)'],
+      ['AA==', 'padding'],
+      ['AAA=', 'padding'],
+      ['AA=', 'partial padding'],
+      ['AAAA====', 'excess padding'],
+      ['+/8', 'raw + and /'],
+      ['-/8', 'raw /'],
+      ['+_8', 'raw +'],
+      [' AAA', 'leading whitespace'],
+      ['AAA ', 'trailing whitespace'],
+      ['AA A', 'embedded space'],
+      ['A\tAA', 'embedded tab'],
+      ['AA\nA', 'embedded newline'],
+      ['A\r\nA', 'embedded CRLF'],
+      ['A', 'length % 4 === 1'],
+      ['AAAAA', 'length % 4 === 1'],
+      ['AA.A', 'invalid character'],
+    ])('should reject %j (%s)', (input) => {
+      expect(decodeBase64url(input)).toBeUndefined()
+    })
+
+    it('should accept exactly one encoding per byte sequence', () => {
+      for (const prefix of ['A', 'AA', 'AAAA_', 'AAAA-A']) {
+        const accepted: string[] = []
+
+        for (const char of alphabet) {
+          const input = prefix + char
+          const decoded = decodeBase64url(input)
+
+          if (decoded !== undefined) {
+            // round-tripping proves no other accepted string decodes to the same bytes
+            expect(encodeBase64url(decoded)).toBe(input)
+            accepted.push(input)
+          }
+        }
+
+        // remainder 2 leaves 2 significant bits in the last char, remainder 3 leaves 4
+        expect(accepted).toHaveLength((prefix.length + 1) % 4 === 2 ? 4 : 16)
+      }
+    })
+  })
 })

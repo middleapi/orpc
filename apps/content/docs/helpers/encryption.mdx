@@ -27,3 +27,7 @@ const decryptedData = await decrypt(encryptedData, secret)
 :::info
 The `decrypt` helper accepts `undefined` or `null` as encrypted value and returns `undefined` for invalid inputs, enabling seamless handling of optional data.
 :::
+
+:::warning
+Use a long, randomly generated secret (for example, 32 random bytes), not a human-chosen password. The key is derived with PBKDF2-HMAC-SHA256 at 60,000 iterations, which is below the [OWASP recommendation](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#pbkdf2) of 600,000 for passwords. The iteration count is fixed so that previously encrypted values remain decryptable, so the secret's entropy is what protects your data.
+:::

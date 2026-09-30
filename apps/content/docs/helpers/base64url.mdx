@@ -19,4 +19,6 @@ const decodedText = new TextDecoder().decode(decodedBytes) // 'Hello World'
 
 :::info
 The `decodeBase64url` accepts `undefined` or `null` as encoded value and returns `undefined` for invalid inputs, enabling seamless handling of optional data.
+
+It only accepts the canonical form that `encodeBase64url` produces. It returns `undefined` for padding (`=`), whitespace, standard base64 characters (`+`, `/`), or a last character with non-zero unused bits, so each byte sequence has exactly one valid encoding.
 :::

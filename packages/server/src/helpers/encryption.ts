@@ -2,7 +2,12 @@ import { decodeBase64url, encodeBase64url } from './base64url'
 
 const PBKDF2_CONFIG = {
   name: 'PBKDF2',
-  iterations: 60_000, // Recommended minimum iterations per current OWASP guidelines
+  /**
+   * Fixed because changing it would make previously encrypted values undecryptable.
+   * This is below OWASP's 600,000 recommendation for PBKDF2-HMAC-SHA256, which targets
+   * low-entropy passwords, so secrets must be high-entropy random values, not passwords.
+   */
+  iterations: 60_000,
   hash: 'SHA-256',
 } as const
 

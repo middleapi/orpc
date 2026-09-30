@@ -93,4 +93,27 @@ describe('encrypt/decrypt', () => {
       expect(await decrypt(fixture.encrypted, fixture.secret)).toBe(fixture.value)
     }
   })
+
+  describe('non-canonical encodings', () => {
+    const fixtureSecret = 'compatibility-encryption-secret'
+    // length % 4 === 3, so the last char has 2 unused bits
+    const encryptedEmpty = '5IXfizzzaGLhausAUKPlg4JBoyYnbKqa5qdVnLFVPMY8YWZfh0ouEFrZGQw'
+    // contains both `-` and `_`
+    const encryptedWithUrlChars = 'xLe6faWGA5J3MUy-Cue5_mZXiJVlrzqKho8ywwhlCHbO4koT4XT3MxzesdTMLxZIAS6pPJLfU4qKKcZHwOwAAU5RHP-sMp8'
+
+    it('should accept the canonical encoding', async () => {
+      expect(await decrypt(encryptedEmpty, fixtureSecret)).toBe('')
+      expect(await decrypt(encryptedWithUrlChars, fixtureSecret)).toBe('value.with.dots-🚀-中文')
+    })
+
+    it.each([
+      ['non-zero unused bits in the last char', `${encryptedEmpty.slice(0, -1)}x`],
+      ['padding', `${encryptedEmpty}=`],
+      ['leading whitespace', ` ${encryptedEmpty}`],
+      ['embedded whitespace', `${encryptedEmpty.slice(0, 20)} ${encryptedEmpty.slice(20)}`],
+      ['raw + and /', encryptedWithUrlChars.replace(/-/g, '+').replace(/_/g, '/')],
+    ])('should reject %s', async (_, input) => {
+      expect(await decrypt(input, fixtureSecret)).toBeUndefined()
+    })
+  })
 })
