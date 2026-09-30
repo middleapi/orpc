@@ -32,3 +32,12 @@ catch (error) {
 :::info
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
 :::
+
+## Batch Requests
+
+With the [Batch Plugin](/docs/plugins/batch), an error rethrown from a sub-request can only reach `handle` if `handle` has not returned the batch response yet. Which case applies depends on the [response mode](/docs/plugins/batch#response-modes):
+
+- **`buffered`**: `handle` waits for every sub-request to finish, then throws the error and discards the batch response. So your framework's error response goes to every call in the batch, not only the failed one. If several sub-requests fail, only the first error is thrown.
+- **`streaming`**: `handle` has already returned the response, so the error is not thrown. The failed sub-request gets a `500` response, and the rest of the batch keeps streaming.
+
+To see these errors in streaming mode as well, log them with an [interceptor](/docs/rpc/handler#interceptors) instead of relying on the rethrow.

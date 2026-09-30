@@ -201,6 +201,19 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       }
 
+      /**
+       * The first error a subrequest throws at the routing interceptor level, such as one
+       * `RethrowHandlerPlugin` rethrows on purpose. The subrequest is answered with a 500 either way.
+       *
+       * Buffered mode throws it once every subrequest is done, so it reaches the caller of `handle`
+       * like an unbatched request's would, without cutting the other subrequests short.
+       * Streaming mode cannot: `handle` has already returned, and erroring the response stream
+       * would discard the subresponses still queued in it.
+       *
+       * Never reject a floating promise here: it becomes an unhandled rejection, which exits Node.js.
+       */
+      let subrequestError: { value: unknown } | undefined
+
       const handleIndividualRequest = async (request: StandardLazyRequest): Promise<StandardResponse> => {
         try {
           request = this.mapSubrequest(request, interceptorOptions)
@@ -212,13 +225,8 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
           return response
         }
-        catch (err) {
-          /**
-           * Errors should not occur at the routing interceptor level.
-           * Reject the promise so it can be handled by the unhandledRejection handler
-           * for global logging or error handling.
-           */
-          Promise.reject(err)
+        catch (error) {
+          subrequestError ??= { value: error }
 
           return { status: 500, headers: {}, body: 'Internal server error' }
         }
@@ -254,6 +262,10 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
         await runSubrequests(peer)
         await peer.close()
+
+        if (subrequestError) {
+          throw subrequestError.value
+        }
 
         if (responseMessages.some(msg => msg.binary !== undefined)) {
           const chunks: Uint8Array<ArrayBuffer>[] = []

@@ -6,6 +6,7 @@ import { os } from '../builder'
 import { BatchHandlerPlugin } from './batch'
 import { RequestCompressionHandlerPlugin } from './request-compression'
 import { RequestLimitHandlerPlugin } from './request-limit'
+import { RethrowHandlerPlugin } from './rethrow'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -214,31 +215,18 @@ describe('batchHandlerPlugin', () => {
       expect(handlerFn).toHaveBeenCalledTimes(0)
     })
 
-    it('returns 500 sub-response when mapSubrequest throws', async ({ onTestFinished }) => {
-      const rejectSpy = vi.spyOn(Promise, 'reject')
-        .mockImplementation(() => new Promise(() => {}) as Promise<never>)
-
-      onTestFinished(() => {
-        rejectSpy.mockRestore()
-      })
-
+    it('throws from handle when mapSubrequest throws', async () => {
+      const error = new Error('boom')
       const handler = createHandler(new BatchHandlerPlugin({
         mapSubrequest: () => {
-          throw new Error('boom')
+          throw error
         },
       }))
 
-      const { response } = await handler.handle(createBatchRequest({
+      await expect(handler.handle(createBatchRequest({
         mode: 'buffered',
         messages: [makePeerRequestMessage(0, '/ping')],
-      }))
-
-      expect(response!.status).toBe(207)
-
-      const body = await response!.json() as any
-      expect(body[0].json.status).toBe(500)
-      expect(body[0].json.body).toBe('Internal server error')
-      expect(rejectSpy).toHaveBeenCalledTimes(1)
+      }))).rejects.toBe(error)
     })
   })
 
@@ -292,6 +280,103 @@ describe('batchHandlerPlugin', () => {
       const { messageLength, payload } = readLengthPrefixedChunk(buffer)
       expect(messageLength).toBe(payload.length)
       expect(new TextDecoder().decode(payload)).toContain('__TEST__')
+    })
+  })
+
+  describe('subrequest errors', () => {
+    const unhandledRejection = vi.fn()
+    let slowGate = promiseWithResolvers<void>()
+    const slowHandlerFn = vi.fn(async () => {
+      await slowGate.promise
+      return 'pong'
+    })
+
+    const handler = new RPCHandler({
+      boom: os.handler(({ input }) => {
+        throw new Error(`__TEST__${input}`)
+      }),
+      slow: os.handler(slowHandlerFn),
+    }, {
+      plugins: [
+        new BatchHandlerPlugin(),
+        new RethrowHandlerPlugin({ filter: error => !(error instanceof ORPCError) }),
+      ],
+    })
+
+    beforeEach(() => {
+      slowGate = promiseWithResolvers<void>()
+      process.on('unhandledRejection', unhandledRejection)
+    })
+
+    afterEach(() => {
+      process.off('unhandledRejection', unhandledRejection)
+    })
+
+    it('rethrows a buffered subrequest error from handle once every subrequest is done', async () => {
+      const settled = vi.fn()
+      const result = handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: [
+          makePeerRequestMessage(0, '/boom', 'POST', { json: 1 }),
+          makePeerRequestMessage(1, '/slow'),
+        ],
+      }))
+      result.then(settled, settled)
+
+      await vi.waitFor(() => expect(slowHandlerFn).toHaveBeenCalledTimes(1))
+      await new Promise(resolve => setTimeout(resolve))
+      expect(settled).not.toHaveBeenCalled() // waits for the other subrequest instead of cutting it short
+
+      slowGate.resolve()
+      await expect(result).rejects.toThrow('__TEST__1')
+
+      await new Promise(resolve => setTimeout(resolve))
+      expect(unhandledRejection).not.toHaveBeenCalled()
+    })
+
+    it('rethrows only the first error when several buffered subrequests fail', async () => {
+      await expect(handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: [
+          makePeerRequestMessage(0, '/boom', 'POST', { json: 1 }),
+          makePeerRequestMessage(1, '/boom', 'POST', { json: 2 }),
+        ],
+      }))).rejects.toThrow('__TEST__1')
+
+      await new Promise(resolve => setTimeout(resolve))
+      expect(unhandledRejection).not.toHaveBeenCalled()
+    })
+
+    it('answers a streaming subrequest error with a 500 and still streams the rest of the batch', async () => {
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'streaming',
+        messages: [
+          makePeerRequestMessage(0, '/boom', 'POST', { json: 1 }),
+          makePeerRequestMessage(1, '/slow'),
+        ],
+      }))
+
+      expect(response!.status).toBe(207)
+
+      await vi.waitFor(() => expect(slowHandlerFn).toHaveBeenCalledTimes(1))
+      slowGate.resolve()
+
+      // the stream closes instead of erroring, so it resolves with every subresponse
+      let buffer = new Uint8Array(await response!.arrayBuffer())
+      const messages: any[] = []
+      while (buffer.length > 0) {
+        const { messageLength, payload } = readLengthPrefixedChunk(buffer)
+        messages.push(JSON.parse(new TextDecoder().decode(payload)))
+        buffer = buffer.slice(4 + messageLength)
+      }
+
+      expect(messages).toEqual([
+        { id: 0, kind: 'response', json: { status: 500, body: 'Internal server error' } },
+        { id: 1, kind: 'response', json: { body: { json: 'pong' } } },
+      ])
+
+      await new Promise(resolve => setTimeout(resolve))
+      expect(unhandledRejection).not.toHaveBeenCalled()
     })
   })
 

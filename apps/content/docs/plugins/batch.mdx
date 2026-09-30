@@ -79,6 +79,10 @@ const link = new RPCLink({
 })
 ```
 
+:::info
+The mode also decides what happens when a sub-request throws past oRPC's error handling, such as an error rethrown by the [Rethrow Plugin](/docs/plugins/rethrow). In `buffered` mode, `handle` throws the error once the whole batch is done, instead of returning the batch response. In `streaming` mode, `handle` has already returned the response, so the failed sub-request gets a `500` response instead. See [Batch Requests](/docs/plugins/rethrow#batch-requests).
+:::
+
 ### Keep-Alive Timer
 
 In **streaming** mode, long-running batch responses may remain idle for extended periods. The server plugin can send keep-alive frames to keep the connection alive.
