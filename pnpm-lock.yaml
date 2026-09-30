@@ -652,8 +652,8 @@ importers:
   packages/json-schema:
     dependencies:
       '@openapi-spec/types':
-        specifier: ~0.1.0
-        version: 0.1.0
+        specifier: ~0.2.0
+        version: 0.2.0
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
@@ -826,8 +826,8 @@ importers:
         specifier: ~0.1.0
         version: 0.1.0
       '@openapi-spec/types':
-        specifier: ~0.1.0
-        version: 0.1.0
+        specifier: ~0.2.0
+        version: 0.2.0
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
@@ -1153,8 +1153,8 @@ importers:
   packages/zod:
     dependencies:
       '@openapi-spec/types':
-        specifier: ~0.1.0
-        version: 0.1.0
+        specifier: ~0.2.0
+        version: 0.2.0
       '@orpc/json-schema':
         specifier: workspace:*
         version: link:../json-schema
@@ -3899,6 +3899,9 @@ packages:
 
   '@openapi-spec/types@0.1.0':
     resolution: {integrity: sha512-5m9GUj5ekwmJ5uXH0yctarqLGckGc8X7pX65dirukZDUAGmrUx5lKovvWA7YvEBKd480Q7R2oG3nE5C+SoVgNw==}
+
+  '@openapi-spec/types@0.2.0':
+    resolution: {integrity: sha512-pNMkzUMjz1jDfmPXKawCgrQNY7eQaTSPkZ38mG44Stvp+Ry+pSxbiEYg0vvQ8X4neJfYFO4AGxXk4DMeQ0X3lQ==}
 
   '@opentelemetry/api-logs@0.221.0':
     resolution: {integrity: sha512-OlanaW1vv7ufTqQ3/fPLI4arGt5ZoM+P8abOMki6uEYnpRazepSWDwDnnw+la7kE26SHVC18//SMccrDvLKOXQ==}
@@ -15114,6 +15117,8 @@ snapshots:
       '@openapi-spec/types': 0.1.0
 
   '@openapi-spec/types@0.1.0': {}
+
+  '@openapi-spec/types@0.2.0': {}
 
   '@opentelemetry/api-logs@0.221.0':
     dependencies:

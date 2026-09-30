@@ -45,7 +45,7 @@
     "type:check": "tsc -b"
   },
   "dependencies": {
-    "@openapi-spec/types": "~0.1.0",
+    "@openapi-spec/types": "~0.2.0",
     "@orpc/client": "workspace:*",
     "@orpc/contract": "workspace:*",
     "@orpc/server": "workspace:*",

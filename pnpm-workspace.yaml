@@ -47,3 +47,4 @@ minimumReleaseAgeExclude:
   - '@standard-server/node@0.10.0'
   - '@standard-server/peer@0.10.0'
   - '@standard-server/shared@0.10.0'
+  - '@openapi-spec/types@0.2.0'
