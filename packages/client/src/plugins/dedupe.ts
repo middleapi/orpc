@@ -1,8 +1,9 @@
 import type { InterceptorOptions, Value } from '@orpc/shared'
-import type { StandardBody, StandardLazyResponse, StandardRequest } from '@standard-server/core'
+import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
 import type { ClientContext } from '../types'
-import { allAbortSignal, defer, isAsyncIteratorObject, replicateAsyncIterator, replicateReadableStream, stringifyJSON, toArray, value } from '@orpc/shared'
+import { allAbortSignal, defer, isAsyncIteratorObject, runWithSignal, stringifyJSON, toArray, value } from '@orpc/shared'
+import { replicateLazyResponse } from './utils'
 
 export interface DedupeLinkPluginGroup<T extends ClientContext> {
   condition: Value<boolean, [options: StandardLinkTransportInterceptorOptions<T>]>
@@ -74,14 +75,15 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
         return interceptorOptions.next()
       }
 
-      return new Promise((resolve, reject) => {
+      // Each caller settles on its own signal, while the shared request keeps running until every caller aborts.
+      return runWithSignal(interceptorOptions.request.signal, () => new Promise((resolve, reject) => {
         // Schedule only for the first queued request, so later ones cannot extend or split the wait.
         if (!this.queue.size) {
           defer(() => this.processPendingRequests(), this.wait)
         }
 
         this.enqueue(group, interceptorOptions, resolve, reject)
-      })
+      }))
     }
 
     return {
@@ -163,11 +165,11 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
         context,
       })
 
-      const replicatedResponses = replicateLazyResponse(response, item.resolves.length)
+      const replicatedResponses = replicateLazyResponse(response, item.signals)
 
-      for (const resolve of item.resolves) {
-        resolve(replicatedResponses.pop()!)
-      }
+      item.resolves.forEach((resolve, index) => {
+        resolve(replicatedResponses[index]!)
+      })
     }
     catch (error) {
       for (const reject of item.rejects) {
@@ -207,38 +209,6 @@ function createRequestKey(path: string[], request: StandardRequest): string {
     method: request.method,
     url: request.url,
   } satisfies Omit<StandardRequest, 'signal'> & { path: string[] })
-}
-
-function replicateLazyResponse(response: StandardLazyResponse, count: number): StandardLazyResponse[] {
-  const replicated: StandardLazyResponse[] = []
-
-  let bodyPromise: Promise<StandardBody> | undefined
-  let replicatedAsyncIterators: StandardBody[] | undefined
-  let replicatedReadableStream: ReadableStream[] | undefined
-
-  for (let i = 0; i < count; i++) {
-    replicated.push({
-      ...response,
-      resolveBody: async (hint) => {
-        bodyPromise ??= response.resolveBody(hint)
-        const body = await bodyPromise
-
-        if (isAsyncIteratorObject(body)) {
-          replicatedAsyncIterators ??= replicateAsyncIterator(body, count)
-          return replicatedAsyncIterators[i]
-        }
-
-        if (body instanceof ReadableStream) {
-          replicatedReadableStream ??= replicateReadableStream(body, count)
-          return replicatedReadableStream[i]
-        }
-
-        return body
-      },
-    })
-  }
-
-  return replicated
 }
 
 function shouldDedupe<T extends ClientContext>(

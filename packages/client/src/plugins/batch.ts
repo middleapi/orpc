@@ -3,9 +3,10 @@ import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUr
 import type { ClientPeerSendMessage } from '@standard-server/peer'
 import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
 import type { ClientContext } from '../types'
-import { defer, isAsyncIteratorObject, loadBytes, once, promiseWithResolvers, safeEncodeURIComponent, splitInHalf, stringifyJSON, toArray, value } from '@orpc/shared'
+import { defer, isAsyncIteratorObject, loadBytes, promiseWithResolvers, safeEncodeURIComponent, splitInHalf, stringifyJSON, toArray, value } from '@orpc/shared'
 import { parseStandardUrl } from '@standard-server/core'
 import { ClientPeer, decodePeerMessage, isServerPeerSendMessage } from '@standard-server/peer'
+import { replicateLazyResponse } from './utils'
 
 export type BatchLinkPluginMode = 'streaming' | 'buffered'
 
@@ -373,14 +374,13 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
 
         /**
          * An error response is not a batch response, so forward it as-is to every subrequest
-         * instead of failing to parse it.
+         * instead of failing to parse it. Each subrequest gets its own copy of the body.
          */
         if (batchResponse.status >= 400) {
-          const resolveBody = once(() => batchResponse.resolveBody())
-          const errorResponse: StandardLazyResponse = { ...batchResponse, resolveBody }
+          const errorResponses = replicateLazyResponse(batchResponse, groupItems.map(([subOptions]) => subOptions.request.signal))
 
-          groupItems.forEach(([subOptions, resolve]) => {
-            resolve(this.mapSubresponse(errorResponse, batchResponse, subOptions))
+          groupItems.forEach(([subOptions, resolve], index) => {
+            resolve(this.mapSubresponse(errorResponses[index]!, batchResponse, subOptions))
           })
 
           suppressErrorFromCurrentBatch = true

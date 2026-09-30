@@ -1,8 +1,11 @@
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard'
 import * as SharedExperimentalV2Module from '@orpc/shared'
-import { StandardLink } from '../adapters/standard'
+import { AbortError, AsyncIteratorClass, sleep } from '@orpc/shared'
+import { ErrorEvent, getEventMeta, withEventMeta } from '@standard-server/core'
+import { RPCLinkCodec, StandardLink } from '../adapters/standard'
 import { DedupeLinkPlugin } from './dedupe'
+import { TimeoutLinkPlugin } from './timeout'
 
 interface TestContext {
   group?: boolean
@@ -50,7 +53,7 @@ beforeEach(() => {
 describe('dedupeLinkPlugin', () => {
   const allAbortSignalSpy = vi.spyOn(SharedExperimentalV2Module, 'allAbortSignal')
 
-  it('dedupes identical requests and reuses the resolved body', async () => {
+  it('dedupes identical requests and resolves the body once', async () => {
     const signal1 = AbortSignal.timeout(1000)
     const signal2 = AbortSignal.timeout(1000)
     const codec = makeCodec()
@@ -74,7 +77,7 @@ describe('dedupeLinkPlugin', () => {
 
     expect(output1).toEqual({ value: '__body__' })
     expect(output2).toEqual({ value: '__body__' })
-    expect(output1).toBe(output2)
+    expect(output1).not.toBe(output2)
 
     expect(codec.encodeInput).toHaveBeenCalledTimes(2)
     expect(transport.send).toHaveBeenCalledTimes(1)
@@ -124,7 +127,7 @@ describe('dedupeLinkPlugin', () => {
       link.call(['QUERY', 'planet'], { value: 1 }, { context: {} }),
     ])
 
-    expect(output1).toBe(output2)
+    expect(output1).toEqual(output2)
     expect(transport.send).toHaveBeenCalledTimes(1)
   })
 
@@ -372,7 +375,7 @@ describe('dedupeLinkPlugin', () => {
       link.call(['POST', 'planet'], { value: 1 }, { context: {} }),
     ])
 
-    expect(output1).toBe(output2)
+    expect(output1).toEqual(output2)
     expect(transport.send).toHaveBeenCalledTimes(1)
   })
 
@@ -500,6 +503,426 @@ describe('dedupeLinkPlugin', () => {
     await vi.advanceTimersByTimeAsync(1)
     await expect(promise3).resolves.toEqual({ value: '__body__' })
     expect(transport.send).toHaveBeenCalledTimes(2)
+  })
+  describe('isolated outputs', () => {
+    function makeLink(resolveBody: StandardLazyResponse['resolveBody']) {
+      const codec = makeCodec()
+      const transport = makeTransport(vi.fn(resolveBody))
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: {} }],
+        })],
+      })
+
+      return { link, transport }
+    }
+
+    it('gives each caller its own copy of the output', async () => {
+      const { link, transport } = makeLink(async () => ({ list: [3, 1, 2] }))
+
+      const [output1, output2] = await Promise.all([
+        link.call(['GET', 'planet'], { value: 1 }, { context: {} }) as Promise<{ list: number[] }>,
+        link.call(['GET', 'planet'], { value: 1 }, { context: {} }) as Promise<{ list: number[] }>,
+      ])
+
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(output1).not.toBe(output2)
+
+      output1.list.sort()
+      output1.list.push(99)
+
+      expect(output1).toEqual({ list: [1, 2, 3, 99] })
+      expect(output2).toEqual({ list: [3, 1, 2] })
+    })
+
+    it('keeps Blob, File, and primitive values while copying their containers', async () => {
+      const blob = new Blob(['blob'])
+      const file = new File(['file'], 'file.txt', { type: 'text/plain' })
+      const { link } = makeLink(async () => ({ nested: { blob, file, big: 1n, list: [1] } }))
+
+      const [output1, output2] = await Promise.all([
+        link.call(['GET', 'planet'], { value: 1 }, { context: {} }) as Promise<any>,
+        link.call(['GET', 'planet'], { value: 1 }, { context: {} }) as Promise<any>,
+      ])
+
+      expect(output1.nested).not.toBe(output2.nested)
+      expect(output1.nested.list).not.toBe(output2.nested.list)
+
+      for (const output of [output1, output2]) {
+        expect(output.nested.blob).toBe(blob)
+        expect(output.nested.file).toBe(file)
+        expect(output.nested.big).toBe(1n)
+      }
+    })
+
+    it('gives each caller its own FormData and URLSearchParams', async () => {
+      const file = new File(['file'], 'file.txt', { type: 'text/plain' })
+      const { link } = makeLink(async () => {
+        const form = new FormData()
+        form.append('a', '1')
+        form.append('a', '2')
+        form.append('file', file)
+        return form
+      })
+
+      const [form1, form2] = await Promise.all([
+        link.call(['GET', 'planet'], { value: 1 }, { context: {} }) as Promise<FormData>,
+        link.call(['GET', 'planet'], { value: 1 }, { context: {} }) as Promise<FormData>,
+      ])
+
+      expect(form1).not.toBe(form2)
+      form1.delete('a')
+      expect(form2.getAll('a')).toEqual(['1', '2'])
+      expect(form2.get('file')).toBeInstanceOf(File)
+      expect((form2.get('file') as File).name).toBe('file.txt')
+
+      const { link: link2 } = makeLink(async () => new URLSearchParams('a=1&a=2'))
+
+      const [params1, params2] = await Promise.all([
+        link2.call(['GET', 'planet'], { value: 1 }, { context: {} }) as Promise<URLSearchParams>,
+        link2.call(['GET', 'planet'], { value: 1 }, { context: {} }) as Promise<URLSearchParams>,
+      ])
+
+      expect(params1).not.toBe(params2)
+      params1.delete('a')
+      expect(params2.getAll('a')).toEqual(['1', '2'])
+    })
+
+    it('gives each caller its own RPC output, including Date, BigInt, and File values', async () => {
+      const file = new File(['file'], 'file.txt', { type: 'text/plain' })
+      const codec = new RPCLinkCodec<TestContext>({ method: 'GET' })
+      const transport = makeTransport(async () => ({
+        json: { list: [3, 1, 2], at: '2026-01-01T00:00:00.000Z', n: '1' },
+        meta: [['date', 'at'], ['bigint', 'n']],
+      }))
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: {} }],
+        })],
+      })
+
+      const [output1, output2] = await Promise.all([
+        link.call(['planet'], { value: 1 }, { context: {} }) as Promise<any>,
+        link.call(['planet'], { value: 1 }, { context: {} }) as Promise<any>,
+      ])
+
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(output1.list).not.toBe(output2.list)
+      expect(output1.at).not.toBe(output2.at)
+
+      output1.list.push(99)
+      output1.at.setFullYear(2000)
+
+      expect(output2).toEqual({ list: [3, 1, 2], at: new Date('2026-01-01T00:00:00.000Z'), n: 1n })
+
+      vi.mocked(transport.send).mockImplementation(async () => ({
+        status: 200,
+        headers: {},
+        resolveBody: async () => {
+          const form = new FormData()
+          form.set('data', JSON.stringify({ json: { file: {}, list: [1] }, maps: [['file']] }))
+          form.set('0', file)
+          return form
+        },
+      }))
+
+      const [output3, output4] = await Promise.all([
+        link.call(['planet'], { value: 2 }, { context: {} }) as Promise<any>,
+        link.call(['planet'], { value: 2 }, { context: {} }) as Promise<any>,
+      ])
+
+      expect(output3.list).not.toBe(output4.list)
+
+      for (const output of [output3, output4]) {
+        expect(output.file).toBeInstanceOf(File)
+        expect(output.file.name).toBe('file.txt')
+        await expect(output.file.text()).resolves.toBe('file')
+      }
+    })
+
+    it('gives each caller its own copy of every async iterator event, keeping event meta', async () => {
+      const { link } = makeLink(async () => (async function* () {
+        yield withEventMeta({ list: [3, 1, 2] }, { id: '1', retry: 100 })
+        yield 'primitive'
+        throw withEventMeta(new ErrorEvent({ list: [1] }, { message: 'event error' }), { id: '2' })
+      })())
+
+      const [iterator1, iterator2] = await Promise.all([
+        link.call(['GET', 'planet'], { value: 1 }, { context: {} }) as Promise<AsyncIterator<any>>,
+        link.call(['GET', 'planet'], { value: 1 }, { context: {} }) as Promise<AsyncIterator<any>>,
+      ])
+
+      // The first caller reads and mutates everything before the second caller reads anything.
+      const { value: event1 } = await iterator1.next()
+      event1.list.push(99)
+      await expect(iterator1.next()).resolves.toEqual({ done: false, value: 'primitive' })
+      const error1 = await iterator1.next().catch(e => e)
+      error1.data.list.push(99)
+
+      const { value: event2 } = await iterator2.next()
+      expect(event2).not.toBe(event1)
+      expect(event2).toEqual({ list: [3, 1, 2] })
+      expect(getEventMeta(event1)).toEqual({ id: '1', retry: 100 })
+      expect(getEventMeta(event2)).toEqual({ id: '1', retry: 100 })
+
+      await expect(iterator2.next()).resolves.toEqual({ done: false, value: 'primitive' })
+
+      const error2 = await iterator2.next().catch(e => e)
+      expect(error2).not.toBe(error1)
+      expect(error2).toBeInstanceOf(ErrorEvent)
+      expect(error2.message).toBe('event error')
+      expect(error2.data).toEqual({ list: [1] })
+      expect(getEventMeta(error2)).toEqual({ id: '2' })
+    })
+  })
+
+  describe('per-caller abort', () => {
+    function makeDelayedLink(options: { sendDelay?: number, resolveBody?: StandardLazyResponse['resolveBody'] } = {}) {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(transport.send).mockImplementation(async () => {
+        if (options.sendDelay) {
+          await sleep(options.sendDelay)
+        }
+
+        return { status: 200, headers: {}, resolveBody: options.resolveBody ?? (async () => 'ok') }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: {} }],
+        })],
+      })
+
+      return { link, transport }
+    }
+
+    it('rejects an aborted caller with its reason while the shared request keeps running for the others', async () => {
+      vi.useFakeTimers()
+
+      const { link, transport } = makeDelayedLink({ sendDelay: 100 })
+      const controller1 = new AbortController()
+      const controller2 = new AbortController()
+
+      const promise1 = link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller1.signal })
+      const promise2 = link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller2.signal })
+      const promise3 = link.call(['GET', 'planet'], { value: 1 }, { context: {} })
+
+      await vi.advanceTimersByTimeAsync(20)
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      const sharedSignal = vi.mocked(transport.send).mock.calls[0]![0].signal
+
+      const reason = new Error('first caller aborted')
+      controller1.abort(reason)
+      await expect(promise1).rejects.toBe(reason)
+      expect(sharedSignal?.aborted ?? false).toBe(false)
+
+      await vi.advanceTimersByTimeAsync(80)
+      await expect(promise2).resolves.toBe('ok')
+      await expect(promise3).resolves.toBe('ok')
+      expect(transport.send).toHaveBeenCalledTimes(1)
+    })
+
+    it('aborts the shared request only after every caller aborts', async () => {
+      vi.useFakeTimers()
+
+      const { link, transport } = makeDelayedLink({ sendDelay: 100 })
+      const controller1 = new AbortController()
+      const controller2 = new AbortController()
+
+      const promise1 = link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller1.signal })
+      const promise2 = link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller2.signal })
+
+      await vi.advanceTimersByTimeAsync(20)
+      const sharedSignal = vi.mocked(transport.send).mock.calls[0]![0].signal!
+
+      controller1.abort(new Error('first'))
+      await expect(promise1).rejects.toThrow('first')
+      expect(sharedSignal.aborted).toBe(false)
+
+      controller2.abort(new Error('second'))
+      await expect(promise2).rejects.toThrow('second')
+      expect(sharedSignal.aborted).toBe(true)
+    })
+
+    it('honors TimeoutLinkPlugin for each caller', async () => {
+      vi.useFakeTimers()
+
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(transport.send).mockImplementation(async () => {
+        await sleep(100)
+        return { status: 200, headers: {}, resolveBody: async () => 'ok' }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [
+          new TimeoutLinkPlugin({ timeout: ({ context }) => context.tag === 'timeout' ? 20 : undefined }),
+          new DedupeLinkPlugin({ groups: [{ condition: () => true, context: {} }] }),
+        ],
+      })
+
+      const promise1 = link.call(['GET', 'planet'], { value: 1 }, { context: { tag: 'timeout' } })
+      const promise2 = link.call(['GET', 'planet'], { value: 1 }, { context: {} })
+      const assertion1 = expect(promise1).rejects.toSatisfy(error =>
+        error instanceof AbortError && error.message === 'Request timed out after 20ms',
+      )
+
+      await vi.advanceTimersByTimeAsync(20)
+      await assertion1
+
+      await vi.advanceTimersByTimeAsync(80)
+      await expect(promise2).resolves.toBe('ok')
+      expect(transport.send).toHaveBeenCalledTimes(1)
+    })
+
+    it('rejects a caller that aborts while its body is resolving', async () => {
+      vi.useFakeTimers()
+
+      const { link } = makeDelayedLink({
+        resolveBody: async () => {
+          await sleep(100)
+          return 'ok'
+        },
+      })
+      const controller = new AbortController()
+
+      const promise1 = link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal })
+      const promise2 = link.call(['GET', 'planet'], { value: 1 }, { context: {} })
+
+      await vi.advanceTimersByTimeAsync(20)
+
+      const reason = new Error('aborted')
+      controller.abort(reason)
+      await expect(promise1).rejects.toBe(reason)
+
+      await vi.advanceTimersByTimeAsync(100)
+      await expect(promise2).resolves.toBe('ok')
+    })
+
+    it('stops an aborted caller\'s async iterator and releases its share of the source', async () => {
+      vi.useFakeTimers()
+
+      const cleanup = vi.fn()
+      let counter = 0
+      const { link } = makeDelayedLink({
+        resolveBody: async () => new AsyncIteratorClass(async () => {
+          await sleep(10)
+          return { done: false, value: counter++ }
+        }, cleanup),
+      })
+      const controller = new AbortController()
+
+      const promise = Promise.all([
+        link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal }) as Promise<AsyncIterator<number>>,
+        link.call(['GET', 'planet'], { value: 1 }, { context: {} }) as Promise<AsyncIterator<number>>,
+      ])
+      await vi.advanceTimersByTimeAsync(1)
+      const [iterator1, iterator2] = await promise
+
+      const next1 = iterator1.next()
+      const next2 = iterator2.next()
+      await vi.advanceTimersByTimeAsync(10)
+      await expect(next1).resolves.toEqual({ done: false, value: 0 })
+      await expect(next2).resolves.toEqual({ done: false, value: 0 })
+
+      const pending1 = iterator1.next()
+      const reason = new Error('aborted')
+      controller.abort(reason)
+      await expect(pending1).rejects.toBe(reason)
+      await expect(iterator1.next()).resolves.toEqual({ done: true, value: undefined })
+
+      await vi.advanceTimersByTimeAsync(10)
+      await expect(iterator2.next()).resolves.toEqual({ done: false, value: 1 })
+      expect(cleanup).not.toHaveBeenCalled()
+
+      await iterator2.return!()
+      expect(cleanup).toHaveBeenCalledTimes(1)
+    })
+
+    it('stops an aborted caller\'s readable stream and releases its share of the source', async () => {
+      vi.useFakeTimers()
+
+      const cancel = vi.fn()
+      let counter = 0
+      const { link } = makeDelayedLink({
+        resolveBody: async () => new ReadableStream<number>({
+          async pull(controller) {
+            await sleep(10)
+            controller.enqueue(counter++)
+          },
+          cancel,
+        }),
+      })
+      const controller = new AbortController()
+
+      const promise = Promise.all([
+        link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal }) as Promise<ReadableStream<number>>,
+        link.call(['GET', 'planet'], { value: 1 }, { context: {} }) as Promise<ReadableStream<number>>,
+      ])
+      await vi.advanceTimersByTimeAsync(1)
+      const [stream1, stream2] = await promise
+      const reader1 = stream1.getReader()
+      const reader2 = stream2.getReader()
+
+      const read1 = reader1.read()
+      const read2 = reader2.read()
+      await vi.advanceTimersByTimeAsync(10)
+      await expect(read1).resolves.toEqual({ done: false, value: 0 })
+      await expect(read2).resolves.toEqual({ done: false, value: 0 })
+
+      const pending1 = reader1.read()
+      const reason = new Error('aborted')
+      controller.abort(reason)
+      await expect(pending1).rejects.toBe(reason)
+
+      await vi.advanceTimersByTimeAsync(10)
+      await expect(reader2.read()).resolves.toEqual({ done: false, value: 1 })
+      expect(cancel).not.toHaveBeenCalled()
+
+      await reader2.cancel('done')
+      expect(cancel).toHaveBeenCalledTimes(1)
+    })
+
+    it.each(['before the response', 'while the body resolves'] as const)(
+      'releases the share of a caller that aborts %s',
+      async (when) => {
+        vi.useFakeTimers()
+
+        const cleanup = vi.fn()
+        const { link } = makeDelayedLink({
+          sendDelay: when === 'before the response' ? 100 : 0,
+          resolveBody: async () => {
+            await sleep(when === 'while the body resolves' ? 100 : 0)
+            return new AsyncIteratorClass(async () => {
+              await sleep(10)
+              return { done: false, value: 'event' }
+            }, cleanup)
+          },
+        })
+        const controller = new AbortController()
+
+        const promise1 = link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal })
+        const promise2 = link.call(['GET', 'planet'], { value: 1 }, { context: {} }) as Promise<AsyncIterator<string>>
+
+        await vi.advanceTimersByTimeAsync(20)
+        controller.abort(new Error('aborted'))
+        await expect(promise1).rejects.toThrow('aborted')
+
+        await vi.advanceTimersByTimeAsync(100)
+        const iterator2 = await promise2
+        const next2 = iterator2.next()
+        await vi.advanceTimersByTimeAsync(10)
+        await expect(next2).resolves.toEqual({ done: false, value: 'event' })
+
+        await iterator2.return!()
+        expect(cleanup).toHaveBeenCalledTimes(1)
+      },
+    )
   })
 })
 

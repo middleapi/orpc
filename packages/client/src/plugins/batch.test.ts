@@ -1162,6 +1162,31 @@ describe('batchLinkPlugin', () => {
       expect(resolveBody).toHaveBeenCalledTimes(1)
     })
 
+    it('gives each subrequest its own copy of the error response body', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(transport.send).mockImplementation(async () => {
+        return { status: 502, headers: {}, resolveBody: async () => ({ list: [3, 1, 2] }) }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered' })],
+      })
+
+      const [output1, output2] = await Promise.all([
+        link.call(['a'], {}, { context: {} }) as Promise<{ list: number[] }>,
+        link.call(['b'], {}, { context: {} }) as Promise<{ list: number[] }>,
+      ])
+
+      expect(output1).not.toBe(output2)
+
+      output1.list.push(99)
+
+      expect(output1).toEqual({ list: [3, 1, 2, 99] })
+      expect(output2).toEqual({ list: [3, 1, 2] })
+    })
+
     it('still parses batch responses with status < 400', async () => {
       const codec = makeCodec()
       const transport = makeTransport()
