@@ -155,6 +155,152 @@ describe('openAPIMatcher', () => {
     })
   })
 
+  describe('static path text', () => {
+    it('treats rou3 route syntax in explicit paths literally', async () => {
+      // Google AIP-136 custom methods: rou3 would read ":batchGet" as a param
+      const batchGet = os.meta(openapi({ method: 'POST', path: '/v1/files:batchGet' })).handler(() => 'batchGet')
+      const batchCreate = os.meta(openapi({ method: 'POST', path: '/v1/files:batchCreate' })).handler(() => 'batchCreate')
+      const star = os.meta(openapi({ method: 'GET', path: '/star/a*b' })).handler(() => 'star')
+      const wildcard = os.meta(openapi({ method: 'GET', path: '/wildcard/*' })).handler(() => 'wildcard')
+      const catchAll = os.meta(openapi({ method: 'GET', path: '/catch-all/**' })).handler(() => 'catchAll')
+      const group = os.meta(openapi({ method: 'GET', path: '/group/(x)' })).handler(() => 'group')
+      const braces = os.meta(openapi({ method: 'GET', path: '/braces/{id}:cancel/{a.b}' })).handler(() => 'braces')
+
+      const matcher = new OpenAPIMatcher({ batchGet, batchCreate, star, wildcard, catchAll, group, braces })
+
+      await expect(matcher.match('POST', '/v1/files:batchGet', undefined)).resolves.toEqual({
+        path: ['batchGet'],
+        procedure: batchGet,
+        params: undefined,
+      })
+
+      await expect(matcher.match('POST', '/v1/files:batchCreate', undefined)).resolves.toEqual({
+        path: ['batchCreate'],
+        procedure: batchCreate,
+        params: undefined,
+      })
+
+      await expect(matcher.match('POST', '/v1/files%3AbatchCreate', undefined)).resolves.toEqual({
+        path: ['batchCreate'],
+        procedure: batchCreate,
+        params: undefined,
+      })
+
+      await expect(matcher.match('POST', '/v1/filesXYZ', undefined)).resolves.toBeUndefined()
+      await expect(matcher.match('POST', '/v1/files:batchDelete', undefined)).resolves.toBeUndefined()
+
+      await expect(matcher.match('GET', '/star/a*b', undefined)).resolves.toEqual({ path: ['star'], procedure: star, params: undefined })
+      await expect(matcher.match('GET', '/star/a%2Ab', undefined)).resolves.toEqual({ path: ['star'], procedure: star, params: undefined })
+      await expect(matcher.match('GET', '/star/aXb', undefined)).resolves.toBeUndefined()
+
+      await expect(matcher.match('GET', '/wildcard/*', undefined)).resolves.toEqual({ path: ['wildcard'], procedure: wildcard, params: undefined })
+      await expect(matcher.match('GET', '/wildcard/x', undefined)).resolves.toBeUndefined()
+
+      await expect(matcher.match('GET', '/catch-all/**', undefined)).resolves.toEqual({ path: ['catchAll'], procedure: catchAll, params: undefined })
+      await expect(matcher.match('GET', '/catch-all/x/y', undefined)).resolves.toBeUndefined()
+
+      await expect(matcher.match('GET', '/group/(x)', undefined)).resolves.toEqual({ path: ['group'], procedure: group, params: undefined })
+      await expect(matcher.match('GET', '/group/x', undefined)).resolves.toBeUndefined()
+
+      // only whole segments like "{id}" are params, so these braces are static text
+      await expect(matcher.match('GET', '/braces/{id}:cancel/{a.b}', undefined)).resolves.toEqual({ path: ['braces'], procedure: braces, params: undefined })
+      await expect(matcher.match('GET', '/braces/%7Bid%7D:cancel/%7Ba.b%7D', undefined)).resolves.toEqual({ path: ['braces'], procedure: braces, params: undefined })
+      await expect(matcher.match('GET', '/braces/1:cancel/a.b', undefined)).resolves.toBeUndefined()
+    })
+
+    it('treats rou3 route syntax in generated paths literally', async () => {
+      const star = os.handler(() => 'star')
+      const matcher = new OpenAPIMatcher({ 'a*b': star })
+
+      await expect(matcher.match('POST', '/a*b', undefined)).resolves.toEqual({ path: ['a*b'], procedure: star, params: undefined })
+      await expect(matcher.match('POST', '/aXb', undefined)).resolves.toBeUndefined()
+    })
+
+    it('prefers a static route over a param route regardless of how the request encodes it', async () => {
+      const find = os.meta(openapi({ method: 'GET', path: '/files/{id}' })).handler(() => 'find')
+      const search = os.meta(openapi({ method: 'GET', path: '/files/:search' })).handler(() => 'search')
+      const info = os.meta(openapi({ method: 'GET', path: '/files/info' })).handler(() => 'info')
+
+      const matcher = new OpenAPIMatcher({ find, search, info })
+
+      await expect(matcher.match('GET', '/files/:search', undefined)).resolves.toEqual({ path: ['search'], procedure: search, params: undefined })
+      await expect(matcher.match('GET', '/files/%3Asearch', undefined)).resolves.toEqual({ path: ['search'], procedure: search, params: undefined })
+      await expect(matcher.match('GET', '/files/%69nfo', undefined)).resolves.toEqual({ path: ['info'], procedure: info, params: undefined })
+
+      await expect(matcher.match('GET', '/files/:other', undefined)).resolves.toEqual({
+        path: ['find'],
+        procedure: find,
+        params: { id: ':other' },
+      })
+
+      await expect(matcher.match('GET', '/files/a*(b)%2F%25', undefined)).resolves.toEqual({
+        path: ['find'],
+        procedure: find,
+        params: { id: 'a*(b)/%' },
+      })
+    })
+
+    it('matches non-ASCII characters and spaces in explicit paths however the request encodes them', async () => {
+      const cafe = os.meta(openapi({ method: 'GET', path: '/café/{id}' })).handler(() => 'cafe')
+      const hello = os.meta(openapi({ method: 'GET', path: '/hello world' })).handler(() => 'hello')
+      const encoded = os.meta(openapi({ method: 'GET', path: '/already%20encoded' })).handler(() => 'encoded')
+
+      const matcher = new OpenAPIMatcher({ cafe, hello, encoded })
+
+      for (const pathname of ['/caf%C3%A9/1', '/caf%c3%a9/1', '/café/1'] as const) {
+        await expect(matcher.match('GET', pathname, undefined)).resolves.toEqual({
+          path: ['cafe'],
+          procedure: cafe,
+          params: { id: '1' },
+        })
+      }
+
+      for (const pathname of ['/hello%20world', '/hello world'] as const) {
+        await expect(matcher.match('GET', pathname, undefined)).resolves.toEqual({
+          path: ['hello'],
+          procedure: hello,
+          params: undefined,
+        })
+      }
+
+      for (const pathname of ['/already%20encoded', '/already encoded'] as const) {
+        await expect(matcher.match('GET', pathname, undefined)).resolves.toEqual({
+          path: ['encoded'],
+          procedure: encoded,
+          params: undefined,
+        })
+      }
+
+      await expect(matcher.match('GET', '/cafe/1', undefined)).resolves.toBeUndefined()
+      await expect(matcher.match('GET', '/hello%2520world', undefined)).resolves.toBeUndefined()
+    })
+
+    it('encodes static text in OpenAPI prefixes, including lazy router prefixes', async () => {
+      const ping = os.meta(openapi({ prefix: '/v1:beta' })).handler(() => 'pong')
+      const info = os.meta(openapi({ method: 'GET', path: '/info' })).handler(() => 'info')
+      const loader = vi.fn(async () => ({ default: { info } }))
+
+      const matcher = new OpenAPIMatcher({
+        ping,
+        cafe: os.meta(openapi({ prefix: '/café' })).lazy(loader),
+      })
+
+      await expect(matcher.match('POST', '/v1:beta/ping', undefined)).resolves.toEqual({
+        path: ['ping'],
+        procedure: ping,
+        params: undefined,
+      })
+      await expect(matcher.match('POST', '/v1Xbeta/ping', undefined)).resolves.toBeUndefined()
+
+      await expect(matcher.match('GET', '/cafe/info', undefined)).resolves.toBeUndefined()
+      expect(loader).not.toHaveBeenCalled()
+
+      const result = await matcher.match('GET', '/caf%C3%A9/info', undefined)
+      expect(result?.path).toEqual(['cafe', 'info'])
+      expect(loader).toHaveBeenCalledTimes(1)
+    })
+  })
+
   describe('runtime prefix stripping', () => {
     it('strips prefixes before route matching, including trailing slash prefixes', async () => {
       const ping = os.handler(() => 'pong')
@@ -294,8 +440,8 @@ describe('openAPIMatcher', () => {
         user: os.meta(openapi({ prefix: '/users' })).lazy(loader),
       })
 
-      // "%75" is "u": the prefix RegExp is tested against the raw pathname first and fails,
-      // so the retry has to re-run lazy resolution against the normalized pathname
+      // "%75" is "u": the prefix RegExp would fail against the raw pathname,
+      // so lazy resolution has to run against the canonical pathname
       const result = await matcher.match('GET', '/%75sers/info', undefined)
 
       expect(result).toBeDefined()

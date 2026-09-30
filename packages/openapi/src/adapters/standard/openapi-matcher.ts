@@ -2,11 +2,23 @@ import type { AnyProcedureContract } from '@orpc/contract'
 import type { AnyProcedure, AnyRouter, WalkProcedureContractsLazyResult } from '@orpc/server'
 import type { Value } from '@orpc/shared'
 import { createContractProcedure, getRouter, Procedure, unlazy, walkProcedureContractsSync } from '@orpc/server'
-import { mergeHttpPath, normalizeHttpPath, pathToHttpPath, safeDecodeURIComponent, value } from '@orpc/shared'
+import { mergeHttpPath, pathToHttpPath, safeDecodeURIComponent, safeEncodeURIComponent, value } from '@orpc/shared'
 import { addRoute, createRouter, findRoute, routeToRegExp } from 'rou3'
 import { DEFAULT_OPENAPI_METHOD } from '../../constants'
 import { getOpenAPIMeta } from '../../meta'
 import { getDynamicPathParams } from '../../utils'
+
+/**
+ * Matches any character that {@link toCanonicalHttpPath} may rewrite.
+ * `%` is included because an escape may decode to a character that is stored unencoded.
+ */
+const NON_CANONICAL_HTTP_PATH_REGEX = /[^\w\-.!~'/]/
+
+/**
+ * Characters `encodeURIComponent` leaves unencoded that rou3 parses as route syntax.
+ */
+const ROU3_SYNTAX_CHAR_REGEX = /[*()]/g
+const ROU3_SYNTAX_CHAR_ESCAPES: Record<string, string> = { '*': '%2A', '(': '%28', ')': '%29' }
 
 export interface OpenAPIMatcherOptions {
   /**
@@ -102,29 +114,21 @@ export class OpenAPIMatcher {
       }
     }
 
+    // Routes are indexed in canonical form, so equivalent spellings of a path (e.g. "a%62c" vs "abc",
+    // "files:get" vs "files%3Aget") match the same route without storing duplicate entries.
+    // Canonicalizing before the lookup, rather than retrying after a miss, also keeps a static
+    // route ahead of a param route that the raw spelling would have matched instead.
+    if (NON_CANONICAL_HTTP_PATH_REGEX.test(pathname)) {
+      pathname = toCanonicalHttpPath(pathname)
+    }
+
     // most requests `await undefined` so conditionally await it to save a microtask turn
     const loading = this.resolvePendingLazyRouters(pathname)
     if (loading !== undefined) {
       await loading
     }
 
-    let match = findRoute(this.tree, method, pathname)
-
-    if (match === undefined && pathname.includes('%')) {
-      // Retry with a normalized path: users may percent-encode characters that
-      // we store unencoded (e.g. "a%62c" vs "abc"), so normalization lets us
-      // handle those requests without storing duplicate entries.
-
-      const normalizedPathname = normalizeHttpPath(pathname)
-
-      // most requests `await undefined` so conditionally await it to save a microtask turn
-      const normalizedLoading = this.resolvePendingLazyRouters(normalizedPathname)
-      if (normalizedLoading !== undefined) {
-        await normalizedLoading
-      }
-
-      match = findRoute(this.tree, method, normalizedPathname)
-    }
+    const match = findRoute(this.tree, method, pathname)
 
     if (match === undefined) {
       return undefined
@@ -192,20 +196,43 @@ export class OpenAPIMatcher {
   }
 }
 
+/**
+ * The form routes are indexed in and request paths are matched in: every segment is decoded and
+ * re-encoded, like `normalizeHttpPath`, so static text never reaches rou3 unencoded
+ * (e.g. `:` would start a param, `{` a group). The `*`, `(` and `)` that survive
+ * `encodeURIComponent` are percent-encoded as well, because rou3 0.9 cannot backslash-escape
+ * `*` inside a segment and `routeToRegExp` produces an invalid RegExp for `\:`.
+ */
+function toCanonicalHttpPath<T extends string>(path: T): T {
+  return path.split('/').map(toCanonicalHttpPathSegment).join('/') as T
+}
+
+function toCanonicalHttpPathSegment(segment: string): string {
+  if (!NON_CANONICAL_HTTP_PATH_REGEX.test(segment)) {
+    return segment
+  }
+
+  return safeEncodeURIComponent(safeDecodeURIComponent(segment))
+    .replace(ROU3_SYNTAX_CHAR_REGEX, char => ROU3_SYNTAX_CHAR_ESCAPES[char]!)
+}
+
 function toRou3Pattern(path: `/${string}`): `/${string}` {
   const params = getDynamicPathParams(path)
 
   if (!params?.length) {
-    return path
+    return toCanonicalHttpPath(path)
   }
 
-  for (let i = params.length - 1; i >= 0; i--) {
-    const param = params[i]!
-    const pattern = param.allowsSlash ? `**:${param.parameterName}` : `:${param.parameterName}`
-    path = path.slice(0, param.startIndex) + pattern + path.slice(param.startIndex + param.segment.length)
+  let pattern = ''
+  let staticStart = 0
+
+  for (const param of params) {
+    pattern += toCanonicalHttpPath(path.slice(staticStart, param.startIndex))
+    pattern += param.allowsSlash ? `**:${param.parameterName}` : `:${param.parameterName}`
+    staticStart = param.startIndex + param.segment.length
   }
 
-  return path
+  return `${pattern}${toCanonicalHttpPath(path.slice(staticStart))}` as `/${string}`
 }
 
 function toRou3PrefixMatcher(path: `/${string}`): RegExp {
