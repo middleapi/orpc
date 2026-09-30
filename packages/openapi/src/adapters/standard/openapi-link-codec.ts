@@ -232,6 +232,19 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       throw new TypeError(`Path param "${param.parameterName}" cannot be empty in call to procedure (${path.join('.')}).`)
     }
 
+    /**
+     * URL parsers collapse "." and ".." segments (even percent-encoded ones),
+     * which would send the request to a different endpoint.
+     */
+    if (param.allowsSlash) {
+      if (encoded.split('/').some(isDotSegment)) {
+        throw new TypeError(`Path param "${param.parameterName}" cannot contain "." or ".." segments in call to procedure (${path.join('.')}).`)
+      }
+    }
+    else if (isDotSegment(encoded)) {
+      throw new TypeError(`Path param "${param.parameterName}" cannot be "." or ".." in call to procedure (${path.join('.')}).`)
+    }
+
     return encoded
   }
 
@@ -478,6 +491,10 @@ function isValidDetailedInput(
   }
 
   return true
+}
+
+function isDotSegment(segment: string): boolean {
+  return segment === '.' || segment === '..'
 }
 
 /**

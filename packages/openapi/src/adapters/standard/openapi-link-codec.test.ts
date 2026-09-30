@@ -607,6 +607,102 @@ describe('openAPILinkCodec', () => {
           'Path param "filter" cannot be empty in call to procedure (item).',
         )
       })
+
+      it('throws when path params are dot segments', async () => {
+        const codec = new OpenAPILinkCodec({
+          compact: oc.meta(openapi({ path: '/posts/{id}/comments' })),
+          detailed: oc.meta(openapi({ path: '/posts/{id}/comments', inputStructure: 'detailed' })),
+        }, { url: '/api', serializer })
+
+        for (const id of ['.', '..']) {
+          await expect(codec.encodeInput({ id }, ['compact'], { context: {} })).rejects.toThrow(
+            'Path param "id" cannot be "." or ".." in call to procedure (compact).',
+          )
+          await expect(codec.encodeInput({ params: { id } }, ['detailed'], { context: {} })).rejects.toThrow(
+            'Path param "id" cannot be "." or ".." in call to procedure (detailed).',
+          )
+        }
+      })
+
+      it('throws when {+rest} path params contain dot segments', async () => {
+        const codec = new OpenAPILinkCodec({
+          compact: oc.meta(openapi({ path: '/files/{+path}' })),
+          detailed: oc.meta(openapi({ path: '/files/{+path}', inputStructure: 'detailed' })),
+        }, { url: '/api', serializer })
+
+        for (const path of ['.', '..', 'a/../../admin', './a', 'a/.', 'a/..', 'a/./b']) {
+          await expect(codec.encodeInput({ path }, ['compact'], { context: {} })).rejects.toThrow(
+            'Path param "path" cannot contain "." or ".." segments in call to procedure (compact).',
+          )
+          await expect(codec.encodeInput({ params: { path } }, ['detailed'], { context: {} })).rejects.toThrow(
+            'Path param "path" cannot contain "." or ".." segments in call to procedure (detailed).',
+          )
+        }
+      })
+
+      it('throws when comma-delimited path params are dot segments', async () => {
+        const codec = new OpenAPILinkCodec({
+          compact: oc.meta(openapi({
+            path: '/items/{ids}/{filter}',
+            paramsStyles: { ids: 'comma-delimited-array', filter: 'comma-delimited-object' },
+          })),
+          detailed: oc.meta(openapi({
+            path: '/items/{ids}/{filter}',
+            inputStructure: 'detailed',
+            paramsStyles: { ids: 'comma-delimited-array', filter: 'comma-delimited-object' },
+          })),
+          rest: oc.meta(openapi({
+            path: '/items/{+ids}',
+            paramsStyles: { ids: 'comma-delimited-array' },
+          })),
+        }, { url: '/api', serializer })
+
+        for (const dot of ['.', '..']) {
+          await expect(codec.encodeInput({ ids: [dot], filter: { a: 'b' } }, ['compact'], { context: {} })).rejects.toThrow(
+            'Path param "ids" cannot be "." or ".." in call to procedure (compact).',
+          )
+          await expect(codec.encodeInput({ ids: [dot, null], filter: { a: 'b' } }, ['compact'], { context: {} })).rejects.toThrow(
+            'Path param "ids" cannot be "." or ".." in call to procedure (compact).',
+          )
+          await expect(codec.encodeInput({ ids: dot, filter: { a: 'b' } }, ['compact'], { context: {} })).rejects.toThrow(
+            'Path param "ids" cannot be "." or ".." in call to procedure (compact).',
+          )
+          await expect(codec.encodeInput({ ids: ['a'], filter: dot }, ['compact'], { context: {} })).rejects.toThrow(
+            'Path param "filter" cannot be "." or ".." in call to procedure (compact).',
+          )
+          await expect(codec.encodeInput({ params: { ids: [dot], filter: { a: 'b' } } }, ['detailed'], { context: {} })).rejects.toThrow(
+            'Path param "ids" cannot be "." or ".." in call to procedure (detailed).',
+          )
+          await expect(codec.encodeInput({ params: { ids: ['a'], filter: dot } }, ['detailed'], { context: {} })).rejects.toThrow(
+            'Path param "filter" cannot be "." or ".." in call to procedure (detailed).',
+          )
+          await expect(codec.encodeInput({ ids: [dot] }, ['rest'], { context: {} })).rejects.toThrow(
+            'Path param "ids" cannot contain "." or ".." segments in call to procedure (rest).',
+          )
+        }
+      })
+
+      it('keeps path params that only contain dots within a segment', async () => {
+        const codec = new OpenAPILinkCodec({
+          plain: oc.meta(openapi({ path: '/posts/{id}/comments' })),
+          rest: oc.meta(openapi({ path: '/files/{+path}' })),
+          styled: oc.meta(openapi({
+            path: '/items/{ids}/{filter}',
+            paramsStyles: { ids: 'comma-delimited-array', filter: 'comma-delimited-object' },
+          })),
+        }, { url: '/api', serializer })
+
+        for (const id of ['...', '.a', 'a.', 'a..b', '%2e%2e', '../a']) {
+          const request = await codec.encodeInput({ id }, ['plain'], { context: {} })
+          expect(request.url).toBe(`/api/posts/${encodeURIComponent(id)}/comments`)
+        }
+
+        const rest = await codec.encodeInput({ path: '.a/v1.0/.../a..b' }, ['rest'], { context: {} })
+        expect(rest.url).toBe('/api/files/.a/v1.0/.../a..b')
+
+        const styled = await codec.encodeInput({ ids: ['.', '.'], filter: { '..': '..' } }, ['styled'], { context: {} })
+        expect(styled.url).toBe('/api/items/.,./..,..')
+      })
     })
 
     describe('option handling', () => {
