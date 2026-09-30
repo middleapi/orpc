@@ -337,6 +337,9 @@ function toORPCOpenAPIParams(contract: AnyProcedureContract, params: NestStandar
     return undefined
   }
 
+  const dynamicParams = getDynamicPathParams(meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path)
+  const nestParamNames = dynamicParams && toNestParamNames(dynamicParams)
+
   // NullProtoObj prevents prototype injection when a param is named like `__proto__`
   const orpcParams: Record<string, string> = new NullProtoObj()
   // express use `path` while fastify use `*` for rest matching
@@ -344,9 +347,7 @@ function toORPCOpenAPIParams(contract: AnyProcedureContract, params: NestStandar
 
   for (const [key, value] of Object.entries(params)) {
     if (key === restKey) {
-      const restParams = getDynamicPathParams(
-        meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path,
-      )?.filter(c => c.allowsSlash)
+      const restParams = dynamicParams?.filter(c => c.allowsSlash)
 
       if (restParams?.length) {
         for (const c of restParams) {
@@ -357,7 +358,9 @@ function toORPCOpenAPIParams(contract: AnyProcedureContract, params: NestStandar
       }
     }
 
-    orpcParams[key] = flattenParamValue(value)
+    // Keys not generated from the contract path, like controller prefix params, are kept as is
+    const index = nestParamNames?.indexOf(key) ?? -1
+    orpcParams[index === -1 ? key : dynamicParams![index]!.parameterName] = flattenParamValue(value)
   }
 
   return orpcParams
@@ -370,11 +373,45 @@ function toNestPattern(path: `/${string}`): `/${string}` {
     return path
   }
 
+  const nestParamNames = toNestParamNames(params)
+
   for (let i = params.length - 1; i >= 0; i--) {
     const param = params[i]!
-    const pattern = param.allowsSlash ? `*` : `:${param.parameterName}`
+    const pattern = param.allowsSlash ? `*` : `:${nestParamNames[i]}`
     path = path.slice(0, param.startIndex) + pattern + path.slice(param.startIndex + param.segment.length)
   }
 
   return path
+}
+
+/**
+ * Express 5 (path-to-regexp v8) and Fastify end a param name at `-`, and Express rejects one that
+ * starts with a digit, while oRPC allows both.
+ */
+const NEST_SAFE_PARAM_NAME_REGEX = /^[a-z_]\w*$/i
+
+/**
+ * Names the params of a contract path for the NestJS router, in path order. Names the router can
+ * parse are kept, so guards and interceptors still see them in `req.params`. The others are replaced
+ * by generated names that no other param of the path uses, and `toORPCOpenAPIParams` translates them back.
+ */
+function toNestParamNames(params: Exclude<ReturnType<typeof getDynamicPathParams>, undefined>): string[] {
+  const usedNames = new Set(params.map(param => param.parameterName))
+
+  return params.map((param, index) => {
+    // Rest params are registered as `*`, so their names never reach the router
+    if (param.allowsSlash || NEST_SAFE_PARAM_NAME_REGEX.test(param.parameterName)) {
+      return param.parameterName
+    }
+
+    let name = `orpc_p${index}`
+
+    while (usedNames.has(name)) {
+      name = `_${name}`
+    }
+
+    usedNames.add(name)
+
+    return name
+  })
 }
