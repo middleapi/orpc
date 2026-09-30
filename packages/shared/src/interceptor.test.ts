@@ -384,6 +384,8 @@ describe('lifecycle interceptors', () => {
 })
 
 describe('onFinish', () => {
+  // Pins the per-call state contract. It passes with `state` in the factory closure too: that version
+  // only leaked the last result, which needs forced garbage collection to observe and is not tested.
   it('gives each call its own state when calls overlap', async () => {
     const callback = vi.fn()
     const interceptor = onFinish(callback)
