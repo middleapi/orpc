@@ -245,7 +245,7 @@ const link = new OpenAPILink(contract, {
 
 ## Malformed Responses
 
-When `OpenAPILink` cannot decode a response, for example when a proxy or gateway answers instead of your handler, it produces an `ORPCError` with code `MALFORMED_ORPC_RESPONSE` and a message inferred from the body or status. Its `cause` is a `MalformedResponseError` carrying the resolved response:
+When `OpenAPILink` cannot decode a response, for example when a proxy or gateway answers instead of your handler, it produces an `ORPCError` with code `MALFORMED_ORPC_RESPONSE` and a message inferred from the body or status. It produces the same error for an opaque response (status `0`), which browsers return for a redirect because the link does not follow redirects. Its `cause` is a `MalformedResponseError` carrying the resolved response:
 
 ```ts
 import { MalformedResponseError, ORPCError, onError } from '@orpc/client'

@@ -4,7 +4,8 @@ import type { ToFetchBodyOptions } from '@standard-server/fetch'
 import type { ClientContext, ClientOptions } from '../../types'
 import type { StandardLinkTransport } from '../standard'
 import { once, value } from '@orpc/shared'
-import { toFetchBody, toFetchHeaders, toStandardLazyResponse } from '@standard-server/fetch'
+import { toFetchBody, toFetchHeaders, toStandardHeaders, toStandardLazyResponse } from '@standard-server/fetch'
+import { createORPCErrorFromMalformedResponse } from '../../error-utils'
 
 const GET_SUPPORTED_DUPLEX_MODE = once(() => {
   // TODO: Try `duplex: 'full'` when it is widely supported.
@@ -92,6 +93,17 @@ export class FetchLinkTransport<T extends ClientContext> implements StandardLink
     // Call without a receiver: browsers throw "Illegal invocation" when native `fetch` is called on a non-global `this`.
     const fetch = this.fetch
     const response = await fetch(url, init, options, path)
+
+    /**
+     * With `redirect: 'manual'`, browsers turn a redirect into an opaque-redirect response
+     * that hides the real status, headers, and body. Reject it instead of decoding it as a success.
+     */
+    if (response.status === 0 || response.type === 'opaqueredirect') {
+      throw createORPCErrorFromMalformedResponse({
+        message: `Received an opaque response (status ${response.status}, type "${response.type}"), likely from a redirect. Redirects are not followed, and browsers hide the status, headers, and body of redirect responses.`,
+        response: { status: response.status, headers: toStandardHeaders(response.headers), body: undefined },
+      })
+    }
 
     const standardResponse = toStandardLazyResponse(response)
 

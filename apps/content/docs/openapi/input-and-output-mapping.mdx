@@ -222,7 +222,7 @@ const redirect = os
 ```
 
 :::warning
-[OpenAPI Link](/docs/openapi/link) does not follow redirects and throws in browsers, where `fetch` hides redirect responses. Server runtimes receive the `3xx` response as the output.
+[OpenAPI Link](/docs/openapi/link) does not follow redirects. In browsers, where `fetch` hides redirect responses, it throws a [`MALFORMED_ORPC_RESPONSE`](/docs/openapi/link#malformed-responses) error. Server runtimes receive the `3xx` response as the output.
 :::
 
 ## Body Hints
