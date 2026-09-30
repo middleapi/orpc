@@ -1,4 +1,5 @@
 import { intercept, onAsyncIteratorObjectError, onError, onFinish, onReadableStreamError, onStart, onSuccess } from './interceptor'
+import { promiseWithResolvers } from './promise'
 
 describe('intercept', () => {
   const interceptor1 = vi.fn(({ next }) => next())
@@ -383,25 +384,19 @@ describe('lifecycle interceptors', () => {
 })
 
 describe('onFinish', () => {
-  it.each([
-    ['result', (value: object) => Promise.resolve(value)],
-    ['error', (value: object) => Promise.reject(value)],
-  ])('does not keep the last %s alive after the call', async (_, settle) => {
-    const interceptor = onFinish(() => {})
+  it('gives each call its own state when calls overlap', async () => {
+    const callback = vi.fn()
+    const interceptor = onFinish(callback)
+    const error = new Error('__error__')
+    const { promise, resolve } = promiseWithResolvers<string>()
 
-    // created in its own scope, so only the interceptor could keep it alive
-    const ref = await (async () => {
-      const value = new Error('__value__')
-      await Promise.allSettled([interceptor({ next: () => settle(value) })])
-      return new WeakRef(value)
-    })()
+    const first = interceptor({ next: () => promise })
+    await expect(interceptor({ next: () => Promise.reject(error) })).rejects.toBe(error)
+    resolve('__first__')
+    await expect(first).resolves.toBe('__first__')
 
-    // a WeakRef target stays alive until the current job ends
-    await new Promise(resolve => setTimeout(resolve))
-    globalThis.gc!()
-
-    expect(ref.deref()).toBeUndefined()
-    expect(interceptor).toBeTypeOf('function') // keeps the interceptor alive until here
+    expect(callback).toHaveBeenNthCalledWith(1, [error, undefined, false], expect.anything())
+    expect(callback).toHaveBeenNthCalledWith(2, [null, '__first__', true], expect.anything())
   })
 })
 
