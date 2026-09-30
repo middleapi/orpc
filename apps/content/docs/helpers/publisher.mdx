@@ -329,6 +329,10 @@ export default {
 
 </CodeGroup>
 
+:::warning
+`UpstashPublisher` subscribes through the Upstash REST API, which carries the channel in the URL path. It therefore rejects a subscription when the channel (`prefix` + event name) contains `/`, `\`, `?`, `#`, `%`, `,` or control characters, ends with a space, or is `.` or `..`. Publishing has no such restriction. When event names include user input, validate that input before subscribing.
+:::
+
 ## Resume Missing Events
 
 Some adapters can resume events missed while a subscriber is offline. This feature is usually disabled by default, but you can enable it when creating the publisher. When enabled, the publisher automatically manages event ids and attempts to deliver events since the last event id provided by the subscriber.

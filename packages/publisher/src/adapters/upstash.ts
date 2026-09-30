@@ -1,8 +1,16 @@
 import type { ThrowableError } from '@orpc/shared'
 import type { Redis } from '@upstash/redis'
 import type { BaseRedisPublisherOptions, RedisStreamEntry } from './base-redis'
-import { promiseWithResolvers } from '@orpc/shared'
+import { promiseWithResolvers, stringifyJSON } from '@orpc/shared'
 import { BaseRedisPublisher } from './base-redis'
+
+/**
+ * `@upstash/redis` puts the channel in the subscribe URL unencoded. `fetch` would turn `/`, `\`, dot segments,
+ * `?`, `#`, control characters and trailing spaces into another path, the server might decode `%`,
+ * and a `,` breaks the SDK's parsing of `message,<channel>,<data>` frames.
+ */
+// eslint-disable-next-line no-control-regex
+const UNSAFE_SUBSCRIBE_CHANNEL_REGEX = /[\u0000-\u001F\u007F/\\?#%,]| $|^\.\.?$/
 
 export interface UpstashPublisherOptions extends BaseRedisPublisherOptions {}
 
@@ -34,6 +42,13 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
     listener: (message: unknown) => void,
     onError?: (error: ThrowableError) => void,
   ): Promise<() => Promise<void>> {
+    if (UNSAFE_SUBSCRIBE_CHANNEL_REGEX.test(channel)) {
+      throw new TypeError(
+        `UpstashPublisher cannot subscribe to ${stringifyJSON(channel)}: the channel (prefix + event name) `
+        + 'must not contain "/", "\\", "?", "#", "%", "," or control characters, end with a space, or be "." or "..".',
+      )
+    }
+
     // Registered before subscribing so messages that arrive meanwhile are not lost.
     push(this.listenersMap, channel, listener)
 
@@ -92,7 +107,12 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
       reject(error)
       this.onErrorsMap.get(channel)?.slice().forEach(onError => onError(error))
     })
-    subscription.on('message', ({ message }) => {
+    subscription.on('message', ({ channel: subscribedChannel, message }) => {
+      // The server names the channel it actually subscribed to; never deliver another channel's messages.
+      if (subscribedChannel !== channel) {
+        return
+      }
+
       // Snapshot, since a listener may unsubscribe itself mid-dispatch.
       this.listenersMap.get(channel)?.slice().forEach(listener => listener(message))
     })

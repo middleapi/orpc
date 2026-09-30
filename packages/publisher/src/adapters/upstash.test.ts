@@ -1,4 +1,7 @@
+import type { ServerResponse } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import type { UpstashPublisherOptions } from './upstash'
+import { createServer } from 'node:http'
 import { RPCJsonSerializer } from '@orpc/client'
 import { getOrBind, promiseWithResolvers, sleep } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
@@ -677,6 +680,173 @@ describe.concurrent(
     })
   },
 )
+
+/**
+ * A local stand-in for Upstash, so channel isolation is tested with the real SDK and `fetch` URL handling.
+ * Like the REST API, `/subscribe/<channel>/...` streams `message,<channel>,<data>` frames
+ * for each path segment, and `publish` commands in the body (or `/pipeline` batches) publish.
+ */
+describe('upstashPublisher channel isolation', () => {
+  const subscribers = new Map<string, Set<ServerResponse>>()
+  const subscribedPaths: string[] = []
+  const server = createServer((req, res) => {
+    const [command, ...channels] = req.url!.split('?')[0]!.split('/').slice(1)
+
+    if (command === 'subscribe') {
+      subscribedPaths.push(req.url!)
+      res.writeHead(200, { 'content-type': 'text/event-stream' })
+
+      channels.forEach((channel, index) => {
+        getOrCreate(subscribers, channel).add(res)
+        res.on('close', () => subscribers.get(channel)?.delete(res))
+        res.write(`data: subscribe,${channel},${index + 1}\n\n`)
+      })
+
+      return
+    }
+
+    let body = ''
+    req.on('data', chunk => (body += chunk))
+    req.on('end', () => {
+      // Auto-pipelining batches commands into `/pipeline`; otherwise the body is a single command.
+      const commands = command === 'pipeline' ? JSON.parse(body) as string[][] : [JSON.parse(body) as string[]]
+      const results = commands.map(([name, channel, message]) => {
+        if (name !== 'publish') {
+          return { error: `ERR unsupported command '${name}'` }
+        }
+
+        const receivers = subscribers.get(channel!) ?? new Set()
+        receivers.forEach(receiver => receiver.write(`data: message,${channel},${message}\n\n`))
+        return { result: receivers.size }
+      })
+
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify(command === 'pipeline' ? results : results[0]))
+    })
+  })
+
+  let redis: Redis
+
+  beforeAll(async () => {
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    redis = new Redis({ url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, token: 'token' })
+  })
+
+  afterAll(async () => {
+    server.closeAllConnections()
+    await new Promise(resolve => server.close(resolve))
+  })
+
+  it('rejects event names that would rewrite the subscribe URL to another channel', async () => {
+    const publisher = new UpstashPublisher<Record<string, object>>(redis, { prefix: 'app:' })
+    const victim = vi.fn()
+    const unsubscribeVictim = await publisher.subscribe('user:victim:inbox', victim)
+    const attacker = vi.fn()
+
+    // As in `publisher.subscribe(`user:${ctx.user.id}:${input.topic}`)` with an attacker-chosen topic.
+    for (const topic of [
+      '/../app:user:victim:inbox#',
+      '/../app:user:victim:inbox?',
+      '\\..\\app:user:victim:inbox',
+      '/%2e%2e/app:user:victim:inbox',
+    ]) {
+      await expect(publisher.subscribe(`user:attacker:${topic}`, attacker)).rejects.toThrow(TypeError)
+    }
+
+    await publisher.publish('user:victim:inbox', { secret: 1 })
+
+    await vi.waitFor(() => {
+      expect(victim).toHaveBeenCalledTimes(1)
+    })
+
+    expect(attacker).not.toHaveBeenCalled()
+    expect(subscribedPaths).toEqual(['/subscribe/app:user:victim:inbox'])
+    expect((publisher as any).listenersMap.size).toBe(1)
+
+    await unsubscribeVictim()
+  })
+
+  it.each([
+    'a/b',
+    'a\\b',
+    'a?b',
+    'a#b',
+    'a%2Fb',
+    'a,b',
+    'a\tb',
+    'a\nb',
+    'a\u0000b',
+    'a\u007Fb',
+    'trailing ',
+    '.',
+    '..',
+  ])('rejects the unsafe channel %j before subscribing', async (event) => {
+    const subscribeSpy = vi.spyOn(redis, 'subscribe')
+    const publisher = new UpstashPublisher<Record<string, object>>(redis)
+
+    await expect(publisher.subscribe(event, vi.fn())).rejects.toThrow(
+      `UpstashPublisher cannot subscribe to ${JSON.stringify(event)}`,
+    )
+
+    expect(subscribeSpy).not.toHaveBeenCalled()
+    expect((publisher as any).listenersMap.size).toBe(0)
+
+    subscribeSpy.mockRestore()
+  })
+
+  it('never delivers messages of a channel other than the one it subscribed to', async () => {
+    const victimChannel = 'app:user:victim:inbox'
+    const rawMessage = vi.fn()
+    // Stands in for any rewrite of the subscribe URL that validation misses.
+    const rewritingRedis = withFakeSubscribe(redis, () => {
+      const subscription = redis.subscribe(victimChannel)
+      subscription.on('message', rawMessage)
+      return subscription
+    })
+    const attackerPublisher = new UpstashPublisher<Record<string, object>>(rewritingRedis, { prefix: 'app:' })
+    const victimPublisher = new UpstashPublisher<Record<string, object>>(redis, { prefix: 'app:' })
+    const attacker = vi.fn()
+
+    const unsubscribeAttacker = await attackerPublisher.subscribe('user:attacker:inbox', attacker)
+    await victimPublisher.publish('user:victim:inbox', { secret: 1 })
+
+    await vi.waitFor(() => {
+      expect(rawMessage).toHaveBeenCalledWith({ channel: victimChannel, message: expect.anything() })
+    })
+
+    // Listeners run synchronously after the raw one, so a leaked message would already be here.
+    expect(attacker).not.toHaveBeenCalled()
+
+    await unsubscribeAttacker()
+  })
+
+  it('delivers events whose names are safe to put in the subscribe URL', async () => {
+    const publisher = new UpstashPublisher<Record<string, object>>(redis, { prefix: 'app:' })
+    const events = ['user:1:inbox', 'order.created', 'a..b', '...', 'a|b@c[d]']
+    const listeners = events.map(() => vi.fn())
+
+    const unsubscribes = await Promise.all(events.map((event, index) => publisher.subscribe(event, listeners[index]!)))
+    await Promise.all(events.map((event, index) => publisher.publish(event, { index })))
+
+    await vi.waitFor(() => {
+      listeners.forEach((listener, index) => {
+        expect(listener).toHaveBeenCalledExactlyOnceWith({ index })
+      })
+    })
+
+    await Promise.all(unsubscribes.map(unsubscribe => unsubscribe()))
+  })
+})
+
+function getOrCreate<K, V>(map: Map<K, Set<V>>, key: K): Set<V> {
+  let values = map.get(key)
+
+  if (!values) {
+    map.set(key, values = new Set())
+  }
+
+  return values
+}
 
 function createFakeSubscription() {
   const handlers = new Map<string, Array<(event: unknown) => void>>()
