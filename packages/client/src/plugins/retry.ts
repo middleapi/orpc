@@ -1,5 +1,5 @@
 import type { Promisable, Value } from '@orpc/shared'
-import type { StandardLinkInterceptor, StandardLinkInterceptorOptions, StandardLinkOptions, StandardLinkPlugin } from '../adapters/standard'
+import type { StandardLinkInterceptor, StandardLinkInterceptorOptions, StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor } from '../adapters/standard'
 import type { ClientContext } from '../types'
 import { AsyncIteratorClass, isAsyncIteratorObject, override, sleep, toArray, value } from '@orpc/shared'
 import { getEventMeta } from '@standard-server/core'
@@ -72,6 +72,8 @@ export interface RetryLinkPluginOptions<_T extends RetryLinkPluginContext> {
  *
  * @remarks
  * **Note**: Retry behavior is configured through the client context on each call.
+ * Calls whose input or request body is a stream (`AsyncIteratorObject` or `ReadableStream`)
+ * are never retried, because a stream can only be read once.
  *
  * @see {@link https://orpc.dev/docs/plugins/retry | Retry Plugin}
  */
@@ -83,6 +85,8 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
 
   name = '~retry'
 
+  private readonly CONTEXT_SYMBOL = Symbol('ORPC_RETRY_LINK_PLUGIN_CONTEXT')
+
   constructor(options: RetryLinkPluginOptions<T> = {}) {
     this.defaultRetry = options.default?.retry ?? 0
     this.defaultRetryDelay = options.default?.retryDelay ?? (o => o.lastEventRetry ?? 2000)
@@ -91,6 +95,13 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
   }
 
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
+    type PluginContext = {
+      /**
+       * Set to `false` by the transport interceptor once a request body is a stream.
+       */
+      isReplayable: boolean
+    }
+
     const interceptor: StandardLinkInterceptor<T> = async (interceptorOptions) => {
       const { next, ...callOptions } = interceptorOptions
       const maxAttempts = await value(
@@ -102,10 +113,12 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
       const shouldRetry = callOptions.context.shouldRetry ?? this.defaultShouldRetry
       const onRetry = callOptions.context.onRetry ?? this.defaultOnRetry
 
-      if (maxAttempts <= 0) {
+      // A stream input is consumed by the first attempt, so it cannot be sent again.
+      if (maxAttempts <= 0 || isStream(callOptions.input)) {
         return next(callOptions)
       }
 
+      const pluginContext: PluginContext = { isReplayable: true }
       let lastEventId = callOptions.lastEventId
       let lastEventRetry: undefined | number
       let callback: void | ((isSuccess: boolean) => void)
@@ -119,7 +132,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
           let retryDelayMs = 0
 
           if (currentError) {
-            if (attempt > maxAttempts) {
+            if (attempt > maxAttempts || !pluginContext.isReplayable) {
               throw currentError.error
             }
 
@@ -151,7 +164,10 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
             }
 
             currentError = undefined
-            return await next(updatedCallOptions)
+            return await next({
+              ...updatedCallOptions,
+              context: { ...updatedCallOptions.context, [this.CONTEXT_SYMBOL]: pluginContext },
+            })
           }
           catch (error) {
             currentError = { error }
@@ -220,6 +236,28 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
       ))
     }
 
-    return { ...options, interceptors: [interceptor, ...toArray(options.interceptors)] }
+    /**
+     * Runs before other transport interceptors, so it sees the body produced by the codec
+     * (e.g. an OpenAPI `{ body: stream }` input) rather than one rewritten by another plugin.
+     */
+    const transportInterceptor: StandardLinkTransportInterceptor<T> = (interceptorOptions) => {
+      const pluginContext = interceptorOptions.context[this.CONTEXT_SYMBOL] as PluginContext | undefined
+
+      if (pluginContext && isStream(interceptorOptions.request.body)) {
+        pluginContext.isReplayable = false
+      }
+
+      return interceptorOptions.next()
+    }
+
+    return {
+      ...options,
+      interceptors: [interceptor, ...toArray(options.interceptors)],
+      transportInterceptors: [transportInterceptor, ...toArray(options.transportInterceptors)],
+    }
   }
+}
+
+function isStream(value: unknown): boolean {
+  return value instanceof ReadableStream || isAsyncIteratorObject(value)
 }

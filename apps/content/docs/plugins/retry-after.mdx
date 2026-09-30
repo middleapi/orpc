@@ -37,6 +37,12 @@ const link = new RPCLink({
 })
 ```
 
+## Stream Bodies
+
+A request is never retried when its body is a stream, either an [AsyncIteratorObject](/docs/async-iterator-object) or a [`ReadableStream`](/docs/binary-data). The first attempt consumes the stream, so a retry would have nothing left to send. Instead, the original response (such as the `429`) is returned as is.
+
+`Blob`, `File`, and `FormData` bodies can be read again, so they are retried as usual.
+
 ## Learn More
 
 For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/client/src/plugins/retry-after.ts).

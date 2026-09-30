@@ -260,6 +260,75 @@ describe('retryAfterLinkPlugin', () => {
     })
   })
 
+  describe('stream body', () => {
+    it.each([
+      ['AsyncIteratorObject', () => (async function* () { yield 1 })()],
+      ['ReadableStream', () => new Blob(['hello']).stream()],
+    ])('should not retry a stream body (%s), since it can only be read once', async (_, createBody) => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const body = createBody()
+
+      vi.mocked(codec.encodeInput).mockResolvedValue({
+        method: 'POST',
+        url: '/test',
+        headers: {},
+        body,
+      } satisfies StandardRequest)
+
+      vi.mocked(transport.send).mockResolvedValue({
+        status: 429,
+        headers: { 'retry-after': '0' },
+        resolveBody: async () => 'rate limited',
+      } satisfies StandardLazyResponse)
+
+      const condition = vi.fn(() => true)
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryAfterLinkPlugin({ condition })],
+      })
+
+      const result = await link.call(['test'], body, { context: {} })
+
+      expect(result).toBe('rate limited')
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(transport.send).mock.calls[0]![0].body).toBe(body)
+      expect(condition).not.toHaveBeenCalled()
+    })
+
+    it('should still retry a Blob body, since it can be read again', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const body = new Blob(['hello'])
+
+      vi.mocked(codec.encodeInput).mockResolvedValue({
+        method: 'POST',
+        url: '/test',
+        headers: {},
+        body,
+      } satisfies StandardRequest)
+
+      vi.mocked(transport.send).mockResolvedValueOnce({
+        status: 429,
+        headers: { 'retry-after': '0' },
+        resolveBody: async () => 'rate limited',
+      } satisfies StandardLazyResponse)
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryAfterLinkPlugin()],
+      })
+
+      const promise = link.call(['test'], body, { context: {} })
+      await vi.runAllTimersAsync()
+
+      expect(await promise).toBe('success')
+      expect(transport.send).toHaveBeenCalledTimes(2)
+      expect(vi.mocked(transport.send).mock.calls[1]![0].body).toBe(body)
+    })
+  })
+
   describe('signal handling', () => {
     it('should stop retrying when signal is aborted during delay', async () => {
       const codec = makeCodec()

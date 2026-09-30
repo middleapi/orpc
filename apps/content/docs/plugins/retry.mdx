@@ -79,6 +79,12 @@ const link = new RPCLink<ClientContext>({
 
 :::
 
+## Stream Inputs
+
+A call is never retried when it sends a stream, either an [AsyncIteratorObject](/docs/async-iterator-object) or a [`ReadableStream`](/docs/binary-data). This includes a stream nested in the input and sent as the request body, such as `{ body: stream }` with a [detailed input structure](/docs/openapi/input-and-output-mapping#detailed-input-structure). The first attempt consumes the stream, so a retry would have nothing left to send. Instead, the original error is thrown without calling `shouldRetry` or `onRetry`.
+
+`Blob`, `File`, and `FormData` inputs can be read again, so they are retried as usual.
+
 ## Event Source Simulation
 
 To replicate the behavior of [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource) for an [AsyncIteratorObject](/docs/async-iterator-object), use the following configuration:
