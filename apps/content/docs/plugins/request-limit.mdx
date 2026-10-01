@@ -32,6 +32,32 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 When used with [Request Compression](/docs/plugins/request-compression), `maxBodySize` applies to the **decompressed** payload size, not the compressed wire size.
 :::
 
+## Peer Adapters
+
+This plugin does not apply to peer-based adapters such as [WebSocket](/docs/adapters/websocket) and [Message Port](/docs/adapters/message-port). Each message reaches the handler fully loaded in memory, so there is no body left to limit. Limit the size of each message at the transport instead, for example with Bun's `maxPayloadLength`:
+
+```ts
+Bun.serve({
+  fetch(req, server) {
+    if (server.upgrade(req)) {
+      return
+    }
+    return new Response('Upgrade failed', { status: 500 })
+  },
+  websocket: {
+    maxPayloadLength: 1024 * 1024, // 1MB, larger messages close the connection
+    async message(ws, message) {
+      await handler.message(ws, message)
+    },
+    async close(ws) {
+      await handler.close(ws)
+    },
+  },
+})
+```
+
+Most WebSocket servers have an equivalent option, such as `maxPayload` in [ws](https://github.com/websockets/ws/blob/master/doc/ws.md#new-websocketserveroptions-callback).
+
 ## Learn More
 
 For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/request-limit.ts).
