@@ -18,6 +18,39 @@ const SATISFIED = 2
 
 type Satisfaction = typeof UNSATISFIED | typeof LOOSELY_SATISFIED | typeof SATISFIED
 
+interface NativeType {
+  is: (value: unknown) => boolean
+  coerce: (value: unknown) => unknown
+  afterTypeCheck?: boolean
+}
+
+const NATIVE_TYPES = new Map<string, NativeType>([
+  [JsonSchemaXNativeType.Date, {
+    is: value => value instanceof Date,
+    coerce: value => typeof value === 'string' ? stringToDate(value) : value,
+  }],
+  [JsonSchemaXNativeType.BigInt, {
+    is: value => typeof value === 'bigint',
+    coerce: value => typeof value === 'string'
+      ? stringToBigInt(value)
+      : typeof value === 'number' ? numberToBigInt(value) : value,
+  }],
+  [JsonSchemaXNativeType.Url, {
+    is: value => value instanceof URL,
+    coerce: value => typeof value === 'string' ? stringToURL(value) : value,
+  }],
+  [JsonSchemaXNativeType.Set, {
+    is: value => value instanceof Set,
+    coerce: value => Array.isArray(value) ? arrayToSet(value) : value,
+    afterTypeCheck: true,
+  }],
+  [JsonSchemaXNativeType.Map, {
+    is: value => value instanceof Map,
+    coerce: value => Array.isArray(value) ? arrayToMap(value) : value,
+    afterTypeCheck: true,
+  }],
+])
+
 function minSatisfaction(a: Satisfaction, b: Satisfaction): Satisfaction {
   return a < b ? a : b
 }
@@ -104,44 +137,14 @@ export class JsonSchemaCoercer {
     }
 
     const nativeType = 'x-native-type' in schema && typeof schema['x-native-type'] === 'string'
-      ? schema['x-native-type']
+      ? NATIVE_TYPES.get(schema['x-native-type'])
       : undefined
 
-    /**
-     * Converters describe a native type with the JSON type of its serialized form, like a bigint as `type: 'string'`,
-     * which the converted value never matches and the raw value may not either (a number for a bigint).
-     * So scalars are converted before the `type` check, and a value already of the native type skips it.
-     */
-    switch (nativeType) {
-      case JsonSchemaXNativeType.Date: {
-        if (typeof coerced === 'string') {
-          coerced = stringToDate(coerced)
-        }
-
-        break
-      }
-      case JsonSchemaXNativeType.BigInt: {
-        switch (typeof coerced) {
-          case 'string':
-            coerced = stringToBigInt(coerced)
-            break
-          case 'number':
-            coerced = numberToBigInt(coerced)
-            break
-        }
-
-        break
-      }
-      case JsonSchemaXNativeType.Url: {
-        if (typeof coerced === 'string') {
-          coerced = stringToURL(coerced)
-        }
-
-        break
-      }
+    if (nativeType && !nativeType.afterTypeCheck) {
+      coerced = nativeType.coerce(coerced)
     }
 
-    if (schema.type && !isNativeTypeValue(nativeType, coerced)) {
+    if (schema.type && !nativeType?.is(coerced)) {
       switch (schema.type) {
         case 'null': {
           if (coerced !== null) {
@@ -222,7 +225,6 @@ export class JsonSchemaCoercer {
               return subCoerced
             })
 
-            // a tuple ending in optional items is shorter than its `prefixItems`, only `minItems` sets the least length
             if (typeof schema.minItems === 'number' && coercedItems.length < schema.minItems) {
               satisfied = UNSATISFIED
             }
@@ -296,16 +298,14 @@ export class JsonSchemaCoercer {
       }
     }
 
-    // sets and maps are converted after the `type` check, which coerces their items first
-    if (nativeType === JsonSchemaXNativeType.Set && Array.isArray(coerced)) {
-      coerced = arrayToSet(coerced)
-    }
-    else if (nativeType === JsonSchemaXNativeType.Map && Array.isArray(coerced)) {
-      coerced = arrayToMap(coerced)
-    }
+    if (nativeType) {
+      if (nativeType.afterTypeCheck) {
+        coerced = nativeType.coerce(coerced)
+      }
 
-    if (isNativeTypeValue(nativeType, coerced) === false) {
-      satisfied = UNSATISFIED
+      if (!nativeType.is(coerced)) {
+        satisfied = UNSATISFIED
+      }
     }
 
     if (schema.allOf) {
@@ -362,26 +362,6 @@ export class JsonSchemaCoercer {
     }
 
     return [satisfied, coerced]
-  }
-}
-
-/**
- * Whether the value already has the native type, or `undefined` for an unknown native type.
- */
-function isNativeTypeValue(nativeType: string | undefined, value: unknown): boolean | undefined {
-  switch (nativeType) {
-    case JsonSchemaXNativeType.Date:
-      return value instanceof Date
-    case JsonSchemaXNativeType.BigInt:
-      return typeof value === 'bigint'
-    case JsonSchemaXNativeType.Url:
-      return value instanceof URL
-    case JsonSchemaXNativeType.Set:
-      return value instanceof Set
-    case JsonSchemaXNativeType.Map:
-      return value instanceof Map
-    default:
-      return undefined
   }
 }
 
@@ -446,9 +426,6 @@ function stringToBoolean(value: string): boolean | string {
   return value
 }
 
-/**
- * Month and day must be zero padded, V8 parses `'2020-1-5'` as local time but `'2020-01-05'` as UTC.
- */
 const DATE_TIME_PATTERN = /^([+-]?\d{4,6})-(\d{2})-(\d{2})(?:[T ].*)?$/
 function stringToDate(value: string): Date | string {
   const match = DATE_TIME_PATTERN.exec(value)
@@ -463,7 +440,6 @@ function stringToDate(value: string): Date | string {
     return value
   }
 
-  // `Date` rolls an impossible day over into the next month, `'2020-02-30'` would become March 1
   const year = Number(match[1])
   const month = Number(match[2]) - 1
   const day = Number(match[3])
