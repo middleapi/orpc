@@ -8,7 +8,7 @@ export interface DurablePublisherObjectResumeOptions {
    *
    * When enabled, published events are temporarily stored so new
    * subscribers can resume from a previous position using `lastEventId`.
-   * Each stored event must fit within 2 MB, the Durable Object SQLite row limit,
+   * Each stored event must fit within the Durable Object SQLite row size limit,
    * so publishing a larger one fails.
    *
    * @default false
@@ -80,16 +80,16 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
   }
 
   private async handlePublish(request: Request): Promise<Response> {
-    const body = await request.arrayBuffer()
-    let stringifiedPayload = new TextDecoder().decode(body)
+    let stringifiedPayload = await request.text()
 
     try {
-      stringifiedPayload = this.resumeStorage.store(stringifiedPayload, body.byteLength)
+      stringifiedPayload = this.resumeStorage.store(stringifiedPayload)
     }
     catch (e) {
       console.error('Failed to store published event:', e)
 
-      if (e instanceof PayloadTooLargeError) {
+      // SQLite enforces the platform's size limit, so it stays accurate as the limit changes
+      if (e instanceof Error && e.message.includes('SQLITE_TOOBIG')) {
         return new Response('Event payload too large', { status: 413 })
       }
 
@@ -142,15 +142,6 @@ interface SerializedPayload {
   meta?: EventMeta | null
 }
 
-/**
- * Durable Object SQLite rejects strings and rows larger than 2 MB.
- *
- * @see https://developers.cloudflare.com/durable-objects/platform/limits/
- */
-const MAX_STORED_PAYLOAD_BYTES = 2_000_000
-
-class PayloadTooLargeError extends Error {}
-
 class ResumeStorage {
   private readonly enabled: boolean
   private readonly seconds: number
@@ -174,19 +165,14 @@ class ResumeStorage {
 
   /**
    * Store an event and return the updated serialized message with an assigned ID.
-   * `byteLength` is the payload's size as UTF-8, which is how SQLite stores it.
    *
-   * @throws {PayloadTooLargeError} if the payload is too large to store.
    * @throws if `stringifiedPayload` is not a JSON object with an optional object `meta`,
-   * or if the insert fails, even after a schema reset retry.
+   * or if the insert fails (`SQLITE_TOOBIG` for a payload over the row size limit),
+   * even after a schema reset retry.
    */
-  store(stringifiedPayload: string, byteLength: number): string {
+  store(stringifiedPayload: string): string {
     if (!this.enabled) {
       return stringifiedPayload
-    }
-
-    if (byteLength > MAX_STORED_PAYLOAD_BYTES) {
-      throw new PayloadTooLargeError(`Event payload exceeds ${MAX_STORED_PAYLOAD_BYTES} bytes`)
     }
 
     const payload: unknown = JSON.parse(stringifiedPayload)

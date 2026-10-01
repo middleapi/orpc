@@ -445,7 +445,6 @@ describe('durable publisher object', () => {
     const kept = JSON.stringify({ data: { text: 'kept' } })
     expect((await publish(stub, kept)).status).toBe(204)
 
-    const wrapperBytes = JSON.stringify({ data: '' }).length
     const rejected: [payload: string, status: number][] = [
       ['null', 400],
       ['[]', 400],
@@ -453,10 +452,7 @@ describe('durable publisher object', () => {
       ['42', 400],
       ['{"data":1,"meta":"text"}', 400],
       ['{"data":1,"meta":[]}', 400],
-      // one byte over the limit, counted as UTF-8 like SQLite does
-      [JSON.stringify({ data: 'a'.repeat(2_000_000 - wrapperBytes + 1) }), 413],
-      [JSON.stringify({ data: '\u00E9'.repeat(Math.ceil((2_000_000 - wrapperBytes + 1) / 2)) }), 413], // 2 bytes each
-      // more than SQLite accepts
+      // over the SQLite row size limit
       [JSON.stringify({ data: 'a'.repeat(3_000_000) }), 413],
     ]
 
@@ -468,17 +464,15 @@ describe('durable publisher object', () => {
     }
 
     expect(consoleError).toHaveBeenCalledTimes(rejected.length)
+    expect(consoleError.mock.calls.at(-1)![1].message).toContain('SQLITE_TOOBIG')
 
-    // the largest allowed payload fits in a row
-    const largest = JSON.stringify({ data: 'a'.repeat(2_000_000 - wrapperBytes) })
-    expect((await publish(stub, largest)).status).toBe(204)
+    expect((await publish(stub, { data: { text: 'after' } })).status).toBe(204)
 
     const resumeSubscriber = await openSocket(stub, '0')
-    const messages = await readMessages<{ data: string, meta: { id: string } }>(resumeSubscriber, 2)
-
-    expect(messages[0]).toEqual({ data: { text: 'kept' }, meta: { id: '1' } })
-    expect(messages[1]!.data).toHaveLength(2_000_000 - wrapperBytes)
-    expect(messages[1]!.meta).toEqual({ id: '2' })
+    expect(await readMessages(resumeSubscriber, 2)).toEqual([
+      { data: { text: 'kept' }, meta: { id: '1' } },
+      { data: { text: 'after' }, meta: { id: '2' } },
+    ])
 
     await closeSocket(resumeSubscriber)
   })

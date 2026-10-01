@@ -198,6 +198,28 @@ describe('durable publisher', () => {
     expect(orders).toEqual([0, 1, 2, 3, 4, 5])
   })
 
+  it('throws when an event is too large to store for resume, and keeps working', async () => {
+    const { publisher } = createTestingPublisher(env.PUBLISHER_RESUME3S_DON)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await publisher.publish('message', { text: 'kept' })
+
+    await expect(publisher.publish('message', { text: 'a'.repeat(3_000_000) })).rejects.toThrow(
+      'Failed to publish event: 413',
+    )
+    expect(consoleError).toHaveBeenCalledTimes(1)
+
+    await publisher.publish('message', { text: 'after' })
+
+    const listener = vi.fn()
+    const unsubscribe = await publisher.subscribe('message', listener, { lastEventId: '0' })
+
+    expect(listener.mock.calls.map(call => call[0].text)).toEqual(['kept', 'after'])
+
+    await unsubscribe()
+    consoleError.mockRestore()
+  })
+
   it('uses the custom serializer and prefix', async () => {
     class Person {
       constructor(
