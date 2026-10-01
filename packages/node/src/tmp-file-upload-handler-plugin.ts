@@ -408,7 +408,8 @@ function assertContentLengthWithin(headers: StandardHeaders, limit: number): voi
 }
 
 /**
- * Limits a stream's total size, also rejecting any chunk `fits` refuses.
+ * Limits a stream's total size, also rejecting once `fits` refuses a chunk.
+ * `fits` sees every chunk in order, so it can keep state across them.
  */
 function limitStream(
   stream: ReadableStream<Uint8Array>,
@@ -435,8 +436,9 @@ const CR = 0x0D
 const LF = 0x0A
 
 /**
- * Fails once an event, which the decoder buffers until its blank line, outgrows
- * the limit. Scans raw bytes, as UTF-8 never puts CR or LF in a multi-byte character.
+ * Counts each event's bytes across chunks until its blank line, since the
+ * decoder buffers the whole event, and fails once one outgrows the limit. Scans
+ * raw bytes, as UTF-8 never puts CR or LF in a multi-byte character.
  */
 function createEventSizeCheck(eventLimit: number): (chunk: Uint8Array) => boolean {
   let eventSize = 0

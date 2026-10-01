@@ -1182,6 +1182,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
         const body = Buffer.from(`\r\n\n${event}${event}\n`)
         const size = Buffer.byteLength(event)
 
+        // One byte per chunk spreads each event over many chunks
         for (const chunkSize of [1, body.length]) {
           await runThroughPlugin({
             limits: { memory: size },
