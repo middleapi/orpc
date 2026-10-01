@@ -1,7 +1,7 @@
 import type { AnySchema, JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
 import type { ConversionConfig, ConversionContext, OverrideSchemaContext, JsonSchema as ValibotJsonSchema } from '@valibot/to-json-schema'
 import type { BaseSchema, MapSchema, SetSchema } from 'valibot'
-import { JsonSchemaFormat, JsonSchemaXNativeType } from '@orpc/json-schema'
+import { isStandardSchemaOptional, JsonSchemaFormat, JsonSchemaXNativeType } from '@orpc/json-schema'
 import { toJsonSchema } from '@valibot/to-json-schema'
 import { any, tuple } from 'valibot'
 
@@ -68,19 +68,7 @@ export class ValibotToJsonSchemaConverter implements JsonSchemaConverter {
     // `$schema` can be safely omitted here.
     const { $schema, ...jsonSchema } = toJsonSchema(valibotSchema, this.createConversionConfig(direction))
 
-    let optional = false
-    try {
-      const result = valibotSchema['~standard'].validate(undefined)
-      if (result instanceof Promise) {
-        result.catch(() => {})
-      }
-      else if (!result.issues) {
-        optional = direction === 'input' ? true : result.value === undefined
-      }
-    }
-    catch {}
-
-    return [jsonSchema as JsonSchema, optional]
+    return [jsonSchema as JsonSchema, isStandardSchemaOptional(valibotSchema, direction)]
   }
 
   private createConversionConfig(direction: JsonSchemaConverterDirection): ConversionConfig {

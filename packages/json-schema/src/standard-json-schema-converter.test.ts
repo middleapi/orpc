@@ -1,7 +1,7 @@
 import type { AnySchema } from '@orpc/contract'
 import * as arktype from 'arktype'
 import z from 'zod'
-import { StandardJsonSchemaConverter } from './standard-json-schema-converter'
+import { isStandardSchemaOptional, StandardJsonSchemaConverter } from './standard-json-schema-converter'
 
 function withStandardOverrides<TSchema extends AnySchema>(schema: TSchema, overrides: Record<string, unknown>): TSchema {
   Object.defineProperty(schema, '~standard', {
@@ -111,5 +111,51 @@ describe('standardJsonSchemaConverter', () => {
     })
 
     expect(converter.convert(schema, 'input')).toEqual([{}, true])
+  })
+})
+
+describe('isStandardSchemaOptional', () => {
+  it.each([
+    ['optional input', z.string().optional(), 'input', true],
+    ['optional output', z.string().optional(), 'output', true],
+    ['defaulted input', z.string().default('fallback'), 'input', true],
+    ['defaulted output', z.string().default('fallback'), 'output', false],
+    ['required input', z.string(), 'input', false],
+    ['required output', z.string(), 'output', false],
+  ] as const)('detects %s schemas', (_, schema, direction, expected) => {
+    expect(isStandardSchemaOptional(schema, direction)).toBe(expected)
+  })
+
+  it('returns false when standard validation throws or is async', () => {
+    const throwingSchema = withStandardOverrides(z.string().optional(), {
+      validate: () => {
+        throw new Error('validate failed')
+      },
+    })
+
+    const asyncSchema = withStandardOverrides(z.string().optional(), {
+      validate: () => Promise.resolve({ value: undefined }),
+    })
+
+    expect(isStandardSchemaOptional(throwingSchema, 'input')).toBe(false)
+    expect(isStandardSchemaOptional(asyncSchema, 'input')).toBe(false)
+  })
+
+  it('does not leak a rejection when async standard validation fails', async ({ onTestFinished }) => {
+    const unhandledRejectionHandler = vi.fn()
+    process.on('unhandledRejection', unhandledRejectionHandler)
+
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejectionHandler)
+    })
+
+    const schema = withStandardOverrides(z.string(), {
+      validate: () => Promise.reject(new Error('validate failed')),
+    })
+
+    expect(isStandardSchemaOptional(schema, 'input')).toBe(false)
+
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(unhandledRejectionHandler).not.toHaveBeenCalled()
   })
 })

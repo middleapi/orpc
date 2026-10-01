@@ -31,29 +31,6 @@ describe('arkTypeToJsonSchemaConverter', () => {
     expect(converter.convert(schema, 'input')).toEqual([{ type: 'string' }, false])
   })
 
-  it('does not leak a rejection when async standard validation fails while checking optionality', async ({ onTestFinished }) => {
-    const unhandledRejectionHandler = vi.fn()
-    process.on('unhandledRejection', unhandledRejectionHandler)
-
-    onTestFinished(() => {
-      process.off('unhandledRejection', unhandledRejectionHandler)
-    })
-
-    const schema = type('boolean')
-
-    Object.defineProperty(schema, '~standard', {
-      value: {
-        ...schema['~standard'],
-        validate: () => Promise.reject(new Error('validate failed')),
-      },
-    })
-
-    expect(converter.convert(schema, 'input')).toEqual([{ type: 'boolean' }, false])
-
-    await new Promise(resolve => setTimeout(resolve, 0))
-    expect(unhandledRejectionHandler).not.toHaveBeenCalled()
-  })
-
   describe('optionality', () => {
     it.each([
       ['optional input schema', type('string | undefined'), 'input', {

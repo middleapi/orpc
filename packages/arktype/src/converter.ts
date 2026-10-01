@@ -1,7 +1,7 @@
 import type { JsonSchema as ArkJsonSchema, ToJsonSchema } from '@ark/schema'
 import type { AnySchema, JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
 import type { Type } from 'arktype'
-import { JsonSchemaFormat, JsonSchemaXNativeType } from '@orpc/json-schema'
+import { isStandardSchemaOptional, JsonSchemaFormat, JsonSchemaXNativeType } from '@orpc/json-schema'
 
 export interface ArkTypeToJsonSchemaConverterOptions extends Omit<ToJsonSchema.Options, 'dialect' | 'target'> {
   /**
@@ -90,19 +90,7 @@ export class ArkTypeToJsonSchemaConverter implements JsonSchemaConverter {
   private convertUncached(arkTypeSchema: Type, direction: JsonSchemaConverterDirection): [jsonSchema: JsonSchema, optional: boolean] {
     const jsonSchema = this.convertArkType(arkTypeSchema, direction)
 
-    let optional = false
-    try {
-      const result = arkTypeSchema['~standard'].validate(undefined)
-      if (result instanceof Promise) {
-        result.catch(() => {})
-      }
-      else if (!result.issues) {
-        optional = direction === 'input' ? true : result.value === undefined
-      }
-    }
-    catch {}
-
-    return [jsonSchema as JsonSchema, optional]
+    return [jsonSchema as JsonSchema, isStandardSchemaOptional(arkTypeSchema, direction)]
   }
 
   private convertArkType(schema: Type, _direction: JsonSchemaConverterDirection): ArkJsonSchema {

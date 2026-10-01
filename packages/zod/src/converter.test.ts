@@ -84,11 +84,9 @@ describe('zodToJsonSchemaConverter', () => {
     })
 
     // Zod falls back to `safeParseAsync` when the sync parse throws, which rejects with the same error.
-    const preprocessSchema = z.preprocess(value => JSON.parse(value as string), z.object({ a: z.string() }))
-    const transformSchema = z.any().transform(value => value.length)
+    const schema = z.preprocess(value => JSON.parse(value as string), z.object({ a: z.string() }))
 
-    expect(converter.convert(preprocessSchema, 'input')).toEqual([expect.objectContaining({ type: 'object' }), false])
-    expect(converter.convert(transformSchema, 'output')).toEqual([{}, false])
+    expect(converter.convert(schema, 'input')).toEqual([expect.objectContaining({ type: 'object' }), false])
 
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(unhandledRejectionHandler).not.toHaveBeenCalled()

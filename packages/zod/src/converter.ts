@@ -1,6 +1,6 @@
 import type { AnySchema, JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
 import type { $ZodType, $ZodTypes, ToJSONSchemaContext, ToJSONSchemaParams, JSONSchema as ZodJsonSchema } from 'zod/v4/core'
-import { JsonSchemaFormat, JsonSchemaXNativeType } from '@orpc/json-schema'
+import { isStandardSchemaOptional, JsonSchemaFormat, JsonSchemaXNativeType } from '@orpc/json-schema'
 import { process as processZodSchema, toJSONSchema } from 'zod/v4/core'
 import { JSON_SCHEMA_INPUT_REGISTRY, JSON_SCHEMA_OUTPUT_REGISTRY, JSON_SCHEMA_REGISTRY } from './registries'
 
@@ -63,19 +63,7 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
   private convertUncached(zodSchema: $ZodType, direction: JsonSchemaConverterDirection): [jsonSchema: JsonSchema, optional: boolean] {
     const jsonSchema = this.convertZod(zodSchema, direction)
 
-    let optional = false
-    try {
-      const result = zodSchema['~standard'].validate(undefined)
-      if (result instanceof Promise) {
-        result.catch(() => {})
-      }
-      else if (!result.issues) {
-        optional = direction === 'input' ? true : result.value === undefined
-      }
-    }
-    catch {}
-
-    return [jsonSchema as JsonSchema, optional]
+    return [jsonSchema as JsonSchema, isStandardSchemaOptional(zodSchema, direction)]
   }
 
   private convertZod(schema: $ZodType, direction: JsonSchemaConverterDirection): ZodJsonSchema.JSONSchema {
