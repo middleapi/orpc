@@ -251,13 +251,13 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
       return this.parseLimitedBody(request, hint, resolvedHint, maxBodySize.memory)
     }
 
-    // Streams are consumed on the fly, but the decoder buffers each event whole, however fast it is read
+    // Streams are consumed on the fly, but the decoder buffers each event whole, however fast the stream is read
     const eventLimit = resolvedHint === 'event-stream' ? maxBodySize.memory : Number.POSITIVE_INFINITY
     return this.parseLimitedBody(request, hint, resolvedHint, maxBodySize.stream, eventLimit)
   }
 
   /**
-   * Enforces a size limit on a body the standard parser handles, counting the
+   * Enforces size limits on a body the standard parser handles, counting the
    * raw bytes before handing them back for regular parsing.
    */
   private async parseLimitedBody(
@@ -436,7 +436,7 @@ const LF = 0x0A
 
 /**
  * Fails once an event, which the decoder buffers until its blank line, outgrows
- * the limit. Scans raw bytes, as UTF-8 never encodes CR or LF inside a character.
+ * the limit. Scans raw bytes, as UTF-8 never puts CR or LF in a multi-byte character.
  */
 function createEventSizeCheck(eventLimit: number): (chunk: Uint8Array) => boolean {
   let eventSize = 0
