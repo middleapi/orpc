@@ -193,9 +193,10 @@ class ResumeStorage {
       }
 
       /**
-       * Drop the unusable table and retry once. May cause data loss, but prevents total
-       * failure. If the retry also fails, the error propagates to the caller so it can be
-       * surfaced as a clean error response.
+       * Drop the unusable table (exhausted ids, a full disk, corruption, or a mismatched
+       * schema) and retry once. May cause data loss, but prevents total failure. If the
+       * retry also fails, the error propagates to the caller so it can be surfaced as a
+       * clean error response.
        */
       console.error('Failed to insert event, resetting resume storage schema.', e)
       this.resetSchema()

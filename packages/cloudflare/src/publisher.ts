@@ -155,7 +155,10 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
 
     websocket.accept()
 
-    await replayed.promise
+    await replayed.promise.catch((error) => {
+      websocket.close()
+      throw error
+    })
 
     return async () => {
       websocket.close()

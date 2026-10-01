@@ -382,6 +382,7 @@ describe('durable publisher', () => {
       await expect(subscription).rejects.toThrow(message)
       expect(listener).toHaveBeenCalledTimes(1)
       expect(onError).not.toHaveBeenCalled()
+      expect(socket.closeCalls).toHaveLength(1)
     })
 
     it('ends an iterator subscriber with the error', async () => {
