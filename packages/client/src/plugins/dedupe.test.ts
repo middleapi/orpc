@@ -1,6 +1,9 @@
-import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
+import type { StandardBody, StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard'
+import { AsyncLocalStorage } from 'node:async_hooks'
+import { getEventListeners } from 'node:events'
 import * as SharedExperimentalV2Module from '@orpc/shared'
+import { AsyncIteratorClass, asyncIteratorToStream, promiseWithResolvers, sleep } from '@orpc/shared'
 import { StandardLink } from '../adapters/standard'
 import { DedupeLinkPlugin } from './dedupe'
 
@@ -447,6 +450,270 @@ describe('dedupeLinkPlugin', () => {
     expect(transport.send).toHaveBeenCalledTimes(1)
   })
 
+  it('rejects only the aborted caller while the shared request continues for the rest', async () => {
+    const controller = new AbortController()
+    const codec = makeCodec()
+    const { body, tick, isCancelled } = createTickingIterator()
+    const transport = makeTransport()
+    const release = promiseWithResolvers<void>()
+
+    vi.mocked(transport.send).mockImplementation(async () => {
+      await release.promise
+      return { status: 200, headers: {}, resolveBody: async () => body }
+    })
+
+    const link = new StandardLink(codec, transport, {
+      plugins: [new DedupeLinkPlugin({
+        groups: [{ condition: () => true, context: { group: true } }],
+      })],
+    })
+
+    const promise1 = link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal })
+    const promise2 = link.call(['GET', 'planet'], { value: 1 }, { context: {} })
+
+    await vi.waitFor(() => expect(transport.send).toHaveBeenCalledTimes(1))
+
+    controller.abort()
+    await expect(promise1).rejects.toBe(controller.signal.reason)
+
+    release.resolve()
+    const iterator = await promise2 as AsyncIteratorObject<string>
+    const next = iterator.next()
+    tick()
+    await expect(next).resolves.toEqual({ done: false, value: 'tick' })
+
+    await iterator.return?.()
+    expect(isCancelled()).toBe(true)
+  })
+
+  it('leaves callers aborted while queued out of the request', async () => {
+    vi.useFakeTimers()
+
+    const controller1 = new AbortController()
+    const signal2 = AbortSignal.timeout(1000)
+    const controller3 = new AbortController()
+    const codec = makeCodec()
+    const transport = makeTransport()
+    const context = vi.fn(() => ({ group: true }))
+
+    const link = new StandardLink(codec, transport, {
+      plugins: [new DedupeLinkPlugin({
+        wait: 100,
+        groups: [{ condition: () => true, context }],
+      })],
+    })
+
+    const promise1 = link.call(['GET', 'planet'], { value: 1 }, { context: { tag: 'first' }, signal: controller1.signal })
+    const promise2 = link.call(['GET', 'planet'], { value: 1 }, { context: { tag: 'second' }, signal: signal2 })
+    const promise3 = link.call(['GET', 'planet'], { value: 2 }, { context: {}, signal: controller3.signal })
+
+    await vi.advanceTimersByTimeAsync(10)
+    controller1.abort()
+    controller3.abort()
+
+    await expect(promise1).rejects.toBe(controller1.signal.reason)
+    await expect(promise3).rejects.toBe(controller3.signal.reason)
+    expect(transport.send).toHaveBeenCalledTimes(0)
+
+    await vi.advanceTimersByTimeAsync(90)
+    await expect(promise2).resolves.toEqual({ value: '__body__' })
+
+    // The only remaining caller is sent on its own, and nothing is sent for the fully aborted request
+    expect(transport.send).toHaveBeenCalledTimes(1)
+    expect(context).not.toHaveBeenCalled()
+    expect(vi.mocked(transport.send).mock.calls[0]![2]).toMatchObject({
+      context: { tag: 'second' },
+      signal: signal2,
+    })
+  })
+
+  it('rejects a caller that aborts while the shared body resolves', async () => {
+    const controller = new AbortController()
+    const codec = makeCodec()
+    const body = promiseWithResolvers<StandardBody>()
+    const transport = makeTransport(() => body.promise)
+
+    const link = new StandardLink(codec, transport, {
+      plugins: [new DedupeLinkPlugin({
+        groups: [{ condition: () => true, context: { group: true } }],
+      })],
+    })
+
+    const promise1 = link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal })
+    const promise2 = link.call(['GET', 'planet'], { value: 1 }, { context: {} })
+
+    await vi.waitFor(() => expect(codec.decodeResponse).toHaveBeenCalledTimes(2))
+
+    controller.abort()
+    body.resolve({ value: '__body__' })
+
+    await expect(promise1).rejects.toBe(controller.signal.reason)
+    await expect(promise2).resolves.toEqual({ value: '__body__' })
+  })
+
+  describe.each([
+    ['async-iterator', createTickingIterator],
+    ['readable-stream', createTickingStream],
+  ])('with a shared %s body', (_name, createTickingBody) => {
+    it('stops streaming to a caller that aborts mid-stream while the rest keep reading', async () => {
+      const controller = new AbortController()
+      const codec = makeCodec()
+      const { body, tick, isCancelled } = createTickingBody()
+      const transport = makeTransport(async () => body)
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: { group: true } }],
+        })],
+      })
+
+      const [reader1, reader2] = await Promise.all([
+        link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal }).then(openReader),
+        link.call(['GET', 'planet'], { value: 1 }, { context: {} }).then(openReader),
+      ])
+
+      const read1 = reader1.read()
+      const read2 = reader2.read()
+      tick()
+      await expect(read1).resolves.toEqual({ done: false, value: 'tick' })
+      await expect(read2).resolves.toEqual({ done: false, value: 'tick' })
+
+      const pending1 = reader1.read()
+      const pending2 = reader2.read()
+      // Let both reads reach their replicas before aborting
+      await sleep(0)
+      controller.abort()
+      tick()
+      await expect(pending1).rejects.toBe(controller.signal.reason)
+      await expect(pending2).resolves.toEqual({ done: false, value: 'tick' })
+
+      await reader2.cancel()
+      expect(isCancelled()).toBe(true)
+    })
+
+    it('lets the rest cancel the shared source after a caller aborts and stops reading', async () => {
+      const controller = new AbortController()
+      const codec = makeCodec()
+      const { body, tick, isCancelled } = createTickingBody()
+      const transport = makeTransport(async () => body)
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: { group: true } }],
+        })],
+      })
+
+      // The first caller never reads, so its replica keeps what it receives
+      const [, reader2] = await Promise.all([
+        link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal }).then(openReader),
+        link.call(['GET', 'planet'], { value: 1 }, { context: {} }).then(openReader),
+      ])
+
+      const read2 = reader2.read()
+      tick()
+      await expect(read2).resolves.toEqual({ done: false, value: 'tick' })
+
+      controller.abort()
+      await reader2.cancel()
+      expect(isCancelled()).toBe(true)
+    })
+
+    it('closes the replica of a caller that aborts while the shared body resolves', async () => {
+      const controller = new AbortController()
+      const codec = makeCodec()
+      const { body, isCancelled } = createTickingBody()
+      const resolvedBody = promiseWithResolvers<StandardBody>()
+      const transport = makeTransport(() => resolvedBody.promise)
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: { group: true } }],
+        })],
+      })
+
+      const promise1 = link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal })
+      const promise2 = link.call(['GET', 'planet'], { value: 1 }, { context: {} })
+
+      await vi.waitFor(() => expect(codec.decodeResponse).toHaveBeenCalledTimes(2))
+
+      controller.abort()
+      resolvedBody.resolve(body)
+
+      await expect(promise1).rejects.toBe(controller.signal.reason)
+
+      await openReader(await promise2).cancel()
+      expect(isCancelled()).toBe(true)
+    })
+
+    it.each([
+      ['ends', true],
+      ['fails', new Error('FAIL')],
+    ] as const)('removes the abort listener once the replica is cancelled or the body %s', async (_name, end) => {
+      const controller1 = new AbortController()
+      const controller2 = new AbortController()
+      const codec = makeCodec()
+      const { body, tick } = createTickingBody()
+      const transport = makeTransport(async () => body)
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: { group: true } }],
+        })],
+      })
+
+      const [reader1, reader2] = await Promise.all([
+        link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller1.signal }).then(openReader),
+        link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller2.signal }).then(openReader),
+      ])
+
+      const listenerCount1 = getEventListeners(controller1.signal, 'abort').length
+      const listenerCount2 = getEventListeners(controller2.signal, 'abort').length
+
+      // A cancelled stream branch settles only once the other branch cancels or the source ends
+      const cancel1 = reader1.cancel()
+      await sleep(0)
+
+      expect(getEventListeners(controller1.signal, 'abort')).toHaveLength(listenerCount1 - 1)
+      expect(getEventListeners(controller2.signal, 'abort')).toHaveLength(listenerCount2)
+
+      const read2 = reader2.read().catch(error => error)
+      tick(end)
+      await expect(read2).resolves.toEqual(end === true ? { done: true, value: undefined } : end)
+      await cancel1
+
+      expect(getEventListeners(controller2.signal, 'abort')).toHaveLength(listenerCount2 - 1)
+    })
+
+    it('swallows a failure to cancel the shared source when the last reader aborts', async () => {
+      const controller = new AbortController()
+      const codec = makeCodec()
+      const cancelError = new Error('CANCEL_FAILED')
+      const { body, isCancelled } = createTickingBody(cancelError)
+      const transport = makeTransport(async () => body)
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: { group: true } }],
+        })],
+      })
+
+      const [reader1, reader2] = await Promise.all([
+        link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal }).then(openReader),
+        link.call(['GET', 'planet'], { value: 1 }, { context: {} }).then(openReader),
+      ])
+
+      // A cancelled stream branch settles with the source's cancel result once the other branch cancels
+      const cancel2 = reader2.cancel().catch(error => error)
+      const read1 = reader1.read()
+      await sleep(0)
+      controller.abort()
+
+      await expect(read1).rejects.toBe(controller.signal.reason)
+      expect(isCancelled()).toBe(true)
+      await cancel2
+    })
+  })
+
   it('does not dedupe when no group matches', async () => {
     const codec = makeCodec()
     const transport = makeTransport()
@@ -501,7 +768,120 @@ describe('dedupeLinkPlugin', () => {
     await expect(promise3).resolves.toEqual({ value: '__body__' })
     expect(transport.send).toHaveBeenCalledTimes(2)
   })
+
+  describe('async context', () => {
+    const storage = new AsyncLocalStorage<string>()
+
+    function makeUserTransport(): StandardLinkTransport<TestContext> {
+      return {
+        send: vi.fn(async () => {
+          const user = storage.getStore()
+          return { status: 200, headers: {}, resolveBody: async () => user }
+        }),
+      }
+    }
+
+    it('sends each request in its first caller\'s async context', async () => {
+      const transport = makeUserTransport()
+      const link = new StandardLink(makeCodec(), transport, {
+        plugins: [new DedupeLinkPlugin({ groups: [{ condition: () => true, context: {} }] })],
+      })
+
+      await expect(Promise.all([
+        storage.run('alice', () => link.call(['GET', 'a'], {}, { context: {} })),
+        storage.run('bob', () => link.call(['GET', 'b'], {}, { context: {} })),
+        storage.run('carol', () => link.call(['GET', 'b'], {}, { context: {} })),
+      ])).resolves.toEqual(['alice', 'bob', 'bob'])
+
+      expect(transport.send).toHaveBeenCalledTimes(2)
+    })
+
+    it('sends in the async context of the first caller that is not aborted', async () => {
+      vi.useFakeTimers()
+
+      const controller = new AbortController()
+      const transport = makeUserTransport()
+      const link = new StandardLink(makeCodec(), transport, {
+        plugins: [new DedupeLinkPlugin({ wait: 100, groups: [{ condition: () => true, context: {} }] })],
+      })
+
+      const alice = storage.run('alice', () => link.call(['GET', 'me'], {}, { context: {}, signal: controller.signal }))
+      const bob = storage.run('bob', () => link.call(['GET', 'me'], {}, { context: {} }))
+
+      await vi.advanceTimersByTimeAsync(10)
+      controller.abort()
+      await expect(alice).rejects.toBe(controller.signal.reason)
+
+      await vi.advanceTimersByTimeAsync(90)
+      await expect(bob).resolves.toBe('bob')
+      expect(transport.send).toHaveBeenCalledTimes(1)
+    })
+
+    it('dedupes only requests with the same scope', async () => {
+      const transport = makeUserTransport()
+      const link = new StandardLink(makeCodec(), transport, {
+        plugins: [new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: {} }],
+          scope: () => storage.getStore(),
+        })],
+      })
+
+      await expect(Promise.all(['alice', 'bob', 'alice', 'bob'].map(user =>
+        storage.run(user, () => link.call(['GET', 'me'], {}, { context: {} })),
+      ))).resolves.toEqual(['alice', 'bob', 'alice', 'bob'])
+
+      expect(transport.send).toHaveBeenCalledTimes(2)
+    })
+  })
 })
+
+interface TickingBody<TBody> {
+  body: TBody
+  /**
+   * Emits the next `'tick'`, or ends the body with `true`, or fails it with an error.
+   */
+  tick: (end?: true | Error) => void
+  isCancelled: () => boolean
+}
+
+function createTickingIterator(cancelError?: Error): TickingBody<AsyncIteratorClass<string, void>> {
+  let cancelled = false
+  let ticks = promiseWithResolvers<true | Error | undefined>()
+
+  const body = new AsyncIteratorClass<string, void>(async () => {
+    const end = await ticks.promise
+    ticks = promiseWithResolvers()
+
+    if (end instanceof Error) {
+      throw end
+    }
+
+    return end ? { done: true, value: undefined } : { done: false, value: 'tick' }
+  }, async ({ kind }) => {
+    cancelled ||= kind === 'cancelled'
+
+    if (cancelled && cancelError) {
+      throw cancelError
+    }
+  })
+
+  return { body, tick: end => ticks.resolve(end), isCancelled: () => cancelled }
+}
+
+function createTickingStream(cancelError?: Error): TickingBody<ReadableStream<string>> {
+  const { body, ...ticking } = createTickingIterator(cancelError)
+  return { body: asyncIteratorToStream(body), ...ticking }
+}
+
+function openReader(output: unknown): { read: () => Promise<unknown>, cancel: () => Promise<void> } {
+  if (output instanceof ReadableStream) {
+    const reader = output.getReader()
+    return { read: () => reader.read(), cancel: () => reader.cancel() }
+  }
+
+  const iterator = output as AsyncIteratorObject<unknown>
+  return { read: () => iterator.next(), cancel: async () => void await iterator.return?.() }
+}
 
 async function readAllAsync<T>(iterator: AsyncIterable<T>): Promise<T[]> {
   const values: T[] = []

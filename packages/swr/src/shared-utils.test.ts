@@ -19,6 +19,14 @@ describe('sharedUtils', () => {
       expect(utils.matcher({ strategy: 'exact', input: { value1: 'test' } })([['invalid'], { input: { value1: 'test' } }])).toBe(false)
     })
 
+    it('matches dates in the input by time', () => {
+      const key = [['test', 'path'], { input: { since: new Date('2024-01-01') } }]
+
+      expect(utils.matcher({ input: { since: new Date('2024-01-01') } })(key)).toBe(true)
+      expect(utils.matcher({ strategy: 'exact', input: { since: new Date('2024-01-01') } })(key)).toBe(true)
+      expect(utils.matcher({ input: { since: new Date('2024-01-02') } })(key)).toBe(false)
+    })
+
     it('with prefix', () => {
       const prefixedUtils = new SharedUtils(['test', 'path'], { prefix: '__prefix__' })
 

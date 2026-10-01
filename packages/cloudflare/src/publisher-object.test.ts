@@ -181,6 +181,28 @@ describe('durable publisher object', () => {
     await closeSocket(tailSubscriber)
   })
 
+  it('resumes messages in numeric id order', async () => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
+
+    for (let order = 1; order <= 11; order++) {
+      expect((await publish(stub, { data: { order } })).status).toBe(204)
+    }
+
+    // sorting ids as text would replay '10' and '11' before '8' and '9'
+    const generation = await getGeneration(stub)
+    const subscriber = await openSocket(stub, `${generation}-7`)
+    const messages = await readMessages(subscriber, 4)
+
+    expect(messages).toEqual([
+      { data: { order: 8 }, meta: { id: `${generation}-8` } },
+      { data: { order: 9 }, meta: { id: `${generation}-9` } },
+      { data: { order: 10 }, meta: { id: `${generation}-10` } },
+      { data: { order: 11 }, meta: { id: `${generation}-11` } },
+    ])
+
+    await closeSocket(subscriber)
+  })
+
   it('keeps resume before new live messages', { repeats: 5 }, async () => {
     const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
 

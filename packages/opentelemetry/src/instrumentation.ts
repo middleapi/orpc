@@ -32,7 +32,7 @@ export class ORPCInstrumentation extends InstrumentationBase<ORPCInstrumentation
 
   override enable(): void {
     setTracer(new OpenTelemetryTracer({
-      tracer: trace.getTracer(pkg.name, pkg.version),
+      tracer: () => this.tracer,
       trace,
       context,
       propagation: (this._config.propagationEnabled ?? true) ? propagation : undefined,

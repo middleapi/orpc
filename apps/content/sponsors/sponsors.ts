@@ -8,7 +8,7 @@ export default [
     "login": "screenshotone",
     "avatar": "https://avatars.githubusercontent.com/u/97035603?v=4",
     "link": "https://screenshotone.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
-    "rel": "",
+    "rel": "sponsored",
     "tierTitle": "Special Sponsor",
     "tierLevel": 5,
     "amount": 1000,

@@ -35,6 +35,11 @@ describe('openAPIJsonSerializer', () => {
       expect(serializer.serialize(Number.NaN).json).toBeNull()
     })
 
+    it('serializes Infinity and -Infinity to null', () => {
+      expect(serializer.serialize(Number.POSITIVE_INFINITY).json).toBeNull()
+      expect(serializer.serialize(Number.NEGATIVE_INFINITY).json).toBeNull()
+    })
+
     it('serializes Date to ISO string', () => {
       expect(serializer.serialize(new Date('2023-01-01')).json).toBe('2023-01-01T00:00:00.000Z')
     })
@@ -211,6 +216,8 @@ describe('openAPIJsonSerializer', () => {
         date: new Date('2023-01-01'),
         invalidDate: new Date('Invalid'),
         nan: Number.NaN,
+        infinity: Number.POSITIVE_INFINITY,
+        negativeInfinity: Number.NEGATIVE_INFINITY,
         url: new URL('https://orpc.dev'),
         set: new Set([1, 2]),
         map: new Map([['a', 1]]),
@@ -221,6 +228,8 @@ describe('openAPIJsonSerializer', () => {
         date: '2023-01-01T00:00:00.000Z',
         invalidDate: null,
         nan: null,
+        infinity: null,
+        negativeInfinity: null,
         url: 'https://orpc.dev/',
         set: [1, 2],
         map: [['a', 1]],

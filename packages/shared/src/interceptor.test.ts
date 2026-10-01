@@ -1,4 +1,5 @@
 import { intercept, onAsyncIteratorObjectError, onError, onFinish, onReadableStreamError, onStart, onSuccess } from './interceptor'
+import { promiseWithResolvers } from './promise'
 
 describe('intercept', () => {
   const interceptor1 = vi.fn(({ next }) => next())
@@ -379,6 +380,25 @@ describe('lifecycle interceptors', () => {
     )
 
     expect(onSuccessFn).toHaveBeenCalledTimes(0)
+  })
+})
+
+describe('onFinish', () => {
+  // Pins the per-call state contract. It passes with `state` in the factory closure too: that version
+  // only leaked the last result, which needs forced garbage collection to observe and is not tested.
+  it('gives each call its own state when calls overlap', async () => {
+    const callback = vi.fn()
+    const interceptor = onFinish(callback)
+    const error = new Error('__error__')
+    const { promise, resolve } = promiseWithResolvers<string>()
+
+    const first = interceptor({ next: () => promise })
+    await expect(interceptor({ next: () => Promise.reject(error) })).rejects.toBe(error)
+    resolve('__first__')
+    await expect(first).resolves.toBe('__first__')
+
+    expect(callback).toHaveBeenNthCalledWith(1, [error, undefined, false], expect.anything())
+    expect(callback).toHaveBeenNthCalledWith(2, [null, '__first__', true], expect.anything())
   })
 })
 

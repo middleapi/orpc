@@ -30,6 +30,16 @@ export const builtInRPCSupportDataTypes: { name: string, value: unknown, expecte
     expected: Number.NaN,
   },
   {
+    name: 'Infinity',
+    value: Number.POSITIVE_INFINITY,
+    expected: Number.POSITIVE_INFINITY,
+  },
+  {
+    name: '-Infinity',
+    value: Number.NEGATIVE_INFINITY,
+    expected: Number.NEGATIVE_INFINITY,
+  },
+  {
     name: 'true',
     value: true,
     expected: true,

@@ -91,6 +91,19 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
     },
     isTerminal: true,
   },
+  infinity: {
+    condition(data: unknown): boolean {
+      return data === Number.POSITIVE_INFINITY || data === Number.NEGATIVE_INFINITY
+    },
+    serialize(data: number): string {
+      return data > 0 ? 'Infinity' : '-Infinity'
+    },
+    deserialize(serialized: string): number {
+      assertSerializedType(serialized === 'Infinity' || serialized === '-Infinity', 'infinity', '"Infinity" or "-Infinity"')
+      return serialized === 'Infinity' ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY
+    },
+    isTerminal: true,
+  },
   url: {
     condition(data: unknown): boolean {
       return data instanceof URL
@@ -166,7 +179,7 @@ export interface RPCJsonSerializerOptions {
    * handlers: { url: undefined }
    * ```
    *
-   * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `url`, `set`, `map`.
+   * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `infinity`, `url`, `set`, `map`.
    */
   handlers?: Record<string, undefined | RPCJsonSerializerHandler> | undefined
 
@@ -262,11 +275,15 @@ export class RPCJsonSerializer {
         case 'boolean':
           return data
         case 'number':
+          if (Number.isFinite(data)) {
+            return data
+          }
           if (Number.isNaN(data)) {
             meta.push(['nan', ...segments])
             return null
           }
-          return data
+          meta.push(['infinity', ...segments])
+          return data > 0 ? 'Infinity' : '-Infinity'
         case 'undefined':
           meta.push(['undefined', ...segments])
           return null
