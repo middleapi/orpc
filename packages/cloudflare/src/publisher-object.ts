@@ -208,9 +208,12 @@ class ResumeStorage {
     /**
      * SQLite INTEGER can exceed JavaScript's safe integer range,
      * so we cast to TEXT for safe resume ID comparison.
+     *
+     * The alias must not be `id`: SQLite resolves ORDER BY to an output
+     * alias before a table column, which would sort ids as text.
      */
     const result = this.ctx.storage.sql.exec(`
-      SELECT CAST(id AS TEXT) as id, payload
+      SELECT CAST(id AS TEXT) AS event_id, payload
       FROM "${this.schemaPrefix}events"
       WHERE id > ?
       ORDER BY id ASC
@@ -219,7 +222,7 @@ class ResumeStorage {
     const events: string[] = []
     for (const record of result.toArray()) {
       const payload: SerializedPayload = JSON.parse(record.payload as string)
-      events.push(stringifyJSON(this.attachEventId(payload, record.id as string)))
+      events.push(stringifyJSON(this.attachEventId(payload, record.event_id as string)))
     }
 
     return events
