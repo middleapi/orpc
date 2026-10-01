@@ -142,13 +142,16 @@ export class JsonSchemaCoercer {
       }
     }
 
-    const nativeType = NATIVE_TYPES.get(schema['x-native-type'])
+    const declaredNativeType = NATIVE_TYPES.get(schema['x-native-type'])
+    const nativeType = schema.type === undefined || declaredNativeType?.types.includes(schema.type)
+      ? declaredNativeType
+      : undefined
 
     if (nativeType && !nativeType.afterTypeCheck) {
       coerced = nativeType.coerce(coerced)
     }
 
-    if (schema.type && !(nativeType?.types.includes(schema.type) && nativeType.is(coerced))) {
+    if (schema.type && !nativeType?.is(coerced)) {
       switch (schema.type) {
         case 'null': {
           if (coerced !== null) {

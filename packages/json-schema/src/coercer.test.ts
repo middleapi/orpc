@@ -465,6 +465,25 @@ describe('jsonSchemaCoercer', () => {
       expect(coerce(schema, { at, count: '1' })).toEqual({ at, count: 1 })
     })
 
+    it('accepts null for a native type declared as a type array with null', () => {
+      // z.object({ at: z.date().nullable(), count: z.number() }).nullable(), with the nullable date as a type array
+      const schema = {
+        anyOf: [
+          {
+            type: 'object',
+            properties: { at: { 'type': ['string', 'null'], 'format': 'date-time', 'x-native-type': 'date' }, count: { type: 'number' } },
+            required: ['at', 'count'],
+          },
+          { type: 'null' },
+        ],
+      }
+
+      const at = new Date('2020-01-01T00:00:00.000Z')
+      expect(coerce(schema, { at: null, count: '1' })).toEqual({ at: null, count: 1 })
+      expect(coerce(schema, { at: '2020-01-01T00:00:00.000Z', count: '1' })).toEqual({ at, count: 1 })
+      expect(coerce(schema, { at, count: '1' })).toEqual({ at, count: 1 })
+    })
+
     it('coerces a tuple ending in optional items inside a union', () => {
       // z.tuple([z.number(), z.number().optional()]).nullable()
       const schema = {
