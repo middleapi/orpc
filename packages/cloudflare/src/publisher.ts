@@ -67,7 +67,8 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
     })
 
     if (!response.ok) {
-      throw new Error(`Failed to publish event: ${response.status} ${response.statusText}`, {
+      const reason = await response.text() // the durable object explains why it rejected the event
+      throw new Error(`Failed to publish event: ${response.status} ${reason || response.statusText}`, {
         cause: response,
       })
     }

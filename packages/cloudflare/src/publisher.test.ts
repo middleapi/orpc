@@ -220,7 +220,7 @@ describe('durable publisher', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     await expect(publisher.publish('message', { text: 'a'.repeat(3_000_000) })).rejects.toThrow(
-      'Failed to publish event: 413',
+      /^Failed to publish event: 400 .*SQLITE_TOOBIG/,
     )
 
     consoleError.mockRestore()
@@ -270,7 +270,7 @@ describe('durable publisher', () => {
 
   it('throws when publish fails', async () => {
     const stub = {
-      fetch: vi.fn(async () => new Response('busy', {
+      fetch: vi.fn(async () => new Response(null, {
         status: 503,
         statusText: 'Service Unavailable',
       })),

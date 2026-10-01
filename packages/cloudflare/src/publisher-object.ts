@@ -87,12 +87,7 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
     }
     catch (e) {
       console.error('Failed to store published event:', e)
-
-      if (isPayloadTooLargeError(e)) {
-        return new Response('Event payload too large', { status: 413 })
-      }
-
-      return new Response('Invalid or unprocessable event payload', { status: 400 })
+      return new Response(String(e), { status: 400 })
     }
 
     for (const ws of this.ctx.getWebSockets()) {
@@ -374,12 +369,4 @@ function isSerializedPayload(value: unknown): value is SerializedPayload {
  */
 function isUnusableTableError(error: unknown): boolean {
   return /SQLITE_(?:FULL|CORRUPT|NOTADB)|no such table|no such column|has no column named/.test(String(error))
-}
-
-/**
- * Whether an insert failed because the payload is over the SQLite row size limit, which
- * SQLite enforces so it always matches the platform's current limit.
- */
-function isPayloadTooLargeError(error: unknown): boolean {
-  return String(error).includes('SQLITE_TOOBIG')
 }

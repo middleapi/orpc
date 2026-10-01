@@ -322,7 +322,7 @@ describe('durable publisher object', () => {
     const invalidResponse = await publish(stub, 'not-json')
 
     expect(invalidResponse.status).toBe(400)
-    expect(await invalidResponse.text()).toBe('Invalid or unprocessable event payload')
+    expect(await invalidResponse.text()).toContain('SyntaxError')
     expect(consoleError).toHaveBeenCalledTimes(1)
 
     expect((await publish(stub, { data: { text: 'after-error' } })).status).toBe(204)
@@ -416,12 +416,17 @@ describe('durable publisher object', () => {
 
     expect((await publish(stub, { data: { text: 'kept' } })).status).toBe(204)
 
-    for (const payload of ['null', '[]', '"text"', '42', '{"data":1,"meta":"text"}', '{"data":1,"meta":[]}']) {
+    for (const payload of [
+      'null',
+      '[]',
+      '"text"',
+      '42',
+      '{"data":1,"meta":"text"}',
+      '{"data":1,"meta":[]}',
+      JSON.stringify({ data: 'a'.repeat(3_000_000) }), // over the SQLite row size limit
+    ]) {
       expect((await publish(stub, payload)).status).toBe(400)
     }
-
-    // over the SQLite row size limit
-    expect((await publish(stub, { data: 'a'.repeat(3_000_000) })).status).toBe(413)
 
     expect((await publish(stub, { data: { text: 'after' } })).status).toBe(204)
 
