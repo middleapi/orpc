@@ -97,7 +97,6 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
     // `Publisher.subscribe` expects them all to reach the listener before this resolves
     const replayedEvents = Number(response.headers.get('orpc-replayed-events'))
     let pendingReplayedEvents = Number.isInteger(replayedEvents) && replayedEvents > 0 ? replayedEvents : 0
-    let replayFailed = false
     const replayed = promiseWithResolvers<void>()
 
     if (pendingReplayedEvents === 0) {
@@ -105,13 +104,8 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
     }
 
     const reportError = (error: Error) => {
-      if (replayFailed) {
-        return
-      }
-
       if (pendingReplayedEvents > 0) {
-        replayFailed = true
-        replayed.reject(error)
+        replayed.reject(error) // no-op once the subscription already rejected
       }
       else {
         options?.onError?.(error)
