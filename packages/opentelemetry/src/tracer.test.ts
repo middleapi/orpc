@@ -26,7 +26,7 @@ afterAll(async () => {
 
 function createTracer(options: { propagation?: boolean } = {}) {
   return new OpenTelemetryTracer({
-    tracer: trace.getTracer('test'),
+    tracer: () => trace.getTracer('test'),
     trace,
     context,
     propagation: options.propagation === false ? undefined : propagation,

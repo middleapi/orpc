@@ -16,11 +16,11 @@ import { parseHeaderParameters, parseMultipart } from './multipart'
 
 export interface TmpFileUploadHandlerPluginMaxBodySize {
   /**
-   * The maximum total size in bytes of request body content that is parsed
-   * into memory: JSON, URL-encoded forms, and the fields and part headers of
-   * a multipart body. A larger body rejects the request with
-   * `PAYLOAD_TOO_LARGE`. Usually the lowest of the three limits, because this
-   * content cannot stream anywhere.
+   * The maximum size in bytes of request body content buffered into memory:
+   * JSON, URL-encoded forms, and the fields and part headers of a multipart
+   * body in total, and each event of an event stream on its own. Exceeding it
+   * rejects with `PAYLOAD_TOO_LARGE`. Usually the lowest of the three limits,
+   * because this content cannot stream anywhere.
    */
   memory: number
 
@@ -105,8 +105,8 @@ export class TmpFile extends File {
  * far larger than available memory parse in constant memory. Every other body is left
  * to the standard parser.
  *
- * Request body sizes are limited per content category: memory-parsed, spooled to
- * disk, and streamed, each limit fixed or resolved per request. This subsumes the
+ * Request body sizes are limited per content category: buffered in memory, spooled
+ * to disk, and streamed, each limit fixed or resolved per request. This subsumes the
  * request limit plugin while sizing each kind of body to what it actually costs.
  *
  * @remarks
@@ -251,12 +251,13 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
       return this.parseLimitedBody(request, hint, resolvedHint, maxBodySize.memory)
     }
 
-    // Event streams and raw binary streams, the kinds consumed on the fly
-    return this.parseLimitedBody(request, hint, resolvedHint, maxBodySize.stream)
+    // Streams are consumed on the fly, but the decoder buffers each event whole, however fast the stream is read
+    const eventLimit = resolvedHint === 'event-stream' ? maxBodySize.memory : Number.POSITIVE_INFINITY
+    return this.parseLimitedBody(request, hint, resolvedHint, maxBodySize.stream, eventLimit)
   }
 
   /**
-   * Enforces a size limit on a body the standard parser handles, counting the
+   * Enforces size limits on a body the standard parser handles, counting the
    * raw bytes before handing them back for regular parsing.
    */
   private async parseLimitedBody(
@@ -264,8 +265,9 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     hint: StandardBodyHint | undefined,
     resolvedHint: StandardBodyHint,
     limit: number,
+    eventLimit = Number.POSITIVE_INFINITY,
   ): Promise<StandardBody> {
-    if (limit === Number.POSITIVE_INFINITY) {
+    if (limit === Number.POSITIVE_INFINITY && eventLimit === Number.POSITIVE_INFINITY) {
       return request.resolveBody(hint)
     }
 
@@ -278,7 +280,10 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
       return stream
     }
 
-    const response = new Response(limitStream(stream, limit), {
+    // An event can't outgrow a limit at or above the total one
+    const fits = eventLimit < limit ? createEventSizeCheck(eventLimit) : undefined
+
+    const response = new Response(limitStream(stream, limit, fits), {
       headers: toFetchHeaders(request.headers),
     })
 
@@ -402,14 +407,22 @@ function assertContentLengthWithin(headers: StandardHeaders, limit: number): voi
   }
 }
 
-function limitStream(stream: ReadableStream<Uint8Array>, limit: number): ReadableStream<Uint8Array> {
+/**
+ * Limits a stream's total size, also rejecting once `fits` refuses a chunk.
+ * `fits` sees every chunk in order, so it can keep state across them.
+ */
+function limitStream(
+  stream: ReadableStream<Uint8Array>,
+  limit: number,
+  fits: (chunk: Uint8Array) => boolean = () => true,
+): ReadableStream<Uint8Array> {
   let total = 0
 
   return stream.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
     transform(chunk, controller) {
       total += chunk.byteLength
 
-      if (total > limit) {
+      if (total > limit || !fits(chunk)) {
         controller.error(new ORPCError('PAYLOAD_TOO_LARGE'))
         return
       }
@@ -417,6 +430,74 @@ function limitStream(stream: ReadableStream<Uint8Array>, limit: number): Readabl
       controller.enqueue(chunk)
     },
   }))
+}
+
+const CR = 0x0D
+const LF = 0x0A
+
+/**
+ * Counts each event's bytes across chunks until its blank line, since the
+ * decoder buffers the whole event, and fails once one outgrows the limit. Scans
+ * raw bytes, as UTF-8 never puts CR or LF in a multi-byte character.
+ */
+function createEventSizeCheck(eventLimit: number): (chunk: Uint8Array) => boolean {
+  let eventSize = 0
+  // The event's trailing line ending: none, a lone CR, or a complete one
+  let trailing: 'none' | 'cr' | 'line' = 'none'
+
+  return (chunk) => {
+    // Buffer's native indexOf skips the content between line endings
+    const bytes = Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength)
+    let nextCR = indexOrEnd(bytes, CR, 0)
+    let nextLF = indexOrEnd(bytes, LF, 0)
+    let offset = 0
+
+    while (true) {
+      const lineEnding = Math.min(nextCR, nextLF)
+
+      if (lineEnding > offset) {
+        eventSize += lineEnding - offset
+        trailing = 'none'
+      }
+
+      if (lineEnding === bytes.length) {
+        return eventSize <= eventLimit
+      }
+
+      const byte = bytes[lineEnding]
+      offset = lineEnding + 1
+
+      if (byte === CR) {
+        nextCR = indexOrEnd(bytes, CR, offset)
+      }
+      else {
+        nextLF = indexOrEnd(bytes, LF, offset)
+      }
+
+      // The decoder skips line endings before an event
+      if (eventSize === 0) {
+        continue
+      }
+
+      if (++eventSize > eventLimit) {
+        return false
+      }
+
+      if (trailing === 'line' || (trailing === 'cr' && byte === CR)) {
+        // A blank line: the decoder releases the event
+        eventSize = 0
+        trailing = 'none'
+      }
+      else {
+        trailing = byte === CR ? 'cr' : 'line'
+      }
+    }
+  }
+}
+
+function indexOrEnd(bytes: Buffer, byte: number, from: number): number {
+  const index = bytes.indexOf(byte, from)
+  return index === -1 ? bytes.length : index
 }
 
 const EMPTY_CHUNK = new Uint8Array(0)

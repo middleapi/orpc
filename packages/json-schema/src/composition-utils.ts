@@ -301,8 +301,8 @@ function extractJsonObjectSchemaEntriesInternal(
       return [
         name,
         schemas.length === 1 ? schemas[0]! : { allOf: schemas },
-        [entries.direct, entries.allOf, entries.anyOf, entries.oneOf]
-          .every(entry => entry === undefined || entry[2]),
+        !schema.required?.includes(name)
+        && [entries.allOf, entries.anyOf, entries.oneOf].every(entry => entry === undefined || entry[2]),
       ] satisfies JsonObjectSchemaEntry
     }),
     objectLike,

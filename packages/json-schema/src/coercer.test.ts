@@ -118,6 +118,8 @@ describe('jsonSchemaCoercer', () => {
 
       // the expanded year form `toISOString` emits outside 0000-9999
       expect(coerce(DATE_SCHEMA, '+010000-01-01T00:00:00.000Z')).toEqual(new Date('+010000-01-01T00:00:00.000Z'))
+      expect(coerce(DATE_SCHEMA, '-000001-02-28T00:00:00.000Z')).toEqual(new Date('-000001-02-28T00:00:00.000Z'))
+      expect(coerce(DATE_SCHEMA, '+000000-01-01')).toEqual(new Date('+000000-01-01'))
     })
 
     it('coerces datetimes carrying a UTC offset in either direction', () => {
@@ -137,9 +139,36 @@ describe('jsonSchemaCoercer', () => {
       expect(coerce(DATE_SCHEMA, '2020-13-45')).toBe('2020-13-45')
       expect(coerce(DATE_SCHEMA, '2020-01-01T99:99Z')).toBe('2020-01-01T99:99Z')
 
+      // unpadded month or day, which V8 parses as local time while the padded form is UTC
+      expect(coerce(DATE_SCHEMA, '2020-1-5')).toBe('2020-1-5')
+      expect(coerce(DATE_SCHEMA, '2020-01-5')).toBe('2020-01-5')
+      expect(coerce(DATE_SCHEMA, '2020-1-05T06:15Z')).toBe('2020-1-05T06:15Z')
+
+      // only four digit or signed six digit years, V8 reads other forms with its legacy parser
+      expect(coerce(DATE_SCHEMA, '+0001-02-28')).toBe('+0001-02-28')
+      expect(coerce(DATE_SCHEMA, '-0048-02-29')).toBe('-0048-02-29')
+      expect(coerce(DATE_SCHEMA, '10000-01-01')).toBe('10000-01-01')
+      // ISO 8601 has no negative year zero
+      expect(coerce(DATE_SCHEMA, '-000000-02-29')).toBe('-000000-02-29')
+
       // epoch numbers are ambiguous (seconds or milliseconds)
       expect(coerce(DATE_SCHEMA, 1700000000000)).toBe(1700000000000)
       expect(coerce(DATE_SCHEMA, [])).toEqual([])
+    })
+
+    it('leaves a day the month does not have untouched, instead of rolling it into the next month', () => {
+      expect(coerce(DATE_SCHEMA, '2020-02-30')).toBe('2020-02-30')
+      expect(coerce(DATE_SCHEMA, '2020-04-31')).toBe('2020-04-31')
+      expect(coerce(DATE_SCHEMA, '2021-02-29')).toBe('2021-02-29')
+      expect(coerce(DATE_SCHEMA, '2020-02-30T06:15:00Z')).toBe('2020-02-30T06:15:00Z')
+      expect(coerce(DATE_SCHEMA, '2020-02-30 06:15')).toBe('2020-02-30 06:15')
+      expect(coerce(DATE_SCHEMA, '0050-02-29')).toBe('0050-02-29')
+
+      // real days stay coerced, including a leap day and years below 100
+      expect(coerce(DATE_SCHEMA, '2020-02-29')).toEqual(new Date('2020-02-29'))
+      expect(coerce(DATE_SCHEMA, '0048-02-29')).toEqual(new Date('0048-02-29'))
+      // the offset moves the instant to March 1 in UTC, but the written day is real
+      expect(coerce(DATE_SCHEMA, '2020-02-29T23:00:00-07:00')).toEqual(new Date('2020-03-01T06:00:00Z'))
     })
 
     it('keeps a value that is already a Date', () => {
@@ -398,6 +427,77 @@ describe('jsonSchemaCoercer', () => {
 
       // z.number().nullish()
       expect(coerce({ anyOf: [{ type: 'number' }, { type: 'null' }] }, undefined, true)).toBeUndefined()
+    })
+
+    it('coerces a number into a bigint inside a union', () => {
+      // z.bigint().nullable(): the bigint branch is `type: 'string'`, which a number never matches
+      const schema = { anyOf: [BIGINT_SCHEMA, { type: 'null' }] }
+
+      expect(coerce(schema, 123)).toBe(123n)
+      expect(coerce(schema, '123')).toBe(123n)
+      expect(coerce(schema, null)).toBeNull()
+      expect(coerce(schema, 4.5)).toBe(4.5)
+    })
+
+    it('accepts a value already of the native type, so the rest of the branch is still coerced', () => {
+      // z.object({ at: z.date(), count: z.number() }).nullable()
+      const schema = {
+        anyOf: [
+          { type: 'object', properties: { at: DATE_SCHEMA, count: { type: 'number' } }, required: ['at', 'count'] },
+          { type: 'null' },
+        ],
+      }
+
+      const at = new Date('2020-01-01T00:00:00.000Z')
+      expect(coerce(schema, { at, count: '1' })).toEqual({ at, count: 1 })
+    })
+
+    it('accepts a native value only under the JSON type it is serialized as', () => {
+      // `type: ['string', 'null']` expands into a `null` branch that keeps `x-native-type`
+      const schema = {
+        anyOf: [
+          { type: 'object', properties: { at: { 'type': 'null', 'x-native-type': 'date' }, count: { type: 'string' } } },
+          { type: 'object', properties: { at: DATE_SCHEMA, count: { type: 'number' } } },
+        ],
+      }
+
+      const at = new Date('2020-01-01T00:00:00.000Z')
+      expect(coerce(schema, { at, count: '1' })).toEqual({ at, count: 1 })
+    })
+
+    it('accepts null for a native type declared as a type array with null', () => {
+      // z.object({ at: z.date().nullable(), count: z.number() }).nullable(), with the nullable date as a type array
+      const schema = {
+        anyOf: [
+          {
+            type: 'object',
+            properties: { at: { 'type': ['string', 'null'], 'format': 'date-time', 'x-native-type': 'date' }, count: { type: 'number' } },
+            required: ['at', 'count'],
+          },
+          { type: 'null' },
+        ],
+      }
+
+      const at = new Date('2020-01-01T00:00:00.000Z')
+      expect(coerce(schema, { at: null, count: '1' })).toEqual({ at: null, count: 1 })
+      expect(coerce(schema, { at: '2020-01-01T00:00:00.000Z', count: '1' })).toEqual({ at, count: 1 })
+      expect(coerce(schema, { at, count: '1' })).toEqual({ at, count: 1 })
+    })
+
+    it('coerces a tuple ending in optional items inside a union', () => {
+      // z.tuple([z.number(), z.number().optional()]).nullable()
+      const schema = {
+        anyOf: [
+          { type: 'array', prefixItems: [{ type: 'number' }, { type: 'number' }], items: false, minItems: 1, maxItems: 2 },
+          { type: 'null' },
+        ],
+      }
+
+      expect(coerce(schema, ['1'])).toEqual([1])
+      expect(coerce(schema, ['1', '2'])).toEqual([1, 2])
+
+      // shorter than minItems, so no branch matches
+      expect(coerce(schema, [])).toEqual([])
     })
 
     it('handles the nullable form', () => {

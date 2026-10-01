@@ -524,6 +524,44 @@ describe('extractJsonObjectSchemaEntries', () => {
     ])
   })
 
+  it('applies top-level required to properties only composition branches declare', () => {
+    expect(extractJsonObjectSchemaEntries({
+      type: 'object',
+      required: ['a', 'b', 'c'],
+      anyOf: [
+        { type: 'object', properties: { a: { type: 'string' } } },
+        { type: 'object', properties: { a: { type: 'number' } } },
+      ],
+      oneOf: [
+        { type: 'object', properties: { b: { type: 'string' } } },
+      ],
+      allOf: [
+        { type: 'object', properties: { c: { type: 'string' }, d: { type: 'string' } } },
+      ],
+    })).toEqual([
+      ['a', { anyOf: [{ type: 'string' }, { type: 'number' }] }, false],
+      ['b', { type: 'string' }, false],
+      ['c', { type: 'string' }, false],
+      ['d', { type: 'string' }, true],
+    ])
+
+    // the same inside a nested composition
+    expect(extractJsonObjectSchemaEntries({
+      allOf: [
+        {
+          required: ['a'],
+          anyOf: [
+            { type: 'object', properties: { a: { type: 'string' } } },
+            { type: 'object', properties: { b: { type: 'string' } } },
+          ],
+        },
+      ],
+    })).toEqual([
+      ['a', { type: 'string' }, false],
+      ['b', { type: 'string' }, true],
+    ])
+  })
+
   it('handles top-level object with properties but no required', () => {
     expect(extractJsonObjectSchemaEntries({
       type: 'object',

@@ -869,6 +869,8 @@ describe('tmpFileUploadHandlerPlugin', () => {
 
     const boundary = 'X-TEST-BOUNDARY'
     const multipartHeaders = { 'content-type': `multipart/form-data; boundary=${boundary}` }
+    const eventStreamHeaders = { 'content-type': 'text/event-stream' }
+    const octetStreamHeaders = { 'content-type': 'application/octet-stream', 'standard-server': 'octet-stream' }
 
     /**
      * Serializes parts by hand, so each part's exact cost is known.
@@ -886,6 +888,17 @@ describe('tmpFileUploadHandlerPlugin', () => {
 
     function sum(values: number[]): number {
       return values.reduce((total, value) => total + value, 0)
+    }
+
+    /**
+     * Reads a streamed body to its end.
+     */
+    async function collect<T>(body: unknown): Promise<T[]> {
+      const items: T[] = []
+      for await (const item of body as AsyncIterable<T>) {
+        items.push(item)
+      }
+      return items
     }
 
     /**
@@ -1115,29 +1128,21 @@ describe('tmpFileUploadHandlerPlugin', () => {
       // A raw stream fails at the reader once the limit is crossed
       await runThroughPlugin({
         limits: { stream: 64 },
-        headers: { 'content-type': 'application/octet-stream', 'standard-server': 'octet-stream' },
+        headers: octetStreamHeaders,
         body: Buffer.alloc(4096, 7),
         inspect: async (body) => {
-          const reader = (body as ReadableStream<Uint8Array>).getReader()
-
-          await expect((async () => {
-            while (!(await reader.read()).done);
-          })()).rejects.toSatisfy(expectPayloadTooLarge)
+          await expect(collect(body)).rejects.toSatisfy(expectPayloadTooLarge)
         },
       })
 
-      // Under the limit the bytes pass through unchanged
+      // Under the limit the bytes pass through unchanged, never charged to memory
       const content = Buffer.alloc(64, 7)
       await runThroughPlugin({
-        limits: { stream: 1024 },
-        headers: { 'content-type': 'application/octet-stream', 'standard-server': 'octet-stream' },
+        limits: { memory: 1, stream: 1024 },
+        headers: octetStreamHeaders,
         body: content,
         inspect: async (body) => {
-          const chunks: Buffer[] = []
-          for await (const chunk of body as ReadableStream<Uint8Array>) {
-            chunks.push(Buffer.from(chunk))
-          }
-          expect(Buffer.concat(chunks).equals(content)).toBe(true)
+          expect(Buffer.concat(await collect<Uint8Array>(body)).equals(content)).toBe(true)
         },
       })
     })
@@ -1147,26 +1152,69 @@ describe('tmpFileUploadHandlerPlugin', () => {
 
       await runThroughPlugin({
         limits: { stream: 1024 },
-        headers: { 'content-type': 'text/event-stream' },
+        headers: eventStreamHeaders,
         body: events,
         inspect: async (body) => {
-          const received: unknown[] = []
-          for await (const event of body as AsyncIterable<unknown>) {
-            received.push(event)
-          }
-          expect(received).toEqual(['one', 'two'])
+          expect(await collect(body)).toEqual(['one', 'two'])
         },
       })
 
       await runThroughPlugin({
         limits: { stream: 8 },
-        headers: { 'content-type': 'text/event-stream' },
+        headers: eventStreamHeaders,
         body: events,
         inspect: async (body) => {
-          await expect((async () => {
-            // eslint-disable-next-line no-empty
-            for await (const _ of body as AsyncIterable<unknown>) {}
-          })()).rejects.toSatisfy(expectPayloadTooLarge)
+          await expect(collect(body)).rejects.toSatisfy(expectPayloadTooLarge)
+        },
+      })
+    })
+
+    it('limits each event of an event stream against maxBodySize.memory, up to its blank line in every line ending style', async () => {
+      const events = [
+        'id: 1\ndata: "lf"\n\n',
+        'id: 2\r\ndata: "crlf"\r\n\r',
+        'id: 3\rdata: "cr"\r\r',
+        'id: 4\ndata: "mixed"\n\r',
+      ]
+
+      for (const event of events) {
+        // Two events exceed the limit only in total, and line endings around them cost nothing
+        const body = Buffer.from(`\r\n\n${event}${event}\n`)
+        const size = Buffer.byteLength(event)
+
+        // One byte per chunk spreads each event over many chunks
+        for (const chunkSize of [1, body.length]) {
+          await runThroughPlugin({
+            limits: { memory: size },
+            headers: eventStreamHeaders,
+            body,
+            chunkSize,
+            inspect: async (body) => {
+              expect(await collect(body)).toHaveLength(2)
+            },
+          })
+
+          await runThroughPlugin({
+            limits: { memory: size - 1 },
+            headers: eventStreamHeaders,
+            body,
+            chunkSize,
+            inspect: async (body) => {
+              await expect(collect(body)).rejects.toSatisfy(expectPayloadTooLarge)
+            },
+          })
+        }
+      }
+    })
+
+    it('rejects an event that never ends, however fast it is read, even with an unlimited stream', async () => {
+      // A single CR, LF, or CRLF ends a line, never the event
+      await runThroughPlugin({
+        limits: { memory: 1024 },
+        headers: eventStreamHeaders,
+        body: Buffer.from('data: a\ndata: b\r\ndata: c\r'.repeat(1024)),
+        inspect: async (body) => {
+          await expect(collect(body)).rejects.toSatisfy(expectPayloadTooLarge)
         },
       })
     })

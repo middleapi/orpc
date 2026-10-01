@@ -95,7 +95,7 @@ export function error<TCode extends ORPCErrorCode, TData = unknown>(
         data = result.value
       }
 
-      super(code, { message, ...options, data })
+      super(code, { ...options, message: options.message ?? message, data })
     }
 
     static override[Symbol.hasInstance](instance: unknown): boolean {

@@ -25,7 +25,6 @@ allowBuilds:
   '@tree-sitter-grammars/tree-sitter-yaml': false
   core-js-pure: false
   esbuild: false
-  msgpackr-extract: false
   msw: false
   protobufjs: false
   sharp: false
@@ -47,3 +46,4 @@ minimumReleaseAgeExclude:
   - '@standard-server/node@0.10.0'
   - '@standard-server/peer@0.10.0'
   - '@standard-server/shared@0.10.0'
+  - effect@4.0.0

@@ -59,8 +59,8 @@ export function middlewareGen<
   middleware: MiddlewareGen<TInContext, TOutContext, TInput, TOutput, TYield, ORPCErrorConstructorMap<TErrorMap>>,
 ): Middleware<TInContext, TOutContext, TInput, TOutput, TErrorMap> {
   const mid: Middleware<TInContext, TOutContext, TInput, TOutput, TErrorMap> = (opts, input, done) => {
-    const next: MiddlewareGenNext<TOutput> = (...rest) => Effect.tryPromise({
-      try: async () => opts.next(...rest),
+    const next: MiddlewareGenNext<TOutput> = <U extends Context = object>(...rest: MaybeOptionalOptions<MiddlewareNextOptions<U>>) => Effect.tryPromise({
+      try: async () => opts.next<U>(...rest),
       catch: error => error,
     })
 

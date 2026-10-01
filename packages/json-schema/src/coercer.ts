@@ -18,6 +18,45 @@ const SATISFIED = 2
 
 type Satisfaction = typeof UNSATISFIED | typeof LOOSELY_SATISFIED | typeof SATISFIED
 
+interface NativeType {
+  types: readonly string[]
+  is: (value: unknown) => boolean
+  coerce: (value: unknown) => unknown
+  afterTypeCheck?: boolean
+}
+
+const NATIVE_TYPES = new Map<unknown, NativeType>([
+  [JsonSchemaXNativeType.Date, {
+    types: ['string'],
+    is: value => value instanceof Date,
+    coerce: value => typeof value === 'string' ? stringToDate(value) : value,
+  }],
+  [JsonSchemaXNativeType.BigInt, {
+    types: ['string', 'integer', 'number'],
+    is: value => typeof value === 'bigint',
+    coerce: value => typeof value === 'string'
+      ? stringToBigInt(value)
+      : typeof value === 'number' ? numberToBigInt(value) : value,
+  }],
+  [JsonSchemaXNativeType.Url, {
+    types: ['string'],
+    is: value => value instanceof URL,
+    coerce: value => typeof value === 'string' ? stringToURL(value) : value,
+  }],
+  [JsonSchemaXNativeType.Set, {
+    types: ['array'],
+    is: value => value instanceof Set,
+    coerce: value => Array.isArray(value) ? arrayToSet(value) : value,
+    afterTypeCheck: true,
+  }],
+  [JsonSchemaXNativeType.Map, {
+    types: ['array'],
+    is: value => value instanceof Map,
+    coerce: value => Array.isArray(value) ? arrayToMap(value) : value,
+    afterTypeCheck: true,
+  }],
+])
+
 function minSatisfaction(a: Satisfaction, b: Satisfaction): Satisfaction {
   return a < b ? a : b
 }
@@ -103,7 +142,16 @@ export class JsonSchemaCoercer {
       }
     }
 
-    if (schema.type) {
+    const declaredNativeType = NATIVE_TYPES.get(schema['x-native-type'])
+    const nativeType = schema.type === undefined || declaredNativeType?.types.includes(schema.type)
+      ? declaredNativeType
+      : undefined
+
+    if (nativeType && !nativeType.afterTypeCheck) {
+      coerced = nativeType.coerce(coerced)
+    }
+
+    if (schema.type && !nativeType?.is(coerced)) {
       switch (schema.type) {
         case 'null': {
           if (coerced !== null) {
@@ -184,7 +232,7 @@ export class JsonSchemaCoercer {
               return subCoerced
             })
 
-            if (coercedItems.length < prefixItemSchemas.length) {
+            if (typeof schema.minItems === 'number' && coercedItems.length < schema.minItems) {
               satisfied = UNSATISFIED
             }
 
@@ -257,68 +305,13 @@ export class JsonSchemaCoercer {
       }
     }
 
-    if ('x-native-type' in schema && typeof schema['x-native-type'] === 'string') {
-      switch (schema['x-native-type']) {
-        case JsonSchemaXNativeType.Date: {
-          if (typeof coerced === 'string') {
-            coerced = stringToDate(coerced)
-          }
+    if (nativeType) {
+      if (nativeType.afterTypeCheck) {
+        coerced = nativeType.coerce(coerced)
+      }
 
-          if (!(coerced instanceof Date)) {
-            satisfied = UNSATISFIED
-          }
-
-          break
-        }
-        case JsonSchemaXNativeType.BigInt: {
-          switch (typeof coerced) {
-            case 'string':
-              coerced = stringToBigInt(coerced)
-              break
-            case 'number':
-              coerced = numberToBigInt(coerced)
-              break
-          }
-
-          if (typeof coerced !== 'bigint') {
-            satisfied = UNSATISFIED
-          }
-
-          break
-        }
-        case JsonSchemaXNativeType.Url: {
-          if (typeof coerced === 'string') {
-            coerced = stringToURL(coerced)
-          }
-
-          if (!(coerced instanceof URL)) {
-            satisfied = UNSATISFIED
-          }
-
-          break
-        }
-        case JsonSchemaXNativeType.Set: {
-          if (Array.isArray(coerced)) {
-            coerced = arrayToSet(coerced)
-          }
-
-          if (!(coerced instanceof Set)) {
-            satisfied = UNSATISFIED
-          }
-
-          break
-        }
-        case JsonSchemaXNativeType.Map: {
-          if (Array.isArray(coerced)) {
-            coerced = arrayToMap(coerced)
-          }
-
-          if (!(coerced instanceof Map)) {
-            satisfied = UNSATISFIED
-          }
-
-          break
-        }
+      if (!nativeType.is(coerced)) {
+        satisfied = UNSATISFIED
       }
     }
 
@@ -440,9 +433,22 @@ function stringToBoolean(value: string): boolean | string {
   return value
 }
 
-const DATE_TIME_PATTERN = /^[+-]?\d{4,6}-\d{1,2}-\d{1,2}(?:[T ].*)?$/
+const DATE_TIME_PATTERN = /^(?!-0{6})(?:[+-]\d{2})?\d{4}-\d{2}-\d{2}(?:[T ].*)?$/
+const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 function stringToDate(value: string): Date | string {
   if (!DATE_TIME_PATTERN.test(value)) {
+    return value
+  }
+
+  const yearEnd = value.indexOf('-', 1)
+  const month = readTwoDigits(value, yearEnd + 1)
+  const day = readTwoDigits(value, yearEnd + 4)
+
+  if (
+    day < 1
+    || day > (DAYS_IN_MONTH[month - 1] ?? 0)
+    || (month === 2 && day === 29 && !isLeapYear(Number(value.slice(0, yearEnd))))
+  ) {
     return value
   }
 
@@ -453,6 +459,14 @@ function stringToDate(value: string): Date | string {
   }
 
   return date
+}
+
+function readTwoDigits(value: string, index: number): number {
+  return (value.charCodeAt(index) - 48) * 10 + value.charCodeAt(index + 1) - 48
+}
+
+function isLeapYear(year: number): boolean {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
 }
 
 function stringToURL(value: string): URL | string {
