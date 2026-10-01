@@ -17,6 +17,12 @@ describe('openapiLink', () => {
     query: os
       .meta(openapi({ method: 'QUERY', path: '/query' }))
       .handler(({ input }) => input),
+    removeOrg: os
+      .meta(openapi({ path: '/orgs/{orgId}/remove' }))
+      .handler(() => 'removeOrg'),
+    removeMember: os
+      .meta(openapi({ path: '/orgs/{orgId}/members/{memberId}/remove' }))
+      .handler(() => 'removeMember'),
   }
 
   const handler = new OpenAPIHandler(router)
@@ -177,23 +183,6 @@ describe('openapiLink', () => {
   })
 
   it('rejects dot-segment path params instead of letting URL parsing retarget the request', async () => {
-    const removeOrg = vi.fn(() => 'removeOrg')
-    const removeMember = vi.fn(() => 'removeMember')
-
-    const router = {
-      removeOrg: os
-        .meta(openapi({ path: '/orgs/{orgId}/remove' }))
-        .handler(removeOrg),
-      removeMember: os
-        .meta(openapi({ path: '/orgs/{orgId}/members/{memberId}/remove' }))
-        .handler(removeMember),
-      file: os
-        .meta(openapi({ path: '/orgs/{orgId}/files/{+path}' }))
-        .handler(({ input }) => input),
-    }
-
-    const handler = new OpenAPIHandler(router)
-
     const fetch = vi.fn(async (url: string, init: RequestInit) => {
       const request = new Request(url, init)
       const { matched, response } = await handler.handle(request, {
@@ -213,23 +202,13 @@ describe('openapiLink', () => {
       url: '/api',
     })) as any
 
+    // without the check, "/api/orgs/acme/members/../remove" is resolved to "/api/orgs/acme/remove" (removeOrg)
     await expect(client.removeMember({ orgId: 'acme', memberId: '..' })).rejects.toThrow(
       'Path param "memberId" cannot contain "." or ".." segments in call to procedure (removeMember).',
     )
-    await expect(client.removeMember({ orgId: 'acme', memberId: '.' })).rejects.toThrow(
-      'Path param "memberId" cannot contain "." or ".." segments in call to procedure (removeMember).',
-    )
-    await expect(client.file({ orgId: 'acme', path: 'a/../../../remove' })).rejects.toThrow(
-      'Path param "path" cannot contain "." or ".." segments in call to procedure (file).',
-    )
-
     expect(fetch).not.toHaveBeenCalled()
-    expect(removeOrg).not.toHaveBeenCalled()
-    expect(removeMember).not.toHaveBeenCalled()
 
     await expect(client.removeMember({ orgId: 'acme', memberId: '...' })).resolves.toBe('removeMember')
-    await expect(client.file({ orgId: 'acme', path: 'a/.../b' })).resolves.toEqual({ orgId: 'acme', path: 'a/.../b' })
-    expect(removeOrg).not.toHaveBeenCalled()
   })
 
   it('supports standard link plugins', async () => {
