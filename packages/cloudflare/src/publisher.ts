@@ -67,7 +67,7 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
     })
 
     if (!response.ok) {
-      const reason = await response.text() // the durable object explains why it rejected the event
+      const reason = await response.text()
       throw new Error(`Failed to publish event: ${response.status} ${reason || response.statusText}`, {
         cause: response,
       })
@@ -106,7 +106,7 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
 
     const reportError = (error: Error) => {
       if (replayFailed) {
-        return // the subscription already rejected with the first error
+        return
       }
 
       if (pendingReplayedEvents > 0) {
@@ -142,7 +142,6 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
     })
 
     websocket.addEventListener('close', (event) => {
-      // Any close before the replay finishes loses missed events, so it is never expected
       if (pendingReplayedEvents > 0 || (event.code !== 1000 && event.code !== 1001)) {
         reportError(
           new Error(`WebSocket closed unexpectedly: ${event.code} ${event.reason}`, {

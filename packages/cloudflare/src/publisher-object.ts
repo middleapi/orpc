@@ -111,10 +111,6 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
       server.send(payload)
     }
 
-    /**
-     * Replayed events are the first messages on the socket, since nothing runs between
-     * reading and sending them, so their count tells `DurablePublisher` where the replay ends.
-     */
     return new Response(null, {
       status: 101,
       webSocket: client,
@@ -160,8 +156,7 @@ class ResumeStorage {
    * Store an event and return the updated serialized message with an assigned ID.
    *
    * @throws if `stringifiedPayload` is not a JSON object with an optional object `meta`,
-   * or if the insert fails (`SQLITE_TOOBIG` for a payload over the row size limit),
-   * even after a schema reset retry.
+   * or if the insert fails.
    */
   store(stringifiedPayload: string): string {
     if (!this.enabled) {
@@ -225,10 +220,6 @@ class ResumeStorage {
      *
      * The alias must not be `id`: SQLite resolves ORDER BY to an output
      * alias before a table column, which would sort ids as text.
-     *
-     * Only events after `lastEventId` are replayed, never one twice or out of order. Ids
-     * restart at 1 after a reset, so an older id may miss events, and a non-numeric one
-     * replays nothing (SQLite sorts text after integers).
      */
     const result = this.ctx.storage.sql.exec(`
       SELECT CAST(id AS TEXT) AS event_id, payload
@@ -361,11 +352,6 @@ function isSerializedPayload(value: unknown): value is SerializedPayload {
   return isPlainObject(value) && (value.meta === undefined || value.meta === null || isPlainObject(value.meta))
 }
 
-/**
- * Whether an insert failed because the events table itself is unusable, rather than
- * because of the event: an exhausted id range or a full database (`SQLITE_FULL`),
- * corruption, or a table that was dropped or has a different schema.
- */
 function isUnusableTableError(error: unknown): boolean {
   return /SQLITE_(?:FULL|CORRUPT|NOTADB)|no such table|no such column|has no column named/.test(String(error))
 }
