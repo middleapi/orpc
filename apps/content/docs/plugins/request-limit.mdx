@@ -34,19 +34,28 @@ When used with [Request Compression](/docs/plugins/request-compression), `maxBod
 
 ## Peer Adapters
 
-This plugin does not apply to peer-based adapters such as [WebSocket](/docs/adapters/websocket) and [Message Port](/docs/adapters/message-port). Each message reaches the handler fully loaded in memory, so there is no body left to limit. Limit the size of each message at the transport instead, for example with Bun's `maxPayloadLength`:
+This plugin does not apply to peer-based adapters such as [WebSocket](/docs/adapters/websocket) and [Message Port](/docs/adapters/message-port). Each message reaches the handler fully loaded in memory, so there is no body left to limit. Instead, limit each message at the transport, and the total bytes per connection per minute, since a single call can span many messages (for example, an [AsyncIteratorObject](/docs/async-iterator-object) input). With Bun:
 
 ```ts
+const MAX_BYTES_PER_MINUTE = 10 * 1024 * 1024 // 10MB
+const usage = new WeakMap<object, { bytes: number, resetAt: number }>()
+
 Bun.serve({
-  fetch(req, server) {
-    if (server.upgrade(req)) {
-      return
-    }
-    return new Response('Upgrade failed', { status: 500 })
-  },
   websocket: {
-    maxPayloadLength: 1024 * 1024, // 1MB, larger messages close the connection
+    maxPayloadLength: 1024 * 1024, // 1MB per message, larger messages close the connection
     async message(ws, message) {
+      let entry = usage.get(ws)
+      if (!entry || Date.now() >= entry.resetAt) {
+        usage.set(ws, entry = { bytes: 0, resetAt: Date.now() + 60_000 })
+      }
+
+      entry.bytes += Buffer.byteLength(message)
+
+      if (entry.bytes > MAX_BYTES_PER_MINUTE) {
+        ws.close(1008, 'Too much data per minute')
+        return
+      }
+
       await handler.message(ws, message)
     },
     async close(ws) {
@@ -56,7 +65,7 @@ Bun.serve({
 })
 ```
 
-Most WebSocket servers have an equivalent option, such as `maxPayload` in [ws](https://github.com/websockets/ws/blob/master/doc/ws.md#new-websocketserveroptions-callback).
+Other WebSocket servers have an equivalent per-message option, such as `maxPayload` in [ws](https://github.com/websockets/ws/blob/master/doc/ws.md#new-websocketserveroptions-callback).
 
 ## Learn More
 
