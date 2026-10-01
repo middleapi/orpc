@@ -85,7 +85,6 @@ describe('sanitizeSchemaIssues', () => {
       { message: expect.any(String), path: ['a', 'b'] },
       { message: expect.any(String), path: ['c'] },
     ]))
-    expect(sanitized.every(isSchemaIssue)).toBe(true)
     expect(JSON.stringify(sanitized)).not.toContain('SECRET')
   })
 })

@@ -196,11 +196,11 @@ describe('requestValidationLinkPlugin', () => {
       new ORPCError('BAD_REQUEST', {
         message: 'Input validation failed',
         data: {
-          issues: expect.any(Array),
+          issues: [{ message: expect.any(String), path: [] }],
         },
         cause: new ValidationError({
           message: 'Input validation failed',
-          issues: expect.any(Array),
+          issues: [expect.objectContaining({ code: expect.any(String) })],
           invalidData: 1,
         }),
       }),
@@ -208,14 +208,5 @@ describe('requestValidationLinkPlugin', () => {
 
     expect(codec.encodeInput).not.toHaveBeenCalled()
     expect(transport.send).not.toHaveBeenCalled()
-  })
-
-  it('keeps only message and path in data.issues and raw issues in the cause', async () => {
-    await expect(link.call(['nested', 'chainedProcedure'], 0, { context: {} })).rejects.toSatisfy((error: any) => {
-      expect(error.data).toEqual({ issues: [{ message: expect.any(String), path: [] }] })
-      expect(error.cause).toBeInstanceOf(ValidationError)
-      expect(error.cause.issues).toEqual([expect.objectContaining({ code: expect.any(String) })])
-      return true
-    })
   })
 })

@@ -477,7 +477,7 @@ v2 also introduces `error` factories for defining reusable typed errors outside 
 
 ### Input validation issues reduced to `message` and `path`
 
-`data.issues` on input validation errors now holds only each issue's `message` and `path`, with path segments reduced to their keys, on the server and in the [Request Validation Plugin](/docs/plugins/request-validation). Previously it held the raw issues from your schema library, and some libraries (such as Valibot and ArkType) embed the validated input in them, which could send unrelated input, like every request header with the [detailed input structure](/docs/openapi/input-and-output-mapping#detailed-input-structure), back to the client. The raw issues remain available on the server as `error.cause.issues`. See [Validation Customization](/docs/recipes/validation-customization#input-validation-errors).
+`data.issues` on input validation errors, on the server and in the [Request Validation Plugin](/docs/plugins/request-validation), now holds only each issue's `message` and `path`, with path segments reduced to their keys. The raw issues remain available on the server as `error.cause.issues`. See [Validation Customization](/docs/recipes/validation-customization#input-validation-errors).
 
 ## AsyncIteratorObject (Event Iterator)
 
