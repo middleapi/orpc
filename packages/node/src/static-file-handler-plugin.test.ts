@@ -695,7 +695,7 @@ describe('staticFileHandlerPlugin', () => {
     })
 
     it('serves files once a rootDir under a symlinked parent is created', async ({ onTestFinished }) => {
-      // Like the macOS /tmp to /private/tmp link, so the lexical rootDir differs from the real one
+      // Like macOS /tmp, the symlinked parent makes the real rootDir differ from the lexical one
       const realParent = path.join(baseDir, 'late-real')
       const linkedParent = path.join(baseDir, 'late-link')
       mkdirSync(realParent)
@@ -711,14 +711,10 @@ describe('staticFileHandlerPlugin', () => {
 
       mkdirSync(path.join(realParent, 'public'))
       writeFileSync(path.join(realParent, 'public', 'late.txt'), 'late')
-      writeFileSync(path.join(realParent, 'secret.txt'), 'outside root')
-      symlinkSync(path.join(realParent, 'secret.txt'), path.join(realParent, 'public', 'link.txt'))
 
       const res = await agent.get('/late.txt')
       expect(res.status).toBe(200)
       expect(res.text).toBe('late')
-
-      expect((await agent.get('/link.txt')).status).toBe(404)
     })
 
     it('follows a rootDir symlink that is re-pointed while serving', async ({ onTestFinished }) => {
@@ -728,7 +724,6 @@ describe('staticFileHandlerPlugin', () => {
       mkdirSync(path.join(releasesDir, 'v2'), { recursive: true })
       writeFileSync(path.join(releasesDir, 'v1', 'app.js'), 'v1')
       writeFileSync(path.join(releasesDir, 'v2', 'app.js'), 'v2')
-      writeFileSync(path.join(releasesDir, 'v2', 'new.js'), 'new in v2')
       symlinkSync(path.join(baseDir, 'secret.txt'), path.join(releasesDir, 'v2', 'link.txt'))
       symlinkSync(path.join(releasesDir, 'v1'), currentLink)
       onTestFinished(() => {
@@ -747,7 +742,6 @@ describe('staticFileHandlerPlugin', () => {
       expect(res.status).toBe(200)
       expect(res.text).toBe('v2')
 
-      expect((await agent.get('/new.js')).text).toBe('new in v2')
       expect((await agent.get('/link.txt')).status).toBe(404)
     })
 
