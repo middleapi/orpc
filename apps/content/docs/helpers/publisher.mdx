@@ -290,8 +290,8 @@ export class PublisherDO extends DurablePublisherObject {
         cleanupIntervalSeconds: 6 * 60 * 60,
 
         /**
-         * Prefix for the resume storage table schema and storage keys.
-         * Used to avoid naming conflicts with other tables and keys in the same Durable Object.
+         * Prefix for the resume storage table schema.
+         * Used to avoid naming conflicts with other tables in the same Durable Object.
          *
          * @default 'orpc:'
          */

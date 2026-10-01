@@ -127,12 +127,11 @@ describe('durable publisher', () => {
     const first = live.mock.calls[0]![0]
     const second = live.mock.calls[1]![0]
 
-    const firstId = getEventMeta(first)?.id
     expect(first).toEqual({ text: 'first' })
-    expect(firstId).toMatch(/^[\da-f]{16}-1$/)
+    expect(getEventMeta(first)?.id).toBe('1')
 
     expect(second).toEqual({ text: 'second' })
-    expect(getEventMeta(second)?.id).toBe(firstId!.replace(/-1$/, '-2'))
+    expect(getEventMeta(second)?.id).toBe('2')
     expect(getEventMeta(second)?.comments).toEqual(['keep me'])
 
     await stopLive()

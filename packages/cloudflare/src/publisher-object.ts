@@ -37,8 +37,8 @@ export interface DurablePublisherObjectResumeOptions {
   cleanupIntervalSeconds?: number
 
   /**
-   * Prefix for the resume storage table schema and storage keys.
-   * Used to avoid naming conflicts with other tables and keys in the same Durable Object.
+   * Prefix for the resume storage table schema.
+   * Used to avoid naming conflicts with other tables in the same Durable Object.
    *
    * @default 'orpc:'
    */
@@ -161,13 +161,6 @@ class ResumeStorage {
   private isInitedAlarm = false
   private lastCleanupTime: number | undefined
 
-  /**
-   * Prefixes every event id. Any newly created events table restarts AUTOINCREMENT at 1,
-   * whether it is the first one or replaces a dropped or wiped one, so it gets a new
-   * generation and ids issued before it are recognized as stale.
-   */
-  private generation: string | undefined
-
   constructor(
     private readonly ctx: DurableObjectState,
     options: DurablePublisherObjectResumeOptions = { enabled: false },
@@ -248,23 +241,24 @@ class ResumeStorage {
 
     this.ensureSchemaAndCleanup()
 
-    // An id from another generation (or not issued here) predates this table, so replay everything
-    const match = /^([\da-f]+)-(\d+)$/.exec(lastEventId)
-    const afterId = match !== null && match[1] === this.generation ? match[2]! : '0'
-
     /**
      * SQLite INTEGER can exceed JavaScript's safe integer range,
      * so we cast to TEXT for safe resume ID comparison.
      *
      * The alias must not be `id`: SQLite resolves ORDER BY to an output
      * alias before a table column, which would sort ids as text.
+     *
+     * Only events after `lastEventId` are replayed, so a subscriber never gets an
+     * event twice or out of order. Ids restart at 1 once the table is wiped, so a
+     * subscriber resuming from an older id may miss the events published since, and
+     * an id that is not a number replays nothing, since SQLite sorts text after integers.
      */
     const result = this.ctx.storage.sql.exec(`
       SELECT CAST(id AS TEXT) AS event_id, payload
       FROM "${this.schemaPrefix}events"
       WHERE id > ?
       ORDER BY id ASC
-    `, afterId)
+    `, lastEventId)
 
     const events: string[] = []
     for (const record of result.toArray()) {
@@ -330,19 +324,9 @@ class ResumeStorage {
         CREATE INDEX IF NOT EXISTS "${this.schemaPrefix}idx_events_stored_at" ON "${this.schemaPrefix}events" (stored_at)
       `)
 
-      const isNewTable = initTableResult.rowsWritten > 0
-
-      // Stored so it survives evictions, and `deleteAll` clears it along with the table
-      const generationKey = `${this.schemaPrefix}generation`
-      this.generation = isNewTable ? undefined : this.ctx.storage.kv.get<string>(generationKey)
-      if (this.generation === undefined) {
-        this.generation = createGeneration()
-        this.ctx.storage.kv.put(generationKey, this.generation)
-      }
-
       this.isInitedSchema = true
 
-      if (isNewTable) {
+      if (initTableResult.rowsWritten > 0) {
         this.lastCleanupTime = Date.now() // schema just created, nothing to cleanup
       }
     }
@@ -391,7 +375,7 @@ class ResumeStorage {
   private attachEventId(message: SerializedPayload, id: string): SerializedPayload {
     return {
       ...message,
-      meta: { ...message.meta, id: `${this.generation}-${id}` },
+      meta: { ...message.meta, id },
     }
   }
 }
@@ -409,8 +393,4 @@ function isUnusableTableError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)
 
   return /SQLITE_(?:FULL|CORRUPT|NOTADB)|no such table|no such column|has no column named/.test(message)
-}
-
-function createGeneration(): string {
-  return Array.from(crypto.getRandomValues(new Uint8Array(8)), byte => byte.toString(16).padStart(2, '0')).join('')
 }
