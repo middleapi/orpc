@@ -65,7 +65,6 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
     const params = this.deserializeParams(matched.params, meta?.paramsStyles)
 
     if (inputStructure === 'compact') {
-      // the query is only part of the input for bodyless methods, so it is not parsed otherwise
       const data = isBodylessMethod(request.method)
         ? this.deserializeQuery(request.url, meta?.queryStyles)
         : this.serializer.deserialize(await request.resolveBody(meta?.requestBodyHint))

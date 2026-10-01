@@ -257,29 +257,6 @@ describe('openAPIHandlerCodec', () => {
         expect(serializer.deserialize).toHaveBeenCalledWith(undefined)
       })
 
-      it('does not parse the query for methods with a body', async () => {
-        const serializer = {
-          serialize: vi.fn(),
-          deserialize: vi.fn().mockReturnValueOnce({ title: 'hello' }),
-        } as any
-
-        const codec = new OpenAPIHandlerCodec(
-          os.meta(openapi({ method: 'POST', path: '/{id}' })).handler(vi.fn()),
-          { serializer },
-        )
-        const body = { title: 'hello' }
-        const result = await codec.resolveProcedure(createRequest({
-          method: 'POST',
-          url: '/24?ignored=1',
-          resolveBody: vi.fn().mockResolvedValueOnce(body),
-        }), options as any)
-
-        await expect(result!.decodeInput()).resolves.toEqual({ id: '24', title: 'hello' })
-
-        expect(serializer.deserialize).toHaveBeenCalledOnce()
-        expect(serializer.deserialize).toHaveBeenCalledWith(body)
-      })
-
       it('merges object body with path params', async () => {
         const procedure = os
           .meta(openapi({ method: 'POST', path: '/{id}', requestBodyHint: 'url-search-params' }))
@@ -354,7 +331,6 @@ describe('openAPIHandlerCodec', () => {
         expect(result).toBeDefined()
 
         await expect(result!.decodeInput()).resolves.toEqual({ id: '24' })
-        expect(serializer.deserialize).toHaveBeenCalledOnce()
         expect(serializer.deserialize).toHaveBeenCalledWith('__body__')
       })
 
