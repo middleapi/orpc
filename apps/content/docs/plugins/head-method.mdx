@@ -1,0 +1,42 @@
+---
+title: "HEAD Method Plugin"
+description: "Use HeadMethodHandlerPlugin to answer HEAD requests with the procedure that answers the same GET request, sending the status and headers without a body."
+sidebar:
+  label: "HEAD Method"
+---
+
+## How It Works
+
+[RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html#name-head) expects a server to support `HEAD` wherever it supports `GET`, and frameworks such as Hono, Express, and Fastify do so automatically. Without this plugin, a procedure only answers the method it is routed with, so `HEAD` requests to a `GET` procedure stay unmatched.
+
+The plugin changes two things:
+
+- A `HEAD` request that matches no procedure is routed again as a `GET` request, so a procedure routed with `method: 'HEAD'` still takes precedence. The `GET` procedure runs as usual, decoding its input from the query string, and interceptors that run after routing see the request as `GET`.
+- Every `HEAD` response is sent without a body, keeping its status and headers. The plugin drops the body itself, because adapters and runtimes differ in whether they do. The response keeps the `Content-Type` the `GET` response would carry, and its `Content-Length` when it is known without reading a stream, such as for JSON and files. A stream or event iterator body is cancelled without being read.
+
+The plugin only changes how requests are handled, so the generated [OpenAPI specification](/docs/openapi/specification) does not document an extra `HEAD` operation for `GET` procedures.
+
+## Setup
+
+```ts
+import { OpenAPIHandler } from '@orpc/openapi/fetch'
+import { HeadMethodHandlerPlugin } from '@orpc/server/plugins'
+
+const handler = new OpenAPIHandler(router, {
+  plugins: [
+    new HeadMethodHandlerPlugin(),
+  ],
+})
+```
+
+:::info
+The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one. With [RPCHandler](/docs/rpc/handler), `HEAD` requests only reach procedures when [the `GET` method is enabled](/docs/rpc/handler#enabling-the-get-method), since they are routed as `GET`.
+:::
+
+:::warning
+A `HEAD` request runs the whole `GET` procedure, so it costs the same as the `GET` request it mirrors.
+:::
+
+## Learn More
+
+For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/head-method.ts).

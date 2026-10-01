@@ -11,7 +11,7 @@ import { brotliCompressSync, gzipSync } from 'node:zlib'
 import { os } from '@orpc/server'
 import { RPCHandler as FetchRPCHandler } from '@orpc/server/fetch'
 import { RPCHandler } from '@orpc/server/node'
-import { ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
+import { HeadMethodHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 import * as sharedModule from '@orpc/shared'
 import request from 'supertest'
 import { StaticFileHandlerPlugin } from './static-file-handler-plugin'
@@ -252,6 +252,26 @@ describe('staticFileHandlerPlugin', () => {
 
       expect(res.status).toBe(200)
       expect(res.headers['content-length']).toBe('10')
+    })
+
+    it.each([
+      ['before', (staticFile: any, head: any) => [staticFile, head]],
+      ['after', (staticFile: any, head: any) => [head, staticFile]],
+    ])('prefers GET procedures answering HEAD over files when listed %s the head method plugin', async (_, order) => {
+      const handler = new RPCHandler({
+        ping: os.handler(() => 'pong'),
+      }, {
+        allowMethods: ['GET'],
+        plugins: order(new StaticFileHandlerPlugin({ rootDir }), new HeadMethodHandlerPlugin()),
+      })
+
+      writeFileSync(path.join(rootDir, 'ping'), 'file content')
+
+      const res = await createAgent(handler).head('/ping')
+
+      expect(res.status).toBe(200)
+      expect(res.headers['content-type']).toBe('application/json')
+      expect(res.headers['content-length']).toBe(`${JSON.stringify({ json: 'pong' }).length}`)
     })
   })
 

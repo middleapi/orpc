@@ -95,6 +95,21 @@ const procedure = base
   })
 ```
 
+## HEAD Requests
+
+A procedure only answers the method it is routed with, so `HEAD` requests to a `GET` procedure stay unmatched by default. Add the [HEAD Method Plugin](/docs/plugins/head-method) to answer them with the matching `GET` procedure, sending its status and headers without a body:
+
+```ts
+import { OpenAPIHandler } from '@orpc/openapi/fetch'
+import { HeadMethodHandlerPlugin } from '@orpc/server/plugins'
+
+const handler = new OpenAPIHandler(router, {
+  plugins: [new HeadMethodHandlerPlugin()],
+})
+```
+
+A procedure routed with `method: 'HEAD'` still takes precedence over the `GET` fallback, and the generated specification does not document an extra `HEAD` operation.
+
 ## Lazy Router
 
 When using a [lazy router](/docs/router#lazy-router), define a `prefix` so lazy loading is triggered only for relevant requests:

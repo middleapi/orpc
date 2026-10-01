@@ -28,6 +28,7 @@ import {
   BatchHandlerPlugin,
   CORSHandlerPlugin,
   GetMethodCsrfProtectionHandlerPlugin,
+  HeadMethodHandlerPlugin,
   MethodOverrideHandlerPlugin,
   RequestCompressionHandlerPlugin,
   RequestHeadersHandlerPlugin,
@@ -76,6 +77,7 @@ function createHandlerPlugins() {
     new CORSHandlerPlugin<TestContext>(),
     new EvlogHandlerPlugin<TestContext>(),
     new GetMethodCsrfProtectionHandlerPlugin<TestContext>(),
+    new HeadMethodHandlerPlugin<TestContext>(),
     new HibernationHandlerPlugin<TestContext>(),
     new MethodOverrideHandlerPlugin(),
     new OpenAPIReferenceHandlerPlugin<TestContext, 'scalar'>({ spec, docsPath: '/docs', specPath: '/spec.json' }),
@@ -177,6 +179,24 @@ describe('all plugins on one handler and one link', () => {
     expect(exchanges).toHaveLength(1)
     expect(exchanges[0]!.request.headers.get('content-encoding')).toEqual('gzip')
     expect(exchanges[0]!.response.headers.get('content-encoding')).toEqual('gzip')
+  })
+
+  it('answers HEAD with the GET procedure through every plugin', async () => {
+    const { handler } = createClientServer()
+
+    const data = encodeURIComponent(JSON.stringify({ json: { value: 1 } }))
+    const { response } = await handler.handle(new Request(`http://localhost/rpc/ping?data=${data}`, {
+      method: 'HEAD',
+      headers: { 'accept-encoding': 'gzip' },
+    }), {
+      context: {},
+      prefix: '/rpc',
+    })
+
+    expect(response?.status).toEqual(200)
+    // the body is dropped after compression, so HEAD reports the encoding GET would use
+    expect(response?.headers.get('content-encoding')).toEqual('gzip')
+    await expect(response?.text()).resolves.toEqual('')
   })
 
   it('serves the openapi reference behind the other routing plugins', async () => {
