@@ -226,15 +226,15 @@ describe('openAPIGenerator operation builders', () => {
       }, undefined)
 
       expect(operation.parameters).toEqual([
-        { in: 'query', name: 'primitive', required: true, allowEmptyValue: true, allowReserved: true, schema: { type: 'string' } },
-        { in: 'query', name: 'array', required: true, allowEmptyValue: true, allowReserved: true, schema: { type: 'array' } },
-        { in: 'query', name: 'commaArray', required: true, explode: false, allowEmptyValue: true, allowReserved: true, schema: { type: 'array' } },
-        { in: 'query', name: 'pipeObject', required: true, style: 'pipeDelimited', allowEmptyValue: true, allowReserved: true, schema: { type: 'object' } },
-        { in: 'query', name: 'spaceArray', required: true, style: 'spaceDelimited', allowEmptyValue: true, allowReserved: true, schema: { type: 'array' } },
-        { in: 'query', name: 'json', required: true, allowEmptyValue: true, allowReserved: true, content: { 'application/json': { schema: { type: 'object' } } } },
-        { in: 'query', name: 'deepObject', required: true, style: 'deepObject', explode: true, allowEmptyValue: true, allowReserved: true, schema: { type: 'object' } },
-        { in: 'query', name: 'arrayable', required: true, allowEmptyValue: true, allowReserved: true, schema: { anyOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] } },
-        { in: 'query', name: 'optional', allowEmptyValue: true, allowReserved: true, schema: { type: 'string' } },
+        { in: 'query', name: 'primitive', required: true, allowEmptyValue: true, schema: { type: 'string' } },
+        { in: 'query', name: 'array', required: true, allowEmptyValue: true, schema: { type: 'array' } },
+        { in: 'query', name: 'commaArray', required: true, explode: false, allowEmptyValue: true, schema: { type: 'array' } },
+        { in: 'query', name: 'pipeObject', required: true, style: 'pipeDelimited', allowEmptyValue: true, schema: { type: 'object' } },
+        { in: 'query', name: 'spaceArray', required: true, style: 'spaceDelimited', allowEmptyValue: true, schema: { type: 'array' } },
+        { in: 'query', name: 'json', required: true, allowEmptyValue: true, content: { 'application/json': { schema: { type: 'object' } } } },
+        { in: 'query', name: 'deepObject', required: true, style: 'deepObject', explode: true, allowEmptyValue: true, schema: { type: 'object' } },
+        { in: 'query', name: 'arrayable', required: true, allowEmptyValue: true, schema: { anyOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] } },
+        { in: 'query', name: 'optional', allowEmptyValue: true, schema: { type: 'string' } },
       ])
       expect(operation.requestBody).toBeUndefined()
     })
@@ -253,7 +253,7 @@ describe('openAPIGenerator operation builders', () => {
 
       expect(operation.parameters).toEqual([
         { in: 'path', required: true, name: 'id', schema: { type: 'string' } },
-        { in: 'query', name: 'verbose', required: true, allowEmptyValue: true, allowReserved: true, schema: { type: 'boolean' } },
+        { in: 'query', name: 'verbose', required: true, allowEmptyValue: true, schema: { type: 'boolean' } },
       ])
       expect(operation.requestBody).toBeUndefined()
     })
@@ -277,7 +277,7 @@ describe('openAPIGenerator operation builders', () => {
 
       expect(operation.parameters).toEqual([
         { in: 'path', required: true, name: 'id', schema: { type: 'string' } },
-        { in: 'query', name: 'expand', allowEmptyValue: true, allowReserved: true, schema: { type: 'boolean' } },
+        { in: 'query', name: 'expand', allowEmptyValue: true, schema: { type: 'boolean' } },
         { in: 'header', name: 'x-trace-id', required: true, schema: { type: 'string' } },
         { in: 'header', name: 'x-optional', schema: { type: 'string' } },
       ])

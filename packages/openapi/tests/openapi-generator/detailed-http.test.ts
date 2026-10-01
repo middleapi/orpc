@@ -46,7 +46,6 @@ describe('openAPIGenerator e2e: webhook endpoint with full http control', () => 
           name: 'retry',
           in: 'query',
           allowEmptyValue: true,
-          allowReserved: true,
           schema: { type: 'boolean' },
         },
         { name: 'x-signature', in: 'header', required: true, schema: { type: 'string' } },

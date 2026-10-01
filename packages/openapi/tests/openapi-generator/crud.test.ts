@@ -100,7 +100,6 @@ describe('openAPIGenerator e2e: crud api', () => {
           name: 'includeArchived',
           in: 'query',
           allowEmptyValue: true,
-          allowReserved: true,
           schema: { type: 'boolean' },
         },
       ],
@@ -131,7 +130,6 @@ describe('openAPIGenerator e2e: crud api', () => {
         name: 'search',
         in: 'query',
         allowEmptyValue: true,
-        allowReserved: true,
         schema: { type: 'string' },
       },
       {
@@ -139,14 +137,12 @@ describe('openAPIGenerator e2e: crud api', () => {
         in: 'query',
         explode: false,
         allowEmptyValue: true,
-        allowReserved: true,
         schema: { type: 'array', items: { type: 'string' } },
       },
       {
         name: 'page',
         in: 'query',
         allowEmptyValue: true,
-        allowReserved: true,
         schema: { type: 'number' },
       },
     ])

@@ -72,7 +72,6 @@ describe('openAPIGenerator e2e: schema library agnosticism', () => {
         name: 'expand',
         in: 'query',
         allowEmptyValue: true,
-        allowReserved: true,
         schema: expect.objectContaining({ type: 'string' }),
       },
     ])

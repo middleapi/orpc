@@ -260,7 +260,6 @@ function renderQueryParameters(
       name,
       schema: ctx.registry.toOpenAPISchema(schema, 'input'),
       allowEmptyValue: true,
-      allowReserved: true,
     }
 
     if (!optional) {

@@ -112,7 +112,6 @@ describe('openAPIGenerator e2e: composed schemas', () => {
         name: 'search',
         in: 'query',
         allowEmptyValue: true,
-        allowReserved: true,
         schema: expect.objectContaining({ type: 'string' }),
       },
     ])
