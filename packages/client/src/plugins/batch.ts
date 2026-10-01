@@ -449,57 +449,42 @@ async function decodeLengthPrefixedBlob(blob: Blob, peer: ClientPeer): Promise<v
 
 async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array<ArrayBuffer>>, peer: ClientPeer): Promise<void> {
   const reader = stream.getReader()
-  // Unread chunks are kept as-is and only copied once a whole frame has arrived,
-  // so a large frame split into many chunks is not re-copied on every chunk.
   const chunks: Uint8Array<ArrayBuffer>[] = []
   let bufferedLength = 0
   let frameLength: number | undefined
+
+  const take = (length: number) => {
+    bufferedLength -= length
+    return shiftBytes(chunks, length)
+  }
 
   try {
     while (true) {
       const { done, value: chunk } = await reader.read()
 
-      if (chunk?.length) {
-        chunks.push(chunk)
-        bufferedLength += chunk.length
+      if (done) {
+        break
       }
 
-      while (true) {
+      chunks.push(chunk)
+      bufferedLength += chunk.length
+
+      while (bufferedLength >= (frameLength ?? 4)) {
         if (frameLength === undefined) {
-          if (bufferedLength < 4) {
-            break
-          }
-
-          const header = shiftBytes(chunks, 4)
-          bufferedLength -= 4
-          frameLength = new DataView(header.buffer, header.byteOffset, 4).getUint32(0, false)
-
+          const header = take(4)
           // Zero-length frame is a keep-alive ping; skip it.
-          if (frameLength === 0) {
-            frameLength = undefined
-            continue
-          }
+          frameLength = new DataView(header.buffer, header.byteOffset, 4).getUint32(0, false) || undefined
+          continue
         }
 
-        if (bufferedLength < frameLength) {
-          break
-        }
-
-        const messageBytes = shiftBytes(chunks, frameLength)
-        bufferedLength -= frameLength
+        const result = decodePeerMessage(take(frameLength))
         frameLength = undefined
-
-        const result = decodePeerMessage(messageBytes)
 
         if (!result.matched || !isServerPeerSendMessage(result.message)) {
           throw new TypeError('Invalid batch response: invalid message.')
         }
 
         await peer.message(result.message)
-      }
-
-      if (done) {
-        break
       }
     }
   }
@@ -508,11 +493,6 @@ async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array<Arra
   }
 }
 
-/**
- * Removes the first `length` bytes from `chunks` and returns them,
- * copying only when they span more than one chunk.
- * The caller must ensure `chunks` holds at least `length` bytes.
- */
 function shiftBytes(chunks: Uint8Array<ArrayBuffer>[], length: number): Uint8Array<ArrayBuffer> {
   const first = chunks[0]!
 
@@ -535,7 +515,7 @@ function shiftBytes(chunks: Uint8Array<ArrayBuffer>[], length: number): Uint8Arr
     const chunk = chunks[consumed]!
     const size = Math.min(chunk.length, length - offset)
 
-    bytes.set(size === chunk.length ? chunk : chunk.subarray(0, size), offset)
+    bytes.set(chunk.subarray(0, size), offset)
     offset += size
 
     if (size === chunk.length) {

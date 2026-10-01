@@ -889,7 +889,13 @@ describe('batchLinkPlugin', () => {
       ])
     })
 
-    it('decodes streamed responses when length header and payload arrive in separate chunks', async () => {
+    it.each([
+      ['the length header and payload arrive in separate chunks', (bytes: Uint8Array) => [bytes.subarray(0, 4), bytes.subarray(4)]],
+      ['frames and length headers span several chunks', (bytes: Uint8Array) => {
+        const framed = new Uint8Array([0, 0, 0, 0, ...bytes])
+        return Array.from({ length: Math.ceil(framed.length / 3) }, (_, i) => framed.subarray(i * 3, i * 3 + 3))
+      }],
+    ])('decodes streamed responses when %s', async (_, toChunks) => {
       const codec = makeCodec()
       const transport = makeTransport()
 
@@ -909,9 +915,7 @@ describe('batchLinkPlugin', () => {
 
         const stream = new ReadableStream<Uint8Array>({
           start(controller) {
-            // Send only length header first, then payload bytes.
-            controller.enqueue(bytes.subarray(0, 4))
-            controller.enqueue(bytes.subarray(4))
+            toChunks(bytes).forEach(chunk => controller.enqueue(chunk))
             controller.close()
           },
         })
@@ -930,53 +934,6 @@ describe('batchLinkPlugin', () => {
       await Promise.all([
         expect(link.call(['x'], {}, { context: {} })).resolves.toBe('split-0'),
         expect(link.call(['y'], {}, { context: {} })).resolves.toBe('split-1'),
-      ])
-    })
-
-    it('decodes streamed responses whose frames and length headers span several chunks', async () => {
-      const codec = makeCodec()
-      const transport = makeTransport()
-
-      vi.mocked(transport.send).mockImplementation(async (request) => {
-        if (!request.headers['orpc-batch']) {
-          return { status: 200, headers: {}, resolveBody: async () => 'direct' }
-        }
-
-        const rawMessages = Array.isArray(request.body) ? request.body : []
-        const responseMessages = rawMessages.map((msg: any, i: number) => ({
-          kind: 'response',
-          id: msg.id,
-          json: { status: 200, headers: {}, body: `chunked-${i}` },
-        }))
-
-        const bytes = await toLengthPrefixedBytes(responseMessages)
-
-        const stream = new ReadableStream<Uint8Array>({
-          start(controller) {
-            // A keep-alive frame split in two, then 3-byte chunks so headers and payloads end mid-chunk.
-            controller.enqueue(new Uint8Array([0, 0]))
-            controller.enqueue(new Uint8Array([0, 0]))
-            for (let i = 0; i < bytes.length; i += 3) {
-              controller.enqueue(bytes.subarray(i, i + 3))
-            }
-            controller.close()
-          },
-        })
-
-        return {
-          status: 207,
-          headers: {},
-          resolveBody: async () => stream,
-        }
-      })
-
-      const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'streaming' })],
-      })
-
-      await Promise.all([
-        expect(link.call(['x'], {}, { context: {} })).resolves.toBe('chunked-0'),
-        expect(link.call(['y'], {}, { context: {} })).resolves.toBe('chunked-1'),
       ])
     })
 
