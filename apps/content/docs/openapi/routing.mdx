@@ -45,8 +45,6 @@ const getFile = os
   .input(z.object({ path: z.string() }))
 ```
 
-[OpenAPI Link](/docs/openapi/link) throws a `TypeError` if a path parameter is empty or would produce a `.` or `..` segment, which URL parsing would resolve to a different endpoint.
-
 :::info
 To customize path parameter encoding and decoding, see [Path Parameter Styles](/docs/openapi/input-and-output-mapping#path-parameter-styles).
 :::
