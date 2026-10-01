@@ -1,7 +1,7 @@
 import type { DurablePublisherOptions } from './publisher'
 import { RPCJsonSerializer } from '@orpc/client'
+import { sleep } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
-import { sleep } from '@standard-server/shared'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
 import { DurablePublisher } from './publisher'
