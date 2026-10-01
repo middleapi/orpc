@@ -430,11 +430,22 @@ function stringToBoolean(value: string): boolean | string {
   return value
 }
 
-const DATE_TIME_PATTERN = /^(\d{4}|\+\d{6}|-(?!0{6})\d{6})-(\d{2})-(\d{2})(?:[T ].*)?$/
+const DATE_TIME_PATTERN = /^(?!-0{6})(?:[+-]\d{2})?\d{4}-\d{2}-\d{2}(?:[T ].*)?$/
+const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 function stringToDate(value: string): Date | string {
-  const match = DATE_TIME_PATTERN.exec(value)
+  if (!DATE_TIME_PATTERN.test(value)) {
+    return value
+  }
 
-  if (!match) {
+  const yearEnd = value.indexOf('-', 1)
+  const month = readTwoDigits(value, yearEnd + 1)
+  const day = readTwoDigits(value, yearEnd + 4)
+
+  if (
+    day < 1
+    || day > (DAYS_IN_MONTH[month - 1] ?? 0)
+    || (month === 2 && day === 29 && !isLeapYear(Number(value.slice(0, yearEnd))))
+  ) {
     return value
   }
 
@@ -444,17 +455,15 @@ function stringToDate(value: string): Date | string {
     return value
   }
 
-  const year = Number(match[1])
-  const month = Number(match[2]) - 1
-  const day = Number(match[3])
-  const calendarDate = new Date(0)
-  calendarDate.setUTCFullYear(year, month, day)
-
-  if (calendarDate.getUTCFullYear() !== year || calendarDate.getUTCMonth() !== month || calendarDate.getUTCDate() !== day) {
-    return value
-  }
-
   return date
+}
+
+function readTwoDigits(value: string, index: number): number {
+  return (value.charCodeAt(index) - 48) * 10 + value.charCodeAt(index + 1) - 48
+}
+
+function isLeapYear(year: number): boolean {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
 }
 
 function stringToURL(value: string): URL | string {
