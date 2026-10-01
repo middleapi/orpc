@@ -1,6 +1,7 @@
 import type { AnyRouter } from '../router'
+import type { BatchHandlerPluginOptions } from './batch'
 import { ORPCError } from '@orpc/client'
-import { promiseWithResolvers } from '@orpc/shared'
+import { promiseWithResolvers, sleep } from '@orpc/shared'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { os } from '../builder'
 import { BatchHandlerPlugin } from './batch'
@@ -46,23 +47,6 @@ function createBatchRequest(options: {
   })
 }
 
-function decodeFrames(buffer: Uint8Array) {
-  const messages: any[] = []
-
-  for (let offset = 0; offset < buffer.byteLength;) {
-    const length = new DataView(buffer.buffer, buffer.byteOffset + offset, 4).getUint32(0, false)
-    const payload = new TextDecoder().decode(buffer.subarray(offset + 4, offset + 4 + length))
-    messages.push(JSON.parse(payload.split('\xFF')[0]!))
-    offset += 4 + length
-  }
-
-  return messages
-}
-
-function waitForMacrotasks(ms = 20) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
 function createEndlessStream() {
   const state = { pulls: 0, cancelled: false }
   const chunk = new Uint8Array(64 * 1024)
@@ -106,6 +90,22 @@ function readLengthPrefixedChunk(buffer: Uint8Array) {
     messageLength,
     payload: buffer.slice(4, 4 + messageLength),
   }
+}
+
+/**
+ * Decodes the JSON part of every length-prefixed frame (a 0xFF byte separates it from binary data).
+ */
+function decodeFrames(buffer: Uint8Array) {
+  const messages: any[] = []
+
+  for (let offset = 0; offset < buffer.byteLength;) {
+    const { messageLength, payload } = readLengthPrefixedChunk(buffer.subarray(offset))
+    const jsonEnd = payload.indexOf(0xFF)
+    messages.push(JSON.parse(new TextDecoder().decode(jsonEnd === -1 ? payload : payload.subarray(0, jsonEnd))))
+    offset += 4 + messageLength
+  }
+
+  return messages
 }
 
 describe('batchHandlerPlugin', () => {
@@ -365,25 +365,34 @@ describe('batchHandlerPlugin', () => {
       return body.sort((a, b) => a.id - b.id)
     }
 
-    function captureUnhandledRejections(onTestFinished: (fn: () => void) => void) {
-      const listener = vi.fn()
-      process.on('unhandledRejection', listener)
-      onTestFinished(() => {
-        process.off('unhandledRejection', listener)
-      })
-      return listener
-    }
-
-    it.for(['buffered', 'streaming'] as const)('reports errors the rethrow plugin rethrows to onError in %s mode', async (mode, { onTestFinished }) => {
-      const unhandledRejection = captureUnhandledRejections(onTestFinished)
-      const onError = vi.fn()
-
-      const handler = new RPCHandler(router, {
+    function createRethrowHandler(onError?: BatchHandlerPluginOptions<any>['onError']) {
+      return new RPCHandler(router, {
         plugins: [
           new BatchHandlerPlugin({ onError }),
           new RethrowHandlerPlugin({ filter: error => !(error instanceof ORPCError) }),
         ],
       })
+    }
+
+    function watchUnhandledRejections(onTestFinished: (fn: () => void) => void) {
+      const listener = vi.fn()
+      process.on('unhandledRejection', listener)
+      onTestFinished(() => {
+        process.off('unhandledRejection', listener)
+      })
+
+      return {
+        async expectNone() {
+          await sleep(20) // let pending rejections be reported
+          expect(listener).not.toHaveBeenCalled()
+        },
+      }
+    }
+
+    it.for(['buffered', 'streaming'] as const)('reports errors the rethrow plugin rethrows to onError in %s mode', async (mode, { onTestFinished }) => {
+      const unhandledRejections = watchUnhandledRejections(onTestFinished)
+      const onError = vi.fn()
+      const handler = createRethrowHandler(onError)
 
       const { response } = await handler.handle(createBatchRequest({ mode, messages }))
 
@@ -400,26 +409,18 @@ describe('batchHandlerPlugin', () => {
         expect.objectContaining({ request: expect.objectContaining({ method: 'POST' }) }),
       )
 
-      await waitForMacrotasks()
-      expect(unhandledRejection).not.toHaveBeenCalled()
+      await unhandledRejections.expectNone()
     })
 
     it.for(['buffered', 'streaming'] as const)('does not leave an unhandled rejection without onError in %s mode', async (mode, { onTestFinished }) => {
-      const unhandledRejection = captureUnhandledRejections(onTestFinished)
-
-      const handler = new RPCHandler(router, {
-        plugins: [
-          new BatchHandlerPlugin(),
-          new RethrowHandlerPlugin({ filter: error => !(error instanceof ORPCError) }),
-        ],
-      })
+      const unhandledRejections = watchUnhandledRejections(onTestFinished)
+      const handler = createRethrowHandler()
 
       const { response } = await handler.handle(createBatchRequest({ mode, messages }))
       const [failed] = await readSubResponses(mode, response!)
       expect(failed).toMatchObject({ id: 0, json: { status: 500 } })
 
-      await waitForMacrotasks()
-      expect(unhandledRejection).not.toHaveBeenCalled()
+      await unhandledRejections.expectNone()
     })
 
     it('returns 500 sub-response and reports the error when mapSubrequest throws', async () => {
@@ -453,22 +454,15 @@ describe('batchHandlerPlugin', () => {
         throw new Error('onError failed')
       }],
     ] as const)('ignores errors thrown by a %s onError', async ([, onError], { onTestFinished }) => {
-      const unhandledRejection = captureUnhandledRejections(onTestFinished)
-
-      const handler = new RPCHandler(router, {
-        plugins: [
-          new BatchHandlerPlugin({ onError }),
-          new RethrowHandlerPlugin({ filter: error => !(error instanceof ORPCError) }),
-        ],
-      })
+      const unhandledRejections = watchUnhandledRejections(onTestFinished)
+      const handler = createRethrowHandler(onError)
 
       const { response } = await handler.handle(createBatchRequest({ mode: 'buffered', messages }))
       const [failed, succeeded] = await readSubResponses('buffered', response!)
       expect(failed).toMatchObject({ id: 0, json: { status: 500 } })
       expect(succeeded).toMatchObject({ id: 1, json: { body: { json: 'pong' } } })
 
-      await waitForMacrotasks()
-      expect(unhandledRejection).not.toHaveBeenCalled()
+      await unhandledRejections.expectNone()
     })
   })
 
@@ -537,11 +531,11 @@ describe('batchHandlerPlugin', () => {
         messages: [makePeerRequestMessage(0, '/download')],
       }))
 
-      await waitForMacrotasks()
+      await sleep(20)
       const unreadPulls = endless.state.pulls
       expect(unreadPulls).toBeLessThanOrEqual(5)
 
-      await waitForMacrotasks()
+      await sleep(20)
       expect(endless.state.pulls).toBe(unreadPulls)
 
       const reader = response!.body!.getReader()
@@ -549,7 +543,7 @@ describe('batchHandlerPlugin', () => {
         await reader.read()
       }
 
-      await waitForMacrotasks()
+      await sleep(20)
       expect(endless.state.pulls).toBeGreaterThan(unreadPulls)
       expect(endless.state.pulls).toBeLessThanOrEqual(unreadPulls + 6)
 
@@ -568,11 +562,11 @@ describe('batchHandlerPlugin', () => {
         messages: [makePeerRequestMessage(0, '/subscribe')],
       }))
 
-      await waitForMacrotasks()
+      await sleep(20)
       const unreadYields = endless.state.yields
       expect(unreadYields).toBeLessThanOrEqual(3)
 
-      await waitForMacrotasks()
+      await sleep(20)
       expect(endless.state.yields).toBe(unreadYields)
 
       await response!.body!.cancel()
@@ -592,7 +586,7 @@ describe('batchHandlerPlugin', () => {
         messages: [makePeerRequestMessage(0, '/a'), makePeerRequestMessage(1, '/b'), makePeerRequestMessage(2, '/c')],
       }))
 
-      await waitForMacrotasks()
+      await sleep(20)
       const totalPulls = streams.reduce((sum, { state }) => sum + state.pulls, 0)
       expect(totalPulls).toBeLessThanOrEqual(15)
 
@@ -613,7 +607,7 @@ describe('batchHandlerPlugin', () => {
         signal: controller.signal,
       }))
 
-      await waitForMacrotasks()
+      await sleep(20)
       controller.abort()
 
       await vi.waitFor(() => expect(endless.state.finished).toBe(true))

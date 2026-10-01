@@ -137,7 +137,7 @@ An error thrown by a procedure becomes an error response for that request, the s
 const handler = new RPCHandler(router, {
   plugins: [
     new BatchHandlerPlugin({
-      onError: (error, subrequest, { context }) => {
+      onError: (error, subrequest) => {
         logger.error({ err: error, url: subrequest.url }, 'batch subrequest failed')
       },
     }),
