@@ -277,10 +277,6 @@ class ResumeStorage {
       `)
 
       this.ctx.storage.sql.exec(`
-        CREATE INDEX IF NOT EXISTS "${this.schemaPrefix}idx_events_id" ON "${this.schemaPrefix}events" (id)
-      `)
-
-      this.ctx.storage.sql.exec(`
         CREATE INDEX IF NOT EXISTS "${this.schemaPrefix}idx_events_stored_at" ON "${this.schemaPrefix}events" (stored_at)
       `)
 
