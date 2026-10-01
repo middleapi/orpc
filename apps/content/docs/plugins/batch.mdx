@@ -252,6 +252,35 @@ const link = new RPCLink({
 
 The wait starts when the first request is queued, so no request waits longer than `wait`, even while more keep arriving.
 
+## Scope
+
+On the server, requests from different users can be batched together. If your transport reads per-request data (in `fetch`, `origin`, and so on), set `scope` to a value unique to the incoming request.
+
+```ts
+import { AsyncLocalStorage } from 'node:async_hooks'
+
+const requestStorage = new AsyncLocalStorage<Request>() // set per incoming request
+
+const link = new RPCLink({
+  url: '/rpc',
+  plugins: [
+    new BatchLinkPlugin({
+      scope: () => requestStorage.getStore(),
+      groups: [
+        {
+          condition: () => true,
+          context: {},
+        },
+      ],
+    }),
+  ],
+})
+```
+
+:::tip
+Per-request data passed through the link's [`headers` option](/docs/rpc/link#url-and-header-options) is resolved for each request, so it is safe without `scope`.
+:::
+
 ## Learn More
 
 See the [BatchHandlerPlugin source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/batch.ts) and the [BatchLinkPlugin source code](https://github.com/middleapi/orpc/blob/main/packages/client/src/plugins/batch.ts) for implementation details.

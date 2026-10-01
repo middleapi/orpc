@@ -266,6 +266,62 @@ describe.each([
 
     expect(fetchSpy).toHaveBeenCalledTimes(2) // the upload plus one batch for both echoes
   })
+
+  it('stops a cancelled stream once every other subrequest in the batch has finished', async () => {
+    const release = promiseWithResolvers<void>()
+    const stopped = promiseWithResolvers<void>()
+
+    const router = {
+      json: os.handler(() => 'ok'),
+      blob: os.handler(() => new Blob(['blob'])),
+      stream: os.handler(() => new ReadableStream<Uint8Array>({
+        async start(controller) {
+          await release.promise
+          controller.enqueue(new TextEncoder().encode('stream'))
+          controller.close()
+        },
+      })),
+      events: os.handler(async function* () {
+        await release.promise
+        yield 'event'
+      }),
+      endless: os.handler(async function* () {
+        try {
+          for (let i = 0; ; i++) {
+            yield i
+            await sleep(10)
+          }
+        }
+        finally {
+          stopped.resolve()
+        }
+      }),
+    }
+
+    const { client, fetchSpy } = createClientServer(router, { mode: 'streaming' })
+
+    const [info, file, stream, events, endless] = await Promise.all([
+      client.json(),
+      client.blob(),
+      client.stream() as Promise<ReadableStream<Uint8Array>>,
+      client.events() as Promise<AsyncIteratorObject<unknown>>,
+      client.endless() as Promise<AsyncIteratorObject<unknown>>,
+    ])
+
+    expect(info).toBe('ok')
+    await expect((file as Blob).text()).resolves.toBe('blob')
+    await expect(endless.next()).resolves.toEqual({ value: 0, done: false })
+    await endless.return?.()
+
+    // The still open streams keep the batch alive, then only the cancelled one is left running.
+    release.resolve()
+    await expect(new Response(stream).text()).resolves.toBe('stream')
+    await expect(events.next()).resolves.toEqual({ value: 'event', done: false })
+    await expect(events.next()).resolves.toEqual({ value: undefined, done: true })
+
+    await stopped.promise
+    expect(fetchSpy).toHaveBeenCalledTimes(1) // ensure batch was used
+  })
 })
 
 describe('batch plugin: QUERY over node-http', () => {

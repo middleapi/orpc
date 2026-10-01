@@ -1,4 +1,5 @@
-import { promiseWithResolvers } from './promise'
+import { AsyncLocalStorage } from 'node:async_hooks'
+import { captureAsyncContext, promiseWithResolvers } from './promise'
 
 describe('promiseWithResolvers', () => {
   it('resolves the promise', async () => {
@@ -49,5 +50,34 @@ describe('promiseWithResolvers', () => {
     resolve(123)
 
     await expect(promise).rejects.toThrow('test')
+  })
+})
+
+describe('captureAsyncContext', () => {
+  const storage = new AsyncLocalStorage<string>()
+
+  it('runs the callback in the captured async context', async () => {
+    const run = storage.run('captured', () => captureAsyncContext())
+
+    await storage.run('current', async () => {
+      await expect(run(async () => storage.getStore())).resolves.toBe('captured')
+    })
+  })
+
+  it('rejects when called more than once', async () => {
+    const run = captureAsyncContext()
+    const second = vi.fn(async () => 2)
+
+    await expect(run(async () => 1)).resolves.toBe(1)
+    await expect(run(second)).rejects.toThrow('A captured async context can be run only once.')
+    expect(second).not.toHaveBeenCalled()
+  })
+
+  it('rejects when the callback rejects', async () => {
+    const run = captureAsyncContext()
+
+    await expect(run(async () => {
+      throw new Error('test')
+    })).rejects.toThrow('test')
   })
 })

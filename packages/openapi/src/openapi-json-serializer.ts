@@ -60,6 +60,15 @@ const DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS: Record<string, OpenAPIJsonSeria
     },
     isTerminal: true,
   },
+  infinity: {
+    condition(data: unknown): boolean {
+      return data === Number.POSITIVE_INFINITY || data === Number.NEGATIVE_INFINITY
+    },
+    serialize() {
+      return null
+    },
+    isTerminal: true,
+  },
   url: {
     condition(data: unknown): boolean {
       return data instanceof URL
@@ -121,7 +130,7 @@ export interface OpenAPIJsonSerializerOptions {
    * handlers: { url: undefined }
    * ```
    *
-   * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `url`, `set`, `map`.
+   * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `infinity`, `url`, `set`, `map`.
    */
   handlers?: Record<string, undefined | OpenAPIJsonSerializerHandler> | undefined
 
@@ -202,7 +211,7 @@ export class OpenAPIJsonSerializer {
         case 'boolean':
           return data
         case 'number':
-          return Number.isNaN(data) ? null : data
+          return Number.isFinite(data) ? data : null
         case 'undefined':
           return null
         case 'bigint':
