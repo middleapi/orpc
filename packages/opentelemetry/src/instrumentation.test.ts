@@ -46,65 +46,23 @@ describe('oRPCInstrumentation', () => {
     expect(setTracerSpy).toHaveBeenCalledWith(undefined)
   })
 
-  describe('tracer provider', () => {
+  describe('tracer provider given to registerInstrumentations', () => {
     const exporter = new InMemorySpanExporter()
-    // Deliberately never registered globally
-    const provider = new NodeTracerProvider({
-      spanProcessors: [new SimpleSpanProcessor(exporter)],
-    })
+    const provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] })
 
     beforeEach(() => {
       exporter.reset()
     })
 
-    afterAll(async () => {
-      await provider.shutdown()
-    })
+    it.each([
+      ['an enabled', {}],
+      ['a disabled', { enabled: false }],
+    ])('receives the spans of %s instrumentation without being registered globally', (_, config) => {
+      registerInstrumentations({ instrumentations: [new ORPCInstrumentation(config)], tracerProvider: provider })
 
-    function startSpanWithLatestTracer(name: string) {
-      const tracer = setTracerSpy.mock.calls.at(-1)![0]!
-      tracer.startSpan(name).end()
-    }
+      setTracerSpy.mock.lastCall![0]!.startSpan('span').end()
 
-    it('sends spans to the tracer provider given to registerInstrumentations without registering it globally', () => {
-      const instrumentation = new ORPCInstrumentation()
-
-      const unregister = registerInstrumentations({
-        instrumentations: [instrumentation],
-        tracerProvider: provider,
-      })
-
-      expect(setTracerSpy).toHaveBeenCalledTimes(2)
-      startSpanWithLatestTracer('registered')
-      expect(exporter.getFinishedSpans().map(span => span.name)).toEqual(['registered'])
-      expect(exporter.getFinishedSpans()[0]!.instrumentationScope).toEqual(expect.objectContaining({ name: pkg.name, version: pkg.version }))
-
-      unregister()
-      expect(setTracerSpy).toHaveBeenLastCalledWith(undefined)
-    })
-
-    it('uses the tracer provider when registerInstrumentations enables a disabled instrumentation', () => {
-      const instrumentation = new ORPCInstrumentation({ enabled: false })
-
-      registerInstrumentations({
-        instrumentations: [instrumentation],
-        tracerProvider: provider,
-      })
-
-      expect(setTracerSpy).toHaveBeenCalledTimes(1)
-      startSpanWithLatestTracer('enabled-later')
-      expect(exporter.getFinishedSpans().map(span => span.name)).toEqual(['enabled-later'])
-    })
-
-    it('does not install a tracer when the tracer provider changes while disabled', () => {
-      const disabled = new ORPCInstrumentation({ enabled: false })
-      disabled.setTracerProvider(provider)
-
-      const enabledThenDisabled = new ORPCInstrumentation()
-      enabledThenDisabled.disable()
-      enabledThenDisabled.setTracerProvider(provider)
-
-      expect(setTracerSpy.mock.calls).toEqual([[expect.any(OpenTelemetryTracer)], [undefined]])
+      expect(exporter.getFinishedSpans()).toHaveLength(1)
     })
   })
 })

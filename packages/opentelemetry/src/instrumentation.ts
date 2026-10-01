@@ -1,4 +1,3 @@
-import type { TracerProvider } from '@opentelemetry/api'
 import type { InstrumentationConfig, InstrumentationModuleDefinition } from '@opentelemetry/instrumentation'
 import { context, propagation, trace } from '@opentelemetry/api'
 import { InstrumentationBase } from '@opentelemetry/instrumentation'
@@ -24,12 +23,6 @@ export interface ORPCInstrumentationConfig extends InstrumentationConfig {
  * @see {@link https://orpc.dev/docs/integrations/opentelemetry | OpenTelemetry Integration}
  */
 export class ORPCInstrumentation extends InstrumentationBase<ORPCInstrumentationConfig> {
-  /**
-   * Declared without an initializer, because `InstrumentationBase` calls `enable()` from its
-   * constructor, and an initializer would run afterwards and reset it.
-   */
-  private declare tracerInstalled: boolean | undefined
-
   constructor(config: ORPCInstrumentationConfig = {}) {
     super(pkg.name, pkg.version, config)
   }
@@ -38,11 +31,8 @@ export class ORPCInstrumentation extends InstrumentationBase<ORPCInstrumentation
   }
 
   override enable(): void {
-    this.tracerInstalled = true
-
     setTracer(new OpenTelemetryTracer({
-      // Comes from the tracer provider passed to `registerInstrumentations`, or the global one by default
-      tracer: this.tracer,
+      tracer: () => this.tracer,
       trace,
       context,
       propagation: (this._config.propagationEnabled ?? true) ? propagation : undefined,
@@ -50,20 +40,6 @@ export class ORPCInstrumentation extends InstrumentationBase<ORPCInstrumentation
   }
 
   override disable(): void {
-    this.tracerInstalled = false
-
     setTracer(undefined)
-  }
-
-  /**
-   * `registerInstrumentations` sets the tracer provider after the constructor has already enabled
-   * the instrumentation, so the oRPC tracer is rebuilt to send spans to the new provider.
-   */
-  override setTracerProvider(tracerProvider: TracerProvider): void {
-    super.setTracerProvider(tracerProvider)
-
-    if (this.tracerInstalled) {
-      this.enable()
-    }
   }
 }
