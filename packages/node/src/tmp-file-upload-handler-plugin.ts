@@ -16,11 +16,13 @@ import { parseHeaderParameters, parseMultipart } from './multipart'
 
 export interface TmpFileUploadHandlerPluginMaxBodySize {
   /**
-   * The maximum total size in bytes of request body content that is parsed
-   * into memory: JSON, URL-encoded forms, and the fields and part headers of
-   * a multipart body. A larger body rejects the request with
-   * `PAYLOAD_TOO_LARGE`. Usually the lowest of the three limits, because this
-   * content cannot stream anywhere.
+   * The maximum size in bytes of request body content buffered into memory:
+   * JSON, URL-encoded forms, and the fields and part headers of a multipart
+   * body in total, and each event of an event stream on its own, because the
+   * decoder buffers an event until the blank line ending it arrives, however
+   * fast the stream is consumed. Content over the limit rejects with
+   * `PAYLOAD_TOO_LARGE`, an oversized event at the reader. Usually the lowest
+   * of the three limits, because this content cannot stream anywhere.
    */
   memory: number
 
@@ -33,10 +35,12 @@ export interface TmpFileUploadHandlerPluginMaxBodySize {
 
   /**
    * The maximum total size in bytes of a request body that is consumed as a
-   * stream: event streams and raw binary streams. Enforced while the stream is
-   * consumed, so an oversized stream fails at the reader. Usually the highest
-   * of the three limits, but keep it finite so no client can stream
-   * indefinitely.
+   * stream: event streams and raw binary streams. It bounds only the total;
+   * what an event stream buffers along the way also counts against `memory`,
+   * while a raw binary stream reaches the procedure chunk by chunk and
+   * buffers nothing. Enforced while the stream is consumed, so an oversized
+   * stream fails at the reader. Usually the highest of the three limits, but
+   * keep it finite so no client can stream indefinitely.
    */
   stream: number
 }
@@ -105,8 +109,8 @@ export class TmpFile extends File {
  * far larger than available memory parse in constant memory. Every other body is left
  * to the standard parser.
  *
- * Request body sizes are limited per content category: memory-parsed, spooled to
- * disk, and streamed, each limit fixed or resolved per request. This subsumes the
+ * Request body sizes are limited per content category: buffered in memory, spooled
+ * to disk, and streamed, each limit fixed or resolved per request. This subsumes the
  * request limit plugin while sizing each kind of body to what it actually costs.
  *
  * @remarks
@@ -251,21 +255,32 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
       return this.parseLimitedBody(request, hint, resolvedHint, maxBodySize.memory)
     }
 
-    // Event streams and raw binary streams, the kinds consumed on the fly
+    /**
+     * However fast an event stream is consumed, the decoder buffers each event
+     * until the blank line ending it arrives, so every event is bounded by the
+     * memory limit on its own as well.
+     */
+    if (resolvedHint === 'event-stream') {
+      return this.parseLimitedBody(request, hint, resolvedHint, maxBodySize.stream, maxBodySize.memory)
+    }
+
+    // Raw binary streams reach the procedure chunk by chunk, buffering nothing
     return this.parseLimitedBody(request, hint, resolvedHint, maxBodySize.stream)
   }
 
   /**
-   * Enforces a size limit on a body the standard parser handles, counting the
-   * raw bytes before handing them back for regular parsing.
+   * Enforces a size limit on a body the standard parser handles, plus one on
+   * each event when given an event limit, counting the raw bytes before
+   * handing them back for regular parsing.
    */
   private async parseLimitedBody(
     request: StandardLazyRequest,
     hint: StandardBodyHint | undefined,
     resolvedHint: StandardBodyHint,
     limit: number,
+    eventLimit = Number.POSITIVE_INFINITY,
   ): Promise<StandardBody> {
-    if (limit === Number.POSITIVE_INFINITY) {
+    if (limit === Number.POSITIVE_INFINITY && eventLimit === Number.POSITIVE_INFINITY) {
       return request.resolveBody(hint)
     }
 
@@ -278,7 +293,11 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
       return stream
     }
 
-    const response = new Response(limitStream(stream, limit), {
+    const limited = eventLimit === Number.POSITIVE_INFINITY
+      ? limitStream(stream, limit)
+      : limitEventStream(stream, limit, eventLimit)
+
+    const response = new Response(limited, {
       headers: toFetchHeaders(request.headers),
     })
 
@@ -410,6 +429,96 @@ function limitStream(stream: ReadableStream<Uint8Array>, limit: number): Readabl
       total += chunk.byteLength
 
       if (total > limit) {
+        controller.error(new ORPCError('PAYLOAD_TOO_LARGE'))
+        return
+      }
+
+      controller.enqueue(chunk)
+    },
+  }))
+}
+
+const CR = 0x0D
+const LF = 0x0A
+
+/**
+ * Limits an event stream's total size and the size of each event in it, which
+ * the decoder buffers from its first byte until the blank line ending it.
+ * Events are delimited at the byte level exactly as the decoder delimits them
+ * in text, which is equivalent because UTF-8 never encodes CR or LF inside
+ * another character: line endings before an event belong to none and are
+ * skipped, and a run of line endings ends the event unless it is a single CR,
+ * LF, or CRLF.
+ */
+function limitEventStream(stream: ReadableStream<Uint8Array>, limit: number, eventLimit: number): ReadableStream<Uint8Array> {
+  let total = 0
+  let eventSize = 0
+  /**
+   * The line endings ending the event so far: none, a lone CR that may still
+   * become CRLF, or a whole line ending that any further one turns into the
+   * blank line.
+   */
+  let trailing: 'none' | 'cr' | 'line' = 'none'
+
+  return stream.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      total += chunk.byteLength
+
+      if (total > limit) {
+        controller.error(new ORPCError('PAYLOAD_TOO_LARGE'))
+        return
+      }
+
+      // A Buffer view searches natively, jumping over the content between line endings
+      const bytes = Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength)
+      let nextCR = bytes.indexOf(CR)
+      let nextLF = bytes.indexOf(LF)
+      let offset = 0
+
+      while (true) {
+        const lineEnding = nextCR === -1 ? nextLF : nextLF === -1 ? nextCR : Math.min(nextCR, nextLF)
+        const contentEnd = lineEnding === -1 ? bytes.length : lineEnding
+
+        if (contentEnd > offset) {
+          eventSize += contentEnd - offset
+          trailing = 'none'
+        }
+
+        if (lineEnding === -1) {
+          break
+        }
+
+        const byte = bytes[lineEnding]
+        offset = lineEnding + 1
+
+        if (byte === CR) {
+          nextCR = bytes.indexOf(CR, offset)
+        }
+        else {
+          nextLF = bytes.indexOf(LF, offset)
+        }
+
+        // Before an event's first byte, the decoder skips line endings instead of buffering them
+        if (eventSize === 0) {
+          continue
+        }
+
+        if (++eventSize > eventLimit) {
+          controller.error(new ORPCError('PAYLOAD_TOO_LARGE'))
+          return
+        }
+
+        if (trailing === 'line' || (trailing === 'cr' && byte === CR)) {
+          // The blank line is complete, so the decoder releases the event
+          eventSize = 0
+          trailing = 'none'
+        }
+        else {
+          trailing = byte === CR ? 'cr' : 'line'
+        }
+      }
+
+      if (eventSize > eventLimit) {
         controller.error(new ORPCError('PAYLOAD_TOO_LARGE'))
         return
       }
