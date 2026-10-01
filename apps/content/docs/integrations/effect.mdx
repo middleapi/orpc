@@ -12,7 +12,7 @@ This guide assumes familiarity with [Effect](https://effect.website/). Review th
 ## Installation
 
 ```package-install
-npm install @orpc/experimental-effect@beta effect@beta
+npm install @orpc/experimental-effect@beta effect
 ```
 
 ## Effectful Handlers
@@ -190,16 +190,18 @@ const recovered = program.pipe(
 )
 
 const fallback = program.pipe(
-  catchORPCErrorCode('NOT_FOUND', error => Effect.succeed(error.data.id)),
+  catchORPCErrorCode('NOT_FOUND', error => Effect.succeed(null)),
 )
 
 const handled = program.pipe(
   catchORPCErrorCodes({
-    NOT_FOUND: error => Effect.succeed(error.data.id),
+    NOT_FOUND: error => Effect.succeed(null),
     CONFLICT: error => Effect.succeed(error.message),
   }),
 )
 ```
+
+`error.data` is typed only when the error channel holds nothing but declared `ORPCError`s. Otherwise, as with [client calls](#client-calls), it is `unknown`.
 
 :::info
 All utilities support data-first `catchORPCError(program, handler)` and data-last `program.pipe(catchORPCError(handler))` styles.
@@ -244,7 +246,7 @@ const program = Effect.gen(function* () {
 )
 ```
 
-You can also combine `Effect.catchIf` with [isDefinedError](/docs/client/error-handling#using-safe-and-isdefinederror) to recover from every defined error in a typesafe way:
+For typed `error.data`, combine `Effect.catchIf` with [isDefinedError](/docs/client/error-handling#using-safe-and-isdefinederror):
 
 ```ts
 import { isDefinedError } from '@orpc/client'
@@ -252,7 +254,7 @@ import { Effect } from 'effect'
 
 const recovered = effectClient.planet.find({ id: 1 }).pipe(
   Effect.catchIf(isDefinedError, (error) => {
-    // error is fully typed here
+    // error and error.data are fully typed here
     return Effect.succeed(null)
   }),
 )

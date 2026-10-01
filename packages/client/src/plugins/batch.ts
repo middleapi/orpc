@@ -1,9 +1,9 @@
 import type { InterceptorOptions, Promisable, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standard-server/core'
-import type { ClientPeerSendMessage } from '@standard-server/peer'
+import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-server/peer'
 import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
 import type { ClientContext } from '../types'
-import { defer, isAsyncIteratorObject, loadBytes, once, promiseWithResolvers, safeEncodeURIComponent, splitInHalf, stringifyJSON, toArray, value } from '@orpc/shared'
+import { captureAsyncContext, defer, isAsyncIteratorObject, loadBytes, once, promiseWithResolvers, safeEncodeURIComponent, splitInHalf, stringifyJSON, toArray, value } from '@orpc/shared'
 import { parseStandardUrl } from '@standard-server/core'
 import { ClientPeer, decodePeerMessage, isServerPeerSendMessage } from '@standard-server/peer'
 
@@ -40,6 +40,14 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
    * @default () => true
    */
   filter?: Value<boolean, [options: StandardLinkTransportInterceptorOptions<T>]>
+
+  /**
+   * Only requests with the same scope are batched together.
+   * On the server, return a value unique to the incoming request so different users never share a batch.
+   *
+   * @default () => undefined
+   */
+  scope?: (options: StandardLinkTransportInterceptorOptions<T>) => unknown
 
   /**
    * The maximum number of requests in the batch.
@@ -117,6 +125,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
 
   private readonly groups: BatchLinkPluginOptions<T>['groups']
   private readonly filter: Exclude<BatchLinkPluginOptions<T>['filter'], undefined>
+  private readonly scope: Exclude<BatchLinkPluginOptions<T>['scope'], undefined>
   private readonly maxSize: Exclude<BatchLinkPluginOptions<T>['maxSize'], undefined>
   private readonly wait: Exclude<BatchLinkPluginOptions<T>['wait'], undefined>
   private readonly mode: Exclude<BatchLinkPluginOptions<T>['mode'], undefined>
@@ -126,18 +135,12 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
   private readonly mapSubrequest: Exclude<BatchLinkPluginOptions<T>['mapSubrequest'], undefined>
   private readonly mapSubresponse: Exclude<BatchLinkPluginOptions<T>['mapSubresponse'], undefined>
 
-  private readonly queue: Map<
-    BatchLinkPluginGroup<T>,
-    [
-        options: InterceptorOptions<StandardLinkTransportInterceptorOptions<T>, Promise<StandardLazyResponse>>,
-        resolve: (response: StandardLazyResponse) => void,
-        reject: (e: unknown) => void,
-    ][]
-  > = new Map()
+  private readonly queue: Map<unknown, Map<BatchLinkPluginGroup<T>, BatchLinkPluginItem<T>[]>> = new Map()
 
   constructor(options: NoInfer<BatchLinkPluginOptions<T>>) {
     this.groups = options.groups
     this.filter = options.filter ?? (() => true)
+    this.scope = options.scope ?? (() => undefined)
     this.maxSize = options.maxSize ?? 10
     this.wait = options.wait ?? 0
     this.mode = options.mode ?? 'streaming'
@@ -206,19 +209,27 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
         return interceptorOptions.next()
       }
 
+      const scope = this.scope(interceptorOptions)
+
       return new Promise((resolve, reject) => {
         // Schedule only for the first queued request, so later ones cannot extend or split the wait.
         if (!this.queue.size) {
           defer(() => this.processPendingBatches(), this.wait)
         }
 
-        let queue = this.queue.get(group)
-        if (!queue) {
-          queue = []
-          this.queue.set(group, queue)
+        let groups = this.queue.get(scope)
+        if (!groups) {
+          groups = new Map()
+          this.queue.set(scope, groups)
         }
 
-        queue.push([interceptorOptions, resolve, reject])
+        let queue = groups.get(group)
+        if (!queue) {
+          queue = []
+          groups.set(group, queue)
+        }
+
+        queue.push([interceptorOptions, resolve, reject, captureAsyncContext()])
       })
     }
 
@@ -228,31 +239,42 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
     }
   }
 
-  private async processPendingBatches(): Promise<void> {
-    const pending = new Map(this.queue)
+  private processPendingBatches(): void {
+    const pending = [...this.queue.values()]
     this.queue.clear()
 
-    for (const [group, items] of pending) {
-      const getItems = items.filter(([options]) => options.request.method === 'GET')
-      const queryItems = items.filter(([options]) => options.request.method === 'QUERY')
-      const unsafeItems = items.filter(([options]) => options.request.method !== 'GET' && options.request.method !== 'QUERY')
+    for (const groups of pending) {
+      for (const [group, items] of groups) {
+        const getItems = items.filter(([options]) => options.request.method === 'GET')
+        const queryItems = items.filter(([options]) => options.request.method === 'QUERY')
+        const unsafeItems = items.filter(([options]) => options.request.method !== 'GET' && options.request.method !== 'QUERY')
 
-      this.executeBatch('GET', group, getItems)
-      this.executeBatch('QUERY', group, queryItems)
-      this.executeBatch('POST', group, unsafeItems)
+        this.executeBatchInOwnContext('GET', group, getItems)
+        this.executeBatchInOwnContext('QUERY', group, queryItems)
+        this.executeBatchInOwnContext('POST', group, unsafeItems)
+      }
     }
+  }
+
+  /**
+   * Runs the batch in the async context of its first request instead of the timer's,
+   * so the transport and batch options see that caller's request state.
+   * `executeBatch` always runs in the context of its first request.
+   */
+  private async executeBatchInOwnContext(
+    method: 'GET' | 'QUERY' | 'POST',
+    group: BatchLinkPluginGroup<T>,
+    groupItems: BatchLinkPluginItem<T>[],
+  ): Promise<void> {
+    await groupItems[0]?.[3](() => this.executeBatch(method, group, groupItems))
   }
 
   private async executeBatch(
     method: 'GET' | 'QUERY' | 'POST',
     group: BatchLinkPluginGroup<T>,
-    groupItems: typeof this.queue extends Map<any, infer U> ? U : never,
+    groupItems: BatchLinkPluginItem<T>[],
   ): Promise<void> {
     try {
-      if (!groupItems.length) {
-        return
-      }
-
       if (groupItems.length === 1) {
         const [options, resolve, reject] = groupItems[0]!
         options.next().then(resolve).catch(reject)
@@ -270,7 +292,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
 
         await Promise.all([
           this.executeBatch(method, group, first),
-          this.executeBatch(method, group, second),
+          this.executeBatchInOwnContext(method, group, second),
         ])
 
         return
@@ -285,29 +307,38 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
       const pendingMessages: ClientPeerSendMessage[] = []
       const subrequests = groupItems.map(([subOptions]) => this.mapSubrequest(subOptions, { url, headers }))
       let batchResponse: StandardLazyResponse
-      let activeCount = subrequests.length
       let markRequestSent: (() => void) | undefined
+      const openRequestIds = new Set<string>()
+      const cancelledRunningRequestIds = new Set<string>()
+      let isBatchSent = false
+
+      const abortIfOnlyCancelledRemain = () => {
+        if (openRequestIds.size === 0 && cancelledRunningRequestIds.size > 0) {
+          controller.abort()
+        }
+      }
 
       const peer = new ClientPeer(async (message) => {
         pendingMessages.push(message)
 
         if (message.kind === 'request') {
+          openRequestIds.add(message.id)
           markRequestSent?.()
         }
-
-        if (message.kind === 'cancel' && --activeCount === 0) {
-          controller.abort()
+        else if (message.kind === 'cancel' && openRequestIds.delete(message.id) && isBatchSent) {
+          cancelledRunningRequestIds.add(message.id)
+          abortIfOnlyCancelledRemain()
         }
       })
 
       /**
        * Subrequests go to the peer one at a time, so a request message always belongs to the current one.
        * A subrequest aborted before the peer starts sending its request message sends nothing, not even a
-       * cancel, so one that settles without a request message is no longer active.
+       * cancel, so settling also ends the wait for it.
        */
       for (const [index, [subOptions, resolve, reject]] of groupItems.entries()) {
-        const sent = promiseWithResolvers<boolean>()
-        markRequestSent = () => sent.resolve(true)
+        const sent = promiseWithResolvers<void>()
+        markRequestSent = sent.resolve
 
         peer
           .request(subrequests[index]!)
@@ -317,16 +348,16 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
               reject(error)
             }
           })
-          .then(() => sent.resolve(false))
+          .then(sent.resolve)
 
-        if (!await sent.promise) {
-          activeCount--
-        }
+        await sent.promise
       }
 
-      if (activeCount === 0) {
+      if (openRequestIds.size === 0) {
         return
       }
+
+      isBatchSent = true
 
       try {
         const request: StandardRequest = {
@@ -350,7 +381,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
 
             await Promise.all([
               this.executeBatch(method, group, first),
-              this.executeBatch(method, group, second),
+              this.executeBatchInOwnContext(method, group, second),
               peer.close(),
             ])
 
@@ -400,7 +431,15 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
           await decodeLengthPrefixedBlob(body, peer)
         }
         else if (body instanceof ReadableStream) {
-          await decodeLengthPrefixedStream(body, peer)
+          await decodeLengthPrefixedStream(body, async (message) => {
+            await peer.message(message)
+
+            if (isLastServerMessage(message)) {
+              openRequestIds.delete(message.id)
+              cancelledRunningRequestIds.delete(message.id)
+              abortIfOnlyCancelledRemain()
+            }
+          })
         }
         else {
           throw new TypeError('Invalid batch response format.')
@@ -415,6 +454,34 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
     catch (error) {
       groupItems.forEach(([, , reject]) => reject(error))
     }
+  }
+}
+
+type BatchLinkPluginItem<T extends ClientContext> = [
+  options: InterceptorOptions<StandardLinkTransportInterceptorOptions<T>, Promise<StandardLazyResponse>>,
+  resolve: (response: StandardLazyResponse) => void,
+  reject: (e: unknown) => void,
+  runInOwnContext: ReturnType<typeof captureAsyncContext>,
+]
+
+/**
+ * Whether the server sends nothing more for the subrequest after this message.
+ */
+function isLastServerMessage(message: ServerPeerSendMessage): boolean {
+  switch (message.kind) {
+    case 'response':
+      // A body-less response with a content type or body hint is followed by stream messages
+      return message.json.body !== undefined
+        || message.binary !== undefined
+        || (message.json.headers?.['content-type'] === undefined && message.json.headers?.['standard-server'] === undefined)
+    case 'event-stream':
+      return message.json.event === 'close' || message.json.event === 'error'
+    case 'octet-stream':
+      return message.json.close === true
+    case 'cancel':
+      return true
+    default:
+      return false
   }
 }
 
@@ -447,7 +514,7 @@ async function decodeLengthPrefixedBlob(blob: Blob, peer: ClientPeer): Promise<v
   }
 }
 
-async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array>, peer: ClientPeer): Promise<void> {
+async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array>, receive: (message: ServerPeerSendMessage) => Promise<void>): Promise<void> {
   const reader = stream.getReader()
   let buffer = new Uint8Array(0)
 
@@ -485,7 +552,7 @@ async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array>, pe
           throw new TypeError('Invalid batch response: invalid message.')
         }
 
-        await peer.message(result.message)
+        await receive(result.message)
       }
 
       if (done) {

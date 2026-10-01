@@ -9,7 +9,7 @@ export default [
     "description": "The screenshot API for developers",
     "logo": "https://avatars.githubusercontent.com/u/97035603?v=4",
     "href": "https://screenshotone.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
-    "rel": "",
+    "rel": "sponsored",
     "background": {
       "light": "#f7f5ff",
       "dark": "#303147"

@@ -607,6 +607,47 @@ describe('openAPILinkCodec', () => {
           'Path param "filter" cannot be empty in call to procedure (item).',
         )
       })
+
+      it('throws when path params are or contain dot segments', async () => {
+        const codec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            path: '/items/{id}/{ids}/{+rest}',
+            paramsStyles: { ids: 'comma-delimited-array' },
+          })),
+        }, { url: '/api', serializer })
+
+        const valid = { id: 'a', ids: ['b'], rest: 'c' }
+
+        for (const id of ['.', '..']) {
+          await expect(codec.encodeInput({ ...valid, id }, ['item'], { context: {} })).rejects.toThrow(
+            'Path param "id" cannot contain "." or ".." segments in call to procedure (item).',
+          )
+        }
+
+        for (const ids of [['.'], ['..'], [null, '..']]) {
+          await expect(codec.encodeInput({ ...valid, ids }, ['item'], { context: {} })).rejects.toThrow(
+            'Path param "ids" cannot contain "." or ".." segments in call to procedure (item).',
+          )
+        }
+
+        for (const rest of ['.', '..', './a', '../a', 'a/.', 'a/..', 'a/./b', 'a/../../admin']) {
+          await expect(codec.encodeInput({ ...valid, rest }, ['item'], { context: {} })).rejects.toThrow(
+            'Path param "rest" cannot contain "." or ".." segments in call to procedure (item).',
+          )
+        }
+      })
+
+      it('allows path params that only contain dots within a segment', async () => {
+        const codec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            path: '/items/{id}/{+rest}',
+          })),
+        }, { url: '/api', serializer })
+
+        const request = await codec.encodeInput({ id: '...', rest: '.well-known/a..b/v1.2/.../%2e%2e' }, ['item'], { context: {} })
+
+        expect(request.url).toBe('/api/items/.../.well-known/a..b/v1.2/.../%252e%252e')
+      })
     })
 
     describe('option handling', () => {
