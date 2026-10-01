@@ -1,4 +1,6 @@
 import { trace } from '@opentelemetry/api'
+import { registerInstrumentations } from '@opentelemetry/instrumentation'
+import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node'
 import * as SharedModule from '@orpc/shared'
 import pkg from '../package.json'
 import { ORPCInstrumentation } from './instrumentation'
@@ -42,5 +44,25 @@ describe('oRPCInstrumentation', () => {
     const instrumentation = new ORPCInstrumentation()
     instrumentation.disable()
     expect(setTracerSpy).toHaveBeenCalledWith(undefined)
+  })
+
+  describe('tracer provider given to registerInstrumentations', () => {
+    const exporter = new InMemorySpanExporter()
+    const provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] })
+
+    beforeEach(() => {
+      exporter.reset()
+    })
+
+    it.each([
+      ['an enabled', {}],
+      ['a disabled', { enabled: false }],
+    ])('receives the spans of %s instrumentation without being registered globally', (_, config) => {
+      registerInstrumentations({ instrumentations: [new ORPCInstrumentation(config)], tracerProvider: provider })
+
+      setTracerSpy.mock.lastCall![0]!.startSpan('span').end()
+
+      expect(exporter.getFinishedSpans()).toHaveLength(1)
+    })
   })
 })

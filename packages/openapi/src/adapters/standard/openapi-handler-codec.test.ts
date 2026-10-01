@@ -313,9 +313,7 @@ describe('openAPIHandlerCodec', () => {
       it('returns only path params when a primitive body cannot be merged', async () => {
         const serializer = {
           serialize: vi.fn(),
-          deserialize: vi.fn()
-            .mockReturnValueOnce(undefined)
-            .mockReturnValueOnce('raw-body'),
+          deserialize: vi.fn().mockReturnValueOnce('raw-body'),
         } as any
 
         const codec = new OpenAPIHandlerCodec(
@@ -333,16 +331,13 @@ describe('openAPIHandlerCodec', () => {
         expect(result).toBeDefined()
 
         await expect(result!.decodeInput()).resolves.toEqual({ id: '24' })
-        expect(serializer.deserialize).toHaveBeenNthCalledWith(1, expect.any(URLSearchParams))
         expect(serializer.deserialize).toHaveBeenCalledWith('__body__')
       })
 
       it('returns body directly when there are no path params', async () => {
         const serializer = {
           serialize: vi.fn(),
-          deserialize: vi.fn()
-            .mockReturnValueOnce(undefined)
-            .mockReturnValueOnce({ name: 'din' }),
+          deserialize: vi.fn().mockReturnValueOnce({ name: 'din' }),
         } as any
 
         const procedure = os
@@ -367,9 +362,7 @@ describe('openAPIHandlerCodec', () => {
       it('returns only path params when an array body cannot be merged', async () => {
         const serializer = {
           serialize: vi.fn(),
-          deserialize: vi.fn()
-            .mockReturnValueOnce(undefined)
-            .mockReturnValueOnce(['first', 'second']),
+          deserialize: vi.fn().mockReturnValueOnce(['first', 'second']),
         } as any
 
         const procedure = os
@@ -394,9 +387,7 @@ describe('openAPIHandlerCodec', () => {
         const blob = new Blob(['raw-bytes'])
         const serializer = {
           serialize: vi.fn(),
-          deserialize: vi.fn()
-            .mockReturnValueOnce(undefined)
-            .mockReturnValueOnce(blob),
+          deserialize: vi.fn().mockReturnValueOnce(blob),
         } as any
 
         const codec = new OpenAPIHandlerCodec(
@@ -420,9 +411,7 @@ describe('openAPIHandlerCodec', () => {
         const blob = new Blob(['raw-bytes'])
         const serializer = {
           serialize: vi.fn(),
-          deserialize: vi.fn()
-            .mockReturnValueOnce(undefined)
-            .mockReturnValueOnce(blob),
+          deserialize: vi.fn().mockReturnValueOnce(blob),
         } as any
 
         const codec = new OpenAPIHandlerCodec(

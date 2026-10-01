@@ -394,6 +394,32 @@ describe('responseCompressionHandlerPlugin', () => {
     })
   })
 
+  it('compresses a response whose content-range header was cleared', async () => {
+    const largeText = 'x'.repeat(2000)
+    const handler = new RPCHandler(os.handler(() => largeText), {
+      plugins: [new ResponseCompressionHandlerPlugin({ threshold: 100 })],
+      routingInterceptors: [async ({ next }) => {
+        const result = await next()
+
+        return result.matched
+          ? { ...result, response: { ...result.response, headers: { ...result.response.headers, 'content-range': [] } } }
+          : result
+      }],
+    })
+
+    const { response } = await handler.handle(new Request('http://localhost', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'accept-encoding': 'gzip',
+      },
+      body: JSON.stringify({ json: null }),
+    }))
+
+    expect(response!.headers.get('content-encoding')).toBe('gzip')
+    expect(response!.headers.has('content-range')).toBe(false)
+  })
+
   describe('json body', () => {
     it.each(
       ['gzip', 'deflate', 'deflate-raw'] as const,

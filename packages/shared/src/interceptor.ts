@@ -85,9 +85,9 @@ export function onFinish<T, TOptions extends { next: () => any }, TRest extends 
     ...rest: TRest
   ) => Promisable<void>>,
 ): (options: TOptions, ...rest: TRest) => T | Promise<Awaited<ReturnType<TOptions['next']>>> {
-  let state: any
-
   return async (options, ...rest) => {
+    let state: any
+
     try {
       const result = await options.next()
       state = [null, result, true]

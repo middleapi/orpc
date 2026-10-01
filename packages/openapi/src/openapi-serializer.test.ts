@@ -51,6 +51,17 @@ describe('openAPISerializer', () => {
       expect(result.has('empty')).toBe(false)
     })
 
+    it('omits NaN and ±Infinity from FormData, matching their null JSON form', () => {
+      const result = serializer.serialize({
+        nan: Number.NaN,
+        max: Number.POSITIVE_INFINITY,
+        min: Number.NEGATIVE_INFINITY,
+        count: 1,
+      }, { asFormData: true }) as FormData
+
+      expect(Array.from(result.keys())).toEqual(['count'])
+    })
+
     it('skips useFormDataForBlobFields when false', () => {
       const blob = new Blob(['hello'])
       expect(serializer.serialize({ file: blob }, { useFormDataForBlobFields: false })).not.toBeInstanceOf(FormData)

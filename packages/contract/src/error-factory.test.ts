@@ -30,6 +30,12 @@ describe('error factory', () => {
     expect(e.cause).toBe('cause')
   })
 
+  it('falls back to the default message when message is explicitly undefined', () => {
+    const e = new TestError({ message: undefined, data: { value: 1 } })
+
+    expect(e.message).toBe('default message')
+  })
+
   it('can be constructed without options when data schema is not defined', () => {
     const e = new SimpleError()
 
