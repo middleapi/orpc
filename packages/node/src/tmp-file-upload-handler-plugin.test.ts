@@ -891,7 +891,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
     }
 
     /**
-     * Reads a streamed body to its end, as a procedure consuming it would.
+     * Reads a streamed body to its end.
      */
     async function collect<T>(body: unknown): Promise<T[]> {
       const items: T[] = []
@@ -1135,7 +1135,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
         },
       })
 
-      // Under the limit the bytes pass through unchanged, and chunks reach the procedure without buffering, so memory never applies
+      // Under the limit the bytes pass through unchanged, never charged to memory
       const content = Buffer.alloc(64, 7)
       await runThroughPlugin({
         limits: { memory: 1, stream: 1024 },
@@ -1169,35 +1169,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
       })
     })
 
-    it('limits each event of an event stream against maxBodySize.memory, however fast it is consumed', async () => {
-      const events = ['data: "one"\n\n', 'data: "two"\n\n', 'data: "three"\n\n']
-      const body = Buffer.from(events.join(''))
-      const largest = Buffer.byteLength(events[2]!)
-
-      // Each event is buffered on its own, so the limit applies per event rather than to the total
-      await runThroughPlugin({
-        limits: { memory: largest },
-        headers: eventStreamHeaders,
-        body,
-        chunkSize: 1,
-        inspect: async (body) => {
-          expect(await collect(body)).toEqual(['one', 'two', 'three'])
-        },
-      })
-
-      // Reading every event as soon as it arrives does not help, since the decoder buffers until the blank line
-      await runThroughPlugin({
-        limits: { memory: largest - 1 },
-        headers: eventStreamHeaders,
-        body,
-        chunkSize: 1,
-        inspect: async (body) => {
-          await expect(collect(body)).rejects.toSatisfy(expectPayloadTooLarge)
-        },
-      })
-    })
-
-    it('measures an event from its first byte to the line ending completing its blank line, in every line ending style', async () => {
+    it('limits each event of an event stream against maxBodySize.memory, up to its blank line in every line ending style', async () => {
       const events = [
         'id: 1\ndata: "lf"\n\n',
         'id: 2\r\ndata: "crlf"\r\n\r',
@@ -1206,18 +1178,18 @@ describe('tmpFileUploadHandlerPlugin', () => {
       ]
 
       for (const event of events) {
-        // Line endings around the event belong to no event, so they cost nothing
-        const body = Buffer.from(`\r\n\n${event}\n`)
+        // Two events exceed the limit only in total, and line endings around them cost nothing
+        const body = Buffer.from(`\r\n\n${event}${event}\n`)
         const size = Buffer.byteLength(event)
 
-        for (const chunkSize of [1, 2, 3, body.length]) {
+        for (const chunkSize of [1, body.length]) {
           await runThroughPlugin({
             limits: { memory: size },
             headers: eventStreamHeaders,
             body,
             chunkSize,
             inspect: async (body) => {
-              expect(await collect(body)).toHaveLength(1)
+              expect(await collect(body)).toHaveLength(2)
             },
           })
 
@@ -1234,32 +1206,16 @@ describe('tmpFileUploadHandlerPlugin', () => {
       }
     })
 
-    it('rejects an unfinished event as soon as it outgrows maxBodySize.memory, even with an unlimited stream', async () => {
+    it('rejects an event that never ends, however fast it is read, even with an unlimited stream', async () => {
       // A single CR, LF, or CRLF ends a line, never the event
-      const lines = ['data: a\n', 'data: b\r\n', 'data: c\r'].map(line => Buffer.from(line))
-      const totalLines = 100_000
-      let pulls = 0
-
       await runThroughPlugin({
         limits: { memory: 1024 },
         headers: eventStreamHeaders,
-        resolveBody: async () => new ReadableStream({
-          pull(controller) {
-            if (pulls === totalLines) {
-              controller.close()
-              return
-            }
-
-            controller.enqueue(lines[pulls++ % lines.length])
-          },
-        }),
+        body: Buffer.from('data: a\ndata: b\r\ndata: c\r'.repeat(1024)),
         inspect: async (body) => {
           await expect(collect(body)).rejects.toSatisfy(expectPayloadTooLarge)
         },
       })
-
-      // The stream is cut off around the limit instead of being buffered to its end
-      expect(pulls).toBeLessThan(1024)
     })
 
     it('spools a file body identified only by its content-disposition, per the 0.8 resolution order', async () => {

@@ -18,11 +18,9 @@ export interface TmpFileUploadHandlerPluginMaxBodySize {
   /**
    * The maximum size in bytes of request body content buffered into memory:
    * JSON, URL-encoded forms, and the fields and part headers of a multipart
-   * body in total, and each event of an event stream on its own, because the
-   * decoder buffers an event until the blank line ending it arrives, however
-   * fast the stream is consumed. Content over the limit rejects with
-   * `PAYLOAD_TOO_LARGE`, an oversized event at the reader. Usually the lowest
-   * of the three limits, because this content cannot stream anywhere.
+   * body in total, and each event of an event stream on its own. Exceeding it
+   * rejects with `PAYLOAD_TOO_LARGE`. Usually the lowest of the three limits,
+   * because this content cannot stream anywhere.
    */
   memory: number
 
@@ -35,11 +33,10 @@ export interface TmpFileUploadHandlerPluginMaxBodySize {
 
   /**
    * The maximum total size in bytes of a request body that is consumed as a
-   * stream: event streams and raw binary streams. It bounds only the total,
-   * while each event of an event stream also counts against `memory`.
-   * Enforced while the stream is consumed, so an oversized stream fails at the
-   * reader. Usually the highest of the three limits, but keep it finite so no
-   * client can stream indefinitely.
+   * stream: event streams and raw binary streams. Enforced while the stream is
+   * consumed, so an oversized stream fails at the reader. Usually the highest
+   * of the three limits, but keep it finite so no client can stream
+   * indefinitely.
    */
   stream: number
 }
@@ -254,20 +251,14 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
       return this.parseLimitedBody(request, hint, resolvedHint, maxBodySize.memory)
     }
 
-    /**
-     * Event streams and raw binary streams, the kinds consumed on the fly. A raw
-     * binary stream reaches the procedure chunk by chunk, but however fast an
-     * event stream is consumed, the decoder buffers each event until the blank
-     * line ending it arrives, so every event is bounded by the memory limit too.
-     */
+    // Streams are consumed on the fly, but the decoder buffers each event whole, however fast it is read
     const eventLimit = resolvedHint === 'event-stream' ? maxBodySize.memory : Number.POSITIVE_INFINITY
     return this.parseLimitedBody(request, hint, resolvedHint, maxBodySize.stream, eventLimit)
   }
 
   /**
-   * Enforces a size limit on a body the standard parser handles, and one on
-   * each event of an event stream, counting the raw bytes before handing them
-   * back for regular parsing.
+   * Enforces a size limit on a body the standard parser handles, counting the
+   * raw bytes before handing them back for regular parsing.
    */
   private async parseLimitedBody(
     request: StandardLazyRequest,
@@ -289,7 +280,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
       return stream
     }
 
-    // No event can outgrow an event limit at or above the total limit, so only a lower one is checked
+    // An event can't outgrow a limit at or above the total one
     const fits = eventLimit < limit ? createEventSizeCheck(eventLimit) : undefined
 
     const response = new Response(limitStream(stream, limit, fits), {
@@ -417,8 +408,7 @@ function assertContentLengthWithin(headers: StandardHeaders, limit: number): voi
 }
 
 /**
- * Limits a stream's total size, and with `fits`, whatever else each chunk must
- * satisfy as it passes.
+ * Limits a stream's total size, also rejecting any chunk `fits` refuses.
  */
 function limitStream(
   stream: ReadableStream<Uint8Array>,
@@ -445,24 +435,16 @@ const CR = 0x0D
 const LF = 0x0A
 
 /**
- * Creates a check, for {@link limitStream}, that measures each event of an event
- * stream, which the decoder buffers from its first byte until the blank line
- * ending it, and fails once one outgrows the limit. Events are found on the raw
- * bytes, which is safe because UTF-8 never encodes CR or LF inside another
- * character: line endings before an event belong to none and are skipped, and a
- * run of line endings ends the event unless it is a single CR, LF, or CRLF.
+ * Fails once an event, which the decoder buffers until its blank line, outgrows
+ * the limit. Scans raw bytes, as UTF-8 never encodes CR or LF inside a character.
  */
 function createEventSizeCheck(eventLimit: number): (chunk: Uint8Array) => boolean {
   let eventSize = 0
-  /**
-   * The line endings ending the event so far: none, a lone CR that may still
-   * become CRLF, or a whole line ending that any further one turns into the
-   * blank line.
-   */
+  // The event's trailing line ending: none, a lone CR, or a complete one
   let trailing: 'none' | 'cr' | 'line' = 'none'
 
   return (chunk) => {
-    // A Buffer view searches natively, jumping over the content between line endings
+    // Buffer's native indexOf skips the content between line endings
     const bytes = Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength)
     let nextCR = indexOrEnd(bytes, CR, 0)
     let nextLF = indexOrEnd(bytes, LF, 0)
@@ -490,7 +472,7 @@ function createEventSizeCheck(eventLimit: number): (chunk: Uint8Array) => boolea
         nextLF = indexOrEnd(bytes, LF, offset)
       }
 
-      // Before an event's first byte, the decoder skips line endings instead of buffering them
+      // The decoder skips line endings before an event
       if (eventSize === 0) {
         continue
       }
@@ -500,7 +482,7 @@ function createEventSizeCheck(eventLimit: number): (chunk: Uint8Array) => boolea
       }
 
       if (trailing === 'line' || (trailing === 'cr' && byte === CR)) {
-        // The blank line is complete, so the decoder releases the event
+        // A blank line: the decoder releases the event
         eventSize = 0
         trailing = 'none'
       }
