@@ -1,5 +1,6 @@
 import type { Promisable } from '@orpc/shared'
 import type { UseQueryFnContext } from './types'
+import { throwIfAborted } from '@orpc/shared'
 
 export interface SerializableStreamedQueryOptions {
   /**
@@ -58,9 +59,7 @@ export function serializableStreamedQuery<T>(
     }
 
     for await (const chunk of stream) {
-      if (signal.aborted) {
-        throw signal.reason
-      }
+      throwIfAborted(signal)
 
       result = limitArraySize([...result, chunk], maxChunks)
 
@@ -71,9 +70,7 @@ export function serializableStreamedQuery<T>(
 
     // A stream can end without throwing when aborted (e.g. server-side or in-process clients),
     // so never resolve the partial buffer as the query data after the fetch was cancelled.
-    if (signal.aborted) {
-      throw signal.reason
-    }
+    throwIfAborted(signal)
 
     return result
   }

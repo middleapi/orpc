@@ -1,5 +1,6 @@
 import type { Promisable } from '@orpc/shared'
 import type { QueryFunction, QueryFunctionContext, QueryKey } from '@tanstack/query-core'
+import { throwIfAborted } from '@orpc/shared'
 
 export interface SerializableStreamedQueryOptions {
   /**
@@ -73,9 +74,7 @@ export function serializableStreamedQuery<
     )
 
     for await (const chunk of stream) {
-      if (context.signal.aborted) {
-        throw context.signal.reason
-      }
+      throwIfAborted(context.signal)
 
       result.push(chunk)
       result = limitArraySize(result, maxChunks)
@@ -90,9 +89,7 @@ export function serializableStreamedQuery<
 
     // A stream can end without throwing when aborted (e.g. server-side or in-process clients),
     // so never write the partial buffer to the cache after the fetch was cancelled.
-    if (context.signal.aborted) {
-      throw context.signal.reason
-    }
+    throwIfAborted(context.signal)
 
     if (!shouldUpdateCacheDuringStream) {
       context.client.setQueryData<Array<TQueryFnData>>(context.queryKey, result)
