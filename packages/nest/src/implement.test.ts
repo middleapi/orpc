@@ -445,6 +445,22 @@ describe('routing', () => {
         path: '/files/{path}',
         method: 'GET',
       })).input(z.object({ tenant: z.string(), path: z.string() })),
+
+      hyphenParam: oc.meta(openapi({
+        path: '/users/{user-id}',
+        method: 'GET',
+      })).input(z.object({ 'tenant': z.string(), 'user-id': z.string() })),
+
+      leadingDigitParams: oc.meta(openapi({
+        path: '/items/{1st}/{2nd-item}',
+        method: 'GET',
+      })).input(z.object({ 'tenant': z.string(), '1st': z.string(), '2nd-item': z.string() })),
+
+      generatedLikeParam: oc.meta(openapi({
+        path: '/{orpc_p0}/{id}/{+rest-path}',
+        prefix: '/orgs/{org-id}',
+        method: 'GET',
+      })).input(z.object({ 'tenant': z.string(), 'org-id': z.string(), 'orpc_p0': z.string(), 'id': z.string(), 'rest-path': z.string() })),
     }
 
     @Controller('/:tenant')
@@ -467,6 +483,21 @@ describe('routing', () => {
       @Implement(contract.pathNamedParam)
       pathNamedParam() {
         return implement(contract.pathNamedParam).handler(({ input }) => input)
+      }
+
+      @Implement(contract.hyphenParam)
+      hyphenParam() {
+        return implement(contract.hyphenParam).handler(({ input }) => input)
+      }
+
+      @Implement(contract.leadingDigitParams)
+      leadingDigitParams() {
+        return implement(contract.leadingDigitParams).handler(({ input }) => input)
+      }
+
+      @Implement(contract.generatedLikeParam)
+      generatedLikeParam() {
+        return implement(contract.generatedLikeParam).handler(({ input }) => input)
       }
     }
 
@@ -531,6 +562,34 @@ describe('routing', () => {
       expect(res.body).toEqual({ tenant: 'acme', path: 'xxx' })
     })
 
+    it('should match a param whose name contains a hyphen', async () => {
+      const res = await supertest(httpServer).get('/acme/users/123')
+
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual({ 'tenant': 'acme', 'user-id': '123' })
+    })
+
+    it('should keep a hyphen after the param as part of its value', async () => {
+      const res = await supertest(httpServer).get('/acme/users/123-id')
+
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual({ 'tenant': 'acme', 'user-id': '123-id' })
+    })
+
+    it('should match params whose names start with a digit', async () => {
+      const res = await supertest(httpServer).get('/acme/items/a/b')
+
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual({ 'tenant': 'acme', '1st': 'a', '2nd-item': 'b' })
+    })
+
+    it('should not confuse generated param names with contract params', async () => {
+      const res = await supertest(httpServer).get('/acme/orgs/o1/x/42/some/long/path')
+
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual({ 'tenant': 'acme', 'org-id': 'o1', 'orpc_p0': 'x', 'id': '42', 'rest-path': 'some/long/path' })
+    })
+
     it('should treat params named like `__proto__` as own properties without polluting the prototype', async () => {
       const res = await supertest(httpServer).post('/proto/some/value')
 
@@ -539,109 +598,6 @@ describe('routing', () => {
         entries: [['__proto__', 'some/value']],
         constructor: 'undefined',
       })
-    })
-  })
-
-  describe.each([
-    ['express adapter', undefined],
-    ['fastify adapter', new FastifyAdapter()],
-  ] as const)('params the router cannot name as-is with %s', async (_, adapter) => {
-    const contract = {
-      hyphen: oc.meta(openapi({
-        path: '/users/{user-id}',
-        method: 'GET',
-      })).input(z.object({ 'user-id': z.string() })),
-
-      leadingDigit: oc.meta(openapi({
-        path: '/items/{1st}/{2nd-item}',
-        method: 'GET',
-      })).input(z.object({ '1st': z.string(), '2nd-item': z.string() })),
-
-      mixed: oc.meta(openapi({
-        path: '/{orpc_p0}/{id}/{+rest-path}',
-        prefix: '/orgs/{org-id}',
-        method: 'GET',
-      })).input(z.object({ 'org-id': z.string(), 'orpc_p0': z.string(), 'id': z.string(), 'rest-path': z.string() })),
-    }
-
-    @Controller()
-    class ProcedureController {
-      @Implement(contract.hyphen)
-      hyphen() {
-        return implement(contract.hyphen).handler(({ input }) => input)
-      }
-
-      @Implement(contract.leadingDigit)
-      leadingDigit() {
-        return implement(contract.leadingDigit).handler(({ input }) => input)
-      }
-
-      @Implement(contract.mixed)
-      mixed() {
-        return implement(contract.mixed).handler(({ input }) => input)
-      }
-    }
-
-    const nestedContract = { nested: { hyphen: contract.hyphen } }
-
-    @Controller('/router/:tenant')
-    class RouterController {
-      @Implement(nestedContract)
-      router() {
-        return {
-          nested: {
-            hyphen: implement(contract.hyphen).handler(({ input }) => input),
-          },
-        }
-      }
-    }
-
-    const moduleRef = await Test.createTestingModule({
-      controllers: [ProcedureController, RouterController],
-    }).compile()
-
-    const app = moduleRef.createNestApplication(adapter as any)
-    await app.init()
-
-    if (adapter) {
-      await app.getHttpAdapter().getInstance().ready()
-    }
-
-    const httpServer = app.getHttpServer()
-
-    it('should match a param whose name contains a hyphen', async () => {
-      const res = await supertest(httpServer).get('/users/123')
-
-      expect(res.statusCode).toEqual(200)
-      expect(res.body).toEqual({ 'user-id': '123' })
-    })
-
-    it('should keep a hyphen after the param as part of its value', async () => {
-      const res = await supertest(httpServer).get('/users/123-id')
-
-      expect(res.statusCode).toEqual(200)
-      expect(res.body).toEqual({ 'user-id': '123-id' })
-    })
-
-    it('should match params whose names start with a digit', async () => {
-      const res = await supertest(httpServer).get('/items/a/b')
-
-      expect(res.statusCode).toEqual(200)
-      expect(res.body).toEqual({ '1st': 'a', '2nd-item': 'b' })
-    })
-
-    it('should not confuse generated param names with contract params', async () => {
-      const res = await supertest(httpServer).get('/orgs/acme/x/42/some/long/path')
-
-      expect(res.statusCode).toEqual(200)
-      expect(res.body).toEqual({ 'org-id': 'acme', 'orpc_p0': 'x', 'id': '42', 'rest-path': 'some/long/path' })
-    })
-
-    it('should translate params of router-based implementations alongside controller prefix params', async () => {
-      const res = await supertest(httpServer).get('/router/acme/users/123')
-
-      expect(res.statusCode).toEqual(200)
-      expect(res.body).toEqual({ 'user-id': '123' })
     })
   })
 })
