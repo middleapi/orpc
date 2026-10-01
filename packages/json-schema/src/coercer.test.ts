@@ -119,6 +119,7 @@ describe('jsonSchemaCoercer', () => {
       // the expanded year form `toISOString` emits outside 0000-9999
       expect(coerce(DATE_SCHEMA, '+010000-01-01T00:00:00.000Z')).toEqual(new Date('+010000-01-01T00:00:00.000Z'))
       expect(coerce(DATE_SCHEMA, '-000001-02-28T00:00:00.000Z')).toEqual(new Date('-000001-02-28T00:00:00.000Z'))
+      expect(coerce(DATE_SCHEMA, '+000000-01-01')).toEqual(new Date('+000000-01-01'))
     })
 
     it('coerces datetimes carrying a UTC offset in either direction', () => {
@@ -142,6 +143,13 @@ describe('jsonSchemaCoercer', () => {
       expect(coerce(DATE_SCHEMA, '2020-1-5')).toBe('2020-1-5')
       expect(coerce(DATE_SCHEMA, '2020-01-5')).toBe('2020-01-5')
       expect(coerce(DATE_SCHEMA, '2020-1-05T06:15Z')).toBe('2020-1-05T06:15Z')
+
+      // only four digit or signed six digit years, V8 reads other forms with its legacy parser
+      expect(coerce(DATE_SCHEMA, '+0001-02-28')).toBe('+0001-02-28')
+      expect(coerce(DATE_SCHEMA, '-0048-02-29')).toBe('-0048-02-29')
+      expect(coerce(DATE_SCHEMA, '10000-01-01')).toBe('10000-01-01')
+      // ISO 8601 has no negative year zero
+      expect(coerce(DATE_SCHEMA, '-000000-02-29')).toBe('-000000-02-29')
 
       // epoch numbers are ambiguous (seconds or milliseconds)
       expect(coerce(DATE_SCHEMA, 1700000000000)).toBe(1700000000000)
@@ -437,6 +445,19 @@ describe('jsonSchemaCoercer', () => {
         anyOf: [
           { type: 'object', properties: { at: DATE_SCHEMA, count: { type: 'number' } }, required: ['at', 'count'] },
           { type: 'null' },
+        ],
+      }
+
+      const at = new Date('2020-01-01T00:00:00.000Z')
+      expect(coerce(schema, { at, count: '1' })).toEqual({ at, count: 1 })
+    })
+
+    it('accepts a native value only under the JSON type it is serialized as', () => {
+      // `type: ['string', 'null']` expands into a `null` branch that keeps `x-native-type`
+      const schema = {
+        anyOf: [
+          { type: 'object', properties: { at: { 'type': 'null', 'x-native-type': 'date' }, count: { type: 'string' } } },
+          { type: 'object', properties: { at: DATE_SCHEMA, count: { type: 'number' } } },
         ],
       }
 

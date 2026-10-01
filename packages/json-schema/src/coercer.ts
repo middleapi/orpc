@@ -19,6 +19,7 @@ const SATISFIED = 2
 type Satisfaction = typeof UNSATISFIED | typeof LOOSELY_SATISFIED | typeof SATISFIED
 
 interface NativeType {
+  types: readonly string[]
   is: (value: unknown) => boolean
   coerce: (value: unknown) => unknown
   afterTypeCheck?: boolean
@@ -26,25 +27,30 @@ interface NativeType {
 
 const NATIVE_TYPES = new Map<unknown, NativeType>([
   [JsonSchemaXNativeType.Date, {
+    types: ['string'],
     is: value => value instanceof Date,
     coerce: value => typeof value === 'string' ? stringToDate(value) : value,
   }],
   [JsonSchemaXNativeType.BigInt, {
+    types: ['string', 'integer', 'number'],
     is: value => typeof value === 'bigint',
     coerce: value => typeof value === 'string'
       ? stringToBigInt(value)
       : typeof value === 'number' ? numberToBigInt(value) : value,
   }],
   [JsonSchemaXNativeType.Url, {
+    types: ['string'],
     is: value => value instanceof URL,
     coerce: value => typeof value === 'string' ? stringToURL(value) : value,
   }],
   [JsonSchemaXNativeType.Set, {
+    types: ['array'],
     is: value => value instanceof Set,
     coerce: value => Array.isArray(value) ? arrayToSet(value) : value,
     afterTypeCheck: true,
   }],
   [JsonSchemaXNativeType.Map, {
+    types: ['array'],
     is: value => value instanceof Map,
     coerce: value => Array.isArray(value) ? arrayToMap(value) : value,
     afterTypeCheck: true,
@@ -142,7 +148,7 @@ export class JsonSchemaCoercer {
       coerced = nativeType.coerce(coerced)
     }
 
-    if (schema.type && !nativeType?.is(coerced)) {
+    if (schema.type && !(nativeType?.types.includes(schema.type) && nativeType.is(coerced))) {
       switch (schema.type) {
         case 'null': {
           if (coerced !== null) {
@@ -424,7 +430,7 @@ function stringToBoolean(value: string): boolean | string {
   return value
 }
 
-const DATE_TIME_PATTERN = /^([+-]?\d{4,6})-(\d{2})-(\d{2})(?:[T ].*)?$/
+const DATE_TIME_PATTERN = /^(\d{4}|\+\d{6}|-(?!0{6})\d{6})-(\d{2})-(\d{2})(?:[T ].*)?$/
 function stringToDate(value: string): Date | string {
   const match = DATE_TIME_PATTERN.exec(value)
 
