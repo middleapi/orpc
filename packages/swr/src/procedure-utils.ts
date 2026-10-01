@@ -110,10 +110,6 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
             throw new TypeError('.subscriber requires an AsyncIteratorObject output')
           }
 
-          /**
-           * Iterators that ignore the signal keep yielding after unsubscribe, so check it
-           * before every write, or a stale subscription (like a StrictMode double mount) writes too.
-           */
           if (controller.signal.aborted) {
             await iterator.return?.()
             return
@@ -217,9 +213,6 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
           }
 
           for await (const event of iterator) {
-            /**
-             * Iterators that ignore the signal keep yielding after unsubscribe.
-             */
             if (controller.signal.aborted) {
               break
             }
