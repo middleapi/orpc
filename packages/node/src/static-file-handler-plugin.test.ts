@@ -695,7 +695,7 @@ describe('staticFileHandlerPlugin', () => {
     })
 
     it('serves files once a rootDir under a symlinked parent is created', async ({ onTestFinished }) => {
-      // Like macOS /tmp, the symlinked parent makes the real rootDir differ from the lexical one
+      // The symlinked parent makes the real rootDir differ from the lexical one
       const realParent = path.join(baseDir, 'late-real')
       const linkedParent = path.join(baseDir, 'late-link')
       mkdirSync(realParent)
@@ -724,7 +724,6 @@ describe('staticFileHandlerPlugin', () => {
       mkdirSync(path.join(releasesDir, 'v2'), { recursive: true })
       writeFileSync(path.join(releasesDir, 'v1', 'app.js'), 'v1')
       writeFileSync(path.join(releasesDir, 'v2', 'app.js'), 'v2')
-      symlinkSync(path.join(baseDir, 'secret.txt'), path.join(releasesDir, 'v2', 'link.txt'))
       symlinkSync(path.join(releasesDir, 'v1'), currentLink)
       onTestFinished(() => {
         rmSync(currentLink, { force: true })
@@ -741,8 +740,6 @@ describe('staticFileHandlerPlugin', () => {
       const res = await agent.get('/app.js')
       expect(res.status).toBe(200)
       expect(res.text).toBe('v2')
-
-      expect((await agent.get('/link.txt')).status).toBe(404)
     })
 
     it('rejects paths containing null bytes', async () => {

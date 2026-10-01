@@ -211,23 +211,17 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
 
     const realPath = await realpath(filePath).catch(() => undefined)
 
-    // Checked first, so missing files do not re-resolve the root
-    if (realPath === undefined) {
-      return undefined
-    }
-
-    if (isWithin(realPath, await this.rootDirReal)) {
+    if (realPath === undefined || isWithin(realPath, await this.rootDirReal)) {
       return realPath
     }
 
-    // The root may have been created or re-pointed since it was resolved
     this.rootDirReal = this.resolveRootDirReal()
 
     return isWithin(realPath, await this.rootDirReal) ? realPath : undefined
   }
 
   private resolveRootDirReal(): Promise<string> {
-    // A real path has no links, so it can only be within the lexical fallback when the two match
+    // Safe, since a real path can only be within a lexical root that has no links
     return realpath(this.rootDir).catch(() => this.rootDir)
   }
 
