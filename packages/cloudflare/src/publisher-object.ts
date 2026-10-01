@@ -80,10 +80,11 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
   }
 
   private async handlePublish(request: Request): Promise<Response> {
-    let stringifiedPayload = await request.text()
+    const body = await request.arrayBuffer()
+    let stringifiedPayload = new TextDecoder().decode(body)
 
     try {
-      stringifiedPayload = this.resumeStorage.store(stringifiedPayload)
+      stringifiedPayload = this.resumeStorage.store(stringifiedPayload, body.byteLength)
     }
     catch (e) {
       console.error('Failed to store published event:', e)
@@ -119,8 +120,7 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
 
     /**
      * Replayed events are the first messages on the socket, since nothing runs between
-     * reading them and sending them. `DurablePublisher` waits for this many messages before
-     * resolving the subscription, so the whole backlog is delivered by then.
+     * reading and sending them, so their count tells `DurablePublisher` where the replay ends.
      */
     return new Response(null, {
       status: 101,
@@ -162,8 +162,9 @@ class ResumeStorage {
   private lastCleanupTime: number | undefined
 
   /**
-   * Prefixes every event id. It changes whenever the events table is recreated, which
-   * restarts AUTOINCREMENT, so an id from before that is recognized as stale.
+   * Prefixes every event id. Any newly created events table restarts AUTOINCREMENT at 1,
+   * whether it is the first one or replaces a dropped or wiped one, so it gets a new
+   * generation and ids issued before it are recognized as stale.
    */
   private generation: string | undefined
 
@@ -180,17 +181,18 @@ class ResumeStorage {
 
   /**
    * Store an event and return the updated serialized message with an assigned ID.
+   * `byteLength` is the payload's size as UTF-8, which is how SQLite stores it.
    *
-   * @throws {PayloadTooLargeError} if `stringifiedPayload` is too large to store.
+   * @throws {PayloadTooLargeError} if the payload is too large to store.
    * @throws if `stringifiedPayload` is not a JSON object with an optional object `meta`,
    * or if the insert fails, even after a schema reset retry.
    */
-  store(stringifiedPayload: string): string {
+  store(stringifiedPayload: string, byteLength: number): string {
     if (!this.enabled) {
       return stringifiedPayload
     }
 
-    if (exceedsUtf8ByteLength(stringifiedPayload, MAX_STORED_PAYLOAD_BYTES)) {
+    if (byteLength > MAX_STORED_PAYLOAD_BYTES) {
       throw new PayloadTooLargeError(`Event payload exceeds ${MAX_STORED_PAYLOAD_BYTES} bytes`)
     }
 
@@ -212,12 +214,11 @@ class ResumeStorage {
         stringifiedPayload,
       )
 
-      return result.one().id as string
+      return stringifyJSON(this.attachEventId(payload, result.one().id as string))
     }
 
-    let id: string
     try {
-      id = insertEvent()
+      return insertEvent()
     }
     catch (e) {
       if (!isUnusableTableError(e)) {
@@ -226,17 +227,14 @@ class ResumeStorage {
 
       /**
        * The table cannot take more events (ID overflow, disk full, corruption, or a
-       * mismatched schema), so drop it and retry once. Stored events are lost, and
-       * the new generation makes clients resuming from an older id replay the new
-       * events from the start. If the retry also fails, the error propagates to the
+       * mismatched schema), so drop it and retry once. May cause data loss, but prevents
+       * total failure. If the retry also fails, the error propagates to the
        * caller so it can be surfaced as a clean error response.
        */
       console.error('Failed to insert event, resetting resume storage schema.', e)
       this.resetSchema()
-      id = insertEvent()
+      return insertEvent()
     }
-
-    return stringifyJSON(this.attachEventId(payload, id))
   }
 
   /**
@@ -250,10 +248,7 @@ class ResumeStorage {
 
     this.ensureSchemaAndCleanup()
 
-    /**
-     * An id from another generation (or not issued here at all) predates the current
-     * table, so every stored event is newer than it.
-     */
+    // An id from another generation (or not issued here) predates this table, so replay everything
     const match = /^([\da-f]+)-(\d+)$/.exec(lastEventId)
     const afterId = match !== null && match[1] === this.generation ? match[2]! : '0'
 
@@ -338,19 +333,14 @@ class ResumeStorage {
 
       const isNewTable = initTableResult.rowsWritten > 0
 
-      /**
-       * A new table restarts AUTOINCREMENT at 1, whether it is the first one or replaces
-       * a dropped or wiped one, so it always gets a new generation. The generation is
-       * stored so it survives evictions, and `deleteAll` clears it along with the table.
-       */
+      // Stored so it survives evictions, and `deleteAll` clears it along with the table
       const generationKey = `${this.schemaPrefix}generation`
-      let generation = isNewTable ? undefined : this.ctx.storage.kv.get<string>(generationKey)
-      if (generation === undefined) {
-        generation = createGeneration()
-        this.ctx.storage.kv.put(generationKey, generation)
+      this.generation = isNewTable ? undefined : this.ctx.storage.kv.get<string>(generationKey)
+      if (this.generation === undefined) {
+        this.generation = createGeneration()
+        this.ctx.storage.kv.put(generationKey, this.generation)
       }
 
-      this.generation = generation
       this.isInitedSchema = true
 
       if (isNewTable) {
@@ -409,22 +399,6 @@ class ResumeStorage {
 
 function isSerializedPayload(value: unknown): value is SerializedPayload {
   return isPlainObject(value) && (value.meta === undefined || value.meta === null || isPlainObject(value.meta))
-}
-
-/**
- * Whether `value` takes more than `maxBytes` bytes as UTF-8, which is how SQLite stores TEXT.
- */
-function exceedsUtf8ByteLength(value: string, maxBytes: number): boolean {
-  // Each UTF-16 code unit takes 1 to 3 bytes, so most payloads skip encoding
-  if (value.length * 3 <= maxBytes) {
-    return false
-  }
-
-  if (value.length > maxBytes) {
-    return true
-  }
-
-  return new TextEncoder().encode(value).byteLength > maxBytes
 }
 
 /**

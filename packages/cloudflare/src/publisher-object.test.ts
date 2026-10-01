@@ -367,56 +367,34 @@ describe('durable publisher object', () => {
     })
   })
 
-  it('resets resume storage when the id reaches the max value', async () => {
-    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    expect((await publish(stub, { data: { text: 'initial' } })).status).toBe(204)
-    await runInDurableObject(stub, async (_, state) => {
-      state.storage.sql.exec(
+  it.each([
+    ['the id reaches the max value', 'SQLITE_FULL', '9223372036854775807', (sql: SqlStorage) => {
+      sql.exec(
         'INSERT INTO "prefix:events" (id, payload) VALUES (?, ?)',
         '9223372036854775807',
         JSON.stringify({ data: { text: 'before-overflow' } }),
       )
-    })
-    const oldGeneration = await getGeneration(stub)
-
-    expect((await publish(stub, { data: { text: 'recovered' } })).status).toBe(204)
-    expect(consoleError).toHaveBeenCalled()
-
-    const newGeneration = await getGeneration(stub)
-    expect(newGeneration).not.toBe(oldGeneration)
-
-    // the recreated table restarts ids at 1, so the last id seen before the reset must not hide it
-    const resumeSubscriber = await openSocket(stub, `${oldGeneration}-9223372036854775807`)
-
-    expect(await readMessages(resumeSubscriber, 1)).toEqual([{
-      data: { text: 'recovered' },
-      meta: { id: `${newGeneration}-1` },
-    }])
-
-    await closeSocket(resumeSubscriber)
-  })
-
-  it('recreates the events table when it disappears under a running object', async () => {
+    }],
+    ['the table disappears under a running object', 'no such table', '1', (sql: SqlStorage) => {
+      sql.exec('DROP TABLE "prefix:events"')
+    }],
+  ])('recreates the events table when %s', async (_name, loggedError, lastSeenId, breakTable) => {
     const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     expect((await publish(stub, { data: { text: 'initial' } })).status).toBe(204)
     const oldGeneration = await getGeneration(stub)
-
-    await runInDurableObject(stub, async (_, state) => {
-      state.storage.sql.exec('DROP TABLE "prefix:events"')
-    })
+    await runInDurableObject(stub, async (_, state) => breakTable(state.storage.sql))
 
     expect((await publish(stub, { data: { text: 'recovered' } })).status).toBe(204)
     expect(consoleError).toHaveBeenCalledTimes(1)
-    expect(consoleError.mock.calls[0]![1].message).toContain('no such table')
+    expect(consoleError.mock.calls[0]![1].message).toContain(loggedError)
 
     const newGeneration = await getGeneration(stub)
     expect(newGeneration).not.toBe(oldGeneration)
 
-    const resumeSubscriber = await openSocket(stub, `${oldGeneration}-1`)
+    // the recreated table restarts ids at 1, so the last id seen before it must not hide the new events
+    const resumeSubscriber = await openSocket(stub, `${oldGeneration}-${lastSeenId}`)
 
     expect(await readMessages(resumeSubscriber, 1)).toEqual([{
       data: { text: 'recovered' },

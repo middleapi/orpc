@@ -138,8 +138,8 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
         )
       }
 
-      if (!replayFailed && pendingReplayedEvents > 0 && --pendingReplayedEvents === 0) {
-        replayed.resolve()
+      if (pendingReplayedEvents > 0 && --pendingReplayedEvents === 0) {
+        replayed.resolve() // no-op if the replay already failed
       }
     })
 

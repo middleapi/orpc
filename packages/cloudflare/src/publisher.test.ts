@@ -316,13 +316,23 @@ describe('durable publisher', () => {
   describe('while replaying missed events', () => {
     const serializer = new RPCJsonSerializer()
 
+    function setup(headers: HeadersInit) {
+      const socket = makeSocket()
+      return { socket, publisher: new DurablePublisher<any>(makeNamespace(socket, headers)) }
+    }
+
+    async function waitForAccept(socket: MockSocket) {
+      await vi.waitFor(() => {
+        expect(socket.accepted).toBe(true)
+      })
+    }
+
     function sendEvent(socket: MockSocket, text: string) {
       socket.sendMessage(JSON.stringify({ data: serializer.serialize({ text }) }))
     }
 
     it('resolves only once every event the durable object announced has arrived', async () => {
-      const socket = makeSocket()
-      const publisher = new DurablePublisher<any>(makeNamespace(socket, { 'orpc-replayed-events': '3' }))
+      const { socket, publisher } = setup({ 'orpc-replayed-events': '3' })
       const listener = vi.fn()
       const onError = vi.fn()
 
@@ -332,9 +342,7 @@ describe('durable publisher', () => {
         return unsubscribe
       })
 
-      await vi.waitFor(() => {
-        expect(socket.accepted).toBe(true)
-      })
+      await waitForAccept(socket)
 
       sendEvent(socket, 'missed 1')
       socket.sendMessage('not-json') // still one of the replayed messages
@@ -359,16 +367,13 @@ describe('durable publisher', () => {
       ['closes abnormally', (socket: MockSocket) => socket.sendClose(1011, 'crashed'), 'WebSocket closed unexpectedly: 1011 crashed'],
       ['errors', (socket: MockSocket) => socket.sendError(), 'Subscription websocket error'],
     ])('rejects when the socket %s before the replay finishes', async (_, fail, message) => {
-      const socket = makeSocket()
-      const publisher = new DurablePublisher<any>(makeNamespace(socket, { 'orpc-replayed-events': '2' }))
+      const { socket, publisher } = setup({ 'orpc-replayed-events': '2' })
       const listener = vi.fn()
       const onError = vi.fn()
 
       const subscription = publisher.subscribe('message', listener, { lastEventId: '0', onError })
 
-      await vi.waitFor(() => {
-        expect(socket.accepted).toBe(true)
-      })
+      await waitForAccept(socket)
 
       sendEvent(socket, 'missed 1')
       fail(socket)
@@ -380,14 +385,10 @@ describe('durable publisher', () => {
     })
 
     it('ends an iterator subscriber with the error', async () => {
-      const socket = makeSocket()
-      const publisher = new DurablePublisher<any>(makeNamespace(socket, { 'orpc-replayed-events': '2' }))
-
+      const { socket, publisher } = setup({ 'orpc-replayed-events': '2' })
       const iterator = publisher.subscribe('message', { lastEventId: '0' })
 
-      await vi.waitFor(() => {
-        expect(socket.accepted).toBe(true)
-      })
+      await waitForAccept(socket)
 
       sendEvent(socket, 'missed 1')
       socket.sendClose(1000, 'done')
@@ -403,9 +404,7 @@ describe('durable publisher', () => {
       ['a negative', { 'orpc-replayed-events': '-1' }],
       ['a fractional', { 'orpc-replayed-events': '1.5' }],
     ])('resolves right away when the durable object announces %s count', async (_, headers) => {
-      const socket = makeSocket()
-      const publisher = new DurablePublisher<any>(makeNamespace(socket, headers))
-
+      const { socket, publisher } = setup(headers)
       const unsubscribe = await publisher.subscribe('message', vi.fn(), { lastEventId: '0' })
 
       expect(socket.accepted).toBe(true)
