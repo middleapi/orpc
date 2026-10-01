@@ -70,50 +70,44 @@ describe('encrypt/decrypt', () => {
     expect(await decrypt(null, 'secret')).toBeUndefined()
   })
 
-  it('should decrypt compatibility fixtures from previous releases', async () => {
-    const fixtures = [
-      {
-        value: 'compatibility-value',
-        secret: 'compatibility-encryption-secret',
-        encrypted: 'hbSNaYOIGOVnapa2UgZgzHgNr6ARf1zWk-3cNWhDBwsFOnQ9S4IZR5uUdqIM-WbTRAfryalkWnHJD8voMh5y',
-      },
-      {
-        value: '',
-        secret: 'compatibility-encryption-secret',
-        encrypted: '5IXfizzzaGLhausAUKPlg4JBoyYnbKqa5qdVnLFVPMY8YWZfh0ouEFrZGQw',
-      },
-      {
-        value: 'value.with.dots-🚀-中文',
-        secret: 'compatibility-encryption-secret',
-        encrypted: 'xLe6faWGA5J3MUy-Cue5_mZXiJVlrzqKho8ywwhlCHbO4koT4XT3MxzesdTMLxZIAS6pPJLfU4qKKcZHwOwAAU5RHP-sMp8',
-      },
-    ] as const
+  const fixtures = [
+    {
+      value: 'compatibility-value',
+      secret: 'compatibility-encryption-secret',
+      encrypted: 'hbSNaYOIGOVnapa2UgZgzHgNr6ARf1zWk-3cNWhDBwsFOnQ9S4IZR5uUdqIM-WbTRAfryalkWnHJD8voMh5y',
+    },
+    {
+      value: '',
+      secret: 'compatibility-encryption-secret',
+      encrypted: '5IXfizzzaGLhausAUKPlg4JBoyYnbKqa5qdVnLFVPMY8YWZfh0ouEFrZGQw',
+    },
+    {
+      value: 'value.with.dots-🚀-中文',
+      secret: 'compatibility-encryption-secret',
+      encrypted: 'xLe6faWGA5J3MUy-Cue5_mZXiJVlrzqKho8ywwhlCHbO4koT4XT3MxzesdTMLxZIAS6pPJLfU4qKKcZHwOwAAU5RHP-sMp8',
+    },
+  ] as const
 
+  it('should decrypt compatibility fixtures from previous releases', async () => {
     for (const fixture of fixtures) {
       expect(await decrypt(fixture.encrypted, fixture.secret)).toBe(fixture.value)
     }
   })
 
   describe('non-canonical encodings', () => {
-    const fixtureSecret = 'compatibility-encryption-secret'
     // length % 4 === 3, so the last char has 2 unused bits
-    const encryptedEmpty = '5IXfizzzaGLhausAUKPlg4JBoyYnbKqa5qdVnLFVPMY8YWZfh0ouEFrZGQw'
+    const empty = fixtures[1]
     // contains both `-` and `_`
-    const encryptedWithUrlChars = 'xLe6faWGA5J3MUy-Cue5_mZXiJVlrzqKho8ywwhlCHbO4koT4XT3MxzesdTMLxZIAS6pPJLfU4qKKcZHwOwAAU5RHP-sMp8'
-
-    it('should accept the canonical encoding', async () => {
-      expect(await decrypt(encryptedEmpty, fixtureSecret)).toBe('')
-      expect(await decrypt(encryptedWithUrlChars, fixtureSecret)).toBe('value.with.dots-🚀-中文')
-    })
+    const withUrlChars = fixtures[2]
 
     it.each([
-      ['non-zero unused bits in the last char', `${encryptedEmpty.slice(0, -1)}x`],
-      ['padding', `${encryptedEmpty}=`],
-      ['leading whitespace', ` ${encryptedEmpty}`],
-      ['embedded whitespace', `${encryptedEmpty.slice(0, 20)} ${encryptedEmpty.slice(20)}`],
-      ['raw + and /', encryptedWithUrlChars.replace(/-/g, '+').replace(/_/g, '/')],
-    ])('should reject %s', async (_, input) => {
-      expect(await decrypt(input, fixtureSecret)).toBeUndefined()
+      ['non-zero unused bits in the last char', empty, `${empty.encrypted.slice(0, -1)}x`],
+      ['padding', empty, `${empty.encrypted}=`],
+      ['leading whitespace', empty, ` ${empty.encrypted}`],
+      ['embedded whitespace', empty, `${empty.encrypted.slice(0, 20)} ${empty.encrypted.slice(20)}`],
+      ['raw + and /', withUrlChars, withUrlChars.encrypted.replace(/-/g, '+').replace(/_/g, '/')],
+    ])('should reject %s', async (_, fixture, input) => {
+      expect(await decrypt(input, fixture.secret)).toBeUndefined()
     })
   })
 })

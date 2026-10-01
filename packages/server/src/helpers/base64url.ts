@@ -28,8 +28,6 @@ export function encodeBase64url(data: Uint8Array): string {
     .replace(/=/g, '')
 }
 
-const BASE64URL_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
-
 /**
  * Decodes a base64url string to Uint8Array
  * Returns undefined if the input is invalid
@@ -49,40 +47,33 @@ const BASE64URL_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
  * @see {@link https://orpc.dev/docs/helpers/base64url | Base64Url Helpers}
  */
 export function decodeBase64url(base64url: string | undefined | null): Uint8Array<ArrayBuffer> | undefined {
-  if (typeof base64url !== 'string' || !/^[\w-]*$/.test(base64url)) {
-    return undefined
-  }
-
-  const remainder = base64url.length % 4
-
-  // A single leftover character cannot encode a whole byte
-  if (remainder === 1) {
-    return undefined
-  }
-
-  // The last character carries bits past the final byte (4 bits when remainder is 2,
-  // 2 bits when remainder is 3). `atob` ignores them, so require them to be zero.
-  if (remainder !== 0) {
-    const lastValue = BASE64URL_ALPHABET.indexOf(base64url.charAt(base64url.length - 1))
-    const unusedBitsMask = remainder === 2 ? 0b1111 : 0b11
-
-    if ((lastValue & unusedBitsMask) !== 0) {
+  try {
+    if (typeof base64url !== 'string') {
       return undefined
     }
+
+    let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/')
+
+    while (base64.length % 4) {
+      base64 += '='
+    }
+
+    const binaryString = atob(base64)
+
+    const bytes = new Uint8Array(binaryString.length)
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i)
+    }
+
+    // `atob` is lenient (padding, whitespace, `+`/`/`, non-zero unused bits),
+    // so only accept the input if it is exactly what the encoder would produce
+    if (encodeBase64url(bytes) !== base64url) {
+      return undefined
+    }
+
+    return bytes
   }
-
-  let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/')
-
-  while (base64.length % 4) {
-    base64 += '='
+  catch {
+    return undefined
   }
-
-  const binaryString = atob(base64)
-
-  const bytes = new Uint8Array(binaryString.length)
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i)
-  }
-
-  return bytes
 }

@@ -1218,7 +1218,7 @@ The `@orpc/server/hibernation` subpath became the `@orpc/hibernation` package. `
 
 ## Helpers
 
-Base64Url, Cookie, Encryption, and Signing helpers are unchanged in `@orpc/server/helpers`.
+Base64Url, Cookie, Encryption, and Signing helpers are unchanged in `@orpc/server/helpers`, except that `decodeBase64url` now only accepts the canonical form `encodeBase64url` produces and returns `undefined` for padding, whitespace, or standard base64 `+`/`/` characters. Values produced by `sign` and `encrypt` are unaffected.
 
 ### Publisher
 

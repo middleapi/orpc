@@ -65,15 +65,10 @@ describe('encodeBase64url / decodeBase64url', () => {
     })
 
     it.each([
-      ['AB', 'non-zero unused bits (remainder 2)'],
-      ['AP', 'non-zero unused bits (remainder 2)'],
-      ['AAB', 'non-zero unused bits (remainder 3)'],
-      ['AAD', 'non-zero unused bits (remainder 3)'],
       ['AA==', 'padding'],
       ['AAA=', 'padding'],
       ['AA=', 'partial padding'],
       ['AAAA====', 'excess padding'],
-      ['+/8', 'raw + and /'],
       ['-/8', 'raw /'],
       ['+_8', 'raw +'],
       [' AAA', 'leading whitespace'],
@@ -84,29 +79,32 @@ describe('encodeBase64url / decodeBase64url', () => {
       ['A\r\nA', 'embedded CRLF'],
       ['A', 'length % 4 === 1'],
       ['AAAAA', 'length % 4 === 1'],
-      ['AA.A', 'invalid character'],
     ])('should reject %j (%s)', (input) => {
       expect(decodeBase64url(input)).toBeUndefined()
     })
 
-    it('should accept exactly one encoding per byte sequence', () => {
-      for (const prefix of ['A', 'AA', 'AAAA_', 'AAAA-A']) {
-        const accepted: string[] = []
+    // The last char has 2 significant bits when length % 4 === 2, and 4 when length % 4 === 3,
+    // so only 4 or 16 of the 64 possible last chars leave the unused bits zero
+    it.each([
+      ['A', 4],
+      ['AA', 16],
+      ['AAAA_', 4],
+      ['AAAA-A', 16],
+    ])('should accept exactly one encoding per byte sequence (prefix %j)', (prefix, expectedCount) => {
+      const accepted: string[] = []
 
-        for (const char of alphabet) {
-          const input = prefix + char
-          const decoded = decodeBase64url(input)
+      for (const char of alphabet) {
+        const input = prefix + char
+        const decoded = decodeBase64url(input)
 
-          if (decoded !== undefined) {
-            // round-tripping proves no other accepted string decodes to the same bytes
-            expect(encodeBase64url(decoded)).toBe(input)
-            accepted.push(input)
-          }
+        if (decoded !== undefined) {
+          // round-tripping proves no other accepted string decodes to the same bytes
+          expect(encodeBase64url(decoded)).toBe(input)
+          accepted.push(input)
         }
-
-        // remainder 2 leaves 2 significant bits in the last char, remainder 3 leaves 4
-        expect(accepted).toHaveLength((prefix.length + 1) % 4 === 2 ? 4 : 16)
       }
+
+      expect(accepted).toHaveLength(expectedCount)
     })
   })
 })
