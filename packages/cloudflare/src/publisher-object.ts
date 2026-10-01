@@ -128,7 +128,7 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
 
 interface SerializedPayload {
   data: unknown
-  meta?: EventMeta | null
+  meta?: EventMeta
 }
 
 class ResumeStorage {
@@ -349,7 +349,7 @@ class ResumeStorage {
 }
 
 function isSerializedPayload(value: unknown): value is SerializedPayload {
-  return isPlainObject(value) && (value.meta === undefined || value.meta === null || isPlainObject(value.meta))
+  return isPlainObject(value) && (value.meta === undefined || isPlainObject(value.meta))
 }
 
 function isUnusableTableError(error: unknown): boolean {
