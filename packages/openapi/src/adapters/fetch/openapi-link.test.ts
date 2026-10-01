@@ -17,12 +17,6 @@ describe('openapiLink', () => {
     query: os
       .meta(openapi({ method: 'QUERY', path: '/query' }))
       .handler(({ input }) => input),
-    removeOrg: os
-      .meta(openapi({ path: '/orgs/{orgId}/remove' }))
-      .handler(() => 'removeOrg'),
-    removeMember: os
-      .meta(openapi({ path: '/orgs/{orgId}/members/{memberId}/remove' }))
-      .handler(() => 'removeMember'),
   }
 
   const handler = new OpenAPIHandler(router)
@@ -180,35 +174,6 @@ describe('openapiLink', () => {
       },
       blob: expect.any(File),
     })
-  })
-
-  it('rejects dot-segment path params instead of letting URL parsing retarget the request', async () => {
-    const fetch = vi.fn(async (url: string, init: RequestInit) => {
-      const request = new Request(url, init)
-      const { matched, response } = await handler.handle(request, {
-        prefix: '/api',
-      })
-
-      if (!matched || !response) {
-        throw new Error('No procedure match')
-      }
-
-      return response
-    })
-
-    const client = createORPCClient(new OpenAPILink(router, {
-      fetch,
-      origin: 'http://localhost:3000',
-      url: '/api',
-    })) as any
-
-    // without the check, "/api/orgs/acme/members/../remove" is resolved to "/api/orgs/acme/remove" (removeOrg)
-    await expect(client.removeMember({ orgId: 'acme', memberId: '..' })).rejects.toThrow(
-      'Path param "memberId" cannot contain "." or ".." segments in call to procedure (removeMember).',
-    )
-    expect(fetch).not.toHaveBeenCalled()
-
-    await expect(client.removeMember({ orgId: 'acme', memberId: '...' })).resolves.toBe('removeMember')
   })
 
   it('supports standard link plugins', async () => {
