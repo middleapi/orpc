@@ -92,11 +92,8 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
       })
     }
 
-    /**
-     * The Durable Object sends the events missed since `lastEventId` as the first messages
-     * and reports how many in this header. The subscription resolves only once they have
-     * all reached the listener, as `Publisher.subscribe` expects of adapters.
-     */
+    // The Durable Object sends missed events first and their count in this header, and
+    // `Publisher.subscribe` expects them all to reach the listener before this resolves
     const replayedEvents = Number(response.headers.get('orpc-replayed-events'))
     let pendingReplayedEvents = Number.isInteger(replayedEvents) && replayedEvents > 0 ? replayedEvents : 0
     let replayFailed = false

@@ -88,8 +88,7 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
     catch (e) {
       console.error('Failed to store published event:', e)
 
-      // SQLite enforces the platform's size limit, so it stays accurate as the limit changes
-      if (e instanceof Error && e.message.includes('SQLITE_TOOBIG')) {
+      if (isPayloadTooLargeError(e)) {
         return new Response('Event payload too large', { status: 413 })
       }
 
@@ -205,10 +204,9 @@ class ResumeStorage {
       }
 
       /**
-       * The table cannot take more events (ID overflow, disk full, corruption, or a
-       * mismatched schema), so drop it and retry once. May cause data loss, but prevents
-       * total failure. If the retry also fails, the error propagates to the
-       * caller so it can be surfaced as a clean error response.
+       * Drop the unusable table and retry once. May cause data loss, but prevents total
+       * failure. If the retry also fails, the error propagates to the caller so it can be
+       * surfaced as a clean error response.
        */
       console.error('Failed to insert event, resetting resume storage schema.', e)
       this.resetSchema()
@@ -234,10 +232,9 @@ class ResumeStorage {
      * The alias must not be `id`: SQLite resolves ORDER BY to an output
      * alias before a table column, which would sort ids as text.
      *
-     * Only events after `lastEventId` are replayed, so a subscriber never gets an
-     * event twice or out of order. Ids restart at 1 once the table is wiped, so a
-     * subscriber resuming from an older id may miss the events published since, and
-     * an id that is not a number replays nothing, since SQLite sorts text after integers.
+     * Only events after `lastEventId` are replayed, never one twice or out of order. Ids
+     * restart at 1 after a reset, so an older id may miss events, and a non-numeric one
+     * replays nothing (SQLite sorts text after integers).
      */
     const result = this.ctx.storage.sql.exec(`
       SELECT CAST(id AS TEXT) AS event_id, payload
@@ -376,7 +373,13 @@ function isSerializedPayload(value: unknown): value is SerializedPayload {
  * corruption, or a table that was dropped or has a different schema.
  */
 function isUnusableTableError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error)
+  return /SQLITE_(?:FULL|CORRUPT|NOTADB)|no such table|no such column|has no column named/.test(String(error))
+}
 
-  return /SQLITE_(?:FULL|CORRUPT|NOTADB)|no such table|no such column|has no column named/.test(message)
+/**
+ * Whether an insert failed because the payload is over the SQLite row size limit, which
+ * SQLite enforces so it always matches the platform's current limit.
+ */
+function isPayloadTooLargeError(error: unknown): boolean {
+  return String(error).includes('SQLITE_TOOBIG')
 }
