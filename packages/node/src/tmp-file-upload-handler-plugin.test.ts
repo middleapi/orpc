@@ -869,6 +869,8 @@ describe('tmpFileUploadHandlerPlugin', () => {
 
     const boundary = 'X-TEST-BOUNDARY'
     const multipartHeaders = { 'content-type': `multipart/form-data; boundary=${boundary}` }
+    const eventStreamHeaders = { 'content-type': 'text/event-stream' }
+    const octetStreamHeaders = { 'content-type': 'application/octet-stream', 'standard-server': 'octet-stream' }
 
     /**
      * Serializes parts by hand, so each part's exact cost is known.
@@ -886,6 +888,17 @@ describe('tmpFileUploadHandlerPlugin', () => {
 
     function sum(values: number[]): number {
       return values.reduce((total, value) => total + value, 0)
+    }
+
+    /**
+     * Reads a streamed body to its end, as a procedure consuming it would.
+     */
+    async function collect<T>(body: unknown): Promise<T[]> {
+      const items: T[] = []
+      for await (const item of body as AsyncIterable<T>) {
+        items.push(item)
+      }
+      return items
     }
 
     /**
@@ -1115,29 +1128,21 @@ describe('tmpFileUploadHandlerPlugin', () => {
       // A raw stream fails at the reader once the limit is crossed
       await runThroughPlugin({
         limits: { stream: 64 },
-        headers: { 'content-type': 'application/octet-stream', 'standard-server': 'octet-stream' },
+        headers: octetStreamHeaders,
         body: Buffer.alloc(4096, 7),
         inspect: async (body) => {
-          const reader = (body as ReadableStream<Uint8Array>).getReader()
-
-          await expect((async () => {
-            while (!(await reader.read()).done);
-          })()).rejects.toSatisfy(expectPayloadTooLarge)
+          await expect(collect(body)).rejects.toSatisfy(expectPayloadTooLarge)
         },
       })
 
-      // Under the limit the bytes pass through unchanged
+      // Under the limit the bytes pass through unchanged, and chunks reach the procedure without buffering, so memory never applies
       const content = Buffer.alloc(64, 7)
       await runThroughPlugin({
-        limits: { stream: 1024 },
-        headers: { 'content-type': 'application/octet-stream', 'standard-server': 'octet-stream' },
+        limits: { memory: 1, stream: 1024 },
+        headers: octetStreamHeaders,
         body: content,
         inspect: async (body) => {
-          const chunks: Buffer[] = []
-          for await (const chunk of body as ReadableStream<Uint8Array>) {
-            chunks.push(Buffer.from(chunk))
-          }
-          expect(Buffer.concat(chunks).equals(content)).toBe(true)
+          expect(Buffer.concat(await collect<Uint8Array>(body)).equals(content)).toBe(true)
         },
       })
     })
@@ -1147,26 +1152,19 @@ describe('tmpFileUploadHandlerPlugin', () => {
 
       await runThroughPlugin({
         limits: { stream: 1024 },
-        headers: { 'content-type': 'text/event-stream' },
+        headers: eventStreamHeaders,
         body: events,
         inspect: async (body) => {
-          const received: unknown[] = []
-          for await (const event of body as AsyncIterable<unknown>) {
-            received.push(event)
-          }
-          expect(received).toEqual(['one', 'two'])
+          expect(await collect(body)).toEqual(['one', 'two'])
         },
       })
 
       await runThroughPlugin({
         limits: { stream: 8 },
-        headers: { 'content-type': 'text/event-stream' },
+        headers: eventStreamHeaders,
         body: events,
         inspect: async (body) => {
-          await expect((async () => {
-            // eslint-disable-next-line no-empty
-            for await (const _ of body as AsyncIterable<unknown>) {}
-          })()).rejects.toSatisfy(expectPayloadTooLarge)
+          await expect(collect(body)).rejects.toSatisfy(expectPayloadTooLarge)
         },
       })
     })
@@ -1179,29 +1177,22 @@ describe('tmpFileUploadHandlerPlugin', () => {
       // Each event is buffered on its own, so the limit applies per event rather than to the total
       await runThroughPlugin({
         limits: { memory: largest },
-        headers: { 'content-type': 'text/event-stream' },
+        headers: eventStreamHeaders,
         body,
         chunkSize: 1,
         inspect: async (body) => {
-          const received: unknown[] = []
-          for await (const event of body as AsyncIterable<unknown>) {
-            received.push(event)
-          }
-          expect(received).toEqual(['one', 'two', 'three'])
+          expect(await collect(body)).toEqual(['one', 'two', 'three'])
         },
       })
 
       // Reading every event as soon as it arrives does not help, since the decoder buffers until the blank line
       await runThroughPlugin({
         limits: { memory: largest - 1 },
-        headers: { 'content-type': 'text/event-stream' },
+        headers: eventStreamHeaders,
         body,
         chunkSize: 1,
         inspect: async (body) => {
-          await expect((async () => {
-            // eslint-disable-next-line no-empty
-            for await (const _ of body as AsyncIterable<unknown>) {}
-          })()).rejects.toSatisfy(expectPayloadTooLarge)
+          await expect(collect(body)).rejects.toSatisfy(expectPayloadTooLarge)
         },
       })
     })
@@ -1222,28 +1213,21 @@ describe('tmpFileUploadHandlerPlugin', () => {
         for (const chunkSize of [1, 2, 3, body.length]) {
           await runThroughPlugin({
             limits: { memory: size },
-            headers: { 'content-type': 'text/event-stream' },
+            headers: eventStreamHeaders,
             body,
             chunkSize,
             inspect: async (body) => {
-              const received: unknown[] = []
-              for await (const event of body as AsyncIterable<unknown>) {
-                received.push(event)
-              }
-              expect(received).toHaveLength(1)
+              expect(await collect(body)).toHaveLength(1)
             },
           })
 
           await runThroughPlugin({
             limits: { memory: size - 1 },
-            headers: { 'content-type': 'text/event-stream' },
+            headers: eventStreamHeaders,
             body,
             chunkSize,
             inspect: async (body) => {
-              await expect((async () => {
-                // eslint-disable-next-line no-empty
-                for await (const _ of body as AsyncIterable<unknown>) {}
-              })()).rejects.toSatisfy(expectPayloadTooLarge)
+              await expect(collect(body)).rejects.toSatisfy(expectPayloadTooLarge)
             },
           })
         }
@@ -1258,7 +1242,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
 
       await runThroughPlugin({
         limits: { memory: 1024 },
-        headers: { 'content-type': 'text/event-stream' },
+        headers: eventStreamHeaders,
         resolveBody: async () => new ReadableStream({
           pull(controller) {
             if (pulls === totalLines) {
@@ -1270,33 +1254,12 @@ describe('tmpFileUploadHandlerPlugin', () => {
           },
         }),
         inspect: async (body) => {
-          await expect((async () => {
-            // eslint-disable-next-line no-empty
-            for await (const _ of body as AsyncIterable<unknown>) {}
-          })()).rejects.toSatisfy(expectPayloadTooLarge)
+          await expect(collect(body)).rejects.toSatisfy(expectPayloadTooLarge)
         },
       })
 
       // The stream is cut off around the limit instead of being buffered to its end
       expect(pulls).toBeLessThan(1024)
-    })
-
-    it('leaves raw binary streams to maxBodySize.stream alone, since they reach the procedure without buffering', async () => {
-      const content = Buffer.alloc(4096, 7)
-
-      await runThroughPlugin({
-        limits: { memory: 1, stream: content.length },
-        headers: { 'content-type': 'application/octet-stream', 'standard-server': 'octet-stream' },
-        body: content,
-        chunkSize: 1024,
-        inspect: async (body) => {
-          const chunks: Buffer[] = []
-          for await (const chunk of body as ReadableStream<Uint8Array>) {
-            chunks.push(Buffer.from(chunk))
-          }
-          expect(Buffer.concat(chunks).equals(content)).toBe(true)
-        },
-      })
     })
 
     it('spools a file body identified only by its content-disposition, per the 0.8 resolution order', async () => {
