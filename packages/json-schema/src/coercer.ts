@@ -24,7 +24,7 @@ interface NativeType {
   afterTypeCheck?: boolean
 }
 
-const NATIVE_TYPES = new Map<string, NativeType>([
+const NATIVE_TYPES = new Map<unknown, NativeType>([
   [JsonSchemaXNativeType.Date, {
     is: value => value instanceof Date,
     coerce: value => typeof value === 'string' ? stringToDate(value) : value,
@@ -136,9 +136,7 @@ export class JsonSchemaCoercer {
       }
     }
 
-    const nativeType = 'x-native-type' in schema && typeof schema['x-native-type'] === 'string'
-      ? NATIVE_TYPES.get(schema['x-native-type'])
-      : undefined
+    const nativeType = NATIVE_TYPES.get(schema['x-native-type'])
 
     if (nativeType && !nativeType.afterTypeCheck) {
       coerced = nativeType.coerce(coerced)

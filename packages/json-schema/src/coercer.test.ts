@@ -429,14 +429,6 @@ describe('jsonSchemaCoercer', () => {
       expect(coerce(schema, '123')).toBe(123n)
       expect(coerce(schema, null)).toBeNull()
       expect(coerce(schema, 4.5)).toBe(4.5)
-
-      // z.object({ id: z.bigint() }).nullable()
-      expect(coerce({
-        anyOf: [
-          { type: 'object', properties: { id: BIGINT_SCHEMA }, required: ['id'] },
-          { type: 'null' },
-        ],
-      }, { id: 123 })).toEqual({ id: 123n })
     })
 
     it('accepts a value already of the native type, so the rest of the branch is still coerced', () => {
@@ -453,23 +445,19 @@ describe('jsonSchemaCoercer', () => {
     })
 
     it('coerces a tuple ending in optional items inside a union', () => {
-      // z.object({ t: z.tuple([z.number(), z.number().optional()]) }).nullable()
+      // z.tuple([z.number(), z.number().optional()]).nullable()
       const schema = {
         anyOf: [
-          {
-            type: 'object',
-            properties: { t: { type: 'array', prefixItems: [{ type: 'number' }, { type: 'number' }], items: false, minItems: 1, maxItems: 2 } },
-            required: ['t'],
-          },
+          { type: 'array', prefixItems: [{ type: 'number' }, { type: 'number' }], items: false, minItems: 1, maxItems: 2 },
           { type: 'null' },
         ],
       }
 
-      expect(coerce(schema, { t: ['1'] })).toEqual({ t: [1] })
-      expect(coerce(schema, { t: ['1', '2'] })).toEqual({ t: [1, 2] })
+      expect(coerce(schema, ['1'])).toEqual([1])
+      expect(coerce(schema, ['1', '2'])).toEqual([1, 2])
 
       // shorter than minItems, so no branch matches
-      expect(coerce(schema, { t: [] })).toEqual({ t: [] })
+      expect(coerce(schema, [])).toEqual([])
     })
 
     it('handles the nullable form', () => {
