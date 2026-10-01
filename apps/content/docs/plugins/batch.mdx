@@ -146,7 +146,7 @@ const handler = new RPCHandler(router, {
 ```
 
 :::info
-Without `onError`, these errors are not reported anywhere. Errors thrown by `onError` itself are ignored.
+Without `onError`, these errors never reach `handler.handle` or your framework's error handling. Errors thrown by `onError` itself are ignored.
 :::
 
 ## Compression

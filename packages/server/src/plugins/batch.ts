@@ -257,9 +257,10 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       }
 
+      const signal = interceptorOptions.request.signal
+
       const runSubrequests = async (peer: ServerPeer): Promise<void> => {
         const promise = Promise.all(messages.map(msg => peer.message(msg, handleIndividualRequest)))
-        const signal = interceptorOptions.request.signal
         const closePeer = () => peer.close(signal?.reason)
 
         if (signal?.aborted) {
@@ -330,27 +331,15 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       }
 
       // streaming mode — binary length-prefixed ReadableStream
-      const signal = interceptorOptions.request.signal
-      const keepAliveEnabled = this.keepAliveEnabled
-      const keepAliveInterval = this.keepAliveInterval
-
       let streamController: ReadableStreamDefaultController<Uint8Array<ArrayBuffer>>
       let isStreamDone = false
       let lastSentAt = Date.now()
       let keepAliveTimer: ReturnType<typeof setTimeout> | undefined
       let pulled: ReturnType<typeof promiseWithResolvers<void>> | undefined
 
-      /**
-       * Wakes up senders waiting for the consumer, see the peer below.
-       */
       const releaseSenders = () => {
         pulled?.resolve()
         pulled = undefined
-      }
-
-      const clearKeepAlive = () => {
-        clearTimeout(keepAliveTimer)
-        keepAliveTimer = undefined
       }
 
       /**
@@ -361,8 +350,8 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         keepAliveTimer = setTimeout(() => {
           const idle = Date.now() - lastSentAt
 
-          if (idle < keepAliveInterval) {
-            scheduleKeepAlive(keepAliveInterval - idle)
+          if (idle < this.keepAliveInterval) {
+            scheduleKeepAlive(this.keepAliveInterval - idle)
             return
           }
 
@@ -377,28 +366,26 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
               lastSentAt = Date.now()
             }
             catch {
-              // Stream may already be closed or errored.
-              clearKeepAlive()
-              return
+              return // Stream may already be closed or errored.
             }
           }
 
-          scheduleKeepAlive(keepAliveInterval)
+          scheduleKeepAlive(this.keepAliveInterval)
         }, delay)
       }
 
       /**
-       * Whether the consumer has not read what is already queued yet. Waiting is pointless
-       * once the stream is done or the batch request is aborted, since nobody reads anymore.
+       * Stops the keep-alive and releases waiting senders once nobody reads the stream anymore:
+       * when it is cancelled, when the batch request is aborted, or when every subrequest settled.
        */
-      const shouldWaitForConsumer = () => !isStreamDone && !signal?.aborted && streamController.desiredSize! <= 0
-
       const finish = () => {
         isStreamDone = true
-        clearKeepAlive()
+        clearTimeout(keepAliveTimer)
         releaseSenders()
-        signal?.removeEventListener('abort', releaseSenders)
+        signal?.removeEventListener('abort', finish)
       }
+
+      const shouldWaitForConsumer = () => !isStreamDone && streamController.desiredSize! <= 0
 
       const peer = new ServerPeer(async (message) => {
         const bytes = await encodeBatchMessage(message)
@@ -421,10 +408,6 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
         start(controller) {
           streamController = controller
-
-          if (keepAliveEnabled) {
-            scheduleKeepAlive(keepAliveInterval)
-          }
         },
         pull() {
           releaseSenders()
@@ -435,11 +418,16 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         },
       })
 
-      /**
-       * Once aborted, nobody reads the response anymore,
-       * so senders must stop waiting for the consumer to let the peer settle.
-       */
-      signal?.addEventListener('abort', releaseSenders)
+      if (this.keepAliveEnabled) {
+        scheduleKeepAlive(this.keepAliveInterval)
+      }
+
+      if (signal?.aborted) {
+        finish()
+      }
+      else {
+        signal?.addEventListener('abort', finish)
+      }
 
       // DO NOT await here to block streaming response
       runSubrequests(peer)
