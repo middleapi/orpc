@@ -315,7 +315,6 @@ describe('durable publisher object', () => {
 
   it('returns 400 for bad resume data and still works after', async () => {
     const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const subscriber = await openSocket(stub)
 
@@ -323,7 +322,6 @@ describe('durable publisher object', () => {
 
     expect(invalidResponse.status).toBe(400)
     expect(await invalidResponse.text()).toContain('SyntaxError')
-    expect(consoleError).toHaveBeenCalledTimes(1)
 
     expect((await publish(stub, { data: { text: 'after-error' } })).status).toBe(204)
     expect((await readMessages(subscriber, 1))[0]).toEqual({
@@ -412,7 +410,6 @@ describe('durable publisher object', () => {
 
   it('rejects payloads it cannot store without dropping stored events', async () => {
     const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
-    vi.spyOn(console, 'error').mockImplementation(() => {})
 
     expect((await publish(stub, { data: { text: 'kept' } })).status).toBe(204)
 
@@ -438,7 +435,6 @@ describe('durable publisher object', () => {
 
   it('keeps stored events when an insert fails for a reason other than the table', async () => {
     const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
-    vi.spyOn(console, 'error').mockImplementation(() => {})
 
     expect((await publish(stub, { data: { text: 'kept' } })).status).toBe(204)
 

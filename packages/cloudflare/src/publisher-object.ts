@@ -86,7 +86,6 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
       stringifiedPayload = this.resumeStorage.store(stringifiedPayload)
     }
     catch (e) {
-      console.error('Failed to store published event:', e)
       return new Response(String(e), { status: 400 })
     }
 
