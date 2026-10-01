@@ -24,26 +24,25 @@ function isDeepEqualInternal(
     return false
   }
 
-  if (a instanceof Date || b instanceof Date) {
-    return a instanceof Date && b instanceof Date && Object.is(a.getTime(), b.getTime())
-  }
+  // Values like Date or Map keep their state in internal slots and would look like empty objects,
+  // so compare their kind first. Unlike `instanceof`, the tag also works across realms.
+  const tag = Object.prototype.toString.call(a)
 
-  if (a instanceof RegExp || b instanceof RegExp) {
-    return a instanceof RegExp && b instanceof RegExp && a.source === b.source && a.flags === b.flags
-  }
-
-  const isArray = Array.isArray(a)
-
-  if (isArray !== Array.isArray(b)) {
+  if (tag !== Object.prototype.toString.call(b)) {
     return false
   }
 
-  if (isArray && a.length !== (b as unknown[]).length) {
-    return false
+  if (tag === '[object Date]') {
+    return Object.is((a as Date).getTime(), (b as Date).getTime())
   }
 
-  const aRecord = a as Record<string, unknown>
-  const bRecord = b as Record<string, unknown>
+  if (tag === '[object RegExp]') {
+    return (a as RegExp).source === (b as RegExp).source && (a as RegExp).flags === (b as RegExp).flags
+  }
+
+  if (tag === '[object Array]' && (a as unknown[]).length !== (b as unknown[]).length) {
+    return false
+  }
 
   const visitedMatches = visited.get(a)
 
@@ -59,13 +58,16 @@ function isDeepEqualInternal(
   }
 
   // Map keys and Set members are matched by identity (SameValueZero), like `Map#has`
-  if (a instanceof Map || b instanceof Map) {
-    if (!(a instanceof Map) || !(b instanceof Map) || a.size !== b.size) {
+  if (tag === '[object Map]') {
+    const aMap = a as Map<unknown, unknown>
+    const bMap = b as Map<unknown, unknown>
+
+    if (aMap.size !== bMap.size) {
       return false
     }
 
-    for (const [key, value] of a) {
-      if (!b.has(key) || !isDeepEqualInternal(value, b.get(key), visited)) {
+    for (const [key, value] of aMap) {
+      if (!bMap.has(key) || !isDeepEqualInternal(value, bMap.get(key), visited)) {
         return false
       }
     }
@@ -73,19 +75,25 @@ function isDeepEqualInternal(
     return true
   }
 
-  if (a instanceof Set || b instanceof Set) {
-    if (!(a instanceof Set) || !(b instanceof Set) || a.size !== b.size) {
+  if (tag === '[object Set]') {
+    const aSet = a as Set<unknown>
+    const bSet = b as Set<unknown>
+
+    if (aSet.size !== bSet.size) {
       return false
     }
 
-    for (const value of a) {
-      if (!b.has(value)) {
+    for (const value of aSet) {
+      if (!bSet.has(value)) {
         return false
       }
     }
 
     return true
   }
+
+  const aRecord = a as Record<string, unknown>
+  const bRecord = b as Record<string, unknown>
 
   const aKeys = Object.keys(aRecord).filter(k => aRecord[k] !== undefined)
   const bKeys = Object.keys(bRecord).filter(k => bRecord[k] !== undefined)

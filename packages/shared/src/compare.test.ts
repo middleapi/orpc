@@ -1,3 +1,4 @@
+import { runInNewContext } from 'node:vm'
 import { isDeepEqual } from './compare'
 
 describe('deepEqual', () => {
@@ -139,6 +140,19 @@ describe('deepEqual', () => {
     expect(isDeepEqual({ pattern: /a/ }, { pattern: /b/ })).toBe(false)
     expect(isDeepEqual(/a/, {})).toBe(false)
     expect(isDeepEqual({}, /a/)).toBe(false)
+  })
+
+  it('returns false for values of different kinds with the same own keys', () => {
+    expect(isDeepEqual(new Uint8Array([1]), { 0: 1 })).toBe(false)
+    expect(isDeepEqual(new Error('x'), {})).toBe(false)
+    expect(isDeepEqual(new Map(), new Set())).toBe(false)
+  })
+
+  it('compares values from other realms', () => {
+    expect(isDeepEqual(runInNewContext('new Date(1)'), new Date(1))).toBe(true)
+    expect(isDeepEqual(runInNewContext('new Date(1)'), new Date(2))).toBe(false)
+    expect(isDeepEqual(runInNewContext('new Map([["a", 1]])'), new Map([['a', 2]]))).toBe(false)
+    expect(isDeepEqual(runInNewContext('({ a: [1] })'), { a: [1] })).toBe(true)
   })
 
   it('compares Map values by entries', () => {

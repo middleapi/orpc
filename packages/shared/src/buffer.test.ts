@@ -29,17 +29,11 @@ describe('toStringOrBytes', () => {
     expect(new TextDecoder().decode(result as Uint8Array)).toBe('test')
   })
 
-  it('sharedArrayBuffer', () => {
-    const input = new SharedArrayBuffer(4)
-    new Uint8Array(input).set([0, 1, 2, 3])
-
-    const result = toStringOrBytes(input as unknown as ArrayBuffer)
-    expect(result).toBeInstanceOf(Uint8Array)
-    expect(result).toEqual(new Uint8Array([0, 1, 2, 3]))
-  })
-
-  it('cross-realm arrayBuffer', () => {
-    const input = runInNewContext('new Uint8Array([0, 1, 2, 3]).buffer') as ArrayBuffer
+  it.each([
+    ['sharedArrayBuffer', () => sharedBuffer([0, 1, 2, 3])],
+    ['cross-realm arrayBuffer', () => runInNewContext('new Uint8Array([0, 1, 2, 3]).buffer') as ArrayBuffer],
+  ])('%s', (_, createInput) => {
+    const input = createInput()
     expect(input).not.toBeInstanceOf(ArrayBuffer)
 
     const result = toStringOrBytes(input)
@@ -95,12 +89,7 @@ describe('toStringOrBytes', () => {
     })
 
     it('array of SharedArrayBuffers concatenates to bytes', () => {
-      const a = new SharedArrayBuffer(2)
-      new Uint8Array(a).set([1, 2])
-      const b = new SharedArrayBuffer(2)
-      new Uint8Array(b).set([3, 4])
-
-      const result = toStringOrBytes([a, b] as unknown as ArrayBuffer[])
+      const result = toStringOrBytes([sharedBuffer([1, 2]), sharedBuffer([3, 4])])
       expect(result).toEqual(new Uint8Array([1, 2, 3, 4]))
     })
 
@@ -152,3 +141,12 @@ describe('toStringOrBytes', () => {
     })
   })
 })
+
+/**
+ * SharedArrayBuffer is not assignable to the ArrayBuffer type, but is handled at runtime.
+ */
+function sharedBuffer(bytes: number[]): ArrayBuffer {
+  const buffer = new SharedArrayBuffer(bytes.length)
+  new Uint8Array(buffer).set(bytes)
+  return buffer as unknown as ArrayBuffer
+}

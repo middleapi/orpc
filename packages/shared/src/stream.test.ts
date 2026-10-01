@@ -250,35 +250,43 @@ describe('wrapReadableStream', () => {
     expect(finishCount).toBe(1)
   })
 
-  it('maps pull errors after reporting them and still finishes once', async () => {
+  it('maps pull errors after reporting them, releases the source without cancelling it, and finishes once', async () => {
     const error = new Error('pull failure')
     const mappedError = new TypeError('mapped pull failure')
-    let finishCount = 0
+    const cancel = vi.fn()
     const onError = vi.fn()
+    const onFinish = vi.fn()
     const stream = new ReadableStream<number>({
       pull() {
         throw error
       },
+      cancel,
     })
 
     const reader = wrapReadableStream(stream, {
       onError,
       mapError: received => new TypeError(`mapped ${(received as Error).message}`),
-      onFinish: () => {
-        finishCount += 1
-      },
+      onFinish,
     }).getReader()
 
     await expect(reader.read()).rejects.toEqual(mappedError)
 
+    await vi.waitFor(() => {
+      expect(onFinish).toHaveBeenCalledTimes(1)
+    })
+
     expect(onError).toHaveBeenCalledTimes(1)
     expect(onError).toHaveBeenCalledWith(error)
-    expect(finishCount).toBe(1)
+    expect(cancel).not.toHaveBeenCalled()
+    expect(stream.locked).toBe(false)
   })
 
-  it('cancels and releases the source when mapResult throws', async () => {
+  it('cancels and releases the source when mapResult throws, reporting cancellation errors', async () => {
     const error = new Error('map failure')
-    const cancel = vi.fn()
+    const cancelError = new Error('cancel failure')
+    const cancel = vi.fn(() => {
+      throw cancelError
+    })
     const onError = vi.fn()
     const onFinish = vi.fn()
     const stream = new ReadableStream<number>({
@@ -305,65 +313,9 @@ describe('wrapReadableStream', () => {
     expect(cancel).toHaveBeenCalledTimes(1)
     expect(cancel).toHaveBeenCalledWith(error)
     expect(stream.locked).toBe(false)
-    expect(onError).toHaveBeenCalledTimes(1)
-    expect(onError).toHaveBeenCalledWith(error)
-  })
-
-  it('reports source cancellation errors after mapResult throws', async () => {
-    const error = new Error('map failure')
-    const cancelError = new Error('cancel failure')
-    const onError = vi.fn()
-    const onFinish = vi.fn()
-    const stream = new ReadableStream<number>({
-      pull(controller) {
-        controller.enqueue(1)
-      },
-      cancel() {
-        throw cancelError
-      },
-    })
-
-    const reader = wrapReadableStream(stream, {
-      mapResult: () => {
-        throw error
-      },
-      onError,
-      onFinish,
-    }).getReader()
-
-    await expect(reader.read()).rejects.toBe(error)
-
-    await vi.waitFor(() => {
-      expect(onFinish).toHaveBeenCalledTimes(1)
-    })
-
-    expect(stream.locked).toBe(false)
     expect(onError).toHaveBeenCalledTimes(2)
     expect(onError).toHaveBeenNthCalledWith(1, error)
     expect(onError).toHaveBeenNthCalledWith(2, cancelError)
-  })
-
-  it('releases without cancelling the source when the read fails', async () => {
-    const error = new Error('pull failure')
-    const cancel = vi.fn()
-    const onFinish = vi.fn()
-    const stream = new ReadableStream<number>({
-      pull() {
-        throw error
-      },
-      cancel,
-    })
-
-    const reader = wrapReadableStream(stream, { onFinish }).getReader()
-
-    await expect(reader.read()).rejects.toBe(error)
-
-    await vi.waitFor(() => {
-      expect(onFinish).toHaveBeenCalledTimes(1)
-    })
-
-    expect(cancel).not.toHaveBeenCalled()
-    expect(stream.locked).toBe(false)
   })
 
   it('runs cancellation inside runWith and finishes once', async () => {

@@ -36,28 +36,16 @@ function toBytes(item: string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buf
     return new TextEncoder().encode(item)
   }
 
-  if (isArrayBufferLike(item)) {
-    return new Uint8Array(item)
-  }
-
   if (item instanceof Uint8Array) {
     return item as Awaited<ReturnType<Blob['bytes']>>
   }
 
-  return new Uint8Array(item.buffer, item.byteOffset, item.byteLength)
-}
-
-/**
- * Matches an ArrayBuffer or SharedArrayBuffer, including ones from other realms
- * that fail `instanceof ArrayBuffer`.
- */
-function isArrayBufferLike(value: object): value is ArrayBuffer {
-  if (ArrayBuffer.isView(value)) {
-    return false
+  // Unlike views, ArrayBuffer and SharedArrayBuffer (from any realm) have no `buffer` property
+  if (!('buffer' in item)) {
+    return new Uint8Array(item)
   }
 
-  const tag = Object.prototype.toString.call(value)
-  return tag === '[object ArrayBuffer]' || tag === '[object SharedArrayBuffer]'
+  return new Uint8Array(item.buffer, item.byteOffset, item.byteLength)
 }
 
 function concatBytes(items: Array<string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>>): Uint8Array<ArrayBuffer> {

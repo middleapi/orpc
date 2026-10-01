@@ -67,7 +67,6 @@ export function wrapReadableStream<T, TMapped = T>(
     }
   }
 
-  // TODO:
   return new ReadableStream<TMapped>({
     async pull(controller) {
       let readResult: ReadableStreamReadResult<T> | undefined
@@ -84,9 +83,8 @@ export function wrapReadableStream<T, TMapped = T>(
         }
         finally {
           try {
-            // Like wrapAsyncIterator, only cancel the source if it has not finished yet.
-            // A failed read is treated as finished, so only a failed mapResult cancels it.
-            if (readResult && !readResult.done) {
+            // A failed read counts as finished (as in wrapAsyncIterator), so only a failed mapResult cancels the source
+            if (readResult?.done === false) {
               await cancelSource(error)
             }
           }
