@@ -63,7 +63,7 @@ describe('openAPIMatcher', () => {
       })
     })
 
-    it('decodes catch-all params and trims trailing slashes', async () => {
+    it('decodes catch-all params, keeps their empty segments, and trims trailing slashes', async () => {
       const files = os
         .meta(openapi({ method: 'GET', path: '/files/{+path}' }))
         .handler(() => 'ok')
@@ -74,6 +74,18 @@ describe('openAPIMatcher', () => {
         path: ['files'],
         procedure: files,
         params: { path: 'a/b/c/d' },
+      })
+
+      await expect(matcher.match('GET', '/files/https%3A//example.com/a', undefined)).resolves.toEqual({
+        path: ['files'],
+        procedure: files,
+        params: { path: 'https://example.com/a' },
+      })
+
+      await expect(matcher.match('GET', '/files//etc/hosts', undefined)).resolves.toEqual({
+        path: ['files'],
+        procedure: files,
+        params: { path: '/etc/hosts' },
       })
     })
 
@@ -245,24 +257,6 @@ describe('openAPIMatcher', () => {
       }
     })
 
-    it('keeps empty segments inside catch-all params', async () => {
-      const files = os.meta(openapi({ method: 'GET', path: '/files/{+path}' })).handler(() => 'ok')
-
-      const matcher = new OpenAPIMatcher({ files })
-
-      await expect(matcher.match('GET', '/files/https%3A//example.com/a', undefined)).resolves.toEqual({
-        path: ['files'],
-        procedure: files,
-        params: { path: 'https://example.com/a' },
-      })
-
-      await expect(matcher.match('GET', '/files//etc/hosts', undefined)).resolves.toEqual({
-        path: ['files'],
-        procedure: files,
-        params: { path: '/etc/hosts' },
-      })
-    })
-
     it('matches segments after a catch-all param', async () => {
       const raw = os.meta(openapi({ method: 'GET', path: '/files/{+path}/raw' })).handler(() => 'ok')
 
@@ -279,9 +273,10 @@ describe('openAPIMatcher', () => {
 
     it('requires a value for catch-all params, falling back to less specific routes', async () => {
       const files = os.meta(openapi({ method: 'GET', path: '/files/{+path}' })).handler(() => 'ok')
+      const filesOnly = new OpenAPIMatcher({ files })
 
-      await expect(new OpenAPIMatcher({ files }).match('GET', '/files', undefined)).resolves.toBeUndefined()
-      await expect(new OpenAPIMatcher({ files }).match('GET', '/files/', undefined)).resolves.toBeUndefined()
+      await expect(filesOnly.match('GET', '/files', undefined)).resolves.toBeUndefined()
+      await expect(filesOnly.match('GET', '/files/', undefined)).resolves.toBeUndefined()
 
       const fallback = os.meta(openapi({ method: 'GET', path: '/{+path}' })).handler(() => 'ok')
       const matcher = new OpenAPIMatcher({ files, fallback })

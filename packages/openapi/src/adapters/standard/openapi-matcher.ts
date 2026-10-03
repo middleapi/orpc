@@ -22,8 +22,8 @@ interface TreeEntry {
   path: string[]
   contract: AnyProcedureContract
   procedure?: AnyProcedure | undefined
-  /** OpenAPI names of the dynamic params, in path order (see {@link toRou3Route}) */
-  paramNames?: string[] | undefined
+  /** rou3 key and OpenAPI name of each dynamic param, in path order (see {@link toRou3Route}) */
+  params?: [key: string, name: string][] | undefined
   /** rou3 key of the `{+param}`, if any */
   catchAllKey?: string | undefined
 }
@@ -62,7 +62,7 @@ export class OpenAPIMatcher {
       const method = meta?.method ?? DEFAULT_OPENAPI_METHOD
       const postHttpPath = meta?.path ?? pathToHttpPath(path)
       const openapiPath = meta?.prefix ? mergeHttpPath(meta.prefix, postHttpPath) : postHttpPath
-      const { pattern, paramNames, catchAllKey } = toRou3Route(openapiPath)
+      const { pattern, ...route } = toRou3Route(openapiPath)
 
       routes.push({
         method,
@@ -71,8 +71,7 @@ export class OpenAPIMatcher {
           path,
           contract,
           procedure: contract instanceof Procedure ? contract : undefined,
-          paramNames,
-          catchAllKey,
+          ...route,
         },
       })
     }, path)
@@ -162,7 +161,7 @@ export class OpenAPIMatcher {
     return {
       path: entry.path,
       procedure: entry.procedure ?? await this.resolveProcedure(entry),
-      params: entry.paramNames && decodeParams(entry.paramNames, match.params!),
+      params: entry.params && decodeParams(entry.params, match.params!),
     }
   }
 
@@ -177,16 +176,8 @@ export class OpenAPIMatcher {
       return match
     }
 
-    // ordered from the least to the most specific
-    const matches = findAllRoutes(this.tree, method, pathname)
-
-    for (let i = matches.length - 1; i >= 0; i--) {
-      if (!hasEmptyCatchAll(matches[i]!)) {
-        return matches[i]
-      }
-    }
-
-    return undefined
+    // ordered from the least to the most specific, and a fresh array, so reversing it in place is safe
+    return findAllRoutes(this.tree, method, pathname).reverse().find(match => !hasEmptyCatchAll(match))
   }
 
   private resolvePendingLazyRouters(pathname: `/${string}`): Promise<void> | void {
@@ -242,32 +233,27 @@ export class OpenAPIMatcher {
   }
 }
 
-interface Rou3Route {
-  pattern: `/${string}`
-  paramNames?: string[] | undefined
-  catchAllKey?: string | undefined
-}
-
 /**
  * Converts an OpenAPI path into a rou3 pattern. Literal text is escaped, since rou3 reads
  * characters such as `:`, `*`, `?`, `(` and `{` as syntax and resolves `.` / `..` segments.
  * Params get positional keys (`p0`, `p1`, ...), since rou3 rejects or misreads many names
  * OpenAPI allows, such as `{user-id}`, `{0}` or a repeated name.
  */
-function toRou3Route(path: `/${string}`): Rou3Route {
-  const params = getDynamicPathParams(path)
+function toRou3Route(path: `/${string}`): { pattern: `/${string}` } & Pick<TreeEntry, 'params' | 'catchAllKey'> {
+  const dynamicParams = getDynamicPathParams(path)
 
-  if (!params) {
+  if (!dynamicParams) {
     return { pattern: escapeRou3Literal(path) as `/${string}` }
   }
 
   let pattern = ''
   let literalStart = 0
   let catchAllKey: string | undefined
+  const params: [key: string, name: string][] = []
 
-  for (let i = 0; i < params.length; i++) {
-    const param = params[i]!
-    const key = `p${i}`
+  for (const param of dynamicParams) {
+    const key = `p${params.length}`
+    params.push([key, param.parameterName])
 
     pattern += escapeRou3Literal(path.slice(literalStart, param.startIndex))
     literalStart = param.startIndex + param.segment.length
@@ -288,11 +274,7 @@ function toRou3Route(path: `/${string}`): Rou3Route {
 
   pattern += escapeRou3Literal(path.slice(literalStart))
 
-  return {
-    pattern: pattern as `/${string}`,
-    paramNames: params.map(param => param.parameterName),
-    catchAllKey,
-  }
+  return { pattern: pattern as `/${string}`, params, catchAllKey }
 }
 
 const ROU3_SYNTAX_CHAR_REGEX = /[\\:*?+(){}.]/g
@@ -314,7 +296,21 @@ function hasEmptyCatchAll(match: MatchedRoute<TreeEntry>): boolean {
   return match.data.catchAllKey !== undefined && !match.params?.[match.data.catchAllKey]
 }
 
-function decodeParams(names: string[], params: Record<string, string>): Record<string, string> {
-  // a repeated name keeps its last value, and `Object.fromEntries` keeps `__proto__` an own property
-  return Object.fromEntries(names.map((name, i) => [name, safeDecodeURIComponent(params[`p${i}`]!)]))
+function decodeParams(params: [key: string, name: string][], values: Record<string, string>): Record<string, string> {
+  const decoded: Record<string, string> = {}
+
+  // a repeated name keeps its last value
+  for (const [key, name] of params) {
+    const value = safeDecodeURIComponent(values[key]!)
+
+    if (name === '__proto__') {
+      // assigning would set the prototype instead of an own property
+      Object.defineProperty(decoded, name, { value, enumerable: true, writable: true, configurable: true })
+    }
+    else {
+      decoded[name] = value
+    }
+  }
+
+  return decoded
 }
