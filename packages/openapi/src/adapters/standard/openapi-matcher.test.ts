@@ -1,5 +1,6 @@
 import { oc } from '@orpc/contract'
 import { os, withHiddenRouterContract } from '@orpc/server'
+import { findAllRoutes } from 'rou3'
 import { getOpenAPIMeta, openapi } from '../../meta'
 import { OpenAPIMatcher } from './openapi-matcher'
 
@@ -153,6 +154,158 @@ describe('openAPIMatcher', () => {
         params: { name: 'a', rest: 'b/c/d' },
       })
     })
+
+    it('supports param names that are not identifiers, and repeated names', async () => {
+      const hyphen = os.meta(openapi({ method: 'GET', path: '/users/{user-id}' })).handler(() => 'ok')
+      const digit = os.meta(openapi({ method: 'GET', path: '/digits/{0}/{1st}' })).handler(() => 'ok')
+      const repeated = os.meta(openapi({ method: 'GET', path: '/repeated/{id}/{id}' })).handler(() => 'ok')
+
+      const matcher = new OpenAPIMatcher({ hyphen, digit, repeated })
+
+      await expect(matcher.match('GET', '/users/a-id', undefined)).resolves.toEqual({
+        path: ['hyphen'],
+        procedure: hyphen,
+        params: { 'user-id': 'a-id' },
+      })
+
+      await expect(matcher.match('GET', '/digits/a/b', undefined)).resolves.toEqual({
+        path: ['digit'],
+        procedure: digit,
+        params: { '0': 'a', '1st': 'b' },
+      })
+
+      // the last value wins
+      await expect(matcher.match('GET', '/repeated/a/b', undefined)).resolves.toEqual({
+        path: ['repeated'],
+        procedure: repeated,
+        params: { id: 'b' },
+      })
+    })
+
+    it('matches path text literally, even characters that are route syntax elsewhere', async () => {
+      const ping = os.handler(() => 'pong')
+      const dotPing = os.handler(() => 'pong')
+      const star = os.handler(() => 'star')
+      const group = os.handler(() => 'group')
+      const batch = os.meta(openapi({ method: 'GET', path: '/items:batchGet' })).handler(() => 'batch')
+      const braces = os.meta(openapi({ method: 'GET', path: '/a/{id}.json' })).handler(() => 'braces')
+      const question = os.meta(openapi({ method: 'GET', path: '/what?' })).handler(() => 'question')
+
+      const matcher = new OpenAPIMatcher({
+        'ping': ping,
+        '..': { ping: dotPing },
+        '*': star,
+        '(x)': group,
+        batch,
+        braces,
+        question,
+      })
+
+      await expect(matcher.match('POST', '/ping', undefined)).resolves.toMatchObject({ procedure: ping })
+      await expect(matcher.match('POST', '/../ping', undefined)).resolves.toMatchObject({ procedure: dotPing })
+
+      await expect(matcher.match('POST', '/*', undefined)).resolves.toMatchObject({ procedure: star, params: undefined })
+      await expect(matcher.match('POST', '/anything', undefined)).resolves.toBeUndefined()
+
+      await expect(matcher.match('POST', '/(x)', undefined)).resolves.toMatchObject({ procedure: group, params: undefined })
+      await expect(matcher.match('POST', '/x', undefined)).resolves.toBeUndefined()
+
+      await expect(matcher.match('GET', '/items:batchGet', undefined)).resolves.toMatchObject({ procedure: batch, params: undefined })
+      await expect(matcher.match('GET', '/itemsfoo', undefined)).resolves.toBeUndefined()
+
+      // only whole-segment `{name}` is a param
+      await expect(matcher.match('GET', '/a/%7Bid%7D.json', undefined)).resolves.toMatchObject({ procedure: braces, params: undefined })
+      await expect(matcher.match('GET', '/a/id.json', undefined)).resolves.toBeUndefined()
+
+      await expect(matcher.match('GET', '/what%3F', undefined)).resolves.toMatchObject({ procedure: question, params: undefined })
+      await expect(matcher.match('GET', '/what', undefined)).resolves.toBeUndefined()
+    })
+
+    it('matches path text whether the request path encodes it or not', async () => {
+      const unicode = os.meta(openapi({ method: 'GET', path: '/café/{id}' })).handler(() => 'ok')
+      const caret = os.meta(openapi({ method: 'GET', path: '/a^b' })).handler(() => 'ok')
+      const colon = os.handler(() => 'ok')
+
+      const matcher = new OpenAPIMatcher({ unicode, caret, 'a:b': colon })
+
+      for (const pathname of ['/caf%C3%A9/1', '/caf%c3%a9/1', '/café/1'] as const) {
+        await expect(matcher.match('GET', pathname, undefined)).resolves.toEqual({
+          path: ['unicode'],
+          procedure: unicode,
+          params: { id: '1' },
+        })
+      }
+
+      for (const pathname of ['/a^b', '/a%5Eb'] as const) {
+        await expect(matcher.match('GET', pathname, undefined)).resolves.toMatchObject({ procedure: caret })
+      }
+
+      for (const pathname of ['/a:b', '/a%3Ab'] as const) {
+        await expect(matcher.match('POST', pathname, undefined)).resolves.toMatchObject({ procedure: colon })
+      }
+    })
+
+    it('keeps empty segments inside catch-all params', async () => {
+      const files = os.meta(openapi({ method: 'GET', path: '/files/{+path}' })).handler(() => 'ok')
+
+      const matcher = new OpenAPIMatcher({ files })
+
+      await expect(matcher.match('GET', '/files/https%3A//example.com/a', undefined)).resolves.toEqual({
+        path: ['files'],
+        procedure: files,
+        params: { path: 'https://example.com/a' },
+      })
+
+      await expect(matcher.match('GET', '/files//etc/hosts', undefined)).resolves.toEqual({
+        path: ['files'],
+        procedure: files,
+        params: { path: '/etc/hosts' },
+      })
+    })
+
+    it('matches segments after a catch-all param', async () => {
+      const raw = os.meta(openapi({ method: 'GET', path: '/files/{+path}/raw' })).handler(() => 'ok')
+
+      const matcher = new OpenAPIMatcher({ raw })
+
+      await expect(matcher.match('GET', '/files/a/b/raw', undefined)).resolves.toEqual({
+        path: ['raw'],
+        procedure: raw,
+        params: { path: 'a/b' },
+      })
+
+      await expect(matcher.match('GET', '/files/a/b', undefined)).resolves.toBeUndefined()
+    })
+
+    it('requires a value for catch-all params, falling back to less specific routes', async () => {
+      const files = os.meta(openapi({ method: 'GET', path: '/files/{+path}' })).handler(() => 'ok')
+
+      await expect(new OpenAPIMatcher({ files }).match('GET', '/files', undefined)).resolves.toBeUndefined()
+      await expect(new OpenAPIMatcher({ files }).match('GET', '/files/', undefined)).resolves.toBeUndefined()
+
+      const fallback = os.meta(openapi({ method: 'GET', path: '/{+path}' })).handler(() => 'ok')
+      const matcher = new OpenAPIMatcher({ files, fallback })
+
+      await expect(matcher.match('GET', '/files', undefined)).resolves.toEqual({
+        path: ['fallback'],
+        procedure: fallback,
+        params: { path: 'files' },
+      })
+
+      await expect(matcher.match('GET', '/files/a', undefined)).resolves.toEqual({
+        path: ['files'],
+        procedure: files,
+        params: { path: 'a' },
+      })
+    })
+
+    it('throws when a path has more than one catch-all param', () => {
+      const procedure = os.meta(openapi({ method: 'GET', path: '/{+a}/x/{+b}' })).handler(() => 'ok')
+
+      expect(() => new OpenAPIMatcher({ procedure })).toThrowError(
+        'OpenAPI path "/{+a}/x/{+b}" has more than one catch-all param ({+name}), but only one is supported per path.',
+      )
+    })
   })
 
   describe('runtime prefix stripping', () => {
@@ -248,6 +401,48 @@ describe('openAPIMatcher', () => {
       await expect(matcher.match('GET', '/users/din/info/settings', undefined)).resolves.toEqual(firstResult)
 
       expect(loader).toHaveBeenCalledTimes(1)
+    })
+
+    it('resolves lazy routers whose prefix ends with a slash or holds a catch-all param', async () => {
+      const info = os.meta(openapi({ method: 'GET', path: '/info' })).handler(() => 'info')
+
+      const slashLoader = vi.fn(async () => ({ default: { info } }))
+      const catchAllLoader = vi.fn(async () => ({ default: { info } }))
+
+      const matcher = new OpenAPIMatcher({
+        slash: os.meta(openapi({ prefix: '/api/' })).lazy(slashLoader),
+        catchAll: os.meta(openapi({ prefix: '/files/{+path}' })).lazy(catchAllLoader),
+      })
+
+      await expect(matcher.match('GET', '/other/info', undefined)).resolves.toBeUndefined()
+      expect(slashLoader).toHaveBeenCalledTimes(0)
+      expect(catchAllLoader).toHaveBeenCalledTimes(0)
+
+      await expect(matcher.match('GET', '/api/info', undefined)).resolves.toMatchObject({
+        path: ['slash', 'info'],
+        params: undefined,
+      })
+      expect(slashLoader).toHaveBeenCalledTimes(1)
+
+      await expect(matcher.match('GET', '/files/a/b/info', undefined)).resolves.toMatchObject({
+        path: ['catchAll', 'info'],
+        params: { path: 'a/b' },
+      })
+      expect(catchAllLoader).toHaveBeenCalledTimes(1)
+    })
+
+    it('leaves a lazy router pending without indexing any of its routes when one path is invalid', async () => {
+      const valid = os.meta(openapi({ method: 'GET', path: '/valid' })).handler(() => 'valid')
+      const invalid = os.meta(openapi({ method: 'GET', path: '/{+a}/x/{+b}' })).handler(() => 'invalid')
+
+      const matcher = new OpenAPIMatcher({
+        lazy: os.lazy(async () => ({ default: { valid, invalid } })),
+      })
+
+      await expect(matcher.match('GET', '/valid', undefined)).rejects.toThrowError('more than one catch-all param')
+      await expect(matcher.match('GET', '/valid', undefined)).rejects.toThrowError('more than one catch-all param')
+
+      expect(findAllRoutes((matcher as any).tree, 'GET', '/valid')).toEqual([])
     })
 
     it('retries a lazy router whose load fails, synchronously or asynchronously', async () => {

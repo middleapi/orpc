@@ -1,9 +1,10 @@
 import type { AnyProcedureContract } from '@orpc/contract'
 import type { AnyProcedure, AnyRouter, WalkProcedureContractsLazyResult } from '@orpc/server'
 import type { Value } from '@orpc/shared'
+import type { MatchedRoute } from 'rou3'
 import { createContractProcedure, getRouter, Procedure, unlazy, walkProcedureContractsSync } from '@orpc/server'
 import { mergeHttpPath, normalizeHttpPath, pathToHttpPath, safeDecodeURIComponent, value } from '@orpc/shared'
-import { addRoute, createRouter, findRoute, routeToRegExp } from 'rou3'
+import { addRoute, createRouter, findAllRoutes, findRoute, routeToRegExp } from 'rou3'
 import { DEFAULT_OPENAPI_METHOD } from '../../constants'
 import { getOpenAPIMeta } from '../../meta'
 import { getDynamicPathParams } from '../../utils'
@@ -21,7 +22,14 @@ interface TreeEntry {
   path: string[]
   contract: AnyProcedureContract
   procedure?: AnyProcedure | undefined
+  /** OpenAPI names of the dynamic params, in path order (see {@link toRou3Route}) */
+  paramNames?: string[] | undefined
+  /** rou3 key of the `{+param}`, if any */
+  catchAllKey?: string | undefined
 }
+
+/** only characters `encodeURIComponent` keeps, plus `/`, so `normalizeHttpPath` would not change it */
+const NORMALIZED_HTTP_PATH_REGEX = /^[\w\-.!~*'()/]*$/
 
 interface PendingLazyRouter extends WalkProcedureContractsLazyResult {
   matcher?: RegExp
@@ -43,6 +51,8 @@ export class OpenAPIMatcher {
   }
 
   private index(router: AnyRouter, path: string[] = []): void {
+    const routes: { method: string, pattern: string, entry: TreeEntry }[] = []
+
     const lazyResults = walkProcedureContractsSync(router, (contract, path) => {
       if (!value(this.filter, contract, path)) {
         return
@@ -52,22 +62,38 @@ export class OpenAPIMatcher {
       const method = meta?.method ?? DEFAULT_OPENAPI_METHOD
       const postHttpPath = meta?.path ?? pathToHttpPath(path)
       const openapiPath = meta?.prefix ? mergeHttpPath(meta.prefix, postHttpPath) : postHttpPath
-      const rou3Path = toRou3Pattern(openapiPath)
+      const { pattern, paramNames, catchAllKey } = toRou3Route(openapiPath)
 
-      addRoute(this.tree, method, rou3Path, {
-        path,
-        contract,
-        procedure: contract instanceof Procedure ? contract : undefined,
+      routes.push({
+        method,
+        pattern,
+        entry: {
+          path,
+          contract,
+          procedure: contract instanceof Procedure ? contract : undefined,
+          paramNames,
+          catchAllKey,
+        },
       })
     }, path)
 
-    for (const result of lazyResults) {
+    const pendingLazyRouters = lazyResults.map((result): PendingLazyRouter => {
       const prefix = getOpenAPIMeta(result.router)?.prefix
 
-      this.pendingLazyRouters.add({
+      return {
         ...result,
         matcher: prefix ? toRou3PrefixMatcher(prefix) : undefined,
-      })
+      }
+    })
+
+    // everything is converted before the tree changes, so a path that fails to convert never
+    // leaves a lazy router half indexed, which would duplicate its routes on every retry
+    for (const { method, pattern, entry } of routes) {
+      addRoute(this.tree, method, pattern, entry)
+    }
+
+    for (const pending of pendingLazyRouters) {
+      this.pendingLazyRouters.add(pending)
     }
   }
 
@@ -108,11 +134,12 @@ export class OpenAPIMatcher {
       await loading
     }
 
-    let match = findRoute(this.tree, method, pathname)
+    let match = this.findMatch(method, pathname)
 
-    if (match === undefined && pathname.includes('%')) {
+    if (match === undefined && !NORMALIZED_HTTP_PATH_REGEX.test(pathname)) {
       // Retry with a normalized path: users may percent-encode characters that
-      // we store unencoded (e.g. "a%62c" vs "abc"), so normalization lets us
+      // we store unencoded (e.g. "a%62c" vs "abc"), or send raw characters that
+      // we store encoded (e.g. "café" vs "caf%C3%A9"), so normalization lets us
       // handle those requests without storing duplicate entries.
 
       const normalizedPathname = normalizeHttpPath(pathname)
@@ -123,7 +150,7 @@ export class OpenAPIMatcher {
         await normalizedLoading
       }
 
-      match = findRoute(this.tree, method, normalizedPathname)
+      match = this.findMatch(method, normalizedPathname)
     }
 
     if (match === undefined) {
@@ -135,8 +162,31 @@ export class OpenAPIMatcher {
     return {
       path: entry.path,
       procedure: entry.procedure ?? await this.resolveProcedure(entry),
-      params: match.params ? decodeParams(match.params) : undefined,
+      params: entry.paramNames && decodeParams(entry.paramNames, match.params!),
     }
+  }
+
+  /**
+   * rou3 lets a catch-all match no segment at all, but a `{+param}` needs a value,
+   * so such a match gives way to the most specific route that does not leave one empty.
+   */
+  private findMatch(method: string, pathname: `/${string}`): MatchedRoute<TreeEntry> | undefined {
+    const match = findRoute(this.tree, method, pathname)
+
+    if (match === undefined || !hasEmptyCatchAll(match)) {
+      return match
+    }
+
+    // ordered from the least to the most specific
+    const matches = findAllRoutes(this.tree, method, pathname)
+
+    for (let i = matches.length - 1; i >= 0; i--) {
+      if (!hasEmptyCatchAll(matches[i]!)) {
+        return matches[i]
+      }
+    }
+
+    return undefined
   }
 
   private resolvePendingLazyRouters(pathname: `/${string}`): Promise<void> | void {
@@ -192,27 +242,79 @@ export class OpenAPIMatcher {
   }
 }
 
-function toRou3Pattern(path: `/${string}`): `/${string}` {
+interface Rou3Route {
+  pattern: `/${string}`
+  paramNames?: string[] | undefined
+  catchAllKey?: string | undefined
+}
+
+/**
+ * Converts an OpenAPI path into a rou3 pattern. Literal text is escaped, since rou3 reads
+ * characters such as `:`, `*`, `?`, `(` and `{` as syntax and resolves `.` / `..` segments.
+ * Params get positional keys (`p0`, `p1`, ...), since rou3 rejects or misreads many names
+ * OpenAPI allows, such as `{user-id}`, `{0}` or a repeated name.
+ */
+function toRou3Route(path: `/${string}`): Rou3Route {
   const params = getDynamicPathParams(path)
 
-  if (!params?.length) {
-    return path
+  if (!params) {
+    return { pattern: escapeRou3Literal(path) as `/${string}` }
   }
 
-  for (let i = params.length - 1; i >= 0; i--) {
+  let pattern = ''
+  let literalStart = 0
+  let catchAllKey: string | undefined
+
+  for (let i = 0; i < params.length; i++) {
     const param = params[i]!
-    const pattern = param.allowsSlash ? `**:${param.parameterName}` : `:${param.parameterName}`
-    path = path.slice(0, param.startIndex) + pattern + path.slice(param.startIndex + param.segment.length)
+    const key = `p${i}`
+
+    pattern += escapeRou3Literal(path.slice(literalStart, param.startIndex))
+    literalStart = param.startIndex + param.segment.length
+
+    if (param.allowsSlash) {
+      if (catchAllKey !== undefined) {
+        throw new TypeError(`OpenAPI path "${path}" has more than one catch-all param ({+name}), but only one is supported per path.`)
+      }
+
+      catchAllKey = key
+      // unlike `**:name`, `:name(.*)` also takes empty segments, such as the `//` of an encoded URL
+      pattern += `:${key}(.*)`
+    }
+    else {
+      pattern += `:${key}`
+    }
   }
 
-  return path
+  pattern += escapeRou3Literal(path.slice(literalStart))
+
+  return {
+    pattern: pattern as `/${string}`,
+    paramNames: params.map(param => param.parameterName),
+    catchAllKey,
+  }
 }
 
-function toRou3PrefixMatcher(path: `/${string}`): RegExp {
-  const pattern = toRou3Pattern(path)
-  return routeToRegExp(pattern === '/' ? '/**' : `${pattern}/**`)
+const ROU3_SYNTAX_CHAR_REGEX = /[\\:*?+(){}.]/g
+
+function escapeRou3Literal(text: string): string {
+  return text.replace(ROU3_SYNTAX_CHAR_REGEX, '\\$&')
 }
 
-function decodeParams(params: Record<string, string>): Record<string, string> {
-  return Object.fromEntries(Object.entries(params).map(([key, val]) => [key, safeDecodeURIComponent(val)]))
+function toRou3PrefixMatcher(prefix: `/${string}`): RegExp {
+  // rou3 allows one catch-all per route, so a prefix with its own is matched only up to it,
+  // which at most loads the lazy router a little more eagerly than needed
+  const catchAll = getDynamicPathParams(prefix)?.find(param => param.allowsSlash)
+  const head = catchAll ? prefix.slice(0, catchAll.startIndex) as `/${string}` : prefix
+
+  return routeToRegExp(mergeHttpPath(toRou3Route(head).pattern, '/**'))
+}
+
+function hasEmptyCatchAll(match: MatchedRoute<TreeEntry>): boolean {
+  return match.data.catchAllKey !== undefined && !match.params?.[match.data.catchAllKey]
+}
+
+function decodeParams(names: string[], params: Record<string, string>): Record<string, string> {
+  // a repeated name keeps its last value, and `Object.fromEntries` keeps `__proto__` an own property
+  return Object.fromEntries(names.map((name, i) => [name, safeDecodeURIComponent(params[`p${i}`]!)]))
 }

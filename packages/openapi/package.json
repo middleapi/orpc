@@ -124,7 +124,7 @@
     "@orpc/shared": "workspace:*",
     "@standard-server/core": "~0.10.0",
     "@standard-server/fetch": "~0.10.0",
-    "rou3": "^0.9.1"
+    "rou3": "^1.0.0"
   },
   "devDependencies": {
     "@scalar/api-reference": "^1.65.1",

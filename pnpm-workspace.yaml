@@ -47,3 +47,4 @@ minimumReleaseAgeExclude:
   - '@standard-server/peer@0.10.0'
   - '@standard-server/shared@0.10.0'
   - effect@4.0.0
+  - rou3@1.0.0
