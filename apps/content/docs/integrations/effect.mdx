@@ -309,15 +309,30 @@ You can also use these extensions with the [contract builder](/docs/contract/pro
 
 ### JSON Schema Converter
 
-This integration also provides `EffectSchemaToJsonSchemaConverter`, built on top of [Effect Schema to JSON Schema](https://effect.website/docs/schema/json-schema/). You can use it with tools such as the [OpenAPI Generator](/docs/openapi/specification#openapi-generator):
+This integration also provides `EffectSchemaToJsonSchemaConverter`, which wraps Effect's built-in [Schema.toJsonSchemaDocument](https://effect.website/docs/schema/json-schema/). Use it with tools such as the [OpenAPI Generator](/docs/openapi/specification#openapi-generator). It accepts the same options as `Schema.toJsonSchemaDocument`, such as `onExcessProperty`, `generateDescriptions`, `includeAnnotationKey`, and `referencePolicy`:
 
 ```ts
 import { EffectSchemaToJsonSchemaConverter } from '@orpc/experimental-effect'
 
 const generator = new OpenAPIGenerator({
-  converters: [new EffectSchemaToJsonSchemaConverter()],
+  converters: [
+    new EffectSchemaToJsonSchemaConverter({
+      onExcessProperty: 'error',
+    }),
+  ],
 })
 ```
+
+Schemas with an `identifier` annotation, including `Schema.Class` and recursive schemas, are preserved in `$defs`, which `OpenAPIGenerator` can then [hoist](/docs/openapi/specification#hoisting-defs) into `components.schemas`.
+
+:::tip
+Enable the `cache` option to reuse conversion results when the same schema instance is converted repeatedly. When enabled, repeated conversions return the same JSON schema object, so treat the results as immutable.
+
+```ts
+const converter = new EffectSchemaToJsonSchemaConverter({ cache: true })
+```
+
+:::
 
 ## OpenTelemetry Integration
 
