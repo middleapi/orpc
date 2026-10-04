@@ -240,9 +240,24 @@ Per-request data passed through the link's [`headers` option](/docs/rpc/link#url
 
 ## Limitations
 
-Browsers only store cookies from the real HTTP response. In a batch, the headers a procedure sets through the [Response Headers Plugin](/docs/plugins/response-headers) go into that procedure's subresponse, which travels inside the batch response body. Your client still sees them on the call's response, but the browser never reads them, so cookies set in a batched call are never stored.
+Cookies set in a batched call are never stored, because the browser only reads headers from the batch response itself, not from each subresponse. Send procedures that set cookies outside the batch:
 
-Send procedures that set cookies, such as sign-in and sign-out, outside the batch with [`filter`](#filtering-requests), for example `filter: ({ path }) => path[0] !== 'auth'`.
+```ts
+const link = new RPCLink({
+  url: '/rpc',
+  plugins: [
+    new BatchLinkPlugin({
+      filter: ({ path }) => path[0] !== 'auth', // auth procedures set cookies
+      groups: [
+        {
+          condition: () => true,
+          context: {},
+        },
+      ],
+    }),
+  ],
+})
+```
 
 ## Learn More
 
