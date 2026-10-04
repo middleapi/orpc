@@ -3,7 +3,7 @@ import type { AnyProcedure, AnyRouter, WalkProcedureContractsLazyResult } from '
 import type { Value } from '@orpc/shared'
 import type { MatchedRoute } from 'rou3'
 import { createContractProcedure, getRouter, Procedure, unlazy, walkProcedureContractsSync } from '@orpc/server'
-import { mergeHttpPath, normalizeHttpPath, pathToHttpPath, safeDecodeURIComponent, value } from '@orpc/shared'
+import { mergeHttpPath, normalizeHttpPath, pathToHttpPath, safeDecodeURIComponent, setOwn, value } from '@orpc/shared'
 import { addRoute, createRouter, findAllRoutes, findRoute, routeToRegExp } from 'rou3'
 import { DEFAULT_OPENAPI_METHOD } from '../../constants'
 import { getOpenAPIMeta } from '../../meta'
@@ -280,14 +280,7 @@ function decodeParams(params: [rou3Key: string, name: string][], values: Record<
   const decoded: Record<string, string> = {}
 
   for (const [rou3Key, name] of params) {
-    const value = safeDecodeURIComponent(values[rou3Key]!)
-
-    if (name === '__proto__') {
-      Object.defineProperty(decoded, name, { value, enumerable: true, writable: true, configurable: true })
-    }
-    else {
-      decoded[name] = value
-    }
+    setOwn(decoded, name, safeDecodeURIComponent(values[rou3Key]!))
   }
 
   return decoded
