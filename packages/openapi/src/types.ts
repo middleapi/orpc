@@ -1,10 +1,13 @@
 // eslint-disable-next-line no-restricted-imports
-import type { OpenAPIV3_0, OpenAPIV3_1, OpenAPIV3_2 } from '@openapi-spec/types'
+import type * as OpenAPIV3_0 from '@openapi-spec/types/v3.0'
+// eslint-disable-next-line no-restricted-imports
+import type * as OpenAPIV3_1 from '@openapi-spec/types/v3.1'
+// eslint-disable-next-line no-restricted-imports
+import type * as OpenAPIV3_2 from '@openapi-spec/types/v3.2'
 import type { AnyNestedClient, Client, ORPCError } from '@orpc/client'
 import type { AsyncIteratorClass } from '@orpc/shared'
 
-// eslint-disable-next-line no-restricted-imports
-export type { OpenAPIV3_0, OpenAPIV3_1, OpenAPIV3_2 } from '@openapi-spec/types'
+export type { OpenAPIV3_0, OpenAPIV3_1, OpenAPIV3_2 }
 
 /**
  * An OpenAPI version `OpenAPIGenerator` can target: any `3.0.x`, `3.1.x`, or `3.2.x` value.

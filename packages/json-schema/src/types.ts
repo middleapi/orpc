@@ -1,5 +1,5 @@
 // eslint-disable-next-line no-restricted-imports
-import type { OpenAPIV3_2 } from '@openapi-spec/types'
+import type * as OpenAPIV3_2 from '@openapi-spec/types/v3.2'
 
 /**
  * A JSON Schema (draft 2020-12) representation used across oRPC's JSON schema tooling.

@@ -49,7 +49,7 @@
     "zod": ">=4.5.0"
   },
   "dependencies": {
-    "@openapi-spec/types": "~0.1.0",
+    "@openapi-spec/types": "~0.3.0",
     "@orpc/json-schema": "workspace:*"
   },
   "devDependencies": {
