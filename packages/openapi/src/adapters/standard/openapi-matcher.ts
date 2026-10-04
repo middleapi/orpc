@@ -28,9 +28,6 @@ interface TreeEntry {
   catchAllKey?: string | undefined
 }
 
-/** only characters `encodeURIComponent` keeps, plus `/`, so `normalizeHttpPath` would not change it */
-const NORMALIZED_HTTP_PATH_REGEX = /^[\w\-.!~*'()/]*$/
-
 interface PendingLazyRouter extends WalkProcedureContractsLazyResult {
   matcher?: RegExp
   /** in-flight load, shared so concurrent matches never load or re-index the same router twice */
@@ -135,11 +132,12 @@ export class OpenAPIMatcher {
 
     let match = this.findMatch(method, pathname)
 
-    if (match === undefined && !NORMALIZED_HTTP_PATH_REGEX.test(pathname)) {
+    if (match === undefined && pathname.includes('%')) {
       // Retry with a normalized path: users may percent-encode characters that
-      // we store unencoded (e.g. "a%62c" vs "abc"), or send raw characters that
-      // we store encoded (e.g. "café" vs "caf%C3%A9"), so normalization lets us
+      // we store unencoded (e.g. "a%62c" vs "abc"), so normalization lets us
       // handle those requests without storing duplicate entries.
+      // Raw characters stored encoded (e.g. "café" vs "caf%C3%A9") are not retried,
+      // to keep misses cheap: HTTP clients always send them encoded.
 
       const normalizedPathname = normalizeHttpPath(pathname)
 
@@ -277,10 +275,14 @@ function toRou3Route(path: `/${string}`): { pattern: `/${string}` } & Pick<TreeE
   return { pattern: pattern as `/${string}`, params, catchAllKey }
 }
 
-const ROU3_SYNTAX_CHAR_REGEX = /[\\:*?+(){}.]/g
+/**
+ * rou3 syntax characters, and the first `.` of a `.` / `..` segment, which rou3 would resolve.
+ * Other dots stay unescaped, since an escape makes rou3 register the route more slowly.
+ */
+const ROU3_SYNTAX_REGEX = /[\\:*?+(){}]|(?<![^/])\.(?=\.?(?:\/|$))/g
 
 function escapeRou3Literal(text: string): string {
-  return text.replace(ROU3_SYNTAX_CHAR_REGEX, '\\$&')
+  return text.replace(ROU3_SYNTAX_REGEX, '\\$&')
 }
 
 function toRou3PrefixMatcher(prefix: `/${string}`): RegExp {

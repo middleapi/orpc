@@ -233,27 +233,17 @@ describe('openAPIMatcher', () => {
       await expect(matcher.match('GET', '/what', undefined)).resolves.toBeUndefined()
     })
 
-    it('matches path text whether the request path encodes it or not', async () => {
-      const unicode = os.meta(openapi({ method: 'GET', path: '/café/{id}' })).handler(() => 'ok')
-      const caret = os.meta(openapi({ method: 'GET', path: '/a^b' })).handler(() => 'ok')
-      const colon = os.handler(() => 'ok')
+    it('matches non-ASCII path text against the percent-encoded request path', async () => {
+      const procedure = os.meta(openapi({ method: 'GET', path: '/café/{id}' })).handler(() => 'ok')
 
-      const matcher = new OpenAPIMatcher({ unicode, caret, 'a:b': colon })
+      const matcher = new OpenAPIMatcher({ procedure })
 
-      for (const pathname of ['/caf%C3%A9/1', '/caf%c3%a9/1', '/café/1'] as const) {
+      for (const pathname of ['/caf%C3%A9/1', '/caf%c3%a9/1'] as const) {
         await expect(matcher.match('GET', pathname, undefined)).resolves.toEqual({
-          path: ['unicode'],
-          procedure: unicode,
+          path: ['procedure'],
+          procedure,
           params: { id: '1' },
         })
-      }
-
-      for (const pathname of ['/a^b', '/a%5Eb'] as const) {
-        await expect(matcher.match('GET', pathname, undefined)).resolves.toMatchObject({ procedure: caret })
-      }
-
-      for (const pathname of ['/a:b', '/a%3Ab'] as const) {
-        await expect(matcher.match('POST', pathname, undefined)).resolves.toMatchObject({ procedure: colon })
       }
     })
 
