@@ -186,29 +186,6 @@ const link = new RPCLink({
 })
 ```
 
-## Response Cookies
-
-Browsers only store cookies from the real HTTP response. In a batch, the headers a procedure sets through the [Response Headers Plugin](/docs/plugins/response-headers) go into that procedure's subresponse, which travels inside the batch response body. Your client still sees them on the call's response, but the browser never reads them, so cookies set in a batched call are never stored.
-
-Use `filter` to send procedures that set cookies, such as sign-in and sign-out, outside the batch:
-
-```ts
-const link = new RPCLink({
-  url: '/rpc',
-  plugins: [
-    new BatchLinkPlugin({
-      filter: ({ path }) => path[0] !== 'auth', // auth procedures set cookies
-      groups: [
-        {
-          condition: () => true,
-          context: {},
-        },
-      ],
-    }),
-  ],
-})
-```
-
 ## Wait Time
 
 By default, only requests made in the same [event loop](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Execution_model#job_queue_and_event_loop) tick are batched together. Set `wait` to keep collecting requests for a number of milliseconds, trading a little latency for fewer, larger batches.
@@ -260,6 +237,12 @@ const link = new RPCLink({
 :::tip
 Per-request data passed through the link's [`headers` option](/docs/rpc/link#url-and-header-options) is resolved for each request, so it is safe without `scope`.
 :::
+
+## Limitations
+
+Browsers only store cookies from the real HTTP response. In a batch, the headers a procedure sets through the [Response Headers Plugin](/docs/plugins/response-headers) go into that procedure's subresponse, which travels inside the batch response body. Your client still sees them on the call's response, but the browser never reads them, so cookies set in a batched call are never stored.
+
+Send procedures that set cookies, such as sign-in and sign-out, outside the batch with [`filter`](#filtering-requests), for example `filter: ({ path }) => path[0] !== 'auth'`.
 
 ## Learn More
 
