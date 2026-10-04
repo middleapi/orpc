@@ -756,11 +756,11 @@ describe('batchLinkPlugin', () => {
       const transport = makeTransport()
       const controller = new AbortController()
 
-      vi.mocked(codec.encodeInput).mockImplementation(async (input, path, { signal }) => ({
+      vi.mocked(codec.encodeInput).mockImplementation(async (_input, path, { signal }) => ({
         method,
         url: `/${path.join('/')}` as `/${string}`,
         headers: {},
-        body: method === 'GET' ? undefined : input,
+        body: undefined,
         signal,
       }))
 
@@ -794,7 +794,6 @@ describe('batchLinkPlugin', () => {
       const batchRequest = vi.mocked(transport.send).mock.calls[0]![0]
       expect(batchRequest.method).toBe(method)
       expect(batchRequest.signal?.aborted).toBe(false)
-      // Only b's request, so a's request and cancel cannot push a full batch past the server's maxSize
       expect(extractBatchMessagesFromRequest(batchRequest).map(m => [m.kind, m.json?.url])).toEqual([['request', '/b']])
     })
 
@@ -802,13 +801,9 @@ describe('batchLinkPlugin', () => {
       const codec = makeCodec()
       const transport = makeTransport()
       const controller = new AbortController()
-      let sentMessageKinds: string[] | undefined
 
       vi.mocked(transport.send).mockImplementationOnce(async (request) => {
-        // Aborted before the transport reads the body, e.g. while an async `origin` resolves
         controller.abort(new Error('TEST_ABORT'))
-        sentMessageKinds = extractBatchMessagesFromRequest(request).map(m => m.kind)
-
         return makeBufferedBatchResponseFromRequest(request)
       })
 
@@ -821,7 +816,7 @@ describe('batchLinkPlugin', () => {
         expect(link.call(['b'], {}, { context: {} })).resolves.toBe('result-1'),
       ])
 
-      expect(sentMessageKinds).toEqual(['request', 'request'])
+      expect(extractBatchMessagesFromRequest(vi.mocked(transport.send).mock.calls[0]![0]).map(m => m.kind)).toEqual(['request', 'request'])
     })
 
     it('aborts the batch request once every subrequest is aborted, including ones aborted before sending', async () => {

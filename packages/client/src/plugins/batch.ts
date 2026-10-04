@@ -360,9 +360,8 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
       isBatchSent = true
 
       /**
-       * A subrequest aborted after its request message leaves that message and a cancel behind. Sending them
-       * would make the server run a call the client already rejected and count both against its batch size
-       * limit, so send only the open subrequests. The copy also stops later cancels from reaching the transport.
+       * Leave out subrequests aborted before the batch is sent: the server counts their request and cancel
+       * against its batch size limit and would still run calls the client already rejected.
        */
       const outgoingMessages = pendingMessages.filter(message => openRequestIds.has(message.id))
 
