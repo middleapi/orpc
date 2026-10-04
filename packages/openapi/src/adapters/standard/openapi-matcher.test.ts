@@ -197,6 +197,7 @@ describe('openAPIMatcher', () => {
     it('matches path text literally, even characters that are route syntax elsewhere', async () => {
       const ping = os.handler(() => 'pong')
       const dotPing = os.handler(() => 'pong')
+      const dotDotPing = os.handler(() => 'pong')
       const star = os.handler(() => 'star')
       const group = os.handler(() => 'group')
       const batch = os.meta(openapi({ method: 'GET', path: '/items:batchGet' })).handler(() => 'batch')
@@ -205,7 +206,8 @@ describe('openAPIMatcher', () => {
 
       const matcher = new OpenAPIMatcher({
         'ping': ping,
-        '..': { ping: dotPing },
+        '.': { ping: dotPing },
+        '..': { ping: dotDotPing },
         '*': star,
         '(x)': group,
         batch,
@@ -214,7 +216,8 @@ describe('openAPIMatcher', () => {
       })
 
       await expect(matcher.match('POST', '/ping', undefined)).resolves.toMatchObject({ procedure: ping })
-      await expect(matcher.match('POST', '/../ping', undefined)).resolves.toMatchObject({ procedure: dotPing })
+      await expect(matcher.match('POST', '/./ping', undefined)).resolves.toMatchObject({ procedure: dotPing })
+      await expect(matcher.match('POST', '/../ping', undefined)).resolves.toMatchObject({ procedure: dotDotPing })
 
       await expect(matcher.match('POST', '/*', undefined)).resolves.toMatchObject({ procedure: star, params: undefined })
       await expect(matcher.match('POST', '/anything', undefined)).resolves.toBeUndefined()
@@ -261,7 +264,7 @@ describe('openAPIMatcher', () => {
       await expect(matcher.match('GET', '/files/a/b', undefined)).resolves.toBeUndefined()
     })
 
-    it('requires a value for catch-all params, falling back to less specific routes', async () => {
+    it('requires a value for catch-all params, falling back to the most specific other route', async () => {
       const files = os.meta(openapi({ method: 'GET', path: '/files/{+path}' })).handler(() => 'ok')
       const filesOnly = new OpenAPIMatcher({ files })
 
@@ -269,12 +272,22 @@ describe('openAPIMatcher', () => {
       await expect(filesOnly.match('GET', '/files/', undefined)).resolves.toBeUndefined()
 
       const fallback = os.meta(openapi({ method: 'GET', path: '/{+path}' })).handler(() => 'ok')
-      const matcher = new OpenAPIMatcher({ files, fallback })
+      const named = os.meta(openapi({ method: 'GET', path: '/{name}' })).handler(() => 'ok')
+      const matcher = new OpenAPIMatcher({ files, fallback, named })
 
-      await expect(matcher.match('GET', '/files', undefined)).resolves.toEqual({
+      // repeated, so a result that depends on reused state would show up
+      for (let i = 0; i < 2; i++) {
+        await expect(matcher.match('GET', '/files', undefined)).resolves.toEqual({
+          path: ['named'],
+          procedure: named,
+          params: { name: 'files' },
+        })
+      }
+
+      await expect(matcher.match('GET', '/a/b', undefined)).resolves.toEqual({
         path: ['fallback'],
         procedure: fallback,
-        params: { path: 'files' },
+        params: { path: 'a/b' },
       })
 
       await expect(matcher.match('GET', '/files/a', undefined)).resolves.toEqual({

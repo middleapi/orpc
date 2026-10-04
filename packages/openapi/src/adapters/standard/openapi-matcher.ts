@@ -22,9 +22,7 @@ interface TreeEntry {
   path: string[]
   contract: AnyProcedureContract
   procedure?: AnyProcedure | undefined
-  /** rou3 key and OpenAPI name of each dynamic param, in path order (see {@link toRou3Route}) */
-  params?: [key: string, name: string][] | undefined
-  /** rou3 key of the `{+param}`, if any */
+  params?: [rou3Key: string, name: string][] | undefined
   catchAllKey?: string | undefined
 }
 
@@ -82,8 +80,6 @@ export class OpenAPIMatcher {
       }
     })
 
-    // everything is converted before the tree changes, so a path that fails to convert never
-    // leaves a lazy router half indexed, which would duplicate its routes on every retry
     for (const { method, pattern, entry } of routes) {
       addRoute(this.tree, method, pattern, entry)
     }
@@ -136,8 +132,7 @@ export class OpenAPIMatcher {
       // Retry with a normalized path: users may percent-encode characters that
       // we store unencoded (e.g. "a%62c" vs "abc"), so normalization lets us
       // handle those requests without storing duplicate entries.
-      // Raw characters stored encoded (e.g. "café" vs "caf%C3%A9") are not retried,
-      // to keep misses cheap: HTTP clients always send them encoded.
+      // Raw characters we store encoded (e.g. "café") are not retried, to keep misses cheap.
 
       const normalizedPathname = normalizeHttpPath(pathname)
 
@@ -163,10 +158,6 @@ export class OpenAPIMatcher {
     }
   }
 
-  /**
-   * rou3 lets a catch-all match no segment at all, but a `{+param}` needs a value,
-   * so such a match gives way to the most specific route that does not leave one empty.
-   */
   private findMatch(method: string, pathname: `/${string}`): MatchedRoute<TreeEntry> | undefined {
     const match = findRoute(this.tree, method, pathname)
 
@@ -174,7 +165,6 @@ export class OpenAPIMatcher {
       return match
     }
 
-    // ordered from the least to the most specific, and a fresh array, so reversing it in place is safe
     return findAllRoutes(this.tree, method, pathname).reverse().find(match => !hasEmptyCatchAll(match))
   }
 
@@ -231,12 +221,6 @@ export class OpenAPIMatcher {
   }
 }
 
-/**
- * Converts an OpenAPI path into a rou3 pattern. Literal text is escaped, since rou3 reads
- * characters such as `:`, `*`, `?`, `(` and `{` as syntax and resolves `.` / `..` segments.
- * Params get positional keys (`p0`, `p1`, ...), since rou3 rejects or misreads many names
- * OpenAPI allows, such as `{user-id}`, `{0}` or a repeated name.
- */
 function toRou3Route(path: `/${string}`): { pattern: `/${string}` } & Pick<TreeEntry, 'params' | 'catchAllKey'> {
   const dynamicParams = getDynamicPathParams(path)
 
@@ -247,7 +231,7 @@ function toRou3Route(path: `/${string}`): { pattern: `/${string}` } & Pick<TreeE
   let pattern = ''
   let literalStart = 0
   let catchAllKey: string | undefined
-  const params: [key: string, name: string][] = []
+  const params: [rou3Key: string, name: string][] = []
 
   for (const param of dynamicParams) {
     const key = `p${params.length}`
@@ -262,7 +246,6 @@ function toRou3Route(path: `/${string}`): { pattern: `/${string}` } & Pick<TreeE
       }
 
       catchAllKey = key
-      // unlike `**:name`, `:name(.*)` also takes empty segments, such as the `//` of an encoded URL
       pattern += `:${key}(.*)`
     }
     else {
@@ -275,10 +258,7 @@ function toRou3Route(path: `/${string}`): { pattern: `/${string}` } & Pick<TreeE
   return { pattern: pattern as `/${string}`, params, catchAllKey }
 }
 
-/**
- * rou3 syntax characters, and the first `.` of a `.` / `..` segment, which rou3 would resolve.
- * Other dots stay unescaped, since an escape makes rou3 register the route more slowly.
- */
+// rou3 syntax and the first dot of `.` / `..` segments; other dots stay unescaped, since escapes slow route registration
 const ROU3_SYNTAX_REGEX = /[\\:*?+(){}]|(?<![^/])\.(?=\.?(?:\/|$))/g
 
 function escapeRou3Literal(text: string): string {
@@ -286,8 +266,6 @@ function escapeRou3Literal(text: string): string {
 }
 
 function toRou3PrefixMatcher(prefix: `/${string}`): RegExp {
-  // rou3 allows one catch-all per route, so a prefix with its own is matched only up to it,
-  // which at most loads the lazy router a little more eagerly than needed
   const catchAll = getDynamicPathParams(prefix)?.find(param => param.allowsSlash)
   const head = catchAll ? prefix.slice(0, catchAll.startIndex) as `/${string}` : prefix
 
@@ -298,15 +276,13 @@ function hasEmptyCatchAll(match: MatchedRoute<TreeEntry>): boolean {
   return match.data.catchAllKey !== undefined && !match.params?.[match.data.catchAllKey]
 }
 
-function decodeParams(params: [key: string, name: string][], values: Record<string, string>): Record<string, string> {
+function decodeParams(params: [rou3Key: string, name: string][], values: Record<string, string>): Record<string, string> {
   const decoded: Record<string, string> = {}
 
-  // a repeated name keeps its last value
-  for (const [key, name] of params) {
-    const value = safeDecodeURIComponent(values[key]!)
+  for (const [rou3Key, name] of params) {
+    const value = safeDecodeURIComponent(values[rou3Key]!)
 
     if (name === '__proto__') {
-      // assigning would set the prototype instead of an own property
       Object.defineProperty(decoded, name, { value, enumerable: true, writable: true, configurable: true })
     }
     else {
