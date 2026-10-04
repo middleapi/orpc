@@ -242,17 +242,17 @@ importers:
         specifier: workspace:*
         version: link:packages/zod
       '@standard-server/core':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       '@standard-server/fetch':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       '@standard-server/peer':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       '@standard-server/shared':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       '@tanstack/ai':
         specifier: ^0.46.0
         version: 0.46.0(@opentelemetry/api@1.9.1)(zod@4.5.4)
@@ -499,8 +499,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standard-server/core':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
     devDependencies:
       '@types/bun':
         specifier: ^1.3.14
@@ -515,14 +515,14 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standard-server/core':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       '@standard-server/fetch':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       '@standard-server/peer':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
     devDependencies:
       '@types/ws':
         specifier: ^8.18.1
@@ -552,8 +552,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standard-server/core':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.22.0
@@ -624,8 +624,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standard-server/core':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
     devDependencies:
       evlog:
         specifier: ^2.26.0
@@ -643,11 +643,11 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standard-server/core':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       '@standard-server/peer':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
 
   packages/json-schema:
     dependencies:
@@ -733,11 +733,11 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standard-server/core':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       '@standard-server/node':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
     devDependencies:
       '@fastify/cookie':
         specifier: ^11.0.2
@@ -801,14 +801,14 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standard-server/core':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       '@standard-server/fetch':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       '@standard-server/node':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       mime:
         specifier: ^4.1.0
         version: 4.1.0
@@ -844,11 +844,11 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standard-server/core':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       '@standard-server/fetch':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       rou3:
         specifier: ^1.0.0
         version: 1.0.0
@@ -857,8 +857,8 @@ importers:
         specifier: ^1.65.1
         version: 1.66.1(axios@1.20.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2))(change-case@5.4.4)(supports-color@10.2.2)(tailwindcss@4.3.3)(typescript@6.0.3)(zod@4.5.4)
       '@standard-server/aws-lambda':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       '@types/swagger-ui':
         specifier: ^5.32.0
         version: 5.32.0
@@ -931,8 +931,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standard-server/core':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
     devDependencies:
       pino:
         specifier: ^10.3.1
@@ -947,8 +947,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standard-server/core':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
     devDependencies:
       '@upstash/redis':
         specifier: ^1.38.2
@@ -966,8 +966,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standard-server/core':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
     devDependencies:
       '@upstash/ratelimit':
         specifier: ^2.0.8
@@ -991,23 +991,23 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standard-server/aws-lambda':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       '@standard-server/core':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       '@standard-server/fastify':
-        specifier: ~0.10.0
-        version: 0.10.0(fastify@5.12.1)
+        specifier: ~0.10.1
+        version: 0.10.1(fastify@5.12.1)
       '@standard-server/fetch':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       '@standard-server/node':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       '@standard-server/peer':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       cookie:
         specifier: ^2.0.1
         version: 2.0.1
@@ -1031,8 +1031,8 @@ importers:
   packages/shared:
     dependencies:
       '@standard-server/shared':
-        specifier: ~0.10.0
-        version: 0.10.0
+        specifier: ~0.10.1
+        version: 0.10.1
       radash:
         specifier: ^12.1.1
         version: 12.1.1
@@ -5227,31 +5227,31 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@standard-server/aws-lambda@0.10.0':
-    resolution: {integrity: sha512-UOT2gtDvRaMPEYWsfGIKdIgDillMjF1LdvvpACWfqKn0krkOQ4x7wfhMwwD4rCN5g/5iI5qO8tlvKJLlJtdInQ==}
+  '@standard-server/aws-lambda@0.10.1':
+    resolution: {integrity: sha512-Rba4wyO9T0ta+Ze2Gu+c27vfzEjFKBqwUobtODvoo0ArZvcycY9Pr5Bf5iFcDX1NAWPFjnyEg5YQe2d+lJqu4g==}
 
-  '@standard-server/core@0.10.0':
-    resolution: {integrity: sha512-t3anpLtP/Qr64TT8OsJbH4b7T3/ho2r2MYZMzT972yh/MGj6iH2SizXTtKdrN9vU1LvZ8BKldAtGNVCu8lW/Ow==}
+  '@standard-server/core@0.10.1':
+    resolution: {integrity: sha512-LtTjCg2x2FfbExGRdtu5J1biNVyNOfLs1/4zHAh/t0qZlbY+jIIbFYT5BPwbiYjF4o+Va5/JKjrA6uZeOQ184w==}
 
-  '@standard-server/fastify@0.10.0':
-    resolution: {integrity: sha512-kDpujjB0eujp9Da06i+yhHXU1ZO3nJxL365lVys6BS3yVJ6CgNh03xO2tODUvOL7NvX29bE6P6WO+yQedwoURg==}
+  '@standard-server/fastify@0.10.1':
+    resolution: {integrity: sha512-8up+11uSaZRNlJ+ejyLPoxgAkftVeV1XCH+afmEbsaQ8YZlLGXQlf12mHFBoS+6Mr0NqtpYn4eBmC6yTnS7llw==}
     peerDependencies:
       fastify: '>=5.6.1'
     peerDependenciesMeta:
       fastify:
         optional: true
 
-  '@standard-server/fetch@0.10.0':
-    resolution: {integrity: sha512-PEyo2yCggoBjQzslvxUGzRkJSr2PWaCFvDw8+JJnCEDvEdTv8hzaTCyU2nog+zPu4XFq6zzVYh1Q6A80gGNlQg==}
+  '@standard-server/fetch@0.10.1':
+    resolution: {integrity: sha512-YK16ZUjJNRl7BZkqsA9dimTqNgjC/pfhXVcRcox22G1x4hrzTd993JLaQSduJ79g8hEyx0LuMCkjLavumwmonQ==}
 
-  '@standard-server/node@0.10.0':
-    resolution: {integrity: sha512-Jiqzuo/50kQCuD6ET9kDir3tgq4CpMxKHr1kXP/dFkTaxIWKmsgoAlw9oDTpok8TYVvpHtHrnENTBvAavNJpMg==}
+  '@standard-server/node@0.10.1':
+    resolution: {integrity: sha512-tVH85dY/qxflrqoGDXy/BiKmzw7w8ELif8yVbIx8XRGsc1qkTere51jsoJlx3tAQN/AC9SUoGjvgcVXVS6IwYw==}
 
-  '@standard-server/peer@0.10.0':
-    resolution: {integrity: sha512-HdNxcZsnYXcHySD31RsGOynQXYWUOOSVWSjdb9di2Gm6FW9EP1mB+h6b+5UkzNSs7hMdhL2z1zlaIFhplznQtg==}
+  '@standard-server/peer@0.10.1':
+    resolution: {integrity: sha512-M1CXBNKMzCSTq33bNHxvUoGSwjjw6rqA+EJ1Cv6UJZSdAN9GoXQPVkmf1qmpPIDlc+0WhXHPoMbND1pqrblMog==}
 
-  '@standard-server/shared@0.10.0':
-    resolution: {integrity: sha512-yHBLREnJzZg9kugvG7zpaFL25wGLbdKgSCavmjOj4wgJ2dwZZ/w4nl503Y+44Kt87Z1gbd2OjwNIz379QAaZ3Q==}
+  '@standard-server/shared@0.10.1':
+    resolution: {integrity: sha512-8OhXcAY13iAtEzprBFDlfOvGVLCrNnf31oiPOJ/aZaR+i2BzT8U7qsUhYU5VPbD++KKfkzsJ7hN2kDlOxJ9C6w==}
 
   '@stoplight/better-ajv-errors@1.0.3':
     resolution: {integrity: sha512-0p9uXkuB22qGdNfy3VeEhxkU5uwvp/KrBTAbrLBURv6ilxIVwanKwjMc41lQfIVgPGcOkmLbTolfFrSsueu7zA==}
@@ -16580,41 +16580,41 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@standard-server/aws-lambda@0.10.0':
+  '@standard-server/aws-lambda@0.10.1':
     dependencies:
-      '@standard-server/core': 0.10.0
-      '@standard-server/fetch': 0.10.0
-      '@standard-server/node': 0.10.0
-      '@standard-server/shared': 0.10.0
+      '@standard-server/core': 0.10.1
+      '@standard-server/fetch': 0.10.1
+      '@standard-server/node': 0.10.1
+      '@standard-server/shared': 0.10.1
 
-  '@standard-server/core@0.10.0':
+  '@standard-server/core@0.10.1':
     dependencies:
-      '@standard-server/shared': 0.10.0
+      '@standard-server/shared': 0.10.1
 
-  '@standard-server/fastify@0.10.0(fastify@5.12.1)':
+  '@standard-server/fastify@0.10.1(fastify@5.12.1)':
     dependencies:
-      '@standard-server/core': 0.10.0
-      '@standard-server/node': 0.10.0
+      '@standard-server/core': 0.10.1
+      '@standard-server/node': 0.10.1
     optionalDependencies:
       fastify: 5.12.1
 
-  '@standard-server/fetch@0.10.0':
+  '@standard-server/fetch@0.10.1':
     dependencies:
-      '@standard-server/core': 0.10.0
-      '@standard-server/shared': 0.10.0
+      '@standard-server/core': 0.10.1
+      '@standard-server/shared': 0.10.1
 
-  '@standard-server/node@0.10.0':
+  '@standard-server/node@0.10.1':
     dependencies:
-      '@standard-server/core': 0.10.0
-      '@standard-server/fetch': 0.10.0
-      '@standard-server/shared': 0.10.0
+      '@standard-server/core': 0.10.1
+      '@standard-server/fetch': 0.10.1
+      '@standard-server/shared': 0.10.1
 
-  '@standard-server/peer@0.10.0':
+  '@standard-server/peer@0.10.1':
     dependencies:
-      '@standard-server/core': 0.10.0
-      '@standard-server/shared': 0.10.0
+      '@standard-server/core': 0.10.1
+      '@standard-server/shared': 0.10.1
 
-  '@standard-server/shared@0.10.0': {}
+  '@standard-server/shared@0.10.1': {}
 
   '@stoplight/better-ajv-errors@1.0.3(ajv@8.20.0)':
     dependencies:

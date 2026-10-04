@@ -48,9 +48,9 @@
   "dependencies": {
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.10.0",
-    "@standard-server/fetch": "~0.10.0",
-    "@standard-server/node": "~0.10.0",
+    "@standard-server/core": "~0.10.1",
+    "@standard-server/fetch": "~0.10.1",
+    "@standard-server/node": "~0.10.1",
     "mime": "^4.1.0"
   },
   "devDependencies": {
