@@ -59,12 +59,7 @@ export class EffectSchemaToJsonSchemaConverter implements JsonSchemaConverter {
   }
 
   private convertUncached(schema: EffectSchema.Top & AnySchema, direction: JsonSchemaConverterDirection): [jsonSchema: JsonSchema, optional: boolean] {
-    try {
-      return [this.convertEffect(schema, direction), isStandardSchemaOptional(schema, direction)]
-    }
-    catch {
-      return [{}, true]
-    }
+    return [this.convertEffect(schema, direction), isStandardSchemaOptional(schema, direction)]
   }
 
   private convertEffect(schema: EffectSchema.Top, direction: JsonSchemaConverterDirection): JsonSchema {

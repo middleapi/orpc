@@ -110,11 +110,11 @@ describe('effectSchemaToJsonSchemaConverter', () => {
     })
   })
 
-  it('falls back to an empty optional schema when conversion throws', () => {
+  it('propagates errors from Effect', () => {
     // Effect cannot represent symbol property names in JSON Schema
     const schema = toStandardSchema(Schema.Struct({ [Symbol.for('key')]: Schema.String }))
 
-    expect(converter.convert(schema, 'input')).toEqual([{}, true])
+    expect(() => converter.convert(schema, 'input')).toThrow('Objects property names must be strings')
   })
 
   describe('cache option', () => {
