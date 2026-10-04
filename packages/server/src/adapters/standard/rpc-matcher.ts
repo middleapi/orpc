@@ -4,7 +4,7 @@ import type { StandardMethod } from '@standard-server/core'
 import type { AnyProcedure } from '../../procedure'
 import type { AnyRouter } from '../../router'
 import type { WalkProcedureContractsLazyResult } from '../../router-utils'
-import { normalizeHttpPath, pathToHttpPath, value } from '@orpc/shared'
+import { isNormalizedHttpPath, normalizeHttpPath, pathToHttpPath, value } from '@orpc/shared'
 import { unlazy } from '../../lazy'
 import { Procedure } from '../../procedure'
 import { createContractProcedure } from '../../procedure-utils'
@@ -133,9 +133,10 @@ export class RPCMatcher {
 
     let entry = this.tree.get(pathname)
 
-    if (entry === undefined && pathname.includes('%')) {
+    if (entry === undefined && !isNormalizedHttpPath(pathname)) {
       // Retry with a normalized path: users may percent-encode characters that
-      // we store unencoded (e.g. "a%62c" vs "abc"), so normalization lets us
+      // we store unencoded (e.g. "a%62c" vs "abc"), or send raw characters that
+      // we store encoded (e.g. "café" vs "caf%C3%A9"), so normalization lets us
       // handle those requests without storing duplicate entries.
 
       const normalizedPathname = normalizeHttpPath(pathname)

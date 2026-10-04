@@ -1,6 +1,7 @@
 import {
   isAcceptableEncoding,
   isCompressibleContentType,
+  isNormalizedHttpPath,
   isNoTransformCacheControl,
   matchesHttpPath,
   matchesHttpPathPrefix,
@@ -66,6 +67,40 @@ describe('normalizeHttpPath', () => {
 
   it('does not remove redundant trailing slash', () => {
     expect(normalizeHttpPath('/a/')).toEqual('/a/')
+  })
+})
+
+describe('isNormalizedHttpPath', () => {
+  it.each([
+    '/',
+    '/a/b/c',
+    '/a/',
+    '//a',
+    '/AZaz09',
+    `/-_.!~*'()`,
+  ] as const)('returns true for %s, which normalizeHttpPath leaves unchanged', (path) => {
+    expect(isNormalizedHttpPath(path)).toBe(true)
+    expect(normalizeHttpPath(path)).toBe(path)
+  })
+
+  it.each([
+    ...[':', '@', '+', ',', ';', '=', '$', '&', '[', ']', '|', ' ', '^', '"', '#', '?', 'é', '\u{1F600}'].map(char => `/a${char}b` as const),
+    '/café',
+  ] as const)('returns false for %s, which normalizeHttpPath encodes', (path) => {
+    expect(isNormalizedHttpPath(path)).toBe(false)
+    expect(normalizeHttpPath(path)).not.toBe(path)
+  })
+
+  it('returns false for any percent-encoding, which normalizeHttpPath may change', () => {
+    expect(isNormalizedHttpPath('/a%62c')).toBe(false)
+    expect(normalizeHttpPath('/a%62c')).toBe('/abc')
+
+    expect(isNormalizedHttpPath('/caf%c3%a9')).toBe(false)
+    expect(normalizeHttpPath('/caf%c3%a9')).toBe('/caf%C3%A9')
+
+    // even when it is already normalized
+    expect(isNormalizedHttpPath('/a%3Ab')).toBe(false)
+    expect(normalizeHttpPath('/a%3Ab')).toBe('/a%3Ab')
   })
 })
 

@@ -452,5 +452,19 @@ describe('rpcMatcher', () => {
       expect(lazyLoader).toHaveBeenCalledTimes(1)
       expect(lazyLazyLoader).toHaveBeenCalledTimes(0)
     })
+
+    it('matches keys with characters stored encoded, whether the request path encodes them or not', async () => {
+      const matcher = new RPCMatcher({ 'a:b': procedure1, 'café': procedure2 })
+
+      for (const pathname of ['/a:b', '/a%3Ab'] as const) {
+        await expect(matcher.match('POST', pathname, undefined)).resolves.toEqual({ path: ['a:b'], procedure: procedure1 })
+      }
+
+      for (const pathname of ['/café', '/caf%C3%A9'] as const) {
+        await expect(matcher.match('POST', pathname, undefined)).resolves.toEqual({ path: ['café'], procedure: procedure2 })
+      }
+
+      await expect(matcher.match('POST', '/missing', undefined)).resolves.toBeUndefined()
+    })
   })
 })

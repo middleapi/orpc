@@ -14,6 +14,20 @@ export function normalizeHttpPath(path: string): `/${string}` {
   return pathToHttpPath(paths.map(safeDecodeURIComponent))
 }
 
+/** only characters `encodeURIComponent` keeps, plus `/` */
+const NORMALIZED_HTTP_PATH_REGEX = /^[\w\-.!~*'()/]*$/
+
+/**
+ * Fast check that {@link normalizeHttpPath} would return a path starting with `/` unchanged.
+ * It accepts only the characters `encodeURIComponent` keeps, plus `/`, so `false` means
+ * normalizing may change the path: a raw character such as `:` or `é` gets encoded, and
+ * percent-encoding may be decoded or re-cased. Any `%` gives `false`, even in a path that is
+ * already normalized.
+ */
+export function isNormalizedHttpPath(path: `/${string}`): boolean {
+  return NORMALIZED_HTTP_PATH_REGEX.test(path)
+}
+
 export function mergeHttpPath(a: `/${string}`, b: `/${string}`): `/${string}` {
   return `${a.endsWith('/') ? a.slice(0, -1) : a}${b}` as `/${string}`
 }
