@@ -1,8 +1,9 @@
 import type { Client } from '@orpc/client'
 import type { StandardLazyResponse } from '@standard-server/core'
+import type { RouterUtilsOptions } from './router-utils'
 import { createORPCClient } from '@orpc/client'
 import { StandardLink } from '@orpc/client/standard'
-import { CacheLinkPlugin } from '@orpc/experimental-cache'
+import { CACHE_LINK_PLUGIN_CONTEXT_SYMBOL, CacheLinkPlugin } from '@orpc/experimental-cache'
 import { encodeCacheTagHeader, promiseWithResolvers } from '@orpc/shared'
 import { dehydrate, hydrate, InfiniteQueryObserver, MutationObserver, QueryClient, QueryObserver } from '@tanstack/query-core'
 import { experimental_CacheRevalidationUtilsPlugin as CacheRevalidationUtilsPlugin } from './cache-revalidation-plugin'
@@ -42,7 +43,7 @@ const handlers = {
   'user.me': vi.fn(async (): Promise<Reply> => ({ output: 'me' })),
 }
 
-function createUtils(options: { prefix?: string, linkPlugin?: boolean } = {}) {
+function createUtils(options: Pick<RouterUtilsOptions<TestClient>, 'prefix' | 'queryInterceptors' | 'plugins'> & { linkPlugin?: boolean } = {}) {
   const link = new StandardLink<object>(
     {
       encodeInput: async (input, path, { signal }) => ({
@@ -73,7 +74,8 @@ function createUtils(options: { prefix?: string, linkPlugin?: boolean } = {}) {
 
   return createRouterUtils(createORPCClient<TestClient>(link), {
     prefix: options.prefix,
-    plugins: [new CacheRevalidationUtilsPlugin()],
+    queryInterceptors: options.queryInterceptors,
+    plugins: options.plugins ?? [new CacheRevalidationUtilsPlugin()],
   })
 }
 
@@ -157,6 +159,29 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     load.resolve()
 
     await expect(mutate).resolves.toBe('updated 1')
+    expect(planet1.getCurrentResult().data).toBe('planet 1 v1')
+  })
+
+  it('shares the response tags with every reader of a call', async () => {
+    const seen: string[][] = []
+    const utils = createUtils({
+      queryInterceptors: [async ({ next, ...options }) => {
+        const pluginContext = { tags: [], revalidatedTags: [] }
+        const context = { ...options.context, [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: pluginContext }
+        const output = await next({ ...options, context })
+        seen.push(pluginContext.tags)
+        return output
+      }],
+      plugins: [new CacheRevalidationUtilsPlugin(), new CacheRevalidationUtilsPlugin()],
+    })
+    const queryClient = createQueryClient()
+
+    const planet1 = await observe(queryClient, utils.planet.find.queryOptions({ input: { id: 1 } }))
+    expect(seen).toEqual([['planet:1']])
+
+    const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions())
+    await mutation.mutate({ id: 1 })
+
     expect(planet1.getCurrentResult().data).toBe('planet 1 v1')
   })
 

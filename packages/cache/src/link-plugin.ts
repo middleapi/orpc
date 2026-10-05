@@ -6,6 +6,11 @@ import { decodeCacheTagHeader, toArray } from '@orpc/shared'
 export const CACHE_LINK_PLUGIN_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_CACHE_LINK_PLUGIN_CONTEXT')
 
 export interface CacheLinkPluginContext {
+  /**
+   * Filled with the cache tags of the call's response. Readers reuse one
+   * already in the context instead of replacing it, so every reader of the
+   * call sees the tags.
+   */
   [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]?: {
     /**
      * The tags the response depends on, from `orpc-cache-tag`.

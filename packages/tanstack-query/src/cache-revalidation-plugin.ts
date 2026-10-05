@@ -25,13 +25,14 @@ const QUERY_CACHE_TAGS = new WeakMap<AnyQuery, readonly string[]>()
 const INFINITE_QUERY_CACHE_TAGS = new WeakMap<AnyQuery, { signal: AbortSignal, pages: Map<unknown, readonly string[]> }>()
 
 /**
- * Calls `next` with a fresh cache link plugin context, returning the output
- * along with the tags the response carried.
+ * Calls `next` with a cache link plugin context, reusing one an outer reader
+ * already placed, and returns the output along with the tags the response
+ * carried.
  */
 async function callWithCacheTags<TOutput>(
   { next, ...options }: { next: (options: any) => Promise<TOutput>, context: object },
 ) {
-  const pluginContext: NonNullable<CacheLinkPluginContext[typeof CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]> = { tags: [], revalidatedTags: [] }
+  const pluginContext = (options.context as CacheLinkPluginContext)[CACHE_LINK_PLUGIN_CONTEXT_SYMBOL] ?? { tags: [], revalidatedTags: [] }
 
   const output = await next({
     ...options,
