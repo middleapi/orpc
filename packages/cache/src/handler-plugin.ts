@@ -1,7 +1,9 @@
-import type { AnyProcedure, Context } from '@orpc/server'
+import type { AnyProcedure, Context, ProcedureClientInterceptor } from '@orpc/server'
 import type { StandardHandlerInterceptor, StandardHandlerOptions, StandardHandlerPlugin } from '@orpc/server/standard'
 import type { StandardHeaders } from '@standard-server/core'
+import type { CacheLinkPluginContext } from './link-plugin'
 import { encodeCacheTagHeader, toArray } from '@orpc/shared'
+import { CACHE_LINK_PLUGIN_CONTEXT_SYMBOL } from './link-plugin'
 
 export const CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_CACHE_HANDLER_PLUGIN_CONTEXT')
 
@@ -87,22 +89,7 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
     }
 
     const interceptor: StandardHandlerInterceptor<T> = async (interceptorOptions) => {
-      const pluginContext: Exclude<CacheHandlerPluginContext[typeof CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL], undefined> = { caches: [], revalidations: [] }
-
-      const response = await interceptorOptions.next({
-        ...interceptorOptions,
-        context: {
-          ...interceptorOptions.context,
-          [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext,
-        } satisfies CacheHandlerPluginContext,
-      })
-
-      const { procedure, path } = interceptorOptions
-      const isRoot = (check: CacheHandlerPluginRevalidation | CacheHandlerPluginLookup) =>
-        check.procedure === procedure && check.path.length === path.length && check.path.every((segment, index) => segment === path[index])
-
-      const rootCache = pluginContext.caches.find(isRoot)
-      const rootRevalidation = pluginContext.revalidations.find(isRoot)
+      const { result: response, rootCache, rootRevalidation } = await nextWithRootCacheActivity(interceptorOptions)
 
       if (rootCache === undefined && rootRevalidation === undefined) {
         return response
@@ -146,5 +133,58 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
         interceptor,
       ],
     }
+  }
+}
+
+/**
+ * Fills the `CacheLinkPluginContext` a router client call carries with the
+ * tags of the called procedure's cache activity, as the handler and link
+ * plugins do over HTTP, for server-side clients such as those rendering
+ * TanStack Query on the server. Router clients keep their client context
+ * from procedures, so the `context` option must forward it.
+ *
+ * @see {@link https://orpc.dev/docs/helpers/cache#server-side-clients | Cache Helpers - Server-Side Clients}
+ */
+export const cacheRouterClientInterceptor: ProcedureClientInterceptor<any, any, any> = async (options) => {
+  const linkContext = (options.context as CacheLinkPluginContext)[CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]
+
+  if (linkContext === undefined) {
+    return options.next()
+  }
+
+  const { result, rootCache, rootRevalidation } = await nextWithRootCacheActivity(options)
+
+  linkContext.tags = [...rootCache?.tags ?? []]
+  linkContext.revalidatedTags = [...rootRevalidation?.tags ?? []]
+
+  return result
+}
+
+/**
+ * Calls `next` with a fresh plugin context and returns the result along with
+ * the first cache lookup and revalidation of the procedure the client called,
+ * so nested procedure calls never leak their tags.
+ */
+async function nextWithRootCacheActivity<TResult>(
+  { next, ...options }: { next: (options: any) => Promise<TResult>, context: object, procedure: AnyProcedure, path: readonly string[] },
+) {
+  const pluginContext: Exclude<CacheHandlerPluginContext[typeof CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL], undefined> = { caches: [], revalidations: [] }
+
+  const result = await next({
+    ...options,
+    context: {
+      ...options.context,
+      [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext,
+    } satisfies CacheHandlerPluginContext,
+  })
+
+  const { procedure, path } = options
+  const isRoot = (check: CacheHandlerPluginRevalidation | CacheHandlerPluginLookup) =>
+    check.procedure === procedure && check.path.length === path.length && check.path.every((segment, index) => segment === path[index])
+
+  return {
+    result,
+    rootCache: pluginContext.caches.find(isRoot),
+    rootRevalidation: pluginContext.revalidations.find(isRoot),
   }
 }

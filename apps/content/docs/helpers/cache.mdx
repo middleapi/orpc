@@ -189,6 +189,23 @@ const link = new RPCLink({
 The `link` can be any supported oRPC link, such as [RPCLink](/docs/rpc/link), [OpenAPILink](/docs/openapi/link), or a custom one. It reads the headers of each call separately, even when [batched](/docs/plugins/batch) or [deduplicated](/docs/plugins/dedupe).
 :::
 
+### Server-Side Clients
+
+[Server-side clients](/docs/client/server-side) call procedures directly, without headers or links, such as when rendering TanStack Query on the server. `cacheRouterClientInterceptor` reports the same tags for them. Router clients keep their client context from procedures, so forward it through the `context` option:
+
+```ts
+import type { CacheLinkPluginContext } from '@orpc/experimental-cache'
+import { CACHE_LINK_PLUGIN_CONTEXT_SYMBOL, cacheRouterClientInterceptor } from '@orpc/experimental-cache'
+
+const client = createRouterClient(router, {
+  context: async (clientContext: CacheLinkPluginContext) => ({
+    'cache/store': store,
+    [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: clientContext[CACHE_LINK_PLUGIN_CONTEXT_SYMBOL],
+  }),
+  interceptors: [cacheRouterClientInterceptor],
+})
+```
+
 ## Tiered Store
 
 `TieredCacheStore` layers several stores front to back, such as a memory store in front of a Redis one. A miss in one tier fills from the next, so only the last tier runs the procedure, and a revalidation reaches every tier. Each tier measures `ttl` from when it stored its copy, so cap it on front tiers to bound how long they may outlive the entry behind them.

@@ -3,24 +3,35 @@ import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInte
 import type { CacheHandlerPluginHeader } from './handler-plugin'
 import { decodeCacheTagHeader, toArray } from '@orpc/shared'
 
+/**
+ * The client context key under which callers receive the cache tags of a call.
+ *
+ * @see {@link https://orpc.dev/docs/helpers/cache#server-side-clients | Cache Helpers - Server-Side Clients}
+ */
 export const CACHE_LINK_PLUGIN_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_CACHE_LINK_PLUGIN_CONTEXT')
 
+/**
+ * The client context through which callers receive the cache tags of a call.
+ *
+ * @see {@link https://orpc.dev/docs/helpers/cache#server-side-clients | Cache Helpers - Server-Side Clients}
+ */
 export interface CacheLinkPluginContext {
   /**
-   * Filled with the cache tags of the call's response. Readers reuse one
-   * already in the context instead of replacing it, so every reader of the
-   * call sees the tags.
+   * Filled with the cache tags of the call's response by `CacheLinkPlugin`,
+   * or by `cacheRouterClientInterceptor` for router clients, and left unset
+   * when neither handles the call. Readers reuse one already in the context
+   * instead of replacing it, so every reader of the call sees the tags.
    */
   [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]?: {
     /**
      * The tags the response depends on, from `orpc-cache-tag`.
      */
-    tags: string[]
+    tags?: string[]
 
     /**
      * The tags the request revalidated, from `orpc-cache-tag-invalidation`.
      */
-    revalidatedTags: string[]
+    revalidatedTags?: string[]
   }
 }
 

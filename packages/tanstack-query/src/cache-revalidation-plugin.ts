@@ -5,34 +5,50 @@ import type { RouterUtilsPlugin } from './plugin'
 import type { RouterUtilsOptions } from './router-utils'
 import { CACHE_LINK_PLUGIN_CONTEXT_SYMBOL } from '@orpc/experimental-cache'
 import { toArray } from '@orpc/shared'
-import { partialMatchKey, replaceEqualDeep } from '@tanstack/query-core'
+import { partialMatchKey } from '@tanstack/query-core'
 import { generateOperationKey } from './key'
 
 type AnyQuery = Query<any, any, any, any>
 
-/**
- * The cache tags of each fetched query, shared by every plugin instance and
- * released together with the query.
- */
-const QUERY_CACHE_TAGS = new WeakMap<AnyQuery, readonly string[]>()
+type PageCacheTags = readonly string[] | null
 
 /**
- * The cache tags of each fetched infinite query page, by page param. Every
- * page of one fetch shares its signal, so a refetch of all pages starts over,
- * and one that fails partway leaves the pages it did not reach untracked
- * rather than pairing its tags with data it never committed.
+ * The cache tags kept in a query's state, so they travel with dehydration.
+ * Unknown tags are `null`, which survives serialization.
  */
-const INFINITE_QUERY_CACHE_TAGS = new WeakMap<AnyQuery, { signal: AbortSignal, pages: Map<unknown, readonly string[]> }>()
+interface CacheTagsQueryState {
+  /**
+   * The tags the data of a query depends on.
+   */
+  orpcCacheTags?: readonly string[] | null
+
+  /**
+   * The tags each page of an infinite query depends on, in page order.
+   */
+  orpcCachePageTags?: readonly PageCacheTags[]
+
+  /**
+   * The `dataUpdateCount` of the data the tags describe. Data committed any
+   * other way, such as by hydration or `setQueryData`, leaves them unknown.
+   */
+  orpcCacheTagsDataUpdateCount?: number
+}
+
+/**
+ * The fetch of all pages each infinite query is in. Its pages arrive in order
+ * and share its signal, retries included, which resume from the failed page.
+ */
+const INFINITE_QUERY_FETCHES = new WeakMap<AnyQuery, { signal: AbortSignal, pageTags: PageCacheTags[] }>()
 
 /**
  * Calls `next` with a cache link plugin context, reusing one an outer reader
  * already placed, and returns the output along with the tags the response
- * carried.
+ * carried, if anything reported them.
  */
 async function callWithCacheTags<TOutput>(
   { next, ...options }: { next: (options: any) => Promise<TOutput>, context: object },
 ) {
-  const pluginContext = (options.context as CacheLinkPluginContext)[CACHE_LINK_PLUGIN_CONTEXT_SYMBOL] ?? { tags: [], revalidatedTags: [] }
+  const pluginContext = (options.context as CacheLinkPluginContext)[CACHE_LINK_PLUGIN_CONTEXT_SYMBOL] ?? {}
 
   const output = await next({
     ...options,
@@ -50,60 +66,54 @@ function findQuery(client: QueryClient, queryKey: QueryKey): AnyQuery | undefine
 }
 
 /**
- * The tags recorded for a page param. Structural sharing keeps an earlier
- * param in the data in place of an equal one fetched later, so a miss looks
- * for the recorded param it would have kept.
+ * Records the tags of the data the running fetch is about to commit.
  */
-function getPageCacheTags(pages: Map<unknown, readonly string[]>, pageParam: unknown): readonly string[] | undefined {
-  const tags = pages.get(pageParam)
+function setCacheTagsState(query: AnyQuery, tags: Pick<CacheTagsQueryState, 'orpcCacheTags' | 'orpcCachePageTags'>): void {
+  const state: CacheTagsQueryState = { ...tags, orpcCacheTagsDataUpdateCount: query.state.dataUpdateCount + 1 }
 
-  if (tags !== undefined) {
-    return tags
-  }
-
-  for (const [recordedPageParam, recordedTags] of pages) {
-    if (replaceEqualDeep(recordedPageParam, pageParam) === recordedPageParam) {
-      return recordedTags
-    }
-  }
-
-  return undefined
+  query.setState({ ...query.state, ...state })
 }
 
 /**
- * The tags the loaded data depends on, or `undefined` when some of it was
- * not fetched through the plugin, such as data hydrated from server-side
- * rendering.
+ * The tag state recorded for the loaded data, if any.
+ */
+function getCacheTagsState(query: AnyQuery): CacheTagsQueryState | undefined {
+  const state = query.state as CacheTagsQueryState
+
+  return state.orpcCacheTagsDataUpdateCount === query.state.dataUpdateCount ? state : undefined
+}
+
+/**
+ * The tags the loaded data depends on, or `undefined` when some of it was not
+ * fetched with its tags reported, such as data hydrated from a server render
+ * that did not report them.
  */
 function getCacheTags(query: AnyQuery): readonly string[] | undefined {
-  const infinite = INFINITE_QUERY_CACHE_TAGS.get(query)
+  const state = getCacheTagsState(query)
 
-  if (infinite === undefined) {
-    return QUERY_CACHE_TAGS.get(query)
+  if (state?.orpcCachePageTags === undefined) {
+    return state?.orpcCacheTags ?? undefined
   }
 
-  const tags: string[] = []
+  const { orpcCachePageTags } = state
 
-  for (const pageParam of (query.state.data as InfiniteData<unknown> | undefined)?.pageParams ?? []) {
-    const pageTags = getPageCacheTags(infinite.pages, pageParam)
+  const pages = (query.state.data as InfiniteData<unknown> | undefined)?.pages ?? []
 
-    if (pageTags === undefined) {
-      return undefined
-    }
-
-    tags.push(...pageTags)
+  if (orpcCachePageTags.length !== pages.length || !orpcCachePageTags.every(tags => tags !== null)) {
+    return undefined
   }
 
-  return tags
+  return orpcCachePageTags.flat()
 }
 
 /**
- * Tracks the cache tags the server reports for queries and infinite queries.
- * When a mutation revalidates tags, invalidates the affected queries and
- * waits for the active ones to refetch before the mutation succeeds. Data
- * not fetched through the plugin, such as data hydrated from server-side
- * rendering, counts as affected until a fetch reveals its tags. Needs the
- * `CacheLinkPlugin` on the link.
+ * Tracks the cache tags the server reports for queries and infinite queries,
+ * keeping them in the query state so they survive dehydration. When a
+ * mutation revalidates tags, invalidates the affected queries and waits for
+ * the active ones to refetch before the mutation succeeds. Data whose tags are
+ * unknown counts as affected until a fetch reveals them. Needs the
+ * `CacheLinkPlugin` on the link, or `cacheRouterClientInterceptor` on a
+ * server-side client.
  *
  * @see {@link https://orpc.dev/docs/integrations/tanstack-query#cache-revalidation-plugin | TanStack Query Integration - Cache Revalidation Plugin}
  */
@@ -126,7 +136,7 @@ export class experimental_CacheRevalidationUtilsPlugin<T extends AnyNestedClient
           const query = findQuery(interceptorOptions.fnContext.client, interceptorOptions.fnContext.queryKey)
 
           if (query !== undefined) {
-            QUERY_CACHE_TAGS.set(query, tags)
+            setCacheTagsState(query, { orpcCacheTags: tags ?? null })
           }
 
           return output
@@ -135,20 +145,55 @@ export class experimental_CacheRevalidationUtilsPlugin<T extends AnyNestedClient
       infiniteInterceptors: [
         ...toArray(options.infiniteInterceptors),
         async (interceptorOptions) => {
-          const { output, tags } = await callWithCacheTags(interceptorOptions)
-          const { client, queryKey, signal, pageParam } = interceptorOptions.fnContext
+          const { output, tags = null } = await callWithCacheTags(interceptorOptions)
+          const { client, queryKey, signal } = interceptorOptions.fnContext
           const query = findQuery(client, queryKey)
 
-          if (query !== undefined) {
-            let infinite = INFINITE_QUERY_CACHE_TAGS.get(query)
+          if (query === undefined) {
+            return output
+          }
 
-            if (infinite === undefined || (infinite.signal !== signal && query.state.fetchMeta?.fetchMore === undefined)) {
-              infinite = { signal, pages: new Map() }
-              INFINITE_QUERY_CACHE_TAGS.set(query, infinite)
+          const fetchMore = query.state.fetchMeta?.fetchMore
+          const { maxPages } = query.options
+
+          if (fetchMore === undefined) {
+            let fetch = INFINITE_QUERY_FETCHES.get(query)
+
+            if (fetch?.signal !== signal) {
+              fetch = { signal, pageTags: [] }
+              INFINITE_QUERY_FETCHES.set(query, fetch)
             }
 
-            infinite.pages.set(pageParam, tags)
+            fetch.pageTags.push(tags)
+
+            if (maxPages && fetch.pageTags.length > maxPages) {
+              fetch.pageTags.shift()
+            }
+
+            setCacheTagsState(query, { orpcCachePageTags: [...fetch.pageTags] })
+
+            return output
           }
+
+          /**
+           * Pages are added the way TanStack Query adds them, dropping one
+           * from the other end beyond `maxPages`.
+           */
+          const pages = (query.state.data as InfiniteData<unknown> | undefined)?.pages ?? []
+          const known = getCacheTagsState(query)?.orpcCachePageTags
+          const current = known?.length === pages.length ? known : pages.map(() => null)
+          const pageTags = fetchMore.direction === 'forward' ? [...current, tags] : [tags, ...current]
+
+          if (maxPages && pageTags.length > maxPages) {
+            if (fetchMore.direction === 'forward') {
+              pageTags.shift()
+            }
+            else {
+              pageTags.pop()
+            }
+          }
+
+          setCacheTagsState(query, { orpcCachePageTags: pageTags })
 
           return output
         },
@@ -156,7 +201,7 @@ export class experimental_CacheRevalidationUtilsPlugin<T extends AnyNestedClient
       mutationInterceptors: [
         ...toArray(options.mutationInterceptors),
         async (interceptorOptions) => {
-          const { output, revalidatedTags } = await callWithCacheTags(interceptorOptions)
+          const { output, revalidatedTags = [] } = await callWithCacheTags(interceptorOptions)
 
           if (revalidatedTags.length) {
             const { client } = interceptorOptions.fnContext

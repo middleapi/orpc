@@ -1,15 +1,15 @@
-import type { CacheContext } from '@orpc/experimental-cache'
+import type { CacheContext, CacheLinkPluginContext } from '@orpc/experimental-cache'
 import type { RouterClient } from '@orpc/server'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { BatchLinkPlugin } from '@orpc/client/plugins'
-import { cache, CacheHandlerPlugin, CacheLinkPlugin, revalidate } from '@orpc/experimental-cache'
+import { cache, CACHE_LINK_PLUGIN_CONTEXT_SYMBOL, CacheHandlerPlugin, CacheLinkPlugin, cacheRouterClientInterceptor, revalidate } from '@orpc/experimental-cache'
 import { MemoryCacheStore } from '@orpc/experimental-cache/memory'
-import { os } from '@orpc/server'
+import { createRouterClient, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { BatchHandlerPlugin } from '@orpc/server/plugins'
 import { promiseWithResolvers } from '@orpc/shared'
-import { MutationObserver, QueryClient, QueryObserver } from '@tanstack/query-core'
+import { dehydrate, hydrate, MutationObserver, QueryClient, QueryObserver } from '@tanstack/query-core'
 import { z } from 'zod'
 import { createTanstackQueryUtils, experimental_CacheRevalidationUtilsPlugin } from '../src'
 
@@ -62,7 +62,19 @@ function setup() {
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } })
 
-  return { planets, find, fetch, orpc, queryClient }
+  const serverClient: RouterClient<typeof router, CacheLinkPluginContext> = createRouterClient(router, {
+    context: (clientContext: CacheLinkPluginContext) => ({
+      'cache/store': store,
+      [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: clientContext[CACHE_LINK_PLUGIN_CONTEXT_SYMBOL],
+    }),
+    interceptors: [cacheRouterClientInterceptor],
+  })
+
+  const serverORPC = createTanstackQueryUtils(serverClient, {
+    plugins: [new experimental_CacheRevalidationUtilsPlugin()],
+  })
+
+  return { planets, find, fetch, orpc, serverORPC, queryClient }
 }
 
 it('refetches the queries a mutation revalidates through batched requests', async () => {
@@ -109,4 +121,25 @@ it('refetches a query whose first load was batched with the mutation', async () 
 
   await expect(renamed).resolves.toBe('Terra')
   expect(earth.getCurrentResult().data).toBe('Terra')
+})
+
+it('keeps the tags of a server render through createRouterClient after hydration', async () => {
+  const { find, orpc, serverORPC, queryClient } = setup()
+
+  const serverQueryClient = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } })
+  await serverQueryClient.prefetchQuery(serverORPC.planet.find.queryOptions({ input: { id: 1 } }))
+  await serverQueryClient.prefetchQuery(serverORPC.planet.find.queryOptions({ input: { id: 2 } }))
+  hydrate(queryClient, JSON.parse(JSON.stringify(dehydrate(serverQueryClient))))
+
+  const earth = new QueryObserver(queryClient, orpc.planet.find.queryOptions({ input: { id: 1 } }))
+  const mars = new QueryObserver(queryClient, orpc.planet.find.queryOptions({ input: { id: 2 } }))
+  earth.subscribe(() => {})
+  mars.subscribe(() => {})
+
+  const rename = new MutationObserver(queryClient, orpc.planet.rename.mutationOptions())
+  await expect(rename.mutate({ id: 1, name: 'Terra' })).resolves.toBe('Terra')
+
+  expect(earth.getCurrentResult().data).toBe('Terra')
+  expect(queryClient.getQueryState(orpc.planet.find.queryKey({ input: { id: 2 } }))?.dataUpdateCount).toBe(1)
+  expect(find).toHaveBeenCalledTimes(3)
 })

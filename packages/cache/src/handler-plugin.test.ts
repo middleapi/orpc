@@ -2,12 +2,14 @@ import type { AnyProcedure } from '@orpc/server'
 import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import type { StandardHeaders } from '@standard-server/core'
 import type { CacheHandlerPluginContext, CacheHandlerPluginHeader } from './handler-plugin'
+import type { CacheLinkPluginContext } from './link-plugin'
 import type { CacheContext } from './types'
-import { call, ORPCError, os } from '@orpc/server'
+import { call, createRouterClient, ORPCError, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { decodeCacheTagHeader, toArray } from '@orpc/shared'
 import { MemoryCacheStore } from './adapters/memory'
-import { CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL, CacheHandlerPlugin } from './handler-plugin'
+import { CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL, CacheHandlerPlugin, cacheRouterClientInterceptor } from './handler-plugin'
+import { CACHE_LINK_PLUGIN_CONTEXT_SYMBOL } from './link-plugin'
 import { cache, revalidate } from './middleware'
 
 type RecordedChecks = Exclude<CacheHandlerPluginContext[typeof CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL], undefined>
@@ -249,5 +251,58 @@ describe('cacheHandlerPlugin', () => {
 
     expect(response!.headers.get('orpc-cache-tag')).toBe('outer-tag')
     expect(response!.headers.get('orpc-cache-tag-invalidation')).toBe('outer-revalidated')
+  })
+})
+
+describe('cacheRouterClientInterceptor', () => {
+  const base = os.$context<CacheContext>()
+  const inner = base
+    .use(cache({ key: 'inner', tags: ['inner-tag'] }))
+    .use(revalidate({ tags: ['inner-revalidated'] }))
+    .handler(() => 'inner')
+
+  const router = {
+    inner,
+    outer: base
+      .use(cache({ key: 'outer', tags: ['outer-tag'] }))
+      .use(revalidate({ tags: ['outer-revalidated'] }))
+      .handler(async ({ context }) => `outer:${await call(inner, undefined, { context })}`),
+    nesting: base.handler(async ({ context }) => `nesting:${await call(inner, undefined, { context })}`),
+    failing: base.use(cache({ key: 'failing', tags: ['failing-tag'] })).handler(() => {
+      throw new ORPCError('NOT_FOUND')
+    }),
+  }
+
+  const client = createRouterClient(router, {
+    context: (clientContext: CacheLinkPluginContext) => ({
+      'cache/store': new MemoryCacheStore(),
+      [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: clientContext[CACHE_LINK_PLUGIN_CONTEXT_SYMBOL],
+    }),
+    interceptors: [cacheRouterClientInterceptor],
+  })
+
+  it('fills the forwarded cache link plugin context with the tags of the procedure called', async () => {
+    const linkContext = {}
+    await expect(client.outer(undefined, { context: { [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: linkContext } })).resolves.toBe('outer:inner')
+
+    expect(linkContext).toEqual({ tags: ['outer-tag'], revalidatedTags: ['outer-revalidated'] })
+  })
+
+  it('never reports the tags of nested calls', async () => {
+    const linkContext = {}
+    await expect(client.nesting(undefined, { context: { [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: linkContext } })).resolves.toBe('nesting:inner')
+
+    expect(linkContext).toEqual({ tags: [], revalidatedTags: [] })
+  })
+
+  it('does nothing for calls without a forwarded context', async () => {
+    await expect(client.outer()).resolves.toBe('outer:inner')
+  })
+
+  it('leaves the forwarded context untouched when the call fails', async () => {
+    const linkContext = {}
+    await expect(client.failing(undefined, { context: { [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: linkContext } })).rejects.toMatchObject({ code: 'NOT_FOUND' })
+
+    expect(linkContext).toEqual({})
   })
 })

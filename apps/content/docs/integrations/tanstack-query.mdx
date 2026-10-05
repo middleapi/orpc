@@ -441,7 +441,7 @@ It covers queries and infinite queries from these utils and mutations from `.mut
 :::
 
 :::tip[Server-Side Rendering]
-The plugin takes the query client from each query and mutation and keeps tags per query, so one instance is safe to share across requests. Queries hydrated from the server have no recorded tags yet, so the first mutation that revalidates tags refetches them too, after which they are matched by their own tags. These are told apart by the utils' key, so when several sets of utils share a query client, give each its own [`prefix`](#setup).
+The plugin takes the query client from each query and mutation and keeps tags in the query state, so one instance is safe to share across requests and tags travel with dehydration, including persisters built on it. When the server renders through a [server-side client](/docs/client/server-side), add [`cacheRouterClientInterceptor`](/docs/helpers/cache#server-side-clients) so it reports tags too. Data whose tags are unknown, such as data hydrated without them or set with `setQueryData`, is refetched by the first mutation that revalidates tags, after which it is matched by its own tags. Such data is told apart by the utils' key, so when several sets of utils share a query client, give each its own [`prefix`](#setup).
 :::
 
 ## Client Context
