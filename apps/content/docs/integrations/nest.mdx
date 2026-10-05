@@ -303,6 +303,41 @@ import { toStandardLazyRequest } from '@standard-server/fetch'
 export class AppModule {}
 ```
 
+## Testing
+
+`@Implement` only registers routing metadata, so a controller method is a plain method that returns an implemented procedure. In unit tests, resolve the controller from a testing module and run that procedure with [`call`](/docs/recipes/testing-and-mocking#testing). Input validation, middleware, the handler, and output validation all run, and nothing needs to be mocked except your own dependencies.
+
+```ts
+import { Test } from '@nestjs/testing'
+import { call } from '@orpc/server'
+
+it('lists planets', async () => {
+  const moduleRef = await Test.createTestingModule({
+    controllers: [PlanetController],
+    providers: [PlanetService],
+  }).compile()
+
+  const controller = moduleRef.get(PlanetController)
+
+  await expect(call(controller.list(), { page: 1, size: 10 })).resolves.toEqual([
+    { id: '1', name: 'Earth' },
+  ])
+
+  // contract validation runs, so invalid input is rejected
+  await expect(call(controller.list(), { page: 0, size: 10 })).rejects.toMatchObject({
+    code: 'BAD_REQUEST',
+  })
+})
+```
+
+If you extended `DefaultInitialContext` (see [Initial Context](#initial-context)), pass it as `call(controller.list(), input, { context })`, because `ORPCModule` is not involved in this kind of test.
+
+Guards, pipes, interceptors, and parameter decorators only run inside a NestJS application, so `call` does not exercise them. Test those end to end by creating an app with `moduleRef.createNestApplication()` and sending HTTP requests to it.
+
+:::info
+For more on calling and mocking procedures, see [Testing and Mocking](/docs/recipes/testing-and-mocking).
+:::
+
 ## Typesafe Client
 
 After implementing your contract in NestJS, you can use the same contract to create a typesafe client. See [OpenAPI Link](/docs/openapi/link) for more details.
