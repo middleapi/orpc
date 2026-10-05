@@ -441,7 +441,7 @@ It covers queries and infinite queries from these utils and mutations from `.mut
 :::
 
 :::tip[Server-Side Rendering]
-The plugin takes the query client from each query and mutation and keeps tags per query, so one instance is safe to share across requests. Queries hydrated from the server have no recorded tags yet, so the first mutation that revalidates tags refetches them too, after which they are matched by their own tags.
+The plugin takes the query client from each query and mutation and keeps tags per query, so one instance is safe to share across requests. Queries hydrated from the server have no recorded tags yet, so the first mutation that revalidates tags refetches them too, after which they are matched by their own tags. These are told apart by the utils' key, so when several sets of utils share a query client, give each its own [`prefix`](#setup).
 :::
 
 ## Client Context

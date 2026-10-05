@@ -326,7 +326,27 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     expect(handlers['planet.list']).toHaveBeenCalledTimes(4)
   })
 
-  it('matches unhashable infinite query page params by identity', async () => {
+  it('keeps distinct infinite query page params apart even when they serialize alike', async () => {
+    const utils = createUtils()
+    const queryClient = createQueryClient()
+
+    const observer = new InfiniteQueryObserver(queryClient, utils.planet.list.infiniteOptions({
+      input: (cursor: Map<string, number>) => ({ cursor: cursor.get('index')! }),
+      initialPageParam: new Map([['index', 0]]),
+      getNextPageParam: (_, pages) => new Map([['index', pages.length]]),
+    }))
+    observer.subscribe(() => {})
+    await vi.waitFor(() => expect(observer.getCurrentResult().status).toBe('success'))
+    await observer.fetchNextPage()
+
+    const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions())
+    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['page:0'] })
+    await mutation.mutate({ id: 1 })
+
+    expect(handlers['planet.list']).toHaveBeenCalledTimes(4)
+  })
+
+  it('matches infinite query page params that JSON cannot serialize', async () => {
     const utils = createUtils()
     const queryClient = createQueryClient()
 

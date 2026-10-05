@@ -5,7 +5,7 @@ import type { RouterUtilsPlugin } from './plugin'
 import type { RouterUtilsOptions } from './router-utils'
 import { CACHE_LINK_PLUGIN_CONTEXT_SYMBOL } from '@orpc/experimental-cache'
 import { toArray } from '@orpc/shared'
-import { hashKey, partialMatchKey } from '@tanstack/query-core'
+import { partialMatchKey, replaceEqualDeep } from '@tanstack/query-core'
 import { generateOperationKey } from './key'
 
 type AnyQuery = Query<any, any, any, any>
@@ -49,17 +49,24 @@ function findQuery(client: QueryClient, queryKey: QueryKey): AnyQuery | undefine
 }
 
 /**
- * Identifies a page param by value, since structural sharing and hydration
- * hand back equal params as other objects. Params that cannot be hashed fall
- * back to their identity.
+ * The tags recorded for a page param. Structural sharing keeps an earlier
+ * param in the data in place of an equal one fetched later, so a miss looks
+ * for the recorded param it would have kept.
  */
-function toPageKey(pageParam: unknown): unknown {
-  try {
-    return hashKey([pageParam])
+function getPageCacheTags(pages: Map<unknown, readonly string[]>, pageParam: unknown): readonly string[] | undefined {
+  const tags = pages.get(pageParam)
+
+  if (tags !== undefined) {
+    return tags
   }
-  catch {
-    return pageParam
+
+  for (const [recordedPageParam, recordedTags] of pages) {
+    if (replaceEqualDeep(recordedPageParam, pageParam) === recordedPageParam) {
+      return recordedTags
+    }
   }
+
+  return undefined
 }
 
 /**
@@ -77,7 +84,7 @@ function getCacheTags(query: AnyQuery): readonly string[] | undefined {
   const tags: string[] = []
 
   for (const pageParam of (query.state.data as InfiniteData<unknown> | undefined)?.pageParams ?? []) {
-    const pageTags = infinite.pages.get(toPageKey(pageParam))
+    const pageTags = getPageCacheTags(infinite.pages, pageParam)
 
     if (pageTags === undefined) {
       return undefined
@@ -139,7 +146,7 @@ export class experimental_CacheRevalidationUtilsPlugin<T extends AnyNestedClient
               INFINITE_QUERY_CACHE_TAGS.set(query, infinite)
             }
 
-            infinite.pages.set(toPageKey(pageParam), tags)
+            infinite.pages.set(pageParam, tags)
           }
 
           return output
