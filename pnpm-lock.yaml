@@ -1117,6 +1117,9 @@ importers:
       '@orpc/contract':
         specifier: workspace:*
         version: link:../contract
+      '@orpc/experimental-cache':
+        specifier: workspace:*
+        version: link:../cache
       '@orpc/openapi':
         specifier: workspace:*
         version: link:../openapi

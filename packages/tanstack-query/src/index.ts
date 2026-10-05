@@ -1,3 +1,4 @@
+export * from './cache-revalidation-plugin'
 export * from './contract-utils'
 export * from './key'
 export * from './meta'

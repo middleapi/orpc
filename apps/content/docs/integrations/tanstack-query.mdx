@@ -416,6 +416,34 @@ const queryClient = new QueryClient({
 
 </Expandable>
 
+### Cache Revalidation Plugin
+
+`experimental_CacheRevalidationUtilsPlugin` revalidates queries from the tags of [Cache Helpers](/docs/helpers/cache). It records the tags each query depends on. When a mutation revalidates tags, it invalidates the affected queries and waits for the active ones to refetch before the mutation succeeds, so `onSuccess` and `mutateAsync` already see fresh data. A failed refetch does not fail the mutation.
+
+The server must send both tag headers through the [Cache Handler Plugin](/docs/helpers/cache#handler-plugin), and the link needs the [Cache Link Plugin](/docs/helpers/cache#link-plugin):
+
+```ts
+import { CacheLinkPlugin } from '@orpc/experimental-cache'
+import { experimental_CacheRevalidationUtilsPlugin } from '@orpc/tanstack-query'
+
+const link = new RPCLink({
+  url: '/rpc',
+  plugins: [new CacheLinkPlugin()],
+})
+
+const orpc = createTanstackQueryUtils(createORPCClient(link), {
+  plugins: [new experimental_CacheRevalidationUtilsPlugin()],
+})
+```
+
+:::info
+It covers queries and infinite queries from these utils and mutations from `.mutationOptions`, unless a custom `queryFn` or `mutationFn` replaces the call. Streamed and live queries are left alone, since their refetch settles only when the stream ends.
+:::
+
+:::tip[Server-Side Rendering]
+The plugin takes the query client from each query and mutation and keeps tags per query, so one instance is safe to share across requests. Queries hydrated from the server have no recorded tags yet, so the first mutation that revalidates tags refetches them too, after which they are matched by their own tags.
+:::
+
 ## Client Context
 
 :::warning

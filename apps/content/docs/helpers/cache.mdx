@@ -170,6 +170,25 @@ new CORSPlugin({
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
 :::
 
+## Link Plugin
+
+The `CacheLinkPlugin` is the client counterpart of the [Handler Plugin](#handler-plugin). It reads `orpc-cache-tag` and `orpc-cache-tag-invalidation` from responses for client cache integrations, such as the [TanStack Query Cache Revalidation Plugin](/docs/integrations/tanstack-query#cache-revalidation-plugin), to track and revalidate tagged data. Other calls pass through untouched.
+
+```ts
+import { CacheLinkPlugin } from '@orpc/experimental-cache'
+
+const link = new RPCLink({
+  url: '/rpc',
+  plugins: [
+    new CacheLinkPlugin(),
+  ],
+})
+```
+
+:::info
+The `link` can be any supported oRPC link, such as [RPCLink](/docs/rpc/link), [OpenAPILink](/docs/openapi/link), or a custom one. It reads the headers of each call separately, even when [batched](/docs/plugins/batch) or [deduplicated](/docs/plugins/dedupe).
+:::
+
 ## Tiered Store
 
 `TieredCacheStore` layers several stores front to back, such as a memory store in front of a Redis one. A miss in one tier fills from the next, so only the last tier runs the procedure, and a revalidation reaches every tier. Each tier measures `ttl` from when it stored its copy, so cap it on front tiers to bound how long they may outlive the entry behind them.
