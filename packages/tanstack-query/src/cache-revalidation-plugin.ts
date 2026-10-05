@@ -106,6 +106,8 @@ export class experimental_CacheRevalidationUtilsPlugin<T extends AnyNestedClient
     const path = toArray(options.path)
     const queryFilterKey = generateOperationKey(path, { prefix: options.prefix, type: 'query' })
     const infiniteFilterKey = generateOperationKey(path, { prefix: options.prefix, type: 'infinite' })
+    const isUtilsQuery = (query: AnyQuery) =>
+      partialMatchKey(query.queryKey, queryFilterKey) || partialMatchKey(query.queryKey, infiniteFilterKey)
 
     return {
       ...options,
@@ -149,13 +151,24 @@ export class experimental_CacheRevalidationUtilsPlugin<T extends AnyNestedClient
           const { output, revalidatedTags } = await callWithCacheTags(interceptorOptions)
 
           if (revalidatedTags.length) {
-            await interceptorOptions.fnContext.client.invalidateQueries({
+            const { client } = interceptorOptions.fnContext
+
+            /**
+             * A first load still in flight may have read data the mutation
+             * changed, such as one batched with it, and invalidating it would
+             * only join that fetch, so let it land and reveal its tags first.
+             */
+            await client.refetchQueries(
+              { fetchStatus: 'fetching', predicate: query => query.state.data === undefined && isUtilsQuery(query) },
+              { cancelRefetch: false },
+            )
+
+            await client.invalidateQueries({
               predicate: (query) => {
                 const tags = getCacheTags(query)
 
                 if (tags === undefined) {
-                  return query.state.data !== undefined
-                    && (partialMatchKey(query.queryKey, queryFilterKey) || partialMatchKey(query.queryKey, infiniteFilterKey))
+                  return query.state.data !== undefined && isUtilsQuery(query)
                 }
 
                 return tags.some(tag => revalidatedTags.includes(tag))

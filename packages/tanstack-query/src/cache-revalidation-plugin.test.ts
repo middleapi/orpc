@@ -135,6 +135,31 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     expect(handlers['user.me']).toHaveBeenCalledTimes(1)
   })
 
+  it('lets a first load in flight land before revalidating it', async () => {
+    const utils = createUtils()
+    const queryClient = createQueryClient()
+    const refetchQueries = vi.spyOn(queryClient, 'refetchQueries')
+
+    const load = promiseWithResolvers<void>()
+    handlers['planet.find'].mockImplementationOnce(async ({ id }) => {
+      const output = `planet ${id} v${version}`
+      await load.promise
+      return { output, tags: [`planet:${id}`] }
+    })
+
+    const planet1 = new QueryObserver(queryClient, utils.planet.find.queryOptions({ input: { id: 1 } }))
+    planet1.subscribe(() => {})
+
+    const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions())
+    const mutate = mutation.mutate({ id: 1 })
+
+    await vi.waitFor(() => expect(refetchQueries).toHaveBeenCalled())
+    load.resolve()
+
+    await expect(mutate).resolves.toBe('updated 1')
+    expect(planet1.getCurrentResult().data).toBe('planet 1 v1')
+  })
+
   it('marks inactive affected queries stale without waiting for them', async () => {
     const utils = createUtils()
     const queryClient = createQueryClient()
