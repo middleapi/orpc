@@ -533,8 +533,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@standard-server/core':
-        specifier: ~0.9.0
-        version: 0.9.2
+        specifier: ~0.10.1
+        version: 0.10.1
     devDependencies:
       '@upstash/redis':
         specifier: ^1.38.2
@@ -5291,9 +5291,6 @@ packages:
   '@standard-server/core@0.10.1':
     resolution: {integrity: sha512-LtTjCg2x2FfbExGRdtu5J1biNVyNOfLs1/4zHAh/t0qZlbY+jIIbFYT5BPwbiYjF4o+Va5/JKjrA6uZeOQ184w==}
 
-  '@standard-server/core@0.9.2':
-    resolution: {integrity: sha512-P1tlRyxyM9n/toFH69/4O5Xn2V33iFszCy2xgZlqpng03nNNmFFH1ua6holdGbQ5CMeRMoJvlb8iezUhfak6Cw==}
-
   '@standard-server/fastify@0.10.1':
     resolution: {integrity: sha512-8up+11uSaZRNlJ+ejyLPoxgAkftVeV1XCH+afmEbsaQ8YZlLGXQlf12mHFBoS+6Mr0NqtpYn4eBmC6yTnS7llw==}
     peerDependencies:
@@ -5313,9 +5310,6 @@ packages:
 
   '@standard-server/shared@0.10.1':
     resolution: {integrity: sha512-8OhXcAY13iAtEzprBFDlfOvGVLCrNnf31oiPOJ/aZaR+i2BzT8U7qsUhYU5VPbD++KKfkzsJ7hN2kDlOxJ9C6w==}
-
-  '@standard-server/shared@0.9.2':
-    resolution: {integrity: sha512-QMdJDBG6/oKMoZOAcWXdZdRcKRXSrRj05NNwA8tRmrymQNt3KxojnWJERwu++z405dYAs3/zRL9eAOWbD7i4qQ==}
 
   '@stoplight/better-ajv-errors@1.0.3':
     resolution: {integrity: sha512-0p9uXkuB22qGdNfy3VeEhxkU5uwvp/KrBTAbrLBURv6ilxIVwanKwjMc41lQfIVgPGcOkmLbTolfFrSsueu7zA==}
@@ -16695,10 +16689,6 @@ snapshots:
     dependencies:
       '@standard-server/shared': 0.10.1
 
-  '@standard-server/core@0.9.2':
-    dependencies:
-      '@standard-server/shared': 0.9.2
-
   '@standard-server/fastify@0.10.1(fastify@5.12.1)':
     dependencies:
       '@standard-server/core': 0.10.1
@@ -16723,8 +16713,6 @@ snapshots:
       '@standard-server/shared': 0.10.1
 
   '@standard-server/shared@0.10.1': {}
-
-  '@standard-server/shared@0.9.2': {}
 
   '@stoplight/better-ajv-errors@1.0.3(ajv@8.20.0)':
     dependencies:

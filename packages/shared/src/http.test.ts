@@ -1,3 +1,4 @@
+import { safeDecodeURIComponent } from '@standard-server/shared'
 import {
   decodeCacheTagHeader,
   encodeCacheTag,
@@ -13,7 +14,6 @@ import {
   pathToHttpPath,
   varyByAcceptEncoding,
 } from './http'
-import { safeDecodeURIComponent } from './uri'
 
 describe('pathToHttpPath', () => {
   it('produces a leading slash', () => {
