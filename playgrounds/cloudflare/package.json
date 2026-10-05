@@ -1,7 +1,7 @@
 {
   "name": "@orpc/cloudflare-playground",
   "type": "module",
-  "version": "2.0.0-beta.35",
+  "version": "2.0.0-beta.42",
   "private": true,
   "scripts": {
     "prepare": "wrangler types",
@@ -11,7 +11,7 @@
     "preview": "vite preview --port 3000"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.54.5",
+    "@cloudflare/vite-plugin": "^1.60.2",
     "@orpc/client": "beta",
     "@orpc/cloudflare": "beta",
     "@orpc/evlog": "beta",
@@ -32,6 +32,6 @@
     "ts-pattern": "^5.9.0",
     "typescript": "^6.0.3",
     "vite": "^8.2.2",
-    "wrangler": "^4.129.1"
+    "wrangler": "^4.141.0"
   }
 }

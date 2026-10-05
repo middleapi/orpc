@@ -199,6 +199,32 @@ const savePlanet = os
   })
 ```
 
+### Redirect Response
+
+Combine `successStatus` with the [detailed output structure](#detailed-output-structure) to return a standard HTTP redirect: a `3xx` status and a [`Location`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Location) header.
+
+```ts
+const redirect = os
+  .meta(openapi({
+    method: 'GET',
+    path: '/redirect',
+    successStatus: 307,
+    outputStructure: 'detailed',
+  }))
+  .output(z.object({
+    headers: z.object({ location: z.string() }),
+  }))
+  .handler(async () => {
+    return {
+      headers: { location: 'https://orpc.dev' },
+    }
+  })
+```
+
+:::warning
+[OpenAPI Link](/docs/openapi/link) does not follow redirects and throws in browsers, where `fetch` hides redirect responses. Server runtimes receive the `3xx` response as the output.
+:::
+
 ## Body Hints
 
 The body parser normally uses `Content-Type`, `Content-Length`, `Content-Disposition`, and `Standard-Server` headers to decide how to parse the body. If that information is missing or misleading, use `requestBodyHint` to tell [OpenAPI Handler](/docs/openapi/handler) how to parse the request body. Likewise, use `responseBodyHint` to tell [OpenAPI Link](/docs/openapi/link) how to parse the response body.

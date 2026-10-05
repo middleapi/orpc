@@ -146,6 +146,27 @@ describe('memoryPublisher', () => {
       await noticeIterator.return()
     })
 
+    it('resumes every missed event for AsyncIteratorObject subscribers beyond maxBufferedEvents', async () => {
+      const publisher = new MemoryPublisher<TestEvents>({
+        maxBufferedEvents: 1,
+        resume: {
+          enabled: true,
+        },
+      })
+
+      for (let i = 0; i < 3; i++) {
+        await publisher.publish('message', { text: `${i}` })
+      }
+
+      const iterator = publisher.subscribe('message', { lastEventId: '0' })
+
+      for (let i = 0; i < 3; i++) {
+        expect((await iterator.next()).value?.text).toBe(`${i}`)
+      }
+
+      await iterator.return()
+    })
+
     it('stays consistent under heavy interleaving of publishes and repeated unsubscriptions', async () => {
       const publisher = new MemoryPublisher<TestEvents>({
         resume: {
@@ -257,6 +278,31 @@ describe('memoryPublisher', () => {
       expect(listener2).toHaveBeenCalledTimes(2)
 
       await unsub2()
+    })
+
+    it('delivers to every listener even when one unsubscribes itself while receiving', async () => {
+      const publisher = new MemoryPublisher<TestEvents>()
+
+      let unsubscribeFirst: () => Promise<void>
+      const first = vi.fn(() => {
+        void unsubscribeFirst()
+      })
+      const second = vi.fn()
+
+      unsubscribeFirst = await publisher.subscribe('message', first)
+      const unsubscribeSecond = await publisher.subscribe('message', second)
+
+      await publisher.publish('message', { text: 'first' })
+
+      expect(first).toHaveBeenCalledTimes(1)
+      expect(second).toHaveBeenCalledTimes(1)
+
+      await publisher.publish('message', { text: 'second' })
+
+      expect(first).toHaveBeenCalledTimes(1)
+      expect(second).toHaveBeenCalledTimes(2)
+
+      await unsubscribeSecond()
     })
   })
 })

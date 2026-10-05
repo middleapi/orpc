@@ -1,4 +1,4 @@
-import type { NodeHttpHandlerPlugin } from '@orpc/server/node'
+import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { os } from '@orpc/server'
 import request from 'supertest'
@@ -44,19 +44,14 @@ describe('openapiHandler', () => {
     expect(mismatchRes.text).toBe('not matched')
   })
 
-  it('supports node http handler plugin', async () => {
-    const plugin: NodeHttpHandlerPlugin<any> = {
+  it('supports standard handler plugins', async () => {
+    const plugin: StandardHandlerPlugin<any> = {
       name: 'test',
-      initNodeHttpHandlerOptions(options) {
+      init(options) {
         return {
           ...options,
-          nodeHttpInterceptors: [
-            async ({ response }) => {
-              response.statusCode = 200
-              response.end('intercepted')
-
-              return { matched: true }
-            },
+          routingInterceptors: [
+            async () => ({ matched: true, response: { status: 200, headers: {}, body: 'intercepted' } }),
           ],
         }
       },
@@ -69,6 +64,6 @@ describe('openapiHandler', () => {
     }).get('/test')
 
     expect(res.status).toBe(200)
-    expect(res.text).toBe('intercepted')
+    expect(res.body).toBe('intercepted')
   })
 })

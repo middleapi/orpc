@@ -1,4 +1,4 @@
-import type { RedisClientType, RedisClusterType } from 'redis'
+import type { RedisClientType } from 'redis'
 import type { BaseRedisRateLimiterOptions } from './base-redis'
 import { BaseRedisRateLimiter } from './base-redis'
 
@@ -12,7 +12,7 @@ export interface RedisRateLimiterOptions extends BaseRedisRateLimiterOptions {}
  */
 export class RedisRateLimiter extends BaseRedisRateLimiter {
   constructor(
-    private readonly redis: RedisClientType<any, any, any, any, any> | RedisClusterType<any, any, any, any, any>,
+    private readonly redis: RedisClientType<any, any, any, any, any>,
     options: RedisRateLimiterOptions,
   ) {
     super(options)

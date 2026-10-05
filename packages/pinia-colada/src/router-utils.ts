@@ -4,7 +4,7 @@ import type { OperationKeyPrefixOptions } from './key'
 import type { RouterUtilsPlugin } from './plugin'
 import type { ProcedureUtilsInfiniteInterceptor, ProcedureUtilsLiveInterceptor, ProcedureUtilsMutationInterceptor, ProcedureUtilsOptions, ProcedureUtilsQueryInterceptor, ProcedureUtilsStreamedInterceptor } from './procedure-utils'
 import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
-import { bindMethods, isTypescriptObject, toArray } from '@orpc/shared'
+import { bindMethods, isTypescriptObject, pick, toArray } from '@orpc/shared'
 import { CompositeRouterUtilsPlugin } from './plugin'
 import { isProcedureUtilsOptions, mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
 import { SharedUtils } from './shared-utils'
@@ -106,14 +106,14 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
         path,
         client,
         plugin.initProcedureOptions(path, mergeProcedureUtilsOptions(
-          {
-            prefix: options.prefix,
-            queryInterceptors: options.queryInterceptors as any,
-            streamedInterceptors: options.streamedInterceptors as any,
-            liveInterceptors: options.liveInterceptors as any,
-            infiniteInterceptors: options.infiniteInterceptors as any,
-            mutationInterceptors: options.mutationInterceptors as any,
-          },
+          pick(options, [
+            'prefix',
+            'queryInterceptors',
+            'streamedInterceptors',
+            'liveInterceptors',
+            'infiniteInterceptors',
+            'mutationInterceptors',
+          ]) as ProcedureUtilsOptions<any, any, any, any>,
           options.scoped ?? {},
         )),
       ), { unbound: ['call'] })

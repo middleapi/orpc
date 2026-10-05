@@ -69,6 +69,5 @@ Define the `name` property on your middleware to improve span naming and make tr
 
 Workers Traces still lack some APIs oRPC relies on, so:
 
-- Request spans are not renamed to the procedure path. The path is still recorded in the `rpc.method` attribute.
 - Streamed inputs and outputs record no `yielded` and `enqueued` events.
 - Trace context propagation is not configurable by oRPC.

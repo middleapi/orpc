@@ -4,7 +4,10 @@
   "main": "worker/index.ts",
   "compatibility_date": "2026-07-01",
   "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
-  "assets": { "not_found_handling": "single-page-application" },
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api", "/api/*", "/rpc/*", "/chat-room"]
+  },
   "observability": {
     "enabled": true,
     "traces": {

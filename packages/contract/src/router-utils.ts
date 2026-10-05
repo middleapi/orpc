@@ -3,7 +3,7 @@ import type { MergedErrorMap } from './error-utils'
 import type { AnyMetaPlugin, Meta } from './meta'
 import type { AnyProcedureContract } from './procedure'
 import type { RouterContract } from './router'
-import { isTypescriptObject } from '@orpc/shared'
+import { getOwn, isTypescriptObject } from '@orpc/shared'
 import { mergeErrorMap } from './error-utils'
 import { resolveMetaPlugins } from './meta-utils'
 import { ProcedureContract } from './procedure'
@@ -72,7 +72,7 @@ export function getRouterContract(router: RouterContract, path: readonly string[
       return undefined
     }
 
-    current = current[segment]
+    current = getOwn(current, segment)
   }
 
   if (!isTypescriptObject(current)) {

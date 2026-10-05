@@ -1,5 +1,5 @@
 import type { Segment } from '@orpc/shared'
-import { isPlainObject, NullProtoObj } from '@orpc/shared'
+import { copyOnWrite, isPlainObject, NullProtoObj } from '@orpc/shared'
 
 export type OpenAPIJsonSerialization
   = | { json: unknown, maps?: undefined, blobs?: undefined }
@@ -60,20 +60,20 @@ const DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS: Record<string, OpenAPIJsonSeria
     },
     isTerminal: true,
   },
+  infinity: {
+    condition(data: unknown): boolean {
+      return data === Number.POSITIVE_INFINITY || data === Number.NEGATIVE_INFINITY
+    },
+    serialize() {
+      return null
+    },
+    isTerminal: true,
+  },
   url: {
     condition(data: unknown): boolean {
       return data instanceof URL
     },
     serialize(data: URL): string {
-      return data.toString()
-    },
-    isTerminal: true,
-  },
-  regexp: {
-    condition(data: unknown): boolean {
-      return data instanceof RegExp
-    },
-    serialize(data: RegExp): string {
       return data.toString()
     },
     isTerminal: true,
@@ -127,10 +127,10 @@ export interface OpenAPIJsonSerializerOptions {
    *
    * **Disabling:** Set a key to `undefined` to remove a built-in handler:
    * ```ts
-   * handlers: { regexp: undefined }
+   * handlers: { url: undefined }
    * ```
    *
-   * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `url`, `regexp`, `set`, `map`.
+   * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `infinity`, `url`, `set`, `map`.
    */
   handlers?: Record<string, undefined | OpenAPIJsonSerializerHandler> | undefined
 
@@ -160,7 +160,9 @@ export class OpenAPIJsonSerializer {
     let inlineBuiltInHandlers = true
     let handlerEntries: OpenAPIJsonSerializerHandler[] = []
 
-    for (const [key, handler] of Object.entries(customHandlers)) {
+    for (const key of Object.keys(customHandlers)) {
+      const handler = customHandlers[key]
+
       if (inlineBuiltInHandlers && key in DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS) {
         inlineBuiltInHandlers = false
         break
@@ -209,7 +211,7 @@ export class OpenAPIJsonSerializer {
         case 'boolean':
           return data
         case 'number':
-          return Number.isNaN(data) ? null : data
+          return Number.isFinite(data) ? data : null
         case 'undefined':
           return null
         case 'bigint':
@@ -222,9 +224,6 @@ export class OpenAPIJsonSerializer {
             return Number.isNaN(data.getTime()) ? null : data.toISOString()
           }
           if (data instanceof URL) {
-            return data.toString()
-          }
-          if (data instanceof RegExp) {
             return data.toString()
           }
           if (data instanceof Set) {
@@ -280,7 +279,8 @@ export class OpenAPIJsonSerializer {
     if (isPlainObject(data)) {
       const json: Record<string, unknown> = new NullProtoObj()
 
-      for (const [k, v] of Object.entries(data)) {
+      for (const k of Object.keys(data)) {
+        const v = data[k]
         /**
          * Skip custom toJSON methods to avoid JSON.stringify invoking them,
          * which could cause meta and serialized data mismatches during deserialization.
@@ -306,28 +306,36 @@ export class OpenAPIJsonSerializer {
   }
 
   deserialize(serialized: OpenAPIJsonSerialization): unknown {
-    const ref = { data: serialized.json }
+    const ref = { json: serialized.json }
 
     if (serialized.blobs?.length) {
       for (let i = 0; i < serialized.maps.length; i++) {
+        const blob = serialized.blobs[i]
+
+        if (!(blob instanceof Blob)) {
+          throw new TypeError(`Invalid OpenAPI serialized data: blob ${i} is not a Blob.`)
+        }
+
         const segments = serialized.maps[i]!
 
+        let original: any = serialized
         let currentRef: any = ref
-        let preSegment: string | number = 'data'
+        let preSegment: string | number = 'json'
 
         for (let j = 0; j < segments.length; j++) {
-          currentRef = currentRef[preSegment]
+          original = original[preSegment]
+          currentRef = copyOnWrite(currentRef, preSegment, original)
           preSegment = segments[j]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
-            throw new Error(`Security error: Invalid serialized data. Segment "${preSegment}" does not exist.`)
+            throw new TypeError(`Invalid OpenAPI serialized data: segment "${preSegment}" does not exist.`)
           }
         }
 
-        currentRef[preSegment] = serialized.blobs[i]
+        currentRef[preSegment] = blob
       }
     }
 
-    return ref.data
+    return ref.json
   }
 }

@@ -117,20 +117,13 @@ export class SharedRouterImplementer<
   lazy<T extends ContractedRouter<TContract, any>>(
     loader: () => Promise<{ default: T }>,
   ): Lazy<T> {
-    if (this.middlewares.length) {
-      const originalLoader = loader
-      loader = async () => {
-        const { default: router } = await originalLoader()
-        return {
-          default: augmentImplementedRouter(router, {
-            ...this.config,
-            middlewares: this.middlewares,
-          }) as any,
-        }
-      }
-    }
-
-    return new Lazy({ loader, meta: {} })
+    return new Lazy({
+      loader: async () => {
+        const { default: router } = await loader()
+        return { default: this.router(router) }
+      },
+      meta: {},
+    })
   }
 }
 

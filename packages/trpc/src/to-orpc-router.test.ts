@@ -113,7 +113,7 @@ describe('toORPCRouter', () => {
   describe('calls', () => {
     const handler = vi.fn()
     const router = toORPCRouter(t.router({
-      procedure: t.procedure.query(handler),
+      procedure: t.procedure.input(z.object({ input: z.number() })).query(handler),
     }))
 
     it('on success', async () => {
@@ -135,6 +135,19 @@ describe('toORPCRouter', () => {
         type: 'query',
         signal: controller.signal,
       }))
+    })
+
+    it('strips keys the input schema does not declare', async () => {
+      const orpcRouter = toORPCRouter(t.router({
+        update: t.procedure
+          .input(z.object({ name: z.string() }))
+          .input(z.object({ age: z.number() }))
+          .mutation(({ input }) => input),
+      }))
+
+      await expect(
+        call(orpcRouter.update, { name: 'n', age: 1, role: 'admin' } as any, { context: { a: 'test' } }),
+      ).resolves.toEqual({ name: 'n', age: 1 })
     })
 
     it('async iterator', async () => {

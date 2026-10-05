@@ -1,4 +1,4 @@
-import type { FastifyHandlerPlugin } from '@orpc/server/fastify'
+import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import type { FastifyInstance } from 'fastify'
 import { os } from '@orpc/server'
 import Fastify from 'fastify'
@@ -52,18 +52,14 @@ describe('openapiHandler', () => {
     expect(mismatchRes.text).toBe('not matched')
   })
 
-  it('supports fastify handler plugin', async () => {
-    const plugin: FastifyHandlerPlugin<any> = {
+  it('supports standard handler plugins', async () => {
+    const plugin: StandardHandlerPlugin<any> = {
       name: 'test',
-      initFastifyHandlerOptions(options) {
+      init(options) {
         return {
           ...options,
-          fastifyInterceptors: [
-            async ({ reply }) => {
-              await reply.status(200).send('intercepted')
-
-              return { matched: true }
-            },
+          routingInterceptors: [
+            async () => ({ matched: true, response: { status: 200, headers: {}, body: 'intercepted' } }),
           ],
         }
       },
@@ -81,6 +77,6 @@ describe('openapiHandler', () => {
     const res = await request(app.server).get('/test')
 
     expect(res.status).toBe(200)
-    expect(res.text).toBe('intercepted')
+    expect(res.body).toBe('intercepted')
   })
 })

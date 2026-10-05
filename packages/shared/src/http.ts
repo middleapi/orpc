@@ -1,4 +1,4 @@
-import { safeDecodeURIComponent, safeEncodeURIComponent } from './uri'
+import { safeDecodeURIComponent, safeEncodeURIComponent } from '@standard-server/shared'
 
 export function pathToHttpPath(path: readonly string[]): `/${string}` {
   return `/${path.map(safeEncodeURIComponent).join('/')}`
@@ -56,8 +56,8 @@ const ACCEPT_ENCODING_QUALITY_REGEX = /^\s*q=([\d.]+)\s*$/i
 
 /**
  * Parse Accept-Encoding into each coding's q-value, where `0` means the coding is explicitly
- * unacceptable. The `*` wildcard is kept under its own key, so a caller can honour it while
- * still letting a specific coding take precedence over it.
+ * unacceptable. The `*` wildcard is kept under its own key; use {@link isAcceptableEncoding}
+ * to decide whether a coding is acceptable.
  *
  * @see https://www.rfc-editor.org/rfc/rfc9110.html#name-accept-encoding
  */
@@ -78,6 +78,16 @@ export function parseAcceptEncodingQualities(header: string | undefined): Map<st
   }
 
   return qualities
+}
+
+/**
+ * Whether the client accepts a coding, given qualities from {@link parseAcceptEncodingQualities}.
+ * An explicit q-value takes precedence over the `*` wildcard, so `gzip;q=0, *` never accepts gzip.
+ *
+ * @see https://www.rfc-editor.org/rfc/rfc9110.html#name-accept-encoding
+ */
+export function isAcceptableEncoding(qualities: Map<string, number>, coding: string): boolean {
+  return (qualities.get(coding) ?? qualities.get('*') ?? 0) > 0
 }
 
 /**

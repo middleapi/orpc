@@ -61,6 +61,8 @@ const handler = new RPCHandler(router, {
 
       /**
        * Whether files and directories whose name starts with a dot can be served.
+       * When disabled, names shaped like 8.3 short names, such as `ENV~1`, are
+       * refused too, since NTFS and FAT resolve them to dotfiles.
        *
        * @default false
        */

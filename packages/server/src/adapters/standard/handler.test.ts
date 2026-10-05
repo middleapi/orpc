@@ -1,5 +1,6 @@
 import { ORPCError } from '@orpc/client'
 import * as sharedExperimental from '@orpc/shared'
+import { ErrorEvent } from '@standard-server/core'
 import { createProcedureClient } from '../../procedure-client'
 import { StandardHandler } from './handler'
 
@@ -419,38 +420,164 @@ describe('standardHandler', () => {
       return { setAttribute: vi.fn(), updateName: vi.fn(), addEvent: vi.fn(), recordException: vi.fn(), end: vi.fn() }
     }
 
-    it('starts the request span under the parent extracted from request headers', async ({ onTestFinished }) => {
-      codec.resolveProcedure.mockResolvedValue(undefined)
+    let span: ReturnType<typeof createSpan>
+    let tracer: {
+      startSpan: ReturnType<typeof vi.fn>
+      startActiveSpan: ReturnType<typeof vi.fn>
+      withActiveSpan: ReturnType<typeof vi.fn>
+      getActiveSpan: () => typeof span
+      extract: ReturnType<typeof vi.fn> | undefined
+    }
 
-      const span = createSpan()
-      const parent = { name: 'parent' }
-      const extract = vi.fn(() => parent)
-      const startActiveSpan = vi.fn((_name, _options, fn) => fn(span))
-
-      sharedExperimental.setTracer({ getActiveSpan: () => span, extract, startActiveSpan } as any)
-      onTestFinished(() => sharedExperimental.setTracer(undefined))
-
-      const request = makeRequest({ headers: { traceparent: '00-test' }, url: '/api/v1/ping?search=1' })
-      await handler.handle(request, OPTIONS)
-
-      expect(extract).toHaveBeenCalledWith(request.headers)
-      expect(startActiveSpan).toHaveBeenCalledWith('POST /api/v1/ping', parent, expect.any(Function))
-      expect(startActiveSpan).toHaveBeenCalledWith('find_procedure', undefined, expect.any(Function))
-      expect(span.updateName).toHaveBeenCalledWith('orpc_no_match')
-      expect(span.end).toHaveBeenCalledTimes(2)
+    beforeEach(() => {
+      span = createSpan()
+      tracer = {
+        startSpan: vi.fn(() => span),
+        // the request span is the first active span started
+        startActiveSpan: vi.fn((_name, _parent, fn) => fn(createSpan())).mockImplementationOnce((_name, _parent, fn) => fn(span)),
+        withActiveSpan: vi.fn((_span, fn) => fn()),
+        getActiveSpan: () => span,
+        extract: vi.fn(),
+      }
+      sharedExperimental.setTracer(tracer as any)
     })
 
-    it('starts the request span without parent when the tracer cannot extract one', async ({ onTestFinished }) => {
+    afterEach(() => {
+      sharedExperimental.setTracer(undefined)
+    })
+
+    async function drain(body: AsyncIterable<unknown>) {
+      const values: unknown[] = []
+      for await (const value of body) values.push(value)
+      return values
+    }
+
+    async function handleBody(body: unknown) {
+      setupHappyPath()
+      codec.encodeOutput.mockResolvedValue({ status: 200, headers: {}, body })
+
+      const result = await handler.handle(makeRequest(), OPTIONS)
+
+      return result.response!.body as any
+    }
+
+    it('does nothing without a tracer', async () => {
+      sharedExperimental.setTracer(undefined)
+      setupHappyPath()
+
+      await expect(handler.handle(makeRequest(), OPTIONS)).resolves.toEqual({ matched: true, response: OK_RESPONSE })
+    })
+
+    it('starts the request span under the parent extracted from request headers and ends it when nothing matches', async () => {
       codec.resolveProcedure.mockResolvedValue(undefined)
+      const parent = { name: 'parent' }
+      tracer.extract!.mockReturnValue(parent)
 
-      const startActiveSpan = vi.fn((_name, _options, fn) => fn(createSpan()))
+      const request = makeRequest({ headers: { traceparent: '00-test' }, url: '/api/v1/ping?search=1' })
+      await expect(handler.handle(request, OPTIONS)).resolves.toEqual({ matched: false })
 
-      sharedExperimental.setTracer({ getActiveSpan: () => undefined, startActiveSpan } as any)
-      onTestFinished(() => sharedExperimental.setTracer(undefined))
+      expect(tracer.extract).toHaveBeenCalledWith(request.headers)
+      expect(tracer.startActiveSpan).toHaveBeenNthCalledWith(1, 'POST /api/v1/ping', parent, expect.any(Function))
+      expect(tracer.startSpan).not.toHaveBeenCalled()
+      expect(tracer.withActiveSpan).not.toHaveBeenCalled()
+      expect(tracer.startActiveSpan).toHaveBeenCalledWith('find_procedure', undefined, expect.any(Function))
+      expect(span.updateName).toHaveBeenCalledWith('orpc_no_match')
+      expect(span.recordException).not.toHaveBeenCalled()
+      expect(span.end).toHaveBeenCalledTimes(1)
+    })
+
+    it('starts the request span without parent when the tracer cannot extract one', async () => {
+      codec.resolveProcedure.mockResolvedValue(undefined)
+      tracer.extract = undefined
 
       await handler.handle(makeRequest(), OPTIONS)
 
-      expect(startActiveSpan).toHaveBeenCalledWith('POST /api/v1/ping', undefined, expect.any(Function))
+      expect(tracer.startActiveSpan).toHaveBeenNthCalledWith(1, 'POST /api/v1/ping', undefined, expect.any(Function))
+    })
+
+    it('ends the request span right away for a non-streaming body', async () => {
+      await expect(handleBody('ok')).resolves.toBe('ok')
+
+      expect(span.recordException).not.toHaveBeenCalled()
+      expect(span.end).toHaveBeenCalledTimes(1)
+    })
+
+    it.each([
+      ['a regular error', new Error('interceptor failure')],
+      ['an abort error', new DOMException('interceptor failure', 'AbortError')],
+    ])('records %s at error level and ends the request span when handling throws', async (_, error) => {
+      handler = new StandardHandler(codec as any, {
+        routingInterceptors: [() => { throw error }],
+      })
+
+      await expect(handler.handle(makeRequest(), OPTIONS)).rejects.toBe(error)
+
+      expect(span.recordException).toHaveBeenCalledExactlyOnceWith('error', expect.objectContaining({ message: 'interceptor failure' }))
+      expect(span.end).toHaveBeenCalledTimes(1)
+    })
+
+    describe.each([
+      ['async iterator', (body: AsyncIterable<unknown>) => body],
+      ['readable stream', (body: AsyncIterable<unknown>) => ReadableStream.from(body)],
+    ])('%s body', (_, toBody) => {
+      it('keeps the request span active and open until the body is drained', async () => {
+        const body = Object.assign(toBody((async function* () {
+          yield 'a'
+          yield 'b'
+        })()), { custom: 'kept' })
+
+        const wrapped = await handleBody(body)
+
+        expect(wrapped).not.toBe(body)
+        expect(wrapped.custom).toBe('kept')
+        expect(span.end).not.toHaveBeenCalled()
+
+        tracer.withActiveSpan.mockClear()
+        await expect(drain(wrapped)).resolves.toEqual(['a', 'b'])
+
+        expect(tracer.withActiveSpan).toHaveBeenCalledWith(span, expect.any(Function))
+        expect(span.recordException).not.toHaveBeenCalled()
+        expect(span.end).toHaveBeenCalledTimes(1)
+      })
+
+      it('ends the request span when the consumer stops early', async () => {
+        const wrapped = await handleBody(toBody((async function* () {
+          yield 'a'
+          yield 'b'
+        })()))
+
+        const iterator = wrapped[Symbol.asyncIterator]()
+        await iterator.next()
+        await iterator.return()
+
+        expect(span.recordException).not.toHaveBeenCalled()
+        expect(span.end).toHaveBeenCalledTimes(1)
+      })
+
+      it('records failures on the request span', async () => {
+        const wrapped = await handleBody(toBody((async function* () {
+          yield 'a'
+          throw new Error('body failure')
+        })()))
+
+        await expect(drain(wrapped)).rejects.toThrow('body failure')
+
+        expect(span.recordException).toHaveBeenCalledExactlyOnceWith('error', expect.objectContaining({ message: 'body failure' }))
+        expect(span.end).toHaveBeenCalledTimes(1)
+      })
+    })
+
+    it('does not record ErrorEvent failures of an async iterator body on the request span', async () => {
+      const errorEvent = new ErrorEvent({ code: 'BAD_REQUEST' })
+      const wrapped = await handleBody((async function* () {
+        yield 'a'
+        throw errorEvent
+      })())
+
+      await expect(drain(wrapped)).rejects.toBe(errorEvent)
+
+      expect(span.recordException).not.toHaveBeenCalled()
+      expect(span.end).toHaveBeenCalledTimes(1)
     })
   })
 })

@@ -128,3 +128,7 @@ export function advertiseHref(position?: AdPosition): string {
 
   return `mailto:${ADVERTISE_EMAIL}?subject=${encodeURIComponent(`Advertise on oRPC${slot}`)}&body=${encodeURIComponent(body)}`
 }
+
+export function sponsorListingHref(): string {
+  return `mailto:${ADVERTISE_EMAIL}?subject=${encodeURIComponent('My oRPC sponsor listing')}`
+}

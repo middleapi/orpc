@@ -20,8 +20,8 @@ export function findDeepMatches(
     })
   }
   else if (isPlainObject(payload)) {
-    for (const [key, value] of Object.entries(payload)) {
-      findDeepMatches(check, value, [...segments, key], maps, values)
+    for (const key of Object.keys(payload)) {
+      findDeepMatches(check, payload[key], [...segments, key], maps, values)
     }
   }
 
@@ -147,7 +147,7 @@ export function mergeTwoLevels(first: unknown, second: unknown): unknown {
   // Spread keeps special keys like __proto__ as own properties instead of re-parenting the result.
   const result: Record<PropertyKey, unknown> = { ...first, ...second }
 
-  for (const key in second) {
+  for (const key of Object.keys(second)) {
     if (!Object.hasOwn(first, key)) {
       continue
     }
@@ -156,7 +156,7 @@ export function mergeTwoLevels(first: unknown, second: unknown): unknown {
     const secondValue = second[key]
 
     if (isPlainObject(firstValue) && isPlainObject(secondValue)) {
-      setOwn(result, key, { ...firstValue, ...secondValue })
+      result[key] = { ...firstValue, ...secondValue }
     }
   }
 
@@ -171,6 +171,21 @@ export function omit<T extends object, K extends keyof T>(
 
   for (const key of keys) {
     delete result[key]
+  }
+
+  return result
+}
+
+export function pick<T extends object, K extends keyof T>(
+  obj: T,
+  keys: readonly K[],
+): Pick<T, K> {
+  const result = {} as Pick<T, K>
+
+  for (const key of keys) {
+    if (Object.hasOwn(obj, key)) {
+      result[key] = obj[key]
+    }
   }
 
   return result
@@ -211,8 +226,8 @@ function cloneWithVisited(value: unknown, visited: WeakMap<object, unknown>): un
     visited.set(value, result)
 
     // Use setOwn so special keys like __proto__ don't re-parent the result.
-    for (const [key, item] of Object.entries(value)) {
-      setOwn(result, key, cloneWithVisited(item, visited))
+    for (const key of Object.keys(value)) {
+      setOwn(result, key, cloneWithVisited(value[key], visited))
     }
 
     for (const sym of Object.getOwnPropertySymbols(value)) {
@@ -223,6 +238,30 @@ function cloneWithVisited(value: unknown, visited: WeakMap<object, unknown>): un
   }
 
   return value
+}
+
+export function copyOnWrite(parent: object, key: PropertyKey, original: unknown): unknown {
+  const value = (parent as Record<PropertyKey, unknown>)[key]
+
+  if (value !== original) {
+    return value
+  }
+
+  let copy: object
+
+  if (Array.isArray(value)) {
+    copy = value.slice()
+  }
+  else if (isPlainObject(value)) {
+    copy = { ...value }
+  }
+  else {
+    return value
+  }
+
+  setOwn(parent, key, copy)
+
+  return copy
 }
 
 export function isPropertyKey(value: unknown): value is PropertyKey {

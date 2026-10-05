@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import type { FastifyHandlerPlugin } from './plugin'
+import type { StandardHandlerPlugin } from '../standard'
 import Fastify from 'fastify'
 import request from 'supertest'
 import { os } from '../../builder'
@@ -50,18 +50,14 @@ describe('rpcHandler', () => {
     expect(mismatchRes.text).toBe('not matched')
   })
 
-  it('supports fastify handler plugin', async () => {
-    const plugin: FastifyHandlerPlugin<any> = {
+  it('supports standard handler plugins', async () => {
+    const plugin: StandardHandlerPlugin<any> = {
       name: 'test',
-      initFastifyHandlerOptions(options) {
+      init(options) {
         return {
           ...options,
-          fastifyInterceptors: [
-            async ({ reply }) => {
-              await reply.status(200).send('intercepted')
-
-              return { matched: true }
-            },
+          routingInterceptors: [
+            async () => ({ matched: true, response: { status: 200, headers: {}, body: 'intercepted' } }),
           ],
         }
       },
@@ -79,7 +75,7 @@ describe('rpcHandler', () => {
     const res = await request(app.server).get('/test')
 
     expect(res.status).toBe(200)
-    expect(res.text).toBe('intercepted')
+    expect(res.body).toBe('intercepted')
   })
 
   it('treats GET requests as unmatched by default', async () => {

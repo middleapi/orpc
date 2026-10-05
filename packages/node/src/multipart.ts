@@ -28,6 +28,11 @@ export interface MultipartPart {
    * The part's `Content-Type` header value, if present.
    */
   type: string | undefined
+
+  /**
+   * The size in bytes of the part's header block, including the blank line.
+   */
+  headerSize: number
 }
 
 export interface MultipartPartWriter {
@@ -69,7 +74,7 @@ export async function parseMultipart(
    * later delimiter.
    */
   let buffer: Buffer = CRLF
-  let state: 'preamble' | 'delimiter-end' | 'headers' | 'body' = 'preamble'
+  let state: 'preamble' | 'delimiter-end' | 'transport-padding' | 'headers' | 'body' = 'preamble'
   let writer: MultipartPartWriter | undefined
   let done = false
 
@@ -119,20 +124,27 @@ export async function parseMultipart(
           return
         }
 
+        state = 'transport-padding'
+        continue
+      }
+
+      if (state === 'transport-padding') {
         let index = 0
         while (index < buffer.length && (buffer[index] === 0x20 || buffer[index] === 0x09)) {
           index++
         }
 
-        if (index + 1 >= buffer.length) {
+        buffer = buffer.subarray(index)
+
+        if (buffer.length < 2) {
           return
         }
 
-        if (buffer[index] !== 0x0D || buffer[index + 1] !== 0x0A) {
+        if (buffer[0] !== 0x0D || buffer[1] !== 0x0A) {
           throw new TypeError('Invalid multipart body: expected CRLF after a boundary delimiter')
         }
 
-        buffer = buffer.subarray(index + 2)
+        buffer = buffer.subarray(2)
         state = 'headers'
         continue
       }
@@ -142,18 +154,20 @@ export async function parseMultipart(
         throw new TypeError('Invalid multipart body: part is missing the content-disposition header')
       }
 
-      const headerEnd = buffer.indexOf(HEADER_BLOCK_END)
+      const headerWindow = MAX_PART_HEADER_SIZE + HEADER_BLOCK_END.length
+      const headerEnd = buffer.subarray(0, headerWindow).indexOf(HEADER_BLOCK_END)
 
       if (headerEnd === -1) {
-        if (buffer.length > MAX_PART_HEADER_SIZE) {
+        if (buffer.length >= headerWindow) {
           throw new TypeError('Invalid multipart body: part headers exceed the maximum allowed size')
         }
 
         return
       }
 
-      const part = parsePartHeaders(buffer.subarray(0, headerEnd).toString())
-      buffer = buffer.subarray(headerEnd + HEADER_BLOCK_END.length)
+      const headerSize = headerEnd + HEADER_BLOCK_END.length
+      const part = parsePartHeaders(buffer.subarray(0, headerEnd).toString(), headerSize)
+      buffer = buffer.subarray(headerSize)
       writer = await onPart(part)
       state = 'body'
     }
@@ -176,7 +190,7 @@ export async function parseMultipart(
   }
 }
 
-function parsePartHeaders(block: string): MultipartPart {
+function parsePartHeaders(block: string, headerSize: number): MultipartPart {
   let contentDisposition: string | undefined
   let contentType: string | undefined
 
@@ -222,6 +236,7 @@ function parsePartHeaders(block: string): MultipartPart {
     name: decodeContentDispositionParameter(name),
     filename: filename === undefined ? undefined : decodeContentDispositionParameter(filename),
     type: contentType,
+    headerSize,
   }
 }
 
@@ -259,16 +274,18 @@ export function parseHeaderParameters(header: string): Map<string, string> {
       index++
     }
 
-    const equals = header.indexOf('=', index)
-    const nextSemicolon = header.indexOf(';', index)
+    let equals = index
+    while (equals < header.length && header[equals] !== '=' && header[equals] !== ';') {
+      equals++
+    }
+
+    if (equals === header.length) {
+      break
+    }
 
     // A parameter without a value ends at the next semicolon and is skipped
-    if (equals === -1 || (nextSemicolon !== -1 && nextSemicolon < equals)) {
-      if (nextSemicolon === -1) {
-        break
-      }
-
-      index = nextSemicolon
+    if (header[equals] === ';') {
+      index = equals
       continue
     }
 

@@ -3,7 +3,8 @@ import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRout
 import type { StandardBodyHint, StandardHeaders } from '@standard-server/core'
 import { Duplex } from 'node:stream'
 import { constants, createDeflate, createDeflateRaw, createGzip } from 'node:zlib'
-import { isNoTransformCacheControl, parseAcceptEncodingQualities, stringifyJSON, toArray, varyByAcceptEncoding } from '@orpc/shared'
+import { negotiateResponseCompressionEncoding, toCompressedHeaders } from '@orpc/server/plugins'
+import { stringifyJSON, toArray } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 
 export interface BatchResponseCompressionHandlerPluginOptions {
@@ -86,27 +87,7 @@ export class BatchResponseCompressionHandlerPlugin<T extends Context> implements
         return result
       }
 
-      if (flattenStandardHeader(headers['content-encoding']) !== undefined) { // already compressed, do not compress again
-        return result
-      }
-
-      /**
-       * A partial response body is a byte range of the identity representation, so compressing it
-       * would leave `Content-Range` describing offsets the client never receives.
-       */
-      if (response.status === 206 || flattenStandardHeader(headers['content-range']) !== undefined) {
-        return result
-      }
-
-      // Cache-Control: no-transform forbids intermediaries (and this plugin) from transforming the body
-      if (isNoTransformCacheControl(flattenStandardHeader(headers['cache-control']))) {
-        return result
-      }
-
-      const acceptEncodings = parseAcceptEncodingQualities(
-        flattenStandardHeader(interceptorOptions.request.headers['accept-encoding']),
-      )
-      const encoding = this.encodings.find(enc => (acceptEncodings.get(enc) ?? 0) > 0)
+      const encoding = negotiateResponseCompressionEncoding(response, interceptorOptions.request.headers, this.encodings)
 
       if (encoding === undefined) {
         return result
@@ -169,11 +150,8 @@ export class BatchResponseCompressionHandlerPlugin<T extends Context> implements
           ...response,
           body: stream.pipeThrough(createFlushingCompressionStream(encoding)),
           headers: {
-            ...headers,
+            ...toCompressedHeaders(headers, encoding),
             ...bodyHeaders,
-            'content-length': [],
-            'content-encoding': encoding,
-            'vary': varyByAcceptEncoding(flattenStandardHeader(headers.vary)),
           },
         },
       }

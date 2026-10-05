@@ -7,6 +7,7 @@ interface Sponsor {
   login: string
   avatar: string
   amount: number
+  type: string
   createdAt: string
   tierTitle: string
   tierTitlePlural: string
@@ -26,7 +27,7 @@ interface Sponsor {
 const SPONSORS_SOURCE_URL = 'https://raw.githubusercontent.com/middleapi/static/refs/heads/main/sponsors.json'
 const SPONSORS_OUTPUT_FILE = 'apps/content/sponsors/sponsors.ts'
 const SLOTS_OUTPUT_FILE = 'apps/content/sponsors/slots.ts'
-const PAST_SPONSORS_URL = 'https://htmlpreview.github.io/?https://github.com/middleapi/static/blob/main/sponsors.svg'
+const PAST_SPONSORS_URL = 'https://orpc.dev/sponsors#past-sponsors'
 const ROOT_DIR = process.cwd()
 const README_FILE_NAME = 'README.md'
 
@@ -223,9 +224,10 @@ function generatedModule(entries: unknown): string {
 
 /**
  * Emit the sponsor list the docs site renders (the landing page's sponsor
- * wall). Only the fields the site draws are kept, and the order is fully
- * determined by the data — highest tier first, then largest amount, then
- * longest-running — so re-running the sync produces a minimal diff.
+ * wall and the /sponsors table). Only the fields the site draws are kept, and
+ * the order is fully determined by the data — highest tier first, then largest
+ * amount, then longest-running — so re-running the sync produces a minimal
+ * diff.
  */
 async function writeSponsorsData(sponsors: Sponsor[]): Promise<void> {
   const entries = [...sponsors]
@@ -243,6 +245,9 @@ async function writeSponsorsData(sponsors: Sponsor[]): Promise<void> {
       rel: sponsor.rel,
       tierTitle: sponsor.tierTitle,
       tierLevel: sponsor.tierLevel,
+      amount: sponsor.amount,
+      createdAt: sponsor.createdAt,
+      type: sponsor.type,
     }))
 
   await writeFile(path.join(ROOT_DIR, SPONSORS_OUTPUT_FILE), generatedModule(entries))

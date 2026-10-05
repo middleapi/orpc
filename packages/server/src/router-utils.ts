@@ -6,7 +6,7 @@ import type { AnyMiddleware } from './middleware'
 import type { AnyProcedure, ProcedureConfig } from './procedure'
 import type { AnyRouter } from './router'
 import { mergeErrorMap, ProcedureContract, resolveMetaPlugins } from '@orpc/contract'
-import { isTypescriptObject, omit } from '@orpc/shared'
+import { getOwn, isTypescriptObject, omit } from '@orpc/shared'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
 import { getHiddenRouterContract } from './router-hidden'
@@ -201,7 +201,7 @@ export function getRouter<T extends Lazyable<AnyRouter | undefined>>(
     }
 
     if (!(current instanceof Lazy)) {
-      current = current[segment]
+      current = getOwn(current, segment)
 
       continue
     }

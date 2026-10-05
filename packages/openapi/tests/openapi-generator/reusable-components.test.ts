@@ -1,4 +1,4 @@
-import { oc } from '@orpc/contract'
+import { eventIterator, oc } from '@orpc/contract'
 import z from 'zod'
 import { openapi, OpenAPIGenerator } from '../../src'
 import { zodJsonSchemaConverter } from '../__shared__/schema'
@@ -82,6 +82,63 @@ describe('openAPIGenerator e2e: reusable component schemas', () => {
           author: { $ref: '#/components/schemas/User' },
         }),
       }),
+    })
+  })
+
+  it('hoists an entity that recurses to its own root out of bodies, error data, and event streams', async () => {
+    const Tree: z.ZodTypeAny = z.looseObject({
+      name: z.string(),
+      get children() { return z.array(Tree) },
+    })
+
+    const doc = await generator.generate({
+      createTree: oc
+        .meta(openapi({ method: 'POST', path: '/trees' }))
+        .errors({ BAD_REQUEST: { data: Tree } })
+        .input(Tree)
+        .output(Tree),
+      streamTrees: oc
+        .meta(openapi({ method: 'GET', path: '/trees' }))
+        .output(eventIterator(Tree)),
+    })
+
+    const operation = doc.paths?.['/trees']?.post
+    expect((operation?.requestBody as any).content['application/json'].schema).toEqual({ $ref: '#/components/schemas/__schema0' })
+    expect((operation?.responses?.['200'] as any).content['application/json'].schema).toEqual({ $ref: '#/components/schemas/__schema0' })
+    expect((doc.paths?.['/trees']?.get?.responses?.['200'] as any).content['text/event-stream'].schema.oneOf[0].properties.data)
+      .toEqual({ $ref: '#/components/schemas/__schema0' })
+    expect(doc.components?.schemas).toEqual({
+      __schema0: expect.objectContaining({
+        properties: {
+          name: { type: 'string' },
+          children: { type: 'array', items: { $ref: '#/components/schemas/__schema0' } },
+        },
+      }),
+      BadRequest: expect.objectContaining({
+        properties: expect.objectContaining({ data: { $ref: '#/components/schemas/__schema0' } }),
+      }),
+      UndefinedError: expect.any(Object),
+    })
+  })
+
+  it('keeps a root-recursive union whole when its file branch is split out', async () => {
+    const Node: z.ZodTypeAny = z.union([
+      z.object({ get children() { return z.array(Node) } }),
+      z.file().mime('image/png'),
+    ])
+
+    const doc = await generator.generate({
+      upload: oc.meta(openapi({ method: 'POST', path: '/nodes' })).input(Node),
+    })
+
+    const content = (doc.paths?.['/nodes']?.post?.requestBody as any).content
+    expect(content['multipart/form-data'].schema.properties.children.items).toEqual({ $ref: '#/components/schemas/__schema0' })
+    expect(content['image/png'].schema).toEqual(expect.objectContaining({ contentMediaType: 'image/png' }))
+    expect(doc.components?.schemas?.__schema0).toEqual({
+      anyOf: [
+        expect.objectContaining({ properties: { children: { type: 'array', items: { $ref: '#/components/schemas/__schema0' } } } }),
+        expect.objectContaining({ contentMediaType: 'image/png' }),
+      ],
     })
   })
 

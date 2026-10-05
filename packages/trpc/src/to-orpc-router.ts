@@ -97,8 +97,8 @@ function toORPCProcedure(procedure: AnyProcedure) {
           signal,
           path: path.join('.'),
           type: procedure._def.type,
-          input: trpcInput,
-          getRawInput: () => trpcInput,
+          // Only the raw input: tRPC merges `input` into the parsed input, so passing it would keep keys the schema strips
+          getRawInput: async () => trpcInput,
           // TODO: this should infer from context when using oRPC Batch Plugin
           batchIndex: 0,
         })

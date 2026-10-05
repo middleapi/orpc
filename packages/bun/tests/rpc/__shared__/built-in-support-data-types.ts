@@ -32,6 +32,16 @@ export const builtInRPCSupportDataTypes: { name: string, value: unknown, expecte
     expected: Number.NaN,
   },
   {
+    name: 'Infinity',
+    value: Number.POSITIVE_INFINITY,
+    expected: Number.POSITIVE_INFINITY,
+  },
+  {
+    name: '-Infinity',
+    value: Number.NEGATIVE_INFINITY,
+    expected: Number.NEGATIVE_INFINITY,
+  },
+  {
     name: 'true',
     value: true,
     expected: true,
@@ -65,16 +75,6 @@ export const builtInRPCSupportDataTypes: { name: string, value: unknown, expecte
     name: 'BigInt',
     value: 99999999999999999999999999999n,
     expected: 99999999999999999999999999999n,
-  },
-  {
-    name: 'regex without flags',
-    value: /npa|npb/,
-    expected: /npa|npb/,
-  },
-  {
-    name: 'regex with flags',
-    value: /uic/gi,
-    expected: /uic/gi,
   },
   {
     name: 'URL',

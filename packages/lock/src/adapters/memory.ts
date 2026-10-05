@@ -1,6 +1,6 @@
 import type { Promisable } from '@orpc/shared'
 import type { LockCallbackOptions, Locker, LockOptions } from '../types'
-import { promiseWithResolvers } from '@orpc/shared'
+import { promiseWithResolvers, throwIfAborted } from '@orpc/shared'
 import { LockTimeoutError } from '../error'
 
 export interface MemoryLockerOptions {
@@ -55,7 +55,7 @@ export class MemoryLocker implements Locker {
     const timeout = options.timeout ?? this.timeout
     const token = {}
 
-    options.signal?.throwIfAborted()
+    throwIfAborted(options.signal)
 
     let entry = this.entries.get(key)
     const waited = entry !== undefined

@@ -210,6 +210,26 @@ describe('retryLinkPlugin', () => {
     expect(clean).toHaveBeenCalledWith(false)
   })
 
+  it('throws the retryDelay error without retrying it', async () => {
+    const codec = makeCodec()
+    const transport = makeTransport()
+
+    vi.mocked(codec.decodeResponse).mockRejectedValue(new Error('FAIL'))
+
+    const retryDelay = vi.fn(() => 0).mockRejectedValueOnce(new Error('DELAY_FAIL'))
+    const onRetry = vi.fn()
+
+    const link = new StandardLink(codec, transport, {
+      plugins: [new RetryLinkPlugin()],
+    })
+
+    await expect(link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 1, retryDelay, onRetry } })).rejects.toThrow('DELAY_FAIL')
+
+    expect(retryDelay).toHaveBeenCalledTimes(1)
+    expect(onRetry).not.toHaveBeenCalled()
+    expect(codec.decodeResponse).toHaveBeenCalledTimes(1)
+  })
+
   describe('asyncIteratorObject', () => {
     it('retries AsyncIteratorObject and forwards lastEventId from metadata', async () => {
       const codec = makeCodec()
@@ -364,7 +384,7 @@ describe('retryLinkPlugin', () => {
       const iterator = await link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 1, retryDelay: 50 } }) as AsyncIterator<any>
 
       const nextPromise = iterator.next()
-      const nextExpectation = expect(nextPromise).rejects.toThrow('ITER_FAIL')
+      const nextExpectation = expect(nextPromise).resolves.toEqual({ done: true, value: undefined })
 
       await vi.advanceTimersByTimeAsync(1)
 

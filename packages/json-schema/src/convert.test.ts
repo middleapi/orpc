@@ -1,6 +1,5 @@
-import type { AnySchema } from '@orpc/contract'
 import type { JsonSchemaConverter } from './convert'
-import * as v from 'valibot'
+import { type } from '@orpc/contract'
 import z from 'zod'
 import { DelegatingJsonSchemaConverter } from './convert'
 
@@ -27,55 +26,18 @@ describe('delegatingJsonSchemaConverter', () => {
     expect(secondConverter.convert).not.toHaveBeenCalled()
   })
 
-  it('converts schemas using the standard json schema fallback behavior', () => {
-    const converter = new DelegatingJsonSchemaConverter([])
-
-    const schema = z.number().transform(String).pipe(z.string())
-    expect(converter.convert(schema, 'input')).toEqual([
-      expect.objectContaining({ type: 'number' }),
-      false,
-    ])
-    expect(converter.convert(schema, 'output')).toEqual([
-      expect.objectContaining({ type: 'string' }),
-      false,
-    ])
-
-    const optionalSchema = v.optional(v.string())
-    expect(converter.convert(optionalSchema, 'input')).toEqual([
-      expect.objectContaining({ }),
-      true,
-    ])
-    expect(converter.convert(optionalSchema, 'output')).toEqual([
-      expect.objectContaining({ }),
-      true,
-    ])
-  })
-
-  it('returns an empty schema when ~standard does not expose jsonSchema', () => {
-    const schema: AnySchema = {
-      '~standard': {
-        vendor: 'custom',
-        version: 1,
-        validate: vi.fn().mockReturnValue({}),
-      },
-    }
+  it('returns an unconstrained optional schema without validating when no converter matches', () => {
+    const map = vi.fn((input: number) => input.toString())
+    const validate = vi.fn()
 
     const converter = new DelegatingJsonSchemaConverter([])
 
-    expect(converter.convert(schema, 'input')).toEqual([{}, true])
-  })
+    expect(converter.convert(undefined, 'input')).toEqual([{}, true])
+    expect(converter.convert(type<number, string>(map), 'input')).toEqual([{}, true])
+    expect(converter.convert({ '~standard': { vendor: 'custom', version: 1, validate } }, 'output')).toEqual([{}, true])
+    expect(converter.convert(z.string(), 'input')).toEqual([{}, true])
 
-  it('treats schemas with async validation as required', () => {
-    const schema: AnySchema = {
-      '~standard': {
-        vendor: 'custom',
-        version: 1,
-        validate: vi.fn().mockResolvedValue({}),
-      },
-    }
-
-    const converter = new DelegatingJsonSchemaConverter([])
-
-    expect(converter.convert(schema, 'input')).toEqual([{}, false])
+    expect(map).not.toHaveBeenCalled()
+    expect(validate).not.toHaveBeenCalled()
   })
 })

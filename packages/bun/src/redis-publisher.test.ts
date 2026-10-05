@@ -207,6 +207,34 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
     await unsubscribe()
   }, { timeout: 20_000 })
 
+  it('keeps live delivery in stream order under concurrent publishers so resume skips nothing', async () => {
+    const prefix = `concurrent:${crypto.randomUUID()}:`
+    const event = 'orders'
+    // Separate connections, like publishers in different processes.
+    const clients = Array.from({ length: 4 }, () => new RedisClient(REDIS_URL))
+    onTestFinished(() => {
+      clients.forEach(client => client.close())
+    })
+    const publishers = clients.map(client => createTestingPublisher({
+      resume: { enabled: true, seconds: 10 },
+      prefix,
+    }, { useRedis: client }))
+    const listener = vi.fn()
+
+    const unsubscribe = await publishers[0]!.subscribe(event, listener)
+
+    await Promise.all(Array.from({ length: 500 }, (_, order) => publishers[order % publishers.length]!.publish(event, { order })))
+
+    await waitFor(() => {
+      expect(listener).toHaveBeenCalledTimes(500)
+    })
+
+    const streamIds = (await redis.send('XRANGE', [`${prefix}${event}`, '-', '+'])).map(([id]: [string]) => id)
+    expect(listener.mock.calls.map(([payload]) => getEventMeta(payload)?.id)).toEqual(streamIds)
+
+    await unsubscribe()
+  })
+
   it('trims stale resume history on the next publish and lets Redis expire the stream key', async () => {
     const prefix = `retention:${crypto.randomUUID()}:`
     const event = 'orders'
@@ -254,7 +282,7 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
         person: {
           condition: p => p instanceof Person,
           serialize: p => ({ name: p.name, date: p.date }),
-          deserialize: p => new Person(p.name, p.date),
+          deserialize: (p: any) => new Person(p.name, p.date),
         },
       },
     })

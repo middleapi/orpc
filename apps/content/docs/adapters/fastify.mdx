@@ -82,7 +82,7 @@ app.listen({ port: 3000 }).then(() => console.log('Listening on port 3000'))
 </CodeGroup>
 
 :::tip
-Fastify only accepts content types it has a registered parser for, and parses request bodies itself. For the best oRPC experience, register a catch-all parser with `app.addContentTypeParser('*', ...)` so every content type is supported, and call `app.removeAllContentTypeParsers()` so every body is parsed by oRPC instead of Fastify:
+Fastify only accepts content types it has a registered parser for, and parses request bodies itself. Registering a catch-all parser lets oRPC handle every content type, but bodies it receives skip Fastify's [`bodyLimit`](https://fastify.dev/docs/latest/Reference/Server/#bodylimit), so cap them with [Request Limit](/docs/plugins/request-limit) or [Tmp File Upload](/docs/plugins/tmp-file-upload):
 
 ```ts
 // Optional, let oRPC parse all content types
@@ -152,13 +152,6 @@ const handler = new OpenAPIHandler(router, {
          */
         comment: '',
       },
-      /**
-       * If true, a `close` event is sent even when the iterator completes with `undefined`.
-       * When the iterator returns a value, a `close` event is always emitted regardless of this setting.
-       *
-       * @default true
-       */
-      emptyCloseEventEnabled: true,
     },
   },
 })

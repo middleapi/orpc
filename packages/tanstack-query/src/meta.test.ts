@@ -144,4 +144,31 @@ describe('contractMetaPlugin', () => {
     expect(marks).toEqual(['meta', 'utils'])
     expect(client.planet.find).toHaveBeenCalledTimes(1)
   })
+
+  it('keeps contract meta interceptors when utils define none', async () => {
+    const metaInterceptor = vi.fn(({ next }: any) => next())
+    const contract = { planet: { find: oc.meta(tanstackQuery({ queryInterceptors: [metaInterceptor] })) } }
+    const client = { planet: { find: vi.fn(async () => '__found__') } }
+
+    const utils = createRouterUtils(client as any, {
+      plugins: [new ContractOptionsUtilsPlugin(contract)],
+    }) as any
+
+    await expect(utils.planet.find.queryOptions({ input: { id: 1 } }).queryFn({ signal: undefined })).resolves.toBe('__found__')
+    expect(metaInterceptor).toHaveBeenCalledTimes(1)
+  })
+
+  it('resets contract meta interceptors when utils set them to undefined explicitly', async () => {
+    const metaInterceptor = vi.fn(({ next }: any) => next())
+    const contract = { planet: { find: oc.meta(tanstackQuery({ queryInterceptors: [metaInterceptor] })) } }
+    const client = { planet: { find: vi.fn(async () => '__found__') } }
+
+    const utils = createRouterUtils(client as any, {
+      queryInterceptors: undefined,
+      plugins: [new ContractOptionsUtilsPlugin(contract)],
+    }) as any
+
+    await expect(utils.planet.find.queryOptions({ input: { id: 1 } }).queryFn({ signal: undefined })).resolves.toBe('__found__')
+    expect(metaInterceptor).not.toHaveBeenCalled()
+  })
 })

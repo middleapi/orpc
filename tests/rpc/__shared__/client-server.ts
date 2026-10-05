@@ -25,7 +25,7 @@ export const defaultSerializer = new RPCSerializer({
     person: {
       condition: value => value instanceof Person,
       serialize: person => ({ name: person.name, age: person.age }),
-      deserialize: data => new Person(data.name, data.age),
+      deserialize: (data: any) => new Person(data.name, data.age),
     },
   },
 })

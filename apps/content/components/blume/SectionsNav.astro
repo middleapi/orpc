@@ -19,7 +19,7 @@ const activeTab = activeTabForRoute(tabs, currentRoute);
 const isExternal = (path: string): boolean => /^https?:\/\//u.test(path);
 
 const rowClass =
-  "block py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:text-foreground aria-[current=page]:text-accent";
+  "block py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:text-foreground aria-[current=true]:text-accent";
 ---
 
 {
@@ -57,7 +57,7 @@ const rowClass =
           ) : (
             <li>
               <a
-                aria-current={tab === activeTab ? "page" : undefined}
+                aria-current={tab === activeTab ? "true" : undefined}
                 class={rowClass}
                 href={withBase(tab.href ?? tab.path)}
               >

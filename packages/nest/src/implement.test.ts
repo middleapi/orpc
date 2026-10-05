@@ -3,6 +3,8 @@ import type { Request as ExpressRequest } from 'express'
 import type { FastifyReply } from 'fastify'
 import type { NestStandardLazyRequest } from './module'
 import { Buffer } from 'node:buffer'
+import { once } from 'node:events'
+import { request as httpRequest } from 'node:http'
 import FastifyCookie from '@fastify/cookie'
 import { Controller, HttpException, Req, Res, SetMetadata, StreamableFile, UseGuards, UseInterceptors } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
@@ -12,10 +14,10 @@ import { meta, oc } from '@orpc/contract'
 import { openapi } from '@orpc/openapi'
 import { implement, ORPCError, os, Procedure } from '@orpc/server'
 import { RequestLimitHandlerPlugin } from '@orpc/server/plugins'
-import { getOrBind } from '@orpc/shared'
+import { AsyncIteratorClass, getOrBind } from '@orpc/shared'
 import { catchError, tap } from 'rxjs'
 import supertest from 'supertest'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as z from 'zod'
 import { Implement } from './implement'
 import { ORPCModule } from './module'
@@ -41,21 +43,143 @@ describe('requirements', () => {
     }).toThrow(/openapi\.path/)
   })
 
-  it('should throw if @Implement uses the QUERY HTTP method', () => {
-    const contract = oc.meta(openapi({
-      path: '/procedure',
-      method: 'QUERY',
-    }))
+  it('should throw if @Implement uses the QUERY HTTP method when QueryMethod is not available (NestJS < 11.2)', async () => {
+    vi.resetModules()
+    vi.doMock('@nestjs/common', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('@nestjs/common')>()
 
-    expect(() => {
-      @Controller()
-      class ImplController {
-        @Implement(contract)
-        procedure() {
-          return implement(contract).handler(() => {})
-        }
+      // Namespace imports resolve a missing CJS export to undefined (unlike a static named import,
+      // which throws SyntaxError at link time). Explicit undefined matches that runtime behavior.
+      return {
+        ...actual,
+        QueryMethod: undefined,
       }
-    }).toThrow(/does not support the 'QUERY' HTTP method/)
+    })
+
+    try {
+      const { Implement: ImplementWithoutQueryMethod } = await import('./implement')
+
+      const contract = oc.meta(openapi({
+        path: '/procedure',
+        method: 'QUERY',
+      }))
+
+      expect(() => {
+        @Controller()
+        class ImplController {
+          @ImplementWithoutQueryMethod(contract)
+          procedure() {
+            return implement(contract).handler(() => {})
+          }
+        }
+
+        void ImplController
+      }).toThrow(/does not support the 'QUERY' HTTP method/)
+    }
+    finally {
+      vi.doUnmock('@nestjs/common')
+      vi.resetModules()
+    }
+  })
+
+  it('should support the QUERY HTTP method when QueryMethod is available (NestJS 11.2+)', async () => {
+    const contract = oc
+      .meta(openapi({
+        path: '/query-route',
+        method: 'QUERY',
+      }))
+      .input(z.object({ search: z.string() }))
+
+    @Controller()
+    class QueryController {
+      @Implement(contract)
+      queryRoute() {
+        return implement(contract).handler(({ input }) => `query: ${input.search}`)
+      }
+    }
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [QueryController],
+    }).compile()
+
+    const app = moduleRef.createNestApplication()
+    await app.init()
+    await app.listen(0)
+
+    try {
+      const server = app.getHttpServer()
+      const port = (server.address() as { port: number }).port
+      const payload = JSON.stringify({ search: 'earth' })
+
+      const res = await new Promise<{ statusCode: number, body: unknown }>((resolve, reject) => {
+        const req = httpRequest({
+          hostname: '127.0.0.1',
+          port,
+          path: '/query-route',
+          method: 'QUERY',
+          headers: {
+            'content-type': 'application/json',
+            'content-length': Buffer.byteLength(payload),
+          },
+        }, (response) => {
+          let data = ''
+          response.on('data', (chunk: Buffer) => {
+            data += chunk
+          })
+          response.on('end', () => resolve({ statusCode: response.statusCode!, body: JSON.parse(data) }))
+        })
+
+        req.on('error', reject)
+        req.write(payload)
+        req.end()
+      })
+
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual('query: earth')
+    }
+    finally {
+      await app.close()
+    }
+  })
+
+  it('should support the QUERY HTTP method with the Fastify adapter', async () => {
+    const contract = oc
+      .meta(openapi({
+        path: '/query-route',
+        method: 'QUERY',
+      }))
+      .input(z.object({ search: z.string() }))
+
+    @Controller()
+    class QueryController {
+      @Implement(contract)
+      queryRoute() {
+        return implement(contract).handler(({ input }) => `query: ${input.search}`)
+      }
+    }
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [QueryController],
+    }).compile()
+
+    const app = moduleRef.createNestApplication(new FastifyAdapter())
+    await app.init()
+    await app.getHttpAdapter().getInstance().ready()
+
+    try {
+      const res = await app.getHttpAdapter().getInstance().inject({
+        method: 'QUERY',
+        url: '/query-route',
+        headers: { 'content-type': 'application/json' },
+        payload: { search: 'earth' },
+      })
+
+      expect(res.statusCode).toEqual(200)
+      expect(JSON.parse(res.body)).toEqual('query: earth')
+    }
+    finally {
+      await app.close()
+    }
   })
 
   it('should error if implemented method return invalid procedure', async () => {
@@ -422,7 +546,7 @@ describe('routing', () => {
 describe('response status, headers and body should follow standard-server', () => {
   const contract = oc.meta(openapi({ outputStructure: 'detailed', path: '/response' }))
 
-  const handler = vi.fn(() => ({}))
+  const handler = vi.fn((_options: { signal?: AbortSignal }) => ({}))
 
   @Controller()
   class ImplController {
@@ -430,6 +554,20 @@ describe('response status, headers and body should follow standard-server', () =
     response() {
       return implement(contract).handler(handler)
     }
+  }
+
+  function createPendingStream(cancel: () => void) {
+    return new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('first chunk'))
+      },
+      cancel,
+    })
+  }
+
+  // like a publisher subscription that never publishes
+  function createPendingIterator(cleanup: () => Promise<void>) {
+    return new AsyncIteratorClass(() => new Promise<never>(() => {}), cleanup)
   }
 
   describe.each([
@@ -453,11 +591,11 @@ describe('response status, headers and body should follow standard-server', () =
         )
       }
     }())
-    await app.init()
+    await app.listen(0, '127.0.0.1')
 
-    if (adapter) {
-      await app.getHttpAdapter().getInstance().ready()
-    }
+    afterAll(async () => {
+      await app.close()
+    })
 
     const httpServer = app.getHttpServer()
 
@@ -798,6 +936,54 @@ describe('response status, headers and body should follow standard-server', () =
         expect(res.body.toString()).toContain('chunk3')
 
         expect(returnedValueSPy).toHaveBeenCalledWith(expect.any(StreamableFile))
+      })
+    })
+
+    describe('streaming response body is canceled when the client disconnects', () => {
+      function sendRequest() {
+        const port = (httpServer.address() as { port: number }).port
+        const req = httpRequest({ hostname: '127.0.0.1', port, path: '/response', method: 'POST' })
+        req.on('error', () => {})
+        req.end()
+        return req
+      }
+
+      async function readFirstChunkThenDisconnect() {
+        const req = sendRequest()
+        const [res] = await once(req, 'response')
+        res.on('error', () => {})
+        await once(res, 'data')
+        req.destroy()
+      }
+
+      it('event iterator', async () => {
+        const cleanup = vi.fn()
+        handler.mockResolvedValueOnce({ body: createPendingIterator(cleanup) })
+
+        await readFirstChunkThenDisconnect()
+        await vi.waitFor(() => expect(cleanup).toHaveBeenCalledWith({ kind: 'cancelled' }))
+      })
+
+      it('readableStream', async () => {
+        const cancel = vi.fn()
+        handler.mockResolvedValueOnce({ body: createPendingStream(cancel) })
+
+        await readFirstChunkThenDisconnect()
+        await vi.waitFor(() => expect(cancel).toHaveBeenCalledTimes(1))
+      })
+
+      it('when the client disconnects before the handler returns', async () => {
+        const cleanup = vi.fn()
+        handler.mockImplementationOnce(async ({ signal }) => {
+          await new Promise(resolve => signal?.addEventListener('abort', resolve, { once: true }))
+          return { body: createPendingIterator(cleanup) }
+        })
+
+        const req = sendRequest()
+        await vi.waitFor(() => expect(handler).toHaveBeenCalledTimes(1))
+        req.destroy()
+
+        await vi.waitFor(() => expect(cleanup).toHaveBeenCalledWith({ kind: 'cancelled' }))
       })
     })
   })

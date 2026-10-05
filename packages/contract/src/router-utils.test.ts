@@ -194,6 +194,9 @@ describe('getRouterContract', () => {
 
     expect(getRouterContract('invalid' as any, [])).toBeUndefined()
     expect(getRouterContract('invalid' as any, ['invalid'])).toBeUndefined()
+
+    expect(getRouterContract(router, ['__proto__'])).toBeUndefined()
+    expect(getRouterContract(router, ['nested', 'hasOwnProperty'])).toBeUndefined()
   })
 })
 

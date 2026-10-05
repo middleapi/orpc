@@ -1,7 +1,7 @@
 {
   "name": "@orpc/json-schema",
   "type": "module",
-  "version": "2.0.0-beta.35",
+  "version": "2.0.0-beta.42",
   "description": "JSON Schema conversion and smart request coercion for oRPC and OpenAPI",
   "license": "MIT",
   "funding": [
@@ -45,7 +45,7 @@
     "type:check": "tsc -b"
   },
   "dependencies": {
-    "@openapi-spec/types": "~0.1.0",
+    "@openapi-spec/types": "~0.3.0",
     "@orpc/client": "workspace:*",
     "@orpc/contract": "workspace:*",
     "@orpc/server": "workspace:*",

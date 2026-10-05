@@ -1,12 +1,12 @@
 {
   "name": "@orpc/monorepo",
   "type": "module",
-  "version": "2.0.0-beta.35",
+  "version": "2.0.0-beta.42",
   "private": true,
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
-      "version": "^12.4.1",
+      "version": "12.4.2",
       "onFail": "download"
     }
   },
@@ -49,10 +49,10 @@
     "@orpc/tanstack-query": "workspace:*",
     "@orpc/valibot": "workspace:*",
     "@orpc/zod": "workspace:*",
-    "@standard-server/core": "~0.9.0",
-    "@standard-server/fetch": "~0.9.0",
-    "@standard-server/peer": "~0.9.0",
-    "@standard-server/shared": "~0.9.0",
+    "@standard-server/core": "~0.10.1",
+    "@standard-server/fetch": "~0.10.1",
+    "@standard-server/peer": "~0.10.1",
+    "@standard-server/shared": "~0.10.1",
     "@tanstack/ai": "^0.46.0",
     "@tanstack/ai-client": "^0.24.0",
     "@testing-library/dom": "^10.4.1",

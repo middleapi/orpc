@@ -17,10 +17,10 @@ interface Props {
 const { items, currentRoute, strings } = Astro.props;
 ---
 
-{/* From `md` the header's inline tab bar takes over; keep the drawer
-    list only when there is no page tree to show (e.g. the blog). */}
+{/* Below `lg` the header has no inline tab bar, so the drawer lists the
+    sections above the page tree. RootLayout hides this component from `lg`. */}
 <SectionsNav
-  class={`mb-4 border-border border-b pb-4${items.length > 0 ? " md:hidden" : ""}`}
+  class="mb-4 border-border border-b pb-4"
   currentRoute={currentRoute}
 />
 <NavTree currentRoute={currentRoute} items={items} strings={strings} />

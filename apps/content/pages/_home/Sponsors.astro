@@ -3,11 +3,7 @@
 // scripts/sync-sponsors.ts, the same source the README tables come from).
 import Icon from 'blume/components/Icon.astro'
 import { relAttribute } from '../../sponsors/ads'
-import { pastSponsors, sponsorTiers } from '../../sponsors/data'
-
-const GITHUB_SPONSOR_URL = 'https://github.com/sponsors/dinwwwh'
-const OPEN_COLLECTIVE_URL = 'https://opencollective.com/middleapi'
-const PAST_SPONSORS_URL = 'https://htmlpreview.github.io/?https://github.com/middleapi/static/blob/main/sponsors.svg'
+import { avatarSrc, pastSponsors, sponsorTiers } from '../../sponsors/data'
 
 const tiers = sponsorTiers()
 
@@ -61,16 +57,10 @@ const past = pastSponsors()
               that goes into it.
             </p>
           </div>
-          <div class="flex shrink-0 flex-col gap-2 self-start sm:self-auto">
-            <a class="orpc-btn orpc-btn-ghost" href={GITHUB_SPONSOR_URL} rel="noopener" target="_blank">
-              <Icon name="heart" size={15} />
-              GitHub Sponsors
-            </a>
-            <a class="orpc-btn orpc-btn-ghost" href={OPEN_COLLECTIVE_URL} rel="noopener" target="_blank">
-              <Icon name="hand-coins" size={15} />
-              Open Collective
-            </a>
-          </div>
+          <a class="orpc-btn orpc-btn-ghost shrink-0 self-start sm:self-auto" href="/sponsors">
+            All sponsors
+            <Icon name="arrow-right" size={15} />
+          </a>
         </div>
 
         {highlights.length > 0 && (
@@ -92,10 +82,11 @@ const past = pastSponsors()
                   <img
                     alt=""
                     class:list={['flex-none rounded-blume object-cover', sponsor.card.avatar]}
+                    data-monogram={sponsor.name}
                     data-no-zoom
                     height={sponsor.card.avatarPx}
                     loading="lazy"
-                    src={sponsor.avatar}
+                    src={avatarSrc(sponsor.avatar, sponsor.card.avatarPx)}
                     width={sponsor.card.avatarPx}
                   />
                   <span class="min-w-0">
@@ -138,10 +129,11 @@ const past = pastSponsors()
                         'rounded-full object-cover ring-1 ring-border transition hover:ring-foreground/40',
                         sponsor.tierLevel >= 2 ? 'size-12' : 'size-10',
                       ]}
+                      data-monogram={sponsor.name}
                       data-no-zoom
                       height={sponsor.tierLevel >= 2 ? 48 : 40}
                       loading="lazy"
-                      src={sponsor.avatar}
+                      src={avatarSrc(sponsor.avatar, sponsor.tierLevel >= 2 ? 48 : 40)}
                       width={sponsor.tierLevel >= 2 ? 48 : 40}
                     />
                   </a>
@@ -154,12 +146,9 @@ const past = pastSponsors()
         {past.length > 0 && (
           <p class="mt-6 text-sm text-muted-foreground">
             With thanks to{' '}
-            {/* The SVG wall lists everyone, current and past, in one place. */}
             <a
               class="underline underline-offset-4 transition-colors hover:text-foreground"
-              href={PAST_SPONSORS_URL}
-              rel="noopener"
-              target="_blank"
+              href="/sponsors#past-sponsors"
             >
               {past.length} past sponsors
             </a>{' '}
@@ -170,3 +159,7 @@ const past = pastSponsors()
     </section>
   )
 }
+
+<script>
+  import '../../sponsors/avatar-fallback'
+</script>

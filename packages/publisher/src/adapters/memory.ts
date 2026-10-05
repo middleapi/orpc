@@ -77,8 +77,7 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
       bucket.push({ expiresAt, payload })
     }
 
-    const listeners = this.listenersMap.get(event)
-    listeners?.forEach(listener => listener(payload))
+    this.listenersMap.get(event)?.forEach(listener => listener(payload))
   }
 
   protected async subscribeListener<K extends keyof T & string>(
@@ -107,10 +106,15 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
 
     // Ensure the returned cleanup function is safe to call multiple times.
     return once(async () => {
-      listeners.splice(listeners.indexOf(listener), 1)
+      const current = this.listenersMap.get(event)!
+      const index = current.indexOf(listener)
+      const remaining = current.filter((_, i) => i !== index)
 
-      if (listeners.length === 0) {
+      if (remaining.length === 0) {
         this.listenersMap.delete(event)
+      }
+      else {
+        this.listenersMap.set(event, remaining)
       }
     })
   }

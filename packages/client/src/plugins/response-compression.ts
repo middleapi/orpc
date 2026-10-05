@@ -4,6 +4,12 @@ import { toArray } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 import { toFetchHeaders, toStandardBody } from '@standard-server/fetch'
 
+/**
+ * Each coding adds a decompressor to the chain, so an unbounded list lets a tiny
+ * response cost unbounded CPU and memory. Same limit as undici and curl.
+ */
+const MAX_CONTENT_ENCODINGS = 5
+
 export interface ResponseCompressionLinkPluginOptions<_T extends ClientContext> {
   /**
    * Compression schemes to advertise via Accept-Encoding, in preference order.
@@ -73,6 +79,10 @@ export class ResponseCompressionLinkPlugin<T extends ClientContext> implements S
           // adapter might not support hint (e.g. peer adapter)
           if (!(stream instanceof ReadableStream)) {
             return stream
+          }
+
+          if (encodings.length > MAX_CONTENT_ENCODINGS) {
+            throw new TypeError('Too many content encodings.')
           }
 
           let decompressedStream = stream

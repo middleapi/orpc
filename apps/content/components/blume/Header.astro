@@ -96,13 +96,10 @@ const SearchSlot = resolveSlot(layout.Search, Search);
 // needed whenever there are tabs to reveal.
 const showNavToggle = hasDrawer && (hasSidebar || navigation.tabs.length > 0);
 const activeTab = activeTabForRoute(navigation.tabs, route);
-// Where the header's inline tab bar appears. With a sidebar it shares the `md`
-// breakpoint with the docs drawer; without one, the tabs-only drawer is the sole
-// mobile nav below `lg`, so the inline tabs wait until `lg` to avoid duplicating
-// the drawer's links between `md` and `lg`.
-const tabsNavClass = hasSidebar
-  ? "hidden items-center gap-4 self-stretch ms-1 md:flex lg:ms-3 lg:gap-6"
-  : "hidden items-center gap-6 self-stretch ms-3 lg:flex";
+// Where the header's inline tab bar appears: from `lg` on every page, since
+// below it the tabs crowd out the logo and icon buttons. The drawers list them
+// until then (SectionsNav). The gaps stay tight until `xl` for the same reason.
+const tabsNavClass = "hidden items-center gap-5 self-stretch ms-3 lg:flex xl:gap-6";
 
 // VitePress-style tab link: full-height, with a 2px accent underline
 // reserved via `after` so the active state doesn't shift the layout.

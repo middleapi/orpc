@@ -25,7 +25,6 @@ allowBuilds:
   '@tree-sitter-grammars/tree-sitter-yaml': false
   core-js-pure: false
   esbuild: false
-  msgpackr-extract: false
   msw: false
   protobufjs: false
   sharp: false
@@ -40,4 +39,12 @@ allowBuilds:
 # Entries go inert once the version ages past it, so prune them on the next bump
 # instead of letting versions accumulate.
 minimumReleaseAgeExclude:
-  - '@valibot/to-json-schema@1.8.0'
+  - '@standard-server/aws-lambda@0.10.1'
+  - '@standard-server/core@0.10.1'
+  - '@standard-server/fastify@0.10.1'
+  - '@standard-server/fetch@0.10.1'
+  - '@standard-server/node@0.10.1'
+  - '@standard-server/peer@0.10.1'
+  - '@standard-server/shared@0.10.1'
+  - effect@4.0.0
+  - rou3@1.0.0

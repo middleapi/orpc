@@ -1,6 +1,7 @@
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard'
-import { sleep } from '@orpc/shared'
+import { AsyncLocalStorage } from 'node:async_hooks'
+import { promiseWithResolvers, sleep } from '@orpc/shared'
 import { encodePeerMessage } from '@standard-server/peer'
 import { StandardLink } from '../adapters/standard'
 import { BatchLinkPlugin } from './batch'
@@ -92,6 +93,37 @@ async function toLengthPrefixedBytes(messages: any[]): Promise<Uint8Array<ArrayB
   return output
 }
 
+/**
+ * Sends calls `a` and `b` as one streaming batch whose response messages the test pushes one by one.
+ */
+async function startStreamingBatch() {
+  const batch = promiseWithResolvers<{ ids: string[], signal: AbortSignal, push: (message: any) => Promise<void> }>()
+
+  const link = new StandardLink(makeCodec(), {
+    send: async (request) => {
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          batch.resolve({
+            ids: extractBatchMessagesFromRequest(request).map(message => message.id),
+            signal: request.signal!,
+            push: async message => controller.enqueue(await toLengthPrefixedBytes([message])),
+          })
+        },
+      })
+
+      return { status: 207, headers: {}, resolveBody: async () => stream }
+    },
+  }, {
+    plugins: [new BatchLinkPlugin({ groups: [{ condition: () => true, context: {} }], mode: 'streaming' })],
+  })
+
+  const outputA = link.call(['a'], {}, { context: {} })
+  const outputB = link.call(['b'], {}, { context: {} })
+  const { ids: [idA, idB], signal, push } = await batch.promise
+
+  return { outputA, outputB, idA, idB, signal, push }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useRealTimers()
@@ -181,6 +213,32 @@ describe('batchLinkPlugin', () => {
       await Promise.all([
         expect(link.call(['upload'], {}, { context: {} })).resolves.toBe('not-batched'),
         expect(link.call(['upload'], {}, { context: {} })).resolves.toBe('not-batched'),
+      ])
+
+      expect(transport.send).toHaveBeenCalledTimes(2)
+    })
+
+    it('skips batching for requests with FormData body', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(codec.encodeInput).mockResolvedValueOnce({
+        method: 'POST',
+        url: '/upload',
+        headers: {},
+        body: new FormData(),
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({
+          groups: [defaultGroup],
+        })],
+      })
+
+      await Promise.all([
+        expect(link.call(['upload'], {}, { context: {} })).resolves.toBe('not-batched'),
+        expect(link.call(['ping'], {}, { context: {} })).resolves.toBe('result-0'),
+        expect(link.call(['ping'], {}, { context: {} })).resolves.toBe('result-1'),
       ])
 
       expect(transport.send).toHaveBeenCalledTimes(2)
@@ -543,6 +601,351 @@ describe('batchLinkPlugin', () => {
       expect(vi.mocked(transport.send).mock.calls[0]![0].signal?.aborted).toBe(true)
 
       await promise
+    })
+
+    it('batches requests made within `wait`, counted from the first queued request', async () => {
+      vi.useFakeTimers()
+
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered', wait: 100 })],
+      })
+
+      const promise1 = link.call(['a'], {}, { context: {} })
+      await vi.advanceTimersByTimeAsync(60)
+      const promise2 = link.call(['b'], {}, { context: {} })
+
+      await vi.advanceTimersByTimeAsync(39)
+      expect(transport.send).toHaveBeenCalledTimes(0)
+
+      await vi.advanceTimersByTimeAsync(1)
+      await expect(promise1).resolves.toBe('result-0')
+      await expect(promise2).resolves.toBe('result-1')
+      expect(transport.send).toHaveBeenCalledTimes(1)
+
+      // Requests made after the batch is sent start a new wait
+      const promise3 = link.call(['c'], {}, { context: {} })
+      const promise4 = link.call(['d'], {}, { context: {} })
+
+      await vi.advanceTimersByTimeAsync(99)
+      expect(transport.send).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(1)
+      await expect(promise3).resolves.toBe('result-0')
+      await expect(promise4).resolves.toBe('result-1')
+      expect(transport.send).toHaveBeenCalledTimes(2)
+    })
+
+    it('rejects requests aborted while queued without stalling the rest of the batch', async () => {
+      vi.useFakeTimers()
+
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered', wait: 100 })],
+      })
+
+      const controller = new AbortController()
+      const abortedPromise = expect(link.call(['a'], {}, { context: {}, signal: controller.signal })).rejects.toThrow('TEST_ABORT')
+      const promise2 = link.call(['b'], {}, { context: {} })
+      const promise3 = link.call(['c'], {}, { context: {} })
+
+      await vi.advanceTimersByTimeAsync(50)
+      controller.abort(new Error('TEST_ABORT'))
+      await vi.advanceTimersByTimeAsync(50)
+
+      await abortedPromise
+      await expect(promise2).resolves.toBe('result-0')
+      await expect(promise3).resolves.toBe('result-1')
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(extractBatchMessagesFromRequest(vi.mocked(transport.send).mock.calls[0]![0])).toHaveLength(2)
+    })
+
+    it('rejects requests aborted while batch options resolve without stalling the rest of the batch', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({
+          groups: [defaultGroup],
+          mode: 'buffered',
+          url: async () => {
+            await sleep(50)
+            return '/__batch__' as const
+          },
+        })],
+      })
+
+      const controller = new AbortController()
+      const abortedPromise = expect(link.call(['a'], {}, { context: {}, signal: controller.signal })).rejects.toThrow('TEST_ABORT')
+      const promise2 = link.call(['b'], {}, { context: {} })
+      const promise3 = link.call(['c'], {}, { context: {} })
+
+      await sleep(10)
+      controller.abort(new Error('TEST_ABORT'))
+
+      await abortedPromise
+      await expect(promise2).resolves.toBe('result-0')
+      await expect(promise3).resolves.toBe('result-1')
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(extractBatchMessagesFromRequest(vi.mocked(transport.send).mock.calls[0]![0])).toHaveLength(2)
+    })
+
+    it('rejects requests aborted before the peer sends them without stalling the rest of the batch', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+      const controller = new AbortController()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({
+          groups: [defaultGroup],
+          mode: 'buffered',
+          mapSubrequest: ({ request }) => {
+            if (request.url === '/a') {
+              // Runs after the peer starts sending this subrequest, before its request message
+              queueMicrotask(() => controller.abort(new Error('TEST_ABORT')))
+            }
+
+            return request
+          },
+        })],
+      })
+
+      const abortedPromise = expect(link.call(['a'], {}, { context: {}, signal: controller.signal })).rejects.toThrow('TEST_ABORT')
+      const promise2 = link.call(['b'], {}, { context: {} })
+      const promise3 = link.call(['c'], {}, { context: {} })
+
+      await abortedPromise
+      await expect(promise2).resolves.toBe('result-0')
+      await expect(promise3).resolves.toBe('result-1')
+      expect(transport.send).toHaveBeenCalledTimes(1)
+
+      // The never-sent subrequest adds no message, not even a cancel
+      expect(extractBatchMessagesFromRequest(vi.mocked(transport.send).mock.calls[0]![0]).map(m => m.kind)).toEqual(['request', 'request'])
+    })
+
+    it('sends no batch request when every subrequest is aborted before the peer sends it', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+      const controller = new AbortController()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({
+          groups: [defaultGroup],
+          mode: 'buffered',
+          mapSubrequest: ({ request }) => {
+            queueMicrotask(() => controller.abort(new Error('TEST_ABORT')))
+            return request
+          },
+        })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {}, signal: controller.signal })).rejects.toThrow('TEST_ABORT'),
+        expect(link.call(['b'], {}, { context: {}, signal: controller.signal })).rejects.toThrow('TEST_ABORT'),
+      ])
+
+      expect(transport.send).not.toHaveBeenCalled()
+    })
+
+    it.each(['POST', 'GET'] as const)('leaves a subrequest aborted after its request message but before the batch out of the %s batch', async (method) => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+      const controller = new AbortController()
+
+      vi.mocked(codec.encodeInput).mockImplementation(async (_input, path, { signal }) => ({
+        method,
+        url: `/${path.join('/')}` as `/${string}`,
+        headers: {},
+        body: undefined,
+        signal,
+      }))
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({
+          groups: [defaultGroup],
+          mode: 'buffered',
+          mapSubrequest: ({ request }) => {
+            if (request.url !== '/b') {
+              return request
+            }
+
+            // Read when the peer starts sending b, after a's request message
+            return {
+              ...request,
+              get body() {
+                controller.abort(new Error('TEST_ABORT'))
+                return request.body
+              },
+            }
+          },
+        })],
+      })
+
+      const abortedPromise = expect(link.call(['a'], {}, { context: {}, signal: controller.signal })).rejects.toThrow('TEST_ABORT')
+      const promise2 = link.call(['b'], {}, { context: {} })
+
+      await abortedPromise
+      await expect(promise2).resolves.toBe('result-0')
+
+      const batchRequest = vi.mocked(transport.send).mock.calls[0]![0]
+      expect(batchRequest.method).toBe(method)
+      expect(batchRequest.signal?.aborted).toBe(false)
+      expect(extractBatchMessagesFromRequest(batchRequest).map(m => [m.kind, m.json?.url])).toEqual([['request', '/b']])
+    })
+
+    it('keeps the sent batch messages unchanged when a subrequest is aborted after the batch is handed to the transport', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+      const controller = new AbortController()
+
+      vi.mocked(transport.send).mockImplementationOnce(async (request) => {
+        controller.abort(new Error('TEST_ABORT'))
+        return makeBufferedBatchResponseFromRequest(request)
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered' })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {}, signal: controller.signal })).rejects.toThrow('TEST_ABORT'),
+        expect(link.call(['b'], {}, { context: {} })).resolves.toBe('result-1'),
+      ])
+
+      expect(extractBatchMessagesFromRequest(vi.mocked(transport.send).mock.calls[0]![0]).map(m => m.kind)).toEqual(['request', 'request'])
+    })
+
+    it('aborts the batch request once every subrequest is aborted, including ones aborted before sending', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(transport.send).mockImplementation(async (request) => {
+        await sleep(50)
+        request.signal?.throwIfAborted()
+
+        return {
+          status: 207,
+          headers: {},
+          resolveBody: async () => [],
+        }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'streaming', wait: 20 })],
+      })
+
+      const controller1 = new AbortController()
+      const controller2 = new AbortController()
+      const controller3 = new AbortController()
+
+      const promise = Promise.all([
+        expect(link.call(['a'], {}, { context: {}, signal: controller1.signal })).rejects.toThrow('aborted'),
+        expect(link.call(['b'], {}, { context: {}, signal: controller2.signal })).rejects.toThrow('aborted'),
+        expect(link.call(['c'], {}, { context: {}, signal: controller3.signal })).rejects.toThrow('aborted'),
+      ])
+
+      await sleep(10)
+      controller1.abort() // aborted while queued, so it is never sent
+      await sleep(20)
+      expect(transport.send).toHaveBeenCalledTimes(1)
+
+      controller2.abort()
+      controller3.abort()
+      await sleep(10)
+      expect(vi.mocked(transport.send).mock.calls[0]![0].signal?.aborted).toBe(true)
+
+      await promise
+    })
+
+    it('aborts the batch request when a cancelled stream is all the server is still running', async () => {
+      const { outputA, outputB, idA, idB, signal, push } = await startStreamingBatch()
+
+      await push({ kind: 'response', id: idA, json: { body: 'a' } })
+      await push({ kind: 'response', id: idB, json: { headers: { 'standard-server': 'event-stream' } } })
+      await expect(outputA).resolves.toBe('a')
+      const iteratorB = await outputB as AsyncIteratorObject<unknown>
+
+      await iteratorB.return?.()
+      expect(signal.aborted).toBe(true)
+    })
+
+    it('keeps the batch request open after a cancel until every other stream finishes', async () => {
+      const { outputA, outputB, idA, idB, signal, push } = await startStreamingBatch()
+
+      await push({ kind: 'response', id: idA, json: { headers: { 'standard-server': 'event-stream' } } })
+      await push({ kind: 'response', id: idB, json: { headers: { 'content-type': 'application/octet-stream' } } })
+      const iteratorA = await outputA as AsyncIteratorObject<unknown>
+      const streamB = await outputB as ReadableStream<Uint8Array>
+
+      await streamB.cancel()
+      await push({ kind: 'event-stream', id: idA, json: { data: 'a1' } })
+      await expect(iteratorA.next()).resolves.toEqual({ value: 'a1', done: false })
+      expect(signal.aborted).toBe(false)
+
+      await push({ kind: 'event-stream', id: idA, json: { event: 'close' } })
+      await expect(iteratorA.next()).resolves.toEqual({ value: undefined, done: true })
+      await sleep(0)
+      expect(signal.aborted).toBe(true)
+    })
+
+    it('keeps the batch request open when a subrequest is cancelled only after the server finished it', async () => {
+      const { outputA, outputB, idA, idB, signal, push } = await startStreamingBatch()
+
+      await push({ kind: 'response', id: idA, json: { headers: { 'standard-server': 'event-stream' } } })
+      await push({ kind: 'response', id: idB, json: { headers: { 'standard-server': 'event-stream' } } })
+      const iteratorA = await outputA as AsyncIteratorObject<unknown>
+      const iteratorB = await outputB as AsyncIteratorObject<unknown>
+
+      // B's event arriving proves A's close was received, though A never reads it
+      await push({ kind: 'event-stream', id: idA, json: { event: 'close' } })
+      await push({ kind: 'event-stream', id: idB, json: { data: 'b1' } })
+      await expect(iteratorB.next()).resolves.toEqual({ value: 'b1', done: false })
+
+      await iteratorA.return?.()
+      await push({ kind: 'event-stream', id: idB, json: { event: 'close' } })
+      await expect(iteratorB.next()).resolves.toEqual({ value: undefined, done: true })
+      await sleep(0)
+      expect(signal.aborted).toBe(false)
+    })
+
+    it('keeps the batch request open when a cancelled stream also finishes on the server before the others', async () => {
+      const { outputA, outputB, idA, idB, signal, push } = await startStreamingBatch()
+
+      await push({ kind: 'response', id: idA, json: { headers: { 'standard-server': 'event-stream' } } })
+      await push({ kind: 'response', id: idB, json: { headers: { 'standard-server': 'event-stream' } } })
+      const iteratorA = await outputA as AsyncIteratorObject<unknown>
+      const iteratorB = await outputB as AsyncIteratorObject<unknown>
+
+      await iteratorA.return?.()
+      await push({ kind: 'event-stream', id: idA, json: { event: 'close' } })
+      await push({ kind: 'event-stream', id: idB, json: { event: 'close' } })
+      await expect(iteratorB.next()).resolves.toEqual({ value: undefined, done: true })
+      await sleep(0)
+      expect(signal.aborted).toBe(false)
+    })
+
+    it('treats a server cancel as the end of a subrequest, but not a stream/cancel', async () => {
+      const { outputA, outputB, idA, idB, signal, push } = await startStreamingBatch()
+
+      await push({ kind: 'response', id: idA, json: { headers: { 'standard-server': 'event-stream' } } })
+      await push({ kind: 'response', id: idB, json: { headers: { 'standard-server': 'event-stream' } } })
+      const iteratorA = await outputA as AsyncIteratorObject<unknown>
+      const iteratorB = await outputB as AsyncIteratorObject<unknown>
+
+      await iteratorB.return?.()
+      await push({ kind: 'stream/cancel', id: idA })
+      await push({ kind: 'event-stream', id: idA, json: { data: 'a1' } })
+      await expect(iteratorA.next()).resolves.toEqual({ value: 'a1', done: false })
+      expect(signal.aborted).toBe(false)
+
+      await push({ kind: 'cancel', id: idA })
+      await expect(iteratorA.next()).rejects.toThrow('Server canceled the request')
+      await sleep(0)
+      expect(signal.aborted).toBe(true)
     })
   })
 
@@ -961,6 +1364,75 @@ describe('batchLinkPlugin', () => {
     })
   })
 
+  describe('batch option failures', () => {
+    it.each(['maxSize', 'url', 'headers', 'mode', 'mapSubrequest'] as const)('rejects every subrequest when %s throws', async (option) => {
+      const error = new Error('option failed')
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], [option]: () => { throw error } })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {} })).rejects.toBe(error),
+        expect(link.call(['b'], {}, { context: {} })).rejects.toBe(error),
+      ])
+
+      expect(transport.send).not.toHaveBeenCalled()
+    })
+
+    it('rejects every subrequest when an option throws for a batch split by maxUrlLength', async () => {
+      const error = new Error('option failed')
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(codec.encodeInput).mockImplementation(async (_input, path) => ({
+        method: 'GET',
+        url: `/${path.join('/')}` as `/${string}`,
+        headers: {},
+        body: undefined,
+      }))
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({
+          groups: [defaultGroup],
+          maxUrlLength: 1,
+          url: vi.fn().mockReturnValueOnce('/__batch__').mockImplementation(() => { throw error }),
+        })],
+      })
+
+      await Promise.all(['a', 'b', 'c', 'd'].map(path =>
+        expect(link.call([path], {}, { context: {} })).rejects.toBe(error),
+      ))
+
+      expect(transport.send).not.toHaveBeenCalled()
+    })
+
+    it('rejects the remaining subrequests when mapSubresponse throws for an error batch response', async () => {
+      const error = new Error('option failed')
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(transport.send).mockImplementation(async () => {
+        return { status: 502, headers: {}, resolveBody: async () => 'Bad Gateway' }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({
+          groups: [defaultGroup],
+          mapSubresponse: vi.fn().mockImplementationOnce(subResponse => subResponse).mockImplementation(() => { throw error }),
+        })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {} })).resolves.toBe('Bad Gateway'),
+        expect(link.call(['b'], {}, { context: {} })).rejects.toBe(error),
+        expect(link.call(['c'], {}, { context: {} })).rejects.toBe(error),
+      ])
+    })
+  })
+
   describe('method GET batch URL handling', () => {
     it('splits GET batches when URL exceeds maxUrlLength', async () => {
       const codec = makeCodec()
@@ -1053,6 +1525,101 @@ describe('batchLinkPlugin', () => {
       const sentRequest = vi.mocked(transport.send).mock.calls[0]![0]
       expect(sentRequest.url).toContain('/custom-no-hash/__batch__?existing=1&data=')
       expect(sentRequest.url).not.toContain('#')
+    })
+  })
+
+  describe('async context', () => {
+    const storage = new AsyncLocalStorage<string>()
+
+    function makeUserCodec(method: 'GET' | 'POST' = 'GET'): StandardLinkCodec<TestContext> {
+      const codec = makeCodec()
+      vi.mocked(codec.encodeInput).mockImplementation(async (_input, path) => ({
+        method: path[0] === 'post' ? 'POST' : method,
+        url: `/${path.join('/')}` as `/${string}`,
+        headers: {},
+        body: undefined,
+      }))
+      return codec
+    }
+
+    function makeUserTransport(): StandardLinkTransport<TestContext> {
+      return {
+        send: vi.fn(async (request) => {
+          const user = storage.getStore()
+
+          if (request.headers['orpc-batch']) {
+            return makeBufferedBatchResponseFromRequest(request, () => user)
+          }
+
+          return { status: 200, headers: {}, resolveBody: async () => user }
+        }),
+      }
+    }
+
+    it('sends a request sent alone in its caller\'s async context', async () => {
+      const transport = makeUserTransport()
+      const link = new StandardLink(makeUserCodec(), transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
+      })
+
+      await expect(Promise.all([
+        storage.run('alice', () => link.call(['get'], {}, { context: {} })),
+        storage.run('bob', () => link.call(['post'], {}, { context: {} })),
+      ])).resolves.toEqual(['alice', 'bob'])
+
+      expect(transport.send).toHaveBeenCalledTimes(2)
+    })
+
+    it.each([
+      ['maxSize', { maxSize: 1 }],
+      ['maxUrlLength', { maxUrlLength: 1 }],
+    ] as const)('sends each part of a batch split by %s in the async context of its first request', async (_, options) => {
+      const transport = makeUserTransport()
+      const link = new StandardLink(makeUserCodec(), transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], ...options })],
+      })
+
+      const users = ['alice', 'bob', 'carol', 'dave']
+      await expect(Promise.all(users.map(user =>
+        storage.run(user, () => link.call(['get'], {}, { context: {} })),
+      ))).resolves.toEqual(users)
+
+      expect(transport.send).toHaveBeenCalledTimes(4)
+    })
+
+    it('batches only requests with the same scope', async () => {
+      const transport = makeUserTransport()
+      const link = new StandardLink(makeUserCodec(), transport, {
+        plugins: [new BatchLinkPlugin({
+          groups: [defaultGroup],
+          scope: () => storage.getStore(),
+          headers: () => ({ 'x-user': storage.getStore() }),
+        })],
+      })
+
+      await expect(Promise.all(['alice', 'bob', 'alice', 'bob'].map(user =>
+        storage.run(user, () => link.call(['get'], {}, { context: {} })),
+      ))).resolves.toEqual(['alice', 'bob', 'alice', 'bob'])
+
+      expect(transport.send).toHaveBeenCalledTimes(2)
+      expect(vi.mocked(transport.send).mock.calls.map(([request]) => request.headers)).toEqual([
+        { 'x-user': 'alice', 'orpc-batch': 'streaming' },
+        { 'x-user': 'bob', 'orpc-batch': 'streaming' },
+      ])
+    })
+
+    it('sends a batch in the async context of its first request when no scope is set', async () => {
+      const transport = makeUserTransport()
+      const link = new StandardLink(makeUserCodec(), transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
+      })
+
+      await expect(Promise.all([
+        storage.run('alice', () => link.call(['get'], {}, { context: {} })),
+        storage.run('bob', () => link.call(['get'], {}, { context: {} })),
+      ])).resolves.toEqual(['alice', 'alice'])
+
+      expect(transport.send).toHaveBeenCalledTimes(1)
     })
   })
 })

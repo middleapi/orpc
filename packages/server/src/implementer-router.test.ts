@@ -5,6 +5,7 @@ import { createRouterImplementer } from './implementer-router'
 import { Lazy } from './lazy'
 import * as MiddlewareDecoratedModule from './middleware-decorated'
 import * as RouterHiddenModule from './router-hidden'
+import { getHiddenRouterContract } from './router-hidden'
 import * as RouterUtilsModule from './router-utils'
 
 const decorateMiddlewareSpy = vi.spyOn(MiddlewareDecoratedModule, 'decorateMiddleware')
@@ -64,13 +65,20 @@ describe('createRouterImplementer', () => {
         expect(applied).toBe(withHiddenRouterContractSpy.mock.results[0]!.value)
       })
 
-      it('.lazy', () => {
-        const loader = vi.fn()
+      it('.lazy', async () => {
+        const router = { nested: {} } as any
+        const loader = vi.fn(() => Promise.resolve({ default: router }))
         const lazy = implementer.lazy(loader)
 
         expect(lazy).toBeInstanceOf(Lazy)
-        expect(lazy['~orpc'].loader).toBe(loader)
         expect(lazy['~orpc'].meta).toEqual({})
+        expect(loader).not.toHaveBeenCalled()
+
+        const { default: applied } = await lazy['~orpc'].loader()
+
+        expect(loader).toHaveBeenCalledTimes(1)
+        expect(applied.nested).toBe(router.nested)
+        expect(getHiddenRouterContract(applied)).toBe(contract)
       })
 
       it('handles router with names that conflict with router methods', () => {
@@ -159,7 +167,6 @@ describe('createRouterImplementer', () => {
         const lazy = implementer.lazy(loader)
 
         expect(lazy).toBeInstanceOf(Lazy)
-        expect(lazy['~orpc'].loader).not.toBe(loader)
         expect(lazy['~orpc'].meta).toEqual({})
 
         const { default: applied } = await lazy['~orpc'].loader()
@@ -170,7 +177,8 @@ describe('createRouterImplementer', () => {
           middlewares: [mid],
         })
 
-        expect(applied).toBe(augmentImplementedRouterSpy.mock.results[0]!.value)
+        expect((applied as any).nested).toBe(augmentImplementedRouterSpy.mock.results[0]!.value.nested)
+        expect(getHiddenRouterContract(applied)).toBe(contract)
       })
 
       it('handles router with names that conflict with router methods', () => {

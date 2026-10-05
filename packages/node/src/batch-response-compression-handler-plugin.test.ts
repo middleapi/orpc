@@ -268,10 +268,15 @@ describe('batchResponseCompressionHandlerPlugin', () => {
   })
 
   describe('encoding negotiation', () => {
-    it.each(['gzip', 'deflate', 'deflate-raw'] as const)('compresses with %s when the client accepts it', async (encoding) => {
+    it.each([
+      ['gzip', 'gzip'],
+      ['deflate', 'deflate'],
+      ['deflate-raw', 'deflate-raw'],
+      ['gzip;q=0, *', 'deflate'],
+    ] as const)('given accept-encoding %s, compresses with %s', async (acceptEncoding, encoding) => {
       const handler = createHandler({ encodings: ['gzip', 'deflate', 'deflate-raw'] })
 
-      const { response } = await handler.handle(createBatchRequest('streaming', ['/ping'], { 'accept-encoding': encoding }))
+      const { response } = await handler.handle(createBatchRequest('streaming', ['/ping'], { 'accept-encoding': acceptEncoding }))
 
       expect(response!.headers.get('content-encoding')).toBe(encoding)
       await expect(decompress(response!, encoding)).resolves.toContain(largeValue)
@@ -308,6 +313,22 @@ describe('batchResponseCompressionHandlerPlugin', () => {
     const { response } = await handler.handle(createBatchRequest('streaming', ['/ping']))
 
     expect(response!.headers.get('vary')).toBe('origin, accept-encoding')
+  })
+
+  it('weakens a strong etag and drops accept-ranges on a compressed response', async () => {
+    const handler = new RPCHandler(router, {
+      plugins: [
+        new BatchHandlerPlugin({ headers: { 'etag': '"abc"', 'accept-ranges': 'bytes' } }),
+        new BatchResponseCompressionHandlerPlugin(),
+      ],
+    })
+
+    const { response } = await handler.handle(createBatchRequest('streaming', ['/ping']))
+
+    expect(response!.headers.get('content-encoding')).toBe('gzip')
+    // A strong tag shared with the identity bytes would let If-Range splice them into compressed ones
+    expect(response!.headers.get('etag')).toBe('W/"abc"')
+    expect(response!.headers.has('accept-ranges')).toBe(false)
   })
 
   it('does not compress a body that is already encoded', async () => {

@@ -569,21 +569,19 @@ The v2 [GET Method CSRF Protection Plugin](/docs/plugins/get-method-csrf-protect
 
 ### Interceptor options renamed
 
-`rootInterceptors` is now `routingInterceptors`, and `adapterInterceptors` is now named after the adapter (for example `fetchInterceptors` on the fetch adapter). See [RPC Handler](/docs/rpc/handler).
+`rootInterceptors` is now `routingInterceptors`. `adapterInterceptors` was removed, because regular interceptors can now customize body parsing behavior. See [RPC Handler](/docs/rpc/handler).
 
 <CodeGroup>
 
 ```ts v2
 const handler = new RPCHandler(router, {
   routingInterceptors: [/* ... */],
-  fetchInterceptors: [/* ... */],
 })
 ```
 
 ```ts v1
 const handler = new RPCHandler(router, {
   rootInterceptors: [/* ... */],
-  adapterInterceptors: [/* ... */],
 })
 ```
 
@@ -623,7 +621,7 @@ const serializer = new RPCSerializer({
     user: {
       condition: data => data instanceof User,
       serialize: data => data.toJSON(),
-      deserialize: data => new User(data.id, data.name),
+      deserialize: (data: any) => new User(data.id, data.name),
     },
   },
 })
@@ -647,6 +645,30 @@ const link = new RPCLink({ url: '...', customJsonSerializers: [userSerializer] }
 ```
 
 </CodeGroup>
+
+### `RegExp` is no longer a built-in type
+
+The [RPC Serializer](/docs/rpc/serializer) and [OpenAPI Serializer](/docs/openapi/serializer) no longer serialize `RegExp` values, and the [Smart Coercion Plugin](/docs/plugins/smart-coercion) no longer recognizes `x-native-type: 'regexp'`. A `RegExp` now serializes like any other class instance, as an empty object. If you send regular expressions over the wire, register a handler to restore the previous behavior:
+
+```ts
+import { RPCSerializer } from '@orpc/client'
+
+const REGEXP_PATTERN = /^\/([\s\S]*)\/([a-z]*)$/
+
+const serializer = new RPCSerializer({
+  handlers: {
+    regexp: {
+      condition: data => data instanceof RegExp,
+      serialize: (data: RegExp) => data.toString(),
+      deserialize: (data: string) => {
+        const [, pattern, flags] = data.match(REGEXP_PATTERN)!
+        return new RegExp(pattern!, flags)
+      },
+      isTerminal: true,
+    },
+  },
+})
+```
 
 ### Event stream options nested under the response mapping
 
@@ -831,7 +853,7 @@ const link = new RPCLink({
 
 ### Link interceptors renamed
 
-`clientInterceptors` is now `transportInterceptors`, and `adapterInterceptors` is now `fetchInterceptors` on the fetch adapter. Event stream options moved under `toFetchRequest.eventStream`, mirroring the handler-side change. See [RPC Link](/docs/rpc/link).
+`clientInterceptors` is now `transportInterceptors`. `adapterInterceptors` was removed, mirroring the handler-side change. Event stream options moved under `toFetchRequest.eventStream`. See [RPC Link](/docs/rpc/link).
 
 ### Typed clients for contracts
 

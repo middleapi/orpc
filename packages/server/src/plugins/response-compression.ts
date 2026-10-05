@@ -1,7 +1,7 @@
-import type { StandardBodyHint } from '@standard-server/core'
+import type { StandardBodyHint, StandardHeaders, StandardResponse } from '@standard-server/core'
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
-import { isAsyncIteratorObject, isCompressibleContentType, isNoTransformCacheControl, parseAcceptEncodingQualities, stringifyJSON, toArray, varyByAcceptEncoding } from '@orpc/shared'
+import { isAcceptableEncoding, isAsyncIteratorObject, isCompressibleContentType, isNoTransformCacheControl, parseAcceptEncodingQualities, stringifyJSON, toArray, varyByAcceptEncoding } from '@orpc/shared'
 import { flattenStandardHeader, generateContentDisposition } from '@standard-server/core'
 
 // Rough UTF-8 estimate. Mostly ASCII text stays close to 1 byte/char;
@@ -71,29 +71,7 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
       }
 
       const response = result.response
-
-      const contentEncoding = flattenStandardHeader(response.headers['content-encoding'])?.trim()?.toLowerCase()
-      if (contentEncoding !== undefined) { // already compressed, do not compress again
-        return result
-      }
-
-      /**
-       * A partial response body is a byte range of the identity representation, so compressing it
-       * would leave `Content-Range` describing offsets the client never receives.
-       */
-      if (response.status === 206 || response.headers['content-range'] !== undefined) {
-        return result
-      }
-
-      // Cache-Control: no-transform forbids intermediaries (and this plugin) from transforming the body
-      if (isNoTransformCacheControl(flattenStandardHeader(response.headers['cache-control']))) {
-        return result
-      }
-
-      const acceptEncodings = parseAcceptEncodingQualities(
-        flattenStandardHeader(interceptorOptions.request.headers['accept-encoding']),
-      )
-      const encoding = this.encodings.find(enc => (acceptEncodings.get(enc) ?? 0) > 0)
+      const encoding = negotiateResponseCompressionEncoding(response, interceptorOptions.request.headers, this.encodings)
 
       if (encoding === undefined) {
         return result
@@ -115,11 +93,8 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
               ...response,
               body: body.pipeThrough(new CompressionStream(encoding)),
               headers: {
-                ...headers,
+                ...toCompressedHeaders(headers, encoding),
                 'standard-server': 'octet-stream' satisfies StandardBodyHint,
-                'content-length': [],
-                'content-encoding': encoding,
-                'vary': varyByAcceptEncoding(flattenStandardHeader(headers.vary)),
               },
             },
           }
@@ -141,13 +116,10 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
               ...response,
               body: body.stream().pipeThrough(new CompressionStream(encoding)),
               headers: {
-                ...headers,
+                ...toCompressedHeaders(headers, encoding),
                 'standard-server': 'file' satisfies StandardBodyHint,
                 'content-type': body.type,
-                'content-length': [],
                 'content-disposition': contentDisposition,
-                'content-encoding': encoding,
-                'vary': varyByAcceptEncoding(flattenStandardHeader(headers.vary)),
               },
             },
           }
@@ -193,12 +165,9 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
               ...response,
               body: compressedStream,
               headers: {
-                ...headers,
+                ...toCompressedHeaders(headers, encoding),
                 'standard-server': [],
                 'content-type': res.headers.get('content-type')!,
-                'content-length': [],
-                'content-encoding': encoding,
-                'vary': varyByAcceptEncoding(flattenStandardHeader(headers.vary)),
               },
             },
           }
@@ -214,12 +183,9 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
               ...response,
               body: new Blob([string]).stream().pipeThrough(new CompressionStream(encoding)),
               headers: {
-                ...headers,
+                ...toCompressedHeaders(headers, encoding),
                 'standard-server': [],
                 'content-type': 'application/x-www-form-urlencoded',
-                'content-length': [],
-                'content-encoding': encoding,
-                'vary': varyByAcceptEncoding(flattenStandardHeader(headers.vary)),
               },
             },
           }
@@ -235,12 +201,9 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
               ...response,
               body: new Blob([string]).stream().pipeThrough(new CompressionStream(encoding)),
               headers: {
-                ...headers,
+                ...toCompressedHeaders(headers, encoding),
                 'standard-server': [],
                 'content-type': 'application/json',
-                'content-length': [],
-                'content-encoding': encoding,
-                'vary': varyByAcceptEncoding(flattenStandardHeader(headers.vary)),
               },
             },
           }
@@ -258,4 +221,61 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
       ],
     }
   }
+}
+
+/**
+ * Picks the first of `encodings` the client accepts, or `undefined` when the response
+ * must be sent as is because it is already encoded, partial, or forbids transforms.
+ * Shared by the response compression plugins so they agree on when to compress.
+ */
+export function negotiateResponseCompressionEncoding<TEncoding extends string>(
+  response: StandardResponse,
+  requestHeaders: StandardHeaders,
+  encodings: readonly TEncoding[],
+): TEncoding | undefined {
+  if (flattenStandardHeader(response.headers['content-encoding']) !== undefined) { // already compressed, do not compress again
+    return undefined
+  }
+
+  /**
+   * A partial response body is a byte range of the identity representation, so compressing it
+   * would leave `Content-Range` describing offsets the client never receives.
+   */
+  if (response.status === 206 || flattenStandardHeader(response.headers['content-range']) !== undefined) {
+    return undefined
+  }
+
+  // Cache-Control: no-transform forbids intermediaries (and these plugins) from transforming the body
+  if (isNoTransformCacheControl(flattenStandardHeader(response.headers['cache-control']))) {
+    return undefined
+  }
+
+  const acceptEncodings = parseAcceptEncodingQualities(flattenStandardHeader(requestHeaders['accept-encoding']))
+
+  return encodings.find(encoding => isAcceptableEncoding(acceptEncodings, encoding))
+}
+
+/**
+ * The headers of a response whose body is compressed with `encoding`.
+ * Shared by the response compression plugins so compressed responses carry the same headers.
+ */
+export function toCompressedHeaders(headers: StandardHeaders, encoding: string): StandardHeaders {
+  return {
+    ...headers,
+    'content-length': [],
+    'content-encoding': encoding,
+    'vary': varyByAcceptEncoding(flattenStandardHeader(headers.vary)),
+    /**
+     * A strong tag shared with the identity bytes would let `If-Range` splice them after compressed ones.
+     * A weak tag still revalidates through `If-None-Match`, and the compressed body serves no ranges.
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc9110.html#name-etag
+     */
+    'etag': weakenEtag(flattenStandardHeader(headers.etag)),
+    'accept-ranges': [],
+  }
+}
+
+function weakenEtag(etag: string | undefined): string | undefined {
+  return etag === undefined || etag.startsWith('W/') ? etag : `W/${etag}`
 }

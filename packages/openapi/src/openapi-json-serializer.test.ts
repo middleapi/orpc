@@ -35,6 +35,11 @@ describe('openAPIJsonSerializer', () => {
       expect(serializer.serialize(Number.NaN).json).toBeNull()
     })
 
+    it('serializes Infinity and -Infinity to null', () => {
+      expect(serializer.serialize(Number.POSITIVE_INFINITY).json).toBeNull()
+      expect(serializer.serialize(Number.NEGATIVE_INFINITY).json).toBeNull()
+    })
+
     it('serializes Date to ISO string', () => {
       expect(serializer.serialize(new Date('2023-01-01')).json).toBe('2023-01-01T00:00:00.000Z')
     })
@@ -50,10 +55,6 @@ describe('openAPIJsonSerializer', () => {
 
     it('serializes URL to string', () => {
       expect(serializer.serialize(new URL('https://dinwwwh.com')).json).toBe('https://dinwwwh.com/')
-    })
-
-    it('serializes RegExp to string', () => {
-      expect(serializer.serialize(/uic/gi).json).toBe('/uic/gi')
     })
 
     it('serializes Set to array and Map to entries, converting nested values', () => {
@@ -131,6 +132,15 @@ describe('openAPIJsonSerializer', () => {
       expect((result as any).file).toBe(blob)
     })
 
+    it('does not mutate the input and deserializes it repeatedly', () => {
+      const blob = new Blob(['hello'])
+      const payload = { json: { files: [null] }, maps: [['files', 0]], blobs: [blob] }
+
+      expect(serializer.deserialize(payload)).toEqual({ files: [blob] })
+      expect(serializer.deserialize(payload)).toEqual({ files: [blob] })
+      expect(payload.json).toEqual({ files: [null] })
+    })
+
     it('returns json as-is when no blobs', () => {
       const json = { a: 1, b: '2023-01-01T00:00:00.000Z' }
       expect(serializer.deserialize({ json })).toEqual(json)
@@ -206,8 +216,9 @@ describe('openAPIJsonSerializer', () => {
         date: new Date('2023-01-01'),
         invalidDate: new Date('Invalid'),
         nan: Number.NaN,
+        infinity: Number.POSITIVE_INFINITY,
+        negativeInfinity: Number.NEGATIVE_INFINITY,
         url: new URL('https://orpc.dev'),
-        regexp: /uic/gi,
         set: new Set([1, 2]),
         map: new Map([['a', 1]]),
         bigint: 123n,
@@ -217,8 +228,9 @@ describe('openAPIJsonSerializer', () => {
         date: '2023-01-01T00:00:00.000Z',
         invalidDate: null,
         nan: null,
+        infinity: null,
+        negativeInfinity: null,
         url: 'https://orpc.dev/',
-        regexp: '/uic/gi',
         set: [1, 2],
         map: [['a', 1]],
         bigint: '123',
@@ -264,15 +276,25 @@ describe('openAPIJsonSerializer', () => {
     it.each(['doesNotExist', '__proto__', 'constructor', 'prototype'])('throws on invalid blob map segment "%s" to prevent prototype pollution', (segment) => {
       expect(
         () => serializer.deserialize({ json: { o: {} }, blobs: [new Blob()], maps: [[segment]] }),
-      ).toThrowError(`Security error: Invalid serialized data. Segment "${segment}" does not exist.`)
+      ).toThrowError(`Invalid OpenAPI serialized data: segment "${segment}" does not exist.`)
 
       expect(
         () => serializer.deserialize({ json: { o: {} }, blobs: [new Blob()], maps: [['o', segment]] }),
-      ).toThrowError(`Security error: Invalid serialized data. Segment "${segment}" does not exist.`)
+      ).toThrowError(`Invalid OpenAPI serialized data: segment "${segment}" does not exist.`)
 
       expect(
         () => serializer.deserialize({ json: { o: {} }, blobs: [new Blob()], maps: [[segment, 'o']] }),
-      ).toThrowError(`Security error: Invalid serialized data. Segment "${segment}" does not exist.`)
+      ).toThrowError(`Invalid OpenAPI serialized data: segment "${segment}" does not exist.`)
+    })
+
+    it('throws when a blobs entry is not a Blob', () => {
+      for (const value of [4294967295, 'text', null, {}, []]) {
+        expect(() => serializer.deserialize({ json: [null], blobs: [value as any], maps: [[0]] }))
+          .toThrowError('Invalid OpenAPI serialized data: blob 0 is not a Blob.')
+      }
+
+      expect(() => serializer.deserialize({ json: [null, null], blobs: [new Blob()], maps: [[0], [1]] }))
+        .toThrowError('Invalid OpenAPI serialized data: blob 1 is not a Blob.')
     })
 
     /* eslint-disable no-proto, no-restricted-properties */

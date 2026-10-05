@@ -12,7 +12,7 @@ const contract = {
   nested: {
     pong: oc
       .meta(meta.path(['nested', 'pong']))
-      .errors({ BAD_GATEWAY: { data: type<string, RegExp>(vi.fn()) } })
+      .errors({ BAD_GATEWAY: { data: type<string, URL>(vi.fn()) } })
       .input(type<string, boolean>(vi.fn()))
       .output(type<number, Date>(vi.fn())),
   },
@@ -81,7 +81,7 @@ describe('createContractUtilsFactory', () => {
     const utils = createUtils(contract.nested.pong)
 
     expectTypeOf(utils).toEqualTypeOf<
-      & Omit<ProcedureUtils<{ cache?: boolean }, string, Date, Error | ORPCError<'BAD_GATEWAY', RegExp>>, 'path' | 'options'>
+      & Omit<ProcedureUtils<{ cache?: boolean }, string, Date, Error | ORPCError<'BAD_GATEWAY', URL>>, 'path' | 'options'>
     >()
   })
 
@@ -90,7 +90,7 @@ describe('createContractUtilsFactory', () => {
     const utils = createUtils(contract)
 
     expectTypeOf(utils.nested.pong).toEqualTypeOf<
-      & Omit<ProcedureUtils<{ cache?: boolean }, string, Date, Error | ORPCError<'BAD_GATEWAY', RegExp>>, 'path' | 'options'>
+      & Omit<ProcedureUtils<{ cache?: boolean }, string, Date, Error | ORPCError<'BAD_GATEWAY', URL>>, 'path' | 'options'>
     >()
 
     expectTypeOf(utils.key).toEqualTypeOf<SharedUtils<unknown>['key']>()

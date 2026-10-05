@@ -91,6 +91,45 @@ describe('requestCompressionHandlerPlugin', () => {
     expect(procedureHandler).toHaveBeenCalledWith(expect.any(Object), 'input')
   })
 
+  it('should decompress request body when 5 content-encodings are applied', async () => {
+    let body: Buffer = Buffer.from(JSON.stringify({ json: 'input' }))
+    for (let i = 0; i < 5; i++) {
+      body = compress(body, 'gzip')
+    }
+
+    const { response } = await handler.handle(new Request('http://localhost', {
+      method: 'POST',
+      headers: {
+        'content-encoding': Array.from({ length: 5 }).fill('gzip').join(', '),
+        'content-type': 'application/json',
+      },
+      body,
+    }))
+
+    expect(response?.status).toBe(200)
+    expect(procedureHandler).toHaveBeenCalledWith(expect.any(Object), 'input')
+  })
+
+  it('should reject request body when more than 5 content-encodings are applied', async () => {
+    let body: Buffer = Buffer.from(JSON.stringify({ json: 'input' }))
+    for (let i = 0; i < 6; i++) {
+      body = compress(body, 'gzip')
+    }
+
+    const { response } = await handler.handle(new Request('http://localhost', {
+      method: 'POST',
+      headers: {
+        'content-encoding': Array.from({ length: 6 }).fill('gzip').join(', '),
+        'content-type': 'application/json',
+      },
+      body,
+    }))
+
+    expect(response?.status).toBe(415)
+    await expect(response!.text()).resolves.toContain('Too many content encodings.')
+    expect(procedureHandler).not.toHaveBeenCalled()
+  })
+
   it('should not decompress when any content-encoding in the list is unsupported', async () => {
     const payload = JSON.stringify({ json: 'input' })
     const body = compress(payload, 'gzip')

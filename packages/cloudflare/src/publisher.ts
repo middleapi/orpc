@@ -2,7 +2,7 @@ import type { PublisherOptions, PublisherSubscribeListenerOptions } from '@orpc/
 import type { Public } from '@orpc/shared'
 import { RPCJsonSerializer } from '@orpc/client'
 import { Publisher } from '@orpc/publisher'
-import { isTypescriptObject, stringifyJSON } from '@orpc/shared'
+import { isTypescriptObject, promiseWithResolvers, stringifyJSON } from '@orpc/shared'
 import { unwrapEvent, withEventMeta } from '@standard-server/core'
 
 export interface DurablePublisherOptions extends PublisherOptions {
@@ -67,7 +67,8 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
     })
 
     if (!response.ok) {
-      throw new Error(`Failed to publish event: ${response.status} ${response.statusText}`, {
+      const reason = await response.text()
+      throw new Error(`Failed to publish event: ${response.status} ${reason || response.statusText}`, {
         cause: response,
       })
     }
@@ -92,6 +93,25 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
       })
     }
 
+    // The Durable Object sends missed events first and their count in this header, and
+    // `Publisher.subscribe` expects them all to reach the listener before this resolves
+    const replayedEvents = Number(response.headers.get('orpc-replayed-events'))
+    let pendingReplayedEvents = Number.isInteger(replayedEvents) && replayedEvents > 0 ? replayedEvents : 0
+    const replayed = promiseWithResolvers<void>()
+
+    if (pendingReplayedEvents === 0) {
+      replayed.resolve()
+    }
+
+    const reportError = (error: Error) => {
+      if (pendingReplayedEvents > 0) {
+        replayed.reject(error) // no-op once the subscription already rejected
+      }
+      else {
+        options?.onError?.(error)
+      }
+    }
+
     websocket.addEventListener('message', (event) => {
       try {
         const serialized = JSON.parse(event.data)
@@ -109,11 +129,15 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
           }),
         )
       }
+
+      if (pendingReplayedEvents > 0 && --pendingReplayedEvents === 0) {
+        replayed.resolve() // no-op if the replay already failed
+      }
     })
 
     websocket.addEventListener('close', (event) => {
-      if (event.code !== 1000 && event.code !== 1001) {
-        options?.onError?.(
+      if (pendingReplayedEvents > 0 || (event.code !== 1000 && event.code !== 1001)) {
+        reportError(
           new Error(`WebSocket closed unexpectedly: ${event.code} ${event.reason}`, {
             cause: event,
           }),
@@ -122,7 +146,7 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
     })
 
     websocket.addEventListener('error', (event) => {
-      options?.onError?.(
+      reportError(
         new Error(`Subscription websocket error`, {
           cause: event,
         }),
@@ -130,6 +154,11 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
     })
 
     websocket.accept()
+
+    await replayed.promise.catch((error) => {
+      websocket.close()
+      throw error
+    })
 
     return async () => {
       websocket.close()

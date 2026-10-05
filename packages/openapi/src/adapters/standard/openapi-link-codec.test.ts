@@ -426,6 +426,43 @@ describe('openAPILinkCodec', () => {
         expect(request.url).toBe('/api/search')
       })
 
+      it('omits null and undefined members for delimiter-based query styles', async () => {
+        const codec = new OpenAPILinkCodec({
+          search: oc.meta(openapi({
+            method: 'GET',
+            queryStyles: {
+              commaArray: 'comma-delimited-array',
+              commaObject: 'comma-delimited-object',
+              spaceArray: 'space-delimited-array',
+              spaceObject: 'space-delimited-object',
+              pipeArray: 'pipe-delimited-array',
+              pipeObject: 'pipe-delimited-object',
+              emptyObject: 'comma-delimited-object',
+            },
+          })),
+        }, { url: '/api', serializer })
+
+        const request = await codec.encodeInput({
+          commaArray: [undefined, '1', null],
+          commaObject: { a: undefined, b: '1', c: null },
+          spaceArray: [undefined, '1', null],
+          spaceObject: { a: undefined, b: '1', c: null },
+          pipeArray: [undefined, '1', null],
+          pipeObject: { a: undefined, b: '1', c: null },
+          emptyObject: { a: undefined, b: null },
+        }, ['search'], { context: {} })
+
+        const searchParams = new URL(request.url, 'http://localhost').searchParams
+
+        expect(searchParams.get('commaArray')).toBe('1')
+        expect(searchParams.get('commaObject')).toBe('b,1')
+        expect(searchParams.get('spaceArray')).toBe('1')
+        expect(searchParams.get('spaceObject')).toBe('b 1')
+        expect(searchParams.get('pipeArray')).toBe('1')
+        expect(searchParams.get('pipeObject')).toBe('b|1')
+        expect(searchParams.has('emptyObject')).toBe(false)
+      })
+
       it('serializes compact GET input as a query when no explicit query styles are defined', async () => {
         const codec = new OpenAPILinkCodec({
           list: oc.meta(openapi({ method: 'GET' })),
@@ -569,6 +606,47 @@ describe('openAPILinkCodec', () => {
         await expect(objectCodec.encodeInput({ filter: '' }, ['item'], { context: {} })).rejects.toThrow(
           'Path param "filter" cannot be empty in call to procedure (item).',
         )
+      })
+
+      it('throws when path params are or contain dot segments', async () => {
+        const codec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            path: '/items/{id}/{ids}/{+rest}',
+            paramsStyles: { ids: 'comma-delimited-array' },
+          })),
+        }, { url: '/api', serializer })
+
+        const valid = { id: 'a', ids: ['b'], rest: 'c' }
+
+        for (const id of ['.', '..']) {
+          await expect(codec.encodeInput({ ...valid, id }, ['item'], { context: {} })).rejects.toThrow(
+            'Path param "id" cannot contain "." or ".." segments in call to procedure (item).',
+          )
+        }
+
+        for (const ids of [['.'], ['..'], [null, '..']]) {
+          await expect(codec.encodeInput({ ...valid, ids }, ['item'], { context: {} })).rejects.toThrow(
+            'Path param "ids" cannot contain "." or ".." segments in call to procedure (item).',
+          )
+        }
+
+        for (const rest of ['.', '..', './a', '../a', 'a/.', 'a/..', 'a/./b', 'a/../../admin']) {
+          await expect(codec.encodeInput({ ...valid, rest }, ['item'], { context: {} })).rejects.toThrow(
+            'Path param "rest" cannot contain "." or ".." segments in call to procedure (item).',
+          )
+        }
+      })
+
+      it('allows path params that only contain dots within a segment', async () => {
+        const codec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            path: '/items/{id}/{+rest}',
+          })),
+        }, { url: '/api', serializer })
+
+        const request = await codec.encodeInput({ id: '...', rest: '.well-known/a..b/v1.2/.../%2e%2e' }, ['item'], { context: {} })
+
+        expect(request.url).toBe('/api/items/.../.well-known/a..b/v1.2/.../%252e%252e')
       })
     })
 

@@ -7,7 +7,7 @@ import { StandardHandler } from '@orpc/server/standard'
 import { OpenAPIHandlerCodec } from '../standard'
 
 export interface OpenAPIHandlerOptions<T extends Context>
-  extends AwsLambdaHandlerOptions<T>, Omit<StandardHandlerOptions<T>, 'plugins'>, OpenAPIHandlerCodecOptions<T> {}
+  extends AwsLambdaHandlerOptions<T>, StandardHandlerOptions<T>, OpenAPIHandlerCodecOptions<T> {}
 
 /**
  * Serves oRPC procedures over the OpenAPI (RESTful) protocol on AWS Lambda.

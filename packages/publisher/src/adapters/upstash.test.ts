@@ -265,6 +265,30 @@ describe.concurrent(
       await unsubscribe2()
     })
 
+    it('keeps live delivery in stream order under concurrent publishers so resume skips nothing', async () => {
+      const prefix = `concurrent:${crypto.randomUUID()}:`
+      const event = 'orders'
+      const publisher = createTestingPublisher({
+        resume: { enabled: true, seconds: 10 },
+        prefix,
+      })
+      const listener = vi.fn()
+
+      const unsubscribe = await publisher.subscribe(event, listener)
+
+      // Each command is a separate HTTP request, like publishers in different processes.
+      await Promise.all(Array.from({ length: 50 }, (_, order) => publisher.publish(event, { order })))
+
+      await vi.waitFor(() => {
+        expect(listener).toHaveBeenCalledTimes(50)
+      })
+
+      const streamIds = (await redis.xread(`${prefix}${event}`, '0') as any)[0][1].map(([id]: [string]) => id)
+      expect(listener.mock.calls.map(([payload]) => getEventMeta(payload)?.id)).toEqual(streamIds)
+
+      await unsubscribe()
+    })
+
     it('trims stale resume history on the next publish and lets Redis expire the stream key', async () => {
       const prefix = `retention:${crypto.randomUUID()}:`
       const event = 'orders'
@@ -311,7 +335,7 @@ describe.concurrent(
           person: {
             condition: p => p instanceof Person,
             serialize: p => ({ name: p.name, date: p.date }),
-            deserialize: p => new Person(p.name, p.date),
+            deserialize: (p: any) => new Person(p.name, p.date),
           },
         },
       })

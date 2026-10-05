@@ -100,11 +100,6 @@ export class RPCMatcher {
       return undefined
     }
 
-    if (pathname.length > 1 && pathname.endsWith('/')) {
-      // Remove trailing slash for matching
-      pathname = pathname.slice(0, -1) as `/${string}`
-    }
-
     if (prefix) {
       if (!pathname.startsWith(prefix)) {
         return undefined
@@ -125,6 +120,11 @@ export class RPCMatcher {
         return undefined
       }
     }
+
+    if (pathname.length > 1 && pathname.endsWith('/')) {
+      pathname = pathname.slice(0, -1) as `/${string}`
+    }
+
     // most requests `await undefined` so conditionally await it to save a microtask turn
     const loading = this.resolvePendingLazyRouters(pathname)
     if (loading !== undefined) {

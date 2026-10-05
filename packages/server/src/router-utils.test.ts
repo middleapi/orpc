@@ -336,6 +336,8 @@ describe('getRouter', () => {
     expect(getRouter(router, ['invalid', 'notExists'])).toBeUndefined()
     expect(getRouter('invalid' as any, [])).toBeUndefined()
     expect(getRouter('invalid' as any, ['invalid'])).toBeUndefined()
+    expect(getRouter(router, ['__proto__'])).toBeUndefined()
+    expect(getRouter(router, ['nested', 'hasOwnProperty'])).toBeUndefined()
   })
 })
 

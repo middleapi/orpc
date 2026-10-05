@@ -101,6 +101,25 @@ describe('Builder', () => {
       })
     })
 
+    it('keeps union and index-signature context', () => {
+      void os.$context<{ kind: 'a', a: string } | { kind: 'b', b: number }>()
+        .use(({ next }) => next({ context: { user: 1 } }))
+        .handler(({ context }) => {
+          if (context.kind === 'a') {
+            expectTypeOf(context.a).toEqualTypeOf<string>()
+          }
+          else {
+            expectTypeOf(context.b).toEqualTypeOf<number>()
+          }
+        })
+
+      void os.$context<{ [k: string]: unknown, db: string }>()
+        .use(({ next }) => next({ context: { user: 1 } }))
+        .handler(({ context }) => {
+          expectTypeOf(context.db).toEqualTypeOf<string>()
+        })
+    })
+
     it('outline middleware', () => {
       const middleware = {} as Middleware<{ auth: boolean, g?: boolean }, { extra: boolean }, unknown, any, { SOME_ERROR: { message: string } }>
 

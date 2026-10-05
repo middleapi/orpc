@@ -6,7 +6,7 @@ import { RPCHandlerCodec, StandardHandler } from '../standard'
 import { NodeHttpHandler } from './handler'
 
 export interface RPCHandlerOptions<T extends Context>
-  extends NodeHttpHandlerOptions<T>, Omit<StandardHandlerOptions<T>, 'plugins'>, RPCHandlerCodecOptions<T> {}
+  extends NodeHttpHandlerOptions<T>, StandardHandlerOptions<T>, RPCHandlerCodecOptions<T> {}
 
 /**
  * Serves an oRPC router over the RPC protocol using Node.js built-in

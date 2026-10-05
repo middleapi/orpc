@@ -9,6 +9,8 @@ function createFakeSpan() {
     setAttribute: vi.fn().mockReturnThis(),
     setAttributes: vi.fn().mockReturnThis(),
     recordException: vi.fn(),
+    updateName: vi.fn().mockReturnThis(),
+    setStatus: vi.fn().mockReturnThis(),
     end: vi.fn(),
   }
 }
@@ -105,18 +107,26 @@ describe('cloudflareTracer', () => {
       expect(fake.setAttribute).toHaveBeenNthCalledWith(4, 'array', '["a","b"]')
     })
 
-    it('ignores renames and events', () => {
+    it('renames spans', () => {
       const fake = createFakeSpan()
       const span = new CloudflareSpan(fake as any)
 
       span.updateName('renamed')
+
+      expect(fake.updateName).toHaveBeenCalledWith('renamed')
+    })
+
+    it('ignores events', () => {
+      const fake = createFakeSpan()
+      const span = new CloudflareSpan(fake as any)
+
       span.addEvent('event')
 
       expect(fake.setAttribute).not.toHaveBeenCalled()
       expect(fake.end).not.toHaveBeenCalled()
     })
 
-    it('records error level exceptions natively', () => {
+    it('records error level exceptions natively and marks the span as failed', () => {
       const fake = createFakeSpan()
       const span = new CloudflareSpan(fake as any)
       const exception = { name: 'TypeError', message: 'boom', stack: 'stack', code: 'CODE' }
@@ -124,36 +134,24 @@ describe('cloudflareTracer', () => {
       span.recordException('error', exception)
 
       expect(fake.recordException).toHaveBeenCalledWith(exception)
-      expect(fake.setAttributes).not.toHaveBeenCalled()
+      expect(fake.setStatus).toHaveBeenCalledWith({ code: 'error', message: 'boom' })
     })
 
-    it('keeps info level exceptions as attributes', () => {
+    it('records info level exceptions natively without marking the span as failed', () => {
       const fake = createFakeSpan()
       const span = new CloudflareSpan(fake as any)
+      const exception = { name: 'AbortError', message: 'aborted', stack: 'stack' }
 
-      span.recordException('info', { name: 'AbortError', message: 'aborted', stack: 'stack' })
+      span.recordException('info', exception)
 
-      expect(fake.recordException).not.toHaveBeenCalled()
-      expect(fake.setAttributes).toHaveBeenCalledWith({
-        'exception.type': 'AbortError',
-        'exception.message': 'aborted',
-        'exception.stacktrace': 'stack',
-      })
-
-      fake.setAttributes.mockClear()
-      span.recordException('info', { name: 'ORPCError', message: 'bad request', code: 'BAD_REQUEST' })
-
-      expect(fake.setAttributes).toHaveBeenCalledWith({
-        'exception.type': 'BAD_REQUEST',
-        'exception.message': 'bad request',
-        'exception.stacktrace': undefined,
-      })
+      expect(fake.recordException).toHaveBeenCalledWith(exception)
+      expect(fake.setStatus).not.toHaveBeenCalled()
     })
   })
 
   /**
-   * The vitest workers pool still bundles a workerd without getActiveSpan and recordException,
-   * so only the older methods run against the real runtime here.
+   * The vitest workers pool still bundles a workerd without getActiveSpan, recordException,
+   * updateName, and setStatus, so only the older methods run against the real runtime here.
    */
   describe('with the runtime tracing api', () => {
     it('defaults to the tracing export of cloudflare:workers', () => {
@@ -169,9 +167,7 @@ describe('cloudflareTracer', () => {
       const result = await tracer.startActiveSpan('active', undefined, async (span) => {
         span.setAttribute('key', 'value')
         span.setAttribute('path', ['a', 'b'])
-        span.updateName('renamed')
         span.addEvent('event')
-        span.recordException('info', { name: 'AbortError', message: 'aborted' })
 
         const detached = tracer.startSpan('detached')
         detached.end()

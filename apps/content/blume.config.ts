@@ -52,14 +52,14 @@ export default defineConfig({
       { label: 'Blog', path: '/blog', href: '/blog' },
       { label: 'Comparison', path: '/docs', href: '/docs/comparison' },
       { label: 'From V1', path: '/docs', href: '/docs/migrations/from-v1' },
+      { label: 'Sponsors', path: '/sponsors', href: '/sponsors' },
+      { label: 'Experts', path: '/experts', href: '/experts' },
       {
         label: 'More',
         path: '',
         items: [
           { label: 'Releases', path: 'https://github.com/middleapi/orpc/releases' },
           { label: 'Discussions', path: 'https://github.com/middleapi/orpc/discussions' },
-          { label: 'GitHub Sponsors', path: 'https://github.com/sponsors/dinwwwh' },
-          { label: 'Open Collective', path: 'https://opencollective.com/middleapi' },
           { label: 'LLM Context', path: 'https://orpc.dev/llms.txt' },
           { label: 'LLM Context (Full)', path: 'https://orpc.dev/llms-full.txt' },
           { label: 'V1 Documentation', path: 'https://v1.orpc.dev' },
@@ -120,6 +120,7 @@ export default defineConfig({
     { from: '/docs/openapi/openapi-specification', to: '/docs/openapi/specification' },
     { from: '/docs/openapi/advanced/openapi-json-serializer', to: '/docs/openapi/serializer' },
     { from: '/docs/openapi/input-output-structure', to: '/docs/openapi/input-and-output-mapping' },
+    { from: '/docs/openapi/advanced/redirect-response', to: '/docs/openapi/input-and-output-mapping#redirect-response' },
     { from: '/docs/openapi/advanced/expanding-type-support-for-openapi-link', to: '/docs/openapi/expanding-type-support-for-link' },
 
     { from: '/docs/event-iterator', to: '/docs/async-iterator-object' },

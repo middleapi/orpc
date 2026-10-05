@@ -31,41 +31,30 @@ export function sortPlugins<T extends OrderablePlugin>(
     }
   }
 
-  const graph: Array<Set<number>> = Array.from(
-    { length: pluginCount },
-    () => new Set<number>(),
-  )
+  const dependencies: number[][] = Array.from({ length: pluginCount }, () => [])
 
   for (let i = 0; i < pluginCount; i++) {
     const plugin = plugins[i]!
 
-    const beforeList = plugin.before
-    if (beforeList !== undefined) {
-      for (const beforeId of beforeList) {
+    if (plugin.before !== undefined) {
+      for (const beforeId of plugin.before) {
         const beforeIndices = pluginIdToIndices.get(beforeId)
-        if (beforeIndices === undefined)
-          continue
 
-        for (const beforeIndex of beforeIndices) {
-          const beforeGraph = graph[beforeIndex]
-          if (beforeGraph !== undefined) {
-            beforeGraph.add(i)
+        if (beforeIndices !== undefined) {
+          for (const beforeIndex of beforeIndices) {
+            dependencies[beforeIndex]!.push(i)
           }
         }
       }
     }
 
-    const afterList = plugin.after
-    if (afterList !== undefined) {
-      const currentGraph = graph[i]
-      if (currentGraph !== undefined) {
-        for (const afterId of afterList) {
-          const afterIndices = pluginIdToIndices.get(afterId)
-          if (afterIndices === undefined)
-            continue
+    if (plugin.after !== undefined) {
+      for (const afterId of plugin.after) {
+        const afterIndices = pluginIdToIndices.get(afterId)
 
+        if (afterIndices !== undefined) {
           for (const afterIndex of afterIndices) {
-            currentGraph.add(afterIndex)
+            dependencies[i]!.push(afterIndex)
           }
         }
       }
@@ -73,40 +62,34 @@ export function sortPlugins<T extends OrderablePlugin>(
   }
 
   const sorted: T[] = []
-  const visiting = new Set<number>()
-  const visited = new Set<number>()
+  const placed = new Set<number>()
 
-  function visit(index: number): void {
-    if (visited.has(index))
-      return
+  while (sorted.length < pluginCount) {
+    const next = plugins.findIndex((_, i) => !placed.has(i) && dependencies[i]!.every(dependency => placed.has(dependency)))
 
-    if (visiting.has(index)) {
-      const plugin = plugins[index]
-      const pluginId = plugin !== undefined ? plugin.name : 'unknown'
-      throw new Error(`Circular dependency detected involving plugin "${pluginId}"`)
+    if (next === -1) {
+      throw new Error(`Circular dependency detected involving plugin "${findCyclicPlugin(plugins, dependencies, placed).name}"`)
     }
 
-    visiting.add(index)
-
-    const deps = graph[index]
-    if (deps !== undefined) {
-      for (const depIndex of deps) {
-        visit(depIndex)
-      }
-    }
-
-    visiting.delete(index)
-    visited.add(index)
-
-    const plugin = plugins[index]
-    if (plugin !== undefined) {
-      sorted.push(plugin)
-    }
-  }
-
-  for (let i = 0; i < pluginCount; i++) {
-    visit(i)
+    placed.add(next)
+    sorted.push(plugins[next]!)
   }
 
   return sorted
+}
+
+function findCyclicPlugin<T extends OrderablePlugin>(
+  plugins: T[],
+  dependencies: number[][],
+  placed: Set<number>,
+): T {
+  const seen = new Set<number>()
+  let current = plugins.findIndex((_, i) => !placed.has(i))
+
+  while (!seen.has(current)) {
+    seen.add(current)
+    current = dependencies[current]!.find(dependency => !placed.has(dependency))!
+  }
+
+  return plugins[current]!
 }

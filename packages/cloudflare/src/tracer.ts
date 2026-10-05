@@ -13,30 +13,20 @@ class CloudflareSpan implements TracingSpan {
     this.span.setAttribute(key, Array.isArray(value) ? toSpanAttributeValue(value) : value)
   }
 
-  updateName(_name: string): void {
-    // Workers Traces cannot rename a span
+  updateName(name: string): void {
+    this.span.updateName(name)
   }
 
   addEvent(_name: string): void {
-    // Workers Traces have no span events
+    // Workers Traces have no custom span events
   }
 
   recordException(level: TracingExceptionLevel, exception: TracingException): void {
-    if (level === 'error') {
-      this.span.recordException(exception)
-      return
-    }
+    this.span.recordException(exception)
 
-    /**
-     * Workers Traces flag every recorded exception as a failure, so lower levels
-     * are kept as attributes named after the
-     * [OpenTelemetry exception event](https://opentelemetry.io/docs/specs/semconv/exceptions/exceptions-spans/).
-     */
-    this.span.setAttributes({
-      'exception.type': exception.code ?? exception.name,
-      'exception.message': exception.message,
-      'exception.stacktrace': exception.stack,
-    })
+    if (level === 'error') {
+      this.span.setStatus({ code: 'error', message: exception.message })
+    }
   }
 
   end(): void {

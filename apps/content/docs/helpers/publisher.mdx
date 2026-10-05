@@ -112,7 +112,8 @@ const publisher = new RedisPublisher<Events>(client, {
   subscriber: client.duplicate(),
 
   /**
-   * The prefix to use for Redis keys.
+   * The prefix to use for Redis keys and Pub/Sub channels.
+   * Set it to isolate events when several apps share one Redis instance.
    *
    * @default ''
    */
@@ -157,7 +158,8 @@ const redis = Redis.fromEnv()
 
 const publisher = new UpstashPublisher<Events>(redis, {
   /**
-   * The prefix to use for Redis keys.
+   * The prefix to use for Redis keys and Pub/Sub channels.
+   * Set it to isolate events when several apps share one Redis instance.
    *
    * @default ''
    */
@@ -209,7 +211,8 @@ const publisher = new BunRedisPublisher<Events>(redis, {
   subscriber: redis.duplicate(),
 
   /**
-   * The prefix to use for Redis keys.
+   * The prefix to use for Redis keys and Pub/Sub channels.
+   * Set it to isolate events when several apps share one Redis instance.
    *
    * @default ''
    */
@@ -258,6 +261,8 @@ export class PublisherDO extends DurablePublisherObject {
          *
          * When enabled, published events are temporarily stored so new
          * subscribers can resume from a previous position using `lastEventId`.
+         * Each stored event must fit within the Durable Object SQLite row size limit,
+         * so publishing a larger one fails.
          *
          * @default false
          */

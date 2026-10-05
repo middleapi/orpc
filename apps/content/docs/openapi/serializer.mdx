@@ -12,12 +12,12 @@ description: "Learn how OpenAPI Serializer performs one-way serialization of com
 | **string**                       |             |                    |                                      |
 | **number**                       |             |                    |                                      |
 | **NaN**                          | `nan`       | `null`             |                                      |
+| **Infinity**, **-Infinity**      | `infinity`  | `null`             |                                      |
 | **boolean**                      |             |                    |                                      |
 | **null**                         |             |                    |                                      |
 | **undefined**                    | `undefined` | `null`             | Ignore `undefined` properties        |
 | **Date**                         | `date`      | ISO String, `null` |                                      |
 | **BigInt**                       | `bigint`    | string             |                                      |
-| **RegExp**                       | `regexp`    | string             |                                      |
 | **URL**                          | `url`       | string             |                                      |
 | **Record (object)**              |             |                    | `toJSON` methods are ignored         |
 | **Array**                        |             |                    |                                      |
@@ -148,10 +148,8 @@ When the output is an `AsyncIteratorObject`, it is sent as a [Server-Sent Events
 HTTP/1.1 200 OK
 Content-Type: text/event-stream
 
-event: message
 data: {"name":"John","createdAt":"2024-01-01T00:00:00.000Z"}
 
-event: message
 data: {"name":"Jane","createdAt":"2024-01-02T00:00:00.000Z"}
 ```
 

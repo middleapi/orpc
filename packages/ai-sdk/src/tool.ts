@@ -8,7 +8,7 @@ import type { FunctionTool } from './tool-meta'
 import { getAsyncIteratorObjectSchemaDetails } from '@orpc/contract'
 import { combineJsonSchemasWithComposition } from '@orpc/json-schema'
 import { call, Procedure } from '@orpc/server'
-import { isAsyncGeneratorFunction, isPlainObject, mergeTwoLevels, ORPC_NAME, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
+import { isAsyncGeneratorFunction, mergeTwoLevels, ORPC_NAME, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
 import { tool } from 'ai'
 import { getAiSdkToolMeta } from './tool-meta'
 
@@ -70,18 +70,16 @@ function combineSchemas(schemas: AnySchema[], merge: boolean): undefined | Flexi
       async validate(value: unknown) {
         let current = value
 
-        /**
-         * Mirrors the server: stacked object input schemas each validate the original value and are
-         * merged afterwards, output schemas stay piped.
-         */
+        // Mirrors the server's stacked input validation, output schemas stay piped.
         for (const [index, schema] of schemas.entries()) {
-          const result = await schema['~standard'].validate(merge && isPlainObject(current) ? value : current)
+          const merging = merge && index !== 0
+          const result = await schema['~standard'].validate(merging ? mergeTwoLevels(value, current) : current)
 
           if (result.issues) {
             return result
           }
 
-          current = merge && index !== 0 ? mergeTwoLevels(current, result.value) : result.value
+          current = merging ? mergeTwoLevels(current, result.value) : result.value
         }
 
         return { value: current }
@@ -207,7 +205,7 @@ export function implementToolFactory(_options: ImplementToolFactoryOptions = {})
 export type CreateToolFactoryOptions<TInitialContext extends Context>
   = & ImplementToolFactoryOptions
     & ProcedureClientOptions<TInitialContext, Schema<unknown>, object, object>
-    & Omit<ClientOptions<object>, 'context'>
+    & Omit<ClientOptions<object>, 'context' | 'signal'>
 
 export interface ToolFactory<TInitialContext extends Context> {
   <TInputSchema extends AnySchema, TOutputSchema extends AnySchema>(
@@ -291,10 +289,10 @@ export function createToolFactory<TInitialContext extends Context = object>(
        */
       execute: isIteratorOutput
         ? async function* (input, callingOptions) {
-          yield* await call(disabledValidation, input as any, { signal: callingOptions.abortSignal, ...options }) as AsyncIterable<any>
+          yield* await call(disabledValidation, input as any, { ...options, signal: callingOptions.abortSignal }) as AsyncIterable<any>
         }
         : (input, callingOptions) => {
-            return call(disabledValidation, input as any, { signal: callingOptions.abortSignal, ...options })
+            return call(disabledValidation, input as any, { ...options, signal: callingOptions.abortSignal })
           },
     }) as any
   }

@@ -1,4 +1,4 @@
-import type { FetchHandlerPlugin } from './plugin'
+import type { StandardHandlerPlugin } from '../standard'
 import { os } from '../../builder'
 import { RPCHandler } from './rpc-handler'
 
@@ -46,14 +46,14 @@ describe('rpcHandler', () => {
     expect(misMatchPrefixResult.response).toBeUndefined()
   })
 
-  it('support fetch handler plugin', async () => {
-    const plugin: FetchHandlerPlugin<any> = {
+  it('supports standard handler plugins', async () => {
+    const plugin: StandardHandlerPlugin<any> = {
       name: 'test',
-      initFetchHandlerOptions(options) {
+      init(options) {
         return {
           ...options,
-          fetchInterceptors: [
-            async () => ({ matched: true, response: new Response('intercepted') }),
+          routingInterceptors: [
+            async () => ({ matched: true, response: { status: 200, headers: {}, body: 'intercepted' } }),
           ],
         }
       },
@@ -66,7 +66,7 @@ describe('rpcHandler', () => {
     expect(matched).toBe(true)
     expect(response).toBeInstanceOf(Response)
     expect(response!.status).toBe(200)
-    return expect(response!.text()).resolves.toBe('intercepted')
+    return expect(response!.text()).resolves.toBe('"intercepted"')
   })
 
   it('treats GET requests as unmatched by default', async () => {

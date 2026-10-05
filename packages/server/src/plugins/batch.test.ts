@@ -1,8 +1,11 @@
 import type { AnyRouter } from '../router'
+import { ORPCError } from '@orpc/client'
 import { promiseWithResolvers } from '@orpc/shared'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { os } from '../builder'
 import { BatchHandlerPlugin } from './batch'
+import { RequestCompressionHandlerPlugin } from './request-compression'
+import { RequestLimitHandlerPlugin } from './request-limit'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -22,6 +25,7 @@ function createBatchRequest(options: {
   messages?: unknown
   method?: 'POST' | 'GET' | 'QUERY'
   data?: string
+  signal?: AbortSignal
 }) {
   if (options.method === 'GET') {
     const search = options.data === undefined ? '' : `?data=${options.data}`
@@ -29,6 +33,7 @@ function createBatchRequest(options: {
     return new Request(`https://example.com/__batch__${search}`, {
       method: 'GET',
       headers: { 'orpc-batch': options.mode },
+      signal: options.signal,
     })
   }
 
@@ -36,6 +41,7 @@ function createBatchRequest(options: {
     method: options.method ?? 'POST',
     headers: { 'orpc-batch': options.mode, 'content-type': 'application/json' },
     body: JSON.stringify(options.messages),
+    signal: options.signal,
   })
 }
 
@@ -157,6 +163,41 @@ describe('batchHandlerPlugin', () => {
       expect(handlerFn).toHaveBeenCalledTimes(0)
     })
 
+    it('returns the ORPCError message a body plugin throws while resolving the batch body', async () => {
+      const handler = new RPCHandler(router, {
+        plugins: [new BatchHandlerPlugin(), new RequestCompressionHandlerPlugin()],
+      })
+
+      const { response } = await handler.handle(new Request('https://example.com/__batch__', {
+        method: 'POST',
+        headers: {
+          'orpc-batch': 'buffered',
+          'content-type': 'application/json',
+          'content-encoding': 'gzip, gzip, gzip, gzip, gzip, gzip',
+        },
+        body: JSON.stringify([makePeerRequestMessage(0, '/ping')]),
+      }))
+
+      expect(response!.status).toBe(400)
+      expect(await response!.text()).toContain('Too many content encodings.')
+      expect(handlerFn).toHaveBeenCalledTimes(0)
+    })
+
+    it('returns the ORPCError message a body plugin raises while streaming the batch body', async () => {
+      const handler = new RPCHandler(router, {
+        plugins: [new BatchHandlerPlugin(), new RequestLimitHandlerPlugin({ maxBodySize: 10 })],
+      })
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: [makePeerRequestMessage(0, '/ping')],
+      }))
+
+      expect(response!.status).toBe(400)
+      expect(await response!.text()).toContain(new ORPCError('PAYLOAD_TOO_LARGE').message)
+      expect(handlerFn).toHaveBeenCalledTimes(0)
+    })
+
     it('returns 413 when batch size exceeds maxSize', async () => {
       const handler = createHandler(new BatchHandlerPlugin({ maxSize: 1 }))
       const peerMessages = [
@@ -251,6 +292,74 @@ describe('batchHandlerPlugin', () => {
       const { messageLength, payload } = readLengthPrefixedChunk(buffer)
       expect(messageLength).toBe(payload.length)
       expect(new TextDecoder().decode(payload)).toContain('__TEST__')
+    })
+  })
+
+  describe('batch request abort', () => {
+    const started = vi.fn()
+    const stopped = vi.fn()
+
+    function waitForAbort(signal: AbortSignal) {
+      return new Promise((resolve) => {
+        if (signal.aborted) {
+          resolve(undefined)
+        }
+        signal.addEventListener('abort', resolve)
+      })
+    }
+
+    const handler = createHandler(new BatchHandlerPlugin(), {
+      wait: os.handler(async ({ signal }) => {
+        started()
+        await waitForAbort(signal!)
+        stopped(signal!.aborted)
+      }),
+      subscribe: os.handler(async function* ({ signal }) {
+        started()
+        try {
+          yield 'ready'
+          await waitForAbort(signal!)
+        }
+        finally {
+          await new Promise(resolve => setTimeout(resolve)) // async cleanup
+          stopped(signal!.aborted)
+        }
+      }),
+    })
+
+    const messages = [makePeerRequestMessage(0, '/wait'), makePeerRequestMessage(1, '/subscribe')]
+
+    it.each(['buffered', 'streaming'] as const)('aborts %s sub-requests when the batch request is aborted', async (mode) => {
+      const controller = new AbortController()
+      const result = handler.handle(createBatchRequest({ mode, messages, signal: controller.signal }))
+
+      await vi.waitFor(() => expect(started).toHaveBeenCalledTimes(2))
+      expect(stopped).not.toHaveBeenCalled()
+
+      controller.abort()
+
+      await vi.waitFor(() => expect(stopped.mock.calls).toEqual([[true], [true]]))
+      await expect(result).resolves.toMatchObject({ matched: true })
+    })
+
+    it('aborts streaming sub-requests when the response stream is cancelled', async () => {
+      const { response } = await handler.handle(createBatchRequest({ mode: 'streaming', messages }))
+
+      await vi.waitFor(() => expect(started).toHaveBeenCalledTimes(2))
+      await response!.body!.cancel()
+
+      expect(stopped.mock.calls).toEqual([[true], [true]])
+    })
+
+    it.each(['buffered', 'streaming'] as const)('aborts %s sub-requests when the batch request is already aborted', async (mode) => {
+      const { response } = await handler.handle(createBatchRequest({
+        mode,
+        messages: [makePeerRequestMessage(0, '/wait')],
+        signal: AbortSignal.abort(),
+      }))
+      await response!.arrayBuffer()
+
+      expect(stopped.mock.calls).toEqual([[true]])
     })
   })
 

@@ -69,6 +69,13 @@ describe('decorateMiddleware', () => {
       expect(mapped['~orpc']).toEqual(original['~orpc'])
       expect(mapped.name).toBe('originalName')
     })
+
+    it('should preserve metadata assigned after decoration', () => {
+      const decorated = decorateMiddleware(vi.fn() as any)
+      decorated['~orpc'] = { errorMap: { BASE: { message: 'test' } }, metaPlugins: [{ name: 'test', init: vi.fn() }] }
+
+      expect(decorated.adaptInput((input: any) => input)['~orpc']).toBe(decorated['~orpc'])
+    })
   })
 
   describe('.errors', () => {
@@ -249,6 +256,16 @@ describe('decorateMiddleware', () => {
       expect(combined['~orpc']?.errorMap).toEqual(mergeErrorMapSpy.mock.results[0]!.value)
 
       expect(combined.name).toBe('M1 + M2')
+      expect(combined['~orpc']?.metaPlugins).toEqual([...plugins1, ...plugins2])
+    })
+
+    it('should combine hidden meta plugins assigned after decoration', () => {
+      const plugins1 = [{ name: 'test', init: vi.fn() }]
+      const plugins2 = [{ name: 'test', init: vi.fn() }]
+      const decorated = decorateMiddleware(vi.fn() as any)
+      decorated['~orpc'] = { metaPlugins: plugins1 }
+
+      const combined = decorated.use(Object.assign(vi.fn(), { '~orpc': { metaPlugins: plugins2 } }) as any)
       expect(combined['~orpc']?.metaPlugins).toEqual([...plugins1, ...plugins2])
     })
   })

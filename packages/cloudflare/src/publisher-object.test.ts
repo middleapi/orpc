@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 interface OpenSocket {
   socket: WebSocket
   messages: string[]
+  replayedEvents: string | null
 }
 
 function toText(data: unknown): string {
@@ -44,7 +45,7 @@ async function openSocket(stub: DurableObjectStub, lastEventId?: string): Promis
 
   socket.accept()
 
-  return { socket, messages }
+  return { socket, messages, replayedEvents: response.headers.get('orpc-replayed-events') }
 }
 
 async function publish(stub: DurableObjectStub, payload: object | string): Promise<Response> {
@@ -150,20 +151,49 @@ describe('durable publisher object', () => {
       { data: { text: 'second' }, meta: { id: '2', comments: ['keep me'] } },
       { data: { text: 'third' }, meta: { id: '3' } },
     ])
+    expect(liveSubscriber.replayedEvents).toBe('0')
 
     const resumeSubscriber = await openSocket(stub, '2')
     const resumedMessages = await readMessages(resumeSubscriber, 1)
 
     expect(resumedMessages).toEqual([liveMessages[2]])
+    expect(resumeSubscriber.replayedEvents).toBe('1')
 
     const tailSubscriber = await openSocket(stub, '3')
 
     await sleep(2)
     expect(tailSubscriber.messages).toHaveLength(0)
+    expect(tailSubscriber.replayedEvents).toBe('0')
+
+    // an id it did not issue replays nothing, rather than events the subscriber may already have
+    const foreignSubscriber = await openSocket(stub, 'not-an-id')
+    expect(foreignSubscriber.replayedEvents).toBe('0')
 
     await closeSocket(liveSubscriber)
     await closeSocket(resumeSubscriber)
     await closeSocket(tailSubscriber)
+    await closeSocket(foreignSubscriber)
+  })
+
+  it('resumes messages in numeric id order', async () => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
+
+    for (let order = 1; order <= 11; order++) {
+      expect((await publish(stub, { data: { order } })).status).toBe(204)
+    }
+
+    // sorting ids as text would replay '10' and '11' before '8' and '9'
+    const subscriber = await openSocket(stub, '7')
+    const messages = await readMessages(subscriber, 4)
+
+    expect(messages).toEqual([
+      { data: { order: 8 }, meta: { id: '8' } },
+      { data: { order: 9 }, meta: { id: '9' } },
+      { data: { order: 10 }, meta: { id: '10' } },
+      { data: { order: 11 }, meta: { id: '11' } },
+    ])
+
+    await closeSocket(subscriber)
   })
 
   it('keeps resume before new live messages', { repeats: 5 }, async () => {
@@ -285,15 +315,13 @@ describe('durable publisher object', () => {
 
   it('returns 400 for bad resume data and still works after', async () => {
     const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const subscriber = await openSocket(stub)
 
     const invalidResponse = await publish(stub, 'not-json')
 
     expect(invalidResponse.status).toBe(400)
-    expect(await invalidResponse.text()).toBe('Invalid or unprocessable event payload')
-    expect(consoleError).toHaveBeenCalledTimes(1)
+    expect(await invalidResponse.text()).toContain('SyntaxError')
 
     expect((await publish(stub, { data: { text: 'after-error' } })).status).toBe(204)
     expect((await readMessages(subscriber, 1))[0]).toEqual({
@@ -350,28 +378,78 @@ describe('durable publisher object', () => {
     })
   })
 
-  it('resets resume storage when the id reaches the max value', async () => {
-    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    expect((await publish(stub, { data: { text: 'initial' } })).status).toBe(204)
-    await runInDurableObject(stub, async (_, state) => {
-      state.storage.sql.exec(
+  it.each([
+    ['the id reaches the max value', (sql: SqlStorage) => {
+      sql.exec(
         'INSERT INTO "prefix:events" (id, payload) VALUES (?, ?)',
         '9223372036854775807',
         JSON.stringify({ data: { text: 'before-overflow' } }),
       )
-    })
+    }],
+    ['the table disappears under a running object', (sql: SqlStorage) => {
+      sql.exec('DROP TABLE "prefix:events"')
+    }],
+  ])('recreates the events table when %s', async (_name, breakTable) => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    expect((await publish(stub, { data: { text: 'initial' } })).status).toBe(204)
+    await runInDurableObject(stub, async (_, state) => breakTable(state.storage.sql))
 
     expect((await publish(stub, { data: { text: 'recovered' } })).status).toBe(204)
-    expect(consoleError).toHaveBeenCalled()
 
     const resumeSubscriber = await openSocket(stub, '0')
-
-    expect((await readMessages(resumeSubscriber, 1))[0]).toEqual({
+    expect(await readMessages(resumeSubscriber, 1)).toEqual([{
       data: { text: 'recovered' },
       meta: { id: '1' },
+    }])
+    expect(resumeSubscriber.replayedEvents).toBe('1')
+
+    await closeSocket(resumeSubscriber)
+  })
+
+  it('rejects payloads it cannot store without dropping stored events', async () => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
+
+    expect((await publish(stub, { data: { text: 'kept' } })).status).toBe(204)
+
+    for (const payload of [
+      'null',
+      '[]',
+      '"text"',
+      '42',
+      '{"data":1,"meta":"text"}',
+      '{"data":1,"meta":[]}',
+      '{"data":1,"meta":null}',
+      JSON.stringify({ data: 'a'.repeat(3_000_000) }), // over the SQLite row size limit
+    ]) {
+      expect((await publish(stub, payload)).status).toBe(400)
+    }
+
+    expect((await publish(stub, { data: { text: 'after' } })).status).toBe(204)
+
+    const resumeSubscriber = await openSocket(stub, '0')
+    expect((await readMessages<{ data: { text: string } }>(resumeSubscriber, 2)).map(message => message.data.text)).toEqual(['kept', 'after'])
+
+    await closeSocket(resumeSubscriber)
+  })
+
+  it('keeps stored events when an insert fails for a reason other than the table', async () => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
+
+    expect((await publish(stub, { data: { text: 'kept' } })).status).toBe(204)
+
+    await runInDurableObject(stub, async (_, state) => {
+      state.storage.sql.exec(`
+        CREATE TRIGGER "prefix:reject" BEFORE INSERT ON "prefix:events"
+        BEGIN SELECT RAISE(ABORT, 'rejected by trigger'); END
+      `)
     })
+
+    expect((await publish(stub, { data: { text: 'rejected' } })).status).toBe(400)
+
+    const resumeSubscriber = await openSocket(stub, '0')
+    expect((await readMessages<{ data: { text: string } }>(resumeSubscriber, 1)).map(message => message.data.text)).toEqual(['kept'])
 
     await closeSocket(resumeSubscriber)
   })

@@ -142,6 +142,11 @@ describe('createToolFactory', () => {
     void createToolFactory({ context: { other: '' } })(procedure)
   })
 
+  it('does not accept a signal, the AI SDK provides one per tool call', () => {
+    // @ts-expect-error signal is not a factory option
+    void createToolFactory({ signal: AbortSignal.timeout(1000) })
+  })
+
   it('infer output as yield type for async iterator outputs', () => {
     const procedure = os
       .input(z.object({ location: z.string() }))

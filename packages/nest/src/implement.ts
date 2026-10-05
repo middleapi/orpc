@@ -8,6 +8,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
 import type { NestStandardLazyRequest, ORPCModuleConfig } from './module'
 import { Readable } from 'node:stream'
+import * as NestCommon from '@nestjs/common'
 import { applyDecorators, Delete, Get, Head, HttpCode, HttpException, Inject, Injectable, Optional, Options, Patch, Post, Put, StreamableFile, UseInterceptors } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { getPathMeta, ProcedureContract } from '@orpc/contract'
@@ -21,6 +22,9 @@ import { toEventStream, toStandardLazyRequest } from '@standard-server/node'
 import { mergeMap } from 'rxjs'
 
 import { ORPC_MODULE_CONFIG_SYMBOL } from './module'
+
+// Namespace access so NestJS < 11.2 (no QueryMethod export) loads without a SyntaxError
+const QueryMethod = NestCommon.QueryMethod as typeof NestCommon.QueryMethod | undefined
 
 const MethodDecoratorMap = {
   HEAD: Head,
@@ -40,6 +44,7 @@ const MethodDecoratorMap = {
  * @remarks
  * **Note**: Every procedure contract must define an `openapi.path` meta;
  * use `populateRouterContractOpenAPIPaths` from `@orpc/openapi` to fill in missing paths.
+ * **Note**: The HTTP `QUERY` method requires NestJS v11.2+ (`QueryMethod`). Older NestJS versions throw; use `GET` instead.
  *
  * @see {@link https://orpc.dev/docs/integrations/nest#implement-your-contract | Implement oRPC contract with NestJS - Implement Your Contract}
  */
@@ -84,10 +89,17 @@ function toNestRouteDecorator(contract: AnyProcedureContract): MethodDecorator {
   const successStatus = meta.successStatus ?? DEFAULT_SUCCESS_STATUS
 
   if (method === 'QUERY') {
-    throw new TypeError(`
-      @Implement decorator does not support the 'QUERY' HTTP method because NestJS does not support it.
-      Use the 'GET' method instead.
-    `)
+    if (!QueryMethod) {
+      throw new TypeError(`
+        @Implement decorator does not support the 'QUERY' HTTP method because the installed version of NestJS does not support it.
+        The 'QUERY' HTTP method requires NestJS v11.2 or later. Alternatively, use 'GET' method.
+      `)
+    }
+
+    return applyDecorators(
+      QueryMethod(path),
+      HttpCode(successStatus),
+    )
   }
 
   return applyDecorators(
@@ -219,7 +231,8 @@ export class ImplementInterceptor implements NestInterceptor {
 
         httpAdapter.status(res, result.response.status)
 
-        for (const [key, value] of Object.entries(result.response.headers)) {
+        for (const key of Object.keys(result.response.headers)) {
+          const value = result.response.headers[key]
           if (typeof value === 'string') {
             httpAdapter.setHeader(res, key, value)
           }
@@ -239,20 +252,20 @@ export class ImplementInterceptor implements NestInterceptor {
 
         if (body instanceof ReadableStream) {
           httpAdapter.setHeader(res, 'standard-server', 'octet-stream' satisfies StandardBodyHint)
-          return new StreamableFile(Readable.fromWeb(body), {
+          return toStreamableFile(Readable.fromWeb(body), standardRequest.signal, {
             type: flattenStandardHeader(result.response.headers['content-type']) ?? 'application/octet-stream',
           })
         }
 
         if (isAsyncIteratorObject(body)) {
-          return new StreamableFile(toEventStream(body, this.config.toNestResponse?.eventStream), {
+          return toStreamableFile(toEventStream(body, this.config.toNestResponse?.eventStream), standardRequest.signal, {
             type: 'text/event-stream',
           })
         }
 
         if (body instanceof Blob) {
           httpAdapter.setHeader(res, 'standard-server', 'file' satisfies StandardBodyHint) // A File is also a Blob
-          return new StreamableFile(Readable.fromWeb(body.stream()), {
+          return toStreamableFile(Readable.fromWeb(body.stream()), standardRequest.signal, {
             type: body.type,
             disposition: flattenStandardHeader(result.response.headers['content-disposition']) ?? generateContentDisposition(body instanceof File ? body.name : 'blob'),
             // BunS3 can use NaN for the size
@@ -262,7 +275,7 @@ export class ImplementInterceptor implements NestInterceptor {
 
         if (body instanceof FormData) {
           const response = new Response(body)
-          return new StreamableFile(Readable.fromWeb(response.body!), {
+          return toStreamableFile(Readable.fromWeb(response.body!), standardRequest.signal, {
             type: response.headers.get('content-type')!,
           })
         }
@@ -296,6 +309,21 @@ export class ImplementInterceptor implements NestInterceptor {
       }),
     )
   }
+}
+
+/**
+ * Destroys the stream once the request is aborted, because Nest's Express adapter only pipes a StreamableFile
+ * and never destroys it on client disconnect, which would leave the underlying event iterator or stream uncanceled.
+ */
+function toStreamableFile(stream: Readable, signal: AbortSignal | undefined, options: StreamableFile['options']): StreamableFile {
+  if (signal?.aborted) {
+    stream.destroy()
+  }
+  else {
+    signal?.addEventListener('abort', () => stream.destroy(), { once: true })
+  }
+
+  return new StreamableFile(stream, options)
 }
 
 function flattenParamValue(value: string | string[]): string {

@@ -1,4 +1,4 @@
-import type { BaseRedisPublisherOptions, RedisStreamEntry, RedisStreamTrimOptions } from '@orpc/publisher/base-redis'
+import type { BaseRedisPublisherOptions, RedisStreamEntry } from '@orpc/publisher/base-redis'
 import type { Promisable } from '@orpc/shared'
 import type { RedisClient } from 'bun'
 import { BaseRedisPublisher } from '@orpc/publisher/base-redis'
@@ -47,19 +47,8 @@ export class BunRedisPublisher<T extends Record<string, object>> extends BaseRed
     }
   }
 
-  protected async addStreamEntry(key: string, data: string, trim?: RedisStreamTrimOptions): Promise<string> {
-    if (!trim) {
-      return await this.redis.send('XADD', [key, '*', 'data', data]) as string
-    }
-
-    // Bun pipelines these, so they reach Redis in order within one round trip.
-    const [id] = await Promise.all([
-      this.redis.send('XADD', [key, '*', 'data', data]),
-      this.redis.send('XTRIM', [key, 'MINID', trim.exactness, trim.minId]),
-      this.redis.expire(key, trim.expireSeconds),
-    ])
-
-    return id as string
+  protected async evalScript(script: string, keys: string[], args: string[]): Promise<unknown> {
+    return await this.redis.send('EVAL', [script, String(keys.length), ...keys, ...args])
   }
 
   protected async readStreamEntries(key: string, lastId: string): Promise<RedisStreamEntry[]> {

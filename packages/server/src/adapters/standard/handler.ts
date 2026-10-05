@@ -6,8 +6,8 @@ import type { ProcedureClientInterceptor } from '../../procedure-client'
 import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from './codec'
 import type { StandardHandlerPlugin } from './plugin'
 import { ORPCError, toORPCError } from '@orpc/client'
-import { getTracer, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, ORPC_NAME, override, recordSpanError, runWithSpan, toArray, traceAsyncIterator, traceReadableStream, value } from '@orpc/shared'
-import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
+import { getTracer, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, ORPC_NAME, override, recordSpanError, runWithSpan, toArray, toTracingException, traceAsyncIterator, traceReadableStream, value, wrapAsyncIterator, wrapReadableStream } from '@orpc/shared'
+import { ErrorEvent, flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { createProcedureClient } from '../../procedure-client'
 import { CompositeStandardHandlerPlugin } from './plugin'
 
@@ -77,8 +77,8 @@ export class StandardHandler<T extends Context> {
     options: StandardHandlerOptions<T>,
   ) {
     options = new CompositeStandardHandlerPlugin([
-      new TracingHandlerPlugin(),
       ...toArray(options.plugins),
+      new TracingHandlerPlugin(),
     ]).init(options)
 
     this.routingInterceptors = options.routingInterceptors
@@ -210,7 +210,12 @@ export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
         // Should be placed before user-provided interceptors to help them access the current active span.
         async ({ next, request }) => {
           const tracer = getTracer()
-          const parent = tracer?.extract?.(request.headers)
+
+          if (!tracer) {
+            return next()
+          }
+
+          const parent = tracer.extract?.(request.headers)
 
           /**
            * The search part is excluded because span names should have low cardinality.
@@ -218,10 +223,84 @@ export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
            */
           const [pathname] = parseStandardUrl(request.url)
 
-          return runWithSpan(
-            { name: `${request.method} ${pathname}`, parent },
-            () => next(),
-          )
+          return tracer.startActiveSpan(`${request.method} ${pathname}`, parent, async (span) => {
+            try {
+              const result = await next()
+
+              if (!result.matched) {
+                span.end()
+                return result
+              }
+
+              const body = result.response.body
+              if (isAsyncIteratorObject(body)) {
+                return {
+                  ...result,
+                  response: {
+                    ...result.response,
+                    /**
+                     * @remarks
+                     * **Warning**: Remember use `override` for remaining special properties
+                     */
+                    body: override(body, wrapAsyncIterator(body, {
+                      runWith: fn => tracer.withActiveSpan(span, fn),
+                      onError(error) {
+                        /**
+                         * Errors here are internal (interceptor/framework) failures,
+                         * except `ErrorEvent`: a business error the protocol delivers
+                         * inside the event stream, already logged by the client interceptor.
+                         */
+                        if (!(error instanceof ErrorEvent)) {
+                          span.recordException('error', toTracingException(error))
+                        }
+                      },
+                      onFinish() {
+                        span.end()
+                      },
+                    })),
+                  },
+                }
+              }
+
+              if (body instanceof ReadableStream) {
+                return {
+                  ...result,
+                  response: {
+                    ...result.response,
+                    /**
+                     * @remarks
+                     * **Warning**: Remember use `override` for remaining special properties
+                     */
+                    body: override(body, wrapReadableStream(body, {
+                      runWith: fn => tracer.withActiveSpan(span, fn),
+                      onError(error) {
+                        /**
+                         * Any error here is internal (interceptor/framework), not business logic.
+                         * Indicates unexpected handler failure.
+                         */
+                        span.recordException('error', toTracingException(error))
+                      },
+                      onFinish() {
+                        span.end()
+                      },
+                    })),
+                  },
+                }
+              }
+
+              span.end()
+              return result
+            }
+            catch (e) {
+              /**
+               * Any error here is internal (interceptor/framework), not business logic.
+               * Always recorded as an error, even when it is an abort error.
+               */
+              span.recordException('error', toTracingException(e))
+              span.end()
+              throw e
+            }
+          })
         },
         ...toArray(options.routingInterceptors),
       ],

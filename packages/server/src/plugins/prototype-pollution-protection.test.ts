@@ -1,6 +1,8 @@
 import type { AsyncIteratorClass } from '@orpc/shared'
 import { ORPCError } from '@orpc/client'
+import { decodePeerMessage } from '@standard-server/peer'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
+import { RPCHandler as MessagePortRPCHandler } from '../adapters/message-port/rpc-handler'
 import { os } from '../builder'
 import { PrototypePollutionProtectionHandlerPlugin } from './prototype-pollution-protection'
 
@@ -26,6 +28,15 @@ function invokeInterceptor(input: unknown) {
   const result = (async () => interceptor({ context: {}, input, next } as any))()
 
   return { result, next, nextResult }
+}
+
+/**
+ * Structured clone, which delivers MessagePort messages, keeps named keys on arrays.
+ */
+function cloneArrayWithKey(key: string, value: unknown): unknown[] {
+  const array = ['item']
+  Object.defineProperty(array, key, { value, enumerable: true, configurable: true, writable: true })
+  return structuredClone(array)
 }
 
 async function expectAllowed(input: unknown) {
@@ -75,6 +86,9 @@ describe('prototypePollutionProtectionHandlerPlugin', () => {
       ['a polluting object used as a Map value', () => new Map([['key', JSON.parse('{"__proto__": {}}')]])],
       ['a polluting object inside a Set', () => new Set([JSON.parse('{"constructor": {"prototype": {}}}')])],
       ['a polluting object behind a benign constructor key', () => JSON.parse('{"constructor": {"nested": {"__proto__": {}}}}')],
+      ['an own __proto__ key on a structured-cloned array', () => cloneArrayWithKey('__proto__', { isAdmin: true })],
+      ['a constructor.prototype pair on a structured-cloned array', () => cloneArrayWithKey('constructor', { prototype: { isAdmin: true } })],
+      ['a polluting object behind a named key on a structured-cloned array', () => ({ list: cloneArrayWithKey('nested', JSON.parse('{"__proto__": {}}')) })],
     ])('blocks %s', async (_, createInput) => {
       await expectBlocked(createInput())
     })
@@ -90,6 +104,7 @@ describe('prototypePollutionProtectionHandlerPlugin', () => {
       ['a prototype key alone', () => JSON.parse('{"prototype": {"isAdmin": true}}')],
       ['non-plain objects such as dates and files', () => ({ at: new Date(), file: new File(['hi'], 'hi.txt') })],
       ['a benign Map and Set', () => ({ map: new Map([['a', 1]]), set: new Set(['a']) })],
+      ['a benign named key on a structured-cloned array', () => cloneArrayWithKey('label', { name: 'Earth' })],
     ])('allows %s', async (_, createInput) => {
       await expectAllowed(createInput())
     })
@@ -224,5 +239,34 @@ describe('prototypePollutionProtectionHandlerPlugin', () => {
       expect(response!.status).toBe(200)
       expect(createPlanet).toHaveBeenCalledOnce()
     })
+  })
+
+  it('blocks an own __proto__ key on an array sent over a MessagePort', async () => {
+    const createPlanet = vi.fn()
+    const handler = new MessagePortRPCHandler({ createPlanet: os.handler(createPlanet) }, {
+      plugins: [new PrototypePollutionProtectionHandlerPlugin()],
+    })
+
+    const { port1: clientPort, port2: serverPort } = new MessageChannel()
+    handler.upgrade(serverPort)
+    onTestFinished(() => clientPort.close())
+
+    const response = new Promise<any>((resolve) => {
+      clientPort.addEventListener('message', event => resolve(decodePeerMessage(event.data)), { once: true })
+    })
+    clientPort.start()
+
+    // A raw peer message skips string encoding and arrives as a structured clone.
+    clientPort.postMessage({
+      id: '1',
+      kind: 'request',
+      json: { url: '/createPlanet', body: { json: cloneArrayWithKey('__proto__', { isAdmin: true }) }, headers: {}, method: 'POST' },
+    })
+
+    const { message } = await response
+
+    expect(message.json.status).toBe(400)
+    expect(message.json.body.json).toMatchObject({ message: 'Request blocked by prototype pollution protection.' })
+    expect(createPlanet).not.toHaveBeenCalled()
   })
 })

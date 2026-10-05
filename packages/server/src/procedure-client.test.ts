@@ -694,6 +694,20 @@ describe('createProcedureClient', () => {
       expect(parentMid).toHaveBeenCalledWith(expect.any(Object), { parent: 'parent__PARENT', child: 'CHILD', unknown: 'UNKNOWN' }, expect.any(Function))
     })
 
+    it('gives later schemas what earlier ones returned', async () => {
+      const procedure = os
+        .input(z.object({ id: z.coerce.number(), page: z.coerce.number() }))
+        .input(z.looseObject({ name: z.string() }))
+        .input(z.object({ page: z.number().transform(page => page * 2) }))
+        .handler(({ input }) => input)
+
+      const client = createProcedureClient(procedure)
+
+      await expect(client({ id: '5', page: '1', name: 'NAME' } as any))
+        .resolves
+        .toEqual({ id: 5, page: 2, name: 'NAME' })
+    })
+
     it('keeps piping input schemas that do not validate into a plain object', async () => {
       const procedure = os
         .input(ContractModule.asyncIteratorObject(ContractModule.type<string, string>(value => `first__${value}`)))

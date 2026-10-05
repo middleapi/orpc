@@ -187,13 +187,12 @@ const limiter = new MemoryRateLimiter({
 
 ### Redis
 
-Stores counters in Redis, so every instance using the same server enforces the same limits. Works with both standalone and cluster clients.
+Stores counters in Redis, so every instance using the same server enforces the same limits.
 
 ```ts
 import { RedisRateLimiter } from '@orpc/ratelimit/redis'
 import { createClient } from 'redis'
 
-// Both standalone (`createClient`) and cluster (`createCluster`) clients are supported.
 const client = createClient({ url: 'redis://localhost:6379' })
 
 // RedisRateLimiter lazily connects to Redis when needed.

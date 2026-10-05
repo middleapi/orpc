@@ -75,6 +75,23 @@ describe('zodToJsonSchemaConverter', () => {
     expect(converter.convert(schema, 'input')).toEqual([{ type: 'string' }, false])
   })
 
+  it('does not leak a rejection when async standard validation fails while checking optionality', async ({ onTestFinished }) => {
+    const unhandledRejectionHandler = vi.fn()
+    process.on('unhandledRejection', unhandledRejectionHandler)
+
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejectionHandler)
+    })
+
+    // Zod falls back to `safeParseAsync` when the sync parse throws, which rejects with the same error.
+    const schema = z.preprocess(value => JSON.parse(value as string), z.object({ a: z.string() }))
+
+    expect(converter.convert(schema, 'input')).toEqual([expect.objectContaining({ type: 'object' }), false])
+
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(unhandledRejectionHandler).not.toHaveBeenCalled()
+  })
+
   describe('supports $ref at root level', () => {
     it('with the global metadata registry and special json pointers', () => {
       const schema = z.object({
@@ -201,6 +218,90 @@ describe('zodToJsonSchemaConverter', () => {
       }],
     ] as const)('extends conversion for %s', (schema, jsonSchema) => {
       expect(converter.convert(schema, 'input')).toEqual([jsonSchema, false])
+      expect(new ZodToJsonSchemaConverter({ unrepresentable: 'throw' }).convert(schema, 'input')).toEqual([jsonSchema, false])
+    })
+
+    it.each([
+      ['set', (node: any) => z.set(node), { 'type': 'array', 'uniqueItems': true, 'items': { $ref: '#/$defs/__schema0' }, 'x-native-type': 'set' }],
+      ['map', (node: any) => z.map(z.string(), node), {
+        'type': 'array',
+        'items': { type: 'array', prefixItems: [{ type: 'string' }, { $ref: '#/$defs/__schema0' }], maxItems: 2, minItems: 2 },
+        'x-native-type': 'map',
+      }],
+    ] as const)('resolves recursion through %s into a $ref', (_, wrap, children) => {
+      const Node: z.ZodType = z.object({
+        get children() { return wrap(Node) },
+      })
+
+      expect(converter.convert(z.object({ tree: Node }), 'input')).toEqual([{
+        type: 'object',
+        properties: { tree: { $ref: '#/$defs/__schema0' } },
+        required: ['tree'],
+        $defs: {
+          __schema0: {
+            type: 'object',
+            properties: { children },
+            required: ['children'],
+          },
+        },
+      }, false])
+
+      expect(() => new ZodToJsonSchemaConverter({ cycles: 'throw' }).convert(Node, 'input')).toThrow('Cycle detected')
+    })
+
+    it('hoists set and map inner schemas with an id into the root $defs', () => {
+      const schema = z.object({
+        set: z.set(z.string().meta({ id: 'Item' })),
+        map: z.map(z.string().meta({ id: 'Key' }), z.number().meta({ id: 'Value' })),
+      })
+
+      expect(converter.convert(schema, 'input')).toEqual([{
+        type: 'object',
+        properties: {
+          set: { 'type': 'array', 'uniqueItems': true, 'items': { $ref: '#/$defs/Item' }, 'x-native-type': 'set' },
+          map: {
+            'type': 'array',
+            'items': { type: 'array', prefixItems: [{ $ref: '#/$defs/Key' }, { $ref: '#/$defs/Value' }], maxItems: 2, minItems: 2 },
+            'x-native-type': 'map',
+          },
+        },
+        required: ['set', 'map'],
+        $defs: {
+          Item: { type: 'string' },
+          Key: { type: 'string' },
+          Value: { type: 'number' },
+        },
+      }, false])
+    })
+
+    it('does not treat a schema reused inside a set or map as a cycle', () => {
+      const tag = z.object({ name: z.string() })
+      const tagJsonSchema = { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] }
+
+      expect(new ZodToJsonSchemaConverter({ cycles: 'throw' }).convert(z.object({
+        tag,
+        set: z.set(tag),
+        map: z.map(tag, tag),
+      }), 'input')).toEqual([{
+        type: 'object',
+        properties: {
+          tag: tagJsonSchema,
+          set: { 'type': 'array', 'uniqueItems': true, 'items': tagJsonSchema, 'x-native-type': 'set' },
+          map: {
+            'type': 'array',
+            'items': { type: 'array', prefixItems: [tagJsonSchema, tagJsonSchema], maxItems: 2, minItems: 2 },
+            'x-native-type': 'map',
+          },
+        },
+        required: ['tag', 'set', 'map'],
+      }, false])
+    })
+
+    it('leaves other unrepresentable types to the unrepresentable option', () => {
+      const converter = new ZodToJsonSchemaConverter({ unrepresentable: ({ message }) => ({ description: message }) })
+
+      expect(converter.convert(z.symbol(), 'input')).toEqual([{ description: 'Symbols cannot be represented in JSON Schema' }, false])
+      expect(() => new ZodToJsonSchemaConverter({ unrepresentable: 'throw' }).convert(z.symbol(), 'input')).toThrow('Symbols cannot be represented')
     })
   })
 

@@ -1,6 +1,6 @@
 import type { Promisable } from '@orpc/shared'
 import type { QueryFunction, QueryFunctionContext, QueryKey } from '@tanstack/query-core'
-import { stringifyJSON } from '@orpc/shared'
+import { stringifyJSON, throwIfAborted } from '@orpc/shared'
 
 export function liveQuery<
   TQueryFnData = unknown,
@@ -15,7 +15,7 @@ export function liveQuery<
     let last: { chunk: TQueryFnData } | undefined
 
     for await (const chunk of stream) {
-      context.signal?.throwIfAborted()
+      throwIfAborted(context.signal)
 
       last = { chunk }
       context.client.setQueryData<TQueryFnData>(context.queryKey, chunk)

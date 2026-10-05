@@ -17,12 +17,18 @@ describe('MergedInitialContext', () => {
   it('conflict keys (type check is not performed here, just key check)', () => {
     expectTypeOf<MergedInitialContext<{ db: string }, object, { db: number }>>().toEqualTypeOf<{ db: string }>()
   })
+
+  it('keeps unions and known keys of index signatures', () => {
+    expectTypeOf<MergedInitialContext<object, object, { kind: 'a', a: string } | { kind: 'b' }>>().toEqualTypeOf<object & ({ kind: 'a', a: string } | { kind: 'b' })>()
+    expectTypeOf<MergedInitialContext<object, object, { a: string } | { b: number }>>().toEqualTypeOf<object & ({ a: string } | { b: number })>()
+    expectTypeOf<MergedInitialContext<object, object, { [k: string]: unknown, db: string }>>().toEqualTypeOf<object & { [k: string]: unknown, db: string }>()
+  })
 })
 
 describe('MergedContext', () => {
   it('merges new context', () => {
     expectTypeOf<MergedContext<{ db: string }, { user: number }>>().toEqualTypeOf<{ db: string } & { user: number }>()
-    expectTypeOf<MergedContext<object, { user: number }>>().toEqualTypeOf<Omit<object, 'user'> & { user: number }>()
+    expectTypeOf<MergedContext<object, { user: number }>>().toEqualTypeOf<object & { user: number }>()
   })
 
   it('overrides existing context', () => {
@@ -32,5 +38,10 @@ describe('MergedContext', () => {
 
   it('returns current if no new context', () => {
     expectTypeOf<MergedContext<{ db: string }, object>>().toEqualTypeOf<{ db: string }>()
+  })
+
+  it('keeps unions and known keys of index signatures', () => {
+    expectTypeOf<MergedContext<{ kind: 'a', a: string, user: string } | { kind: 'b', user: string }, { user: number }>>().toEqualTypeOf<({ kind: 'a', a: string } | { kind: 'b' }) & { user: number }>()
+    expectTypeOf<MergedContext<{ [k: string]: unknown, db: string }, { user: number }>>().toEqualTypeOf<{ [k: string]: unknown, db: string } & { user: number }>()
   })
 })

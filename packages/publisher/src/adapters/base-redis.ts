@@ -8,13 +8,21 @@ import { getEventMeta, unwrapEvent, withEventMeta } from '@standard-server/core'
 import { Publisher } from '../publisher'
 
 /**
+ * Adds `ARGV[1]` to stream `KEYS[1]` and publishes it with its ID to the channel of the same name,
+ * trimming and setting a TTL when `ARGV[2..4]` are given. One script keeps Pub/Sub order
+ * equal to stream order. Kept on one line because `EVAL` sends it with every call.
+ */
+const PUBLISH_SCRIPT = `local id=redis.call('XADD',KEYS[1],'*','data',ARGV[1]) if ARGV[2] then redis.call('XTRIM',KEYS[1],'MINID',ARGV[2],ARGV[3]) redis.call('EXPIRE',KEYS[1],ARGV[4]) end redis.call('PUBLISH',KEYS[1],'{"data":'..ARGV[1]..',"id":"'..id..'"}')`
+
+/**
  * Options shared by every Redis-backed publisher adapter.
  *
  * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
  */
 export interface BaseRedisPublisherOptions extends PublisherOptions {
   /**
-   * The prefix to use for Redis keys.
+   * The prefix to use for Redis keys and Pub/Sub channels.
+   * Set it to isolate events when several apps share one Redis instance.
    *
    * @default ''
    */
@@ -75,28 +83,6 @@ export interface RedisStreamEntry {
   data: unknown
 }
 
-/**
- * Trimming to apply to a Redis Stream while adding an entry.
- *
- * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
- */
-export interface RedisStreamTrimOptions {
-  /**
-   * Entries with an ID lower than this one are removed (`XTRIM key MINID minId`).
-   */
-  minId: string
-
-  /**
-   * Whether trimming is exact (`=`) or approximate (`~`).
-   */
-  exactness: '~' | '='
-
-  /**
-   * Time to live to set on the stream key, in seconds (`EXPIRE key seconds`).
-   */
-  expireSeconds: number
-}
-
 interface SerializedEvent {
   payload: RPCJsonSerialization
   meta?: undefined | EventMeta
@@ -155,11 +141,11 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
   ): Promise<() => Promise<void>>
 
   /**
-   * Appends an entry to a stream (`XADD key * data <data>`) and resolves with its ID.
-   * When `trim` is provided, also trims the stream and refreshes its TTL,
-   * preferably within the same round trip.
+   * Runs a Lua script (`EVAL script numkeys key [key ...] arg [arg ...]`) and resolves with its reply.
+   * The publish script also uses its key as the Pub/Sub channel, so a client that prefixes
+   * keys must prefix channels the same way.
    */
-  protected abstract addStreamEntry(key: string, data: string, trim?: RedisStreamTrimOptions): Promise<string>
+  protected abstract evalScript(script: string, keys: string[], args: string[]): Promise<unknown>
 
   /**
    * Reads the entries with an ID greater than `lastId` (`XREAD STREAMS key lastId`), oldest first.
@@ -169,34 +155,38 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
   async publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void> {
     const channel = `${this.prefix}${event}`
     const data = this.serializePayload(payload)
-    let id: string | undefined
 
-    if (this.resumeEnabled) {
-      const now = Date.now()
-      const windowMs = this.resumeSeconds * 1000
-
-      for (const [trimmedChannel, trimTime] of this.lastTrimTimes) {
-        if (trimTime + windowMs < now) {
-          this.lastTrimTimes.delete(trimmedChannel)
-        }
-      }
-
-      if (this.lastTrimTimes.has(channel)) {
-        id = await this.addStreamEntry(channel, stringifyJSON(data))
-      }
-      else {
-        this.lastTrimTimes.set(channel, now)
-
-        id = await this.addStreamEntry(channel, stringifyJSON(data), {
-          minId: `${now - windowMs}-0`,
-          exactness: this.xTrimExactness,
-          // 2x so entries added late in a window outlive it until the next trim refreshes the TTL.
-          expireSeconds: this.resumeSeconds * 2,
-        })
-      }
+    if (!this.resumeEnabled) {
+      await this.publishMessage(channel, stringifyJSON({ data }))
+      return
     }
 
-    await this.publishMessage(channel, stringifyJSON({ data, id }))
+    const now = Date.now()
+    const windowMs = this.resumeSeconds * 1000
+
+    // Entries are inserted in time order, so expired ones come first.
+    for (const [trimmedChannel, trimTime] of this.lastTrimTimes) {
+      if (trimTime + windowMs >= now) {
+        break
+      }
+
+      this.lastTrimTimes.delete(trimmedChannel)
+    }
+
+    const args = [stringifyJSON(data)]
+
+    if (!this.lastTrimTimes.has(channel)) {
+      this.lastTrimTimes.set(channel, now)
+
+      args.push(
+        this.xTrimExactness,
+        `${now - windowMs}-0`,
+        // 2x so entries added late in a window outlive it until the next trim refreshes the TTL.
+        String(this.resumeSeconds * 2),
+      )
+    }
+
+    await this.evalScript(PUBLISH_SCRIPT, [channel], args)
   }
 
   protected async subscribeListener<K extends keyof T & string>(

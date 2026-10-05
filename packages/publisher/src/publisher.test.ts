@@ -136,6 +136,28 @@ describe('publisher', () => {
       expect(received).toHaveLength(100)
     })
 
+    it('keeps order while a large buffer is drained and refilled', async () => {
+      const iterator = publisher.subscribe('count', { maxBufferedEvents: Infinity })
+
+      for (let i = 0; i < 100; i++) {
+        await publisher.publish('count', { value: i })
+      }
+
+      for (let i = 0; i < 50; i++) {
+        expect((await iterator.next()).value?.value).toBe(i)
+      }
+
+      for (let i = 100; i < 200; i++) {
+        await publisher.publish('count', { value: i })
+      }
+
+      for (let i = 50; i < 200; i++) {
+        expect((await iterator.next()).value?.value).toBe(i)
+      }
+
+      await iterator.return()
+    })
+
     describe('when a subscriber falls behind', () => {
       it('delivers queued messages once the subscriber catches up', async () => {
         const iterator = publisher.subscribe('message', { maxBufferedEvents: 3 })
@@ -227,6 +249,74 @@ describe('publisher', () => {
         expect(result2.value?.text).toBe('second')
 
         await iterator.return()
+      })
+
+      describe('while missed events are replayed during setup', () => {
+        let setup: Promise<unknown>
+
+        beforeEach(() => {
+          subscribeListenerSpy.mockImplementationOnce((event: any, listener: any, options: any) => setup = (async () => {
+            const unsubscribe = await TestPublisher.prototype.subscribeListener.call(publisher, event, listener, options)
+            await sleep(0)
+            listener({ text: 'missed 1' })
+            listener({ text: 'missed 2' })
+            listener({ text: 'missed 3' })
+            return unsubscribe
+          })())
+        })
+
+        async function read(iterator: AsyncIterator<TestEvents['message']>, count: number) {
+          const texts: (string | undefined)[] = []
+
+          for (let i = 0; i < count; i++) {
+            texts.push((await iterator.next()).value?.text)
+          }
+
+          return texts
+        }
+
+        it('keeps every resumed event while the subscriber keeps up', async () => {
+          const iterator = publisher.subscribe('message', { lastEventId: '0', maxBufferedEvents: 1 })
+          await setup
+
+          expect(await read(iterator, 1)).toEqual(['missed 1'])
+          await publisher.publish('message', { text: 'live 1' })
+          expect(await read(iterator, 1)).toEqual(['missed 2'])
+          await publisher.publish('message', { text: 'live 2' })
+          expect(await read(iterator, 3)).toEqual(['missed 3', 'live 1', 'live 2'])
+
+          await iterator.return()
+        })
+
+        it('drops the oldest events once the subscriber falls further behind than the limit', async () => {
+          const iterator = publisher.subscribe('message', { lastEventId: '0', maxBufferedEvents: 2 })
+          await setup
+
+          await publisher.publish('message', { text: 'live 1' })
+          await publisher.publish('message', { text: 'live 2' })
+          await publisher.publish('message', { text: 'live 3' })
+          expect(await read(iterator, 1)).toEqual(['missed 2'])
+
+          await publisher.publish('message', { text: 'live 4' })
+          await publisher.publish('message', { text: 'live 5' })
+          expect(await read(iterator, 5)).toEqual(['live 1', 'live 2', 'live 3', 'live 4', 'live 5'])
+
+          await publisher.publish('message', { text: 'live 6' })
+          await publisher.publish('message', { text: 'live 7' })
+          await publisher.publish('message', { text: 'live 8' })
+          expect(await read(iterator, 2)).toEqual(['live 7', 'live 8'])
+
+          await iterator.return()
+        })
+
+        it('applies the limit to events delivered during setup when not resuming', async () => {
+          const iterator = publisher.subscribe('message', { maxBufferedEvents: 1 })
+          await setup
+
+          expect(await read(iterator, 1)).toEqual(['missed 3'])
+
+          await iterator.return()
+        })
       })
     })
 

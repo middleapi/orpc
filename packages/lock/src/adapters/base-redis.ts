@@ -1,6 +1,6 @@
 import type { Promisable } from '@orpc/shared'
 import type { LockCallbackOptions, Locker, LockOptions } from '../types'
-import { sleep } from '@orpc/shared'
+import { sleep, throwIfAborted } from '@orpc/shared'
 import { LockTimeoutError } from '../error'
 
 const RELEASE_LOCK_SCRIPT = `
@@ -89,7 +89,7 @@ export abstract class BaseRedisLocker implements Locker {
     const token = crypto.randomUUID()
     let waited = false
 
-    options.signal?.throwIfAborted()
+    throwIfAborted(options.signal)
 
     while (!(await this.acquire(prefixedKey, token, ttl))) {
       const remaining = deadline - Date.now()

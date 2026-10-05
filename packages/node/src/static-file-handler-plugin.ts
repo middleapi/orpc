@@ -5,7 +5,7 @@ import type { Stats } from 'node:fs'
 import { createReadStream } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
-import { getTracer, isCompressibleContentType, matchesHttpPathPrefix, mergeHttpPath, parseAcceptEncodingQualities, safeDecodeURIComponent, safeEncodeURIComponent, toArray } from '@orpc/shared'
+import { getTracer, isAcceptableEncoding, isCompressibleContentType, matchesHttpPathPrefix, mergeHttpPath, parseAcceptEncodingQualities, safeDecodeURIComponent, safeEncodeURIComponent, toArray } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { toWebReadableStream } from '@standard-server/node'
 import mime from 'mime'
@@ -20,6 +20,18 @@ import mime from 'mime'
  * @see https://html.spec.whatwg.org/multipage/parsing.html#determining-the-character-encoding
  */
 const TEXT_CONTENT_TYPE_REGEX = /^text\//
+
+/**
+ * NTFS and FAT give every name that breaks 8.3 rules, a leading dot included, a short alias that
+ * opens the same entry, so `ENV~1` reads `.env` and `GIT~1/config` reads `.git/config` on any OS.
+ * A generated alias ends its base of at most eight characters with a `~` numeric tail, and only
+ * that prefix is matched, so suffixes the filesystem strips or ignores, like a trailing dot or a
+ * `::$DATA` stream, are covered too. Linux vfat mounted with `nonumtail` drops the tail when it
+ * can, and such an alias cannot be told apart from a real name, so that mount is not covered.
+ *
+ * @see https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#short-vs-long-names
+ */
+const SHORT_NAME_ALIAS_REGEX = /^[^.]{0,6}~\d/
 
 const PRECOMPRESSED_ENCODINGS: [encoding: string, extension: string][] = [
   ['br', '.br'],
@@ -67,6 +79,8 @@ export interface StaticFileHandlerPluginOptions {
 
   /**
    * Whether files and directories whose name starts with a dot can be served.
+   * When disabled, names shaped like 8.3 short names, such as `ENV~1`, are refused too,
+   * since NTFS and FAT resolve them to dotfiles.
    *
    * @default false
    */
@@ -292,7 +306,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
         return undefined
       }
 
-      if (!this.dotfiles && segment.startsWith('.')) {
+      if (!this.dotfiles && (segment.startsWith('.') || SHORT_NAME_ALIAS_REGEX.test(segment))) {
         return undefined
       }
 
@@ -370,8 +384,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       const qualities = parseAcceptEncodingQualities(flattenStandardHeader(request.headers['accept-encoding']))
 
       const variants = await Promise.all(PRECOMPRESSED_ENCODINGS
-        // An explicit q-value takes precedence over the wildcard, so `br;q=0, *` never serves brotli
-        .filter(([encoding]) => (qualities.get(encoding) ?? qualities.get('*') ?? 0) > 0)
+        .filter(([encoding]) => isAcceptableEncoding(qualities, encoding))
         .map(async ([encoding, extension]) => {
           const candidatePath = filePath + extension
           // Sidecars are reached by string concatenation, so they need the same containment check

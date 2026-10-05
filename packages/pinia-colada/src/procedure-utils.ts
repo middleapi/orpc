@@ -186,7 +186,7 @@ export function isProcedureUtilsOptions(value: unknown): value is ProcedureUtils
     return false
   }
 
-  for (const key in value) {
+  for (const key of Object.keys(value)) {
     if (value[key] === undefined) {
       continue
     }

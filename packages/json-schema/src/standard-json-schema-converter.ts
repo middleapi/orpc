@@ -5,6 +5,28 @@ import type { JsonSchemaConverter, JsonSchemaConverterDirection } from './conver
 import type { JsonSchema } from './types'
 import { isTypescriptObject } from '@orpc/shared'
 
+/**
+ * Returns true when the schema accepts `undefined` in the given direction,
+ * found by validating `undefined` against it. For `output`, the validated value must also be `undefined`.
+ *
+ * Returns false when validation throws or is async. An async result is never left as an unhandled rejection.
+ */
+export function isStandardSchemaOptional(schema: AnySchema, direction: JsonSchemaConverterDirection): boolean {
+  try {
+    const result = schema['~standard'].validate(undefined)
+
+    if (result instanceof Promise) {
+      result.catch(() => {})
+      return false
+    }
+
+    return !result.issues && (direction === 'input' || result.value === undefined)
+  }
+  catch {
+    return false
+  }
+}
+
 export class StandardJsonSchemaConverter implements JsonSchemaConverter {
   condition(schema: AnySchema | undefined, _direction: JsonSchemaConverterDirection): boolean {
     return Boolean(
@@ -28,16 +50,7 @@ export class StandardJsonSchemaConverter implements JsonSchemaConverter {
         ? schema['~standard'].jsonSchema.input({ target: 'draft-2020-12' })
         : schema['~standard'].jsonSchema.output({ target: 'draft-2020-12' })
 
-      let optional = false
-      try {
-        const result = schema['~standard'].validate(undefined)
-        if (!(result instanceof Promise) && !result.issues) {
-          optional = direction === 'input' ? true : result.value === undefined
-        }
-      }
-      catch {}
-
-      return [jsonSchema, optional]
+      return [jsonSchema, isStandardSchemaOptional(schema, direction)]
     }
     catch {
       return [{}, true]

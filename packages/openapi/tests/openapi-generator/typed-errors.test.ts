@@ -73,7 +73,7 @@ describe('openAPIGenerator e2e: typed errors', () => {
     }))
   })
 
-  it('builds error components with code, status, message, and data', async () => {
+  it('builds error components with defined, code, message, and data', async () => {
     const doc = await generator.generate(router)
 
     expect(doc.components?.schemas?.Conflict).toEqual({
@@ -82,7 +82,6 @@ describe('openAPIGenerator e2e: typed errors', () => {
       properties: {
         defined: { const: true },
         code: { const: 'CONFLICT' },
-        status: { const: 409 },
         message: { type: 'string' },
         data: expect.objectContaining({
           type: 'object',
@@ -92,7 +91,7 @@ describe('openAPIGenerator e2e: typed errors', () => {
           required: ['existingId'],
         }),
       },
-      required: ['defined', 'code', 'status', 'message', 'data'],
+      required: ['defined', 'code', 'message', 'data'],
     })
 
     expect(doc.components?.schemas?.UndefinedError).toEqual({
@@ -101,11 +100,10 @@ describe('openAPIGenerator e2e: typed errors', () => {
       properties: {
         defined: { const: false },
         code: { type: 'string' },
-        status: { type: 'number' },
         message: { type: 'string' },
         data: {},
       },
-      required: ['defined', 'code', 'status', 'message'],
+      required: ['defined', 'code', 'message'],
     })
   })
 

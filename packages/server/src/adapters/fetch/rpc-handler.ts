@@ -6,7 +6,7 @@ import { RPCHandlerCodec, StandardHandler } from '../standard'
 import { FetchHandler } from './handler'
 
 export interface RPCHandlerOptions<T extends Context>
-  extends FetchHandlerOptions<T>, Omit<StandardHandlerOptions<T>, 'plugins'>, RPCHandlerCodecOptions<T> {}
+  extends FetchHandlerOptions<T>, StandardHandlerOptions<T>, RPCHandlerCodecOptions<T> {}
 
 /**
  * Serves an oRPC router over the RPC protocol using the Fetch API

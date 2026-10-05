@@ -344,6 +344,22 @@ describe('rpcMatcher', () => {
       expect(result!.path).toEqual([])
       expect(result!.procedure).toBe(procedure1)
     })
+
+    it('handles prefix with trailing slash that is equal to pathname', async () => {
+      const matcher = new RPCMatcher(procedure1)
+      const result = await matcher.match('POST', '/api/', '/api/')
+
+      expect(result).toBeDefined()
+      expect(result!.path).toEqual([])
+      expect(result!.procedure).toBe(procedure1)
+    })
+
+    it('strips trailing slash after prefix stripping', async () => {
+      const matcher = new RPCMatcher(router)
+
+      await expect(matcher.match('POST', '/api/ping/', '/api/')).resolves.toEqual({ path: ['ping'], procedure: procedure1 })
+      await expect(matcher.match('POST', '/api/ping/', '/api')).resolves.toEqual({ path: ['ping'], procedure: procedure1 })
+    })
   })
 
   describe('contract first', () => {

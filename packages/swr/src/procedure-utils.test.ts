@@ -1,4 +1,5 @@
 import type { OperationKey } from './key'
+import { promiseWithResolvers } from '@orpc/shared'
 import { ProcedureUtils } from './procedure-utils'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
 
@@ -180,6 +181,89 @@ describe('procedureUtils', () => {
       expect(client.mock.calls[0]![1].signal.aborted).toBe(true)
     })
 
+    it('does not duplicate chunks on a StrictMode double mount when the iterator ignores the signal', async () => {
+      const generator = async function* () {
+        await new Promise(resolve => setTimeout(resolve, 10))
+        yield '__event__1'
+        yield '__event__2'
+      }
+      client.mockImplementationOnce(generator).mockImplementationOnce(generator)
+      const subscriber = utils.subscriber()
+
+      // simulate SWR: updaters are invoked synchronously with the current data
+      let data: unknown
+      const next = vi.fn((error, update?) => {
+        if (error === undefined) {
+          data = typeof update === 'function' ? update(data) : update
+        }
+      })
+
+      // StrictMode subscribes, unsubscribes, then subscribes again
+      subscriber(key, { next })()
+      subscriber(key, { next })
+
+      await new Promise(resolve => setTimeout(resolve, 20))
+
+      expect(client).toHaveBeenCalledTimes(2)
+      expect(data).toEqual(['__event__1', '__event__2'])
+    })
+
+    it('stops writing and returns the iterator when unsubscribed mid-stream', async () => {
+      const cleanup = vi.fn()
+      const paused = promiseWithResolvers<void>()
+      client.mockImplementationOnce(async function* () {
+        try {
+          yield '__event__1'
+          await paused.promise
+          yield '__event__2'
+          yield '__event__3'
+        }
+        finally {
+          cleanup()
+        }
+      })
+      const subscriber = utils.subscriber()
+
+      const next = vi.fn()
+      const unsubscribe = subscriber(key, { next })
+
+      await vi.waitFor(() => expect(next).toHaveBeenCalledTimes(2)) // reset + first event
+      unsubscribe()
+      paused.resolve()
+      await new Promise(resolve => setTimeout(resolve, 10))
+
+      expect(next).toHaveBeenCalledTimes(2)
+      expect(cleanup).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not replace data after unsubscribe in refetchMode=replace', async () => {
+      const paused = promiseWithResolvers<void>()
+      client.mockImplementationOnce(async function* () {
+        yield '__event__1'
+        await paused.promise
+        yield '__event__2'
+      })
+      const subscriber = utils.subscriber({ refetchMode: 'replace' })
+
+      // simulate SWR: updaters are invoked synchronously with the current data
+      let data: unknown = ['__previous__']
+      const next = vi.fn((error, update?) => {
+        if (error === undefined) {
+          data = typeof update === 'function' ? update(data) : update
+        }
+      })
+
+      const unsubscribe = subscriber(key, { next })
+      await vi.waitFor(() => expect(next).toHaveBeenCalledTimes(1)) // the probe
+      await new Promise(resolve => setTimeout(resolve, 10)) // the first event is buffered
+      unsubscribe()
+      paused.resolve()
+      await new Promise(resolve => setTimeout(resolve, 10))
+
+      expect(next).toHaveBeenCalledTimes(1)
+      expect(data).toEqual(['__previous__'])
+    })
+
     it('on error while yielding', async () => {
       client.mockImplementationOnce(async function* () {
         await new Promise(resolve => setTimeout(resolve, 10))
@@ -209,7 +293,7 @@ describe('procedureUtils', () => {
       const unsubscribe = subscriber(key, { next })
       unsubscribe()
       await new Promise(resolve => setTimeout(resolve, 20))
-      expect(next).toHaveBeenCalledTimes(1)
+      expect(next).toHaveBeenCalledTimes(0)
     })
 
     it('on non-AsyncIteratorObject output', async () => {
@@ -269,6 +353,27 @@ describe('procedureUtils', () => {
       expect(client).toHaveBeenCalledTimes(1)
       expect(client).toHaveBeenCalledWith({ search: '__search__' }, { context: { batch: true, [OPERATION_CONTEXT_SYMBOL]: { key, type: 'liveSubscriber' } }, signal: expect.any(AbortSignal) })
       expect(client.mock.calls[0]![1].signal.aborted).toBe(true)
+    })
+
+    it('stops writing after unsubscribe when the iterator ignores the signal', async () => {
+      const paused = promiseWithResolvers<void>()
+      client.mockImplementationOnce(async function* () {
+        yield '__event__1'
+        await paused.promise
+        yield '__event__2'
+      })
+      const subscriber = utils.liveSubscriber()
+
+      const next = vi.fn()
+      const unsubscribe = subscriber(key, { next })
+
+      await vi.waitFor(() => expect(next).toHaveBeenCalledTimes(1))
+      unsubscribe()
+      paused.resolve()
+      await new Promise(resolve => setTimeout(resolve, 10))
+
+      expect(next).toHaveBeenCalledTimes(1)
+      expect(next).toHaveBeenCalledWith(undefined, '__event__1')
     })
 
     it('on error while yielding', async () => {

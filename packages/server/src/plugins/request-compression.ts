@@ -1,8 +1,15 @@
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard'
 import type { Context } from '../context'
+import { ORPCError } from '@orpc/client'
 import { toArray } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 import { toFetchHeaders, toStandardBody } from '@standard-server/fetch'
+
+/**
+ * Each coding adds a decompressor to the chain, so an unbounded list lets a tiny
+ * request cost unbounded CPU and memory. Same limit as undici and curl.
+ */
+const MAX_CONTENT_ENCODINGS = 5
 
 /**
  * Decompresses incoming request bodies based on the Content-Encoding header,
@@ -45,6 +52,10 @@ export class RequestCompressionHandlerPlugin<T extends Context> implements Stand
             // adapter might not support hint (e.g peer adapter)
             if (!(stream instanceof ReadableStream)) {
               return stream
+            }
+
+            if (encodings.length > MAX_CONTENT_ENCODINGS) {
+              throw new ORPCError('UNSUPPORTED_MEDIA_TYPE', { message: 'Too many content encodings.' })
             }
 
             let decompressedStream = stream

@@ -63,6 +63,27 @@ describe('openAPIReferenceHandlerPlugin', () => {
     return { next, result }
   }
 
+  /**
+   * Runs the inline swagger script in a fake window holding a fake bundle plus `globals`,
+   * and returns the config passed to the bundle.
+   */
+  function runSwaggerScript(html: string, globals: Record<string, unknown> = {}) {
+    const script = html.match(/<script>([\s\S]*?)<\/script>/)![1]!
+    const SwaggerUIBundle = Object.assign(vi.fn(), {
+      presets: { apis: { preset: 'apis' } },
+      plugins: { DownloadUrl: { plugin: 'DownloadUrl' } },
+    })
+    const window: { onload?: () => void } = { SwaggerUIBundle, ...globals } as any
+
+    // eslint-disable-next-line no-new-func
+    new Function('window', 'SwaggerUIBundle', script)(window, SwaggerUIBundle)
+    window.onload!()
+
+    expect(SwaggerUIBundle).toHaveBeenCalledTimes(1)
+
+    return { bundle: SwaggerUIBundle, config: SwaggerUIBundle.mock.calls[0]![0] }
+  }
+
   it('preserves existing routing interceptors and returns the matched result from next', async () => {
     const spec = vi.fn().mockResolvedValue(createSpec())
     const existing = vi.fn(({ next }) => next())
@@ -246,9 +267,10 @@ describe('openAPIReferenceHandlerPlugin', () => {
     expect(html).toContain('\\u002F')
   })
 
-  it('renders swagger docs with default asset URLs and unquoted bundle references', async () => {
+  it('renders swagger docs with default asset URLs and resolved bundle references', async () => {
+    const spec = createSpec('Swagger Default Title')
     const plugin = new OpenAPIReferenceHandlerPlugin({
-      spec: createSpec('Swagger Default Title'),
+      spec,
       provider: 'swagger',
     })
     const { interceptor } = getInterceptor(plugin)
@@ -263,11 +285,48 @@ describe('openAPIReferenceHandlerPlugin', () => {
     expect(html).toContain('https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js')
     expect(html).toContain('https://unpkg.com/swagger-ui-dist/swagger-ui.css')
     expect(html).toContain('const swaggerConfig =')
-    expect(html).toContain('SwaggerUIBundle.presets.apis')
-    expect(html).toContain('SwaggerUIBundle.plugins.DownloadUrl')
-    expect(html).not.toContain('"SwaggerUIBundle.presets.apis"')
-    expect(html).not.toContain('"SwaggerUIBundle.plugins.DownloadUrl"')
     expect(html).toContain('window.ui = SwaggerUIBundle(swaggerConfig)')
+
+    const { bundle, config } = runSwaggerScript(html)
+
+    expect(config).toEqual({
+      dom_id: '#app',
+      spec,
+      deepLinking: true,
+      presets: [bundle.presets.apis],
+      plugins: [bundle.plugins.DownloadUrl],
+    })
+  })
+
+  it('keeps swagger spec strings that look like bundle references as plain data', async () => {
+    const spec = {
+      ...createSpec(),
+      info: {
+        title: 'Example API',
+        description: 'Configure with "SwaggerUIBundle.presets',
+        version: '1.0.0',
+      },
+      components: {
+        schemas: {
+          Preset: { type: 'string', enum: ['SwaggerUIBundle.presets.apis'] },
+        },
+      },
+    } as OpenAPIDocument<OpenAPIVersion>
+    const plugin = new OpenAPIReferenceHandlerPlugin({
+      spec,
+      provider: 'swagger',
+    })
+    const { interceptor } = getInterceptor(plugin)
+
+    const { result } = await invoke(interceptor, {
+      url: '/',
+    })
+
+    const html = await (result.response?.body as File).text()
+    const { bundle, config } = runSwaggerScript(html)
+
+    expect(config.spec).toEqual(spec)
+    expect(config.presets).toEqual([bundle.presets.apis])
   })
 
   it('renders swagger docs with custom title, head, asset URLs, and escaped provider config', async () => {
@@ -282,8 +341,8 @@ describe('openAPIReferenceHandlerPlugin', () => {
       providerConfig: {
         tryItOutEnabled: true,
         customOption: '&\'<>/',
-        presets: ['SwaggerUIBundle.presets.apis'],
-        plugins: ['SwaggerUIBundle.plugins.DownloadUrl'],
+        presets: ['SwaggerUIBundle.presets.apis', 'SwaggerUIStandalonePreset'],
+        plugins: ['SwaggerUIBundle.plugins.DownloadUrl', 'MyPlugins.logger', 'Missing.plugin'],
       } as any,
     })
     const { interceptor } = getInterceptor(plugin)
@@ -306,7 +365,35 @@ describe('openAPIReferenceHandlerPlugin', () => {
     expect(html).toContain('\\u003C')
     expect(html).toContain('\\u003E')
     expect(html).toContain('\\u002F')
-    expect(html).not.toContain('"SwaggerUIBundle.presets.apis"')
-    expect(html).not.toContain('"SwaggerUIBundle.plugins.DownloadUrl"')
+
+    const SwaggerUIStandalonePreset = { preset: 'standalone' }
+    const MyPlugins = { logger: { plugin: 'logger' } }
+    const { bundle, config } = runSwaggerScript(html, { SwaggerUIStandalonePreset, MyPlugins })
+
+    expect(config.customOption).toBe('&\'<>/')
+    expect(config.presets).toEqual([bundle.presets.apis, SwaggerUIStandalonePreset])
+    expect(config.plugins).toEqual([bundle.plugins.DownloadUrl, MyPlugins.logger, undefined])
+  })
+
+  it('leaves swagger presets and plugins unset when provider config clears them', async () => {
+    const plugin = new OpenAPIReferenceHandlerPlugin({
+      spec: createSpec(),
+      provider: 'swagger',
+      providerConfig: {
+        presets: undefined,
+        plugins: undefined,
+      },
+    })
+    const { interceptor } = getInterceptor(plugin)
+
+    const { result } = await invoke(interceptor, {
+      url: '/',
+    })
+
+    const html = await (result.response?.body as File).text()
+    const { config } = runSwaggerScript(html)
+
+    expect(config).not.toHaveProperty('presets')
+    expect(config).not.toHaveProperty('plugins')
   })
 })

@@ -1,5 +1,5 @@
 import type { EventMeta } from '@standard-server/core'
-import { stringifyJSON } from '@orpc/shared'
+import { isPlainObject, stringifyJSON } from '@orpc/shared'
 import { DurableObject } from 'cloudflare:workers'
 
 export interface DurablePublisherObjectResumeOptions {
@@ -8,6 +8,8 @@ export interface DurablePublisherObjectResumeOptions {
    *
    * When enabled, published events are temporarily stored so new
    * subscribers can resume from a previous position using `lastEventId`.
+   * Each stored event must fit within the Durable Object SQLite row size limit,
+   * so publishing a larger one fails.
    *
    * @default false
    */
@@ -84,8 +86,7 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
       stringifiedPayload = this.resumeStorage.store(stringifiedPayload)
     }
     catch (e) {
-      console.error('Failed to store published event:', e)
-      return new Response('Invalid or unprocessable event payload', { status: 400 })
+      return new Response(String(e), { status: 400 })
     }
 
     for (const ws of this.ctx.getWebSockets()) {
@@ -101,18 +102,20 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
 
   private async handleSubscribe(request: Request): Promise<Response> {
     const lastEventId = request.headers.get('last-event-id')
-    const payloads = lastEventId === null ? undefined : this.resumeStorage.getAfter(lastEventId)
+    const payloads = lastEventId === null ? [] : this.resumeStorage.getAfter(lastEventId)
 
     const { '0': client, '1': server } = new WebSocketPair()
     this.ctx.acceptWebSocket(server)
 
-    if (payloads) {
-      for (const payload of payloads) {
-        server.send(payload)
-      }
+    for (const payload of payloads) {
+      server.send(payload)
     }
 
-    return new Response(null, { status: 101, webSocket: client })
+    return new Response(null, {
+      status: 101,
+      webSocket: client,
+      headers: { 'orpc-replayed-events': String(payloads.length) },
+    })
   }
 
   override webSocketClose(_ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): void | Promise<void> {
@@ -152,15 +155,19 @@ class ResumeStorage {
   /**
    * Store an event and return the updated serialized message with an assigned ID.
    *
-   * @throws if `stringified` is not valid JSON, or if the insert fails after
-   * a schema reset retry.
+   * @throws if `stringifiedPayload` is not a JSON object with an optional object `meta`,
+   * or if the insert fails.
    */
   store(stringifiedPayload: string): string {
     if (!this.enabled) {
       return stringifiedPayload
     }
 
-    const payload: SerializedPayload = JSON.parse(stringifiedPayload)
+    const payload: unknown = JSON.parse(stringifiedPayload)
+
+    if (!isSerializedPayload(payload)) {
+      throw new TypeError('Event payload must be a JSON object with an optional object `meta`')
+    }
 
     this.ensureSchemaAndCleanup()
 
@@ -174,19 +181,22 @@ class ResumeStorage {
         stringifiedPayload,
       )
 
-      const row = result.one()
-      return stringifyJSON(this.attachEventId(payload, row.id as string))
+      return stringifyJSON(this.attachEventId(payload, result.one().id as string))
     }
 
     try {
       return insertEvent()
     }
     catch (e) {
+      if (!isUnusableTableError(e)) {
+        throw e
+      }
+
       /**
-       * On error (disk full, ID overflow, corrupted table, etc.), reset
-       * schema and retry once. May cause data loss, but prevents total
-       * failure. If the retry also fails, the error propagates to the
-       * caller so it can be surfaced as a clean error response.
+       * Drop the unusable table (exhausted ids, a full disk, corruption, or a mismatched
+       * schema) and retry once. May cause data loss, but prevents total failure. If the
+       * retry also fails, the error propagates to the caller so it can be surfaced as a
+       * clean error response.
        */
       console.error('Failed to insert event, resetting resume storage schema.', e)
       this.resetSchema()
@@ -208,9 +218,12 @@ class ResumeStorage {
     /**
      * SQLite INTEGER can exceed JavaScript's safe integer range,
      * so we cast to TEXT for safe resume ID comparison.
+     *
+     * The alias must not be `id`: SQLite resolves ORDER BY to an output
+     * alias before a table column, which would sort ids as text.
      */
     const result = this.ctx.storage.sql.exec(`
-      SELECT CAST(id AS TEXT) as id, payload
+      SELECT CAST(id AS TEXT) AS event_id, payload
       FROM "${this.schemaPrefix}events"
       WHERE id > ?
       ORDER BY id ASC
@@ -219,7 +232,7 @@ class ResumeStorage {
     const events: string[] = []
     for (const record of result.toArray()) {
       const payload: SerializedPayload = JSON.parse(record.payload as string)
-      events.push(stringifyJSON(this.attachEventId(payload, record.id as string)))
+      events.push(stringifyJSON(this.attachEventId(payload, record.event_id as string)))
     }
 
     return events
@@ -274,10 +287,6 @@ class ResumeStorage {
           payload TEXT NOT NULL,
           stored_at INTEGER NOT NULL DEFAULT (unixepoch())
         )
-      `)
-
-      this.ctx.storage.sql.exec(`
-        CREATE INDEX IF NOT EXISTS "${this.schemaPrefix}idx_events_id" ON "${this.schemaPrefix}events" (id)
       `)
 
       this.ctx.storage.sql.exec(`
@@ -338,4 +347,12 @@ class ResumeStorage {
       meta: { ...message.meta, id },
     }
   }
+}
+
+function isSerializedPayload(value: unknown): value is SerializedPayload {
+  return isPlainObject(value) && (value.meta === undefined || isPlainObject(value.meta))
+}
+
+function isUnusableTableError(error: unknown): boolean {
+  return /SQLITE_(?:FULL|CORRUPT|NOTADB)|no such table|no such column|has no column named/.test(String(error))
 }

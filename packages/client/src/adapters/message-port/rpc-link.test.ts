@@ -1,4 +1,4 @@
-import { sleep } from '@orpc/shared'
+import { AbortError, sleep } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
 import { createORPCClient } from '../../client'
 import { RPCLink } from './rpc-link'
@@ -76,13 +76,23 @@ describe('rpcLink', () => {
     const port = createPort()
     const orpc = createORPCClient(new RPCLink({ port })) as any
 
-    const promise = expect(orpc.ping('input')).rejects.toThrow()
+    const promise = expect(orpc.ping('input')).rejects.toThrow(new AbortError('MessagePort closed'))
 
     await sleep(0)
 
     onClose()
 
     await promise
+  })
+
+  it('rejects calls made after close', async () => {
+    const port = createPort()
+    const orpc = createORPCClient(new RPCLink({ port })) as any
+
+    onClose()
+
+    await expect(orpc.ping('input')).rejects.toThrow(new AbortError('MessagePort closed'))
+    expect(port.postMessage).not.toHaveBeenCalled()
   })
 
   it('can encode messages with prefix', async () => {

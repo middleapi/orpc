@@ -94,11 +94,19 @@ describe('createRouterClient', () => {
     expect(createRouterClient(router, options).ping).not.toBe(isolatedClient.ping)
   })
 
-  it('not define on Symbol, undefined procedure, or unwrap lazy properties', () => {
+  it('not define on Symbol, undefined procedure, inherited, or unwrap lazy properties', () => {
     expect((client as any).invalid).toBeUndefined()
+    expect((client as any).toString).toBe(Object.prototype.toString)
+    expect((client as any).nested.hasOwnProperty).toBe(Object.prototype.hasOwnProperty)
     expect((client as any)[Symbol.for('something')]).toBeUndefined()
     expect((client as any).lazy.then).toBeUndefined()
     expect((client as any).lazy.call).toBe(Function.prototype.call)
     expect((client as any).lazy.apply).toBe(Function.prototype.apply)
+  })
+
+  it('exposes procedures named like unwrap properties on non-lazy routers', () => {
+    const toStringClient = createRouterClient({ toString: router.ping }, options).toString
+
+    expect(toStringClient).toBe(createProcedureClientSpy.mock.results[0]!.value)
   })
 })

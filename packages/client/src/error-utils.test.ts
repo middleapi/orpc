@@ -203,6 +203,7 @@ describe('createORPCErrorFromMalformedResponse', () => {
   it('infers message from a common error code matching the status', () => {
     expect(createORPCErrorFromMalformedResponse({ response: { status: 404, headers: {}, body: { detail: 'no message here' } } }).message).toBe('Not Found')
     expect(createORPCErrorFromMalformedResponse({ response: { status: 503, headers: {}, body: undefined } }).message).toBe('Service Unavailable')
+    expect(createORPCErrorFromMalformedResponse({ response: { status: 411, headers: {}, body: undefined } }).message).toBe('Length Required')
   })
 
   it('ignores bodies longer than 256 characters', () => {

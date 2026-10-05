@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { AsyncIteratorClass, sleep } from '@standard-server/shared'
 import { consumeAsyncIterator, replicateAsyncIterator, traceAsyncIterator, wrapAsyncIterator } from './iterator'
+import { promiseWithResolvers } from './promise'
 import * as Tracing from './tracing'
 
 const runInSpanContextSpy = vi.spyOn(Tracing, 'runInSpanContext')
@@ -264,9 +265,10 @@ describe('traceAsyncIterator', () => {
 
   it('can be cancelled while an iteration is pending', async () => {
     const cleanup = vi.fn()
+    const pull = promiseWithResolvers<void>()
     const iterator = new AsyncIteratorClass(
       async () => {
-        await sleep(100)
+        await pull.promise
         return { done: true, value: 'done' }
       },
       cleanup,
@@ -276,14 +278,13 @@ describe('traceAsyncIterator', () => {
 
     const nextPromise = withSpan.next()
     await sleep(10)
-    const start = Date.now()
-    await withSpan.return()
-    expect(Date.now() - start).toBeLessThan(10)
+    await withSpan.return() // would hang if it waited for the pending pull
 
     expect(cleanup).toHaveBeenCalledTimes(1)
     expect(cleanup).toHaveBeenCalledWith({ kind: 'cancelled' })
 
-    await expect(nextPromise).resolves.toEqual({ done: true, value: 'done' })
+    pull.resolve()
+    await expect(nextPromise).resolves.toEqual({ done: true, value: undefined })
   })
 })
 
@@ -463,6 +464,83 @@ describe('consumeAsyncIterator', () => {
 
       expect(onSuccess).toHaveBeenCalledTimes(0)
     })
+  })
+
+  it('closes the iterator when onEvent throws', async () => {
+    const error = new Error('TEST')
+    let cleanup = false
+    const iterator = (async function* () {
+      try {
+        yield 1
+        yield 2
+        return 3
+      }
+      finally {
+        cleanup = true
+      }
+    }())
+
+    const onEvent = vi.fn(() => {
+      throw error
+    })
+    const onError = vi.fn()
+    const onSuccess = vi.fn()
+    let cleanupBeforeFinish: boolean | undefined
+    const onFinish = vi.fn(() => {
+      cleanupBeforeFinish = cleanup
+    })
+
+    void consumeAsyncIterator(iterator, {
+      onEvent,
+      onError,
+      onSuccess,
+      onFinish,
+    })
+
+    await vi.waitFor(() => {
+      expect(onFinish).toHaveBeenCalledTimes(1)
+    })
+
+    expect(cleanupBeforeFinish).toBe(true)
+    expect(onFinish).toHaveBeenNthCalledWith(1, [error, undefined, false])
+
+    expect(onEvent).toHaveBeenCalledTimes(1)
+    expect(onEvent).toHaveBeenNthCalledWith(1, 1)
+
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(onError).toHaveBeenNthCalledWith(1, error)
+
+    expect(onSuccess).toHaveBeenCalledTimes(0)
+  })
+
+  it('reports the return error when closing the iterator fails', async () => {
+    const returnError = new Error('RETURN')
+    const iterator: AsyncIterator<number> = {
+      next: async () => ({ done: false, value: 1 }),
+      return: vi.fn(async () => {
+        throw returnError
+      }),
+    }
+
+    const onError = vi.fn()
+    const onFinish = vi.fn()
+
+    void consumeAsyncIterator(iterator, {
+      onEvent: () => {
+        throw new Error('TEST')
+      },
+      onError,
+      onFinish,
+    })
+
+    await vi.waitFor(() => {
+      expect(onFinish).toHaveBeenCalledTimes(1)
+    })
+
+    expect(iterator.return).toHaveBeenCalledTimes(1)
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(onError).toHaveBeenNthCalledWith(1, returnError)
+    expect(onFinish).toHaveBeenNthCalledWith(1, [returnError, undefined, false])
   })
 
   it('unsubscribe', async () => {

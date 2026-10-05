@@ -11,6 +11,7 @@ import { brotliCompressSync, gzipSync } from 'node:zlib'
 import { os } from '@orpc/server'
 import { RPCHandler as FetchRPCHandler } from '@orpc/server/fetch'
 import { RPCHandler } from '@orpc/server/node'
+import { ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 import * as sharedModule from '@orpc/shared'
 import request from 'supertest'
 import { StaticFileHandlerPlugin } from './static-file-handler-plugin'
@@ -707,6 +708,22 @@ describe('staticFileHandlerPlugin', () => {
       expect(allowedRes.status).toBe(200)
       expect(allowedRes.body).toEqual(Buffer.from('dotfile'))
     })
+
+    it('refuses 8.3 short names that can alias dotfiles', async () => {
+      // A refused path falls through before the fallback, while an allowed missing one is answered by it
+      const agent = createStaticAgent({ fallbackFile: 'hello.txt' })
+
+      for (const url of ['/ENV~1', '/env~1', '/HTACCE~1', '/ENV~1.LOC', '/ENV~1.', '/ENV~1::$DATA', '/GIT~1/config', '/nested/GIT~1/HEAD']) {
+        expect((await agent.get(url)).status, url).toBe(404)
+      }
+
+      // A tilde that cannot be the numeric tail of a short name is an ordinary character
+      for (const url of ['/vendors~main~1a2b.js', '/index.html~', '/~user', '/a.b~1']) {
+        expect((await agent.get(url)).status, url).toBe(200)
+      }
+
+      expect((await createStaticAgent({ fallbackFile: 'hello.txt', dotfiles: true }).get('/ENV~1')).status).toBe(200)
+    })
   })
 
   describe('mounting', () => {
@@ -893,6 +910,26 @@ describe('staticFileHandlerPlugin', () => {
     })
   })
 
+  it('restarts a download resumed through response compression instead of splicing identity bytes into compressed ones', async () => {
+    const agent = createAgent(new RPCHandler({}, {
+      plugins: [new StaticFileHandlerPlugin({ rootDir }), new ResponseCompressionHandlerPlugin({ threshold: 0 })],
+    }))
+
+    const first = await agent.get('/hello.txt').set('accept-encoding', 'gzip')
+    expect(first.headers['content-encoding']).toBe('gzip')
+    expect(first.headers.etag).toBe(`W/${helloEtag}`)
+    expect(first.headers['accept-ranges']).toBeUndefined()
+
+    // The weak tag cannot satisfy if-range, so the full compressed body comes back instead of a 206
+    const resumed = await agent.get('/hello.txt').set('accept-encoding', 'gzip').set('range', 'bytes=5-').set('if-range', first.headers.etag!)
+    expect(resumed.status).toBe(200)
+    expect(resumed.headers['content-encoding']).toBe('gzip')
+    expect(resumed.text).toBe('hello world')
+
+    const revalidated = await agent.get('/hello.txt').set('accept-encoding', 'gzip').set('if-none-match', first.headers.etag!)
+    expect(revalidated.status).toBe(304)
+  })
+
   describe('fallback file', () => {
     it('serves the fallback file when nothing matches', async () => {
       const res = await createStaticAgent({ fallbackFile: 'index.html' }).get('/some/spa/route')
@@ -928,8 +965,10 @@ describe('staticFileHandlerPlugin', () => {
 
   describe('tracing', () => {
     it('renames the active span to the mounted base path', async ({ onTestFinished }) => {
-      const span = { updateName: vi.fn(), setAttribute: vi.fn() }
+      const span = { updateName: vi.fn(), setAttribute: vi.fn(), recordException: vi.fn(), end: vi.fn() }
       const spy = vi.spyOn(sharedModule, 'getTracer').mockReturnValue({
+        startActiveSpan: (_name: unknown, _parent: unknown, fn: (span: unknown) => unknown) => fn(span),
+        withActiveSpan: (_: unknown, fn: () => unknown) => fn(),
         getActiveSpan: () => span,
       } as any)
       onTestFinished(() => spy.mockRestore())

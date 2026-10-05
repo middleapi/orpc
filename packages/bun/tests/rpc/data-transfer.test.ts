@@ -1,5 +1,5 @@
 import { os } from '@orpc/server'
-import { sleep } from 'bun'
+import { promiseWithResolvers } from '@orpc/shared'
 import { describe, expect, it } from 'bun:test'
 import { z } from 'zod'
 import { builtInRPCSupportDataTypes } from './__shared__/built-in-support-data-types'
@@ -53,80 +53,75 @@ describe.each([
   // TODO: There an issues with Bun Websocket Server, when multiple messages sent simultaneously
   // We might need to report this issue
   it.skipIf(adapter === 'bun-websocket' || adapter === 'compression-bun-websocket')('support octet stream and transfer octet in parallel', async () => {
+    const order2 = promiseWithResolvers<void>()
+    const order3 = promiseWithResolvers<void>()
+
     const stream = new ReadableStream<string>({
       async start(controller) {
         controller.enqueue('order 1')
-        await sleep(200)
+        await order2.promise
         controller.enqueue('order 2')
-        await sleep(200)
+        await order3.promise
         controller.enqueue('order 3')
         controller.close()
       },
     }).pipeThrough(new TextEncoderStream())
 
-    let startTime = Date.now()
+    // The source holds everything after its first chunk until the test releases it, so a transport
+    // that buffered the stream would hang here instead of resolving.
     const result = await client.ping(stream) as ReadableStream<Uint8Array>
-    expect(Date.now() - startTime).toBeLessThan(100)
 
     const reader = result.getReader()
 
-    startTime = Date.now()
     const first = await reader.read()
     expect(first.done).toBe(false)
     expect(first.value).toBeInstanceOf(Uint8Array)
     expect(new TextDecoder().decode(first.value)).toBe('order 1')
-    expect(Date.now() - startTime).toBeLessThan(100)
 
-    startTime = Date.now()
+    order2.resolve()
     const second = await reader.read()
     expect(second.done).toBe(false)
     expect(second.value).toBeInstanceOf(Uint8Array)
     expect(new TextDecoder().decode(second.value)).toBe('order 2')
-    expect(Date.now() - startTime).toBeLessThan(250)
 
-    startTime = Date.now()
+    order3.resolve()
     const third = await reader.read()
     expect(third.done).toBe(false)
     expect(third.value).toBeInstanceOf(Uint8Array)
     expect(new TextDecoder().decode(third.value)).toBe('order 3')
-    expect(Date.now() - startTime).toBeLessThan(250)
 
-    startTime = Date.now()
     await expect(reader.read()).resolves.toEqual({ value: undefined, done: true })
-    expect(Date.now() - startTime).toBeLessThan(100)
   })
 
   // TODO: There an issues with Bun Websocket Server, when multiple messages sent simultaneously
   // We might need to report this issue
   it.skipIf(adapter === 'bun-websocket' || adapter === 'compression-bun-websocket')('support AsyncIteratorObject and transfer AsyncIteratorObject in parallel', async () => {
+    const order2 = promiseWithResolvers<void>()
+    const order3 = promiseWithResolvers<void>()
+    const completion = promiseWithResolvers<void>()
+
     const stream = (async function* () {
       yield 'order 1'
-      await sleep(200)
+      await order2.promise
       yield { order: 2 }
-      await sleep(200)
+      await order3.promise
       yield new Person('Order 3', 3)
-      await sleep(200)
+      await completion.promise
       return new Date('2024-01-01')
     }())
 
-    let startTime = Date.now()
+    // The source holds everything after its first event until the test releases it, so a transport
+    // that buffered the stream would hang here instead of resolving.
     const result = await client.ping(stream) as AsyncIteratorObject<unknown>
-    expect(Date.now() - startTime).toBeLessThan(100)
-
-    startTime = Date.now()
     await expect(result.next()).resolves.toEqual({ value: 'order 1', done: false })
-    expect(Date.now() - startTime).toBeLessThan(50)
 
-    startTime = Date.now()
+    order2.resolve()
     await expect(result.next()).resolves.toEqual({ value: { order: 2 }, done: false })
-    expect(Date.now() - startTime).toBeLessThan(250)
 
-    startTime = Date.now()
+    order3.resolve()
     await expect(result.next()).resolves.toEqual({ value: new Person('Order 3', 3), done: false })
-    expect(Date.now() - startTime).toBeLessThan(250)
 
-    startTime = Date.now()
+    completion.resolve()
     await expect(result.next()).resolves.toEqual({ value: new Date('2024-01-01'), done: true })
-    expect(Date.now() - startTime).toBeLessThan(250)
   })
 })

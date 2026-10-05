@@ -34,7 +34,10 @@ export class OpenTelemetrySpan implements TracingSpan {
 }
 
 export interface OpenTelemetryTracerOptions {
-  tracer: OpenTelemetryApiTracer
+  /**
+   * Called for every span, so a tracer provider set after construction is picked up.
+   */
+  tracer: () => OpenTelemetryApiTracer
   trace: TraceAPI
   context: ContextAPI
 
@@ -45,7 +48,7 @@ export interface OpenTelemetryTracerOptions {
 }
 
 export class OpenTelemetryTracer implements Tracer {
-  private readonly tracer: OpenTelemetryApiTracer
+  private readonly tracer: () => OpenTelemetryApiTracer
   private readonly trace: TraceAPI
   private readonly context: ContextAPI
 
@@ -73,8 +76,8 @@ export class OpenTelemetryTracer implements Tracer {
 
   startSpan(name: string, parent?: TracingSpan): TracingSpan {
     const span = parent === undefined
-      ? this.tracer.startSpan(name)
-      : this.tracer.startSpan(name, undefined, this.contextOf(parent))
+      ? this.tracer().startSpan(name)
+      : this.tracer().startSpan(name, undefined, this.contextOf(parent))
 
     return new OpenTelemetrySpan(span)
   }
@@ -83,10 +86,10 @@ export class OpenTelemetryTracer implements Tracer {
     const callback = (span: Span) => fn(new OpenTelemetrySpan(span))
 
     if (parent === undefined) {
-      return this.tracer.startActiveSpan(name, callback)
+      return this.tracer().startActiveSpan(name, callback)
     }
 
-    return this.tracer.startActiveSpan(name, {}, this.contextOf(parent), callback)
+    return this.tracer().startActiveSpan(name, {}, this.contextOf(parent), callback)
   }
 
   getActiveSpan(): TracingSpan | undefined {

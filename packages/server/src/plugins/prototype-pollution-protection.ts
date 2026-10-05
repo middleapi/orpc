@@ -56,10 +56,11 @@ export class PrototypePollutionProtectionHandlerPlugin<T extends Context> implem
 
   /**
    * Walks the containers the built-in codecs can produce: arrays, maps, sets, and plain
-   * objects, including null-prototype ones. Other objects, such as files and dates, carry
-   * no attacker-authored keys and are left alone. The walk is iterative, so input nested
-   * deeper than the call stack allows still gets the intended verdict instead of a
-   * `RangeError`.
+   * objects, including null-prototype ones. Arrays get the same key checks as plain objects,
+   * since structured clone, as used over MessagePort, keeps named keys like `__proto__` on
+   * them. Other objects, such as files and dates, carry no attacker-authored keys and are
+   * left alone. The walk is iterative, so input nested deeper than the call stack allows
+   * still gets the intended verdict instead of a `RangeError`.
    */
   private containsPollutingKey(root: unknown): boolean {
     const visited = new WeakSet<object>()
@@ -74,14 +75,6 @@ export class PrototypePollutionProtectionHandlerPlugin<T extends Context> implem
 
       visited.add(value)
 
-      if (Array.isArray(value)) {
-        for (const item of value) {
-          stack.push(item)
-        }
-
-        continue
-      }
-
       // A map yields `[key, item]` entry arrays, so walking them covers both keys and values.
       if (value instanceof Map || value instanceof Set) {
         for (const entry of value) {
@@ -91,7 +84,7 @@ export class PrototypePollutionProtectionHandlerPlugin<T extends Context> implem
         continue
       }
 
-      if (!isPlainObject(value)) {
+      if (!Array.isArray(value) && !isPlainObject(value)) {
         continue
       }
 
@@ -109,8 +102,11 @@ export class PrototypePollutionProtectionHandlerPlugin<T extends Context> implem
         return true
       }
 
-      for (const key of Object.keys(value)) {
-        stack.push(value[key])
+      // Primitives carry no keys, so only objects go on the stack.
+      for (const item of Object.values(value)) {
+        if (typeof item === 'object' && item !== null) {
+          stack.push(item)
+        }
       }
     }
 

@@ -62,7 +62,7 @@ describe('handlerGen', () => {
       .use(({ next }) => next({ context: { extra: true } }))
       .handler(handlerGen(function* ({ input, context, errors }) {
         expectTypeOf(input).toEqualTypeOf<{ schema1: string }>()
-        expectTypeOf(context).toEqualTypeOf<{ auth: boolean } & { extra: boolean } & Omit<object, 'extra'>>()
+        expectTypeOf(context).toEqualTypeOf<{ auth: boolean } & { extra: boolean } & object>()
         expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
 
         // use error that has properties that ORPCError doesn't have.
@@ -75,7 +75,7 @@ describe('handlerGen', () => {
     expectTypeOf(procedure).toEqualTypeOf<
       DecoratedProcedure<
         { auth: boolean } & object,
-        Omit<object, 'extra'> & { extra: boolean },
+        object & { extra: boolean },
         typeof schema1,
         typeof schema2,
         typeof errorMap

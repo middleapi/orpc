@@ -288,12 +288,22 @@ const link = new RPCLink({
 
     /**
      * Maximum number of consecutive failed attempts before giving up.
-     * When exceeded, `getConnectedPeer` throws instead of retrying.
+     * When reached, calls waiting for the connection fail, and the next
+     * call starts a new reconnect cycle.
      * Should greater than 1
      *
      * @default Infinity
      */
     maxAttempt: Infinity,
+
+    /**
+     * Maximum number of connection attempts over the transport's lifetime,
+     * successful ones included (see `totalAttempt`).
+     * When reached, calls that need a new connection fail instead of connecting.
+     *
+     * @default Infinity
+     */
+    maxTotalAttempt: Infinity,
 
     onClose: {
       /**

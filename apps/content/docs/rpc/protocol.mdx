@@ -7,7 +7,7 @@ The RPC protocol is a lightweight protocol for remote procedure calls, used by [
 
 ## Serializer
 
-Most of the protocol's flexibility comes from its serializer. In addition to JSON-compatible values, it supports native types such as `Date`, `BigInt`, `RegExp`, `URL`, `Set`, `Map`, `Blob`, `File`, `AsyncIteratorObject`, and `ReadableStream<Uint8Array>`. To learn more, including how to extend it, see [RPC Serializer](/docs/rpc/serializer).
+Most of the protocol's flexibility comes from its serializer. In addition to JSON-compatible values, it supports native types such as `Date`, `BigInt`, `URL`, `Set`, `Map`, `Blob`, `File`, `AsyncIteratorObject`, and `ReadableStream<Uint8Array>`. To learn more, including how to extend it, see [RPC Serializer](/docs/rpc/serializer).
 
 :::warning
 To better support `Blob`, `File`, and `ReadableStream<Uint8Array>` at the root level in cross-origin scenarios,

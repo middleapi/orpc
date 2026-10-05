@@ -50,6 +50,7 @@ export interface OpenAPILinkCodecOptions<T extends ClientContext> {
 }
 
 const END_SLASH_REGEX = /\/$/
+const DOT_SEGMENT_REGEX = /(?:^|\/)\.{1,2}(?:\/|$)/
 
 export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCodec<T> {
   private readonly baseUrl: Exclude<OpenAPILinkCodecOptions<T>['url'], undefined>
@@ -230,6 +231,11 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
     if (!encoded) {
       throw new TypeError(`Path param "${param.parameterName}" cannot be empty in call to procedure (${path.join('.')}).`)
+    }
+
+    // URL parsing (e.g. in fetch) resolves "." and ".." segments, which would send the request to a different endpoint
+    if (DOT_SEGMENT_REGEX.test(encoded)) {
+      throw new TypeError(`Path param "${param.parameterName}" cannot contain "." or ".." segments in call to procedure (${path.join('.')}).`)
     }
 
     return encoded
@@ -508,7 +514,7 @@ function encodeDelimitedArray(serializedValues: unknown[], encodedDelimiter: str
 
 function encodeDelimitedObject(entries: [string, unknown][], encodedDelimiter: string): string | undefined {
   const strings = entries
-    .filter(([v]) => v !== null && v !== undefined)
+    .filter(([, v]) => v !== null && v !== undefined)
     .map(([k, v]) => [k, String(v)]) as [string, string][]
 
   if (!strings.length) {

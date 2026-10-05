@@ -2,7 +2,7 @@ import type { ClientContext } from '@orpc/client'
 import type { StandardLinkOptions, StandardLinkPlugin } from '@orpc/client/standard'
 import type { RouterContract } from '../router'
 import { ORPCError } from '@orpc/client'
-import { isPlainObject, mergeTwoLevels, toArray } from '@orpc/shared'
+import { mergeTwoLevels, toArray } from '@orpc/shared'
 import { ValidationError } from '../error'
 import { getProcedureContractOrThrow } from '../router-utils'
 
@@ -48,11 +48,8 @@ export class RequestValidationLinkPlugin<T extends ClientContext> implements Sta
         let currentInput = originalInput
 
         for (const [index, schema] of inputSchemas.entries()) {
-          /**
-           * Mirrors the server: stacked object schemas each validate the original input and are
-           * merged afterwards, anything else stays piped.
-           */
-          const validating = inputSchemas.length > 1 && isPlainObject(currentInput) ? originalInput : currentInput
+          // Mirrors the server's stacked input validation.
+          const validating = index !== 0 ? mergeTwoLevels(originalInput, currentInput) : currentInput
           const result = await schema['~standard'].validate(validating)
 
           if (result.issues) {

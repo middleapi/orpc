@@ -60,16 +60,13 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
     matched: { procedure: AnyProcedure, params?: undefined | Record<string, string> },
     request: StandardLazyRequest,
   ): Promise<unknown> {
-    const [_, search] = parseStandardUrl(request.url)
-
     const meta = getOpenAPIMeta(matched.procedure)
     const inputStructure = meta?.inputStructure ?? DEFAULT_OPENAPI_INPUT_STRUCTURE
     const params = this.deserializeParams(matched.params, meta?.paramsStyles)
-    const query = this.deserializeQuery(search, meta?.queryStyles)
 
     if (inputStructure === 'compact') {
       const data = isBodylessMethod(request.method)
-        ? query
+        ? this.deserializeQuery(request.url, meta?.queryStyles)
         : this.serializer.deserialize(await request.resolveBody(meta?.requestBodyHint))
 
       if (data === undefined) {
@@ -94,7 +91,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
 
     return {
       params,
-      query,
+      query: this.deserializeQuery(request.url, meta?.queryStyles),
       headers: request.headers,
       body: this.serializer.deserialize(await request.resolveBody(meta?.requestBodyHint)),
     }
@@ -148,9 +145,10 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
   }
 
   private deserializeQuery(
-    search: `?${string}` | undefined,
+    url: StandardLazyRequest['url'],
     styles: OpenAPIMeta['queryStyles'],
   ): unknown {
+    const [, search] = parseStandardUrl(url)
     const searchParams = new URLSearchParams(search)
     const parsed = this.serializer.deserialize(searchParams)
 
@@ -228,11 +226,11 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
     const parsed: Record<string, unknown> = { ...params }
 
     Object.entries(styles).forEach(([key, hint]) => {
-      if (hint === undefined || hint === 'primitive') {
+      const value = getOwn(params, key)
+
+      if (hint === undefined || hint === 'primitive' || value === undefined) {
         return
       }
-
-      const value = params[key]
 
       if (hint === 'comma-delimited-array') {
         parsed[key] = decodeDelimitedArray(value, ',')

@@ -45,6 +45,8 @@ const getFile = os
   .input(z.object({ path: z.string() }))
 ```
 
+A path can have only one `{+name}`, but more segments can follow it, as in `/files/{+path}/raw`.
+
 :::info
 To customize path parameter encoding and decoding, see [Path Parameter Styles](/docs/openapi/input-and-output-mapping#path-parameter-styles).
 :::

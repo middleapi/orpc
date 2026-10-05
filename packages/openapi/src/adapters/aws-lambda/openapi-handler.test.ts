@@ -1,4 +1,4 @@
-import type { AwsLambdaHandlerPlugin } from '@orpc/server/aws-lambda'
+import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import type { APIGatewayProxyEventV2, AwsLambdaGlobal, HttpResponseStream } from '@standard-server/aws-lambda'
 import { Buffer } from 'node:buffer'
 import { Writable } from 'node:stream'
@@ -87,18 +87,14 @@ describe('openapiHandler', () => {
     expect(mismatchStream.text).toBe('')
   })
 
-  it('supports aws lambda handler plugin', async () => {
-    const plugin: AwsLambdaHandlerPlugin<any> = {
+  it('supports standard handler plugins', async () => {
+    const plugin: StandardHandlerPlugin<any> = {
       name: 'test',
-      initAwsLambdaHandlerOptions(options) {
+      init(options) {
         return {
           ...options,
-          awsLambdaInterceptors: [
-            async ({ responseStream }) => {
-              responseStream.end('intercepted')
-
-              return { matched: true }
-            },
+          routingInterceptors: [
+            async () => ({ matched: true, response: { status: 200, headers: {}, body: 'intercepted' } }),
           ],
         }
       },
@@ -110,6 +106,6 @@ describe('openapiHandler', () => {
     const result = await handler.handle(createEvent({ requestContext: { http: { method: 'GET' } }, body: undefined }), responseStream)
 
     expect(result.matched).toBe(true)
-    expect(responseStream.text).toBe('intercepted')
+    expect(responseStream.text).toBe('"intercepted"')
   })
 })

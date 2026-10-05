@@ -7,7 +7,6 @@ const coercer = new JsonSchemaCoercer()
 const DATE_SCHEMA = { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' } as JsonSchema
 const BIGINT_SCHEMA = { 'type': 'string', 'pattern': '^-?[0-9]+$', 'x-native-type': 'bigint' } as JsonSchema
 const URL_SCHEMA = { 'type': 'string', 'format': 'uri', 'x-native-type': 'url' } as JsonSchema
-const REGEXP_SCHEMA = { 'type': 'string', 'x-native-type': 'regexp' } as JsonSchema
 
 /** What a GET request's query params look like: every leaf arrives as a string. */
 const FLAT_SCHEMA: JsonSchema = {
@@ -62,9 +61,8 @@ const UNIT_SCHEMA: JsonSchema = {
       'x-native-type': 'map',
     } as JsonSchema,
     homepage: URL_SCHEMA,
-    pattern: REGEXP_SCHEMA,
   },
-  required: ['id', 'name', 'active', 'createdAt', 'largeInt', 'tags', 'metadata', 'homepage', 'pattern'],
+  required: ['id', 'name', 'active', 'createdAt', 'largeInt', 'tags', 'metadata', 'homepage'],
 }
 
 /** A unit as it arrives after JSON parsing: native types collapsed to strings/arrays. */
@@ -82,7 +80,6 @@ function createJsonUnit(i: number) {
       ['nested', '2023-06-15T12:30:00.000Z'],
     ],
     homepage: 'https://orpc.dev/docs',
-    pattern: '/^[a-z0-9-]+$/i',
   }
 }
 
@@ -101,7 +98,6 @@ function createTypedUnit(i: number) {
       ['nested', new Date('2023-06-15T12:30:00.000Z')],
     ]),
     homepage: new URL('https://orpc.dev/docs'),
-    pattern: /^[a-z0-9-]+$/i,
   }
 }
 

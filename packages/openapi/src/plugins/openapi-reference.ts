@@ -14,8 +14,22 @@ export interface OpenAPIReferenceHandlerPluginScalarConfig extends Partial<Scala
 
 export interface OpenAPIReferenceHandlerPluginSwaggerConfig extends Partial<Omit<SwaggerUIOptions, 'dom_id' | 'presets' | 'plugins'>> {
   dom_id?: undefined | never
-  presets?: undefined | `SwaggerUIBundle.${string}`[]
-  plugins?: undefined | `SwaggerUIBundle.${string}`[]
+
+  /**
+   * Paths to global variables holding the presets, resolved in the browser,
+   * e.g. `'SwaggerUIBundle.presets.apis'`. Load custom presets through `docsHead`.
+   *
+   * @default ['SwaggerUIBundle.presets.apis']
+   */
+  presets?: undefined | string[]
+
+  /**
+   * Paths to global variables holding the plugins, resolved in the browser,
+   * e.g. `'SwaggerUIBundle.plugins.DownloadUrl'`. Load custom plugins through `docsHead`.
+   *
+   * @default ['SwaggerUIBundle.plugins.DownloadUrl']
+   */
+  plugins?: undefined | string[]
 }
 
 export interface OpenAPIReferenceHandlerPluginOptions<T extends Context, TProvider extends OpenAPIReferenceHandlerPluginProvider> {
@@ -189,13 +203,8 @@ export class OpenAPIReferenceHandlerPlugin<
               dom_id: '#app',
               spec,
               deepLinking: true,
-              presets: [
-                'SwaggerUIBundle.presets.apis',
-                'SwaggerUIBundle.presets.standalone',
-              ],
-              plugins: [
-                'SwaggerUIBundle.plugins.DownloadUrl',
-              ],
+              presets: ['SwaggerUIBundle.presets.apis'],
+              plugins: ['SwaggerUIBundle.plugins.DownloadUrl'],
               ...this.providerConfig,
             }
 
@@ -216,10 +225,15 @@ export class OpenAPIReferenceHandlerPlugin<
 
                 <!-- IMPORTANT: assign to a variable first to prevent ), ( in values breaking the call expression. -->
                 <!-- IMPORTANT: escapeJsonForHtml ensures <, > cannot terminate the </script> tag prematurely. -->
+                <!-- IMPORTANT: resolve presets/plugins global paths at runtime, never unquote them in the JSON, which also holds the spec. -->
                 <script>
-                    const swaggerConfig = ${escapeJsonForHtml(config).replace(/"(SwaggerUIBundle\.[.a-zA-Z0-9]+)"/g, '$1')}
+                    const swaggerConfig = ${escapeJsonForHtml(config)}
 
                     window.onload = () => {
+                        for (const key of ['presets', 'plugins']) {
+                            swaggerConfig[key] &&= swaggerConfig[key].map(path => path.split('.').reduce((value, name) => value?.[name], window))
+                        }
+
                         window.ui = SwaggerUIBundle(swaggerConfig)
                     }
                 </script>

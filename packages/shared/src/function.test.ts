@@ -29,6 +29,23 @@ describe('defer', () => {
     expect(callback2).toHaveBeenCalledBefore(callback1)
   })
 
+  it('with setTimeout and delay', async ({ onTestFinished }) => {
+    vi.useFakeTimers()
+    onTestFinished(() => {
+      vi.useRealTimers()
+    })
+
+    const callback = vi.fn()
+
+    defer(callback, 100)
+
+    await vi.advanceTimersByTimeAsync(99)
+    expect(callback).toHaveBeenCalledTimes(0)
+
+    await vi.advanceTimersByTimeAsync(1)
+    expect(callback).toHaveBeenCalledTimes(1)
+  })
+
   it('without setTimeout', async () => {
     const callback1 = vi.fn()
     const callback2 = vi.fn()

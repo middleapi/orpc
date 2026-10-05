@@ -141,13 +141,12 @@ const locker = new MemoryLocker({
 
 ### Redis
 
-Stores locks in Redis, so every instance using the same server shares the same locks. Works with both standalone and cluster clients.
+Stores locks in Redis, so every instance using the same server shares the same locks.
 
 ```ts
 import { RedisLocker } from '@orpc/experimental-lock/redis'
 import { createClient } from 'redis'
 
-// Both standalone (`createClient`) and cluster (`createCluster`) clients are supported.
 const client = createClient({ url: 'redis://localhost:6379' })
 
 // RedisLocker lazily connects to Redis when needed.

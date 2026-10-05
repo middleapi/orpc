@@ -84,8 +84,8 @@ describe('implementToolFactory', () => {
       const combined = tool.inputSchema as any
 
       /**
-       * Both schemas strip the fragment declared by the other, so they must each validate the
-       * original value instead of what the previous one returned.
+       * Both schemas strip the fragment declared by the other, so each must see the original value,
+       * not only what the previous one returned.
        */
       await expect(
         combined['~standard'].validate({ name: 'Alice', age: 18, unknown: true }),
@@ -114,6 +114,19 @@ describe('implementToolFactory', () => {
           query: { page: 1 },
         },
       })
+    })
+
+    it('keeps earlier transforms when a later input schema passes the raw values through', async () => {
+      const contract = oc
+        .input(z.object({ id: z.coerce.number() }))
+        .input(z.looseObject({ name: z.string() }))
+
+      const tool = implementToolFactory()(contract)
+      const combined = tool.inputSchema as any
+
+      await expect(
+        combined['~standard'].validate({ id: '5', name: 'NAME' }),
+      ).resolves.toEqual({ value: { id: 5, name: 'NAME' } })
     })
 
     it('combines non-object input schemas by piping validation in order', async () => {
@@ -327,6 +340,34 @@ describe('createToolFactory', () => {
       input: { name: 'Alice' },
       context: { authToken: 'auth-token' },
     }), { name: 'Alice' })
+  })
+
+  it('always passes the tool call signal to the procedure', async () => {
+    const signals: (AbortSignal | undefined)[] = []
+
+    const procedure = os
+      .input(inputSchema)
+      .output(outputSchema)
+      .handler(({ input, signal }) => {
+        signals.push(signal)
+        return { greeting: `Hello, ${input.name}!` }
+      })
+
+    const streamingProcedure = os
+      .input(inputSchema)
+      .handler(async function* ({ input, signal }) {
+        signals.push(signal)
+        yield { greeting: `Hello, ${input.name}!` }
+      })
+
+    const createTool = createToolFactory({ signal: undefined } as any)
+
+    await (createTool(procedure) as any).execute({ name: 'Alice' }, { abortSignal })
+    for await (const _ of (createTool(streamingProcedure) as any).execute({ name: 'Alice' }, { abortSignal })) {
+      // consume
+    }
+
+    expect(signals).toEqual([abortSignal, abortSignal])
   })
 
   it('accepts ai sdk tool options in the factory result', async () => {

@@ -1,7 +1,7 @@
 import type { LockCallbackOptions, Locker, LockOptions } from '@orpc/experimental-lock'
 import type { Promisable } from '@orpc/shared'
 import { LockTimeoutError } from '@orpc/experimental-lock'
-import { promiseWithResolvers, runWithSignal } from '@orpc/shared'
+import { promiseWithResolvers, runWithSignal, throwIfAborted } from '@orpc/shared'
 
 export interface experimental_DurableLockerOptions {
   /**
@@ -58,7 +58,7 @@ export class experimental_DurableLocker implements Locker {
   }
 
   async lock<T>(key: string, fn: (options: LockCallbackOptions) => Promisable<T>, options: LockOptions = {}): Promise<T> {
-    options.signal?.throwIfAborted()
+    throwIfAborted(options.signal)
 
     const response = await this.getStubByName(this.namespace, `${this.prefix}${key}`).fetch('http://localhost/acquire', {
       headers: { upgrade: 'websocket' },

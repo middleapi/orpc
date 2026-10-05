@@ -42,7 +42,7 @@ To avoid repeating `.$context` declarations, you can define a default initial co
 
 ```ts
 declare module '@orpc/server' {
-  export interface DefaultInitialContext {
+  interface DefaultInitialContext {
     env: { DB_URL: string }
   }
 }

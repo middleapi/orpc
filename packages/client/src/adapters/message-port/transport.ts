@@ -4,7 +4,7 @@ import type { DecodePeerMessageOptions, EncodePeerMessageOptions, ServerPeerSend
 import type { ClientContext, ClientOptions } from '../../types'
 import type { StandardLinkTransport } from '../standard'
 import type { SupportedMessagePort } from './message-port'
-import { value } from '@orpc/shared'
+import { AbortError, value } from '@orpc/shared'
 import { ClientPeer, decodePeerMessage, encodePeerMessage, isPeerMessage, isServerPeerSendMessage } from '@standard-server/peer'
 import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from './message-port'
 
@@ -41,7 +41,14 @@ export class MessagePortLinkTransport<T extends ClientContext> implements Standa
   private readonly peer: ClientPeer
 
   constructor({ port, experimental_transfer, encodePeerMessage: encodePeerMessageOptions, decodePeerMessage: decodePeerMessageOptions }: MessagePortLinkTransportOptions<T>) {
+    let closeReason: undefined | AbortError
+
     this.peer = new ClientPeer(async (message) => {
+      // `postMessage` silently discards data once the port is closed, so requests would never settle
+      if (closeReason) {
+        throw closeReason
+      }
+
       const transfer = await value(experimental_transfer, message, port)
 
       if (transfer) {
@@ -80,7 +87,8 @@ export class MessagePortLinkTransport<T extends ClientContext> implements Standa
     })
 
     onMessagePortClose(port, async () => {
-      await this.peer.close()
+      closeReason = new AbortError('MessagePort closed')
+      await this.peer.close(closeReason)
     })
   }
 

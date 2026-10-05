@@ -1,6 +1,6 @@
 import type { ThrowableError } from '@orpc/shared'
 import type { Redis } from '@upstash/redis'
-import type { BaseRedisPublisherOptions, RedisStreamEntry, RedisStreamTrimOptions } from './base-redis'
+import type { BaseRedisPublisherOptions, RedisStreamEntry } from './base-redis'
 import { promiseWithResolvers } from '@orpc/shared'
 import { BaseRedisPublisher } from './base-redis'
 
@@ -62,18 +62,8 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
     }
   }
 
-  protected async addStreamEntry(key: string, data: string, trim?: RedisStreamTrimOptions): Promise<string> {
-    if (!trim) {
-      return this.redis.xadd(key, '*', { data })
-    }
-
-    const [id] = await this.redis.multi()
-      .xadd(key, '*', { data })
-      .xtrim(key, { strategy: 'MINID', exactness: trim.exactness, threshold: trim.minId })
-      .expire(key, trim.expireSeconds)
-      .exec()
-
-    return id
+  protected async evalScript(script: string, keys: string[], args: string[]): Promise<unknown> {
+    return await this.redis.eval(script, keys, args)
   }
 
   protected async readStreamEntries(key: string, lastId: string): Promise<RedisStreamEntry[]> {

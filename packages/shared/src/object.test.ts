@@ -1,7 +1,7 @@
 import * as a from 'arktype'
 import * as v from 'valibot'
 import z from 'zod'
-import { bindMethods, clone, deepSortKeys, findDeepMatches, get, getConstructor, getConstructors, getOwn, isPlainObject, isPropertyKey, mergeTwoLevels, NullProtoObj, omit, set, setOwn } from './object'
+import { bindMethods, clone, copyOnWrite, deepSortKeys, findDeepMatches, get, getConstructor, getConstructors, getOwn, isPlainObject, isPropertyKey, mergeTwoLevels, NullProtoObj, omit, pick, set, setOwn } from './object'
 
 it('findDeepMatches', () => {
   const { maps, values } = findDeepMatches(v => typeof v === 'string', {
@@ -355,6 +355,20 @@ describe('mergeTwoLevels', () => {
     expect(mergeTwoLevels({ a: undefined }, { a: { b: 1 } })).toEqual({ a: { b: 1 } })
   })
 
+  it('does not merge a key the second object only inherits', () => {
+    // `isPlainObject` accepts a prototype without a `constructor`, such as a `NullProtoObj`
+    const proto: any = new NullProtoObj()
+    proto.user = { polluted: true }
+
+    const second: any = Object.create(proto)
+    second.other = 1
+
+    expect(mergeTwoLevels({ user: { name: 'NAME' } }, second)).toEqual({
+      user: { name: 'NAME' },
+      other: 1,
+    })
+  })
+
   it('returns a new object', () => {
     const first = { a: { b: 1 } }
     const merged = mergeTwoLevels(first, { a: { c: 2 } }) as any
@@ -410,6 +424,28 @@ describe('omit', () => {
   })
 })
 
+describe('pick', () => {
+  it('picks specified keys', () => {
+    expect(pick({ a: 1, b: 2, c: 3 }, ['a', 'c'])).toEqual({
+      a: 1,
+      c: 3,
+    })
+  })
+
+  it('keeps keys explicitly set to undefined', () => {
+    const result = pick({ a: undefined, b: 2 } as { a?: number, b: number }, ['a'])
+
+    expect(result).toEqual({ a: undefined })
+    expect(Object.hasOwn(result, 'a')).toBe(true)
+  })
+
+  it('skips missing and inherited keys', () => {
+    const obj = Object.create({ inherited: 1 }) as { inherited?: number, missing?: number }
+
+    expect(Object.keys(pick(obj, ['inherited', 'missing']))).toEqual([])
+  })
+})
+
 it('isPropertyKey', () => {
   expect(isPropertyKey('a')).toBe(true)
   expect(isPropertyKey(1)).toBe(true)
@@ -443,6 +479,41 @@ it('nullProtoObj', () => {
   // eslint-disable-next-line no-restricted-properties, no-proto
   expect(clone.__proto__).toBe(2)
   expect(clone.a).toBe(1)
+})
+
+describe('copyOnWrite', () => {
+  it('copies arrays and plain objects still held by the input, returns everything else as is', () => {
+    const child = { a: 1 }
+    const list = [1]
+    const parent = { child, list, date: new Date(), none: null }
+
+    const childCopy = copyOnWrite(parent, 'child', child)
+    expect(childCopy).toEqual(child)
+    expect(childCopy).not.toBe(child)
+    expect(parent.child).toBe(childCopy)
+    expect(copyOnWrite(parent, 'child', child)).toBe(childCopy)
+
+    const listCopy = copyOnWrite(parent, 'list', list)
+    expect(listCopy).toEqual(list)
+    expect(listCopy).not.toBe(list)
+    expect(parent.list).toBe(listCopy)
+
+    expect(copyOnWrite(parent, 'date', parent.date)).toBe(parent.date)
+    expect(copyOnWrite(parent, 'none', null)).toBeNull()
+  })
+
+  it('keeps __proto__ an own property on the parent and the copy', () => {
+    const parent = JSON.parse('{"__proto__": {"a": 1}}')
+    const original = getOwn(parent, '__proto__')
+
+    const copy = copyOnWrite(parent, '__proto__', original) as any
+
+    expect(Object.getPrototypeOf(parent)).toBe(Object.prototype)
+    expect(Object.getPrototypeOf(copy)).toBe(Object.prototype)
+    expect(getOwn(parent, '__proto__')).toBe(copy)
+    expect(copy).toEqual({ a: 1 })
+    expect(({} as any).a).toBeUndefined()
+  })
 })
 
 describe('clone', () => {

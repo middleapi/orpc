@@ -30,6 +30,12 @@ describe('error factory', () => {
     expect(e.cause).toBe('cause')
   })
 
+  it('falls back to the default message when message is explicitly undefined', () => {
+    const e = new TestError({ message: undefined, data: { value: 1 } })
+
+    expect(e.message).toBe('default message')
+  })
+
   it('can be constructed without options when data schema is not defined', () => {
     const e = new SimpleError()
 
@@ -212,14 +218,16 @@ describe('createORPCErrorConstructorMap', () => {
     expect(e.defined).toBe(true)
   })
 
-  it('not proxy when access with symbol', () => {
-    // @ts-expect-error - invalid access
-    expect(constructors[Symbol('something')]).toBeUndefined()
-  })
-
   it('in operator works', () => {
     expect('BAD_GATEWAY' in constructors).toBe(true)
     expect('ANY_THING' in constructors).toBe(false)
+  })
+
+  it('not proxy on symbol and then keys', async () => {
+    const map = constructors as any
+    expect(map[Symbol('something')]).toBeUndefined()
+    expect(map.then).toBeUndefined()
+    expect(await map).toBe(map)
   })
 
   it('does not resolve error codes through Object.prototype', () => {

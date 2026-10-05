@@ -1,5 +1,5 @@
 import type { Segment } from '@orpc/shared'
-import { isPlainObject, NullProtoObj } from '@orpc/shared'
+import { copyOnWrite, isPlainObject, NullProtoObj } from '@orpc/shared'
 
 export type RPCJsonSerializationMeta = [type: string, ...path: Segment[]]
 export type RPCJsonSerialization
@@ -9,7 +9,10 @@ export type RPCJsonSerialization
 export interface RPCJsonSerializerHandler {
   condition(value: unknown): boolean
   serialize(value: any): unknown
-  deserialize(serialized: any): unknown
+  /**
+   * `serialized` comes from the wire, so validate its type and throw on mismatch.
+   */
+  deserialize(serialized: unknown): unknown
   /**
    * If false, the result of this serializer will not be further processed by other serializers,
    * even if it matches their conditions and treat it as final serialized value.
@@ -21,7 +24,15 @@ export interface RPCJsonSerializerHandler {
   isTerminal?: boolean
 }
 
-const REGEX_STRING_PATTERN = /^\/([\s\S]*)\/([a-z]*)$/
+function invalidSerializedData(detail: string): TypeError {
+  return new TypeError(`Invalid RPC serialized data: ${detail}`)
+}
+
+function assertSerializedType(ok: boolean, type: string, expected: string): void {
+  if (!ok) {
+    throw invalidSerializedData(`type "${type}" expects ${expected}.`)
+  }
+}
 
 const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHandler> = {
   undefined: {
@@ -31,7 +42,8 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
     serialize() {
       return null
     },
-    deserialize() {
+    deserialize(serialized: null): undefined {
+      assertSerializedType(serialized === null, 'undefined', 'null')
       return undefined
     },
     isTerminal: true,
@@ -44,6 +56,7 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
       return data.toString()
     },
     deserialize(serialized: string): bigint {
+      assertSerializedType(typeof serialized === 'string', 'bigint', 'a string')
       return BigInt(serialized)
     },
     isTerminal: true,
@@ -60,7 +73,8 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
       return data.toISOString()
     },
     deserialize(serialized: string | null): Date {
-      return new Date(serialized ?? 'Invalid Date')
+      assertSerializedType(typeof serialized === 'string' || serialized === null, 'date', 'a string or null')
+      return new Date(serialized ?? Number.NaN)
     },
     isTerminal: true,
   },
@@ -71,8 +85,22 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
     serialize() {
       return null
     },
-    deserialize() {
+    deserialize(serialized: null): number {
+      assertSerializedType(serialized === null, 'nan', 'null')
       return Number.NaN
+    },
+    isTerminal: true,
+  },
+  infinity: {
+    condition(data: unknown): boolean {
+      return data === Number.POSITIVE_INFINITY || data === Number.NEGATIVE_INFINITY
+    },
+    serialize(data: number): string {
+      return data > 0 ? 'Infinity' : '-Infinity'
+    },
+    deserialize(serialized: string): number {
+      assertSerializedType(serialized === 'Infinity' || serialized === '-Infinity', 'infinity', '"Infinity" or "-Infinity"')
+      return serialized === 'Infinity' ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY
     },
     isTerminal: true,
   },
@@ -84,20 +112,8 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
       return data.toString()
     },
     deserialize(serialized: string): URL {
+      assertSerializedType(typeof serialized === 'string', 'url', 'a string')
       return new URL(serialized)
-    },
-    isTerminal: true,
-  },
-  regexp: {
-    condition(data: unknown): boolean {
-      return data instanceof RegExp
-    },
-    serialize(data: RegExp): string {
-      return data.toString()
-    },
-    deserialize(serialized: string): RegExp {
-      const [, pattern, flags] = serialized.match(REGEX_STRING_PATTERN)!
-      return new RegExp(pattern!, flags)
     },
     isTerminal: true,
   },
@@ -109,6 +125,7 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
       return Array.from(data)
     },
     deserialize(serialized: unknown[]): Set<unknown> {
+      assertSerializedType(Array.isArray(serialized), 'set', 'an array')
       return new Set(serialized)
     },
   },
@@ -120,6 +137,7 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
       return Array.from(data.entries())
     },
     deserialize(serialized: [unknown, unknown][]): Map<unknown, unknown> {
+      assertSerializedType(Array.isArray(serialized), 'map', 'an array')
       return new Map(serialized)
     },
   },
@@ -158,10 +176,10 @@ export interface RPCJsonSerializerOptions {
    *
    * **Disabling:** Set a key to `undefined` to remove a built-in handler:
    * ```ts
-   * handlers: { regexp: undefined }
+   * handlers: { url: undefined }
    * ```
    *
-   * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `url`, `regexp`, `set`, `map`.
+   * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `infinity`, `url`, `set`, `map`.
    */
   handlers?: Record<string, undefined | RPCJsonSerializerHandler> | undefined
 
@@ -198,7 +216,8 @@ export class RPCJsonSerializer {
     let inlineBuiltInHandlers = true
     let handlerEntries: [string, RPCJsonSerializerHandler][] = []
 
-    for (const [key, handler] of Object.entries(customHandlers)) {
+    for (const key of Object.keys(customHandlers)) {
+      const handler = customHandlers[key]
       this.handlers[key] = handler
 
       if (inlineBuiltInHandlers && key in DEFAULT_RPC_JSON_SERIALIZER_HANDLERS) {
@@ -212,7 +231,8 @@ export class RPCJsonSerializer {
 
     if (!inlineBuiltInHandlers) {
       handlerEntries = []
-      for (const [key, handler] of Object.entries(this.handlers)) {
+      for (const key of Object.keys(this.handlers)) {
+        const handler = this.handlers[key]
         if (handler !== undefined) {
           handlerEntries.push([key, handler])
         }
@@ -255,11 +275,15 @@ export class RPCJsonSerializer {
         case 'boolean':
           return data
         case 'number':
+          if (Number.isFinite(data)) {
+            return data
+          }
           if (Number.isNaN(data)) {
             meta.push(['nan', ...segments])
             return null
           }
-          return data
+          meta.push(['infinity', ...segments])
+          return data > 0 ? 'Infinity' : '-Infinity'
         case 'undefined':
           meta.push(['undefined', ...segments])
           return null
@@ -276,10 +300,6 @@ export class RPCJsonSerializer {
           }
           if (data instanceof URL) {
             meta.push(['url', ...segments])
-            return data.toString()
-          }
-          if (data instanceof RegExp) {
-            meta.push(['regexp', ...segments])
             return data.toString()
           }
           if (data instanceof Set) {
@@ -344,7 +364,8 @@ export class RPCJsonSerializer {
     if (isPlainObject(data)) {
       const json: Record<string, unknown> = new NullProtoObj()
 
-      for (const [k, v] of Object.entries(data)) {
+      for (const k of Object.keys(data)) {
+        const v = data[k]
         /**
          * Skip custom toJSON methods to avoid JSON.stringify invoking them,
          * which could cause meta and serialized data mismatches during deserialization.
@@ -370,48 +391,63 @@ export class RPCJsonSerializer {
   }
 
   deserialize(serialized: RPCJsonSerialization): unknown {
-    const ref = { data: serialized.json }
+    const ref = { json: serialized.json }
 
     if (serialized.blobs?.length) {
       for (let i = 0; i < serialized.maps.length; i++) {
+        const blob = serialized.blobs[i]
+
+        if (!(blob instanceof Blob)) {
+          throw invalidSerializedData(`blob ${i} is not a Blob.`)
+        }
+
         const segments = serialized.maps[i]!
 
+        let original: any = serialized
         let currentRef: any = ref
-        let preSegment: string | number = 'data'
+        let preSegment: string | number = 'json'
 
         for (let j = 0; j < segments.length; j++) {
-          currentRef = currentRef[preSegment]
+          original = original[preSegment]
+          currentRef = copyOnWrite(currentRef, preSegment, original)
           preSegment = segments[j]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
-            throw new Error(`Security error: Invalid serialized data. Segment "${preSegment}" does not exist.`)
+            throw invalidSerializedData(`segment "${preSegment}" does not exist.`)
           }
         }
 
-        currentRef[preSegment] = serialized.blobs[i]
+        currentRef[preSegment] = blob
       }
     }
 
     if (serialized.meta) {
       for (const item of serialized.meta) {
         const type = item[0]
+        const handler = this.handlers[type]
 
+        if (handler === undefined) {
+          throw invalidSerializedData(`type "${type}" is not supported.`)
+        }
+
+        let original: any = serialized
         let currentRef: any = ref
-        let preSegment: string | number = 'data'
+        let preSegment: string | number = 'json'
 
         for (let i = 1; i < item.length; i++) {
-          currentRef = currentRef[preSegment]
+          original = original[preSegment]
+          currentRef = copyOnWrite(currentRef, preSegment, original)
           preSegment = item[i]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
-            throw new Error(`Security error: Invalid serialized data. Segment "${preSegment}" does not exist.`)
+            throw invalidSerializedData(`segment "${preSegment}" does not exist.`)
           }
         }
 
-        currentRef[preSegment] = this.handlers[type]!.deserialize(currentRef[preSegment])
+        currentRef[preSegment] = handler.deserialize(currentRef[preSegment])
       }
     }
 
-    return ref.data
+    return ref.json
   }
 }

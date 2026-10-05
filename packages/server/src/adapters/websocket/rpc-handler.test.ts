@@ -1,4 +1,7 @@
+import type { AddressInfo } from 'node:net'
+import { once } from 'node:events'
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
+import WebSocket, { WebSocketServer } from 'ws'
 import { os } from '../../builder'
 import { RPCHandler } from './rpc-handler'
 
@@ -191,6 +194,23 @@ describe('rpcHandler', () => {
     expect(ws.send).not.toHaveBeenCalled()
 
     onClose?.() // safely call again to ensure no error is thrown
+  })
+
+  it('closes the connection instead of crashing on malformed ws frames via upgrade', async () => {
+    const handler = createHandler()
+
+    const wss = new WebSocketServer({ port: 0 })
+    wss.on('connection', ws => handler.upgrade(ws))
+    onTestFinished(() => wss.close())
+
+    const client = new WebSocket(`ws://localhost:${(wss.address() as AddressInfo).port}`)
+    await once(client, 'open')
+
+    // `ws` rejects text frames carrying invalid UTF-8 by emitting `error` on the server socket
+    client.send(new Uint8Array([0xFF]), { binary: false })
+
+    const [code] = await once(client, 'close')
+    expect(code).toBe(1007)
   })
 
   it('handles Blob messages via upgrade', async () => {

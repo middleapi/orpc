@@ -52,7 +52,7 @@ export async function fetch(request: Request) {
 :::
 
 :::tip
-`context` also accepts an sync or async function, that receives the standard request. The handler only calls it once the request matches `prefix`, so work such as loading a session is skipped for requests that other routes serve:
+`context` also accepts a sync or async function that receives the standard request. The handler only calls it once the request matches `prefix`, so work such as loading a session is skipped for requests that other routes serve:
 
 ```ts
 const { matched, response } = await handler.handle(request, {
@@ -222,25 +222,6 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-### Adapter Interceptors
-
-Some `RPCHandler` implementations, such as fetch or node adapters, also support adapter interceptors. These run before [Routing Interceptors](#routing-interceptors) and let you work with the adapter's native request and response objects.
-
-```ts
-const handler = new RPCHandler(router, {
-  fetchInterceptors: [
-    async ({ next, request }) => {
-      const { matched, response } = await next()
-      return { matched, response }
-    },
-  ],
-})
-```
-
-:::info
-This example uses the fetch adapter. For other adapters, refer to their JSDoc or adapter-specific documentation.
-:::
-
 ## Plugins
 
 Plugins package reusable interceptors. For example, [CORS Plugin](/docs/plugins/cors) adds a [routing interceptor](#routing-interceptors) to handle preflight requests and adds CORS headers to every response.
@@ -309,6 +290,7 @@ const handler = new RPCHandler(router, {
 | TIMEOUT                |              408 |
 | CONFLICT               |              409 |
 | GONE                   |              410 |
+| LENGTH_REQUIRED        |              411 |
 | PRECONDITION_FAILED    |              412 |
 | PAYLOAD_TOO_LARGE      |              413 |
 | UNSUPPORTED_MEDIA_TYPE |              415 |
@@ -367,13 +349,6 @@ const handler = new RPCHandler(router, {
          */
         comment: '',
       },
-      /**
-       * If true, a `close` event is sent even when the iterator completes with `undefined`.
-       * When the iterator returns a value, a `close` event is always emitted regardless of this setting.
-       *
-       * @default true
-       */
-      emptyCloseEventEnabled: true,
     },
   },
 })
@@ -391,7 +366,6 @@ sequenceDiagram
   participant Procedure as Server-Side Procedure Client
 
   Client ->> Adapter: request
-  Note over Adapter: adapter interceptors (e.g. fetchInterceptors)
   Adapter ->> Handler: standard request
   Note over Handler: routingInterceptors
   Handler ->> Handler: find matching procedure

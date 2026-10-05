@@ -38,19 +38,6 @@ export class DelegatingJsonSchemaConverter implements Pick<JsonSchemaConverter, 
       }
     }
 
-    const result = schema?.['~standard'].validate(undefined)
-    const optional = result instanceof Promise ? false : !result?.issues?.length
-
-    if (schema && 'jsonSchema' in schema['~standard'] && schema['~standard'].jsonSchema) {
-      try {
-        return [
-          (schema['~standard'].jsonSchema as any)[direction](),
-          optional,
-        ]
-      }
-      catch { }
-    }
-
-    return [{}, optional]
+    return [{}, true]
   }
 }

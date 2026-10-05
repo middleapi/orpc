@@ -68,9 +68,9 @@ By specifying `.output` or the handler's return type, TypeScript can infer the o
 
 ### Multiple Schemas
 
-`.input` and `.output` can be called multiple times. Each call adds a schema instead of replacing the previous one, and the value must pass all of them.
+`.input` and `.output` can be called multiple times. Each call adds a schema, and the value must pass all of them.
 
-Every `.input` object schema validates the original input, then the results are merged. This lets you extend a base procedure without repeating its fields. Fields that no schema defines are dropped before the handler runs. [Middleware](/docs/middleware) placed between schemas sees the fields validated so far plus the raw rest of the input, so a whole-input middleware like caching works anywhere in the chain, but fields a later schema defines are not validated yet at that point.
+Each `.input` object schema validates the original input with the earlier results applied, then the results are merged. This lets you extend a base procedure without repeating its fields. Fields no schema defines are dropped before the handler runs. [Middleware](/docs/middleware) between schemas receives the fields validated so far plus the raw rest of the input, so whole-input middleware like caching works anywhere in the chain.
 
 ```ts
 const base = os
@@ -85,7 +85,7 @@ const example = base
 ```
 
 :::warning
-Only plain objects are merged, and only for the first two levels. Deeper values and anything else, like [`asyncIteratorObject`](/docs/async-iterator-object) or a `z.string()` transform, are piped: each schema validates what the previous one returned. Use `z.looseObject` when two schemas define the same object deeper than that:
+Only plain objects are merged, and only two levels deep. Deeper values and anything else, like [`asyncIteratorObject`](/docs/async-iterator-object) or a `z.string()` transform, are piped: each schema validates what the previous one returned. Use `z.looseObject` when two schemas define the same object deeper than that:
 
 ```ts
 const example = os
@@ -96,7 +96,7 @@ const example = os
 :::
 
 :::warning
-Schemas that reject unknown fields, like `z.strictObject`, cannot be stacked. Each one rejects the fields the others define.
+A field several schemas define is validated by each in turn, so put a type-changing transform like `z.string().transform(s => new Date(s))` in only one. Stacked `.output` schemas have the same limit. Schemas that reject unknown fields, like `z.strictObject`, cannot be stacked.
 :::
 
 `.output` schemas are piped, not merged, and run in reverse: the last one validates the handler result, then each earlier one validates what the next returned. Use `z.looseObject` so no schema drops a field another one needs.

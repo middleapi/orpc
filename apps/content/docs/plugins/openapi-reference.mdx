@@ -83,6 +83,22 @@ npm install swagger-ui @types/swagger-ui
 You can also load custom assets for the docs UI by setting `providerScriptUrl` and `providerCssUrl`.
 :::
 
+### Swagger Presets and Plugins
+
+With Swagger UI, `presets` and `plugins` are paths to global variables, resolved in the browser when the page loads. To use your own, load them through `docsHead` and reference them by name:
+
+```ts
+new OpenAPIReferenceHandlerPlugin({
+  provider: 'swagger',
+  docsHead: '<script src="https://unpkg.com/swagger-ui-dist/swagger-ui-standalone-preset.js"></script>',
+  providerConfig: {
+    presets: ['SwaggerUIBundle.presets.apis', 'SwaggerUIStandalonePreset'],
+    plugins: ['SwaggerUIBundle.plugins.DownloadUrl'],
+    layout: 'StandaloneLayout',
+  },
+})
+```
+
 ## Restricting Access
 
 By default, the docs UI and OpenAPI specification are publicly accessible. Use `allow` to serve them conditionally. When it resolves to `false`, the request falls through as unmatched, as if the plugin were not installed.

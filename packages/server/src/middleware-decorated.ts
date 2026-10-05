@@ -65,9 +65,9 @@ export function decorateMiddleware<
       },
     )
 
-    mapped['~orpc'] = middleware['~orpc']
+    mapped['~orpc'] = decorated['~orpc']
     Object.defineProperty(mapped, 'name', {
-      value: middleware.name,
+      value: decorated.name,
     })
 
     return mapped as any
@@ -121,12 +121,12 @@ export function decorateMiddleware<
       ...decorated['~orpc'],
       errorMap: mergeErrorMap(usedMiddleware['~orpc']?.errorMap, decorated['~orpc']?.errorMap),
       metaPlugins: [
-        ...toArray(middleware['~orpc']?.metaPlugins),
+        ...toArray(decorated['~orpc']?.metaPlugins),
         ...toArray(usedMiddleware['~orpc']?.metaPlugins),
       ],
     }
     Object.defineProperty(merged, 'name', {
-      value: `${middleware.name} + ${usedMiddleware.name}`,
+      value: `${decorated.name} + ${usedMiddleware.name}`,
     })
 
     return merged as any

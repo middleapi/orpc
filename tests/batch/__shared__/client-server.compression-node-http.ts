@@ -11,8 +11,8 @@ import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-ser
 
 /**
  * The same suite as the plain node-http one, with batch responses compressed on the wire.
- * Its timing assertions are what prove the compressor flushes: a buffering one would hold
- * every subresponse until the slowest of them resolved.
+ * Its streaming test is what proves the compressor flushes: a buffering one would hold every
+ * subresponse until the slowest of them resolved, which that test only allows after reading.
  */
 export const createCompressionNodeHttpBatchClientServerTest: CreateBatchClientServerTest = (
   router,

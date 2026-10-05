@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { NodeHttpHandlerPlugin } from './plugin'
+import type { StandardHandlerPlugin } from '../standard'
 import request from 'supertest'
 import { os } from '../../builder'
 import { RPCHandler } from './rpc-handler'
@@ -42,19 +42,14 @@ describe('rpcHandler', () => {
     expect(mismatchRes.text).toBe('not matched')
   })
 
-  it('supports node http handler plugin', async () => {
-    const plugin: NodeHttpHandlerPlugin<any> = {
+  it('supports standard handler plugins', async () => {
+    const plugin: StandardHandlerPlugin<any> = {
       name: 'test',
-      initNodeHttpHandlerOptions(options) {
+      init(options) {
         return {
           ...options,
-          nodeHttpInterceptors: [
-            async ({ response }) => {
-              response.statusCode = 200
-              response.end('intercepted')
-
-              return { matched: true }
-            },
+          routingInterceptors: [
+            async () => ({ matched: true, response: { status: 200, headers: {}, body: 'intercepted' } }),
           ],
         }
       },
@@ -67,7 +62,7 @@ describe('rpcHandler', () => {
     }).get('/test')
 
     expect(res.status).toBe(200)
-    expect(res.text).toBe('intercepted')
+    expect(res.body).toBe('intercepted')
   })
 
   it('treats GET requests as unmatched by default', async () => {

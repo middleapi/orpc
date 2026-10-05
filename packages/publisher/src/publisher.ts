@@ -1,5 +1,5 @@
 import type { ThrowableError } from '@orpc/shared'
-import { AsyncIteratorClass } from '@orpc/shared'
+import { AsyncIteratorClass, throwIfAborted } from '@orpc/shared'
 
 export interface PublisherOptions {
   /**
@@ -7,6 +7,8 @@ export interface PublisherOptions {
    *
    * If the buffer exceeds this limit, the oldest event is dropped.
    * This prevents unbounded memory growth if consumers process events slowly.
+   * Missed events the adapter replays for `lastEventId` while subscribing are all kept,
+   * and the limit then applies to how much further behind the consumer falls.
    *
    * Set to:
    * - `0`: Disable buffering. Events must be consumed before the next one arrives.
@@ -55,6 +57,8 @@ export abstract class Publisher<T extends Record<string, object>> {
   /**
    * Subscribes to a specific event using a callback function.
    * Returns an unsubscribe function to remove the listener.
+   * Events missed since `lastEventId` should reach the listener before the returned promise
+   * resolves, so iterator subscribers keep them all regardless of `maxBufferedEvents`.
    *
    * @remarks
    * This method should be protected to avoid conflicts with `subscribe` method
@@ -109,34 +113,45 @@ export abstract class Publisher<T extends Record<string, object>> {
     const signal = listenerOrOptions?.signal
     const maxBufferedEvents = listenerOrOptions?.maxBufferedEvents ?? this.maxBufferedEvents
 
-    signal?.throwIfAborted()
+    throwIfAborted(signal)
 
-    const bufferedEvents: T[K][] = []
+    const resuming = listenerOrOptions?.lastEventId !== undefined
+    const bufferedEvents = new Queue<T[K]>()
     const pullResolvers: { resolve: (result: IteratorResult<T[K]>) => void, reject: (error: Error) => void }[] = []
 
-    const unsubscribePromise = this
-      .subscribeListener(event, (payload) => {
-        if (signal?.aborted) {
-          return
-        }
+    let bufferFloor = 0
+    let bufferLimit = resuming ? Infinity : maxBufferedEvents
 
-        const resolver = pullResolvers.shift()
+    const subscription = this.subscribeListener(event, (payload) => {
+      if (signal?.aborted) {
+        return
+      }
 
-        if (resolver) {
-          resolver.resolve({ done: false, value: payload })
-        }
-        else {
-          bufferedEvents.push(payload)
+      const resolver = pullResolvers.shift()
 
-          if (bufferedEvents.length > maxBufferedEvents) {
-            bufferedEvents.shift()
-          }
+      if (resolver) {
+        resolver.resolve({ done: false, value: payload })
+      }
+      else {
+        bufferedEvents.push(payload)
+
+        if (bufferedEvents.length > bufferLimit) {
+          bufferedEvents.shift()
         }
-      }, {
-        lastEventId: listenerOrOptions?.lastEventId,
-        onError: error => terminate({ kind: 'error', error }),
-      })
-      .catch(error => terminate({ kind: 'error', error }))
+      }
+    }, {
+      lastEventId: listenerOrOptions?.lastEventId,
+      onError: error => terminate({ kind: 'error', error }),
+    })
+
+    const unsubscribePromise = (
+      resuming
+        ? subscription.finally(() => {
+            bufferFloor = bufferedEvents.length
+            bufferLimit = bufferFloor + maxBufferedEvents
+          })
+        : subscription
+    ).catch(error => terminate({ kind: 'error', error }))
 
     const abortListener = () => terminate({ kind: 'error', error: signal!.reason })
     signal?.addEventListener('abort', abortListener)
@@ -159,7 +174,7 @@ export abstract class Publisher<T extends Record<string, object>> {
 
       if (signal?.aborted) {
         pullResolvers.length = 0
-        bufferedEvents.length = 0
+        bufferedEvents.clear()
       }
 
       // Keep this async call at the end to avoid race conditions.
@@ -173,8 +188,15 @@ export abstract class Publisher<T extends Record<string, object>> {
           return { done: true, value: undefined }
         }
 
-        if (bufferedEvents.length > 0) {
-          return { done: false, value: bufferedEvents.shift()! }
+        const value = bufferedEvents.shift()
+
+        if (value !== undefined) {
+          if (bufferedEvents.length < bufferFloor) {
+            bufferFloor = bufferedEvents.length
+            bufferLimit = bufferFloor + maxBufferedEvents
+          }
+
+          return { done: false, value }
         }
 
         if (terminalState?.kind === 'error') {
@@ -187,5 +209,42 @@ export abstract class Publisher<T extends Record<string, object>> {
       },
       () => terminate({ kind: 'cancelled' }),
     )
+  }
+}
+
+/**
+ * FIFO queue with O(1) `shift`, since `Array.prototype.shift` copies large arrays on every call.
+ */
+class Queue<T extends object> {
+  private readonly items: (T | undefined)[] = []
+  private head = 0
+
+  get length(): number {
+    return this.items.length - this.head
+  }
+
+  push(item: T): void {
+    this.items.push(item)
+  }
+
+  shift(): T | undefined {
+    if (this.head === this.items.length) {
+      return undefined
+    }
+
+    const item = this.items[this.head]
+    this.items[this.head++] = undefined
+
+    if (this.head >= 32 && this.head * 2 >= this.items.length) {
+      this.items.splice(0, this.head)
+      this.head = 0
+    }
+
+    return item
+  }
+
+  clear(): void {
+    this.items.length = 0
+    this.head = 0
   }
 }

@@ -298,19 +298,6 @@ aside[class~='bg-accent/10'] [class~='text-accent'] {
   border-color: var(--blume-border);
 }
 
-/* Between md and lg the header shows the tab bar, the hamburger, and
-   the search box at once: collapse search to its icon so nothing wraps. */
-@media (min-width: 48rem) and (max-width: 63.9375rem) {
-  [data-blume-search-open] {
-    min-width: 0;
-  }
-
-  [data-blume-search-open] > span,
-  [data-blume-search-open] > kbd {
-    display: none;
-  }
-}
-
 /* The page-actions popovers (Export, Connect to MCP) are up to 22rem
    wide but live inside the scrollable TOC rail, which clips anything
    wider than the rail. Size them to the rail instead. */
@@ -335,9 +322,9 @@ body > aside[data-blume-nav-drawer]:not([data-orpc-drawer]) {
 }
 
 /* ---------------------------------------------------------------- */
-/* Landing page (pages/index.astro + pages/_home/*)                 */
-/* Its code panes live outside `.prose`, so the dual-theme Shiki     */
-/* variables and the pane chrome are re-declared here.               */
+/* Custom pages (pages/*.astro): landing, experts, sponsors         */
+/* The landing code panes live outside `.prose`, so the dual-theme  */
+/* Shiki variables and the pane chrome are re-declared here.        */
 /* ---------------------------------------------------------------- */
 
 /* Dot field behind the hero and the closing CTA, faded out with a
@@ -355,6 +342,14 @@ body > aside[data-blume-nav-drawer]:not([data-orpc-drawer]) {
 
 .orpc-dots-bottom {
   mask-image: radial-gradient(ellipse 75% 60% at 50% 100%, #000 10%, transparent 70%);
+}
+
+/* Inner pages (experts, sponsors) keep their text on the left, so the field
+   fades in from the top-right corner instead, anchored there so the dots keep
+   the same inset from a panel's border at every width. */
+.orpc-dots-corner {
+  background-position: right top;
+  mask-image: radial-gradient(ellipse 60% 100% at 100% 0%, #000 10%, transparent 70%);
 }
 
 /* Buttons */
@@ -377,8 +372,8 @@ body > aside[data-blume-nav-drawer]:not([data-orpc-drawer]) {
 }
 
 .orpc-btn-primary {
-  background: var(--blume-accent);
-  color: var(--blume-accent-foreground);
+  background: var(--blume-action);
+  color: var(--blume-action-foreground);
 }
 
 .orpc-btn-primary:hover {
@@ -713,8 +708,8 @@ body > aside[data-blume-nav-drawer]:not([data-orpc-drawer]) {
 
 /* Align the first value in each row with the section gutter above it. Scoped to
    the two-column tier: these selectors outrank the wider tier's plain
-   `.orpc-stat > a` padding, so unscoped they would strip the inner padding off
-   the third and fourth cells there too. */
+   `.orpc-stat > a` padding, so unscoped they would strip the inner
+   padding off the third and fourth cells there too. */
 @media (max-width: 63.9375rem) {
   .orpc-stat:nth-child(odd) > a {
     padding-inline-start: 0;
@@ -818,6 +813,112 @@ body > aside[data-blume-nav-drawer]:not([data-orpc-drawer]) {
 
 .orpc-compare td {
   text-align: center;
+}
+
+/* Separate, not collapsed: a collapsed border stays behind when the header
+   row sticks. */
+.orpc-sponsors {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.875rem;
+}
+
+.orpc-sponsors :is(th, td) {
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--blume-border);
+  text-align: start;
+  vertical-align: middle;
+}
+
+.orpc-sponsors th {
+  font-weight: 400;
+}
+
+.orpc-sponsors thead th {
+  padding-block: 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--blume-muted-foreground);
+  white-space: nowrap;
+}
+
+.orpc-sponsors .orpc-num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.orpc-sponsors-band :is(th, td) {
+  padding-block: 0.5rem;
+  background: var(--blume-muted);
+  font-family: var(--blume-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--blume-muted-foreground);
+}
+
+.orpc-sponsors tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.orpc-sponsors tbody tr:is(:hover, :focus-within) {
+  background: color-mix(in oklch, var(--blume-muted) 60%, transparent);
+}
+
+.orpc-sponsors tfoot :is(th, td) {
+  padding-block: 0.875rem;
+  border-bottom: 0;
+  background: var(--blume-muted);
+  font-weight: 600;
+}
+
+/* Any overflow hidden/auto ancestor silently disables the sticky header. */
+@media (min-width: 48rem) {
+  .orpc-sponsors thead th {
+    position: sticky;
+    top: var(--docs-header-height);
+    z-index: 1;
+    background: var(--blume-background);
+  }
+
+  /* `scroll-padding-top` only clears the site header, not this one. */
+  .orpc-sponsors tbody a {
+    scroll-margin-top: 2.5rem;
+  }
+}
+
+@media (min-width: 64rem) {
+  .orpc-sponsors :is(th, td) {
+    padding-inline: 1.25rem;
+  }
+}
+
+/* Validated ordinal ramp (monotone lightness, >= 0.06 apart, every step >= 2:1
+   on the page and the muted band); re-check before changing a step. Hue 359 is
+   the brand accent in blume.config.ts; re-validate if it changes. */
+:root {
+  --orpc-tier-1: oklch(0.45 0.17 359);
+  --orpc-tier-2: oklch(0.53 0.19 359);
+  --orpc-tier-3: oklch(0.61 0.17 359);
+  --orpc-tier-4: oklch(0.68 0.145 359);
+  --orpc-tier-5: oklch(0.75 0.11 359);
+}
+
+:root[data-theme='dark'] {
+  --orpc-tier-1: oklch(0.82 0.105 359);
+  --orpc-tier-2: oklch(0.74 0.16 359);
+  --orpc-tier-3: oklch(0.66 0.17 359);
+  --orpc-tier-4: oklch(0.58 0.16 359);
+  --orpc-tier-5: oklch(0.5 0.14 359);
+}
+
+@media (forced-colors: active) {
+  .orpc-tier-swatch {
+    forced-color-adjust: none;
+  }
 }
 
 /* Star count riding inside the GitHub CTA, split off by a hairline. */

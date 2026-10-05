@@ -2,6 +2,7 @@ import {
   decodeCacheTagHeader,
   encodeCacheTag,
   encodeCacheTagHeader,
+  isAcceptableEncoding,
   isCompressibleContentType,
   isNoTransformCacheControl,
   matchesHttpPath,
@@ -216,6 +217,22 @@ describe('parseAcceptEncodingQualities', () => {
   it('returns an empty map for a missing or empty header', () => {
     expect(parseAcceptEncodingQualities(undefined)).toEqual(new Map())
     expect(parseAcceptEncodingQualities('')).toEqual(new Map())
+  })
+})
+
+describe('isAcceptableEncoding', () => {
+  it.each([
+    ['gzip', 'gzip', true],
+    ['gzip;q=0', 'gzip', false],
+    ['br', 'gzip', false],
+    ['*', 'gzip', true],
+    ['*;q=0', 'gzip', false],
+    ['gzip;q=0, *', 'gzip', false],
+    ['gzip;q=0, *', 'deflate', true],
+    ['gzip, *;q=0', 'gzip', true],
+    [undefined, 'gzip', false],
+  ] as const)('given %s, %s is acceptable: %s', (header, coding, expected) => {
+    expect(isAcceptableEncoding(parseAcceptEncodingQualities(header), coding)).toBe(expected)
   })
 })
 

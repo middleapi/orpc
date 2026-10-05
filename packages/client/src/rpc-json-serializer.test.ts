@@ -37,8 +37,8 @@ const customSupportedDataTypes: { name: string, value: unknown, expected: unknow
   },
   {
     name: 'person - 2',
-    value: new Person2('dinwwwh - 2', [{ nested: new Date('2023-01-02') }, /uic/gi]),
-    expected: new Person2('dinwwwh - 2', [{ nested: new Date('2023-01-02') }, /uic/gi]),
+    value: new Person2('dinwwwh - 2', [{ nested: new Date('2023-01-02') }, new URL('https://orpc.dev')]),
+    expected: new Person2('dinwwwh - 2', [{ nested: new Date('2023-01-02') }, new URL('https://orpc.dev')]),
   },
   {
     name: 'should not resolve toJSON',
@@ -71,12 +71,12 @@ describe.each([
       person: {
         condition: data => data instanceof Person,
         serialize: data => data.toJSON(),
-        deserialize: data => new Person(data.name, data.date),
+        deserialize: (data: any) => new Person(data.name, data.date),
       },
       person2: {
         condition: data => data instanceof Person2,
         serialize: data => data.toJSON(),
-        deserialize: data => new Person2(data.name, data.data),
+        deserialize: (data: any) => new Person2(data.name, data.data),
       },
     },
   })
@@ -110,7 +110,6 @@ describe.each([
   it('complex', () => {
     assert({
       'date': new Date('2023-01-01'),
-      'regexp': /uic/gi,
       'url': new URL('https://dinwwwh.com'),
       '!@#$%^^&()[]>?<~_<:"~+!_': value,
       'list': [value],
@@ -121,7 +120,6 @@ describe.each([
       },
     }, {
       'date': new Date('2023-01-01'),
-      'regexp': /uic/gi,
       'url': new URL('https://dinwwwh.com'),
       '!@#$%^^&()[]>?<~_<:"~+!_': expected,
       'list': [expected],
@@ -143,9 +141,10 @@ describe('rpcJsonSerializer: wire format', () => {
       createdAt: new Date('2023-01-01T00:00:00.000Z'),
       tags: new Set(['a']),
       scores: new Map([['x', 1]]),
-      pattern: /^a$/i,
       homepage: new URL('https://orpc.dev'),
       missing: Number.NaN,
+      max: Number.POSITIVE_INFINITY,
+      min: Number.NEGATIVE_INFINITY,
     })
 
     expect(json).toEqual({
@@ -153,9 +152,10 @@ describe('rpcJsonSerializer: wire format', () => {
       createdAt: '2023-01-01T00:00:00.000Z',
       tags: ['a'],
       scores: [['x', 1]],
-      pattern: '/^a$/i',
       homepage: 'https://orpc.dev/',
       missing: null,
+      max: 'Infinity',
+      min: '-Infinity',
     })
 
     expect(meta).toEqual(expect.arrayContaining([
@@ -163,11 +163,12 @@ describe('rpcJsonSerializer: wire format', () => {
       ['date', 'createdAt'],
       ['set', 'tags'],
       ['map', 'scores'],
-      ['regexp', 'pattern'],
       ['url', 'homepage'],
       ['nan', 'missing'],
+      ['infinity', 'max'],
+      ['infinity', 'min'],
     ]))
-    expect(meta).toHaveLength(7)
+    expect(meta).toHaveLength(8)
   })
 
   it('omits meta entirely for pure JSON payloads', () => {
@@ -286,7 +287,7 @@ describe('rpcJsonSerializer: custom handlers', () => {
         person: {
           condition: data => data instanceof Person,
           serialize: (data: Person) => data.toJSON(),
-          deserialize: data => new Person(data.name, data.date),
+          deserialize: (data: any) => new Person(data.name, data.date),
         },
       },
     })
@@ -336,8 +337,9 @@ describe('rpcJsonSerializer: custom handlers', () => {
       date: new Date('2023-01-01'),
       invalidDate: new Date('Invalid'),
       nan: Number.NaN,
+      infinity: Number.POSITIVE_INFINITY,
+      negativeInfinity: Number.NEGATIVE_INFINITY,
       url: new URL('https://orpc.dev'),
-      regexp: /uic/gi,
       set: new Set([1, 2]),
       map: new Map([['a', 1]]),
       bigint: 123n,
@@ -377,6 +379,23 @@ describe('rpcJsonSerializer: custom handlers', () => {
   })
 })
 
+describe('rpcJsonSerializer: deserialize', () => {
+  const serializer = new RPCJsonSerializer()
+
+  it.each([
+    ['json', { count: 10n, list: [{ tags: new Set(['a']), nested: [new Date('2023-01-01'), new URL('https://orpc.dev')] }] }],
+    ['blobs', { files: [new Blob(['hello'])], map: new Map([[1n, new Set(['a'])]]) }],
+  ])('does not mutate the input and can deserialize repeatedly: %s', (_, value) => {
+    // https://github.com/middleapi/orpc/issues/2053
+    const payload = serializer.serialize(value)
+    const snapshot = JSON.stringify(payload)
+
+    expect(serializer.deserialize(payload)).toEqual(value)
+    expect(serializer.deserialize(payload)).toEqual(value)
+    expect(JSON.stringify(payload)).toBe(snapshot)
+  })
+})
+
 describe('rpcJsonSerializer: security', () => {
   const serializer = new RPCJsonSerializer()
 
@@ -386,7 +405,7 @@ describe('rpcJsonSerializer: security', () => {
   })
 
   it.each(['doesNotExist', '__proto__', 'constructor', 'prototype'])('throws when a meta or blob path references the non-own segment "%s"', (segment) => {
-    const error = `Security error: Invalid serialized data. Segment "${segment}" does not exist.`
+    const error = `Invalid RPC serialized data: segment "${segment}" does not exist.`
 
     expect(
       () => serializer.deserialize({ json: { o: {} }, meta: [['date', segment]] }),
@@ -413,13 +432,44 @@ describe('rpcJsonSerializer: security', () => {
     ).toThrow(error)
   })
 
+  it('throws when a blobs entry is not a Blob', () => {
+    for (const value of [4294967295, 'text', null, {}, []]) {
+      expect(() => serializer.deserialize({ json: [null], blobs: [value as any], maps: [[0]] }))
+        .toThrow('Invalid RPC serialized data: blob 0 is not a Blob.')
+    }
+
+    expect(() => serializer.deserialize({ json: [null, null], blobs: [new Blob()], maps: [[0], [1]] }))
+      .toThrow('Invalid RPC serialized data: blob 1 is not a Blob.')
+  })
+
   it.each(['nonexistent', '__proto__', 'constructor', 'prototype', 'toString', 'hasOwnProperty', 'valueOf'])('never resolves the meta type "%s" through the prototype chain', (type) => {
-    expect(() => serializer.deserialize({ json: 1, meta: [[type]] })).toThrow()
+    expect(() => serializer.deserialize({ json: 1, meta: [[type]] }))
+      .toThrow(`Invalid RPC serialized data: type "${type}" is not supported.`)
   })
 
   it('throws instead of producing garbage for corrupted built-in payloads', () => {
-    expect(() => serializer.deserialize({ json: 'not-a-regexp', meta: [['regexp']] })).toThrow()
     expect(() => serializer.deserialize({ json: 'not-a-bigint', meta: [['bigint']] })).toThrow()
+  })
+
+  it.each([
+    ['undefined', 'null', ['text', 1, true, [], {}]],
+    ['nan', 'null', ['text', 1, true, [], {}]],
+    ['infinity', '"Infinity" or "-Infinity"', [null, 'text', 'infinity', 1, true, [], {}]],
+    ['bigint', 'a string', [null, 1, true, [], {}]],
+    ['url', 'a string', [null, 1, true, [], {}]],
+    ['date', 'a string or null', [1, true, [], {}]],
+    ['set', 'an array', [null, 'text', 1, true, {}]],
+    ['map', 'an array', [null, 'text', 1, true, {}]],
+  ])('%s rejects mistyped serialized values', (type, expected, rejected) => {
+    for (const value of rejected) {
+      expect(() => serializer.deserialize({ json: { value }, meta: [[type, 'value']] }))
+        .toThrow(`Invalid RPC serialized data: type "${type}" expects ${expected}.`)
+    }
+  })
+
+  it('rejects a value already restored by an earlier meta entry', () => {
+    expect(() => serializer.deserialize({ json: { value: '1' }, meta: [['bigint', 'value'], ['url', 'value']] }))
+      .toThrow('Invalid RPC serialized data: type "url" expects a string.')
   })
 
   /* eslint-disable no-proto, no-restricted-properties */

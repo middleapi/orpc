@@ -22,8 +22,8 @@ describe('requestValidationLinkPlugin', () => {
 
   const stackedObjectProcedure = new ProcedureContract({
     inputSchemas: [
-      z.object({ parent: z.string() }),
-      z.object({ child: z.string() }),
+      z.object({ parent: z.string().transform(value => `parent__${value}`) }),
+      z.object({ parent: z.string(), child: z.string() }),
     ],
     outputSchemas: [],
     errorMap: {},
@@ -140,7 +140,7 @@ describe('requestValidationLinkPlugin', () => {
 
     expect(output).toBe('__output__')
     expect(codec.encodeInput).toHaveBeenCalledWith(
-      { parent: 'PARENT', child: 'CHILD' },
+      { parent: 'parent__PARENT', child: 'CHILD' },
       ['stackedObjectProcedure'],
       { context: {} },
     )

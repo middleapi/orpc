@@ -50,26 +50,6 @@ describe('responseCompressionHandlerPlugin', () => {
       await expect(response!.json()).resolves.toEqual({ json: largeText })
     })
 
-    it('does not compress when accept-encoding has no supported coding', async () => {
-      const handler = new RPCHandler(os.handler(() => 'x'.repeat(2000)), {
-        plugins: [
-          new ResponseCompressionHandlerPlugin({ threshold: 100 }),
-        ],
-      })
-
-      const { matched, response } = await handler.handle(new Request('http://localhost', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'accept-encoding': 'br, zstd',
-        },
-        body: JSON.stringify({ json: null }),
-      }))
-
-      expect(matched).toBe(true)
-      expect(response!.headers.has('content-encoding')).toBe(false)
-    })
-
     it('prefers the first configured encoding the client accepts', async () => {
       const handler = new RPCHandler(os.handler(() => 'x'.repeat(2000)), {
         plugins: [
@@ -117,7 +97,11 @@ describe('responseCompressionHandlerPlugin', () => {
       ).resolves.toBe(JSON.stringify({ json: largeText }))
     })
 
-    it('skips empty tokens in accept-encoding', async () => {
+    it.each([
+      ['only unsupported codings', 'br, zstd', null],
+      ['empty list elements', ' , gzip , ', 'gzip'],
+      ['a wildcard beside an explicitly rejected coding', 'gzip;q=0, *', 'deflate'],
+    ])('negotiates accept-encoding with %s', async (_case, acceptEncoding, expected) => {
       const handler = new RPCHandler(os.handler(() => 'x'.repeat(2000)), {
         plugins: [
           new ResponseCompressionHandlerPlugin({ threshold: 100 }),
@@ -128,13 +112,13 @@ describe('responseCompressionHandlerPlugin', () => {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'accept-encoding': ' , gzip , ',
+          'accept-encoding': acceptEncoding,
         },
         body: JSON.stringify({ json: null }),
       }))
 
       expect(matched).toBe(true)
-      expect(response!.headers.get('content-encoding')).toBe('gzip')
+      expect(response!.headers.get('content-encoding')).toBe(expected)
     })
   })
 
@@ -291,6 +275,72 @@ describe('responseCompressionHandlerPlugin', () => {
     })
   })
 
+  describe('validators', () => {
+    function createHandler(extraHeaders: Record<string, string>) {
+      return new RPCHandler(os.handler(() => 'x'.repeat(2000)), {
+        plugins: [
+          {
+            name: 'set-validators',
+            init(options) {
+              return {
+                ...options,
+                routingInterceptors: [
+                  async ({ next, ...interceptorOptions }) => {
+                    const result = await next(interceptorOptions)
+                    if (!result.matched) {
+                      return result
+                    }
+                    return {
+                      ...result,
+                      response: {
+                        ...result.response,
+                        headers: { ...result.response.headers, ...extraHeaders },
+                      },
+                    }
+                  },
+                  ...options.routingInterceptors ?? [],
+                ],
+              }
+            },
+          },
+          new ResponseCompressionHandlerPlugin({ threshold: 100 }),
+        ],
+      })
+    }
+
+    function createRequest(acceptEncoding: string) {
+      return new Request('http://localhost', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'accept-encoding': acceptEncoding,
+        },
+        body: JSON.stringify({ json: null }),
+      })
+    }
+
+    it.each([
+      ['weakens a strong etag', '"abc"', 'W/"abc"'],
+      ['keeps a weak etag', 'W/"abc"', 'W/"abc"'],
+      ['adds no etag when there is none', undefined, null],
+    ])('%s and drops accept-ranges on a compressed response', async (_label, etag, expected) => {
+      const { response } = await createHandler({ ...etag === undefined ? {} : { etag }, 'accept-ranges': 'bytes' }).handle(createRequest('gzip'))
+
+      expect(response!.headers.get('content-encoding')).toBe('gzip')
+      // A strong tag shared with the identity bytes would let If-Range splice them into compressed ones
+      expect(response!.headers.get('etag')).toBe(expected)
+      expect(response!.headers.has('accept-ranges')).toBe(false)
+    })
+
+    it('keeps validators on a response it does not compress', async () => {
+      const { response } = await createHandler({ 'etag': '"abc"', 'accept-ranges': 'bytes' }).handle(createRequest('identity'))
+
+      expect(response!.headers.has('content-encoding')).toBe(false)
+      expect(response!.headers.get('etag')).toBe('"abc"')
+      expect(response!.headers.get('accept-ranges')).toBe('bytes')
+    })
+  })
+
   describe('partial responses', () => {
     it.each([
       ['a 206 status', 206, {}],
@@ -342,6 +392,32 @@ describe('responseCompressionHandlerPlugin', () => {
       expect(response!.headers.has('content-encoding')).toBe(false)
       await expect(response!.json()).resolves.toEqual({ json: largeText })
     })
+  })
+
+  it('compresses a response whose content-range header was cleared', async () => {
+    const largeText = 'x'.repeat(2000)
+    const handler = new RPCHandler(os.handler(() => largeText), {
+      plugins: [new ResponseCompressionHandlerPlugin({ threshold: 100 })],
+      routingInterceptors: [async ({ next }) => {
+        const result = await next()
+
+        return result.matched
+          ? { ...result, response: { ...result.response, headers: { ...result.response.headers, 'content-range': [] } } }
+          : result
+      }],
+    })
+
+    const { response } = await handler.handle(new Request('http://localhost', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'accept-encoding': 'gzip',
+      },
+      body: JSON.stringify({ json: null }),
+    }))
+
+    expect(response!.headers.get('content-encoding')).toBe('gzip')
+    expect(response!.headers.has('content-range')).toBe(false)
   })
 
   describe('json body', () => {

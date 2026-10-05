@@ -25,11 +25,12 @@ export function once<T>(fn: () => T): () => T {
 }
 
 /**
- * Executes the callback function after the current call stack has been cleared.
+ * Executes the callback function after the current call stack has been cleared,
+ * waiting at least `delay` ms when `setTimeout` is available.
  */
-export function defer(callback: () => void): void {
+export function defer(callback: () => void, delay = 0): void {
   if (typeof setTimeout === 'function') {
-    setTimeout(callback, 0)
+    setTimeout(callback, delay)
   }
   else {
     Promise.resolve()

@@ -1,5 +1,6 @@
 import type { RedisClientType } from 'redis'
 import type { RedisPublisherOptions } from './redis'
+import { Buffer } from 'node:buffer'
 import { RPCJsonSerializer } from '@orpc/client'
 import { getOrBind, promiseWithResolvers, sleep } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
@@ -163,6 +164,26 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
     await unsubscribe()
   })
 
+  it('resumes every missed event for AsyncIteratorObject subscribers beyond maxBufferedEvents', async () => {
+    const publisher = createTestingPublisher({
+      maxBufferedEvents: 2,
+      resume: { enabled: true, seconds: 10 },
+    })
+    const event = 'large-backlog'
+
+    for (let i = 0; i < 5; i++) {
+      await publisher.publish(event, { order: i })
+    }
+
+    const iterator = publisher.subscribe(event, { lastEventId: '0' })
+
+    for (let i = 0; i < 5; i++) {
+      expect((await iterator.next()).value).toEqual({ order: i })
+    }
+
+    await iterator.return()
+  })
+
   it('deduplicates events that race between resume and live delivery during reconnect', async ({ onTestFinished }) => {
     const { resolve, promise } = promiseWithResolvers<void>()
     const delayedRedis = new Proxy(createClient({ url: REDIS_URL }), {
@@ -207,6 +228,80 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
     expect(listener.mock.calls.map(call => call[0].order)).toEqual([1, 2, 3, 4])
 
     await unsubscribe()
+  })
+
+  it('keeps live delivery in stream order under concurrent publishers so resume skips nothing', async ({ onTestFinished }) => {
+    const prefix = `concurrent:${crypto.randomUUID()}:`
+    const event = 'orders'
+    // Separate connections, like publishers in different processes.
+    const clients = Array.from({ length: 4 }, () => createClient({ url: REDIS_URL }))
+    onTestFinished(() => {
+      clients.forEach(client => client.destroy())
+    })
+    const publishers = clients.map(client => createTestingPublisher({
+      resume: { enabled: true, seconds: 10 },
+      prefix,
+    }, { useRedis: client }))
+    const listener = vi.fn()
+
+    const unsubscribe = await publishers[0]!.subscribe(event, listener)
+
+    await Promise.all(Array.from({ length: 500 }, (_, order) => publishers[order % publishers.length]!.publish(event, { order })))
+
+    await vi.waitFor(() => {
+      expect(listener).toHaveBeenCalledTimes(500)
+    })
+
+    const streamIds = (await redis.xRange(`${prefix}${event}`, '-', '+')).map(entry => entry.id)
+    expect(listener.mock.calls.map(([payload]) => getEventMeta(payload)?.id)).toEqual(streamIds)
+
+    await unsubscribe()
+  })
+
+  it('delivers live and resumed events when the client has a keyPrefix', async ({ onTestFinished }) => {
+    // node-redis prefixes keys but not channels, so the adapter prefixes channels to match.
+    const prefixedRedis = createClient({ url: REDIS_URL, keyPrefix: `key-prefix:${crypto.randomUUID()}:` })
+    const subscriber = prefixedRedis.duplicate()
+    onTestFinished(() => {
+      prefixedRedis.destroy()
+      subscriber.destroy()
+    })
+    const prefix = `prefix:${crypto.randomUUID()}:`
+    const publisher = createTestingPublisher({
+      resume: { enabled: true, seconds: 10 },
+      subscriber,
+      prefix,
+    }, { useRedis: prefixedRedis })
+    const publisherWithoutResume = createTestingPublisher({ subscriber, prefix }, { useRedis: prefixedRedis })
+    const event = 'orders'
+    const listener = vi.fn()
+
+    const unsubscribe = await publisher.subscribe(event, listener)
+
+    await publisher.publish(event, { order: 1 })
+    await publisher.publish(event, { order: 2 })
+    await publisherWithoutResume.publish(event, { order: 3 })
+
+    await vi.waitFor(() => {
+      expect(listener).toHaveBeenCalledTimes(3)
+    })
+
+    await unsubscribe()
+
+    const resumed = vi.fn()
+    const unsubscribeResumed = await publisher.subscribe(event, resumed, {
+      lastEventId: getEventMeta(listener.mock.calls[0]![0])?.id,
+    })
+
+    expect(resumed).toHaveBeenCalledTimes(1)
+    expect(resumed).toHaveBeenCalledWith({ order: 2 })
+
+    await unsubscribeResumed()
+  })
+
+  it('rejects a client whose keyPrefix is not a string', () => {
+    expect(() => new RedisPublisher(createClient({ keyPrefix: Buffer.from('app:') })))
+      .toThrow('RedisPublisher only supports a string keyPrefix on the Redis client.')
   })
 
   it('trims stale resume history on the next publish and lets Redis expire the stream key', async () => {
@@ -256,7 +351,7 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
         person: {
           condition: p => p instanceof Person,
           serialize: p => ({ name: p.name, date: p.date }),
-          deserialize: p => new Person(p.name, p.date),
+          deserialize: (p: any) => new Person(p.name, p.date),
         },
       },
     })

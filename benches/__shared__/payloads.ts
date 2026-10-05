@@ -30,7 +30,6 @@ function createUnit(i: number) {
       ['nested', new Date('2023-06-15T12:30:00.000Z')],
     ]),
     homepage: new URL('https://orpc.dev/docs'),
-    pattern: /^[a-z0-9-]+$/i,
     person: new Person(`person-${i}`, 20 + (i % 50)),
   }
 }

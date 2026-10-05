@@ -5,5 +5,4 @@ export {
   RequestLimitHandlerPlugin as BodyLimitPlugin,
 } from '../../plugins/request-limit'
 export * from './handler'
-export * from './plugin'
 export * from './rpc-handler'

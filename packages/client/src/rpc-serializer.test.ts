@@ -337,7 +337,7 @@ describe('rpcSerializer', () => {
         meta: [['date', '__proto__', 'polluted']],
       }))
 
-      expect(() => serializer.deserialize(body)).toThrow('Security error')
+      expect(() => serializer.deserialize(body)).toThrow('Invalid RPC serialized data')
     })
 
     it('rejects meta paths escaping the payload in form data bodies', () => {
@@ -348,7 +348,7 @@ describe('rpcSerializer', () => {
         maps: [],
       }))
 
-      expect(() => serializer.deserialize(form)).toThrow('Security error')
+      expect(() => serializer.deserialize(form)).toThrow('Invalid RPC serialized data')
     })
 
     it('rejects blob maps escaping the payload in form data bodies', () => {
@@ -359,7 +359,27 @@ describe('rpcSerializer', () => {
       }))
       form.set('0', new Blob(['x']))
 
-      expect(() => serializer.deserialize(form)).toThrow('Security error')
+      expect(() => serializer.deserialize(form)).toThrow('Invalid RPC serialized data')
+    })
+
+    it('rejects blobs smuggled in plain bodies', () => {
+      // would otherwise resize the array to 2 ** 32 - 1 empty slots for `set` to iterate
+      const body = JSON.parse('{"json":[1],"meta":[["set"]],"maps":[["length"]],"blobs":[4294967295]}')
+
+      expect(() => serializer.deserialize(body)).toThrow('Invalid RPC serialized data: blob 0 is not a Blob.')
+    })
+
+    it('cannot resize an array through blob maps in form data bodies', () => {
+      const form = new FormData()
+      form.set('data', JSON.stringify({
+        json: [1],
+        meta: [['set']],
+        maps: [['length']],
+      }))
+      form.set('0', new Blob(['x']))
+
+      // only a Blob can land there, and the spec rejects it as an array length
+      expect(() => serializer.deserialize(form)).toThrow(RangeError)
     })
 
     it('rejects unknown meta types instead of resolving them on the prototype chain', () => {

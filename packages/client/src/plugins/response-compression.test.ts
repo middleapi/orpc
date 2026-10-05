@@ -97,6 +97,40 @@ describe('responseCompressionLinkPlugin', () => {
     await expect(link.call(['test'], undefined, { context: {} })).resolves.toEqual('OK')
   })
 
+  it('decompresses response body when 5 content-encodings are applied', async () => {
+    let body: Uint8Array<ArrayBuffer> = await compressAsync(JSON.stringify({ json: 'OK' }), 'gzip')
+    for (let i = 1; i < 5; i++) {
+      body = new Uint8Array(await new Response(new Blob([body]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer())
+    }
+
+    const { link } = createLink({
+      fetchImpl: async () => new Response(body, {
+        headers: {
+          'content-type': 'application/json',
+          'content-encoding': Array.from({ length: 5 }).fill('gzip').join(', '),
+        },
+      }),
+    })
+
+    await expect(link.call(['test'], undefined, { context: {} })).resolves.toEqual('OK')
+  })
+
+  it('rejects response body when more than 5 content-encodings are applied', async () => {
+    const { link } = createLink({
+      fetchImpl: async () => new Response('irrelevant', {
+        headers: {
+          'content-type': 'application/json',
+          'content-encoding': Array.from({ length: 6 }).fill('gzip').join(', '),
+        },
+      }),
+    })
+
+    const promise = link.call(['test'], undefined, { context: {} })
+
+    await expect(promise).rejects.toBeInstanceOf(TypeError)
+    await expect(promise).rejects.toThrow('Too many content encodings.')
+  })
+
   it('does not decompress when content-encoding is not supported', async () => {
     const payload = JSON.stringify({ json: 'OK' })
 
