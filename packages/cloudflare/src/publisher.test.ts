@@ -145,10 +145,10 @@ describe('durable publisher', () => {
     const second = live.mock.calls[1]![0]
 
     expect(first).toEqual({ text: 'first' })
-    expect(getEventMeta(first)?.id).toBe('1')
+    expect(getEventMeta(first)?.id).toMatch(/^\d+$/)
 
     expect(second).toEqual({ text: 'second' })
-    expect(getEventMeta(second)?.id).toBe('2')
+    expect(getEventMeta(second)?.id).toBe(String(BigInt(getEventMeta(first)!.id!) + 1n))
     expect(getEventMeta(second)?.comments).toEqual(['keep me'])
 
     await stopLive()

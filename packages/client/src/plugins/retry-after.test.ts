@@ -260,6 +260,75 @@ describe('retryAfterLinkPlugin', () => {
     })
   })
 
+  describe('request body', () => {
+    it.each([
+      ['ReadableStream', () => new Blob(['data']).stream()],
+      ['AsyncIteratorObject', () => (async function* () { yield 'data' })()],
+    ])('should not retry a %s body, since it cannot be resent', async (_, createBody) => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const body = createBody()
+      vi.mocked(codec.encodeInput).mockResolvedValue({
+        method: 'POST',
+        url: '/test',
+        headers: {},
+        body,
+      })
+
+      vi.mocked(transport.send).mockResolvedValue({
+        status: 429,
+        headers: { 'retry-after': '0' },
+        resolveBody: async () => 'rate limited',
+      } satisfies StandardLazyResponse)
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryAfterLinkPlugin()],
+      })
+
+      const result = await link.call(['test'], 'input', { context: {} })
+
+      expect(result).toBe('rate limited')
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(transport.send).toHaveBeenCalledWith(expect.objectContaining({ body }), ['test'], expect.anything())
+    })
+
+    it.each([
+      ['Blob', () => new Blob(['data'])],
+      ['FormData', () => {
+        const form = new FormData()
+        form.append('file', new Blob(['data']))
+        return form
+      }],
+    ])('should retry a %s body, since it can be resent', async (_, createBody) => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(codec.encodeInput).mockResolvedValue({
+        method: 'POST',
+        url: '/test',
+        headers: {},
+        body: createBody(),
+      })
+
+      vi.mocked(transport.send).mockResolvedValueOnce({
+        status: 429,
+        headers: { 'retry-after': '0' },
+        resolveBody: async () => 'rate limited',
+      } satisfies StandardLazyResponse)
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryAfterLinkPlugin()],
+      })
+
+      const promise = link.call(['test'], 'input', { context: {} })
+      await vi.runAllTimersAsync()
+
+      expect(await promise).toBe('success')
+      expect(transport.send).toHaveBeenCalledTimes(2)
+    })
+  })
+
   describe('signal handling', () => {
     it('should stop retrying when signal is aborted during delay', async () => {
       const codec = makeCodec()

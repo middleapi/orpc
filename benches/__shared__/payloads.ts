@@ -34,9 +34,6 @@ function createUnit(i: number) {
   }
 }
 
-const SIZE_1KB = 1024
-const SIZE_10KB = 10 * SIZE_1KB
-const SIZE_100KB = 100 * SIZE_1KB
 const SIZE_5MB = 5 * 1024 * 1024
 
 export const PAYLOAD_1KB = createUnit(0)
@@ -60,25 +57,6 @@ export const EVENTS_10KB = Array.from({ length: 10 }).fill(PAYLOAD_1KB)
 export const EVENTS_100KB = Array.from({ length: 50 }).fill([PAYLOAD_1KB, PAYLOAD_1KB])
 export const EVENTS_5MB = Array.from({ length: 1000 }).fill([PAYLOAD_1KB, PAYLOAD_1KB, PAYLOAD_1KB, PAYLOAD_1KB, PAYLOAD_1KB])
 
-function splitBytes(size: number, parts: number): Uint8Array<ArrayBuffer>[] {
-  const buf = new Uint8Array(size)
-  const base = Math.floor(size / parts)
-  let rem = size - base * parts
-  const out: Uint8Array<ArrayBuffer>[] = []
-  let off = 0
-  for (let i = 0; i < parts; i++) {
-    const n = base + (rem-- > 0 ? 1 : 0)
-    out.push(buf.subarray(off, off + n))
-    off += n
-  }
-  return out
-}
-
-export const BYTES_1KB = splitBytes(SIZE_1KB, 1)
-export const BYTES_10KB = splitBytes(SIZE_10KB, 10)
-export const BYTES_100KB = splitBytes(SIZE_100KB, 50)
-export const BYTES_5MB = splitBytes(SIZE_5MB, 1000)
-
 /** Fresh async generator over prebuilt event parts (one-shot per call). */
 export function asSyncIteratorObject(parts: readonly unknown[]): AsyncGenerator<unknown, void, undefined> {
   return (async function* () {
@@ -86,21 +64,6 @@ export function asSyncIteratorObject(parts: readonly unknown[]): AsyncGenerator<
       yield part
     }
   }())
-}
-
-/** Fresh ReadableStream over prebuilt octet chunks (one-shot per call). */
-export function asReadableStream(parts: readonly Uint8Array<ArrayBuffer>[]): ReadableStream<Uint8Array<ArrayBuffer>> {
-  let i = 0
-  return new ReadableStream({
-    pull(controller) {
-      if (i >= parts.length) {
-        controller.close()
-      }
-      else {
-        controller.enqueue(parts[i++]!)
-      }
-    },
-  })
 }
 
 export async function drainBody(body: unknown): Promise<void> {

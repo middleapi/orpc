@@ -21,6 +21,10 @@ const link = new RPCLink({
 The `link` can be any supported oRPC link, such as [RPCLink](/docs/rpc/link), [OpenAPILink](/docs/openapi/link), or a custom one.
 :::
 
+:::warning
+Requests whose body is a [`ReadableStream`](/docs/binary-data#readablestreamuint8array) or an [`AsyncIteratorObject`](/docs/async-iterator-object) are never retried. The first attempt consumes the body, so it cannot be resent, and the plugin returns the first response as-is.
+:::
+
 ## Options
 
 By default, the plugin retries only requests that receive a `429` (Too Many Requests) or `503` (Service Unavailable) status code. It times out after 5 minutes and allows up to 3 retry attempts. You can customize this behavior with the following options:
