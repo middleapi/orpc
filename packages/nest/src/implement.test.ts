@@ -561,7 +561,7 @@ describe('routing', () => {
   describe.each([
     ['express adapter', undefined],
     ['fastify adapter', new FastifyAdapter()],
-  ] as const)('matches OpenAPIHandler params with %s', async (_, adapter) => {
+  ] as const)('matches OpenAPIHandler routing with %s', async (_, adapter) => {
     const contract = {
       hyphen: oc.meta(openapi({ method: 'GET', path: '/users/{user-id}', inputStructure: 'detailed' })),
       digits: oc.meta(openapi({ method: 'GET', path: '/digits/{0}/{1st}', inputStructure: 'detailed' })),
@@ -569,6 +569,7 @@ describe('routing', () => {
       namedPath: oc.meta(openapi({ method: 'GET', path: '/named/{path}/{+rest}', inputStructure: 'detailed' })),
       catchAll: oc.meta(openapi({ method: 'GET', path: '/files/{+path}', inputStructure: 'detailed' })),
       nonAscii: oc.meta(openapi({ method: 'GET', path: '/café/{id}', inputStructure: 'detailed' })),
+      caret: oc.meta(openapi({ method: 'GET', path: '/v1^beta/{id}', inputStructure: 'detailed' })),
     }
 
     const handler = vi.fn(({ input }) => (input as any).params)
@@ -585,6 +586,7 @@ describe('routing', () => {
           namedPath: impl.namedPath.handler(handler),
           catchAll: impl.catchAll.handler(handler),
           nonAscii: impl.nonAscii.handler(handler),
+          caret: impl.caret.handler(handler),
         }
       }
     }
@@ -611,6 +613,10 @@ describe('routing', () => {
       ['/files//etc/hosts', { path: '/etc/hosts' }],
       ['/caf%C3%A9/1', { id: '1' }],
       ['/caf%c3%a9/1', { id: '1' }],
+      // literal text matches whether the request sends it raw or percent-encoded
+      ['/v1^beta/a', { id: 'a' }],
+      ['/v1%5Ebeta/a', { id: 'a' }],
+      ['/v1%5ebeta/a', { id: 'a' }],
     ])('gET %s', async (url, params) => {
       const res = await supertest(httpServer).get(url)
 
@@ -634,6 +640,9 @@ describe('routing', () => {
   describe('matches OpenAPIHandler literal path text with express adapter', async () => {
     const contract = {
       colon: oc.meta(openapi({ method: 'GET', path: '/items:batchGet' })),
+      encodedColon: oc.meta(openapi({ method: 'GET', path: '/x%3Ay' })),
+      caretColon: oc.meta(openapi({ method: 'GET', path: '/v1^beta/items:batchGet' })),
+      encodedSlash: oc.meta(openapi({ method: 'GET', path: '/a%2Fb' })),
       braces: oc.meta(openapi({ method: 'GET', path: '/a/{id}.json' })),
       parens: oc.meta(openapi({ method: 'GET', path: '/(x)' })),
       question: oc.meta(openapi({ method: 'GET', path: '/what?' })),
@@ -649,6 +658,9 @@ describe('routing', () => {
       literal() {
         return {
           colon: impl.colon.handler(() => 'colon'),
+          encodedColon: impl.encodedColon.handler(() => 'encodedColon'),
+          caretColon: impl.caretColon.handler(() => 'caretColon'),
+          encodedSlash: impl.encodedSlash.handler(() => 'encodedSlash'),
           braces: impl.braces.handler(() => 'braces'),
           parens: impl.parens.handler(() => 'parens'),
           question: impl.question.handler(() => 'question'),
@@ -669,6 +681,13 @@ describe('routing', () => {
 
     it.each([
       ['/items:batchGet', 'colon'],
+      ['/items%3AbatchGet', 'colon'],
+      ['/x:y', 'encodedColon'],
+      ['/x%3ay', 'encodedColon'],
+      // Node's URL keeps `^` raw, while OpenAPIMatcher stores it encoded
+      ['/v1^beta/items:batchGet', 'caretColon'],
+      ['/v1%5Ebeta/items:batchGet', 'caretColon'],
+      ['/a%2Fb', 'encodedSlash'],
       // only whole-segment `{name}` is a param
       ['/a/%7Bid%7D.json', 'braces'],
       ['/(x)', 'parens'],
@@ -684,6 +703,8 @@ describe('routing', () => {
 
     it.each([
       '/itemsfoo',
+      // an encoded slash stays part of its segment
+      '/a/b',
       '/a/id.json',
       '/x',
       '/what',

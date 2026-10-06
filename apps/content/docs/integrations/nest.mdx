@@ -45,10 +45,11 @@ const contract = populateRouterContractOpenAPIPaths({
 ```
 
 :::warning
-Routes match like the [OpenAPI Handler](/docs/openapi/routing), with two exceptions when you use the Fastify adapter:
+Routes match like the [OpenAPI Handler](/docs/openapi/routing), with these exceptions when you use the Fastify adapter:
 
 - `{+name}` must be the last path segment, because Fastify only supports wildcards at the end of a route.
 - Literal path text must not contain route syntax characters such as `:`, `*`, `?`, `(`, `)`, `{`, or `}`. Fastify does not match these routes.
+- Reserved characters such as `$`, `&`, or `@` in literal path text only match when the request sends them raw, not percent-encoded.
 :::
 
 ## Implement Your Contract

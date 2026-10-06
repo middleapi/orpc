@@ -16,7 +16,7 @@ import { DEFAULT_OPENAPI_METHOD, getDynamicPathParams, getOpenAPIMeta } from '@o
 import { OpenAPIHandlerCodecCore } from '@orpc/openapi/standard'
 import { DEFAULT_SUCCESS_STATUS, getRouter, Procedure, unlazy } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
-import { isAsyncIteratorObject, mergeHttpPath, NullProtoObj, safeEncodeURIComponent, stringifyJSON, value } from '@orpc/shared'
+import { isAsyncIteratorObject, mergeHttpPath, NullProtoObj, safeDecodeURIComponent, safeEncodeURIComponent, stringifyJSON, value } from '@orpc/shared'
 import { flattenStandardHeader, generateContentDisposition } from '@standard-server/core'
 import { toEventStream, toStandardLazyRequest } from '@standard-server/node'
 import { mergeMap } from 'rxjs'
@@ -385,8 +385,8 @@ function toORPCOpenAPIParams(route: NestRoute | undefined, params: NestStandardL
 
 interface NestRoute {
   /**
-   * Express matches the percent-encoded request path while Fastify matches the decoded one,
-   * so a path with text that clients percent-encode (like `/café`) is also registered in its raw form.
+   * Express matches the request path as sent while Fastify matches it decoded, so literal text
+   * is registered in each common encoding for Express, and raw for Fastify.
    */
   paths: `/${string}`[]
   /**
@@ -406,8 +406,21 @@ function toContractNestRoute(contract: AnyProcedureContract): NestRoute | undefi
   return toNestRoute(meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path)
 }
 
-// the text clients percent-encode, the same set OpenAPIMatcher stores encoded
-const ENCODED_LITERAL_REGEX = /[ "#<>?^`{}\x7F-\uFFFC]+/g
+// chars a URL path keeps raw, which OpenAPIMatcher stores raw too
+const RAW_PATH_CHARS = String.raw`\w!$&'()*+,\-.:;=@[\\\]|~`
+const NOT_RAW_PATH_TEXT_REGEX = new RegExp(`[^${RAW_PATH_CHARS}]+`, 'g')
+const NOT_RAW_PATH_TEXT_OR_CARET_REGEX = new RegExp(`[^${RAW_PATH_CHARS}^]+`, 'g')
+
+/**
+ * The common ways clients send the same literal text, which OpenAPIHandler matches alike:
+ * as OpenAPIMatcher stores it, as Node's URL serializes it (keeping `^` raw), and as encodeURIComponent encodes it.
+ */
+const LITERAL_ENCODINGS: ((text: string) => string)[] = [
+  text => text.replace(NOT_RAW_PATH_TEXT_REGEX, safeEncodeURIComponent),
+  text => text.replace(NOT_RAW_PATH_TEXT_OR_CARET_REGEX, safeEncodeURIComponent),
+  safeEncodeURIComponent,
+]
+
 // path-to-regexp (Express) syntax
 const EXPRESS_SYNTAX_REGEX = /[\\:*(){}[\]+?!]/g
 
@@ -471,18 +484,21 @@ function toNestRoute(path: `/${string}`): NestRoute {
 
   literals.push(path.slice(literalStart))
 
+  // literal text means its decoded text, so `/x%3Ay` matches like `/x:y`
+  const decodedLiterals = literals.map(literal => literal.split('/').map(safeDecodeURIComponent))
+
   const join = (texts: string[]) => texts.map((text, i) => text + (patterns[i] ?? '')).join('') as `/${string}`
 
-  const expressPath = join(literals.map(text => text
-    .replace(ENCODED_LITERAL_REGEX, safeEncodeURIComponent)
+  const paths = new Set(LITERAL_ENCODINGS.map(encode => join(decodedLiterals.map(segments => segments
+    .map(encode)
+    .join('/')
     .replace(EXPRESS_SYNTAX_REGEX, '\\$&'),
-  ))
+  ))))
 
-  // the raw path can only be registered when Express reads it literally too
-  const rawPath = literals.some(text => text.search(EXPRESS_SYNTAX_REGEX) !== -1) ? undefined : join(literals)
-
-  return {
-    paths: rawPath === undefined || rawPath === expressPath ? [expressPath] : [expressPath, rawPath],
-    params,
+  // the raw text can only be registered when Express reads it literally too, and keeps its segments
+  if (decodedLiterals.every(segments => segments.every(segment => !segment.includes('/') && segment.search(EXPRESS_SYNTAX_REGEX) === -1))) {
+    paths.add(join(decodedLiterals.map(segments => segments.join('/'))))
   }
+
+  return { paths: [...paths], params }
 }
