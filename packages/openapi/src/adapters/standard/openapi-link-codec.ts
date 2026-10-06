@@ -378,7 +378,26 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     const procedure = await this.resolveProcedure(path)
     const meta = getOpenAPIMeta(procedure)
 
-    const body = await response.resolveBody(meta?.responseBodyHint)
+    const body = await (async () => {
+      try {
+        return await response.resolveBody(meta?.responseBodyHint)
+      }
+      catch (cause) {
+        /**
+         * A body that cannot be parsed (e.g. a gateway HTML page labeled as JSON, or a truncated body)
+         * is a malformed response. Other failures (abort, network) are rethrown as is.
+         */
+        if (cause instanceof SyntaxError) {
+          throw createORPCErrorFromMalformedResponse({
+            message: 'Invalid OpenAPI response format.',
+            response: { status: response.status, headers: response.headers, body: undefined },
+            cause,
+          })
+        }
+
+        throw cause
+      }
+    })()
 
     const deserialized = await (async () => {
       try {

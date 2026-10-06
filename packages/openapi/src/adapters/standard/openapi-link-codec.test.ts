@@ -855,6 +855,30 @@ describe('openAPILinkCodec', () => {
       }, ['ping'], { context: {} })).rejects.toThrow('network error')
     })
 
+    it.each([200, 502])('throws MALFORMED_ORPC_RESPONSE when the response body cannot be parsed (status %i)', async (status) => {
+      const codec = new OpenAPILinkCodec({
+        ping: oc.meta(openapi({ responseBodyHint: 'json' })),
+      }, { serializer })
+
+      const parseError = new SyntaxError('Unexpected token \'<\'')
+      const resolveBody = vi.fn(() => Promise.reject(parseError))
+
+      const error: any = await codec.decodeResponse({
+        status,
+        headers: { 'content-type': 'application/json' },
+        resolveBody,
+      }, ['ping'], { context: {} }).then(() => null, e => e)
+
+      expect(resolveBody).toHaveBeenCalledWith('json')
+      expect(error).toBeInstanceOf(ORPCError)
+      expect(error.code).toBe('MALFORMED_ORPC_RESPONSE')
+      expect(error.message).toBe('Invalid OpenAPI response format.')
+      expect(error.data).toEqual({ status, headers: { 'content-type': 'application/json' }, body: undefined })
+      expect(error.cause).toBeInstanceOf(MalformedResponseError)
+      expect(error.cause.response).toBe(error.data)
+      expect(error.cause.cause).toBe(parseError)
+    })
+
     it('throws when the deserialized response body has an invalid format', async () => {
       const badSerializer: any = {
         ...serializer,

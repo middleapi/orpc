@@ -1,5 +1,6 @@
 import { toFetchBody } from '@standard-server/fetch'
 import { createORPCClient } from '../../client'
+import { MalformedResponseError, ORPCError } from '../../error'
 import { RPCLink } from './rpc-link'
 
 vi.mock('@orpc/shared', async (loadOrigin) => {
@@ -54,6 +55,33 @@ describe('rpcLink', () => {
       }),
       ['ping'],
     )
+  })
+
+  it.each([
+    [502, '<html><body>Bad Gateway</body></html>'],
+    [200, '{"json":"po'],
+  ])('throws MALFORMED_ORPC_RESPONSE when a JSON response body cannot be parsed (status %i)', async (status, body) => {
+    const fetch = vi.fn(async () => {
+      return new Response(body, {
+        status,
+        headers: {
+          'content-type': 'application/json',
+        },
+      })
+    })
+
+    const orpc = createORPCClient(new RPCLink({
+      fetch,
+      origin: 'http://api.example.com',
+    })) as any
+
+    const error = await orpc.ping('input').then(() => null, (e: unknown) => e)
+
+    expect(error).toBeInstanceOf(ORPCError)
+    expect(error.code).toBe('MALFORMED_ORPC_RESPONSE')
+    expect(error.data).toEqual(expect.objectContaining({ status, body: undefined }))
+    expect(error.cause).toBeInstanceOf(MalformedResponseError)
+    expect(error.cause.cause).toBeInstanceOf(SyntaxError)
   })
 
   it('sends QUERY requests with body-encoded input', async () => {

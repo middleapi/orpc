@@ -356,5 +356,42 @@ describe('rpcLinkCodec', () => {
       expect(error.cause.response).toBe(error.data)
       expect(error.cause.cause).toBeInstanceOf(Error)
     })
+
+    it.each([200, 502])('throws MALFORMED_ORPC_RESPONSE when the response body cannot be parsed (status %i)', async (status) => {
+      const parseError = new SyntaxError('Unexpected token \'<\'')
+
+      const error: any = await codec.decodeResponse({
+        status,
+        headers: { 'content-type': 'application/json' },
+        resolveBody: () => Promise.reject(parseError),
+      }).then(() => null, e => e)
+
+      expect(error).toBeInstanceOf(ORPCError)
+      expect(error.code).toBe('MALFORMED_ORPC_RESPONSE')
+      expect(error.message).toBe('Invalid RPC response format.')
+      expect(error.data).toEqual({ status, headers: { 'content-type': 'application/json' }, body: undefined })
+      expect(error.cause).toBeInstanceOf(MalformedResponseError)
+      expect(error.cause.response).toBe(error.data)
+      expect(error.cause.cause).toBe(parseError)
+      expect(deserializeSpy).not.toHaveBeenCalled()
+    })
+
+    it('rethrows the original error when the response body cannot be read', async () => {
+      const abortError = new DOMException('This operation was aborted', 'AbortError')
+
+      await expect(codec.decodeResponse({
+        status: 200,
+        headers: {},
+        resolveBody: () => Promise.reject(abortError),
+      })).rejects.toBe(abortError)
+
+      const networkError = new TypeError('terminated')
+
+      await expect(codec.decodeResponse({
+        status: 200,
+        headers: {},
+        resolveBody: () => Promise.reject(networkError),
+      })).rejects.toBe(networkError)
+    })
   })
 })

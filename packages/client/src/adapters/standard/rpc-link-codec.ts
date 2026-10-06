@@ -124,7 +124,26 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
   async decodeResponse(response: StandardLazyResponse): Promise<StandardLinkCodecDecodedResponse> {
     const isOk = response.status < 400
 
-    const body = await response.resolveBody()
+    const body = await (async () => {
+      try {
+        return await response.resolveBody()
+      }
+      catch (cause) {
+        /**
+         * A body that cannot be parsed (e.g. a gateway HTML page labeled as JSON, or a truncated body)
+         * is a malformed response. Other failures (abort, network) are rethrown as is.
+         */
+        if (cause instanceof SyntaxError) {
+          throw createORPCErrorFromMalformedResponse({
+            message: 'Invalid RPC response format.',
+            response: { status: response.status, headers: response.headers, body: undefined },
+            cause,
+          })
+        }
+
+        throw cause
+      }
+    })()
 
     const deserialized = await (async () => {
       try {
