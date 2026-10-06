@@ -48,6 +48,18 @@ describe('openapiHandler', () => {
     expect(misMatchPrefixResult.response).toBeUndefined()
   })
 
+  it('rejects bracket notation input that leaves too many empty slots', async () => {
+    const handler = new OpenAPIHandler({
+      ping: os.meta(openapi({ method: 'GET', path: '/ping' })).handler(({ input }) => input),
+    })
+
+    const query = Array.from({ length: 11 }, (_, i) => `k${i}[999]=x`).join('&')
+    const { response } = await handler.handle(new Request(`https://example.com/ping?${query}`))
+
+    expect(response!.status).toBe(400)
+    await expect(response!.text()).resolves.toContain('Malformed request')
+  })
+
   it('supports standard handler plugins', async () => {
     const plugin: StandardHandlerPlugin<any> = {
       name: 'test',

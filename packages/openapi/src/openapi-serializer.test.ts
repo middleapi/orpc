@@ -397,5 +397,15 @@ describe('openAPISerializer', () => {
       expect(Array.isArray(result.arr)).toBe(false)
       expect(result.arr).toEqual({ 4294967295: 'x' })
     })
+
+    it('rejects sparse keys repeated to exhaust memory', () => {
+      const query = Array.from({ length: 11 }, (_, i) => `k${i}[999]=x`).join('&')
+
+      expect(() => serializer.deserialize(new URLSearchParams(query))).toThrow(TypeError)
+
+      const form = new FormData()
+      form.append('a[1]', 'x')
+      expect(() => new OpenAPISerializer({ bracketNotation: { maxDeserializingEmptySlots: 0 } }).deserialize(form)).toThrow(TypeError)
+    })
   })
 })

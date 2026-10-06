@@ -28,12 +28,15 @@ description: "Learn how bracket notation encodes structured data like nested obj
    ::: info
    Missing indexes create sparse arrays.
 
-   Explicit indexes greater than `999` are treated as object keys by default to avoid huge sparse arrays during deserialization. To change that limit, configure `maxExplicitDeserializingArrayIndex`:
+   Explicit indexes greater than `999` are treated as object keys by default to avoid huge sparse arrays during deserialization. To change that limit, configure `maxExplicitDeserializingArrayIndex`.
+
+   JS engines reserve memory for the empty slots below an integer key, in objects as well as arrays, so the empty slots that integer keys leave across one input are limited to `10,000` by default. Inputs that leave more are rejected, and [OpenAPI Handler](/docs/openapi/handler) responds with `400 Bad Request`. Keys far beyond the existing ones, like timestamps, are stored sparsely and do not count. To change that limit, configure `maxDeserializingEmptySlots`:
 
    ```ts
    const serializer = new OpenAPISerializer({
      bracketNotation: {
        maxExplicitDeserializingArrayIndex: 1999,
+       maxDeserializingEmptySlots: 20_000,
      }
    })
    ```

@@ -363,6 +363,70 @@ describe('bracket notation serializer', () => {
       expect(result.arr).toEqual({ 4294967295: 'x' })
     })
 
+    describe('maxDeserializingEmptySlots', () => {
+      const limited = new BracketNotationSerializer({ maxDeserializingEmptySlots: 4 })
+
+      function query(count: number, entry: (i: number) => string): [string, unknown][] {
+        return Array.from(new URLSearchParams(Array.from({ length: count }, (_, i) => entry(i)).join('&')).entries())
+      }
+
+      it('counts the empty slots explicit array indexes leave across the payload', () => {
+        expect(limited.deserialize([['a[0]', 1], ['a[3]', 2], ['b[2]', 3]])).toEqual({
+          a: [1, undefined, undefined, 2],
+          b: [undefined, undefined, 3],
+        })
+
+        expect(() => limited.deserialize([['a[0]', 1], ['a[3]', 2], ['b[3]', 3]])).toThrow(
+          new TypeError('Invalid bracket notation: integer keys leave more than 4 empty slots (maxDeserializingEmptySlots).'),
+        )
+      })
+
+      it('counts integer keys of objects and the root too', () => {
+        expect(limited.deserialize([['a[x]', 1], ['a[4]', 2]])).toEqual({ a: { x: 1, 4: 2 } })
+        expect(() => limited.deserialize([['a[x]', 1], ['a[5]', 2]])).toThrow(TypeError)
+        expect(() => limited.deserialize([['5', 1]])).toThrow(TypeError)
+      })
+
+      it('keeps counting from where an array left off when it falls back to an object', () => {
+        expect(limited.deserialize([['a[0]', 1], ['a[4]', 2], ['a[x]', 3], ['a[5]', 4]])).toEqual({
+          a: { 0: 1, 4: 2, x: 3, 5: 4 },
+        })
+      })
+
+      it('does not count slots filled later, existing keys, or keys far past the existing ones', () => {
+        expect(limited.deserialize([['a[3]', 1], ['a[0]', 2], ['a[1]', 3], ['a[2]', 4], ['b[1]', 5]])).toEqual({
+          a: [2, 3, 4, 1],
+          b: [undefined, 5],
+        })
+
+        expect(limited.deserialize([['a', { 9: 'x' }], ['a[9][b]', 1]])).toEqual({ a: { 9: { b: 1 } } })
+
+        expect(limited.deserialize([
+          ['rows[1700000000000][name]', 'a'],
+          ['rows[1700000000999][name]', 'b'],
+          ['ids[5000]', 'c'],
+          ['ids[5100]', 'd'],
+        ])).toEqual({
+          rows: { 1700000000000: { name: 'a' }, 1700000000999: { name: 'b' } },
+          ids: { 5000: 'c', 5100: 'd' },
+        })
+      })
+
+      it('does not count gaps past index 4,096, where engines only keep dense keys flat', () => {
+        const result = serializer.deserialize(query(2000, i => `cart[${1000 + i * 37}]=1`)) as any
+
+        expect(Object.keys(result.cart)).toHaveLength(2000)
+      })
+
+      it('rejects inputs that repeat sparse keys to exhaust memory (default 10,000)', () => {
+        expect(() => serializer.deserialize(query(10, i => `k${i}[999]=x`))).not.toThrow()
+        expect(() => serializer.deserialize(query(11, i => `k${i}[999]=x`))).toThrow(TypeError)
+        expect(() => serializer.deserialize(query(100, i => `k${i}[999][999][999]=x`))).toThrow(TypeError)
+        expect(() => serializer.deserialize(query(100, i => `k${i}[1000]=x`))).toThrow(TypeError)
+        expect(() => serializer.deserialize(query(100, i => `k${i}[a]=x&k${i}[999]=x`))).toThrow(TypeError)
+      })
+    })
+
     it('can prevent prototype pollution attack', () => {
       /* eslint-disable no-proto, no-restricted-properties */
       const result = serializer.deserialize([

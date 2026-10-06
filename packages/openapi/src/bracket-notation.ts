@@ -18,13 +18,28 @@ export interface BracketNotationSerializerOptions {
    * @default 999 (array with 1,000 elements)
    */
   maxExplicitDeserializingArrayIndex?: number
+
+  /**
+   * Maximum number of empty slots that integer keys may leave in total during deserialization
+   * (e.g., `a[0]=x&a[3]=y` leaves 2, and `b[5]=z` leaves 5). Exceeding it throws a `TypeError`.
+   *
+   * JS engines store the integer keys of arrays and objects alike in a flat backing store with a slot
+   * for every index below the largest one, so a lone `?a[999]=x` can take ~12KB. This limit keeps that
+   * memory bounded no matter how many such keys the input repeats. Keys far past the existing ones
+   * (e.g., `?a[1700000000000]=x`) are not counted, because engines store those sparsely.
+   *
+   * @default 10_000 (~120KB in V8)
+   */
+  maxDeserializingEmptySlots?: number
 }
 
 export class BracketNotationSerializer {
   private readonly maxExplicitDeserializingArrayIndex: number
+  private readonly maxDeserializingEmptySlots: number
 
   constructor(options: BracketNotationSerializerOptions = {}) {
     this.maxExplicitDeserializingArrayIndex = options.maxExplicitDeserializingArrayIndex ?? 999
+    this.maxDeserializingEmptySlots = options.maxDeserializingEmptySlots ?? 10_000
   }
 
   serialize(data: unknown): BracketNotationSerializeResult {
@@ -56,6 +71,7 @@ export class BracketNotationSerializer {
     // `NullProtoObj` it carries a real prototype, so accesses below stay own-property only.
     const arrayPushStyles = new WeakSet()
     const root: Record<string, unknown> = new NullProtoObj()
+    const emptySlots = new InternalEmptySlotBudget(this.maxDeserializingEmptySlots)
 
     for (const [path, value] of serialized) {
       const segments = this.parsePath(path)
@@ -83,11 +99,20 @@ export class BracketNotationSerializer {
 
           if (!canStayArray) {
             arrayPushStyles.delete(child)
-            child = isPushStyle ? internalPushStyleArrayToObject(child) : internalArrayToObject(child)
+
+            if (isPushStyle) {
+              child = internalPushStyleArrayToObject(child)
+            }
+            else {
+              const array = child
+              child = internalArrayToObject(array)
+              emptySlots.inheritSpan(array, child)
+            }
           }
         }
 
         if (child !== existing) {
+          emptySlots.claim(currentRef, nextSegment)
           setOwn(currentRef, nextSegment, child)
         }
 
@@ -110,6 +135,7 @@ export class BracketNotationSerializer {
         }
       }
       else {
+        emptySlots.claim(currentRef, nextSegment)
         setOwn(currentRef, nextSegment, value)
       }
     }
@@ -187,4 +213,70 @@ function internalPushStyleArrayToObject(array: readonly unknown[]): Record<strin
   obj[''] = array.length === 1 ? array[0] : array
 
   return obj
+}
+
+/**
+ * Counts the empty slots that integer keys leave below them, see `maxDeserializingEmptySlots`.
+ *
+ * Engines keep the integer keys of a container in a flat backing store while they stay close together.
+ * V8 grows that store to `1.5 * span + 16` slots and keeps it flat for keys up to 1,024 slots past its
+ * end, so only those keys are counted: a key further out switches the container to sparse storage.
+ * Slots past index 4,096 are not counted either, since V8 keeps a store that large (5,000+ slots)
+ * flat only when the container is dense enough, which keeps its memory in line with the input.
+ */
+class InternalEmptySlotBudget {
+  // One past the largest integer key of each object; arrays use their length instead
+  private spans: WeakMap<object, number> | undefined
+  private remaining: number
+
+  constructor(private readonly max: number) {
+    this.remaining = max
+  }
+
+  /**
+   * Carries the span of an array over to the object replacing it.
+   */
+  inheritSpan(array: readonly unknown[], object: object): void {
+    if (array.length > 0) {
+      this.setSpan(object, array.length)
+    }
+  }
+
+  private setSpan(object: object, span: number): void {
+    (this.spans ??= new WeakMap()).set(object, span)
+  }
+
+  /**
+   * Call before adding `key` to `container`. Arrays only ever receive keys already checked by `internalIsValidArrayIndex`.
+   *
+   * @throws {TypeError} If the key leaves more empty slots than the budget has left.
+   */
+  claim(container: object, key: string): void {
+    const isArray = Array.isArray(container)
+
+    if (!isArray && !INTEGER_PATTERN.test(key)) {
+      return
+    }
+
+    const index = Number(key)
+    const span = isArray ? container.length : this.spans?.get(container) ?? 0
+
+    if (index < span) {
+      return
+    }
+
+    const slots = Math.min(index, 4096) - span
+
+    if (slots > 0 && index < span * 1.5 + 16 + 1024 && !Object.hasOwn(container, key)) {
+      if (slots > this.remaining) {
+        throw new TypeError(`Invalid bracket notation: integer keys leave more than ${this.max} empty slots (maxDeserializingEmptySlots).`)
+      }
+
+      this.remaining -= slots
+    }
+
+    if (!isArray) {
+      this.setSpan(container, index + 1)
+    }
+  }
 }
