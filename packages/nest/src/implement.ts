@@ -13,7 +13,7 @@ import { applyDecorators, Delete, Get, Head, HttpCode, HttpException, Inject, In
 import { HttpAdapterHost } from '@nestjs/core'
 import { getPathMeta, ProcedureContract } from '@orpc/contract'
 import { DEFAULT_OPENAPI_METHOD, getDynamicPathParams, getOpenAPIMeta } from '@orpc/openapi'
-import { OpenAPIHandlerCodecCore } from '@orpc/openapi/standard'
+import { encodeOpenAPIMatcherSegment, OpenAPIHandlerCodecCore } from '@orpc/openapi/standard'
 import { DEFAULT_SUCCESS_STATUS, getRouter, Procedure, unlazy } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
 import { isAsyncIteratorObject, mergeHttpPath, NullProtoObj, safeDecodeURIComponent, safeEncodeURIComponent, stringifyJSON, value } from '@orpc/shared'
@@ -34,6 +34,7 @@ const MethodDecoratorMap = {
   PATCH: Patch,
   DELETE: Delete,
   OPTIONS: Options,
+  QUERY: QueryMethod,
 }
 
 const NEST_ROUTE_METADATA_SYMBOL = Symbol('ORPC_NEST_ROUTE')
@@ -88,28 +89,20 @@ function toNestRouteDecorator(contract: AnyProcedureContract): MethodDecorator {
     `)
   }
 
-  const method = meta.method ?? DEFAULT_OPENAPI_METHOD
-  const path = route.paths.length === 1 ? route.paths[0] : route.paths
-  const successStatus = meta.successStatus ?? DEFAULT_SUCCESS_STATUS
+  const methodDecorator = MethodDecoratorMap[meta.method ?? DEFAULT_OPENAPI_METHOD]
 
-  if (method === 'QUERY') {
-    if (!QueryMethod) {
-      throw new TypeError(`
-        @Implement decorator does not support the 'QUERY' HTTP method because the installed version of NestJS does not support it.
-        The 'QUERY' HTTP method requires NestJS v11.2 or later. Alternatively, use 'GET' method.
-      `)
-    }
-
-    return applyDecorators(
-      QueryMethod(path),
-      HttpCode(successStatus),
-      SetMetadata(NEST_ROUTE_METADATA_SYMBOL, route),
-    )
+  // only QueryMethod can be missing
+  if (methodDecorator === undefined) {
+    throw new TypeError(`
+      @Implement decorator does not support the 'QUERY' HTTP method because the installed version of NestJS does not support it.
+      The 'QUERY' HTTP method requires NestJS v11.2 or later. Alternatively, use 'GET' method.
+    `)
   }
 
   return applyDecorators(
-    MethodDecoratorMap[method](path),
-    HttpCode(successStatus),
+    // a single path stays a string, as NestJS decorators usually store it
+    methodDecorator(route.paths.length === 1 ? route.paths[0] : route.paths),
+    HttpCode(meta.successStatus ?? DEFAULT_SUCCESS_STATUS),
     SetMetadata(NEST_ROUTE_METADATA_SYMBOL, route),
   )
 }
@@ -336,12 +329,15 @@ export class ImplementInterceptor implements NestInterceptor {
     }
 
     const params = (req.params ?? {}) as Record<string, string | string[] | undefined>
-    const catchAllKey = type === 'fastify' ? '*' : 'path'
+    const isEmpty = (key: string) => params[key] === undefined || params[key].length === 0
 
-    return route.params.some(([key]) => {
-      const value = params[key ?? catchAllKey]
-      return value === undefined || value.length === 0
-    })
+    for (const key of route.params.keys()) {
+      if (isEmpty(key)) {
+        return true
+      }
+    }
+
+    return route.catchAll !== undefined && isEmpty(getCatchAllKey(params))
   }
 }
 
@@ -371,16 +367,20 @@ function toORPCOpenAPIParams(route: NestRoute | undefined, params: NestStandardL
 
   // NullProtoObj prevents prototype injection when a param is named like `__proto__`
   const orpcParams: Record<string, string> = new NullProtoObj()
-  // express use `path` while fastify use `*` for a trailing catch-all
-  const catchAllKey = Object.hasOwn(params, '*') ? '*' : 'path'
-  const names = new Map(route?.params.map(([key, name]) => [key ?? catchAllKey, name]))
+  const catchAllKey = getCatchAllKey(params)
 
   for (const [key, value] of Object.entries(params)) {
     // params outside the contract path, like dynamic controller prefixes, keep their key
-    orpcParams[names.get(key) ?? key] = flattenParamValue(value)
+    const name = key === catchAllKey && route?.catchAll !== undefined ? route.catchAll : route?.params.get(key) ?? key
+    orpcParams[name] = flattenParamValue(value)
   }
 
   return orpcParams
+}
+
+// Express names a trailing catch-all `path` while Fastify names it `*`
+function getCatchAllKey(params: object): '*' | 'path' {
+  return Object.hasOwn(params, '*') ? '*' : 'path'
 }
 
 interface NestRoute {
@@ -390,10 +390,13 @@ interface NestRoute {
    */
   paths: `/${string}`[]
   /**
-   * Keys of the Nest path params mapped to their OpenAPI param names, in path order.
-   * A trailing catch-all has no key of its own: Express names it `path` and Fastify `*`.
+   * Keys of the Nest path params mapped to their OpenAPI param names.
    */
-  params: [key: string | undefined, name: string][]
+  params: Map<string, string>
+  /**
+   * OpenAPI name of a trailing catch-all, which has no key of its own (see {@link getCatchAllKey}).
+   */
+  catchAll: string | undefined
 }
 
 function toContractNestRoute(contract: AnyProcedureContract): NestRoute | undefined {
@@ -406,18 +409,14 @@ function toContractNestRoute(contract: AnyProcedureContract): NestRoute | undefi
   return toNestRoute(meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path)
 }
 
-// chars a URL path keeps raw, which OpenAPIMatcher stores raw too
-const RAW_PATH_CHARS = String.raw`\w!$&'()*+,\-.:;=@[\\\]|~`
-const NOT_RAW_PATH_TEXT_REGEX = new RegExp(`[^${RAW_PATH_CHARS}]+`, 'g')
-const NOT_RAW_PATH_TEXT_OR_CARET_REGEX = new RegExp(`[^${RAW_PATH_CHARS}^]+`, 'g')
-
 /**
  * The common ways clients send the same literal text, which OpenAPIHandler matches alike:
  * as OpenAPIMatcher stores it, as Node's URL serializes it (keeping `^` raw), and as encodeURIComponent encodes it.
  */
-const LITERAL_ENCODINGS: ((text: string) => string)[] = [
-  text => text.replace(NOT_RAW_PATH_TEXT_REGEX, safeEncodeURIComponent),
-  text => text.replace(NOT_RAW_PATH_TEXT_OR_CARET_REGEX, safeEncodeURIComponent),
+const LITERAL_ENCODINGS: ((segment: string) => string)[] = [
+  encodeOpenAPIMatcherSegment,
+  // every `%` in the encoded text starts an escape, so this only reverts encoded carets
+  segment => encodeOpenAPIMatcherSegment(segment).replaceAll('%5E', '^'),
   safeEncodeURIComponent,
 ]
 
@@ -433,32 +432,28 @@ const EXPRESS_SYNTAX_REGEX = /[\\:*(){}[\]+?!]/g
  */
 function toNestRoute(path: `/${string}`): NestRoute {
   const dynamicParams = getDynamicPathParams(path) ?? []
-  const catchAlls = dynamicParams.filter(param => param.allowsSlash)
 
-  if (catchAlls.length > 1) {
+  if (dynamicParams.filter(param => param.allowsSlash).length > 1) {
     throw new TypeError(`OpenAPI path "${path}" has more than one catch-all param ({+name}), but only one is supported per path.`)
   }
 
-  const catchAll = catchAlls[0]
-  const trailingCatchAll = catchAll && ['', '/'].includes(path.slice(catchAll.startIndex + catchAll.segment.length))
-    ? catchAll
-    : undefined
+  const trailingCatchAll = dynamicParams.find(param => param.allowsSlash && ['', '/'].includes(path.slice(param.startIndex + param.segment.length)))
 
-  const keys = new Map<string, string>()
   // Express names the trailing catch-all `path`
-  const usedKeys = new Set(trailingCatchAll ? ['path'] : [])
-  const params: NestRoute['params'] = []
-  const literals: string[] = []
+  const reservedKey = trailingCatchAll ? 'path' : undefined
+  const keys = new Map<string, string>()
+  const params: NestRoute['params'] = new Map()
+  // literal text means its decoded text, so `/x%3Ay` matches like `/x:y`
+  const literals: string[][] = []
   const patterns: string[] = []
   let literalStart = 0
 
   for (const param of dynamicParams) {
-    literals.push(path.slice(literalStart, param.startIndex))
+    literals.push(path.slice(literalStart, param.startIndex).split('/').map(safeDecodeURIComponent))
     literalStart = param.startIndex + param.segment.length
 
     if (param === trailingCatchAll) {
       // the only catch-all syntax both adapters support
-      params.push([undefined, param.parameterName])
       patterns.push('*')
       continue
     }
@@ -469,36 +464,30 @@ function toNestRoute(path: `/${string}`): NestRoute {
       const base = param.parameterName.replaceAll('-', '_').replace(/^\d/, '_$&')
 
       key = base
-      for (let i = 1; usedKeys.has(key); i++) {
+      for (let i = 1; params.has(key) || key === reservedKey; i++) {
         key = `${base}_${i}`
       }
 
       keys.set(param.parameterName, key)
-      usedKeys.add(key)
+      params.set(key, param.parameterName)
     }
 
-    params.push([key, param.parameterName])
     // a catch-all followed by more segments needs Express's named wildcard, which Fastify does not support
     patterns.push(param.allowsSlash ? `*${key}` : `:${key}`)
   }
 
-  literals.push(path.slice(literalStart))
+  literals.push(path.slice(literalStart).split('/').map(safeDecodeURIComponent))
 
-  // literal text means its decoded text, so `/x%3Ay` matches like `/x:y`
-  const decodedLiterals = literals.map(literal => literal.split('/').map(safeDecodeURIComponent))
+  const toPath = (encode: (segment: string) => string) => literals
+    .map((segments, i) => segments.map(encode).join('/') + (patterns[i] ?? ''))
+    .join('') as `/${string}`
 
-  const join = (texts: string[]) => texts.map((text, i) => text + (patterns[i] ?? '')).join('') as `/${string}`
-
-  const paths = new Set(LITERAL_ENCODINGS.map(encode => join(decodedLiterals.map(segments => segments
-    .map(encode)
-    .join('/')
-    .replace(EXPRESS_SYNTAX_REGEX, '\\$&'),
-  ))))
+  const paths = new Set(LITERAL_ENCODINGS.map(encode => toPath(segment => encode(segment).replace(EXPRESS_SYNTAX_REGEX, '\\$&'))))
 
   // the raw text can only be registered when Express reads it literally too, and keeps its segments
-  if (decodedLiterals.every(segments => segments.every(segment => !segment.includes('/') && segment.search(EXPRESS_SYNTAX_REGEX) === -1))) {
-    paths.add(join(decodedLiterals.map(segments => segments.join('/'))))
+  if (literals.flat().every(segment => !segment.includes('/') && segment.search(EXPRESS_SYNTAX_REGEX) === -1)) {
+    paths.add(toPath(segment => segment))
   }
 
-  return { paths: [...paths], params }
+  return { paths: [...paths], params, catchAll: trailingCatchAll?.parameterName }
 }

@@ -277,8 +277,16 @@ function toRou3Literal(text: string): string {
 function normalizeRou3Path(path: string): string {
   return path
     .split('/')
-    .map(segment => safeDecodeURIComponent(segment).replace(ROU3_ENCODED_SEGMENT_TEXT_REGEX, safeEncodeURIComponent))
+    .map(segment => encodeOpenAPIMatcherSegment(safeDecodeURIComponent(segment)))
     .join('/')
+}
+
+/**
+ * Percent-encodes decoded path segment text the way {@link OpenAPIMatcher} stores literal text,
+ * so other routers can match the same requests.
+ */
+export function encodeOpenAPIMatcherSegment(segment: string): string {
+  return segment.replace(ROU3_ENCODED_SEGMENT_TEXT_REGEX, safeEncodeURIComponent)
 }
 
 function toRou3PrefixMatcher(prefix: `/${string}`): RegExp {
