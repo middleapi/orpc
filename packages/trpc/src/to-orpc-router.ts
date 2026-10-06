@@ -122,23 +122,29 @@ function toORPCProcedure(procedure: AnyProcedure) {
 
               return result
             },
+            // Errors thrown while iterating escape the catch below, so they must be converted here too
+            mapError: toORPCError,
           })
         }
 
         return output
       }
       catch (cause) {
-        if (cause instanceof TRPCError) {
-          throw new ORPC.ORPCError(cause.code, {
-            message: cause.message,
-            cause,
-          })
-        }
-
-        throw cause
+        throw toORPCError(cause)
       }
     },
   })
+}
+
+function toORPCError<T>(error: T): T | ORPC.ORPCError<string, undefined> {
+  if (error instanceof TRPCError) {
+    return new ORPC.ORPCError(error.code, {
+      message: error.message,
+      cause: error,
+    })
+  }
+
+  return error
 }
 
 /**

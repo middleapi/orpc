@@ -193,6 +193,26 @@ describe('toORPCRouter', () => {
       })
     })
 
+    it('converts TRPCError thrown while iterating', async () => {
+      const orpcRouter = toORPCRouter(t.router({
+        subscribe: t.procedure.subscription(async function* () {
+          yield 'pong'
+          throw new TRPCError({ code: 'UNAUTHORIZED', message: 'login required' })
+        }),
+      }))
+
+      const output = await call(orpcRouter.subscribe, undefined, { context: { a: 'test' } }) as any
+      await expect(output.next()).resolves.toEqual({ done: false, value: 'pong' })
+      await expect(output.next()).rejects.toSatisfy((err: any) => {
+        expect(err).toBeInstanceOf(ORPCError)
+        expect(err.code).toBe('UNAUTHORIZED')
+        expect(err.message).toBe('login required')
+        expect(err.cause).toBeInstanceOf(TRPCError)
+
+        return true
+      })
+    })
+
     it('rethrows non-TRPCError errors as-is', async () => {
       const error = new Error('broken')
       const orpcRouter = toORPCRouter(t.router({
