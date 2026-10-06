@@ -230,6 +230,79 @@ describe('retryLinkPlugin', () => {
     expect(codec.decodeResponse).toHaveBeenCalledTimes(1)
   })
 
+  describe('stream input', () => {
+    const streamInputs = [
+      ['ReadableStream', () => new Blob(['data']).stream()],
+      ['AsyncIteratorObject', () => (async function* () { yield 'data' })()],
+    ] as const
+
+    it.each(streamInputs)('does not retry %s input, since it cannot be resent', async (_, createInput) => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(codec.decodeResponse).mockRejectedValue(new Error('FAIL'))
+
+      const retry = vi.fn(() => 3)
+      const shouldRetry = vi.fn(() => true)
+      const onRetry = vi.fn()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      await expect(link.call(['planet', 'create'], createInput(), { context: { retry, retryDelay: 0, shouldRetry, onRetry } })).rejects.toThrow('FAIL')
+
+      expect(codec.encodeInput).toHaveBeenCalledTimes(1)
+      expect(retry).not.toHaveBeenCalled()
+      expect(shouldRetry).not.toHaveBeenCalled()
+      expect(onRetry).not.toHaveBeenCalled()
+    })
+
+    it.each(streamInputs)('does not reconnect an iterator output for %s input', async (_, createInput) => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(codec.decodeResponse).mockResolvedValue({
+        kind: 'output',
+        output: (async function* () {
+          yield 'first'
+          throw new Error('ITER_FAIL')
+        })(),
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      const iterator = await link.call(['planet', 'create'], createInput(), { context: { retry: 1, retryDelay: 0 } }) as AsyncIterator<any>
+
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: 'first' })
+      await expect(iterator.next()).rejects.toThrow('ITER_FAIL')
+
+      expect(codec.encodeInput).toHaveBeenCalledTimes(1)
+    })
+
+    it('still retries a Blob input, since it can be resent', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(codec.decodeResponse)
+        .mockRejectedValueOnce(new Error('FAIL_1'))
+        .mockResolvedValueOnce({ kind: 'output', output: 'OK' })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      const input = new Blob(['data'])
+
+      await expect(link.call(['planet', 'create'], input, { context: { retry: 1, retryDelay: 0 } })).resolves.toBe('OK')
+
+      expect(codec.encodeInput).toHaveBeenCalledTimes(2)
+      expect(codec.encodeInput).toHaveBeenNthCalledWith(2, input, ['planet', 'create'], expect.anything())
+    })
+  })
+
   describe('asyncIteratorObject', () => {
     it('retries AsyncIteratorObject and forwards lastEventId from metadata', async () => {
       const codec = makeCodec()

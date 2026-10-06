@@ -72,6 +72,7 @@ export interface RetryLinkPluginOptions<_T extends RetryLinkPluginContext> {
  *
  * @remarks
  * **Note**: Retry behavior is configured through the client context on each call.
+ * Calls with a stream or async iterator input are never retried, since the input cannot be resent.
  *
  * @see {@link https://orpc.dev/docs/plugins/retry | Retry Plugin}
  */
@@ -93,6 +94,15 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
     const interceptor: StandardLinkInterceptor<T> = async (interceptorOptions) => {
       const { next, ...callOptions } = interceptorOptions
+
+      /**
+       * A stream or iterator input is consumed by the first attempt and cannot be resent,
+       * so call once instead of retrying (or reconnecting an iterator output) with an empty input.
+       */
+      if (callOptions.input instanceof ReadableStream || isAsyncIteratorObject(callOptions.input)) {
+        return next(callOptions)
+      }
+
       const maxAttempts = await value(
         callOptions.context.retry ?? this.defaultRetry,
         callOptions,

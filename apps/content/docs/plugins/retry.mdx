@@ -27,6 +27,10 @@ const link = new RPCLink<ClientContext>({
 The `link` can be any supported oRPC link, such as [RPCLink](/docs/rpc/link), [OpenAPILink](/docs/openapi/link), or a custom one.
 :::
 
+:::warning
+Calls whose input is a [`ReadableStream`](/docs/binary-data#readablestreamuint8array) or an [`AsyncIteratorObject`](/docs/async-iterator-object) are never retried, and an `AsyncIteratorObject` output from such a call is never reconnected. The first attempt consumes the input, so it cannot be resent, and the plugin surfaces the first error as-is.
+:::
+
 ## Usage
 
 By default, retries are disabled. To enable retries, set the `retry` count in the request context:
