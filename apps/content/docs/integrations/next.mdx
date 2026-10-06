@@ -308,59 +308,24 @@ export const formFunctionableProcedure = formFunctionable(
 
 ## Special Next.js Errors
 
-Next.js functions such as [redirect](https://nextjs.org/docs/app/api-reference/functions/redirect), [notFound](https://nextjs.org/docs/app/api-reference/functions/not-found), [forbidden](https://nextjs.org/docs/app/api-reference/functions/forbidden), and [unauthorized](https://nextjs.org/docs/app/api-reference/functions/unauthorized) work by throwing special errors that Next.js must receive. Anything that catches errors along the way sees them as regular errors: middleware, `onError` interceptors, and [hooks](#hooks), which store them as their `error` state and return them from `execute`. If your procedures can throw these errors, call [unstable_rethrow](https://nextjs.org/docs/app/api-reference/functions/unstable_rethrow) wherever you handle errors, so they reach Next.js instead of being reported as failures.
+Next.js functions such as [redirect](https://nextjs.org/docs/app/api-reference/functions/redirect) and [notFound](https://nextjs.org/docs/app/api-reference/functions/not-found) throw special errors. Middleware, interceptors, and [hooks](#hooks) treat them as regular errors, so use [unstable_rethrow](https://nextjs.org/docs/app/api-reference/functions/unstable_rethrow) to pass them on to Next.js.
 
-<CodeGroup>
-
-```ts server
-'use server'
-
-import { onError } from '@orpc/server'
-import { unstable_rethrow } from 'next/navigation'
-
-export const serverFunction = createServerFunction(procedure, {
+```tsx
+const { execute } = useServerFunction(serverFunction, {
   interceptors: [
     onError((error) => {
-      unstable_rethrow(error) // <- let redirect, notFound, ... pass through
-      console.error(error)
+      unstable_rethrow(error) // <- skip redirect, notFound, ...
+      toast.error(error.message)
     }),
   ],
 })
-```
 
-```tsx client
-'use client'
-
-import { onError } from '@orpc/client'
-import { parseFormData } from '@orpc/next'
-import { useServerFunction } from '@orpc/next/hooks'
-import { unstable_rethrow } from 'next/navigation'
-
-export function MyComponent() {
-  const { execute } = useServerFunction(serverFunction, {
-    interceptors: [
-      onError((error) => {
-        unstable_rethrow(error) // <- skip redirect, notFound, ...
-        toast.error(error.message)
-      }),
-    ],
-  })
-
-  return (
-    <form
-      action={async (form) => {
-        const [error] = await execute(parseFormData(form))
-        unstable_rethrow(error) // <- let Next.js handle redirect, notFound, ...
-      }}
-    >
-      <button type="submit">Submit</button>
-    </form>
-  )
+async function action(form: FormData) {
+  const [error] = await execute(parseFormData(form))
+  unstable_rethrow(error) // <- let Next.js handle them
 }
 ```
 
-</CodeGroup>
-
 :::warning
-Do not call `unstable_rethrow` inside deferred interceptors such as `onErrorDeferred`. They run after the call has settled, so the rethrown error escapes as an uncaught error (for `redirect`, Next.js then navigates a second time). Use `onError` for error handling that should skip these errors.
+Do not use `unstable_rethrow` in deferred interceptors such as `onErrorDeferred`, because they run after the call has settled.
 :::
