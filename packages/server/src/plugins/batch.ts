@@ -212,14 +212,16 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
           return response
         }
-        catch (err) {
+        catch {
           /**
-           * Errors should not occur at the routing interceptor level.
-           * Reject the promise so it can be handled by the unhandledRejection handler
-           * for global logging or error handling.
+           * The sub-request's routing chain threw, e.g. `mapSubrequest` or the Rethrow Handler Plugin
+           * rethrowing a procedure error. It cannot reach the caller of `handler.handle` because
+           * the batch response is shared with other sub-requests, so only this sub-request fails.
+           *
+           * Never turn it into an unhandled rejection: by default that terminates Node.js and Deno,
+           * letting any client take the server down. Tracing and logging plugins run inside the batch,
+           * so they still record errors thrown by the procedure and routing interceptors.
            */
-          Promise.reject(err)
-
           return { status: 500, headers: {}, body: 'Internal server error' }
         }
       }

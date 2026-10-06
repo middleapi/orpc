@@ -32,3 +32,7 @@ catch (error) {
 :::info
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
 :::
+
+## Batch Requests
+
+With the [Batch Plugin](/docs/plugins/batch), a rethrown error cannot reach `handler.handle`, because a batched call shares its response with the other calls in the batch. That call receives a `500` response instead, and the rest of the batch is unaffected. To log these errors, use an [interceptor](/docs/rpc/handler#interceptors) or a logging integration such as [Pino](/docs/integrations/pino).

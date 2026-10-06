@@ -6,6 +6,7 @@ import { os } from '../builder'
 import { BatchHandlerPlugin } from './batch'
 import { RequestCompressionHandlerPlugin } from './request-compression'
 import { RequestLimitHandlerPlugin } from './request-limit'
+import { RethrowHandlerPlugin } from './rethrow'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -215,11 +216,11 @@ describe('batchHandlerPlugin', () => {
     })
 
     it('returns 500 sub-response when mapSubrequest throws', async ({ onTestFinished }) => {
-      const rejectSpy = vi.spyOn(Promise, 'reject')
-        .mockImplementation(() => new Promise(() => {}) as Promise<never>)
+      const unhandledRejectionHandler = vi.fn()
+      process.on('unhandledRejection', unhandledRejectionHandler)
 
       onTestFinished(() => {
-        rejectSpy.mockRestore()
+        process.off('unhandledRejection', unhandledRejectionHandler)
       })
 
       const handler = createHandler(new BatchHandlerPlugin({
@@ -238,7 +239,9 @@ describe('batchHandlerPlugin', () => {
       const body = await response!.json() as any
       expect(body[0].json.status).toBe(500)
       expect(body[0].json.body).toBe('Internal server error')
-      expect(rejectSpy).toHaveBeenCalledTimes(1)
+
+      await new Promise(resolve => setTimeout(resolve))
+      expect(unhandledRejectionHandler).not.toHaveBeenCalled()
     })
   })
 
@@ -360,6 +363,71 @@ describe('batchHandlerPlugin', () => {
       await response!.arrayBuffer()
 
       expect(stopped.mock.calls).toEqual([[true]])
+    })
+  })
+
+  describe('with rethrow handler plugin', () => {
+    const handler = new RPCHandler({
+      ping: os.handler(handlerFn),
+      fail: os.handler(() => {
+        throw new Error('db down')
+      }),
+    }, {
+      plugins: [
+        new BatchHandlerPlugin(),
+        new RethrowHandlerPlugin({ filter: error => !(error instanceof ORPCError) }),
+      ],
+    })
+
+    const messages = [makePeerRequestMessage(0, '/fail'), makePeerRequestMessage(1, '/ping')]
+
+    const unhandledRejectionHandler = vi.fn()
+
+    beforeEach(() => {
+      process.on('unhandledRejection', unhandledRejectionHandler)
+    })
+
+    afterEach(() => {
+      process.off('unhandledRejection', unhandledRejectionHandler)
+    })
+
+    async function readResponseMessages(response: Response, mode: 'buffered' | 'streaming'): Promise<any[]> {
+      if (mode === 'buffered') {
+        return response.json() as any
+      }
+
+      const buffer = new Uint8Array(await response.arrayBuffer())
+      const responseMessages = []
+
+      for (let offset = 0; offset < buffer.length;) {
+        const { messageLength, payload } = readLengthPrefixedChunk(buffer.subarray(offset))
+        responseMessages.push(JSON.parse(new TextDecoder().decode(payload)))
+        offset += 4 + messageLength
+      }
+
+      return responseMessages
+    }
+
+    it.each(['buffered', 'streaming'] as const)('returns 500 for a rethrown error in a %s sub-request without an unhandled rejection', async (mode) => {
+      const { response } = await handler.handle(createBatchRequest({ mode, messages }))
+
+      expect(response!.status).toBe(207)
+
+      const responseMessages = await readResponseMessages(response!, mode)
+      expect(responseMessages).toHaveLength(2)
+      expect(responseMessages).toContainEqual(expect.objectContaining({
+        id: 0,
+        kind: 'response',
+        json: expect.objectContaining({ status: 500, body: 'Internal server error' }),
+      }))
+      expect(responseMessages).toContainEqual(expect.objectContaining({
+        id: 1,
+        kind: 'response',
+        json: expect.objectContaining({ body: { json: 'pong' } }),
+      }))
+
+      await new Promise(resolve => setTimeout(resolve))
+      expect(unhandledRejectionHandler).not.toHaveBeenCalled()
     })
   })
 
