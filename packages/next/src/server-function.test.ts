@@ -4,7 +4,7 @@ import * as next from 'next/navigation'
 import { createServerFunction } from './server-function'
 
 const createProcedureClientSpy = vi.spyOn(ServerModule, 'createProcedureClient')
-const { os, type } = ServerModule
+const { onError, os, type } = ServerModule
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -70,5 +70,35 @@ describe('createServerFunction', () => {
     expect(createProcedureClientSpy).toHaveBeenCalledWith(...args)
 
     await expect(serverFn({ input: 'ping' })).rejects.toBe(error)
+  })
+
+  it.each([
+    [() => next.redirect('/foo')],
+    [() => next.notFound()],
+  ])('lets special Next.js errors pass through interceptors using unstable_rethrow %s', async (createError) => {
+    let thrown: unknown
+    const errorCallback = vi.fn()
+
+    const serverFn = createServerFunction(os.handler(() => {
+      try {
+        createError()
+      }
+      catch (e) {
+        thrown = e
+        throw e
+      }
+    }), {
+      interceptors: [
+        onError((error) => {
+          next.unstable_rethrow(error)
+          errorCallback(error)
+        }),
+      ],
+    })
+
+    const error = await serverFn().catch(e => e)
+
+    expect(error).toBe(thrown)
+    expect(errorCallback).not.toHaveBeenCalled()
   })
 })

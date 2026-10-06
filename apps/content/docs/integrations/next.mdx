@@ -55,7 +55,7 @@ export default function Page() {
 }
 ```
 
-Special Next.js errors such as [redirect](https://nextjs.org/docs/app/api-reference/functions/redirect) and [notFound](https://nextjs.org/docs/app/api-reference/functions/not-found) are rethrown so Next.js handles them normally. All other errors are serialized to `ORPCErrorJSON` and returned as the first element of the tuple.
+[Special Next.js errors](#special-nextjs-errors) such as [redirect](https://nextjs.org/docs/app/api-reference/functions/redirect) and [notFound](https://nextjs.org/docs/app/api-reference/functions/not-found) are rethrown so Next.js handles them normally. All other errors are serialized to `ORPCErrorJSON` and returned as the first element of the tuple.
 
 ### Typesafe Errors
 
@@ -158,7 +158,7 @@ export const base = os
 
 ### Hooks
 
-This integration also includes React hooks for server functions. `useServerFunction` executes a server function and tracks its status. `useOptimisticServerFunction` does the same, with optimistic updates. Unlike direct server function calls, hook errors are deserialized into native `ORPCError` instances instead of plain JSON (`ORPCErrorJSON`) for a more natural developer experience. Special Next.js errors such as [redirect](https://nextjs.org/docs/app/api-reference/functions/redirect) and [notFound](https://nextjs.org/docs/app/api-reference/functions/not-found) never become the hook's error state: they are rethrown so Next.js handles them, just like a direct server function call.
+This integration also includes React hooks for server functions. `useServerFunction` executes a server function and tracks its status. `useOptimisticServerFunction` does the same, with optimistic updates. Unlike direct server function calls, hook errors are deserialized into native `ORPCError` instances instead of plain JSON (`ORPCErrorJSON`) for a more natural developer experience. [Special Next.js errors](#special-nextjs-errors) never become the hook's error state: they are rethrown so Next.js handles them, just like a direct server function call.
 
 <CodeGroup>
 
@@ -240,7 +240,7 @@ export function MyComponent() {
 </CodeGroup>
 
 :::info
-Besides hooks, this integration also re-exports [form-data helpers](/docs/helpers/form-data) for working with `FormData`, as well as deferred interceptors for updating UI states: `onStartDeferred`, `onSuccessDeferred`, `onErrorDeferred`, and `onFinishDeferred`. `onErrorDeferred` ignores special Next.js errors, so a redirect does not trigger your error handling.
+Besides hooks, this integration also re-exports [form-data helpers](/docs/helpers/form-data) for working with `FormData`, as well as deferred interceptors for updating UI states: `onStartDeferred`, `onSuccessDeferred`, `onErrorDeferred`, and `onFinishDeferred`.
 :::
 
 :::info
@@ -305,3 +305,47 @@ export const formFunctionableProcedure = formFunctionable(
   os.handler(async () => 'Hello from oRPC + Next.js!')
 )
 ```
+
+## Special Next.js Errors
+
+Next.js functions such as [redirect](https://nextjs.org/docs/app/api-reference/functions/redirect), [notFound](https://nextjs.org/docs/app/api-reference/functions/not-found), [forbidden](https://nextjs.org/docs/app/api-reference/functions/forbidden), and [unauthorized](https://nextjs.org/docs/app/api-reference/functions/unauthorized) work by throwing special errors. oRPC rethrows them so Next.js can handle them, but anything that catches errors along the way sees them first, including middleware, `onError` interceptors, and [hook](#hooks) interceptors. If your procedures can throw these errors, call [unstable_rethrow](https://nextjs.org/docs/app/api-reference/functions/unstable_rethrow) before handling an error, so a redirect is not logged or reported as a failure.
+
+<CodeGroup>
+
+```ts server
+'use server'
+
+import { onError } from '@orpc/server'
+import { unstable_rethrow } from 'next/navigation'
+
+export const serverFunction = createServerFunction(procedure, {
+  interceptors: [
+    onError((error) => {
+      unstable_rethrow(error) // <- let redirect, notFound, ... pass through
+      console.error(error)
+    }),
+  ],
+})
+```
+
+```tsx client
+'use client'
+
+import { onError } from '@orpc/client'
+import { unstable_rethrow } from 'next/navigation'
+
+const { execute } = useServerFunction(serverFunction, {
+  interceptors: [
+    onError((error) => {
+      unstable_rethrow(error) // <- let redirect, notFound, ... pass through
+      toast.error(error.message)
+    }),
+  ],
+})
+```
+
+</CodeGroup>
+
+:::info
+`onErrorDeferred` ignores special Next.js errors automatically, because a deferred callback runs after the call has settled and cannot rethrow.
+:::

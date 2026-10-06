@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { onError } from '@orpc/client'
 import { ORPCError, os } from '@orpc/server'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import * as next from 'next/navigation'
@@ -352,11 +353,18 @@ describe('useServerFunction', () => {
 
     const fn = createServerFunction(os.handler(createError))
     const errorCallback = vi.fn()
+    const rethrowErrorCallback = vi.fn()
     const states: string[] = []
 
     const { result } = renderHook(() => {
       const state = useServerFunction(fn, {
-        interceptors: [onErrorDeferred(errorCallback)],
+        interceptors: [
+          onErrorDeferred(errorCallback),
+          onError((error) => {
+            next.unstable_rethrow(error)
+            rethrowErrorCallback(error)
+          }),
+        ],
       })
 
       states.push(state.status)
@@ -382,6 +390,7 @@ describe('useServerFunction', () => {
 
     await new Promise(resolve => setTimeout(resolve, 6))
     expect(errorCallback).not.toHaveBeenCalled()
+    expect(rethrowErrorCallback).not.toHaveBeenCalled()
 
     consoleErrorSpy.mockRestore()
   })
