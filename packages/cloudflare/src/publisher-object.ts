@@ -131,6 +131,17 @@ interface SerializedPayload {
   meta?: EventMeta
 }
 
+/**
+ * Generation of a table created before generations existed, which keeps
+ * issuing plain sequence ids so ids already held by subscribers stay valid.
+ */
+const LEGACY_GENERATION = '0'
+
+/**
+ * Matches `<generation>-<sequence>`, or a plain `<sequence>` from the legacy generation.
+ */
+const EVENT_ID_REGEX = /^(?:(\d+)-)?(\d+)$/
+
 class ResumeStorage {
   private readonly enabled: boolean
   private readonly seconds: number
@@ -140,6 +151,13 @@ class ResumeStorage {
   private isInitedSchema = false
   private isInitedAlarm = false
   private lastCleanupTime: number | undefined
+
+  /**
+   * Identifies the current events table. Its sequence restarts at 1 whenever the table is
+   * recreated (by the idle cleanup or a schema reset), so event ids are `<generation>-<sequence>`
+   * to tell an id issued by an earlier table apart from one issued by the current table.
+   */
+  private generation = LEGACY_GENERATION
 
   constructor(
     private readonly ctx: DurableObjectState,
@@ -215,6 +233,19 @@ class ResumeStorage {
 
     this.ensureSchemaAndCleanup()
 
+    const match = EVENT_ID_REGEX.exec(lastEventId)
+    if (!match) {
+      return [] // not an id this object issues, so there is no position to resume from
+    }
+
+    const [, generation = LEGACY_GENERATION, sequence] = match
+
+    /**
+     * An id from another generation was issued by an earlier table, so every
+     * stored event is newer than it, however their sequences compare.
+     */
+    const afterSequence = generation === this.generation ? sequence : '0'
+
     /**
      * SQLite INTEGER can exceed JavaScript's safe integer range,
      * so we cast to TEXT for safe resume ID comparison.
@@ -227,7 +258,7 @@ class ResumeStorage {
       FROM "${this.schemaPrefix}events"
       WHERE id > ?
       ORDER BY id ASC
-    `, lastEventId)
+    `, afterSequence)
 
     const events: string[] = []
     for (const record of result.toArray()) {
@@ -293,24 +324,36 @@ class ResumeStorage {
         CREATE INDEX IF NOT EXISTS "${this.schemaPrefix}idx_events_stored_at" ON "${this.schemaPrefix}events" (stored_at)
       `)
 
-      this.isInitedSchema = true
+      this.ctx.storage.sql.exec(`
+        CREATE TABLE IF NOT EXISTS "${this.schemaPrefix}meta" (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        )
+      `)
 
       if (initTableResult.rowsWritten > 0) {
         /**
-         * Recreating the table (after the idle cleanup or a schema reset) restarts the
-         * AUTOINCREMENT sequence, while subscribers may still hold ids issued before it,
-         * and resuming with one of them would skip newer events (`WHERE id > ?`).
-         * Start the sequence at the current time in microseconds so new ids stay above
-         * every id issued before.
+         * A new generation only has to differ from the earlier ones: the time keeps it
+         * distinct across Durable Object restarts, and the previous generation this
+         * instance knows keeps it distinct even if the clock has not moved.
          */
-        this.ctx.storage.sql.exec(
-          `INSERT INTO sqlite_sequence (name, seq) VALUES (?, CAST(? AS INTEGER))`,
-          `${this.schemaPrefix}events`,
-          Date.now() * 1000,
-        )
+        this.generation = String(Math.max(Date.now(), Number(this.generation) + 1))
+
+        this.ctx.storage.sql.exec(`
+          INSERT OR REPLACE INTO "${this.schemaPrefix}meta" (key, value) VALUES ('generation', ?)
+        `, this.generation)
 
         this.lastCleanupTime = Date.now() // schema just created, nothing to cleanup
       }
+      else {
+        const generationRow = this.ctx.storage.sql.exec(`
+          SELECT value FROM "${this.schemaPrefix}meta" WHERE key = 'generation'
+        `).toArray()[0]
+
+        this.generation = generationRow ? generationRow.value as string : LEGACY_GENERATION
+      }
+
+      this.isInitedSchema = true
     }
 
     const now = Date.now()
@@ -354,7 +397,9 @@ class ResumeStorage {
     return this.ctx.storage.setAlarm(Date.now() + this.cleanupIntervalSeconds * 1000)
   }
 
-  private attachEventId(message: SerializedPayload, id: string): SerializedPayload {
+  private attachEventId(message: SerializedPayload, sequence: string): SerializedPayload {
+    const id = this.generation === LEGACY_GENERATION ? sequence : `${this.generation}-${sequence}`
+
     return {
       ...message,
       meta: { ...message.meta, id },
