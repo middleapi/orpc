@@ -2,7 +2,7 @@ import type { Value } from '@orpc/shared'
 import type { StandardLazyResponse } from '@standard-server/core'
 import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
 import type { ClientContext } from '../types'
-import { sleep, toArray, value } from '@orpc/shared'
+import { isAsyncIteratorObject, sleep, toArray, value } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 import { COMMON_ERROR_STATUS_MAP } from '../error'
 
@@ -42,6 +42,9 @@ export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
  * The Retry After Link Plugin automatically retries requests based on server `retry-after` header.
  * This is particularly useful for handling rate limiting and temporary server unavailability.
  *
+ * @remarks
+ * **Note**: Requests with a stream or async iterator body are never retried, since the body cannot be resent.
+ *
  * @see {@link https://orpc.dev/docs/plugins/retry-after | Retry After Plugin}
  */
 export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
@@ -64,6 +67,16 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
 
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
     const interceptor: StandardLinkTransportInterceptor<T> = async (interceptorOptions) => {
+      const { body } = interceptorOptions.request
+
+      /**
+       * A stream or iterator body is consumed by the first attempt and cannot be resent,
+       * so return its response as-is instead of retrying with an empty or locked body.
+       */
+      if (body instanceof ReadableStream || isAsyncIteratorObject(body)) {
+        return interceptorOptions.next()
+      }
+
       const startTime = Date.now()
       let attemptCount = 0
 
