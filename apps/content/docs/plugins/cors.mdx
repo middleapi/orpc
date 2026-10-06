@@ -46,16 +46,29 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-:::warning
-To better support `Blob`, `File`, and `ReadableStream<Uint8Array>` at the root level in cross-origin scenarios,
-extend your [CORS allowlist](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_response_header) to allow clients to send and receive the `Content-Disposition` and `Standard-Server` headers. Learn more in the [Standard Server documentation](https://github.com/middleapi/standard-server#how-body-parsing-works). If you use the [CORS Plugin](/docs/plugins/cors), include them in `allowHeaders` and `exposeHeaders`:
+## Allowed Headers
+
+By default, preflight responses allow every header the browser lists in `Access-Control-Request-Headers`, so oRPC clients and plugins work without extra configuration.
+
+Setting `allowHeaders` replaces this default with a fixed list, so it must include every non-[safelisted](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_request_header) header your clients send. That includes `Content-Type`, which clients set for JSON bodies, and headers added by plugins, such as `orpc-batch` from the [Batch Plugin](/docs/plugins/batch):
 
 ```ts
 const cors = new CORSHandlerPlugin({
-  allowHeaders: ['Content-Disposition', 'Standard-Server'],
+  allowHeaders: ['Content-Type', 'Authorization', 'orpc-batch'],
+})
+```
+
+:::warning
+To better support `Blob`, `File`, and `ReadableStream<Uint8Array>` at the root level in cross-origin scenarios,
+extend your [CORS allowlist](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_response_header) to allow clients to send and receive the `Content-Disposition` and `Standard-Server` headers. Learn more in the [Standard Server documentation](https://github.com/middleapi/standard-server#how-body-parsing-works). If you use the [CORS Plugin](/docs/plugins/cors), include them in `exposeHeaders`:
+
+```ts
+const cors = new CORSHandlerPlugin({
   exposeHeaders: ['Content-Disposition', 'Standard-Server'],
 })
 ```
+
+Request headers are [allowed by default](/docs/plugins/cors#allowed-headers). If you set `allowHeaders`, list them there as well, along with `Content-Type` and any other headers your clients send.
 
 :::
 

@@ -30,6 +30,8 @@ export interface CORSHandlerPluginOptions<T extends Context> {
   /**
    * Configures the `Access-Control-Allow-Headers` header for preflight requests.
    * Falls back to the request's `Access-Control-Request-Headers` if not set.
+   * When set, it replaces that fallback, so include every non-safelisted header
+   * clients send, such as `Content-Type`.
    */
   allowHeaders?: readonly string[]
 

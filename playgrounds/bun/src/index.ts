@@ -22,7 +22,6 @@ const openapiGenerator = new OpenAPIGenerator({
 const openapiHandler = new OpenAPIHandler(router, {
   plugins: [
     new CORSHandlerPlugin({
-      allowHeaders: ['Content-Disposition', 'Standard-Server'],
       exposeHeaders: ['Content-Disposition', 'Standard-Server'],
     }),
     new EvlogHandlerPlugin({ logAbort: true }),
