@@ -6,7 +6,7 @@ import { OpenAPIHandlerCodec, OpenAPILinkCodec } from '@orpc/openapi/standard'
 import { os, type } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
 import { bench } from 'vitest'
-import { asReadableStream, asSyncIteratorObject, BYTES_10KB, drainBody, EVENTS_10KB, handlers, PAYLOAD_10KB } from './__shared__/payloads'
+import { asSyncIteratorObject, drainBody, EVENTS_10KB, handlers, PAYLOAD_10KB } from './__shared__/payloads'
 
 const serializer = new OpenAPISerializer({ handlers })
 
@@ -44,12 +44,6 @@ describe('openapi link + handler', () => {
   bench('event stream', async () => {
     await drainBody(
       await client.ping(asSyncIteratorObject(EVENTS_10KB)),
-    )
-  })
-
-  bench('octet stream', async () => {
-    await drainBody(
-      await client.ping(asReadableStream(BYTES_10KB)),
     )
   })
 })
