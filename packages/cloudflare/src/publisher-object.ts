@@ -132,13 +132,12 @@ interface SerializedPayload {
 }
 
 /**
- * Generation of a table created before generations existed, which keeps
- * issuing plain sequence ids so ids already held by subscribers stay valid.
+ * Generation of a table created before generations existed, which issued plain sequence ids.
  */
 const LEGACY_GENERATION = '0'
 
 /**
- * Matches `<generation>-<sequence>`, or a plain `<sequence>` from the legacy generation.
+ * Matches `<generation>-<sequence>`, or a plain `<sequence>` issued by the legacy generation.
  */
 const EVENT_ID_REGEX = /^(?:(\d+)-)?(\d+)$/
 
@@ -156,6 +155,7 @@ class ResumeStorage {
    * Identifies the current events table. Its sequence restarts at 1 whenever the table is
    * recreated (by the idle cleanup or a schema reset), so event ids are `<generation>-<sequence>`
    * to tell an id issued by an earlier table apart from one issued by the current table.
+   * Kept across resets, since the next generation is derived from it.
    */
   private generation = LEGACY_GENERATION
 
@@ -328,7 +328,7 @@ class ResumeStorage {
         CREATE TABLE IF NOT EXISTS "${this.schemaPrefix}meta" (
           key TEXT PRIMARY KEY,
           value TEXT NOT NULL
-        )
+        ) WITHOUT ROWID
       `)
 
       if (initTableResult.rowsWritten > 0) {
@@ -346,11 +346,11 @@ class ResumeStorage {
         this.lastCleanupTime = Date.now() // schema just created, nothing to cleanup
       }
       else {
-        const generationRow = this.ctx.storage.sql.exec(`
+        const generation = this.ctx.storage.sql.exec(`
           SELECT value FROM "${this.schemaPrefix}meta" WHERE key = 'generation'
-        `).toArray()[0]
+        `).toArray()[0]?.value as string | undefined
 
-        this.generation = generationRow ? generationRow.value as string : LEGACY_GENERATION
+        this.generation = generation ?? LEGACY_GENERATION
       }
 
       this.isInitedSchema = true
@@ -398,11 +398,9 @@ class ResumeStorage {
   }
 
   private attachEventId(message: SerializedPayload, sequence: string): SerializedPayload {
-    const id = this.generation === LEGACY_GENERATION ? sequence : `${this.generation}-${sequence}`
-
     return {
       ...message,
-      meta: { ...message.meta, id },
+      meta: { ...message.meta, id: `${this.generation}-${sequence}` },
     }
   }
 }

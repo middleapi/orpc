@@ -153,7 +153,6 @@ describe('durable publisher object', () => {
     const liveMessages = await readMessages(liveSubscriber, 3)
     const generation = await getGeneration(stub)
 
-    expect(generation).toMatch(/^\d+$/)
     expect(liveMessages).toEqual([
       { data: { text: 'first' }, meta: { id: `${generation}-1` } },
       { data: { text: 'second' }, meta: { id: `${generation}-2`, comments: ['keep me'] } },
@@ -335,7 +334,7 @@ describe('durable publisher object', () => {
     expect((await publish(stub, { data: { text: 'after-error' } })).status).toBe(204)
     expect((await readMessages(subscriber, 1))[0]).toEqual({
       data: { text: 'after-error' },
-      meta: { id: expect.any(String) },
+      meta: { id: expect.stringMatching(/^\d+-1$/) },
     })
 
     await closeSocket(subscriber)
@@ -402,20 +401,18 @@ describe('durable publisher object', () => {
     const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
     vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    const subscriber = await openSocket(stub)
     expect((await publish(stub, { data: { text: 'initial' } })).status).toBe(204)
-    const [initial] = await readMessages<{ meta: { id: string } }>(subscriber, 1)
-    await closeSocket(subscriber)
+    const initialId = `${await getGeneration(stub)}-1`
 
     await runInDurableObject(stub, async (_, state) => breakTable(state.storage.sql))
 
     expect((await publish(stub, { data: { text: 'recovered' } })).status).toBe(204)
 
     // the recreated table restarts its sequence, so the id issued before must still replay
-    const resumeSubscriber = await openSocket(stub, initial!.meta.id)
+    const resumeSubscriber = await openSocket(stub, initialId)
     expect(await readMessages(resumeSubscriber, 1)).toEqual([{
       data: { text: 'recovered' },
-      meta: { id: expect.any(String) },
+      meta: { id: expect.stringMatching(/^\d+-1$/) },
     }])
     expect(resumeSubscriber.replayedEvents).toBe('1')
 
@@ -478,7 +475,7 @@ describe('durable publisher object', () => {
     expect((await publish(stub, { data: { text: 'after-alarm' } })).status).toBe(204)
     expect((await readMessages(subscriber, 1))[0]).toEqual({
       data: { text: 'after-alarm' },
-      meta: { id: expect.any(String) },
+      meta: { id: expect.stringMatching(/^\d+-1$/) },
     })
 
     await runDurableObjectAlarm(stub)
@@ -499,7 +496,7 @@ describe('durable publisher object', () => {
 
     expect((await readMessages(beforeExpirySubscriber, 1))[0]).toEqual({
       data: { text: 'fresh resume event' },
-      meta: { id: expect.any(String) },
+      meta: { id: expect.stringMatching(/^\d+-1$/) },
     })
 
     await closeSocket(beforeExpirySubscriber)
@@ -523,7 +520,7 @@ describe('durable publisher object', () => {
     expect((await publish(stub, { data: { text: 'after cleanup' } })).status).toBe(204)
     expect((await readMessages(newLiveSubscriber, 1))[0]).toEqual({
       data: { text: 'after cleanup' },
-      meta: { id: expect.any(String) },
+      meta: { id: expect.stringMatching(/^\d+-1$/) },
     })
 
     await closeSocket(newLiveSubscriber)
@@ -557,8 +554,6 @@ describe('durable publisher object', () => {
     }
 
     const generation = await getGeneration(stub)
-    expect(seen[1]!.meta.id.startsWith(`${generation}-`)).toBe(false)
-
     const resumeSubscriber = await openSocket(stub, seen[1]!.meta.id)
 
     expect(resumeSubscriber.replayedEvents).toBe('2')
@@ -570,7 +565,7 @@ describe('durable publisher object', () => {
     await closeSocket(resumeSubscriber)
   })
 
-  it('keeps plain ids for a table created before generations existed', async () => {
+  it('resumes plain ids issued by a table created before generations existed', async () => {
     const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
 
     expect((await publish(stub, { data: { text: 'first' } })).status).toBe(204)
@@ -581,12 +576,12 @@ describe('durable publisher object', () => {
 
     const subscriber = await openSocket(stub)
     expect((await publish(stub, { data: { text: 'second' } })).status).toBe(204)
-    expect(await readMessages(subscriber, 1)).toEqual([{ data: { text: 'second' }, meta: { id: '2' } }])
+    expect(await readMessages(subscriber, 1)).toEqual([{ data: { text: 'second' }, meta: { id: '0-2' } }])
     await closeSocket(subscriber)
 
-    // a plain id still resumes within the same table
+    // a plain id issued before generations existed still resumes within the same table
     const resumeSubscriber = await openSocket(stub, '1')
-    expect(await readMessages(resumeSubscriber, 1)).toEqual([{ data: { text: 'second' }, meta: { id: '2' } }])
+    expect(await readMessages(resumeSubscriber, 1)).toEqual([{ data: { text: 'second' }, meta: { id: '0-2' } }])
     await closeSocket(resumeSubscriber)
 
     // and replays everything once the table is recreated with a generation
