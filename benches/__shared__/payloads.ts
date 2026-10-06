@@ -79,5 +79,21 @@ export async function drainBody(body: unknown): Promise<void> {
         break
       }
     }
+    return
+  }
+
+  if (body instanceof ReadableStream) {
+    const reader = body.getReader()
+    try {
+      while (true) {
+        const { done } = await reader.read()
+        if (done) {
+          break
+        }
+      }
+    }
+    finally {
+      reader.releaseLock()
+    }
   }
 }
