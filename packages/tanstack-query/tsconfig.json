@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.lib.json",
   "references": [
+    { "path": "../cache" },
     { "path": "../client" },
     { "path": "../contract" },
     { "path": "../openapi" },

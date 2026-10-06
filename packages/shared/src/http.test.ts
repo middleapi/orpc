@@ -1,4 +1,8 @@
+import { safeDecodeURIComponent } from '@standard-server/shared'
 import {
+  decodeCacheTagHeader,
+  encodeCacheTag,
+  encodeCacheTagHeader,
   isAcceptableEncoding,
   isCompressibleContentType,
   isNoTransformCacheControl,
@@ -263,5 +267,53 @@ describe('isNoTransformCacheControl', () => {
 
   it('does not match a directive that merely contains the token', () => {
     expect(isNoTransformCacheControl('no-transform-extension')).toBe(false)
+  })
+})
+
+describe('encodeCacheTag', () => {
+  it.each([
+    ['leaves plain tags alone', 'planets', 'planets'],
+    ['leaves other printable ASCII alone', 'a1!~*\'()-_.:/?', 'a1!~*\'()-_.:/?'],
+    ['escapes the comma separator', 'a,b', 'a%2Cb'],
+    ['escapes the percent escape', '100%', '100%25'],
+    ['escapes uppercase letters by code point', 'Planets', '%50lanets'],
+    ['escapes spaces', 'sp ace', 'sp%20ace'],
+    ['escapes control characters', 'a\nb', 'a%0Ab'],
+    ['escapes delete', 'a\x7Fb', 'a%7Fb'],
+    ['escapes non-ASCII as UTF-8', 'tiếng việt', 'ti%E1%BA%BFng%20vi%E1%BB%87t'],
+    ['escapes astral characters as UTF-8', 'a😀', 'a%F0%9F%98%80'],
+  ])('%s', (_, tag, encoded) => {
+    expect(encodeCacheTag(tag)).toBe(encoded)
+    expect(safeDecodeURIComponent(encoded)).toBe(tag)
+  })
+
+  it('keeps case-folded tags distinct', () => {
+    expect(encodeCacheTag('Planets')).not.toBe(encodeCacheTag('planets'))
+    expect(encodeCacheTag('Planets').toLowerCase()).not.toBe(encodeCacheTag('planets').toLowerCase())
+  })
+
+  it('encodes identically across calls, since the pattern is shared', () => {
+    expect(encodeCacheTag('A,B%C')).toBe(encodeCacheTag('A,B%C'))
+    expect(encodeCacheTag('A,B%C')).toBe('%41%2C%42%25%43')
+  })
+})
+
+describe('encodeCacheTagHeader & decodeCacheTagHeader', () => {
+  it('joins encoded tags with commas, and round-trips the list', () => {
+    const tags = ['plain', 'a,b', '100%', 'CamelCase', 'tiếng việt', 'sp ace']
+
+    expect(encodeCacheTagHeader(['a', 'b'])).toBe('a,b')
+    expect(encodeCacheTagHeader(tags)).toBe(tags.map(tag => encodeCacheTag(tag)).join(','))
+    expect(decodeCacheTagHeader(encodeCacheTagHeader(tags))).toEqual(tags)
+  })
+
+  it('keeps empty tags instead of dropping them', () => {
+    expect(encodeCacheTagHeader(['a', '', 'b'])).toBe('a,,b')
+    expect(decodeCacheTagHeader('a,,b')).toEqual(['a', '', 'b'])
+    expect(decodeCacheTagHeader('')).toEqual([''])
+  })
+
+  it('decodes malformed escapes as-is', () => {
+    expect(decodeCacheTagHeader('%zz')).toEqual(['%zz'])
   })
 })
