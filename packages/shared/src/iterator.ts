@@ -239,6 +239,17 @@ export function consumeAsyncIterator<T, TReturn, TError = ThrowableError>(
   })()
 
   return async () => {
-    await (await iterator)?.return?.()
+    let resolvedIterator: AsyncIterator<T, TReturn>
+
+    try {
+      resolvedIterator = await iterator
+    }
+    catch {
+      // The initial rejection is already reported through onError/onFinish above,
+      // so there is nothing to cancel and no reason to reject again.
+      return
+    }
+
+    await resolvedIterator?.return?.()
   }
 }

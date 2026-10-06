@@ -656,4 +656,23 @@ describe('consumeAsyncIterator', () => {
       expect(onSuccess).toHaveBeenCalledTimes(0)
     })
   })
+
+  it('unsubscribe does not reject again after iterator promise rejection', async () => {
+    const error = new Error('TEST')
+    const iterator = Promise.reject(error)
+
+    const onError = vi.fn()
+
+    const unsubscribe = consumeAsyncIterator(iterator, {
+      onEvent: vi.fn(),
+      onError,
+    })
+
+    await vi.waitFor(() => {
+      expect(onError).toHaveBeenCalledTimes(1)
+    })
+
+    await expect(unsubscribe()).resolves.toBeUndefined()
+    expect(onError).toHaveBeenCalledTimes(1)
+  })
 })
