@@ -1,7 +1,7 @@
 import type { Promisable, Value } from '@orpc/shared'
 import type { StandardLinkInterceptor, StandardLinkInterceptorOptions, StandardLinkOptions, StandardLinkPlugin } from '../adapters/standard'
 import type { ClientContext } from '../types'
-import { AsyncIteratorClass, isAsyncIteratorObject, override, sleep, toArray, value } from '@orpc/shared'
+import { anyAbortSignal, AsyncIteratorClass, isAsyncIteratorObject, override, sleep, toArray, value } from '@orpc/shared'
 import { getEventMeta } from '@standard-server/core'
 
 export interface RetryLinkPluginAttemptOptions<T extends RetryLinkPluginContext> extends StandardLinkInterceptorOptions<T> {
@@ -31,6 +31,10 @@ export interface RetryLinkPluginContext {
   /**
    * Maximum retry attempts before throwing.
    * Use `Number.POSITIVE_INFINITY` for infinite retries (e.g. for AsyncIteratorObject).
+   *
+   * @remarks
+   * **Note**: Calls with a stream input (AsyncIteratorObject or ReadableStream) are never retried,
+   * because the first attempt consumes the input.
    *
    * @default 0
    */
@@ -93,6 +97,12 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
     const interceptor: StandardLinkInterceptor<T> = async (interceptorOptions) => {
       const { next, ...callOptions } = interceptorOptions
+
+      // A stream input is consumed by the first attempt, so a retry would send it again empty or locked.
+      if (isAsyncIteratorObject(callOptions.input) || callOptions.input instanceof ReadableStream) {
+        return next(callOptions)
+      }
+
       const maxAttempts = await value(
         callOptions.context.retry ?? this.defaultRetry,
         callOptions,
@@ -111,15 +121,15 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
       let callback: void | ((isSuccess: boolean) => void)
       let attempt = 1
 
-      const callNext = async (initialError?: { error: unknown }) => {
+      const callNext = async (signal: AbortSignal | undefined, initialError?: { error: unknown }) => {
         let currentError = initialError
 
         while (true) {
-          const updatedCallOptions = { ...callOptions, lastEventId }
+          const updatedCallOptions = { ...callOptions, signal, lastEventId }
           let retryDelayMs = 0
 
           if (currentError) {
-            if (attempt > maxAttempts) {
+            if (attempt > maxAttempts || signal?.aborted) {
               throw currentError.error
             }
 
@@ -145,7 +155,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
 
           try {
             if (currentError) {
-              await sleep(retryDelayMs, { signal: updatedCallOptions.signal })
+              await sleep(retryDelayMs, { signal })
 
               attempt++
             }
@@ -156,7 +166,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
           catch (error) {
             currentError = { error }
 
-            if (updatedCallOptions.signal?.aborted) {
+            if (signal?.aborted) {
               throw error
             }
           }
@@ -167,14 +177,17 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
         }
       }
 
-      const output = await callNext()
+      const output = await callNext(callOptions.signal)
 
       if (!isAsyncIteratorObject(output)) {
         return output
       }
 
       let current = output
-      let isIteratorAborted = false
+
+      // Aborted once the iterator is closed, so reconnecting stops at once instead of retrying forever.
+      const iteratorController = new AbortController()
+      const reconnectSignal = anyAbortSignal([callOptions.signal, iteratorController.signal])
 
       return override(() => current, new AsyncIteratorClass(
         async () => {
@@ -194,7 +207,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
               lastEventId = meta?.id ?? lastEventId
               lastEventRetry = meta?.retry ?? lastEventRetry
 
-              const asyncIteratorObject = await callNext({ error })
+              const asyncIteratorObject = await callNext(reconnectSignal, { error })
               if (!isAsyncIteratorObject(asyncIteratorObject)) {
                 throw new TypeError(
                   'RetryLinkPlugin: Expected an AsyncIteratorObject, got a different type.',
@@ -203,7 +216,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
 
               current = asyncIteratorObject
 
-              if (isIteratorAborted) {
+              if (iteratorController.signal.aborted) {
                 await current.return?.()
                 throw error
               }
@@ -211,7 +224,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
           }
         },
         async ({ kind }) => {
-          isIteratorAborted = true
+          iteratorController.abort()
 
           if (kind === 'cancelled') {
             await current.return?.()

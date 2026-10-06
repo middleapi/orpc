@@ -79,6 +79,10 @@ const link = new RPCLink<ClientContext>({
 
 :::
 
+:::warning
+Calls with a stream input ([AsyncIteratorObject](/docs/async-iterator-object) or `ReadableStream`) are never retried, because the first attempt consumes the input and a retry would send it again empty.
+:::
+
 ## Event Source Simulation
 
 To replicate the behavior of [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource) for an [AsyncIteratorObject](/docs/async-iterator-object), use the following configuration:
