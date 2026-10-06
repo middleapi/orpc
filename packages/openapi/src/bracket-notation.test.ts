@@ -350,72 +350,41 @@ describe('bracket notation serializer', () => {
     describe('maxDeserializingEmptySlots', () => {
       const limited = new BracketNotationSerializer({ maxDeserializingEmptySlots: 4 })
 
-      function query(count: number, entry: (i: number) => string): [string, unknown][] {
-        return Array.from(new URLSearchParams(Array.from({ length: count }, (_, i) => entry(i)).join('&')).entries())
-      }
-
-      it('counts the empty slots that array indexes and object keys leave across the payload', () => {
-        expect(limited.deserialize([['a[0]', 1], ['a[3]', 2], ['b[x]', 3], ['b[2]', 4]])).toEqual({
+      it('counts the empty slots that explicit array indexes leave across the payload', () => {
+        expect(limited.deserialize([['a[0]', 1], ['a[3]', 2], ['b[2]', 3]])).toEqual({
           a: [1, undefined, undefined, 2],
-          b: { x: 3, 2: 4 },
+          b: [undefined, undefined, 3],
         })
 
-        expect(() => limited.deserialize([['a[0]', 1], ['a[3]', 2], ['b[x]', 3], ['b[3]', 4]])).toThrow(
-          new TypeError('Invalid bracket notation: integer keys leave more than 4 empty slots (maxDeserializingEmptySlots).'),
-        )
-        expect(() => limited.deserialize([['5', 1]])).toThrow(TypeError)
-      })
-
-      it('turns an array into an object when its index does not fit, which throws only if the key still counts', () => {
-        expect(limited.deserialize([['a[5000]', 1]])).toEqual({ a: { 5000: 1 } })
-        expect(() => limited.deserialize([['a[5]', 1]])).toThrow(TypeError)
-      })
-
-      it('counts object keys from the largest index already present', () => {
-        expect(limited.deserialize([['a[0]', 1], ['a[4]', 2], ['a[x]', 3], ['a[5]', 4]])).toEqual({
-          a: { 0: 1, 4: 2, x: 3, 5: 4 },
-        })
-
-        expect(limited.deserialize([['a', { 9: 'x' }], ['a[9][b]', 1], ['a[10]', 2]])).toEqual({
-          a: { 9: { b: 1 }, 10: 2 },
+        expect(limited.deserialize([['a[0]', 1], ['a[3]', 2], ['b[3]', 3]])).toEqual({
+          a: [1, undefined, undefined, 2],
+          b: { 3: 3 },
         })
       })
 
-      it('does not count slots filled later or keys far past the existing ones', () => {
+      it('does not count slots filled later', () => {
         expect(limited.deserialize([['a[3]', 1], ['a[0]', 2], ['a[1]', 3], ['a[2]', 4], ['b[1]', 5]])).toEqual({
           a: [2, 3, 4, 1],
           b: [undefined, 5],
         })
-
-        expect(limited.deserialize([
-          ['rows[1700000000000][name]', 'a'],
-          ['rows[1700000000999][name]', 'b'],
-          ['qty[1500]', 1],
-          ['qty[1700]', 2],
-          ['qty[2300]', 3],
-        ])).toEqual({
-          rows: { 1700000000000: { name: 'a' }, 1700000000999: { name: 'b' } },
-          qty: { 1500: 1, 1700: 2, 2300: 3 },
-        })
       })
 
-      it('ignores integer keys past 2 ** 32 - 2, which engines store as ordinary properties', () => {
-        expect(() => limited.deserialize([['a[4294967295]', 1], ['a[5]', 2]])).toThrow(TypeError)
+      it('never throws for sparse object keys, which are stored sparsely instead', () => {
+        const entries = Array.from({ length: 100 }, (_, i): [string, unknown][] => [[`k${i}[a]`, 'x'], [`k${i}[999]`, 'y']]).flat()
+
+        expect(limited.deserialize(entries)).toEqual(Object.fromEntries(
+          Array.from({ length: 100 }, (_, i) => [`k${i}`, { a: 'x', 999: 'y' }]),
+        ))
       })
 
-      it('does not count object keys past index 4,096, where engines only keep dense keys flat', () => {
-        const dense = Array.from({ length: 4096 }, (_, i): [string, unknown] => [`k[${i}]`, i])
-        const sparse = Array.from({ length: 100 }, (_, i): [string, unknown] => [`k[${4200 + i * 100}]`, i])
+      it('leaves no trace of switching objects to sparse storage', () => {
+        const result = limited.deserialize([['a[x]', 1], ['a[5]', 2], ['b[x]', 3], ['b[4294967294]', 4], ['b[5]', 5]]) as any
 
-        expect(() => limited.deserialize([['k[x]', 0], ...dense, ...sparse])).not.toThrow()
-      })
+        expect(Object.keys(result.a)).toEqual(['5', 'x'])
+        expect(result.b).toEqual({ x: 3, 4294967294: 4, 5: 5 })
 
-      it('rejects inputs that repeat sparse keys to exhaust memory', () => {
-        expect(() => serializer.deserialize(query(1, i => `k${i}[999]=x`))).not.toThrow()
-        expect(() => serializer.deserialize(query(2, i => `k${i}[999]=x`))).toThrow(TypeError)
-        expect(() => serializer.deserialize(query(100, i => `k${i}[999][999][999]=x`))).toThrow(TypeError)
-        expect(() => serializer.deserialize(query(100, i => `k${i}[a]=x&k${i}[999]=x`))).toThrow(TypeError)
-        expect(() => serializer.deserialize(query(100, i => `k${i}[4294967295]=x&k${i}[1000]=x`))).toThrow(TypeError)
+        const value = { 4294967294: 'keep' }
+        expect(limited.deserialize([['a', value], ['a[5]', 1]])).toEqual({ a: { 4294967294: 'keep', 5: 1 } })
       })
     })
 

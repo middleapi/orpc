@@ -354,9 +354,9 @@ describe('openAPISerializer', () => {
 
       expect(serializer.deserialize(form)).toEqual({ tags: ['a', undefined, 'b'] })
 
-      // index 2 leaves 1 empty slot, more than the limit of 0
+      // index 2 leaves 1 empty slot, more than the limit of 0, so the array should be deserialized as an object
       const s = new OpenAPISerializer({ bracketNotation: { maxDeserializingEmptySlots: 0 } })
-      expect(() => s.deserialize(form)).toThrow(TypeError)
+      expect(s.deserialize(form)).toEqual({ tags: { 0: 'a', 2: 'b' } })
     })
   })
 
