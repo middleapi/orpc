@@ -122,7 +122,6 @@ function toORPCProcedure(procedure: AnyProcedure) {
 
               return result
             },
-            // Errors thrown while iterating escape the catch below, so they must be converted here too
             mapError: toORPCError,
           })
         }
