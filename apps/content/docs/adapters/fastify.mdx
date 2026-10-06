@@ -98,15 +98,13 @@ app.addContentTypeParser('*', (request, payload, done) => {
 
 :::warning
 To better support `Blob`, `File`, and `ReadableStream<Uint8Array>` at the root level in cross-origin scenarios,
-extend your [CORS allowlist](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_response_header) to allow clients to send and receive the `Content-Disposition` and `Standard-Server` headers. Learn more in the [Standard Server documentation](https://github.com/middleapi/standard-server#how-body-parsing-works). If you use the [CORS Plugin](/docs/plugins/cors), include them in `exposeHeaders`:
+extend your [CORS allowlist](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_response_header) to allow clients to read the `Content-Disposition` and `Standard-Server` response headers. Learn more in the [Standard Server documentation](https://github.com/middleapi/standard-server#how-body-parsing-works). If you use the [CORS Plugin](/docs/plugins/cors), include them in `exposeHeaders`:
 
 ```ts
 const cors = new CORSHandlerPlugin({
   exposeHeaders: ['Content-Disposition', 'Standard-Server'],
 })
 ```
-
-Request headers are [allowed by default](/docs/plugins/cors#allowed-headers). If you set `allowHeaders`, list them there as well, along with `Content-Type` and any other headers your clients send.
 
 :::
 
