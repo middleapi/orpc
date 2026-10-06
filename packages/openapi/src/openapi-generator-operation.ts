@@ -410,44 +410,76 @@ function extractDetailedResponseParts(
     }
 
     const statusSchema = entries.find(([name]) => name === 'status')?.[1]
+    const statuses = statusSchema === undefined
+      ? new Map([[defaultStatus, undefined]])
+      : extractDetailedStatuses(statusSchema)
 
-    // Some converters (e.g. Effect) emit literals as a single-value `enum` instead of `const`
-    const literalStatus = typeof statusSchema === 'object'
-      ? statusSchema.const ?? (statusSchema.enum?.length === 1 ? statusSchema.enum[0] : undefined)
-      : undefined
-
-    if (statusSchema !== undefined && (typeof statusSchema !== 'object' || !Number.isInteger(literalStatus) || literalStatus >= 400)) {
+    if (!statuses) {
       throw new OpenAPIGeneratorError(
         `invalid "status" field in the detailed output schema.\n`
-        + `  Expected: a literal (const or single-value enum) integer below 400\n`
+        + `  Expected: literal integers below 400 (const, enum, or a union of them)\n`
         + `  Received: ${stringifyJSON(statusSchema)}`,
       )
     }
 
-    const status = (literalStatus as number || undefined) ?? defaultStatus
-
-    let parts = partsByStatus.get(status)
-    if (!parts) {
-      parts = { descriptions: [], bodies: [], headers: [] }
-      partsByStatus.set(status, parts)
-    }
-
-    if (statusSchema?.description !== undefined) {
-      parts.descriptions.push(statusSchema.description)
-    }
-
     const headersSchema = entries.find(([name]) => name === 'headers')?.[1]
-    if (headersSchema !== undefined) {
-      parts.headers.push(headersSchema)
-    }
-
     const bodySchema = entries.find(([name]) => name === 'body')?.[1]
-    if (bodySchema !== undefined) {
-      parts.bodies.push(bodySchema)
+
+    for (const [status, description] of statuses) {
+      let parts = partsByStatus.get(status)
+      if (!parts) {
+        parts = { descriptions: [], bodies: [], headers: [] }
+        partsByStatus.set(status, parts)
+      }
+
+      if (description !== undefined) {
+        parts.descriptions.push(description)
+      }
+
+      if (headersSchema !== undefined) {
+        parts.headers.push(headersSchema)
+      }
+
+      if (bodySchema !== undefined) {
+        parts.bodies.push(bodySchema)
+      }
     }
   }
 
   return partsByStatus
+}
+
+/**
+ * Collects every status a detailed output `status` schema allows, mapped to its description.
+ * Accepts `const`, `enum` (how Effect, arktype, and valibot `picklist` emit literals), or a union of them.
+ * Returns `undefined` when any member is not a literal integer below 400.
+ */
+function extractDetailedStatuses(schema: JsonSchema): Map<number, string | undefined> | undefined {
+  const statuses = new Map<number, string | undefined>()
+
+  for (const member of flattenJsonUnionSchema(schema)) {
+    if (typeof member !== 'object') {
+      return undefined
+    }
+
+    const values = member.const !== undefined ? [member.const] : member.enum
+
+    if (!values?.length) {
+      return undefined
+    }
+
+    for (const value of values) {
+      if (!Number.isInteger(value) || value >= 400) {
+        return undefined
+      }
+
+      if (!statuses.has(value)) {
+        statuses.set(value, member.description)
+      }
+    }
+  }
+
+  return statuses.size ? statuses : undefined
 }
 
 export function buildErrorResponse(

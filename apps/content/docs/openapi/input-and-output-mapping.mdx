@@ -165,6 +165,8 @@ In `detailed` mode, return an object with the following fields:
 - `headers`: optional response headers in lower-case keys
 - `body`: optional response body
 
+For OpenAPI generation, `status` must be a literal or a union of literals. A union like `z.literal([200, 201])` documents the same `headers` and `body` under each status.
+
 ```ts
 const savePlanet = os
   .meta(openapi({
