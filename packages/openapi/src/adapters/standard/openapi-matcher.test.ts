@@ -250,6 +250,45 @@ describe('openAPIMatcher', () => {
       }
     })
 
+    it('matches path text that requests leave raw but rou3 stores encoded', async () => {
+      // rou3 stores "^" as "%5E", while WHATWG URL and Node's req.url keep it raw
+      const procedure = os.meta(openapi({ method: 'GET', path: '/v1^beta/items:batchGet/{id}' })).handler(() => 'ok')
+
+      const matcher = new OpenAPIMatcher({ procedure })
+
+      for (const pathname of [
+        '/v1^beta/items:batchGet/a^b',
+        '/v1%5Ebeta/items:batchGet/a^b',
+        '/v1%5ebeta/items%3AbatchGet/a%5Eb',
+      ] as const) {
+        await expect(matcher.match('GET', pathname, undefined)).resolves.toEqual({
+          path: ['procedure'],
+          procedure,
+          params: { id: 'a^b' },
+        })
+      }
+
+      await expect(matcher.match('GET', '/v1beta/items:batchGet/a^b', undefined)).resolves.toBeUndefined()
+    })
+
+    it('matches path text however the route and the request encode it', async () => {
+      const generated = os.handler(() => 'generated')
+      const explicit = os.meta(openapi({ method: 'GET', path: '/x%3Ay/a%2Fb/{id}' })).handler(() => 'explicit')
+
+      const matcher = new OpenAPIMatcher({ 'a:b{c}': generated, explicit })
+
+      for (const pathname of ['/a:b%7Bc%7D', '/a%3Ab%7bc%7d', '/a:b{c}'] as const) {
+        await expect(matcher.match('POST', pathname, undefined)).resolves.toMatchObject({ procedure: generated, params: undefined })
+      }
+
+      for (const pathname of ['/x:y/a%2Fb/1', '/x%3Ay/a%2fb/1'] as const) {
+        await expect(matcher.match('GET', pathname, undefined)).resolves.toMatchObject({ procedure: explicit, params: { id: '1' } })
+      }
+
+      // an encoded slash stays part of its segment
+      await expect(matcher.match('GET', '/x:y/a/b/1', undefined)).resolves.toBeUndefined()
+    })
+
     it('matches segments after a catch-all param', async () => {
       const raw = os.meta(openapi({ method: 'GET', path: '/files/{+path}/raw' })).handler(() => 'ok')
 
@@ -500,6 +539,26 @@ describe('openAPIMatcher', () => {
         prefix: '/users',
       })
 
+      expect(loader).toHaveBeenCalledTimes(1)
+    })
+
+    it('resolves a prefixed lazy router whose prefix holds a char rou3 stores encoded', async () => {
+      const info = os.meta(openapi({ method: 'GET', path: '/info' })).handler(() => 'info')
+
+      const loader = vi.fn(async () => ({ default: { info } }))
+
+      const matcher = new OpenAPIMatcher({
+        beta: os.meta(openapi({ prefix: '/v1^beta' })).lazy(loader),
+      })
+
+      await expect(matcher.match('GET', '/v1beta/info', undefined)).resolves.toBeUndefined()
+      expect(loader).toHaveBeenCalledTimes(0)
+
+      // the prefix RegExp holds "%5E", so the raw "^" only matches it after normalization
+      await expect(matcher.match('GET', '/v1^beta/info', undefined)).resolves.toMatchObject({
+        path: ['beta', 'info'],
+        params: undefined,
+      })
       expect(loader).toHaveBeenCalledTimes(1)
     })
 

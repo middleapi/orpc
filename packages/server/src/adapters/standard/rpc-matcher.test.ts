@@ -442,6 +442,33 @@ describe('rpcMatcher', () => {
       expect(result!.procedure).toBe(procedure2)
     })
 
+    it('handles raw characters in pathnames that are stored percent-encoded', async () => {
+      const deepLoader = vi.fn(async () => ({ default: { info: procedure3 } }))
+
+      const matcher = new RPCMatcher({
+        'v1^beta': { 'items:batchGet': procedure1 },
+        'lazy^beta': new Lazy({ loader: deepLoader, meta: {} }),
+      })
+
+      // WHATWG URL and Node's req.url keep "^" raw, while procedure paths are stored as "%5E"
+      for (const pathname of ['/v1^beta/items:batchGet', '/v1%5Ebeta/items%3AbatchGet', '/v1%5ebeta/items:batchGet'] as const) {
+        const result = await matcher.match('POST', pathname, undefined)
+
+        expect(result).toBeDefined()
+        expect(result!.path).toEqual(['v1^beta', 'items:batchGet'])
+        expect(result!.procedure).toBe(procedure1)
+      }
+
+      await expect(matcher.match('POST', '/v1beta/items:batchGet', undefined)).resolves.toBeUndefined()
+
+      const result = await matcher.match('POST', '/lazy^beta/info', undefined)
+
+      expect(result).toBeDefined()
+      expect(result!.path).toEqual(['lazy^beta', 'info'])
+      expect(result!.procedure).toBe(procedure3)
+      expect(deepLoader).toHaveBeenCalledTimes(1)
+    })
+
     it('resolves lazy routers found only after normalizing a percent-encoded pathname', async () => {
       const matcher = new RPCMatcher(router)
       const result = await matcher.match('POST', '/%6Cazy/info', undefined) // %6C is 'l'

@@ -17,6 +17,9 @@ describe('openapiLink', () => {
     query: os
       .meta(openapi({ method: 'QUERY', path: '/query' }))
       .handler(({ input }) => input),
+    caret: os
+      .meta(openapi({ method: 'GET', path: '/v1^beta/{id}' }))
+      .handler(({ input }) => input),
   }
 
   const handler = new OpenAPIHandler(router)
@@ -106,6 +109,32 @@ describe('openapiLink', () => {
         arr: [3, date.toISOString()],
       },
     })
+  })
+
+  it('calls an OpenAPI endpoint whose path keeps a raw "^"', async () => {
+    const fetch = vi.fn(async (url: string, init: RequestInit) => {
+      const request = new Request(url, init)
+      const { matched, response } = await handler.handle(request, {
+        prefix: '/api',
+      })
+
+      if (!matched || !response) {
+        throw new Error('No procedure match')
+      }
+
+      return response
+    })
+
+    const client = createORPCClient(new OpenAPILink(router, {
+      fetch,
+      origin: 'http://localhost:3000',
+      url: '/api',
+    })) as any
+
+    await expect(client.caret({ id: '1' })).resolves.toEqual({ id: '1' })
+
+    // WHATWG URL keeps "^" raw, while the matcher stores it as "%5E"
+    expect(fetch.mock.calls[0]![0]).toBe('http://localhost:3000/api/v1^beta/1')
   })
 
   it('calls a QUERY OpenAPI endpoint with body-encoded input', async () => {
