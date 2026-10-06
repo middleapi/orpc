@@ -177,8 +177,18 @@ const INTEGER_PATTERN = /^0$|^[1-9]\d*$/
  * or `undefined` if it is not one. Integer keys past `2 ** 32 - 2` are ordinary properties.
  */
 function internalToArrayIndex(key: string): number | undefined {
-  const index = INTEGER_PATTERN.test(key) ? Number(key) : undefined
-  return index !== undefined && index <= 4294967294 ? index : undefined
+  // Most keys are names or longer than `4294967294`, which are ruled out before the regex has to run
+  const first = key.charCodeAt(0)
+
+  if (key.length <= 10 && first >= 48 && first <= 57 && INTEGER_PATTERN.test(key)) {
+    const index = Number(key)
+
+    if (index <= 4294967294) {
+      return index
+    }
+  }
+
+  return undefined
 }
 
 function internalArrayToObject(array: readonly unknown[]): Record<string, unknown> {
@@ -234,7 +244,8 @@ function internalGetObjectSpan(object: object): number {
  * Counts the empty slots that integer keys leave below them, see `maxDeserializingEmptySlots`.
  */
 class InternalEmptySlotBudget {
-  // One past the largest array index of each object, or `Infinity` once V8 stores it sparsely
+  // One past the largest array index of each object, capped at `MAX_COUNTED_OBJECT_INDEX` since nothing past it
+  // counts, or `Infinity` once V8 stores the object sparsely
   private spans: WeakMap<object, number> | undefined
   private used = 0
 
@@ -295,7 +306,7 @@ class InternalEmptySlotBudget {
       this.setSpan(object, span)
     }
 
-    if (index < span) {
+    if (index < span || span >= MAX_COUNTED_OBJECT_INDEX) {
       return
     }
 
@@ -314,7 +325,7 @@ class InternalEmptySlotBudget {
       }
     }
 
-    this.setSpan(object, index + 1)
+    this.setSpan(object, Math.min(index + 1, MAX_COUNTED_OBJECT_INDEX))
   }
 
   private setSpan(object: object, span: number): void {
