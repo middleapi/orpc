@@ -158,7 +158,7 @@ export const base = os
 
 ### Hooks
 
-This integration also includes React hooks for server functions. `useServerFunction` executes a server function and tracks its status. `useOptimisticServerFunction` does the same, with optimistic updates. Unlike direct server function calls, hook errors are deserialized into native `ORPCError` instances instead of plain JSON (`ORPCErrorJSON`) for a more natural developer experience. [Special Next.js errors](#special-nextjs-errors) never become the hook's error state: they are rethrown so Next.js handles them, just like a direct server function call.
+This integration also includes React hooks for server functions. `useServerFunction` executes a server function and tracks its status. `useOptimisticServerFunction` does the same, with optimistic updates. Unlike direct server function calls, hook errors are deserialized into native `ORPCError` instances instead of plain JSON (`ORPCErrorJSON`) for a more natural developer experience. If your procedures can throw `redirect` or `notFound`, see [Special Next.js Errors](#special-nextjs-errors).
 
 <CodeGroup>
 
@@ -308,7 +308,7 @@ export const formFunctionableProcedure = formFunctionable(
 
 ## Special Next.js Errors
 
-Next.js functions such as [redirect](https://nextjs.org/docs/app/api-reference/functions/redirect), [notFound](https://nextjs.org/docs/app/api-reference/functions/not-found), [forbidden](https://nextjs.org/docs/app/api-reference/functions/forbidden), and [unauthorized](https://nextjs.org/docs/app/api-reference/functions/unauthorized) work by throwing special errors. oRPC rethrows them so Next.js can handle them, but anything that catches errors along the way sees them first, including middleware, `onError` interceptors, and [hook](#hooks) interceptors. If your procedures can throw these errors, call [unstable_rethrow](https://nextjs.org/docs/app/api-reference/functions/unstable_rethrow) before handling an error, so a redirect is not logged or reported as a failure.
+Next.js functions such as [redirect](https://nextjs.org/docs/app/api-reference/functions/redirect), [notFound](https://nextjs.org/docs/app/api-reference/functions/not-found), [forbidden](https://nextjs.org/docs/app/api-reference/functions/forbidden), and [unauthorized](https://nextjs.org/docs/app/api-reference/functions/unauthorized) work by throwing special errors that Next.js must receive. Anything that catches errors along the way sees them as regular errors: middleware, `onError` interceptors, and [hooks](#hooks), which store them as their `error` state and return them from `execute`. If your procedures can throw these errors, call [unstable_rethrow](https://nextjs.org/docs/app/api-reference/functions/unstable_rethrow) wherever you handle errors, so they reach Next.js instead of being reported as failures.
 
 <CodeGroup>
 
@@ -332,20 +332,35 @@ export const serverFunction = createServerFunction(procedure, {
 'use client'
 
 import { onError } from '@orpc/client'
+import { parseFormData } from '@orpc/next'
+import { useServerFunction } from '@orpc/next/hooks'
 import { unstable_rethrow } from 'next/navigation'
 
-const { execute } = useServerFunction(serverFunction, {
-  interceptors: [
-    onError((error) => {
-      unstable_rethrow(error) // <- let redirect, notFound, ... pass through
-      toast.error(error.message)
-    }),
-  ],
-})
+export function MyComponent() {
+  const { execute } = useServerFunction(serverFunction, {
+    interceptors: [
+      onError((error) => {
+        unstable_rethrow(error) // <- skip redirect, notFound, ...
+        toast.error(error.message)
+      }),
+    ],
+  })
+
+  return (
+    <form
+      action={async (form) => {
+        const [error] = await execute(parseFormData(form))
+        unstable_rethrow(error) // <- let Next.js handle redirect, notFound, ...
+      }}
+    >
+      <button type="submit">Submit</button>
+    </form>
+  )
+}
 ```
 
 </CodeGroup>
 
-:::info
-`onErrorDeferred` ignores special Next.js errors automatically, because a deferred callback runs after the call has settled and cannot rethrow.
+:::warning
+Do not call `unstable_rethrow` inside deferred interceptors such as `onErrorDeferred`. They run after the call has settled, so the rethrown error escapes as an uncaught error (for `redirect`, Next.js then navigates a second time). Use `onError` for error handling that should skip these errors.
 :::
