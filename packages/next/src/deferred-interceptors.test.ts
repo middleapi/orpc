@@ -1,4 +1,5 @@
 import { intercept } from '@orpc/shared'
+import * as next from 'next/navigation'
 import { onErrorDeferred, onFinishDeferred, onStartDeferred, onSuccessDeferred } from './deferred-interceptors'
 
 describe('onStartDeferred/onSuccessDeferred/onErrorDeferred/onFinishDeferred', async () => {
@@ -55,6 +56,37 @@ describe('onStartDeferred/onSuccessDeferred/onErrorDeferred/onFinishDeferred', a
       context: true,
     }))
     expect(callback).toHaveBeenNthCalledWith(3, [new Error('test'), undefined, false], expect.objectContaining({
+      context: true,
+    }))
+  })
+
+  it.each([
+    [() => next.redirect('/foo')],
+    [() => next.notFound()],
+  ])('ignores special Next.js errors in onErrorDeferred %s', async (createError) => {
+    let error: unknown
+    try {
+      createError()
+    }
+    catch (e) {
+      error = e
+    }
+
+    const errorCallback = vi.fn()
+    const finishCallback = vi.fn()
+    await expect(intercept([
+      onFinishDeferred(finishCallback),
+      onErrorDeferred(errorCallback),
+    ], {
+      context: true,
+    }, async () => {
+      throw error
+    })).rejects.toBe(error)
+
+    await new Promise(resolve => setTimeout(resolve, 6))
+    expect(errorCallback).toHaveBeenCalledTimes(0)
+    expect(finishCallback).toHaveBeenCalledTimes(1)
+    expect(finishCallback).toHaveBeenCalledWith([error, undefined, false], expect.objectContaining({
       context: true,
     }))
   })

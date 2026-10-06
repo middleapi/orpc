@@ -1,6 +1,10 @@
+import type { ReactNode } from 'react'
 import { ORPCError, os } from '@orpc/server'
 import { act, renderHook, waitFor } from '@testing-library/react'
+import * as next from 'next/navigation'
+import { Component } from 'react'
 import { z } from 'zod'
+import { onErrorDeferred } from '../deferred-interceptors'
 import { createServerFunction } from '../server-function'
 import { useServerFunction } from './server-function'
 
@@ -322,5 +326,63 @@ describe('useServerFunction', () => {
     expect(result.current.input).toBeUndefined()
     expect(result.current.data).toBeUndefined()
     expect(result.current.error).toBeNull()
+  })
+
+  it.each([
+    [() => next.redirect('/thank-you')],
+    [() => next.notFound()],
+  ])('rethrows special Next.js errors %s', async (createError) => {
+    const boundaryErrors: unknown[] = []
+
+    class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+      override state = { hasError: false }
+
+      static getDerivedStateFromError() {
+        return { hasError: true }
+      }
+
+      override componentDidCatch(error: unknown) {
+        boundaryErrors.push(error)
+      }
+
+      override render() {
+        return this.state.hasError ? null : this.props.children
+      }
+    }
+
+    const fn = createServerFunction(os.handler(createError))
+    const errorCallback = vi.fn()
+    const states: string[] = []
+
+    const { result } = renderHook(() => {
+      const state = useServerFunction(fn, {
+        interceptors: [onErrorDeferred(errorCallback)],
+      })
+
+      states.push(state.status)
+
+      return state
+    }, {
+      wrapper: ErrorBoundary,
+    })
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    let promise: Promise<any>
+
+    act(() => {
+      promise = result.current.execute()
+    })
+
+    const error = await act(async () => promise!.catch(e => e))
+
+    expect(() => next.unstable_rethrow(error)).toThrow(error)
+    await waitFor(() => expect(boundaryErrors).toEqual([error]))
+    expect(states).not.toContain('error')
+
+    await new Promise(resolve => setTimeout(resolve, 6))
+    expect(errorCallback).not.toHaveBeenCalled()
+
+    consoleErrorSpy.mockRestore()
   })
 })

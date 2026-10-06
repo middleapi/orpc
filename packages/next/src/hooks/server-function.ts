@@ -3,6 +3,7 @@ import type { Interceptor, PromiseWithError } from '@orpc/shared'
 import type { ServerFunction, ServerFunctionError } from '../server-function'
 import { createORPCErrorFromJson, safe } from '@orpc/client'
 import { intercept, toArray } from '@orpc/shared'
+import { unstable_rethrow } from 'next/navigation'
 import { useCallback, useMemo, useRef, useState, useTransition } from 'react'
 
 export interface UserSeverFunctionOptions<TInput, TOutput, TError> {
@@ -101,7 +102,8 @@ const PENDING_STATE = {
  *
  * @remarks
  * **Note**: Unlike direct server function calls, errors are deserialized into native
- * `ORPCError` instances instead of plain JSON (`ORPCErrorJSON`).
+ * `ORPCError` instances instead of plain JSON (`ORPCErrorJSON`). Special Next.js errors
+ * such as `redirect` and `notFound` are rethrown instead of becoming the error state.
  *
  * @see {@link https://orpc.dev/docs/integrations/next#hooks | Next.js Integration - Hooks}
  */
@@ -132,7 +134,7 @@ export function useServerFunction<TInput, TOutput, TError extends AnyORPCErrorJS
 
     setInput(input)
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       startTransition(async () => {
         const result = await safe(intercept(
           [...toArray(options.interceptors), ...toArray(executeOptions.interceptors)],
@@ -145,6 +147,19 @@ export function useServerFunction<TInput, TOutput, TError extends AnyORPCErrorJS
             return data as TOutput
           }),
         ))
+
+        /**
+         * Special Next.js errors (redirect, notFound, ...) are not failures, so rethrow them
+         * to let Next.js handle them as if the server function were called directly.
+         * https://nextjs.org/docs/app/api-reference/functions/unstable_rethrow
+         */
+        try {
+          unstable_rethrow(result.error)
+        }
+        catch (error) {
+          reject(error)
+          throw error
+        }
 
         /**
          * If multiple execute calls are made in parallel, only the last one will be effective.

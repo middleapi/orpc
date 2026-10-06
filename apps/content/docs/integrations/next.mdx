@@ -158,7 +158,7 @@ export const base = os
 
 ### Hooks
 
-This integration also includes React hooks for server functions. `useServerFunction` executes a server function and tracks its status. `useOptimisticServerFunction` does the same, with optimistic updates. Unlike direct server function calls, hook errors are deserialized into native `ORPCError` instances instead of plain JSON (`ORPCErrorJSON`) for a more natural developer experience.
+This integration also includes React hooks for server functions. `useServerFunction` executes a server function and tracks its status. `useOptimisticServerFunction` does the same, with optimistic updates. Unlike direct server function calls, hook errors are deserialized into native `ORPCError` instances instead of plain JSON (`ORPCErrorJSON`) for a more natural developer experience. Special Next.js errors such as [redirect](https://nextjs.org/docs/app/api-reference/functions/redirect) and [notFound](https://nextjs.org/docs/app/api-reference/functions/not-found) never become the hook's error state: they are rethrown so Next.js handles them, just like a direct server function call.
 
 <CodeGroup>
 
@@ -240,7 +240,7 @@ export function MyComponent() {
 </CodeGroup>
 
 :::info
-Besides hooks, this integration also re-exports [form-data helpers](/docs/helpers/form-data) for working with `FormData`, as well as deferred interceptors for updating UI states: `onStartDeferred`, `onSuccessDeferred`, `onErrorDeferred`, and `onFinishDeferred`.
+Besides hooks, this integration also re-exports [form-data helpers](/docs/helpers/form-data) for working with `FormData`, as well as deferred interceptors for updating UI states: `onStartDeferred`, `onSuccessDeferred`, `onErrorDeferred`, and `onFinishDeferred`. `onErrorDeferred` ignores special Next.js errors, so a redirect does not trigger your error handling.
 :::
 
 :::info
