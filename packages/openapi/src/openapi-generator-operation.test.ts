@@ -614,115 +614,53 @@ describe('openAPIGenerator operation builders', () => {
       })
     })
 
-    it('accepts a single-value enum as a literal detailed status', () => {
-      const { ctx, operation } = createContext()
-
-      // Effect emits `Schema.Literal(201)` as `{ type: 'number', enum: [201] }`
-      buildSuccessResponse(ctx, operation, testDef({
-        outputs: [testSchema({
-          type: 'object',
-          properties: {
-            status: { type: 'number', enum: [201], description: 'created' },
-            body: { type: 'string' },
-          },
-          required: ['status', 'body'],
-        })],
-      }), { outputStructure: 'detailed' })
-
-      expect(operation.responses).toEqual({
-        201: {
-          description: 'created',
-          content: {
-            'application/json': {
-              schema: { type: 'string' },
-            },
-          },
-        },
-      })
-    })
-
-    it('maps every value of a multi-value enum detailed status to its own response', () => {
-      const { ctx, operation } = createContext()
-
-      buildSuccessResponse(ctx, operation, testDef({
-        outputs: [testSchema({
+    it.each([
+      {
+        // Effect emits `Schema.Literal(201)` as `{ type: 'number', enum: [201] }`
+        name: 'a single-value enum',
+        status: { type: 'number', enum: [201], description: 'created' },
+        descriptions: { 201: 'created' },
+      },
+      {
+        name: 'a multi-value enum',
+        status: { type: 'number', enum: [200, 201, 200], description: 'success' },
+        descriptions: { 200: 'success', 201: 'success' },
+      },
+      {
+        // zod and valibot emit a union of literals as `anyOf` of `const` schemas
+        name: 'a union of literals',
+        status: {
+          description: 'accepted',
           anyOf: [
-            {
-              type: 'object',
-              properties: {
-                status: { type: 'number', enum: [200, 201, 200], description: 'success' },
-                headers: { type: 'object', properties: { 'x-id': { type: 'string' } }, required: ['x-id'] },
-                body: { type: 'string' },
-              },
-              required: ['status', 'headers', 'body'],
-            },
-            {
-              type: 'object',
-              properties: {
-                status: { const: 201 },
-                body: { type: 'number' },
-              },
-              required: ['status', 'body'],
-            },
+            { type: 'number', const: 201, description: 'created' },
+            { type: 'number', const: 202 },
+            { type: 'number', enum: [203, 204] },
           ],
-        })],
-      }), { outputStructure: 'detailed' })
-
-      expect(operation.responses).toEqual({
-        200: {
-          description: 'success',
-          headers: {
-            'x-id': { required: true, schema: { type: 'string' } },
-          },
-          content: {
-            'application/json': {
-              schema: { type: 'string' },
-            },
-          },
         },
-        201: {
-          description: 'success',
-          headers: {
-            'x-id': { required: true, schema: { type: 'string' } },
-          },
-          content: {
-            'application/json': {
-              schema: { anyOf: [{ type: 'string' }, { type: 'number' }] },
-            },
-          },
-        },
-      })
-    })
-
-    it('maps a union of literal detailed statuses with per-member descriptions', () => {
+        descriptions: { 201: 'created', 202: 'accepted', 203: 'accepted', 204: 'accepted' },
+      },
+    ])('maps $name detailed status to per-status responses', ({ status, descriptions }) => {
       const { ctx, operation } = createContext()
 
-      // zod and valibot emit a union of literals as `anyOf` of `const` schemas
       buildSuccessResponse(ctx, operation, testDef({
         outputs: [testSchema({
           type: 'object',
           properties: {
-            status: {
-              description: 'accepted',
-              anyOf: [
-                { type: 'number', const: 201, description: 'created' },
-                { type: 'number', const: 202 },
-                { type: 'number', enum: [203, 204] },
-              ],
-            },
+            status: status as any,
+            headers: { type: 'object', properties: { 'x-id': { type: 'string' } }, required: ['x-id'] },
             body: { type: 'string' },
           },
-          required: ['status', 'body'],
+          required: ['status', 'headers', 'body'],
         })],
       }), { outputStructure: 'detailed' })
 
-      const content = { 'application/json': { schema: { type: 'string' } } }
-      expect(operation.responses).toEqual({
-        201: { description: 'created', content },
-        202: { description: 'accepted', content },
-        203: { description: 'accepted', content },
-        204: { description: 'accepted', content },
-      })
+      expect(operation.responses).toEqual(Object.fromEntries(
+        Object.entries(descriptions).map(([code, description]) => [code, {
+          description,
+          headers: { 'x-id': { required: true, schema: { type: 'string' } } },
+          content: { 'application/json': { schema: { type: 'string' } } },
+        }]),
+      ))
     })
 
     it.each([
@@ -737,7 +675,7 @@ describe('openAPIGenerator operation builders', () => {
         message: 'invalid "status" field in the detailed output schema',
       },
       {
-        name: 'a detailed status is not a const integer',
+        name: 'a detailed status is not a literal integer',
         output: { type: 'object', properties: { status: { type: 'number' } }, required: ['status'] },
         message: 'invalid "status" field in the detailed output schema',
       },
@@ -754,6 +692,11 @@ describe('openAPIGenerator operation builders', () => {
       {
         name: 'a detailed enum status is empty',
         output: { type: 'object', properties: { status: { type: 'number', enum: [] } }, required: ['status'] },
+        message: 'invalid "status" field in the detailed output schema',
+      },
+      {
+        name: 'a detailed status union is empty',
+        output: { type: 'object', properties: { status: { anyOf: [] } }, required: ['status'] },
         message: 'invalid "status" field in the detailed output schema',
       },
       {
