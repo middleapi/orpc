@@ -3,6 +3,7 @@ import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/stand
 import type { RetryLinkPluginContext } from './retry'
 import { withEventMeta } from '@standard-server/core'
 import { StandardLink } from '../adapters/standard'
+import { RequestCompressionLinkPlugin } from './request-compression'
 import { RetryLinkPlugin } from './retry'
 
 interface TestContext extends RetryLinkPluginContext {
@@ -230,19 +231,28 @@ describe('retryLinkPlugin', () => {
     expect(codec.decodeResponse).toHaveBeenCalledTimes(1)
   })
 
-  describe('stream input', () => {
-    const streamInputs = [
+  describe('read-once request body', () => {
+    const readOnceBodies = [
       ['ReadableStream', () => new Blob(['data']).stream()],
       ['AsyncIteratorObject', () => (async function* () { yield 'data' })()],
     ] as const
 
-    it.each(streamInputs)('does not retry %s input, since it cannot be resent', async (_, createInput) => {
+    function mockEncodedBody(codec: StandardLinkCodec<TestContext>, createBody: () => StandardRequest['body']) {
+      vi.mocked(codec.encodeInput).mockImplementation(async () => ({
+        method: 'POST',
+        url: '/test',
+        headers: {},
+        body: createBody(),
+      }))
+    }
+
+    it.each(readOnceBodies)('does not retry once the %s body is sent, since it cannot be resent', async (_, createBody) => {
       const codec = makeCodec()
       const transport = makeTransport()
 
+      mockEncodedBody(codec, createBody)
       vi.mocked(codec.decodeResponse).mockRejectedValue(new Error('FAIL'))
 
-      const retry = vi.fn(() => 3)
       const shouldRetry = vi.fn(() => true)
       const onRetry = vi.fn()
 
@@ -250,18 +260,18 @@ describe('retryLinkPlugin', () => {
         plugins: [new RetryLinkPlugin()],
       })
 
-      await expect(link.call(['planet', 'create'], createInput(), { context: { retry, retryDelay: 0, shouldRetry, onRetry } })).rejects.toThrow('FAIL')
+      await expect(link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 3, retryDelay: 0, shouldRetry, onRetry } })).rejects.toThrow('FAIL')
 
-      expect(codec.encodeInput).toHaveBeenCalledTimes(1)
-      expect(retry).not.toHaveBeenCalled()
+      expect(transport.send).toHaveBeenCalledTimes(1)
       expect(shouldRetry).not.toHaveBeenCalled()
       expect(onRetry).not.toHaveBeenCalled()
     })
 
-    it.each(streamInputs)('does not reconnect an iterator output for %s input', async (_, createInput) => {
+    it.each(readOnceBodies)('does not reconnect an iterator output once the %s body is sent', async (_, createBody) => {
       const codec = makeCodec()
       const transport = makeTransport()
 
+      mockEncodedBody(codec, createBody)
       vi.mocked(codec.decodeResponse).mockResolvedValue({
         kind: 'output',
         output: (async function* () {
@@ -274,18 +284,41 @@ describe('retryLinkPlugin', () => {
         plugins: [new RetryLinkPlugin()],
       })
 
-      const iterator = await link.call(['planet', 'create'], createInput(), { context: { retry: 1, retryDelay: 0 } }) as AsyncIterator<any>
+      const iterator = await link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 1, retryDelay: 0 } }) as AsyncIterator<any>
 
       await expect(iterator.next()).resolves.toEqual({ done: false, value: 'first' })
       await expect(iterator.next()).rejects.toThrow('ITER_FAIL')
 
-      expect(codec.encodeInput).toHaveBeenCalledTimes(1)
+      expect(transport.send).toHaveBeenCalledTimes(1)
     })
 
-    it('still retries a Blob input, since it can be resent', async () => {
+    it.each(readOnceBodies)('retries a failure that happens before the %s body is sent', async (_, createBody) => {
       const codec = makeCodec()
       const transport = makeTransport()
 
+      mockEncodedBody(codec, createBody)
+      vi.mocked(codec.encodeInput).mockRejectedValueOnce(new Error('ENCODE_FAIL'))
+      vi.mocked(codec.decodeResponse).mockResolvedValue({ kind: 'output', output: 'OK' })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      await expect(link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 1, retryDelay: 0 } })).resolves.toBe('OK')
+
+      expect(codec.encodeInput).toHaveBeenCalledTimes(2)
+      expect(transport.send).toHaveBeenCalledTimes(1)
+    })
+
+    it.each([
+      ['Blob', () => new Blob(['data'])],
+      ['FormData', () => new FormData()],
+      ['JSON', () => ({ name: 'Earth' })],
+    ] as const)('still retries the %s body, since it can be resent', async (_, createBody) => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      mockEncodedBody(codec, createBody)
       vi.mocked(codec.decodeResponse)
         .mockRejectedValueOnce(new Error('FAIL_1'))
         .mockResolvedValueOnce({ kind: 'output', output: 'OK' })
@@ -294,12 +327,31 @@ describe('retryLinkPlugin', () => {
         plugins: [new RetryLinkPlugin()],
       })
 
-      const input = new Blob(['data'])
+      await expect(link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 1, retryDelay: 0 } })).resolves.toBe('OK')
 
-      await expect(link.call(['planet', 'create'], input, { context: { retry: 1, retryDelay: 0 } })).resolves.toBe('OK')
+      expect(transport.send).toHaveBeenCalledTimes(2)
+    })
 
-      expect(codec.encodeInput).toHaveBeenCalledTimes(2)
-      expect(codec.encodeInput).toHaveBeenNthCalledWith(2, input, ['planet', 'create'], expect.anything())
+    it.each([
+      ['after', () => [new RetryLinkPlugin<TestContext>(), new RequestCompressionLinkPlugin<TestContext>({ threshold: 0 })]],
+      ['before', () => [new RequestCompressionLinkPlugin<TestContext>({ threshold: 0 }), new RetryLinkPlugin<TestContext>()]],
+    ] as const)('still retries a body that request compression, listed %s it, sends as a stream', async (_, createPlugins) => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      mockEncodedBody(codec, () => ({ name: 'Earth' }))
+      vi.mocked(codec.decodeResponse)
+        .mockRejectedValueOnce(new Error('FAIL_1'))
+        .mockResolvedValueOnce({ kind: 'output', output: 'OK' })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: createPlugins(),
+      })
+
+      await expect(link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 1, retryDelay: 0 } })).resolves.toBe('OK')
+
+      expect(transport.send).toHaveBeenCalledTimes(2)
+      expect(vi.mocked(transport.send).mock.calls[1]![0].body).toBeInstanceOf(ReadableStream)
     })
   })
 
