@@ -296,6 +296,19 @@ class ResumeStorage {
       this.isInitedSchema = true
 
       if (initTableResult.rowsWritten > 0) {
+        /**
+         * Recreating the table (after the idle cleanup or a schema reset) restarts the
+         * AUTOINCREMENT sequence, while subscribers may still hold ids issued before it,
+         * and resuming with one of them would skip newer events (`WHERE id > ?`).
+         * Start the sequence at the current time in microseconds so new ids stay above
+         * every id issued before.
+         */
+        this.ctx.storage.sql.exec(
+          `INSERT INTO sqlite_sequence (name, seq) VALUES (?, CAST(? AS INTEGER))`,
+          `${this.schemaPrefix}events`,
+          Date.now() * 1000,
+        )
+
         this.lastCleanupTime = Date.now() // schema just created, nothing to cleanup
       }
     }
