@@ -5,7 +5,7 @@ import type { AnyProcedureContract } from './procedure'
 import type { RouterContract } from './router'
 import { getOwn, isTypescriptObject } from '@orpc/shared'
 import { mergeErrorMap } from './error-utils'
-import { resolveMetaPlugins } from './meta-utils'
+import { getReplayableMetaPlugins, resolveMetaPlugins } from './meta-utils'
 import { ProcedureContract } from './procedure'
 
 export type AugmentedContractRouter<T extends RouterContract, TErrorMap extends ErrorMap>
@@ -32,7 +32,7 @@ export function augmentContractRouter<T extends RouterContract, TErrorMap extend
     const [meta, metaPlugins] = resolveMetaPlugins(
       options.meta,
       options.metaPlugins,
-      router['~orpc'].metaPlugins,
+      getReplayableMetaPlugins(router),
     )
 
     const enhanced = new ProcedureContract({

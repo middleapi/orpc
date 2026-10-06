@@ -1,5 +1,5 @@
 import type { RouterContract } from '@orpc/contract'
-import { ProcedureContract, resolveMetaPlugins } from '@orpc/contract'
+import { getReplayableMetaPlugins, ProcedureContract, resolveMetaPlugins } from '@orpc/contract'
 import { isTypescriptObject, pathToHttpPath, toArray } from '@orpc/shared'
 import { getOpenAPIMeta, openapi } from './meta'
 
@@ -38,7 +38,7 @@ export function populateRouterContractOpenAPIPaths<T extends RouterContract>(
 
     const [meta, metaPlugins] = resolveMetaPlugins(
       router['~orpc'].meta,
-      router['~orpc'].metaPlugins,
+      getReplayableMetaPlugins(router),
       [openapi({ path: pathToHttpPath(path) })],
     )
 

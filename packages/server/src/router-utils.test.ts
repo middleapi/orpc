@@ -7,6 +7,7 @@ import { augmentImplementedRouter, augmentRouter, getRouter, unlazyRouter, walkP
 
 const oc = ContractModule.oc
 const resolveMetaPluginsSpy = vi.spyOn(ContractModule, 'resolveMetaPlugins')
+const getReplayableMetaPluginsSpy = vi.spyOn(ContractModule, 'getReplayableMetaPlugins')
 const mergeErrorMapSpy = vi.spyOn(ContractModule, 'mergeErrorMap')
 
 beforeEach(() => {
@@ -111,11 +112,12 @@ describe('augmentRouter', () => {
     expect(actual).toBeInstanceOf(Procedure)
     expect(actual).not.toBe(original)
     expect(mergeErrorMapSpy).toHaveBeenNthCalledWith(mergeCallIndex, options.errorMap, original['~orpc'].errorMap)
+    expect(getReplayableMetaPluginsSpy).toHaveBeenNthCalledWith(resolveCallIndex, original)
     expect(resolveMetaPluginsSpy).toHaveBeenNthCalledWith(
       resolveCallIndex,
       options.meta,
       options.metaPlugins,
-      original['~orpc'].metaPlugins,
+      getReplayableMetaPluginsSpy.mock.results[resolveCallIndex - 1]?.value,
     )
     expect(actual['~orpc']).toEqual({
       disableOutputValidation: true,
@@ -140,11 +142,12 @@ describe('augmentRouter', () => {
 
     expect(actual).toBeInstanceOf(Lazy)
     expect(actual).not.toBe(original)
+    expect(getReplayableMetaPluginsSpy).toHaveBeenNthCalledWith(resolveCallIndex, original)
     expect(resolveMetaPluginsSpy).toHaveBeenNthCalledWith(
       resolveCallIndex,
       options.meta,
       options.metaPlugins,
-      original['~orpc'].metaPlugins,
+      getReplayableMetaPluginsSpy.mock.results[resolveCallIndex - 1]?.value,
     )
     expect(actual['~orpc']).toEqual({
       ...original['~orpc'],
@@ -211,6 +214,36 @@ describe('augmentRouter', () => {
     expect(augmentRouter(invalid, options)).toBe(invalid)
     expect(mergeErrorMapSpy).not.toHaveBeenCalled()
     expect(resolveMetaPluginsSpy).not.toHaveBeenCalled()
+  })
+
+  it('keeps meta of procedures and lazy routers not built from meta plugins', async () => {
+    const plainLazy = new Lazy({
+      loader: async () => ({ default: { p2: procedure2 } }),
+      meta: { lazy: true },
+    })
+
+    const options = {
+      meta: { base: true, p2: false },
+      metaPlugins: [{ name: 'base', init: (meta: ContractModule.Meta) => ({ ...meta, base: true, p2: false }) }],
+      errorMap: {},
+      middlewares: [],
+    }
+
+    const augmented = augmentRouter({ p2: procedure2, lazy: plainLazy }, options)
+
+    expect(augmented.p2['~orpc'].meta).toEqual({ base: true, p2: true })
+    expect(augmented.lazy['~orpc'].meta).toEqual({ base: true, p2: false, lazy: true })
+    expect((await unlazyDefault(augmented.lazy)).p2['~orpc'].meta).toEqual({ base: true, p2: true })
+
+    const reaugmented = augmentRouter(augmented, {
+      meta: { outer: true },
+      metaPlugins: [{ name: 'outer', init: meta => ({ ...meta, outer: true }) }],
+      errorMap: {},
+      middlewares: [],
+    })
+
+    expect(reaugmented.p2['~orpc'].meta).toEqual({ outer: true, base: true, p2: true })
+    expect(reaugmented.lazy['~orpc'].meta).toEqual({ outer: true, base: true, p2: false, lazy: true })
   })
 })
 

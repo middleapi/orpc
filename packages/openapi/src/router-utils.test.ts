@@ -1,4 +1,4 @@
-import { oc } from '@orpc/contract'
+import { getPathMeta, meta, minifyRouterContract, oc } from '@orpc/contract'
 import z from 'zod'
 import { getOpenAPIMeta, openapi } from './meta'
 import { populateRouterContractOpenAPIPaths } from './router-utils'
@@ -42,5 +42,23 @@ describe('populateRouterContractOpenAPIPaths', () => {
 
     expect(populated.invalid).toEqual('invalid')
     expect(getOpenAPIMeta(populated.procedure)?.path).toBe('/procedure')
+  })
+
+  it('keeps meta of minified router contracts when they are extended later', () => {
+    const contract = {
+      ping: oc.meta(meta.path(['ping'])).meta(openapi({ method: 'GET' })),
+      pong: oc.meta(meta.path(['pong'])).meta(openapi({ method: 'GET', path: '/pong' })),
+    }
+
+    const minified = minifyRouterContract(contract) as typeof contract
+    const extended = oc.errors({ EXTENDED: {} }).router(minified)
+    const populated = oc.errors({ EXTENDED: {} }).router(populateRouterContractOpenAPIPaths(minified))
+
+    expect(getPathMeta(extended.pong)).toEqual(['pong'])
+    expect(getOpenAPIMeta(extended.pong)).toEqual({ method: 'GET', path: '/pong' })
+
+    expect(getPathMeta(populated.ping)).toEqual(['ping'])
+    expect(getOpenAPIMeta(populated.ping)).toEqual({ method: 'GET', path: '/ping' })
+    expect(getOpenAPIMeta(populated.pong)).toEqual({ method: 'GET', path: '/pong' })
   })
 })

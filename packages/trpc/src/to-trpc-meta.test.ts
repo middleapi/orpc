@@ -1,6 +1,6 @@
 import type { Meta } from '@orpc/server'
 import { getOpenAPIMeta, openapi } from '@orpc/openapi'
-import { defineMeta } from '@orpc/server'
+import { defineMeta, os } from '@orpc/server'
 import { initTRPC } from '@trpc/server'
 import { toORPCRouter } from './to-orpc-router'
 import { toTRPCMeta } from './to-trpc-meta'
@@ -59,5 +59,21 @@ describe('toTRPCMeta', () => {
       'custom': 'value',
     })
     expect(getOpenAPIMeta(orpcRouter.ping)).toEqual({ path: '/ping', summary: 'Ping procedure', prefix: '/api' })
+  })
+
+  it('keeps meta when the converted router is extended by an oRPC builder', () => {
+    const t = initTRPC.meta<Meta>().create()
+
+    const trpcRouter = t.router({
+      hello: t.procedure
+        .meta(toTRPCMeta(openapi({ method: 'GET', path: '/hello' })))
+        .query(() => 'Hello, World!'),
+    })
+
+    const extended = os
+      .use(({ next }) => next())
+      .router(toORPCRouter(trpcRouter))
+
+    expect(getOpenAPIMeta(extended.hello)).toEqual({ method: 'GET', path: '/hello' })
   })
 })

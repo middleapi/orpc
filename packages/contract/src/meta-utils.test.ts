@@ -1,6 +1,6 @@
 import type { AnyMetaPlugin } from './meta'
 import { oc } from './builder'
-import { defineMeta, resolveMetaPlugins } from './meta-utils'
+import { defineMeta, getReplayableMetaPlugins, resolveMetaPlugins } from './meta-utils'
 
 it('resolveMetaPlugins', () => {
   const baseMeta = { mode: 'base' }
@@ -56,6 +56,32 @@ it('resolveMetaPlugins', () => {
   expect(plugin2.init).toHaveBeenCalledBefore(plugin3.init)
   expect(plugin1.apply).toHaveBeenCalledBefore(plugin2.apply)
   expect(plugin2.apply).toHaveBeenCalledBefore(plugin3.apply)
+})
+
+describe('getReplayableMetaPlugins', () => {
+  it('returns existing meta plugins as-is', () => {
+    const plugin = { name: 'plugin', init: vi.fn() } satisfies AnyMetaPlugin
+
+    expect(getReplayableMetaPlugins({ '~orpc': { meta: {}, metaPlugins: [plugin] } })).toEqual([plugin])
+    expect(getReplayableMetaPlugins({ '~orpc': { meta: { other: true }, metaPlugins: [plugin] } })).toEqual([plugin])
+  })
+
+  it('returns no plugins when there is nothing to replay', () => {
+    expect(getReplayableMetaPlugins({ '~orpc': { meta: {} } })).toEqual([])
+    expect(getReplayableMetaPlugins({ '~orpc': { meta: {}, metaPlugins: [] } })).toEqual([])
+  })
+
+  it('wraps meta that was not built from plugins into a plugin', () => {
+    const symbol = Symbol('symbol')
+    const meta = { 'own': true, 'shared': 'own', '~nested': { value: 1 }, [symbol]: 'symbol' }
+
+    const plugins = getReplayableMetaPlugins({ '~orpc': { meta } })
+    const [resolved] = resolveMetaPlugins({ base: true, shared: 'base' }, undefined, plugins)
+
+    expect(plugins).toHaveLength(1)
+    expect(resolved).toEqual({ 'base': true, 'own': true, 'shared': 'own', '~nested': { value: 1 }, [symbol]: 'symbol' })
+    expect(getReplayableMetaPlugins({ '~orpc': { meta: { [symbol]: 'symbol' }, metaPlugins: [] } })).toHaveLength(1)
+  })
 })
 
 it('defineMeta', () => {

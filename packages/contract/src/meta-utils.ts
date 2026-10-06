@@ -34,6 +34,28 @@ export function resolveMetaPlugins<
 }
 
 /**
+ * Returns plugins that rebuild the target's meta when replayed on top of another meta.
+ *
+ * @remarks
+ * Meta that was not built from plugins (e.g. from `minifyRouterContract` or a converted tRPC router)
+ * is wrapped in a plugin that shallowly merges it, so replaying does not drop it.
+ */
+export function getReplayableMetaPlugins(
+  target: { '~orpc': { meta: Meta, metaPlugins?: AnyMetaPlugin[] | undefined } },
+): AnyMetaPlugin[] {
+  const { meta, metaPlugins } = target['~orpc']
+
+  if (metaPlugins?.length || Reflect.ownKeys(meta).length === 0) {
+    return toArray(metaPlugins)
+  }
+
+  return [{
+    name: '~static',
+    init: current => ({ ...current, ...meta }),
+  }]
+}
+
+/**
  * Quickly defines a meta plugin factory and reader.
  *
  * @example Mark a procedure as requiring authentication and read it in middleware.

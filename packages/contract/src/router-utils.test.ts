@@ -1,16 +1,20 @@
 import type { AnyMetaPlugin } from './meta'
 import { z } from 'zod'
+import { oc } from './builder'
 import * as ErrorUtilsModule from './error-utils'
+import { getPathMeta, meta } from './meta-built-in'
 import * as MetaUtilsModule from './meta-utils'
 import { ProcedureContract } from './procedure'
 import { augmentContractRouter, getProcedureContractOrThrow, getRouterContract, minifyRouterContract } from './router-utils'
 
 const mergeErrorMapSpy = vi.spyOn(ErrorUtilsModule, 'mergeErrorMap')
 const resolveMetaPluginsSpy = vi.spyOn(MetaUtilsModule, 'resolveMetaPlugins')
+const getReplayableMetaPluginsSpy = vi.spyOn(MetaUtilsModule, 'getReplayableMetaPlugins')
 
 beforeEach(() => {
   mergeErrorMapSpy.mockClear()
   resolveMetaPluginsSpy.mockClear()
+  getReplayableMetaPluginsSpy.mockClear()
 })
 
 const schema1 = z.object({ schema1: z.string() })
@@ -103,11 +107,12 @@ describe('augmentContractRouter', () => {
     expect(actual).toBeInstanceOf(ProcedureContract)
     expect(actual).not.toBe(original)
     expect(mergeErrorMapSpy).toHaveBeenNthCalledWith(callIndex, options.errorMap, original['~orpc'].errorMap)
+    expect(getReplayableMetaPluginsSpy).toHaveBeenNthCalledWith(callIndex, original)
     expect(resolveMetaPluginsSpy).toHaveBeenNthCalledWith(
       callIndex,
       options.meta,
       options.metaPlugins,
-      original['~orpc'].metaPlugins,
+      getReplayableMetaPluginsSpy.mock.results[callIndex - 1]?.value,
     )
     expect(actual['~orpc']).toEqual({
       ...original['~orpc'],
@@ -165,6 +170,48 @@ describe('augmentContractRouter', () => {
     expect(augmentContractRouter(invalid, options)).toBe(invalid)
     expect(mergeErrorMapSpy).not.toHaveBeenCalled()
     expect(resolveMetaPluginsSpy).not.toHaveBeenCalled()
+  })
+
+  it('keeps meta of procedures not built from meta plugins', () => {
+    const augmented = oc.meta(meta1).router({ ping: router.ping, nested: router.nested })
+
+    expect(augmented.ping['~orpc'].meta).toEqual({ meta1: true, ping: true })
+    expect(augmented.nested.ping['~orpc'].meta).toEqual({ meta1: true, nestedPing: true })
+  })
+
+  it('lets procedure meta win over router meta and survives nested augmentation', () => {
+    const shared: AnyMetaPlugin = { name: 'shared', init: current => ({ ...current, shared: 'router' }) }
+
+    const procedure = new ProcedureContract({
+      errorMap: {},
+      meta: { shared: 'procedure' },
+      inputSchemas: [],
+      outputSchemas: [],
+    })
+
+    const augmented = oc.meta(meta1).router({
+      nested: oc.meta(shared).router({ procedure }),
+    })
+
+    expect(augmented.nested.procedure['~orpc'].meta).toEqual({ meta1: true, shared: 'procedure' })
+  })
+
+  it('keeps meta of minified router contracts', () => {
+    const contract = {
+      ping: oc.meta(meta.path(['ping'])).meta(meta2),
+      nested: {
+        pong: oc.meta(meta.path(['nested', 'pong'])),
+      },
+    }
+
+    const augmented = oc
+      .errors({ AUGMENTED: { message: 'augmented' } })
+      .router(minifyRouterContract(contract)) as any
+
+    expect(getPathMeta(augmented.ping)).toEqual(['ping'])
+    expect(augmented.ping['~orpc'].meta).toEqual({ '~path': ['ping'], 'meta2': true })
+    expect(getPathMeta(augmented.nested.pong)).toEqual(['nested', 'pong'])
+    expect(augmented.ping['~orpc'].errorMap).toEqual({ AUGMENTED: { message: 'augmented' } })
   })
 })
 

@@ -5,7 +5,7 @@ import type { Lazyable } from './lazy'
 import type { AnyMiddleware } from './middleware'
 import type { AnyProcedure, ProcedureConfig } from './procedure'
 import type { AnyRouter } from './router'
-import { mergeErrorMap, ProcedureContract, resolveMetaPlugins } from '@orpc/contract'
+import { getReplayableMetaPlugins, mergeErrorMap, ProcedureContract, resolveMetaPlugins } from '@orpc/contract'
 import { getOwn, isTypescriptObject, omit } from '@orpc/shared'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
@@ -81,7 +81,7 @@ export function augmentRouter<
     const [meta, metaPlugins] = resolveMetaPlugins(
       options.meta,
       options.metaPlugins,
-      router['~orpc'].metaPlugins,
+      getReplayableMetaPlugins(router),
     )
 
     const enhanced = new Lazy({
@@ -101,7 +101,7 @@ export function augmentRouter<
     const [meta, metaPlugins] = resolveMetaPlugins(
       options.meta,
       options.metaPlugins,
-      router['~orpc'].metaPlugins,
+      getReplayableMetaPlugins(router),
     )
 
     const enhanced = new Procedure({
