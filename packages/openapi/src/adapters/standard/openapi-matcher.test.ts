@@ -251,7 +251,6 @@ describe('openAPIMatcher', () => {
     })
 
     it('matches path text that requests leave raw but rou3 stores encoded', async () => {
-      // rou3 stores "^" as "%5E", while WHATWG URL and Node's req.url keep it raw
       const procedure = os.meta(openapi({ method: 'GET', path: '/v1^beta/items:batchGet/{id}' })).handler(() => 'ok')
 
       const matcher = new OpenAPIMatcher({ procedure })
@@ -287,6 +286,22 @@ describe('openAPIMatcher', () => {
 
       // an encoded slash stays part of its segment
       await expect(matcher.match('GET', '/x:y/a/b/1', undefined)).resolves.toBeUndefined()
+    })
+
+    it('matches every ASCII char in path text, raw or percent-encoded', async () => {
+      // fails if rou3 starts percent-encoding a char that ROU3_RAW_CHARS treats as raw
+      const chars = Array.from({ length: 0x7F - 0x20 }, (_, i) => String.fromCharCode(0x20 + i)).filter(char => char !== '/')
+
+      const matcher = new OpenAPIMatcher(Object.fromEntries(chars.map(char => [
+        char,
+        os.meta(openapi({ method: 'GET', path: `/x${char}y` })).handler(() => char),
+      ])))
+
+      for (const char of chars) {
+        for (const pathname of [`/x${char}y`, `/x${encodeURIComponent(char)}y`] as const) {
+          await expect(matcher.match('GET', pathname, undefined)).resolves.toMatchObject({ path: [char], params: undefined })
+        }
+      }
     })
 
     it('matches segments after a catch-all param', async () => {

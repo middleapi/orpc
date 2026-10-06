@@ -137,11 +137,9 @@ export class RPCMatcher {
     let entry = this.tree.get(pathname)
 
     if (entry === undefined && NORMALIZABLE_PATHNAME_REGEX.test(pathname)) {
-      // Retry with a normalized path: users may percent-encode characters that
-      // we store unencoded (e.g. "a%62c" vs "abc"), or leave raw characters that
-      // we store encoded (e.g. "a^b" vs "a%5Eb", since WHATWG URL and Node's
-      // req.url keep "^" raw), so normalization lets us handle those requests
-      // without storing duplicate entries.
+      // Retry with a normalized path: users may percent-encode characters that we store
+      // unencoded ("a%62c" vs "abc"), or leave raw characters that we store encoded
+      // ("a^b" vs "a%5Eb"), so normalization handles both without duplicate entries.
 
       const normalizedPathname = normalizeHttpPath(pathname)
 

@@ -18,9 +18,12 @@ export interface OpenAPIMatcherOptions {
   filter?: Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]>
 }
 
-// rou3 encodes literal text with the WHATWG path percent-encode set, so only \w!$&'()*+,-.:;=@[\]|~ stay raw.
-// This matches `%` or a char rou3 stores encoded, meaning normalization may change the pathname.
-const NORMALIZABLE_PATHNAME_REGEX = /[^\w!$&'()*+,\-./:;=@[\\\]|~]/
+// chars rou3 keeps raw in literal text, it percent-encodes the rest (the WHATWG path percent-encode set)
+const ROU3_RAW_CHARS = String.raw`\w!$&'()*+,\-.:;=@[\\\]|~`
+// `%` or a char rou3 stores encoded, meaning normalization may change the pathname
+const NORMALIZABLE_PATHNAME_REGEX = new RegExp(`[^${ROU3_RAW_CHARS}/]`)
+// `/` is encoded too, so a decoded `%2F` stays inside its segment
+const ROU3_ENCODED_SEGMENT_TEXT_REGEX = new RegExp(`[^${ROU3_RAW_CHARS}]+`, 'g')
 
 interface TreeEntry {
   path: string[]
@@ -133,11 +136,9 @@ export class OpenAPIMatcher {
     let match = this.findMatch(method, pathname)
 
     if (match === undefined && NORMALIZABLE_PATHNAME_REGEX.test(pathname)) {
-      // Retry with a normalized path: users may percent-encode characters that
-      // we store unencoded (e.g. "a%62c" vs "abc"), or leave raw characters that
-      // we store encoded (e.g. "a^b" vs "a%5Eb", since WHATWG URL and Node's
-      // req.url keep "^" raw), so normalization lets us handle those requests
-      // without storing duplicate entries.
+      // Retry with a normalized path: users may percent-encode characters that we store
+      // unencoded ("a%62c" vs "abc"), or leave raw characters that we store encoded
+      // ("a^b" vs "a%5Eb"), so normalization handles both without duplicate entries.
 
       const normalizedPathname = normalizeRou3Path(pathname) as `/${string}`
 
@@ -272,13 +273,7 @@ function toRou3Literal(text: string): string {
   return normalized.replace(ROU3_SYNTAX_REGEX, '\\$&')
 }
 
-// chars rou3 stores encoded, plus `%` and `/` so decoded segment text keeps its meaning
-const ROU3_ENCODED_SEGMENT_TEXT_REGEX = /[^\w!$&'()*+,\-.:;=@[\\\]|~]+/g
-
-/**
- * Brings a path into the form rou3 stores literal text in: each segment is decoded, then re-encoded
- * the way rou3 encodes it, so a request matches a route however either of them is encoded.
- */
+// decodes each segment, then re-encodes it the way rou3 stores literal text
 function normalizeRou3Path(path: string): string {
   return path
     .split('/')
