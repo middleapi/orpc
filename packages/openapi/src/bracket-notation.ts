@@ -14,7 +14,7 @@ export interface BracketNotationSerializerOptions {
    *
    * NOTE: Append-style notation (e.g., `arr[]`) never leaves empty slots.
    *
-   * @default 1_000 (~12KB in V8)
+   * @default 1_000
    */
   maxDeserializingEmptySlots?: number
 }
@@ -55,7 +55,7 @@ export class BracketNotationSerializer {
     // `NullProtoObj` it carries a real prototype, so accesses below stay own-property only.
     const arrayPushStyles = new WeakSet()
     const root: Record<string, unknown> = new NullProtoObj()
-    const integerKeys = new InternalIntegerKeyGuard(this.maxDeserializingEmptySlots)
+    const guard = new InternalIntegerKeyGuard(this.maxDeserializingEmptySlots)
 
     for (const [path, value] of serialized) {
       const segments = this.parsePath(path)
@@ -79,7 +79,7 @@ export class BracketNotationSerializer {
 
           const canStayArray = segment === ''
             ? isLast && (isPushStyle || child.length === 0)
-            : !(isLast && isPushStyle) && integerKeys.claimArrayIndex(child, segment)
+            : !(isLast && isPushStyle) && guard.claimArrayIndex(child, segment)
 
           if (!canStayArray) {
             arrayPushStyles.delete(child)
@@ -88,7 +88,7 @@ export class BracketNotationSerializer {
         }
 
         if (child !== existing) {
-          integerKeys.set(currentRef, nextSegment, child)
+          guard.setOwn(currentRef, nextSegment, child)
         }
 
         currentRef = child
@@ -106,11 +106,11 @@ export class BracketNotationSerializer {
           current.push(value)
         }
         else {
-          integerKeys.set(currentRef, nextSegment, [current, value])
+          guard.setOwn(currentRef, nextSegment, [current, value])
         }
       }
       else {
-        integerKeys.set(currentRef, nextSegment, value)
+        guard.setOwn(currentRef, nextSegment, value)
       }
     }
 
@@ -166,25 +166,38 @@ export class BracketNotationSerializer {
   }
 }
 
-const INTEGER_PATTERN = /^0$|^[1-9]\d*$/
+/**
+ * The largest array index. Larger integer keys are ordinary properties.
+ */
+const MAX_ARRAY_INDEX = 2 ** 32 - 2
 
 /**
- * Returns `key` as an array index, which is also how engines store the integer keys of objects,
- * or `undefined` if it is not one. Integer keys past `2 ** 32 - 2` are ordinary properties.
+ * Returns `key` as an array index (no sign, no leading zeros), which is also how engines store the
+ * integer keys of objects, or `undefined` if it is not one.
  */
 function internalToArrayIndex(key: string): number | undefined {
-  // Most keys are names or longer than `4294967294`, which are ruled out before the regex has to run
-  const first = key.charCodeAt(0)
-
-  if (key.length <= 10 && first >= 48 && first <= 57 && INTEGER_PATTERN.test(key)) {
-    const index = Number(key)
-
-    if (index <= 4294967294) {
-      return index
-    }
+  // `MAX_ARRAY_INDEX` has 10 digits
+  if (key.length === 0 || key.length > 10) {
+    return undefined
   }
 
-  return undefined
+  let index = key.charCodeAt(0) - 48 // '0'
+
+  if (index < 0 || index > 9 || (index === 0 && key.length > 1)) {
+    return undefined
+  }
+
+  for (let i = 1; i < key.length; i++) {
+    const digit = key.charCodeAt(i) - 48
+
+    if (digit < 0 || digit > 9) {
+      return undefined
+    }
+
+    index = index * 10 + digit
+  }
+
+  return index <= MAX_ARRAY_INDEX ? index : undefined
 }
 
 function internalArrayToObject(array: readonly unknown[]): Record<string, unknown> {
@@ -207,13 +220,13 @@ function internalPushStyleArrayToObject(array: readonly unknown[]): Record<strin
 
 /**
  * Engines keep the integer keys of an object in a flat backing store sized by the largest one, so a lone
- * `{ 999: x }` takes ~12KB in V8. Holding a key this large switches the object to sparse storage for good
- * (V8 and JSC), so writing and deleting one keeps every integer key the object receives later cheap.
+ * `{ 999: x }` takes ~12KB in V8. Holding `MAX_ARRAY_INDEX` switches the object to sparse storage for good
+ * (V8 and JSC), so writing and deleting it keeps every integer key the object receives later cheap.
  */
 function internalUseSparseIntegerKeys(object: Record<string, unknown>): void {
-  if (!Object.hasOwn(object, 4294967294)) {
-    object[4294967294] = undefined
-    delete object[4294967294]
+  if (!Object.hasOwn(object, MAX_ARRAY_INDEX)) {
+    object[MAX_ARRAY_INDEX] = undefined
+    delete object[MAX_ARRAY_INDEX]
   }
 }
 
@@ -239,28 +252,30 @@ class InternalIntegerKeyGuard {
       return false
     }
 
-    const slots = index - array.length
+    const slots = Math.max(0, index - array.length)
 
-    if (slots > 0) {
-      if (this.emptySlots + slots > this.maxEmptySlots) {
-        return false
-      }
-
-      this.emptySlots += slots
+    if (this.emptySlots + slots > this.maxEmptySlots) {
+      return false
     }
 
+    this.emptySlots += slots
     return true
   }
 
   /**
-   * Adds `key` to `container`. Arrays only receive keys already counted by `claimArrayIndex`,
-   * while objects switch to sparse storage before their first integer key.
+   * Adds `key` to `container`. Arrays only receive keys already counted by `claimArrayIndex`, while
+   * objects created during deserialization switch to sparse storage before an integer key that leaves a gap.
    */
-  set(container: Record<string, unknown>, key: string, value: unknown): void {
-    if (!Array.isArray(container) && !this.sparseObjects?.has(container) && internalToArrayIndex(key) !== undefined) {
-      internalUseSparseIntegerKeys(container)
-      this.sparseObjects ??= new WeakSet()
-      this.sparseObjects.add(container)
+  setOwn(container: Record<string, unknown>, key: string, value: unknown): void {
+    if (container instanceof NullProtoObj && !this.sparseObjects?.has(container)) {
+      const index = internalToArrayIndex(key)
+
+      // `0`, or the key right after an existing one, keeps the flat store filled
+      if (index !== undefined && index !== 0 && !Object.hasOwn(container, index - 1)) {
+        internalUseSparseIntegerKeys(container)
+        this.sparseObjects ??= new WeakSet()
+        this.sparseObjects.add(container)
+      }
     }
 
     setOwn(container, key, value)
