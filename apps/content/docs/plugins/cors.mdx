@@ -46,18 +46,6 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-## Allowed Headers
-
-By default, preflight responses allow every header the browser lists in `Access-Control-Request-Headers`, so oRPC clients and plugins work without extra configuration.
-
-Setting `allowHeaders` replaces this default with a fixed list, so it must include every non-[safelisted](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_request_header) header your clients send. That includes `Content-Type` for JSON bodies, `Content-Disposition` and `Standard-Server` for `Blob`, `File`, and `ReadableStream<Uint8Array>` bodies, and headers added by plugins, such as `orpc-batch` from the [Batch Plugin](/docs/plugins/batch):
-
-```ts
-const cors = new CORSHandlerPlugin({
-  allowHeaders: ['Content-Type', 'Content-Disposition', 'Standard-Server', 'orpc-batch'],
-})
-```
-
 :::warning
 To better support `Blob`, `File`, and `ReadableStream<Uint8Array>` at the root level in cross-origin scenarios,
 extend your [CORS allowlist](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_response_header) to allow clients to read the `Content-Disposition` and `Standard-Server` response headers. Learn more in the [Standard Server documentation](https://github.com/middleapi/standard-server#how-body-parsing-works). If you use the [CORS Plugin](/docs/plugins/cors), include them in `exposeHeaders`:
