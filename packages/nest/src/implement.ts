@@ -9,14 +9,14 @@ import type { Observable } from 'rxjs'
 import type { NestStandardLazyRequest, ORPCModuleConfig } from './module'
 import { Readable } from 'node:stream'
 import * as NestCommon from '@nestjs/common'
-import { applyDecorators, Delete, Get, Head, HttpCode, HttpException, Inject, Injectable, Optional, Options, Patch, Post, Put, StreamableFile, UseInterceptors } from '@nestjs/common'
+import { applyDecorators, Delete, Get, Head, HttpCode, HttpException, Inject, Injectable, NotFoundException, Optional, Options, Patch, Post, Put, SetMetadata, StreamableFile, UseInterceptors } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { getPathMeta, ProcedureContract } from '@orpc/contract'
 import { DEFAULT_OPENAPI_METHOD, getDynamicPathParams, getOpenAPIMeta } from '@orpc/openapi'
 import { OpenAPIHandlerCodecCore } from '@orpc/openapi/standard'
 import { DEFAULT_SUCCESS_STATUS, getRouter, Procedure, unlazy } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
-import { isAsyncIteratorObject, mergeHttpPath, NullProtoObj, stringifyJSON, value } from '@orpc/shared'
+import { isAsyncIteratorObject, mergeHttpPath, NullProtoObj, safeEncodeURIComponent, stringifyJSON, value } from '@orpc/shared'
 import { flattenStandardHeader, generateContentDisposition } from '@standard-server/core'
 import { toEventStream, toStandardLazyRequest } from '@standard-server/node'
 import { mergeMap } from 'rxjs'
@@ -36,6 +36,8 @@ const MethodDecoratorMap = {
   OPTIONS: Options,
 }
 
+const NEST_ROUTE_METADATA_SYMBOL = Symbol('ORPC_NEST_ROUTE')
+
 /**
  * Decorator that implements an oRPC contract (procedure or router contract)
  * on a NestJS controller method. It registers the corresponding NestJS routes
@@ -45,6 +47,7 @@ const MethodDecoratorMap = {
  * **Note**: Every procedure contract must define an `openapi.path` meta;
  * use `populateRouterContractOpenAPIPaths` from `@orpc/openapi` to fill in missing paths.
  * **Note**: The HTTP `QUERY` method requires NestJS v11.2+ (`QueryMethod`). Older NestJS versions throw; use `GET` instead.
+ * **Note**: With the Fastify adapter, `{+name}` must be the last path segment, and literal path text cannot contain route syntax like `:` or `*`.
  *
  * @see {@link https://orpc.dev/docs/integrations/nest#implement-your-contract | Implement oRPC contract with NestJS - Implement Your Contract}
  */
@@ -75,8 +78,9 @@ export function Implement<T extends RouterContract>(
 
 function toNestRouteDecorator(contract: AnyProcedureContract): MethodDecorator {
   const meta = getOpenAPIMeta(contract)
+  const route = toContractNestRoute(contract)
 
-  if (meta?.path === undefined) {
+  if (meta === undefined || route === undefined) {
     throw new TypeError(`
       @Implement decorator requires contract to have a 'openapi.path' meta.
       Please define one using '.meta(openapi({ path: '/example' }))'.
@@ -85,7 +89,7 @@ function toNestRouteDecorator(contract: AnyProcedureContract): MethodDecorator {
   }
 
   const method = meta.method ?? DEFAULT_OPENAPI_METHOD
-  const path = toNestPattern(meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path)
+  const path = route.paths.length === 1 ? route.paths[0] : route.paths
   const successStatus = meta.successStatus ?? DEFAULT_SUCCESS_STATUS
 
   if (method === 'QUERY') {
@@ -99,12 +103,14 @@ function toNestRouteDecorator(contract: AnyProcedureContract): MethodDecorator {
     return applyDecorators(
       QueryMethod(path),
       HttpCode(successStatus),
+      SetMetadata(NEST_ROUTE_METADATA_SYMBOL, route),
     )
   }
 
   return applyDecorators(
     MethodDecoratorMap[method](path),
     HttpCode(successStatus),
+    SetMetadata(NEST_ROUTE_METADATA_SYMBOL, route),
   )
 }
 
@@ -189,6 +195,16 @@ export class ImplementInterceptor implements NestInterceptor {
   }
 
   intercept(ctx: ExecutionContext, next: CallHandler<any>): Observable<any> {
+    const req: ExpressRequest | FastifyRequest = ctx.switchToHttp().getRequest()
+    const res: ExpressResponse | FastifyReply = ctx.switchToHttp().getResponse()
+    const route: NestRoute | undefined = Reflect.getMetadata(NEST_ROUTE_METADATA_SYMBOL, ctx.getHandler())
+
+    if (route !== undefined && this.hasEmptyRouteParam(route, req)) {
+      // OpenAPIHandler does not match empty params, so respond like NestJS does for unmatched routes
+      const httpAdapter = this.httpAdapterHost.httpAdapter
+      throw new NotFoundException(`Cannot ${httpAdapter.getRequestMethod(req)} ${httpAdapter.getRequestUrl(req)}`)
+    }
+
     return next.handle().pipe(
       mergeMap(async (impl: unknown) => {
         const { default: procedure } = await unlazy(impl)
@@ -199,9 +215,6 @@ export class ImplementInterceptor implements NestInterceptor {
           `)
         }
 
-        const req: ExpressRequest | FastifyRequest = ctx.switchToHttp().getRequest()
-        const res: ExpressResponse | FastifyReply = ctx.switchToHttp().getResponse()
-
         const standardRequest = this.toNestStandardLazyRequest(req, res)
 
         const handler = new StandardHandler({
@@ -210,7 +223,7 @@ export class ImplementInterceptor implements NestInterceptor {
             procedure,
             decodeInput: () => this.codec.decodeInput({
               procedure,
-              params: toORPCOpenAPIParams(procedure, standardRequest.params),
+              params: toORPCOpenAPIParams(route ?? toContractNestRoute(procedure), standardRequest.params),
             }, request),
           }),
           encodeError: this.codec.encodeError.bind(this.codec),
@@ -309,6 +322,27 @@ export class ImplementInterceptor implements NestInterceptor {
       }),
     )
   }
+
+  /**
+   * Express matches an empty trailing catch-all and Fastify also matches empty segments,
+   * while OpenAPIHandler requires every param to have a value.
+   */
+  private hasEmptyRouteParam(route: NestRoute, req: ExpressRequest | FastifyRequest): boolean {
+    const type = this.httpAdapterHost.httpAdapter.getType()
+
+    // other adapters may name their params differently
+    if (type !== 'express' && type !== 'fastify') {
+      return false
+    }
+
+    const params = (req.params ?? {}) as Record<string, string | string[] | undefined>
+    const catchAllKey = type === 'fastify' ? '*' : 'path'
+
+    return route.params.some(([key]) => {
+      const value = params[key ?? catchAllKey]
+      return value === undefined || value.length === 0
+    })
+  }
 }
 
 /**
@@ -330,51 +364,125 @@ function flattenParamValue(value: string | string[]): string {
   return Array.isArray(value) ? value.join('/') : value
 }
 
-function toORPCOpenAPIParams(contract: AnyProcedureContract, params: NestStandardLazyRequest['params']): undefined | Record<string, string> {
-  const meta = getOpenAPIMeta(contract)
-
-  if (!params || meta?.path === undefined || Object.keys(params).length === 0) {
+function toORPCOpenAPIParams(route: NestRoute | undefined, params: NestStandardLazyRequest['params']): undefined | Record<string, string> {
+  if (!params || Object.keys(params).length === 0) {
     return undefined
   }
 
   // NullProtoObj prevents prototype injection when a param is named like `__proto__`
   const orpcParams: Record<string, string> = new NullProtoObj()
-  // express use `path` while fastify use `*` for rest matching
-  const restKey = Object.hasOwn(params, '*') ? '*' : 'path'
+  // express use `path` while fastify use `*` for a trailing catch-all
+  const catchAllKey = Object.hasOwn(params, '*') ? '*' : 'path'
+  const names = new Map(route?.params.map(([key, name]) => [key ?? catchAllKey, name]))
 
   for (const [key, value] of Object.entries(params)) {
-    if (key === restKey) {
-      const restParams = getDynamicPathParams(
-        meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path,
-      )?.filter(c => c.allowsSlash)
-
-      if (restParams?.length) {
-        for (const c of restParams) {
-          orpcParams[c.parameterName] = flattenParamValue(value)
-        }
-
-        continue
-      }
-    }
-
-    orpcParams[key] = flattenParamValue(value)
+    // params outside the contract path, like dynamic controller prefixes, keep their key
+    orpcParams[names.get(key) ?? key] = flattenParamValue(value)
   }
 
   return orpcParams
 }
 
-function toNestPattern(path: `/${string}`): `/${string}` {
-  const params = getDynamicPathParams(path)
+interface NestRoute {
+  /**
+   * Express matches the percent-encoded request path while Fastify matches the decoded one,
+   * so a path with text that clients percent-encode (like `/café`) is also registered in its raw form.
+   */
+  paths: `/${string}`[]
+  /**
+   * Keys of the Nest path params mapped to their OpenAPI param names, in path order.
+   * A trailing catch-all has no key of its own: Express names it `path` and Fastify `*`.
+   */
+  params: [key: string | undefined, name: string][]
+}
 
-  if (!params?.length) {
-    return path
+function toContractNestRoute(contract: AnyProcedureContract): NestRoute | undefined {
+  const meta = getOpenAPIMeta(contract)
+
+  if (meta?.path === undefined) {
+    return undefined
   }
 
-  for (let i = params.length - 1; i >= 0; i--) {
-    const param = params[i]!
-    const pattern = param.allowsSlash ? `*` : `:${param.parameterName}`
-    path = path.slice(0, param.startIndex) + pattern + path.slice(param.startIndex + param.segment.length)
+  return toNestRoute(meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path)
+}
+
+// the text clients percent-encode, the same set OpenAPIMatcher stores encoded
+const ENCODED_LITERAL_REGEX = /[ "#<>?^`{}\x7F-\uFFFC]+/g
+// path-to-regexp (Express) syntax
+const EXPRESS_SYNTAX_REGEX = /[\\:*(){}[\]+?!]/g
+
+/**
+ * Converts an OpenAPI path to a Nest path that Express routes like OpenAPIHandler:
+ * param names become valid keys (`{user-id}` -> `:user_id`) and literal text only matches itself.
+ *
+ * Fastify routes the same, except that it throws for a catch-all followed by more segments,
+ * and does not match literal text holding route syntax like `:`, `*`, `(` or `{`.
+ */
+function toNestRoute(path: `/${string}`): NestRoute {
+  const dynamicParams = getDynamicPathParams(path) ?? []
+  const catchAlls = dynamicParams.filter(param => param.allowsSlash)
+
+  if (catchAlls.length > 1) {
+    throw new TypeError(`OpenAPI path "${path}" has more than one catch-all param ({+name}), but only one is supported per path.`)
   }
 
-  return path
+  const catchAll = catchAlls[0]
+  const trailingCatchAll = catchAll && ['', '/'].includes(path.slice(catchAll.startIndex + catchAll.segment.length))
+    ? catchAll
+    : undefined
+
+  const keys = new Map<string, string>()
+  // Express names the trailing catch-all `path`
+  const usedKeys = new Set(trailingCatchAll ? ['path'] : [])
+  const params: NestRoute['params'] = []
+  const literals: string[] = []
+  const patterns: string[] = []
+  let literalStart = 0
+
+  for (const param of dynamicParams) {
+    literals.push(path.slice(literalStart, param.startIndex))
+    literalStart = param.startIndex + param.segment.length
+
+    if (param === trailingCatchAll) {
+      // the only catch-all syntax both adapters support
+      params.push([undefined, param.parameterName])
+      patterns.push('*')
+      continue
+    }
+
+    let key = keys.get(param.parameterName)
+
+    if (key === undefined) {
+      const base = param.parameterName.replaceAll('-', '_').replace(/^\d/, '_$&')
+
+      key = base
+      for (let i = 1; usedKeys.has(key); i++) {
+        key = `${base}_${i}`
+      }
+
+      keys.set(param.parameterName, key)
+      usedKeys.add(key)
+    }
+
+    params.push([key, param.parameterName])
+    // a catch-all followed by more segments needs Express's named wildcard, which Fastify does not support
+    patterns.push(param.allowsSlash ? `*${key}` : `:${key}`)
+  }
+
+  literals.push(path.slice(literalStart))
+
+  const join = (texts: string[]) => texts.map((text, i) => text + (patterns[i] ?? '')).join('') as `/${string}`
+
+  const expressPath = join(literals.map(text => text
+    .replace(ENCODED_LITERAL_REGEX, safeEncodeURIComponent)
+    .replace(EXPRESS_SYNTAX_REGEX, '\\$&'),
+  ))
+
+  // the raw path can only be registered when Express reads it literally too
+  const rawPath = literals.some(text => text.search(EXPRESS_SYNTAX_REGEX) !== -1) ? undefined : join(literals)
+
+  return {
+    paths: rawPath === undefined || rawPath === expressPath ? [expressPath] : [expressPath, rawPath],
+    params,
+  }
 }

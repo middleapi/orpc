@@ -44,6 +44,13 @@ const contract = populateRouterContractOpenAPIPaths({
 })
 ```
 
+:::warning
+Routes match like the [OpenAPI Handler](/docs/openapi/routing), with two exceptions when you use the Fastify adapter:
+
+- `{+name}` must be the last path segment, because Fastify only supports wildcards at the end of a route.
+- Literal path text must not contain route syntax characters such as `:`, `*`, `?`, `(`, `)`, `{`, or `}`. Fastify does not match these routes.
+:::
+
 ## Implement Your Contract
 
 To implement your contract in NestJS, use the `@Implement` decorator and the `implement` function. The `@Implement` very similar to NestJS built-in HTTP method decorators (e.g., `@Get`, `@Post`) and can be used to implement either a single procedure contract or an [router contract](/docs/contract/router) or combine with other NestJS decorators.

@@ -43,6 +43,22 @@ describe('requirements', () => {
     }).toThrow(/openapi\.path/)
   })
 
+  it('should throw if @Implement is used on a path with more than one catch-all param', () => {
+    const contract = oc.meta(openapi({
+      path: '/{+a}/x/{+b}',
+    }))
+
+    expect(() => {
+      @Controller()
+      class ImplController {
+        @Implement(contract)
+        catchAlls() {
+          return implement(contract).handler(() => {})
+        }
+      }
+    }).toThrow('OpenAPI path "/{+a}/x/{+b}" has more than one catch-all param ({+name}), but only one is supported per path.')
+  })
+
   it('should throw if @Implement uses the QUERY HTTP method when QueryMethod is not available (NestJS < 11.2)', async () => {
     vi.resetModules()
     vi.doMock('@nestjs/common', async (importOriginal) => {
@@ -540,6 +556,164 @@ describe('routing', () => {
         constructor: 'undefined',
       })
     })
+  })
+
+  describe.each([
+    ['express adapter', undefined],
+    ['fastify adapter', new FastifyAdapter()],
+  ] as const)('matches OpenAPIHandler params with %s', async (_, adapter) => {
+    const contract = {
+      hyphen: oc.meta(openapi({ method: 'GET', path: '/users/{user-id}', inputStructure: 'detailed' })),
+      digits: oc.meta(openapi({ method: 'GET', path: '/digits/{0}/{1st}', inputStructure: 'detailed' })),
+      repeated: oc.meta(openapi({ method: 'GET', path: '/repeated/{id}/{id}', inputStructure: 'detailed' })),
+      namedPath: oc.meta(openapi({ method: 'GET', path: '/named/{path}/{+rest}', inputStructure: 'detailed' })),
+      catchAll: oc.meta(openapi({ method: 'GET', path: '/files/{+path}', inputStructure: 'detailed' })),
+      nonAscii: oc.meta(openapi({ method: 'GET', path: '/café/{id}', inputStructure: 'detailed' })),
+    }
+
+    const handler = vi.fn(({ input }) => (input as any).params)
+    const impl = implement(contract)
+
+    @Controller()
+    class ParamsController {
+      @Implement(contract)
+      params() {
+        return {
+          hyphen: impl.hyphen.handler(handler),
+          digits: impl.digits.handler(handler),
+          repeated: impl.repeated.handler(handler),
+          namedPath: impl.namedPath.handler(handler),
+          catchAll: impl.catchAll.handler(handler),
+          nonAscii: impl.nonAscii.handler(handler),
+        }
+      }
+    }
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ParamsController],
+    }).compile()
+
+    const app = moduleRef.createNestApplication(adapter as any)
+    await app.init()
+
+    if (adapter) {
+      await app.getHttpAdapter().getInstance().ready()
+    }
+
+    const httpServer = app.getHttpServer()
+
+    it.each([
+      ['/users/a-id', { 'user-id': 'a-id' }],
+      ['/digits/a/b', { '0': 'a', '1st': 'b' }],
+      // the last value wins
+      ['/repeated/a/b', { id: 'b' }],
+      ['/named/a/b/c', { path: 'a', rest: 'b/c' }],
+      ['/files//etc/hosts', { path: '/etc/hosts' }],
+      ['/caf%C3%A9/1', { id: '1' }],
+      ['/caf%c3%a9/1', { id: '1' }],
+    ])('gET %s', async (url, params) => {
+      const res = await supertest(httpServer).get(url)
+
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual(params)
+    })
+
+    it.each([
+      '/users/',
+      '/repeated/a/',
+      '/files/',
+    ])('returns 404 instead of matching an empty param for GET %s', async (url) => {
+      const res = await supertest(httpServer).get(url)
+
+      expect(res.statusCode).toEqual(404)
+      expect(res.body).toMatchObject({ statusCode: 404, message: `Cannot GET ${url}` })
+      expect(handler).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('matches OpenAPIHandler literal path text with express adapter', async () => {
+    const contract = {
+      colon: oc.meta(openapi({ method: 'GET', path: '/items:batchGet' })),
+      braces: oc.meta(openapi({ method: 'GET', path: '/a/{id}.json' })),
+      parens: oc.meta(openapi({ method: 'GET', path: '/(x)' })),
+      question: oc.meta(openapi({ method: 'GET', path: '/what?' })),
+      star: oc.meta(openapi({ method: 'GET', path: '/*' })),
+      segmentsAfterCatchAll: oc.meta(openapi({ method: 'GET', path: '/files/{+path}/raw', inputStructure: 'detailed' })),
+    }
+
+    const impl = implement(contract)
+
+    @Controller()
+    class LiteralController {
+      @Implement(contract)
+      literal() {
+        return {
+          colon: impl.colon.handler(() => 'colon'),
+          braces: impl.braces.handler(() => 'braces'),
+          parens: impl.parens.handler(() => 'parens'),
+          question: impl.question.handler(() => 'question'),
+          star: impl.star.handler(() => 'star'),
+          segmentsAfterCatchAll: impl.segmentsAfterCatchAll.handler(({ input }) => (input as any).params),
+        }
+      }
+    }
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [LiteralController],
+    }).compile()
+
+    const app = moduleRef.createNestApplication()
+    await app.init()
+
+    const httpServer = app.getHttpServer()
+
+    it.each([
+      ['/items:batchGet', 'colon'],
+      // only whole-segment `{name}` is a param
+      ['/a/%7Bid%7D.json', 'braces'],
+      ['/(x)', 'parens'],
+      ['/what%3F', 'question'],
+      ['/*', 'star'],
+      ['/files/a/b/raw', { path: 'a/b' }],
+    ])('gET %s', async (url, body) => {
+      const res = await supertest(httpServer).get(url)
+
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual(body)
+    })
+
+    it.each([
+      '/itemsfoo',
+      '/a/id.json',
+      '/x',
+      '/what',
+      '/anything',
+      '/files/a/b',
+    ])('returns 404 for GET %s', async (url) => {
+      const res = await supertest(httpServer).get(url)
+
+      expect(res.statusCode).toEqual(404)
+    })
+  })
+
+  it('fastify adapter rejects segments after a catch-all param', async () => {
+    const contract = oc.meta(openapi({ method: 'GET', path: '/files/{+path}/raw' }))
+
+    @Controller()
+    class ImplController {
+      @Implement(contract)
+      raw() {
+        return implement(contract).handler(() => 'raw')
+      }
+    }
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ImplController],
+    }).compile()
+
+    const app = moduleRef.createNestApplication(new FastifyAdapter())
+
+    await expect(app.init()).rejects.toThrow('Wildcard must be the last character in the route')
   })
 })
 
