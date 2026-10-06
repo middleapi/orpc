@@ -158,7 +158,7 @@ export const base = os
 
 ### Hooks
 
-This integration also includes React hooks for server functions. `useServerFunction` executes a server function and tracks its status. `useOptimisticServerFunction` does the same, with optimistic updates. Unlike direct server function calls, hook errors are deserialized into native `ORPCError` instances instead of plain JSON (`ORPCErrorJSON`) for a more natural developer experience. If your procedures can throw special Next.js errors, see [Special Next.js Errors](#special-nextjs-errors).
+This integration also includes React hooks for server functions. `useServerFunction` executes a server function and tracks its status. `useOptimisticServerFunction` does the same, with optimistic updates. Unlike direct server function calls, hook errors are deserialized into native `ORPCError` instances instead of plain JSON (`ORPCErrorJSON`) for a more natural developer experience. [Special Next.js errors](#special-nextjs-errors) are rethrown instead of becoming the hook's error state.
 
 <CodeGroup>
 
@@ -308,7 +308,7 @@ export const formFunctionableProcedure = formFunctionable(
 
 ## Special Next.js Errors
 
-Next.js throws special errors to control rendering and navigation, for example in [redirect](https://nextjs.org/docs/app/api-reference/functions/redirect) and [notFound](https://nextjs.org/docs/app/api-reference/functions/not-found). Middleware, interceptors, and [hooks](#hooks) treat them as regular errors. Use [unstable_rethrow](https://nextjs.org/docs/app/api-reference/functions/unstable_rethrow), which rethrows any special Next.js error, to detect them and pass them on to Next.js.
+Next.js throws special errors to control rendering and navigation, for example in [redirect](https://nextjs.org/docs/app/api-reference/functions/redirect) and [notFound](https://nextjs.org/docs/app/api-reference/functions/not-found). Server functions and [hooks](#hooks) rethrow them so Next.js can handle them, but middleware and interceptors still see them as regular errors. Use [unstable_rethrow](https://nextjs.org/docs/app/api-reference/functions/unstable_rethrow), which rethrows any special Next.js error, to detect and skip them.
 
 ```tsx
 import { unstable_rethrow } from 'next/navigation'
@@ -323,7 +323,7 @@ function isSpecialNextError(error: unknown): boolean {
   }
 }
 
-const { execute } = useServerFunction(serverFunction, {
+useServerFunction(serverFunction, {
   interceptors: [
     onError((error) => {
       if (!isSpecialNextError(error)) {
@@ -337,9 +337,4 @@ const { execute } = useServerFunction(serverFunction, {
     }),
   ],
 })
-
-async function action(form: FormData) {
-  const [error] = await execute(parseFormData(form))
-  unstable_rethrow(error) // <- let Next.js handle its own errors
-}
 ```
