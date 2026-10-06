@@ -47,4 +47,9 @@ it('getIssueMessage', () => {
   expect(getIssueMessage({ data: { issues: [{ message: 'hi', path: [{ key: '0' }] }] } }, '0')).toBe('hi')
   expect(getIssueMessage({ data: { issues: [{ message: 'hi', path: [{ key: '0' }] }] } }, '')).toBe('hi')
   expect(getIssueMessage({ data: { issues: [{ message: 'hi', path: [{ key: '0' }] }] } }, '1')).toBeUndefined()
+
+  expect(getIssueMessage({ data: { issues: [{ message: 'hi', path: ['address2'] }] } }, '')).toBeUndefined()
+  expect(getIssueMessage({ data: { issues: [{ message: 'hi', path: ['user', 'phone1'] }] } }, '')).toBeUndefined()
+  expect(getIssueMessage({ data: { issues: [{ message: 'hi', path: ['10'] }] } }, '')).toBe('hi')
+  expect(getIssueMessage({ data: { issues: [{ message: 'hi', path: ['01'] }] } }, '')).toBeUndefined()
 })

@@ -41,6 +41,9 @@ export interface RPCMatcherOptions {
   allowMethods?: readonly StandardMethod[] | ((method: StandardMethod, procedure: AnyProcedure, path: string[]) => boolean)
 }
 
+// `%` or a char `encodeURIComponent` encodes, meaning normalization may change the pathname
+const NORMALIZABLE_PATHNAME_REGEX = /[^\w\-.!~*'()/]/
+
 interface TreeEntry {
   path: string[]
   contract: AnyProcedureContract
@@ -133,10 +136,10 @@ export class RPCMatcher {
 
     let entry = this.tree.get(pathname)
 
-    if (entry === undefined && pathname.includes('%')) {
-      // Retry with a normalized path: users may percent-encode characters that
-      // we store unencoded (e.g. "a%62c" vs "abc"), so normalization lets us
-      // handle those requests without storing duplicate entries.
+    if (entry === undefined && NORMALIZABLE_PATHNAME_REGEX.test(pathname)) {
+      // Retry with a normalized path: users may percent-encode characters that we store
+      // unencoded ("a%62c" vs "abc"), or leave raw characters that we store encoded
+      // ("a^b" vs "a%5Eb"), so normalization handles both without duplicate entries.
 
       const normalizedPathname = normalizeHttpPath(pathname)
 

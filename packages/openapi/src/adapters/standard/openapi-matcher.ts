@@ -3,7 +3,7 @@ import type { AnyProcedure, AnyRouter, WalkProcedureContractsLazyResult } from '
 import type { Value } from '@orpc/shared'
 import type { MatchedRoute } from 'rou3'
 import { createContractProcedure, getRouter, Procedure, unlazy, walkProcedureContractsSync } from '@orpc/server'
-import { mergeHttpPath, normalizeHttpPath, pathToHttpPath, safeDecodeURIComponent, setOwn, value } from '@orpc/shared'
+import { mergeHttpPath, pathToHttpPath, safeDecodeURIComponent, safeEncodeURIComponent, setOwn, value } from '@orpc/shared'
 import { addRoute, createRouter, findAllRoutes, findRoute, routeToRegExp } from 'rou3'
 import { DEFAULT_OPENAPI_METHOD } from '../../constants'
 import { getOpenAPIMeta } from '../../meta'
@@ -17,6 +17,13 @@ export interface OpenAPIMatcherOptions {
    */
   filter?: Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]>
 }
+
+// chars normalized text keeps raw: rou3 encodes the WHATWG path percent-encode set in literal text, and
+// we also encode `%` and `/`, so a decoded "%25" or "%2F" keeps its meaning
+const ROU3_RAW_CHARS = String.raw`\w!$&'()*+,\-.:;=@[\\\]|~`
+// `%` or a char rou3 stores encoded, meaning normalization may change the pathname
+const NORMALIZABLE_PATHNAME_REGEX = new RegExp(`[^${ROU3_RAW_CHARS}/]`)
+const ROU3_ENCODED_SEGMENT_TEXT_REGEX = new RegExp(`[^${ROU3_RAW_CHARS}]+`, 'g')
 
 interface TreeEntry {
   path: string[]
@@ -128,13 +135,12 @@ export class OpenAPIMatcher {
 
     let match = this.findMatch(method, pathname)
 
-    if (match === undefined && pathname.includes('%')) {
-      // Retry with a normalized path: users may percent-encode characters that
-      // we store unencoded (e.g. "a%62c" vs "abc"), so normalization lets us
-      // handle those requests without storing duplicate entries.
-      // Raw characters we store encoded (e.g. "café") are not retried, to keep misses cheap.
+    if (match === undefined && NORMALIZABLE_PATHNAME_REGEX.test(pathname)) {
+      // Retry with a normalized path: users may percent-encode characters that we store
+      // unencoded ("a%62c" vs "abc"), or leave raw characters that we store encoded
+      // ("a^b" vs "a%5Eb"), so normalization handles both without duplicate entries.
 
-      const normalizedPathname = normalizeHttpPath(pathname)
+      const normalizedPathname = normalizeRou3Path(pathname) as `/${string}`
 
       // most requests `await undefined` so conditionally await it to save a microtask turn
       const normalizedLoading = this.resolvePendingLazyRouters(normalizedPathname)
@@ -225,7 +231,7 @@ function toRou3Route(path: `/${string}`): { pattern: `/${string}` } & Pick<TreeE
   const dynamicParams = getDynamicPathParams(path)
 
   if (!dynamicParams) {
-    return { pattern: escapeRou3Literal(path) as `/${string}` }
+    return { pattern: toRou3Literal(path) as `/${string}` }
   }
 
   let pattern = ''
@@ -237,7 +243,7 @@ function toRou3Route(path: `/${string}`): { pattern: `/${string}` } & Pick<TreeE
     const key = `p${params.length}`
     params.push([key, param.parameterName])
 
-    pattern += escapeRou3Literal(path.slice(literalStart, param.startIndex))
+    pattern += toRou3Literal(path.slice(literalStart, param.startIndex))
     literalStart = param.startIndex + param.segment.length
 
     if (param.allowsSlash) {
@@ -253,7 +259,7 @@ function toRou3Route(path: `/${string}`): { pattern: `/${string}` } & Pick<TreeE
     }
   }
 
-  pattern += escapeRou3Literal(path.slice(literalStart))
+  pattern += toRou3Literal(path.slice(literalStart))
 
   return { pattern: pattern as `/${string}`, params, catchAllKey }
 }
@@ -261,8 +267,18 @@ function toRou3Route(path: `/${string}`): { pattern: `/${string}` } & Pick<TreeE
 // rou3 syntax and the first dot of `.` / `..` segments; other dots stay unescaped, since escapes slow route registration
 const ROU3_SYNTAX_REGEX = /[\\:*?+(){}]|(?<![^/])\.(?=\.?(?:\/|$))/g
 
-function escapeRou3Literal(text: string): string {
-  return text.replace(ROU3_SYNTAX_REGEX, '\\$&')
+function toRou3Literal(text: string): string {
+  const normalized = NORMALIZABLE_PATHNAME_REGEX.test(text) ? normalizeRou3Path(text) : text
+
+  return normalized.replace(ROU3_SYNTAX_REGEX, '\\$&')
+}
+
+// decodes each segment, then re-encodes it the way rou3 stores literal text
+function normalizeRou3Path(path: string): string {
+  return path
+    .split('/')
+    .map(segment => safeDecodeURIComponent(segment).replace(ROU3_ENCODED_SEGMENT_TEXT_REGEX, safeEncodeURIComponent))
+    .join('/')
 }
 
 function toRou3PrefixMatcher(prefix: `/${string}`): RegExp {
