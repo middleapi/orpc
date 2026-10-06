@@ -411,15 +411,20 @@ function extractDetailedResponseParts(
 
     const statusSchema = entries.find(([name]) => name === 'status')?.[1]
 
-    if (statusSchema !== undefined && (typeof statusSchema !== 'object' || !Number.isInteger(statusSchema.const) || statusSchema.const >= 400)) {
+    // Some converters (e.g. Effect) emit literals as a single-value `enum` instead of `const`
+    const literalStatus = typeof statusSchema === 'object'
+      ? statusSchema.const ?? (statusSchema.enum?.length === 1 ? statusSchema.enum[0] : undefined)
+      : undefined
+
+    if (statusSchema !== undefined && (typeof statusSchema !== 'object' || !Number.isInteger(literalStatus) || literalStatus >= 400)) {
       throw new OpenAPIGeneratorError(
         `invalid "status" field in the detailed output schema.\n`
-        + `  Expected: a literal (const) integer below 400\n`
+        + `  Expected: a literal (const or single-value enum) integer below 400\n`
         + `  Received: ${stringifyJSON(statusSchema)}`,
       )
     }
 
-    const status = (statusSchema?.const as number || undefined) ?? defaultStatus
+    const status = (literalStatus as number || undefined) ?? defaultStatus
 
     let parts = partsByStatus.get(status)
     if (!parts) {

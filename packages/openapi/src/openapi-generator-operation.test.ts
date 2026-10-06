@@ -614,6 +614,33 @@ describe('openAPIGenerator operation builders', () => {
       })
     })
 
+    it('accepts a single-value enum as a literal detailed status', () => {
+      const { ctx, operation } = createContext()
+
+      // Effect emits `Schema.Literal(201)` as `{ type: 'number', enum: [201] }`
+      buildSuccessResponse(ctx, operation, testDef({
+        outputs: [testSchema({
+          type: 'object',
+          properties: {
+            status: { type: 'number', enum: [201], description: 'created' },
+            body: { type: 'string' },
+          },
+          required: ['status', 'body'],
+        })],
+      }), { outputStructure: 'detailed' })
+
+      expect(operation.responses).toEqual({
+        201: {
+          description: 'created',
+          content: {
+            'application/json': {
+              schema: { type: 'string' },
+            },
+          },
+        },
+      })
+    })
+
     it.each([
       {
         name: 'a detailed output member is not an object',
@@ -633,6 +660,16 @@ describe('openAPIGenerator operation builders', () => {
       {
         name: 'a detailed status is not a success status',
         output: { type: 'object', properties: { status: { const: 400 } }, required: ['status'] },
+        message: 'invalid "status" field in the detailed output schema',
+      },
+      {
+        name: 'a detailed status is a multi-value enum',
+        output: { type: 'object', properties: { status: { type: 'number', enum: [200, 201] } }, required: ['status'] },
+        message: 'invalid "status" field in the detailed output schema',
+      },
+      {
+        name: 'a detailed single-value enum status is not a success status',
+        output: { type: 'object', properties: { status: { type: 'number', enum: [400] } }, required: ['status'] },
         message: 'invalid "status" field in the detailed output schema',
       },
     ])('throws when $name', ({ output, message }) => {
