@@ -74,6 +74,92 @@ describe('standardOpenAPICodec', () => {
         expect(serializer.deserialize).toHaveBeenCalledOnce()
         expect(serializer.deserialize).toHaveBeenCalledWith(serialized)
       })
+
+      it('gives path params precedence over conflicting query params', async () => {
+        serializer.deserialize.mockReturnValueOnce({ id: '99', q: 'hello' })
+
+        const input = await codec.decode({
+          method: 'GET',
+          url: new URL('http://localhost/42?id=99&q=hello'),
+          body: vi.fn(),
+          headers: {},
+          signal: undefined,
+        }, { id: '42' }, ping)
+
+        expect(input).toEqual({ id: '42', q: 'hello' })
+      })
+
+      it('gives path params precedence over conflicting body properties', async () => {
+        serializer.deserialize.mockReturnValueOnce({ id: '99', title: 'hello' })
+
+        const input = await codec.decode({
+          method: 'POST',
+          url: new URL('http://localhost/24'),
+          body: vi.fn(async () => '__body__'),
+          headers: {},
+          signal: undefined,
+        }, { id: '24' }, ping)
+
+        expect(input).toEqual({ id: '24', title: 'hello' })
+      })
+
+      it('returns only path params when a primitive body cannot be merged', async () => {
+        serializer.deserialize.mockReturnValueOnce('raw-body')
+
+        const input = await codec.decode({
+          method: 'POST',
+          url: new URL('http://localhost/24'),
+          body: vi.fn(async () => '__body__'),
+          headers: {},
+          signal: undefined,
+        }, { id: '24' }, ping)
+
+        expect(input).toEqual({ id: '24' })
+      })
+
+      it('returns only path params when an array body cannot be merged', async () => {
+        serializer.deserialize.mockReturnValueOnce(['first', 'second'])
+
+        const input = await codec.decode({
+          method: 'POST',
+          url: new URL('http://localhost/24'),
+          body: vi.fn(async () => '__body__'),
+          headers: {},
+          signal: undefined,
+        }, { id: '24' }, ping)
+
+        expect(input).toEqual({ id: '24' })
+      })
+
+      it('returns only path params when a binary body cannot be merged', async () => {
+        const file = new File(['raw-bytes'], 'other.txt')
+        serializer.deserialize.mockReturnValueOnce(file)
+
+        const input = await codec.decode({
+          method: 'POST',
+          url: new URL('http://localhost/report.txt'),
+          body: vi.fn(async () => file),
+          headers: {},
+          signal: undefined,
+        }, { name: 'report.txt' }, ping)
+
+        expect(input).toEqual({ name: 'report.txt' })
+      })
+
+      it('returns a binary body as-is when there are no path params', async () => {
+        const blob = new Blob(['raw-bytes'])
+        serializer.deserialize.mockReturnValueOnce(blob)
+
+        const input = await codec.decode({
+          method: 'POST',
+          url: new URL('http://localhost/submit'),
+          body: vi.fn(async () => blob),
+          headers: {},
+          signal: undefined,
+        }, undefined, ping)
+
+        expect(input).toBe(blob)
+      })
     })
 
     describe('with detailed structure', () => {
