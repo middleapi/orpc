@@ -55,7 +55,7 @@ export class BracketNotationSerializer {
     // `NullProtoObj` it carries a real prototype, so accesses below stay own-property only.
     const arrayPushStyles = new WeakSet()
     const root: Record<string, unknown> = new NullProtoObj()
-    const guard = new InternalIntegerKeyGuard(this.maxDeserializingEmptySlots)
+    let emptySlotsLeft = this.maxDeserializingEmptySlots
 
     for (const [path, value] of serialized) {
       const segments = this.parsePath(path)
@@ -70,24 +70,33 @@ export class BracketNotationSerializer {
         const existing: any = getOwn(currentRef, nextSegment)
         let child: any = existing
 
-        if (!Array.isArray(child) && !isPlainObject(child)) {
-          child = (segment === '' ? isLast : guard.claimArrayIndex(0, segment)) ? [] : new NullProtoObj()
-        }
-        else if (Array.isArray(child)) {
-          const isPushStyle = arrayPushStyles.has(child)
+        // A missing or primitive value is treated like an empty array, which becomes an object if it cannot stay one
+        if (Array.isArray(child) || !isPlainObject(child)) {
+          const isArray = Array.isArray(child)
+          const isPushStyle = isArray && arrayPushStyles.has(child)
+          const length = isArray ? child.length : 0
+          const index = internalToArrayIndex(segment)
+          const emptySlots = index === undefined ? 0 : Math.max(0, index - length)
 
-          const canStayArray = segment === ''
-            ? isLast && (isPushStyle || child.length === 0)
-            : !(isLast && isPushStyle) && guard.claimArrayIndex(child.length, segment)
+          const canBeArray = segment === ''
+            ? isLast && (isPushStyle || length === 0)
+            : index !== undefined && !(isLast && isPushStyle) && emptySlots <= emptySlotsLeft
 
-          if (!canStayArray) {
+          if (canBeArray) {
+            emptySlotsLeft -= emptySlots
+            child = isArray ? child : []
+          }
+          else if (isArray) {
             arrayPushStyles.delete(child)
             child = isPushStyle ? internalPushStyleArrayToObject(child) : internalArrayToObject(child)
+          }
+          else {
+            child = new NullProtoObj()
           }
         }
 
         if (child !== existing) {
-          guard.setOwn(currentRef, nextSegment, child)
+          internalSetOwn(currentRef, nextSegment, child)
         }
 
         currentRef = child
@@ -105,11 +114,11 @@ export class BracketNotationSerializer {
           current.push(value)
         }
         else {
-          guard.setOwn(currentRef, nextSegment, [current, value])
+          internalSetOwn(currentRef, nextSegment, [current, value])
         }
       }
       else {
-        guard.setOwn(currentRef, nextSegment, value)
+        internalSetOwn(currentRef, nextSegment, value)
       }
     }
 
@@ -206,65 +215,21 @@ function internalPushStyleArrayToObject(array: readonly unknown[]): Record<strin
 }
 
 /**
- * Engines keep the integer keys of an object in a flat backing store sized by the largest one, so a lone
- * `{ 999: x }` takes ~12KB in V8. Holding `MAX_ARRAY_INDEX` switches the object to sparse storage for good
- * (V8 and JSC), so writing and deleting it keeps every integer key the object receives later cheap.
+ * Like `setOwn`, but first switches an object created during deserialization to sparse storage when an
+ * integer key would leave a gap. Engines keep integer keys in a flat backing store sized by the largest one,
+ * so a lone `{ 999: x }` takes ~12KB in V8. Holding `MAX_ARRAY_INDEX` switches an object to sparse storage
+ * for good (V8 and JSC), so writing and deleting it keeps the object's integer keys cheap without a trace.
  */
-function internalUseSparseIntegerKeys(object: Record<string, unknown>): void {
-  if (!Object.hasOwn(object, MAX_ARRAY_INDEX)) {
-    object[MAX_ARRAY_INDEX] = undefined
-    delete object[MAX_ARRAY_INDEX]
-  }
-}
-
-/**
- * Keeps the memory that integer keys take in line with the input, see `maxDeserializingEmptySlots`.
- */
-class InternalIntegerKeyGuard {
-  private emptySlots = 0
-  private sparseObjects: WeakSet<object> | undefined
-
-  constructor(private readonly maxEmptySlots: number) {}
-
-  /**
-   * Counts the empty slots that `key` leaves in an array of `length`.
-   *
-   * @returns `false`, counting nothing, if `key` is not an array index or its empty slots do not fit,
-   * so the array should be an object instead.
-   */
-  claimArrayIndex(length: number, key: string): boolean {
+function internalSetOwn(container: Record<string, unknown>, key: string, value: unknown): void {
+  if (container instanceof NullProtoObj) {
     const index = internalToArrayIndex(key)
 
-    if (index === undefined) {
-      return false
+    // `0`, or the key right after an existing one, keeps the flat store filled
+    if (index !== undefined && index !== 0 && !Object.hasOwn(container, index - 1) && !Object.hasOwn(container, MAX_ARRAY_INDEX)) {
+      container[MAX_ARRAY_INDEX] = undefined
+      delete container[MAX_ARRAY_INDEX]
     }
-
-    const slots = Math.max(0, index - length)
-
-    if (this.emptySlots + slots > this.maxEmptySlots) {
-      return false
-    }
-
-    this.emptySlots += slots
-    return true
   }
 
-  /**
-   * Adds `key` to `container`. Arrays only receive keys already counted by `claimArrayIndex`, while
-   * objects created during deserialization switch to sparse storage before an integer key that leaves a gap.
-   */
-  setOwn(container: Record<string, unknown>, key: string, value: unknown): void {
-    if (container instanceof NullProtoObj && !this.sparseObjects?.has(container)) {
-      const index = internalToArrayIndex(key)
-
-      // `0`, or the key right after an existing one, keeps the flat store filled
-      if (index !== undefined && index !== 0 && !Object.hasOwn(container, index - 1)) {
-        internalUseSparseIntegerKeys(container)
-        this.sparseObjects ??= new WeakSet()
-        this.sparseObjects.add(container)
-      }
-    }
-
-    setOwn(container, key, value)
-  }
+  setOwn(container, key, value)
 }

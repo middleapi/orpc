@@ -28,7 +28,7 @@ description: "Learn how bracket notation encodes structured data like nested obj
    ::: info
    Missing indexes create sparse arrays.
 
-   Empty slots take memory, and code iterating an array walks every one of them, so the empty slots that explicit indexes leave across one input are limited to `1,000` by default. An index that would exceed the limit turns its array into an object instead, for example `color[5000]=blue` becomes `{ color: { 5000: 'blue' } }`. To change that limit, configure `maxDeserializingEmptySlots`:
+   Explicit indexes may leave at most `1,000` empty slots per input by default. An index that would exceed that turns its array into an object, for example `color[5000]=blue` becomes `{ color: { 5000: 'blue' } }`. To change the limit, configure `maxDeserializingEmptySlots`:
 
    ```ts
    const serializer = new OpenAPISerializer({

@@ -306,13 +306,7 @@ describe('bracket notation serializer', () => {
       expect(serializer.deserialize([['a[+1]', 1]])).toEqual({ a: { '+1': 1 } })
       expect(serializer.deserialize([['a[1e3]', 1]])).toEqual({ a: { '1e3': 1 } })
       expect(serializer.deserialize([['a[1.5]', 1]])).toEqual({ a: { 1.5: 1 } })
-    })
-
-    it('does not allocate huge arrays for memory exhaustion attacks', () => {
-      const result = serializer.deserialize([['arr[4294967295]', 'x']]) as any
-
-      expect(Array.isArray(result.arr)).toBe(false)
-      expect(result.arr).toEqual({ 4294967295: 'x' })
+      expect(serializer.deserialize([['a[4294967295]', 1]])).toEqual({ a: { 4294967295: 1 } })
     })
 
     describe('maxDeserializingEmptySlots', () => {
@@ -327,17 +321,16 @@ describe('bracket notation serializer', () => {
           return arr
         })() })
 
-        expect(serializer.deserialize([
-          ['arr[1]', 1],
-          ['arr[5000]', 2],
-        ])).toEqual({ arr: { 1: 1, 5000: 2 } })
+        expect(serializer.deserialize([['arr[1001]', 3]])).toEqual({ arr: { 1001: 3 } })
+        expect(serializer.deserialize([['arr[1]', 1], ['arr[5000]', 2]])).toEqual({ arr: { 1: 1, 5000: 2 } })
+        expect(serializer.deserialize([['arr[4294967294]', 'x']])).toEqual({ arr: { 4294967294: 'x' } })
 
         // sequential indexes leave no empty slots, so long arrays stay arrays
         expect(serializer.deserialize(Array.from({ length: 2000 }, (_, i): [string, unknown] => [`arr[${i}]`, i]))).toEqual({
           arr: Array.from({ length: 2000 }, (_, i) => i),
         })
 
-        // push array syntax never leaves empty slots
+        // repeated keys append without using the limit
         expect(serializer.deserialize([
           ['arr[999]', 3],
           ['arr', 4],
