@@ -71,15 +71,14 @@ export class BracketNotationSerializer {
         let child: any = existing
 
         if (!Array.isArray(child) && !isPlainObject(child)) {
-          child = []
+          child = (segment === '' ? isLast : guard.claimArrayIndex(0, segment)) ? [] : new NullProtoObj()
         }
-
-        if (Array.isArray(child)) {
+        else if (Array.isArray(child)) {
           const isPushStyle = arrayPushStyles.has(child)
 
           const canStayArray = segment === ''
             ? isLast && (isPushStyle || child.length === 0)
-            : !(isLast && isPushStyle) && guard.claimArrayIndex(child, segment)
+            : !(isLast && isPushStyle) && guard.claimArrayIndex(child.length, segment)
 
           if (!canStayArray) {
             arrayPushStyles.delete(child)
@@ -132,37 +131,25 @@ export class BracketNotationSerializer {
   }
 
   parsePath(path: string): string[] {
-    const segments: string[] = []
+    const start = path.indexOf('[')
 
-    let inBrackets = false
-    let currentSegment = ''
-
-    for (let i = 0; i < path.length; i++) {
-      const char = path[i]!
-      const nextChar = path[i + 1]
-
-      if (inBrackets && char === ']' && (nextChar === undefined || nextChar === '[')) {
-        if (nextChar === undefined) {
-          inBrackets = false
-        }
-
-        segments.push(currentSegment)
-        currentSegment = ''
-        i++
-      }
-
-      else if (segments.length === 0 && char === '[') {
-        inBrackets = true
-        segments.push(currentSegment)
-        currentSegment = ''
-      }
-
-      else {
-        currentSegment += char
-      }
+    // Brackets must open after the first segment and close at the very end, e.g. `a[b][c]`
+    if (start === -1 || path[path.length - 1] !== ']') {
+      return [path]
     }
 
-    return inBrackets || segments.length === 0 ? [path] : segments
+    const segments = [path.slice(0, start)]
+    let from = start + 1
+    let to = path.indexOf('][', from)
+
+    while (to !== -1) {
+      segments.push(path.slice(from, to))
+      from = to + 2
+      to = path.indexOf('][', from)
+    }
+
+    segments.push(path.slice(from, -1))
+    return segments
   }
 }
 
@@ -240,19 +227,19 @@ class InternalIntegerKeyGuard {
   constructor(private readonly maxEmptySlots: number) {}
 
   /**
-   * Counts the empty slots that `key` leaves in `array`.
+   * Counts the empty slots that `key` leaves in an array of `length`.
    *
    * @returns `false`, counting nothing, if `key` is not an array index or its empty slots do not fit,
-   * so `array` should become an object instead.
+   * so the array should be an object instead.
    */
-  claimArrayIndex(array: readonly unknown[], key: string): boolean {
+  claimArrayIndex(length: number, key: string): boolean {
     const index = internalToArrayIndex(key)
 
     if (index === undefined) {
       return false
     }
 
-    const slots = Math.max(0, index - array.length)
+    const slots = Math.max(0, index - length)
 
     if (this.emptySlots + slots > this.maxEmptySlots) {
       return false
