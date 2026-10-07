@@ -53,7 +53,7 @@ export class BracketNotationSerializer {
   deserialize(serialized: BracketNotationSerializeResult): Record<string, unknown> {
     // A caller-supplied object value can become a container for deeper paths, and unlike
     // `NullProtoObj` it carries a real prototype, so accesses below stay own-property only.
-    const arrayPushStyles = new WeakSet()
+    let arrayPushStyles: WeakSet<unknown[]> | undefined
     const root: Record<string, unknown> = new NullProtoObj()
     let emptySlotsLeft = this.maxDeserializingEmptySlots
 
@@ -61,7 +61,8 @@ export class BracketNotationSerializer {
       const segments = this.parsePath(path)
 
       let currentRef: any = root
-      let nextSegment: string = segments[0]!
+      // Arrays take keys as numbers, so engines do not parse the same key again on each access
+      let nextSegment: string | number = segments[0]!
 
       for (let i = 1; i < segments.length; i++) {
         const segment = segments[i]!
@@ -69,11 +70,12 @@ export class BracketNotationSerializer {
 
         const existing: any = getOwn(currentRef, nextSegment)
         let child: any = existing
+        let key: string | number = segment
 
         // A missing or primitive value is treated like an empty array, which becomes an object if it cannot stay one
         if (Array.isArray(child) || !isPlainObject(child)) {
           const isArray = Array.isArray(child)
-          const isPushStyle = isArray && arrayPushStyles.has(child)
+          const isPushStyle = isArray && !!arrayPushStyles?.has(child)
           const length = isArray ? child.length : 0
           const index = internalToArrayIndex(segment)
           const emptySlots = index === undefined ? 0 : Math.max(0, index - length)
@@ -85,9 +87,10 @@ export class BracketNotationSerializer {
           if (canBeArray) {
             emptySlotsLeft -= emptySlots
             child = isArray ? child : []
+            key = index ?? segment
           }
           else if (isArray) {
-            arrayPushStyles.delete(child)
+            arrayPushStyles?.delete(child)
             child = isPushStyle ? internalPushStyleArrayToObject(child) : internalArrayToObject(child)
           }
           else {
@@ -100,10 +103,11 @@ export class BracketNotationSerializer {
         }
 
         currentRef = child
-        nextSegment = segment
+        nextSegment = key
       }
 
       if (Array.isArray(currentRef) && nextSegment === '') {
+        arrayPushStyles ??= new WeakSet()
         arrayPushStyles.add(currentRef)
         currentRef.push(value)
       }
@@ -220,8 +224,8 @@ function internalPushStyleArrayToObject(array: readonly unknown[]): Record<strin
  * so a lone `{ 999: x }` takes ~12KB in V8. Holding `MAX_ARRAY_INDEX` switches an object to sparse storage
  * for good (V8 and JSC), so writing and deleting it keeps the object's integer keys cheap without a trace.
  */
-function internalSetOwn(container: Record<string, unknown>, key: string, value: unknown): void {
-  if (container instanceof NullProtoObj) {
+function internalSetOwn(container: Record<string, unknown>, key: string | number, value: unknown): void {
+  if (typeof key === 'string' && container instanceof NullProtoObj) {
     const index = internalToArrayIndex(key)
 
     // `0`, or the key right after an existing one, keeps the flat store filled
