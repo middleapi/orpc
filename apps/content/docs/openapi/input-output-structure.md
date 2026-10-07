@@ -13,7 +13,7 @@ The `inputStructure` option defines how the incoming request data is structured.
 
 ### Compact Mode (default)
 
-Combines path parameters with query or body data (depending on the HTTP method) into a single object.
+Combines path parameters with query or body data (depending on the HTTP method) into a single object. Path parameters take precedence over query or body fields with the same name. If the path has parameters and the body cannot be merged (e.g. a primitive, array, or file), only the path parameters are used. Use detailed mode if you also need the body.
 
 ```ts
 const compactMode = os.route({

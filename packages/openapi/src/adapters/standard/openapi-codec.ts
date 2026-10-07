@@ -42,14 +42,20 @@ export class StandardOpenAPICodec implements StandardCodec {
         return params
       }
 
-      if (isObject(data)) {
-        return {
-          ...params,
-          ...data,
-        }
+      if (!params || Object.keys(params).length < 1) {
+        return data
       }
 
-      return data
+      // Non-object data (primitive, array, Blob, ReadableStream, ...) cannot be merged with params.
+      // Prefer params to stay consistent with the OpenAPI generator, which only describes path params here.
+      if (!isObject(data)) {
+        return params
+      }
+
+      return {
+        ...data,
+        ...params,
+      }
     }
 
     const deserializeSearchParams = () => {
