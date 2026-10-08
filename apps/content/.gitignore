@@ -25,3 +25,4 @@ vitest.config.ts.timestamp-*
 *.local
 *.pem
 .vercel/
+.wrangler/

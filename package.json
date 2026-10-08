@@ -73,7 +73,7 @@
     "lint-staged": "^17.3.0",
     "pino": "^10.3.1",
     "pkg-pr-new": "^0.0.88",
-    "react": "^19.2.8",
+    "react": "^19.3.0",
     "sherif": "^1.11.1",
     "simple-git-hooks": "^2.13.1",
     "supertest": "^7.2.2",

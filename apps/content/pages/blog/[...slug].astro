@@ -198,9 +198,12 @@ const postJsonLd = {
       <hr class="my-8 border-border" />
 
       {/* The collapsible is sized for the docs prose column; widen it to this
-          article's own measure. */}
+          article's own measure. Below `xl` the page actions move from the rail
+          into its mount, as they do on docs pages. */}
       <div class="[&>details]:max-w-none">
-        <TableOfContents headings={tocHeadings} title={ui.toc.title} variant="mobile" />
+        <TableOfContents headings={tocHeadings} title={ui.toc.title} variant="mobile">
+          <div data-blume-page-actions-mount />
+        </TableOfContents>
       </div>
 
       <div class="prose max-w-none">

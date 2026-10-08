@@ -9,8 +9,7 @@
     "experts",
     "pages",
     "sponsors",
-    ".blume/.astro/types.d.ts",
-    ".blume/src/env.d.ts"
+    ".blume/.astro/types.d.ts"
   ],
   "exclude": [
     "**/*.test.*",
