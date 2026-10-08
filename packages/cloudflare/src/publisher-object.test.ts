@@ -428,7 +428,7 @@ describe('durable publisher object', () => {
       '{"data":1,"meta":"text"}',
       '{"data":1,"meta":[]}',
       '{"data":1,"meta":null}',
-      JSON.stringify({ data: 'a'.repeat(12_000_000) }), // over the SQLite row size limit
+      JSON.stringify({ data: 'a'.repeat(9_000_000) }), // over workerd's ~8 MiB SQLite row size limit
     ]) {
       expect((await publish(stub, payload)).status).toBe(400)
     }
