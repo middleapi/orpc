@@ -18,8 +18,6 @@ interface Props {
 const { items, currentRoute, strings } = Astro.props;
 ---
 
-{/* Below `lg` the header has no inline tab bar, so the drawer lists the
-    sections above the page tree. RootLayout hides this component from `lg`. */}
 <SectionsNav
   class="mb-4 border-border border-b pb-4"
   currentRoute={currentRoute}

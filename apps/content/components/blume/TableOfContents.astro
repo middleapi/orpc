@@ -1,6 +1,6 @@
 ---
 import type { Heading } from "blume/core/types.ts";
-import Icon from "blume/components/Icon.astro";
+import BlumeTableOfContents from "blume/components/layout/TableOfContents.astro";
 import CoffeeCard from "../../sponsors/CoffeeCard.astro";
 
 interface Props {
@@ -16,45 +16,21 @@ interface Props {
 }
 
 const { headings, title, variant } = Astro.props;
-// The mobile dropdown also holds what the layout passes as children (the
-// mount the page actions move into below `xl`, where the rail that renders
-// them is hidden), so a page with actions but no headings still gets it.
-const hasChildren = Astro.slots.has("default");
 ---
 
 {
-  (headings.length > 0 || hasChildren) && variant === "mobile" && (
-    <details class="group mx-auto mb-6 max-w-content rounded-blume border border-border xl:hidden">
-      <summary class="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 font-medium text-foreground text-sm [&::-webkit-details-marker]:hidden">
-        <span>{title}</span>
-        <Icon
-          class="text-muted-foreground transition-transform group-open:rotate-180"
-          name="chevron-down"
-          size={16}
-        />
-      </summary>
-      {headings.length > 0 && (
-        <blume-toc class="block">
-          <ul class="m-0 list-none border-border border-t p-2">
-            {headings.map((heading) => (
-              <li
-                data-depth={heading.depth}
-                style={`padding-inline-start:${(heading.depth - 2) * 0.75}rem`}
-              >
-                <a
-                  class="block rounded-md px-2 py-1.5 text-muted-foreground text-sm transition-colors hover:text-foreground aria-[current=location]:font-medium aria-[current=location]:text-foreground"
-                  href={`#${heading.slug}`}
-                >
-                  {heading.text}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </blume-toc>
-      )}
-      <slot />
-    </details>
-  )
+  // Only the desktop rail is customized; the mobile dropdown is Blume's own.
+  // The layout's children (the mount the page actions move into below `xl`)
+  // are passed through only when given, since Blume renders the dropdown for
+  // them even on a page without headings.
+  variant === "mobile" &&
+    (Astro.slots.has("default") ? (
+      <BlumeTableOfContents headings={headings} title={title} variant="mobile">
+        <slot />
+      </BlumeTableOfContents>
+    ) : (
+      <BlumeTableOfContents headings={headings} title={title} variant="mobile" />
+    ))
 }
 {
   headings.length > 0 && variant === "desktop" && (

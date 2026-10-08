@@ -3,7 +3,6 @@ import { defineConfig } from 'blume'
 import { posthog } from 'blume/analytics'
 import { cloudflare } from 'blume/deploy'
 import { filesystem } from 'blume/sources'
-import { searchCodeIndexPlugin } from './search/code-index'
 import { sponsorAdsInjectPlugin } from './sponsors/inject'
 
 export default defineConfig({
@@ -44,6 +43,9 @@ export default defineConfig({
       body: 'inter',
     },
   },
+  // The pages are code-first: index fenced code too, so a query for the API a
+  // snippet demonstrates finds the page (and the MCP `search_docs` tool does too).
+  search: { indexing: { includeCodeBlocks: true } },
   lastModified: 'git',
   navigation: {
     // The owned header links the repository, so keep it out of Blume's site
@@ -152,7 +154,8 @@ export default defineConfig({
       // Blume's PageLayout (used by the custom blog pages) imports the built-in
       // Header directly and has no layout-slot support, so the owned header in
       // components/blume/ is swapped in with a Vite alias that both RootLayout
-      // and PageLayout resolve. It carries the "More" dropdown tab support.
+      // and PageLayout resolve. It carries the VitePress-style tab bar from
+      // `lg`, the X and GitHub links, and the oRPC drawer on chrome-only pages.
       name: 'header-override',
       hooks: {
         'astro:config:setup': ({ updateConfig }) => {
@@ -179,13 +182,10 @@ export default defineConfig({
       },
     },
     {
-      // Blume drops fenced code from the search index; fold it back in so the
-      // code-first docs are searchable by the API they demonstrate.
-      name: 'search-code-index',
+      // Render the matched passage in the search preview pane the way the page does.
+      name: 'search-page-preview',
       hooks: {
-        'astro:config:setup': ({ updateConfig, injectScript }) => {
-          updateConfig({ vite: { plugins: [searchCodeIndexPlugin()] } })
-          // Render the matched passage in the preview pane the way the page does.
+        'astro:config:setup': ({ injectScript }) => {
           const clientPath = fileURLToPath(new URL('./search/page-preview.ts', import.meta.url))
           injectScript('page', `import '${clientPath.replaceAll('\\', '\\\\').replaceAll('\'', '\\\'')}'`)
         },

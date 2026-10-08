@@ -5,11 +5,7 @@ import { withBase } from "blume/components/islands/base-path.ts";
 import type { ComponentOverride } from "blume/core/define-components.ts";
 import { EN_UI } from "blume/core/i18n-ui.ts";
 import type { UIStrings } from "blume/core/i18n-ui.ts";
-import type {
-  LocaleSwitchOption,
-  Navigation,
-  NavSelector as NavSelectorConfig,
-} from "blume/core/types.ts";
+import type { LocaleSwitchOption, Navigation } from "blume/core/types.ts";
 import { GITHUB_MARK } from "blume/components/github-mark.ts";
 import Icon from "blume/components/Icon.astro";
 import LanguageSwitcher from "blume/components/layout/LanguageSwitcher.astro";
@@ -60,16 +56,8 @@ interface Props {
   /** Localized chrome labels (nav toggle, sections, GitHub, theme toggle). */
   navStrings?: UIStrings["nav"];
   localeSwitch?: LocaleSwitchOption[];
-  /**
-   * Auto-populated version switcher, rendered ahead of the configured
-   * selectors. `null`/absent when versioning is off — or when the user
-   * declares their own `kind: "version"` selector, which then owns the UI.
-   */
-  versionSelector?: NavSelectorConfig | null;
   /** Active locale for per-language search filtering. */
   searchLocale?: string;
-  /** Viewed docs version for search filtering (`""` = current; `null`/absent = off). */
-  searchVersion?: string | null;
   /**
    * Layout-slot overrides forwarded from the root layout. The header honors
    * `Logo` and `Search` here so those pieces can be replaced without swapping
@@ -96,9 +84,7 @@ const {
   switcherStrings,
   navStrings,
   localeSwitch,
-  versionSelector,
   searchLocale,
-  searchVersion = null,
   layout = {},
 } = Astro.props;
 
@@ -111,11 +97,10 @@ const LogoSlot = resolveSlot(layout.Logo, Logo);
 const SearchSlot = resolveSlot(layout.Search, Search);
 
 // The mobile nav-toggle opens a drawer of navigation. On docs pages that drawer
-// is the sidebar tree (`hasSidebar`); on chrome-only pages (a landing page via
-// PageLayout) it's a tabs-only drawer the layout renders — so the button is also
+// is RootLayout's sidebar (`hasSidebar`); on chrome-only pages (a landing page
+// via PageLayout) it's the tabs-only drawer below — so the button is also
 // needed whenever there are tabs to reveal.
 const showNavToggle = hasDrawer && (hasSidebar || navigation.tabs.length > 0);
-// Docs pages open RootLayout's drawer; chrome-only pages open the one below.
 const drawerId = hasSidebar ? "blume-nav-drawer" : "orpc-nav-drawer";
 const activeTab = activeTabForRoute(navigation.tabs, route);
 // Where the header's inline tab bar appears: from `lg` on every page, since
@@ -143,16 +128,20 @@ const iconButton =
 // The mobile drawer sits below the sticky header, but the banner above the
 // header has no fixed height (its text wraps), so the drawer's top offset can't
 // be static: on open we measure the header's on-screen bottom edge into
-// `--blume-drawer-top` (read by the drawer's `top`/`height`), lock page scroll
-// so the offset can't drift while open, and re-measure when a banner dismiss or
-// a resize/rotation moves the header. Crossing into the desktop breakpoint
-// (64rem, Tailwind `lg`) closes the drawer so the scroll lock can't outlive it.
-// The lock itself, Escape to close, and the inert page behind the drawer
-// follow `data-blume-nav-open` from Blume's layouts (drawer-inert.ts).
+// `--blume-drawer-top` (read by the drawer's `top`/`height`) and re-measure
+// when a banner dismiss or a resize/rotation moves the header; Blume's theme
+// locks page scroll while `data-blume-nav-open` is set, so the offset can't
+// drift. Crossing into the desktop breakpoint (64rem, Tailwind `lg`) closes the
+// drawer so the scroll lock can't outlive it. The toggle's `aria-expanded`,
+// Escape to close, and the inert page behind the drawer follow the same
+// attribute from the layouts' drawer-inert.ts.
 //
 // It also flags Apple platforms (`data-orpc-apple`) so the search trigger in
-// theme.css shows the shortcut as ⌘K rather than Ctrl K.
-const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-blume-header]");if(h){document.documentElement.style.setProperty("--blume-drawer-top",h.getBoundingClientRect().bottom+"px");}};const save=(k,v)=>{try{localStorage.setItem(k,v);}catch{}};document.addEventListener("click",(e)=>{const t=e.target.closest("[data-blume-theme-toggle]");if(t){const d=document.documentElement;const next=d.dataset.theme==="dark"?"light":"dark";const s=document.createElement("style");s.appendChild(document.createTextNode("*,*::before,*::after{transition:none!important}"));document.head.appendChild(s);d.dataset.theme=next;window.getComputedStyle(d).opacity;setTimeout(()=>document.head.removeChild(s),1);save("blume-theme",next);}const n=e.target.closest("[data-blume-nav-toggle]");if(n){const d=document.documentElement;const open=d.toggleAttribute("data-blume-nav-open");if(open){dr();}}const b=e.target.closest("[data-blume-banner-dismiss]");if(b){document.documentElement.setAttribute("data-blume-banner-hidden","");requestAnimationFrame(dr);const bar=b.closest("[data-blume-banner]");const k=bar&&bar.getAttribute("data-banner-key");if(k){save("blume-banner:"+k,"1");}}});addEventListener("resize",()=>{const d=document.documentElement;if(!d.hasAttribute("data-blume-nav-open")){return;}if(matchMedia("(min-width:64rem)").matches){d.removeAttribute("data-blume-nav-open");}else{dr();}});if(/mac|iphone|ipad|ipod/iu.test(navigator.platform)){document.documentElement.setAttribute("data-orpc-apple","");}})();`;
+// theme.css shows the shortcut as ⌘K rather than Ctrl K. The client router
+// replaces <html>'s attributes on every navigation and doesn't re-run this
+// script, so the flag is stamped onto the incoming page before each swap, the
+// way Blume carries its theme and banner state.
+const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-blume-header]");if(h){document.documentElement.style.setProperty("--blume-drawer-top",h.getBoundingClientRect().bottom+"px");}};const save=(k,v)=>{try{localStorage.setItem(k,v);}catch{}};document.addEventListener("click",(e)=>{const t=e.target.closest("[data-blume-theme-toggle]");if(t){const d=document.documentElement;const next=d.dataset.theme==="dark"?"light":"dark";const s=document.createElement("style");s.appendChild(document.createTextNode("*,*::before,*::after{transition:none!important}"));document.head.appendChild(s);d.dataset.theme=next;window.getComputedStyle(d).opacity;setTimeout(()=>document.head.removeChild(s),1);save("blume-theme",next);}const n=e.target.closest("[data-blume-nav-toggle]");if(n){const d=document.documentElement;const open=d.toggleAttribute("data-blume-nav-open");if(open){dr();}}const b=e.target.closest("[data-blume-banner-dismiss]");if(b){document.documentElement.setAttribute("data-blume-banner-hidden","");requestAnimationFrame(dr);const bar=b.closest("[data-blume-banner]");const k=bar&&bar.getAttribute("data-banner-key");if(k){save("blume-banner:"+k,"1");}}});addEventListener("resize",()=>{const d=document.documentElement;if(!d.hasAttribute("data-blume-nav-open")){return;}if(matchMedia("(min-width:64rem)").matches){d.removeAttribute("data-blume-nav-open");}else{dr();}});if(/mac|iphone|ipad|ipod/iu.test(navigator.platform)){document.documentElement.setAttribute("data-orpc-apple","");document.addEventListener("astro:before-swap",(e)=>{e.newDocument.documentElement.setAttribute("data-orpc-apple","");});}})();`;
 ---
 
 <header
@@ -230,11 +219,6 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
   }
   <div class="flex-1"></div>
   {
-    versionSelector && (
-      <NavSelector align="end" route={route} selector={versionSelector} />
-    )
-  }
-  {
     navigation.selectors.length > 0 && (
       <div class="flex items-center gap-1.5">
         {navigation.selectors.map((selector) => (
@@ -260,7 +244,6 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
         navigation={navigation}
         popularPages={data.config.search.popular}
         strings={searchStrings}
-        version={searchVersion}
       />
     )
   }
@@ -322,11 +305,8 @@ const clickScript = `(()=>{const dr=()=>{const h=document.querySelector("[data-b
 </div>
 </header>
 {
-  // Chrome-only pages (blog, custom landings via PageLayout) have no sidebar
-  // drawer, and PageLayout's built-in tabs drawer is hidden in theme.css so the
-  // section list matches the docs drawer's (SectionsNav) — this drawer, using
-  // the same nav-toggle machinery, takes its place. `data-orpc-drawer` keeps
-  // it exempt from that hiding rule.
+  // The tabs-only drawer for chrome-only pages (blog, custom landings via
+  // PageLayout); it stands in for PageLayout's built-in one (see theme.css).
   hasDrawer && !hasSidebar && navigation.tabs.length > 0 && (
     <aside
       aria-label={n.navigation}

@@ -272,18 +272,16 @@ main#blume-content {
    pink — a tip then reads as an alarm, barely distinguishable from the red
    `:::danger` blocks. Green instead (GitHub's alert convention), drawn like
    Blume's own `:::success` variant; the docs use no `success` callouts for it
-   to collide with. */
+   to collide with. Re-pointing the accent inside the callout recolors its
+   icon; the tint and border are set outright for the success variant's mix. */
 aside[data-blume-callout='tip'] {
+  --blume-accent: var(--color-green-700);
   border-color: color-mix(in oklab, var(--color-green-500) 25%, transparent);
   background-color: color-mix(in oklab, var(--color-green-500) 10%, transparent);
 }
 
-aside[data-blume-callout='tip'] [class~='text-accent'] {
-  color: var(--color-green-700);
-}
-
-:root[data-theme='dark'] aside[data-blume-callout='tip'] [class~='text-accent'] {
-  color: var(--color-green-400);
+:root[data-theme='dark'] aside[data-blume-callout='tip'] {
+  --blume-accent: var(--color-green-400);
 }
 
 /* Search trigger: wide, quiet gray box like the reference header. Blume
@@ -314,6 +312,7 @@ aside[data-blume-callout='tip'] [class~='text-accent'] {
     justify-content: flex-start;
     gap: 0.5rem;
     font-size: 0.875rem;
+    /* Tailwind's `text-sm` ratio, as the old label and shortcut inherited it. */
     line-height: calc(1.25 / 0.875);
   }
 
