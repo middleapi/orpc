@@ -252,7 +252,7 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
       expect(listener).toHaveBeenCalledTimes(500)
     })
 
-    const streamIds = (await redis.xRange(`${prefix}${event}`, '-', '+')).map(entry => entry.id)
+    const streamIds = (await redis.xRange(`${prefix}${event}`, '-', '+'))!.map(entry => entry.id)
     expect(listener.mock.calls.map(([payload]) => getEventMeta(payload)?.id)).toEqual(streamIds)
 
     await unsubscribe()
@@ -319,13 +319,13 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
       publisher.publish(event, { order: 3 }),
     ])
 
-    const beforeCleanup = await redis.xRange(key, '-', '+')
+    const beforeCleanup = (await redis.xRange(key, '-', '+'))!
     expect(beforeCleanup.length).toBe(3)
 
     await sleep(1100)
     await publisher.publish(event, { order: 4 })
 
-    const afterCleanup = await redis.xRange(key, '-', '+')
+    const afterCleanup = (await redis.xRange(key, '-', '+'))!
     expect(afterCleanup.length).toBe(1)
 
     const ttl = await redis.ttl(key)

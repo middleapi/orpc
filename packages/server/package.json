@@ -151,10 +151,10 @@
     "cookie": "^2.0.1"
   },
   "devDependencies": {
-    "crossws": "^0.4.6",
-    "fastify": "^5.12.1",
-    "supertest": "^7.2.2",
-    "ws": "^8.21.3",
-    "zod": "^4.5.4"
+    "crossws": "^0.4.15",
+    "fastify": "^5.12.5",
+    "supertest": "^7.3.1",
+    "ws": "^8.22.0",
+    "zod": "^4.6.5"
   }
 }

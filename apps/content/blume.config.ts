@@ -1,5 +1,8 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'blume'
+import { posthog } from 'blume/analytics'
+import { cloudflare } from 'blume/deploy'
+import { filesystem } from 'blume/sources'
 import { searchCodeIndexPlugin } from './search/code-index'
 import { sponsorAdsInjectPlugin } from './sponsors/inject'
 
@@ -14,14 +17,13 @@ export default defineConfig({
   },
   content: {
     sources: [
-      {
-        type: 'filesystem',
+      filesystem({
         root: '.',
         include: [
           'docs/**/*.{md,mdx}',
           'blog/**/*.{md,mdx}',
         ],
-      },
+      }),
     ],
   },
   github: {
@@ -42,8 +44,11 @@ export default defineConfig({
       body: 'inter',
     },
   },
-  lastModified: true,
+  lastModified: 'git',
   navigation: {
+    // The owned header links the repository, so keep it out of Blume's site
+    // footer, where it would be the only thing left to render.
+    repo: false,
     sidebar: {
       display: 'group',
     },
@@ -67,17 +72,15 @@ export default defineConfig({
       },
     ],
   },
-  analytics: {
-    posthog: {
+  analytics: [
+    posthog({
       /** Reverse proxy on our own domain, so ad blockers don't drop events. */
       host: 'https://poho.orpc.dev',
       key: 'phc_YHeqjC9tR604AHH45kQi63fT4aBvpsS7zAaCxntBzZm',
-    },
-    scripts: [
-      /** A reverse proxy requires `ui_host`, and Blume has no option for it. */
-      { content: 'posthog.set_config({ ui_host: "https://us.posthog.com" })' },
-    ],
-  },
+      /** A reverse proxy requires `ui_host` so PostHog links open the real app. */
+      ui_host: 'https://us.posthog.com',
+    }),
+  ],
 
   seo: {
     x: { creator: '@middleapi', handle: '@middleapi' },
@@ -202,15 +205,13 @@ export default defineConfig({
       },
     },
   ],
-  ai: {
+  agents: {
     mcp: {
       enabled: true,
     },
     skills: '../../skills',
   },
-  deployment: {
-    output: 'server',
-    adapter: 'cloudflare',
+  deployment: cloudflare({
     site: 'https://orpc.dev',
-  },
+  }),
 })

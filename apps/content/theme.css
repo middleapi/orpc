@@ -270,32 +270,69 @@ main#blume-content {
 
 /* Blume tints `:::tip` blocks with the accent color, which here is the brand
    pink — a tip then reads as an alarm, barely distinguishable from the red
-   `:::danger` blocks. Green instead (GitHub's alert convention); the docs use
-   no `success`/`check` callouts for it to collide with. Matched on Blume's own
-   accent utilities, the only marker the tip variant leaves in the markup. */
-aside[class~='bg-accent/10'] {
+   `:::danger` blocks. Green instead (GitHub's alert convention), drawn like
+   Blume's own `:::success` variant; the docs use no `success` callouts for it
+   to collide with. */
+aside[data-blume-callout='tip'] {
   border-color: color-mix(in oklab, var(--color-green-500) 25%, transparent);
   background-color: color-mix(in oklab, var(--color-green-500) 10%, transparent);
 }
 
-aside[class~='bg-accent/10'] [class~='text-accent'] {
-  color: var(--color-green-600);
+aside[data-blume-callout='tip'] [class~='text-accent'] {
+  color: var(--color-green-700);
 }
 
-:root[data-theme='dark'] aside[class~='bg-accent/10'] [class~='text-accent'] {
+:root[data-theme='dark'] aside[data-blume-callout='tip'] [class~='text-accent'] {
   color: var(--color-green-400);
 }
 
-/* Search trigger: wide, quiet gray box like the reference header */
+/* Search trigger: wide, quiet gray box like the reference header. Blume
+   renders an icon-only button, so from lg the label comes from its
+   `data-label` and the shortcut hint from the platform flag the owned
+   header sets (`data-orpc-apple`); below lg it stays an icon button. */
 [data-blume-search-open] {
   height: 2.375rem;
-  border-color: transparent;
+  border: 1px solid transparent;
   border-radius: 0.5rem;
   background: var(--blume-muted);
 }
 
 [data-blume-search-open]:hover {
   border-color: var(--blume-border);
+}
+
+@media (min-width: 64rem) {
+  [data-blume-search-open] {
+    width: auto;
+    min-width: 10rem;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    padding-inline: 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  [data-blume-search-open] > svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  [data-blume-search-open]::before {
+    content: attr(data-label);
+    order: 1;
+    flex: 1;
+    text-align: start;
+  }
+
+  [data-blume-search-open]::after {
+    content: 'Ctrl K';
+    order: 2;
+    font-family: var(--blume-font-mono);
+    font-size: 0.7rem;
+  }
+
+  :root[data-orpc-apple] [data-blume-search-open]::after {
+    content: '⌘K';
+  }
 }
 
 /* The page-actions popovers (Export, Connect to MCP) are up to 22rem
@@ -308,11 +345,13 @@ aside[class~='bg-accent/10'] [class~='text-accent'] {
   max-width: none;
 }
 
-/* The built-in drawer section lists can't render dropdown-tab items
-   (the "More" menu), so the overrides supply their own: MobileNav inside
-   the docs drawer, and the header's own drawer (data-orpc-drawer) on
-   chrome-only PageLayout pages, whose built-in drawer sits directly
-   under <body> and is hidden wholesale here. */
+/* The built-in drawer section lists are drawn for Blume's own header (the
+   docs one hides from md, where the owned header's tab bar only starts at
+   lg), so the overrides supply their own, with a dropdown tab (the "More"
+   menu) expanded into a labeled group: MobileNav inside the docs drawer, and
+   the header's own drawer (data-orpc-drawer) on chrome-only PageLayout pages,
+   whose built-in drawer sits directly under <body> and is hidden wholesale
+   here. */
 [data-blume-nav-drawer]:not([data-orpc-drawer]) > nav:not([data-blume-nav-tree]) {
   display: none;
 }

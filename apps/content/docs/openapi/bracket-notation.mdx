@@ -25,7 +25,7 @@ description: "Learn how bracket notation encodes structured data like nested obj
    color[0]=red&color[2]=blue -> { color: ['red', <empty>, 'blue'] }
    ```
 
-   ::: info
+   :::info
    Missing indexes create sparse arrays.
 
    Explicit indexes greater than `999` are treated as object keys by default to avoid huge sparse arrays during deserialization. To change that limit, configure `maxExplicitDeserializingArrayIndex`:

@@ -258,7 +258,6 @@ describe('ProcedureUtils', () => {
           initialData: { pageParams: [], pages: [] },
         }))
 
-        // @ts-expect-error - TODO: fix this, seem svelte-query do not understand initialData
         expectTypeOf(query.data).toEqualTypeOf<{ mapped: InfiniteData<UtilsOutput, number> }>()
         expectTypeOf(query.error).toEqualTypeOf<UtilsError | null>()
       })

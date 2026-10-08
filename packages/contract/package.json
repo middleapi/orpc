@@ -59,8 +59,8 @@
     "@standard-schema/spec": "^1.1.0"
   },
   "devDependencies": {
-    "arktype": "^2.2.1",
+    "arktype": "^2.2.7",
     "valibot": "^1.5.0",
-    "zod": "^4.5.4"
+    "zod": "^4.6.5"
   }
 }

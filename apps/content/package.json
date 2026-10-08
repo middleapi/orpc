@@ -9,10 +9,10 @@
     "docs:validate": "blume validate --strict"
   },
   "devDependencies": {
-    "@astrojs/cloudflare": "^14.2.3",
-    "@opentelemetry/instrumentation": "^0.221.0",
-    "@opentelemetry/sdk-node": "^0.221.0",
-    "@opentelemetry/sdk-trace-web": "^2.10.0",
+    "@astrojs/cloudflare": "^14.3.4",
+    "@opentelemetry/instrumentation": "^0.223.0",
+    "@opentelemetry/sdk-node": "^0.223.0",
+    "@opentelemetry/sdk-trace-web": "^2.12.0",
     "@orpc/arktype": "workspace:*",
     "@orpc/client": "workspace:*",
     "@orpc/contract": "workspace:*",
@@ -27,15 +27,15 @@
     "@orpc/shared": "workspace:*",
     "@orpc/valibot": "workspace:*",
     "@orpc/zod": "workspace:*",
-    "@tanstack/react-query": "^5.101.4",
-    "@tanstack/solid-query": "^5.101.4",
-    "@tanstack/svelte-query": "^6.1.38",
-    "@tanstack/vue-query": "^5.101.4",
-    "@types/node": "^26.2.0",
-    "blume": "^1.5.3",
-    "effect": "^4.0.0",
-    "pino": "^10.3.1",
+    "@tanstack/react-query": "^5.104.1",
+    "@tanstack/solid-query": "^5.104.1",
+    "@tanstack/svelte-query": "^6.3.1",
+    "@tanstack/vue-query": "^5.104.1",
+    "@types/node": "^26.6.4",
+    "blume": "^2.2.1",
+    "effect": "^4.0.1",
+    "pino": "^10.4.0",
     "superjson": "^2.2.6",
-    "zod": "^4.5.4"
+    "zod": "^4.6.5"
   }
 }

@@ -91,7 +91,7 @@ export const Loading: Story = {
 
 ## Passthrough
 
-The `.passthrough` method creates an MSW request handler that performs matching requests against the real server as-is, useful to exempt specific procedures from mocking, for example while [onUnhandledRequest](https://mswjs.io/docs/api/setup-server/listen#onunhandledrequest) treats everything else as an error:
+The `.passthrough` method creates an MSW request handler that performs matching requests against the real server as-is, useful to exempt specific procedures from mocking, for example while [onUnhandledFrame](https://mswjs.io/docs/api/setup-server/listen) (`onUnhandledRequest` before MSW 3) treats everything else as an error:
 
 ```ts
 const handlers = [

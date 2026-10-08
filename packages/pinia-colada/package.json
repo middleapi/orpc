@@ -57,10 +57,10 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "@pinia/colada": "^1.4.2",
-    "@vue/test-utils": "^2.4.11",
-    "pinia": "^4.0.2",
-    "vue": "^3.5.41",
-    "zod": "^4.5.4"
+    "@pinia/colada": "^1.4.7",
+    "@vue/test-utils": "^2.5.1",
+    "pinia": "^4.0.3",
+    "vue": "^3.5.43",
+    "zod": "^4.6.5"
   }
 }

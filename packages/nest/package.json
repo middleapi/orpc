@@ -71,15 +71,15 @@
     "@standard-server/node": "~0.10.1"
   },
   "devDependencies": {
-    "@fastify/cookie": "^11.0.2",
-    "@nestjs/common": "^12.0.1",
-    "@nestjs/core": "^12.0.1",
-    "@nestjs/platform-express": "^12.0.1",
-    "@nestjs/platform-fastify": "^12.0.1",
-    "@nestjs/testing": "^12.0.1",
+    "@fastify/cookie": "^11.1.2",
+    "@nestjs/common": "^12.1.2",
+    "@nestjs/core": "^12.1.2",
+    "@nestjs/platform-express": "^12.1.2",
+    "@nestjs/platform-fastify": "^12.1.2",
+    "@nestjs/testing": "^12.1.2",
     "@types/express": "^5.0.6",
     "express": "^5.2.1",
-    "fastify": "^5.12.1",
+    "fastify": "^5.12.5",
     "rxjs": "^7.8.2"
   }
 }

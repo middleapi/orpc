@@ -72,7 +72,7 @@ Sometimes you need to import the contract on the client, for example when using 
     fs.writeFileSync('./contract.json', JSON.stringify(minifiedRouter))
     ```
 
-    ::: info
+    :::info
     `minifyRouterContract` preserves only the metadata needed by the client; all other data is stripped out.
     :::
 
@@ -84,7 +84,7 @@ Sometimes you need to import the contract on the client, for example when using 
     const link = new OpenAPILink(contract as typeof router)
     ```
 
-    ::: info
+    :::info
     Cast `contract` to `typeof router` to preserve type safety, since standard schema types cannot be serialized to JSON and must be cast manually.
     :::
 
