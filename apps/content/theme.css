@@ -291,7 +291,9 @@ aside[data-blume-callout='tip'] [class~='text-accent'] {
    `data-label` and the shortcut hint from the platform flag the owned
    header sets (`data-orpc-apple`); below lg it stays an icon button. */
 [data-blume-search-open] {
+  width: auto;
   height: 2.375rem;
+  padding-inline: 0.75rem;
   border: 1px solid transparent;
   border-radius: 0.5rem;
   background: var(--blume-muted);
@@ -301,19 +303,18 @@ aside[data-blume-callout='tip'] [class~='text-accent'] {
   border-color: var(--blume-border);
 }
 
+[data-blume-search-open] > svg {
+  width: 1rem;
+  height: 1rem;
+}
+
 @media (min-width: 64rem) {
   [data-blume-search-open] {
-    width: auto;
     min-width: 10rem;
     justify-content: flex-start;
     gap: 0.5rem;
-    padding-inline: 0.75rem;
     font-size: 0.875rem;
-  }
-
-  [data-blume-search-open] > svg {
-    width: 1rem;
-    height: 1rem;
+    line-height: calc(1.25 / 0.875);
   }
 
   [data-blume-search-open]::before {
