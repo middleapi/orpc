@@ -5,9 +5,10 @@ import NavTree from "./NavTree.astro";
 import SectionsNav from "./SectionsNav.astro";
 
 // The nav shown inside the docs mobile drawer. RootLayout's own drawer tab
-// list renders dropdown tabs (`items`) as dead links, so it is hidden in
-// theme.css and this component lists the sections itself — expanding a
-// dropdown tab (the "More" menu) into a labeled group — above the page tree.
+// list can't render dropdown tabs (`items`) — drawer-tabs.ts drops them from
+// it — so it is hidden in theme.css and this component lists the sections
+// itself, expanding a dropdown tab (the "More" menu) into a labeled group,
+// above the page tree.
 interface Props {
   items: NavNode[];
   currentRoute: string;

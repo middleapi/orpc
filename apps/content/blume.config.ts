@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'blume'
+import { drawerTabsPlugin } from './components/blume/drawer-tabs'
 import { searchCodeIndexPlugin } from './search/code-index'
 import { sponsorAdsInjectPlugin } from './sponsors/inject'
 
@@ -161,6 +162,16 @@ export default defineConfig({
               },
             },
           })
+        },
+      },
+    },
+    {
+      // The built-in drawer section lists link dropdown tabs ("More") to an
+      // unrelated page; drop them there, SectionsNav lists their items.
+      name: 'drawer-tabs',
+      hooks: {
+        'astro:config:setup': ({ updateConfig }) => {
+          updateConfig({ vite: { plugins: [drawerTabsPlugin()] } })
         },
       },
     },
