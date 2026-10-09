@@ -307,53 +307,95 @@ describe('bracket notation serializer', () => {
       expect(serializer.deserialize([['a[1.5]', 1]])).toEqual({ a: { 1.5: 1 } })
     })
 
-    it('fallback to object when explicit array index exceeds maxExplicitDeserializingArrayIndex (default 999)', () => {
-      expect(serializer.deserialize([
-        ['arr[1]', 1],
-        ['arr[999]', 2],
-        ['arr[1000]', 3],
-      ])).toEqual({ arr: { 1: 1, 999: 2, 1000: 3 } })
+    describe('maxDeserializingEmptySlots', () => {
+      const noEmptySlotsSerializer = new BracketNotationSerializer({ maxDeserializingEmptySlots: 0 })
 
-      expect(serializer.deserialize([
-        ['arr[999]', 3],
-      ])).toEqual({ arr: (() => {
-        const arr = []
-        arr[999] = 3
+      function sparse(entries: [number, unknown][]): unknown[] {
+        const arr: unknown[] = []
+        for (const [i, v] of entries) {
+          arr[i] = v
+        }
         return arr
-      })() })
+      }
 
-      expect(serializer.deserialize([
-        ['arr[1000]', 3],
-      ])).toEqual({ arr: { 1000: 3 } })
+      it('allows up to 1000 empty slots by default', () => {
+        expect(serializer.deserialize([['arr[1000]', 1]])).toEqual({ arr: sparse([[1000, 1]]) })
+        expect(serializer.deserialize([['arr[1001]', 1]])).toEqual({ arr: { 1001: 1 } })
 
-      // the limit not apply to push array syntax
-      expect(serializer.deserialize([
-        ['arr[999]', 3],
-        ['arr', 4],
-      ])).toEqual({
-        arr: (() => {
-          const arr = []
-          arr[999] = 3
-          arr[1000] = 4
-          return arr
-        })(),
+        // 1 + 997 empty slots, leaving 2, then arr[1003] needs 3
+        expect(serializer.deserialize([
+          ['arr[1]', 1],
+          ['arr[999]', 2],
+          ['arr[1003]', 3],
+        ])).toEqual({ arr: { 1: 1, 999: 2, 1003: 3 } })
       })
 
-      const customSerializer = new BracketNotationSerializer({ maxExplicitDeserializingArrayIndex: 499 })
+      it('counts empty slots only when an index skips past the end of an array', () => {
+        expect(noEmptySlotsSerializer.deserialize(
+          Array.from({ length: 2000 }, (_, i) => [`arr[${i}]`, i] as [string, unknown]),
+        )).toEqual({ arr: Array.from({ length: 2000 }, (_, i) => i) })
 
-      expect(customSerializer.deserialize([
-        ['arr[1]', 1],
-        ['arr[499]', 2],
-        ['arr[500]', 3],
-      ])).toEqual({ arr: { 1: 1, 499: 2, 500: 3 } })
+        expect(noEmptySlotsSerializer.deserialize([
+          ['arr[0]', 1],
+          ['arr[0]', 2],
+          ['arr[1][a]', 3],
+          ['arr[1][b]', 4],
+        ])).toEqual({ arr: [[1, 2], { a: 3, b: 4 }] })
 
-      expect(customSerializer.deserialize([
-        ['arr[499]', 2],
-      ])).toEqual({ arr: (() => {
-        const arr = []
-        arr[499] = 2
-        return arr
-      })() })
+        // arr[1] leaves arr[0] empty, so even filling it later cannot keep the array
+        expect(noEmptySlotsSerializer.deserialize([
+          ['arr[1]', 2],
+          ['arr[0]', 1],
+        ])).toEqual({ arr: { 0: 1, 1: 2 } })
+
+        expect(new BracketNotationSerializer({ maxDeserializingEmptySlots: 1 }).deserialize([
+          ['arr[1]', 2],
+          ['arr[0]', 1],
+        ])).toEqual({ arr: [1, 2] })
+      })
+
+      it('shares the budget across all arrays in a single deserialization', () => {
+        expect(serializer.deserialize([
+          ['a[600]', 1],
+          ['b[400]', 2],
+          ['c[1]', 3],
+          ['d[0]', 4],
+        ])).toEqual({
+          a: sparse([[600, 1]]),
+          b: sparse([[400, 2]]),
+          c: { 1: 3 },
+          d: [4],
+        })
+
+        expect(serializer.deserialize([
+          ['a[0][600]', 1],
+          ['a[1][400]', 2],
+          ['a[2][1]', 3],
+        ])).toEqual({
+          a: [
+            sparse([[600, 1]]),
+            sparse([[400, 2]]),
+            { 1: 3 },
+          ],
+        })
+      })
+
+      it('resets the budget for each deserialization', () => {
+        expect(serializer.deserialize([['arr[1000]', 1]])).toEqual({ arr: sparse([[1000, 1]]) })
+        expect(serializer.deserialize([['arr[1000]', 1]])).toEqual({ arr: sparse([[1000, 1]]) })
+      })
+
+      it('does not apply to push-style notation', () => {
+        expect(noEmptySlotsSerializer.deserialize([
+          ['arr[]', 1],
+          ['arr[]', 2],
+        ])).toEqual({ arr: [1, 2] })
+
+        expect(noEmptySlotsSerializer.deserialize([
+          ['arr[0]', 1],
+          ['arr', 2],
+        ])).toEqual({ arr: [1, 2] })
+      })
     })
 
     it('does not allocate huge arrays for memory exhaustion attacks', () => {

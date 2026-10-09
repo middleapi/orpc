@@ -348,16 +348,16 @@ describe('openAPISerializer', () => {
     })
 
     it('passes BracketNotationSerializerOptions to BracketNotationSerializer', () => {
-      const s = new OpenAPISerializer({ bracketNotation: { maxExplicitDeserializingArrayIndex: 0 } })
+      const s = new OpenAPISerializer({ bracketNotation: { maxDeserializingEmptySlots: 0 } })
 
-      // index 1 exceeds the limit of 0, so the array should be deserialized as an object
+      // index 2 would leave tags[1] empty, exceeding the budget of 0, so the array should be deserialized as an object
       const form = new FormData()
       form.append('tags[0]', 'a')
-      form.append('tags[1]', 'b')
+      form.append('tags[2]', 'b')
       const result = s.deserialize(form) as any
       expect(Array.isArray(result.tags)).toBe(false)
       expect(result.tags['0']).toBe('a')
-      expect(result.tags['1']).toBe('b')
+      expect(result.tags['2']).toBe('b')
     })
   })
 

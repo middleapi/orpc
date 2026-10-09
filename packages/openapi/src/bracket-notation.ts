@@ -3,28 +3,29 @@ import { getOwn, isPlainObject, NullProtoObj, setOwn } from '@orpc/shared'
 
 export type BracketNotationSerializeResult = [string, unknown][]
 
+const INTEGER_PATTERN = /^0$|^[1-9]\d*$/
+
 export interface BracketNotationSerializerOptions {
   /**
-   * Maximum explicit array index allowed during deserialization (e.g., `arr[0]`, `arr[999]`).
-   * If the index exceeds this limit, the array is deserialized as an object instead.
+   * Maximum total number of empty slots that explicit array indexes may create during a single
+   * deserialization (e.g., `arr[5]` on an empty array creates 5 empty slots). Once the budget is
+   * spent, any array that would need more empty slots is deserialized as an object instead.
    *
-   * This guards against memory exhaustion attacks where malicious input uses extremely large
-   * indices (e.g., `?arr[4294967296]=value`). Although orpc uses sparse arrays handle large indices
-   * efficiently, downstream code may inadvertently densify them - creating millions of
-   * undefined slots and exhausting memory.
+   * This guards against memory exhaustion attacks where malicious input uses large indexes
+   * (e.g., `?arr[4294967294]=value`) or many sparse arrays (e.g., `?a[999]=1&b[999]=1&...`).
+   * Although sparse arrays store large indexes cheaply, downstream code may inadvertently
+   * densify them, creating millions of undefined slots and exhausting memory.
    *
-   * NOTE: Does not apply to append-style notation (e.g., `arr[]`).
-   *
-   * @default 999 (array with 1,000 elements)
+   * @default 1000
    */
-  maxExplicitDeserializingArrayIndex?: number
+  maxDeserializingEmptySlots?: number
 }
 
 export class BracketNotationSerializer {
-  private readonly maxExplicitDeserializingArrayIndex: number
+  private readonly maxDeserializingEmptySlots: number
 
   constructor(options: BracketNotationSerializerOptions = {}) {
-    this.maxExplicitDeserializingArrayIndex = options.maxExplicitDeserializingArrayIndex ?? 999
+    this.maxDeserializingEmptySlots = options.maxDeserializingEmptySlots ?? 1000
   }
 
   serialize(data: unknown): BracketNotationSerializeResult {
@@ -56,6 +57,7 @@ export class BracketNotationSerializer {
     // `NullProtoObj` it carries a real prototype, so accesses below stay own-property only.
     const arrayPushStyles = new WeakSet()
     const root: Record<string, unknown> = new NullProtoObj()
+    let remainingEmptySlots = this.maxDeserializingEmptySlots
 
     for (const [path, value] of serialized) {
       const segments = this.parsePath(path)
@@ -77,11 +79,17 @@ export class BracketNotationSerializer {
         if (Array.isArray(child)) {
           const isPushStyle = arrayPushStyles.has(child)
 
+          // indexes past the end leave empty slots, budgeted across all arrays in this call
+          const emptySlots = Math.max(0, Number(segment) - child.length)
+
           const canStayArray = segment === ''
             ? isLast && (isPushStyle || child.length === 0)
-            : internalIsValidArrayIndex(segment, this.maxExplicitDeserializingArrayIndex) && !(isLast && isPushStyle)
+            : INTEGER_PATTERN.test(segment) && !(isLast && isPushStyle) && emptySlots <= remainingEmptySlots
 
-          if (!canStayArray) {
+          if (canStayArray) {
+            remainingEmptySlots -= emptySlots
+          }
+          else {
             arrayPushStyles.delete(child)
             child = isPushStyle ? internalPushStyleArrayToObject(child) : internalArrayToObject(child)
           }
@@ -164,11 +172,6 @@ export class BracketNotationSerializer {
 
     return inBrackets || segments.length === 0 ? [path] : segments
   }
-}
-
-const INTEGER_PATTERN = /^0$|^[1-9]\d*$/
-function internalIsValidArrayIndex(value: string, maxIndex: number): boolean {
-  return INTEGER_PATTERN.test(value) && Number(value) <= maxIndex
 }
 
 function internalArrayToObject(array: readonly unknown[]): Record<string, unknown> {

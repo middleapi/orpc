@@ -26,7 +26,7 @@ export interface OpenAPISerializerSerializeOptions {
 
 export interface OpenAPISerializerOptions extends OpenAPIJsonSerializerOptions {
   /**
-   * Options for bracket notation serializer, like maxExplicitDeserializingArrayIndex
+   * Options for bracket notation serializer, like maxDeserializingEmptySlots
    */
   bracketNotation?: BracketNotationSerializerOptions | undefined
 
