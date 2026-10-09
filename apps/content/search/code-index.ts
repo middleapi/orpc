@@ -1,30 +1,35 @@
 /**
- * Blume's search index strips fenced code before indexing (`toPlainText` in
+ * Blume's search index strips fenced code before indexing (`collectCode` in
  * `blume/src/search/documents.ts`), so a query like `createSafeClient` or
  * `onSuccess` only matches pages that also happen to name it in prose. On oRPC's
  * docs that hides most of the answer: the pages are code-first, and the snippet
  * a reader is hunting for usually lives inside a ```ts fence.
  *
- * The generated index (`.blume/src/generated/search.json`) is imported through
- * Vite by the generated `/blume-search.json` endpoint, so a `pre` transform can
- * fold the code back in before it is served. The full Markdown for every route
- * sits next to it in `raw-markdown.json` (Blume generates it for the raw `.md`
- * URLs), which is where the fences come from — no second content pass.
+ * Blume's own `search.indexing.includeCodeBlocks` would index every fence as
+ * written — twoslash directives, `[!code]` notations, and the same imports
+ * repeated across a dozen examples — flattened onto one line. This keeps the
+ * index to the code a reader would search for, one line per line.
  *
- * Working on the generated file rather than a fork of Blume's document builder
+ * Blume serves the index as the in-memory `blume:search-index` module, which the
+ * generated `/blume-search.json` endpoint imports, and every route's full
+ * Markdown as `blume:raw-markdown` (behind the raw `.md` URLs), which is where
+ * the fences come from — no second content pass. The index module is rewritten
+ * to import that Markdown and fold the fences in as it evaluates, so the import
+ * also keeps the index current when a page's code changes in dev.
+ *
+ * Working on the generated module rather than a fork of Blume's document builder
  * keeps this to one hook: the index keeps its shape, and Orama, FlexSearch, the
  * preview pane and the hosted syncs all read the enriched `content` unchanged.
  */
 
 import type { Plugin } from 'vite'
-import { readFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { stringifyJSON } from '@orpc/shared'
 
-/** The generated module this plugin rewrites, matched against Vite's ids. */
-const SEARCH_JSON = '/.blume/src/generated/search.json'
-/** Sibling holding each route's full Markdown, fences included. */
-const RAW_MARKDOWN = 'raw-markdown.json'
+/** Vite's id for the module this plugin rewrites (a resolved virtual module). */
+const SEARCH_INDEX = '\0blume:search-index'
+/** How Blume loads that module: one default export of the parsed snapshot. */
+const DEFAULT_EXPORT = 'export default '
 
 /**
  * Opening fence, its info string, body, and closing fence of the same length.
@@ -53,6 +58,9 @@ interface IndexedDocument {
   route: string
   content: string
 }
+
+/** `blume:raw-markdown`: each route's source, keyed by route. */
+type RawMarkdown = Record<string, { mdx?: string }>
 
 /**
  * Pull the indexable text out of one page's Markdown: every fenced block that
@@ -90,36 +98,49 @@ function extractCode(markdown: string): string {
 
 /**
  * Fold each page's fenced code into its search document, so code is searchable
- * and the preview pane can find the block a query matched.
+ * and the preview pane can find the block a query matched. Imported by the
+ * rewritten index module, so it runs wherever that module evaluates.
  */
+export function foldCodeIntoSearchIndex(documents: IndexedDocument[], raw: RawMarkdown): IndexedDocument[] {
+  // Rewritten in place: the snapshot module parses a fresh copy on evaluation,
+  // and the endpoint is its only importer.
+  for (const doc of documents) {
+    const markdown = raw[doc.route]?.mdx
+    const extracted = markdown ? extractCode(markdown) : ''
+    if (extracted) {
+      doc.content = `${doc.content}\n${extracted}`
+    }
+  }
+
+  return documents
+}
+
 export function searchCodeIndexPlugin(): Plugin {
+  const self = fileURLToPath(import.meta.url)
+
   return {
     name: 'orpc:search-code-index',
-    // Ahead of Vite's own JSON plugin, which would otherwise hand us an ES
-    // module rather than the file's JSON text.
     enforce: 'pre',
-    async transform(code, id) {
-      // Vite ids use `/` on every platform, and can carry a query suffix.
-      if (!id.split('?')[0]!.endsWith(SEARCH_JSON)) {
+    transform(code, id) {
+      if (id !== SEARCH_INDEX) {
         return null
       }
 
-      const raw = JSON.parse(
-        await readFile(join(dirname(id), RAW_MARKDOWN), 'utf8'),
-      ) as Record<string, { mdx?: string }>
-
-      // Rewritten in place: the documents were just parsed here, so nothing else
-      // holds a reference for a copy to protect.
-      const documents = JSON.parse(code) as IndexedDocument[]
-      for (const doc of documents) {
-        const markdown = raw[doc.route]?.mdx
-        const extracted = markdown ? extractCode(markdown) : ''
-        if (extracted) {
-          doc.content = `${doc.content}\n${extracted}`
-        }
+      // Fail the build loudly rather than ship an index without code: a newer
+      // Blume that loads the snapshot differently needs this hook updated.
+      if (!code.startsWith(DEFAULT_EXPORT)) {
+        this.error(`Unexpected shape for ${id.slice(1)}; update apps/content/search/code-index.ts for this Blume version.`)
       }
 
-      return { code: stringifyJSON(documents), map: null }
+      const snapshot = code.slice(DEFAULT_EXPORT.length).trim().replace(/;$/u, '')
+      return {
+        code: [
+          `import raw from 'blume:raw-markdown'`,
+          `import { foldCodeIntoSearchIndex } from ${stringifyJSON(self)}`,
+          `export default foldCodeIntoSearchIndex(${snapshot}, raw)`,
+        ].join('\n'),
+        map: null,
+      }
     },
   }
 }

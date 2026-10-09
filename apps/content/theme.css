@@ -28,9 +28,9 @@
      blume.config.ts `theme`). Surfaces sit above the page, code blocks
      recess below it like Zed's editor pane. */
   --blume-foreground: #dce0e5;
-  /* Blume forces white accent text in dark mode; our accent there is the
-     light brand pink (#ff6ca5), where white text fails contrast (2.6:1).
-     Flip the text dark instead (7.5:1). */
+  /* Accent text on the dark-mode brand pink (#ff6ca5), where white fails
+     contrast (2.6:1). Blume already flips it dark; this pins the shade the
+     theme was designed with (7.5:1). */
   --blume-accent-foreground: oklch(0.145 0 0);
   --blume-muted: #1a202a;
   --blume-muted-foreground: #a9afbc;
@@ -271,31 +271,36 @@ main#blume-content {
 /* Blume tints `:::tip` blocks with the accent color, which here is the brand
    pink — a tip then reads as an alarm, barely distinguishable from the red
    `:::danger` blocks. Green instead (GitHub's alert convention); the docs use
-   no `success`/`check` callouts for it to collide with. Matched on Blume's own
-   accent utilities, the only marker the tip variant leaves in the markup. */
-aside[class~='bg-accent/10'] {
+   no `success`/`check` callouts for it to collide with. */
+aside[data-blume-callout='tip'] {
   border-color: color-mix(in oklab, var(--color-green-500) 25%, transparent);
   background-color: color-mix(in oklab, var(--color-green-500) 10%, transparent);
 }
 
-aside[class~='bg-accent/10'] [class~='text-accent'] {
+aside[data-blume-callout='tip'] [class~='text-accent'] {
   color: var(--color-green-600);
 }
 
-:root[data-theme='dark'] aside[class~='bg-accent/10'] [class~='text-accent'] {
+:root[data-theme='dark'] aside[data-blume-callout='tip'] [class~='text-accent'] {
   color: var(--color-green-400);
 }
 
-/* Search trigger: wide, quiet gray box like the reference header */
-[data-blume-search-open] {
+/* Search trigger: wide, quiet gray box like the reference header. The owned
+   header renders this field and forwards clicks to Blume's own icon trigger,
+   which stays hidden. */
+[data-orpc-search-field] {
   height: 2.375rem;
   border-color: transparent;
   border-radius: 0.5rem;
   background: var(--blume-muted);
 }
 
-[data-blume-search-open]:hover {
+[data-orpc-search-field]:hover {
   border-color: var(--blume-border);
+}
+
+[data-orpc-search] [data-blume-search-open] {
+  display: none;
 }
 
 /* The page-actions popovers (Export, Connect to MCP) are up to 22rem
