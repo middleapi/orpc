@@ -86,7 +86,7 @@
   "dependencies": {
     "@orpc/client": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.10.1"
+    "@standard-server/core": "~0.10.2"
   },
   "devDependencies": {
     "@upstash/redis": "^1.38.2",

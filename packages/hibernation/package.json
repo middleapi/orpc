@@ -48,7 +48,7 @@
     "@orpc/client": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.10.1",
-    "@standard-server/peer": "~0.10.1"
+    "@standard-server/core": "~0.10.2",
+    "@standard-server/peer": "~0.10.2"
   }
 }
