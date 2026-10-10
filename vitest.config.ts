@@ -49,7 +49,7 @@ export default defineConfig(({ mode }) => ({
       {
         // also test @orpc/experimental-msw against MSW v2
         resolve: {
-          alias: [{ find: /^msw(?=\/|$)/, replacement: 'msw-v2' }],
+          alias: { msw: 'msw-v2' },
         },
         test: {
           name: 'msw-v2',
