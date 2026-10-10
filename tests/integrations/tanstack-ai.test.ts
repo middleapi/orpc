@@ -23,21 +23,19 @@ function mockText(): AnyTextAdapter {
       const threadId = options.threadId ?? 'thread_mock'
       const messageId = 'msg_mock'
 
-      yield { type: EventType.RUN_STARTED, runId, threadId, model: 'mock-echo-1', timestamp: Date.now() }
-      yield { type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant', model: 'mock-echo-1', timestamp: Date.now() }
+      yield { type: EventType.RUN_STARTED, runId, threadId, timestamp: Date.now() }
+      yield { type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant', timestamp: Date.now() }
 
       const lastUser = [...(options.messages ?? [])].reverse().find(m => m.role === 'user')
       const lastContent = typeof lastUser?.content === 'string'
         ? lastUser.content
         : JSON.stringify(lastUser?.content)
 
-      let content = ''
       for (const delta of ['echo: ', lastContent]) {
-        content += delta
-        yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta, content, model: 'mock-echo-1', timestamp: Date.now() }
+        yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta, timestamp: Date.now() }
       }
 
-      yield { type: EventType.TEXT_MESSAGE_END, messageId, model: 'mock-echo-1', timestamp: Date.now() }
+      yield { type: EventType.TEXT_MESSAGE_END, messageId, timestamp: Date.now() }
       yield { type: EventType.RUN_FINISHED, runId, threadId, model: 'mock-echo-1', timestamp: Date.now(), finishReason: 'stop' }
     },
     structuredOutput: async (): Promise<never> => {
