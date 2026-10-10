@@ -40,7 +40,7 @@ export default defineConfig(({ mode }) => ({
         },
       },
       {
-        // @orpc/experimental-msw supports both MSW v2 and v3, so its tests also run against v2
+        // also test @orpc/experimental-msw against MSW v2
         resolve: {
           alias: [{ find: /^msw(?=\/|$)/, replacement: 'msw-v2' }],
         },
