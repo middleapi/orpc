@@ -17,7 +17,7 @@
     <img alt="Discord" src="https://img.shields.io/discord/1308966753044398161?color=7389D8&label&logo=discord&logoColor=ffffff" />
   </a>
   <a href="https://deepwiki.com/middleapi/orpc">
-    <img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki">
+    <img alt="Ask DeepWiki" src="https://img.shields.io/badge/Ask-DeepWiki-blue" />
   </a>
 </div>
 
