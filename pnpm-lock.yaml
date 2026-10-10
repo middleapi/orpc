@@ -1037,8 +1037,8 @@ importers:
         specifier: ^12.1.1
         version: 12.1.1
       type-fest:
-        specifier: ^5.3.1
-        version: 5.8.0
+        specifier: ^5.10.0
+        version: 5.10.0
     devDependencies:
       arktype:
         specifier: ^2.2.1
@@ -12423,8 +12423,8 @@ packages:
     resolution: {integrity: sha512-TeTSQ6H5YHvpqVwBRcnLDCBnDOHWYu7IvGbHT6N8AOymcr9PJGjc1GTtiWZTYg0NCgYwvnYWEkVChQAr9bjfwA==}
     engines: {node: '>=16'}
 
-  type-fest@5.8.0:
-    resolution: {integrity: sha512-YGYEVz3Fm5iy/AybuA0oyNFq7H4CgQNfRp/qfe8nurE1kuCeNm3/vfm9X4Mtl+qLyaKJUh5xrFZwogr41SMjYA==}
+  type-fest@5.10.0:
+    resolution: {integrity: sha512-NoSdpq/WEiAg5sjmBkmV/hfxv6HJH4NqPNrqjtSO5CwRmpsDfaf4begxW34KdJykH/l1yHtwBWQkCRdoXO8mPA==}
     engines: {node: '>=20'}
 
   type-is@1.6.18:
@@ -17145,14 +17145,14 @@ snapshots:
     dependencies:
       '@scalar/helpers': 0.11.1
       nanoid: 5.1.16
-      type-fest: 5.8.0
+      type-fest: 5.10.0
       zod: 4.5.4
 
   '@scalar/types@0.23.0':
     dependencies:
       '@scalar/helpers': 0.16.1
       nanoid: 5.1.16
-      type-fest: 5.8.0
+      type-fest: 5.10.0
       zod: 4.5.4
 
   '@scalar/use-codemirror@0.14.15(typescript@6.0.3)':
@@ -17209,7 +17209,7 @@ snapshots:
       '@scalar/types': 0.18.2
       '@scalar/validation': 0.6.3
       js-base64: 3.9.3
-      type-fest: 5.8.0
+      type-fest: 5.10.0
       vue: 3.5.42(typescript@6.0.3)
       yaml: 2.9.0
     transitivePeerDependencies:
@@ -23438,7 +23438,7 @@ snapshots:
       statuses: 2.0.2
       strict-event-emitter: 0.5.1
       tough-cookie: 6.0.2
-      type-fest: 5.8.0
+      type-fest: 5.10.0
       until-async: 3.0.2
       yargs: 17.7.3
     optionalDependencies:
@@ -25793,7 +25793,7 @@ snapshots:
 
   type-fest@4.41.0: {}
 
-  type-fest@5.8.0:
+  type-fest@5.10.0:
     dependencies:
       tagged-tag: 1.0.0
 

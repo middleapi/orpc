@@ -42,7 +42,7 @@
   "dependencies": {
     "@standard-server/shared": "~0.10.2",
     "radash": "^12.1.1",
-    "type-fest": "^5.3.1"
+    "type-fest": "^5.10.0"
   },
   "devDependencies": {
     "arktype": "^2.2.1",
