@@ -1,3 +1,4 @@
+import type { LogLevel } from 'evlog'
 import { ORPCError, RPCSerializer } from '@orpc/client'
 import { AbortError, ORPC_NAME, sleep } from '@orpc/shared'
 import { ErrorEvent } from '@standard-server/core'
@@ -516,7 +517,7 @@ describe('evlogHandlerPlugin', () => {
   it('honors the procedureErrorLevel option, passing the error and its default level', async () => {
     const logger = createLogger()
     const procedureErrorLevel = vi.fn(
-      (error: unknown, level: 'info' | 'error' | 'warn' | 'debug') =>
+      (error: unknown, level: LogLevel) =>
         error instanceof ORPCError && error.code === 'UNAUTHORIZED' ? 'debug' as const : level,
     )
     const plugin = new EvlogHandlerPlugin({ procedureErrorLevel })
