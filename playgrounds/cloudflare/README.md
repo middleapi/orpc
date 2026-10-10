@@ -33,14 +33,6 @@ Like what we build over at [middleapi](https://github.com/middleapi)? You can he
   </tr>
 </table>
 
-### Special Sponsors
-
-<table>
-  <tr>
-   <td align="center"><a href="http://twitter.com/rauchg?ref=middleapi&amp;utm_source=middleapi&amp;utm_medium=sponsor" target="_blank" rel="noopener sponsored" title="Guillermo Rauch"><img src="https://avatars.githubusercontent.com/u/13041?u=1ee8d111657cdd02ff6d253df00978d17ee6d722&amp;v=4" width="279" alt="Guillermo Rauch"/><br />Guillermo Rauch</a></td>
-  </tr>
-</table>
-
 ### Premium Sponsors
 
 <table>
@@ -116,4 +108,4 @@ Like what we build over at [middleapi](https://github.com/middleapi)? You can he
   </tr>
 </table>
 
-With thanks to [38 past sponsors](https://orpc.dev/sponsors#past-sponsors) who helped get oRPC here.
+With thanks to [39 past sponsors](https://orpc.dev/sponsors#past-sponsors) who helped get oRPC here.

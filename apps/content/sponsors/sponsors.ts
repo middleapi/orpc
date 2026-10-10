@@ -16,18 +16,6 @@ export default [
     "type": "Organization"
   },
   {
-    "name": "Guillermo Rauch",
-    "login": "rauchg",
-    "avatar": "https://avatars.githubusercontent.com/u/13041?u=1ee8d111657cdd02ff6d253df00978d17ee6d722&v=4",
-    "link": "http://twitter.com/rauchg?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
-    "rel": "sponsored",
-    "tierTitle": "Special Sponsor",
-    "tierLevel": 5,
-    "amount": 1000,
-    "createdAt": "2026-09-09T19:11:39Z",
-    "type": "User"
-  },
-  {
     "name": "Yuzu",
     "login": "yuzu-health",
     "avatar": "https://avatars.githubusercontent.com/u/102488956?v=4",
@@ -961,6 +949,18 @@ export default [
     "tierLevel": 0,
     "amount": -1,
     "createdAt": "2026-06-28T20:17:54Z",
+    "type": "User"
+  },
+  {
+    "name": "Guillermo Rauch",
+    "login": "rauchg",
+    "avatar": "https://avatars.githubusercontent.com/u/13041?u=1ee8d111657cdd02ff6d253df00978d17ee6d722&v=4",
+    "link": "http://twitter.com/rauchg?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "rel": "sponsored",
+    "tierTitle": "Past Sponsor",
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2026-09-09T19:11:39Z",
     "type": "User"
   },
   {
