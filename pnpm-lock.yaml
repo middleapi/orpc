@@ -423,7 +423,7 @@ importers:
         version: 26.4.0
       blume:
         specifier: ^2.2.1
-        version: 2.2.1(@astrojs/cloudflare@14.3.4(@types/node@26.4.0)(astro@7.3.6(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(wrangler@4.141.0(@types/node@26.4.0))(yaml@2.9.0))(@asyncapi/converter@2.0.2)(@shikijs/themes@4.4.3)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(babel-plugin-react-compiler@1.0.0)(csstype@3.2.3)(esbuild@0.28.2)(next@16.3.3(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(prettier@3.9.6)(rollup@4.63.0)(supports-color@10.2.2)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(terser@5.51.1)(vite@8.3.3(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(vue@3.5.42(typescript@6.0.3))(ws@8.21.3)(yaml@2.9.0)
+        version: 2.2.1(@astrojs/cloudflare@14.3.4(@types/node@26.4.0)(astro@7.3.6(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(wrangler@4.141.0(@types/node@26.4.0))(yaml@2.9.0))(@asyncapi/converter@2.0.2)(@shikijs/themes@4.4.3)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(babel-plugin-react-compiler@1.0.0)(csstype@3.2.3)(esbuild@0.28.2)(next@16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(prettier@3.9.6)(rollup@4.63.0)(supports-color@10.2.2)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(terser@5.51.1)(vite@8.3.3(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(vue@3.5.42(typescript@6.0.3))(ws@8.21.3)(yaml@2.9.0)
       effect:
         specifier: ^4.0.0
         version: 4.0.0
@@ -1037,8 +1037,8 @@ importers:
         specifier: ^12.1.1
         version: 12.1.1
       type-fest:
-        specifier: ^5.3.1
-        version: 5.8.0
+        specifier: ^5.10.0
+        version: 5.10.0
     devDependencies:
       arktype:
         specifier: ^2.2.1
@@ -8126,9 +8126,6 @@ packages:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
 
-  devalue@5.9.1:
-    resolution: {integrity: sha512-+17vil3EVQRzvtDJSFuTWEb8XJRvXqAiV3qZyQWD398QeXUa6CxsUyMdD1fxzEhUrd4FojitFz7lhIHBTlV4fw==}
-
   devalue@5.9.4:
     resolution: {integrity: sha512-sPAT4pztbu6586/hrhOnMKS17IJrvg12mXiSPSS3W5qDeN2RGgvZ0diZCm31dBbnevfVmujNO3IM2wrS4Y2Rhg==}
 
@@ -10390,11 +10387,6 @@ packages:
   mz@2.7.0:
     resolution: {integrity: sha512-z81GNO7nnYMEhrGh9LeymoE4+Yr0Wn5McHIZMK5cfQCl+NDX08sCZgUc9/6MHni9IWuFLm1Z3HTCXu2z9fN62Q==}
 
-  nanoid@3.3.18:
-    resolution: {integrity: sha512-DTg4MJbGMWkfi6VZFdNt2/caMbQy4Ou+Op/hJQvGEWcnVfoA1QA+xzRKAzw9jD6+GVOOeYr/mIcuDSdug6F6+w==}
-    engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
-    hasBin: true
-
   nanoid@3.3.20:
     resolution: {integrity: sha512-uKdg2G3GNCKQn9byYOpxbGqrT2fGO5KRt5J/8b3pok8rT6qxGWF6hxMyJiEYtAf+FVyYuD9hRaDqX5uPFYJ4ZQ==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
@@ -12357,8 +12349,8 @@ packages:
     resolution: {integrity: sha512-TeTSQ6H5YHvpqVwBRcnLDCBnDOHWYu7IvGbHT6N8AOymcr9PJGjc1GTtiWZTYg0NCgYwvnYWEkVChQAr9bjfwA==}
     engines: {node: '>=16'}
 
-  type-fest@5.8.0:
-    resolution: {integrity: sha512-YGYEVz3Fm5iy/AybuA0oyNFq7H4CgQNfRp/qfe8nurE1kuCeNm3/vfm9X4Mtl+qLyaKJUh5xrFZwogr41SMjYA==}
+  type-fest@5.10.0:
+    resolution: {integrity: sha512-NoSdpq/WEiAg5sjmBkmV/hfxv6HJH4NqPNrqjtSO5CwRmpsDfaf4begxW34KdJykH/l1yHtwBWQkCRdoXO8mPA==}
     engines: {node: '>=20'}
 
   type-is@1.6.18:
@@ -12454,10 +12446,6 @@ packages:
   undici@7.29.1:
     resolution: {integrity: sha512-RYONW2MeafgYlkVOKYKkA/Ag7BmXqgIWCa8t1m0JcxrQg9pI9lEqRhAOruOBCbAohOa/gkCF+iPi9hrgvTzu6Q==}
     engines: {node: '>=20.18.1'}
-
-  undici@8.10.0:
-    resolution: {integrity: sha512-HvltHd7avK13QIw/oLe4qoOLyoVSoafqJ2jYOrtMRBkbYT31eiBQ8O0ehRKZiEZCMEyLFQNIADpgCWC5fALvYQ==}
-    engines: {node: '>=22.19.0'}
 
   undici@8.11.2:
     resolution: {integrity: sha512-u4UB2/IrKdU6lFxumHmmo1a3fCQO5tzQllRorfoRS63txhrB7xTpSn1PftwC4qEHkOaqP95fCWW4lJzwErwzhQ==}
@@ -13631,10 +13619,10 @@ snapshots:
 
   '@astrojs/underscore-redirects@1.0.4': {}
 
-  '@astrojs/vercel@11.0.12(astro@7.3.6(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(next@16.3.3(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)(rollup@4.63.0)(supports-color@10.2.2)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))(ws@8.21.3)':
+  '@astrojs/vercel@11.0.12(astro@7.3.6(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(next@16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)(rollup@4.63.0)(supports-color@10.2.2)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))(ws@8.21.3)':
     dependencies:
       '@astrojs/internal-helpers': 0.12.0
-      '@vercel/analytics': 2.0.1(next@16.3.3(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))
+      '@vercel/analytics': 2.0.1(next@16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))
       '@vercel/functions': 3.9.11(ws@8.21.3)
       '@vercel/nft': 1.11.0(rollup@4.63.0)(supports-color@10.2.2)
       '@vercel/routing-utils': 6.6.0
@@ -15137,7 +15125,7 @@ snapshots:
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
-      '@jridgewell/sourcemap-codec': 1.5.5
+      '@jridgewell/sourcemap-codec': 1.6.0
       '@jridgewell/trace-mapping': 0.3.31
 
   '@jridgewell/remapping@2.3.5':
@@ -15160,12 +15148,12 @@ snapshots:
   '@jridgewell/trace-mapping@0.3.31':
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
-      '@jridgewell/sourcemap-codec': 1.5.5
+      '@jridgewell/sourcemap-codec': 1.6.0
 
   '@jridgewell/trace-mapping@0.3.9':
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
-      '@jridgewell/sourcemap-codec': 1.5.5
+      '@jridgewell/sourcemap-codec': 1.6.0
 
   '@js-sdsl/ordered-map@4.4.2': {}
 
@@ -17070,14 +17058,14 @@ snapshots:
     dependencies:
       '@scalar/helpers': 0.11.1
       nanoid: 5.1.16
-      type-fest: 5.8.0
+      type-fest: 5.10.0
       zod: 4.5.4
 
   '@scalar/types@0.23.0':
     dependencies:
       '@scalar/helpers': 0.16.1
       nanoid: 5.1.16
-      type-fest: 5.8.0
+      type-fest: 5.10.0
       zod: 4.5.4
 
   '@scalar/use-codemirror@0.14.15(typescript@6.0.3)':
@@ -17134,7 +17122,7 @@ snapshots:
       '@scalar/types': 0.18.2
       '@scalar/validation': 0.6.3
       js-base64: 3.9.3
-      type-fest: 5.8.0
+      type-fest: 5.10.0
       vue: 3.5.42(typescript@6.0.3)
       yaml: 2.9.0
     transitivePeerDependencies:
@@ -18683,7 +18671,7 @@ snapshots:
     dependencies:
       valibot: 1.5.0(typescript@6.0.3)
 
-  '@vercel/analytics@2.0.1(next@16.3.3(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))':
+  '@vercel/analytics@2.0.1(next@16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))':
     optionalDependencies:
       next: 16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react: 19.3.0
@@ -18796,7 +18784,7 @@ snapshots:
       istanbul-lib-coverage: 3.2.2
       istanbul-lib-report: 3.0.1
       istanbul-reports: 3.2.0
-      magicast: 0.5.4
+      magicast: 0.5.5
       obug: 2.1.4
       tinyrainbow: 3.1.1
       vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-istanbul@4.1.11)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.15.0(@types/node@26.4.0)(typescript@6.0.3))(vite@8.2.2(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))
@@ -18942,7 +18930,7 @@ snapshots:
       '@vue/shared': 3.5.42
       entities: 7.0.1
       estree-walker: 2.0.2
-      source-map-js: 1.2.1
+      source-map-js: 1.2.2
 
   '@vue/compiler-dom@3.5.42':
     dependencies:
@@ -18958,8 +18946,8 @@ snapshots:
       '@vue/shared': 3.5.42
       estree-walker: 2.0.2
       magic-string: 0.30.21
-      postcss: 8.5.26
-      source-map-js: 1.2.1
+      postcss: 8.5.29
+      source-map-js: 1.2.2
 
   '@vue/compiler-ssr@3.5.42':
     dependencies:
@@ -19422,7 +19410,7 @@ snapshots:
       yargs-parser: 22.0.0
       zod: 4.6.5
     optionalDependencies:
-      sharp: 0.35.4(@types/node@22.20.5)
+      sharp: 0.35.5(@types/node@22.20.5)
     transitivePeerDependencies:
       - '@azure/app-configuration'
       - '@azure/cosmos'
@@ -19511,7 +19499,7 @@ snapshots:
       yargs-parser: 22.0.0
       zod: 4.6.5
     optionalDependencies:
-      sharp: 0.35.4(@types/node@26.4.0)
+      sharp: 0.35.5(@types/node@26.4.0)
     transitivePeerDependencies:
       - '@azure/app-configuration'
       - '@azure/cosmos'
@@ -19623,14 +19611,14 @@ snapshots:
 
   blake3-wasm@2.1.5: {}
 
-  blume@2.2.1(@astrojs/cloudflare@14.3.4(@types/node@26.4.0)(astro@7.3.6(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(wrangler@4.141.0(@types/node@26.4.0))(yaml@2.9.0))(@asyncapi/converter@2.0.2)(@shikijs/themes@4.4.3)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(babel-plugin-react-compiler@1.0.0)(csstype@3.2.3)(esbuild@0.28.2)(next@16.3.3(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(prettier@3.9.6)(rollup@4.63.0)(supports-color@10.2.2)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(terser@5.51.1)(vite@8.3.3(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(vue@3.5.42(typescript@6.0.3))(ws@8.21.3)(yaml@2.9.0):
+  blume@2.2.1(@astrojs/cloudflare@14.3.4(@types/node@26.4.0)(astro@7.3.6(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(wrangler@4.141.0(@types/node@26.4.0))(yaml@2.9.0))(@asyncapi/converter@2.0.2)(@shikijs/themes@4.4.3)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(babel-plugin-react-compiler@1.0.0)(csstype@3.2.3)(esbuild@0.28.2)(next@16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(prettier@3.9.6)(rollup@4.63.0)(supports-color@10.2.2)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(terser@5.51.1)(vite@8.3.3(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(vue@3.5.42(typescript@6.0.3))(ws@8.21.3)(yaml@2.9.0):
     dependencies:
       '@astrojs/check': 0.9.10(prettier@3.9.6)(typescript@6.0.3)
       '@astrojs/markdown-satteri': 0.4.3
       '@astrojs/mdx': 8.0.3(@astrojs/markdown-satteri@0.4.3)(astro@7.3.6(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))
       '@astrojs/node': 11.1.7(astro@7.3.6(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(supports-color@10.2.2)
       '@astrojs/react': 7.0.1(@types/node@22.20.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(babel-plugin-react-compiler@1.0.0)(esbuild@0.28.2)(jiti@2.7.0)(oxc-transform-react@0.145.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(terser@5.51.1)(yaml@2.9.0)
-      '@astrojs/vercel': 11.0.12(astro@7.3.6(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(next@16.3.3(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)(rollup@4.63.0)(supports-color@10.2.2)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))(ws@8.21.3)
+      '@astrojs/vercel': 11.0.12(astro@7.3.6(@types/node@26.4.0)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))(next@16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)(rollup@4.63.0)(supports-color@10.2.2)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))(ws@8.21.3)
       '@clack/prompts': 1.8.1
       '@iconify-json/lucide': 1.2.140
       '@iconify/types': 2.0.0
@@ -19647,7 +19635,7 @@ snapshots:
       '@tailwindcss/vite': 4.3.3(vite@8.3.3(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))
       '@types/mdast': 4.0.4
       '@types/node': 22.20.5
-      '@vercel/analytics': 2.0.1(next@16.3.3(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))
+      '@vercel/analytics': 2.0.1(next@16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))
       '@vitejs/plugin-react': 6.1.1(babel-plugin-react-compiler@1.0.0)(oxc-transform-react@0.145.0)(vite@8.3.3(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))
       ai: 7.0.130(zod@4.6.5)
       astro: 7.3.6(@types/node@22.20.5)(@upstash/redis@1.38.3)(@vercel/functions@3.9.5(ws@8.21.3))(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0)
@@ -20213,7 +20201,7 @@ snapshots:
   css-tree@2.2.1:
     dependencies:
       mdn-data: 2.0.28
-      source-map-js: 1.2.1
+      source-map-js: 1.2.2
 
   css-tree@3.2.1:
     dependencies:
@@ -20560,8 +20548,6 @@ snapshots:
   detect-indent@7.0.2: {}
 
   detect-libc@2.1.2: {}
-
-  devalue@5.9.1: {}
 
   devalue@5.9.4: {}
 
@@ -21233,7 +21219,7 @@ snapshots:
 
   esrap@2.3.6(@typescript-eslint/types@8.68.0):
     dependencies:
-      '@jridgewell/sourcemap-codec': 1.5.5
+      '@jridgewell/sourcemap-codec': 1.6.0
     optionalDependencies:
       '@typescript-eslint/types': 8.68.0
 
@@ -22715,7 +22701,7 @@ snapshots:
 
   magic-string@0.30.21:
     dependencies:
-      '@jridgewell/sourcemap-codec': 1.5.5
+      '@jridgewell/sourcemap-codec': 1.6.0
 
   magic-string@1.0.0:
     dependencies:
@@ -22735,7 +22721,7 @@ snapshots:
     dependencies:
       '@babel/parser': 7.29.8
       '@babel/types': 7.29.8
-      source-map-js: 1.2.1
+      source-map-js: 1.2.2
 
   make-asynchronous@1.1.0:
     dependencies:
@@ -23291,7 +23277,7 @@ snapshots:
       statuses: 2.0.2
       strict-event-emitter: 0.5.1
       tough-cookie: 6.0.2
-      type-fest: 5.8.0
+      type-fest: 5.10.0
       until-async: 3.0.2
       yargs: 17.7.3
     optionalDependencies:
@@ -23315,8 +23301,6 @@ snapshots:
       any-promise: 1.3.0
       object-assign: 4.1.1
       thenify-all: 1.6.0
-
-  nanoid@3.3.18: {}
 
   nanoid@3.3.20: {}
 
@@ -23360,7 +23344,7 @@ snapshots:
       '@next/swc-win32-x64-msvc': 16.3.3
       '@opentelemetry/api': 1.9.1
       babel-plugin-react-compiler: 1.0.0
-      sharp: 0.35.4(@types/node@26.4.0)
+      sharp: 0.35.5(@types/node@26.4.0)
     transitivePeerDependencies:
       - '@babel/core'
       - '@types/node'
@@ -24043,15 +24027,15 @@ snapshots:
 
   postcss@8.5.23:
     dependencies:
-      nanoid: 3.3.18
+      nanoid: 3.3.20
       picocolors: 1.1.1
-      source-map-js: 1.2.1
+      source-map-js: 1.2.2
 
   postcss@8.5.26:
     dependencies:
-      nanoid: 3.3.18
+      nanoid: 3.3.20
       picocolors: 1.1.1
-      source-map-js: 1.2.1
+      source-map-js: 1.2.2
 
   postcss@8.5.29:
     dependencies:
@@ -24835,40 +24819,6 @@ snapshots:
       '@img/sharp-win32-ia32': 0.35.2
       '@img/sharp-win32-x64': 0.35.2
 
-  sharp@0.35.4(@types/node@22.20.5):
-    dependencies:
-      '@img/colour': 1.1.0
-      detect-libc: 2.1.2
-      semver: 7.8.5
-    optionalDependencies:
-      '@img/sharp-darwin-arm64': 0.35.4
-      '@img/sharp-darwin-x64': 0.35.4
-      '@img/sharp-freebsd-wasm32': 0.35.4
-      '@img/sharp-libvips-darwin-arm64': 1.3.3
-      '@img/sharp-libvips-darwin-x64': 1.3.3
-      '@img/sharp-libvips-linux-arm': 1.3.3
-      '@img/sharp-libvips-linux-arm64': 1.3.3
-      '@img/sharp-libvips-linux-ppc64': 1.3.3
-      '@img/sharp-libvips-linux-riscv64': 1.3.3
-      '@img/sharp-libvips-linux-s390x': 1.3.3
-      '@img/sharp-libvips-linux-x64': 1.3.3
-      '@img/sharp-libvips-linuxmusl-arm64': 1.3.3
-      '@img/sharp-libvips-linuxmusl-x64': 1.3.3
-      '@img/sharp-linux-arm': 0.35.4
-      '@img/sharp-linux-arm64': 0.35.4
-      '@img/sharp-linux-ppc64': 0.35.4
-      '@img/sharp-linux-riscv64': 0.35.4
-      '@img/sharp-linux-s390x': 0.35.4
-      '@img/sharp-linux-x64': 0.35.4
-      '@img/sharp-linuxmusl-arm64': 0.35.4
-      '@img/sharp-linuxmusl-x64': 0.35.4
-      '@img/sharp-webcontainers-wasm32': 0.35.4
-      '@img/sharp-win32-arm64': 0.35.4
-      '@img/sharp-win32-ia32': 0.35.4
-      '@img/sharp-win32-x64': 0.35.4
-      '@types/node': 22.20.5
-    optional: true
-
   sharp@0.35.4(@types/node@26.4.0):
     dependencies:
       '@img/colour': 1.1.0
@@ -24934,6 +24884,40 @@ snapshots:
       '@img/sharp-win32-ia32': 0.35.5
       '@img/sharp-win32-x64': 0.35.5
       '@types/node': 22.20.5
+
+  sharp@0.35.5(@types/node@26.4.0):
+    dependencies:
+      '@img/colour': 1.1.0
+      detect-libc: 2.1.2
+      semver: 7.8.5
+    optionalDependencies:
+      '@img/sharp-darwin-arm64': 0.35.5
+      '@img/sharp-darwin-x64': 0.35.5
+      '@img/sharp-freebsd-wasm32': 0.35.5
+      '@img/sharp-libvips-darwin-arm64': 1.3.4
+      '@img/sharp-libvips-darwin-x64': 1.3.4
+      '@img/sharp-libvips-linux-arm': 1.3.4
+      '@img/sharp-libvips-linux-arm64': 1.3.4
+      '@img/sharp-libvips-linux-ppc64': 1.3.4
+      '@img/sharp-libvips-linux-riscv64': 1.3.4
+      '@img/sharp-libvips-linux-s390x': 1.3.4
+      '@img/sharp-libvips-linux-x64': 1.3.4
+      '@img/sharp-libvips-linuxmusl-arm64': 1.3.4
+      '@img/sharp-libvips-linuxmusl-x64': 1.3.4
+      '@img/sharp-linux-arm': 0.35.5
+      '@img/sharp-linux-arm64': 0.35.5
+      '@img/sharp-linux-ppc64': 0.35.5
+      '@img/sharp-linux-riscv64': 0.35.5
+      '@img/sharp-linux-s390x': 0.35.5
+      '@img/sharp-linux-x64': 0.35.5
+      '@img/sharp-linuxmusl-arm64': 0.35.5
+      '@img/sharp-linuxmusl-x64': 0.35.5
+      '@img/sharp-webcontainers-wasm32': 0.35.5
+      '@img/sharp-win32-arm64': 0.35.5
+      '@img/sharp-win32-ia32': 0.35.5
+      '@img/sharp-win32-x64': 0.35.5
+      '@types/node': 26.4.0
+    optional: true
 
   shebang-command@2.0.0:
     dependencies:
@@ -25274,7 +25258,7 @@ snapshots:
   svelte@5.56.10(@typescript-eslint/types@8.68.0):
     dependencies:
       '@jridgewell/remapping': 2.3.5
-      '@jridgewell/sourcemap-codec': 1.5.5
+      '@jridgewell/sourcemap-codec': 1.6.0
       '@sveltejs/acorn-typescript': 1.0.13(acorn@8.18.0)
       '@types/estree': 1.0.9
       '@types/trusted-types': 2.0.7
@@ -25282,7 +25266,7 @@ snapshots:
       aria-query: 5.3.1
       axobject-query: 4.1.0
       clsx: 2.1.1
-      devalue: 5.9.1
+      devalue: 5.9.4
       esm-env: 1.2.2
       esrap: 2.3.6(@typescript-eslint/types@8.68.0)
       is-reference: 3.0.3
@@ -25644,7 +25628,7 @@ snapshots:
 
   type-fest@4.41.0: {}
 
-  type-fest@5.8.0:
+  type-fest@5.10.0:
     dependencies:
       tagged-tag: 1.0.0
 
@@ -25787,8 +25771,6 @@ snapshots:
 
   undici@7.29.1: {}
 
-  undici@8.10.0: {}
-
   undici@8.11.2: {}
 
   unenv@2.0.0-rc.24:
@@ -25815,7 +25797,7 @@ snapshots:
     dependencies:
       css-tree: 3.2.1
       ohash: 2.0.12
-      undici: 8.10.0
+      undici: 8.11.2
 
   unist-util-find-after@5.0.0:
     dependencies:
