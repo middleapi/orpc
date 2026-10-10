@@ -40,6 +40,21 @@ export default defineConfig(({ mode }) => ({
         },
       },
       {
+        // @orpc/experimental-msw supports both MSW v2 and v3, so its tests also run against v2
+        resolve: {
+          alias: [{ find: /^msw(?=\/|$)/, replacement: 'msw-v2' }],
+        },
+        test: {
+          name: 'msw-v2',
+          globals: true,
+          setupFiles: ['./vitest.javascript.ts'],
+          include: ['./packages/msw/**/*.test.ts'],
+          benchmark: {
+            exclude: ['**/**'],
+          },
+        },
+      },
+      {
         test: {
           globals: true,
           environment: 'jsdom',

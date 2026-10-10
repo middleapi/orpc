@@ -15,6 +15,8 @@ This guide assumes you are already familiar with [MSW](https://mswjs.io/). If yo
 npm install @orpc/experimental-msw@beta
 ```
 
+Both MSW v2 and v3 are supported.
+
 ## Setup
 
 Create MSW utils from a [router contract](/docs/contract/router) or an implemented [router](/docs/router) (convert [lazy routers](/docs/router#lazy-router) with [`unlazyRouter`](/docs/contract/router#router-to-contract) first). The `handler` option creates the fetch handler that serves each mock. Configure it like your production handler, so serialization, validation, and error envelopes behave exactly like your real server.
@@ -91,7 +93,7 @@ export const Loading: Story = {
 
 ## Passthrough
 
-The `.passthrough` method creates an MSW request handler that performs matching requests against the real server as-is, useful to exempt specific procedures from mocking, for example while [onUnhandledRequest](https://mswjs.io/docs/api/setup-server/listen#onunhandledrequest) treats everything else as an error:
+The `.passthrough` method creates an MSW request handler that performs matching requests against the real server as-is, useful to exempt specific procedures from mocking, for example while [onUnhandledFrame](https://mswjs.io/docs/api/setup-server/listen) (`onUnhandledRequest` in MSW v2) treats everything else as an error:
 
 ```ts
 const handlers = [
