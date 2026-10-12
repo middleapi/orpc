@@ -117,4 +117,42 @@ describe('deepEqual', () => {
       },
     )).toBe(true)
   })
+
+  it('compares dates by time value', () => {
+    expect(isDeepEqual(new Date(0), new Date(0))).toBe(true)
+    expect(isDeepEqual(new Date(0), new Date(1))).toBe(false)
+    expect(isDeepEqual(new Date(Number.NaN), new Date(Number.NaN))).toBe(true)
+  })
+
+  it('returns false when comparing a date to a plain object', () => {
+    expect(isDeepEqual(new Date(0), {})).toBe(false)
+    expect(isDeepEqual({}, new Date(0))).toBe(false)
+  })
+
+  it('compares regular expressions by source and flags', () => {
+    expect(isDeepEqual(/a/g, /a/g)).toBe(true)
+    expect(isDeepEqual(/a/, /b/)).toBe(false)
+    expect(isDeepEqual(/a/g, /a/i)).toBe(false)
+  })
+
+  it('compares other non-plain objects by reference', () => {
+    const set = new Set([1])
+    const map = new Map([[1, 1]])
+
+    expect(isDeepEqual(set, set)).toBe(true)
+    expect(isDeepEqual(new Set([1]), new Set([1]))).toBe(false)
+    expect(isDeepEqual(new Set([1]), new Set([2]))).toBe(false)
+    expect(isDeepEqual(map, map)).toBe(true)
+    expect(isDeepEqual(new Map([[1, 1]]), new Map([[1, 1]]))).toBe(false)
+    expect(isDeepEqual(new Map([[1, 1]]), new Map([[1, 2]]))).toBe(false)
+  })
+
+  it('compares null-prototype objects structurally', () => {
+    expect(isDeepEqual(Object.assign(Object.create(null), { a: 1 }), { a: 1 })).toBe(true)
+  })
+
+  it('compares dates nested inside objects and arrays', () => {
+    expect(isDeepEqual({ items: [new Date(0)] }, { items: [new Date(0)] })).toBe(true)
+    expect(isDeepEqual({ items: [new Date(0)] }, { items: [new Date(1)] })).toBe(false)
+  })
 })

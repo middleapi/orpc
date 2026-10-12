@@ -6,7 +6,7 @@ import {
   ensureJsonSchemaObject,
   mapJsonSchemaRefs,
 } from '@orpc/json-schema'
-import { getOwn, isDeepEqual, setOwn } from '@orpc/shared'
+import { getOwn, isDeepEqual, isPlainObject, setOwn } from '@orpc/shared'
 
 const DEFS_REF_PREFIX = '#/$defs/'
 const COMPONENTS_REF_PREFIX = '#/components/schemas/'
@@ -191,6 +191,10 @@ interface ReuseComparisonContext {
   visited: WeakMap<object, WeakSet<object>>
 }
 
+function isSchemaContainer(value: unknown): value is unknown[] | Record<PropertyKey, unknown> {
+  return Array.isArray(value) || isPlainObject(value)
+}
+
 function areSchemasEquivalentForReuse(candidate: unknown, existing: unknown, ctx: ReuseComparisonContext): boolean {
   if (candidate === existing) {
     return true
@@ -204,7 +208,8 @@ function areSchemasEquivalentForReuse(candidate: unknown, existing: unknown, ctx
     return candidate === existing
   }
 
-  if (typeof candidate !== 'object' || typeof existing !== 'object') {
+  // Only arrays and plain objects carry schema structure; primitives and values like Date are compared as a whole
+  if (!isSchemaContainer(candidate) || !isSchemaContainer(existing)) {
     return isDeepEqual(candidate, existing)
   }
 

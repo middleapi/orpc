@@ -2099,4 +2099,15 @@ describe('deduplicateJsonSchemas', () => {
       },
     ])
   })
+
+  it('keeps schemas whose date defaults differ', () => {
+    expect(deduplicateJsonSchemas([
+      { type: 'string', default: new Date(0) },
+      { type: 'string', default: new Date(1) },
+      { type: 'string', default: new Date(0) },
+    ])).toEqual([
+      { type: 'string', default: new Date(0) },
+      { type: 'string', default: new Date(1) },
+    ])
+  })
 })

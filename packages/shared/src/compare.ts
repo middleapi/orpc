@@ -1,3 +1,5 @@
+import { isPlainObject } from './object'
+
 export function isDeepEqual(a: unknown, b: unknown): boolean {
   return isDeepEqualInternal(a, b, new WeakMap())
 }
@@ -26,6 +28,20 @@ function isDeepEqualInternal(
   const isArray = Array.isArray(a)
 
   if (isArray !== Array.isArray(b)) {
+    return false
+  }
+
+  if (!isArray && (!isPlainObject(a) || !isPlainObject(b))) {
+    if (a instanceof Date && b instanceof Date) {
+      return Object.is(a.getTime(), b.getTime())
+    }
+
+    if (a instanceof RegExp && b instanceof RegExp) {
+      return a.source === b.source && a.flags === b.flags
+    }
+
+    // Other non-plain objects (Map, Set, class instances, ...) keep their state outside own enumerable keys,
+    // so they are only equal by reference, which Object.is already handled above
     return false
   }
 
