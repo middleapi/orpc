@@ -93,7 +93,7 @@ function inferMalformedResponseMessage(response: StandardResponse): string | und
   }
 
   if (response.status === 0) {
-    return 'Received an opaque response (status 0), which fetch returns for redirects when redirect is \'manual\'.'
+    return 'Received an opaque response (status 0), typically a redirect that browsers hide from fetch.'
   }
 
   const commonCode = Object.entries(COMMON_ERROR_STATUS_MAP).find(([, status]) => status === response.status)?.[0]

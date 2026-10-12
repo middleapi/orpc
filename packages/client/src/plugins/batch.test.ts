@@ -1295,13 +1295,18 @@ describe('batchLinkPlugin', () => {
   })
 
   describe('error batch responses', () => {
-    it.each(['buffered', 'streaming'] as const)('forwards %s batch responses with status >= 400 to every subrequest', async (mode) => {
+    it.each([
+      ['buffered', 502],
+      ['streaming', 502],
+      ['buffered', 0],
+      ['streaming', 0],
+    ] as const)('forwards %s batch responses with non-success status %i to every subrequest', async (mode, status) => {
       const codec = makeCodec()
       const transport = makeTransport()
 
       vi.mocked(transport.send).mockImplementation(async () => {
         return {
-          status: 502,
+          status,
           headers: { 'x-error': 'gateway' },
           resolveBody: async () => 'Bad Gateway',
         }
@@ -1318,11 +1323,11 @@ describe('batchLinkPlugin', () => {
 
       expect(codec.decodeResponse).toHaveBeenCalledTimes(2)
       expect(vi.mocked(codec.decodeResponse).mock.calls[0]![0]).toMatchObject({
-        status: 502,
+        status,
         headers: { 'x-error': 'gateway' },
       })
       expect(vi.mocked(codec.decodeResponse).mock.calls[1]![0]).toMatchObject({
-        status: 502,
+        status,
         headers: { 'x-error': 'gateway' },
       })
     })

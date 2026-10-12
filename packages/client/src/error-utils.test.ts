@@ -208,7 +208,7 @@ describe('createORPCErrorFromMalformedResponse', () => {
 
   it('infers an opaque response message for status 0', () => {
     expect(createORPCErrorFromMalformedResponse({ response: { status: 0, headers: {}, body: undefined } }).message).toBe(
-      'Received an opaque response (status 0), which fetch returns for redirects when redirect is \'manual\'.',
+      'Received an opaque response (status 0), typically a redirect that browsers hide from fetch.',
     )
     expect(createORPCErrorFromMalformedResponse({ response: { status: 0, headers: {}, body: 'from body' } }).message).toBe('from body')
   })

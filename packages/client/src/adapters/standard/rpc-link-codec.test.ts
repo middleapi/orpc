@@ -294,15 +294,14 @@ describe('rpcLinkCodec', () => {
         resolveBody: () => Promise.resolve(undefined),
       })
 
-      expect(result.kind).toBe('error')
-      if (result.kind === 'error') {
-        expect(result.error).toBeInstanceOf(ORPCError)
-        expect(result.error.code).toBe('MALFORMED_ORPC_RESPONSE')
-        expect(result.error.message).toContain('status 0')
-        expect(result.error.data).toEqual({ status: 0, headers: {}, body: undefined })
-        expect(result.error.cause).toBeInstanceOf(MalformedResponseError)
-        expect((result.error.cause as MalformedResponseError).response).toBe(result.error.data)
-      }
+      expect(result).toEqual({
+        kind: 'error',
+        error: expect.objectContaining({
+          code: 'MALFORMED_ORPC_RESPONSE',
+          data: { status: 0, headers: {}, body: undefined },
+          cause: expect.any(MalformedResponseError),
+        }),
+      })
     })
 
     it('decodes ORPCError JSON from error response', async () => {

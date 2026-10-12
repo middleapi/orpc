@@ -7,6 +7,7 @@ import { mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
 import { toStandardHeaders } from '@standard-server/fetch'
 import { createORPCErrorFromJson, createORPCErrorFromMalformedResponse, isORPCErrorJson } from '../../error-utils'
 import { RPCSerializer } from '../../rpc-serializer'
+import { isSuccessResponseStatus } from './codec'
 
 export interface RPCLinkCodecOptions<T extends ClientContext> {
   /**
@@ -122,11 +123,7 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
   }
 
   async decodeResponse(response: StandardLazyResponse): Promise<StandardLinkCodecDecodedResponse> {
-    /**
-     * Status 0 is an opaque response, e.g. a redirect hidden by fetch's `redirect: 'manual'`,
-     * so it must not be treated as success.
-     */
-    const isOk = response.status > 0 && response.status < 400
+    const isOk = isSuccessResponseStatus(response.status)
 
     const body = await response.resolveBody()
 

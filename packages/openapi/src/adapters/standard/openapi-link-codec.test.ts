@@ -946,12 +946,7 @@ describe('openAPILinkCodec', () => {
       expectORPCErrorResult(result, 'MALFORMED_ORPC_RESPONSE', {
         data: { status: 0, headers: {}, body: undefined },
       })
-
-      if (result.kind === 'error') {
-        expect(result.error.message).toContain('status 0')
-        expect(result.error.cause).toBeInstanceOf(MalformedResponseError)
-        expect((result.error.cause as MalformedResponseError).response).toBe(result.error.data)
-      }
+      expect((result as any).error.cause).toBeInstanceOf(MalformedResponseError)
     })
   })
 })

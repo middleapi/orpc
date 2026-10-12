@@ -5,6 +5,7 @@ import type { Promisable, Public, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standard-server/core'
 import type { OpenAPIMeta } from '../../meta'
 import { createORPCErrorFromJson, createORPCErrorFromMalformedResponse, isORPCErrorJson } from '@orpc/client'
+import { isSuccessResponseStatus } from '@orpc/client/standard'
 import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import { unlazy } from '@orpc/server'
 import { isTypescriptObject, mergeHttpPath, pathToHttpPath, safeEncodeURIComponent, stringifyJSON, value } from '@orpc/shared'
@@ -374,11 +375,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     path: string[],
     _options: ClientOptions<T>,
   ): Promise<StandardLinkCodecDecodedResponse> {
-    /**
-     * Status 0 is an opaque response, e.g. a redirect hidden by fetch's `redirect: 'manual'`,
-     * so it must not be treated as success.
-     */
-    const isOk = response.status > 0 && response.status < 400
+    const isOk = isSuccessResponseStatus(response.status)
     const procedure = await this.resolveProcedure(path)
     const meta = getOpenAPIMeta(procedure)
 
