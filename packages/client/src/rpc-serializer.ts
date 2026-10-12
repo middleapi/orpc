@@ -104,7 +104,7 @@ export class RPCSerializer {
             return e
           }
 
-          const deserialized = this.deserializeValue(e.data)
+          const deserialized = e.data === undefined ? undefined : this.deserializeValue(e.data)
 
           if (isORPCErrorJson(deserialized)) {
             return createORPCErrorFromJson(deserialized, { cause: e })

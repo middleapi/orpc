@@ -262,6 +262,23 @@ describe('rpcSerializer', () => {
         return true
       })
     })
+
+    it('deserialize an error event without data', async () => {
+      const event = withEventMeta(new ErrorEvent(undefined), { id: '5', retry: 1000 })
+
+      const iterator = serializer.deserialize((async function* () {
+        throw event
+      })()) as any
+
+      await expect(iterator.next()).rejects.toSatisfy((e: any) => {
+        expect(e).toBeInstanceOf(ErrorEvent)
+        expect(e.data).toBe(undefined)
+        expect(e.cause).toBe(event)
+        expect(getEventMeta(e)).toEqual({ id: '5', retry: 1000 })
+
+        return true
+      })
+    })
   })
 
   describe('readable stream & blob', () => {
