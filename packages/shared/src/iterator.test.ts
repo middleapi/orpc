@@ -656,4 +656,60 @@ describe('consumeAsyncIterator', () => {
       expect(onSuccess).toHaveBeenCalledTimes(0)
     })
   })
+
+  it('unsubscribe resolves after iterator promise rejected', async () => {
+    const error = new Error('TEST')
+    const iterator = Promise.reject(error)
+
+    const onEvent = vi.fn()
+    const onError = vi.fn()
+    const onFinish = vi.fn()
+
+    const unsubscribe = consumeAsyncIterator(iterator, {
+      onEvent,
+      onError,
+      onFinish,
+    })
+
+    await vi.waitFor(() => {
+      expect(onError).toHaveBeenCalledTimes(1)
+    })
+
+    await expect(unsubscribe()).resolves.toBeUndefined()
+
+    expect(onEvent).toHaveBeenCalledTimes(0)
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(onError).toHaveBeenNthCalledWith(1, error)
+    expect(onFinish).toHaveBeenCalledTimes(1)
+    expect(onFinish).toHaveBeenNthCalledWith(1, [error, undefined, false])
+  })
+
+  it('unsubscribe resolves when iterator promise rejects after unsubscribe is called', async () => {
+    const error = new Error('TEST')
+    const { promise, reject } = promiseWithResolvers<AsyncIterator<number, void>>()
+
+    const onEvent = vi.fn()
+    const onError = vi.fn()
+    const onFinish = vi.fn()
+
+    const unsubscribe = consumeAsyncIterator(promise, {
+      onEvent,
+      onError,
+      onFinish,
+    })
+
+    const unsubscribePromise = unsubscribe()
+    reject(error)
+
+    await expect(unsubscribePromise).resolves.toBeUndefined()
+
+    await vi.waitFor(() => {
+      expect(onError).toHaveBeenCalledTimes(1)
+    })
+
+    expect(onEvent).toHaveBeenCalledTimes(0)
+    expect(onError).toHaveBeenNthCalledWith(1, error)
+    expect(onFinish).toHaveBeenCalledTimes(1)
+    expect(onFinish).toHaveBeenNthCalledWith(1, [error, undefined, false])
+  })
 })
