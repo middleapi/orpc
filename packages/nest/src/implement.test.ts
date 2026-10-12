@@ -43,6 +43,35 @@ describe('requirements', () => {
     }).toThrow(/openapi\.path/)
   })
 
+  it.each([
+    ['a colon', { path: '/models:predict' }],
+    ['an asterisk', { path: '/files/*.txt' }],
+    ['a colon in a non-parameter brace segment', { path: '/users/{user:id}' }],
+    ['a colon in the prefix', { path: '/predict', prefix: '/models:v1' }],
+  ] as const)('should throw if the contract path literally contains %s', (_, route) => {
+    const contract = oc.meta(openapi({ method: 'POST', ...route }))
+
+    expect(() => {
+      @Controller()
+      class ImplController {
+        @Implement(contract)
+        procedure() {
+          return implement(contract).handler(() => {})
+        }
+      }
+    }).toThrow(/NestJS routing can't represent/)
+
+    expect(() => {
+      @Controller()
+      class ImplController {
+        @Implement({ nested: { contract } })
+        router() {
+          return { nested: { contract: implement(contract).handler(() => {}) } }
+        }
+      }
+    }).toThrow(/NestJS routing can't represent/)
+  })
+
   it('should throw if @Implement uses the QUERY HTTP method when QueryMethod is not available (NestJS < 11.2)', async () => {
     vi.resetModules()
     vi.doMock('@nestjs/common', async (importOriginal) => {
@@ -445,6 +474,11 @@ describe('routing', () => {
         path: '/files/{path}',
         method: 'GET',
       })).input(z.object({ tenant: z.string(), path: z.string() })),
+
+      hyphenParam: oc.meta(openapi({
+        path: '/members/{user-id}',
+        method: 'GET',
+      })).input(z.object({ 'tenant': z.string(), 'user-id': z.string() })),
     }
 
     @Controller('/:tenant')
@@ -467,6 +501,48 @@ describe('routing', () => {
       @Implement(contract.pathNamedParam)
       pathNamedParam() {
         return implement(contract.pathNamedParam).handler(({ input }) => input)
+      }
+
+      @Implement(contract.hyphenParam)
+      hyphenParam() {
+        return implement(contract.hyphenParam).handler(({ input }) => input)
+      }
+    }
+
+    const nonIdentifierContract = {
+      hyphenParam: oc.meta(openapi({
+        path: '/users/{user-id}',
+        method: 'GET',
+      })).input(z.object({ 'user-id': z.string() })),
+
+      digitParam: oc.meta(openapi({
+        path: '/ranks/{1st}',
+        method: 'GET',
+      })).input(z.object({ '1st': z.string() })),
+
+      mixedParams: oc.meta(openapi({
+        // `orpc_p0` is the key a non-identifier param would naturally be generated under
+        path: '/{orpc_p0}/{a-b}/{id}',
+        prefix: '/mixed/{x-y}',
+        method: 'GET',
+      })).input(z.object({ 'x-y': z.string(), 'orpc_p0': z.string(), 'a-b': z.string(), 'id': z.string() })),
+    }
+
+    @Controller()
+    class NonIdentifierController {
+      @Implement(nonIdentifierContract.hyphenParam)
+      hyphenParam() {
+        return implement(nonIdentifierContract.hyphenParam).handler(({ input }) => input)
+      }
+
+      @Implement(nonIdentifierContract.digitParam)
+      digitParam() {
+        return implement(nonIdentifierContract.digitParam).handler(({ input }) => input)
+      }
+
+      @Implement(nonIdentifierContract.mixedParams)
+      mixedParams() {
+        return implement(nonIdentifierContract.mixedParams).handler(({ input }) => input)
       }
     }
 
@@ -491,7 +567,7 @@ describe('routing', () => {
     }
 
     const moduleRef = await Test.createTestingModule({
-      controllers: [TenantController, ProtoController],
+      controllers: [TenantController, NonIdentifierController, ProtoController],
     }).compile()
 
     const app = moduleRef.createNestApplication(adapter as any)
@@ -529,6 +605,31 @@ describe('routing', () => {
 
       expect(res.statusCode).toEqual(200)
       expect(res.body).toEqual({ tenant: 'acme', path: 'xxx' })
+    })
+
+    it('should route params whose names are not identifiers', async () => {
+      const hyphen = await supertest(httpServer).get('/users/42')
+      expect(hyphen.statusCode).toEqual(200)
+      expect(hyphen.body).toEqual({ 'user-id': '42' })
+
+      const hyphenInValue = await supertest(httpServer).get('/users/42-id')
+      expect(hyphenInValue.statusCode).toEqual(200)
+      expect(hyphenInValue.body).toEqual({ 'user-id': '42-id' })
+
+      const digit = await supertest(httpServer).get('/ranks/gold')
+      expect(digit.statusCode).toEqual(200)
+      expect(digit.body).toEqual({ '1st': 'gold' })
+
+      const mixed = await supertest(httpServer).get('/mixed/1/2/3/4')
+      expect(mixed.statusCode).toEqual(200)
+      expect(mixed.body).toEqual({ 'x-y': '1', 'orpc_p0': '2', 'a-b': '3', 'id': '4' })
+    })
+
+    it('should keep dynamic controller prefix params alongside non-identifier contract params', async () => {
+      const res = await supertest(httpServer).get('/acme/members/42')
+
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual({ 'tenant': 'acme', 'user-id': '42' })
     })
 
     it('should treat params named like `__proto__` as own properties without polluting the prototype', async () => {

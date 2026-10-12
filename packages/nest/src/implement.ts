@@ -44,6 +44,7 @@ const MethodDecoratorMap = {
  * @remarks
  * **Note**: Every procedure contract must define an `openapi.path` meta;
  * use `populateRouterContractOpenAPIPaths` from `@orpc/openapi` to fill in missing paths.
+ * **Note**: NestJS routing can't represent a literal `:` or `*` across adapters, so contract paths containing them outside of a path parameter (e.g. `/models:predict`) throw.
  * **Note**: The HTTP `QUERY` method requires NestJS v11.2+ (`QueryMethod`). Older NestJS versions throw; use `GET` instead.
  *
  * @see {@link https://orpc.dev/docs/integrations/nest#implement-your-contract | Implement oRPC contract with NestJS - Implement Your Contract}
@@ -85,7 +86,7 @@ function toNestRouteDecorator(contract: AnyProcedureContract): MethodDecorator {
   }
 
   const method = meta.method ?? DEFAULT_OPENAPI_METHOD
-  const path = toNestPattern(meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path)
+  const path = toNestRoute(meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path).pattern
   const successStatus = meta.successStatus ?? DEFAULT_SUCCESS_STATUS
 
   if (method === 'QUERY') {
@@ -337,44 +338,74 @@ function toORPCOpenAPIParams(contract: AnyProcedureContract, params: NestStandar
     return undefined
   }
 
+  const { paramNames } = toNestRoute(meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path)
   // NullProtoObj prevents prototype injection when a param is named like `__proto__`
   const orpcParams: Record<string, string> = new NullProtoObj()
   // express use `path` while fastify use `*` for rest matching
   const restKey = Object.hasOwn(params, '*') ? '*' : 'path'
 
   for (const [key, value] of Object.entries(params)) {
-    if (key === restKey) {
-      const restParams = getDynamicPathParams(
-        meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path,
-      )?.filter(c => c.allowsSlash)
-
-      if (restParams?.length) {
-        for (const c of restParams) {
-          orpcParams[c.parameterName] = flattenParamValue(value)
-        }
-
-        continue
-      }
-    }
-
-    orpcParams[key] = flattenParamValue(value)
+    // keys the route did not generate (e.g. controller-level params) pass through as is
+    const name = paramNames.get(key === restKey ? '*' : key) ?? key
+    orpcParams[name] = flattenParamValue(value)
   }
 
   return orpcParams
 }
 
-function toNestPattern(path: `/${string}`): `/${string}` {
-  const params = getDynamicPathParams(path)
+const NEST_PARAM_NAME_REGEX = /^[a-z_]\w*$/i
 
-  if (!params?.length) {
-    return path
+/**
+ * Converts an oRPC OpenAPI path into a NestJS route pattern.
+ *
+ * Express and Fastify end a `:name` param at the first non-identifier character,
+ * so params like `{user-id}` are routed under generated keys instead.
+ * `paramNames` maps each generated key (and `*` for the rest param) back to its oRPC param name.
+ */
+function toNestRoute(path: `/${string}`): { pattern: `/${string}`, paramNames: Map<string, string> } {
+  const params = getDynamicPathParams(path) ?? []
+  const paramNames = new Map<string, string>()
+
+  let pattern = ''
+  let literalStart = 0
+
+  for (const [index, param] of params.entries()) {
+    pattern += toNestLiteral(path.slice(literalStart, param.startIndex), path)
+    literalStart = param.startIndex + param.segment.length
+
+    if (param.allowsSlash) {
+      paramNames.set('*', param.parameterName)
+      pattern += '*'
+    }
+    else if (NEST_PARAM_NAME_REGEX.test(param.parameterName)) {
+      // kept as is so NestJS guards and pipes can still read `req.params[name]`
+      pattern += `:${param.parameterName}`
+    }
+    else {
+      let key = `orpc_p${index}`
+      while (params.some(p => p.parameterName === key)) {
+        key = `_${key}`
+      }
+
+      paramNames.set(key, param.parameterName)
+      pattern += `:${key}`
+    }
   }
 
-  for (let i = params.length - 1; i >= 0; i--) {
-    const param = params[i]!
-    const pattern = param.allowsSlash ? `*` : `:${param.parameterName}`
-    path = path.slice(0, param.startIndex) + pattern + path.slice(param.startIndex + param.segment.length)
+  pattern += toNestLiteral(path.slice(literalStart), path)
+
+  return { pattern: pattern as `/${string}`, paramNames }
+}
+
+function toNestLiteral(text: string, path: string): string {
+  // escaping is adapter-specific (Express needs `\:` while Fastify needs `::`), and the adapter is unknown here
+  if (text.includes(':') || text.includes('*')) {
+    throw new TypeError(`
+      @Implement decorator does not support a literal ':' or '*' in the contract path "${path}",
+      because NestJS routing can't represent these characters across adapters (Express and Fastify parse them as route syntax).
+      Please remove them from the path, e.g. use '/models/predict' instead of '/models:predict'.
+    `)
   }
 
-  return path
+  return text
 }

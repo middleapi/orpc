@@ -44,6 +44,14 @@ const contract = populateRouterContractOpenAPIPaths({
 })
 ```
 
+:::warning
+NestJS routing can't represent a literal `:` or `*` in a path across adapters, so `@Implement` throws a `TypeError` for contract paths (including the `openapi.prefix`) that contain them outside of a [path parameter](/docs/openapi/routing#path-parameters), such as `/models:predict`. Use a separate segment instead, e.g. `/models/predict`.
+:::
+
+:::info
+Path parameters whose names are not valid identifiers (e.g. `{user-id}`) are registered with NestJS under generated names. They still reach your procedure `input` under their original names, but NestJS guards and pipes won't find them under those names in `req.params`.
+:::
+
 ## Implement Your Contract
 
 To implement your contract in NestJS, use the `@Implement` decorator and the `implement` function. The `@Implement` very similar to NestJS built-in HTTP method decorators (e.g., `@Get`, `@Post`) and can be used to implement either a single procedure contract or an [router contract](/docs/contract/router) or combine with other NestJS decorators.
