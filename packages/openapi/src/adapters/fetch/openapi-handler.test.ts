@@ -48,6 +48,34 @@ describe('openapiHandler', () => {
     expect(misMatchPrefixResult.response).toBeUndefined()
   })
 
+  it('responds with 500 instead of rejecting when the output status cannot carry a body', async () => {
+    const handler = new OpenAPIHandler({
+      ping: os
+        .meta(openapi({ method: 'GET', path: '/ping', outputStructure: 'detailed' }))
+        .handler(() => ({ status: 204, body: 'x' })),
+    })
+
+    const { matched, response } = await handler.handle(new Request('https://example.com/ping'))
+
+    expect(matched).toBe(true)
+    expect(response!.status).toBe(500)
+    await expect(response!.json()).resolves.toEqual(expect.objectContaining({ code: 'INTERNAL_SERVER_ERROR' }))
+  })
+
+  it('still sends a bodyless 204 response', async () => {
+    const handler = new OpenAPIHandler({
+      ping: os
+        .meta(openapi({ method: 'GET', path: '/ping', successStatus: 204 }))
+        .handler(() => undefined),
+    })
+
+    const { matched, response } = await handler.handle(new Request('https://example.com/ping'))
+
+    expect(matched).toBe(true)
+    expect(response!.status).toBe(204)
+    await expect(response!.text()).resolves.toBe('')
+  })
+
   it('supports standard handler plugins', async () => {
     const plugin: StandardHandlerPlugin<any> = {
       name: 'test',

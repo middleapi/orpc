@@ -54,7 +54,8 @@ export interface OpenAPIMeta {
 
   /**
    * HTTP status code returned on success.
-   * Should be in the `2xx` range and must be less than `400`.
+   * Should be in the `2xx` range and must be an integer in the `200-399` range.
+   * `204`, `205` and `304` cannot carry a body, so the response body must be `undefined`.
    *
    * @default 200
    */
@@ -257,8 +258,9 @@ export interface OpenAPIMeta {
    *   ```
    *
    * - `detailed` — Return an object with optional properties:
-   *   - status: HTTP status code (200–399). Defaults to
-   *     successStatus if omitted. Use a literal type
+   *   - status: HTTP status code (integer 200–399). Defaults to
+   *     successStatus if omitted. 204, 205 and 304 cannot
+   *     carry a body. Use a literal type
    *     (e.g. z.literal(201)) so the generated spec can reflects
    *     the exact code.
    *   - headers: Custom headers to merge into the response

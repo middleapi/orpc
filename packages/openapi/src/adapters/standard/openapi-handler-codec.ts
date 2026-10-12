@@ -2,7 +2,7 @@ import type { AnyORPCError } from '@orpc/client'
 import type { AnyProcedure, AnyRouter, Context } from '@orpc/server'
 import type { ResolvedStandardHandlerHandleOptions, StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '@orpc/server/standard'
 import type { Promisable, Public } from '@orpc/shared'
-import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
+import type { StandardBody, StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { OpenAPIMeta } from '../../meta'
 import type { OpenAPIMatcherOptions } from './openapi-matcher'
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
@@ -99,6 +99,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
 
   /**
    * @throws {TypeError} If `outputStructure` is "detailed" and the output doesn't match the expected structure.
+   * @throws {TypeError} If the response status is not an integer in the 200-399 range, or is 204, 205 or 304 with a body.
    */
   encodeOutput(output: unknown, procedure: AnyProcedure, path: string[]): Promisable<StandardResponse> {
     const meta = getOpenAPIMeta(procedure)
@@ -106,10 +107,14 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
     const outputStructure = meta?.outputStructure ?? DEFAULT_OPENAPI_OUTPUT_STRUCTURE
 
     if (outputStructure === 'compact') {
+      const body = this.serializer.serialize(output)
+
+      assertSendableSuccessResponse(successStatus, body, path)
+
       return {
         status: successStatus,
         headers: {},
-        body: this.serializer.serialize(output),
+        body,
       }
     }
 
@@ -117,7 +122,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
       throw new TypeError(`
         Invalid "detailed" output structure returned by procedure (${path.join('.')}):
         • Expected an object with optional properties:
-          - status (number <400)
+          - status (integer 200-399)
           - headers (object)
           - body (any)
         • No extra keys allowed.
@@ -127,10 +132,16 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
       `)
     }
 
+    const status = output.status ?? successStatus
+    const headers = output.headers !== undefined ? serializeHeaders(output.headers, this.serializer) : {}
+    const body = this.serializer.serialize(output.body)
+
+    assertSendableSuccessResponse(status, body, path)
+
     return {
-      status: output.status ?? successStatus,
-      headers: output.headers !== undefined ? serializeHeaders(output.headers, this.serializer) : {},
-      body: this.serializer.serialize(output.body),
+      status,
+      headers,
+      body,
     }
   }
 
@@ -283,11 +294,7 @@ function isValidDetailedOutput(output: unknown): output is { status?: number, bo
     return false
   }
 
-  if (output.status !== undefined && (
-    typeof output.status !== 'number'
-    || !Number.isInteger(output.status)
-    || output.status > 399
-  )) {
+  if (output.status !== undefined && !isValidSuccessStatus(output.status)) {
     return false
   }
 
@@ -296,6 +303,35 @@ function isValidDetailedOutput(output: unknown): output is { status?: number, bo
   }
 
   return true
+}
+
+const BODYLESS_STATUSES = [204, 205, 304]
+
+function isValidSuccessStatus(status: unknown): status is number {
+  return typeof status === 'number' && Number.isInteger(status) && status >= 200 && status <= 399
+}
+
+/**
+ * Adapters cannot send every status a procedure may return (e.g. fetch `Response` rejects statuses below 200
+ * and a body on 204, 205 and 304), so reject them while encoding, where the error becomes a 500 response.
+ *
+ * @throws {TypeError} If the status is not an integer in the 200-399 range, or cannot carry the given body.
+ */
+function assertSendableSuccessResponse(status: number, body: StandardBody, path: string[]): void {
+  if (!isValidSuccessStatus(status)) {
+    throw new TypeError(`
+      Invalid success status (${status}) for procedure (${path.join('.')}):
+      • Expected an integer in the 200-399 range. Check the "successStatus" meta.
+    `)
+  }
+
+  if (body !== undefined && BODYLESS_STATUSES.includes(status)) {
+    throw new TypeError(`
+      Invalid success response returned by procedure (${path.join('.')}):
+      • HTTP status ${status} cannot have a body, but the output has one.
+      • Return \`undefined\` as the body, or use a status that allows a body.
+    `)
+  }
 }
 
 function decodeDelimitedArray(value: string | undefined, delimiter: string): undefined | string[] {

@@ -758,6 +758,35 @@ describe('openAPIHandlerCodec', () => {
         expect(serializer.serialize).toHaveBeenCalledOnce()
         expect(serializer.serialize).toHaveBeenCalledWith('__output__')
       })
+
+      it('accepts a bodyless successStatus when the output is undefined', () => {
+        const procedure = os.meta(openapi({ successStatus: 204 })).handler(vi.fn())
+        const codec = new OpenAPIHandlerCodec(procedure)
+
+        const response = codec.encodeOutput(undefined, procedure, [])
+
+        expect(response).toEqual({
+          status: 204,
+          headers: {},
+          body: undefined,
+        })
+      })
+
+      it('throws when a bodyless successStatus is used with a returned value', () => {
+        const procedure = os.meta(openapi({ successStatus: 204 })).handler(vi.fn())
+        const codec = new OpenAPIHandlerCodec(procedure)
+
+        expect(() => codec.encodeOutput({ a: 1 }, procedure, ['planet', 'get'])).toThrow(TypeError)
+        expect(() => codec.encodeOutput({ a: 1 }, procedure, ['planet', 'get'])).toThrow(/planet\.get[\s\S]*status 204 cannot have a body/)
+      })
+
+      it.each([0, -1, 101, 199, 400, 500, 250.5])('throws for successStatus outside the 200-399 range: %s', (successStatus) => {
+        const procedure = os.meta(openapi({ successStatus })).handler(vi.fn())
+        const codec = new OpenAPIHandlerCodec(procedure)
+
+        expect(() => codec.encodeOutput(undefined, procedure, ['planet', 'get'])).toThrow(TypeError)
+        expect(() => codec.encodeOutput(undefined, procedure, ['planet', 'get'])).toThrow(/planet\.get[\s\S]*integer in the 200-399 range/)
+      })
     })
 
     describe('outputStructure=detailed', () => {
@@ -824,7 +853,7 @@ describe('openAPIHandlerCodec', () => {
         })
       })
 
-      it('accepts informational and redirect statuses since any status below 400 is success', () => {
+      it('accepts redirect statuses since any status below 400 is success', () => {
         const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
 
@@ -883,18 +912,55 @@ describe('openAPIHandlerCodec', () => {
         expect(Object.getOwnPropertyDescriptor(response.headers, 'constructor')?.value).toBe('c')
       })
 
-      it.each([
-        ['non-object output', '__invalid__'],
-        ['status of 400 or above', { status: 400 }],
-        ['non-integer status', { status: 250.5 }],
-        ['non-number status', { status: '200' }],
-        ['extra keys', { body: 'ok', extra: true }],
-        ['non-object headers', { headers: 'invalid' }],
-      ])('throws for invalid output: %s', (_, output) => {
+      it.each([204, 304])('accepts bodyless status %s without a body', (status) => {
         const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
 
-        expect(() => codec.encodeOutput(output, procedure, [])).toThrow('Invalid "detailed" output structure')
+        const response = codec.encodeOutput({
+          status,
+          headers: { etag: '"v1"' },
+        }, procedure, [])
+
+        expect(response).toEqual({
+          status,
+          headers: { etag: '"v1"' },
+          body: undefined,
+        })
+      })
+
+      it('throws when the bodyless successStatus fallback is used with a body', () => {
+        const procedure = os.meta(openapi({ outputStructure: 'detailed', successStatus: 205 })).handler(vi.fn())
+        const codec = new OpenAPIHandlerCodec(procedure)
+
+        expect(() => codec.encodeOutput({ body: 'x' }, procedure, ['planet', 'reset'])).toThrow(/planet\.reset[\s\S]*status 205 cannot have a body/)
+      })
+
+      it('throws when the successStatus fallback is outside the 200-399 range', () => {
+        const procedure = os.meta(openapi({ outputStructure: 'detailed', successStatus: 101 })).handler(vi.fn())
+        const codec = new OpenAPIHandlerCodec(procedure)
+
+        expect(() => codec.encodeOutput({}, procedure, ['planet', 'get'])).toThrow(/planet\.get[\s\S]*integer in the 200-399 range/)
+      })
+
+      it.each([
+        ['non-object output', '__invalid__', 'Invalid "detailed" output structure'],
+        ['status of 400 or above', { status: 400 }, 'Invalid "detailed" output structure'],
+        ['status of 0', { status: 0 }, 'Invalid "detailed" output structure'],
+        ['negative status', { status: -1 }, 'Invalid "detailed" output structure'],
+        ['informational status', { status: 101 }, 'Invalid "detailed" output structure'],
+        ['status below 200', { status: 199 }, 'Invalid "detailed" output structure'],
+        ['non-integer status', { status: 250.5 }, 'Invalid "detailed" output structure'],
+        ['non-number status', { status: '200' }, 'Invalid "detailed" output structure'],
+        ['extra keys', { body: 'ok', extra: true }, 'Invalid "detailed" output structure'],
+        ['non-object headers', { headers: 'invalid' }, 'Invalid "detailed" output structure'],
+        ['204 with a body', { status: 204, body: 'x' }, 'status 204 cannot have a body'],
+        ['304 with a body', { status: 304, body: {} }, 'status 304 cannot have a body'],
+      ])('throws for invalid output: %s', (_, output, message) => {
+        const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
+        const codec = new OpenAPIHandlerCodec(procedure)
+
+        expect(() => codec.encodeOutput(output, procedure, [])).toThrow(TypeError)
+        expect(() => codec.encodeOutput(output, procedure, [])).toThrow(message)
       })
     })
   })
