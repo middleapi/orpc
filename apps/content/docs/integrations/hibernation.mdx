@@ -46,6 +46,10 @@ The plugin provides `HibernationAsyncIteratorClass` and `encodeHibernationRPCEve
    })
    ```
 
+   :::info
+   Output schemas such as [`asyncIteratorObject`](/docs/async-iterator-object#validating-events) still work for typing and OpenAPI generation, but events sent with `encodeHibernationRPCEvent` skip yield-schema validation.
+   :::
+
 2. Send events to clients with `encodeHibernationRPCEvent`
 
    ```ts

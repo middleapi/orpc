@@ -1,4 +1,5 @@
-import { os } from '@orpc/server'
+import { oc } from '@orpc/contract'
+import { asyncIteratorObject, implement, os, type } from '@orpc/server'
 import { RPCHandlerCodec, StandardHandler } from '@orpc/server/standard'
 import { RPCHandler } from '@orpc/server/websocket'
 import { decodePeerMessage, encodePeerMessage, HibernationAsyncIteratorClass } from '@standard-server/peer'
@@ -16,6 +17,18 @@ describe('hibernationHandlerPlugin', () => {
   const router = {
     ping: os.handler(() => new HibernationAsyncIteratorClass(callback)),
     pong: os.handler(() => 'pong'),
+    withSchema: os
+      .output(asyncIteratorObject(type<string>()))
+      .handler(() => new HibernationAsyncIteratorClass<string>(callback)),
+    contractFirst: implement(oc.output(asyncIteratorObject(type<string>())))
+      .handler(() => new HibernationAsyncIteratorClass<string>(callback)),
+    replacedByMiddleware: os
+      .use(async ({ next }) => {
+        await next()
+        return { output: 'replaced', context: {} }
+      })
+      .output(asyncIteratorObject(type<string>()))
+      .handler(() => new HibernationAsyncIteratorClass<string>(callback)),
   }
 
   const options = {
@@ -46,6 +59,29 @@ describe('hibernationHandlerPlugin', () => {
     expect(response!.body).toBeInstanceOf(HibernationAsyncIteratorClass)
   })
 
+  it.each(['withSchema', 'contractFirst'])('sets body as the original HibernationAsyncIteratorClass behind an output schema: %s', async (path) => {
+    const { response } = await handler.handle(createRequest(`/${path}`), {
+      context: {},
+    })
+
+    expect(response!.status).toBe(200)
+    expect(response!.body).toBeInstanceOf(HibernationAsyncIteratorClass)
+
+    const body = response!.body as HibernationAsyncIteratorClass<any>
+    body['~callback']!('1')
+    expect(callback).toHaveBeenCalledTimes(1)
+    expect(callback).toHaveBeenCalledWith('1')
+  })
+
+  it('does nothing if a middleware replaces the HibernationAsyncIteratorClass output', async () => {
+    const { response } = await handler.handle(createRequest('/replacedByMiddleware'), {
+      context: {},
+    })
+
+    expect(response!.status).toBe(200)
+    expect(response!.body).toEqual({ json: 'replaced' })
+  })
+
   it('does nothing if output is not HibernationAsyncIteratorClass', async () => {
     const { response } = await handler.handle(createRequest('/pong'), {
       context: {},
@@ -74,7 +110,7 @@ describe('hibernationHandlerPlugin', () => {
   })
 
   describe('websocket integration', () => {
-    it('invokes the hibernation callback with the request id and can send events later', async () => {
+    it.each(['ping', 'withSchema', 'contractFirst'])('invokes the hibernation callback with the request id and can send events later: %s', async (path) => {
       const handler = new RPCHandler(router, options)
 
       const ws = {
@@ -86,7 +122,7 @@ describe('hibernationHandlerPlugin', () => {
         id: '19',
         kind: 'request',
         json: {
-          url: '/ping',
+          url: `/${path}`,
           method: 'POST',
           headers: {},
           body: undefined,
