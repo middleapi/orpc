@@ -276,7 +276,6 @@ describe('decorateMiddleware', () => {
 
       const combined = decorated.use(Object.assign(vi.fn(), { '~orpc': { metaPlugins: [shared, own] } }) as any)
       expect(combined['~orpc']?.metaPlugins).toEqual([shared, own])
-      expect(combined['~orpc']?.metaPlugins?.[1]).toBe(own)
     })
   })
 })

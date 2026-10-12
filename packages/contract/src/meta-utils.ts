@@ -12,16 +12,23 @@ export function resolveMetaPlugins<
   existingPlugins: MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[] | undefined,
   incomingPlugins: MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[] | undefined,
 ): [meta: Meta, plugins: MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[]] {
-  const existing = mergeMetaPlugins(existingPlugins)
-  const plugins = mergeMetaPlugins(existing, incomingPlugins)
+  const seen = new Set(toArray(existingPlugins))
 
   let meta = baseMeta
-  // A plugin instance that is already present must not init again (e.g. prefix would concatenate twice)
-  for (const plugin of plugins.slice(existing.length)) {
+  for (const plugin of toArray(incomingPlugins)) {
+    // init is not guaranteed to be idempotent, so an instance already present must not run it again
+    if (seen.has(plugin)) {
+      continue
+    }
+
+    seen.add(plugin)
+
     if (plugin.init) {
       meta = plugin.init(meta)
     }
   }
+
+  const plugins = [...seen]
 
   for (const plugin of plugins) {
     if (plugin.apply) {

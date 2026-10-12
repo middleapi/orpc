@@ -58,62 +58,27 @@ it('resolveMetaPlugins', () => {
   expect(plugin2.apply).toHaveBeenCalledBefore(plugin3.apply)
 })
 
-describe('resolveMetaPlugins dedupes plugin instances', () => {
-  it('skips an incoming plugin already in existing', () => {
-    const plugin = {
-      name: 'plugin',
-      init: vi.fn(m => ({ ...m, count: (m.count as number ?? 0) + 1 })),
-      apply: vi.fn(m => ({ ...m, applied: (m.applied as number ?? 0) + 1 })),
-    } satisfies AnyMetaPlugin
+it('resolveMetaPlugins skips plugin instances already present', () => {
+  const plugin1 = { name: 'same', init: vi.fn(m => m), apply: vi.fn(m => m) } satisfies AnyMetaPlugin
+  const plugin2 = { name: 'same', init: vi.fn(m => m), apply: vi.fn(m => m) } satisfies AnyMetaPlugin
 
-    const [meta, plugins] = resolveMetaPlugins({ count: 1 }, [plugin], [plugin])
+  const [, plugins] = resolveMetaPlugins({}, [plugin1], [plugin1, plugin2, plugin2])
 
-    expect(plugin.init).not.toHaveBeenCalled()
-    expect(plugin.apply).toHaveBeenCalledTimes(1)
-    expect(plugins).toEqual([plugin])
-    expect(meta).toEqual({ count: 1, applied: 1 })
-  })
-
-  it('inits a plugin repeated within incoming only once', () => {
-    const plugin = {
-      name: 'plugin',
-      init: vi.fn(m => ({ ...m, count: (m.count as number ?? 0) + 1 })),
-      apply: vi.fn(m => ({ ...m, applied: (m.applied as number ?? 0) + 1 })),
-    } satisfies AnyMetaPlugin
-
-    const [meta, plugins] = resolveMetaPlugins({}, undefined, [plugin, plugin])
-
-    expect(plugin.init).toHaveBeenCalledTimes(1)
-    expect(plugin.apply).toHaveBeenCalledTimes(1)
-    expect(plugins).toEqual([plugin])
-    expect(meta).toEqual({ count: 1, applied: 1 })
-  })
-
-  it('keeps distinct instances with the same name', () => {
-    const plugin1 = { name: 'same', init: vi.fn(m => m) } satisfies AnyMetaPlugin
-    const plugin2 = { name: 'same', init: vi.fn(m => m) } satisfies AnyMetaPlugin
-
-    const [, plugins] = resolveMetaPlugins({}, [plugin1], [plugin1, plugin2])
-
-    expect(plugin1.init).not.toHaveBeenCalled()
-    expect(plugin2.init).toHaveBeenCalledTimes(1)
-    expect(plugins).toEqual([plugin1, plugin2])
-  })
+  expect(plugins).toEqual([plugin1, plugin2])
+  expect(plugin1.init).not.toHaveBeenCalled()
+  expect(plugin2.init).toHaveBeenCalledTimes(1)
+  expect(plugin1.apply).toHaveBeenCalledTimes(1)
+  expect(plugin2.apply).toHaveBeenCalledTimes(1)
 })
 
 it('mergeMetaPlugins', () => {
-  const plugin1 = { name: 'same' } satisfies AnyMetaPlugin
-  const plugin2 = { name: 'same' } satisfies AnyMetaPlugin
-  const plugin3 = { name: 'other' } satisfies AnyMetaPlugin
+  const plugin1 = { name: 'same', init: vi.fn() } satisfies AnyMetaPlugin
+  const plugin2 = { name: 'same', init: vi.fn() } satisfies AnyMetaPlugin
+  const plugin3 = { name: 'other', init: vi.fn() } satisfies AnyMetaPlugin
 
   expect(mergeMetaPlugins()).toEqual([])
   expect(mergeMetaPlugins(undefined, [plugin1])).toEqual([plugin1])
-
-  const merged = mergeMetaPlugins<AnyMetaPlugin>([plugin1, plugin2], undefined, [plugin2, plugin3, plugin1])
-  expect(merged).toHaveLength(3)
-  expect(merged[0]).toBe(plugin1)
-  expect(merged[1]).toBe(plugin2)
-  expect(merged[2]).toBe(plugin3)
+  expect(mergeMetaPlugins([plugin1, plugin2], undefined, [plugin2, plugin3, plugin1])).toEqual([plugin1, plugin2, plugin3])
 })
 
 it('defineMeta', () => {

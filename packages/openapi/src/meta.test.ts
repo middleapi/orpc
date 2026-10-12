@@ -305,24 +305,22 @@ describe('openapi meta', () => {
     const mw = base.middleware(({ next }) => next())
     const expected = { prefix: '/planets', tags: ['planet'], path: '/list' }
 
-    it('builder middleware used back on the same builder', () => {
-      const list = base.use(mw).meta(openapi({ method: 'GET', path: '/list' })).handler(() => [])
-      expect(getOpenAPIMeta(list)).toEqual({ ...expected, method: 'GET' })
+    it('does not re-init when a builder middleware is used on the same builder', () => {
+      const list = base.use(mw).meta(openapi({ path: '/list' })).handler(() => [])
+      expect(getOpenAPIMeta(list)).toEqual(expected)
     })
 
-    it('builder middleware used on a procedure from the same builder', () => {
+    it('does not re-init when a builder middleware is used on a procedure from the same builder', () => {
       const list = base.meta(openapi({ path: '/list' })).handler(() => []).use(mw)
       expect(getOpenAPIMeta(list)).toEqual(expected)
     })
 
-    it('two builder middlewares combined', () => {
-      const a = base.middleware(({ next }) => next())
-      const b = base.middleware(({ next }) => next())
-      const list = os.use(a.use(b)).meta(openapi({ path: '/list' })).handler(() => [])
+    it('does not re-init when two builder middlewares are combined', () => {
+      const list = os.use(mw.use(base.middleware(({ next }) => next()))).meta(openapi({ path: '/list' })).handler(() => [])
       expect(getOpenAPIMeta(list)).toEqual(expected)
     })
 
-    it('procedure routed through the same builder', () => {
+    it('does not re-init when a procedure is routed through the same builder', () => {
       const router = base.router({ list: base.meta(openapi({ path: '/list' })).handler(() => []) })
       expect(getOpenAPIMeta(router.list)).toEqual(expected)
     })
