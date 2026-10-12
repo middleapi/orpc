@@ -1,6 +1,7 @@
 import type { AnyRouter } from '../router'
 import { ORPCError } from '@orpc/client'
 import { promiseWithResolvers } from '@orpc/shared'
+import { ServerPeer } from '@standard-server/peer'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { os } from '../builder'
 import { BatchHandlerPlugin } from './batch'
@@ -292,6 +293,126 @@ describe('batchHandlerPlugin', () => {
       const { messageLength, payload } = readLengthPrefixedChunk(buffer)
       expect(messageLength).toBe(payload.length)
       expect(new TextDecoder().decode(payload)).toContain('__TEST__')
+    })
+
+    describe('backpressure', () => {
+      const item = 'x'.repeat(1024)
+      const produce = vi.fn()
+      const finalize = vi.fn()
+
+      const handler = createHandler(new BatchHandlerPlugin({ keepAlive: { enabled: false } }), {
+        stream: os.handler(async function* () {
+          try {
+            for (let i = 0; i < 10_000; i++) {
+              produce()
+              yield item
+            }
+          }
+          finally {
+            finalize()
+          }
+        }),
+      })
+
+      async function readPeerMessages(body: ReadableStream<Uint8Array>) {
+        const reader = body.getReader()
+        const messages: any[] = []
+        let buffer = new Uint8Array(0)
+
+        while (true) {
+          const { done, value } = await reader.read()
+
+          if (done) {
+            return messages
+          }
+
+          const next = new Uint8Array(buffer.length + value.length)
+          next.set(buffer)
+          next.set(value, buffer.length)
+          buffer = next
+
+          while (buffer.length >= 4) {
+            const { messageLength, payload } = readLengthPrefixedChunk(buffer)
+
+            if (payload.length < messageLength) {
+              break
+            }
+
+            messages.push(JSON.parse(new TextDecoder().decode(payload)))
+            buffer = buffer.subarray(4 + messageLength)
+          }
+        }
+      }
+
+      async function waitUntilStalled() {
+        await vi.waitFor(() => expect(produce).toHaveBeenCalled())
+
+        let produced: number
+        do {
+          produced = produce.mock.calls.length
+          await new Promise(resolve => setTimeout(resolve, 50))
+        } while (produce.mock.calls.length !== produced)
+
+        return produced
+      }
+
+      it('stops pulling sub-response streams until the body is read', async () => {
+        const { response } = await handler.handle(createBatchRequest({
+          mode: 'streaming',
+          messages: [makePeerRequestMessage(0, '/stream')],
+        }))
+
+        await new Promise(resolve => setTimeout(resolve, 100)) // body never read
+
+        // Bounded by the 64 KiB high-water mark of the batch stream, about 60 frames of ~1 KiB
+        expect(produce.mock.calls.length).toBeGreaterThan(0)
+        expect(produce.mock.calls.length).toBeLessThan(100)
+        expect(await waitUntilStalled()).toBeLessThan(100)
+
+        // Reading the body resumes production, and every frame still decodes
+        const messages = await readPeerMessages(response!.body!)
+
+        expect(produce).toHaveBeenCalledTimes(10_000)
+        expect(finalize).toHaveBeenCalledTimes(1)
+        expect(messages).toHaveLength(1 + 10_000 + 1)
+        expect(messages[0]).toMatchObject({ id: 0, kind: 'response' })
+        expect(messages.slice(1, -1)).toEqual(Array.from({ length: 10_000 }, () => ({
+          id: 0,
+          kind: 'event-stream',
+          json: { data: { json: item } },
+        })))
+        expect(messages.at(-1)).toMatchObject({ id: 0, kind: 'event-stream', json: { event: 'close' } })
+      })
+
+      it.each([
+        ['the response body is cancelled', (response: Response) => response.body!.cancel()],
+        ['the batch request is aborted', (_: Response, controller: AbortController) => controller.abort()],
+      ] as const)('releases sub-responses waiting for demand when %s', async (_, teardown) => {
+        const messageSpy = vi.spyOn(ServerPeer.prototype, 'message')
+
+        try {
+          const controller = new AbortController()
+          const { response } = await handler.handle(createBatchRequest({
+            mode: 'streaming',
+            messages: [makePeerRequestMessage(0, '/stream')],
+            signal: controller.signal,
+          }))
+
+          expect(await waitUntilStalled()).toBeLessThan(100)
+          expect(finalize).not.toHaveBeenCalled()
+
+          await teardown(response!, controller)
+
+          await vi.waitFor(() => expect(finalize).toHaveBeenCalledTimes(1))
+          expect(produce.mock.calls.length).toBeLessThan(100)
+
+          // The transmitter blocked in `send` finishes instead of hanging
+          await expect(messageSpy.mock.results[0]!.value).resolves.toBeUndefined()
+        }
+        finally {
+          messageSpy.mockRestore()
+        }
+      })
     })
   })
 

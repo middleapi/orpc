@@ -5,7 +5,7 @@ import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-ser
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
 import { ORPCError } from '@orpc/client'
-import { toArray, value } from '@orpc/shared'
+import { promiseWithResolvers, toArray, value } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
 
@@ -224,22 +224,25 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       }
 
-      const runSubrequests = async (peer: ServerPeer): Promise<void> => {
+      const runSubrequests = async (
+        peer: ServerPeer,
+        closePeer: (reason?: unknown) => Promise<void> = reason => peer.close(reason),
+      ): Promise<void> => {
         const promise = Promise.all(messages.map(msg => peer.message(msg, handleIndividualRequest)))
         const signal = interceptorOptions.request.signal
-        const closePeer = () => peer.close(signal?.reason)
+        const onAbort = () => closePeer(signal?.reason)
 
         if (signal?.aborted) {
-          closePeer()
+          onAbort()
         }
 
-        signal?.addEventListener('abort', closePeer)
+        signal?.addEventListener('abort', onAbort)
 
         try {
           await promise
         }
         finally {
-          signal?.removeEventListener('abort', closePeer)
+          signal?.removeEventListener('abort', onAbort)
         }
       }
 
@@ -289,6 +292,25 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       // streaming mode — binary length-prefixed ReadableStream
       let streamController: ReadableStreamDefaultController<Uint8Array>
       let keepAliveTimer: ReturnType<typeof setInterval> | undefined
+      let peerClosed = false
+      let demand = promiseWithResolvers<void>()
+
+      /**
+       * Wakes every `send` waiting for demand at once, so concurrent sub-requests all re-check it.
+       */
+      const notifyDemand = () => {
+        demand.resolve()
+        demand = promiseWithResolvers<void>()
+      }
+
+      /**
+       * Whether the consumer is behind, so `send` must wait for `pull` to signal demand.
+       * A cancelled stream reports a `desiredSize` of 0 rather than `null`, so closing is tracked separately.
+       */
+      const isBackpressured = () => {
+        const desiredSize = streamController.desiredSize
+        return !peerClosed && desiredSize !== null && desiredSize <= 0
+      }
 
       const clearKeepAlive = () => {
         if (keepAliveTimer !== undefined) {
@@ -321,35 +343,56 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         const encoded = await encodePeerMessage(message)
         const bytes = typeof encoded === 'string' ? new TextEncoder().encode(encoded) : encoded
 
-        const lengthBuffer = new ArrayBuffer(4)
-        new DataView(lengthBuffer).setUint32(0, bytes.byteLength, false)
-        streamController.enqueue(new Uint8Array(lengthBuffer))
-        streamController.enqueue(bytes)
+        const frame = new Uint8Array(4 + bytes.byteLength)
+        new DataView(frame.buffer).setUint32(0, bytes.byteLength, false)
+        frame.set(bytes, 4)
+        streamController.enqueue(frame)
         scheduleKeepAlive() // reset idle timer
+
+        /**
+         * Transmitters wait for `send` before pulling their next item, so holding it until the consumer
+         * catches up stops an unread response from pulling sub-responses into memory without limit.
+         */
+        while (isBackpressured()) {
+          await demand.promise
+        }
       })
+
+      /**
+       * Every way the stream ends goes through here, so no `send` is left waiting for demand that
+       * never comes. The peer closes in the same tick, so released transmitters see they are done.
+       */
+      const closePeer = (reason?: unknown) => {
+        peerClosed = true
+        notifyDemand()
+        return peer.close(reason)
+      }
 
       const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
         start(controller) {
           streamController = controller
           scheduleKeepAlive()
         },
+        pull() {
+          notifyDemand()
+        },
         async cancel(reason) {
           clearKeepAlive()
-          await peer.close(reason)
+          await closePeer(reason)
         },
-      })
+      }, new ByteLengthQueuingStrategy({ highWaterMark: 64 * 1024 }))
 
       // DO NOT await here to block streaming response
-      runSubrequests(peer)
+      runSubrequests(peer, closePeer)
         .then(async () => {
           clearKeepAlive()
           streamController.close()
-          await peer.close()
+          await closePeer()
         })
         .catch(async (error) => {
           clearKeepAlive()
           streamController.error(error)
-          await peer.close(error)
+          await closePeer(error)
         })
 
       return {
