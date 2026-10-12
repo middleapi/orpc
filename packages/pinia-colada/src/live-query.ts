@@ -1,6 +1,7 @@
 import type { Promisable } from '@orpc/shared'
 import type { UseQueryFnContext } from './types'
 import { stringifyJSON } from '@orpc/shared'
+import { cancelWhenInactive } from './cancel-when-inactive'
 
 /**
  * A Pinia Colada query function that publishes each streamed chunk to the
@@ -11,7 +12,7 @@ export function liveQuery<T>(
     context: UseQueryFnContext,
   ) => Promisable<AsyncIterable<T>>,
 ): (context: UseQueryFnContext) => Promise<T> {
-  return async (context) => {
+  return cancelWhenInactive(async (context) => {
     const { entry, signal } = context
 
     const stream = await queryFn(context)
@@ -33,5 +34,5 @@ export function liveQuery<T>(
     }
 
     return last.chunk
-  }
+  })
 }

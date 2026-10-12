@@ -1,5 +1,6 @@
 import type { Promisable } from '@orpc/shared'
 import type { UseQueryFnContext } from './types'
+import { cancelWhenInactive } from './cancel-when-inactive'
 
 export interface SerializableStreamedQueryOptions {
   /**
@@ -36,7 +37,7 @@ export function serializableStreamedQuery<T>(
   ) => Promisable<AsyncIterable<T>>,
   { refetchMode = 'reset', maxChunks = Number.POSITIVE_INFINITY }: SerializableStreamedQueryOptions = {},
 ): (context: UseQueryFnContext) => Promise<T[]> {
-  return async (context) => {
+  return cancelWhenInactive(async (context) => {
     const { entry, signal } = context
 
     const previousData = entry.state.value.data as T[] | undefined
@@ -70,7 +71,7 @@ export function serializableStreamedQuery<T>(
     }
 
     return result
-  }
+  })
 }
 
 function limitArraySize<T>(items: T[], maxSize: number): T[] {

@@ -2,7 +2,7 @@ import type { UseQueryOptions } from '@pinia/colada'
 import { PiniaColada, useQuery, useQueryCache } from '@pinia/colada'
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
-import { defineComponent } from 'vue'
+import { defineComponent, h, nextTick, ref } from 'vue'
 import { liveQuery } from './live-query'
 
 /**
@@ -118,5 +118,91 @@ describe('liveQuery', () => {
     await vi.waitFor(() => expect(mounted.vm.query.asyncStatus.value).toEqual('idle'))
     expect(mounted.vm.query.data.value).toEqual(1)
     expect(mounted.vm.query.error.value).toBeNull()
+  })
+
+  describe('cancels the stream once it is no longer used', () => {
+    function createLiveQuery() {
+      const controller = createChunkController<number>()
+      const onFinally = vi.fn()
+      const signals: AbortSignal[] = []
+
+      const query = liveQuery(async function* ({ signal }) {
+        signals.push(signal)
+
+        try {
+          yield* controller.stream()
+        }
+        finally {
+          onFinally()
+        }
+      })
+
+      return { controller, onFinally, signals, query }
+    }
+
+    it('when the last consumer unmounts', async () => {
+      const { controller, onFinally, signals, query } = createLiveQuery()
+      const mounted = mountQuery({ key: ['live'], query })
+
+      controller.push(1)
+      await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual(1))
+      const entry = mounted.vm.queryCache.get(['live'])!
+
+      mounted.unmount()
+      await vi.waitFor(() => expect(signals[0]!.aborted).toBe(true))
+      expect(entry.asyncStatus.value).toEqual('idle')
+
+      controller.push(2) // resumes the stream loop, which now observes the aborted signal
+      await vi.waitFor(() => expect(onFinally).toHaveBeenCalledTimes(1))
+      expect(entry.state.value).toEqual({ status: 'success', data: 1, error: null })
+      expect(signals).toHaveLength(1)
+    })
+
+    it('not while another consumer of the same key is mounted', async () => {
+      const { controller, onFinally, signals, query } = createLiveQuery()
+
+      const Consumer = defineComponent({
+        setup() {
+          useQuery({ key: ['live'], query })
+        },
+        render: () => null,
+      })
+
+      const mounted = mount(defineComponent({
+        setup() {
+          return { queryCache: useQueryCache(), showSecond: ref(true) }
+        },
+        render() {
+          // like `v-if="showSecond"` on the second consumer
+          return [h(Consumer), this.showSecond ? h(Consumer) : null]
+        },
+      }), {
+        global: {
+          plugins: [
+            createPinia(),
+            PiniaColada,
+          ],
+        },
+      })
+
+      controller.push(1)
+      await vi.waitFor(() => expect(mounted.vm.queryCache.getQueryData(['live'])).toEqual(1))
+      const entry = mounted.vm.queryCache.get(['live'])!
+      expect(entry.deps.size).toBe(2)
+
+      mounted.vm.showSecond = false
+      await nextTick()
+      expect(entry.deps.size).toBe(1)
+
+      controller.push(2)
+      await vi.waitFor(() => expect(entry.state.value.data).toEqual(2))
+      expect(entry.asyncStatus.value).toEqual('loading')
+      expect(signals).toHaveLength(1)
+      expect(signals[0]!.aborted).toBe(false)
+      expect(onFinally).not.toHaveBeenCalled()
+
+      mounted.unmount()
+      await vi.waitFor(() => expect(signals[0]!.aborted).toBe(true))
+    })
   })
 })

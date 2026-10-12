@@ -177,6 +177,65 @@ it('case: with live/useQuery', async () => {
   ).toEqual({ output: '1' })
 })
 
+describe('case: closes the server stream once the last consumer unmounts', () => {
+  function mockOpenStream() {
+    const onFinally = vi.fn()
+
+    vi.mocked(router.stream['~orpc'].handler).mockImplementationOnce(async function* ({ signal }: { signal?: AbortSignal }) {
+      try {
+        yield { output: '0' }
+        // never yields again, like waiting on a publisher subscription bound to the request signal
+        await new Promise(resolve => signal?.addEventListener('abort', resolve))
+      }
+      finally {
+        onFinally()
+      }
+    } as any)
+
+    return onFinally
+  }
+
+  it('with streamed/useQuery', async () => {
+    const onFinally = mockOpenStream()
+
+    const mounted = mount(defineComponent({
+      setup() {
+        const query = useQuery(orpc.stream.streamedOptions({ input: { input: 1 } }))
+
+        return { query }
+      },
+      render: () => null,
+    }))
+
+    await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual([{ output: '0' }]))
+    expect(mounted.vm.query.isLoading.value).toEqual(true)
+
+    mounted.unmount()
+
+    await vi.waitFor(() => expect(onFinally).toHaveBeenCalledTimes(1))
+  })
+
+  it('with live/useQuery', async () => {
+    const onFinally = mockOpenStream()
+
+    const mounted = mount(defineComponent({
+      setup() {
+        const query = useQuery(orpc.stream.liveOptions({ input: { input: 1 } }))
+
+        return { query }
+      },
+      render: () => null,
+    }))
+
+    await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual({ output: '0' }))
+    expect(mounted.vm.query.isLoading.value).toEqual(true)
+
+    mounted.unmount()
+
+    await vi.waitFor(() => expect(onFinally).toHaveBeenCalledTimes(1))
+  })
+})
+
 it('case: with useInfiniteQuery', async () => {
   const mounted = mount(defineComponent({
     setup() {

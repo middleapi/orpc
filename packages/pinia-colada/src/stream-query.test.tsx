@@ -1,8 +1,8 @@
 import type { UseQueryOptions } from '@pinia/colada'
-import { PiniaColada, useQuery, useQueryCache } from '@pinia/colada'
+import { defineQuery, PiniaColada, useQuery, useQueryCache } from '@pinia/colada'
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
-import { defineComponent } from 'vue'
+import { createApp, defineComponent, h, nextTick, ref } from 'vue'
 import { serializableStreamedQuery } from './stream-query'
 
 /**
@@ -256,5 +256,144 @@ describe('serializableStreamedQuery', () => {
     await vi.waitFor(() => expect(mounted.vm.query.asyncStatus.value).toEqual('idle'))
     expect(mounted.vm.query.data.value).toEqual(['a'])
     expect(mounted.vm.query.error.value).toBeNull()
+  })
+
+  describe('cancels the stream once it is no longer used', () => {
+    function createStreamedQuery() {
+      const controller = createChunkController<number>()
+      const onFinally = vi.fn()
+      const signals: AbortSignal[] = []
+
+      const query = serializableStreamedQuery(async function* ({ signal }) {
+        signals.push(signal)
+
+        try {
+          yield* controller.stream()
+        }
+        finally {
+          onFinally()
+        }
+      })
+
+      return { controller, onFinally, signals, query }
+    }
+
+    /**
+     * Mounts two consumers of the same query in one app, the second one rendered
+     * conditionally like `v-if="showSecond"`.
+     */
+    function mountConsumers(useStreamQuery: () => unknown) {
+      const Consumer = defineComponent({
+        setup() {
+          useStreamQuery()
+        },
+        render: () => null,
+      })
+
+      return mount(defineComponent({
+        setup() {
+          return { queryCache: useQueryCache(), showSecond: ref(true) }
+        },
+        render() {
+          return [h(Consumer), this.showSecond ? h(Consumer) : null]
+        },
+      }), {
+        global: {
+          plugins: [
+            createPinia(),
+            PiniaColada,
+          ],
+        },
+      })
+    }
+
+    it('when the last consumer unmounts', async () => {
+      const { controller, onFinally, signals, query } = createStreamedQuery()
+      const mounted = mountQuery({ key: ['stream'], query })
+
+      controller.push(1)
+      await vi.waitFor(() => expect(mounted.vm.query.data.value).toEqual([1]))
+      const entry = mounted.vm.queryCache.get(['stream'])!
+
+      mounted.unmount()
+      await vi.waitFor(() => expect(signals[0]!.aborted).toBe(true))
+      expect(entry.asyncStatus.value).toEqual('idle')
+
+      controller.push(2) // resumes the stream loop, which now observes the aborted signal
+      await vi.waitFor(() => expect(onFinally).toHaveBeenCalledTimes(1))
+      expect(entry.state.value).toEqual({ status: 'success', data: [1], error: null })
+      expect(signals).toHaveLength(1)
+    })
+
+    it('when the entry is removed from the cache', async () => {
+      const { controller, onFinally, signals, query } = createStreamedQuery()
+
+      const app = createApp({}).use(createPinia()).use(PiniaColada)
+      const queryCache = app.runWithContext(() => useQueryCache())
+      const entry = queryCache.ensure({ key: ['stream'], query })
+      const fetching = queryCache.fetch(entry)
+
+      controller.push(1)
+      await vi.waitFor(() => expect(entry.state.value.data).toEqual([1]))
+
+      queryCache.remove(entry)
+      await vi.waitFor(() => expect(signals[0]!.aborted).toBe(true))
+
+      controller.push(2)
+      await expect(fetching).rejects.toBe(signals[0]!.reason)
+      expect(onFinally).toHaveBeenCalledTimes(1)
+      expect(entry.state.value).toEqual({ status: 'success', data: [1], error: null })
+    })
+
+    it('not while another consumer of the same key is mounted', async () => {
+      const { controller, onFinally, signals, query } = createStreamedQuery()
+      const mounted = mountConsumers(() => useQuery({ key: ['stream'], query }))
+
+      controller.push(1)
+      await vi.waitFor(() => expect(mounted.vm.queryCache.getQueryData(['stream'])).toEqual([1]))
+      const entry = mounted.vm.queryCache.get(['stream'])!
+      expect(entry.deps.size).toBe(2)
+
+      mounted.vm.showSecond = false
+      await nextTick()
+      expect(entry.deps.size).toBe(1)
+
+      controller.push(2)
+      await vi.waitFor(() => expect(entry.state.value.data).toEqual([1, 2]))
+      expect(entry.asyncStatus.value).toEqual('loading')
+      expect(signals).toHaveLength(1)
+      expect(signals[0]!.aborted).toBe(false)
+      expect(onFinally).not.toHaveBeenCalled()
+
+      mounted.unmount()
+      await vi.waitFor(() => expect(signals[0]!.aborted).toBe(true))
+    })
+
+    it('with defineQuery, once no component uses it', async () => {
+      const { controller, onFinally, signals, query } = createStreamedQuery()
+      const useStreamQuery = defineQuery({ key: ['stream'], query })
+      const mounted = mountConsumers(useStreamQuery)
+
+      controller.push(1)
+      await vi.waitFor(() => expect(mounted.vm.queryCache.getQueryData(['stream'])).toEqual([1]))
+      const entry = mounted.vm.queryCache.get(['stream'])!
+      expect(entry.deps.size).toBe(2)
+
+      mounted.vm.showSecond = false
+      await nextTick()
+      expect(entry.deps.size).toBe(1)
+
+      controller.push(2)
+      await vi.waitFor(() => expect(entry.state.value.data).toEqual([1, 2]))
+      expect(signals).toHaveLength(1)
+      expect(signals[0]!.aborted).toBe(false)
+
+      mounted.unmount()
+      await vi.waitFor(() => expect(signals[0]!.aborted).toBe(true))
+
+      controller.push(3)
+      await vi.waitFor(() => expect(onFinally).toHaveBeenCalledTimes(1))
+      expect(entry.state.value.data).toEqual([1, 2])
+    })
   })
 })
