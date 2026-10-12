@@ -1,4 +1,4 @@
-import { QueryClient, skipToken } from '@tanstack/query-core'
+import { InfiniteQueryObserver, QueryClient, QueryObserver, skipToken } from '@tanstack/query-core'
 import * as KeyModule from './key'
 import * as LiveQuery from './live-query'
 import { isProcedureUtilsOptions, mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
@@ -438,6 +438,64 @@ describe('procedureUtils', () => {
     expect(mutationFn).toHaveBeenCalledTimes(1)
     expect(mutationFn).toHaveBeenCalledWith('__input__', fnContext)
     expect(client).toHaveBeenCalledTimes(0)
+  })
+})
+
+describe('skipToken queries do not share a query with unskipped ones', () => {
+  const retrylessQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const client = vi.fn(async () => '__output__')
+  const utils = new ProcedureUtils<Record<never, never>, { search?: string } | undefined, string, Error>(['planet', 'list'], client)
+
+  beforeEach(() => {
+    retrylessQueryClient.clear()
+  })
+
+  it('.queryOptions', async () => {
+    const unskipped = new QueryObserver(retrylessQueryClient, utils.queryOptions())
+    const unsubscribeUnskipped = unskipped.subscribe(() => {})
+    await vi.waitFor(() => expect(unskipped.getCurrentResult().status).toBe('success'))
+
+    const skipped = new QueryObserver(retrylessQueryClient, utils.queryOptions({ input: skipToken }))
+    const unsubscribeSkipped = skipped.subscribe(() => {})
+
+    expect(retrylessQueryClient.getQueryCache().getAll()).toHaveLength(2)
+
+    await retrylessQueryClient.invalidateQueries({ queryKey: utils.key() })
+
+    expect(unskipped.getCurrentResult().status).toBe('success')
+    expect(skipped.getCurrentResult().status).toBe('pending')
+    expect(client).toHaveBeenCalledTimes(2)
+
+    unsubscribeUnskipped()
+    unsubscribeSkipped()
+  })
+
+  it('.infiniteOptions', async () => {
+    const unskipped = new InfiniteQueryObserver(retrylessQueryClient, utils.infiniteOptions({
+      input: () => undefined,
+      initialPageParam: 0,
+      getNextPageParam: () => undefined,
+    }))
+    const unsubscribeUnskipped = unskipped.subscribe(() => {})
+    await vi.waitFor(() => expect(unskipped.getCurrentResult().status).toBe('success'))
+
+    const skipped = new InfiniteQueryObserver(retrylessQueryClient, utils.infiniteOptions({
+      input: skipToken,
+      initialPageParam: 0,
+      getNextPageParam: () => undefined,
+    }))
+    const unsubscribeSkipped = skipped.subscribe(() => {})
+
+    expect(retrylessQueryClient.getQueryCache().getAll()).toHaveLength(2)
+
+    await retrylessQueryClient.invalidateQueries({ queryKey: utils.key() })
+
+    expect(unskipped.getCurrentResult().status).toBe('success')
+    expect(skipped.getCurrentResult().status).toBe('pending')
+    expect(client).toHaveBeenCalledTimes(2)
+
+    unsubscribeUnskipped()
+    unsubscribeSkipped()
   })
 })
 
