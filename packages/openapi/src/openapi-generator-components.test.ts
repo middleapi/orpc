@@ -514,14 +514,15 @@ describe('openAPIComponentRegistry', () => {
       })
     })
 
-    it('reuses components whose date defaults are equal', () => {
+    it('reuses components that share the same date default instance', () => {
+      const date = new Date(0)
       const { doc, registry } = createRegistry({
-        schemas: { Event: { type: 'string', default: new Date(0) } },
+        schemas: { Event: { type: 'string', default: date } },
       })
 
       const result = registry.hoistDefs({
         $ref: '#/$defs/Event',
-        $defs: { Event: { type: 'string', default: new Date(0) } as any },
+        $defs: { Event: { type: 'string', default: date } as any },
       })
 
       expect(result).toEqual({ $ref: '#/components/schemas/Event' })

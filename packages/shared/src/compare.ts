@@ -19,11 +19,7 @@ function isDeepEqualInternal(
     }
   }
   else if (!isPlainObject(a) || !isPlainObject(b)) {
-    if (a instanceof Date && b instanceof Date) {
-      return Object.is(a.getTime(), b.getTime())
-    }
-
-    // Anything else (primitives, RegExp, Map, Set, class instances, ...) is only equal when Object.is above matched:
+    // Anything else (primitives, Date, RegExp, Map, Set, class instances, ...) is only equal when Object.is above matched:
     // non-plain objects keep their state outside own enumerable keys, so they cannot be compared structurally
     return false
   }

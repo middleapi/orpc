@@ -2100,11 +2100,13 @@ describe('deduplicateJsonSchemas', () => {
     ])
   })
 
-  it('keeps schemas whose date defaults differ', () => {
+  it('keeps schemas whose date defaults are different instances', () => {
+    const date = new Date(0)
+
     expect(deduplicateJsonSchemas([
-      { type: 'string', default: new Date(0) },
+      { type: 'string', default: date },
       { type: 'string', default: new Date(1) },
-      { type: 'string', default: new Date(0) },
+      { type: 'string', default: date },
     ])).toEqual([
       { type: 'string', default: new Date(0) },
       { type: 'string', default: new Date(1) },
