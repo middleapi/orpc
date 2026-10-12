@@ -239,6 +239,54 @@ describe('openAPIJsonSerializer', () => {
       })
     })
 
+    // plain JSON primitives must reach custom handlers whether or not a built-in key is customized
+    describe.each([
+      ['only new keys', {}],
+      ['a built-in key customized', { url: undefined }],
+    ])('applies custom handlers to plain JSON primitives with %s', (_, builtInHandlers) => {
+      it('strings and numbers', () => {
+        const custom = new OpenAPIJsonSerializer({
+          handlers: {
+            ...builtInHandlers,
+            upper: {
+              condition: data => typeof data === 'string',
+              serialize: (data: string) => data.toUpperCase(),
+              isTerminal: true,
+            },
+            double: {
+              condition: data => typeof data === 'number',
+              serialize: (data: number) => data * 2,
+              isTerminal: true,
+            },
+          },
+        })
+
+        // NaN and Infinity still go to the built-in handlers first
+        expect(custom.serialize({ a: 'x', b: ['y'], c: 2, nan: Number.NaN, infinity: Number.POSITIVE_INFINITY }).json)
+          .toEqual({ a: 'X', b: ['Y'], c: 4, nan: null, infinity: null })
+      })
+
+      it('booleans and null', () => {
+        const custom = new OpenAPIJsonSerializer({
+          handlers: {
+            ...builtInHandlers,
+            flag: {
+              condition: data => typeof data === 'boolean',
+              serialize: (data: boolean) => (data ? 'yes' : 'no'),
+              isTerminal: true,
+            },
+            empty: {
+              condition: data => data === null,
+              serialize: () => '',
+              isTerminal: true,
+            },
+          },
+        })
+
+        expect(custom.serialize({ a: true, b: [false], c: null }).json).toEqual({ a: 'yes', b: ['no'], c: '' })
+      })
+    })
+
     it('collects blobs returned by terminal custom handlers', () => {
       class BlobContainer {
         constructor(public blob: Blob) {}

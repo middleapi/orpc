@@ -200,6 +200,7 @@ export interface RPCJsonSerializerOptions {
 export class RPCJsonSerializer {
   private readonly handlers: Exclude<RPCJsonSerializerOptions['handlers'], undefined>
   private readonly inlineBuiltInHandlers: boolean
+  private readonly inlinePrimitives: boolean
   private readonly handlerEntries: [string, RPCJsonSerializerHandler][] | undefined
   private readonly omitUndefinedProperties: boolean
 
@@ -210,6 +211,7 @@ export class RPCJsonSerializer {
 
     if (customHandlers === undefined) {
       this.inlineBuiltInHandlers = true
+      this.inlinePrimitives = true
       return
     }
 
@@ -240,6 +242,7 @@ export class RPCJsonSerializer {
     }
 
     this.inlineBuiltInHandlers = inlineBuiltInHandlers
+    this.inlinePrimitives = inlineBuiltInHandlers && handlerEntries.length === 0
     this.handlerEntries = handlerEntries
   }
 
@@ -268,15 +271,25 @@ export class RPCJsonSerializer {
      * Inlined version of DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: primitives are
      * dispatched on typeof and skip every handler condition check.
      * Must match the built-in handlers exactly.
+     *
+     * Strings, booleans, finite numbers and null match no built-in handler, so they
+     * are returned directly only when there are no custom handlers. Otherwise they
+     * fall through to the custom handlers, like in the generic handler scan.
      */
     if (this.inlineBuiltInHandlers) {
       switch (typeof data) {
         case 'string':
         case 'boolean':
-          return data
+          if (this.inlinePrimitives) {
+            return data
+          }
+          break
         case 'number':
           if (Number.isFinite(data)) {
-            return data
+            if (this.inlinePrimitives) {
+              return data
+            }
+            break
           }
           if (Number.isNaN(data)) {
             meta.push(['nan', ...segments])
@@ -292,7 +305,10 @@ export class RPCJsonSerializer {
           return data.toString()
         case 'object': {
           if (data === null) {
-            return data
+            if (this.inlinePrimitives) {
+              return data
+            }
+            break
           }
           if (data instanceof Date) {
             meta.push(['date', ...segments])

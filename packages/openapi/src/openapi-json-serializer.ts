@@ -144,6 +144,7 @@ export interface OpenAPIJsonSerializerOptions {
 
 export class OpenAPIJsonSerializer {
   private readonly inlineBuiltInHandlers: boolean
+  private readonly inlinePrimitives: boolean
   private readonly handlerEntries: OpenAPIJsonSerializerHandler[] | undefined
   private readonly omitUndefinedProperties: boolean
 
@@ -154,6 +155,7 @@ export class OpenAPIJsonSerializer {
 
     if (customHandlers === undefined) {
       this.inlineBuiltInHandlers = true
+      this.inlinePrimitives = true
       return
     }
 
@@ -183,6 +185,7 @@ export class OpenAPIJsonSerializer {
     }
 
     this.inlineBuiltInHandlers = inlineBuiltInHandlers
+    this.inlinePrimitives = inlineBuiltInHandlers && handlerEntries.length === 0
     this.handlerEntries = handlerEntries
   }
 
@@ -204,21 +207,37 @@ export class OpenAPIJsonSerializer {
      * Inlined version of DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS: primitives
      * are dispatched on typeof and skip every handler condition check.
      * Must match the built-in handlers exactly.
+     *
+     * Strings, booleans, finite numbers and null match no built-in handler, so they
+     * are returned directly only when there are no custom handlers. Otherwise they
+     * fall through to the custom handlers, like in the generic handler scan.
      */
     if (this.inlineBuiltInHandlers) {
       switch (typeof data) {
         case 'string':
         case 'boolean':
-          return data
+          if (this.inlinePrimitives) {
+            return data
+          }
+          break
         case 'number':
-          return Number.isFinite(data) ? data : null
+          if (!Number.isFinite(data)) {
+            return null
+          }
+          if (this.inlinePrimitives) {
+            return data
+          }
+          break
         case 'undefined':
           return null
         case 'bigint':
           return data.toString()
         case 'object': {
           if (data === null) {
-            return data
+            if (this.inlinePrimitives) {
+              return data
+            }
+            break
           }
           if (data instanceof Date) {
             return Number.isNaN(data.getTime()) ? null : data.toISOString()

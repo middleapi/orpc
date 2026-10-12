@@ -350,6 +350,53 @@ describe('rpcJsonSerializer: custom handlers', () => {
     expect(roundTripThroughWire(serializer, value)).toEqual(value)
   })
 
+  // plain JSON primitives must reach custom handlers whether or not a built-in key is customized
+  describe.each([
+    ['only new keys', {}],
+    ['a built-in key customized', { url: undefined }],
+  ])('applies custom handlers to plain JSON primitives with %s', (_, builtInHandlers) => {
+    it('numbers', () => {
+      const serializer = new RPCJsonSerializer({
+        handlers: {
+          ...builtInHandlers,
+          negZero: {
+            condition: data => Object.is(data, -0),
+            serialize: () => 0,
+            deserialize: () => -0,
+            isTerminal: true,
+          },
+        },
+      })
+
+      expect(serializer.serialize({ a: -0, b: 0 })).toEqual({ json: { a: 0, b: 0 }, meta: [['negZero', 'a']] })
+
+      const restored = roundTripThroughWire(serializer, { a: -0, b: 0 }) as any
+      expect(Object.is(restored.a, -0)).toBe(true)
+      expect(Object.is(restored.b, 0)).toBe(true)
+    })
+
+    it('strings', () => {
+      const serializer = new RPCJsonSerializer({
+        handlers: {
+          ...builtInHandlers,
+          prefixed: {
+            condition: data => typeof data === 'string' && data.startsWith('id:'),
+            serialize: (data: string) => data.slice(3),
+            deserialize: (data: string) => `id:${data}`,
+            isTerminal: true,
+          },
+        },
+      })
+
+      expect(serializer.serialize({ a: 'id:1', b: ['id:2', 'plain'] })).toEqual({
+        json: { a: '1', b: ['2', 'plain'] },
+        meta: [['prefixed', 'a'], ['prefixed', 'b', 0]],
+      })
+
+      expect(roundTripThroughWire(serializer, { a: 'id:1', b: ['id:2', 'plain'] })).toEqual({ a: 'id:1', b: ['id:2', 'plain'] })
+    })
+  })
+
   it('collects blobs returned by terminal custom handlers', () => {
     class BlobContainer {
       constructor(public blob: Blob) {}
