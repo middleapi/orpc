@@ -57,10 +57,9 @@ export class MessagePortHandler<T extends Context> {
    * Prefer this over calling `.message()` and `.close()` manually.
    *
    * @remarks
-   * Routing-level errors (e.g. from the `context` function or a routing interceptor) are not surfaced:
-   * the client receives a `cancel` message for the failed request and the error is discarded.
-   * To observe them, call `.message()` yourself or use a routing interceptor
-   * (the `context` function runs before routing interceptors, so only `.message()` sees its errors).
+   * Errors from handling a message are discarded rather than crashing the process. For routing-level errors
+   * (e.g. from the `context` function or a routing interceptor), the client receives a `cancel` message.
+   * To observe them, call `.message()` yourself or use a routing interceptor (which does not see `context` errors).
    */
   upgrade(
     port: SupportedMessagePort,
@@ -69,16 +68,9 @@ export class MessagePortHandler<T extends Context> {
     /**
      * Message order is important: loading -> decode -> .message.
      * This flow must stay synchronous, or we need to use `sequential` helper
-     *
-     * Rejections are swallowed to avoid crashing the process: the client has already been sent a `cancel`
-     * for the failed request. Callers who need the error should call `.message()` themselves.
      */
-    onMessagePortMessage(port, (message) => {
-      this.message(port, message, ...rest).catch(() => {})
-    })
-    onMessagePortClose(port, () => {
-      this.close(port).catch(() => {})
-    })
+    onMessagePortMessage(port, message => this.message(port, message, ...rest).catch(() => {})) // discarded, see @remarks
+    onMessagePortClose(port, () => this.close(port).catch(() => {}))
   }
 
   /**

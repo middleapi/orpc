@@ -289,33 +289,24 @@ describe('rpcHandler', () => {
   })
 
   it('does not leak unhandled rejections from routing-level errors via upgrade', async () => {
-    let onMessage: ((event: { data: string }) => void) | undefined
-
     const handler = createHandler()
+    const { clientPort, serverPort } = createPort()
+    onTestFinished(() => clientPort.close())
 
-    const port = {
-      addEventListener: vi.fn((event: string, callback: any) => {
-        if (event === 'message') {
-          onMessage = callback
-        }
-      }),
-      postMessage: vi.fn(),
-    }
-
-    handler.upgrade(port as any, {
+    handler.upgrade(serverPort, {
       context: () => {
         throw new Error('unauthorized')
       },
     })
 
-    const request = await createRequestMessage()
-    onMessage?.({ data: request as string })
-
-    await vi.waitFor(() => {
-      expect(port.postMessage).toHaveBeenCalledTimes(1)
+    const response = new Promise((resolve) => {
+      clientPort.addEventListener('message', event => resolve(decodePeerMessage(event.data)), { once: true })
     })
+    clientPort.start()
 
-    expect(decodePeerMessage(port.postMessage.mock.calls[0]![0])).toEqual({
+    clientPort.postMessage(await createRequestMessage())
+
+    expect(await response).toEqual({
       matched: true,
       message: { id: '19', kind: 'cancel' },
     })

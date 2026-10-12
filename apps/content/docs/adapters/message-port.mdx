@@ -65,7 +65,7 @@ The examples above only show how to configure the link. For examples of creating
 :::
 
 :::info
-`upgrade()` does not surface routing-level errors; the client receives a `cancel` message instead. To observe them, call `.message()` yourself or use a [routing interceptor](/docs/rpc/handler#routing-interceptors) (errors from the `context` function are only visible through `.message()`).
+`upgrade()` discards routing-level errors; the client receives a `cancel` message instead. To observe them, call `.message()` yourself or use a [routing interceptor](/docs/rpc/handler#routing-interceptors) (which does not see `context` errors).
 :::
 
 ## Transfer

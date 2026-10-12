@@ -199,22 +199,17 @@ describe('rpcHandler', () => {
   })
 
   describe('does not leak unhandled rejections from routing-level errors via upgrade', () => {
-    const upgradeAndSendRequest = async (handler: RPCHandler<any>, ...rest: any[]) => {
-      let onMessage: ((event: { data: string }) => void) | undefined
-
-      const ws = {
-        addEventListener: vi.fn((event: string, callback: any) => {
-          if (event === 'message') {
-            onMessage = callback
-          }
-        }),
-        send: vi.fn(() => undefined),
-      }
-
+    const upgrade = (handler: RPCHandler<any>, ...rest: any[]) => {
+      const ws = createWs()
       handler.upgrade(ws as any, ...rest)
+      const onMessage = ws.addEventListener.mock.calls.find(([event]) => event === 'message')![1]
 
-      const request = await createRequestMessage()
-      onMessage?.({ data: request as string })
+      return { ws, onMessage }
+    }
+
+    const expectCancelOnRequest = async (handler: RPCHandler<any>, ...rest: any[]) => {
+      const { ws, onMessage } = upgrade(handler, ...rest)
+      onMessage({ data: await createRequestMessage() })
 
       await vi.waitFor(() => {
         expect(ws.send).toHaveBeenCalledTimes(1)
@@ -227,7 +222,7 @@ describe('rpcHandler', () => {
     }
 
     it('context function throws', async () => {
-      await upgradeAndSendRequest(createHandler(), {
+      await expectCancelOnRequest(createHandler(), {
         context: () => {
           throw new Error('unauthorized')
         },
@@ -243,37 +238,21 @@ describe('rpcHandler', () => {
         plugins: [new RethrowHandlerPlugin({ filter: () => true })],
       })
 
-      await upgradeAndSendRequest(handler)
+      await expectCancelOnRequest(handler)
     })
 
     it('blob fails to load', async () => {
-      let onMessage: ((event: { data: unknown }) => void) | undefined
-
-      const handler = createHandler()
-
-      const ws = {
-        addEventListener: vi.fn((event: string, callback: any) => {
-          if (event === 'message') {
-            onMessage = callback
-          }
-        }),
-        send: vi.fn(() => undefined),
-      }
-
-      handler.upgrade(ws as any)
+      const { ws, onMessage } = upgrade(createHandler())
 
       const blob = new Blob(['unused'])
       blob.bytes = vi.fn(() => Promise.reject(new Error('read failed')))
-      onMessage?.({ data: blob })
+      onMessage({ data: blob })
 
-      await vi.waitFor(() => {
-        expect(blob.bytes).toHaveBeenCalledTimes(1)
-      })
-      await sleep(10) // let the failed load settle before the next message attaches to the chain
+      await sleep(0) // let the failed load settle before the next message attaches to the chain
+      expect(blob.bytes).toHaveBeenCalledTimes(1)
 
       // later messages are still handled
-      const request = await createRequestMessage()
-      onMessage?.({ data: request as string })
+      onMessage({ data: await createRequestMessage() })
 
       await vi.waitFor(() => {
         expect(ws.send).toHaveBeenCalledTimes(1)
