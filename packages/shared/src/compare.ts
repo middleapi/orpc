@@ -13,35 +13,18 @@ function isDeepEqualInternal(
     return true
   }
 
-  if (typeof a !== typeof b) {
-    return false
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b) || a.length !== b.length) {
+      return false
+    }
   }
-
-  if (a === null || typeof a !== 'object') {
-    return false
-  }
-
-  if (b === null || typeof b !== 'object') {
-    return false
-  }
-
-  const isArray = Array.isArray(a)
-
-  if (isArray !== Array.isArray(b)) {
-    return false
-  }
-
-  if (!isArray && (!isPlainObject(a) || !isPlainObject(b))) {
+  else if (!isPlainObject(a) || !isPlainObject(b)) {
     if (a instanceof Date && b instanceof Date) {
       return Object.is(a.getTime(), b.getTime())
     }
 
-    // Other non-plain objects (RegExp, Map, Set, class instances, ...) keep their state outside own enumerable keys,
-    // so they are only equal by reference, which Object.is already handled above
-    return false
-  }
-
-  if (isArray && a.length !== (b as unknown[]).length) {
+    // Anything else (primitives, RegExp, Map, Set, class instances, ...) is only equal when Object.is above matched:
+    // non-plain objects keep their state outside own enumerable keys, so they cannot be compared structurally
     return false
   }
 

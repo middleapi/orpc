@@ -200,14 +200,6 @@ function areSchemasEquivalentForReuse(candidate: unknown, existing: unknown, ctx
     return true
   }
 
-  if (typeof candidate !== typeof existing) {
-    return false
-  }
-
-  if (candidate === null || existing === null) {
-    return candidate === existing
-  }
-
   // Only arrays and plain objects carry schema structure; primitives and values like Date are compared as a whole
   if (!isSchemaContainer(candidate) || !isSchemaContainer(existing)) {
     return isDeepEqual(candidate, existing)
