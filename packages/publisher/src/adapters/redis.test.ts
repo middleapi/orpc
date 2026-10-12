@@ -478,6 +478,75 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
     await unsubscribe2()
   })
 
+  it('reports subscriber connection errors to the onError of active subscriptions only', async ({ onTestFinished }) => {
+    const userSubscriber = redis.duplicate()
+    onTestFinished(() => {
+      userSubscriber.destroy()
+    })
+    const publishers = [
+      createTestingPublisher(),
+      createTestingPublisher({ subscriber: userSubscriber }),
+    ]
+
+    for (const publisher of publishers) {
+      const subscriber = (publisher as any).subscriber
+      const onError = vi.fn()
+      const error = new Error('boom')
+
+      const unsubscribe = await publisher.subscribe('connection-errors', () => {}, { onError })
+
+      subscriber.emit('error', error)
+
+      expect(onError).toHaveBeenCalledTimes(1)
+      expect(onError).toHaveBeenCalledWith(error)
+
+      await unsubscribe()
+
+      expect(() => subscriber.emit('error', new Error('after unsubscribe'))).not.toThrow()
+      expect(onError).toHaveBeenCalledTimes(1)
+    }
+  })
+
+  it('reports a dropped subscriber connection and keeps delivering after node-redis reconnects', async ({ onTestFinished }) => {
+    // `duplicate()` copies the name, which identifies the subscriber connection in `CLIENT LIST`.
+    const name = `dropped:${crypto.randomUUID()}`
+    const namedRedis = createClient({ url: REDIS_URL, name })
+    const prefix = `dropped:${crypto.randomUUID()}:`
+    const publisher = createTestingPublisher({ prefix }, { useRedis: namedRedis })
+    onTestFinished(() => {
+      namedRedis.destroy()
+      ;(publisher as any).subscriber.destroy()
+    })
+    const event = 'alerts'
+    const channel = `${prefix}${event}`
+    const listener = vi.fn()
+    const onError = vi.fn()
+
+    const unsubscribe = await publisher.subscribe(event, listener, { onError })
+
+    // Kill only this connection, since `CLIENT KILL TYPE pubsub` would break concurrent tests.
+    const { id } = (await redis.clientList()).find(client => client.name === name)!
+    await redis.clientKill({ filter: 'ID', id })
+
+    await vi.waitFor(() => {
+      expect(onError).toHaveBeenCalledWith(expect.any(Error))
+    })
+
+    await vi.waitFor(async () => {
+      expect(await redis.pubSubNumSub(channel)).toEqual({ [channel]: 1 })
+    }, { timeout: 5000 })
+
+    await publisher.publish(event, { order: 1 })
+
+    await vi.waitFor(() => {
+      expect(listener).toHaveBeenCalledTimes(1)
+    })
+
+    expect(listener).toHaveBeenCalledWith({ order: 1 })
+
+    await unsubscribe()
+  })
+
   it('lazily connects to Redis once under concurrent limit calls', async () => {
     const redis1 = createClient({ url: REDIS_URL })
     const redis2 = createClient({ url: REDIS_URL })

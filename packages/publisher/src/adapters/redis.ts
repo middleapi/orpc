@@ -1,3 +1,4 @@
+import type { ThrowableError } from '@orpc/shared'
 import type { RedisClientType } from 'redis'
 import type { BaseRedisPublisherOptions, RedisStreamEntry } from './base-redis'
 import { BaseRedisPublisher } from './base-redis'
@@ -7,6 +8,8 @@ export interface RedisPublisherOptions extends BaseRedisPublisherOptions {
    * Redis subscriber instance.
    * Pub/Sub takes over the connection, so a client with subscriptions
    * cannot execute commands and must use a dedicated connection.
+   * Its connection errors are reported to the `onError` of active subscriptions,
+   * which ends iterator subscriptions.
    *
    * @default redis.duplicate()
    */
@@ -28,6 +31,8 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
    */
   private readonly channelPrefix: string
 
+  private readonly onErrors: Array<(error: ThrowableError) => void> = []
+
   constructor(
     private readonly redis: RedisClientType<any, any, any, any, any>,
     { subscriber, ...options }: RedisPublisherOptions = {},
@@ -42,6 +47,13 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
 
     this.subscriber = subscriber ?? redis.duplicate()
     this.channelPrefix = keyPrefix ?? ''
+
+    // node-redis emits `'error'` on every dropped connection and then reconnects and re-subscribes
+    // on its own, but an `'error'` event without a listener crashes the process.
+    this.subscriber.on('error', (error) => {
+      // Snapshot, since a callback may unsubscribe itself mid-dispatch.
+      this.onErrors.slice().forEach(onError => onError(error))
+    })
   }
 
   protected async publishMessage(channel: string, message: string): Promise<void> {
@@ -49,13 +61,30 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
     await this.redis.publish(`${this.channelPrefix}${channel}`, message)
   }
 
-  protected async subscribeChannel(channel: string, listener: (message: unknown) => void): Promise<() => Promise<void>> {
+  protected async subscribeChannel(
+    channel: string,
+    listener: (message: unknown) => void,
+    onError?: (error: ThrowableError) => void,
+  ): Promise<() => Promise<void>> {
     const prefixedChannel = `${this.channelPrefix}${channel}`
 
     await connectIfNeeded(this.subscriber)
     await this.subscriber.subscribe(prefixedChannel, listener)
 
+    // Registered after subscribing because a failed subscription rejects instead.
+    if (onError) {
+      this.onErrors.push(onError)
+    }
+
     return async () => {
+      if (onError) {
+        const index = this.onErrors.indexOf(onError)
+
+        if (index !== -1) {
+          this.onErrors.splice(index, 1)
+        }
+      }
+
       await this.subscriber.unsubscribe(prefixedChannel, listener)
     }
   }
