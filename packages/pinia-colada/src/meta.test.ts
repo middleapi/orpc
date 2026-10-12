@@ -145,6 +145,36 @@ describe('contractOptionsUtilsPlugin', () => {
     expect(client.planet.find).toHaveBeenCalledTimes(1)
   })
 
+  it('lets object utils options beat defaults of a function meta modifier', () => {
+    const contract = {
+      planet: {
+        find: oc.meta(piniaColada({
+          queryOptions: (options: any) => ({ staleTime: 1000, gcTime: 1, ...options }),
+        })),
+      },
+    }
+
+    const client = { planet: { find: vi.fn(async () => '__found__') } }
+
+    const utils = createRouterUtils(client as any, {
+      scoped: {
+        planet: {
+          find: {
+            queryOptions: { gcTime: 2 },
+          },
+        },
+      },
+      plugins: [new ContractOptionsUtilsPlugin(contract)],
+    }) as any
+
+    const options = utils.planet.find.queryOptions({ input: { id: 1 } })
+
+    expect(options.staleTime).toBe(1000)
+    expect(options.gcTime).toBe(2)
+
+    expect(utils.planet.find.queryOptions({ input: { id: 1 }, gcTime: 5 }).gcTime).toBe(5)
+  })
+
   it('keeps contract meta interceptors when utils define none', async () => {
     const metaInterceptor = vi.fn(({ next }: any) => next())
     const contract = { planet: { find: oc.meta(piniaColada({ queryInterceptors: [metaInterceptor] })) } }

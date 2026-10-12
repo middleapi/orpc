@@ -1206,4 +1206,14 @@ describe('mergeProcedureUtilsOptions', () => {
 
     expect((functionFirst.queryOptions as any)({ enabled: true })).toEqual({ enabled: true, staleTime: 1000, retry: 2 })
   })
+
+  it('lets an object override beat defaults of a function base, below per-call options', () => {
+    const merged = mergeProcedureUtilsOptions<any, any, any, any>(
+      { queryOptions: (options: any) => ({ staleTime: 1000, ...options }) },
+      { queryOptions: { staleTime: 0 } },
+    )
+
+    expect((merged.queryOptions as any)({})).toEqual({ staleTime: 0 })
+    expect((merged.queryOptions as any)({ staleTime: 5 })).toEqual({ staleTime: 5 })
+  })
 })

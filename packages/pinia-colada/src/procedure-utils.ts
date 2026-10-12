@@ -215,22 +215,26 @@ function mergeProcedureUtilsModifier<T extends object>(
   base: ProcedureUtilsModifier<T>,
   override: ProcedureUtilsModifier<T>,
 ): ProcedureUtilsModifier<T> {
-  if (typeof base !== 'function' && typeof override !== 'function') {
-    return { ...base, ...override } as Partial<T>
+  if (typeof override !== 'function') {
+    if (typeof base !== 'function') {
+      return { ...base, ...override } as Partial<T>
+    }
+
+    return options => base({ ...override, ...options })
   }
 
   const applyBase = typeof base === 'function' ? base : (options: T) => ({ ...base, ...options })
-  const applyOverride = typeof override === 'function' ? override : (options: T) => ({ ...override, ...options })
 
-  return options => applyOverride(applyBase(options))
+  return options => override(applyBase(options))
 }
 
 /**
  * Merge two procedure utils options where `override` takes priority.
  * A key explicitly set to `undefined` in `override` resets the base value.
- * When both sides define a key: interceptors are concatenated (base ones run first),
- * modifiers are spread-merged when both are plain objects and composed (base applied
- * first) otherwise, with plain objects applied as regular spread merges.
+ * When both sides define a key, interceptors are concatenated (base ones run first) and
+ * modifiers are combined so per-call options beat `override`, which beats `base`:
+ * two plain objects are spread-merged, an object `override` is passed to a function `base`
+ * as defaults under the per-call options, and a function `override` receives the result of `base`.
  */
 export function mergeProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError>(
   base: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>,
