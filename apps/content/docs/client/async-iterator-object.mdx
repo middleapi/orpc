@@ -84,7 +84,7 @@ for await (const event of iterator) {
 
 ## Using `consumeAsyncIterator`
 
-Use `consumeAsyncIterator` to consume an `AsyncIterator` with lifecycle callbacks. It accepts either an iterator or a promise that resolves to one.
+Use `consumeAsyncIterator` to consume an `AsyncIterator` with lifecycle callbacks. It accepts either an iterator or a promise that resolves to one. If you omit both `onError` and `onFinish`, errors are sent to the unhandled rejection channel.
 
 ```ts
 import { consumeAsyncIterator } from '@orpc/client'

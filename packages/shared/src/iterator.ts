@@ -187,7 +187,8 @@ export interface ConsumeAsyncIteratorOptions<T, TReturn, TError> {
  * Consumes an AsyncIteratorObject with lifecycle callbacks.
  *
  * @remarks
- * **Warning**: If no `onError` or `onFinish` is provided, errors are thrown into the unhandled rejection channel.
+ * **Warning**: If neither `onError` nor `onFinish` is provided, errors (from the initial promise,
+ * iteration, or `onEvent`) are thrown into the unhandled rejection channel.
  *
  * @returns An unsubscribe callback that stops consuming and cleans up the iterator.
  * @see {@link https://orpc.dev/docs/client/async-iterator-object#using-consumeasynciterator | AsyncIteratorObject in Client - Using consumeAsyncIterator}
@@ -231,7 +232,18 @@ export function consumeAsyncIterator<T, TReturn, TError = ThrowableError>(
     }
     catch (error) {
       onFinishState = [error as ThrowableError, undefined, false]
-      options.onError?.(error as ThrowableError)
+
+      if (options.onError === undefined && options.onFinish === undefined) {
+        /**
+         * Without onError or onFinish, the error would be silently dropped.
+         * Reject a detached promise so it can be handled by the unhandledRejection handler
+         * for global logging or error handling.
+         */
+        Promise.reject(error)
+      }
+      else {
+        options.onError?.(error as ThrowableError)
+      }
     }
     finally {
       options.onFinish?.(onFinishState!)

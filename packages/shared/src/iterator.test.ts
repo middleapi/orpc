@@ -656,4 +656,153 @@ describe('consumeAsyncIterator', () => {
       expect(onSuccess).toHaveBeenCalledTimes(0)
     })
   })
+
+  describe('unhandled rejection when neither onError nor onFinish is provided', () => {
+    function spyOnPromiseReject(onTestFinished: (fn: () => void) => void) {
+      const rejectSpy = vi.spyOn(Promise, 'reject')
+        .mockImplementation(() => new Promise(() => {}) as Promise<never>)
+
+      onTestFinished(() => {
+        rejectSpy.mockRestore()
+      })
+
+      return rejectSpy
+    }
+
+    it('raises an iteration error', async ({ onTestFinished }) => {
+      const rejectSpy = spyOnPromiseReject(onTestFinished)
+      const error = new Error('TEST')
+      const iterator = (async function* () {
+        yield 1
+        throw error
+      }())
+
+      const onEvent = vi.fn()
+
+      void consumeAsyncIterator(iterator, { onEvent })
+
+      await vi.waitFor(() => {
+        expect(rejectSpy).toHaveBeenCalledTimes(1)
+      })
+
+      expect(rejectSpy).toHaveBeenNthCalledWith(1, error)
+      expect(onEvent).toHaveBeenCalledTimes(1)
+      expect(onEvent).toHaveBeenNthCalledWith(1, 1)
+    })
+
+    it('raises an initial promise rejection', async ({ onTestFinished }) => {
+      const error = new Error('TEST')
+      const iterator = new Promise<AsyncIterator<number>>((_, reject) => reject(error))
+      const rejectSpy = spyOnPromiseReject(onTestFinished)
+
+      const onEvent = vi.fn()
+
+      void consumeAsyncIterator(iterator, { onEvent })
+
+      await vi.waitFor(() => {
+        expect(rejectSpy).toHaveBeenCalledTimes(1)
+      })
+
+      expect(rejectSpy).toHaveBeenNthCalledWith(1, error)
+      expect(onEvent).toHaveBeenCalledTimes(0)
+    })
+
+    it('raises an onEvent error', async ({ onTestFinished }) => {
+      const rejectSpy = spyOnPromiseReject(onTestFinished)
+      const error = new Error('TEST')
+      let cleanup = false
+      const iterator = (async function* () {
+        try {
+          yield 1
+          yield 2
+        }
+        finally {
+          cleanup = true
+        }
+      }())
+
+      const onEvent = vi.fn(() => {
+        throw error
+      })
+
+      void consumeAsyncIterator(iterator, { onEvent })
+
+      await vi.waitFor(() => {
+        expect(rejectSpy).toHaveBeenCalledTimes(1)
+      })
+
+      expect(rejectSpy).toHaveBeenNthCalledWith(1, error)
+      expect(cleanup).toBe(true)
+      expect(onEvent).toHaveBeenCalledTimes(1)
+    })
+
+    it.for(['onError', 'onFinish'] as const)('does not raise when only %s is provided', async (name, { onTestFinished }) => {
+      const rejectSpy = spyOnPromiseReject(onTestFinished)
+      const error = new Error('TEST')
+      const iterator = (async function* () {
+        yield 1
+        throw error
+      }())
+
+      const callback = vi.fn()
+
+      void consumeAsyncIterator(iterator, { onEvent: vi.fn(), [name]: callback })
+
+      await vi.waitFor(() => {
+        expect(callback).toHaveBeenCalledTimes(1)
+      })
+
+      expect(rejectSpy).not.toHaveBeenCalledWith(error)
+    })
+
+    it('does not raise on success', async ({ onTestFinished }) => {
+      const rejectSpy = spyOnPromiseReject(onTestFinished)
+      const iterator = (async function* () {
+        yield 1
+        return 2
+      }())
+
+      const onSuccess = vi.fn()
+
+      void consumeAsyncIterator(iterator, { onEvent: vi.fn(), onSuccess })
+
+      await vi.waitFor(() => {
+        expect(onSuccess).toHaveBeenCalledTimes(1)
+      })
+
+      expect(onSuccess).toHaveBeenNthCalledWith(1, 2)
+      expect(rejectSpy).toHaveBeenCalledTimes(0)
+    })
+
+    it('does not raise on unsubscribe', async ({ onTestFinished }) => {
+      const rejectSpy = spyOnPromiseReject(onTestFinished)
+      let cleanup = false
+      const iterator = (async function* () {
+        try {
+          await new Promise(resolve => setTimeout(resolve, 10))
+          yield 1
+          yield 2
+          return 3
+        }
+        finally {
+          cleanup = true
+        }
+      }())
+
+      const onSuccess = vi.fn()
+
+      const unsubscribe = consumeAsyncIterator(iterator, { onEvent: vi.fn(), onSuccess })
+
+      await new Promise(resolve => setTimeout(resolve, 1))
+      await unsubscribe()
+
+      await vi.waitFor(() => {
+        expect(onSuccess).toHaveBeenCalledTimes(1)
+      })
+
+      expect(cleanup).toBe(true)
+      expect(onSuccess).toHaveBeenNthCalledWith(1, undefined)
+      expect(rejectSpy).toHaveBeenCalledTimes(0)
+    })
+  })
 })
