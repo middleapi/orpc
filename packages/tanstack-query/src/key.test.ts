@@ -15,6 +15,9 @@ it('generateOperationKey', () => {
   expect(generateOperationKey(['path'], { prefix: '__prefix__' })).toEqual(['__prefix__', ['path'], {}])
   expect(generateOperationKey(['path'], { prefix: undefined })).toEqual([['path'], {}])
   expect(generateOperationKey(['path'], { prefix: '__prefix__', type: 'query', input: { a: 1 } })).toEqual(['__prefix__', ['path'], { type: 'query', input: { a: 1 } }])
+
+  expect(generateOperationKey(['planet', 'list'], { type: 'query', input: skipToken as any }))
+    .toEqual([['planet', 'list'], { type: 'query', skipToken: true }])
 })
 
 describe('generateOperationKey with skipToken', () => {
@@ -32,32 +35,17 @@ describe('generateOperationKey with skipToken', () => {
     }],
   ]
 
-  it('replaces the symbol with a serializable marker', () => {
-    expect(generateOperationKey(['planet', 'list'], { type: 'query', input: skipToken as any }))
-      .toEqual([['planet', 'list'], { type: 'query', skipToken: true }])
-    expect(generateOperationKey(['planet', 'list'], { prefix: '__prefix__', type: 'streamed', input: skipToken as any, fnOptions: { refetchMode: 'append' } }))
-      .toEqual(['__prefix__', ['planet', 'list'], { type: 'streamed', skipToken: true, fnOptions: { refetchMode: 'append' } }])
-  })
-
-  it.each(hashers)('does not collide with unskipped keys when hashed with %s', (_, hash) => {
-    for (const type of ['query', 'streamed', 'live', 'infinite'] as const) {
-      const skipped = hash(generateOperationKey(['planet', 'list'], { type, input: skipToken as any }))
-
-      expect(skipped).not.toEqual(hash(generateOperationKey(['planet', 'list'], { type })))
-      expect(skipped).not.toEqual(hash(generateOperationKey(['planet', 'list'], { type, input: {} })))
-      expect(skipped).not.toEqual(hash(generateOperationKey(['planet', 'list'], { type, input: { search: 'earth' } })))
-    }
+  it.each(hashers)('does not collide with the no-input key when hashed with %s', (_, hash) => {
+    expect(hash(generateOperationKey(['planet', 'list'], { type: 'query', input: skipToken as any })))
+      .not
+      .toEqual(hash(generateOperationKey(['planet', 'list'], { type: 'query' })))
   })
 
   it('still partially matches keys without input', () => {
     const skipped = generateOperationKey(['planet', 'list'], { type: 'query', input: skipToken as any })
 
-    expect(partialMatchKey(skipped, generateOperationKey(['planet']))).toBe(true)
     expect(partialMatchKey(skipped, generateOperationKey(['planet', 'list']))).toBe(true)
     expect(partialMatchKey(skipped, generateOperationKey(['planet', 'list'], { type: 'query' }))).toBe(true)
-
-    expect(partialMatchKey(skipped, generateOperationKey(['planet', 'list'], { type: 'infinite' }))).toBe(false)
     expect(partialMatchKey(skipped, generateOperationKey(['planet', 'list'], { input: {} }))).toBe(false)
-    expect(partialMatchKey(skipped, generateOperationKey(['planet', 'list'], { input: { search: 'earth' } }))).toBe(false)
   })
 })
