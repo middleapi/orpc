@@ -58,6 +58,37 @@ describe('arkTypeToJsonSchemaConverter', () => {
     })
   })
 
+  describe('direction', () => {
+    it.each([
+      ['morph and default object', type({ a: 'string.numeric.parse', b: 'number = 5' }), {
+        type: 'object',
+        properties: {
+          a: { type: 'string', pattern: expect.any(String) },
+          b: { type: 'number', default: 5 },
+        },
+        required: ['a'],
+      }, {
+        type: 'object',
+        properties: {
+          a: { type: 'number' },
+          b: { type: 'number' },
+        },
+        required: ['a', 'b'],
+      }],
+      ['pipe with output type', type('string').pipe(s => s.length).to('number'), {
+        type: 'string',
+      }, {
+        type: 'number',
+      }],
+      ['unconstrained pipe', type('string').pipe(s => s.length), {
+        type: 'string',
+      }, {}],
+    ] as const)('converts %s from the matching side', (_, schema, input, output) => {
+      expect(converter.convert(schema, 'input')).toEqual([input, false])
+      expect(converter.convert(schema, 'output')).toEqual([output, false])
+    })
+  })
+
   describe('native type extensions', () => {
     it.each([
       [type('bigint'), {
