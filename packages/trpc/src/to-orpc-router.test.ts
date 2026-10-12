@@ -3,6 +3,7 @@ import { getOpenAPIMeta } from '@orpc/openapi'
 import { call, createRouterClient, getEventMeta, Lazy, ORPCError, Procedure, unlazy } from '@orpc/server'
 import { isAsyncIteratorObject } from '@orpc/shared'
 import { initTRPC, lazy, tracked, TRPCError } from '@trpc/server'
+import { observable } from '@trpc/server/observable'
 import * as z from 'zod'
 import { toORPCRouter } from './to-orpc-router'
 
@@ -350,6 +351,93 @@ describe('toORPCRouter', () => {
       await expect(output.next()).resolves.toEqual({ done: false, value: { order: 1 } })
       await expect(output.return?.()).resolves.toEqual({ done: true, value: undefined })
       expect(cleanupCalled).toBe(true)
+    })
+  })
+
+  describe('observable subscriptions', () => {
+    it('emits values & completes', async () => {
+      const orpcRouter = toORPCRouter(t.router({
+        subscribe: t.procedure.subscription(() => observable<unknown>((emit) => {
+          emit.next(1)
+          emit.next(tracked('id-1', { order: 1 }))
+          emit.complete()
+        })),
+      }))
+
+      const output = await call(orpcRouter.subscribe, undefined, { context: { a: 'test' } }) as any
+      expect(output).toSatisfy(isAsyncIteratorObject)
+      await expect(output.next()).resolves.toEqual({ done: false, value: 1 })
+      await expect(output.next()).resolves.toSatisfy((result) => {
+        expect(result.done).toEqual(false)
+        expect(result.value).toEqual({ id: 'id-1', data: { order: 1 } })
+        expect(getEventMeta(result.value)).toEqual({ id: 'id-1' })
+
+        return true
+      })
+      await expect(output.next()).resolves.toEqual({ done: true, value: undefined })
+    })
+
+    it('tears down on return', async () => {
+      const teardown = vi.fn()
+      const orpcRouter = toORPCRouter(t.router({
+        subscribe: t.procedure.subscription(() => observable<number>((emit) => {
+          emit.next(1)
+          return teardown
+        })),
+      }))
+
+      const output = await call(orpcRouter.subscribe, undefined, { context: { a: 'test' } })
+      await expect(output.next()).resolves.toEqual({ done: false, value: 1 })
+      expect(teardown).not.toHaveBeenCalled()
+      await expect(output.return?.()).resolves.toEqual({ done: true, value: undefined })
+      expect(teardown).toHaveBeenCalledTimes(1)
+    })
+
+    it('tears down on abort', async () => {
+      const teardown = vi.fn()
+      const orpcRouter = toORPCRouter(t.router({
+        subscribe: t.procedure.subscription(() => observable<number>((emit) => {
+          emit.next(1)
+          return teardown
+        })),
+      }))
+
+      const controller = new AbortController()
+      const output = await call(orpcRouter.subscribe, undefined, { context: { a: 'test' }, signal: controller.signal })
+      await expect(output.next()).resolves.toEqual({ done: false, value: 1 })
+      expect(teardown).not.toHaveBeenCalled()
+      controller.abort()
+      expect(teardown).toHaveBeenCalledTimes(1)
+    })
+
+    it('converts TRPCError emitted by the observable', async () => {
+      const orpcRouter = toORPCRouter(t.router({
+        subscribe: t.procedure.subscription(() => observable<number>((emit) => {
+          emit.next(1)
+          emit.error(new TRPCError({ code: 'UNAUTHORIZED', message: 'login required' }))
+        })),
+      }))
+
+      const output = await call(orpcRouter.subscribe, undefined, { context: { a: 'test' } })
+      await expect(output.next()).resolves.toEqual({ done: false, value: 1 })
+      await expect(output.next()).rejects.toSatisfy((err: any) => {
+        expect(err).toBeInstanceOf(ORPCError)
+        expect(err.code).toBe('UNAUTHORIZED')
+        expect(err.message).toBe('login required')
+        expect(err.cause).toBeInstanceOf(TRPCError)
+
+        return true
+      })
+    })
+
+    it('keeps non-subscription outputs with a `subscribe` key as-is', async () => {
+      const orpcRouter = toORPCRouter(t.router({
+        user: t.procedure.query(() => ({ email: 'a@b.c', subscribe: true })),
+      }))
+
+      await expect(
+        call(orpcRouter.user, undefined, { context: { a: 'test' } }),
+      ).resolves.toEqual({ email: 'a@b.c', subscribe: true })
     })
   })
 })

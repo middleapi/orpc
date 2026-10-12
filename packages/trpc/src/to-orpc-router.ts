@@ -1,9 +1,10 @@
 import type { AsyncIteratorClass } from '@orpc/shared'
 import type { AnyProcedure, AnyRouter, inferRouterContext } from '@trpc/server'
-import type { Parser, TrackedData } from '@trpc/server/unstable-core-do-not-import'
+import type { LegacyObservableSubscriptionProcedure, Parser, TrackedData } from '@trpc/server/unstable-core-do-not-import'
 import * as ORPC from '@orpc/server'
 import { isTypescriptObject, set, wrapAsyncIterator } from '@orpc/shared'
 import { isTrackedEnvelope, TRPCError } from '@trpc/server'
+import { isObservable, observableToAsyncIterable } from '@trpc/server/observable'
 import { isAsyncIterable, isObject } from '@trpc/server/unstable-core-do-not-import'
 
 export type ToORPCOutput<T>
@@ -19,7 +20,10 @@ export type ToORPCRouterResult<TContext extends ORPC.Context, TRecord extends Re
         TContext,
           object,
           ORPC.Schema<TRecord[K]['_def']['$types']['input'], unknown>,
-          ORPC.Schema<unknown, ToORPCOutput<TRecord[K]['_def']['$types']['output']>>,
+          ORPC.Schema<unknown, TRecord[K] extends LegacyObservableSubscriptionProcedure<any>
+            // tRPC types observable subscriptions with the emitted value as output
+            ? AsyncIteratorClass<TRecord[K]['_def']['$types']['output'], void, any>
+            : ToORPCOutput<TRecord[K]['_def']['$types']['output']>>,
           object
       >
       : TRecord[K] extends Record<string, any>
@@ -103,8 +107,13 @@ function toORPCProcedure(procedure: AnyProcedure) {
           batchIndex: 0,
         })
 
-        if (isAsyncIterable(output)) {
-          return wrapAsyncIterator(output[Symbol.asyncIterator](), {
+        // `isObservable` only checks for a `subscribe` key, so limit it to subscriptions
+        const iterable = procedure._def.type === 'subscription' && isObservable(output)
+          ? observableToAsyncIterable(output, signal ?? new AbortController().signal)
+          : output
+
+        if (isAsyncIterable(iterable)) {
+          return wrapAsyncIterator(iterable[Symbol.asyncIterator](), {
             mapResult: (result) => {
               if (isTrackedEnvelope(result.value)) {
                 const [id, data] = result.value
