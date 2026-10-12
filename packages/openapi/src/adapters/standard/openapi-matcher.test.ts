@@ -270,6 +270,46 @@ describe('openAPIMatcher', () => {
       await expect(matcher.match('GET', '/v1beta/items:batchGet/a^b', undefined)).resolves.toBeUndefined()
     })
 
+    it('prefers a static route over a dynamic sibling when the request path needs normalization', async () => {
+      const beta = os.meta(openapi({ method: 'GET', path: '/v1^beta/items' })).handler(() => 'beta')
+      const version = os.meta(openapi({ method: 'GET', path: '/{version}/items' })).handler(() => 'version')
+      const me = os.meta(openapi({ method: 'GET', path: '/users/me' })).handler(() => 'me')
+      const byId = os.meta(openapi({ method: 'GET', path: '/users/{id}' })).handler(() => 'byId')
+
+      const matcher = new OpenAPIMatcher({ beta, version, me, byId })
+
+      // a raw char rou3 stores encoded, as `fetch` sends "^"
+      for (const pathname of ['/v1^beta/items', '/v1%5Ebeta/items', '/v1%5ebeta/items'] as const) {
+        await expect(matcher.match('GET', pathname, undefined)).resolves.toEqual({
+          path: ['beta'],
+          procedure: beta,
+          params: undefined,
+        })
+      }
+
+      // a percent-encoded char rou3 stores raw
+      for (const pathname of ['/users/me', '/users/m%65', '/users/%6D%65'] as const) {
+        await expect(matcher.match('GET', pathname, undefined)).resolves.toEqual({
+          path: ['me'],
+          procedure: me,
+          params: undefined,
+        })
+      }
+
+      // the dynamic siblings still match everything else, with decoded params
+      await expect(matcher.match('GET', '/v2^beta/items', undefined)).resolves.toEqual({
+        path: ['version'],
+        procedure: version,
+        params: { version: 'v2^beta' },
+      })
+
+      await expect(matcher.match('GET', '/users/m%2Fe', undefined)).resolves.toEqual({
+        path: ['byId'],
+        procedure: byId,
+        params: { id: 'm/e' },
+      })
+    })
+
     it('matches path text however the route and the request encode it', async () => {
       const generated = os.handler(() => 'generated')
       const explicit = os.meta(openapi({ method: 'GET', path: '/x%3Ay/a%2Fb/{id}' })).handler(() => 'explicit')
@@ -541,8 +581,7 @@ describe('openAPIMatcher', () => {
         user: os.meta(openapi({ prefix: '/users' })).lazy(loader),
       })
 
-      // "%75" is "u": the prefix RegExp is tested against the raw pathname first and fails,
-      // so the retry has to re-run lazy resolution against the normalized pathname
+      // "%75" is "u": the prefix RegExp only matches the normalized pathname
       const result = await matcher.match('GET', '/%75sers/info', undefined)
 
       expect(result).toBeDefined()
@@ -573,6 +612,31 @@ describe('openAPIMatcher', () => {
       await expect(matcher.match('GET', '/v1^beta/info', undefined)).resolves.toMatchObject({
         path: ['beta', 'info'],
         params: undefined,
+      })
+      expect(loader).toHaveBeenCalledTimes(1)
+    })
+
+    it('resolves a prefixed lazy router before a dynamic sibling can catch a path that needs normalization', async () => {
+      const info = os.meta(openapi({ method: 'GET', path: '/info' })).handler(() => 'info')
+      const version = os.meta(openapi({ method: 'GET', path: '/{version}/info' })).handler(() => 'version')
+
+      const loader = vi.fn(async () => ({ default: { info } }))
+
+      const matcher = new OpenAPIMatcher({
+        version,
+        beta: os.meta(openapi({ prefix: '/v1^beta' })).lazy(loader),
+      })
+
+      await expect(matcher.match('GET', '/v1^beta/info', undefined)).resolves.toMatchObject({
+        path: ['beta', 'info'],
+        params: undefined,
+      })
+      expect(loader).toHaveBeenCalledTimes(1)
+
+      await expect(matcher.match('GET', '/v2/info', undefined)).resolves.toEqual({
+        path: ['version'],
+        procedure: version,
+        params: { version: 'v2' },
       })
       expect(loader).toHaveBeenCalledTimes(1)
     })

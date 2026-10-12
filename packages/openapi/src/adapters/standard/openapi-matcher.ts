@@ -127,29 +127,21 @@ export class OpenAPIMatcher {
       }
     }
 
+    if (NORMALIZABLE_PATHNAME_REGEX.test(pathname)) {
+      // Normalize before any lookup: users may percent-encode characters that we store
+      // unencoded ("a%62c" vs "abc"), or leave raw characters that we store encoded
+      // ("a^b" vs "a%5Eb"). Matching the raw path first would let a dynamic sibling
+      // ("/{version}/items") catch a path meant for a static route ("/v1^beta/items").
+      pathname = normalizeRou3Path(pathname) as `/${string}`
+    }
+
     // most requests `await undefined` so conditionally await it to save a microtask turn
     const loading = this.resolvePendingLazyRouters(pathname)
     if (loading !== undefined) {
       await loading
     }
 
-    let match = this.findMatch(method, pathname)
-
-    if (match === undefined && NORMALIZABLE_PATHNAME_REGEX.test(pathname)) {
-      // Retry with a normalized path: users may percent-encode characters that we store
-      // unencoded ("a%62c" vs "abc"), or leave raw characters that we store encoded
-      // ("a^b" vs "a%5Eb"), so normalization handles both without duplicate entries.
-
-      const normalizedPathname = normalizeRou3Path(pathname) as `/${string}`
-
-      // most requests `await undefined` so conditionally await it to save a microtask turn
-      const normalizedLoading = this.resolvePendingLazyRouters(normalizedPathname)
-      if (normalizedLoading !== undefined) {
-        await normalizedLoading
-      }
-
-      match = this.findMatch(method, normalizedPathname)
-    }
+    const match = this.findMatch(method, pathname)
 
     if (match === undefined) {
       return undefined
