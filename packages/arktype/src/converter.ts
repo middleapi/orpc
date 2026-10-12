@@ -96,9 +96,7 @@ export class ArkTypeToJsonSchemaConverter implements JsonSchemaConverter {
   private convertArkType(schema: Type, direction: JsonSchemaConverterDirection): ArkJsonSchema {
     // `toJsonSchema` describes the input side (and keeps `default` annotations),
     // so output conversions go through `.out` to reflect morph outputs and applied defaults.
-    const jsonSchema = direction === 'output'
-      ? schema.out.toJsonSchema(this.toJsonSchemaOptions)
-      : schema.toJsonSchema(this.toJsonSchemaOptions)
+    const jsonSchema = (direction === 'output' ? schema.out : schema).toJsonSchema(this.toJsonSchemaOptions)
 
     // Since the default oRPC format is always draft/2020-12,
     // `$schema` can be safely omitted here.

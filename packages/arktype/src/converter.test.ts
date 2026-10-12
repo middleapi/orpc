@@ -75,14 +75,8 @@ describe('arkTypeToJsonSchemaConverter', () => {
         },
         required: ['a', 'b'],
       }],
-      ['pipe with output type', type('string').pipe(s => s.length).to('number'), {
-        type: 'string',
-      }, {
-        type: 'number',
-      }],
-      ['unconstrained pipe', type('string').pipe(s => s.length), {
-        type: 'string',
-      }, {}],
+      ['pipe with output type', type('string').pipe(s => s.length).to('number'), { type: 'string' }, { type: 'number' }],
+      ['unconstrained pipe', type('string').pipe(s => s.length), { type: 'string' }, {}],
     ] as const)('converts %s from the matching side', (_, schema, input, output) => {
       expect(converter.convert(schema, 'input')).toEqual([input, false])
       expect(converter.convert(schema, 'output')).toEqual([output, false])
