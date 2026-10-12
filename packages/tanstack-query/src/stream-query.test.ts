@@ -504,6 +504,63 @@ describe('serializableStreamedQuery', () => {
       // Should not replace cache when aborted
       expect(queryClient.getQueryData(['abort-replace-test'])).toEqual(['initial1', 'initial2'])
     })
+
+    it('does not write to the cache when the stream resolves after abort', async () => {
+      const queryFn = serializableStreamedQuery(async () => {
+        await sleep(10) // ignores the signal, like a server-side client
+        return (async function* () {
+          yield 'late'
+        }())
+      })
+
+      const controller = new AbortController()
+
+      const resultPromise = expect(queryFn({
+        queryKey: ['late-stream'],
+        signal: controller.signal,
+        client: queryClient,
+      } as any)).rejects.toSatisfy(err => err === controller.signal.reason)
+
+      controller.abort()
+
+      await resultPromise
+      expect(queryClient.getQueryData(['late-stream'])).toBeUndefined()
+    })
+
+    it('closes a started stream that resolves after abort', async () => {
+      let cleanupCalled = false
+      const yieldFn = vi.fn(v => v)
+      const queryFn = serializableStreamedQuery(async () => {
+        const iterator = (async function* () {
+          try {
+            yield yieldFn('chunk1')
+            yield yieldFn('chunk2')
+          }
+          finally {
+            cleanupCalled = true
+          }
+        }())
+
+        await iterator.next() // starts the iterator, like an eagerly connected stream
+        await sleep(10) // ignores the signal, like a server-side client
+        return iterator
+      })
+
+      const controller = new AbortController()
+
+      const resultPromise = expect(queryFn({
+        queryKey: ['late-started-stream'],
+        signal: controller.signal,
+        client: queryClient,
+      } as any)).rejects.toSatisfy(err => err === controller.signal.reason)
+
+      controller.abort()
+
+      await resultPromise
+      expect(cleanupCalled).toBe(true)
+      expect(yieldFn).toHaveBeenCalledTimes(1)
+      expect(queryClient.getQueryData(['late-started-stream'])).toBeUndefined()
+    })
   })
 
   describe('edge cases', () => {

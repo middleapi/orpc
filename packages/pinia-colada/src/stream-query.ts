@@ -47,6 +47,16 @@ export function serializableStreamedQuery<T>(
     }
 
     const stream = await queryFn(context)
+
+    /**
+     * The stream can resolve after abort (e.g. server-side clients ignore the signal),
+     * so close it and skip writing to the cache.
+     */
+    if (signal.aborted) {
+      await stream[Symbol.asyncIterator]().return?.()
+      throw signal.reason
+    }
+
     const shouldUpdateCacheDuringStream = !hasPreviousData || refetchMode !== 'replace'
 
     let result: T[] = hasPreviousData && refetchMode === 'append'

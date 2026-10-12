@@ -1,4 +1,5 @@
 import type { UseQueryOptions } from '@pinia/colada'
+import { sleep } from '@orpc/shared'
 import { PiniaColada, useQuery, useQueryCache } from '@pinia/colada'
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
@@ -256,5 +257,37 @@ describe('serializableStreamedQuery', () => {
     await vi.waitFor(() => expect(mounted.vm.query.asyncStatus.value).toEqual('idle'))
     expect(mounted.vm.query.data.value).toEqual(['a'])
     expect(mounted.vm.query.error.value).toBeNull()
+  })
+
+  it('ignores a stream that resolves after its fetch was aborted', async () => {
+    let releaseFirst!: () => void
+    const firstReady = new Promise<void>((resolve) => {
+      releaseFirst = resolve
+    })
+
+    const queryFn = vi.fn()
+      .mockImplementationOnce(async () => {
+        await firstReady // ignores the signal, like a server-side client
+        return (async function* () {}())
+      })
+      .mockImplementationOnce(async function* () {
+        yield 2
+        yield 3
+      })
+
+    const mounted = mountQuery({
+      key: ['stream'],
+      query: serializableStreamedQuery(queryFn),
+    })
+
+    await vi.waitFor(() => expect(queryFn).toHaveBeenCalledTimes(1))
+
+    // aborts the first fetch, which is still waiting for its stream
+    await mounted.vm.query.refetch()
+    expect(mounted.vm.query.data.value).toEqual([2, 3])
+
+    releaseFirst()
+    await sleep(0)
+    expect(mounted.vm.query.data.value).toEqual([2, 3])
   })
 })
