@@ -27,9 +27,21 @@ export class BodyLimitPlugin<T extends Context> implements NodeHttpHandlerPlugin
     options.adapterInterceptors ??= []
 
     options.adapterInterceptors.push(async (options) => {
+      const throwPayloadTooLarge = () => {
+        /**
+         * The rest of the body is never read, so the connection cannot serve another request.
+         * Tell keep-alive clients to drop it instead of reusing it (HTTP/2 forbids this header).
+         */
+        if (!('stream' in options.response) && !options.response.headersSent) {
+          options.response.setHeader('connection', 'close')
+        }
+
+        throw new ORPCError('PAYLOAD_TOO_LARGE')
+      }
+
       const checkHeader = once(() => {
         if (Number(options.request.headers['content-length']) > this.maxBodySize) {
-          throw new ORPCError('PAYLOAD_TOO_LARGE')
+          throwPayloadTooLarge()
         }
       })
 
@@ -44,7 +56,7 @@ export class BodyLimitPlugin<T extends Context> implements NodeHttpHandlerPlugin
           currentBodySize += args[0].length
 
           if (currentBodySize > this.maxBodySize) {
-            throw new ORPCError('PAYLOAD_TOO_LARGE')
+            throwPayloadTooLarge()
           }
         }
 
