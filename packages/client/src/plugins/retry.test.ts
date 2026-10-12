@@ -444,6 +444,8 @@ describe('retryLinkPlugin', () => {
     it.each([
       ['ReadableStream', () => new Blob(['data']).stream()],
       ['AsyncIteratorObject', () => createIteratorInput()],
+      ['object with a ReadableStream body', () => ({ params: { id: '1' }, body: new Blob(['data']).stream() })],
+      ['object with an AsyncIteratorObject body', () => ({ params: { id: '1' }, body: createIteratorInput() })],
     ])('does not retry a %s input, since it cannot be resent', async (_, createInput) => {
       const codec = makeCodec()
       const transport = makeTransport()
@@ -462,24 +464,6 @@ describe('retryLinkPlugin', () => {
       expect(codec.encodeInput).toHaveBeenCalledTimes(1)
       expect(shouldRetry).not.toHaveBeenCalled()
       expect(onRetry).not.toHaveBeenCalled()
-    })
-
-    it.each([
-      ['ReadableStream', () => new Blob(['data']).stream()],
-      ['AsyncIteratorObject', () => createIteratorInput()],
-    ])('does not retry an input with a %s body, since it cannot be resent', async (_, createBody) => {
-      const codec = makeCodec()
-      const transport = makeTransport()
-
-      vi.mocked(codec.decodeResponse).mockRejectedValue(new Error('FAIL'))
-
-      const link = new StandardLink(codec, transport, {
-        plugins: [new RetryLinkPlugin()],
-      })
-
-      await expect(link.call(['upload'], { params: { id: '1' }, body: createBody() }, { context: { retry: 3, retryDelay: 0 } })).rejects.toThrow('FAIL')
-
-      expect(codec.encodeInput).toHaveBeenCalledTimes(1)
     })
 
     it.each([

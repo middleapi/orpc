@@ -100,7 +100,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
        * A stream or iterator input is consumed by the first attempt and cannot be resent,
        * so call once instead of retrying or resuming with an empty or locked input.
        */
-      if (!isResendableInput(callOptions.input)) {
+      if (hasStreamInput(callOptions.input)) {
         return next(callOptions)
       }
 
@@ -235,12 +235,14 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
   }
 }
 
+function isStreamLike(value: unknown): boolean {
+  return value instanceof ReadableStream || isAsyncIteratorObject(value)
+}
+
 /**
  * Checks the root input and its top-level `body`, where `OpenAPILink` with
  * `inputStructure: 'detailed'` places the body (`{ params, query, headers, body }`).
  */
-function isResendableInput(input: unknown): boolean {
-  const isStreamLike = (value: unknown) => value instanceof ReadableStream || isAsyncIteratorObject(value)
-
-  return !isStreamLike(input) && !(isTypescriptObject(input) && isStreamLike(input.body))
+function hasStreamInput(input: unknown): boolean {
+  return isStreamLike(input) || (isTypescriptObject(input) && isStreamLike(input.body))
 }
