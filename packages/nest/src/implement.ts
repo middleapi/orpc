@@ -1,6 +1,6 @@
 import type { CallHandler, ExecutionContext, NestInterceptor } from '@nestjs/common'
 import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
-import type { AnyProcedure, ContractedRouter, DefaultInitialContext } from '@orpc/server'
+import type { ContractedRouter, DefaultInitialContext } from '@orpc/server'
 import type { Promisable } from '@orpc/shared'
 import type { StandardBodyHint } from '@standard-server/core'
 import type { Request as ExpressRequest, Response as ExpressResponse } from 'express'
@@ -162,16 +162,12 @@ function implementRouterContract(
 const NEST_PROCEDURE_SYMBOL = Symbol('ORPC_NEST_PROCEDURE')
 
 interface NestProcedureLazyRequest extends NestStandardLazyRequest {
-  [NEST_PROCEDURE_SYMBOL]?: {
-    procedure: AnyProcedure
-    params: undefined | Record<string, string>
-  }
+  [NEST_PROCEDURE_SYMBOL]?: Parameters<OpenAPIHandlerCodecCore<DefaultInitialContext>['decodeInput']>[0]
 }
 
 @Injectable()
 export class ImplementInterceptor implements NestInterceptor {
   private readonly config: ORPCModuleConfig
-  private readonly codec: OpenAPIHandlerCodecCore<DefaultInitialContext>
   private readonly handler: StandardHandler<DefaultInitialContext>
   private readonly toNestStandardLazyRequest: Exclude<ORPCModuleConfig['toNestStandardLazyRequest'], undefined>
   private readonly httpAdapterHost: HttpAdapterHost
@@ -184,7 +180,7 @@ export class ImplementInterceptor implements NestInterceptor {
     this.config = config ?? {} as ORPCModuleConfig
     this.httpAdapterHost = httpAdapterHost
 
-    this.codec = new OpenAPIHandlerCodecCore(this.config)
+    const codec = new OpenAPIHandlerCodecCore(this.config)
     this.handler = new StandardHandler({
       resolveProcedure: (request) => {
         const resolved = (request as NestProcedureLazyRequest)[NEST_PROCEDURE_SYMBOL]
@@ -198,11 +194,11 @@ export class ImplementInterceptor implements NestInterceptor {
         return {
           path: getPathMeta(procedure) ?? [],
           procedure,
-          decodeInput: () => this.codec.decodeInput({ procedure, params }, request),
+          decodeInput: () => codec.decodeInput({ procedure, params }, request),
         }
       },
-      encodeError: this.codec.encodeError.bind(this.codec),
-      encodeOutput: this.codec.encodeOutput.bind(this.codec),
+      encodeError: codec.encodeError.bind(codec),
+      encodeOutput: codec.encodeOutput.bind(codec),
     }, this.config)
     this.toNestStandardLazyRequest = this.config.toNestStandardLazyRequest ?? ((req: ExpressRequest | FastifyRequest, res: ExpressResponse | FastifyReply) => {
       const standardRequest: NestStandardLazyRequest = toStandardLazyRequest(
