@@ -520,37 +520,114 @@ async function decodeLengthPrefixedBlob(blob: Blob, peer: ClientPeer): Promise<v
   }
 }
 
-async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array>, receive: (message: ServerPeerSendMessage) => Promise<void>): Promise<void> {
+/**
+ * Bytes received but not yet consumed, kept as the received chunks so a frame spanning many chunks
+ * is copied once when complete instead of on every chunk.
+ */
+class PendingBytes {
+  private readonly chunks: Uint8Array<ArrayBuffer>[] = []
+  private size = 0
+
+  get length(): number {
+    return this.size
+  }
+
+  push(chunk: Uint8Array<ArrayBuffer>): void {
+    if (chunk.length) {
+      this.chunks.push(chunk)
+      this.size += chunk.length
+    }
+  }
+
+  /**
+   * Reads the big-endian uint32 at the start without consuming it.
+   * Requires at least 4 pending bytes.
+   */
+  peekUint32(): number {
+    let value = 0
+    let read = 0
+
+    for (let index = 0; read < 4; index++) {
+      const chunk = this.chunks[index]!
+
+      for (let offset = 0; offset < chunk.length && read < 4; offset++, read++) {
+        value = value * 256 + chunk[offset]!
+      }
+    }
+
+    return value
+  }
+
+  /**
+   * Consumes the first `size` bytes, copying them only when they span chunks.
+   * Requires at least `size` pending bytes.
+   */
+  take(size: number): Uint8Array<ArrayBuffer> {
+    this.size -= size
+    const first = this.chunks[0]!
+
+    if (first.length >= size) {
+      if (first.length === size) {
+        this.chunks.shift()
+      }
+      else {
+        this.chunks[0] = first.subarray(size)
+      }
+
+      return first.subarray(0, size)
+    }
+
+    const output = new Uint8Array(size)
+    let offset = 0
+    let index = 0
+
+    while (offset < size) {
+      const chunk = this.chunks[index]!
+      const piece = Math.min(chunk.length, size - offset)
+      output.set(chunk.subarray(0, piece), offset)
+      offset += piece
+
+      if (piece < chunk.length) {
+        this.chunks[index] = chunk.subarray(piece)
+      }
+      else {
+        index++
+      }
+    }
+
+    this.chunks.splice(0, index)
+
+    return output
+  }
+}
+
+async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array<ArrayBuffer>>, receive: (message: ServerPeerSendMessage) => Promise<void>): Promise<void> {
   const reader = stream.getReader()
-  let buffer = new Uint8Array(0)
+  const pendingBytes = new PendingBytes()
 
   try {
     while (true) {
       const { done, value: chunk } = await reader.read()
 
       if (chunk) {
-        const newBuffer = new Uint8Array(buffer.length + chunk.length)
-        newBuffer.set(buffer)
-        newBuffer.set(chunk, buffer.length)
-        buffer = newBuffer
+        pendingBytes.push(chunk)
       }
 
-      while (buffer.length >= 4) {
-        const view = new DataView(buffer.buffer, buffer.byteOffset, 4)
-        const length = view.getUint32(0, false)
+      while (pendingBytes.length >= 4) {
+        const length = pendingBytes.peekUint32()
 
         // Zero-length frame is a keep-alive ping; skip it.
         if (length === 0) {
-          buffer = buffer.subarray(4)
+          pendingBytes.take(4)
           continue
         }
 
-        if (buffer.length < 4 + length) {
+        if (pendingBytes.length < 4 + length) {
           break
         }
 
-        const messageBytes = buffer.subarray(4, 4 + length)
-        buffer = buffer.subarray(4 + length)
+        pendingBytes.take(4)
+        const messageBytes = pendingBytes.take(length)
 
         const result = decodePeerMessage(messageBytes)
 

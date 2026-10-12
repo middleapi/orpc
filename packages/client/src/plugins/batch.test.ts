@@ -81,6 +81,10 @@ async function toLengthPrefixedBytes(messages: any[]): Promise<Uint8Array<ArrayB
     chunks.push(new Uint8Array(header), bytes)
   }
 
+  return concatBytes(chunks)
+}
+
+function concatBytes(chunks: Uint8Array[]): Uint8Array<ArrayBuffer> {
   const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
   const output = new Uint8Array(total)
   let offset = 0
@@ -91,6 +95,21 @@ async function toLengthPrefixedBytes(messages: any[]): Promise<Uint8Array<ArrayB
   }
 
   return output
+}
+
+/**
+ * Streams the bytes as consecutive `chunkSize`-byte slices.
+ */
+function toChunkedStream(bytes: Uint8Array, chunkSize: number): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+        controller.enqueue(bytes.subarray(offset, offset + chunkSize))
+      }
+
+      controller.close()
+    },
+  })
 }
 
 /**
@@ -1118,6 +1137,126 @@ describe('batchLinkPlugin', () => {
         expect(link.call(['x'], {}, { context: {} })).resolves.toBe('split-0'),
         expect(link.call(['y'], {}, { context: {} })).resolves.toBe('split-1'),
       ])
+    })
+
+    it('decodes streamed responses when a length header is split across chunks', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(transport.send).mockImplementation(async (request) => {
+        const responseMessages = extractBatchMessagesFromRequest(request).map((msg: any, i: number) => ({
+          kind: 'response',
+          id: msg.id,
+          json: { status: 200, headers: {}, body: `split-header-${i}` },
+        }))
+
+        const bytes = await toLengthPrefixedBytes(responseMessages)
+        const secondHeaderOffset = 4 + new DataView(bytes.buffer, bytes.byteOffset, 4).getUint32(0, false)
+
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            // Each length header arrives as 2 + 2 bytes, once alone and once next to a payload.
+            controller.enqueue(bytes.subarray(0, 2))
+            controller.enqueue(bytes.subarray(2, secondHeaderOffset + 2))
+            controller.enqueue(bytes.subarray(secondHeaderOffset + 2))
+            controller.close()
+          },
+        })
+
+        return {
+          status: 207,
+          headers: {},
+          resolveBody: async () => stream,
+        }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'streaming' })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {} })).resolves.toBe('split-header-0'),
+        expect(link.call(['b'], {}, { context: {} })).resolves.toBe('split-header-1'),
+      ])
+    })
+
+    it('ignores zero-length keep-alive frames between streamed frames spanning many chunks', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(transport.send).mockImplementation(async (request) => {
+        const [frameA, frameB] = await Promise.all(
+          extractBatchMessagesFromRequest(request).map((msg: any, i: number) => toLengthPrefixedBytes([{
+            kind: 'response',
+            id: msg.id,
+            json: { status: 200, headers: {}, body: `keepalive-${i}` },
+          }])),
+        )
+
+        const keepAlive = new Uint8Array(4)
+        const bytes = concatBytes([keepAlive, frameA!, keepAlive, keepAlive, frameB!, keepAlive])
+
+        return {
+          status: 207,
+          headers: {},
+          // 3-byte chunks split every frame, length header and keep-alive frame across chunks.
+          resolveBody: async () => toChunkedStream(bytes, 3),
+        }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'streaming' })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {} })).resolves.toBe('keepalive-0'),
+        expect(link.call(['b'], {}, { context: {} })).resolves.toBe('keepalive-1'),
+      ])
+    })
+
+    it('copies each byte of a streamed frame spanning many chunks a constant number of times', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+      const largeBody = 'x'.repeat(1024 * 1024)
+      let responseSize = 0
+
+      vi.mocked(transport.send).mockImplementation(async (request) => {
+        const [idA, idB] = extractBatchMessagesFromRequest(request).map((msg: any) => msg.id)
+
+        const bytes = await toLengthPrefixedBytes([
+          { kind: 'response', id: idA, json: { status: 200, headers: {}, body: largeBody } },
+          { kind: 'response', id: idB, json: { status: 200, headers: {}, body: 'small' } },
+        ])
+        responseSize = bytes.length
+
+        return {
+          status: 207,
+          headers: {},
+          resolveBody: async () => toChunkedStream(bytes, 1024),
+        }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'streaming' })],
+      })
+
+      const setSpy = vi.spyOn(Uint8Array.prototype, 'set')
+      let copiedBytes = 0
+
+      try {
+        await Promise.all([
+          expect(link.call(['a'], {}, { context: {} })).resolves.toBe(largeBody),
+          expect(link.call(['b'], {}, { context: {} })).resolves.toBe('small'),
+        ])
+
+        copiedBytes = setSpy.mock.calls.reduce((sum, [source]) => sum + source.length, 0)
+      }
+      finally {
+        setSpy.mockRestore()
+      }
+
+      // Building the response copies it once, so decoding may copy it about once more.
+      expect(copiedBytes).toBeLessThan(4 * responseSize)
     })
 
     it('rejects on malformed array batch responses with invalid messages', async () => {
