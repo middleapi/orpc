@@ -1,6 +1,7 @@
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard'
 import type { RetryLinkPluginContext } from './retry'
+import { promiseWithResolvers } from '@orpc/shared'
 import { withEventMeta } from '@standard-server/core'
 import { StandardLink } from '../adapters/standard'
 import { RetryLinkPlugin } from './retry'
@@ -345,6 +346,8 @@ describe('retryLinkPlugin', () => {
 
       const retriedReturn = vi.fn(async () => ({ done: true as const, value: undefined }))
 
+      const reconnect = promiseWithResolvers<void>()
+
       let callCount = 0
       vi.mocked(codec.decodeResponse).mockImplementation(async () => {
         callCount++
@@ -362,6 +365,8 @@ describe('retryLinkPlugin', () => {
             })(),
           }
         }
+
+        await reconnect.promise
 
         return {
           kind: 'output',
@@ -386,17 +391,102 @@ describe('retryLinkPlugin', () => {
       const nextPromise = iterator.next()
       const nextExpectation = expect(nextPromise).resolves.toEqual({ done: true, value: undefined })
 
-      await vi.advanceTimersByTimeAsync(1)
-
-      const returnPromise = iterator.return?.()
-
       await vi.advanceTimersByTimeAsync(60)
+      expect(codec.decodeResponse).toHaveBeenCalledTimes(2) // reconnect request is in flight
+
+      await iterator.return?.()
+      reconnect.resolve()
 
       await nextExpectation
-      await returnPromise
 
       expect(cleanup).toHaveBeenCalledTimes(1)
       expect(retriedReturn).toHaveBeenCalledTimes(1)
+    })
+
+    it('stops reconnecting once the iterator is closed', async () => {
+      vi.useFakeTimers()
+
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const onRetry = vi.fn()
+
+      let calls = 0
+      vi.mocked(codec.decodeResponse).mockImplementation(async () => {
+        calls++
+
+        if (calls === 1) {
+          return {
+            kind: 'output',
+            output: (async function* () {
+              throw new Error('DISCONNECTED')
+            })(),
+          }
+        }
+
+        throw new Error('SERVER_DOWN')
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      const iterator = await link.call(['stream'], undefined, { context: { retry: Number.POSITIVE_INFINITY, retryDelay: 10, onRetry } }) as AsyncIterator<any>
+
+      const nextPromise = iterator.next()
+
+      await vi.advanceTimersByTimeAsync(35)
+      expect(calls).toBeGreaterThan(1)
+
+      await iterator.return?.()
+
+      const callsAtReturn = calls
+      const onRetryCallsAtReturn = onRetry.mock.calls.length
+
+      await vi.advanceTimersByTimeAsync(1000)
+
+      expect(calls).toBe(callsAtReturn)
+      expect(onRetry).toHaveBeenCalledTimes(onRetryCallsAtReturn)
+      await expect(nextPromise).resolves.toEqual({ done: true, value: undefined })
+    })
+
+    it('does not send further requests when closed during the retry delay', async () => {
+      vi.useFakeTimers()
+
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(codec.decodeResponse).mockResolvedValue({
+        kind: 'output',
+        output: (async function* () {
+          throw new Error('DISCONNECTED')
+        })(),
+      })
+
+      const clean = vi.fn()
+      const onRetry = vi.fn(() => clean)
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      const iterator = await link.call(['stream'], undefined, { context: { retry: 3, retryDelay: 1000, onRetry } }) as AsyncIterator<any>
+
+      const nextPromise = iterator.next()
+
+      await vi.advanceTimersByTimeAsync(10)
+      expect(onRetry).toHaveBeenCalledTimes(1)
+
+      await iterator.return?.()
+      await vi.advanceTimersByTimeAsync(5000)
+
+      await expect(nextPromise).resolves.toEqual({ done: true, value: undefined })
+
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(codec.decodeResponse).toHaveBeenCalledTimes(1)
+      expect(onRetry).toHaveBeenCalledTimes(1)
+      expect(clean).toHaveBeenCalledTimes(1)
+      expect(clean).toHaveBeenCalledWith(false)
     })
 
     it('reset special AsyncIteratorObject properties after retry', async () => {

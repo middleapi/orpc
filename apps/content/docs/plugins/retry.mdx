@@ -95,6 +95,8 @@ for await (const message of streaming) {
 }
 ```
 
+Closing the iterator (for example with `break` or `streaming.return()`) cancels any pending reconnect and stops further retries.
+
 ## Learn More
 
 For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/client/src/plugins/retry.ts).
