@@ -65,10 +65,7 @@ export function serializableStreamedQuery<
     let result: Array<TQueryFnData> = []
     const stream = await queryFn(context)
 
-    /**
-     * The stream can resolve after abort (e.g. server-side clients ignore the signal),
-     * so close it and skip writing to the cache.
-     */
+    // the stream can resolve after abort (e.g. server-side clients ignore the signal)
     if (context.signal.aborted) {
       await stream[Symbol.asyncIterator]().return?.()
       throw context.signal.reason

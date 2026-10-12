@@ -1,5 +1,5 @@
 import type { UseQueryOptions } from '@pinia/colada'
-import { sleep } from '@orpc/shared'
+import { promiseWithResolvers, sleep } from '@orpc/shared'
 import { PiniaColada, useQuery, useQueryCache } from '@pinia/colada'
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
@@ -260,14 +260,11 @@ describe('serializableStreamedQuery', () => {
   })
 
   it('ignores a stream that resolves after its fetch was aborted', async () => {
-    let releaseFirst!: () => void
-    const firstReady = new Promise<void>((resolve) => {
-      releaseFirst = resolve
-    })
+    const firstReady = promiseWithResolvers<void>()
 
     const queryFn = vi.fn()
       .mockImplementationOnce(async () => {
-        await firstReady // ignores the signal, like a server-side client
+        await firstReady.promise // ignores the signal, like a server-side client
         return (async function* () {}())
       })
       .mockImplementationOnce(async function* () {
@@ -286,7 +283,7 @@ describe('serializableStreamedQuery', () => {
     await mounted.vm.query.refetch()
     expect(mounted.vm.query.data.value).toEqual([2, 3])
 
-    releaseFirst()
+    firstReady.resolve()
     await sleep(0)
     expect(mounted.vm.query.data.value).toEqual([2, 3])
   })
