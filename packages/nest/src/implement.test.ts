@@ -541,6 +541,116 @@ describe('routing', () => {
       })
     })
   })
+
+  describe.each([
+    ['express adapter', undefined],
+    ['fastify adapter', new FastifyAdapter()],
+  ] as const)('trailing rest param alongside a param named `path` with %s', async (_, adapter) => {
+    const contract = oc.meta(openapi({
+      path: '/{path}/{+rest}',
+      method: 'GET',
+    })).input(z.object({ path: z.string(), rest: z.string() }))
+
+    @Controller()
+    class ImplController {
+      @Implement(contract)
+      pathAndRest() {
+        return implement(contract).handler(({ input }) => input)
+      }
+    }
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ImplController],
+    }).compile()
+
+    const app = moduleRef.createNestApplication(adapter as any)
+    await app.init()
+
+    if (adapter) {
+      await app.getHttpAdapter().getInstance().ready()
+    }
+
+    const httpServer = app.getHttpServer()
+
+    it('should keep both the `path` param and the rest param', async () => {
+      const res = await supertest(httpServer).get('/x/a/b')
+
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual({ path: 'x', rest: 'a/b' })
+    })
+  })
+
+  describe('non-trailing rest params', () => {
+    const contract = {
+      midPath: oc.meta(openapi({
+        path: '/files/{+path}/raw',
+        method: 'GET',
+      })).input(z.object({ path: z.string() })),
+
+      tenantMidPath: oc.meta(openapi({
+        path: '/files/{+path}/raw',
+        method: 'GET',
+      })).input(z.object({ tenant: z.string(), path: z.string() })),
+    }
+
+    @Controller()
+    class ImplController {
+      @Implement(contract.midPath)
+      midPath() {
+        return implement(contract.midPath).handler(({ input }) => input)
+      }
+    }
+
+    @Controller('/:tenant')
+    class TenantController {
+      @Implement(contract.tenantMidPath)
+      tenantMidPath() {
+        return implement(contract.tenantMidPath).handler(({ input }) => input)
+      }
+    }
+
+    describe('with express adapter', async () => {
+      const moduleRef = await Test.createTestingModule({
+        controllers: [ImplController, TenantController],
+      }).compile()
+
+      const app = moduleRef.createNestApplication()
+      await app.init()
+
+      const httpServer = app.getHttpServer()
+
+      it('should handle a rest param followed by more segments', async () => {
+        const res = await supertest(httpServer).get('/files/a/b/raw')
+
+        expect(res.statusCode).toEqual(200)
+        expect(res.body).toEqual({ path: 'a/b' })
+      })
+
+      it('should decode percent-encoded characters in a non-trailing rest param', async () => {
+        const res = await supertest(httpServer).get('/files/a%2Fb/c/raw')
+
+        expect(res.statusCode).toEqual(200)
+        expect(res.body).toEqual({ path: 'a/b/c' })
+      })
+
+      it('should keep dynamic controller prefix params alongside a non-trailing rest param', async () => {
+        const res = await supertest(httpServer).get('/acme/files/a/b/raw')
+
+        expect(res.statusCode).toEqual(200)
+        expect(res.body).toEqual({ tenant: 'acme', path: 'a/b' })
+      })
+    })
+
+    it('should fail to register a non-trailing rest param with fastify adapter', async () => {
+      const moduleRef = await Test.createTestingModule({
+        controllers: [ImplController],
+      }).compile()
+
+      const app = moduleRef.createNestApplication(new FastifyAdapter())
+
+      await expect(app.init()).rejects.toThrow('Wildcard must be the last character in the route')
+    })
+  })
 })
 
 describe('response status, headers and body should follow standard-server', () => {

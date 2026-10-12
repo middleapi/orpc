@@ -85,7 +85,7 @@ function toNestRouteDecorator(contract: AnyProcedureContract): MethodDecorator {
   }
 
   const method = meta.method ?? DEFAULT_OPENAPI_METHOD
-  const path = toNestPattern(meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path)
+  const path = toNestRoute(meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path).pattern
   const successStatus = meta.successStatus ?? DEFAULT_SUCCESS_STATUS
 
   if (method === 'QUERY') {
@@ -337,44 +337,73 @@ function toORPCOpenAPIParams(contract: AnyProcedureContract, params: NestStandar
     return undefined
   }
 
+  const route = toNestRoute(meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path)
+  // only fastify reports the trailing wildcard as `*`, and there a `path` key is a literal param (e.g. from a controller prefix)
+  const hasFastifyWildcard = Object.hasOwn(params, '*')
+
   // NullProtoObj prevents prototype injection when a param is named like `__proto__`
   const orpcParams: Record<string, string> = new NullProtoObj()
-  // express use `path` while fastify use `*` for rest matching
-  const restKey = Object.hasOwn(params, '*') ? '*' : 'path'
 
   for (const [key, value] of Object.entries(params)) {
-    if (key === restKey) {
-      const restParams = getDynamicPathParams(
-        meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path,
-      )?.filter(c => c.allowsSlash)
-
-      if (restParams?.length) {
-        for (const c of restParams) {
-          orpcParams[c.parameterName] = flattenParamValue(value)
-        }
-
-        continue
-      }
-    }
-
-    orpcParams[key] = flattenParamValue(value)
+    const name = key === 'path' && hasFastifyWildcard ? key : route.params[key] ?? key
+    orpcParams[name] = flattenParamValue(value)
   }
 
   return orpcParams
 }
 
-function toNestPattern(path: `/${string}`): `/${string}` {
-  const params = getDynamicPathParams(path)
+const NEST_REST_PARAM_NAME = 'orpc_rest'
+const NEST_PATH_PARAM_NAME = 'orpc_path'
 
-  if (!params?.length) {
-    return path
+/**
+ * Converts an oRPC OpenAPI path into a Nest route pattern. `params` maps each Nest param key back to its contract param name;
+ * keys outside it (e.g. from a controller prefix) are kept as is.
+ */
+function toNestRoute(path: `/${string}`): { pattern: `/${string}`, params: Record<string, string> } {
+  const dynamicParams = getDynamicPathParams(path)
+  const params: Record<string, string> = new NullProtoObj()
+
+  if (!dynamicParams) {
+    return { pattern: path, params }
   }
 
-  for (let i = params.length - 1; i >= 0; i--) {
-    const param = params[i]!
-    const pattern = param.allowsSlash ? `*` : `:${param.parameterName}`
-    path = path.slice(0, param.startIndex) + pattern + path.slice(param.startIndex + param.segment.length)
+  // Fastify only accepts the unnamed `*`, and only at the end of a route. It arrives as `*` on Fastify
+  // and as `path` on Express, because Nest's LegacyRouteConverter rewrites a trailing `*` to `{*path}`.
+  const lastParam = dynamicParams.at(-1)!
+  const trailingRest = lastParam.allowsSlash && lastParam.startIndex + lastParam.segment.length === path.length
+    ? lastParam
+    : undefined
+
+  let pattern = ''
+  let literalStart = 0
+
+  for (const param of dynamicParams) {
+    pattern += path.slice(literalStart, param.startIndex)
+    literalStart = param.startIndex + param.segment.length
+
+    if (param === trailingRest) {
+      pattern += '*'
+      params['*'] = param.parameterName
+      params.path = param.parameterName
+    }
+    else if (param.allowsSlash) {
+      // Nest's LegacyRouteConverter names an unnamed mid-path `*` after its offset in the full route (e.g. `*path6`),
+      // so name it here instead. Only Express supports this, Fastify refuses to register the route.
+      pattern += `*${NEST_REST_PARAM_NAME}`
+      params[NEST_REST_PARAM_NAME] = param.parameterName
+    }
+    else if (trailingRest && param.parameterName === 'path') {
+      // the trailing `*` becomes `{*path}` on Express, which would overwrite this param
+      pattern += `:${NEST_PATH_PARAM_NAME}`
+      params[NEST_PATH_PARAM_NAME] = param.parameterName
+    }
+    else {
+      pattern += `:${param.parameterName}`
+      params[param.parameterName] = param.parameterName
+    }
   }
 
-  return path
+  pattern += path.slice(literalStart)
+
+  return { pattern: pattern as `/${string}`, params }
 }
