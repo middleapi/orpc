@@ -12,17 +12,16 @@ export function resolveMetaPlugins<
   existingPlugins: MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[] | undefined,
   incomingPlugins: MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[] | undefined,
 ): [meta: Meta, plugins: MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[]] {
-  existingPlugins = toArray(existingPlugins)
-  incomingPlugins = toArray(incomingPlugins)
+  const existing = mergeMetaPlugins(existingPlugins)
+  const plugins = mergeMetaPlugins(existing, incomingPlugins)
 
   let meta = baseMeta
-  for (const plugin of incomingPlugins) {
+  // A plugin instance that is already present must not init again (e.g. prefix would concatenate twice)
+  for (const plugin of plugins.slice(existing.length)) {
     if (plugin.init) {
       meta = plugin.init(meta)
     }
   }
-
-  const plugins = [...existingPlugins, ...incomingPlugins]
 
   for (const plugin of plugins) {
     if (plugin.apply) {
@@ -31,6 +30,14 @@ export function resolveMetaPlugins<
   }
 
   return [meta, plugins]
+}
+
+/**
+ * Concatenates meta plugin lists, keeping only the first occurrence of each plugin instance.
+ * Plugins are compared by identity, so distinct instances with the same name are all kept.
+ */
+export function mergeMetaPlugins<T extends AnyMetaPlugin>(...pluginLists: (T[] | undefined)[]): T[] {
+  return [...new Set(pluginLists.flatMap(plugins => toArray(plugins)))]
 }
 
 /**

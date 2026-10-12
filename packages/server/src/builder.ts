@@ -7,7 +7,7 @@ import type { DecoratedMiddleware } from './middleware-decorated'
 import type { OrderedMiddleware, ProcedureConfig, ProcedureHandler } from './procedure'
 import type { AnyRouter } from './router'
 import type { AugmentedRouter } from './router-utils'
-import { getHiddenMetaPlugins, mergeErrorMap, resolveMetaPlugins } from '@orpc/contract'
+import { getHiddenMetaPlugins, mergeErrorMap, mergeMetaPlugins, resolveMetaPlugins } from '@orpc/contract'
 import { toArray } from '@orpc/shared'
 import { Lazy } from './lazy'
 import { decorateMiddleware } from './middleware-decorated'
@@ -206,10 +206,7 @@ export class Builder<
     current['~orpc'] = {
       ...current['~orpc'],
       errorMap: this['~orpc'].errorMap,
-      metaPlugins: [
-        ...toArray(this['~orpc'].metaPlugins),
-        ...toArray(middleware['~orpc']?.metaPlugins),
-      ],
+      metaPlugins: mergeMetaPlugins(this['~orpc'].metaPlugins, middleware['~orpc']?.metaPlugins),
     }
 
     return current

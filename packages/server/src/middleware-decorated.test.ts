@@ -268,5 +268,15 @@ describe('decorateMiddleware', () => {
       const combined = decorated.use(Object.assign(vi.fn(), { '~orpc': { metaPlugins: plugins2 } }) as any)
       expect(combined['~orpc']?.metaPlugins).toEqual([...plugins1, ...plugins2])
     })
+
+    it('should not duplicate a meta plugin instance shared by both middlewares', () => {
+      const shared = { name: 'shared', init: vi.fn() }
+      const own = { name: 'shared', init: vi.fn() }
+      const decorated = decorateMiddleware(Object.assign(vi.fn(), { '~orpc': { metaPlugins: [shared] } }) as any)
+
+      const combined = decorated.use(Object.assign(vi.fn(), { '~orpc': { metaPlugins: [shared, own] } }) as any)
+      expect(combined['~orpc']?.metaPlugins).toEqual([shared, own])
+      expect(combined['~orpc']?.metaPlugins?.[1]).toBe(own)
+    })
   })
 })

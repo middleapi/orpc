@@ -2,8 +2,7 @@ import type { ErrorMap, MergedErrorMap } from '@orpc/contract'
 import type { IntersectPick } from '@orpc/shared'
 import type { Context, MergedContext, MergedInitialContext } from './context'
 import type { AnyMiddleware, Middleware, MiddlewareNextOptions, MiddlewareResult } from './middleware'
-import { mergeErrorMap } from '@orpc/contract'
-import { toArray } from '@orpc/shared'
+import { mergeErrorMap, mergeMetaPlugins } from '@orpc/contract'
 
 export interface DecoratedMiddleware<
   TInContext extends Context,
@@ -120,10 +119,7 @@ export function decorateMiddleware<
     merged['~orpc'] = {
       ...decorated['~orpc'],
       errorMap: mergeErrorMap(usedMiddleware['~orpc']?.errorMap, decorated['~orpc']?.errorMap),
-      metaPlugins: [
-        ...toArray(decorated['~orpc']?.metaPlugins),
-        ...toArray(usedMiddleware['~orpc']?.metaPlugins),
-      ],
+      metaPlugins: mergeMetaPlugins(decorated['~orpc']?.metaPlugins, usedMiddleware['~orpc']?.metaPlugins),
     }
     Object.defineProperty(merged, 'name', {
       value: `${decorated.name} + ${usedMiddleware.name}`,

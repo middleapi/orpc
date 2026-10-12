@@ -1,4 +1,5 @@
 import { oc } from '@orpc/contract'
+import { os } from '@orpc/server'
 import { getOpenAPIMeta, openapi } from './meta'
 
 describe('openapi meta', () => {
@@ -296,6 +297,34 @@ describe('openapi meta', () => {
     it('sets the openapi prefix', () => {
       const procedure = oc.meta(openapi.prefix('/api'))
       expect(getOpenAPIMeta(procedure)?.prefix).toBe('/api')
+    })
+  })
+
+  describe('reusing a plugin instance', () => {
+    const base = os.meta(openapi.prefix('/planets'), openapi({ tags: ['planet'] }))
+    const mw = base.middleware(({ next }) => next())
+    const expected = { prefix: '/planets', tags: ['planet'], path: '/list' }
+
+    it('builder middleware used back on the same builder', () => {
+      const list = base.use(mw).meta(openapi({ method: 'GET', path: '/list' })).handler(() => [])
+      expect(getOpenAPIMeta(list)).toEqual({ ...expected, method: 'GET' })
+    })
+
+    it('builder middleware used on a procedure from the same builder', () => {
+      const list = base.meta(openapi({ path: '/list' })).handler(() => []).use(mw)
+      expect(getOpenAPIMeta(list)).toEqual(expected)
+    })
+
+    it('two builder middlewares combined', () => {
+      const a = base.middleware(({ next }) => next())
+      const b = base.middleware(({ next }) => next())
+      const list = os.use(a.use(b)).meta(openapi({ path: '/list' })).handler(() => [])
+      expect(getOpenAPIMeta(list)).toEqual(expected)
+    })
+
+    it('procedure routed through the same builder', () => {
+      const router = base.router({ list: base.meta(openapi({ path: '/list' })).handler(() => []) })
+      expect(getOpenAPIMeta(router.list)).toEqual(expected)
     })
   })
 
