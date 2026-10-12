@@ -107,6 +107,10 @@ const result = await call(
 )
 ```
 
+:::info[Event Iterator Outputs]
+When a procedure returns an [AsyncIteratorObject](/docs/async-iterator-object), the lock is held until the stream finishes, throws, or is cancelled, not just until the handler returns. A stream that is never consumed or cancelled holds the lock until its `ttl` expires, so `ttl` acts as a safety net for streaming procedures. Set it longer than your streams usually run.
+:::
+
 :::info[Automatic Deduplication]
 When the same `locker` and `key` combination is used multiple times in a single request chain, the `lock` middleware acquires the lock only once, so a procedure never waits for a lock it already holds. This behavior follows the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe. To disable deduplication, set `dedupe: false`.
 :::

@@ -1,5 +1,8 @@
+import type { LockMiddlewareContext } from './middleware'
 import type { Locker } from './types'
 import { call, ORPCError, os, type } from '@orpc/server'
+import { sleep } from '@orpc/shared'
+import { MemoryLocker } from './adapters/memory'
 import { LockTimeoutError } from './error'
 import { lock, LOCK_MIDDLEWARE_CONTEXT_SYMBOL } from './middleware'
 
@@ -130,6 +133,156 @@ describe('lock', () => {
         { locker, key: 'k', waited: false },
         { locker, key: 'k', waited: false },
       ],
+    })
+  })
+
+  describe('event iterator output', () => {
+    const expectHeld = async (locker: Locker, key: string) => {
+      await expect(locker.lock(key, () => 'free', { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
+    }
+
+    const expectReleased = async (locker: Locker, key: string) => {
+      const fn = vi.fn(() => 'free')
+      await expect(locker.lock(key, fn, { timeout: 0 })).resolves.toBe('free')
+      expect(fn).toHaveBeenCalledWith({ waited: false })
+    }
+
+    it('never runs streams sharing the same key concurrently', async () => {
+      const locker = new MemoryLocker()
+      let active = 0
+      let maxActive = 0
+      const procedure = os.use(lock({ locker, key: () => 'k' })).handler(async function* () {
+        active++
+        maxActive = Math.max(maxActive, active)
+        await sleep(20)
+        yield 1
+        active--
+      })
+
+      const consume = async () => {
+        const values: unknown[] = []
+        for await (const value of await call(procedure, undefined, { context: {} })) {
+          values.push(value)
+        }
+        return values
+      }
+
+      await expect(Promise.all([consume(), consume()])).resolves.toEqual([[1], [1]])
+      expect(maxActive).toBe(1)
+    })
+
+    it('releases the lock once the stream completes', async () => {
+      const locker = new MemoryLocker()
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(async function* () {
+        yield 1
+        yield 2
+      })
+
+      const values: unknown[] = []
+      for await (const value of await call(procedure, undefined, { context: {} })) {
+        await expectHeld(locker, 'k')
+        values.push(value)
+      }
+
+      expect(values).toEqual([1, 2])
+      await expectReleased(locker, 'k')
+    })
+
+    it('releases the lock once the consumer stops early', async () => {
+      const locker = new MemoryLocker()
+      let cleanedUp = false
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(async function* () {
+        try {
+          yield 1
+          yield 2
+        }
+        finally {
+          cleanedUp = true
+        }
+      })
+
+      const values: unknown[] = []
+      for await (const value of await call(procedure, undefined, { context: {} })) {
+        await expectHeld(locker, 'k')
+        values.push(value)
+
+        if (values.length === 1) {
+          break
+        }
+      }
+
+      expect(values).toEqual([1])
+      expect(cleanedUp).toBe(true)
+      await expectReleased(locker, 'k')
+    })
+
+    it('releases the lock once the stream throws', async () => {
+      const locker = new MemoryLocker()
+      const error = new Error('stream failed')
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(async function* () {
+        yield 1
+        throw error
+      })
+
+      const values: unknown[] = []
+      await expect((async () => {
+        for await (const value of await call(procedure, undefined, { context: {} })) {
+          await expectHeld(locker, 'k')
+          values.push(value)
+        }
+      })()).rejects.toBe(error)
+
+      expect(values).toEqual([1])
+      await expectReleased(locker, 'k')
+    })
+
+    it('surfaces a release error to the consumer once the stream finishes', async () => {
+      const error = new Error('release failed')
+      const locker: Locker = {
+        lock: async (_key, fn) => {
+          await fn({ waited: false })
+          throw error
+        },
+      }
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(async function* () {
+        yield 1
+      })
+
+      const values: unknown[] = []
+      await expect((async () => {
+        for await (const value of await call(procedure, undefined, { context: {} })) {
+          values.push(value)
+        }
+      })()).rejects.toBe(error)
+
+      expect(values).toEqual([1])
+    })
+
+    it('exposes whether the lock was waited for and the held locks', async () => {
+      const locker = new MemoryLocker()
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(async function* ({ context }) {
+        yield context['lock/waited']
+        yield (context as LockMiddlewareContext)[LOCK_MIDDLEWARE_CONTEXT_SYMBOL]
+      })
+
+      const values: unknown[] = []
+      for await (const value of await call(procedure, undefined, { context: {} })) {
+        values.push(value)
+      }
+
+      expect(values).toEqual([false, { held: [{ locker, key: 'k', waited: false }] }])
+    })
+
+    it('returns non-iterator outputs unchanged and releases the lock after the handler', async () => {
+      const locker = new MemoryLocker()
+      const output = { value: 1 }
+      const procedure = os.use(lock({ locker, key: 'k' })).handler(async () => {
+        await expectHeld(locker, 'k')
+        return output
+      })
+
+      await expect(call(procedure, undefined, { context: {} })).resolves.toBe(output)
+      await expectReleased(locker, 'k')
     })
   })
 
