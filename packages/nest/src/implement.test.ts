@@ -445,6 +445,11 @@ describe('routing', () => {
         path: '/files/{path}',
         method: 'GET',
       })).input(z.object({ tenant: z.string(), path: z.string() })),
+
+      pathNamedParamWithRest: oc.meta(openapi({
+        path: '/collision/{path}/{+rest}',
+        method: 'GET',
+      })).input(z.object({ tenant: z.string(), path: z.string(), rest: z.string() })),
     }
 
     @Controller('/:tenant')
@@ -467,6 +472,11 @@ describe('routing', () => {
       @Implement(contract.pathNamedParam)
       pathNamedParam() {
         return implement(contract.pathNamedParam).handler(({ input }) => input)
+      }
+
+      @Implement(contract.pathNamedParamWithRest)
+      pathNamedParamWithRest() {
+        return implement(contract.pathNamedParamWithRest).handler(({ input }) => input)
       }
     }
 
@@ -531,6 +541,13 @@ describe('routing', () => {
       expect(res.body).toEqual({ tenant: 'acme', path: 'xxx' })
     })
 
+    it('should keep a param named `path` alongside a trailing rest param', async () => {
+      const res = await supertest(httpServer).get('/acme/collision/x/a/b')
+
+      expect(res.statusCode).toEqual(200)
+      expect(res.body).toEqual({ tenant: 'acme', path: 'x', rest: 'a/b' })
+    })
+
     it('should treat params named like `__proto__` as own properties without polluting the prototype', async () => {
       const res = await supertest(httpServer).post('/proto/some/value')
 
@@ -542,70 +559,25 @@ describe('routing', () => {
     })
   })
 
-  describe.each([
-    ['express adapter', undefined],
-    ['fastify adapter', new FastifyAdapter()],
-  ] as const)('trailing rest param alongside a param named `path` with %s', async (_, adapter) => {
+  describe('non-trailing rest params', () => {
     const contract = oc.meta(openapi({
-      path: '/{path}/{+rest}',
+      path: '/files/{+path}/raw',
       method: 'GET',
-    })).input(z.object({ path: z.string(), rest: z.string() }))
+    })).input(z.object({ tenant: z.string().optional(), path: z.string() }))
 
     @Controller()
     class ImplController {
       @Implement(contract)
-      pathAndRest() {
-        return implement(contract).handler(({ input }) => input)
-      }
-    }
-
-    const moduleRef = await Test.createTestingModule({
-      controllers: [ImplController],
-    }).compile()
-
-    const app = moduleRef.createNestApplication(adapter as any)
-    await app.init()
-
-    if (adapter) {
-      await app.getHttpAdapter().getInstance().ready()
-    }
-
-    const httpServer = app.getHttpServer()
-
-    it('should keep both the `path` param and the rest param', async () => {
-      const res = await supertest(httpServer).get('/x/a/b')
-
-      expect(res.statusCode).toEqual(200)
-      expect(res.body).toEqual({ path: 'x', rest: 'a/b' })
-    })
-  })
-
-  describe('non-trailing rest params', () => {
-    const contract = {
-      midPath: oc.meta(openapi({
-        path: '/files/{+path}/raw',
-        method: 'GET',
-      })).input(z.object({ path: z.string() })),
-
-      tenantMidPath: oc.meta(openapi({
-        path: '/files/{+path}/raw',
-        method: 'GET',
-      })).input(z.object({ tenant: z.string(), path: z.string() })),
-    }
-
-    @Controller()
-    class ImplController {
-      @Implement(contract.midPath)
       midPath() {
-        return implement(contract.midPath).handler(({ input }) => input)
+        return implement(contract).handler(({ input }) => input)
       }
     }
 
     @Controller('/:tenant')
     class TenantController {
-      @Implement(contract.tenantMidPath)
-      tenantMidPath() {
-        return implement(contract.tenantMidPath).handler(({ input }) => input)
+      @Implement(contract)
+      midPath() {
+        return implement(contract).handler(({ input }) => input)
       }
     }
 
