@@ -42,6 +42,26 @@ export class Lazy<T> {
 
 export type Lazyable<T> = T | Lazy<T>
 
+/**
+ * Wraps a lazy loader so it runs at most once: concurrent and later calls share
+ * the in-flight or resolved promise. A rejected load is not cached, so a failed
+ * load (e.g. a dynamic import) can be retried.
+ */
+export function memoizeLoader<T>(loader: () => Promise<{ default: T }>): () => Promise<{ default: T }> {
+  let loading: Promise<{ default: T }> | undefined
+
+  return () => {
+    if (loading === undefined) {
+      loading = loader().catch((error) => {
+        loading = undefined
+        throw error
+      })
+    }
+
+    return loading
+  }
+}
+
 export function unlazy<T extends Lazyable<any>>(maybeLazy: T): Promise<{ default: T extends Lazy<infer U> ? U : T }> {
   return maybeLazy instanceof Lazy ? maybeLazy['~orpc'].loader() : Promise.resolve({ default: maybeLazy as T extends Lazy<infer U> ? U : T })
 }

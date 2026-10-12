@@ -412,4 +412,41 @@ describe('builder', () => {
       middlewares: builder['~orpc'].orderedMiddlewares.map((m: any) => m.middleware),
     })
   })
+
+  it('.lazy loads and augments the router once', async () => {
+    const router = { ping: builder.handler(vi.fn()) }
+    const loader = vi.fn(async () => ({ default: router }))
+    const applied = builder.lazy(loader)
+
+    expect(loader).not.toHaveBeenCalled()
+
+    const [first, second] = await Promise.all([applied['~orpc'].loader(), LazyModule.unlazy(applied)])
+    const third = await LazyModule.unlazy(applied)
+
+    expect(first.default).toBe(augmentRouterSpy.mock.results[0]?.value)
+    expect(second).toBe(first)
+    expect(third).toBe(first)
+    expect(third.default.ping).toBe(first.default.ping)
+    expect(loader).toHaveBeenCalledOnce()
+    expect(augmentRouterSpy).toHaveBeenCalledOnce()
+  })
+
+  it('.lazy retries the loader after a rejected load', async () => {
+    const router = { ping: builder.handler(vi.fn()) }
+    const error = new Error('failed to load')
+    const loader = vi.fn(async () => ({ default: router }))
+    loader.mockRejectedValueOnce(error)
+    const applied = builder.lazy(loader)
+
+    await expect(applied['~orpc'].loader()).rejects.toBe(error)
+    expect(augmentRouterSpy).not.toHaveBeenCalled()
+
+    const first = await LazyModule.unlazy(applied)
+    const second = await applied['~orpc'].loader()
+
+    expect(first.default).toBe(augmentRouterSpy.mock.results[0]?.value)
+    expect(second).toBe(first)
+    expect(loader).toHaveBeenCalledTimes(2)
+    expect(augmentRouterSpy).toHaveBeenCalledOnce()
+  })
 })

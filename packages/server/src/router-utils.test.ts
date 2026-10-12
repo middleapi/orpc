@@ -180,6 +180,40 @@ describe('augmentRouter', () => {
     expectAugmentedProcedure(5, 6, augmentedLazy.nested.p1, routerLazy.nested.p1, options)
   })
 
+  it('loads and augments a lazy router once', async () => {
+    const options = createAugmentOptions()
+    const loader = vi.fn(async () => ({ default: { p1: procedure1 } }))
+    const augmented = augmentRouter({ lazy: new Lazy({ loader, meta: {} }) }, options)
+
+    const [first, second] = await Promise.all([augmented.lazy['~orpc'].loader(), unlazy(augmented.lazy)])
+    const third = await unlazy(augmented.lazy)
+
+    expect(second).toBe(first)
+    expect(third).toBe(first)
+    expect(third.default.p1).toBe(first.default.p1)
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(mergeErrorMapSpy).toHaveBeenCalledTimes(1)
+    expect(resolveMetaPluginsSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries a lazy router load after a rejection', async () => {
+    const options = createAugmentOptions()
+    const error = new Error('failed to load')
+    const loader = vi.fn(async () => ({ default: { p1: procedure1 } }))
+    loader.mockRejectedValueOnce(error)
+    const augmented = augmentRouter({ lazy: new Lazy({ loader, meta: {} }) }, options)
+
+    await expect(unlazy(augmented.lazy)).rejects.toBe(error)
+    expect(mergeErrorMapSpy).not.toHaveBeenCalled()
+
+    const first = await augmented.lazy['~orpc'].loader()
+    const second = await unlazy(augmented.lazy)
+
+    expect(second).toBe(first)
+    expect(loader).toHaveBeenCalledTimes(2)
+    expect(mergeErrorMapSpy).toHaveBeenCalledTimes(1)
+  })
+
   it('augments a procedure passed as the root router', () => {
     const options = createAugmentOptions()
     const augmented = augmentRouter(router.p2, options)
@@ -269,6 +303,38 @@ describe('augmentImplementedRouter', () => {
 
     expect(mergeErrorMapSpy).not.toHaveBeenCalled()
     expect(resolveMetaPluginsSpy).not.toHaveBeenCalled()
+  })
+
+  it('loads and augments a lazy router once', async () => {
+    const options = createImplementedOptions()
+    const loader = vi.fn(async () => ({ default: { p1: procedure1 } }))
+    const augmented = augmentImplementedRouter({ lazy: new Lazy({ loader, meta: {} }) }, options)
+
+    const [first, second] = await Promise.all([augmented.lazy['~orpc'].loader(), unlazy(augmented.lazy)])
+    const third = await unlazy(augmented.lazy)
+
+    expect(second).toBe(first)
+    expect(third).toBe(first)
+    expect(third.default.p1).toBe(first.default.p1)
+    expectImplementedProcedure(first.default.p1, procedure1, options)
+    expect(loader).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries a lazy router load after a rejection', async () => {
+    const options = createImplementedOptions()
+    const error = new Error('failed to load')
+    const loader = vi.fn(async () => ({ default: { p1: procedure1 } }))
+    loader.mockRejectedValueOnce(error)
+    const augmented = augmentImplementedRouter({ lazy: new Lazy({ loader, meta: {} }) }, options)
+
+    await expect(unlazy(augmented.lazy)).rejects.toBe(error)
+
+    const first = await augmented.lazy['~orpc'].loader()
+    const second = await unlazy(augmented.lazy)
+
+    expect(second).toBe(first)
+    expectImplementedProcedure(first.default.p1, procedure1, options)
+    expect(loader).toHaveBeenCalledTimes(2)
   })
 
   it('augments a procedure passed as the root router', () => {

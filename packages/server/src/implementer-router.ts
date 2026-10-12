@@ -9,7 +9,7 @@ import type { AugmentedRouterWithMiddlewares } from './router-utils'
 import { ProcedureContract } from '@orpc/contract'
 import { bindMethods } from '@orpc/shared'
 import { ProcedureImplementer } from './implementer-procedure'
-import { Lazy } from './lazy'
+import { Lazy, memoizeLoader } from './lazy'
 import { decorateMiddleware } from './middleware-decorated'
 import { withHiddenRouterContract } from './router-hidden'
 import { augmentImplementedRouter } from './router-utils'
@@ -118,10 +118,10 @@ export class SharedRouterImplementer<
     loader: () => Promise<{ default: T }>,
   ): Lazy<T> {
     return new Lazy({
-      loader: async () => {
+      loader: memoizeLoader(async () => {
         const { default: router } = await loader()
         return { default: this.router(router) }
-      },
+      }),
       meta: {},
     })
   }

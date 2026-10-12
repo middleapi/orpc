@@ -9,7 +9,7 @@ import type { AnyRouter } from './router'
 import type { AugmentedRouter } from './router-utils'
 import { getHiddenMetaPlugins, mergeErrorMap, resolveMetaPlugins } from '@orpc/contract'
 import { toArray } from '@orpc/shared'
-import { Lazy } from './lazy'
+import { Lazy, memoizeLoader } from './lazy'
 import { decorateMiddleware } from './middleware-decorated'
 import { DecoratedProcedure } from './procedure-decorated'
 import { augmentRouter } from './router-utils'
@@ -306,12 +306,12 @@ export class Builder<
     loader: () => Promise<{ default: T }>,
   ): Lazy<AugmentedRouter<T, TErrorMap>> {
     return new Lazy({
-      loader: async () => {
+      loader: memoizeLoader(async () => {
         const { default: router } = await loader()
         return {
           default: this.router(router),
         }
-      },
+      }),
       meta: this['~orpc'].meta,
       metaPlugins: this['~orpc'].metaPlugins,
     })

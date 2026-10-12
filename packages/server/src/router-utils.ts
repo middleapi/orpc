@@ -7,7 +7,7 @@ import type { AnyProcedure, ProcedureConfig } from './procedure'
 import type { AnyRouter } from './router'
 import { mergeErrorMap, ProcedureContract, resolveMetaPlugins } from '@orpc/contract'
 import { getOwn, isTypescriptObject, omit } from '@orpc/shared'
-import { Lazy, unlazy } from './lazy'
+import { Lazy, memoizeLoader, unlazy } from './lazy'
 import { Procedure } from './procedure'
 import { getHiddenRouterContract } from './router-hidden'
 
@@ -87,11 +87,11 @@ export function augmentRouter<
     const enhanced = new Lazy({
       meta,
       metaPlugins,
-      async loader() {
+      loader: memoizeLoader(async () => {
         const { default: unlaziedRouter } = await unlazy(router)
         const enhanced = augmentRouter(unlaziedRouter, options)
         return unlazy(enhanced)
-      },
+      }),
     })
 
     return enhanced as any
@@ -147,11 +147,11 @@ export function augmentImplementedRouter<
   if (router instanceof Lazy) {
     const enhanced = new Lazy({
       ...router['~orpc'],
-      async loader() {
+      loader: memoizeLoader(async () => {
         const { default: unlaziedRouter } = await unlazy(router)
         const enhanced = augmentImplementedRouter(unlaziedRouter, options)
         return unlazy(enhanced)
-      },
+      }),
     })
 
     return enhanced as any

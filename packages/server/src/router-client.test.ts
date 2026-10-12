@@ -79,6 +79,16 @@ describe('createRouterClient', () => {
     expect((pengClient as any)()).toBe('__MOCK2__')
   })
 
+  it('loads a lazy router once across calls', async () => {
+    const loader = vi.fn(async () => ({ default: { ping: os.handler(() => 'pong') } }))
+    const lazyClient = createRouterClient({ lazy: os.use(({ next }) => next()).lazy(loader) })
+
+    await expect(lazyClient.lazy.ping()).resolves.toBe('pong')
+    await expect(lazyClient.lazy.ping()).resolves.toBe('pong')
+
+    expect(loader).toHaveBeenCalledTimes(1)
+  })
+
   it('returns strictly equal client on repeated access', () => {
     const isolatedClient = createRouterClient(router, options)
 

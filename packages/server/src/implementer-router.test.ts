@@ -2,7 +2,7 @@ import { oc } from '@orpc/contract'
 import z from 'zod'
 import { ImplementedProcedure, ProcedureImplementer } from './implementer-procedure'
 import { createRouterImplementer } from './implementer-router'
-import { Lazy } from './lazy'
+import { Lazy, unlazy } from './lazy'
 import * as MiddlewareDecoratedModule from './middleware-decorated'
 import * as RouterHiddenModule from './router-hidden'
 import { getHiddenRouterContract } from './router-hidden'
@@ -79,6 +79,40 @@ describe('createRouterImplementer', () => {
         expect(loader).toHaveBeenCalledTimes(1)
         expect(applied.nested).toBe(router.nested)
         expect(getHiddenRouterContract(applied)).toBe(contract)
+      })
+
+      it('.lazy loads the router once', async () => {
+        const router = { nested: {} } as any
+        const loader = vi.fn(() => Promise.resolve({ default: router }))
+        const lazy = implementer.lazy(loader)
+
+        const [first, second] = await Promise.all([lazy['~orpc'].loader(), unlazy(lazy)])
+        const third = await unlazy(lazy)
+
+        expect(second).toBe(first)
+        expect(third).toBe(first)
+        expect(loader).toHaveBeenCalledTimes(1)
+        expect(withHiddenRouterContractSpy).toHaveBeenCalledTimes(1)
+        expect(first.default).toBe(withHiddenRouterContractSpy.mock.results[0]!.value)
+      })
+
+      it('.lazy retries the loader after a rejected load', async () => {
+        const router = { nested: {} } as any
+        const error = new Error('failed to load')
+        const loader = vi.fn(() => Promise.resolve({ default: router }))
+        loader.mockRejectedValueOnce(error)
+        const lazy = implementer.lazy(loader)
+
+        await expect(unlazy(lazy)).rejects.toBe(error)
+        expect(withHiddenRouterContractSpy).not.toHaveBeenCalled()
+
+        const first = await lazy['~orpc'].loader()
+        const second = await unlazy(lazy)
+
+        expect(second).toBe(first)
+        expect(loader).toHaveBeenCalledTimes(2)
+        expect(withHiddenRouterContractSpy).toHaveBeenCalledTimes(1)
+        expect(getHiddenRouterContract(first.default)).toBe(contract)
       })
 
       it('handles router with names that conflict with router methods', () => {
@@ -179,6 +213,42 @@ describe('createRouterImplementer', () => {
 
         expect((applied as any).nested).toBe(augmentImplementedRouterSpy.mock.results[0]!.value.nested)
         expect(getHiddenRouterContract(applied)).toBe(contract)
+      })
+
+      it('.lazy loads and augments the router once', async () => {
+        const router = { nested: {} } as any
+        const loader = vi.fn(() => Promise.resolve({ default: router }))
+        const lazy = implementer.lazy(loader)
+
+        const [first, second] = await Promise.all([lazy['~orpc'].loader(), unlazy(lazy)])
+        const third = await unlazy(lazy)
+
+        expect(second).toBe(first)
+        expect(third).toBe(first)
+        expect(loader).toHaveBeenCalledTimes(1)
+        expect(augmentImplementedRouterSpy).toHaveBeenCalledTimes(1)
+        expect(withHiddenRouterContractSpy).toHaveBeenCalledTimes(1)
+        expect(first.default).toBe(withHiddenRouterContractSpy.mock.results[0]!.value)
+      })
+
+      it('.lazy retries the loader after a rejected load', async () => {
+        const router = { nested: {} } as any
+        const error = new Error('failed to load')
+        const loader = vi.fn(() => Promise.resolve({ default: router }))
+        loader.mockRejectedValueOnce(error)
+        const lazy = implementer.lazy(loader)
+
+        await expect(unlazy(lazy)).rejects.toBe(error)
+        expect(augmentImplementedRouterSpy).not.toHaveBeenCalled()
+
+        const first = await lazy['~orpc'].loader()
+        const second = await unlazy(lazy)
+
+        expect(second).toBe(first)
+        expect(loader).toHaveBeenCalledTimes(2)
+        expect(augmentImplementedRouterSpy).toHaveBeenCalledTimes(1)
+        expect(withHiddenRouterContractSpy).toHaveBeenCalledTimes(1)
+        expect(getHiddenRouterContract(first.default)).toBe(contract)
       })
 
       it('handles router with names that conflict with router methods', () => {
