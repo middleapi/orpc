@@ -31,6 +31,12 @@ function makeTransport(): StandardLinkTransport<TestContext> {
   }
 }
 
+async function* createIteratorInput() {
+  yield 1
+  yield 2
+  yield 3
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useRealTimers()
@@ -431,6 +437,105 @@ describe('retryLinkPlugin', () => {
       expect((iterator as any).specialProperty).toEqual('specialValue:1')
       await expect(iterator.next()).rejects.toThrow('ITER_FAIL')
       expect((iterator as any).specialProperty).toEqual('specialValue:2')
+    })
+  })
+
+  describe('input', () => {
+    it.each([
+      ['ReadableStream', () => new Blob(['data']).stream()],
+      ['AsyncIteratorObject', () => createIteratorInput()],
+    ])('does not retry a %s input, since it cannot be resent', async (_, createInput) => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(codec.decodeResponse).mockRejectedValue(new Error('FAIL'))
+
+      const shouldRetry = vi.fn(() => true)
+      const onRetry = vi.fn()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      await expect(link.call(['upload'], createInput(), { context: { retry: 3, retryDelay: 0, shouldRetry, onRetry } })).rejects.toThrow('FAIL')
+
+      expect(codec.encodeInput).toHaveBeenCalledTimes(1)
+      expect(shouldRetry).not.toHaveBeenCalled()
+      expect(onRetry).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['ReadableStream', () => new Blob(['data']).stream()],
+      ['AsyncIteratorObject', () => createIteratorInput()],
+    ])('does not retry an input with a %s body, since it cannot be resent', async (_, createBody) => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(codec.decodeResponse).mockRejectedValue(new Error('FAIL'))
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      await expect(link.call(['upload'], { params: { id: '1' }, body: createBody() }, { context: { retry: 3, retryDelay: 0 } })).rejects.toThrow('FAIL')
+
+      expect(codec.encodeInput).toHaveBeenCalledTimes(1)
+    })
+
+    it.each([
+      ['Blob', () => new Blob(['data'])],
+      ['FormData', () => {
+        const form = new FormData()
+        form.append('file', new Blob(['data']))
+        return form
+      }],
+      ['object with a Blob body', () => ({ body: new Blob(['data']) })],
+    ])('retries a %s input, since it can be resent', async (_, createInput) => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(codec.decodeResponse)
+        .mockRejectedValueOnce(new Error('FAIL'))
+        .mockResolvedValueOnce({ kind: 'output', output: 'OK' })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      const input = createInput()
+
+      await expect(link.call(['upload'], input, { context: { retry: 1, retryDelay: 0 } })).resolves.toBe('OK')
+
+      expect(codec.encodeInput).toHaveBeenCalledTimes(2)
+      expect(codec.encodeInput).toHaveBeenNthCalledWith(2, input, ['upload'], expect.anything())
+    })
+
+    it('does not resume an AsyncIteratorObject output when the input is an AsyncIteratorObject', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(codec.decodeResponse).mockImplementation(async () => ({
+        kind: 'output',
+        output: (async function* () {
+          yield withEventMeta({ phase: 'first' }, { id: 'evt-1', retry: 0 })
+          throw new Error('ITER_FAIL')
+        })(),
+      }))
+
+      const shouldRetry = vi.fn(() => true)
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      const input = createIteratorInput()
+      const iterator = await link.call(['chat'], input, { context: { retry: Number.POSITIVE_INFINITY, shouldRetry } }) as AsyncIterator<any>
+
+      await expect(iterator.next()).resolves.toEqual({ done: false, value: { phase: 'first' } })
+      await expect(iterator.next()).rejects.toThrow('ITER_FAIL')
+
+      expect(codec.encodeInput).toHaveBeenCalledTimes(1)
+      expect(shouldRetry).not.toHaveBeenCalled()
     })
   })
 })

@@ -1,7 +1,7 @@
 import type { Promisable, Value } from '@orpc/shared'
 import type { StandardLinkInterceptor, StandardLinkInterceptorOptions, StandardLinkOptions, StandardLinkPlugin } from '../adapters/standard'
 import type { ClientContext } from '../types'
-import { AsyncIteratorClass, isAsyncIteratorObject, override, sleep, toArray, value } from '@orpc/shared'
+import { AsyncIteratorClass, isAsyncIteratorObject, isTypescriptObject, override, sleep, toArray, value } from '@orpc/shared'
 import { getEventMeta } from '@standard-server/core'
 
 export interface RetryLinkPluginAttemptOptions<T extends RetryLinkPluginContext> extends StandardLinkInterceptorOptions<T> {
@@ -73,6 +73,8 @@ export interface RetryLinkPluginOptions<_T extends RetryLinkPluginContext> {
  * @remarks
  * **Note**: Retry behavior is configured through the client context on each call.
  *
+ * **Note**: Calls with a stream or async iterator input are never retried or resumed, since the input cannot be resent.
+ *
  * @see {@link https://orpc.dev/docs/plugins/retry | Retry Plugin}
  */
 export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> implements StandardLinkPlugin<T> {
@@ -93,6 +95,15 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
     const interceptor: StandardLinkInterceptor<T> = async (interceptorOptions) => {
       const { next, ...callOptions } = interceptorOptions
+
+      /**
+       * A stream or iterator input is consumed by the first attempt and cannot be resent,
+       * so call once instead of retrying or resuming with an empty or locked input.
+       */
+      if (!isResendableInput(callOptions.input)) {
+        return next(callOptions)
+      }
+
       const maxAttempts = await value(
         callOptions.context.retry ?? this.defaultRetry,
         callOptions,
@@ -222,4 +233,14 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
 
     return { ...options, interceptors: [interceptor, ...toArray(options.interceptors)] }
   }
+}
+
+/**
+ * Checks the root input and its top-level `body`, where `OpenAPILink` with
+ * `inputStructure: 'detailed'` places the body (`{ params, query, headers, body }`).
+ */
+function isResendableInput(input: unknown): boolean {
+  const isStreamLike = (value: unknown) => value instanceof ReadableStream || isAsyncIteratorObject(value)
+
+  return !isStreamLike(input) && !(isTypescriptObject(input) && isStreamLike(input.body))
 }
