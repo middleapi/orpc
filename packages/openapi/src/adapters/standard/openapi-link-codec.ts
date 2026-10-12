@@ -374,7 +374,11 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     path: string[],
     _options: ClientOptions<T>,
   ): Promise<StandardLinkCodecDecodedResponse> {
-    const isOk = response.status < 400
+    /**
+     * Status 0 is an opaque response, e.g. a redirect hidden by fetch's `redirect: 'manual'`,
+     * so it must not be treated as success.
+     */
+    const isOk = response.status > 0 && response.status < 400
     const procedure = await this.resolveProcedure(path)
     const meta = getOpenAPIMeta(procedure)
 

@@ -92,6 +92,10 @@ function inferMalformedResponseMessage(response: StandardResponse): string | und
     return response.body.message
   }
 
+  if (response.status === 0) {
+    return 'Received an opaque response (status 0), which fetch returns for redirects when redirect is \'manual\'.'
+  }
+
   const commonCode = Object.entries(COMMON_ERROR_STATUS_MAP).find(([, status]) => status === response.status)?.[0]
 
   return commonCode?.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')

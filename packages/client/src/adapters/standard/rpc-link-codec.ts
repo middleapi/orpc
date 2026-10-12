@@ -122,7 +122,11 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
   }
 
   async decodeResponse(response: StandardLazyResponse): Promise<StandardLinkCodecDecodedResponse> {
-    const isOk = response.status < 400
+    /**
+     * Status 0 is an opaque response, e.g. a redirect hidden by fetch's `redirect: 'manual'`,
+     * so it must not be treated as success.
+     */
+    const isOk = response.status > 0 && response.status < 400
 
     const body = await response.resolveBody()
 
