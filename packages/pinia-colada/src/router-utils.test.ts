@@ -153,6 +153,21 @@ describe('createRouterUtils', () => {
     }
   })
 
+  it('resolves call from the nested utils of conflicted methods', () => {
+    const utils = createRouterUtils(client) as any
+    const keyUtils = utils.key // "key" is both a util method and a nested client
+    const call = vi.mocked(ProcedureUtils).mock.results[1]!.value.call
+
+    expect(keyUtils.call).toBe(call)
+    keyUtils.call({ id: 1 })
+    expect(call).toHaveBeenCalledWith({ id: 1 })
+
+    expect(keyUtils.bind).toBe(Function.prototype.bind)
+    expect(keyUtils.apply).toBe(Function.prototype.apply)
+    expect(keyUtils({ type: 'query' })).toBe(generateOperationKeySpy.mock.results[0]?.value)
+    expect(generateOperationKeySpy).toHaveBeenCalledWith([], { type: 'query', prefix: undefined })
+  })
+
   it('supports scoped options', () => {
     const keyOptions = {
       queryOptions: {

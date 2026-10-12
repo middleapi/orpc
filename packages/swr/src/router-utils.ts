@@ -61,7 +61,7 @@ export function createRouterUtils<T extends AnyNestedClient>(
           ? nextUtils
           : new Proxy(value, {
               get(target, prop) {
-                if (typeof prop !== 'string' || RECURSIVE_CLIENT_UNWRAP_KEYS.has(prop)) {
+                if (typeof prop !== 'string' || (RECURSIVE_CLIENT_UNWRAP_KEYS.has(prop) && !(prop in nextUtils))) {
                   return Reflect.get(target, prop)
                 }
 

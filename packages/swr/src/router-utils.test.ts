@@ -99,6 +99,20 @@ describe('createRouterUtils', () => {
     expect(keyUtils.bind).toBeInstanceOf(Function) // resolved from the underlying method, not the nested utils
   })
 
+  it('resolves call from the nested utils of conflicted methods', () => {
+    const utils = createRouterUtils(client) as any
+    const keyUtils = utils.key // "key" is both a util method and a nested client
+    const call = vi.mocked(ProcedureUtils).mock.results[1]!.value.call
+
+    expect(keyUtils.call).toBe(call)
+    keyUtils.call({ id: 1 })
+    expect(call).toHaveBeenCalledWith({ id: 1 })
+
+    expect(keyUtils.bind).toBe(Function.prototype.bind)
+    expect(keyUtils.apply).toBe(Function.prototype.apply)
+    expect(keyUtils()).toBe(vi.mocked(ProcedureUtils).mock.results[0]!.value.key.mock.results[0]?.value)
+  })
+
   it('stops recursive on RECURSIVE_CLIENT_UNWRAP_KEYS', () => {
     client.then = vi.fn()
 
