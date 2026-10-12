@@ -201,12 +201,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       }
 
-      /**
-       * Routing-level errors (a failing lazy router, a throwing `mapSubrequest` or routing interceptor,
-       * errors rethrown by `RethrowHandlerPlugin`, ...) are not turned into a sub-response.
-       * They fail the whole batch instead, as they fail the whole request in a non-batch request:
-       * buffered mode rejects `handler.handle()` and streaming mode errors the response stream.
-       */
+      // Routing-level errors are not caught here: as in a non-batch request, they fail the whole batch
       const handleIndividualRequest = async (request: StandardLazyRequest): Promise<StandardResponse> => {
         request = this.mapSubrequest(request, interceptorOptions)
         const { matched, response } = await interceptorOptions.next({ ...interceptorOptions, request })

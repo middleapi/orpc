@@ -33,9 +33,6 @@ catch (error) {
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
 :::
 
-## Batch Requests
-
-With the [Batch Plugin](/docs/plugins/batch), a rethrown error fails the whole batch instead of a single call.
-
-- In `buffered` mode, `handler.handle()` rejects with the error, so it can be caught as above.
-- In `streaming` mode, `handler.handle()` has already resolved with a streaming response, so the error cannot be caught around it. It errors the response stream instead, and reaches whatever consumes the response body.
+:::warning
+With the [Batch Plugin](/docs/plugins/batch#error-handling) in `streaming` mode, `handler.handle()` resolves before batched calls finish, so a rethrown error cannot be caught around it. It errors the response stream instead.
+:::

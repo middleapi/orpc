@@ -381,8 +381,7 @@ describe('batchHandlerPlugin', () => {
 
       await expect(handler.handle(createBatchRequest({ mode: 'buffered', messages }))).rejects.toBe(error)
 
-      expect(slowSignal).toHaveBeenCalledTimes(1)
-      expect(slowSignal.mock.calls[0]![0].aborted).toBe(true)
+      expect(slowSignal).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ aborted: true }))
     })
 
     it('errors the streaming response body with the original error and aborts sibling sub-requests', async () => {
@@ -393,8 +392,7 @@ describe('batchHandlerPlugin', () => {
       expect(response!.status).toBe(207)
       await expect(response!.arrayBuffer()).rejects.toBe(error)
 
-      expect(slowSignal).toHaveBeenCalledTimes(1)
-      expect(slowSignal.mock.calls[0]![0].aborted).toBe(true)
+      expect(slowSignal).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ aborted: true }))
     })
   })
 

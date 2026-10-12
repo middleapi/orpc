@@ -238,6 +238,13 @@ const link = new RPCLink({
 Per-request data passed through the link's [`headers` option](/docs/rpc/link#url-and-header-options) is resolved for each request, so it is safe without `scope`.
 :::
 
+## Error Handling
+
+An error thrown by a procedure only fails its own call. An error thrown at the routing level fails the whole batch, just as it fails a request sent on its own. Examples include a failing [lazy router](/docs/router#lazy-router) import, a throwing `mapSubrequest` or routing interceptor, and errors rethrown by the [Rethrow Handler Plugin](/docs/plugins/rethrow).
+
+- In `buffered` mode, `handler.handle()` rejects with the error.
+- In `streaming` mode, `handler.handle()` has already resolved with the streaming response, so the response stream errors instead. Every call in the batch still waiting for its response fails.
+
 ## Limitations
 
 Cookies set in a batched call are never stored, because the browser only reads headers from the batch response itself, not from each subresponse. Send procedures that set cookies outside the batch:
@@ -258,8 +265,6 @@ const link = new RPCLink({
   ],
 })
 ```
-
-An error thrown at the routing level of a batched call fails the whole batch, just as it fails a request sent on its own. Examples include a failing [lazy router](/docs/router#lazy-router) import, a throwing `mapSubrequest` or routing interceptor, and errors rethrown by the [Rethrow Handler Plugin](/docs/plugins/rethrow). In `buffered` mode, `handler.handle()` rejects with the error. In `streaming` mode, the response has already been returned, so the response stream errors instead, and every call in the batch still waiting for its response fails.
 
 ## Learn More
 
