@@ -1704,4 +1704,43 @@ describe('compatibility', () => {
       })
     })
   })
+
+  it('initializes handler plugins once instead of per request', async () => {
+    const contract = oc.meta(openapi({
+      path: '/init-once/{id}',
+      inputStructure: 'detailed',
+    }))
+
+    @Controller()
+    class ImplController {
+      @Implement(contract)
+      initOnce() {
+        return implement(contract).handler(({ input }) => (input as any).params.id)
+      }
+    }
+
+    const init = vi.fn(options => options)
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ImplController],
+      imports: [
+        ORPCModule.forRoot({
+          plugins: [{ name: 'count-init', init }],
+        }),
+      ],
+    }).compile()
+
+    const app = moduleRef.createNestApplication()
+    await app.init()
+
+    const initCallsBeforeRequests = init.mock.calls.length
+
+    for (const id of ['1', '2', '3']) {
+      const res = await supertest(app.getHttpServer()).post(`/init-once/${id}`)
+      expect(res.status).toBe(200)
+      expect(res.body).toBe(id)
+    }
+
+    expect(init).toHaveBeenCalledTimes(initCallsBeforeRequests)
+  })
 })

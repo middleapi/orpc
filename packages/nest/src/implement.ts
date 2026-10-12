@@ -1,6 +1,6 @@
 import type { CallHandler, ExecutionContext, NestInterceptor } from '@nestjs/common'
 import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
-import type { ContractedRouter, DefaultInitialContext } from '@orpc/server'
+import type { AnyProcedure, ContractedRouter, DefaultInitialContext } from '@orpc/server'
 import type { Promisable } from '@orpc/shared'
 import type { StandardBodyHint } from '@standard-server/core'
 import type { Request as ExpressRequest, Response as ExpressResponse } from 'express'
@@ -155,10 +155,24 @@ function implementRouterContract(
   }
 }
 
+/**
+ * Carries the per-request procedure and params into the shared handler's `resolveProcedure`.
+ * Routing interceptors that replace the request by spreading it keep this key.
+ */
+const NEST_PROCEDURE_SYMBOL = Symbol('ORPC_NEST_PROCEDURE')
+
+interface NestProcedureLazyRequest extends NestStandardLazyRequest {
+  [NEST_PROCEDURE_SYMBOL]?: {
+    procedure: AnyProcedure
+    params: undefined | Record<string, string>
+  }
+}
+
 @Injectable()
 export class ImplementInterceptor implements NestInterceptor {
   private readonly config: ORPCModuleConfig
   private readonly codec: OpenAPIHandlerCodecCore<DefaultInitialContext>
+  private readonly handler: StandardHandler<DefaultInitialContext>
   private readonly toNestStandardLazyRequest: Exclude<ORPCModuleConfig['toNestStandardLazyRequest'], undefined>
   private readonly httpAdapterHost: HttpAdapterHost
 
@@ -171,6 +185,25 @@ export class ImplementInterceptor implements NestInterceptor {
     this.httpAdapterHost = httpAdapterHost
 
     this.codec = new OpenAPIHandlerCodecCore(this.config)
+    this.handler = new StandardHandler({
+      resolveProcedure: (request) => {
+        const resolved = (request as NestProcedureLazyRequest)[NEST_PROCEDURE_SYMBOL]
+
+        if (!resolved) {
+          return undefined
+        }
+
+        const { procedure, params } = resolved
+
+        return {
+          path: getPathMeta(procedure) ?? [],
+          procedure,
+          decodeInput: () => this.codec.decodeInput({ procedure, params }, request),
+        }
+      },
+      encodeError: this.codec.encodeError.bind(this.codec),
+      encodeOutput: this.codec.encodeOutput.bind(this.codec),
+    }, this.config)
     this.toNestStandardLazyRequest = this.config.toNestStandardLazyRequest ?? ((req: ExpressRequest | FastifyRequest, res: ExpressResponse | FastifyReply) => {
       const standardRequest: NestStandardLazyRequest = toStandardLazyRequest(
         'raw' in req ? req.raw : req,
@@ -202,22 +235,14 @@ export class ImplementInterceptor implements NestInterceptor {
         const req: ExpressRequest | FastifyRequest = ctx.switchToHttp().getRequest()
         const res: ExpressResponse | FastifyReply = ctx.switchToHttp().getResponse()
 
-        const standardRequest = this.toNestStandardLazyRequest(req, res)
+        const standardRequest: NestProcedureLazyRequest = this.toNestStandardLazyRequest(req, res)
 
-        const handler = new StandardHandler({
-          resolveProcedure: request => Promise.resolve({
-            path: getPathMeta(procedure) ?? [],
-            procedure,
-            decodeInput: () => this.codec.decodeInput({
-              procedure,
-              params: toORPCOpenAPIParams(procedure, standardRequest.params),
-            }, request),
-          }),
-          encodeError: this.codec.encodeError.bind(this.codec),
-          encodeOutput: this.codec.encodeOutput.bind(this.codec),
-        }, this.config)
+        standardRequest[NEST_PROCEDURE_SYMBOL] = {
+          procedure,
+          params: toORPCOpenAPIParams(procedure, standardRequest.params),
+        }
 
-        const result = await handler.handle(standardRequest, {
+        const result = await this.handler.handle(standardRequest, {
           context: await value(this.config.context ?? {} as DefaultInitialContext, ctx),
         })
 
