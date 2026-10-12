@@ -6,6 +6,7 @@ import { os } from '../builder'
 import { BatchHandlerPlugin } from './batch'
 import { RequestCompressionHandlerPlugin } from './request-compression'
 import { RequestLimitHandlerPlugin } from './request-limit'
+import { RethrowHandlerPlugin } from './rethrow'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -42,6 +43,15 @@ function createBatchRequest(options: {
     headers: { 'orpc-batch': options.mode, 'content-type': 'application/json' },
     body: JSON.stringify(options.messages),
     signal: options.signal,
+  })
+}
+
+function waitForAbort(signal: AbortSignal) {
+  return new Promise((resolve) => {
+    if (signal.aborted) {
+      resolve(undefined)
+    }
+    signal.addEventListener('abort', resolve)
   })
 }
 
@@ -214,31 +224,19 @@ describe('batchHandlerPlugin', () => {
       expect(handlerFn).toHaveBeenCalledTimes(0)
     })
 
-    it('returns 500 sub-response when mapSubrequest throws', async ({ onTestFinished }) => {
-      const rejectSpy = vi.spyOn(Promise, 'reject')
-        .mockImplementation(() => new Promise(() => {}) as Promise<never>)
-
-      onTestFinished(() => {
-        rejectSpy.mockRestore()
-      })
-
+    it('rejects when mapSubrequest throws', async () => {
       const handler = createHandler(new BatchHandlerPlugin({
         mapSubrequest: () => {
           throw new Error('boom')
         },
       }))
 
-      const { response } = await handler.handle(createBatchRequest({
+      await expect(handler.handle(createBatchRequest({
         mode: 'buffered',
         messages: [makePeerRequestMessage(0, '/ping')],
-      }))
+      }))).rejects.toThrow('boom')
 
-      expect(response!.status).toBe(207)
-
-      const body = await response!.json() as any
-      expect(body[0].json.status).toBe(500)
-      expect(body[0].json.body).toBe('Internal server error')
-      expect(rejectSpy).toHaveBeenCalledTimes(1)
+      expect(handlerFn).toHaveBeenCalledTimes(0)
     })
   })
 
@@ -299,15 +297,6 @@ describe('batchHandlerPlugin', () => {
     const started = vi.fn()
     const stopped = vi.fn()
 
-    function waitForAbort(signal: AbortSignal) {
-      return new Promise((resolve) => {
-        if (signal.aborted) {
-          resolve(undefined)
-        }
-        signal.addEventListener('abort', resolve)
-      })
-    }
-
     const handler = createHandler(new BatchHandlerPlugin(), {
       wait: os.handler(async ({ signal }) => {
         started()
@@ -360,6 +349,52 @@ describe('batchHandlerPlugin', () => {
       await response!.arrayBuffer()
 
       expect(stopped.mock.calls).toEqual([[true]])
+    })
+  })
+
+  describe('with rethrow plugin', () => {
+    const error = new Error('db down')
+    const slowSignal = vi.fn()
+
+    function createRethrowHandler() {
+      const { promise: slowStarted, resolve: resolveSlowStarted } = promiseWithResolvers<void>()
+
+      return new RPCHandler({
+        boom: os.handler(async () => {
+          await slowStarted
+          throw error
+        }),
+        slow: os.handler(async ({ signal }) => {
+          slowSignal(signal)
+          resolveSlowStarted()
+          await waitForAbort(signal!)
+        }),
+      }, {
+        plugins: [new RethrowHandlerPlugin({ filter: () => true }), new BatchHandlerPlugin()],
+      })
+    }
+
+    const messages = [makePeerRequestMessage(0, '/slow'), makePeerRequestMessage(1, '/boom')]
+
+    it('rejects buffered batches with the original error and aborts sibling sub-requests', async () => {
+      const handler = createRethrowHandler()
+
+      await expect(handler.handle(createBatchRequest({ mode: 'buffered', messages }))).rejects.toBe(error)
+
+      expect(slowSignal).toHaveBeenCalledTimes(1)
+      expect(slowSignal.mock.calls[0]![0].aborted).toBe(true)
+    })
+
+    it('errors the streaming response body with the original error and aborts sibling sub-requests', async () => {
+      const handler = createRethrowHandler()
+
+      const { response } = await handler.handle(createBatchRequest({ mode: 'streaming', messages }))
+
+      expect(response!.status).toBe(207)
+      await expect(response!.arrayBuffer()).rejects.toBe(error)
+
+      expect(slowSignal).toHaveBeenCalledTimes(1)
+      expect(slowSignal.mock.calls[0]![0].aborted).toBe(true)
     })
   })
 

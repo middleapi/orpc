@@ -259,6 +259,8 @@ const link = new RPCLink({
 })
 ```
 
+An error thrown at the routing level of a batched call fails the whole batch, just as it fails a request sent on its own. Examples include a failing [lazy router](/docs/router#lazy-router) import, a throwing `mapSubrequest` or routing interceptor, and errors rethrown by the [Rethrow Handler Plugin](/docs/plugins/rethrow). In `buffered` mode, `handler.handle()` rejects with the error. In `streaming` mode, the response has already been returned, so the response stream errors instead, and every call in the batch still waiting for its response fails.
+
 ## Learn More
 
 See the [BatchHandlerPlugin source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/batch.ts) and the [BatchLinkPlugin source code](https://github.com/middleapi/orpc/blob/main/packages/client/src/plugins/batch.ts) for implementation details.

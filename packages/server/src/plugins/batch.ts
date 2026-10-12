@@ -201,27 +201,21 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       }
 
+      /**
+       * Routing-level errors (a failing lazy router, a throwing `mapSubrequest` or routing interceptor,
+       * errors rethrown by `RethrowHandlerPlugin`, ...) are not turned into a sub-response.
+       * They fail the whole batch instead, as they fail the whole request in a non-batch request:
+       * buffered mode rejects `handler.handle()` and streaming mode errors the response stream.
+       */
       const handleIndividualRequest = async (request: StandardLazyRequest): Promise<StandardResponse> => {
-        try {
-          request = this.mapSubrequest(request, interceptorOptions)
-          const { matched, response } = await interceptorOptions.next({ ...interceptorOptions, request })
+        request = this.mapSubrequest(request, interceptorOptions)
+        const { matched, response } = await interceptorOptions.next({ ...interceptorOptions, request })
 
-          if (!matched) {
-            return { status: 404, headers: {}, body: 'No procedure matched' }
-          }
-
-          return response
+        if (!matched) {
+          return { status: 404, headers: {}, body: 'No procedure matched' }
         }
-        catch (err) {
-          /**
-           * Errors should not occur at the routing interceptor level.
-           * Reject the promise so it can be handled by the unhandledRejection handler
-           * for global logging or error handling.
-           */
-          Promise.reject(err)
 
-          return { status: 500, headers: {}, body: 'Internal server error' }
-        }
+        return response
       }
 
       const runSubrequests = async (peer: ServerPeer): Promise<void> => {
@@ -252,7 +246,14 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
           responseMessages.push(message)
         })
 
-        await runSubrequests(peer)
+        try {
+          await runSubrequests(peer)
+        }
+        catch (error) {
+          await peer.close(error) // abort sibling sub-requests that are still running
+          throw error
+        }
+
         await peer.close()
 
         if (responseMessages.some(msg => msg.binary !== undefined)) {
