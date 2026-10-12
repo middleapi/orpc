@@ -49,7 +49,7 @@ NestJS routing can't represent a literal `:` or `*` in a path across adapters, s
 :::
 
 :::info
-Path parameters whose names are not valid identifiers (e.g. `{user-id}`) are registered with NestJS under generated names. They still reach your procedure `input` under their original names, but NestJS guards and pipes won't find them under those names in `req.params`.
+Path parameters whose names are not valid identifiers (e.g. `{user-id}`) are registered with NestJS under generated names. They still reach your procedure `input` under their original names, but NestJS guards and pipes see them in `req.params` under the generated names.
 :::
 
 ## Implement Your Contract

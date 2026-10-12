@@ -86,7 +86,7 @@ function toNestRouteDecorator(contract: AnyProcedureContract): MethodDecorator {
   }
 
   const method = meta.method ?? DEFAULT_OPENAPI_METHOD
-  const path = toNestRoute(meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path).pattern
+  const path = toNestRoute(meta.path, meta.prefix).pattern
   const successStatus = meta.successStatus ?? DEFAULT_SUCCESS_STATUS
 
   if (method === 'QUERY') {
@@ -338,7 +338,7 @@ function toORPCOpenAPIParams(contract: AnyProcedureContract, params: NestStandar
     return undefined
   }
 
-  const { paramNames } = toNestRoute(meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path)
+  const { paramNames } = toNestRoute(meta.path, meta.prefix)
   // NullProtoObj prevents prototype injection when a param is named like `__proto__`
   const orpcParams: Record<string, string> = new NullProtoObj()
   // express use `path` while fastify use `*` for rest matching
@@ -356,21 +356,22 @@ function toORPCOpenAPIParams(contract: AnyProcedureContract, params: NestStandar
 const NEST_PARAM_NAME_REGEX = /^[a-z_]\w*$/i
 
 /**
- * Converts an oRPC OpenAPI path into a NestJS route pattern.
+ * Converts an oRPC OpenAPI path (with its optional prefix) into a NestJS route pattern.
  *
  * Express and Fastify end a `:name` param at the first non-identifier character,
  * so params like `{user-id}` are routed under generated keys instead.
  * `paramNames` maps each generated key (and `*` for the rest param) back to its oRPC param name.
  */
-function toNestRoute(path: `/${string}`): { pattern: `/${string}`, paramNames: Map<string, string> } {
-  const params = getDynamicPathParams(path) ?? []
+function toNestRoute(path: `/${string}`, prefix?: `/${string}`): { pattern: `/${string}`, paramNames: Map<string, string> } {
+  const fullPath = prefix ? mergeHttpPath(prefix, path) : path
+  const params = getDynamicPathParams(fullPath) ?? []
   const paramNames = new Map<string, string>()
 
   let pattern = ''
   let literalStart = 0
 
   for (const [index, param] of params.entries()) {
-    pattern += toNestLiteral(path.slice(literalStart, param.startIndex), path)
+    pattern += toNestLiteral(fullPath.slice(literalStart, param.startIndex), fullPath)
     literalStart = param.startIndex + param.segment.length
 
     if (param.allowsSlash) {
@@ -392,7 +393,7 @@ function toNestRoute(path: `/${string}`): { pattern: `/${string}`, paramNames: M
     }
   }
 
-  pattern += toNestLiteral(path.slice(literalStart), path)
+  pattern += toNestLiteral(fullPath.slice(literalStart), fullPath)
 
   return { pattern: pattern as `/${string}`, paramNames }
 }
