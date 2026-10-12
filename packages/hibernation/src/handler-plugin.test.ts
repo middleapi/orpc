@@ -27,7 +27,6 @@ describe('hibernationHandlerPlugin', () => {
         await next()
         return { output: 'replaced', context: {} }
       })
-      .output(asyncIteratorObject(type<string>()))
       .handler(() => new HibernationAsyncIteratorClass<string>(callback)),
   }
 
@@ -50,16 +49,7 @@ describe('hibernationHandlerPlugin', () => {
     resolveBody: () => Promise.resolve(undefined),
   } as any)
 
-  it('sets body as HibernationAsyncIteratorClass if output is HibernationAsyncIteratorClass', async () => {
-    const { response } = await handler.handle(createRequest('/ping'), {
-      context: {},
-    })
-
-    expect(response!.status).toBe(200)
-    expect(response!.body).toBeInstanceOf(HibernationAsyncIteratorClass)
-  })
-
-  it.each(['withSchema', 'contractFirst'])('sets body as the original HibernationAsyncIteratorClass behind an output schema: %s', async (path) => {
+  it.each(['ping', 'withSchema', 'contractFirst'])('sets body as the HibernationAsyncIteratorClass returned by the handler: %s', async (path) => {
     const { response } = await handler.handle(createRequest(`/${path}`), {
       context: {},
     })

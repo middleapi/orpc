@@ -77,8 +77,8 @@ export class HibernationHandlerPlugin<T extends Context> implements StandardHand
       }
 
       /**
-       * Output schemas like `asyncIteratorObject` wrap the iterator in a new
-       * `AsyncIteratorClass`, hiding the one returned by the handler.
+       * Output schemas like `asyncIteratorObject` (or a middleware) can wrap the
+       * iterator returned by the handler, hiding it from the check above.
        * The wrapper has not been started yet, so it can be dropped as is.
        */
       if (pluginContext.handlerHibernation && isAsyncIteratorObject(output)) {
@@ -105,7 +105,7 @@ export class HibernationHandlerPlugin<T extends Context> implements StandardHand
   /**
    * Returns a copy of the procedure whose handler records a returned
    * `HibernationAsyncIteratorClass` in the plugin context before output
-   * validation runs.
+   * validation runs. Middlewares and the handler see this copy as `procedure`.
    */
   private getRecordingProcedure(procedure: AnyProcedure): AnyProcedure {
     let recording = this.recordingProcedures.get(procedure)
