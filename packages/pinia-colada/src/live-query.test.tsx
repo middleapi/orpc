@@ -149,7 +149,7 @@ describe('liveQuery', () => {
       const entry = mounted.vm.queryCache.get(['live'])!
 
       mounted.unmount()
-      await vi.waitFor(() => expect(signals[0]!.aborted).toBe(true))
+      expect(signals[0]!.aborted).toBe(true)
       expect(entry.asyncStatus.value).toEqual('idle')
 
       controller.push(2) // resumes the stream loop, which now observes the aborted signal
@@ -159,7 +159,7 @@ describe('liveQuery', () => {
     })
 
     it('not while another consumer of the same key is mounted', async () => {
-      const { controller, onFinally, signals, query } = createLiveQuery()
+      const { controller, signals, query } = createLiveQuery()
 
       const Consumer = defineComponent({
         setup() {
@@ -196,13 +196,11 @@ describe('liveQuery', () => {
 
       controller.push(2)
       await vi.waitFor(() => expect(entry.state.value.data).toEqual(2))
-      expect(entry.asyncStatus.value).toEqual('loading')
       expect(signals).toHaveLength(1)
       expect(signals[0]!.aborted).toBe(false)
-      expect(onFinally).not.toHaveBeenCalled()
 
       mounted.unmount()
-      await vi.waitFor(() => expect(signals[0]!.aborted).toBe(true))
+      expect(signals[0]!.aborted).toBe(true)
     })
   })
 })

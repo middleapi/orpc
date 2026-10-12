@@ -1,5 +1,5 @@
-import type { QueryCache } from '@pinia/colada'
 import type { UseQueryFnContext } from './types'
+import { tryOrUndefined } from '@orpc/shared'
 import { useQueryCache } from '@pinia/colada'
 
 /**
@@ -16,24 +16,23 @@ export function cancelWhenInactive<T>(
   return async (context) => {
     const { entry, signal } = context
 
-    // Must run before any `await`, while Pinia Colada's `fetch` action keeps the right Pinia active
-    const queryCache = tryUseQueryCache()
+    // Resolved before any `await`: Pinia Colada's `fetch` action only keeps the query's Pinia
+    // active while it synchronously calls the query function
+    const queryCache = tryOrUndefined(() => useQueryCache())
 
-    const unsubscribe = queryCache?.$onAction(({ name, args, after }) => {
-      if (args[0] !== entry || signal.aborted) {
-        return
-      }
+    if (!queryCache) {
+      // No active Pinia: the query function is not run by Pinia Colada (e.g. called directly)
+      return queryFn(context)
+    }
 
-      if (name === 'untrack') {
+    const unsubscribe = queryCache.$onAction(({ name, args, after }) => {
+      if (args[0] === entry && (name === 'untrack' || name === 'remove')) {
         after(() => {
           // A newer fetch would have aborted this signal, so `entry.pending` still belongs to this fetch
-          if (!entry.active && !signal.aborted) {
+          if (!signal.aborted && (name === 'remove' || !entry.active)) {
             queryCache.cancel(entry)
           }
         })
-      }
-      else if (name === 'remove') {
-        queryCache.cancel(entry)
       }
     }, true) // detached: keep watching after the component that triggered the fetch unmounts
 
@@ -41,17 +40,7 @@ export function cancelWhenInactive<T>(
       return await queryFn(context)
     }
     finally {
-      unsubscribe?.()
+      unsubscribe()
     }
-  }
-}
-
-function tryUseQueryCache(): QueryCache | undefined {
-  try {
-    return useQueryCache()
-  }
-  catch {
-    // No active Pinia: the query function is not run by Pinia Colada (e.g. called directly)
-    return undefined
   }
 }

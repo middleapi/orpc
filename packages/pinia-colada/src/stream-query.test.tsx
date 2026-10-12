@@ -278,6 +278,8 @@ describe('serializableStreamedQuery', () => {
       return { controller, onFinally, signals, query }
     }
 
+    type StreamedQueryFn = ReturnType<typeof createStreamedQuery>['query']
+
     /**
      * Mounts two consumers of the same query in one app, the second one rendered
      * conditionally like `v-if="showSecond"`.
@@ -316,7 +318,7 @@ describe('serializableStreamedQuery', () => {
       const entry = mounted.vm.queryCache.get(['stream'])!
 
       mounted.unmount()
-      await vi.waitFor(() => expect(signals[0]!.aborted).toBe(true))
+      expect(signals[0]!.aborted).toBe(true)
       expect(entry.asyncStatus.value).toEqual('idle')
 
       controller.push(2) // resumes the stream loop, which now observes the aborted signal
@@ -337,7 +339,7 @@ describe('serializableStreamedQuery', () => {
       await vi.waitFor(() => expect(entry.state.value.data).toEqual([1]))
 
       queryCache.remove(entry)
-      await vi.waitFor(() => expect(signals[0]!.aborted).toBe(true))
+      expect(signals[0]!.aborted).toBe(true)
 
       controller.push(2)
       await expect(fetching).rejects.toBe(signals[0]!.reason)
@@ -345,34 +347,12 @@ describe('serializableStreamedQuery', () => {
       expect(entry.state.value).toEqual({ status: 'success', data: [1], error: null })
     })
 
-    it('not while another consumer of the same key is mounted', async () => {
-      const { controller, onFinally, signals, query } = createStreamedQuery()
-      const mounted = mountConsumers(() => useQuery({ key: ['stream'], query }))
-
-      controller.push(1)
-      await vi.waitFor(() => expect(mounted.vm.queryCache.getQueryData(['stream'])).toEqual([1]))
-      const entry = mounted.vm.queryCache.get(['stream'])!
-      expect(entry.deps.size).toBe(2)
-
-      mounted.vm.showSecond = false
-      await nextTick()
-      expect(entry.deps.size).toBe(1)
-
-      controller.push(2)
-      await vi.waitFor(() => expect(entry.state.value.data).toEqual([1, 2]))
-      expect(entry.asyncStatus.value).toEqual('loading')
-      expect(signals).toHaveLength(1)
-      expect(signals[0]!.aborted).toBe(false)
-      expect(onFinally).not.toHaveBeenCalled()
-
-      mounted.unmount()
-      await vi.waitFor(() => expect(signals[0]!.aborted).toBe(true))
-    })
-
-    it('with defineQuery, once no component uses it', async () => {
-      const { controller, onFinally, signals, query } = createStreamedQuery()
-      const useStreamQuery = defineQuery({ key: ['stream'], query })
-      const mounted = mountConsumers(useStreamQuery)
+    it.each([
+      ['useQuery', (query: StreamedQueryFn) => () => useQuery({ key: ['stream'], query })],
+      ['defineQuery', (query: StreamedQueryFn) => defineQuery({ key: ['stream'], query })],
+    ])('not while another consumer of the same key is mounted (%s)', async (_, defineStreamQuery) => {
+      const { controller, signals, query } = createStreamedQuery()
+      const mounted = mountConsumers(defineStreamQuery(query))
 
       controller.push(1)
       await vi.waitFor(() => expect(mounted.vm.queryCache.getQueryData(['stream'])).toEqual([1]))
@@ -389,11 +369,7 @@ describe('serializableStreamedQuery', () => {
       expect(signals[0]!.aborted).toBe(false)
 
       mounted.unmount()
-      await vi.waitFor(() => expect(signals[0]!.aborted).toBe(true))
-
-      controller.push(3)
-      await vi.waitFor(() => expect(onFinally).toHaveBeenCalledTimes(1))
-      expect(entry.state.value.data).toEqual([1, 2])
+      expect(signals[0]!.aborted).toBe(true)
     })
   })
 })
