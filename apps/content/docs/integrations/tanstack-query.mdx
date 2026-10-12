@@ -504,8 +504,6 @@ const query = useInfiniteQuery(
 )
 ```
 
-Skipped queries store `skipToken: true` in their query key instead of `input`, so they never share a cache entry with the same procedure called without input. Partial-match keys such as `orpc.planet.list.key()` still match them.
-
 ## Server-Side Rendering (SSR)
 
 When [server-side rendering](/docs/recipes/optimizing-ssr) with [TanStack Query hydration](https://tanstack.com/query/latest/docs/framework/react/guides/ssr), two things need special care: oRPC types that JSON cannot represent, and streamed or live queries that never complete.
