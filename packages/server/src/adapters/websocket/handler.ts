@@ -100,6 +100,12 @@ export class WebSocketHandler<T extends Context> {
    * Attaches message, close, and error event listeners to a WebSocket.
    *
    * Prefer this over calling `.message()` and `.close()` manually.
+   *
+   * @remarks
+   * Routing-level errors (e.g. from the `context` function or a routing interceptor) are not surfaced:
+   * the client receives a `cancel` message for the failed request and the error is discarded.
+   * To observe them, call `.message()` yourself or use a routing interceptor
+   * (the `context` function runs before routing interceptors, so only `.message()` sees its errors).
    */
   upgrade(
     ws: Pick<WebSocket, 'send' | 'addEventListener' | 'removeEventListener'>,
@@ -110,14 +116,23 @@ export class WebSocketHandler<T extends Context> {
      * This flow must stay synchronous, or we need to use `sequential` helper
      */
     ws.addEventListener('message', sequential(async (event) => {
-      // For better compatibility avoid control or depend on websocket.binaryType
-      const data = event.data instanceof Blob ? await loadBytes(event.data) : event.data
+      try {
+        // For better compatibility avoid control or depend on websocket.binaryType
+        const data = event.data instanceof Blob ? await loadBytes(event.data) : event.data
 
-      // Not awaited: `this.message` runs business logic that may be slow,
-      // and awaiting it would block decoding of subsequent messages.
-      this.message(ws, data, ...rest)
+        // Not awaited: `this.message` runs business logic that may be slow,
+        // and awaiting it would block decoding of subsequent messages.
+        // Rejections are swallowed to avoid crashing the process: the client has already been sent a `cancel`
+        // for the failed request. Callers who need the error should call `.message()` themselves.
+        this.message(ws, data, ...rest).catch(() => {})
+      }
+      catch {
+        // A frame that fails to load is dropped; nothing in it can be answered.
+      }
     }))
-    ws.addEventListener('close', () => this.close(ws))
+    ws.addEventListener('close', () => {
+      this.close(ws).catch(() => {})
+    })
 
     // EventEmitter-based implementations like `ws` throw an unhandled `error` event,
     // so a single malformed frame would crash the process. `close` always follows and handles cleanup.

@@ -234,6 +234,10 @@ const app = App()
 
 </CodeGroup>
 
+:::info
+`upgrade()` does not surface routing-level errors; the client receives a `cancel` message instead. To observe them, call `.message()` yourself or use a [routing interceptor](/docs/rpc/handler#routing-interceptors) (errors from the `context` function are only visible through `.message()`).
+:::
+
 ## Client Adapters
 
 | Adapter     | Target                                                                          |

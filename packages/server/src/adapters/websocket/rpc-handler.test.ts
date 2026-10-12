@@ -1,8 +1,10 @@
 import type { AddressInfo } from 'node:net'
 import { once } from 'node:events'
+import { sleep } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
 import WebSocket, { WebSocketServer } from 'ws'
 import { os } from '../../builder'
+import { RethrowHandlerPlugin } from '../../plugins'
 import { RPCHandler } from './rpc-handler'
 
 describe('rpcHandler', () => {
@@ -194,6 +196,94 @@ describe('rpcHandler', () => {
     expect(ws.send).not.toHaveBeenCalled()
 
     onClose?.() // safely call again to ensure no error is thrown
+  })
+
+  describe('does not leak unhandled rejections from routing-level errors via upgrade', () => {
+    const upgradeAndSendRequest = async (handler: RPCHandler<any>, ...rest: any[]) => {
+      let onMessage: ((event: { data: string }) => void) | undefined
+
+      const ws = {
+        addEventListener: vi.fn((event: string, callback: any) => {
+          if (event === 'message') {
+            onMessage = callback
+          }
+        }),
+        send: vi.fn(() => undefined),
+      }
+
+      handler.upgrade(ws as any, ...rest)
+
+      const request = await createRequestMessage()
+      onMessage?.({ data: request as string })
+
+      await vi.waitFor(() => {
+        expect(ws.send).toHaveBeenCalledTimes(1)
+      })
+
+      expect(decodePeerMessage((ws as any).send.mock.calls[0][0])).toEqual({
+        matched: true,
+        message: { id: '19', kind: 'cancel' },
+      })
+    }
+
+    it('context function throws', async () => {
+      await upgradeAndSendRequest(createHandler(), {
+        context: () => {
+          throw new Error('unauthorized')
+        },
+      })
+    })
+
+    it('rethrow plugin rethrows a procedure error', async () => {
+      const handler = new RPCHandler({
+        ping: os.handler(() => {
+          throw new Error('procedure failed')
+        }),
+      }, {
+        plugins: [new RethrowHandlerPlugin({ filter: () => true })],
+      })
+
+      await upgradeAndSendRequest(handler)
+    })
+
+    it('blob fails to load', async () => {
+      let onMessage: ((event: { data: unknown }) => void) | undefined
+
+      const handler = createHandler()
+
+      const ws = {
+        addEventListener: vi.fn((event: string, callback: any) => {
+          if (event === 'message') {
+            onMessage = callback
+          }
+        }),
+        send: vi.fn(() => undefined),
+      }
+
+      handler.upgrade(ws as any)
+
+      const blob = new Blob(['unused'])
+      blob.bytes = vi.fn(() => Promise.reject(new Error('read failed')))
+      onMessage?.({ data: blob })
+
+      await vi.waitFor(() => {
+        expect(blob.bytes).toHaveBeenCalledTimes(1)
+      })
+      await sleep(10) // let the failed load settle before the next message attaches to the chain
+
+      // later messages are still handled
+      const request = await createRequestMessage()
+      onMessage?.({ data: request as string })
+
+      await vi.waitFor(() => {
+        expect(ws.send).toHaveBeenCalledTimes(1)
+      })
+
+      const decoded = decodePeerMessage((ws as any).send.mock.calls[0][0]) as any
+
+      expect(decoded.matched).toBe(true)
+      expect(decoded.message.kind).toBe('response')
+    })
   })
 
   it('closes the connection instead of crashing on malformed ws frames via upgrade', async () => {

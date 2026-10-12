@@ -288,6 +288,39 @@ describe('rpcHandler', () => {
     expect(ws.send).not.toHaveBeenCalled()
   })
 
+  it('does not leak unhandled rejections from routing-level errors via upgrade', async () => {
+    let onMessage: ((event: { data: string }) => void) | undefined
+
+    const handler = createHandler()
+
+    const port = {
+      addEventListener: vi.fn((event: string, callback: any) => {
+        if (event === 'message') {
+          onMessage = callback
+        }
+      }),
+      postMessage: vi.fn(),
+    }
+
+    handler.upgrade(port as any, {
+      context: () => {
+        throw new Error('unauthorized')
+      },
+    })
+
+    const request = await createRequestMessage()
+    onMessage?.({ data: request as string })
+
+    await vi.waitFor(() => {
+      expect(port.postMessage).toHaveBeenCalledTimes(1)
+    })
+
+    expect(decodePeerMessage(port.postMessage.mock.calls[0]![0])).toEqual({
+      matched: true,
+      message: { id: '19', kind: 'cancel' },
+    })
+  })
+
   it('ignore invalid message format', async () => {
     const handler = createHandler()
     const { serverPort } = createPort()
