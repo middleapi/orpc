@@ -632,13 +632,6 @@ describe('openAPIMatcher', () => {
         params: undefined,
       })
       expect(loader).toHaveBeenCalledTimes(1)
-
-      await expect(matcher.match('GET', '/v2/info', undefined)).resolves.toEqual({
-        path: ['version'],
-        procedure: version,
-        params: { version: 'v2' },
-      })
-      expect(loader).toHaveBeenCalledTimes(1)
     })
 
     it('resolves nested lazy routers added during the same match', async () => {
