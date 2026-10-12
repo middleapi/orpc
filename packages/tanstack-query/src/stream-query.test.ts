@@ -504,6 +504,40 @@ describe('serializableStreamedQuery', () => {
       // Should not replace cache when aborted
       expect(queryClient.getQueryData(['abort-replace-test'])).toEqual(['initial1', 'initial2'])
     })
+
+    it('does not replace cache when stream ends gracefully after abort in replace refetch mode', async () => {
+      const key = ['abort-replace-graceful-test']
+
+      await serializableStreamedQuery(async function* () {
+        yield 'old1'
+        yield 'old2'
+      })({
+        queryKey: key,
+        signal: new AbortController().signal,
+        client: queryClient,
+      } as any)
+
+      expect(queryClient.getQueryData(key)).toEqual(['old1', 'old2'])
+
+      const controller = new AbortController()
+
+      const resultPromise = expect(serializableStreamedQuery(async function* ({ signal }) {
+        yield 'new1'
+        // end the stream gracefully on abort instead of yielding or throwing again
+        await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true }))
+      }, { refetchMode: 'replace' })({
+        queryKey: key,
+        signal: controller.signal,
+        client: queryClient,
+      } as any)).rejects.toSatisfy(err => err === controller.signal.reason)
+
+      await sleep(10)
+      controller.abort()
+
+      await resultPromise
+
+      expect(queryClient.getQueryData(key)).toEqual(['old1', 'old2'])
+    })
   })
 
   describe('edge cases', () => {

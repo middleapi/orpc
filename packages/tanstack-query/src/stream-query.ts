@@ -88,6 +88,11 @@ export function serializableStreamedQuery<
       }
     }
 
+    // some iterators end gracefully on abort instead of yielding or throwing again
+    if (context.signal.aborted) {
+      throw context.signal.reason
+    }
+
     if (!shouldUpdateCacheDuringStream) {
       context.client.setQueryData<Array<TQueryFnData>>(context.queryKey, result)
     }
