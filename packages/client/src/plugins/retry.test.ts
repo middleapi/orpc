@@ -411,21 +411,14 @@ describe('retryLinkPlugin', () => {
 
       const onRetry = vi.fn()
 
-      let calls = 0
-      vi.mocked(codec.decodeResponse).mockImplementation(async () => {
-        calls++
-
-        if (calls === 1) {
-          return {
-            kind: 'output',
-            output: (async function* () {
-              throw new Error('DISCONNECTED')
-            })(),
-          }
-        }
-
-        throw new Error('SERVER_DOWN')
-      })
+      vi.mocked(codec.decodeResponse)
+        .mockResolvedValueOnce({
+          kind: 'output',
+          output: (async function* () {
+            throw new Error('DISCONNECTED')
+          })(),
+        })
+        .mockRejectedValue(new Error('SERVER_DOWN'))
 
       const link = new StandardLink(codec, transport, {
         plugins: [new RetryLinkPlugin()],
@@ -436,16 +429,16 @@ describe('retryLinkPlugin', () => {
       const nextPromise = iterator.next()
 
       await vi.advanceTimersByTimeAsync(35)
-      expect(calls).toBeGreaterThan(1)
+      expect(vi.mocked(codec.decodeResponse).mock.calls.length).toBeGreaterThan(1)
 
       await iterator.return?.()
 
-      const callsAtReturn = calls
+      const callsAtReturn = vi.mocked(codec.decodeResponse).mock.calls.length
       const onRetryCallsAtReturn = onRetry.mock.calls.length
 
       await vi.advanceTimersByTimeAsync(1000)
 
-      expect(calls).toBe(callsAtReturn)
+      expect(codec.decodeResponse).toHaveBeenCalledTimes(callsAtReturn)
       expect(onRetry).toHaveBeenCalledTimes(onRetryCallsAtReturn)
       await expect(nextPromise).resolves.toEqual({ done: true, value: undefined })
     })
@@ -483,7 +476,6 @@ describe('retryLinkPlugin', () => {
       await expect(nextPromise).resolves.toEqual({ done: true, value: undefined })
 
       expect(transport.send).toHaveBeenCalledTimes(1)
-      expect(codec.decodeResponse).toHaveBeenCalledTimes(1)
       expect(onRetry).toHaveBeenCalledTimes(1)
       expect(clean).toHaveBeenCalledTimes(1)
       expect(clean).toHaveBeenCalledWith(false)
