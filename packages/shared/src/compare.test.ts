@@ -129,16 +129,14 @@ describe('deepEqual', () => {
     expect(isDeepEqual({}, new Date(0))).toBe(false)
   })
 
-  it('compares regular expressions by source and flags', () => {
-    expect(isDeepEqual(/a/g, /a/g)).toBe(true)
-    expect(isDeepEqual(/a/, /b/)).toBe(false)
-    expect(isDeepEqual(/a/g, /a/i)).toBe(false)
-  })
-
   it('compares other non-plain objects by reference', () => {
+    const regexp = /a/
     const set = new Set([1])
     const map = new Map([[1, 1]])
 
+    expect(isDeepEqual(regexp, regexp)).toBe(true)
+    expect(isDeepEqual(/a/, /a/)).toBe(false)
+    expect(isDeepEqual(/a/, /b/)).toBe(false)
     expect(isDeepEqual(set, set)).toBe(true)
     expect(isDeepEqual(new Set([1]), new Set([1]))).toBe(false)
     expect(isDeepEqual(new Set([1]), new Set([2]))).toBe(false)
