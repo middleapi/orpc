@@ -1,5 +1,5 @@
 import type { BaseRedisPublisherOptions, RedisStreamEntry } from '@orpc/publisher/base-redis'
-import type { Promisable } from '@orpc/shared'
+import type { Promisable, ThrowableError } from '@orpc/shared'
 import type { RedisClient } from 'bun'
 import { BaseRedisPublisher } from '@orpc/publisher/base-redis'
 
@@ -8,6 +8,9 @@ export interface BunRedisPublisherOptions extends BaseRedisPublisherOptions {
    * Redis subscriber instance.
    * Pub/Sub takes over the connection, so a client with subscriptions
    * cannot execute commands and must use a dedicated connection.
+   * Its `onconnect` and `onclose` handlers are wrapped to report a lost connection
+   * to the `onError` of active subscriptions, which ends iterator subscriptions.
+   * Bun does not restore subscriptions after reconnecting, so subscribe again in `onError`.
    *
    * @default redis.duplicate() (lazily created on first listen)
    */
@@ -22,6 +25,9 @@ export interface BunRedisPublisherOptions extends BaseRedisPublisherOptions {
  */
 export class BunRedisPublisher<T extends Record<string, object>> extends BaseRedisPublisher<T> {
   private subscriber: BunRedisPublisherOptions['subscriber']
+  private isSubscriberWatched = false
+
+  private readonly onErrors: Array<(error: ThrowableError) => void> = []
 
   constructor(
     private readonly redis: RedisClient,
@@ -36,14 +42,46 @@ export class BunRedisPublisher<T extends Record<string, object>> extends BaseRed
     await this.redis.publish(channel, message)
   }
 
-  protected async subscribeChannel(channel: string, listener: (message: unknown) => void): Promise<() => Promise<void>> {
+  protected async subscribeChannel(
+    channel: string,
+    listener: (message: unknown) => void,
+    onError?: (error: ThrowableError) => void,
+  ): Promise<() => Promise<void>> {
     this.subscriber ??= this.redis.duplicate()
     const subscriber = await this.subscriber
 
+    this.watchSubscriberIfNeeded(subscriber)
+
+    // Bun stays closed once it gives up reconnecting, until `connect()` is called.
+    if (!subscriber.connected) {
+      await subscriber.connect()
+    }
+
     await subscriber.subscribe(channel, listener)
 
+    // Registered after subscribing because a failed subscription rejects instead.
+    if (onError) {
+      this.onErrors.push(onError)
+    }
+
     return async () => {
-      await subscriber.unsubscribe(channel, listener)
+      if (onError) {
+        const index = this.onErrors.indexOf(onError)
+
+        if (index !== -1) {
+          this.onErrors.splice(index, 1)
+        }
+      }
+
+      try {
+        await subscriber.unsubscribe(channel, listener)
+      }
+      catch (error) {
+        // A closed connection holds no subscriptions, and Bun still removes the listener.
+        if (subscriber.connected) {
+          throw error
+        }
+      }
     }
   }
 
@@ -56,5 +94,32 @@ export class BunRedisPublisher<T extends Record<string, object>> extends BaseRed
     const entries: Array<[id: string, fields: [name: string, value: string]]> = results?.[key] ?? []
 
     return entries.map(([id, fields]) => ({ id, data: fields[1] }))
+  }
+
+  /**
+   * Bun reconnects without restoring subscriptions, and closes for good once it gives up,
+   * so both `onconnect` and `onclose` mean active subscriptions are gone. These handlers
+   * are single slots, so the ones already set are kept and called first.
+   */
+  private watchSubscriberIfNeeded(subscriber: RedisClient): void {
+    if (this.isSubscriberWatched) {
+      return
+    }
+
+    this.isSubscriberWatched = true
+
+    const { onconnect, onclose } = subscriber
+    // Snapshot, since a callback may unsubscribe itself mid-dispatch.
+    const report = (error: ThrowableError) => this.onErrors.slice().forEach(onError => onError(error))
+
+    subscriber.onconnect = function () {
+      onconnect?.call(this)
+      report(new Error('Redis subscriber reconnected without its subscriptions.'))
+    }
+
+    subscriber.onclose = function (error) {
+      onclose?.call(this, error)
+      report(error)
+    }
   }
 }

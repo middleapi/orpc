@@ -210,6 +210,9 @@ const publisher = new BunRedisPublisher<Events>(redis, {
    * Redis subscriber instance.
    * Pub/Sub takes over the connection, so a client with subscriptions
    * cannot execute commands and must use a dedicated connection.
+   * Its `onconnect` and `onclose` handlers are wrapped to report a lost connection
+   * to the `onError` of active subscriptions, which ends iterator subscriptions.
+   * Bun does not restore subscriptions after reconnecting, so subscribe again in `onError`.
    *
    * @default redis.duplicate() (lazily created on first listen)
    */

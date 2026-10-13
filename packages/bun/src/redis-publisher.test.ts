@@ -409,4 +409,105 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
 
     await unsubscribe2()
   }, { timeout: 20_000 })
+
+  it('reports a lost subscriber connection to the onError of active subscriptions only', async () => {
+    const userSubscriber = await redis.duplicate()
+    const userOnclose = vi.fn()
+    userSubscriber.onclose = userOnclose
+    onTestFinished(() => {
+      userSubscriber.close()
+    })
+    const publishers = [
+      createTestingPublisher(),
+      createTestingPublisher({ subscriber: userSubscriber }),
+    ]
+
+    for (const publisher of publishers) {
+      const onError = vi.fn()
+      const error = new Error('boom')
+
+      const unsubscribe = await publisher.subscribe('connection-errors', () => {}, { onError })
+      const subscriber: RedisClient = await (publisher as any).subscriber
+
+      subscriber.onconnect!.call(subscriber)
+      subscriber.onclose!.call(subscriber, error)
+
+      expect(onError).toHaveBeenCalledTimes(2)
+      expect(onError).toHaveBeenNthCalledWith(1, expect.any(Error))
+      expect(onError).toHaveBeenNthCalledWith(2, error)
+
+      await unsubscribe()
+
+      subscriber.onconnect!.call(subscriber)
+      subscriber.onclose!.call(subscriber, error)
+
+      expect(onError).toHaveBeenCalledTimes(2)
+    }
+
+    expect(userOnclose).toHaveBeenCalledTimes(2)
+  }, { timeout: 20_000 })
+
+  it('reports a dropped subscriber connection and delivers again after subscribing again', async () => {
+    const prefix = `dropped:${crypto.randomUUID()}:`
+    const event = 'alerts'
+    const publisher = createTestingPublisher({ prefix })
+    const onError = vi.fn()
+
+    const unsubscribe = await publisher.subscribe(event, () => {}, { onError })
+    const subscriber: RedisClient = await (publisher as any).subscriber
+
+    await redis.send('CLIENT', ['KILL', 'ID', String(await subscriber.send('CLIENT', ['ID']))])
+
+    await waitFor(() => {
+      expect(onError).toHaveBeenCalledWith(expect.any(Error))
+    })
+
+    await unsubscribe()
+
+    // Bun reconnects without restoring subscriptions, so a new subscription must restore delivery.
+    const listener = vi.fn()
+    const unsubscribeAgain = await publisher.subscribe(event, listener)
+
+    await publisher.publish(event, { order: 1 })
+
+    await waitFor(() => {
+      expect(listener).toHaveBeenCalledTimes(1)
+    })
+
+    expect(listener).toHaveBeenCalledWith({ order: 1 })
+
+    await unsubscribeAgain()
+  }, { timeout: 20_000 })
+
+  it('reports a closed subscriber and reconnects it on the next subscribe', async () => {
+    const prefix = `closed:${crypto.randomUUID()}:`
+    const event = 'alerts'
+    const publisher = createTestingPublisher({ prefix })
+    const onError = vi.fn()
+
+    const unsubscribe = await publisher.subscribe(event, () => {}, { onError })
+    const subscriber: RedisClient = await (publisher as any).subscriber
+
+    // Bun also closes the client like this once it gives up reconnecting.
+    subscriber.close()
+
+    await waitFor(() => {
+      expect(onError).toHaveBeenCalledWith(expect.any(Error))
+    })
+
+    await unsubscribe() // must not reject although the connection is closed
+
+    const listener = vi.fn()
+    const unsubscribeAgain = await publisher.subscribe(event, listener)
+
+    await publisher.publish(event, { order: 1 })
+
+    await waitFor(() => {
+      expect(listener).toHaveBeenCalledTimes(1)
+    })
+
+    expect(listener).toHaveBeenCalledWith({ order: 1 })
+
+    await unsubscribeAgain()
+  }, { timeout: 20_000 })
 })
