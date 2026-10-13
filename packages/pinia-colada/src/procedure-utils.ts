@@ -232,8 +232,8 @@ function mergeProcedureUtilsModifier<T extends object>(
  * Merge two procedure utils options where `override` takes priority.
  * A key explicitly set to `undefined` in `override` resets the base value.
  * When both sides define a key, interceptors are concatenated (base ones run first) and
- * modifiers are combined so per-call options beat `override`, which beats `base`
- * (a function `override` receives the result of `base`).
+ * modifiers are combined so that, for object values, per-call options beat `override`,
+ * which beats `base`. A function modifier receives the merged options and its result wins.
  */
 export function mergeProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError>(
   base: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>,
