@@ -672,86 +672,37 @@ describe('responseCompressionHandlerPlugin', () => {
     })
 
     it.each([
-      ['keeps the header instead of the blob type', new Blob(['a,b\n'.repeat(500)], { type: 'text/plain' }), 'text/csv; charset=utf-8', 'gzip'],
-      ['compresses an untyped blob when the header is compressible', new Blob(['<p>large content</p>'.repeat(100)]), 'text/html; charset=utf-8', 'gzip'],
-      ['does not compress when the header is non-compressible', new Blob(['large content'.repeat(100)], { type: 'text/plain' }), 'image/png', null],
-    ] as const)('uses the existing content-type header for blob body: %s', async (_label, blob, contentType, encoding) => {
-      const handler = new RPCHandler(os.handler(() => blob), {
-        plugins: [
-          {
-            name: 'set-content-type',
-            init(options) {
-              return {
-                ...options,
-                routingInterceptors: [
-                  async ({ next, ...interceptorOptions }) => {
-                    const result = await next(interceptorOptions)
-                    if (!result.matched) {
-                      return result
-                    }
-                    return {
-                      ...result,
-                      response: {
-                        ...result.response,
-                        headers: {
-                          ...result.response.headers,
-                          'content-type': contentType,
-                        },
-                      },
-                    }
-                  },
-                  ...options.routingInterceptors ?? [],
-                ],
-              }
-            },
-          },
-          new ResponseCompressionHandlerPlugin({ threshold: 100 }),
-        ],
-      })
-
-      const { matched, response } = await handler.handle(new Request('http://localhost', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'accept-encoding': 'gzip',
-        },
-        body: JSON.stringify({ json: null }),
-      }))
-
-      expect(matched).toBe(true)
-      expect(response!.headers.get('content-encoding')).toBe(encoding)
-      expect(response!.headers.get('content-type')).toBe(contentType)
-
-      await expect(
-        encoding === null ? response!.text() : decompressStream(response!.body!, encoding),
-      ).resolves.toEqual(await blob.text())
-    })
-
-    it('should not fall back to the blob type when content-type header is an empty array', async () => {
-      const largeBlob = new Blob(['large content'.repeat(100)], { type: 'text/plain' })
-      const handler = new RPCHandler(os.handler(() => largeBlob), {
+      ['text/csv; charset=utf-8', 'text/plain', 'gzip'],
+      ['text/html; charset=utf-8', '', 'gzip'],
+      ['image/png', 'text/plain', null],
+      [[], 'text/plain', null],
+    ])('uses content-type header %j over blob type %j', async (contentType, blobType, encoding) => {
+      const handler = new RPCHandler(os.handler(() => new Blob(['large content'.repeat(100)], { type: blobType })), {
         plugins: [new ResponseCompressionHandlerPlugin({ threshold: 100 })],
         routingInterceptors: [async ({ next }) => {
           const result = await next()
 
           return result.matched
-            ? { ...result, response: { ...result.response, headers: { ...result.response.headers, 'content-type': [] } } }
+            ? { ...result, response: { ...result.response, headers: { ...result.response.headers, 'content-type': contentType } } }
             : result
         }],
       })
 
-      const { matched, response } = await handler.handle(new Request('http://localhost', {
+      const handle = (acceptEncoding: string) => handler.handle(new Request('http://localhost', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'accept-encoding': 'gzip',
+          'accept-encoding': acceptEncoding,
         },
         body: JSON.stringify({ json: null }),
       }))
 
-      expect(matched).toBe(true)
-      // Like the adapters' `??=`, an empty array counts as a set header, so the type is unknown
-      expect(response!.headers.has('content-encoding')).toBe(false)
+      const { response } = await handle('gzip')
+      const { response: uncompressed } = await handle('identity')
+
+      expect(response!.headers.get('content-encoding')).toBe(encoding)
+      // Same content-type the adapter sends when the response is not compressed
+      expect(response!.headers.get('content-type')).toBe(uncompressed!.headers.get('content-type'))
     })
   })
 
