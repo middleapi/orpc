@@ -223,20 +223,17 @@ function mergeProcedureUtilsModifier<T extends object>(
     return options => base({ ...override, ...options })
   }
 
-  if (typeof base !== 'function') {
-    return options => ({ ...base, ...override(options) })
-  }
+  const applyBase = typeof base === 'function' ? base : (options: T) => ({ ...base, ...options })
 
-  return options => override(base(options))
+  return options => override(applyBase(options))
 }
 
 /**
  * Merge two procedure utils options where `override` takes priority.
  * A key explicitly set to `undefined` in `override` resets the base value.
  * When both sides define a key, interceptors are concatenated (base ones run first) and
- * modifiers are combined so `override` beats `base`, with object values acting as defaults
- * under the per-call options. A function modifier's result wins over what it receives,
- * and two functions are composed (base applied first).
+ * modifiers are combined so that, for object values, per-call options beat `override`,
+ * which beats `base`. A function modifier receives the merged options and its result wins.
  */
 export function mergeProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError>(
   base: ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>,
