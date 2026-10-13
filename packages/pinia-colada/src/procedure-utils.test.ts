@@ -1014,4 +1014,14 @@ describe('mergeProcedureUtilsOptions', () => {
     expect((merged.queryOptions as any)({})).toEqual({ staleTime: 0 })
     expect((merged.queryOptions as any)({ staleTime: 5 })).toEqual({ staleTime: 5 })
   })
+
+  it('lets a function override beat an object base, which only fills keys missing from its result', () => {
+    const merged = mergeProcedureUtilsOptions<any, any, any, any>(
+      { queryOptions: { staleTime: 1000, gcTime: 1 } },
+      { queryOptions: (options: any) => ({ gcTime: 2, ...options }) },
+    )
+
+    expect((merged.queryOptions as any)({})).toEqual({ staleTime: 1000, gcTime: 2 })
+    expect((merged.queryOptions as any)({ gcTime: 5 })).toEqual({ staleTime: 1000, gcTime: 5 })
+  })
 })
