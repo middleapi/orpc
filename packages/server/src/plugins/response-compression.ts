@@ -103,11 +103,11 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
 
       else if (body instanceof Blob) {
         // Adapters only fall back to the blob type when no Content-Type header is set
-        const contentType = flattenStandardHeader(headers['content-type']) ?? body.type
+        const contentType = headers['content-type'] ?? body.type
 
         if (
           (!Number.isFinite(body.size) || body.size >= this.threshold)
-          && this.isCompressibleContentType(contentType, interceptorOptions)
+          && this.isCompressibleContentType(flattenStandardHeader(contentType), interceptorOptions)
         ) {
           const contentDisposition = headers['content-disposition'] ?? generateContentDisposition(
             body instanceof File ? body.name : 'blob',

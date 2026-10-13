@@ -726,6 +726,33 @@ describe('responseCompressionHandlerPlugin', () => {
         encoding === null ? response!.text() : decompressStream(response!.body!, encoding),
       ).resolves.toEqual(await blob.text())
     })
+
+    it('should not fall back to the blob type when content-type header is an empty array', async () => {
+      const largeBlob = new Blob(['large content'.repeat(100)], { type: 'text/plain' })
+      const handler = new RPCHandler(os.handler(() => largeBlob), {
+        plugins: [new ResponseCompressionHandlerPlugin({ threshold: 100 })],
+        routingInterceptors: [async ({ next }) => {
+          const result = await next()
+
+          return result.matched
+            ? { ...result, response: { ...result.response, headers: { ...result.response.headers, 'content-type': [] } } }
+            : result
+        }],
+      })
+
+      const { matched, response } = await handler.handle(new Request('http://localhost', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'accept-encoding': 'gzip',
+        },
+        body: JSON.stringify({ json: null }),
+      }))
+
+      expect(matched).toBe(true)
+      // Like the adapters' `??=`, an empty array counts as a set header, so the type is unknown
+      expect(response!.headers.has('content-encoding')).toBe(false)
+    })
   })
 
   describe('readable stream body', () => {
