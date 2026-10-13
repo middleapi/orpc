@@ -185,9 +185,10 @@ describe('liveQuery', () => {
         },
       })
 
-      controller.push(1)
-      await vi.waitFor(() => expect(mounted.vm.queryCache.getQueryData(['live'])).toEqual(1))
       const entry = mounted.vm.queryCache.get(['live'])!
+
+      controller.push(1)
+      await vi.waitFor(() => expect(entry.state.value.data).toEqual(1))
       expect(entry.deps.size).toBe(2)
 
       mounted.vm.showSecond = false

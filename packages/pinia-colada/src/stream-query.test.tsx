@@ -278,8 +278,6 @@ describe('serializableStreamedQuery', () => {
       return { controller, onFinally, signals, query }
     }
 
-    type StreamedQueryFn = ReturnType<typeof createStreamedQuery>['query']
-
     /**
      * Mounts two consumers of the same query in one app, the second one rendered
      * conditionally like `v-if="showSecond"`.
@@ -347,16 +345,14 @@ describe('serializableStreamedQuery', () => {
       expect(entry.state.value).toEqual({ status: 'success', data: [1], error: null })
     })
 
-    it.each([
-      ['useQuery', (query: StreamedQueryFn) => () => useQuery({ key: ['stream'], query })],
-      ['defineQuery', (query: StreamedQueryFn) => defineQuery({ key: ['stream'], query })],
-    ])('not while another consumer of the same key is mounted (%s)', async (_, defineStreamQuery) => {
+    it.each(['useQuery', 'defineQuery'] as const)('not while another consumer of the same key is mounted (%s)', async (api) => {
       const { controller, signals, query } = createStreamedQuery()
-      const mounted = mountConsumers(defineStreamQuery(query))
+      const options = { key: ['stream'], query }
+      const mounted = mountConsumers(api === 'useQuery' ? () => useQuery(options) : defineQuery(options))
+      const entry = mounted.vm.queryCache.get(['stream'])!
 
       controller.push(1)
-      await vi.waitFor(() => expect(mounted.vm.queryCache.getQueryData(['stream'])).toEqual([1]))
-      const entry = mounted.vm.queryCache.get(['stream'])!
+      await vi.waitFor(() => expect(entry.state.value.data).toEqual([1]))
       expect(entry.deps.size).toBe(2)
 
       mounted.vm.showSecond = false
