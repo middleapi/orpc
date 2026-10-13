@@ -59,7 +59,7 @@ Options accept plain values only. For reactive inputs, pass a callback to `useQu
 
 ## Streamed Query Options Utility
 
-Use `.streamedOptions` to build streamed query options for an [AsyncIteratorObject](/docs/async-iterator-object). The resulting data is an array of chunks, and each new chunk is appended as it arrives. The stream is aborted once the last component using the query unmounts. It works with `useQuery` and any other API that accepts query options.
+Use `.streamedOptions` to build streamed query options for an [AsyncIteratorObject](/docs/async-iterator-object). The resulting data is an array of chunks, and each new chunk is appended as it arrives. It works with `useQuery` and any other API that accepts query options.
 
 ```ts
 const query = useQuery(orpc.streamed.streamedOptions({
@@ -84,7 +84,7 @@ const query = useQuery(orpc.streamed.streamedOptions({
 
 ## Live Query Options Utility
 
-Use `.liveOptions` to build live query options for an [AsyncIteratorObject](/docs/async-iterator-object). The data always reflects the latest chunk, replacing the previous value whenever a new one arrives. The stream is aborted once the last component using the query unmounts. It works with `useQuery` and any other API that accepts query options.
+Use `.liveOptions` to build live query options for an [AsyncIteratorObject](/docs/async-iterator-object). The data always reflects the latest chunk, replacing the previous value whenever a new one arrives. It works with `useQuery` and any other API that accepts query options.
 
 ```ts
 const query = useQuery(orpc.live.liveOptions({
