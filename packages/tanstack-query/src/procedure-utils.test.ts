@@ -1,4 +1,4 @@
-import { QueryClient, skipToken } from '@tanstack/query-core'
+import { InfiniteQueryObserver, QueryClient, QueryObserver, skipToken } from '@tanstack/query-core'
 import * as KeyModule from './key'
 import * as LiveQuery from './live-query'
 import { isProcedureUtilsOptions, mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
@@ -438,6 +438,53 @@ describe('procedureUtils', () => {
     expect(mutationFn).toHaveBeenCalledTimes(1)
     expect(mutationFn).toHaveBeenCalledWith('__input__', fnContext)
     expect(client).toHaveBeenCalledTimes(0)
+  })
+})
+
+describe('skipToken queries do not share a query with unskipped ones', () => {
+  const client = vi.fn(async () => '__output__')
+  const utils = new ProcedureUtils<Record<never, never>, { search?: string } | undefined, string, Error>(['planet', 'list'], client)
+
+  it('.queryOptions', async () => {
+    const unskipped = new QueryObserver(queryClient, utils.queryOptions())
+    onTestFinished(unskipped.subscribe(() => {}))
+    await vi.waitFor(() => expect(unskipped.getCurrentResult().status).toBe('success'))
+
+    const skipped = new QueryObserver(queryClient, utils.queryOptions({ input: skipToken }))
+    onTestFinished(skipped.subscribe(() => {}))
+
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(2)
+
+    await queryClient.invalidateQueries({ queryKey: utils.key() })
+
+    expect(unskipped.getCurrentResult().status).toBe('success')
+    expect(skipped.getCurrentResult().status).toBe('pending')
+    expect(client).toHaveBeenCalledTimes(2)
+  })
+
+  it('.infiniteOptions', async () => {
+    const unskipped = new InfiniteQueryObserver(queryClient, utils.infiniteOptions({
+      input: () => undefined,
+      initialPageParam: 0,
+      getNextPageParam: () => undefined,
+    }))
+    onTestFinished(unskipped.subscribe(() => {}))
+    await vi.waitFor(() => expect(unskipped.getCurrentResult().status).toBe('success'))
+
+    const skipped = new InfiniteQueryObserver(queryClient, utils.infiniteOptions({
+      input: skipToken,
+      initialPageParam: 0,
+      getNextPageParam: () => undefined,
+    }))
+    onTestFinished(skipped.subscribe(() => {}))
+
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(2)
+
+    await queryClient.invalidateQueries({ queryKey: utils.key() })
+
+    expect(unskipped.getCurrentResult().status).toBe('success')
+    expect(skipped.getCurrentResult().status).toBe('pending')
+    expect(client).toHaveBeenCalledTimes(2)
   })
 })
 

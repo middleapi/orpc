@@ -1,7 +1,9 @@
 import type { StandardHandlerPlugin } from '@orpc/server/standard'
+import { createORPCClient } from '@orpc/client'
 import { os } from '@orpc/server'
 import { openapi } from '../../meta'
 import { OpenAPIHandler } from './openapi-handler'
+import { OpenAPILink } from './openapi-link'
 
 describe('openapiHandler', () => {
   beforeEach(() => {
@@ -46,6 +48,34 @@ describe('openapiHandler', () => {
 
     expect(misMatchPrefixResult.matched).toBe(false)
     expect(misMatchPrefixResult.response).toBeUndefined()
+  })
+
+  it('routes an OpenAPILink call with a raw char to its static route, not a dynamic sibling', async () => {
+    const router = {
+      beta: os.meta(openapi({ method: 'GET', path: '/v1^beta/items' })).handler(() => 'beta'),
+      version: os.meta(openapi({ method: 'GET', path: '/{version}/items' })).handler(() => 'version'),
+    }
+
+    const handler = new OpenAPIHandler(router)
+
+    const fetch = vi.fn(async (url: string, init: RequestInit) => {
+      const { matched, response } = await handler.handle(new Request(url, init), { prefix: '/api' })
+
+      if (!matched || !response) {
+        throw new Error('No procedure match')
+      }
+
+      return response
+    })
+
+    const client = createORPCClient<any>(new OpenAPILink(router, {
+      fetch,
+      origin: 'http://localhost:3000',
+      url: '/api',
+    }))
+
+    await expect(client.beta()).resolves.toBe('beta')
+    expect(fetch).toHaveBeenCalledWith('http://localhost:3000/api/v1^beta/items', expect.anything(), expect.anything(), ['beta'])
   })
 
   it('supports standard handler plugins', async () => {
