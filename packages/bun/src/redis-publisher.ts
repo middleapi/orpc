@@ -2,6 +2,7 @@ import type { BaseRedisPublisherOptions, RedisStreamEntry } from '@orpc/publishe
 import type { Promisable, ThrowableError } from '@orpc/shared'
 import type { RedisClient } from 'bun'
 import { BaseRedisPublisher } from '@orpc/publisher/base-redis'
+import { once } from '@orpc/shared'
 
 export interface BunRedisPublisherOptions extends BaseRedisPublisherOptions {
   /**
@@ -24,8 +25,7 @@ export interface BunRedisPublisherOptions extends BaseRedisPublisherOptions {
  * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
  */
 export class BunRedisPublisher<T extends Record<string, object>> extends BaseRedisPublisher<T> {
-  private subscriber: BunRedisPublisherOptions['subscriber']
-  private isSubscriberWatched = false
+  private readonly getSubscriber: () => Promise<RedisClient>
 
   private readonly onErrors: Array<(error: ThrowableError) => void> = []
 
@@ -35,7 +35,11 @@ export class BunRedisPublisher<T extends Record<string, object>> extends BaseRed
   ) {
     super(options)
 
-    this.subscriber = subscriber
+    this.getSubscriber = once(async () => {
+      const client = await (subscriber ?? redis.duplicate())
+      this.watchSubscriber(client)
+      return client
+    })
   }
 
   protected async publishMessage(channel: string, message: string): Promise<void> {
@@ -47,10 +51,7 @@ export class BunRedisPublisher<T extends Record<string, object>> extends BaseRed
     listener: (message: unknown) => void,
     onError?: (error: ThrowableError) => void,
   ): Promise<() => Promise<void>> {
-    this.subscriber ??= this.redis.duplicate()
-    const subscriber = await this.subscriber
-
-    this.watchSubscriberIfNeeded(subscriber)
+    const subscriber = await this.getSubscriber()
 
     // Bun stays closed once it gives up reconnecting, until `connect()` is called.
     if (!subscriber.connected) {
@@ -101,13 +102,7 @@ export class BunRedisPublisher<T extends Record<string, object>> extends BaseRed
    * so both `onconnect` and `onclose` mean active subscriptions are gone. These handlers
    * are single slots, so the ones already set are kept and called first.
    */
-  private watchSubscriberIfNeeded(subscriber: RedisClient): void {
-    if (this.isSubscriberWatched) {
-      return
-    }
-
-    this.isSubscriberWatched = true
-
+  private watchSubscriber(subscriber: RedisClient): void {
     const { onconnect, onclose } = subscriber
     // Snapshot, since a callback may unsubscribe itself mid-dispatch.
     const report = (error: ThrowableError) => this.onErrors.slice().forEach(onError => onError(error))
