@@ -48,7 +48,7 @@ A [batch](/docs/plugins/batch) response might be left uncompressed here, dependi
 
 ### Customize Compressible Content Types
 
-For binary transfers (streams, files, and file form-data parts), the plugin only compresses content types that benefit from compression. For a file body, the check uses the response's `Content-Type` header when one is set, and falls back to the file's own type otherwise. Override the check with `isCompressibleContentType`:
+For binary transfers (streams, files, and file form-data parts), the plugin only compresses content types that benefit from compression. Override the check with `isCompressibleContentType`:
 
 ```ts handler
 import { ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
