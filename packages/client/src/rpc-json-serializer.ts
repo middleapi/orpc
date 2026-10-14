@@ -201,12 +201,8 @@ export interface RPCJsonSerializerOptions {
   omitUndefinedProperties?: boolean | undefined
 
   /**
-   * Maximum number of digits, excluding a leading `-`, the built-in `bigint` handler accepts when deserializing.
-   * Longer values are rejected before being parsed, because parsing a long digit string
-   * blocks the event loop for a time that grows faster than its length.
-   *
-   * Values longer than the limit fail to deserialize, so both sides must raise it to exchange them.
-   * Use `Number.POSITIVE_INFINITY` to disable the limit. Ignored when `handlers.bigint` is set.
+   * Maximum digits, excluding a leading `-`, the built-in `bigint` handler deserializes.
+   * Both sides must raise it to exchange longer values. `Number.POSITIVE_INFINITY` disables it.
    *
    * @default 4300
    */

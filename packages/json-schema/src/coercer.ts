@@ -67,11 +67,8 @@ function minSatisfaction(a: Satisfaction, b: Satisfaction): Satisfaction {
 
 export interface JsonSchemaCoercerOptions {
   /**
-   * Maximum number of digits, excluding a leading `-`, of a string coerced to `bigint`.
-   * Longer strings are left unchanged without being parsed, so validation rejects them,
-   * because parsing a long digit string blocks the event loop for a time that grows faster than its length.
-   *
-   * Use `Number.POSITIVE_INFINITY` to disable the limit.
+   * Maximum digits, excluding a leading `-`, of a string coerced to `bigint`. Longer strings are left unchanged.
+   * `Number.POSITIVE_INFINITY` disables it.
    *
    * @default 4300
    */

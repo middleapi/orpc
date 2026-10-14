@@ -52,15 +52,7 @@ const link = new OpenAPILink(contract, {
 ```
 
 :::info
-Both plugins accept `maxBigIntDigits` (default 4300), the maximum number of digits, not counting a leading `-`, of a string coerced to `BigInt`. Longer strings are [left unchanged](#stringnumber--bigint) because parsing them blocks the event loop for a time that grows faster than their length. Raise it only when your schemas need longer values, or set it to `Number.POSITIVE_INFINITY` to disable the limit:
-
-```ts
-new SmartCoercionHandlerPlugin({
-  converters: [new ZodToJsonSchemaConverter()],
-  maxBigIntDigits: 10_000,
-})
-```
-
+Both plugins accept `maxBigIntDigits` (default 4300), the maximum digits of a string coerced to `BigInt`.
 :::
 
 :::info
@@ -116,7 +108,7 @@ Supports integer strings and whole numbers:
 - `'12345678901234567890'` → `12345678901234567890n`
 - `123` → `123n`
 
-Integer strings longer than `maxBigIntDigits` digits (default 4300, not counting a leading `-`) are left unchanged, so validation rejects them. See [Setup](#setup) to change the limit.
+Strings longer than `maxBigIntDigits` digits are left unchanged.
 
 ### String → Date
 
