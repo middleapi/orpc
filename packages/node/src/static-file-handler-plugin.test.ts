@@ -968,33 +968,22 @@ describe('staticFileHandlerPlugin', () => {
    * The batch plugin runs this plugin's routing interceptor for each subrequest,
    * so a batched GET streams the file through the length-prefixed batch response.
    */
-  it('streams a file requested through a streaming batch with its bytes intact', async ({ onTestFinished }) => {
+  it('streams a file requested through a streaming batch with its bytes intact', async () => {
     const content = randomBytes(1024 * 1024) // spans many reads and the batch stream's queue
     writeFileSync(path.join(rootDir, 'large.bin'), content)
 
-    const handler = new RPCHandler({}, {
+    const agent = createAgent(new RPCHandler({}, {
       plugins: [new BatchHandlerPlugin(), new StaticFileHandlerPlugin({ rootDir })],
-    })
+    }))
 
-    const server = createServer(async (req, res) => {
-      await handler.handle(req, res, { context: {} })
-    })
+    const res = await agent.post('/__batch__')
+      .set('orpc-batch', 'streaming')
+      .send([{ kind: 'request', id: '0', json: { url: '/large.bin', method: 'GET', headers: {} } }])
+      .responseType('blob') // buffers the binary body
 
-    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-    onTestFinished(() => {
-      server.close()
-    })
-    const { port } = server.address() as AddressInfo
+    expect(res.status).toBe(207)
 
-    const response = await fetch(`http://127.0.0.1:${port}/__batch__`, {
-      method: 'POST',
-      headers: { 'orpc-batch': 'streaming', 'content-type': 'application/json' },
-      body: JSON.stringify([{ kind: 'request', id: '0', json: { url: '/large.bin', method: 'GET', headers: {} } }]),
-    })
-
-    expect(response.status).toBe(207)
-
-    const body = new Uint8Array(await response.arrayBuffer())
+    const body: Buffer = res.body
     const messages: { kind: string, id: string, json: any, binary?: Uint8Array }[] = []
 
     for (let offset = 0; offset < body.byteLength;) {
@@ -1017,7 +1006,8 @@ describe('staticFileHandlerPlugin', () => {
     expect(head!.json.status).toBeUndefined() // 200
     expect(chunks.every(chunk => chunk.kind === 'octet-stream' && chunk.id === '0')).toBe(true)
     expect(chunks.at(-1)!.json.close).toBe(true)
-    expect(Buffer.concat(chunks.map(chunk => chunk.binary ?? new Uint8Array()))).toEqual(content)
+    // `equals` instead of `toEqual`, which takes seconds to compare 1 MiB
+    expect(Buffer.concat(chunks.map(chunk => chunk.binary ?? new Uint8Array())).equals(content)).toBe(true)
   })
 
   describe('tracing', () => {

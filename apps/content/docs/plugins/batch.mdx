@@ -60,7 +60,7 @@ const cors = new CORSHandlerPlugin({
 
 By default, the plugin uses `streaming` mode. Responses are sent as soon as they are ready, so one slow request does not block the rest of the batch.
 
-Streaming mode applies backpressure. The server only pulls more output from streamed responses, such as [AsyncIteratorObject](/docs/async-iterator-object) and file streams, once the client has read what is already queued. A client that stops reading pauses its subrequests instead of making the server buffer their output. Because every subrequest shares one response, they all pause together when the connection is backed up.
+Streaming mode applies backpressure. The server only pulls more output from streamed responses, such as [AsyncIteratorObject](/docs/async-iterator-object) and file streams, once the client has read what is already queued. A client that stops reading the response body pauses its subrequests instead of making the server buffer their output. Because every subrequest shares one response, they all pause together when the connection is backed up.
 
 If your environment does not support streaming responses, such as some serverless platforms or older browsers, switch to `buffered` mode instead. In this mode, all responses are collected and sent together.
 
@@ -101,7 +101,7 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-A long-lived subscription can never finish, so in a buffered batch it only ends once it reaches this limit. Use streaming mode for batches that include subscriptions, or keep them out of the batch with [`filter`](#filtering-requests).
+A long-lived subscription holds a buffered batch open until it ends or its buffered output reaches this limit. Use streaming mode for batches that include subscriptions, or keep them out of the batch with [`filter`](#filtering-requests).
 
 :::info
 `File` and `Blob` responses are read fully into memory before they are added to a batch response, in both modes. Each one is bounded by its own size.

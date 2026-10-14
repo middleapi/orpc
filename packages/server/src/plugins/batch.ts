@@ -5,7 +5,7 @@ import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-ser
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
 import { ORPCError } from '@orpc/client'
-import { AbortError, stringifyJSON, toArray, value } from '@orpc/shared'
+import { AbortError, promiseWithResolvers, stringifyJSON, toArray, value } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
 
@@ -247,13 +247,10 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       }
 
-      const runSubrequests = async (
-        peer: ServerPeer,
-        closePeer: (reason: unknown) => Promise<void> = reason => peer.close(reason),
-      ): Promise<void> => {
+      const runSubrequests = async (peer: ServerPeer, close: (reason: unknown) => Promise<void>): Promise<void> => {
         const promise = Promise.all(messages.map(msg => peer.message(msg, handleIndividualRequest)))
         const signal = interceptorOptions.request.signal
-        const onAbort = () => closePeer(signal?.reason)
+        const onAbort = () => close(signal?.reason)
 
         if (signal?.aborted) {
           onAbort()
@@ -274,6 +271,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
       if (mode === 'buffered') {
         const maxBufferedResponseSize = await value(this.maxBufferedResponseSize, interceptorOptions)
+        const overflowMessage = 'Batch response size exceeds the maximum allowed size'
         const responseMessages: ServerPeerSendMessage[] = []
         let bufferedResponseSize = 0
         let overflowClosing: Promise<void> | undefined
@@ -287,28 +285,32 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
             return
           }
 
-          bufferedResponseSize += stringifyJSON({ ...message, binary: undefined }).length
+          // Measuring costs an extra serialization of each message, so skip it when the limit is disabled.
+          if (maxBufferedResponseSize !== Infinity) {
+            bufferedResponseSize += stringifyJSON({ ...message, binary: undefined }).length
 
-          if (message.binary !== undefined) {
-            bufferedResponseSize += message.binary instanceof Blob ? message.binary.size : message.binary.byteLength
-          }
+            if (message.binary !== undefined) {
+              bufferedResponseSize += message.binary instanceof Blob ? message.binary.size : message.binary.byteLength
+            }
 
-          if (bufferedResponseSize > maxBufferedResponseSize) {
-            overflowClosing = peer.close(new AbortError('Batch response size exceeds the maximum allowed size'))
-            return
+            if (bufferedResponseSize > maxBufferedResponseSize) {
+              overflowClosing = peer.close(new AbortError(overflowMessage))
+              responseMessages.length = 0 // release them while the subrequests wind down
+              return
+            }
           }
 
           responseMessages.push(message)
         })
 
-        await runSubrequests(peer)
+        await runSubrequests(peer, reason => peer.close(reason))
 
         if (overflowClosing) {
           await overflowClosing
 
           return {
             matched: true,
-            response: { status: 413, headers: {}, body: 'Batch response size exceeds the maximum allowed size' },
+            response: { status: 413, headers: {}, body: overflowMessage },
           }
         }
 
@@ -351,15 +353,16 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
       /**
        * Set once the stream stops accepting messages (completed, cancelled, errored, or the batch request aborted).
-       * Waiting `send` calls are released and throw instead of waiting for a `pull` that never comes.
+       * Waiting `send` calls are then released and throw instead of waiting for a `pull` that never comes.
        */
       let finished = false
-      let pullWaiters: (() => void)[] = []
+      let pullWaiter: ReturnType<typeof promiseWithResolvers<void>> | undefined
 
-      const releasePullWaiters = () => {
-        const waiters = pullWaiters
-        pullWaiters = []
-        waiters.forEach(resolve => resolve())
+      const hasCapacity = () => (streamController.desiredSize ?? 0) > 0
+
+      const releasePullWaiter = () => {
+        pullWaiter?.resolve()
+        pullWaiter = undefined
       }
 
       const throwIfFinished = () => {
@@ -375,12 +378,6 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       }
 
-      const finish = () => {
-        finished = true
-        clearKeepAlive()
-        releasePullWaiters()
-      }
-
       const scheduleKeepAlive = () => {
         if (!this.keepAliveEnabled) {
           return
@@ -389,7 +386,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         clearKeepAlive()
         keepAliveTimer = setInterval(() => {
           // A full queue already has data waiting for the client, so it needs no keep-alive frame.
-          if ((streamController.desiredSize ?? 0) <= 0) {
+          if (!hasCapacity()) {
             return
           }
 
@@ -408,14 +405,12 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
       const peer = new ServerPeer(async (message) => {
         /**
-         * Wait for the client to read before producing the next frame. The peer pulls the next chunk
-         * of a streamed subresponse only once `send` resolves, so a client that stops reading pauses
-         * the subrequests instead of having their whole output buffered in memory.
-         * Waiting before encoding also avoids allocating frames that cannot be queued yet.
+         * Backpressure: the peer pulls the next chunk of a streamed subresponse only once `send` resolves,
+         * so wait, before encoding, until the client has read enough of what is already queued.
          */
-        while ((streamController.desiredSize ?? 0) <= 0) {
+        while (!hasCapacity()) {
           throwIfFinished()
-          await new Promise<void>(resolve => pullWaiters.push(resolve))
+          await (pullWaiter ??= promiseWithResolvers<void>()).promise
         }
 
         throwIfFinished()
@@ -435,12 +430,14 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       })
 
       /**
-       * Close the peer before finishing, so every request is already unregistered when the waiting
-       * `send` calls throw. Otherwise the peer would try to send a `cancel` message for each of them.
+       * Close the peer before releasing the waiting `send` calls, so their requests are already unregistered
+       * when they throw. Otherwise the peer would try to send a `cancel` message for each of them.
        */
       const closePeer = (reason?: unknown): Promise<void> => {
         const closing = peer.close(reason)
-        finish()
+        finished = true
+        clearKeepAlive()
+        releasePullWaiter()
         return closing
       }
 
@@ -449,20 +446,15 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
           streamController = controller
           scheduleKeepAlive()
         },
-        pull() {
-          releasePullWaiters()
-        },
-        async cancel(reason) {
-          await closePeer(reason)
-        },
+        pull: releasePullWaiter,
+        cancel: closePeer,
       }, new ByteLengthQueuingStrategy({ highWaterMark: STREAMING_HIGH_WATER_MARK }))
 
       // DO NOT await here to block streaming response
       runSubrequests(peer, closePeer)
         .then(async () => {
-          finish()
           streamController.close()
-          await peer.close()
+          await closePeer()
         })
         .catch(async (error) => {
           const closing = closePeer(error)

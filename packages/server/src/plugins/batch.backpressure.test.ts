@@ -1,13 +1,10 @@
+import { sleep } from '@orpc/shared'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { os } from '../builder'
 import { BatchHandlerPlugin } from './batch'
 
 const KiB = 1024
 const MiB = 1024 * KiB
-
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
 
 function setup(plugin = new BatchHandlerPlugin()) {
   const state = { pulledBytes: 0, finalized: 0 }
@@ -70,11 +67,11 @@ function setup(plugin = new BatchHandlerPlugin()) {
   return { handler, state }
 }
 
-function batch(mode: 'streaming' | 'buffered', url: string, { count = 10, signal }: { count?: number, signal?: AbortSignal } = {}) {
+function batch(mode: 'streaming' | 'buffered', url: string, signal?: AbortSignal) {
   return new Request('https://example.com/__batch__', {
     method: 'POST',
     headers: { 'orpc-batch': mode, 'content-type': 'application/json' },
-    body: JSON.stringify(Array.from({ length: count }, (_, id) => ({
+    body: JSON.stringify(Array.from({ length: 10 }, (_, id) => ({
       kind: 'request',
       id: String(id),
       json: { url, method: 'POST', headers: {} },
@@ -92,7 +89,7 @@ describe('batchHandlerPlugin backpressure and buffering limits', () => {
     await sleep(300) // the client never reads a byte
 
     try {
-      expect(state.pulledBytes).toBeLessThanOrEqual(4 * MiB) // today: all 40 MiB
+      expect(state.pulledBytes).toBeLessThanOrEqual(4 * MiB) // of the 40 MiB available
     }
     finally {
       await response!.body!.cancel()
@@ -121,7 +118,7 @@ describe('batchHandlerPlugin backpressure and buffering limits', () => {
   it('streaming mode releases blocked sub-streams when the batch request is aborted', async () => {
     const { handler, state } = setup()
     const controller = new AbortController()
-    const { response } = await handler.handle(batch('streaming', '/export', { signal: controller.signal }))
+    const { response } = await handler.handle(batch('streaming', '/export', controller.signal))
 
     await sleep(100)
     controller.abort()
@@ -134,20 +131,20 @@ describe('batchHandlerPlugin backpressure and buffering limits', () => {
     const { handler, state } = setup()
     const { response } = await handler.handle(batch('buffered', '/file')) // 10 x 4 MiB
 
-    expect(response!.status).toBeGreaterThanOrEqual(400) // today: 207 with 40 MiB buffered
+    expect(response!.status).toBe(413)
     expect(state.pulledBytes).toBeLessThanOrEqual(16 * MiB)
   })
 
   it('buffered mode stops an endless stream instead of buffering it forever', async () => {
     const { handler, state } = setup(new BatchHandlerPlugin({ maxBufferedResponseSize: 1 * MiB }))
     const controller = new AbortController()
-    const pending = handler.handle(batch('buffered', '/live', { signal: controller.signal }))
+    const pending = handler.handle(batch('buffered', '/live', controller.signal))
 
     try {
       const result = await Promise.race([pending, sleep(2000).then(() => undefined)])
 
       expect(result, `still pending after 2s with ${state.pulledBytes} bytes buffered`).toBeDefined()
-      expect(result!.response!.status).toBeGreaterThanOrEqual(400)
+      expect(result!.response!.status).toBe(413)
       await vi.waitFor(() => expect(state.finalized).toBe(10))
     }
     finally {
