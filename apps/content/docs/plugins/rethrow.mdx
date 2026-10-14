@@ -32,3 +32,7 @@ catch (error) {
 :::info
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
 :::
+
+:::warning
+With the [Batch Plugin](/docs/plugins/batch), errors from batched sub-requests cannot be rethrown to the `handler.handle()` caller, since the batch response is shared by the other sub-requests. They become `500` sub-responses instead and are reported to the [`onError` option](/docs/plugins/batch#error-handling) of `BatchHandlerPlugin`.
+:::

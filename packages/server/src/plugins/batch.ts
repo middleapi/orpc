@@ -29,10 +29,29 @@ export interface BatchHandlerPluginOptions<T extends Context> {
   /**
    * Map each subrequest in the batch before it is processed.
    *
-   * @default merges the batch request headers into the subrequest, giving them priority over
-   * the subrequest headers, and removes the `orpc-batch` header to prevent nested batching
+   * @default lowercases the subrequest header names, merges the batch request headers into the
+   * subrequest, giving them priority over the subrequest headers case-insensitively, and removes
+   * the `orpc-batch` header to prevent nested batching
    */
   mapSubrequest?: (subrequest: StandardLazyRequest, batchOptions: StandardHandlerRoutingInterceptorOptions<T>) => StandardLazyRequest
+
+  /**
+   * Called when a subrequest fails at the routing interceptor level, for example when
+   * `mapSubrequest` or a routing interceptor throws, or when the Rethrow Handler Plugin
+   * rethrows an error. The subrequest gets a `500` sub-response either way, and the other
+   * subrequests in the batch are unaffected.
+   *
+   * `subrequest` is the subrequest as decoded from the batch, before `mapSubrequest`.
+   * Errors thrown by this callback, including rejections from an async callback, are ignored.
+   *
+   * @remarks
+   * Errors thrown after `mapSubrequest` are also visible to the routing interceptors that run
+   * inside the batch one, once per subrequest: your own routing interceptors, and the tracing
+   * one, which records them on the subrequest span when a tracer is configured.
+   *
+   * @default no-op
+   */
+  onError?: (error: unknown, subrequest: StandardLazyRequest, batchOptions: StandardHandlerRoutingInterceptorOptions<T>) => void
 
   /**
    * Success batch response status code.
@@ -93,6 +112,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
   private readonly maxSize: Exclude<BatchHandlerPluginOptions<T>['maxSize'], undefined>
   private readonly mapSubrequest: Exclude<BatchHandlerPluginOptions<T>['mapSubrequest'], undefined>
+  private readonly onError: Exclude<BatchHandlerPluginOptions<T>['onError'], undefined>
   private readonly successStatus: Exclude<BatchHandlerPluginOptions<T>['successStatus'], undefined>
   private readonly headers: Exclude<BatchHandlerPluginOptions<T>['headers'], undefined>
   private readonly keepAliveEnabled: boolean
@@ -101,19 +121,31 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
   constructor(options: BatchHandlerPluginOptions<T> = {}) {
     this.maxSize = options.maxSize ?? 10
 
-    this.mapSubrequest = options.mapSubrequest ?? ((subRequest, { request: batchRequest }) => ({
-      ...subRequest,
-      headers: {
-        ...subRequest.headers,
-        /**
-         * The batch request headers win over the subrequest ones. They are the only ones the
-         * transport actually saw, so headers the browser injects on its own, such as `cookie`
-         * or `origin`, cannot be overridden by a subrequest, which is just request payload.
-         */
-        ...batchRequest.headers,
-        'orpc-batch': undefined, // useful in case batch plugin is used multiple times
-      },
-    }))
+    this.mapSubrequest = options.mapSubrequest ?? ((subRequest, { request: batchRequest }) => {
+      /**
+       * The batch request headers win over the subrequest ones. They are the only ones the
+       * transport actually saw, so headers the browser or a proxy sets, such as `cookie`,
+       * `origin` or `x-real-ip`, cannot be overridden by a subrequest, which is just request
+       * payload. Names are lowercased first, like the adapters do for the transport headers,
+       * so a case variant such as `Cookie` cannot slip past them either. A `Map` keeps a
+       * `__proto__` header name an own key of the result.
+       */
+      const headers = new Map<string, string | string[] | undefined>()
+
+      for (const [key, value] of Object.entries(subRequest.headers)) {
+        headers.set(key.toLowerCase(), value)
+      }
+
+      for (const [key, value] of Object.entries(batchRequest.headers)) {
+        headers.set(key.toLowerCase(), value)
+      }
+
+      headers.set('orpc-batch', undefined) // useful in case batch plugin is used multiple times
+
+      return { ...subRequest, headers: Object.fromEntries(headers) }
+    })
+
+    this.onError = options.onError ?? (() => {})
 
     this.successStatus = options.successStatus ?? 207
     this.headers = options.headers ?? {}
@@ -201,9 +233,9 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       }
 
-      const handleIndividualRequest = async (request: StandardLazyRequest): Promise<StandardResponse> => {
+      const handleIndividualRequest = async (subrequest: StandardLazyRequest): Promise<StandardResponse> => {
         try {
-          request = this.mapSubrequest(request, interceptorOptions)
+          const request = this.mapSubrequest(subrequest, interceptorOptions)
           const { matched, response } = await interceptorOptions.next({ ...interceptorOptions, request })
 
           if (!matched) {
@@ -212,13 +244,24 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
           return response
         }
-        catch (err) {
+        catch (error) {
           /**
-           * Errors should not occur at the routing interceptor level.
-           * Reject the promise so it can be handled by the unhandledRejection handler
-           * for global logging or error handling.
+           * Procedure errors are already turned into error responses, so only a throwing
+           * `mapSubrequest` or routing interceptor, or an error rethrown by the Rethrow Handler
+           * Plugin, ends up here. It fails this subrequest only, and is reported through `onError`
+           * instead of a detached rejection, which would terminate Node.js by default.
            */
-          Promise.reject(err)
+          try {
+            const result: unknown = this.onError(error, subrequest, interceptorOptions)
+
+            // The result is ignored, but a rejection from an async callback must not go unhandled either
+            if (result instanceof Promise) {
+              result.catch(() => {})
+            }
+          }
+          catch {
+            // A throwing `onError` must not break the batch response
+          }
 
           return { status: 500, headers: {}, body: 'Internal server error' }
         }
