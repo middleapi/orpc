@@ -48,7 +48,6 @@ export function serializableStreamedQuery<T>(
 
     const stream = await queryFn(context)
 
-    // the stream can resolve after abort (e.g. server-side clients ignore the signal)
     if (signal.aborted) {
       await stream[Symbol.asyncIterator]().return?.()
       throw signal.reason
