@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { StaticFileHandlerPluginOptions } from './static-file-handler-plugin'
 import { Buffer } from 'node:buffer'
+import { randomBytes } from 'node:crypto'
 import { mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { createServer, request as httpRequest } from 'node:http'
 import { tmpdir } from 'node:os'
@@ -11,7 +12,7 @@ import { brotliCompressSync, gzipSync } from 'node:zlib'
 import { os } from '@orpc/server'
 import { RPCHandler as FetchRPCHandler } from '@orpc/server/fetch'
 import { RPCHandler } from '@orpc/server/node'
-import { ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
+import { BatchHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 import * as sharedModule from '@orpc/shared'
 import request from 'supertest'
 import { StaticFileHandlerPlugin } from './static-file-handler-plugin'
@@ -961,6 +962,62 @@ describe('staticFileHandlerPlugin', () => {
 
     const freshRes = await agent.get('/old.txt').set('if-modified-since', past.toUTCString())
     expect(freshRes.status).toBe(304)
+  })
+
+  /**
+   * The batch plugin runs this plugin's routing interceptor for each subrequest,
+   * so a batched GET streams the file through the length-prefixed batch response.
+   */
+  it('streams a file requested through a streaming batch with its bytes intact', async ({ onTestFinished }) => {
+    const content = randomBytes(1024 * 1024) // spans many reads and the batch stream's queue
+    writeFileSync(path.join(rootDir, 'large.bin'), content)
+
+    const handler = new RPCHandler({}, {
+      plugins: [new BatchHandlerPlugin(), new StaticFileHandlerPlugin({ rootDir })],
+    })
+
+    const server = createServer(async (req, res) => {
+      await handler.handle(req, res, { context: {} })
+    })
+
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    onTestFinished(() => {
+      server.close()
+    })
+    const { port } = server.address() as AddressInfo
+
+    const response = await fetch(`http://127.0.0.1:${port}/__batch__`, {
+      method: 'POST',
+      headers: { 'orpc-batch': 'streaming', 'content-type': 'application/json' },
+      body: JSON.stringify([{ kind: 'request', id: '0', json: { url: '/large.bin', method: 'GET', headers: {} } }]),
+    })
+
+    expect(response.status).toBe(207)
+
+    const body = new Uint8Array(await response.arrayBuffer())
+    const messages: { kind: string, id: string, json: any, binary?: Uint8Array }[] = []
+
+    for (let offset = 0; offset < body.byteLength;) {
+      const length = new DataView(body.buffer, body.byteOffset + offset, 4).getUint32(0, false)
+      const frame = body.subarray(offset + 4, offset + 4 + length)
+      offset += 4 + length
+
+      if (length === 0) {
+        continue // keep-alive frame
+      }
+
+      // 0xFF never appears in UTF-8, so it separates the json part from the binary part
+      const delimiter = frame.indexOf(0xFF)
+      const json = JSON.parse(new TextDecoder().decode(delimiter === -1 ? frame : frame.subarray(0, delimiter)))
+      messages.push({ ...json, binary: delimiter === -1 ? undefined : frame.subarray(delimiter + 1) })
+    }
+
+    const [head, ...chunks] = messages
+    expect(head).toMatchObject({ kind: 'response', id: '0', json: { headers: { 'content-length': String(content.byteLength) } } })
+    expect(head!.json.status).toBeUndefined() // 200
+    expect(chunks.every(chunk => chunk.kind === 'octet-stream' && chunk.id === '0')).toBe(true)
+    expect(chunks.at(-1)!.json.close).toBe(true)
+    expect(Buffer.concat(chunks.map(chunk => chunk.binary ?? new Uint8Array()))).toEqual(content)
   })
 
   describe('tracing', () => {

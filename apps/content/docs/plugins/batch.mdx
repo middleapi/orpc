@@ -60,6 +60,8 @@ const cors = new CORSHandlerPlugin({
 
 By default, the plugin uses `streaming` mode. Responses are sent as soon as they are ready, so one slow request does not block the rest of the batch.
 
+Streaming mode applies backpressure. The server only pulls more output from streamed responses, such as [AsyncIteratorObject](/docs/async-iterator-object) and file streams, once the client has read what is already queued. A client that stops reading pauses its subrequests instead of making the server buffer their output. Because every subrequest shares one response, they all pause together when the connection is backed up.
+
 If your environment does not support streaming responses, such as some serverless platforms or older browsers, switch to `buffered` mode instead. In this mode, all responses are collected and sent together.
 
 ```ts
@@ -78,6 +80,32 @@ const link = new RPCLink({
   ],
 })
 ```
+
+### Buffered Response Size
+
+In **buffered** mode, the server holds the whole batch response in memory until every subrequest finishes, including every message of streamed responses. To bound that memory, the server stops a batch whose buffered response grows past `maxBufferedResponseSize` (10 MiB by default). It closes every subrequest and answers the whole batch with `413`, which the client reports as the error of each call in the batch.
+
+```ts
+const handler = new RPCHandler(router, {
+  plugins: [
+    new BatchHandlerPlugin({
+      /**
+       * The max size (in bytes) of a buffered batch response.
+       * Use `Infinity` to disable the limit.
+       *
+       * @default 10 * 1024 * 1024 (10 MiB)
+       */
+      maxBufferedResponseSize: 10 * 1024 * 1024,
+    }),
+  ],
+})
+```
+
+A long-lived subscription can never finish, so in a buffered batch it only ends once it reaches this limit. Use streaming mode for batches that include subscriptions, or keep them out of the batch with [`filter`](#filtering-requests).
+
+:::info
+`File` and `Blob` responses are read fully into memory before they are added to a batch response, in both modes. Each one is bounded by its own size.
+:::
 
 ### Keep-Alive Timer
 
