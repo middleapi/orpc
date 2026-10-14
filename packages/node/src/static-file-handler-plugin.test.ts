@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net'
 import type { StaticFileHandlerPluginOptions } from './static-file-handler-plugin'
 import { Buffer } from 'node:buffer'
 import { randomBytes } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { createServer, request as httpRequest } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -925,12 +925,7 @@ describe('staticFileHandlerPlugin', () => {
     }
 
     function listCacheDir(dir: string): string[] {
-      try {
-        return readdirSync(dir)
-      }
-      catch {
-        return []
-      }
+      return existsSync(dir) ? readdirSync(dir) : []
     }
 
     /**
@@ -1121,9 +1116,9 @@ describe('staticFileHandlerPlugin', () => {
 
     it('serves the file as it is when compression does not make it smaller', async ({ onTestFinished }) => {
       const dir = createCacheDir()
-      const content = randomBytes(4096).toString('latin1')
-      writeFileSync(path.join(rootDir, 'random.txt'), content, 'latin1')
-      onTestFinished(() => rmSync(path.join(rootDir, 'random.txt'), { force: true }))
+      const filePath = path.join(rootDir, 'random.txt')
+      writeFileSync(filePath, randomBytes(4096))
+      onTestFinished(() => rmSync(filePath, { force: true }))
       const agent = createStaticAgent({ compressionCache: { dir } })
 
       for (let i = 0; i < 2; i++) {

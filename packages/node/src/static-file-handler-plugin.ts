@@ -38,16 +38,18 @@ const TEXT_CONTENT_TYPE_REGEX = /^text\//
  */
 const SHORT_NAME_ALIAS_REGEX = /^[^.]{0,6}~\d/
 
-type ContentEncoding = 'br' | 'zstd' | 'gzip'
-
-const CONTENT_ENCODING_EXTENSIONS: Record<ContentEncoding, string> = {
+const CONTENT_ENCODING_EXTENSIONS = {
   br: '.br',
   zstd: '.zst',
   gzip: '.gz',
-}
+} as const
+
+type ContentEncoding = keyof typeof CONTENT_ENCODING_EXTENSIONS
 
 /** Sidecars in order of preference, best compression first. */
 const PRECOMPRESSED_ENCODINGS: readonly ContentEncoding[] = ['br', 'zstd', 'gzip']
+
+type FoundFile = [filePath: string, stats: Stats, realPath: string]
 
 interface EncodedFile {
   encoding: ContentEncoding
@@ -286,17 +288,17 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   }
 
   /**
-   * Resolves symbolic links and confirms the target is still inside the root,
-   * which the lexical `resolveWithinRoot` check cannot see.
+   * Resolves symbolic links and, unless `allowSymlinks` is enabled, confirms the target is
+   * still inside the root, which the lexical `resolveWithinRoot` check cannot see.
    */
   private async resolveContainedRealPath(filePath: string): Promise<string | undefined> {
-    if (this.allowSymlinks) {
-      return filePath
+    const realPath = await realpath(filePath).catch(() => undefined)
+
+    if (realPath === undefined || this.allowSymlinks) {
+      return realPath
     }
 
     const [rootDirReal, rootDirRealPrefix] = await this.rootDirRealPaths
-    // An empty string is contained by no root, so an unresolvable path is simply not contained
-    const realPath = await realpath(filePath).catch(() => '')
 
     return realPath === rootDirReal || realPath.startsWith(rootDirRealPrefix) ? realPath : undefined
   }
@@ -324,10 +326,9 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
 
   /**
    * Resolves segments under `rootDir` and stats the result, rejecting anything that
-   * escapes the root either lexically or by following a symbolic link. The contained real
-   * path is only resolved when `allowSymlinks` is disabled, and is the lexical path otherwise.
+   * escapes the root either lexically or by following a symbolic link.
    */
-  private async lookup(segments: string[]): Promise<[filePath: string, stats: Stats, containedRealPath: string] | undefined> {
+  private async lookup(segments: string[]): Promise<FoundFile | undefined> {
     const filePath = this.resolveWithinRoot(segments)
 
     if (filePath === undefined) {
@@ -335,16 +336,16 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     }
 
     // Both resolutions are always needed, so they run together and cost the latency of one
-    const [stats, containedRealPath] = await Promise.all([
+    const [stats, realPath] = await Promise.all([
       stat(filePath).catch(() => undefined),
       this.resolveContainedRealPath(filePath),
     ])
 
-    if (stats === undefined || containedRealPath === undefined) {
+    if (stats === undefined || realPath === undefined) {
       return undefined
     }
 
-    return [filePath, stats, containedRealPath]
+    return [filePath, stats, realPath]
   }
 
   /**
@@ -376,7 +377,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   private async resolveCompressionCacheFile(
     compressionCache: Required<StaticFileHandlerPluginCompressionCacheOptions>,
     filePath: string,
-    containedRealPath: string,
+    realPath: string,
     stats: Stats,
     qualities: Map<string, number>,
   ): Promise<EncodedFile | undefined> {
@@ -392,17 +393,12 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
      * compressed again instead of a stale copy being served. The change time is part of the
      * version because, unlike the modification time, tools that copy files cannot restore it.
      */
-    const realPath = this.allowSymlinks ? await realpath(filePath).catch(() => undefined) : containedRealPath
-
-    if (realPath === undefined) {
-      return undefined
-    }
-
     const key = createHash('sha256').update(`${realPath}\0${toFileVersion(stats)}`).digest('hex')
     const cachePath = path.join(compressionCache.dir, key + CONTENT_ENCODING_EXTENSIONS[encoding])
 
-    const cachedStats = await stat(cachePath).catch(() => undefined)
-      ?? await this.compressIntoCache(compressionCache.dir, filePath, stats, encoding, cachePath)
+    // A compression already in progress is joined directly, since the copy cannot exist yet
+    const cachedStats = await (this.pendingCompressions.get(cachePath)
+      ?? stat(cachePath).catch(() => this.compressIntoCache(filePath, stats, encoding, cachePath)))
 
     /**
      * A copy no smaller than the file saves nothing, so the file is served as it is. The copy is
@@ -416,7 +412,6 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   }
 
   private compressIntoCache(
-    cacheDir: string,
     filePath: string,
     stats: Stats,
     encoding: ContentEncoding,
@@ -425,7 +420,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     let pending = this.pendingCompressions.get(cachePath)
 
     if (pending === undefined) {
-      pending = writeCompressedCopy(cacheDir, filePath, stats, encoding, cachePath)
+      pending = writeCompressedCopy(filePath, stats, encoding, cachePath)
         .finally(() => this.pendingCompressions.delete(cachePath))
 
       this.pendingCompressions.set(cachePath, pending)
@@ -489,7 +484,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       return undefined
     }
 
-    let found: [filePath: string, stats: Stats, containedRealPath: string] | undefined
+    let found: FoundFile | undefined
 
     if (pathname.endsWith('/')) {
       // The url already denotes a directory, so only its index file can be served
@@ -533,14 +528,15 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       }
     }
 
-    let [filePath, stats, containedRealPath] = found
+    let [filePath, stats, realPath] = found
 
     const contentType = this.resolveContentType(filePath)
-    const isCompressible = isCompressibleContentType(contentType)
-    const compressionCache = isCompressible && this.compressionCache !== undefined && stats.size >= this.compressionCache.threshold
+    // The content type is only tested when an encoding could apply at all
+    const canEncode = (this.precompressed || this.compressionCache !== undefined) && isCompressibleContentType(contentType)
+    const compressionCache = canEncode && this.compressionCache !== undefined && stats.size >= this.compressionCache.threshold
       ? this.compressionCache
       : undefined
-    const negotiatesEncoding = (this.precompressed && isCompressible) || compressionCache !== undefined
+    const negotiatesEncoding = (this.precompressed && canEncode) || compressionCache !== undefined
 
     let contentEncoding: string | undefined
 
@@ -549,7 +545,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
 
       // A sidecar is prepared ahead of time, usually with stronger compression, so it wins over the cache
       const encoded = (this.precompressed ? await this.findPrecompressedFile(filePath, qualities) : undefined)
-        ?? (compressionCache !== undefined ? await this.resolveCompressionCacheFile(compressionCache, filePath, containedRealPath, stats, qualities) : undefined)
+        ?? (compressionCache !== undefined ? await this.resolveCompressionCacheFile(compressionCache, filePath, realPath, stats, qualities) : undefined)
 
       if (encoded !== undefined) {
         filePath = encoded.filePath
@@ -655,7 +651,6 @@ function createCompressor(encoding: ContentEncoding): Transform {
  * serves the file as it is instead of failing the request.
  */
 async function writeCompressedCopy(
-  cacheDir: string,
   filePath: string,
   stats: Stats,
   encoding: ContentEncoding,
@@ -665,26 +660,27 @@ async function writeCompressedCopy(
   const tmpPath = `${cachePath}.${randomUUID()}.tmp`
 
   try {
-    await mkdir(cacheDir, { recursive: true })
+    await mkdir(path.dirname(cachePath), { recursive: true })
     // `wx` refuses to write through anything already at the temporary name
     await pipeline(createReadStream(filePath), createCompressor(encoding), createWriteStream(tmpPath, { flags: 'wx' }))
 
+    // Renaming keeps the size and modification time, so the copy's stats are read before it moves
+    const [currentStats, copyStats] = await Promise.all([stat(filePath), stat(tmpPath)])
+
     // A file changed while it was read may have been compressed half old and half new
-    if (toFileVersion(await stat(filePath)) !== toFileVersion(stats)) {
-      return undefined
+    if (toFileVersion(currentStats) === toFileVersion(stats)) {
+      await rename(tmpPath, cachePath)
+
+      return copyStats
     }
-
-    await rename(tmpPath, cachePath)
-
-    return await stat(cachePath)
   }
   catch {
-    return undefined
+    // A cache that cannot be written only costs the compression
   }
-  finally {
-    // Already gone once renamed into place, otherwise a partial or discarded copy
-    await rm(tmpPath, { force: true }).catch(() => {})
-  }
+
+  await rm(tmpPath, { force: true }).catch(() => {})
+
+  return undefined
 }
 
 function stripTrailingSlash(path: `/${string}`): `/${string}` {
