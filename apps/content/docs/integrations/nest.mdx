@@ -122,6 +122,30 @@ async function bootstrap() {
 }
 ```
 
+### Body Size Limit
+
+NestJS only limits the bodies it parses itself. Bodies it leaves unparsed, such as content types it has no parser for, or every body when `bodyParser: false` is set, are read by oRPC and capped at `maxBodySize` (1MB by default). Larger bodies are rejected with `413 Payload Too Large`.
+
+```ts
+@Module({
+  imports: [
+    ORPCModule.forRoot({
+      maxBodySize: 10 * 1024 * 1024, // 10MB
+      // maxBodySize: Number.POSITIVE_INFINITY, // disables the limit
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+:::warning
+Raise `maxBodySize` if your procedures accept uploads or streamed request bodies larger than 1MB. It also caps bodies passed to [Request Limit](/docs/plugins/request-limit) and [Tmp File Upload](/docs/plugins/tmp-file-upload), so whichever limit is stricter applies.
+:::
+
+:::tip
+`maxBodySize` counts the bytes received on the wire. To also limit the decompressed size of bodies handled by [Request Compression](/docs/plugins/request-compression), add [Request Limit](/docs/plugins/request-limit).
+:::
+
 ## Configuration
 
 Configure `@orpc/nest` by importing `ORPCModule` into your NestJS module. It supports the same

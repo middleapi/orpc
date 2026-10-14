@@ -37,6 +37,16 @@ export type ORPCModuleConfig
       toNestStandardLazyRequest?: undefined | ((req: any, res: any) => NestStandardLazyRequest)
 
       /**
+       * The maximum size in bytes of request bodies NestJS has not parsed, which oRPC reads itself
+       * (every body when NestJS body parsing is disabled). Larger bodies are rejected with `PAYLOAD_TOO_LARGE` (413).
+       * Bodies NestJS has already parsed are only limited by NestJS. Use `Number.POSITIVE_INFINITY` to disable the limit.
+       *
+       * @default 1024 * 1024
+       * @see {@link https://orpc.dev/docs/integrations/nest#body-size-limit | Implement oRPC contract with NestJS - Body Size Limit}
+       */
+      maxBodySize?: undefined | number
+
+      /**
        * Options for how to convert the Standard Response to a Nest Response (returning value), like event stream options, etc.
        */
       toNestResponse?: undefined | {

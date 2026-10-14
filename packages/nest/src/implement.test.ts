@@ -1705,3 +1705,178 @@ describe('compatibility', () => {
     })
   })
 })
+
+describe('body size limit for bodies NestJS did not parse (express adapter)', () => {
+  const OVERSIZED = 5 * 1024 * 1024 // above NestJS's 100kb json limit and the 1MB default
+  const handlerSpy = vi.fn()
+  const contract = oc.meta(openapi({ method: 'POST', path: '/body-limit' })).input(z.unknown())
+  const detailedContract = oc.meta(openapi({ method: 'GET', path: '/body-limit/detailed', inputStructure: 'detailed' })).input(z.object({ body: z.unknown() }))
+
+  @Controller()
+  class BodyLimitController {
+    @Implement(contract)
+    upload() {
+      return implement(contract).handler(({ input }) => {
+        handlerSpy()
+        return { size: input instanceof Blob ? input.size : JSON.stringify(input).length }
+      })
+    }
+
+    @Implement(detailedContract)
+    detailed() {
+      return implement(detailedContract).handler(({ input }) => {
+        handlerSpy()
+        return { size: input.body instanceof Blob ? input.body.size : 0 }
+      })
+    }
+  }
+
+  async function withApp(options: { bodyParser?: boolean, imports?: any[] }, run: (server: any) => Promise<void>) {
+    handlerSpy.mockClear()
+    const moduleRef = await Test.createTestingModule({ controllers: [BodyLimitController], imports: options.imports ?? [] }).compile()
+    const app = moduleRef.createNestApplication({ bodyParser: options.bodyParser })
+    await app.init()
+    try {
+      await run(app.getHttpServer())
+    }
+    finally {
+      await app.close()
+    }
+  }
+
+  async function postChunked(server: any, headers: Record<string, string>, chunks: Buffer[]): Promise<number | 'reset'> {
+    await new Promise<void>(resolve => server.listen(0, resolve))
+    return new Promise((resolve) => {
+      const req = httpRequest({ port: server.address().port, method: 'POST', path: '/body-limit', agent: false, headers: { ...headers, 'transfer-encoding': 'chunked' } })
+      req.on('response', (res) => {
+        res.resume()
+        res.on('end', () => resolve(res.statusCode!))
+      })
+      req.on('error', () => resolve('reset'))
+      chunks.forEach(chunk => req.write(chunk))
+      req.end()
+    })
+  }
+
+  it('nestJS still rejects an oversized application/json body it parses itself', async () => {
+    await withApp({}, async (server) => {
+      const res = await supertest(server).post('/body-limit').set('content-type', 'application/json').send(JSON.stringify({ a: 'x'.repeat(OVERSIZED) }))
+      expect(res.status).toBe(413)
+      expect(handlerSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  it.each([
+    ['application/octet-stream', {}, Buffer.alloc(OVERSIZED, 1)],
+    ['text/plain (no hint)', {}, 'x'.repeat(OVERSIZED)],
+    ['text/plain + standard-server: json', { 'standard-server': 'json' }, JSON.stringify({ a: 'x'.repeat(OVERSIZED) })],
+  ] as const)('rejects an oversized %s body by default', async (label, extraHeaders, body) => {
+    await withApp({}, async (server) => {
+      const res = await supertest(server).post('/body-limit').set('content-type', label.split(' ')[0]!).set(extraHeaders).send(body)
+      expect(res.status).toBe(413)
+      expect(handlerSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  it('rejects an oversized multipart/form-data body by default', async () => {
+    await withApp({}, async (server) => {
+      const res = await supertest(server).post('/body-limit').attach('file', Buffer.alloc(OVERSIZED, 1), 'big.bin')
+      expect(res.status).toBe(413)
+      expect(handlerSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  it('rejects an oversized chunked body without Content-Length by default', async () => {
+    await withApp({}, async (server) => {
+      const status = await postChunked(server, { 'content-type': 'application/octet-stream', 'standard-server': 'file' }, Array.from({ length: 5 }, () => Buffer.alloc(1024 * 1024, 1)))
+      expect(status).toBe(413)
+      expect(handlerSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  it('applies the limit to every body when NestJS body parsing is disabled', async () => {
+    await withApp({ bodyParser: false }, async (server) => {
+      const res = await supertest(server).post('/body-limit').set('content-type', 'application/json').send(JSON.stringify({ a: 'x'.repeat(OVERSIZED) }))
+      expect(res.status).toBe(413)
+      expect(handlerSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  it('accepts bodies within the limit', async () => {
+    await withApp({}, async (server) => {
+      const res = await supertest(server).post('/body-limit').set('content-type', 'application/octet-stream').send(Buffer.alloc(1024, 1))
+      expect(res.status).toBe(200)
+      expect(res.body).toEqual({ size: 1024 })
+    })
+  })
+
+  it.each([['a larger limit', 10 * 1024 * 1024], ['no limit', Number.POSITIVE_INFINITY]])('maxBodySize can be raised (%s)', async (_, maxBodySize) => {
+    await withApp({ imports: [ORPCModule.forRoot({ maxBodySize })] }, async (server) => {
+      const res = await supertest(server).post('/body-limit').set('content-type', 'application/octet-stream').send(Buffer.alloc(OVERSIZED, 1))
+      expect(res.status).toBe(200)
+      expect(res.body).toEqual({ size: OVERSIZED })
+    })
+  })
+
+  it('does not re-limit bodies NestJS already parsed', async () => {
+    await withApp({ imports: [ORPCModule.forRoot({ maxBodySize: 10 })] }, async (server) => {
+      const res = await supertest(server).post('/body-limit').send({ value: 'longer than ten bytes' })
+      expect(res.status).toBe(200)
+    })
+  })
+
+  it('limits bodies resolved even for GET requests with the detailed input structure', async () => {
+    await withApp({}, async (server) => {
+      const res = await supertest(server).get('/body-limit/detailed').set('content-type', 'application/octet-stream').send(Buffer.alloc(OVERSIZED, 1))
+      expect(res.status).toBe(413)
+      expect(handlerSpy).not.toHaveBeenCalled()
+    })
+
+    await withApp({}, async (server) => {
+      const res = await supertest(server).get('/body-limit/detailed')
+      expect(res.status).toBe(200)
+      expect(res.body).toEqual({ size: 0 })
+    })
+  })
+
+  it('limits bodies resolved by a custom toNestStandardLazyRequest', async () => {
+    const toNestStandardLazyRequest = (req: ExpressRequest): NestStandardLazyRequest => ({
+      url: '/body-limit',
+      method: req.method,
+      headers: { 'standard-server': 'file' }, // no content-length, so only the bytes read can be limited
+      resolveBody: async () => new Blob([Buffer.alloc(OVERSIZED, 1)]).stream(),
+    })
+
+    await withApp({ imports: [ORPCModule.forRoot({ toNestStandardLazyRequest })] }, async (server) => {
+      const res = await supertest(server).post('/body-limit')
+      expect(res.status).toBe(413)
+      expect(handlerSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('with RequestLimitHandlerPlugin, the stricter limit applies', () => {
+    it('plugin limit is stricter', async () => {
+      await withApp({ bodyParser: false, imports: [ORPCModule.forRoot({ plugins: [new RequestLimitHandlerPlugin({ maxBodySize: 10 })] })] }, async (server) => {
+        const status = await postChunked(server, { 'content-type': 'application/json' }, [Buffer.from(JSON.stringify({ value: 'longer than ten bytes' }))])
+        expect(status).toBe(413)
+        expect(handlerSpy).not.toHaveBeenCalled()
+      })
+    })
+
+    it('maxBodySize is stricter', async () => {
+      await withApp({ bodyParser: false, imports: [ORPCModule.forRoot({ plugins: [new RequestLimitHandlerPlugin({ maxBodySize: 10 * OVERSIZED })] })] }, async (server) => {
+        const status = await postChunked(server, { 'content-type': 'application/octet-stream', 'standard-server': 'file' }, Array.from({ length: 5 }, () => Buffer.alloc(1024 * 1024, 1)))
+        expect(status).toBe(413)
+        expect(handlerSpy).not.toHaveBeenCalled()
+      })
+    })
+
+    it('accepts bodies within both limits', async () => {
+      await withApp({ bodyParser: false, imports: [ORPCModule.forRoot({ plugins: [new RequestLimitHandlerPlugin({ maxBodySize: 1024 })] })] }, async (server) => {
+        const status = await postChunked(server, { 'content-type': 'application/json' }, [Buffer.from(JSON.stringify({ value: 'within limits' }))])
+        expect(status).toBe(200)
+        expect(handlerSpy).toHaveBeenCalledTimes(1)
+      })
+    })
+  })
+})

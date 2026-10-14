@@ -1,3 +1,4 @@
+import type { StandardLazyRequest } from '@standard-server/core'
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard'
 import type { Context } from '../context'
 import { ORPCError } from '@orpc/client'
@@ -47,44 +48,7 @@ export class RequestLimitHandlerPlugin<T extends Context> implements StandardHan
         ...interceptorOptions,
         request: {
           ...interceptorOptions.request,
-          async resolveBody(hint) {
-            const contentLength = Number(
-              flattenStandardHeader(interceptorOptions.request.headers['content-length']),
-            )
-
-            if (Number.isFinite(contentLength) && contentLength > maxBodySize) {
-              throw new ORPCError('PAYLOAD_TOO_LARGE')
-            }
-
-            const stream = await interceptorOptions.request.resolveBody('octet-stream')
-
-            // adapter might not support hint (e.g. peer adapter)
-            if (!(stream instanceof ReadableStream)) {
-              return stream
-            }
-
-            let currentBodySize = 0
-            const limitedStream = stream.pipeThrough(
-              new TransformStream<Uint8Array, Uint8Array>({
-                transform(chunk, controller) {
-                  currentBodySize += chunk.byteLength
-
-                  if (currentBodySize > maxBodySize) {
-                    controller.error(new ORPCError('PAYLOAD_TOO_LARGE'))
-                    return
-                  }
-
-                  controller.enqueue(chunk)
-                },
-              }),
-            )
-
-            const response = new Response(limitedStream, {
-              headers: toFetchHeaders(interceptorOptions.request.headers),
-            })
-
-            return toStandardBody(response, { hint })
-          },
+          resolveBody: toLimitedResolveBody(interceptorOptions.request, maxBodySize),
         },
       })
     }
@@ -96,5 +60,56 @@ export class RequestLimitHandlerPlugin<T extends Context> implements StandardHan
         ...toArray(options.routingInterceptors),
       ],
     }
+  }
+}
+
+/**
+ * A `resolveBody` for `request` that rejects with `PAYLOAD_TOO_LARGE` once the body exceeds `maxBodySize` bytes,
+ * checking `content-length` up front and then counting the bytes actually read (so chunked bodies are limited too).
+ * Called with the `'octet-stream'` hint, it resolves the limited stream itself.
+ * Shared by the request limit plugin and `@orpc/nest` so they limit bodies the same way.
+ */
+export function toLimitedResolveBody(
+  request: Pick<StandardLazyRequest, 'headers' | 'resolveBody'>,
+  maxBodySize: number,
+): StandardLazyRequest['resolveBody'] {
+  // captured now so `request.resolveBody` can be replaced with the returned function
+  const resolveBody = request.resolveBody.bind(request)
+
+  return async (hint) => {
+    const contentLength = Number(flattenStandardHeader(request.headers['content-length']))
+
+    if (Number.isFinite(contentLength) && contentLength > maxBodySize) {
+      throw new ORPCError('PAYLOAD_TOO_LARGE')
+    }
+
+    const stream = await resolveBody('octet-stream')
+
+    // adapter might not support hint (e.g. peer adapter)
+    if (!(stream instanceof ReadableStream)) {
+      return stream
+    }
+
+    let currentBodySize = 0
+    const limitedStream = stream.pipeThrough(
+      new TransformStream<Uint8Array, Uint8Array>({
+        transform(chunk, controller) {
+          currentBodySize += chunk.byteLength
+
+          if (currentBodySize > maxBodySize) {
+            controller.error(new ORPCError('PAYLOAD_TOO_LARGE'))
+            return
+          }
+
+          controller.enqueue(chunk)
+        },
+      }),
+    )
+
+    const response = new Response(limitedStream, {
+      headers: toFetchHeaders(request.headers),
+    })
+
+    return toStandardBody(response, { hint })
   }
 }

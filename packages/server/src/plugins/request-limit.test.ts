@@ -1,10 +1,11 @@
+import type { StandardLazyRequest } from '@standard-server/core'
 import zlib from 'node:zlib'
 import supertest from 'supertest'
 import { RPCHandler } from '../adapters/fetch'
 import { RPCHandler as NodeRPCHandler } from '../adapters/node'
 import { os } from '../builder'
 import { RequestCompressionHandlerPlugin } from './request-compression'
-import { RequestLimitHandlerPlugin } from './request-limit'
+import { RequestLimitHandlerPlugin, toLimitedResolveBody } from './request-limit'
 
 describe('requestLimitHandlerPlugin', () => {
   const size22Json = { json: { foo: 'bar' } }
@@ -233,5 +234,63 @@ describe('requestLimitHandlerPlugin', () => {
       await expect(response!.text()).resolves.toContain('ping')
       expect(response!.status).toBe(200)
     })
+  })
+})
+
+describe('toLimitedResolveBody', () => {
+  function toStream(...chunks: Uint8Array[]): ReadableStream<Uint8Array<ArrayBuffer>> {
+    return new ReadableStream<Uint8Array>({
+      start(controller) {
+        chunks.forEach(chunk => controller.enqueue(chunk))
+        controller.close()
+      },
+    }) as ReadableStream<Uint8Array<ArrayBuffer>>
+  }
+
+  it('rejects before reading the body when content-length exceeds the limit', async () => {
+    const resolveBody = vi.fn()
+    const limited = toLimitedResolveBody({ headers: { 'content-length': '11' }, resolveBody }, 10)
+
+    await expect(limited()).rejects.toMatchObject({ code: 'PAYLOAD_TOO_LARGE' })
+    expect(resolveBody).not.toHaveBeenCalled()
+  })
+
+  it('decodes the body with the given hint or the request headers', async () => {
+    const request = {
+      headers: { 'content-type': 'application/json' },
+      resolveBody: vi.fn(async () => toStream(new TextEncoder().encode('{"a":1}'))),
+    }
+
+    await expect(toLimitedResolveBody(request, 10)()).resolves.toEqual({ a: 1 })
+    await expect(toLimitedResolveBody(request, 10)('url-search-params')).resolves.toEqual(new URLSearchParams('{"a":1}'))
+    expect(request.resolveBody).toHaveBeenCalledWith('octet-stream')
+  })
+
+  it('resolves the limited stream itself for the octet-stream hint', async () => {
+    const limited = toLimitedResolveBody({
+      headers: {},
+      resolveBody: async () => toStream(new Uint8Array(6), new Uint8Array(6)),
+    }, 10)
+
+    const stream = await limited('octet-stream') as ReadableStream<Uint8Array>
+    const reader = stream.getReader()
+
+    await expect(reader.read()).resolves.toMatchObject({ done: false })
+    await expect(reader.read()).rejects.toMatchObject({ code: 'PAYLOAD_TOO_LARGE' })
+  })
+
+  it('can replace the resolveBody it wraps', async () => {
+    const request: Pick<StandardLazyRequest, 'headers' | 'resolveBody'> = {
+      headers: {},
+      async resolveBody() {
+        expect(this).toBe(request)
+        return toStream(new Uint8Array(3))
+      },
+    }
+
+    request.resolveBody = toLimitedResolveBody(request, 10)
+
+    const stream = await request.resolveBody('octet-stream')
+    expect(stream).toBeInstanceOf(ReadableStream)
   })
 })

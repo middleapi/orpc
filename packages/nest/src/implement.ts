@@ -15,6 +15,7 @@ import { getPathMeta, ProcedureContract } from '@orpc/contract'
 import { DEFAULT_OPENAPI_METHOD, getDynamicPathParams, getOpenAPIMeta } from '@orpc/openapi'
 import { OpenAPIHandlerCodecCore } from '@orpc/openapi/standard'
 import { DEFAULT_SUCCESS_STATUS, getRouter, Procedure, unlazy } from '@orpc/server'
+import { toLimitedResolveBody } from '@orpc/server/plugins'
 import { StandardHandler } from '@orpc/server/standard'
 import { isAsyncIteratorObject, mergeHttpPath, NullProtoObj, stringifyJSON, value } from '@orpc/shared'
 import { flattenStandardHeader, generateContentDisposition } from '@standard-server/core'
@@ -25,6 +26,8 @@ import { ORPC_MODULE_CONFIG_SYMBOL } from './module'
 
 // Namespace access so NestJS < 11.2 (no QueryMethod export) loads without a SyntaxError
 const QueryMethod = NestCommon.QueryMethod as typeof NestCommon.QueryMethod | undefined
+
+const DEFAULT_MAX_BODY_SIZE = 1024 * 1024
 
 const MethodDecoratorMap = {
   HEAD: Head,
@@ -160,6 +163,7 @@ export class ImplementInterceptor implements NestInterceptor {
   private readonly config: ORPCModuleConfig
   private readonly codec: OpenAPIHandlerCodecCore<DefaultInitialContext>
   private readonly toNestStandardLazyRequest: Exclude<ORPCModuleConfig['toNestStandardLazyRequest'], undefined>
+  private readonly maxBodySize: number
   private readonly httpAdapterHost: HttpAdapterHost
 
   constructor(
@@ -169,6 +173,7 @@ export class ImplementInterceptor implements NestInterceptor {
     // @Optional() does not allow set default value so we need to do it here
     this.config = config ?? {} as ORPCModuleConfig
     this.httpAdapterHost = httpAdapterHost
+    this.maxBodySize = this.config.maxBodySize ?? DEFAULT_MAX_BODY_SIZE
 
     this.codec = new OpenAPIHandlerCodecCore(this.config)
     this.toNestStandardLazyRequest = this.config.toNestStandardLazyRequest ?? ((req: ExpressRequest | FastifyRequest, res: ExpressResponse | FastifyReply) => {
@@ -203,6 +208,12 @@ export class ImplementInterceptor implements NestInterceptor {
         const res: ExpressResponse | FastifyReply = ctx.switchToHttp().getResponse()
 
         const standardRequest = this.toNestStandardLazyRequest(req, res)
+
+        // NestJS did not parse the body, so oRPC reads it from the raw request and must enforce a limit itself.
+        // Applied here rather than in the default converter so custom converters are limited too.
+        if (req.body === undefined && this.maxBodySize !== Number.POSITIVE_INFINITY) {
+          standardRequest.resolveBody = toLimitedResolveBody(standardRequest, this.maxBodySize)
+        }
 
         const handler = new StandardHandler({
           resolveProcedure: request => Promise.resolve({
