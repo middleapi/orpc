@@ -34,7 +34,27 @@ When used with [Request Compression](/docs/plugins/request-compression), `maxBod
 
 ## Peer Adapters
 
-This plugin does not apply to peer-based adapters such as [WebSocket](/docs/adapters/websocket) and [Message Port](/docs/adapters/message-port). Each message reaches the handler fully loaded in memory, so there is no body left to limit. Instead, limit each message at the transport, and the total bytes per connection per minute, since a single call can span many messages (for example, an [AsyncIteratorObject](/docs/async-iterator-object) input). With Bun:
+This plugin does not apply to peer-based adapters such as [WebSocket](/docs/adapters/websocket) and [Message Port](/docs/adapters/message-port). Each message reaches the handler fully loaded in memory, so there is no body left to limit.
+
+What a connection makes the server keep in memory is bounded by the adapters themselves, with secure defaults. A tiny message can start a call that lives as long as the connection, or a response stream the client never reads, so limiting inbound data alone does not bound it.
+
+| Option                  | Default | Bounds                                                                                       |
+| ----------------------- | ------- | -------------------------------------------------------------------------------------------- |
+| `maxConcurrentRequests` | `100`   | Calls in flight at once. Calls above it get a `TOO_MANY_REQUESTS` error                      |
+| `maxBufferedStreamSize` | 16 MiB  | Streamed input received but not yet read. Above it, the input is cancelled                   |
+| `sendHighWaterMark`     | 1 MiB   | Data buffered for a client that does not read before sending waits (WebSocket adapters only) |
+
+```ts
+const handler = new RPCHandler(router, {
+  maxConcurrentRequests: 100,
+  maxBufferedStreamSize: 16 * 1024 * 1024,
+  sendHighWaterMark: 1024 * 1024,
+})
+```
+
+Set an option to `Infinity` to disable it. See [WebSocket](/docs/adapters/websocket#limits-and-backpressure) and [Message Port](/docs/adapters/message-port#limits) for details.
+
+These options do not limit inbound data. Each in-flight call keeps its request message in memory, so also limit each message at the transport, and the total bytes per connection per minute, since a single call can span many messages (for example, an [AsyncIteratorObject](/docs/async-iterator-object) input). With Bun:
 
 ```ts
 const MAX_BYTES_PER_MINUTE = 10 * 1024 * 1024 // 10MB

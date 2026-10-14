@@ -2,9 +2,10 @@ import type { Arrayable, MaybeOptionalOptions } from '@orpc/shared'
 import type { DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standard-server/peer'
 import type { Context } from '../../context'
 import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
+import type { StandardPeerGuardOptions } from '../standard-peer'
 import { loadBytes, resolveMaybeOptionalOptions, sequential, toStringOrBytes } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
-import { createStandardPeerRequestHandler } from '../standard-peer'
+import { createStandardPeerRequestHandler, StandardPeerGuard } from '../standard-peer'
 
 /**
  * Supports standard WebSocket instances, Bun ServerWebSocket, "ws" ServerWebSocket,
@@ -12,9 +13,26 @@ import { createStandardPeerRequestHandler } from '../standard-peer'
  */
 export type WebSocketLike = {
   send: (data: string | Uint8Array<ArrayBuffer>) => unknown
+
+  /**
+   * Bytes queued but not yet transmitted, as on standard WebSocket, "ws" and Deno.
+   * Used for `sendHighWaterMark`.
+   */
+  readonly bufferedAmount?: number | undefined
+
+  /**
+   * Bytes queued but not yet transmitted, as on Bun ServerWebSocket and uWebSockets.js.
+   * Used for `sendHighWaterMark` when `bufferedAmount` is not available.
+   */
+  getBufferedAmount?: (() => number) | undefined
+
+  /**
+   * Above `1` once the connection is closing or closed.
+   */
+  readonly readyState?: number | undefined
 }
 
-export interface WebSocketHandlerOptions<_T extends Context> {
+export interface WebSocketHandlerOptions<_T extends Context> extends StandardPeerGuardOptions {
   /**
    * Options for encoding peer messages. such as `prefix` for distinguishing messages on the same channel..
    */
@@ -24,12 +42,28 @@ export interface WebSocketHandlerOptions<_T extends Context> {
    * Options for decoding peer messages. such as `prefix` for distinguishing messages on the same channel..
    */
   decodePeerMessage?: DecodePeerMessageOptions | undefined
+
+  /**
+   * Maximum number of bytes buffered on the WebSocket but not yet transmitted before sending waits.
+   * While a client does not read, streaming responses stop pulling from procedures, as over HTTP.
+   *
+   * The buffered amount is read from `bufferedAmount` (standard WebSocket, "ws", Deno)
+   * or `getBufferedAmount()` (Bun, uWebSockets.js). Other WebSockets (e.g. Cloudflare) never wait.
+   * On Bun and uWebSockets.js, keep it below the runtime's own limit
+   * (`backpressureLimit` / `maxBackpressure`), above which they drop messages.
+   *
+   * Set to `Infinity` to never wait.
+   *
+   * @default 1024 * 1024 (1 MiB)
+   */
+  sendHighWaterMark?: number | undefined
 }
 
 export class WebSocketHandler<T extends Context> {
-  private readonly peers = new WeakMap<WebSocketLike, ServerPeer>()
+  private readonly peers = new WeakMap<WebSocketLike, { peer: ServerPeer, guard: StandardPeerGuard }>()
   private readonly encodePeerMessageOptions: WebSocketHandlerOptions<T>['encodePeerMessage']
   private readonly decodePeerMessageOptions: WebSocketHandlerOptions<T>['decodePeerMessage']
+  private readonly guardOptions: StandardPeerGuardOptions
 
   constructor(
     private readonly handler: StandardHandler<T>,
@@ -37,6 +71,11 @@ export class WebSocketHandler<T extends Context> {
   ) {
     this.encodePeerMessageOptions = options.encodePeerMessage
     this.decodePeerMessageOptions = options.decodePeerMessage
+    this.guardOptions = {
+      maxConcurrentRequests: options.maxConcurrentRequests,
+      maxBufferedStreamSize: options.maxBufferedStreamSize,
+      sendHighWaterMark: options.sendHighWaterMark,
+    }
   }
 
   /**
@@ -56,13 +95,16 @@ export class WebSocketHandler<T extends Context> {
     data: Arrayable<string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>>,
     ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): Promise<{ matched: boolean }> {
-    let peer = this.peers.get(ws)
+    let state = this.peers.get(ws)
 
-    if (!peer) {
-      this.peers.set(ws, peer = new ServerPeer(async (message) => {
+    if (!state) {
+      const guard = new StandardPeerGuard(this.guardOptions)
+      const peer = new ServerPeer(async (message) => {
         const encoded = await encodePeerMessage(message, this.encodePeerMessageOptions)
-        await ws.send(encoded)
-      }))
+        await guard.send(() => ws.send(encoded), () => getBufferedAmount(ws))
+      })
+
+      this.peers.set(ws, state = { peer, guard })
     }
 
     /**
@@ -72,9 +114,11 @@ export class WebSocketHandler<T extends Context> {
     const encoded = toStringOrBytes(data)
     const result = decodePeerMessage(encoded, this.decodePeerMessageOptions)
     if (result.matched && isClientPeerSendMessage(result.message)) {
-      await peer.message(
+      await state.guard.message(
+        state.peer,
         result.message,
         createStandardPeerRequestHandler(this.handler, resolveMaybeOptionalOptions(rest)),
+        typeof encoded === 'string' ? encoded.length : encoded.byteLength,
       )
     }
 
@@ -87,12 +131,13 @@ export class WebSocketHandler<T extends Context> {
    * @param ws The same WebSocket instance passed to `.message()`.
    */
   async close(ws: WebSocketLike): Promise<void> {
-    const peer = this.peers.get(ws)
+    const state = this.peers.get(ws)
 
-    if (peer) {
+    if (state) {
       // delete before close to avoid potential race conditions
       this.peers.delete(ws)
-      await peer.close()
+      state.guard.close()
+      await state.peer.close()
     }
   }
 
@@ -123,4 +168,21 @@ export class WebSocketHandler<T extends Context> {
     // so a single malformed frame would crash the process. `close` always follows and handles cleanup.
     ws.addEventListener('error', () => {})
   }
+}
+
+function getBufferedAmount(ws: WebSocketLike): number | null | undefined {
+  if (typeof ws.readyState === 'number' && ws.readyState > 1) {
+    return null
+  }
+
+  if (typeof ws.bufferedAmount === 'number') {
+    return ws.bufferedAmount
+  }
+
+  if (typeof ws.getBufferedAmount === 'function') {
+    // uWebSockets.js throws once the socket is closed
+    return ws.getBufferedAmount()
+  }
+
+  return undefined
 }

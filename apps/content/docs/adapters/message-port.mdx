@@ -64,6 +64,35 @@ clientPort.start()
 The examples above only show how to configure the link. For examples of creating a typesafe client, see [RPC Link](/docs/rpc/link#typesafe-clients).
 :::
 
+## Limits
+
+The handler bounds the memory one port can make the server hold. The defaults are secure. Raise a limit if your app needs more, or set it to `Infinity` to disable it.
+
+```ts
+const handler = new RPCHandler(router, {
+  /**
+   * Maximum number of requests one port may have in flight at once.
+   * Requests above it get a `TOO_MANY_REQUESTS` error without running the procedure.
+   * A subscription holds its slot until it ends.
+   *
+   * @default 100
+   */
+  maxConcurrentRequests: 100,
+
+  /**
+   * Maximum total size in bytes of streamed input (such as an AsyncIteratorObject input)
+   * that one port may have sent but its procedures not yet read, across all its calls.
+   * When a message would exceed it, the input it belongs to is cancelled,
+   * and the procedure's next read throws a `PAYLOAD_TOO_LARGE` error.
+   *
+   * @default 16 * 1024 * 1024 (16 MiB)
+   */
+  maxBufferedStreamSize: 16 * 1024 * 1024,
+})
+```
+
+Unlike the [WebSocket adapters](/docs/adapters/websocket#limits-and-backpressure), sending never waits for a slow receiver, because a message port does not expose how much it has buffered.
+
 ## Transfer
 
 By default, oRPC serializes request/response messages to string/binary data before sending over message port. If needed, you can define the `transfer` option to utilize full power of [MessagePort: postMessage() method](https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage), such as transferring ownership of objects to the other side or support unserializable objects like `OffscreenCanvas`.

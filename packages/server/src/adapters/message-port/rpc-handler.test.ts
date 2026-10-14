@@ -294,4 +294,99 @@ describe('rpcHandler', () => {
     const result = await handler.message(serverPort as any, { invalid: true })
     expect(result.matched).toBe(false)
   })
+
+  describe('per-connection resource limits', () => {
+    const tick = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms))
+    const big = 'A'.repeat(2 * 1024 * 1024)
+
+    const setup = (options: ConstructorParameters<typeof RPCHandler>[1] = {}) => {
+      const handler = new RPCHandler({
+        live: os.handler(async function* ({ signal }) {
+          await new Promise(resolve => signal?.addEventListener('abort', resolve))
+        }),
+      }, options)
+
+      const { serverPort } = createPort()
+      const posted: unknown[] = []
+      vi.spyOn(serverPort, 'postMessage').mockImplementation((message) => {
+        posted.push(message)
+      })
+
+      const messages = () => posted.map(m => typeof m === 'string' || m instanceof Uint8Array ? (decodePeerMessage(m as any) as any).message : m)
+      const cancelled = (id: string) => messages().some(m => m.id === id && m.kind === 'stream/cancel')
+
+      return { handler, port: serverPort as any, messages, cancelled }
+    }
+
+    it('rejects requests above `maxConcurrentRequests`', async () => {
+      const { handler, port, messages } = setup({ maxConcurrentRequests: 1 })
+      void handler.message(port, await encodePeerMessage({ id: '1', kind: 'request', json: { url: '/live' } }))
+      void handler.message(port, { id: '2', kind: 'request', json: { url: '/live' } })
+      await vi.waitFor(() => expect(messages().map(m => [m.id, m.json?.status])).toEqual([['2', 429], ['1', undefined]]))
+      await handler.close(port)
+    })
+
+    it('cancels encoded streamed input exceeding `maxBufferedStreamSize`', async () => {
+      const { handler, port, cancelled } = setup({ maxBufferedStreamSize: 1024 * 1024 })
+      void handler.message(port, await encodePeerMessage({ id: '1', kind: 'request', json: { url: '/live', headers: { 'content-type': 'application/octet-stream' } } }))
+      await tick()
+      const message = await encodePeerMessage({ id: '1', kind: 'octet-stream', json: {}, binary: new Uint8Array(64 * 1024) })
+      for (let i = 0; i < 32; i++) await handler.message(port, message)
+      await vi.waitFor(() => expect(cancelled('1')).toBe(true))
+      await handler.close(port)
+    })
+
+    it.each([
+      ['string', () => ({ json: big })],
+      ['`Map`', () => new Map([['key', big]])],
+      ['`Set`', () => new Set([big])],
+      ['typed array', () => new Uint8Array(big.length)],
+      ['`ArrayBuffer`', () => new ArrayBuffer(big.length)],
+      ['`Blob`', () => new Blob([big])],
+      ['circular', () => {
+        const data: Record<string, unknown> = {}
+        data.self = data
+        return data
+      }],
+    ])('estimates the size of raw-object stream messages: %s', async (_, createData) => {
+      const { handler, port, cancelled } = setup({ maxBufferedStreamSize: 1024 * 1024 })
+      void handler.message(port, { id: '1', kind: 'request', json: { url: '/live', headers: { 'standard-server': 'event-stream' } } })
+      await tick()
+      await handler.message(port, { id: '1', kind: 'event-stream', json: { data: createData() } })
+      await vi.waitFor(() => expect(cancelled('1')).toBe(true))
+      await handler.close(port)
+    })
+
+    it('estimates the size of raw-object binary stream messages', async () => {
+      const { handler, port, cancelled } = setup({ maxBufferedStreamSize: 1024 * 1024 })
+      void handler.message(port, { id: '1', kind: 'request', json: { url: '/live', headers: { 'content-type': 'application/octet-stream' } } })
+      void handler.message(port, { id: '2', kind: 'request', json: { url: '/live', headers: { 'content-type': 'application/octet-stream' } } })
+      await tick()
+      await handler.message(port, { id: '1', kind: 'octet-stream', json: {}, binary: new Uint8Array(big.length) })
+      await handler.message(port, { id: '2', kind: 'octet-stream', json: {}, binary: new Blob([big]) })
+      await vi.waitFor(() => expect(cancelled('1') && cancelled('2')).toBe(true))
+      await handler.close(port)
+    })
+
+    it('keeps small raw-object stream messages, including `bigint`', async () => {
+      const { handler, port, cancelled } = setup({ maxBufferedStreamSize: 1024 * 1024 })
+      void handler.message(port, { id: '1', kind: 'request', json: { url: '/live', headers: { 'standard-server': 'event-stream' } } })
+      await tick()
+      for (let i = 0; i < 100; i++) await handler.message(port, { id: '1', kind: 'event-stream', json: { data: { value: 10n ** 30n } } })
+      await tick()
+      expect(cancelled('1')).toBe(false)
+      await handler.close(port)
+    })
+
+    it('restores the previous behavior with `Infinity`', async () => {
+      const { handler, port, messages } = setup({ maxConcurrentRequests: Infinity, maxBufferedStreamSize: Infinity })
+      for (let i = 0; i < 150; i++) void handler.message(port, { id: String(i), kind: 'request', json: { url: '/live' } })
+      void handler.message(port, { id: 'stream', kind: 'request', json: { url: '/live', headers: { 'standard-server': 'event-stream' } } })
+      await tick()
+      for (let i = 0; i < 16; i++) await handler.message(port, { id: 'stream', kind: 'event-stream', json: { data: big } })
+      await vi.waitFor(() => expect(messages()).toHaveLength(151))
+      expect(messages().some(m => m.kind === 'stream/cancel' || m.json?.status === 429)).toBe(false)
+      await handler.close(port)
+    })
+  })
 })

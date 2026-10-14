@@ -51,6 +51,10 @@ const publisher = new MemoryPublisher<Record<string, { message: string }>>()
 
 :::
 
+:::info
+Each iterator subscriber buffers at most `maxBufferedEvents` (default `100`) unread events, dropping the oldest. Over [WebSocket](/docs/adapters/websocket#limits-and-backpressure), this bounds memory for slow clients only while `sendHighWaterMark` is finite. With `Infinity`, events are pulled as soon as they are published and pile up in the socket's send buffer instead.
+:::
+
 ## Adapters
 
 | Name                | Resume Support | Adapter for                                                                      |

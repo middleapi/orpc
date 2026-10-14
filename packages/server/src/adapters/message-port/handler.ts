@@ -3,16 +3,20 @@ import type { MaybeOptionalOptions, Promisable, Value } from '@orpc/shared'
 import type { ClientPeerSendMessage, DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standard-server/peer'
 import type { Context } from '../../context'
 import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
+import type { StandardPeerGuardOptions } from '../standard-peer'
 import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from '@orpc/client/message-port'
 import { resolveMaybeOptionalOptions, value } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, isPeerMessage, ServerPeer } from '@standard-server/peer'
-import { createStandardPeerRequestHandler } from '../standard-peer'
+import { createStandardPeerRequestHandler, StandardPeerGuard } from '../standard-peer'
 
 type DecodedResponseMessage = ConstructorParameters<typeof ServerPeer>[0] extends (message: infer TMessage) => unknown
   ? TMessage
   : never
 
-export interface MessagePortHandlerOptions<_T extends Context> {
+/**
+ * Has no `sendHighWaterMark`, since a message port does not expose how much it has buffered.
+ */
+export interface MessagePortHandlerOptions<_T extends Context> extends Omit<StandardPeerGuardOptions, 'sendHighWaterMark'> {
   /**
    * By default, oRPC encodes peer messages as strings or binary data before sending them over the message port.
    * Use this option to bypass encoding and leverage the full capabilities of the
@@ -37,10 +41,11 @@ export interface MessagePortHandlerOptions<_T extends Context> {
 }
 
 export class MessagePortHandler<T extends Context> {
-  private readonly peers = new WeakMap<SupportedMessagePort, ServerPeer>()
+  private readonly peers = new WeakMap<SupportedMessagePort, { peer: ServerPeer, guard: StandardPeerGuard }>()
   private readonly transfer: MessagePortHandlerOptions<T>['experimental_transfer']
   private readonly encodePeerMessageOptions: MessagePortHandlerOptions<T>['encodePeerMessage']
   private readonly decodePeerMessageOptions: MessagePortHandlerOptions<T>['decodePeerMessage']
+  private readonly guardOptions: StandardPeerGuardOptions
 
   constructor(
     private readonly handler: StandardHandler<T>,
@@ -49,6 +54,10 @@ export class MessagePortHandler<T extends Context> {
     this.transfer = options.experimental_transfer
     this.encodePeerMessageOptions = options.encodePeerMessage
     this.decodePeerMessageOptions = options.decodePeerMessage
+    this.guardOptions = {
+      maxConcurrentRequests: options.maxConcurrentRequests,
+      maxBufferedStreamSize: options.maxBufferedStreamSize,
+    }
   }
 
   /**
@@ -78,33 +87,39 @@ export class MessagePortHandler<T extends Context> {
     data: unknown,
     ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): Promise<{ matched: boolean }> {
-    let peer = this.peers.get(port)
+    let state = this.peers.get(port)
 
-    if (!peer) {
-      this.peers.set(port, peer = new ServerPeer(async (message) => {
-        const transfer = await value(this.transfer, message, port)
+    if (!state) {
+      this.peers.set(port, state = {
+        guard: new StandardPeerGuard(this.guardOptions),
+        peer: new ServerPeer(async (message) => {
+          const transfer = await value(this.transfer, message, port)
 
-        if (transfer) {
-          postMessagePortMessage(port, message, transfer)
-        }
-        else {
-          postMessagePortMessage(port, await encodePeerMessage(message, this.encodePeerMessageOptions))
-        }
-      }))
+          if (transfer) {
+            postMessagePortMessage(port, message, transfer)
+          }
+          else {
+            postMessagePortMessage(port, await encodePeerMessage(message, this.encodePeerMessageOptions))
+          }
+        }),
+      })
     }
 
     let peerMessage: ClientPeerSendMessage | undefined
+    let size: Value<number> = 0
 
     if (typeof data === 'string' || data instanceof Uint8Array) {
       // MessagePort receives the exact payload sent, and `encodePeerMessage` only returns string or Uint8Array.
       const result = decodePeerMessage(data as string | Uint8Array<ArrayBuffer>, this.decodePeerMessageOptions)
       if (result.matched && isClientPeerSendMessage(result.message)) {
         peerMessage = result.message
+        size = typeof data === 'string' ? data.length : data.byteLength
       }
     }
 
     else if (isPeerMessage(data) && isClientPeerSendMessage(data)) {
       peerMessage = data
+      size = () => estimateRawPeerMessageSize(data)
     }
 
     if (peerMessage === undefined) {
@@ -115,7 +130,13 @@ export class MessagePortHandler<T extends Context> {
      * Message order is important: loading -> decode -> .message.
      * This flow must stay synchronous, or we need to use `sequential` helper
      */
-    await peer.message(peerMessage, createStandardPeerRequestHandler(this.handler, resolveMaybeOptionalOptions(rest)))
+    await state.guard.message(
+      state.peer,
+      peerMessage,
+      createStandardPeerRequestHandler(this.handler, resolveMaybeOptionalOptions(rest)),
+      size,
+    )
+
     return { matched: true }
   }
 
@@ -125,12 +146,53 @@ export class MessagePortHandler<T extends Context> {
    * @param port The same message port instance passed to `.message()`.
    */
   async close(port: SupportedMessagePort): Promise<void> {
-    const peer = this.peers.get(port)
+    const state = this.peers.get(port)
 
-    if (peer) {
+    if (state) {
       // delete before close to avoid potential race conditions
       this.peers.delete(port)
-      await peer.close()
+      state.guard.close()
+      await state.peer.close()
     }
+  }
+}
+
+/**
+ * Estimates the size of a message received as a structured-cloned object.
+ * Returns `Infinity` when it cannot, so the message counts as too large.
+ */
+function estimateRawPeerMessageSize(message: ClientPeerSendMessage): number {
+  let size = message.binary instanceof Blob ? message.binary.size : message.binary?.byteLength ?? 0
+
+  try {
+    // Needs a replacer, and an `undefined` result is handled below.
+    // eslint-disable-next-line ban/ban
+    const json = JSON.stringify(message.json, (_, value) => {
+      if (typeof value === 'bigint') {
+        return value.toString()
+      }
+
+      if (value instanceof Map || value instanceof Set) {
+        return Array.from(value)
+      }
+
+      if (value instanceof Blob) {
+        size += value.size
+        return null
+      }
+
+      if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
+        size += value.byteLength
+        return null
+      }
+
+      return value
+    })
+
+    return size + (json?.length ?? 0)
+  }
+  catch {
+    // e.g. circular references
+    return Infinity
   }
 }

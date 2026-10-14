@@ -234,6 +234,57 @@ const app = App()
 
 </CodeGroup>
 
+## Limits and Backpressure
+
+One connection can carry many calls, so the server adapters bound the memory a single connection can make the server hold. The defaults are secure. Raise a limit if your app needs more, or set it to `Infinity` to disable it.
+
+```ts
+const handler = new RPCHandler(router, {
+  /**
+   * Maximum number of requests one connection may have in flight at once.
+   * Requests above it get a `TOO_MANY_REQUESTS` error without running the procedure.
+   *
+   * @default 100
+   */
+  maxConcurrentRequests: 100,
+
+  /**
+   * Maximum total size in bytes of streamed input (such as an AsyncIteratorObject input)
+   * that one connection may have sent but its procedures not yet read.
+   *
+   * @default 16 * 1024 * 1024 (16 MiB)
+   */
+  maxBufferedStreamSize: 16 * 1024 * 1024,
+
+  /**
+   * Maximum number of bytes buffered on the WebSocket but not yet transmitted
+   * before sending waits.
+   *
+   * @default 1024 * 1024 (1 MiB)
+   */
+  sendHighWaterMark: 1024 * 1024,
+})
+```
+
+- **`maxConcurrentRequests`**: A request holds its slot until its procedure and response stream finish, so a subscription holds it until it ends. Raise the limit if one connection legitimately runs more calls at once. With [Hibernation](/docs/integrations/hibernation), event iterator calls finish right after they are registered, so they barely use slots.
+- **`maxBufferedStreamSize`**: The limit is shared by all calls of a connection. The protocol has no inbound flow control, so when a message would exceed it, the input it belongs to is cancelled: the client is told to stop sending, and the procedure's next read throws a `PAYLOAD_TOO_LARGE` error. Raise the limit if clients stream input faster than your procedures read it, by more than the limit.
+- **`sendHighWaterMark`**: While a client does not read, streaming responses stop pulling from procedures, as over HTTP, instead of the server buffering everything the client has not read. Fast clients see no change. Set it to `Infinity` to send eagerly as before. It requires the WebSocket to expose how much it has buffered:
+
+  | WebSocket                     | Buffered amount                                 |
+  | ----------------------------- | ----------------------------------------------- |
+  | MDN WebSocket API, `ws`, Deno | `bufferedAmount`                                |
+  | Bun, uWebSockets              | `getBufferedAmount()`                           |
+  | `crossws` (>= 0.4)            | `peer.bufferedAmount` and `peer.waitForDrain()` |
+  | Others, such as Cloudflare    | Not exposed, sending never waits                |
+
+:::warning
+Bun and uWebSockets drop messages once their own send buffer is full (`backpressureLimit` in Bun, `maxBackpressure` in uWebSockets). Keep `sendHighWaterMark` below that limit.
+:::
+
+:::info
+These limits bound what the server keeps in memory for a connection, not how much a client sends. To also limit inbound data, see [Request Limit](/docs/plugins/request-limit#peer-adapters).
+:::
+
 ## Client Adapters
 
 | Adapter     | Target                                                                          |
