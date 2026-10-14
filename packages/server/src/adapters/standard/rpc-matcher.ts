@@ -63,7 +63,7 @@ export class RPCMatcher {
 
   private readonly tree: Map<`/${string}`, TreeEntry> = new Map()
   private readonly pendingLazyRouters: Map<string, PendingLazyRouter> = new Map()
-  /** upper bound on the segment count of any pending key, so deeper pathname prefixes are never looked up */
+  /** segment count of the deepest pending key, never lowered so it stays an upper bound */
   private maxPendingLazyRouterDepth = 0
 
   constructor(router: AnyRouter, options: RPCMatcherOptions = {}) {
@@ -178,31 +178,16 @@ export class RPCMatcher {
 
     let slashIndex = 0
 
-    // a pending key has exactly as many segments as its path, so prefixes deeper than
-    // the deepest pending key can never match, and scanning them would make slash-heavy
-    // pathnames cost quadratic time
+    // a pending key has as many segments as its path, so deeper prefixes can never match,
+    // and scanning them would cost quadratic time on slash-heavy pathnames
     for (let depth = 1; slashIndex !== -1 && depth <= this.maxPendingLazyRouterDepth; depth++) {
       const nextSlashIndex = pathname.indexOf('/', slashIndex + 1)
       const httpPathPrefix = nextSlashIndex === -1 ? pathname : pathname.slice(0, nextSlashIndex)
-
-      if (this.pendingLazyRouters.has(httpPathPrefix)) {
-        return this.loadPendingLazyRouters(pathname, slashIndex, depth)
-      }
-
-      slashIndex = nextSlashIndex
-    }
-  }
-
-  private async loadPendingLazyRouters(pathname: `/${string}`, slashIndex: number, depth: number): Promise<void> {
-    // the bound is re-read every iteration, loading a router can index deeper pending ones
-    for (; slashIndex !== -1 && depth <= this.maxPendingLazyRouterDepth; depth++) {
-      const nextSlashIndex = pathname.indexOf('/', slashIndex + 1)
-      const httpPathPrefix = nextSlashIndex === -1 ? pathname : pathname.slice(0, nextSlashIndex)
-
       const pending = this.pendingLazyRouters.get(httpPathPrefix)
 
       if (pending !== undefined) {
-        await this.loadPendingLazyRouter(httpPathPrefix, pending)
+        // rescan once loaded, since the loaded router may contain deeper pending routers
+        return this.loadPendingLazyRouter(httpPathPrefix, pending).then(() => this.resolvePendingLazyRouters(pathname))
       }
 
       slashIndex = nextSlashIndex
