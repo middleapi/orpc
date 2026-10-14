@@ -2,6 +2,7 @@ it('exports plugins', async () => {
   await expect(import('.')).resolves.toMatchObject({
     BatchHandlerPlugin: expect.any(Function),
     CORSHandlerPlugin: expect.any(Function),
+    CsrfProtectionHandlerPlugin: expect.any(Function),
     RequestHeadersHandlerPlugin: expect.any(Function),
     ResponseHeadersHandlerPlugin: expect.any(Function),
     GetMethodCsrfProtectionHandlerPlugin: expect.any(Function),

@@ -1,0 +1,115 @@
+---
+title: "CSRF Protection Plugin"
+description: "Use CsrfProtectionHandlerPlugin to reject cross-site POST, PUT, PATCH, and DELETE requests, such as forged HTML forms, that may carry SameSite=None or unmarked cookies."
+sidebar:
+  label: "CSRF Protection"
+---
+
+## How It Works
+
+Another site can send `POST` requests to your API without a [CORS preflight](https://developer.mozilla.org/en-US/docs/Glossary/Preflight_request), either from a plain HTML `<form>` or from a `fetch` with `mode: 'no-cors'`. Browsers attach every cookie not explicitly marked [`SameSite=Lax` or `SameSite=Strict`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#samesitesamesite-value) to these requests, and their bodies reach your procedures: [RPCHandler](/docs/rpc/handler) decodes a `multipart/form-data` body whose `data` field holds the serialized input, and [OpenAPIHandler](/docs/openapi/handler) decodes plain `application/x-www-form-urlencoded` bodies. The procedure runs with the victim's cookies and input of the attacker's choosing. [CORS](/docs/plugins/cors) only decides whether the attacker can read the response, so it cannot stop this.
+
+The plugin rejects these requests with a `403` for every method other than `GET`, `HEAD`, and `OPTIONS`, following Go's [`http.CrossOriginProtection`](https://pkg.go.dev/net/http#CrossOriginProtection). The verdict comes from [`Sec-Fetch-Site`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Sec-Fetch-Site), with the `Origin` header as a fallback for requests without it:
+
+| `Sec-Fetch-Site` | `Origin` | |
+| --- | --- | --- |
+| `same-origin`, `same-site`, `none` | any | allowed |
+| `cross-site` or any other value | listed in [`trustedOrigins`](#trusted-origins) | allowed |
+| `cross-site` or any other value | anything else, or absent | rejected |
+| absent | absent, as sent by non-browser clients | allowed |
+| absent | host equals the `Host` header | allowed |
+| absent | listed in [`trustedOrigins`](#trusted-origins) | allowed |
+| absent | anything else | rejected |
+
+Unlike Go, the plugin allows `same-site` requests, including those from sibling subdomains, matching the [GET Method CSRF Protection Plugin](/docs/plugins/get-method-csrf-protection) and the `SameSite` cookie model, where the site is the trust boundary. Host untrusted content on a separate site, not a subdomain.
+
+Only requests that match a procedure are judged. The rest stay unmatched, so a handler can fall through to whatever serves the rest of your site. [Batch](/docs/plugins/batch) sub-requests are judged by the headers of the batch request itself, which override the ones a client writes into each sub-request.
+
+## Setup
+
+```ts twoslash
+import { RPCHandler } from '@orpc/server/fetch'
+import { router } from './shared/planet'
+// ---cut---
+import { CsrfProtectionHandlerPlugin } from '@orpc/server/plugins'
+
+const handler = new RPCHandler(router, {
+  plugins: [
+    new CsrfProtectionHandlerPlugin(),
+  ],
+})
+```
+
+:::info
+The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
+:::
+
+The plugin leaves safe methods alone. If you [enable the `GET` method](/docs/rpc/handler#enabling-the-get-method), add the [GET Method CSRF Protection Plugin](/docs/plugins/get-method-csrf-protection) as well:
+
+```ts twoslash
+import { RPCHandler } from '@orpc/server/fetch'
+import { router } from './shared/planet'
+// ---cut---
+import { CsrfProtectionHandlerPlugin, GetMethodCsrfProtectionHandlerPlugin } from '@orpc/server/plugins'
+import { RPC_DEFAULT_ALLOW_METHODS } from '@orpc/server/standard'
+
+const handler = new RPCHandler(router, {
+  allowMethods: ['GET', ...RPC_DEFAULT_ALLOW_METHODS],
+  plugins: [
+    new CsrfProtectionHandlerPlugin(),
+    new GetMethodCsrfProtectionHandlerPlugin(),
+  ],
+})
+```
+
+## Trusted Origins
+
+A forged form and a legitimate client on another site look alike: an [RPC Link](/docs/rpc/link) uploading a file sends a `multipart/form-data` body without a preflight, just like a form. So the plugin rejects every cross-site request, including the ones your [CORS Plugin](/docs/plugins/cors) allows, unless its origin is trusted. This is also why the plugin is opt-in.
+
+List every origin that calls your API from another site in `trustedOrigins`. Entries match the `Origin` header exactly, in its `scheme://host[:port]` form without a trailing slash, so you can share the list with the CORS Plugin:
+
+```ts twoslash
+import { RPCHandler } from '@orpc/server/fetch'
+import { router } from './shared/planet'
+// ---cut---
+import { CORSHandlerPlugin, CsrfProtectionHandlerPlugin } from '@orpc/server/plugins'
+
+const trustedOrigins = ['https://app.example.com', 'https://admin.example.com']
+
+const handler = new RPCHandler(router, {
+  plugins: [
+    new CORSHandlerPlugin({ origin: trustedOrigins, credentials: true }),
+    new CsrfProtectionHandlerPlugin({ trustedOrigins }),
+  ],
+})
+```
+
+`trustedOrigins` also accepts a function (optionally async) that receives the `Origin` header and the interceptor options, including the [handler context](/docs/context). Anchor any pattern you match, so that a look-alike such as `https://app.example.com.evil.example` does not pass:
+
+```ts
+const csrf = new CsrfProtectionHandlerPlugin({
+  trustedOrigins: origin => /^https:\/\/[a-z0-9-]+\.preview\.example\.com$/.test(origin),
+})
+```
+
+## Cookie Requirements
+
+The plugin protects cookies that browsers attach to cross-site requests: `SameSite=None` cookies, which frontends on another site need, and unmarked cookies. Only Chrome treats unmarked cookies as `Lax`, while Firefox and Safari treat them like `SameSite=None`, and Chrome still sends fresh unmarked cookies on cross-site `POST` for [two minutes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#lax). Cookies explicitly marked `SameSite=Lax` or `SameSite=Strict` are already withheld from cross-site `POST`, so the plugin adds defense in depth there.
+
+With such cookies:
+
+- Trusted origins and same-site pages receive the full power of the cookie, so trust only origins and subdomains you control.
+- The plugin does not guard `GET`. The [GET Method CSRF Protection Plugin](/docs/plugins/get-method-csrf-protection) only rejects navigations, so a cross-site `<img>` or `fetch` can still send a `GET` request with these cookies. Keep `GET` disabled, or allow it only for procedures that never modify data.
+
+## Limitations
+
+- Browsers [send Fetch Metadata only to trustworthy URLs](https://w3c.github.io/webappsec-fetch-metadata/): HTTPS and `localhost`. Over plain HTTP, and in browsers older than Safari 16.4 from March 2023, the plugin compares the `Origin` header with the `Host` header instead (`:authority` on HTTP/2 with the Node adapter). In that fallback:
+  - Sibling subdomains are rejected unless listed in `trustedOrigins`.
+  - A proxy that rewrites `Host` makes every browser request look cross-origin, so add your public origin to `trustedOrigins` or have the proxy forward the original `Host`.
+  - `Host` carries no scheme, so an `http://` page passes for an `https://` API on the same host. Enable [HSTS](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Strict-Transport-Security) to keep browsers off plain HTTP.
+- Requests with neither `Sec-Fetch-Site` nor `Origin` pass, since browsers send `Origin` on every request with an unsafe method. Proxies that strip both headers disable the check.
+- Prefer `SameSite=Strict` or a [synchronizer token](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#synchronizer-token-pattern) for high-value requests.
+
+## Learn More
+
+Learn more about the attack this plugin prevents on [MDN](https://developer.mozilla.org/en-US/docs/Web/Security/Attacks/CSRF), in the [OWASP CSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html), and in the documentation of Go's [`http.CrossOriginProtection`](https://pkg.go.dev/net/http#CrossOriginProtection). For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/csrf-protection.ts).

@@ -15,6 +15,10 @@ HTML forms only support the GET and POST methods. When a POST request carries a 
 </form>
 ```
 
+:::warning[Forms on other sites can submit too]
+Form submissions need no [CORS preflight](https://developer.mozilla.org/en-US/docs/Glossary/Preflight_request), so a form on another site can invoke the same procedures with any input. This is safe only when your authentication cookies are explicitly marked `SameSite=Lax` or `SameSite=Strict`, which browsers withhold from these requests. Otherwise, add the [CSRF Protection Plugin](/docs/plugins/csrf-protection), which judges the overridden method. Keep `GET` and `HEAD` out of `methods`, since the CSRF Protection Plugin leaves safe methods alone.
+:::
+
 ## Setup
 
 ```ts

@@ -16,7 +16,7 @@ Cross-site, browsers withhold explicitly marked [`SameSite=Lax`](https://develop
 | `fetch`, `XMLHttpRequest` | no | allowed, CORS governs the response |
 | `<img>`, `<script>`, media, prefetch | no | allowed |
 | `<iframe>`, `<embed>`, `<object>`, which are not top-level | no | allowed |
-| any method other than `GET` | no | ignored |
+| any method other than `GET` | no | ignored, see the [CSRF Protection Plugin](/docs/plugins/csrf-protection) |
 
 The verdict comes from [Fetch Metadata](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers#fetch_metadata_request_headers): a `GET` request is rejected when [`Sec-Fetch-Site`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Sec-Fetch-Site) reports `cross-site` or `none` on a top-level navigation (`Sec-Fetch-Mode: navigate` targeting `Sec-Fetch-Dest: document`). A guarded request stripped of either header is rejected. Only `GET` needs guarding, since [navigations use no method](https://html.spec.whatwg.org/multipage/browsing-the-web.html) besides `GET` and the unsafe `POST`. The result resembles upgrading your cookies to `SameSite=Strict` for safe methods, and also covers links opened from outside the browser, where browsers attach even `Strict` cookies.
 
@@ -49,7 +49,7 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 
 Mark authentication cookies `SameSite=Lax` or `SameSite=Strict` explicitly. Do not rely on browser defaults: only Chrome treats unmarked cookies as `Lax`, while Firefox and Safari treat them like `SameSite=None`, and Chrome still sends fresh unmarked cookies on cross-site `POST` for [two minutes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#lax).
 
-With `SameSite=None` or unmarked cookies, cross-site requests the plugin allows, such as `fetch` and `<img>`, can still carry them. In that case, fix the cookie attribute or add a [synchronizer token](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#synchronizer-token-pattern).
+With `SameSite=None` or unmarked cookies, cross-site requests the plugin allows, such as `fetch` and `<img>`, can still carry them, and so can requests with other methods, such as an HTML form `POST`. In that case, fix the cookie attribute or add a [synchronizer token](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#synchronizer-token-pattern). The [CSRF Protection Plugin](/docs/plugins/csrf-protection) guards the methods other than `GET` against such cookies, but neither plugin stops a cross-site `<img>` or `fetch` from sending them on `GET`.
 
 ## Limitations
 

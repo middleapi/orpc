@@ -1,6 +1,8 @@
 import type { StandardHandlerPlugin } from '@orpc/server/standard'
-import { createORPCClient } from '@orpc/client'
+import { createORPCClient, ORPCError } from '@orpc/client'
 import { os } from '@orpc/server'
+import { CsrfProtectionHandlerPlugin, GetMethodCsrfProtectionHandlerPlugin, MethodOverrideHandlerPlugin } from '@orpc/server/plugins'
+import * as z from 'zod'
 import { openapi } from '../../meta'
 import { OpenAPIHandler } from './openapi-handler'
 import { OpenAPILink } from './openapi-link'
@@ -99,5 +101,74 @@ describe('openapiHandler', () => {
     expect(response).toBeInstanceOf(Response)
     expect(response!.status).toBe(200)
     return expect(response!.text()).resolves.toBe('"intercepted"')
+  })
+
+  describe('cross-site form CSRF', () => {
+    function createRouter(calls: unknown[], method: 'POST' | 'DELETE' = 'POST') {
+      return {
+        transfer: os.$context<{ headers: Headers }>()
+          .meta(openapi({ method, path: '/transfer' }))
+          .use(({ context, next }) => {
+            if (!context.headers.get('cookie')?.includes('session=victim'))
+              throw new ORPCError('UNAUTHORIZED')
+            return next({ context: { user: 'victim' } })
+          })
+          .input(z.object({ to: z.string(), amount: z.coerce.number() }))
+          .handler(({ input, context }) => {
+            calls.push({ input, user: context.user })
+            return { ok: true }
+          }),
+      }
+    }
+
+    // What a browser sends for a cross-site <form method=POST action=https://app.example.com/api/transfer>
+    function crossSiteUrlencodedForm(search = '') {
+      return new Request(`https://app.example.com/api/transfer${search}`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          'cookie': 'session=victim',
+          'origin': 'https://evil.example',
+          'sec-fetch-site': 'cross-site',
+          'sec-fetch-mode': 'navigate',
+          'sec-fetch-dest': 'document',
+        },
+        body: 'to=attacker&amount=1000',
+      })
+    }
+
+    async function run(handler: OpenAPIHandler<any>, request: Request) {
+      return handler.handle(request, { prefix: '/api', context: { headers: request.headers } })
+    }
+
+    it('runs a POST procedure from a cross-site urlencoded form despite the GET CSRF plugin', async () => {
+      const calls: unknown[] = []
+      const handler = new OpenAPIHandler(createRouter(calls), { plugins: [new GetMethodCsrfProtectionHandlerPlugin()] })
+      const { response } = await run(handler, crossSiteUrlencodedForm())
+      expect(response?.status).toBe(200)
+      expect(calls).toEqual([{ input: { to: 'attacker', amount: 1000 }, user: 'victim' }])
+    })
+
+    it('blocks a cross-site urlencoded form with the CSRF protection plugin', async () => {
+      const calls: unknown[] = []
+      const handler = new OpenAPIHandler(createRouter(calls), {
+        plugins: [new CsrfProtectionHandlerPlugin(), new GetMethodCsrfProtectionHandlerPlugin()],
+      })
+      const { matched, response } = await run(handler, crossSiteUrlencodedForm())
+      expect(matched).toBe(true)
+      expect(response?.status).toBe(403)
+      expect(calls).toEqual([])
+    })
+
+    it('blocks a cross-site form overriding its method with the CSRF protection plugin', async () => {
+      const calls: unknown[] = []
+      const handler = new OpenAPIHandler(createRouter(calls, 'DELETE'), {
+        plugins: [new MethodOverrideHandlerPlugin(), new CsrfProtectionHandlerPlugin()],
+      })
+      const { matched, response } = await run(handler, crossSiteUrlencodedForm('?method=DELETE'))
+      expect(matched).toBe(true)
+      expect(response?.status).toBe(403)
+      expect(calls).toEqual([])
+    })
   })
 })

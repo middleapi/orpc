@@ -73,6 +73,10 @@ const cors = new CORSHandlerPlugin({
 
 :::
 
+:::warning[HTML forms can call your procedures]
+A cross-site HTML form needs no [CORS preflight](https://developer.mozilla.org/en-US/docs/Glossary/Preflight_request) and can `POST` a plain `application/x-www-form-urlencoded` or `multipart/form-data` body, which `OpenAPIHandler` decodes into the input of any procedure routed as `POST`, or as `PUT`, `PATCH`, or `DELETE` with the [Method Override Plugin](/docs/plugins/method-override). This is safe only when your authentication cookies are explicitly marked `SameSite=Lax` or `SameSite=Strict`, which browsers withhold from these requests. Otherwise, add the [CSRF Protection Plugin](/docs/plugins/csrf-protection). Procedures routed as `GET` that modify data also need the [GET Method CSRF Protection Plugin](/docs/plugins/get-method-csrf-protection).
+:::
+
 ## Interceptors
 
 Interceptors let you observe or change different stages of an OpenAPI request. Common use cases include logging, error handling, and metrics.

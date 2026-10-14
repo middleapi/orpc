@@ -6,6 +6,7 @@ export {
    */
   CORSHandlerPlugin as CORSPlugin,
 } from './cors'
+export * from './csrf-protection'
 export * from './get-method-csrf-protection'
 export * from './method-override'
 export * from './prototype-pollution-protection'

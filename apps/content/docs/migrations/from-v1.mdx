@@ -565,7 +565,7 @@ const handler = new RPCHandler(router)
 The simplest migration is to stop sending GET instead of allowing it: remove the `method` option from your [RPC Link](/docs/rpc/link) so every call uses POST (the default), and keep the handler's default `allowMethods`. Only allow GET when you really need it, for example for HTTP caching.
 :::
 
-The v2 [GET Method CSRF Protection Plugin](/docs/plugins/get-method-csrf-protection) replaces the v1 CSRF plugin pair. It checks the browser's `Sec-Fetch-*` headers, so it needs no matching link plugin and no configuration. Remove `SimpleCsrfProtectionPlugin` from your handler and `SimpleCsrfProtectionLinkPlugin` from your client; they no longer exist.
+The v2 [GET Method CSRF Protection Plugin](/docs/plugins/get-method-csrf-protection) checks the browser's `Sec-Fetch-*` headers, so it needs no matching link plugin and no configuration. It only guards `GET`, so it does not replace the v1 CSRF plugin pair. See [CSRF plugins removed](#csrf-plugins-removed).
 
 ### Interceptor options renamed
 
@@ -724,15 +724,16 @@ wss.on('connection', (ws) => {
 
 Handler plugins were renamed with a `HandlerPlugin` suffix. Deprecated aliases exist unless noted:
 
-| v1                                        | v2                                                                                                                                                |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CORSPlugin`                              | [`CORSHandlerPlugin`](/docs/plugins/cors)                                                                                                         |
-| `RequestHeadersPlugin`                    | [`RequestHeadersHandlerPlugin`](/docs/plugins/request-headers)                                                                                    |
-| `ResponseHeadersPlugin`                   | [`ResponseHeadersHandlerPlugin`](/docs/plugins/response-headers)                                                                                  |
-| `BodyLimitPlugin` (from adapter subpaths) | [`RequestLimitHandlerPlugin`](/docs/plugins/request-limit) (from `@orpc/server/plugins`)                                                          |
-| `CompressionPlugin` (no alias)            | [`RequestCompressionHandlerPlugin`](/docs/plugins/request-compression) + [`ResponseCompressionHandlerPlugin`](/docs/plugins/response-compression) |
-| `experimental_RethrowHandlerPlugin`       | [`RethrowHandlerPlugin`](/docs/plugins/rethrow)                                                                                                   |
-| `StrictGetMethodPlugin` (no alias)        | removed, use `allowMethods`                                                                                                                       |
+| v1                                                                                | v2                                                                                                                                                |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CORSPlugin`                                                                      | [`CORSHandlerPlugin`](/docs/plugins/cors)                                                                                                         |
+| `RequestHeadersPlugin`                                                            | [`RequestHeadersHandlerPlugin`](/docs/plugins/request-headers)                                                                                    |
+| `ResponseHeadersPlugin`                                                           | [`ResponseHeadersHandlerPlugin`](/docs/plugins/response-headers)                                                                                  |
+| `BodyLimitPlugin` (from adapter subpaths)                                         | [`RequestLimitHandlerPlugin`](/docs/plugins/request-limit) (from `@orpc/server/plugins`)                                                          |
+| `CompressionPlugin` (no alias)                                                    | [`RequestCompressionHandlerPlugin`](/docs/plugins/request-compression) + [`ResponseCompressionHandlerPlugin`](/docs/plugins/response-compression) |
+| `experimental_RethrowHandlerPlugin`                                               | [`RethrowHandlerPlugin`](/docs/plugins/rethrow)                                                                                                   |
+| `StrictGetMethodPlugin` (no alias)                                                | removed, use `allowMethods`                                                                                                                       |
+| `SimpleCsrfProtectionHandlerPlugin` + `SimpleCsrfProtectionLinkPlugin` (no alias) | removed, see [CSRF plugins removed](#csrf-plugins-removed)                                                                                        |
 
 <CodeGroup>
 
@@ -766,6 +767,66 @@ const handler = new RPCHandler(router, {
 :::info
 When serving binary data cross-origin, allow and expose both the `Content-Disposition` and the new `Standard-Server` headers in your CORS configuration. See [Binary Data](/docs/binary-data).
 :::
+
+### CSRF plugins removed
+
+v1's `SimpleCsrfProtectionHandlerPlugin` and `SimpleCsrfProtectionLinkPlugin` no longer exist. The handler plugin rejected requests of **every** method that lacked the `x-csrf-token` header the link plugin added, and since browsers cannot attach a custom header cross-site without a [CORS preflight](https://developer.mozilla.org/en-US/docs/Glossary/Preflight_request), forged requests never reached your procedures. The v2 [GET Method CSRF Protection Plugin](/docs/plugins/get-method-csrf-protection) only guards `GET` and lets every other method through.
+
+Without the v1 plugins, `POST`, `PUT`, `PATCH`, and `DELETE` are safe only when your authentication cookies are explicitly marked `SameSite=Lax` or `SameSite=Strict`. With `SameSite=None` or unmarked cookies, a plain HTML form on another site can submit a `multipart/form-data` body to [RPCHandler](/docs/rpc/handler#supported-http-methods) or an `application/x-www-form-urlencoded` body to [OpenAPIHandler](/docs/openapi/handler), running any procedure with the victim's cookies and input of the attacker's choosing. In that case, add the [CSRF Protection Plugin](/docs/plugins/csrf-protection):
+
+<CodeGroup>
+
+```ts v2
+import { CsrfProtectionHandlerPlugin } from '@orpc/server/plugins'
+
+const handler = new RPCHandler(router, {
+  plugins: [
+    new CsrfProtectionHandlerPlugin({
+      trustedOrigins: ['https://app.example.com'], // frontends on another site, if any
+    }),
+  ],
+})
+```
+
+```ts v1
+import { SimpleCsrfProtectionLinkPlugin } from '@orpc/client/plugins'
+import { SimpleCsrfProtectionHandlerPlugin } from '@orpc/server/plugins'
+
+const handler = new RPCHandler(router, {
+  plugins: [new SimpleCsrfProtectionHandlerPlugin()],
+})
+
+const link = new RPCLink({
+  url: 'http://localhost:3000/rpc',
+  plugins: [new SimpleCsrfProtectionLinkPlugin()],
+})
+```
+
+</CodeGroup>
+
+Or keep the v1 behavior with a custom-header check of your own, which also covers `GET`. Clients that do not send the header, such as `curl`, are rejected as before:
+
+```ts
+import { ORPCError } from '@orpc/server'
+
+const handler = new RPCHandler(router, {
+  interceptors: [
+    ({ request, next }) => {
+      if (request.headers['x-csrf-token'] !== 'orpc') {
+        throw new ORPCError('FORBIDDEN', { message: 'Invalid CSRF token' })
+      }
+
+      return next()
+    },
+  ],
+})
+
+const link = new RPCLink({
+  origin: 'http://localhost:3000',
+  url: '/rpc',
+  headers: { 'x-csrf-token': 'orpc' },
+})
+```
 
 ### CORS allows any origin by default
 
