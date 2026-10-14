@@ -1,4 +1,5 @@
 import type { AnyRouter } from '../router'
+import zlib from 'node:zlib'
 import { ORPCError } from '@orpc/client'
 import { promiseWithResolvers } from '@orpc/shared'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
@@ -180,6 +181,26 @@ describe('batchHandlerPlugin', () => {
 
       expect(response!.status).toBe(400)
       expect(await response!.text()).toContain('Too many content encodings.')
+      expect(handlerFn).toHaveBeenCalledTimes(0)
+    })
+
+    it('returns 400 when the decompressed batch body exceeds maxDecompressedSize', async () => {
+      const handler = new RPCHandler(router, {
+        plugins: [new BatchHandlerPlugin(), new RequestCompressionHandlerPlugin({ maxDecompressedSize: 1024 })],
+      })
+
+      const { response } = await handler.handle(new Request('https://example.com/__batch__', {
+        method: 'POST',
+        headers: {
+          'orpc-batch': 'buffered',
+          'content-type': 'application/json',
+          'content-encoding': 'gzip',
+        },
+        body: zlib.gzipSync(JSON.stringify([makePeerRequestMessage(0, '/ping')]) + ' '.repeat(2048)),
+      }))
+
+      expect(response!.status).toBe(400)
+      expect(await response!.text()).toContain(new ORPCError('PAYLOAD_TOO_LARGE').message)
       expect(handlerFn).toHaveBeenCalledTimes(0)
     })
 

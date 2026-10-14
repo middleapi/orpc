@@ -72,17 +72,28 @@ import { RequestCompressionHandlerPlugin } from '@orpc/server/plugins'
 
 const handler = new RPCHandler(router, {
   plugins: [
-    new RequestCompressionHandlerPlugin(),
+    new RequestCompressionHandlerPlugin({
+      /**
+       * Maximum size in bytes of the decompressed request body. Requests whose
+       * decompressed body exceeds it are rejected with PAYLOAD_TOO_LARGE (413).
+       * Set to Number.POSITIVE_INFINITY to disable.
+       *
+       * @default 10 * 1024 * 1024 (10MB)
+       */
+      maxDecompressedSize: 10 * 1024 * 1024,
+    }),
   ],
 })
 ```
+
+By default, decompressed request bodies are limited to 10MB. Requests over the limit receive a `413` response (`400` inside a [batch request](/docs/plugins/batch)). Set `maxDecompressedSize` to `Number.POSITIVE_INFINITY` to disable the limit.
 
 :::info
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
 :::
 
-:::tip
-Combine with the [Request Limit Plugin](/docs/plugins/request-limit) to limit the decompressed payload size.
+:::warning
+Proxy or platform body-size limits (such as nginx `client_max_body_size` or serverless request caps) only see the compressed wire size, so a tiny compressed request can still expand to a huge body on your server. Use `maxDecompressedSize` or the [Request Limit Plugin](/docs/plugins/request-limit) to bound the decompressed size.
 :::
 
 ## Learn More

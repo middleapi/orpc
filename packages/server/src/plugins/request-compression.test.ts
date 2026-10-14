@@ -211,3 +211,62 @@ describe('requestCompressionHandlerPlugin', () => {
     expect(procedureHandler).toHaveBeenCalledWith(expect.any(Object), 'input')
   })
 })
+
+describe('decompressed size limit', () => {
+  const big = Buffer.concat([
+    Buffer.from('{"json":"'),
+    Buffer.alloc(20 * 1024 * 1024, 'a'), // 20 MiB once decompressed
+    Buffer.from('"}'),
+  ])
+  const nested = zlib.gzipSync(zlib.gzipSync(big)) // ~200 bytes on the wire
+
+  it('rejects bodies whose decompressed size exceeds the default limit', async () => {
+    const procedureHandler = vi.fn(() => 'ok')
+    const handler = new RPCHandler(os.handler(procedureHandler), {
+      plugins: [new RequestCompressionHandlerPlugin()],
+    })
+
+    expect(nested.length).toBeLessThan(2048)
+
+    const { response } = await handler.handle(new Request('http://localhost', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-encoding': 'gzip, gzip' },
+      body: nested,
+    }))
+
+    expect(response?.status).toBe(413)
+    expect(procedureHandler).not.toHaveBeenCalled()
+  })
+
+  it('respects a custom maxDecompressedSize', async () => {
+    const procedureHandler = vi.fn(() => 'ok')
+    const handler = new RPCHandler(os.handler(procedureHandler), {
+      plugins: [new RequestCompressionHandlerPlugin({ maxDecompressedSize: 1024 })],
+    })
+
+    const { response } = await handler.handle(new Request('http://localhost', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-encoding': 'gzip' },
+      body: zlib.gzipSync(JSON.stringify({ json: 'a'.repeat(4096) })),
+    }))
+
+    expect(response?.status).toBe(413)
+    expect(procedureHandler).not.toHaveBeenCalled()
+  })
+
+  it('allows opting out with Number.POSITIVE_INFINITY', async () => {
+    const procedureHandler = vi.fn(() => 'ok')
+    const handler = new RPCHandler(os.handler(procedureHandler), {
+      plugins: [new RequestCompressionHandlerPlugin({ maxDecompressedSize: Number.POSITIVE_INFINITY })],
+    })
+
+    const { response } = await handler.handle(new Request('http://localhost', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-encoding': 'gzip, gzip' },
+      body: nested,
+    }))
+
+    expect(response?.status).toBe(200)
+    expect(procedureHandler).toHaveBeenCalledTimes(1)
+  })
+})
