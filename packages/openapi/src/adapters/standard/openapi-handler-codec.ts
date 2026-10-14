@@ -2,7 +2,7 @@ import type { AnyORPCError } from '@orpc/client'
 import type { AnyProcedure, AnyRouter, Context } from '@orpc/server'
 import type { ResolvedStandardHandlerHandleOptions, StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '@orpc/server/standard'
 import type { Promisable, Public } from '@orpc/shared'
-import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
+import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { OpenAPIMeta } from '../../meta'
 import type { OpenAPIMatcherOptions } from './openapi-matcher'
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
@@ -98,7 +98,8 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
   }
 
   /**
-   * @throws {TypeError} If `outputStructure` is "detailed" and the output doesn't match the expected structure.
+   * @throws {TypeError} If `outputStructure` is "detailed" and the output doesn't match the expected structure,
+   *   or contains a header name or value that cannot be sent over HTTP.
    */
   encodeOutput(output: unknown, procedure: AnyProcedure, path: string[]): Promisable<StandardResponse> {
     const meta = getOpenAPIMeta(procedure)
@@ -117,7 +118,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
       throw new TypeError(`
         Invalid "detailed" output structure returned by procedure (${path.join('.')}):
         • Expected an object with optional properties:
-          - status (number <400)
+          - status (integer 200-399)
           - headers (object)
           - body (any)
         • No extra keys allowed.
@@ -127,9 +128,13 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
       `)
     }
 
+    const headers = output.headers !== undefined ? serializeHeaders(output.headers, this.serializer) : {}
+
+    assertValidResponseHeaders(headers, path)
+
     return {
       status: output.status ?? successStatus,
-      headers: output.headers !== undefined ? serializeHeaders(output.headers, this.serializer) : {},
+      headers,
       body: this.serializer.serialize(output.body),
     }
   }
@@ -286,6 +291,7 @@ function isValidDetailedOutput(output: unknown): output is { status?: number, bo
   if (output.status !== undefined && (
     typeof output.status !== 'number'
     || !Number.isInteger(output.status)
+    || output.status < 200
     || output.status > 399
   )) {
     return false
@@ -296,6 +302,37 @@ function isValidDetailedOutput(output: unknown): output is { status?: number, bo
   }
 
   return true
+}
+
+/**
+ * RFC 9110 `token`, see https://www.rfc-editor.org/rfc/rfc9110#section-5.1
+ */
+const HTTP_HEADER_NAME_REGEX = /^[!#$%&'*+\-.^\w`|~]+$/
+
+/**
+ * Characters both Node (`res.setHeader`) and Fetch (`Headers.append`) accept in a field value:
+ * tab, visible ASCII, space, and Latin-1 (no CR, LF, NUL, other control characters, or code points above U+00FF).
+ */
+const HTTP_HEADER_VALUE_REGEX = /^[\t\x20-\x7E\x80-\xFF]*$/
+
+/**
+ * Adapters write headers after the handler's error pipeline, where an invalid header would
+ * reject `handle()` (or crash the process), so it must be rejected while encoding instead.
+ *
+ * @warning The value is intentionally left out of the error message since it may be attacker-controlled.
+ */
+function assertValidResponseHeaders(headers: StandardHeaders, path: readonly string[]): void {
+  for (const [name, value] of Object.entries(headers)) {
+    if (!HTTP_HEADER_NAME_REGEX.test(name)) {
+      throw new TypeError(`Invalid header name ${stringifyJSON(name)} in "detailed" output returned by procedure (${path.join('.')}). Header names must be valid HTTP tokens.`)
+    }
+
+    const values = Array.isArray(value) ? value : [value]
+
+    if (values.some(item => item !== undefined && !HTTP_HEADER_VALUE_REGEX.test(item))) {
+      throw new TypeError(`Invalid value for header ${stringifyJSON(name)} in "detailed" output returned by procedure (${path.join('.')}). Header values must not contain CR, LF, or other control characters (except tab), or characters above U+00FF.`)
+    }
+  }
 }
 
 function decodeDelimitedArray(value: string | undefined, delimiter: string): undefined | string[] {

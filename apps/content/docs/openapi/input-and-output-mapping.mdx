@@ -161,7 +161,7 @@ const getPlanet = os
 
 In `detailed` mode, return an object with the following fields:
 
-- `status`: optional success status code _(defaults to `successStatus`, should be in the `2xx` range and must be less than `400`)_
+- `status`: optional success status code _(defaults to `successStatus`, must be an integer from `200` to `399`)_
 - `headers`: optional response headers in lower-case keys
 - `body`: optional response body
 
@@ -199,6 +199,12 @@ const savePlanet = os
   })
 ```
 
+Header names must be valid HTTP tokens, and header values must be valid HTTP field values: no CR, LF, or other control characters, and only Latin-1 characters. An invalid header makes the procedure respond with a `500` error.
+
+:::tip
+Encode user-provided text before putting it in a header. For `content-disposition`, use `filename*=UTF-8''${encodeURIComponent(name)}` ([RFC 6266](https://www.rfc-editor.org/rfc/rfc6266)/[RFC 5987](https://www.rfc-editor.org/rfc/rfc5987)), or return a `File` body and let oRPC generate the header.
+:::
+
 ### Redirect Response
 
 Combine `successStatus` with the [detailed output structure](#detailed-output-structure) to return a standard HTTP redirect: a `3xx` status and a [`Location`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Location) header.
@@ -220,6 +226,8 @@ const redirect = os
     }
   })
 ```
+
+If the redirect target is built from input, validate it or check it against an allow-list to avoid open redirects and invalid `Location` headers.
 
 :::warning
 [OpenAPI Link](/docs/openapi/link) does not follow redirects and throws in browsers, where `fetch` hides redirect responses. Server runtimes receive the `3xx` response as the output.

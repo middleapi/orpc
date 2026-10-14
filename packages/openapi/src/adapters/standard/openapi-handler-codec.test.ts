@@ -824,7 +824,7 @@ describe('openAPIHandlerCodec', () => {
         })
       })
 
-      it('accepts informational and redirect statuses since any status below 400 is success', () => {
+      it('accepts redirect statuses', () => {
         const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
         const codec = new OpenAPIHandlerCodec(procedure)
 
@@ -884,8 +884,39 @@ describe('openAPIHandlerCodec', () => {
       })
 
       it.each([
+        ['CRLF in value', { location: '/\r\nset-cookie: a=b' }, 'location'],
+        ['code point above U+00FF in value', { 'content-disposition': 'attachment; filename="日.txt"' }, 'content-disposition'],
+        ['NUL in value', { 'x-a': 'a\0b' }, 'x-a'],
+        ['CRLF in an array item', { 'set-cookie': ['a=b', 'c=d\r\nx: y'] }, 'set-cookie'],
+        ['non-token name', { 'bad name': 'v' }, 'bad name'],
+      ])('throws for invalid headers: %s', (_, headers, name) => {
+        const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
+        const codec = new OpenAPIHandlerCodec(procedure)
+
+        const encode = () => codec.encodeOutput({ headers }, procedure, ['download'])
+
+        expect(encode).toThrow(TypeError)
+        expect(encode).toThrow('(download)')
+        expect(encode).toThrow(JSON.stringify(name))
+      })
+
+      it('accepts Latin-1 and tab header values and array headers', () => {
+        const procedure = os.meta(openapi({ outputStructure: 'detailed' })).handler(vi.fn())
+        const codec = new OpenAPIHandlerCodec(procedure)
+
+        const response = codec.encodeOutput({
+          headers: { 'x-latin1': 'café', 'x-tab': 'a\tb', 'set-cookie': ['a=b', 'c=d'] },
+        }, procedure, ['download']) as any
+
+        expect(response.headers).toEqual({ 'x-latin1': 'café', 'x-tab': 'a\tb', 'set-cookie': ['a=b', 'c=d'] })
+      })
+
+      it.each([
         ['non-object output', '__invalid__'],
         ['status of 400 or above', { status: 400 }],
+        ['informational status', { status: 199 }],
+        ['zero status', { status: 0 }],
+        ['negative status', { status: -1 }],
         ['non-integer status', { status: 250.5 }],
         ['non-number status', { status: '200' }],
         ['extra keys', { body: 'ok', extra: true }],

@@ -1,7 +1,8 @@
 import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { os } from '@orpc/server'
+import { onError, os } from '@orpc/server'
 import request from 'supertest'
+import z from 'zod'
 import { openapi } from '../../meta'
 import { OpenAPIHandler } from './openapi-handler'
 
@@ -65,5 +66,53 @@ describe('openapiHandler', () => {
 
     expect(res.status).toBe(200)
     expect(res.body).toBe('intercepted')
+  })
+})
+
+describe('openapiHandler: invalid detailed-output headers', () => {
+  const router = {
+    download: os
+      .meta(openapi({ method: 'GET', path: '/download', outputStructure: 'detailed' }))
+      .input(z.object({ name: z.string() }))
+      .handler(({ input }) => ({
+        headers: { 'content-disposition': `attachment; filename="${input.name}"` },
+        body: 'file-content',
+      })),
+    redirect: os
+      .meta(openapi({ method: 'GET', path: '/redirect', successStatus: 307, outputStructure: 'detailed' }))
+      .input(z.object({ to: z.string().startsWith('/') }))
+      .handler(({ input }) => ({ headers: { location: input.to } })),
+  }
+
+  it.each([
+    ['/api/download?name=%E6%97%A5.txt'], // code point above U+00FF
+    ['/api/redirect?to=%2F%0D%0ASet-Cookie:%20a=b'], // CRLF
+  ])('responds 500 and calls onError instead of rejecting for %s', async (url) => {
+    const onErrorSpy = vi.fn()
+    const handler = new OpenAPIHandler(router, { interceptors: [onError(onErrorSpy)] })
+    let handleError: unknown
+
+    const res = await request(async (req: IncomingMessage, response: ServerResponse) => {
+      try {
+        await handler.handle(req as any, response as any, { prefix: '/api' })
+      }
+      catch (e) {
+        handleError = e
+      }
+    }).get(url)
+
+    expect(handleError).toBeUndefined()
+    expect(res.status).toBe(500)
+    expect(onErrorSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('still sends valid headers', async () => {
+    const handler = new OpenAPIHandler(router)
+    const res = await request(async (req: IncomingMessage, response: ServerResponse) => {
+      await handler.handle(req as any, response as any, { prefix: '/api' })
+    }).get('/api/download?name=a.txt')
+
+    expect(res.status).toBe(200)
+    expect(res.headers['content-disposition']).toBe('attachment; filename="a.txt"')
   })
 })
