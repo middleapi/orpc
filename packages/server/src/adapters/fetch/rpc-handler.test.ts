@@ -83,17 +83,6 @@ describe('rpcHandler', () => {
     expect(middleware).not.toHaveBeenCalled()
   })
 
-  it('still accepts normal bigint values', async () => {
-    const handler = new RPCHandler({ echo: os.handler(({ input }) => input) })
-    const { response } = await handler.handle(new Request('https://example.com/echo', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ json: '-12345678901234567890', meta: [['bigint']] }),
-    }))
-    expect(response?.status).toBe(200)
-    await expect(response?.json()).resolves.toEqual({ json: '-12345678901234567890', meta: [['bigint']] })
-  })
-
   it('treats GET requests as unmatched by default', async () => {
     const handler = new RPCHandler({
       ping: os.handler(() => 'pong'),

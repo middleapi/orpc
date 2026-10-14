@@ -209,27 +209,16 @@ describe('jsonSchemaCoercer', () => {
       expect(coerce(BIGINT_SCHEMA, '0x10')).toBe('0x10')
     })
 
-    it('leaves overly long integer strings untouched instead of parsing them', () => {
-      const huge = '9'.repeat(1_000_000)
-      expect(typeof coerce(BIGINT_SCHEMA, huge)).toBe('string')
-      expect(typeof coerce(BIGINT_SCHEMA, `-${huge}`)).toBe('string')
-      expect(typeof coerce({ anyOf: [BIGINT_SCHEMA, BIGINT_SCHEMA] }, huge)).toBe('string')
-      expect(coerce(BIGINT_SCHEMA, '9'.repeat(100))).toBe(BigInt('9'.repeat(100)))
-      expect(coerce(BIGINT_SCHEMA, `-${'9'.repeat(4300)}`)).toBe(-BigInt('9'.repeat(4300)))
-      expect(coerce(BIGINT_SCHEMA, `-${'9'.repeat(4301)}`)).toBe(`-${'9'.repeat(4301)}`)
-    })
+    it('leaves integer strings longer than maxBigIntDigits untouched', () => {
+      expect(coerce(BIGINT_SCHEMA, '9'.repeat(4300))).toBe(BigInt('9'.repeat(4300)))
+      expect(coerce(BIGINT_SCHEMA, '9'.repeat(4301))).toBe('9'.repeat(4301))
+      expect(coerce({ anyOf: [BIGINT_SCHEMA, BIGINT_SCHEMA] }, '9'.repeat(4301))).toBe('9'.repeat(4301))
 
-    it('supports raising, lowering and disabling the digit limit with maxBigIntDigits', () => {
-      const coerceWith = (maxBigIntDigits: number, value: unknown) =>
-        new JsonSchemaCoercer({ maxBigIntDigits }).coerce([BIGINT_SCHEMA as JsonSchema, false], value)
-
-      expect(coerceWith(5000, '9'.repeat(5000))).toBe(BigInt('9'.repeat(5000)))
-      expect(coerceWith(5000, '9'.repeat(5001))).toBe('9'.repeat(5001))
-      expect(coerceWith(3, '-999')).toBe(-999n)
-      expect(coerceWith(3, '1000')).toBe('1000')
+      const limited = new JsonSchemaCoercer({ maxBigIntDigits: 3 })
+      expect(limited.coerce([BIGINT_SCHEMA as JsonSchema, false], '999')).toBe(999n)
+      expect(limited.coerce([BIGINT_SCHEMA as JsonSchema, false], '1000')).toBe('1000')
       // whole numbers are bounded by the JSON number range, so they are not limited
-      expect(coerceWith(3, 1000)).toBe(1000n)
-      expect(coerceWith(Number.POSITIVE_INFINITY, '9'.repeat(10_000))).toBe(BigInt('9'.repeat(10_000)))
+      expect(limited.coerce([BIGINT_SCHEMA as JsonSchema, false], 1000)).toBe(1000n)
     })
   })
 

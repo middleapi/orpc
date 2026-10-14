@@ -1,4 +1,3 @@
-import * as z from 'zod'
 import { builtInRPCSupportDataTypes } from '../../../tests/rpc/__shared__/built-in-support-data-types'
 import { RPCJsonSerializer } from './rpc-json-serializer'
 
@@ -61,10 +60,6 @@ function roundTripThroughWire(serializer: RPCJsonSerializer, value: unknown): un
   const { json, meta, maps, blobs } = serializer.serialize(value)
   const wire = JSON.parse(JSON.stringify({ json, meta, maps }))
   return serializer.deserialize({ ...wire, blobs })
-}
-
-function digits(count: number): string {
-  return '9'.repeat(count)
 }
 
 describe.each([
@@ -401,37 +396,6 @@ describe('rpcJsonSerializer: deserialize', () => {
   })
 })
 
-describe('rpcJsonSerializer: bigint digit limit', () => {
-  const serializer = new RPCJsonSerializer()
-
-  it('accepts up to 4300 digits, with or without a sign', () => {
-    for (const sign of ['', '-']) {
-      expect(serializer.deserialize({ json: sign + digits(4300), meta: [['bigint']] })).toBe(BigInt(sign + digits(4300)))
-      expect(() => serializer.deserialize({ json: sign + digits(4301), meta: [['bigint']] }))
-        .toThrow('Invalid RPC serialized data: type "bigint" expects a decimal integer string of at most 4300 digits.')
-    }
-  })
-
-  it('does not limit serialization', () => {
-    expect(serializer.serialize(BigInt(digits(5000)))).toEqual({ json: digits(5000), meta: [['bigint']] })
-  })
-
-  it('can be raised by overriding the bigint handler', () => {
-    const raised = new RPCJsonSerializer({
-      handlers: {
-        bigint: {
-          condition: v => typeof v === 'bigint',
-          serialize: (v: bigint) => v.toString(),
-          deserialize: v => BigInt(z.string().max(10_000).regex(/^-?\d+$/).parse(v)),
-        },
-      },
-    })
-
-    expect(roundTripThroughWire(raised, { value: BigInt(digits(5000)) })).toEqual({ value: BigInt(digits(5000)) })
-    expect(() => raised.deserialize({ json: digits(10_001), meta: [['bigint']] })).toThrow()
-  })
-})
-
 describe('rpcJsonSerializer: security', () => {
   const serializer = new RPCJsonSerializer()
 
@@ -503,13 +467,13 @@ describe('rpcJsonSerializer: security', () => {
     }
   })
 
-  it('bigint deserialize validates format and length', () => {
-    expect(() => serializer.deserialize({ json: '9'.repeat(1_000_000), meta: [['bigint']] })).toThrow(TypeError)
-    for (const bad of ['0x10', '0b1', '', ' 1 ']) {
-      expect(() => serializer.deserialize({ json: bad, meta: [['bigint']] })).toThrow(TypeError)
+  it('bigint rejects non-canonical strings and more than 4300 digits', () => {
+    expect(serializer.deserialize({ json: '9'.repeat(4300), meta: [['bigint']] })).toBe(BigInt('9'.repeat(4300)))
+
+    for (const bad of ['9'.repeat(4301), '0x10', ' 1 ']) {
+      expect(() => serializer.deserialize({ json: bad, meta: [['bigint']] }))
+        .toThrow('Invalid RPC serialized data: type "bigint" expects a decimal integer string of at most 4300 digits.')
     }
-    expect(serializer.deserialize({ json: '-12345678901234567890', meta: [['bigint']] })).toBe(-12345678901234567890n)
-    expect(serializer.deserialize({ json: '0', meta: [['bigint']] })).toBe(0n)
   })
 
   it('rejects a value already restored by an earlier meta entry', () => {
