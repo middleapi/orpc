@@ -42,6 +42,22 @@ testSchemaSmartCoercion([
     input: '12345n',
   },
   {
+    name: 'bigint - 0x10',
+    schema: z.bigint(),
+    input: '0x10',
+  },
+  {
+    name: 'bigint - 4300 digits',
+    schema: z.bigint(),
+    input: '9'.repeat(4300),
+    expected: BigInt('9'.repeat(4300)),
+  },
+  {
+    name: 'bigint - 4301 digits',
+    schema: z.bigint(),
+    input: '9'.repeat(4301),
+  },
+  {
     name: 'bigint - true',
     schema: z.bigint(),
     input: true,

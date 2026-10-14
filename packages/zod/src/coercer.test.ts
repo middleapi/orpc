@@ -47,6 +47,21 @@ const nativeCases: TestCase[] = [
     expected: '12345n',
   },
   {
+    schema: z.bigint(),
+    input: '0x10',
+    expected: '0x10',
+  },
+  {
+    schema: z.bigint(),
+    input: '9'.repeat(4300),
+    expected: BigInt('9'.repeat(4300)),
+  },
+  {
+    schema: z.bigint(),
+    input: '9'.repeat(4301),
+    expected: '9'.repeat(4301),
+  },
+  {
     schema: z.boolean(),
     input: 't',
     expected: true,

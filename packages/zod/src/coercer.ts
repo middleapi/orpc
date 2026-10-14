@@ -24,7 +24,7 @@ import type {
   ZodTypeAny,
   ZodUnion,
 } from 'zod/v3'
-import { guard, isObject, NullProtoObj } from '@orpc/shared'
+import { DEFAULT_MAX_BIGINT_DIGITS, guard, isObject, NullProtoObj, parseBigIntString } from '@orpc/shared'
 import { ZodFirstPartyTypeKind } from 'zod/v3'
 import { getCustomZodDef } from './schemas/base'
 
@@ -360,7 +360,7 @@ function zodCoerceInternal(
 }
 
 function safeToBigInt(value: string): bigint | string {
-  return guard(() => BigInt(value)) ?? value
+  return parseBigIntString(value, DEFAULT_MAX_BIGINT_DIGITS) ?? value
 }
 
 function safeToNumber(value: string): number | string {

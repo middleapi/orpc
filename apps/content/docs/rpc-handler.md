@@ -26,7 +26,7 @@ Other adapters may remove or change options to keep things simple.
 - **null**
 - **undefined**
 - **Date** (including `Invalid Date`)
-- **BigInt**
+- **BigInt** (up to 4300 digits, see [BigInt Digit Limit](/docs/advanced/rpc-json-serializer#bigint-digit-limit))
 - **RegExp** (lazy: compiled on first use)
 - **URL**
 - **Record (object)**

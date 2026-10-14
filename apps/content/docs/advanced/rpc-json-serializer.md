@@ -99,3 +99,19 @@ export const undefinedSerializer: StandardRPCCustomJsonSerializer = {
 ```
 
 A custom serializer that matches a built-in `type` fully replaces it: the built-in `deserialize` no longer runs on that value, so your `deserialize` must validate the input itself.
+
+## BigInt Digit Limit
+
+The built-in `bigint` type only accepts decimal strings of up to 4300 digits, since parsing longer ones can block the event loop. To allow longer values, override it on both sides:
+
+```ts
+import type { StandardRPCCustomJsonSerializer } from '@orpc/client/standard'
+import * as z from 'zod'
+
+export const bigintSerializer: StandardRPCCustomJsonSerializer = {
+  type: 0, // Match the built-in bigint type.
+  condition: data => typeof data === 'bigint',
+  serialize: (data: bigint) => data.toString(),
+  deserialize: data => BigInt(z.string().max(10_000).regex(/^-?\d+$/).parse(data)),
+}
+```

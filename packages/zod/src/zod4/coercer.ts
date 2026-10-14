@@ -22,7 +22,7 @@ import type {
   $ZodType,
   $ZodUnion,
 } from 'zod/v4/core'
-import { guard, isObject, NullProtoObj } from '@orpc/shared'
+import { DEFAULT_MAX_BIGINT_DIGITS, isObject, NullProtoObj, parseBigIntString } from '@orpc/shared'
 
 /**
  * @deprecated Use [Smart Coercion Plugin](https://orpc.dev/docs/openapi/plugins/smart-coercion) instead.
@@ -376,7 +376,7 @@ export class experimental_ZodSmartCoercionPlugin<TContext extends Context> imple
   }
 
   #stringToBigInt(value: string): bigint | string {
-    return guard(() => BigInt(value)) ?? value
+    return parseBigIntString(value, DEFAULT_MAX_BIGINT_DIGITS) ?? value
   }
 
   #stringToBoolean(value: string): boolean | string {

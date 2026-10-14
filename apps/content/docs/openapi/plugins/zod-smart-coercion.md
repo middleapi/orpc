@@ -101,6 +101,8 @@ const raw = '12345678901234567890' // Input
 const coerced = 12345678901234567890n // Output
 ```
 
+Strings longer than 4300 digits are left unchanged.
+
 #### Date
 
 Converts valid date strings into Date objects:

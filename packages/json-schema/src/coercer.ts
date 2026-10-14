@@ -1,5 +1,5 @@
 import type { JsonSchema } from './types'
-import { guard, isObject, NullProtoObj, toArray } from '@orpc/shared'
+import { DEFAULT_MAX_BIGINT_DIGITS, guard, isObject, NullProtoObj, parseBigIntString, toArray } from '@orpc/shared'
 import { JsonSchemaXNativeType } from './types'
 
 const FLEXIBLE_DATE_FORMAT_REGEX = /^[^-]+-[^-]+-[^-]+$/
@@ -8,7 +8,23 @@ export interface JsonSchemaCoerceOptions {
   components?: Record<string, JsonSchema>
 }
 
+export interface JsonSchemaCoercerOptions {
+  /**
+   * Maximum digits, excluding a leading `-`, of a string coerced to `bigint`. Longer strings are left unchanged.
+   * `Number.POSITIVE_INFINITY` disables it.
+   *
+   * @default 4300
+   */
+  maxBigIntDigits?: number | undefined
+}
+
 export class JsonSchemaCoercer {
+  private readonly maxBigIntDigits: number
+
+  constructor(options: JsonSchemaCoercerOptions = {}) {
+    this.maxBigIntDigits = options.maxBigIntDigits ?? DEFAULT_MAX_BIGINT_DIGITS
+  }
+
   coerce(schema: JsonSchema, value: unknown, options: JsonSchemaCoerceOptions = {}): unknown {
     const [, coerced] = this.#coerce(schema, value, options)
     return coerced
@@ -376,7 +392,7 @@ export class JsonSchemaCoercer {
   }
 
   #stringToBigInt(value: string): bigint | string {
-    return guard(() => BigInt(value)) ?? value
+    return parseBigIntString(value, this.maxBigIntDigits) ?? value
   }
 
   #numberToBigInt(value: number): bigint | number {
