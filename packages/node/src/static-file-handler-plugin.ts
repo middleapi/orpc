@@ -46,10 +46,14 @@ const CONTENT_ENCODING_EXTENSIONS = {
 
 type ContentEncoding = keyof typeof CONTENT_ENCODING_EXTENSIONS
 
-/** Sidecars in order of preference, best compression first. */
-const PRECOMPRESSED_ENCODINGS: readonly ContentEncoding[] = ['br', 'zstd', 'gzip']
-
 type FoundFile = [filePath: string, stats: Stats, realPath: string]
+
+interface CompressionCache {
+  dir: string
+  /** The configured encodings this runtime can compress into. */
+  encodings: readonly ContentEncoding[]
+  threshold: number
+}
 
 interface EncodedFile {
   encoding: ContentEncoding
@@ -57,27 +61,42 @@ interface EncodedFile {
   stats: Stats
 }
 
-export interface StaticFileHandlerPluginCompressionCacheOptions {
+export interface StaticFileHandlerPluginCompressionOptions {
   /**
-   * The directory compressed copies are stored in, created on first use. Resolved against the
-   * working directory when relative. Use a directory nothing else writes to. Entries are never
-   * removed, since a changed file gets a new one, so the directory can be cleared at any time,
-   * such as on every deploy.
-   */
-  dir: string
-
-  /**
-   * The encodings files are compressed with, prioritized by their order in this array and
-   * only applied if the client supports them (via Accept-Encoding).
-   * `zstd` requires Node.js 22.15 or later.
+   * The encodings files can be served in, prioritized by their order in this array and
+   * only applied if the client supports them (via Accept-Encoding). Applies to both
+   * precompressed sidecars and compression into `cacheDir`.
    *
-   * @default ['br', 'gzip']
+   * @default ['br', 'zstd', 'gzip']
    */
   encodings?: readonly ContentEncoding[]
 
   /**
-   * The minimum file size in bytes required to trigger compression.
-   * Smaller files are always served as they are.
+   * Whether precompressed sidecar files next to a file, such as `app.js.br`, `app.js.zst`,
+   * and `app.js.gz`, are served.
+   *
+   * @default true
+   */
+  precompressed?: boolean
+
+  /**
+   * The directory files are compressed into when no sidecar provides an accepted encoding,
+   * created on first use and resolved against the working directory when relative. The first
+   * request for a file in an encoding waits for its compression, and every later request,
+   * after a restart too, is answered from the stored copy. Use a directory nothing else writes
+   * to. Copies are never removed, since a changed file gets a new one, so the directory can
+   * be cleared at any time, such as on every deploy.
+   *
+   * Compressing into `zstd` requires Node.js 22.15 or later. Older versions skip it here and
+   * still serve `zstd` sidecars.
+   *
+   * @default undefined (only sidecars are served)
+   */
+  cacheDir?: string
+
+  /**
+   * The minimum file size in bytes required to compress a file into `cacheDir`.
+   * Sidecars are served whatever their size.
    *
    * @default 1024 (1KB)
    */
@@ -132,23 +151,14 @@ export interface StaticFileHandlerPluginOptions {
   dotfiles?: boolean
 
   /**
-   * Whether precompressed sidecar files (`.br`, `.zst`, `.gz`) can be served
-   * when the client accepts their encoding and the content type is compressible.
+   * Serves files with a compressible content type in an encoding the client accepts, from
+   * precompressed sidecars and, when `cacheDir` is set, from copies compressed on demand.
+   * Encoded files keep conditional and range requests working. Omit to always serve files
+   * as they are.
    *
-   * @default false
+   * @default undefined
    */
-  precompressed?: boolean
-
-  /**
-   * Compresses a file with a compressible content type the first time a client accepts an
-   * encoding that no precompressed sidecar provides, then stores the result on disk, so each
-   * file is compressed once per encoding instead of on every request. The first request waits
-   * for the compression, and every request is answered from the stored copy like a sidecar,
-   * keeping conditional and range requests working.
-   *
-   * @default undefined (disabled)
-   */
-  compressionCache?: StaticFileHandlerPluginCompressionCacheOptions
+  compression?: StaticFileHandlerPluginCompressionOptions
 
   /**
    * Whether symbolic links whose target lies outside `rootDir` can be served.
@@ -203,8 +213,9 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   private readonly fallbackFile: StaticFileHandlerPluginOptions['fallbackFile']
   private readonly cacheControl: Exclude<StaticFileHandlerPluginOptions['cacheControl'], undefined>
   private readonly dotfiles: Exclude<StaticFileHandlerPluginOptions['dotfiles'], undefined>
-  private readonly precompressed: Exclude<StaticFileHandlerPluginOptions['precompressed'], undefined>
-  private readonly compressionCache: Required<StaticFileHandlerPluginCompressionCacheOptions> | undefined
+  /** The encodings sidecars are looked up in, or `undefined` when sidecars are not served. */
+  private readonly precompressedEncodings: readonly ContentEncoding[] | undefined
+  private readonly compressionCache: CompressionCache | undefined
   private readonly allowSymlinks: Exclude<StaticFileHandlerPluginOptions['allowSymlinks'], undefined>
   private readonly mimeTypes: Exclude<StaticFileHandlerPluginOptions['mimeTypes'], undefined>
   /** Compressions in progress keyed by cache path, so concurrent requests for a file share one. */
@@ -221,19 +232,18 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     this.fallbackFile = options.fallbackFile
     this.cacheControl = options.cacheControl ?? 'public, max-age=0'
     this.dotfiles = options.dotfiles ?? false
-    this.precompressed = options.precompressed ?? false
 
-    if (options.compressionCache !== undefined) {
-      const encodings = options.compressionCache.encodings ?? ['br', 'gzip']
+    const compression = options.compression
+    const encodings = compression?.encodings ?? ['br', 'zstd', 'gzip']
 
-      if (encodings.includes('zstd') && typeof zlib.createZstdCompress !== 'function') {
-        throw new TypeError('[StaticFileHandlerPlugin] The zstd compression cache encoding requires Node.js 22.15 or later')
-      }
+    this.precompressedEncodings = compression !== undefined && (compression.precompressed ?? true) ? encodings : undefined
 
+    if (compression?.cacheDir !== undefined) {
       this.compressionCache = {
-        dir: path.resolve(options.compressionCache.dir),
-        encodings,
-        threshold: options.compressionCache.threshold ?? 1024,
+        dir: path.resolve(compression.cacheDir),
+        // Without zstd support, a client that accepts it is answered in its next accepted encoding
+        encodings: typeof zlib.createZstdCompress === 'function' ? encodings : encodings.filter(encoding => encoding !== 'zstd'),
+        threshold: compression.threshold ?? 1024,
       }
     }
 
@@ -349,10 +359,14 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   }
 
   /**
-   * Finds the first precompressed sidecar of `filePath` the client accepts.
+   * Finds the precompressed sidecar of `filePath` in the first of `encodings` the client accepts.
    */
-  private async findPrecompressedFile(filePath: string, qualities: Map<string, number>): Promise<EncodedFile | undefined> {
-    const candidates = await Promise.all(PRECOMPRESSED_ENCODINGS
+  private async findPrecompressedFile(
+    encodings: readonly ContentEncoding[],
+    filePath: string,
+    qualities: Map<string, number>,
+  ): Promise<EncodedFile | undefined> {
+    const candidates = await Promise.all(encodings
       .filter(encoding => isAcceptableEncoding(qualities, encoding))
       .map(async (encoding) => {
         const candidatePath = filePath + CONTENT_ENCODING_EXTENSIONS[encoding]
@@ -375,7 +389,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
    * accepts, compressing the file into the cache when no copy exists yet.
    */
   private async resolveCompressionCacheFile(
-    compressionCache: Required<StaticFileHandlerPluginCompressionCacheOptions>,
+    compressionCache: CompressionCache,
     filePath: string,
     realPath: string,
     stats: Stats,
@@ -532,11 +546,12 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
 
     const contentType = this.resolveContentType(filePath)
     // The content type is only tested when an encoding could apply at all
-    const canEncode = (this.precompressed || this.compressionCache !== undefined) && isCompressibleContentType(contentType)
+    const canEncode = (this.precompressedEncodings !== undefined || this.compressionCache !== undefined) && isCompressibleContentType(contentType)
+    const precompressedEncodings = canEncode ? this.precompressedEncodings : undefined
     const compressionCache = canEncode && this.compressionCache !== undefined && stats.size >= this.compressionCache.threshold
       ? this.compressionCache
       : undefined
-    const negotiatesEncoding = (this.precompressed && canEncode) || compressionCache !== undefined
+    const negotiatesEncoding = precompressedEncodings !== undefined || compressionCache !== undefined
 
     let contentEncoding: string | undefined
 
@@ -544,7 +559,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       const qualities = parseAcceptEncodingQualities(flattenStandardHeader(request.headers['accept-encoding']))
 
       // A sidecar is prepared ahead of time, usually with stronger compression, so it wins over the cache
-      const encoded = (this.precompressed ? await this.findPrecompressedFile(filePath, qualities) : undefined)
+      const encoded = (precompressedEncodings !== undefined ? await this.findPrecompressedFile(precompressedEncodings, filePath, qualities) : undefined)
         ?? (compressionCache !== undefined ? await this.resolveCompressionCacheFile(compressionCache, filePath, realPath, stats, qualities) : undefined)
 
       if (encoded !== undefined) {

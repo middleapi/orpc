@@ -69,21 +69,13 @@ const handler = new RPCHandler(router, {
       dotfiles: false,
 
       /**
-       * Whether precompressed `.br`, `.zst`, and `.gz` sidecar files can be served
-       * when the client accepts their encoding.
+       * Serves compressible files in an encoding the client accepts, from
+       * precompressed sidecars and optionally from copies compressed on demand.
+       * Omit to always serve files as they are. See Compression below.
        *
-       * @default false
+       * @default undefined
        */
-      precompressed: false,
-
-      /**
-       * Compresses files the first time a client accepts an encoding that no
-       * precompressed sidecar provides, and stores the result on disk, so each
-       * file is compressed once per encoding. See Compression below.
-       *
-       * @default undefined (disabled)
-       */
-      compressionCache: undefined,
+      compression: undefined,
 
       /**
        * Whether symbolic links whose target lies outside `rootDir` can be served.
@@ -116,31 +108,44 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 
 ## Compression
 
-Set `compressionCache` to compress files that have no `precompressed` sidecar. The first request for a file in a given encoding compresses it into `dir` and is answered with the compressed copy. Later requests, including after a restart, are served straight from that copy, so each file is compressed only once per encoding.
+Set `compression` to serve compressible files, such as HTML, CSS, JavaScript, JSON, and SVG, in an encoding the client accepts. An encoded file comes from one of two sources, tried in order:
+
+1. **A precompressed sidecar** next to the file, such as `app.js.br`, `app.js.zst`, or `app.js.gz`, usually written by your build.
+2. **A copy compressed on demand** into `cacheDir`, when one is set and no sidecar provides an accepted encoding. The first request for a file in an encoding compresses it and is answered with the copy. Later requests, after a restart too, are served straight from that copy, so each file is compressed only once per encoding.
 
 ```ts
 const handler = new RPCHandler(router, {
   plugins: [
     new StaticFileHandlerPlugin({
       rootDir: './public',
-      precompressed: true,
-      compressionCache: {
+      compression: {
         /**
-         * The directory compressed copies are stored in, created on first use.
-         */
-        dir: './.cache/static-file',
-
-        /**
-         * The encodings files are compressed with, prioritized by their order
-         * and only applied if the client supports them. `zstd` requires
-         * Node.js 22.15 or later.
+         * The encodings files can be served in, prioritized by their order and
+         * only applied if the client supports them. Applies to both sidecars and
+         * compression into `cacheDir`.
          *
-         * @default ['br', 'gzip']
+         * @default ['br', 'zstd', 'gzip']
          */
-        encodings: ['br', 'gzip'],
+        encodings: ['br', 'zstd', 'gzip'],
 
         /**
-         * The minimum file size in bytes required to trigger compression.
+         * Whether precompressed sidecar files next to a file are served.
+         *
+         * @default true
+         */
+        precompressed: true,
+
+        /**
+         * The directory files are compressed into when no sidecar provides an
+         * accepted encoding, created on first use.
+         *
+         * @default undefined (only sidecars are served)
+         */
+        cacheDir: './.cache/static-file',
+
+        /**
+         * The minimum file size in bytes required to compress a file into
+         * `cacheDir`. Sidecars are served whatever their size.
          *
          * @default 1024 (1KB)
          */
@@ -151,12 +156,16 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-Only compressible content types, such as HTML, CSS, JavaScript, JSON, and SVG, are compressed, and a copy that comes out no smaller than its file is never served. Copies are served like sidecars, with their own `ETag` and `Content-Length`, so conditional and range requests keep working.
+Encoded files carry their own `ETag` and `Content-Length`, so conditional and range requests keep working, and every response that could be encoded carries `Vary: Accept-Encoding`.
 
-A copy is keyed by the file's real path, size, and modification and change times, so an edited or replaced file is compressed again rather than served stale. Old copies are never removed, so you can clear the directory whenever you like, such as on every deploy.
+:::info
+`compression: {}` only serves sidecars that already exist. Set `cacheDir` for the plugin to compress files itself.
+:::
+
+In `cacheDir`, a copy is keyed by the file's real path, size, and modification and change times, so an edited or replaced file is compressed again rather than served stale. A copy that comes out no smaller than its file is never served. Old copies are never removed, so you can clear the directory whenever you like, such as on every deploy. Compressing into `zstd` requires Node.js 22.15 or later; older versions skip it there and still serve `zstd` sidecars.
 
 :::warning
-Use a `dir` that nothing else writes to, since its copies are served as the compressed form of your files, and keep it outside `rootDir` so the copies are not reachable as files of their own. A file whose copy cannot be written is served uncompressed instead of failing the request.
+Use a `cacheDir` that nothing else writes to, since its copies are served as the compressed form of your files, and keep it outside `rootDir` so the copies are not reachable as files of their own. A file whose copy cannot be written is served uncompressed instead of failing the request.
 :::
 
 To compress responses on every request instead, add the [Response Compression Plugin](/docs/plugins/response-compression). It skips anything already encoded, so sidecars and cached copies are served as they are, and it leaves `206 Partial Content` responses alone so range requests keep working.
@@ -166,14 +175,14 @@ import { ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 
 const handler = new RPCHandler(router, {
   plugins: [
-    new StaticFileHandlerPlugin({ rootDir: './public', precompressed: true }),
+    new StaticFileHandlerPlugin({ rootDir: './public', compression: {} }),
     new ResponseCompressionHandlerPlugin(),
   ],
 })
 ```
 
 :::tip
-Precompressing assets at build time costs nothing per request and compresses best, since it can use the slowest levels. Reach for `precompressed` first, and let `compressionCache` cover whatever has no sidecar.
+Precompressing assets at build time costs nothing per request and compresses best, since it can use the slowest levels. Reach for sidecars first, and let `cacheDir` cover whatever has none.
 :::
 
 ## Learn More
