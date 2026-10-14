@@ -2,8 +2,15 @@ import type { APIGatewayProxyEventV2, AwsLambdaGlobal, HttpResponseStream } from
 import type { StandardHandlerPlugin } from '../standard'
 import { Buffer } from 'node:buffer'
 import { Writable } from 'node:stream'
+import { ORPCError } from '@orpc/client'
 import { os } from '../../builder'
 import { RPCHandler } from './rpc-handler'
+
+class Unserializable {
+  toJSON(): never {
+    throw new Error('not serializable')
+  }
+}
 
 class TestResponseStream extends Writable implements HttpResponseStream {
   chunks: Buffer[] = []
@@ -142,5 +149,41 @@ describe('rpcHandler', () => {
     expect(result.matched).toBe(true)
     expect(responseStream.metadata?.statusCode).toBe(200)
     expect(responseStream.text).toContain('pong')
+  })
+
+  it('responds with an empty 500 and resolves when the response body cannot be encoded', async () => {
+    const onSendResponseError = vi.fn()
+    const handler = new RPCHandler({
+      ping: os.handler(() => {
+        throw new ORPCError('BAD_REQUEST', { data: new Unserializable() })
+      }),
+    }, { onSendResponseError })
+
+    const responseStream = new TestResponseStream()
+    const result = await handler.handle(createEvent(), responseStream)
+
+    expect(result.matched).toBe(true)
+    expect(responseStream.metadata?.statusCode).toBe(500)
+    expect(responseStream.text).toBe('')
+    expect(onSendResponseError).toHaveBeenCalledExactlyOnceWith(new Error('not serializable'))
+  })
+
+  it('resolves without writing when the response stream is destroyed before sending', async () => {
+    const onSendResponseError = vi.fn()
+    const destroyError = new Error('stream destroyed')
+    const responseStream = new TestResponseStream()
+    const handler = new RPCHandler({
+      ping: os.handler(() => {
+        responseStream.destroy(destroyError)
+        return 'pong'
+      }),
+    }, { onSendResponseError })
+
+    const result = await handler.handle(createEvent(), responseStream)
+
+    expect(result.matched).toBe(true)
+    expect(responseStream.metadata).toBeUndefined()
+    expect(responseStream.text).toBe('')
+    expect(onSendResponseError).toHaveBeenCalledExactlyOnceWith(destroyError)
   })
 })

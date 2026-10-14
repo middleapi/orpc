@@ -262,6 +262,23 @@ describe('rpcSerializer', () => {
         return true
       })
     })
+
+    it('falls back to a data-less error event when the error data cannot be serialized', async () => {
+      const serializer = new RPCSerializer({ maxDepth: 3 })
+      const error = new ORPCError('BAD_REQUEST', { message: 'invalid', data: [[[[[1]]]]] })
+
+      const iterator = serializer.serialize((async function* () {
+        throw error
+      })()) as any
+
+      await expect(iterator.next()).rejects.toSatisfy((e: any) => {
+        expect(e).toBeInstanceOf(ErrorEvent)
+        expect(e.cause).toBe(error)
+        expect(e.data).toEqual(serializer.serialize({ defined: false, code: 'BAD_REQUEST', message: 'invalid', data: undefined }))
+
+        return true
+      })
+    })
   })
 
   describe('readable stream & blob', () => {

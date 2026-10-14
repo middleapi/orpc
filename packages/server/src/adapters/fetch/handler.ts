@@ -13,18 +13,30 @@ export interface FetchHandlerOptions<_T extends Context> {
    * Options for how to convert the Fetch Response to a Standard Response, like event stream options, etc.
    */
   toFetchResponse?: undefined | ToFetchResponseOptions
+
+  /**
+   * Called when converting the Standard Response to a Fetch Response fails
+   * (e.g. the body contains a value `JSON.stringify` cannot encode).
+   * `handle()` then resolves with an empty `500` response instead of rejecting.
+   */
+  onSendResponseError?: undefined | ((error: unknown) => void)
 }
 
 export class FetchHandler<T extends Context> {
   private readonly toFetchResponseOptions: FetchHandlerOptions<T>['toFetchResponse']
+  private readonly onSendResponseError: FetchHandlerOptions<T>['onSendResponseError']
 
   constructor(
     private readonly standardHandler: StandardHandler<T>,
     options: NoInfer<FetchHandlerOptions<T>> = {},
   ) {
     this.toFetchResponseOptions = options.toFetchResponse
+    this.onSendResponseError = options.onSendResponseError
   }
 
+  /**
+   * Does not reject when converting the response fails, it resolves with an empty `500` response instead.
+   */
   async handle(
     request: Request,
     ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
@@ -40,9 +52,15 @@ export class FetchHandler<T extends Context> {
       return result
     }
 
-    return {
-      matched: true,
-      response: toFetchResponse(result.response, this.toFetchResponseOptions),
+    try {
+      return {
+        matched: true,
+        response: toFetchResponse(result.response, this.toFetchResponseOptions),
+      }
+    }
+    catch (error) {
+      this.onSendResponseError?.(error)
+      return { matched: true, response: new Response(null, { status: 500 }) }
     }
   }
 }

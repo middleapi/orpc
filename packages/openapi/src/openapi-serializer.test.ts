@@ -149,6 +149,22 @@ describe('openAPISerializer', () => {
         })
       })
 
+      it('falls back to a data-less error payload when the error data cannot be serialized', async () => {
+        const s = new OpenAPISerializer({ maxDepth: 3 })
+        const error = new ORPCError('BAD_REQUEST', { message: 'invalid', data: [[[[[1]]]]] })
+        const result = s.serialize((async function* () {
+          throw error
+        })()) as AsyncIteratorObject<unknown>
+
+        await expect(result.next()).rejects.toSatisfy((e: any) => {
+          expect(e).toBeInstanceOf(ErrorEvent)
+          expect(e.data).toEqual({ defined: false, code: 'BAD_REQUEST', message: 'invalid', data: undefined })
+          expect(e.cause).toBe(error)
+
+          return true
+        })
+      })
+
       it('maps unknown iterator errors into INTERNAL_SERVER_ERROR payloads', async () => {
         const error = new Error('unexpected')
         const result = serializer.serialize((async function* () {

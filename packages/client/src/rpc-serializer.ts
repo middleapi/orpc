@@ -1,8 +1,10 @@
 import type { StandardBody } from '@standard-server/core'
+import type { AnyORPCError } from './error'
 import type { RPCJsonSerializerOptions } from './rpc-json-serializer'
 import { isAsyncIteratorObject, stringifyJSON } from '@orpc/shared'
 import { ErrorEvent } from '@standard-server/core'
 import { wrapAsyncIteratorPreservingEventMeta } from './async-iterator-object'
+import { ORPCError } from './error'
 import { createORPCErrorFromJson, isORPCErrorJson, toORPCError } from './error-utils'
 import { RPCJsonSerializer } from './rpc-json-serializer'
 
@@ -56,15 +58,25 @@ export class RPCSerializer {
 
           return { done: result.done, value: this.serializeValue(result.value, false) }
         },
-        mapError: e => new ErrorEvent(
-          this.serializeValue(toORPCError(e).toJSON(), false),
-          { cause: e },
-        ),
+        mapError: e => new ErrorEvent(this.serializeErrorValue(toORPCError(e)), { cause: e }),
       })
     }
 
     const useFormDataForBlobs = options.useFormDataForBlobFields ?? this.defaultSerializeOptions?.useFormDataForBlobFields ?? true
     return this.serializeValue(data, useFormDataForBlobs)
+  }
+
+  /**
+   * Error data can be client-controlled, so falls back to a data-less copy
+   * (same code) when it cannot be serialized (e.g. too deeply nested).
+   */
+  private serializeErrorValue(error: AnyORPCError): unknown {
+    try {
+      return this.serializeValue(error.toJSON(), false)
+    }
+    catch {
+      return this.serializeValue(new ORPCError(error.code, { message: error.message }).toJSON(), false)
+    }
   }
 
   private serializeValue(data: unknown, useFormDataForBlobs: boolean): unknown {

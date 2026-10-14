@@ -1,6 +1,13 @@
 import type { StandardHandlerPlugin } from '../standard'
+import { ORPCError } from '@orpc/client'
 import { os } from '../../builder'
 import { RPCHandler } from './rpc-handler'
+
+class Unserializable {
+  toJSON(): never {
+    throw new Error('not serializable')
+  }
+}
 
 describe('rpcHandler', () => {
   beforeEach(() => {
@@ -146,5 +153,25 @@ describe('rpcHandler', () => {
 
     expect(blocked.matched).toBe(false)
     expect(allowMethods).toHaveBeenCalledTimes(2)
+  })
+
+  it('responds with an empty 500 and reports the error when the response cannot be converted', async () => {
+    const onSendResponseError = vi.fn()
+    const handler = new RPCHandler({
+      ping: os.handler(() => {
+        throw new ORPCError('BAD_REQUEST', { data: new Unserializable() })
+      }),
+    }, { onSendResponseError })
+
+    const result = await handler.handle(new Request('https://example.com/ping', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ json: null }),
+    }))
+
+    expect(result.matched).toBe(true)
+    expect(result.response!.status).toBe(500)
+    await expect(result.response!.text()).resolves.toBe('')
+    expect(onSendResponseError).toHaveBeenCalledExactlyOnceWith(new Error('not serializable'))
   })
 })

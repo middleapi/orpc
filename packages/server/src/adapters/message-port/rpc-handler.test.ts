@@ -1,6 +1,13 @@
+import { ORPCError } from '@orpc/client'
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
 import { os } from '../../builder'
 import { RPCHandler } from './rpc-handler'
+
+class Unserializable {
+  toJSON(): never {
+    throw new Error('not serializable')
+  }
+}
 
 describe('rpcHandler', () => {
   beforeEach(() => {
@@ -293,5 +300,43 @@ describe('rpcHandler', () => {
     const { serverPort } = createPort()
     const result = await handler.message(serverPort as any, { invalid: true })
     expect(result.matched).toBe(false)
+  })
+
+  it('does not leak an unhandled rejection via upgrade when the response cannot be encoded', async () => {
+    const unhandledRejection = vi.fn()
+    process.on('unhandledRejection', unhandledRejection)
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejection)
+    })
+
+    let onMessage: ((event: { data: string }) => void) | undefined
+
+    const handler = new RPCHandler({
+      ping: os.handler(() => {
+        throw new ORPCError('BAD_REQUEST', { data: new Unserializable() })
+      }),
+    })
+
+    const port = {
+      addEventListener: vi.fn((event: string, callback: any) => {
+        if (event === 'message') {
+          onMessage = callback
+        }
+      }),
+      postMessage: vi.fn(),
+    }
+
+    handler.upgrade(port as any)
+
+    onMessage?.({ data: await createRequestMessage() as string })
+
+    // the request is cancelled once encoding the response fails
+    await vi.waitFor(() => {
+      expect(port.postMessage).toHaveBeenCalledTimes(1)
+    })
+    expect((decodePeerMessage(port.postMessage.mock.calls[0]![0]) as any).message.kind).toBe('cancel')
+
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(unhandledRejection).not.toHaveBeenCalled()
   })
 })

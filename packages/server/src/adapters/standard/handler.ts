@@ -1,7 +1,9 @@
+import type { AnyORPCError } from '@orpc/client'
 import type { ErrorMap, Schema } from '@orpc/contract'
-import type { Interceptor, Promisable, Value } from '@orpc/shared'
+import type { Interceptor, Promisable, TracingSpan, Value } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { Context } from '../../context'
+import type { AnyProcedure } from '../../procedure'
 import type { ProcedureClientInterceptor } from '../../procedure-client'
 import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from './codec'
 import type { StandardHandlerPlugin } from './plugin'
@@ -191,12 +193,42 @@ export class StandardHandler<T extends Context> {
               })
             : toORPCError(e)
 
-          const response = await this.codec.encodeError(error, procedure, path, { context, prefix })
+          const response = await this.encodeErrorSafely(span, error, procedure, path, { context, prefix })
 
           return { matched: true, response }
         }
       },
     )
+  }
+
+  /**
+   * Error data can be client-controlled (e.g. validation issues that carry the raw input),
+   * so encoding may fail (too deeply nested, a throwing `toJSON`, ...).
+   * Falls back to a data-less copy (same code, so the same status), then to a bare 500.
+   */
+  private async encodeErrorSafely(
+    span: TracingSpan | undefined,
+    error: AnyORPCError,
+    procedure: AnyProcedure,
+    path: string[],
+    options: ResolvedStandardHandlerHandleOptions<T>,
+  ): Promise<StandardResponse> {
+    try {
+      return await this.codec.encodeError(error, procedure, path, options)
+    }
+    catch (encodingError) {
+      recordSpanError(span, encodingError)
+    }
+
+    try {
+      /**
+       * `defined` stays `false`: the declared data contract can no longer be met.
+       */
+      return await this.codec.encodeError(new ORPCError(error.code, { message: error.message, cause: error }), procedure, path, options)
+    }
+    catch {
+      return { status: 500, headers: {}, body: undefined }
+    }
   }
 }
 

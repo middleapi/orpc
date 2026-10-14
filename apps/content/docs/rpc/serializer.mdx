@@ -118,6 +118,20 @@ const data = serializer.deserialize({ json, meta })
 // data: { name: 'John', createdAt: Date }
 ```
 
+### Maximum Depth
+
+Serialization walks values recursively, so it stops at `maxDepth` nesting levels and throws a `TypeError` instead of overflowing the call stack. The root value is at depth `0`, and every array, plain object, `Set`, `Map`, and non-terminal handler result adds a level. `RPCSerializer` accepts the same option.
+
+```ts twoslash
+import { RPCSerializer } from '@orpc/client'
+
+const serializer = new RPCSerializer({
+  maxDepth: 1000, // default
+})
+```
+
+[RPC Handler](/docs/rpc/handler) turns this error into an error response: a too-deep output becomes an `INTERNAL_SERVER_ERROR`, and a too-deep error, such as validation issues that carry the client's input, is sent with its code and message but without its `data`.
+
 ## Serialization Format
 
 In most cases, serialized data includes two optional fields: `json` and `meta`. `json` contains JSON-serializable data. `meta` contains the metadata needed to deserialize values.

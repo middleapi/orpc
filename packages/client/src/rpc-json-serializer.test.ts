@@ -248,6 +248,85 @@ describe('rpcJsonSerializer: edge cases', () => {
   })
 })
 
+describe('rpcJsonSerializer: max depth', () => {
+  const MAX_DEPTH = 10
+
+  function wrap(depth: number, wrapOnce: (value: unknown) => unknown, leaf: unknown = 1): unknown {
+    let value = leaf
+    for (let i = 0; i < depth; i++) {
+      value = wrapOnce(value)
+    }
+    return value
+  }
+
+  const inArray = (value: unknown) => [value]
+  const inObject = (value: unknown) => ({ a: value })
+  const tooDeep = (maxDepth: number) => new TypeError(`Cannot serialize RPC data: value exceeds the maximum nesting depth of ${maxDepth}.`)
+
+  describe.each([
+    ['inlined built-in handlers', new RPCJsonSerializer({ maxDepth: MAX_DEPTH })],
+    // customizing a built-in key switches to the generic handler scan, which must count depth the same way
+    ['generic handler scan', new RPCJsonSerializer({
+      maxDepth: MAX_DEPTH,
+      handlers: {
+        date: {
+          condition: data => data instanceof Date,
+          serialize: (data: Date) => data.toISOString(),
+          deserialize: (data: string) => new Date(data),
+          isTerminal: true,
+        },
+      },
+    })],
+  ])('%s', (_, serializer) => {
+    it.each([
+      ['arrays', inArray],
+      ['objects', inObject],
+    ])('serializes %s nested maxDepth levels deep and throws one level deeper', (_, wrapOnce) => {
+      expect(roundTripThroughWire(serializer, wrap(MAX_DEPTH, wrapOnce))).toEqual(wrap(MAX_DEPTH, wrapOnce))
+      expect(() => serializer.serialize(wrap(MAX_DEPTH + 1, wrapOnce))).toThrow(tooDeep(MAX_DEPTH))
+    })
+
+    it('counts a set as two levels: the set and the array it serializes to', () => {
+      const set = new Set([1])
+      expect(roundTripThroughWire(serializer, wrap(MAX_DEPTH - 2, inArray, set))).toEqual(wrap(MAX_DEPTH - 2, inArray, set))
+      expect(() => serializer.serialize(wrap(MAX_DEPTH - 1, inArray, set))).toThrow(tooDeep(MAX_DEPTH))
+      expect(() => serializer.serialize(wrap(MAX_DEPTH, (value: unknown) => new Set([value])))).toThrow(tooDeep(MAX_DEPTH))
+    })
+
+    it('counts a map as three levels: the map, its entries array, and each entry', () => {
+      const map = new Map([['key', 1]])
+      expect(roundTripThroughWire(serializer, wrap(MAX_DEPTH - 3, inArray, map))).toEqual(wrap(MAX_DEPTH - 3, inArray, map))
+      expect(() => serializer.serialize(wrap(MAX_DEPTH - 2, inArray, map))).toThrow(tooDeep(MAX_DEPTH))
+      expect(() => serializer.serialize(wrap(MAX_DEPTH, (value: unknown) => new Map([['key', value]])))).toThrow(tooDeep(MAX_DEPTH))
+    })
+  })
+
+  it('defaults to 1000 and throws a TypeError instead of overflowing the call stack', () => {
+    const serializer = new RPCJsonSerializer()
+
+    expect(serializer.serialize(wrap(1000, inArray)).json).toEqual(wrap(1000, inArray))
+    expect(() => serializer.serialize(wrap(1001, inArray))).toThrow(tooDeep(1000))
+    expect(() => serializer.serialize(wrap(100_000, inObject))).toThrow(tooDeep(1000))
+  })
+
+  it('bounds a non-terminal handler that matches its own output', () => {
+    class Loop {}
+
+    const serializer = new RPCJsonSerializer({
+      maxDepth: MAX_DEPTH,
+      handlers: {
+        loop: {
+          condition: data => data instanceof Loop,
+          serialize: () => new Loop(),
+          deserialize: data => data,
+        },
+      },
+    })
+
+    expect(() => serializer.serialize(new Loop())).toThrow(tooDeep(MAX_DEPTH))
+  })
+})
+
 describe('rpcJsonSerializer: custom handlers', () => {
   it('supports overriding default handlers', () => {
     const serializer = new RPCJsonSerializer({

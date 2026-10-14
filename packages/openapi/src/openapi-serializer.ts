@@ -1,7 +1,8 @@
+import type { AnyORPCError } from '@orpc/client'
 import type { StandardBody } from '@standard-server/core'
 import type { BracketNotationSerializerOptions } from './bracket-notation'
 import type { OpenAPIJsonSerializerOptions } from './openapi-json-serializer'
-import { createORPCErrorFromJson, isORPCErrorJson, toORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
+import { createORPCErrorFromJson, isORPCErrorJson, ORPCError, toORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import { isAsyncIteratorObject } from '@orpc/shared'
 import { ErrorEvent } from '@standard-server/core'
 import { BracketNotationSerializer } from './bracket-notation'
@@ -72,10 +73,7 @@ export class OpenAPISerializer {
 
             return { done: result.done, value: this.serializeValue(result.value, false, false) }
           },
-          mapError: e => new ErrorEvent(
-            this.serializeValue(toORPCError(e).toJSON(), false, false),
-            { cause: e },
-          ),
+          mapError: e => new ErrorEvent(this.serializeErrorValue(toORPCError(e)), { cause: e }),
         })
       }
     }
@@ -83,6 +81,19 @@ export class OpenAPISerializer {
     const useFormDataForBlobFields = options.useFormDataForBlobFields ?? this.defaultSerializeOptions?.useFormDataForBlobFields ?? true
     const asFormData = options.asFormData ?? this.defaultSerializeOptions?.asFormData ?? false
     return this.serializeValue(data, useFormDataForBlobFields, asFormData)
+  }
+
+  /**
+   * Error data can be client-controlled, so falls back to a data-less copy
+   * (same code) when it cannot be serialized (e.g. too deeply nested).
+   */
+  private serializeErrorValue(error: AnyORPCError): unknown {
+    try {
+      return this.serializeValue(error.toJSON(), false, false)
+    }
+    catch {
+      return this.serializeValue(new ORPCError(error.code, { message: error.message }).toJSON(), false, false)
+    }
   }
 
   private serializeValue(value: unknown, useFormDataForBlobFields: boolean, asFormData: boolean): unknown {

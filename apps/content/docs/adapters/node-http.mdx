@@ -27,17 +27,30 @@ const handler = new RPCHandler(router, {
 })
 
 const server = createServer(async (req, res) => {
-  const { matched } = await handler.handle(req, res, {
-    prefix: '/rpc',
-    context: {} // Provide initial context if needed, can be an async function
-  })
+  try {
+    const { matched } = await handler.handle(req, res, {
+      prefix: '/rpc',
+      context: {} // Provide initial context if needed, can be an async function
+    })
 
-  if (matched) {
-    return
+    if (matched) {
+      return
+    }
+
+    res.statusCode = 404
+    res.end('Not found')
   }
+  catch (error) {
+    console.error(error)
 
-  res.statusCode = 404
-  res.end('Not found')
+    if (!res.headersSent) {
+      res.statusCode = 500
+      res.end()
+    }
+    else {
+      res.destroy()
+    }
+  }
 })
 
 server.listen(3000, '127.0.0.1', () => console.log('Listening on 127.0.0.1:3000'))
@@ -61,23 +74,40 @@ const handler = new OpenAPIHandler(router, {
 })
 
 const server = createServer(async (req, res) => {
-  const { matched } = await handler.handle(req, res, {
-    prefix: '/api',
-    context: {} // Provide initial context if needed, can be an async function
-  })
+  try {
+    const { matched } = await handler.handle(req, res, {
+      prefix: '/api',
+      context: {} // Provide initial context if needed, can be an async function
+    })
 
-  if (matched) {
-    return
+    if (matched) {
+      return
+    }
+
+    res.statusCode = 404
+    res.end('Not found')
   }
+  catch (error) {
+    console.error(error)
 
-  res.statusCode = 404
-  res.end('Not found')
+    if (!res.headersSent) {
+      res.statusCode = 500
+      res.end()
+    }
+    else {
+      res.destroy()
+    }
+  }
 })
 
 server.listen(3000, '127.0.0.1', () => console.log('Listening on 127.0.0.1:3000'))
 ```
 
 </CodeGroup>
+
+:::info
+Keep the `try/catch`: `handle()` can still reject on errors thrown outside procedures, such as in the `context` function or a routing interceptor, and in Node.js an unhandled rejection terminates the process.
+:::
 
 :::warning
 To better support `Blob`, `File`, and `ReadableStream<Uint8Array>` at the root level in cross-origin scenarios,
@@ -90,6 +120,19 @@ const cors = new CORSHandlerPlugin({
 ```
 
 :::
+
+## Response Send Errors
+
+`handle()` resolves even when the response cannot be sent. If nothing has been written yet, for example because the response body cannot be encoded, it sends an empty `500` response. If the response is already started or closed, for example because the client disconnected or reset its HTTP/2 stream, it stops without writing anything. Use `onSendResponseError` to observe these failures:
+
+```ts
+const handler = new RPCHandler(router, {
+  onSendResponseError(error) {
+    // Also reports client resets that surface as errors, such as `ERR_HTTP2_STREAM_ERROR`
+    console.error(error)
+  },
+})
+```
 
 ## Event Stream Options
 

@@ -388,6 +388,44 @@ describe('standardHandler', () => {
       expect(error).toBeInstanceOf(ORPCError)
       expect(error.code).toBe('INTERNAL_SERVER_ERROR')
     })
+
+    it('falls back to a data-less copy of the error when encoding it throws', async () => {
+      const procedureError = new ORPCError('BAD_REQUEST', { message: 'invalid', data: { deep: true } })
+      client.mockRejectedValue(procedureError)
+
+      codec.resolveProcedure.mockResolvedValue(makeResolved())
+      codec.encodeError
+        .mockImplementationOnce(() => { throw new TypeError('too deep') })
+        .mockResolvedValueOnce({ status: 400, headers: {}, body: 'data-less' })
+
+      const result = await handler.handle(makeRequest(), OPTIONS)
+
+      expect(result).toEqual({ matched: true, response: { status: 400, headers: {}, body: 'data-less' } })
+      expect(codec.encodeError).toHaveBeenCalledTimes(2)
+      expect(codec.encodeError.mock.calls[0]?.[0]).toBe(procedureError)
+
+      const fallback = codec.encodeError.mock.calls[1]?.[0]
+      expect(fallback).toBeInstanceOf(ORPCError)
+      expect(fallback).not.toBe(procedureError)
+      expect(fallback.code).toBe('BAD_REQUEST')
+      expect(fallback.message).toBe('invalid')
+      expect(fallback.data).toBeUndefined()
+      expect(fallback.defined).toBe(false)
+      expect(fallback.cause).toBe(procedureError)
+      expect(codec.encodeError.mock.calls[1]?.slice(1)).toEqual([expect.anything(), ['ping'], OPTIONS])
+    })
+
+    it('responds with a bare 500 when encoding the data-less copy also throws', async () => {
+      client.mockRejectedValue(new ORPCError('BAD_REQUEST', { data: { deep: true } }))
+
+      codec.resolveProcedure.mockResolvedValue(makeResolved())
+      codec.encodeError.mockRejectedValue(new Error('custom serializer failure'))
+
+      const result = await handler.handle(makeRequest(), OPTIONS)
+
+      expect(result).toEqual({ matched: true, response: { status: 500, headers: {}, body: undefined } })
+      expect(codec.encodeError).toHaveBeenCalledTimes(2)
+    })
   })
 
   describe('plugins', () => {
@@ -499,6 +537,21 @@ describe('standardHandler', () => {
       await expect(handleBody('ok')).resolves.toBe('ok')
 
       expect(span.recordException).not.toHaveBeenCalled()
+      expect(span.end).toHaveBeenCalledTimes(1)
+    })
+
+    it('records an error-encoding failure on the request span', async () => {
+      const encodingError = new TypeError('too deep')
+      client.mockRejectedValue(new ORPCError('BAD_REQUEST', { data: { deep: true } }))
+
+      codec.resolveProcedure.mockResolvedValue(makeResolved())
+      codec.encodeError
+        .mockImplementationOnce(() => { throw encodingError })
+        .mockResolvedValueOnce({ status: 400, headers: {}, body: 'data-less' })
+
+      await expect(handler.handle(makeRequest(), OPTIONS)).resolves.toEqual({ matched: true, response: { status: 400, headers: {}, body: 'data-less' } })
+
+      expect(span.recordException).toHaveBeenCalledExactlyOnceWith('error', expect.objectContaining({ message: 'too deep' }))
       expect(span.end).toHaveBeenCalledTimes(1)
     })
 

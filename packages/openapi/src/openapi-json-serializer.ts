@@ -96,6 +96,11 @@ const DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS: Record<string, OpenAPIJsonSeria
   },
 }
 
+/**
+ * Well below where the recursive serializer (and `JSON.stringify` of its output) overflows the call stack.
+ */
+const DEFAULT_OPEN_API_JSON_SERIALIZER_MAX_DEPTH = 1000
+
 export interface OpenAPIJsonSerializerOptions {
   /**
    * Extend or override the built-in type handlers used during serialization.
@@ -140,15 +145,26 @@ export interface OpenAPIJsonSerializerOptions {
    * @default true
    */
   omitUndefinedProperties?: boolean | undefined
+
+  /**
+   * Maximum nesting depth walked during serialization, the root value is at depth 0.
+   * Each array, plain object, `Set`, `Map`, and non-terminal handler result adds a level.
+   * Deeper values throw a `TypeError` instead of overflowing the call stack.
+   *
+   * @default 1000
+   */
+  maxDepth?: number | undefined
 }
 
 export class OpenAPIJsonSerializer {
   private readonly inlineBuiltInHandlers: boolean
   private readonly handlerEntries: OpenAPIJsonSerializerHandler[] | undefined
   private readonly omitUndefinedProperties: boolean
+  private readonly maxDepth: number
 
   constructor(options: OpenAPIJsonSerializerOptions = {}) {
     this.omitUndefinedProperties = options.omitUndefinedProperties !== false
+    this.maxDepth = options.maxDepth ?? DEFAULT_OPEN_API_JSON_SERIALIZER_MAX_DEPTH
 
     const customHandlers = options.handlers
 
@@ -190,7 +206,7 @@ export class OpenAPIJsonSerializer {
     const maps: Segment[][] = []
     const blobs: Blob[] = []
 
-    const json = this.serializeValue(data, [], maps, blobs)
+    const json = this.serializeValue(data, [], maps, blobs, 0)
 
     return { json, maps, blobs }
   }
@@ -199,7 +215,11 @@ export class OpenAPIJsonSerializer {
    * `segments` is a shared mutable stack (push/pop while walking),
    * so it must be copied before being stored in `maps`.
    */
-  private serializeValue(data: unknown, segments: Segment[], maps: Segment[][], blobs: Blob[]): unknown {
+  private serializeValue(data: unknown, segments: Segment[], maps: Segment[][], blobs: Blob[], depth: number): unknown {
+    if (depth > this.maxDepth) {
+      throw new TypeError(`Cannot serialize OpenAPI data: value exceeds the maximum nesting depth of ${this.maxDepth}.`)
+    }
+
     /**
      * Inlined version of DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS: primitives
      * are dispatched on typeof and skip every handler condition check.
@@ -227,10 +247,10 @@ export class OpenAPIJsonSerializer {
             return data.toString()
           }
           if (data instanceof Set) {
-            return this.serializeValue(Array.from(data), segments, maps, blobs)
+            return this.serializeValue(Array.from(data), segments, maps, blobs, depth + 1)
           }
           if (data instanceof Map) {
-            return this.serializeValue(Array.from(data.entries()), segments, maps, blobs)
+            return this.serializeValue(Array.from(data.entries()), segments, maps, blobs, depth + 1)
           }
         }
       }
@@ -253,7 +273,7 @@ export class OpenAPIJsonSerializer {
             return serialized
           }
 
-          return this.serializeValue(serialized, segments, maps, blobs)
+          return this.serializeValue(serialized, segments, maps, blobs, depth + 1)
         }
       }
     }
@@ -269,7 +289,7 @@ export class OpenAPIJsonSerializer {
 
       for (let i = 0; i < data.length; i++) {
         segments.push(i)
-        json.push(this.serializeValue(data[i], segments, maps, blobs))
+        json.push(this.serializeValue(data[i], segments, maps, blobs, depth + 1))
         segments.pop()
       }
 
@@ -295,7 +315,7 @@ export class OpenAPIJsonSerializer {
         }
 
         segments.push(k)
-        json[k] = this.serializeValue(v, segments, maps, blobs)
+        json[k] = this.serializeValue(v, segments, maps, blobs, depth + 1)
         segments.pop()
       }
 

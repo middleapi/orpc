@@ -143,6 +143,11 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
   },
 }
 
+/**
+ * Well below where the recursive serializer (and `JSON.stringify` of its output) overflows the call stack.
+ */
+const DEFAULT_RPC_JSON_SERIALIZER_MAX_DEPTH = 1000
+
 export interface RPCJsonSerializerOptions {
   /**
    * Extend or override the built-in type handlers used during serialization and deserialization.
@@ -189,6 +194,15 @@ export interface RPCJsonSerializerOptions {
    * @default true
    */
   omitUndefinedProperties?: boolean | undefined
+
+  /**
+   * Maximum nesting depth walked during serialization, the root value is at depth 0.
+   * Each array, plain object, `Set`, `Map`, and non-terminal handler result adds a level.
+   * Deeper values throw a `TypeError` instead of overflowing the call stack.
+   *
+   * @default 1000
+   */
+  maxDepth?: number | undefined
 }
 
 /**
@@ -202,9 +216,11 @@ export class RPCJsonSerializer {
   private readonly inlineBuiltInHandlers: boolean
   private readonly handlerEntries: [string, RPCJsonSerializerHandler][] | undefined
   private readonly omitUndefinedProperties: boolean
+  private readonly maxDepth: number
 
   constructor(options: RPCJsonSerializerOptions = {}) {
     this.omitUndefinedProperties = options.omitUndefinedProperties !== false
+    this.maxDepth = options.maxDepth ?? DEFAULT_RPC_JSON_SERIALIZER_MAX_DEPTH
     this.handlers = Object.assign(new NullProtoObj(), DEFAULT_RPC_JSON_SERIALIZER_HANDLERS)
     const customHandlers = options.handlers
 
@@ -248,7 +264,7 @@ export class RPCJsonSerializer {
     const maps: Segment[][] = []
     const blobs: Blob[] = []
 
-    const json = this.serializeValue(data, [], meta, maps, blobs)
+    const json = this.serializeValue(data, [], meta, maps, blobs, 0)
 
     meta = meta.length === 0 ? undefined : meta
 
@@ -263,7 +279,11 @@ export class RPCJsonSerializer {
    * `segments` is a shared mutable stack (push/pop while walking),
    * so it must be copied before being stored in `meta` or `maps`.
    */
-  private serializeValue(data: unknown, segments: Segment[], meta: RPCJsonSerializationMeta[], maps: Segment[][], blobs: Blob[]): unknown {
+  private serializeValue(data: unknown, segments: Segment[], meta: RPCJsonSerializationMeta[], maps: Segment[][], blobs: Blob[], depth: number): unknown {
+    if (depth > this.maxDepth) {
+      throw new TypeError(`Cannot serialize RPC data: value exceeds the maximum nesting depth of ${this.maxDepth}.`)
+    }
+
     /**
      * Inlined version of DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: primitives are
      * dispatched on typeof and skip every handler condition check.
@@ -303,12 +323,12 @@ export class RPCJsonSerializer {
             return data.toString()
           }
           if (data instanceof Set) {
-            const result = this.serializeValue(Array.from(data), segments, meta, maps, blobs)
+            const result = this.serializeValue(Array.from(data), segments, meta, maps, blobs, depth + 1)
             meta.push(['set', ...segments])
             return result
           }
           if (data instanceof Map) {
-            const result = this.serializeValue(Array.from(data.entries()), segments, meta, maps, blobs)
+            const result = this.serializeValue(Array.from(data.entries()), segments, meta, maps, blobs, depth + 1)
             meta.push(['map', ...segments])
             return result
           }
@@ -336,7 +356,7 @@ export class RPCJsonSerializer {
             return serialized
           }
 
-          const result = this.serializeValue(serialized, segments, meta, maps, blobs)
+          const result = this.serializeValue(serialized, segments, meta, maps, blobs, depth + 1)
           meta.push([entry[0], ...segments])
           return result
         }
@@ -354,7 +374,7 @@ export class RPCJsonSerializer {
 
       for (let i = 0; i < data.length; i++) {
         segments.push(i)
-        json.push(this.serializeValue(data[i], segments, meta, maps, blobs))
+        json.push(this.serializeValue(data[i], segments, meta, maps, blobs, depth + 1))
         segments.pop()
       }
 
@@ -380,7 +400,7 @@ export class RPCJsonSerializer {
         }
 
         segments.push(k)
-        json[k] = this.serializeValue(v, segments, meta, maps, blobs)
+        json[k] = this.serializeValue(v, segments, meta, maps, blobs, depth + 1)
         segments.pop()
       }
 
