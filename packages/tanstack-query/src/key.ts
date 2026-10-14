@@ -1,6 +1,7 @@
 import type { PartialDeep } from '@orpc/shared'
 import type { SerializableStreamedQueryOptions } from './stream-query'
 import type { OperationType } from './types'
+import { skipToken } from '@tanstack/query-core'
 
 export interface OperationKeyPrefixOptions {
   /**
@@ -16,9 +17,17 @@ export type OperationKeyOptions<TType extends OperationType, TInput> = Operation
   fnOptions?: TType extends 'streamed' ? SerializableStreamedQueryOptions : never
 }
 
+type OperationKeyContent<TType extends OperationType, TInput> = Omit<OperationKeyOptions<TType, TInput>, 'prefix'> & {
+  /**
+   * Set in place of `input` when the operation is disabled with `skipToken`,
+   * because query key hashers drop symbols.
+   */
+  skipToken?: TType extends 'mutation' ? never : true
+}
+
 export type OperationKey<TType extends OperationType, TInput>
-  = | [path: string[], options: Omit<OperationKeyOptions<TType, TInput>, 'prefix'>]
-    | [prefix: string, path: string[], options: Omit<OperationKeyOptions<TType, TInput>, 'prefix'>]
+  = | [path: string[], options: OperationKeyContent<TType, TInput>]
+    | [prefix: string, path: string[], options: OperationKeyContent<TType, TInput>]
 
 export function generateOperationKey<TType extends OperationType, TInput>(
   path: string[],
@@ -28,7 +37,9 @@ export function generateOperationKey<TType extends OperationType, TInput>(
     ...options.prefix !== undefined ? [options.prefix] : [],
     path,
     {
-      ...options.input !== undefined ? { input: options.input } : {},
+      ...options.input === skipToken
+        ? { skipToken: true }
+        : options.input !== undefined ? { input: options.input } : {},
       ...options.type !== undefined ? { type: options.type } : {},
       ...options.fnOptions !== undefined ? { fnOptions: options.fnOptions } : {},
     },

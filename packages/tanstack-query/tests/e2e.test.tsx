@@ -55,6 +55,26 @@ it('case: with useQuery and skipToken', async () => {
   expect(result.current.status).toEqual('pending')
 })
 
+it('case: useQuery with and without skipToken do not share a query', async () => {
+  const { result } = renderHook(() => ({
+    unskipped: useQuery(orpc.stream.streamedOptions(), queryClient),
+    skipped: useQuery(orpc.stream.streamedOptions({ input: skipToken }), queryClient),
+  }))
+
+  await act(async () => {
+    await vi.waitFor(() => expect(result.current.unskipped.status).toEqual('success'))
+  })
+
+  expect(queryClient.getQueryCache().findAll({ queryKey: orpc.stream.key() })).toHaveLength(2)
+
+  await act(async () => {
+    await queryClient.invalidateQueries({ queryKey: orpc.stream.key() })
+  })
+
+  expect(result.current.unskipped.status).toEqual('success')
+  expect(result.current.skipped.status).toEqual('pending')
+})
+
 it('case: with streamed/useQuery', async () => {
   const { result } = renderHook(() => useQuery(orpc.stream.streamedOptions({
     queryFnOptions: {

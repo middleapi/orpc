@@ -102,9 +102,12 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
       }
 
       else if (body instanceof Blob) {
+        // Adapters only fall back to the blob type when no Content-Type header is set
+        const contentType = headers['content-type'] ?? body.type
+
         if (
           (!Number.isFinite(body.size) || body.size >= this.threshold)
-          && this.isCompressibleContentType(body.type, interceptorOptions)
+          && this.isCompressibleContentType(flattenStandardHeader(contentType), interceptorOptions)
         ) {
           const contentDisposition = headers['content-disposition'] ?? generateContentDisposition(
             body instanceof File ? body.name : 'blob',
@@ -118,7 +121,7 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
               headers: {
                 ...toCompressedHeaders(headers, encoding),
                 'standard-server': 'file' satisfies StandardBodyHint,
-                'content-type': body.type,
+                'content-type': contentType,
                 'content-disposition': contentDisposition,
               },
             },

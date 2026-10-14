@@ -670,6 +670,40 @@ describe('responseCompressionHandlerPlugin', () => {
       expect(matched).toBe(true)
       expect(response!.headers.has('content-encoding')).toBe(false)
     })
+
+    it.each([
+      ['text/csv; charset=utf-8', 'text/plain', 'gzip'],
+      ['text/html; charset=utf-8', '', 'gzip'],
+      ['image/png', 'text/plain', null],
+      [[], 'text/plain', null],
+    ])('uses content-type header %j over blob type %j', async (contentType, blobType, encoding) => {
+      const handler = new RPCHandler(os.handler(() => new Blob(['large content'.repeat(100)], { type: blobType })), {
+        plugins: [new ResponseCompressionHandlerPlugin({ threshold: 100 })],
+        routingInterceptors: [async ({ next }) => {
+          const result = await next()
+
+          return result.matched
+            ? { ...result, response: { ...result.response, headers: { ...result.response.headers, 'content-type': contentType } } }
+            : result
+        }],
+      })
+
+      const handle = (acceptEncoding: string) => handler.handle(new Request('http://localhost', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'accept-encoding': acceptEncoding,
+        },
+        body: JSON.stringify({ json: null }),
+      }))
+
+      const { response } = await handle('gzip')
+      const { response: uncompressed } = await handle('identity')
+
+      expect(response!.headers.get('content-encoding')).toBe(encoding)
+      // Same content-type the adapter sends when the response is not compressed
+      expect(response!.headers.get('content-type')).toBe(uncompressed!.headers.get('content-type'))
+    })
   })
 
   describe('readable stream body', () => {

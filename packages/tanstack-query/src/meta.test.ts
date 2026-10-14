@@ -145,6 +145,36 @@ describe('contractMetaPlugin', () => {
     expect(client.planet.find).toHaveBeenCalledTimes(1)
   })
 
+  it('lets object utils options beat defaults of a function meta modifier', () => {
+    const contract = {
+      planet: {
+        find: oc.meta(tanstackQuery({
+          queryOptions: (options: any) => ({ staleTime: 1000, retry: 1, ...options }),
+        })),
+      },
+    }
+
+    const client = { planet: { find: vi.fn(async () => '__found__') } }
+
+    const utils = createRouterUtils(client as any, {
+      scoped: {
+        planet: {
+          find: {
+            queryOptions: { retry: 2 },
+          },
+        },
+      },
+      plugins: [new ContractOptionsUtilsPlugin(contract)],
+    }) as any
+
+    const options = utils.planet.find.queryOptions({ input: { id: 1 } })
+
+    expect(options.staleTime).toBe(1000)
+    expect(options.retry).toBe(2)
+
+    expect(utils.planet.find.queryOptions({ input: { id: 1 }, retry: 5 }).retry).toBe(5)
+  })
+
   it('keeps contract meta interceptors when utils define none', async () => {
     const metaInterceptor = vi.fn(({ next }: any) => next())
     const contract = { planet: { find: oc.meta(tanstackQuery({ queryInterceptors: [metaInterceptor] })) } }

@@ -433,7 +433,7 @@ function stringToBoolean(value: string): boolean | string {
   return value
 }
 
-const DATE_TIME_PATTERN = /^(?!-0{6})(?:[+-]\d{2})?\d{4}-\d{2}-\d{2}(?:[T ].*)?$/
+const DATE_TIME_PATTERN = /^(?!-0{6})(?:[+-]\d{2})?\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/
 const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 function stringToDate(value: string): Date | string {
   if (!DATE_TIME_PATTERN.test(value)) {
