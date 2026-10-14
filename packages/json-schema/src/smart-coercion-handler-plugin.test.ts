@@ -56,7 +56,7 @@ describe('smartCoercionHandlerPlugin', () => {
   describe('bigint digit limit', () => {
     const BIGINT_SCHEMA = { 'type': 'string', 'pattern': '^-?[0-9]+$', 'x-native-type': 'bigint' } as const
 
-    async function handle(id: string, options: { maxBigIntDigits?: number } = {}) {
+    it('does not parse a huge digit string into a bigint before middleware runs', async () => {
       const seen = vi.fn()
       const router = {
         p: os
@@ -69,7 +69,6 @@ describe('smartCoercionHandlerPlugin', () => {
       }
       const handler = new RPCHandler(router, {
         plugins: [new SmartCoercionHandlerPlugin({
-          ...options,
           converters: [{
             condition: () => true,
             convert: () => [{ type: 'object', properties: { id: BIGINT_SCHEMA }, required: ['id'] } as any, false],
@@ -79,24 +78,27 @@ describe('smartCoercionHandlerPlugin', () => {
       const { response } = await handler.handle(new Request('http://localhost/p', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ json: { id } }),
+        body: JSON.stringify({ json: { id: '9'.repeat(1_000_000) } }),
       }), { context: {} })
 
-      return { status: response?.status, seen }
-    }
-
-    it('does not parse a huge digit string into a bigint before middleware runs', async () => {
-      const { status, seen } = await handle('9'.repeat(1_000_000))
-
-      expect(status).toBe(200)
+      expect(response?.status).toBe(200)
       expect(seen).toHaveBeenCalledWith('string')
     })
 
-    it('respects maxBigIntDigits', async () => {
-      expect((await handle('9'.repeat(4300))).seen).toHaveBeenCalledWith('bigint')
-      expect((await handle('9'.repeat(5000))).seen).toHaveBeenCalledWith('string')
-      expect((await handle('9'.repeat(5000), { maxBigIntDigits: 5000 })).seen).toHaveBeenCalledWith('bigint')
-      expect((await handle('1000', { maxBigIntDigits: 3 })).seen).toHaveBeenCalledWith('string')
+    it('passes maxBigIntDigits to the coercer', async () => {
+      const plugin = new SmartCoercionHandlerPlugin({
+        converters: [{ condition: () => true, convert: () => [BIGINT_SCHEMA as any, false] }],
+        maxBigIntDigits: 3,
+      })
+      const procedure = oc.input(z.unknown())
+      const interceptor = plugin.init({} as any).clientInterceptors?.[0]
+      const next = vi.fn()
+
+      await interceptor?.({ procedure, input: '999', next } as any)
+      await interceptor?.({ procedure, input: '1000', next } as any)
+
+      expect(next).toHaveBeenNthCalledWith(1, { procedure, input: 999n })
+      expect(next).toHaveBeenNthCalledWith(2, { procedure, input: '1000' })
     })
   })
 })

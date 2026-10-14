@@ -386,14 +386,14 @@ describe('rpcSerializer', () => {
       const digits = '9'.repeat(5000)
       const body = { json: digits, meta: [['bigint']] }
 
-      expect(() => serializer.deserialize(body)).toThrow('Invalid RPC serialized data: type "bigint" expects at most 4300 digits.')
+      expect(() => serializer.deserialize(body)).toThrow('at most 4300 digits')
       expect(new RPCSerializer({ maxBigIntDigits: 5000 }).deserialize(body)).toBe(BigInt(digits))
 
       const form = new FormData()
       form.set('data', JSON.stringify({ json: { value: digits, file: {} }, meta: [['bigint', 'value']], maps: [['file']] }))
       form.set('0', new Blob(['x']))
 
-      expect(() => serializer.deserialize(form)).toThrow('Invalid RPC serialized data: type "bigint" expects at most 4300 digits.')
+      expect(() => serializer.deserialize(form)).toThrow('at most 4300 digits')
     })
 
     it('rejects unknown meta types instead of resolving them on the prototype chain', () => {

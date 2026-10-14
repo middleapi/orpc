@@ -1,5 +1,5 @@
 import type { JsonSchema } from './types'
-import { DEFAULT_MAX_BIGINT_DIGITS, get, getOwn, isPlainObject, toArray, tryOrUndefined } from '@orpc/shared'
+import { DEFAULT_MAX_BIGINT_DIGITS, get, getOwn, isPlainObject, parseBigIntString, toArray, tryOrUndefined } from '@orpc/shared'
 import { decodeJsonPointerSegment } from './ref-utils'
 import { JsonSchemaXNativeType } from './types'
 
@@ -429,14 +429,7 @@ function stringToInteger(value: string): number | string {
 }
 
 function stringToBigInt(value: string, maxDigits: number): bigint | string {
-  // checked before the regex and `BigInt()`, whose cost grows super-linearly with the digit count
-  const digits = value.startsWith('-') ? value.length - 1 : value.length
-
-  if (digits > maxDigits || !INTEGER_PATTERN.test(value)) {
-    return value
-  }
-
-  return BigInt(value)
+  return parseBigIntString(value, maxDigits) ?? value
 }
 
 function numberToBigInt(value: number): bigint | number {

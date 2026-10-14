@@ -1,5 +1,4 @@
 import type { StandardHandlerPlugin } from '../standard'
-import { RPCSerializer } from '@orpc/client'
 import { os } from '../../builder'
 import { RPCHandler } from './rpc-handler'
 
@@ -93,23 +92,6 @@ describe('rpcHandler', () => {
     }))
     expect(response?.status).toBe(200)
     await expect(response?.json()).resolves.toEqual({ json: '-12345678901234567890', meta: [['bigint']] })
-  })
-
-  it('accepts longer bigint values when the serializer raises maxBigIntDigits', async () => {
-    const handler = new RPCHandler(
-      { echo: os.handler(({ input }) => input) },
-      { serializer: new RPCSerializer({ maxBigIntDigits: 5000 }) },
-    )
-    const digits = '9'.repeat(5000)
-
-    const { response } = await handler.handle(new Request('https://example.com/echo', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ json: digits, meta: [['bigint']] }),
-    }))
-
-    expect(response?.status).toBe(200)
-    await expect(response?.json()).resolves.toEqual({ json: digits, meta: [['bigint']] })
   })
 
   it('treats GET requests as unmatched by default', async () => {

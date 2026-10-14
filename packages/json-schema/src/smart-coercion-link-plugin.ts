@@ -41,7 +41,7 @@ export class SmartCoercionLinkPlugin<T extends ClientContext> implements Standar
       ...toArray(options.converters),
       new StandardJsonSchemaConverter(),
     ])
-    this.coercer = new JsonSchemaCoercer({ maxBigIntDigits: options.maxBigIntDigits })
+    this.coercer = new JsonSchemaCoercer(options)
   }
 
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {

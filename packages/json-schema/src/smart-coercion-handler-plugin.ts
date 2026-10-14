@@ -31,7 +31,7 @@ export class SmartCoercionHandlerPlugin<T extends Context> implements StandardHa
       ...toArray(options.converters),
       new StandardJsonSchemaConverter(),
     ])
-    this.coercer = new JsonSchemaCoercer({ maxBigIntDigits: options.maxBigIntDigits })
+    this.coercer = new JsonSchemaCoercer(options)
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
