@@ -11,10 +11,8 @@ export interface BunRedisPublisherOptions extends BaseRedisPublisherOptions {
    * cannot execute commands and must use a dedicated connection.
    *
    * @remarks
-   * The publisher takes over the client's `onconnect` and `onclose` to report lost
-   * subscriptions to `onError`. Handlers set before the first listen still run, but
-   * assigning them later replaces the publisher's and stops these reports. The publisher
-   * also calls `connect()` on a closed client when subscribing.
+   * The publisher takes over `onconnect` and `onclose` to detect lost subscriptions.
+   * Set your own handlers before the first listen, or they replace the publisher's.
    *
    * @default redis.duplicate() (lazily created on first listen)
    */
