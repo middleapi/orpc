@@ -1,7 +1,7 @@
 import type { Promisable, Value } from '@orpc/shared'
 import type { StandardLinkInterceptor, StandardLinkInterceptorOptions, StandardLinkOptions, StandardLinkPlugin } from '../adapters/standard'
 import type { ClientContext } from '../types'
-import { anyAbortSignal, AsyncIteratorClass, isAsyncIteratorObject, override, sleep, toArray, value } from '@orpc/shared'
+import { AsyncIteratorClass, isAsyncIteratorObject, override, sleep, toArray, value } from '@orpc/shared'
 import { getEventMeta } from '@standard-server/core'
 
 export interface RetryLinkPluginAttemptOptions<T extends RetryLinkPluginContext> extends StandardLinkInterceptorOptions<T> {
@@ -106,7 +106,6 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
         return next(callOptions)
       }
 
-      let signal = callOptions.signal
       let lastEventId = callOptions.lastEventId
       let lastEventRetry: undefined | number
       let callback: void | ((isSuccess: boolean) => void)
@@ -117,7 +116,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
         let currentError = initialError
 
         while (true) {
-          const updatedCallOptions = { ...callOptions, signal, lastEventId }
+          const updatedCallOptions = { ...callOptions, lastEventId }
           let retryDelayMs = 0
 
           if (currentError) {
@@ -149,6 +148,10 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
             if (currentError) {
               await sleep(retryDelayMs, { signal: updatedCallOptions.signal })
 
+              if (isIteratorAborted) {
+                throw currentError.error
+              }
+
               attempt++
             }
 
@@ -176,12 +179,6 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
       }
 
       let current = output
-
-      /**
-       * Lets closing the iterator interrupt a pending reconnect (retry delay or in-flight request).
-       */
-      const controller = new AbortController()
-      signal = anyAbortSignal([callOptions.signal, controller.signal])
 
       return override(() => current, new AsyncIteratorClass(
         async () => {
@@ -220,13 +217,8 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
         async ({ kind }) => {
           isIteratorAborted = true
 
-          try {
-            if (kind === 'cancelled') {
-              await current.return?.()
-            }
-          }
-          finally {
-            controller.abort()
+          if (kind === 'cancelled') {
+            await current.return?.()
           }
         },
       ))
