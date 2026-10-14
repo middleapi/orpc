@@ -322,11 +322,9 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     const fileName = contentDisposition !== undefined ? getFilenameFromContentDisposition(contentDisposition) : undefined
     const contentType = flattenStandardHeader(request.headers['content-type'])
 
-    const limited = maxBodySize.file === Number.POSITIVE_INFINITY ? stream : limitStream(stream, maxBodySize.file)
+    const upload = new UploadWriter(tmpFiles, new Budget(maxBodySize.memory), new Budget(maxBodySize.file), this.spoolThreshold)
 
-    const upload = new UploadWriter(tmpFiles, new Budget(maxBodySize.memory), this.spoolThreshold)
-
-    for await (const chunk of limited) {
+    for await (const chunk of stream) {
       await upload.write(chunk)
     }
 
@@ -386,13 +384,10 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
       const filename = part.filename
       // A part without a content-type defaults to text/plain, matching the standard parser
       const type = part.type ?? 'text/plain'
-      const upload = new UploadWriter(tmpFiles, memory, this.spoolThreshold)
+      const upload = new UploadWriter(tmpFiles, memory, file, this.spoolThreshold)
 
       return {
-        write: async (chunk) => {
-          file.charge(chunk.length)
-          await upload.write(chunk)
-        },
+        write: chunk => upload.write(chunk),
         end: async () => {
           form.append(name, await upload.end(filename, type))
         },
@@ -545,24 +540,27 @@ class Budget {
 }
 
 /**
- * Receives one upload, holding it in memory while it stays within the spool
- * threshold and the memory budget, and moving it to a temporary file at the
- * first chunk that doesn't fit. Spilling writes everything held so far in a
- * single append and refunds its memory, so a spooled upload never counts as
- * held in memory.
+ * Receives one upload, counting it against the file budget wherever it is
+ * held. It stays in memory while within the spool threshold and the memory
+ * budget, and moves to a temporary file at the first chunk that doesn't fit.
+ * Spilling writes everything held so far in a single append and refunds its
+ * memory, so a spooled upload never counts as held in memory.
  */
 class UploadWriter {
-  private held: Buffer<ArrayBuffer>[] = []
+  private held: Buffer[] = []
   private heldSize = 0
   private tmpPath: string | undefined
 
   constructor(
     private readonly tmpFiles: RequestTmpFiles,
     private readonly memory: Budget,
+    private readonly file: Budget,
     private readonly spoolThreshold: number,
   ) {}
 
   async write(chunk: Uint8Array): Promise<void> {
+    this.file.charge(chunk.length)
+
     if (this.tmpPath !== undefined) {
       return this.tmpFiles.append(this.tmpPath, chunk)
     }
@@ -574,22 +572,23 @@ class UploadWriter {
       return
     }
 
-    this.tmpPath = await this.tmpFiles.allocate()
-    await this.tmpFiles.append(this.tmpPath, Buffer.concat([...this.held, chunk]))
+    this.tmpPath = await this.tmpFiles.create(Buffer.concat([...this.held, chunk]))
     this.memory.refund(this.heldSize)
     this.held = []
   }
 
   async end(name: string, type: string): Promise<File> {
-    // A chunk that doesn't fit is never empty, so a spilled upload's file always exists
-    return this.tmpPath === undefined
-      ? new File(this.held, name, { type })
-      : this.tmpFiles.seal(this.tmpPath, name, type)
+    if (this.tmpPath !== undefined) {
+      return this.tmpFiles.seal(this.tmpPath, name, type)
+    }
+
+    // One contiguous part, however many chunks it arrived in, keeps reads and native memory proportional to its size
+    return new File([Buffer.concat(this.held, this.heldSize)], name, { type })
   }
 }
 
 /**
- * Owns every temporary file a request creates: allocates them inside one lazily
+ * Owns every temporary file a request creates: creates them inside one lazily
  * created per-request directory and guarantees removal. Content lands through
  * self-contained appends rather than long-lived handles, so a request holds at
  * most one transient file descriptor per in-flight write no matter how many
@@ -610,10 +609,15 @@ class RequestTmpFiles {
     return this.dir !== undefined
   }
 
-  async allocate(): Promise<string> {
+  /**
+   * Creates a temporary file holding `content` and returns its path.
+   */
+  async create(content: Uint8Array): Promise<string> {
     try {
       this.dir ??= mkdtemp(path.join(this.tmpDir, 'orpc-upload-'))
-      return path.join(await this.dir, String(this.count++))
+      const tmpPath = path.join(await this.dir, String(this.count++))
+      await appendFile(tmpPath, content)
+      return tmpPath
     }
     catch (cause) {
       throw new ORPCError('INTERNAL_SERVER_ERROR', { cause })
