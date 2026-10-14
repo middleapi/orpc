@@ -97,8 +97,6 @@ import { RedisPublisher } from '@orpc/publisher/redis'
 
 const client = createClient({ url: 'redis://localhost:6379' })
 
-client.on('error', error => console.error('Redis client error', error))
-
 // RedisPublisher lazily connects to Redis when needed.
 // You can still call `client.connect()` manually, but it is optional.
 await client.connect()
