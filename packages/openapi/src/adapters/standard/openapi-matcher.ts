@@ -3,7 +3,7 @@ import type { AnyProcedure, AnyRouter, WalkProcedureContractsLazyResult } from '
 import type { Value } from '@orpc/shared'
 import type { MatchedRoute } from 'rou3'
 import { createContractProcedure, getRouter, Procedure, unlazy, walkProcedureContractsSync } from '@orpc/server'
-import { mergeHttpPath, pathToHttpPath, safeDecodeURIComponent, safeEncodeURIComponent, setOwn, value } from '@orpc/shared'
+import { MAX_NORMALIZABLE_PATHNAME_LENGTH, mergeHttpPath, pathToHttpPath, safeDecodeURIComponent, safeEncodeURIComponent, setOwn, value } from '@orpc/shared'
 import { addRoute, createRouter, findAllRoutes, findRoute, routeToRegExp } from 'rou3'
 import { DEFAULT_OPENAPI_METHOD } from '../../constants'
 import { getOpenAPIMeta } from '../../meta'
@@ -131,7 +131,10 @@ export class OpenAPIMatcher {
     // unencoded ("a%62c" vs "abc"), or leave raw characters that we store encoded
     // ("a^b" vs "a%5Eb"). Matching the raw path first would let a dynamic sibling
     // ("/{version}/items") catch a path meant for a static route ("/v1^beta/items").
-    pathname = normalizeRou3Path(pathname) as `/${string}`
+    // Over-long pathnames are looked up as given, to bound the cost of normalizing them.
+    if (pathname.length <= MAX_NORMALIZABLE_PATHNAME_LENGTH) {
+      pathname = normalizeRou3Path(pathname) as `/${string}`
+    }
 
     // most requests `await undefined` so conditionally await it to save a microtask turn
     const loading = this.resolvePendingLazyRouters(pathname)

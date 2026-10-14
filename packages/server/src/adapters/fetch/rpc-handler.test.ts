@@ -2,6 +2,27 @@ import type { StandardHandlerPlugin } from '../standard'
 import { os } from '../../builder'
 import { RPCHandler } from './rpc-handler'
 
+async function countThrows(name: 'decodeURIComponent' | 'encodeURIComponent', fn: () => unknown): Promise<number> {
+  const original: (value: string) => string = globalThis[name]
+  let throws = 0
+  const spy = vi.spyOn(globalThis, name).mockImplementation((value: string) => {
+    try {
+      return original(value)
+    }
+    catch (error) {
+      throws++
+      throw error
+    }
+  })
+  try {
+    await fn()
+  }
+  finally {
+    spy.mockRestore()
+  }
+  return throws
+}
+
 describe('rpcHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -146,5 +167,14 @@ describe('rpcHandler', () => {
 
     expect(blocked.matched).toBe(false)
     expect(allowMethods).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not throw per segment when normalizing a "%"-heavy path', async () => {
+    const handler = new RPCHandler({ ping: os.handler(() => 'pong') })
+    const throws = await countThrows('decodeURIComponent', async () => {
+      const { matched } = await handler.handle(new Request(`http://localhost/${'/%'.repeat(5_000)}`, { method: 'POST' }))
+      expect(matched).toBe(false)
+    })
+    expect(throws).toBe(0)
   })
 })

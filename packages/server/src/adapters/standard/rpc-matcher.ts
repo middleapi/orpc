@@ -4,7 +4,7 @@ import type { StandardMethod } from '@standard-server/core'
 import type { AnyProcedure } from '../../procedure'
 import type { AnyRouter } from '../../router'
 import type { WalkProcedureContractsLazyResult } from '../../router-utils'
-import { normalizeHttpPath, pathToHttpPath, value } from '@orpc/shared'
+import { MAX_NORMALIZABLE_PATHNAME_LENGTH, normalizeHttpPath, pathToHttpPath, value } from '@orpc/shared'
 import { unlazy } from '../../lazy'
 import { Procedure } from '../../procedure'
 import { createContractProcedure } from '../../procedure-utils'
@@ -136,10 +136,15 @@ export class RPCMatcher {
 
     let entry = this.tree.get(pathname)
 
-    if (entry === undefined && NORMALIZABLE_PATHNAME_REGEX.test(pathname)) {
+    if (
+      entry === undefined
+      && pathname.length <= MAX_NORMALIZABLE_PATHNAME_LENGTH
+      && NORMALIZABLE_PATHNAME_REGEX.test(pathname)
+    ) {
       // Retry with a normalized path: users may percent-encode characters that we store
       // unencoded ("a%62c" vs "abc"), or leave raw characters that we store encoded
       // ("a^b" vs "a%5Eb"), so normalization handles both without duplicate entries.
+      // Over-long pathnames are matched only exactly, to bound the cost of normalizing them.
 
       const normalizedPathname = normalizeHttpPath(pathname)
 

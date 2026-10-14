@@ -1,4 +1,138 @@
-import { safeDecodeURIComponent, safeEncodeURIComponent } from '@standard-server/shared'
+/**
+ * Longest pathname a matcher normalizes. Normalization decodes and re-encodes every segment, so
+ * its cost grows with the pathname, and peer messages and batch sub-requests carry URLs of any
+ * length. Matching longer pathnames only as given keeps that cost bounded. 16 KiB is Node's
+ * default `maxHeaderSize`, so any URL default Node HTTP accepts is still normalized.
+ */
+export const MAX_NORMALIZABLE_PATHNAME_LENGTH = 16 * 1024
+
+// with the `u` flag a valid surrogate pair is one code point and never matches
+const LONE_SURROGATE_REGEX = /[\uD800-\uDFFF]/gu
+
+/**
+ * `encodeURIComponent` that replaces lone surrogates with U+FFFD instead of throwing.
+ */
+export function safeEncodeURIComponent(value: string): string {
+  // eslint-disable-next-line no-restricted-globals -- cannot throw once lone surrogates are replaced
+  return encodeURIComponent(value.replace(LONE_SURROGATE_REGEX, '\uFFFD'))
+}
+
+/**
+ * `decodeURIComponent` that returns the value unchanged instead of throwing when it is malformed.
+ * Validity is checked up front, since a throw captures a stack trace and callers decode values
+ * (such as path segments) whose count the client controls.
+ */
+export function safeDecodeURIComponent(value: string): string {
+  if (!value.includes('%')) {
+    return value
+  }
+
+  // eslint-disable-next-line no-restricted-globals -- cannot throw once the value is validated
+  return isDecodableURIComponent(value) ? decodeURIComponent(value) : value
+}
+
+/**
+ * Whether `decodeURIComponent` accepts the value: every `%` starts a `%XX` escape, and the escaped
+ * bytes form strict UTF-8, with each continuation byte in the very next escape.
+ *
+ * @see https://tc39.es/ecma262/#sec-decode
+ */
+function isDecodableURIComponent(value: string): boolean {
+  let index = value.indexOf('%')
+
+  while (index !== -1) {
+    const lead = readEscapedByte(value, index)
+
+    if (lead === -1) {
+      return false
+    }
+
+    let continuations: number
+    // range of the first continuation byte, narrowed for some leads to reject overlong forms,
+    // surrogates and code points above U+10FFFF
+    let min = 0x80
+    let max = 0xBF
+
+    if (lead < 0x80) {
+      continuations = 0
+    }
+    else if (lead < 0xC2) {
+      return false
+    }
+    else if (lead < 0xE0) {
+      continuations = 1
+    }
+    else if (lead < 0xF0) {
+      continuations = 2
+
+      if (lead === 0xE0) {
+        min = 0xA0
+      }
+      else if (lead === 0xED) {
+        max = 0x9F
+      }
+    }
+    else if (lead < 0xF5) {
+      continuations = 3
+
+      if (lead === 0xF0) {
+        min = 0x90
+      }
+      else if (lead === 0xF4) {
+        max = 0x8F
+      }
+    }
+    else {
+      return false
+    }
+
+    for (let i = 0; i < continuations; i++) {
+      index += 3
+      const byte = readEscapedByte(value, index)
+
+      if (byte < min || byte > max) {
+        return false
+      }
+
+      min = 0x80
+      max = 0xBF
+    }
+
+    index = value.indexOf('%', index + 3)
+  }
+
+  return true
+}
+
+/**
+ * The byte of the `%XX` escape at `index`, or `-1` when there is none.
+ */
+function readEscapedByte(value: string, index: number): number {
+  if (value.charCodeAt(index) !== 0x25 /* % */) {
+    return -1
+  }
+
+  const high = hexDigitValue(value.charCodeAt(index + 1))
+  const low = hexDigitValue(value.charCodeAt(index + 2))
+
+  return high === -1 || low === -1 ? -1 : high * 16 + low
+}
+
+function hexDigitValue(code: number): number {
+  if (code >= 0x30 && code <= 0x39) { // 0-9
+    return code - 0x30
+  }
+
+  if (code >= 0x41 && code <= 0x46) { // A-F
+    return code - 0x37
+  }
+
+  if (code >= 0x61 && code <= 0x66) { // a-f
+    return code - 0x57
+  }
+
+  return -1
+}
 
 export function pathToHttpPath(path: readonly string[]): `/${string}` {
   return `/${path.map(safeEncodeURIComponent).join('/')}`

@@ -27,8 +27,6 @@ export {
   isAsyncIteratorObject,
   isTypescriptObject,
   parseEmptyableJSON,
-  safeDecodeURIComponent,
-  safeEncodeURIComponent,
   sequential,
   SequentialIdGenerator,
   sleep,

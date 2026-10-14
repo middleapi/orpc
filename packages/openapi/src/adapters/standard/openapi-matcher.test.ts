@@ -4,6 +4,27 @@ import { findAllRoutes } from 'rou3'
 import { getOpenAPIMeta, openapi } from '../../meta'
 import { OpenAPIMatcher } from './openapi-matcher'
 
+async function countThrows(name: 'decodeURIComponent' | 'encodeURIComponent', fn: () => unknown): Promise<number> {
+  const original: (value: string) => string = globalThis[name]
+  let throws = 0
+  const spy = vi.spyOn(globalThis, name).mockImplementation((value: string) => {
+    try {
+      return original(value)
+    }
+    catch (error) {
+      throws++
+      throw error
+    }
+  })
+  try {
+    await fn()
+  }
+  finally {
+    spy.mockRestore()
+  }
+  return throws
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
 })
@@ -389,6 +410,36 @@ describe('openAPIMatcher', () => {
         procedure: files,
         params: { path: 'a' },
       })
+    })
+
+    it('does not throw per segment on "%"-heavy paths and catch-all params', async () => {
+      const files = os.meta(openapi({ method: 'GET', path: '/files/{+path}' })).handler(() => 'ok')
+      const matcher = new OpenAPIMatcher({ files })
+
+      expect(await countThrows('decodeURIComponent', async () => {
+        await expect(matcher.match('GET', `/${'/%'.repeat(5_000)}`, undefined)).resolves.toBeUndefined()
+      })).toBe(0)
+
+      expect(await countThrows('decodeURIComponent', async () => {
+        await expect(matcher.match('GET', `/files/${'%FF/'.repeat(5_000)}`, undefined)).resolves.toMatchObject({
+          params: { path: Array.from({ length: 5_000 }).fill('%FF').join('/') },
+        })
+      })).toBe(0)
+    })
+
+    it('matches over-long pathnames as given, without normalizing them', async () => {
+      const short = 'a'.repeat(1_000)
+      const long = 'a'.repeat(20_000)
+      const matcher = new OpenAPIMatcher({
+        short: os.meta(openapi({ method: 'GET', path: `/${short}` })).handler(() => 'short'),
+        long: os.meta(openapi({ method: 'GET', path: `/${long}` })).handler(() => 'long'),
+      })
+
+      expect((await matcher.match('GET', `/%61${short.slice(1)}`, undefined))?.path).toEqual(['short'])
+      expect((await matcher.match('GET', `/${long}`, undefined))?.path).toEqual(['long'])
+
+      const match = await matcher.match('GET', `/%61${long.slice(1)}`, undefined)
+      expect(match !== undefined).toBe(false)
     })
 
     it('throws when a path has more than one catch-all param', () => {

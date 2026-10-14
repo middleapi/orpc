@@ -478,5 +478,17 @@ describe('rpcMatcher', () => {
       expect(lazyLoader).toHaveBeenCalledTimes(1)
       expect(lazyLazyLoader).toHaveBeenCalledTimes(0)
     })
+
+    it('matches over-long pathnames only exactly, without normalizing them', async () => {
+      const short = 'a'.repeat(1_000)
+      const long = 'a'.repeat(20_000)
+      const matcher = new RPCMatcher({ [short]: procedure1, [long]: procedure1 })
+
+      expect((await matcher.match('POST', `/%61${short.slice(1)}`, undefined))?.path).toEqual([short])
+      expect((await matcher.match('POST', `/${long}`, undefined))?.path).toEqual([long])
+
+      const match = await matcher.match('POST', `/%61${long.slice(1)}`, undefined)
+      expect(match !== undefined).toBe(false)
+    })
   })
 })

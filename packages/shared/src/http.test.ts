@@ -1,4 +1,8 @@
 import {
+  safeDecodeURIComponent as upstreamSafeDecodeURIComponent,
+  safeEncodeURIComponent as upstreamSafeEncodeURIComponent,
+} from '@standard-server/shared'
+import {
   isAcceptableEncoding,
   isCompressibleContentType,
   isNoTransformCacheControl,
@@ -8,8 +12,31 @@ import {
   normalizeHttpPath,
   parseAcceptEncodingQualities,
   pathToHttpPath,
+  safeDecodeURIComponent,
+  safeEncodeURIComponent,
   varyByAcceptEncoding,
-} from './http'
+} from '.'
+
+async function countThrows(name: 'decodeURIComponent' | 'encodeURIComponent', fn: () => unknown): Promise<number> {
+  const original: (value: string) => string = globalThis[name]
+  let throws = 0
+  const spy = vi.spyOn(globalThis, name).mockImplementation((value: string) => {
+    try {
+      return original(value)
+    }
+    catch (error) {
+      throws++
+      throw error
+    }
+  })
+  try {
+    await fn()
+  }
+  finally {
+    spy.mockRestore()
+  }
+  return throws
+}
 
 describe('pathToHttpPath', () => {
   it('produces a leading slash', () => {
@@ -66,6 +93,142 @@ describe('normalizeHttpPath', () => {
 
   it('does not remove redundant trailing slash', () => {
     expect(normalizeHttpPath('/a/')).toEqual('/a/')
+  })
+})
+
+describe('safeDecodeURIComponent / safeEncodeURIComponent', () => {
+  function randomString(tokens: readonly string[], maxTokens: number): string {
+    let value = ''
+    const length = Math.floor(Math.random() * (maxTokens + 1))
+
+    for (let i = 0; i < length; i++) {
+      value += tokens[Math.floor(Math.random() * tokens.length)]
+    }
+
+    return value
+  }
+
+  it('keeps decoding semantics', () => {
+    expect(safeDecodeURIComponent('a%62c')).toBe('abc')
+    expect(safeDecodeURIComponent('%')).toBe('%')
+    expect(safeDecodeURIComponent('%E4%BD%A0%')).toBe('%E4%BD%A0%') // whole value kept when any part is invalid
+    expect(safeDecodeURIComponent('%FF%41')).toBe('%FF%41')
+    expect(safeDecodeURIComponent('%FFx%41')).toBe('%FFx%41')
+    expect(safeDecodeURIComponent('%E4x%BD%A0')).toBe('%E4x%BD%A0') // multi-byte sequence must be contiguous
+    expect(safeDecodeURIComponent('%ED%A0%80')).toBe('%ED%A0%80') // surrogate
+    expect(safeDecodeURIComponent('%C0%80')).toBe('%C0%80') // overlong
+    expect(safeDecodeURIComponent('%F4%90%80%80')).toBe('%F4%90%80%80') // > U+10FFFF
+    expect(safeDecodeURIComponent('%F0%9F%98%80')).toBe('😀')
+    expect(safeDecodeURIComponent('%E4%BD')).toBe('%E4%BD') // truncated
+    expect(safeDecodeURIComponent('%2F%25%41')).toBe('/%A')
+  })
+
+  it('keeps encoding semantics', () => {
+    expect(safeEncodeURIComponent('a b')).toBe('a%20b')
+    expect(safeEncodeURIComponent('😀')).toBe('%F0%9F%98%80')
+    expect(safeEncodeURIComponent('a\uD800b')).toBe('a%EF%BF%BDb')
+    expect(safeEncodeURIComponent('\uDE00\uD83D')).toBe('%EF%BF%BD%EF%BF%BD') // reversed pair = two lone surrogates
+  })
+
+  it('never throws internally', async () => {
+    expect(await countThrows('decodeURIComponent', () => normalizeHttpPath(`/${'/%'.repeat(5_000)}`))).toBe(0)
+    expect(await countThrows('decodeURIComponent', () => safeDecodeURIComponent('a%FF'.repeat(5_000)))).toBe(0)
+    expect(await countThrows('encodeURIComponent', () => normalizeHttpPath(`/${'/\uD800'.repeat(5_000)}`))).toBe(0)
+  })
+
+  it('decodes exactly like @standard-server/shared on every lead and first continuation byte', () => {
+    const escape = (byte: number) => `%${byte.toString(16).padStart(2, '0').toUpperCase()}`
+    const mismatches: { input: string, actual: string, expected: string }[] = []
+
+    for (let lead = 0; lead < 256; lead++) {
+      for (let next = 0; next < 256; next++) {
+        // only a 11xxxxxx byte can start a multi-byte sequence, so only those leads need suffixes
+        // completing 2-, 3- and 4-byte sequences to reach every byte-range boundary
+        for (const suffix of lead >= 0xC0 ? ['', '%80', '%80%80'] : ['']) {
+          const input = `${escape(lead)}${escape(next)}${suffix}`
+          const actual = safeDecodeURIComponent(input)
+          const expected = upstreamSafeDecodeURIComponent(input)
+
+          if (actual !== expected) {
+            mismatches.push({ input, actual, expected })
+          }
+        }
+      }
+    }
+
+    expect(mismatches).toEqual([])
+  })
+
+  it('decodes exactly like @standard-server/shared on random input', () => {
+    const tokens = [
+      '%',
+      '%4',
+      '%G1',
+      'a',
+      '/',
+      '%41',
+      '%FF',
+      '%C3',
+      '%A9',
+      '%E4',
+      '%e4',
+      '%BD',
+      '%bd',
+      '%BF',
+      '%A0',
+      '%ED',
+      '%9F',
+      '%F0',
+      '%90',
+      '%80',
+      '%F4',
+      '%8F',
+      '%C0',
+      '%C1',
+      '%C2',
+      '%DF',
+      '%E0',
+      '%EF',
+      '%F1',
+      '%F3',
+      '%F5',
+      '%2F',
+      '%25',
+      '%C3%A9',
+      '%E4%BD%A0',
+      '%F0%9F%98%80',
+      '%F4%8F%BF%BF',
+    ]
+    const mismatches: { input: string, actual: string, expected: string }[] = []
+
+    for (let i = 0; i < 20_000; i++) {
+      const input = randomString(tokens, 8)
+      const actual = safeDecodeURIComponent(input)
+      const expected = upstreamSafeDecodeURIComponent(input)
+
+      if (actual !== expected) {
+        mismatches.push({ input, actual, expected })
+      }
+    }
+
+    expect(mismatches).toEqual([])
+  })
+
+  it('encodes exactly like @standard-server/shared on random input', () => {
+    const tokens = ['a', '/', ' ', '%', 'é', '😀', '\uD800', '\uDBFF', '\uDC00', '\uDFFF']
+    const mismatches: { input: string, actual: string, expected: string }[] = []
+
+    for (let i = 0; i < 20_000; i++) {
+      const input = randomString(tokens, 8)
+      const actual = safeEncodeURIComponent(input)
+      const expected = upstreamSafeEncodeURIComponent(input)
+
+      if (actual !== expected) {
+        mismatches.push({ input, actual, expected })
+      }
+    }
+
+    expect(mismatches).toEqual([])
   })
 })
 
