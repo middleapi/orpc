@@ -931,22 +931,5 @@ describe('openAPILinkCodec', () => {
 
       expect(result.kind).toBe('error')
     })
-
-    it.each(['compact', 'detailed'] as const)('treats status 0 (opaque redirect) as MALFORMED_ORPC_RESPONSE with %s output', async (outputStructure) => {
-      const codec = new OpenAPILinkCodec({
-        ping: oc.meta(openapi({ outputStructure })),
-      }, { serializer })
-
-      const result = await codec.decodeResponse({
-        status: 0,
-        headers: {},
-        resolveBody: async () => undefined,
-      }, ['ping'], { context: {} })
-
-      expectORPCErrorResult(result, 'MALFORMED_ORPC_RESPONSE', {
-        data: { status: 0, headers: {}, body: undefined },
-      })
-      expect((result as any).error.cause).toBeInstanceOf(MalformedResponseError)
-    })
   })
 })

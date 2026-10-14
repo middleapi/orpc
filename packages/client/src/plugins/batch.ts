@@ -6,7 +6,6 @@ import type { ClientContext } from '../types'
 import { captureAsyncContext, defer, isAsyncIteratorObject, loadBytes, once, promiseWithResolvers, safeEncodeURIComponent, splitInHalf, stringifyJSON, toArray, value } from '@orpc/shared'
 import { parseStandardUrl } from '@standard-server/core'
 import { ClientPeer, decodePeerMessage, isServerPeerSendMessage } from '@standard-server/peer'
-import { isSuccessResponseStatus } from '../adapters/standard/codec'
 
 export type BatchLinkPluginMode = 'streaming' | 'buffered'
 
@@ -410,10 +409,10 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
         })
 
         /**
-         * A non-success response is not a batch response, so forward it as-is to every subrequest
+         * An error response is not a batch response, so forward it as-is to every subrequest
          * instead of failing to parse it.
          */
-        if (!isSuccessResponseStatus(batchResponse.status)) {
+        if (batchResponse.status >= 400) {
           const resolveBody = once(() => batchResponse.resolveBody())
           const errorResponse: StandardLazyResponse = { ...batchResponse, resolveBody }
 

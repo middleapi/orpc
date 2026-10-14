@@ -287,23 +287,6 @@ describe('rpcLinkCodec', () => {
       expect(result.kind).toBe('error')
     })
 
-    it('treats status 0 (opaque redirect) as MALFORMED_ORPC_RESPONSE', async () => {
-      const result = await codec.decodeResponse({
-        status: 0,
-        headers: {},
-        resolveBody: () => Promise.resolve(undefined),
-      })
-
-      expect(result).toEqual({
-        kind: 'error',
-        error: expect.objectContaining({
-          code: 'MALFORMED_ORPC_RESPONSE',
-          data: { status: 0, headers: {}, body: undefined },
-          cause: expect.any(MalformedResponseError),
-        }),
-      })
-    })
-
     it('decodes ORPCError JSON from error response', async () => {
       const error = new ORPCError('NOT_FOUND', { message: 'Resource not found', data: { id: '123' } })
       const serialized = serializer.serialize(error.toJSON())

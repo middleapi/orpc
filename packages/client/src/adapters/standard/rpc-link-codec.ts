@@ -7,7 +7,6 @@ import { mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
 import { toStandardHeaders } from '@standard-server/fetch'
 import { createORPCErrorFromJson, createORPCErrorFromMalformedResponse, isORPCErrorJson } from '../../error-utils'
 import { RPCSerializer } from '../../rpc-serializer'
-import { isSuccessResponseStatus } from './codec'
 
 export interface RPCLinkCodecOptions<T extends ClientContext> {
   /**
@@ -123,7 +122,7 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
   }
 
   async decodeResponse(response: StandardLazyResponse): Promise<StandardLinkCodecDecodedResponse> {
-    const isOk = isSuccessResponseStatus(response.status)
+    const isOk = response.status < 400
 
     const body = await response.resolveBody()
 

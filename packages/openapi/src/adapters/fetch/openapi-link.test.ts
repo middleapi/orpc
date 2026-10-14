@@ -198,4 +198,23 @@ describe('openapiLink', () => {
 
     await expect(client.post('ignored')).resolves.toBe('intercepted')
   })
+
+  it('rejects redirect responses hidden by browser fetch', async () => {
+    // Node cannot construct status 0 responses, so mimic the filtered response a browser returns
+    const fetch = vi.fn(async () => Object.defineProperties(new Response(null), {
+      type: { value: 'opaqueredirect' },
+      status: { value: 0 },
+    }))
+
+    const client = createORPCClient(new OpenAPILink(router, {
+      fetch,
+      origin: 'http://localhost:3000',
+      url: '/api',
+    })) as any
+
+    await expect(client.post('input')).rejects.toMatchObject({
+      code: 'MALFORMED_ORPC_RESPONSE',
+      data: { status: 0 },
+    })
+  })
 })

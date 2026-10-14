@@ -18,12 +18,3 @@ export interface StandardLinkCodec<T extends ClientContext> {
     options: ClientOptions<T>
   ): Promisable<StandardLinkCodecDecodedResponse>
 }
-
-/**
- * Whether a link should decode a response with this status as success.
- * 1xx and 3xx count as success. Status 0 does not: it is an opaque response,
- * e.g. a redirect hidden by fetch's `redirect: 'manual'`.
- */
-export function isSuccessResponseStatus(status: number): boolean {
-  return status > 0 && status < 400
-}

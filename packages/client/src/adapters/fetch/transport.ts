@@ -5,6 +5,7 @@ import type { ClientContext, ClientOptions } from '../../types'
 import type { StandardLinkTransport } from '../standard'
 import { once, value } from '@orpc/shared'
 import { toFetchBody, toFetchHeaders, toStandardLazyResponse } from '@standard-server/fetch'
+import { createORPCErrorFromMalformedResponse } from '../../error-utils'
 
 const GET_SUPPORTED_DUPLEX_MODE = once(() => {
   // TODO: Try `duplex: 'full'` when it is widely supported.
@@ -94,6 +95,19 @@ export class FetchLinkTransport<T extends ClientContext> implements StandardLink
     const response = await fetch(url, init, options, path)
 
     const standardResponse = toStandardLazyResponse(response)
+
+    /**
+     * Browsers return opaque responses (status 0, no headers, null body) for redirects, since requests
+     * use `redirect: 'manual'`, and for `no-cors` requests. They must not decode as success.
+     */
+    if (response.type === 'opaqueredirect' || response.type === 'opaque') {
+      throw createORPCErrorFromMalformedResponse({
+        message: response.type === 'opaqueredirect'
+          ? 'Received a redirect response, which oRPC links do not follow.'
+          : 'Received an opaque response, which cannot be read (was the request sent with mode \'no-cors\'?).',
+        response: { status: standardResponse.status, headers: standardResponse.headers, body: undefined },
+      })
+    }
 
     return standardResponse
   }
