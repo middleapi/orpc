@@ -110,7 +110,7 @@ With all three limits configured, the plugin subsumes the [Request Limit Plugin]
 
 ## Keeping Small Uploads in Memory
 
-Every temporary file costs filesystem work to create and remove, however few bytes it holds. If every upload spooled, a small request carrying thousands of empty file parts could create thousands of files before any middleware runs. So an upload only spools once it exceeds `spoolThreshold`; smaller ones, empty files included, stay in memory as plain `File`s, the way the standard parser keeps them.
+Uploads up to `spoolThreshold` stay in memory as plain `File`s, so small and empty files never cost a temporary file.
 
 ```ts
 const handler = new RPCHandler(router, {
@@ -118,7 +118,8 @@ const handler = new RPCHandler(router, {
     new TmpFileUploadHandlerPlugin({
       /**
        * The size in bytes an uploaded file must exceed before it is
-       * spooled to a temporary file.
+       * spooled to a temporary file. Set to `0` to spool every
+       * non-empty upload.
        *
        * @default 64 * 1024
        */
@@ -128,9 +129,7 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-An upload held in memory counts against `maxBodySize.memory`, shared with the fields and part headers of the same body. One that would no longer fit spools to disk instead of rejecting the request, so the memory limit bounds the memory uploads use without capping their size, while `maxBodySize.file` keeps counting every upload wherever it is held. Fields arriving after small files still need room of their own, so size `memory` for both.
-
-A lower threshold makes each temporary file cheaper for a client to cause; set it to `0` to spool every non-empty upload.
+In-memory uploads count against `maxBodySize.memory`, shared with the body's fields, and spool to disk once they no longer fit, so size `memory` for both.
 
 ## Per-Request Limits
 
