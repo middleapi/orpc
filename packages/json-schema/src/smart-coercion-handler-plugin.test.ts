@@ -59,10 +59,10 @@ describe('smartCoercionHandlerPlugin', () => {
     const next = vi.fn().mockResolvedValue('handled')
 
     await new SmartCoercionHandlerPlugin({ maxStepsPerValue: 1 }).init({} as any).clientInterceptors![0]!({ procedure, input, next } as any)
-    expect(next.mock.calls[0]![0].input).toBe(input)
-
     await new SmartCoercionHandlerPlugin().init({} as any).clientInterceptors![0]!({ procedure, input, next } as any)
-    expect(next.mock.calls[1]![0].input).toEqual(Array.from({ length: 200 }, (_, i) => i))
+
+    expect(next).toHaveBeenNthCalledWith(1, { procedure, input })
+    expect(next).toHaveBeenNthCalledWith(2, { procedure, input: Array.from({ length: 200 }, (_, i) => i) })
   })
 
   it('coerces deep recursive unions in linear time and still coerces every leaf', async () => {

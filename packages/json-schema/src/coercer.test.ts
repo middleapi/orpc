@@ -861,6 +861,11 @@ describe('jsonSchemaCoercer', () => {
       $defs: { node: nodeSchema(['paragraph', 'text'], 'children', ['type', 'children']) },
     }
 
+    const SIX_BRANCH = {
+      $ref: '#/$defs/node',
+      $defs: { node: nodeSchema(['doc', 'paragraph', 'heading', 'list', 'item', 'text'], 'content', ['type']) },
+    }
+
     function nested(depth: number, type: string, childKey = 'children'): Record<string, unknown> {
       let node: Record<string, unknown> = { type, [childKey]: [] }
       for (let i = 0; i < depth; i++) {
@@ -872,13 +877,15 @@ describe('jsonSchemaCoercer', () => {
     it.each(['text', 'zzz'])('stays linear when the discriminator is %s', (type) => {
       const value = { doc: nested(14, type) }
       // before the fix: 262137 for both
-      expect(countCoerceSteps(() => new JsonSchemaCoercer().coerce([TWO_BRANCH as any, false], value))).toBeLessThan(2_000)
+      expect(countCoerceSteps(() => coerce(TWO_BRANCH, value))).toBeLessThan(2_000)
     })
 
     it('stays linear with many branches sharing a child key', () => {
-      const schema = { $ref: '#/$defs/node', $defs: { node: nodeSchema(['doc', 'paragraph', 'heading', 'list', 'item', 'text'], 'content', ['type']) } }
       // before the fix: 1119740
-      expect(countCoerceSteps(() => new JsonSchemaCoercer().coerce([schema as any, false], nested(6, 'text', 'content')))).toBeLessThan(2_000)
+      expect(countCoerceSteps(() => coerce(SIX_BRANCH, nested(6, 'text', 'content')))).toBeLessThan(2_000)
+
+      const deep = nested(200, 'text', 'content')
+      expect(countCoerceSteps(() => expect(coerce(SIX_BRANCH, deep)).toBe(deep))).toBeLessThan(10_000)
     })
 
     it('stays linear for a record branch listed before an array branch', () => {
@@ -888,7 +895,7 @@ describe('jsonSchemaCoercer', () => {
         value = [value]
       }
       // before the fix: 131066
-      expect(countCoerceSteps(() => new JsonSchemaCoercer().coerce([schema as any, false], value))).toBeLessThan(2_000)
+      expect(countCoerceSteps(() => coerce(schema, value))).toBeLessThan(2_000)
     })
 
     it('coerces every level of a deep recursive union', () => {
@@ -913,10 +920,6 @@ describe('jsonSchemaCoercer', () => {
       }
 
       expect(countCoerceSteps(() => expect(coerce(schema, value)).toEqual(expected))).toBeLessThan(10_000)
-
-      const six = { $ref: '#/$defs/node', $defs: { node: nodeSchema(['doc', 'paragraph', 'heading', 'list', 'item', 'text'], 'content', ['type']) } }
-      const deep = nested(200, 'text', 'content')
-      expect(countCoerceSteps(() => expect(coerce(six, deep)).toBe(deep))).toBeLessThan(10_000)
     })
   })
 
@@ -935,33 +938,30 @@ describe('jsonSchemaCoercer', () => {
     }
 
     it('leaves the whole input untouched once coercion runs out of steps', () => {
-      const coercer = new JsonSchemaCoercer()
       const value = { page: '2', count: '1' }
 
       // inputs with fewer than 100 values get the budget of 100 values
-      expect(countCoerceSteps(() => {
-        expect(coercer.coerce([EXPONENTIAL_SCHEMA as any, false], value)).toBe(value)
-      })).toBe(100_001)
+      expect(countCoerceSteps(() => expect(coerce(EXPONENTIAL_SCHEMA, value)).toBe(value))).toBe(100_001)
 
       expect(value).toEqual({ page: '2', count: '1' })
 
       // the coercer keeps no state from a coercion it gave up on
-      expect(coercer.coerce([{ type: 'object', properties: { page: { type: 'integer' } } }, false], { page: '2' })).toEqual({ page: 2 })
+      expect(coerce({ type: 'object', properties: { page: { type: 'integer' } } }, { page: '2' })).toEqual({ page: 2 })
     })
 
     it('extends the budget with the number of values in the input', () => {
       const coercer = new JsonSchemaCoercer({ maxStepsPerValue: 2 })
 
-      // one step for the array and one per item, so it never runs out
       const integers = Array.from({ length: 1_000 }, (_, i) => String(i))
-      expect(coercer.coerce([{ type: 'array', items: { type: 'integer' } }, false], integers))
-        .toEqual(Array.from({ length: 1_000 }, (_, i) => i))
+      const expected = Array.from({ length: 1_000 }, (_, i) => i)
+
+      // one step for the array and one per item, so it never runs out
+      expect(coercer.coerce([{ type: 'array', items: { type: 'integer' } }, false], integers)).toEqual(expected)
 
       // the union takes three more steps per item, more than two per value
       const union: JsonSchema = { type: 'array', items: { anyOf: [{ type: 'boolean' }, { type: 'null' }, { type: 'integer' }] } }
       expect(coercer.coerce([union, false], integers)).toBe(integers)
-      expect(new JsonSchemaCoercer({ maxStepsPerValue: 5 }).coerce([union, false], integers))
-        .toEqual(Array.from({ length: 1_000 }, (_, i) => i))
+      expect(new JsonSchemaCoercer({ maxStepsPerValue: 5 }).coerce([union, false], integers)).toEqual(expected)
     })
 
     it('fully coerces large inputs that take many steps', () => {

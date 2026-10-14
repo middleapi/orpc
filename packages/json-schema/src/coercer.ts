@@ -88,15 +88,14 @@ interface CoercionContext {
    * Union branches often reach the same nested value through the same `$ref`, so without it
    * recursive unions would coerce that value once per branch at every depth.
    */
-  memo?: Map<JsonSchema, Map<object, [satisfied: Satisfaction, coerced: unknown]>>
+  memo: Map<JsonSchema, Map<unknown, [satisfied: Satisfaction, coerced: unknown]>> | undefined
   steps: number
   maxSteps: number
   /**
-   * The input is only counted once the minimum budget is spent, to extend `maxSteps` to its size,
+   * Only counted once the minimum budget is spent, to extend `maxSteps` to its size,
    * so most coercions skip counting.
    */
   input: unknown
-  inputCounted: boolean
 }
 
 class CoercionBudgetExceededError extends Error {}
@@ -115,10 +114,10 @@ export class JsonSchemaCoercer {
 
     const context: CoercionContext = {
       rootSchema: schema,
+      memo: undefined,
       steps: 0,
       maxSteps: this.maxStepsPerValue * MIN_BUDGETED_VALUES,
       input: value,
-      inputCounted: false,
     }
 
     try {
@@ -146,10 +145,8 @@ export class JsonSchemaCoercer {
     appliedRefs?: Set<JsonSchema>,
   ): [satisfied: Satisfaction, coerced: unknown] {
     if (++context.steps > context.maxSteps) {
-      if (!context.inputCounted) {
-        context.maxSteps = this.maxStepsPerValue * Math.max(countValues(context.input), MIN_BUDGETED_VALUES)
-        context.inputCounted = true
-      }
+      // counting either throws below or extends the budget past the steps taken, so it runs at most twice
+      context.maxSteps = this.maxStepsPerValue * Math.max(countValues(context.input), MIN_BUDGETED_VALUES)
 
       if (context.steps > context.maxSteps) {
         throw new CoercionBudgetExceededError('Coercion took too many steps')
@@ -185,11 +182,19 @@ export class JsonSchemaCoercer {
          * With no other `$ref` applied to this value, the result only depends on the value and the resolved schema.
          * Coercion never mutates a value in place, so a cached result can be shared.
          */
-        const memo = !appliedRefs?.size && typeof coerced === 'object' && coerced !== null
-          ? (context.memo ??= new Map()).get(resolved) ?? context.memo.set(resolved, new Map()).get(resolved)!
-          : undefined
+        let memo: Map<unknown, [satisfied: Satisfaction, coerced: unknown]> | undefined
 
-        let result = memo?.get(coerced as object)
+        if (!appliedRefs?.size && typeof coerced === 'object' && coerced !== null) {
+          context.memo ??= new Map()
+          memo = context.memo.get(resolved)
+
+          if (!memo) {
+            memo = new Map()
+            context.memo.set(resolved, memo)
+          }
+        }
+
+        let result = memo?.get(coerced)
 
         if (!result) {
           appliedRefs ??= new Set()
@@ -199,7 +204,7 @@ export class JsonSchemaCoercer {
 
           appliedRefs.delete(resolved)
 
-          memo?.set(coerced as object, result)
+          memo?.set(coerced, result)
         }
 
         const [subSatisfied, subCoerced] = result
@@ -470,18 +475,21 @@ export class JsonSchemaCoercer {
 function countValues(input: unknown): number {
   const walked = new Set<object>()
   const stack = [input]
-  let count = 0
+  let count = 1
 
   while (stack.length) {
     const value = stack.pop()
-    count++
 
     if ((Array.isArray(value) || isPlainObject(value)) && !walked.has(value)) {
       walked.add(value)
 
       // like coercion, `Object.values` skips the holes of sparse arrays
       for (const item of Object.values(value)) {
-        stack.push(item)
+        count++
+
+        if (typeof item === 'object' && item !== null) {
+          stack.push(item)
+        }
       }
     }
   }
