@@ -281,10 +281,11 @@ describe('rpcHandler', () => {
     // the request is cancelled once encoding the response fails
     await vi.waitFor(() => {
       expect(ws.send).toHaveBeenCalledTimes(1)
-    })
+    }, { interval: 1 })
     expect((decodePeerMessage((ws as any).send.mock.calls[0][0]) as any).message.kind).toBe('cancel')
 
-    await new Promise(resolve => setTimeout(resolve, 10))
+    // `unhandledRejection` fires once the microtask queue drains
+    await new Promise(resolve => setImmediate(resolve))
     expect(unhandledRejection).not.toHaveBeenCalled()
   })
 })

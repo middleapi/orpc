@@ -17,7 +17,6 @@ export interface FetchHandlerOptions<_T extends Context> {
   /**
    * Called when converting the Standard Response to a Fetch Response fails
    * (e.g. the body contains a value `JSON.stringify` cannot encode).
-   * `handle()` then resolves with an empty `500` response instead of rejecting.
    */
   onSendResponseError?: undefined | ((error: unknown) => void)
 }

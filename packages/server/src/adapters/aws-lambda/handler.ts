@@ -17,7 +17,6 @@ export interface AwsLambdaHandlerOptions<_T extends Context> {
 
   /**
    * Called when sending the response fails (e.g. the response stream errored).
-   * `handle()` resolves either way.
    */
   onSendResponseError?: undefined | ((error: unknown) => void)
 }

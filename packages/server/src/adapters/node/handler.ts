@@ -16,7 +16,7 @@ export interface NodeHttpHandlerOptions<_T extends Context> {
 
   /**
    * Called when sending the response fails, including client resets that surface as errors
-   * (e.g. HTTP/2 `ERR_HTTP2_STREAM_ERROR`). `handle()` resolves either way.
+   * (e.g. HTTP/2 `ERR_HTTP2_STREAM_ERROR`).
    */
   onSendResponseError?: undefined | ((error: unknown) => void)
 }
