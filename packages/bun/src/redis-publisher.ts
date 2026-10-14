@@ -9,9 +9,6 @@ export interface BunRedisPublisherOptions extends BaseRedisPublisherOptions {
    * Redis subscriber instance.
    * Pub/Sub takes over the connection, so a client with subscriptions
    * cannot execute commands and must use a dedicated connection.
-   * Its `onconnect` and `onclose` handlers are wrapped to report a lost connection
-   * to the `onError` of active subscriptions, which ends iterator subscriptions.
-   * Bun does not restore subscriptions after reconnecting, so subscribe again in `onError`.
    *
    * @default redis.duplicate() (lazily created on first listen)
    */
@@ -53,7 +50,6 @@ export class BunRedisPublisher<T extends Record<string, object>> extends BaseRed
   ): Promise<() => Promise<void>> {
     const subscriber = await this.getSubscriber()
 
-    // Bun stays closed once it gives up reconnecting, until `connect()` is called.
     if (!subscriber.connected) {
       await subscriber.connect()
     }
@@ -78,7 +74,6 @@ export class BunRedisPublisher<T extends Record<string, object>> extends BaseRed
         await subscriber.unsubscribe(channel, listener)
       }
       catch (error) {
-        // A closed connection holds no subscriptions, and Bun still removes the listener.
         if (subscriber.connected) {
           throw error
         }
@@ -97,11 +92,6 @@ export class BunRedisPublisher<T extends Record<string, object>> extends BaseRed
     return entries.map(([id, fields]) => ({ id, data: fields[1] }))
   }
 
-  /**
-   * Bun reconnects without restoring subscriptions, and closes for good once it gives up,
-   * so both `onconnect` and `onclose` mean active subscriptions are gone. These handlers
-   * are single slots, so the ones already set are kept and called first.
-   */
   private watchSubscriber(subscriber: RedisClient): void {
     const { onconnect, onclose } = subscriber
     // Snapshot, since a callback may unsubscribe itself mid-dispatch.

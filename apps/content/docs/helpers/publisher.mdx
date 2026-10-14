@@ -97,7 +97,6 @@ import { RedisPublisher } from '@orpc/publisher/redis'
 
 const client = createClient({ url: 'redis://localhost:6379' })
 
-// node-redis requires an error listener, otherwise a lost connection crashes the process.
 client.on('error', error => console.error('Redis client error', error))
 
 // RedisPublisher lazily connects to Redis when needed.
@@ -109,8 +108,6 @@ const publisher = new RedisPublisher<Events>(client, {
    * Redis subscriber instance.
    * Pub/Sub takes over the connection, so a client with subscriptions
    * cannot execute commands and must use a dedicated connection.
-   * Its connection errors are reported to the `onError` of active subscriptions,
-   * which ends iterator subscriptions.
    *
    * @default client.duplicate()
    */
@@ -210,9 +207,6 @@ const publisher = new BunRedisPublisher<Events>(redis, {
    * Redis subscriber instance.
    * Pub/Sub takes over the connection, so a client with subscriptions
    * cannot execute commands and must use a dedicated connection.
-   * Its `onconnect` and `onclose` handlers are wrapped to report a lost connection
-   * to the `onError` of active subscriptions, which ends iterator subscriptions.
-   * Bun does not restore subscriptions after reconnecting, so subscribe again in `onError`.
    *
    * @default redis.duplicate() (lazily created on first listen)
    */

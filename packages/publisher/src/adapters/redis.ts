@@ -8,8 +8,6 @@ export interface RedisPublisherOptions extends BaseRedisPublisherOptions {
    * Redis subscriber instance.
    * Pub/Sub takes over the connection, so a client with subscriptions
    * cannot execute commands and must use a dedicated connection.
-   * Its connection errors are reported to the `onError` of active subscriptions,
-   * which ends iterator subscriptions.
    *
    * @default redis.duplicate()
    */
@@ -48,8 +46,6 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
     this.subscriber = subscriber ?? redis.duplicate()
     this.channelPrefix = keyPrefix ?? ''
 
-    // node-redis emits `'error'` on every dropped connection and then reconnects and re-subscribes
-    // on its own, but an `'error'` event without a listener crashes the process.
     this.subscriber.on('error', (error) => {
       // Snapshot, since a callback may unsubscribe itself mid-dispatch.
       this.onErrors.slice().forEach(onError => onError(error))
