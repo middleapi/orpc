@@ -64,6 +64,29 @@ clientPort.start()
 The examples above only show how to configure the link. For examples of creating a typesafe client, see [RPC Link](/docs/rpc/link#typesafe-clients).
 :::
 
+## Security
+
+`upgrade()` serves your whole router to whoever holds the other end of the port, and a port carries no information about who sent it. Make sure only trusted code can reach that end:
+
+- Ports you create or receive from code you control, such as a local `MessageChannel`, a [Web Worker](/docs/adapters/web-workers) you spawned, or a port sent to a [Worker Thread](/docs/adapters/worker-threads) by its parent, need no extra check.
+- Ports that arrive through a window `message` event, such as from iframes, popups, `window.opener`, [Electron](/docs/adapters/electron) preload scripts or [browser extension](/docs/adapters/browser#advanced-relay-pattern) content scripts, can be posted by any frame or window that can reach yours. Check `event.source` and `event.origin` before you upgrade or forward them.
+- Never send a port to another window with targetOrigin `'*'`. Pass the expected origin instead, so the browser drops the port if that window is on another origin. Posting to your own window with `'*'` is fine.
+
+```ts
+window.addEventListener('message', (event) => {
+  if (event.source !== expectedWindow || event.origin !== 'https://expected.example') {
+    return
+  }
+
+  if (event.data instanceof MessagePort) {
+    handler.upgrade(event.data)
+    event.data.start()
+  }
+})
+```
+
+See MDN's [postMessage security concerns](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage#security_concerns) for more details.
+
 ## Transfer
 
 By default, oRPC serializes request/response messages to string/binary data before sending over message port. If needed, you can define the `transfer` option to utilize full power of [MessagePort: postMessage() method](https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage), such as transferring ownership of objects to the other side or support unserializable objects like `OffscreenCanvas`.

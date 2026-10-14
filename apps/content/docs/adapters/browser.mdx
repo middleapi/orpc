@@ -59,7 +59,7 @@ The examples above only show how to configure the link. For examples of creating
 
 ## Window to Window
 
-To enable communication between two window contexts (e.g. parent and popup), one must listen and upgrade the port, and the other must initiate the connection.
+To enable communication between two window contexts (e.g. parent and popup), one must listen and upgrade the port, and the other must initiate the connection. Any window or frame can post messages to yours, so both sides must check who they talk to (see [Message Port Security](/docs/adapters/message-port#security)).
 
 <CodeGroup>
 
@@ -75,7 +75,14 @@ const handler = new RPCHandler(router, {
   ],
 })
 
+const popup = window.open('/example/popup', 'popup', 'width=680,height=520')
+
 window.addEventListener('message', (event) => {
+  // Only accept ports from the popup opened above, while it is on your origin (or its expected origin)
+  if (event.source !== popup || event.origin !== window.location.origin) {
+    return
+  }
+
   if (event.data instanceof MessagePort) {
     handler.upgrade(event.data, {
       /**
@@ -89,8 +96,6 @@ window.addEventListener('message', (event) => {
     event.data.start()
   }
 })
-
-window.open('/example/popup', 'popup', 'width=680,height=520')
 ```
 
 ```ts popup
@@ -98,7 +103,8 @@ import { RPCLink } from '@orpc/client/message-port'
 
 const { port1: serverPort, port2: clientPort } = new MessageChannel()
 
-window.opener.postMessage(serverPort, '*', [serverPort])
+// Never use '*' here: if the opener is not on the expected origin, the browser drops the port
+window.opener.postMessage(serverPort, window.location.origin, [serverPort])
 
 const link = new RPCLink({
   port: clientPort,
@@ -115,33 +121,47 @@ In some advanced cases, direct communication between scripts isn't possible. For
 
 To work around this, you can use a **relay pattern**: an additional content script running in the **"ISOLATED" (default) world** relays messages between the two contexts, enabling communication where direct access is restricted.
 
+:::warning
+The "MAIN" world is the web page's own JavaScript context, so the page can do anything your MAIN world script can, including posting its own port to the relay. This means **every page where these content scripts run can call every procedure the relay exposes**. The `event.source` check in the relay only blocks other frames and windows. To limit the impact:
+
+- Serve relayed connections with a dedicated, minimal router, chosen by `port.name` in a single `onConnect` listener, so they never reach the router of your trusted extension scripts.
+- Authorize calls with `port.sender` (e.g. its `url`, `origin` or `tab`).
+- Never expose secrets or privileged APIs on that router.
+- Limit the content scripts' `matches` to the sites that need them.
+
+See [Message Port Security](/docs/adapters/message-port#security) for more details.
+:::
+
 <CodeGroup>
 
 ```ts relay
 window.addEventListener('message', (event) => {
-  if (event.data instanceof MessagePort) {
-    const port = browser.runtime.connect()
-
-    // Relay `message` and `close/disconnect` events between the MessagePort and runtime.Port
-
-    event.data.addEventListener('message', (event) => {
-      port.postMessage(event.data)
-    })
-
-    event.data.addEventListener('close', () => {
-      port.disconnect()
-    })
-
-    port.onMessage.addListener((message) => {
-      event.data.postMessage(message)
-    })
-
-    port.onDisconnect.addListener(() => {
-      event.data.close()
-    })
-
-    event.data.start()
+  // Only relay ports the page posts to itself, not ones from iframes or other windows
+  if (event.source !== window || !(event.data instanceof MessagePort)) {
+    return
   }
+
+  const port = browser.runtime.connect({ name: 'orpc-relay' })
+
+  // Relay `message` and `close/disconnect` events between the MessagePort and runtime.Port
+
+  event.data.addEventListener('message', (event) => {
+    port.postMessage(event.data)
+  })
+
+  event.data.addEventListener('close', () => {
+    port.disconnect()
+  })
+
+  port.onMessage.addListener((message) => {
+    event.data.postMessage(message)
+  })
+
+  port.onDisconnect.addListener(() => {
+    event.data.close()
+  })
+
+  event.data.start()
 })
 ```
 
@@ -149,7 +169,8 @@ window.addEventListener('message', (event) => {
 import { onError } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/message-port'
 
-const handler = new RPCHandler(router, {
+// Every page where the relay runs can call this router, so keep it minimal
+const relayHandler = new RPCHandler(relayRouter, {
   interceptors: [
     onError((error) => {
       console.error(error)
@@ -158,13 +179,16 @@ const handler = new RPCHandler(router, {
 })
 
 browser.runtime.onConnect.addListener((port) => {
-  handler.upgrade(port, {
+  if (port.name !== 'orpc-relay') {
+    return // or upgrade it with the handler of your trusted extension scripts
+  }
+
+  relayHandler.upgrade(port, {
     /**
-     * Provide initial context if needed. The context can be an async function
-     * that receives the per-call request as its first argument, and is **not**
-     * related to the initial upgrade request.
+     * `port.sender` tells which page and tab the connection comes from.
+     * Pass it to the context so procedures can authorize each call.
      */
-    context: request => ({}),
+    context: { sender: port.sender },
   })
 })
 ```
