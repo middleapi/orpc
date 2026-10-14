@@ -66,6 +66,21 @@ export interface TmpFileUploadHandlerPluginOptions<T extends Context> {
    * @default unlimited for every kind
    */
   maxBodySize?: Value<Promisable<TmpFileUploadHandlerPluginMaxBodySize>, [options: StandardHandlerRoutingInterceptorOptions<T>]>
+
+  /**
+   * The maximum number of parts, fields and files together, a multipart body
+   * may contain, either fixed or resolved per request. Each file part is
+   * spooled to its own temporary file, even an empty one, so this bounds the
+   * files and filesystem work one request can cause. Exceeding it rejects with
+   * `PAYLOAD_TOO_LARGE`. Set to `Number.POSITIVE_INFINITY` to leave it
+   * unlimited.
+   *
+   * A resolver runs only when a multipart body is parsed, and it receives the
+   * request as it arrived, before this plugin wraps its body resolution.
+   *
+   * @default 1000
+   */
+  maxParts?: Value<Promisable<number>, [options: StandardHandlerRoutingInterceptorOptions<T>]>
 }
 
 /**
@@ -108,6 +123,8 @@ export class TmpFile extends File {
  * Request body sizes are limited per content category: buffered in memory, spooled
  * to disk, and streamed, each limit fixed or resolved per request. This subsumes the
  * request limit plugin while sizing each kind of body to what it actually costs.
+ * Multipart bodies are also limited in how many parts they contain, 1000 by default,
+ * since every file part costs a temporary file however small it is.
  *
  * @remarks
  * Temporary files are removed when the request finishes. A streaming response body,
@@ -134,6 +151,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
 
   private readonly tmpDir: string
   private readonly maxBodySize: Exclude<TmpFileUploadHandlerPluginOptions<T>['maxBodySize'], undefined>
+  private readonly maxParts: Exclude<TmpFileUploadHandlerPluginOptions<T>['maxParts'], undefined>
 
   constructor(options: TmpFileUploadHandlerPluginOptions<T> = {}) {
     this.tmpDir = options.tmpDir ?? tmpdir()
@@ -142,6 +160,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
       file: Number.POSITIVE_INFINITY,
       stream: Number.POSITIVE_INFINITY,
     }
+    this.maxParts = options.maxParts ?? 1000
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
@@ -240,7 +259,8 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
      * parser, which would fall back to urlencoded form data.
      */
     if (resolvedHint === 'form-data') {
-      return this.parseMultipartBody(request, tmpFiles, maxBodySize)
+      const maxParts = await value(this.maxParts, interceptorOptions)
+      return this.parseMultipartBody(request, tmpFiles, maxBodySize, maxParts)
     }
 
     if (resolvedHint === 'file') {
@@ -315,7 +335,12 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     return tmpFiles.seal(tmpPath, fileName ?? 'blob', contentType ?? '')
   }
 
-  private async parseMultipartBody(request: StandardLazyRequest, tmpFiles: RequestTmpFiles, maxBodySize: TmpFileUploadHandlerPluginMaxBodySize): Promise<StandardBody> {
+  private async parseMultipartBody(
+    request: StandardLazyRequest,
+    tmpFiles: RequestTmpFiles,
+    maxBodySize: TmpFileUploadHandlerPluginMaxBodySize,
+    maxParts: number,
+  ): Promise<StandardBody> {
     const contentType = flattenStandardHeader(request.headers['content-type'])
     const boundary = contentType === undefined ? undefined : parseHeaderParameters(contentType).get('boundary')
 
@@ -342,6 +367,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
 
     const form = new FormData()
     const used = { memory: 0, file: 0 }
+    let parts = 0
 
     const charge = (category: 'memory' | 'file', size: number): void => {
       used[category] += size
@@ -352,6 +378,15 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     }
 
     await parseMultipart(limited, boundary, (part) => {
+      /**
+       * Checked before the part costs anything: parts are processed one at a
+       * time, so the one over the limit never reaches disk, and the request's
+       * cleanup removes those spooled before it.
+       */
+      if (++parts > maxParts) {
+        throw new ORPCError('PAYLOAD_TOO_LARGE')
+      }
+
       const name = part.name
 
       charge('memory', part.headerSize)

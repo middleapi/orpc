@@ -103,9 +103,31 @@ A multipart body splits across the first two limits, fields and part headers aga
 
 With all three limits configured, the plugin subsumes the [Request Limit Plugin](/docs/plugins/request-limit). When the [Request Compression Plugin](/docs/plugins/request-compression) is present, limits apply to the decompressed payload rather than the compressed wire size.
 
+## Limiting Multipart Parts
+
+Every file part of a multipart body becomes its own temporary file, even an empty one, so byte limits alone cannot bound how many files one request creates. `maxParts` caps the number of parts a multipart body may contain, fields and files counted together, and applies even when `maxBodySize` is omitted. The part over the limit never reaches disk: the request rejects with `PAYLOAD_TOO_LARGE`, and the parts spooled before it are removed.
+
+```ts
+const handler = new RPCHandler(router, {
+  plugins: [
+    new TmpFileUploadHandlerPlugin({
+      /**
+       * The maximum number of parts, fields and files together,
+       * a multipart body may contain.
+       *
+       * @default 1000
+       */
+      maxParts: 5000,
+    }),
+  ],
+})
+```
+
+Raise it when legitimate forms carry more parts, such as a directory upload with thousands of files, or set it to `Number.POSITIVE_INFINITY` to leave the part count unlimited.
+
 ## Per-Request Limits
 
-`maxBodySize` also accepts a function, sync or async, receiving the handler `context`, `request`, and `prefix`, so limits can follow who is uploading:
+`maxBodySize` and `maxParts` also accept a function, sync or async, receiving the handler `context`, `request`, and `prefix`, so limits can follow who is uploading. A resolver runs only when a body is parsed, and the `maxParts` one only for a multipart body:
 
 ```ts
 const handler = new RPCHandler(router, {
@@ -118,6 +140,9 @@ const handler = new RPCHandler(router, {
           : 500 * 1024 * 1024, // 500MB for authenticated users
         stream: 500 * 1024 * 1024, // 500MB
       }),
+      maxParts: ({ context }) => context.user === undefined
+        ? 10 // 10 parts for guests
+        : 1000, // 1000 parts for authenticated users
     }),
   ],
 })

@@ -106,6 +106,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
    */
   async function runThroughPlugin(options: {
     limits?: { memory?: number, file?: number, stream?: number }
+    maxParts?: number
     headers: Record<string, string>
     body?: Buffer
     chunkSize?: number
@@ -123,6 +124,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
         file: options.limits?.file ?? Number.POSITIVE_INFINITY,
         stream: options.limits?.stream ?? Number.POSITIVE_INFINITY,
       },
+      maxParts: options.maxParts,
     })
     const interceptor = plugin.init({}).routingInterceptors![0]!
 
@@ -1355,6 +1357,189 @@ describe('tmpFileUploadHandlerPlugin', () => {
 
       expect(bodyless.resolverCalls).toHaveLength(0)
       expect(bodyless.resolved[0]).toBeInstanceOf(ReadableStream)
+    })
+  })
+
+  describe('multipart part count limit', () => {
+    // The limits the documentation recommends
+    const documentedLimits = { memory: 1024 * 1024, file: 500 * 1024 * 1024, stream: 500 * 1024 * 1024 }
+    const multipartHeaders = { 'content-type': 'multipart/form-data; boundary=B' }
+
+    /**
+     * The cheapest part that still costs a tmp file: 57 bytes of memory budget each.
+     */
+    const emptyFilePart = '--B\r\nContent-Disposition: form-data; name="a"; filename=""\r\n\r\n\r\n'
+    const fieldPart = '--B\r\nContent-Disposition: form-data; name="a"\r\n\r\nvalue\r\n'
+
+    function multipartBody(parts: string): Buffer {
+      return Buffer.from(`${parts}--B--\r\n`)
+    }
+
+    function emptyFileParts(count: number): Buffer {
+      return multipartBody(emptyFilePart.repeat(count))
+    }
+
+    function countTmpFiles(): number {
+      return readdirSync(tmpDir).reduce((count, dir) => count + readdirSync(path.join(tmpDir, dir)).length, 0)
+    }
+
+    function isPayloadTooLarge(error: unknown): boolean {
+      return error instanceof ORPCError && error.code === 'PAYLOAD_TOO_LARGE'
+    }
+
+    /**
+     * Counts the tmp files a request rejected for its part count had spooled,
+     * before cleanup removes them. No `maxBodySize` is set, so nothing else
+     * can reject it.
+     */
+    async function countTmpFilesWhenRejected(options: { maxParts?: number, body: Buffer | ReadableStream<Uint8Array> }): Promise<number> {
+      const plugin = new TmpFileUploadHandlerPlugin({ tmpDir, maxParts: options.maxParts })
+      let count: number | undefined
+
+      await plugin.init({}).routingInterceptors![0]!({
+        context: {},
+        prefix: undefined,
+        request: {
+          method: 'POST',
+          url: '/upload',
+          headers: multipartHeaders,
+          resolveBody: async () => options.body instanceof ReadableStream ? options.body : new Response(options.body).body!,
+        },
+        next: async (nextOptions) => {
+          await expect(nextOptions!.request.resolveBody()).rejects.toSatisfy(isPayloadTooLarge)
+          count = countTmpFiles()
+          return { matched: false }
+        },
+      })
+
+      // Parts spooled before the rejection are removed with the request
+      expect(readdirSync(tmpDir)).toHaveLength(0)
+
+      return count!
+    }
+
+    it('rejects a body with too many parts before any middleware runs', async () => {
+      let tmpFilesSeenByAuth: number | undefined
+
+      const handler = new RPCHandler({
+        upload: os
+          .use(() => {
+            tmpFilesSeenByAuth = countTmpFiles()
+            throw new ORPCError('UNAUTHORIZED')
+          })
+          .handler(() => 'ok'),
+      }, {
+        plugins: [new TmpFileUploadHandlerPlugin({ tmpDir, maxBodySize: documentedLimits })],
+      })
+
+      const response = await request(createServer(async (req, res) => {
+        await handler.handle(req, res, { context: {} })
+      }))
+        .post('/upload')
+        .set('content-type', 'multipart/form-data; boundary=B')
+        .send(emptyFileParts(5000)) // ~320 KB, well under the 1 MB memory limit
+
+      expect({ status: response.status, tmpFilesSeenByAuth }).toEqual({ status: 413, tmpFilesSeenByAuth: undefined })
+      expect(readdirSync(tmpDir)).toHaveLength(0)
+    }, 60_000)
+
+    it('spools at most 1000 parts by default, even without maxBodySize', async () => {
+      // The part over the limit never reaches disk
+      expect(await countTmpFilesWhenRejected({ body: emptyFileParts(2000) })).toBe(1000)
+    }, 60_000)
+
+    it('accepts up to maxParts parts and rejects one more', async () => {
+      await runThroughPlugin({
+        maxParts: 5,
+        headers: multipartHeaders,
+        body: emptyFileParts(5),
+        inspect: (parsed) => {
+          expect([...parsed as FormData]).toHaveLength(5)
+        },
+      })
+
+      expect(await countTmpFilesWhenRejected({ maxParts: 5, body: emptyFileParts(6) })).toBe(5)
+    })
+
+    it('leaves the part count unlimited when set to Number.POSITIVE_INFINITY', async () => {
+      await runThroughPlugin({
+        maxParts: Number.POSITIVE_INFINITY,
+        headers: multipartHeaders,
+        body: multipartBody(fieldPart.repeat(1001)),
+        chunkSize: 64 * 1024,
+        inspect: (parsed) => {
+          expect([...parsed as FormData]).toHaveLength(1001)
+        },
+      })
+    })
+
+    it('counts fields and files together', async () => {
+      // Fields alone reach the limit without a single tmp file
+      expect(await countTmpFilesWhenRejected({ maxParts: 5, body: multipartBody(fieldPart.repeat(6)) })).toBe(0)
+
+      // The third file is the sixth part
+      expect(await countTmpFilesWhenRejected({ maxParts: 5, body: multipartBody(fieldPart.repeat(3) + emptyFilePart.repeat(3)) })).toBe(2)
+    })
+
+    it('rejects a stalled body as soon as it carries one part too many', async () => {
+      // Ten empty file parts arrive one chunk each, and the close delimiter never does
+      const stalled = new ReadableStream<Uint8Array>({
+        start(controller) {
+          for (let i = 0; i < 10; i++) {
+            controller.enqueue(Buffer.from(emptyFilePart))
+          }
+        },
+      })
+
+      expect(await countTmpFilesWhenRejected({ maxParts: 5, body: stalled })).toBe(5)
+    })
+
+    it('limits parts by what the resolver returns for the request, resolving it only for multipart bodies', async () => {
+      interface AuthContext { user?: string }
+
+      const resolverCalls: Array<{ context: AuthContext, url: string }> = []
+
+      const plugin = new TmpFileUploadHandlerPlugin<AuthContext>({
+        tmpDir,
+        maxParts: async ({ context, request }) => {
+          resolverCalls.push({ context, url: request.url })
+
+          return context.user === undefined ? 2 : 3
+        },
+      })
+      const interceptor = plugin.init({}).routingInterceptors![0]!
+
+      async function resolveBody(context: AuthContext, headers: Record<string, string>, body: Buffer = Buffer.alloc(0)): Promise<unknown> {
+        let resolved: unknown
+
+        await interceptor({
+          context,
+          prefix: undefined,
+          request: { method: 'POST', url: '/upload', headers, resolveBody: async () => toStream(body) },
+          next: async (nextOptions) => {
+            resolved = await nextOptions!.request.resolveBody()
+            return { matched: false }
+          },
+        })
+
+        return resolved
+      }
+
+      const body = emptyFileParts(3)
+
+      expect([...await resolveBody({ user: 'admin' }, multipartHeaders, body) as FormData]).toHaveLength(3)
+      expect(resolverCalls).toEqual([{ context: { user: 'admin' }, url: '/upload' }])
+
+      await expect(resolveBody({}, multipartHeaders, body)).rejects.toSatisfy(isPayloadTooLarge)
+      expect(resolverCalls).toHaveLength(2)
+      expect(readdirSync(tmpDir)).toHaveLength(0)
+
+      // Other bodies never pay for the resolver, not even a spooled file body
+      await resolveBody({}, { 'content-type': 'application/json' }, Buffer.from('{}'))
+      await resolveBody({}, { 'content-type': 'application/octet-stream', 'standard-server': 'file' }, Buffer.from('file'))
+      await resolveBody({}, {})
+
+      expect(resolverCalls).toHaveLength(2)
     })
   })
 })
