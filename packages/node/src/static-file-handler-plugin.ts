@@ -38,20 +38,48 @@ const TEXT_CONTENT_TYPE_REGEX = /^text\//
  */
 const SHORT_NAME_ALIAS_REGEX = /^[^.]{0,6}~\d/
 
-const CONTENT_ENCODING_EXTENSIONS = {
-  br: '.br',
-  zstd: '.zst',
-  gzip: '.gz',
-} as const
+interface ContentEncodingSpec {
+  /** The extension of the sidecar holding a file in this encoding. */
+  extension: string
+  /** `undefined` when this runtime cannot compress into the encoding. */
+  createCompressor: (() => Transform) | undefined
+}
 
-type ContentEncoding = keyof typeof CONTENT_ENCODING_EXTENSIONS
+/**
+ * Each compression level is about the strongest that still compresses a megabyte in a tenth of
+ * a second, since the first request for a file waits on it. Brotli 10 and 11 are ten to thirty
+ * times slower. zstd compression only exists from Node.js 22.15.
+ */
+const CONTENT_ENCODINGS: Record<'br' | 'zstd' | 'gzip', ContentEncodingSpec> = {
+  br: {
+    extension: '.br',
+    createCompressor: () => zlib.createBrotliCompress({ params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 9 } }),
+  },
+  zstd: {
+    extension: '.zst',
+    createCompressor: typeof zlib.createZstdCompress === 'function'
+      ? () => zlib.createZstdCompress({ params: { [zlib.constants.ZSTD_c_compressionLevel]: 15 } })
+      : undefined,
+  },
+  gzip: {
+    extension: '.gz',
+    createCompressor: () => zlib.createGzip({ level: zlib.constants.Z_BEST_COMPRESSION }),
+  },
+}
+
+type ContentEncoding = keyof typeof CONTENT_ENCODINGS
 
 type FoundFile = [filePath: string, stats: Stats, realPath: string]
 
+interface CacheCompressor {
+  encoding: ContentEncoding
+  createCompressor: () => Transform
+}
+
 interface CompressionCache {
   dir: string
-  /** The configured encodings this runtime can compress into. */
-  encodings: readonly ContentEncoding[]
+  /** The configured encodings this runtime can compress into, in order of preference. */
+  compressors: readonly CacheCompressor[]
   threshold: number
 }
 
@@ -72,8 +100,8 @@ export interface StaticFileHandlerPluginCompressionOptions {
   encodings?: readonly ContentEncoding[]
 
   /**
-   * Whether precompressed sidecar files next to a file, such as `app.js.br`, `app.js.zst`,
-   * and `app.js.gz`, are served.
+   * Whether precompressed sidecar files next to a file, such as `app.js.br`, are served.
+   * Disable it when your build writes none, to skip looking for them on every request.
    *
    * @default true
    */
@@ -81,14 +109,9 @@ export interface StaticFileHandlerPluginCompressionOptions {
 
   /**
    * The directory files are compressed into when no sidecar provides an accepted encoding,
-   * created on first use and resolved against the working directory when relative. The first
-   * request for a file in an encoding waits for its compression, and every later request,
-   * after a restart too, is answered from the stored copy. Use a directory nothing else writes
-   * to. Copies are never removed, since a changed file gets a new one, so the directory can
-   * be cleared at any time, such as on every deploy.
-   *
-   * Compressing into `zstd` requires Node.js 22.15 or later. Older versions skip it here and
-   * still serve `zstd` sidecars.
+   * created on first use and resolved against the working directory when relative. Use a
+   * directory nothing else writes to; it can be cleared at any time. Compressing into `zstd`
+   * requires Node.js 22.15 or later, and older versions skip it here.
    *
    * @default undefined (only sidecars are served)
    */
@@ -153,8 +176,7 @@ export interface StaticFileHandlerPluginOptions {
   /**
    * Serves files with a compressible content type in an encoding the client accepts, from
    * precompressed sidecars and, when `cacheDir` is set, from copies compressed on demand.
-   * Encoded files keep conditional and range requests working. Omit to always serve files
-   * as they are.
+   * Omit to always serve files as they are.
    *
    * @default undefined
    */
@@ -218,8 +240,8 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   private readonly compressionCache: CompressionCache | undefined
   private readonly allowSymlinks: Exclude<StaticFileHandlerPluginOptions['allowSymlinks'], undefined>
   private readonly mimeTypes: Exclude<StaticFileHandlerPluginOptions['mimeTypes'], undefined>
-  /** Compressions in progress keyed by cache path, so concurrent requests for a file share one. */
-  private readonly pendingCompressions = new Map<string, Promise<Stats | undefined>>()
+  /** Cache lookups in progress keyed by cache path, so concurrent requests share one compression. */
+  private readonly pendingCacheLookups = new Map<string, Promise<Stats | undefined>>()
 
   constructor(options: StaticFileHandlerPluginOptions) {
     this.rootDir = path.resolve(options.rootDir)
@@ -241,8 +263,12 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     if (compression?.cacheDir !== undefined) {
       this.compressionCache = {
         dir: path.resolve(compression.cacheDir),
-        // Without zstd support, a client that accepts it is answered in its next accepted encoding
-        encodings: typeof zlib.createZstdCompress === 'function' ? encodings : encodings.filter(encoding => encoding !== 'zstd'),
+        // An encoding this runtime cannot compress into leaves its clients to their next accepted one
+        compressors: encodings.flatMap((encoding) => {
+          const { createCompressor } = CONTENT_ENCODINGS[encoding]
+
+          return createCompressor === undefined ? [] : [{ encoding, createCompressor }]
+        }),
         threshold: compression.threshold ?? 1024,
       }
     }
@@ -359,17 +385,13 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   }
 
   /**
-   * Finds the precompressed sidecar of `filePath` in the first of `encodings` the client accepts.
+   * Finds the precompressed sidecar of `filePath` in the first encoding the client accepts.
    */
-  private async findPrecompressedFile(
-    encodings: readonly ContentEncoding[],
-    filePath: string,
-    qualities: Map<string, number>,
-  ): Promise<EncodedFile | undefined> {
-    const candidates = await Promise.all(encodings
+  private async findPrecompressedFile(filePath: string, qualities: Map<string, number>): Promise<EncodedFile | undefined> {
+    const candidates = await Promise.all((this.precompressedEncodings ?? [])
       .filter(encoding => isAcceptableEncoding(qualities, encoding))
       .map(async (encoding) => {
-        const candidatePath = filePath + CONTENT_ENCODING_EXTENSIONS[encoding]
+        const candidatePath = filePath + CONTENT_ENCODINGS[encoding].extension
         // Sidecars are reached by string concatenation, so they need the same containment check
         const [candidateStats, containedRealPath] = await Promise.all([
           stat(candidatePath).catch(() => undefined),
@@ -395,9 +417,9 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     stats: Stats,
     qualities: Map<string, number>,
   ): Promise<EncodedFile | undefined> {
-    const encoding = compressionCache.encodings.find(encoding => isAcceptableEncoding(qualities, encoding))
+    const compressor = compressionCache.compressors.find(({ encoding }) => isAcceptableEncoding(qualities, encoding))
 
-    if (encoding === undefined) {
+    if (compressor === undefined) {
       return undefined
     }
 
@@ -408,11 +430,8 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
      * version because, unlike the modification time, tools that copy files cannot restore it.
      */
     const key = createHash('sha256').update(`${realPath}\0${toFileVersion(stats)}`).digest('hex')
-    const cachePath = path.join(compressionCache.dir, key + CONTENT_ENCODING_EXTENSIONS[encoding])
-
-    // A compression already in progress is joined directly, since the copy cannot exist yet
-    const cachedStats = await (this.pendingCompressions.get(cachePath)
-      ?? stat(cachePath).catch(() => this.compressIntoCache(filePath, stats, encoding, cachePath)))
+    const cachePath = path.join(compressionCache.dir, key + CONTENT_ENCODINGS[compressor.encoding].extension)
+    const cachedStats = await this.statOrCompress(filePath, stats, compressor.createCompressor, cachePath)
 
     /**
      * A copy no smaller than the file saves nothing, so the file is served as it is. The copy is
@@ -422,22 +441,26 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       return undefined
     }
 
-    return { encoding, filePath: cachePath, stats: cachedStats }
+    return { encoding: compressor.encoding, filePath: cachePath, stats: cachedStats }
   }
 
-  private compressIntoCache(
+  /**
+   * Stats the cached copy, compressing the file into the cache when it is missing.
+   */
+  private statOrCompress(
     filePath: string,
     stats: Stats,
-    encoding: ContentEncoding,
+    createCompressor: () => Transform,
     cachePath: string,
   ): Promise<Stats | undefined> {
-    let pending = this.pendingCompressions.get(cachePath)
+    let pending = this.pendingCacheLookups.get(cachePath)
 
     if (pending === undefined) {
-      pending = writeCompressedCopy(filePath, stats, encoding, cachePath)
-        .finally(() => this.pendingCompressions.delete(cachePath))
+      pending = stat(cachePath)
+        .catch(() => writeCompressedCopy(filePath, stats, createCompressor, cachePath))
+        .finally(() => this.pendingCacheLookups.delete(cachePath))
 
-      this.pendingCompressions.set(cachePath, pending)
+      this.pendingCacheLookups.set(cachePath, pending)
     }
 
     return pending
@@ -545,13 +568,11 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     let [filePath, stats, realPath] = found
 
     const contentType = this.resolveContentType(filePath)
-    // The content type is only tested when an encoding could apply at all
-    const canEncode = (this.precompressedEncodings !== undefined || this.compressionCache !== undefined) && isCompressibleContentType(contentType)
-    const precompressedEncodings = canEncode ? this.precompressedEncodings : undefined
-    const compressionCache = canEncode && this.compressionCache !== undefined && stats.size >= this.compressionCache.threshold
+    const eligibleCache = this.compressionCache !== undefined && stats.size >= this.compressionCache.threshold
       ? this.compressionCache
       : undefined
-    const negotiatesEncoding = precompressedEncodings !== undefined || compressionCache !== undefined
+    const negotiatesEncoding = (this.precompressedEncodings !== undefined || eligibleCache !== undefined)
+      && isCompressibleContentType(contentType)
 
     let contentEncoding: string | undefined
 
@@ -559,8 +580,8 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       const qualities = parseAcceptEncodingQualities(flattenStandardHeader(request.headers['accept-encoding']))
 
       // A sidecar is prepared ahead of time, usually with stronger compression, so it wins over the cache
-      const encoded = (precompressedEncodings !== undefined ? await this.findPrecompressedFile(precompressedEncodings, filePath, qualities) : undefined)
-        ?? (compressionCache !== undefined ? await this.resolveCompressionCacheFile(compressionCache, filePath, realPath, stats, qualities) : undefined)
+      const encoded = await this.findPrecompressedFile(filePath, qualities)
+        ?? (eligibleCache !== undefined ? await this.resolveCompressionCacheFile(eligibleCache, filePath, realPath, stats, qualities) : undefined)
 
       if (encoded !== undefined) {
         filePath = encoded.filePath
@@ -646,21 +667,6 @@ function toFileVersion(stats: Stats): string {
 }
 
 /**
- * Each level is about the strongest that still compresses a megabyte in a tenth of a second,
- * since the first request for a file waits on it. Brotli 10 and 11 are ten to thirty times slower.
- */
-function createCompressor(encoding: ContentEncoding): Transform {
-  switch (encoding) {
-    case 'br':
-      return zlib.createBrotliCompress({ params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 9 } })
-    case 'zstd':
-      return zlib.createZstdCompress({ params: { [zlib.constants.ZSTD_c_compressionLevel]: 15 } })
-    case 'gzip':
-      return zlib.createGzip({ level: zlib.constants.Z_BEST_COMPRESSION })
-  }
-}
-
-/**
  * Compresses a file into the cache, returning the stats of the stored copy, or `undefined` when
  * it cannot be stored. A cache that cannot be written only costs the compression, so the caller
  * serves the file as it is instead of failing the request.
@@ -668,7 +674,7 @@ function createCompressor(encoding: ContentEncoding): Transform {
 async function writeCompressedCopy(
   filePath: string,
   stats: Stats,
-  encoding: ContentEncoding,
+  createCompressor: () => Transform,
   cachePath: string,
 ): Promise<Stats | undefined> {
   // Written beside its final name and renamed into place, so no reader ever sees a partial copy
@@ -677,7 +683,7 @@ async function writeCompressedCopy(
   try {
     await mkdir(path.dirname(cachePath), { recursive: true })
     // `wx` refuses to write through anything already at the temporary name
-    await pipeline(createReadStream(filePath), createCompressor(encoding), createWriteStream(tmpPath, { flags: 'wx' }))
+    await pipeline(createReadStream(filePath), createCompressor(), createWriteStream(tmpPath, { flags: 'wx' }))
 
     // Renaming keeps the size and modification time, so the copy's stats are read before it moves
     const [currentStats, copyStats] = await Promise.all([stat(filePath), stat(tmpPath)])
@@ -689,9 +695,7 @@ async function writeCompressedCopy(
       return copyStats
     }
   }
-  catch {
-    // A cache that cannot be written only costs the compression
-  }
+  catch {}
 
   await rm(tmpPath, { force: true }).catch(() => {})
 
