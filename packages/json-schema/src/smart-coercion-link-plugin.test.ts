@@ -1,4 +1,5 @@
 import type { AnyORPCError } from '@orpc/client'
+import type { JsonSchemaConverter } from './convert'
 import { ORPCError } from '@orpc/client'
 import { oc } from '@orpc/contract'
 import z from 'zod'
@@ -144,5 +145,25 @@ describe('smartCoercionLinkPlugin', () => {
 
       return true
     })
+  })
+
+  it('leaves output strings longer than maxBigIntDigits untouched', async () => {
+    const contract = oc.router({
+      get: oc.output(z.unknown()),
+    })
+    const converters: JsonSchemaConverter[] = [{
+      condition: () => true,
+      convert: () => [{ 'type': 'string', 'pattern': '^-?[0-9]+$', 'x-native-type': 'bigint' } as any, false],
+    }]
+
+    async function coerceOutput(output: string, maxBigIntDigits?: number) {
+      const interceptor = new SmartCoercionLinkPlugin(contract, { converters, maxBigIntDigits }).init({} as any).interceptors?.[0]
+      return interceptor?.({ path: ['get'], next: vi.fn().mockResolvedValue(output) } as any)
+    }
+
+    await expect(coerceOutput('9'.repeat(4300))).resolves.toBe(BigInt('9'.repeat(4300)))
+    await expect(coerceOutput('9'.repeat(4301))).resolves.toBe('9'.repeat(4301))
+    await expect(coerceOutput('9'.repeat(5000), 5000)).resolves.toBe(BigInt('9'.repeat(5000)))
+    await expect(coerceOutput('1000', 3)).resolves.toBe('1000')
   })
 })

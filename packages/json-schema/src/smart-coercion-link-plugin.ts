@@ -1,6 +1,7 @@
 import type { ClientContext } from '@orpc/client'
 import type { StandardLinkOptions, StandardLinkPlugin } from '@orpc/client/standard'
 import type { AnySchema, ErrorMap, RouterContract } from '@orpc/contract'
+import type { JsonSchemaCoercerOptions } from './coercer'
 import type { JsonSchemaConverter } from './convert'
 import type { JsonSchema } from './types'
 import { cloneORPCError, ORPCError } from '@orpc/client'
@@ -10,7 +11,7 @@ import { JsonSchemaCoercer } from './coercer'
 import { DelegatingJsonSchemaConverter } from './convert'
 import { StandardJsonSchemaConverter } from './standard-json-schema-converter'
 
-export interface SmartCoercionLinkPluginOptions {
+export interface SmartCoercionLinkPluginOptions extends JsonSchemaCoercerOptions {
   converters?: undefined | JsonSchemaConverter[]
 }
 
@@ -40,7 +41,7 @@ export class SmartCoercionLinkPlugin<T extends ClientContext> implements Standar
       ...toArray(options.converters),
       new StandardJsonSchemaConverter(),
     ])
-    this.coercer = new JsonSchemaCoercer()
+    this.coercer = new JsonSchemaCoercer({ maxBigIntDigits: options.maxBigIntDigits })
   }
 
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {

@@ -1,4 +1,6 @@
 import { oc } from '@orpc/contract'
+import { os } from '@orpc/server'
+import { RPCHandler } from '@orpc/server/fetch'
 import z from 'zod'
 import { SmartCoercionHandlerPlugin } from './smart-coercion-handler-plugin'
 
@@ -49,5 +51,52 @@ describe('smartCoercionHandlerPlugin', () => {
 
     expect(next).toHaveBeenNthCalledWith(1, { procedure, input: { number: 123, boolean: true } })
     expect(next).toHaveBeenNthCalledWith(2, { procedure, input: { number: 456, boolean: false } })
+  })
+
+  describe('bigint digit limit', () => {
+    const BIGINT_SCHEMA = { 'type': 'string', 'pattern': '^-?[0-9]+$', 'x-native-type': 'bigint' } as const
+
+    async function handle(id: string, options: { maxBigIntDigits?: number } = {}) {
+      const seen = vi.fn()
+      const router = {
+        p: os
+          .input(z.object({ id: z.unknown() }))
+          .use(({ next }, input: any) => {
+            seen(typeof input.id)
+            return next()
+          })
+          .handler(() => 'ok'),
+      }
+      const handler = new RPCHandler(router, {
+        plugins: [new SmartCoercionHandlerPlugin({
+          ...options,
+          converters: [{
+            condition: () => true,
+            convert: () => [{ type: 'object', properties: { id: BIGINT_SCHEMA }, required: ['id'] } as any, false],
+          }],
+        })],
+      })
+      const { response } = await handler.handle(new Request('http://localhost/p', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ json: { id } }),
+      }), { context: {} })
+
+      return { status: response?.status, seen }
+    }
+
+    it('does not parse a huge digit string into a bigint before middleware runs', async () => {
+      const { status, seen } = await handle('9'.repeat(1_000_000))
+
+      expect(status).toBe(200)
+      expect(seen).toHaveBeenCalledWith('string')
+    })
+
+    it('respects maxBigIntDigits', async () => {
+      expect((await handle('9'.repeat(4300))).seen).toHaveBeenCalledWith('bigint')
+      expect((await handle('9'.repeat(5000))).seen).toHaveBeenCalledWith('string')
+      expect((await handle('9'.repeat(5000), { maxBigIntDigits: 5000 })).seen).toHaveBeenCalledWith('bigint')
+      expect((await handle('1000', { maxBigIntDigits: 3 })).seen).toHaveBeenCalledWith('string')
+    })
   })
 })

@@ -1,5 +1,5 @@
 import type { Segment } from '@orpc/shared'
-import { copyOnWrite, isPlainObject, NullProtoObj } from '@orpc/shared'
+import { copyOnWrite, DEFAULT_MAX_BIGINT_DIGITS, isPlainObject, NullProtoObj } from '@orpc/shared'
 
 export type RPCJsonSerializationMeta = [type: string, ...path: Segment[]]
 export type RPCJsonSerialization
@@ -34,6 +34,32 @@ function assertSerializedType(ok: boolean, type: string, expected: string): void
   }
 }
 
+/**
+ * Matches `bigint.toString()` exactly, so whitespace, `0x`/`0o`/`0b` prefixes and the empty string,
+ * which `BigInt()` would accept, are rejected.
+ */
+const BIGINT_PATTERN = /^-?(?:0|[1-9]\d*)$/
+
+function createBigIntHandler(maxDigits: number): RPCJsonSerializerHandler {
+  return {
+    condition(data: unknown): boolean {
+      return typeof data === 'bigint'
+    },
+    serialize(data: bigint): string {
+      return data.toString()
+    },
+    deserialize(serialized: string): bigint {
+      assertSerializedType(typeof serialized === 'string', 'bigint', 'a string')
+      // checked before the regex and `BigInt()`, whose cost grows super-linearly with the digit count
+      const digits = serialized.startsWith('-') ? serialized.length - 1 : serialized.length
+      assertSerializedType(digits <= maxDigits, 'bigint', `at most ${maxDigits} digits`)
+      assertSerializedType(BIGINT_PATTERN.test(serialized), 'bigint', 'a decimal integer string')
+      return BigInt(serialized)
+    },
+    isTerminal: true,
+  }
+}
+
 const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHandler> = {
   undefined: {
     condition(data: unknown): boolean {
@@ -48,19 +74,7 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
     },
     isTerminal: true,
   },
-  bigint: {
-    condition(data: unknown): boolean {
-      return typeof data === 'bigint'
-    },
-    serialize(data: bigint): string {
-      return data.toString()
-    },
-    deserialize(serialized: string): bigint {
-      assertSerializedType(typeof serialized === 'string', 'bigint', 'a string')
-      return BigInt(serialized)
-    },
-    isTerminal: true,
-  },
+  bigint: createBigIntHandler(DEFAULT_MAX_BIGINT_DIGITS),
   date: {
     condition(data: unknown): boolean {
       return data instanceof Date
@@ -189,6 +203,18 @@ export interface RPCJsonSerializerOptions {
    * @default true
    */
   omitUndefinedProperties?: boolean | undefined
+
+  /**
+   * Maximum number of digits, excluding a leading `-`, the built-in `bigint` handler accepts when deserializing.
+   * Longer values are rejected before being parsed, because parsing a long digit string
+   * blocks the event loop for a time that grows faster than its length.
+   *
+   * Values longer than the limit fail to deserialize, so both sides must raise it to exchange them.
+   * Use `Number.POSITIVE_INFINITY` to disable the limit. Ignored when `handlers.bigint` is set.
+   *
+   * @default 4300
+   */
+  maxBigIntDigits?: number | undefined
 }
 
 /**
@@ -206,6 +232,12 @@ export class RPCJsonSerializer {
   constructor(options: RPCJsonSerializerOptions = {}) {
     this.omitUndefinedProperties = options.omitUndefinedProperties !== false
     this.handlers = Object.assign(new NullProtoObj(), DEFAULT_RPC_JSON_SERIALIZER_HANDLERS)
+
+    // installed before custom handlers, so a custom `bigint` handler still wins
+    if (options.maxBigIntDigits !== undefined) {
+      this.handlers.bigint = createBigIntHandler(options.maxBigIntDigits)
+    }
+
     const customHandlers = options.handlers
 
     if (customHandlers === undefined) {

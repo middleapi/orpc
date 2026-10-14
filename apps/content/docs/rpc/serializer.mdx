@@ -7,26 +7,26 @@ description: "Learn how RPC Serializers encode data between client and server, s
 
 `RPCSerializer` supports the following types by default:
 
-| Type                             | Handler key | Notes                                |
-| -------------------------------- | ----------- | ------------------------------------ |
-| **string**                       |             |                                      |
-| **number**                       |             |                                      |
-| **NaN**                          | `nan`       |                                      |
-| **Infinity**, **-Infinity**      | `infinity`  |                                      |
-| **boolean**                      |             |                                      |
-| **null**                         |             |                                      |
-| **undefined**                    | `undefined` | Ignore `undefined` properties        |
-| **Date**                         | `date`      | Includes `Invalid Date`.             |
-| **BigInt**                       | `bigint`    |                                      |
-| **URL**                          | `url`       |                                      |
-| **Record (object)**              |             | `toJSON` methods are ignored         |
-| **Array**                        |             |                                      |
-| **Set**                          | `set`       |                                      |
-| **Map**                          | `map`       |                                      |
-| **Blob**                         |             | Unsupported in `AsyncIteratorObject` |
-| **File**                         |             | Unsupported in `AsyncIteratorObject` |
-| **AsyncIteratorObject**          |             | Only at the root level               |
-| **`ReadableStream<Uint8Array>`** |             | Only at the root level               |
+| Type                             | Handler key | Notes                                                                                      |
+| -------------------------------- | ----------- | ------------------------------------------------------------------------------------------ |
+| **string**                       |             |                                                                                            |
+| **number**                       |             |                                                                                            |
+| **NaN**                          | `nan`       |                                                                                            |
+| **Infinity**, **-Infinity**      | `infinity`  |                                                                                            |
+| **boolean**                      |             |                                                                                            |
+| **null**                         |             |                                                                                            |
+| **undefined**                    | `undefined` | Ignore `undefined` properties                                                              |
+| **Date**                         | `date`      | Includes `Invalid Date`.                                                                   |
+| **BigInt**                       | `bigint`    | Decimal strings only, up to [`maxBigIntDigits`](#bigint-digit-limit) digits (default 4300) |
+| **URL**                          | `url`       |                                                                                            |
+| **Record (object)**              |             | `toJSON` methods are ignored                                                               |
+| **Array**                        |             |                                                                                            |
+| **Set**                          | `set`       |                                                                                            |
+| **Map**                          | `map`       |                                                                                            |
+| **Blob**                         |             | Unsupported in `AsyncIteratorObject`                                                       |
+| **File**                         |             | Unsupported in `AsyncIteratorObject`                                                       |
+| **AsyncIteratorObject**          |             | Only at the root level                                                                     |
+| **`ReadableStream<Uint8Array>`** |             | Only at the root level                                                                     |
 
 :::warning
 To better support `Blob`, `File`, and `ReadableStream<Uint8Array>` at the root level in cross-origin scenarios,
@@ -92,6 +92,30 @@ const link = new RPCLink({
 })
 ```
 
+:::
+
+## BigInt Digit Limit
+
+Parsing a digit string into a `BigInt` takes time that grows faster than the string's length, so the built-in `bigint` handler accepts only decimal integer strings, exactly as `bigint.toString()` produces them, with at most `maxBigIntDigits` digits (default 4300, not counting a leading `-`). Longer values are rejected before parsing: [RPC Handler](/docs/rpc/handler) responds with `BAD_REQUEST`, and [RPC Link](/docs/rpc/link) throws.
+
+To exchange longer values, raise the limit on both sides:
+
+```ts
+const serializer = new RPCSerializer({
+  maxBigIntDigits: 10_000, // or Number.POSITIVE_INFINITY to disable the limit
+})
+
+const handler = new RPCHandler(router, {
+  serializer,
+})
+
+const link = new RPCLink({
+  serializer,
+})
+```
+
+:::warning
+Keep the limit as low as your data allows. Parsing runs while the request is decoded, before any middleware, so with `Number.POSITIVE_INFINITY` only a request body limit such as the [Request Limit Plugin](/docs/plugins/request-limit) bounds how long one request can block the event loop.
 :::
 
 ## RPC JSON Serializer

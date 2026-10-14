@@ -1,6 +1,7 @@
 import type { AnySchema } from '@orpc/contract'
 import type { Context } from '@orpc/server'
 import type { StandardHandlerOptions, StandardHandlerPlugin } from '@orpc/server/standard'
+import type { JsonSchemaCoercerOptions } from './coercer'
 import type { JsonSchemaConverter } from './convert'
 import type { JsonSchema } from './types'
 import { toArray } from '@orpc/shared'
@@ -8,7 +9,7 @@ import { JsonSchemaCoercer } from './coercer'
 import { DelegatingJsonSchemaConverter } from './convert'
 import { StandardJsonSchemaConverter } from './standard-json-schema-converter'
 
-export interface SmartCoercionHandlerPluginOptions {
+export interface SmartCoercionHandlerPluginOptions extends JsonSchemaCoercerOptions {
   converters?: undefined | JsonSchemaConverter[]
 }
 
@@ -30,7 +31,7 @@ export class SmartCoercionHandlerPlugin<T extends Context> implements StandardHa
       ...toArray(options.converters),
       new StandardJsonSchemaConverter(),
     ])
-    this.coercer = new JsonSchemaCoercer()
+    this.coercer = new JsonSchemaCoercer({ maxBigIntDigits: options.maxBigIntDigits })
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {

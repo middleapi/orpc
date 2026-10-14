@@ -396,6 +396,113 @@ describe('rpcJsonSerializer: deserialize', () => {
   })
 })
 
+describe('rpcJsonSerializer: maxBigIntDigits', () => {
+  const digits = (n: number) => '9'.repeat(n)
+
+  it('raises the limit', () => {
+    const serializer = new RPCJsonSerializer({ maxBigIntDigits: 5000 })
+
+    expect(serializer.deserialize({ json: digits(5000), meta: [['bigint']] })).toBe(BigInt(digits(5000)))
+    expect(serializer.deserialize({ json: `-${digits(5000)}`, meta: [['bigint']] })).toBe(-BigInt(digits(5000)))
+    expect(() => serializer.deserialize({ json: digits(5001), meta: [['bigint']] }))
+      .toThrow('Invalid RPC serialized data: type "bigint" expects at most 5000 digits.')
+  })
+
+  it('lowers the limit', () => {
+    const serializer = new RPCJsonSerializer({ maxBigIntDigits: 3 })
+
+    expect(serializer.deserialize({ json: { a: '999', b: '-999' }, meta: [['bigint', 'a'], ['bigint', 'b']] }))
+      .toEqual({ a: 999n, b: -999n })
+    expect(() => serializer.deserialize({ json: '1000', meta: [['bigint']] }))
+      .toThrow('Invalid RPC serialized data: type "bigint" expects at most 3 digits.')
+    expect(() => serializer.deserialize({ json: '-1000', meta: [['bigint']] }))
+      .toThrow('Invalid RPC serialized data: type "bigint" expects at most 3 digits.')
+  })
+
+  it('disables the limit with Infinity, but still validates the format', () => {
+    const serializer = new RPCJsonSerializer({ maxBigIntDigits: Number.POSITIVE_INFINITY })
+
+    expect(serializer.deserialize({ json: digits(10_000), meta: [['bigint']] })).toBe(BigInt(digits(10_000)))
+    expect(() => serializer.deserialize({ json: '0x10', meta: [['bigint']] }))
+      .toThrow('Invalid RPC serialized data: type "bigint" expects a decimal integer string.')
+  })
+
+  it('does not limit serialization', () => {
+    const value = { big: BigInt(digits(5000)) }
+
+    expect(roundTripThroughWire(new RPCJsonSerializer({ maxBigIntDigits: 5000 }), value)).toEqual(value)
+    expect(() => roundTripThroughWire(new RPCJsonSerializer(), value)).toThrow(TypeError)
+  })
+
+  it('applies alongside custom handlers for other types', () => {
+    const serializer = new RPCJsonSerializer({
+      maxBigIntDigits: 3,
+      handlers: {
+        date: {
+          condition: v => v instanceof Date,
+          serialize: (v: Date) => v.getTime(),
+          deserialize: (v: number) => new Date(v),
+        },
+      },
+    })
+
+    expect(roundTripThroughWire(serializer, { a: 999n, b: new Date(0) })).toEqual({ a: 999n, b: new Date(0) })
+    expect(() => roundTripThroughWire(serializer, { a: 1000n })).toThrow('expects at most 3 digits')
+  })
+
+  it.each([
+    ['as the only custom handler', {}],
+    ['next to other custom handlers', { url: undefined }],
+  ])('lets a custom bigint handler take precedence %s', (_, otherHandlers) => {
+    const serializer = new RPCJsonSerializer({
+      maxBigIntDigits: 3,
+      handlers: {
+        ...otherHandlers,
+        bigint: {
+          condition: v => typeof v === 'bigint',
+          serialize: (v: bigint) => v.toString(16),
+          deserialize: (v: string) => BigInt(`0x${v}`),
+        },
+      },
+    })
+
+    expect(serializer.serialize(255n)).toEqual({ json: 'ff', meta: [['bigint']] })
+    expect(serializer.deserialize({ json: 'ffff', meta: [['bigint']] })).toBe(65535n)
+  })
+
+  it('lets a custom bigint handler take precedence without maxBigIntDigits', () => {
+    const serializer = new RPCJsonSerializer({
+      handlers: {
+        bigint: {
+          condition: v => typeof v === 'bigint',
+          serialize: (v: bigint) => v.toString(),
+          deserialize: (v: string) => BigInt(v),
+        },
+      },
+    })
+
+    expect(serializer.deserialize({ json: digits(5000), meta: [['bigint']] })).toBe(BigInt(digits(5000)))
+    expect(serializer.deserialize({ json: '0x10', meta: [['bigint']] })).toBe(16n)
+  })
+
+  it('keeps a disabled bigint handler disabled', () => {
+    const serializer = new RPCJsonSerializer({ maxBigIntDigits: 3, handlers: { bigint: undefined } })
+
+    expect(() => serializer.deserialize({ json: '1', meta: [['bigint']] }))
+      .toThrow('Invalid RPC serialized data: type "bigint" is not supported.')
+  })
+
+  it('does not change the limit of other instances', () => {
+    const lowered = new RPCJsonSerializer({ maxBigIntDigits: 3 })
+    const serializer = new RPCJsonSerializer()
+
+    expect(() => lowered.deserialize({ json: '1000', meta: [['bigint']] })).toThrow('expects at most 3 digits')
+    expect(serializer.deserialize({ json: digits(4300), meta: [['bigint']] })).toBe(BigInt(digits(4300)))
+    expect(() => serializer.deserialize({ json: digits(4301), meta: [['bigint']] }))
+      .toThrow('Invalid RPC serialized data: type "bigint" expects at most 4300 digits.')
+  })
+})
+
 describe('rpcJsonSerializer: security', () => {
   const serializer = new RPCJsonSerializer()
 
@@ -464,6 +571,35 @@ describe('rpcJsonSerializer: security', () => {
     for (const value of rejected) {
       expect(() => serializer.deserialize({ json: { value }, meta: [[type, 'value']] }))
         .toThrow(`Invalid RPC serialized data: type "${type}" expects ${expected}.`)
+    }
+  })
+
+  it('bigint deserialize validates format and length', () => {
+    expect(() => serializer.deserialize({ json: '9'.repeat(1_000_000), meta: [['bigint']] })).toThrow(TypeError)
+    for (const bad of ['0x10', '0b1', '', ' 1 ']) {
+      expect(() => serializer.deserialize({ json: bad, meta: [['bigint']] })).toThrow(TypeError)
+    }
+    expect(serializer.deserialize({ json: '-12345678901234567890', meta: [['bigint']] })).toBe(-12345678901234567890n)
+    expect(serializer.deserialize({ json: '0', meta: [['bigint']] })).toBe(0n)
+  })
+
+  it('bigint rejects strings bigint.toString() never produces', () => {
+    // `BigInt()` accepts all of these
+    for (const bad of ['0x10', '0o7', '0b1', '', ' ', ' 1 ', '1\n', '+1', '01', '-', '1e3', '1.0', '1n']) {
+      expect(() => serializer.deserialize({ json: { value: bad }, meta: [['bigint', 'value']] }))
+        .toThrow('Invalid RPC serialized data: type "bigint" expects a decimal integer string.')
+    }
+  })
+
+  it('bigint rejects strings longer than 4300 digits before parsing them', () => {
+    const max = '9'.repeat(4300)
+
+    expect(serializer.deserialize({ json: max, meta: [['bigint']] })).toBe(BigInt(max))
+    expect(serializer.deserialize({ json: `-${max}`, meta: [['bigint']] })).toBe(-BigInt(max))
+
+    for (const bad of [`${max}9`, `-${max}9`, `${max}x`, ' '.repeat(4301)]) {
+      expect(() => serializer.deserialize({ json: bad, meta: [['bigint']] }))
+        .toThrow('Invalid RPC serialized data: type "bigint" expects at most 4300 digits.')
     }
   })
 
