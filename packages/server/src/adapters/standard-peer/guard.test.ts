@@ -1,7 +1,6 @@
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-server/peer'
 import { ORPCError, RPCSerializer } from '@orpc/client'
-import { ServerPeer } from '@standard-server/peer'
 import { StandardPeerGuard } from './guard'
 
 const tick = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms))
@@ -27,12 +26,15 @@ function octet(id: string, binary?: Uint8Array<ArrayBuffer>, close?: true): Clie
  */
 const OVERHEAD = 128
 
-function createConnection(options: ConstructorParameters<typeof StandardPeerGuard>[0] = {}) {
-  const guard = new StandardPeerGuard(options)
+function createConnection(
+  options: ConstructorParameters<typeof StandardPeerGuard>[1] = {},
+  getBufferedAmount?: () => number | null | undefined,
+) {
   const sent: ServerPeerSendMessage[] = []
-  const peer = new ServerPeer(async (message) => {
-    sent.push(message)
-  })
+  const guard = new StandardPeerGuard({
+    send: (message, sendWhenDrained) => sendWhenDrained(() => sent.push(message)),
+    getBufferedAmount,
+  }, options)
 
   /**
    * Sends a message through the guard and returns the request the handler received.
@@ -40,7 +42,7 @@ function createConnection(options: ConstructorParameters<typeof StandardPeerGuar
   const message = (message: ClientPeerSendMessage, size = 0, handle?: (request: StandardLazyRequest) => Promise<StandardResponse>) => {
     let received: StandardLazyRequest | undefined
 
-    const promise = guard.message(peer, message, async (request) => {
+    const promise = guard.message(message, async (request) => {
       received = request
       // by default, stay in flight until aborted
       return handle
@@ -53,7 +55,6 @@ function createConnection(options: ConstructorParameters<typeof StandardPeerGuar
 
   return {
     guard,
-    peer,
     sent,
     message,
     buffered: () => (guard as any).budget.size as number,
@@ -113,18 +114,16 @@ describe('standardPeerGuard', () => {
 
     it('drops requests once as many rejections wait for a client that does not read', async () => {
       let bufferedAmount = 0
-      const guard = new StandardPeerGuard({ maxConcurrentRequests: 2, sendHighWaterMark: 0 })
-      const sent: ServerPeerSendMessage[] = []
-      const peer = new ServerPeer(message => guard.send(() => sent.push(message), () => bufferedAmount))
+      const { guard, message, sent } = createConnection({ maxConcurrentRequests: 2, sendHighWaterMark: 0 }, () => bufferedAmount)
       const handle = vi.fn(() => new Promise<never>(() => {}))
 
-      guard.message(peer, plainRequest('active-1'), handle, 0)
-      guard.message(peer, plainRequest('active-2'), handle, 0)
+      message(plainRequest('active-1'), 0, handle)
+      message(plainRequest('active-2'), 0, handle)
 
       // the client stops reading, requests keep arriving one I/O event at a time
       bufferedAmount = 1
       for (let i = 0; i < 10; i++) {
-        guard.message(peer, eventStreamRequest(String(i)), handle, 0)
+        message(eventStreamRequest(String(i)))
         await tick()
       }
 
@@ -133,8 +132,8 @@ describe('standardPeerGuard', () => {
       bufferedAmount = 0
       await vi.waitFor(() => expect(sent.filter(m => m.kind === 'response')).toHaveLength(2))
       await tick(50)
-      expect(sent.filter(m => m.kind === 'response')).toHaveLength(2)
-      // the streamed input of the rejected requests was discarded at once
+      expect(sent.filter(m => m.kind === 'response').map(m => m.id)).toEqual(['0', '1'])
+      // the streamed input of the rejected requests was cancelled too
       expect(sent.filter(m => m.kind === 'stream/cancel').map(m => m.id)).toEqual(['0', '1'])
       expect(handle).toHaveBeenCalledTimes(2)
       expect((guard as any).pendingRejections).toBe(0)
@@ -146,7 +145,7 @@ describe('standardPeerGuard', () => {
       message(plainRequest('active'))
       await message(eventStreamRequest('1')).promise
 
-      expect(cancelled('1')).toBe(true)
+      await vi.waitFor(() => expect(cancelled('1')).toBe(true))
       expect(sent.find(m => m.id === '1' && m.kind === 'response')).toMatchObject({ json: { status: 429 } })
 
       await message(event('1'), 10_000).promise
@@ -216,20 +215,23 @@ describe('standardPeerGuard', () => {
       await message(event('1'), 100).promise
       await message(event('1'), 100).promise
 
-      guard.close()
+      // the peer keeps already buffered messages readable after closing
+      await guard.close()
       await expect(iterator.next()).resolves.toEqual({ done: false, value: 'data' })
       expect(buffered()).toBe(0)
     })
 
     it('returns a body that is not a stream as is', async () => {
-      const guard = new StandardPeerGuard({ maxBufferedStreamSize: 1000 })
+      const { guard } = createConnection({ maxBufferedStreamSize: 1000 })
       let body: unknown
 
-      await guard.message({
-        message: async (_, handleRequest) => {
+      ;(guard as any).peer = {
+        message: async (_: unknown, handleRequest: (request: StandardLazyRequest) => Promise<StandardResponse>) => {
           await handleRequest({ url: '/', method: 'POST', headers: {}, resolveBody: async () => 'not a stream' })
         },
-      }, eventStreamRequest('1'), async (request) => {
+      }
+
+      await guard.message(eventStreamRequest('1'), async (request) => {
         body = await request.resolveBody()
         return { status: 200, headers: {}, body: undefined }
       }, 0)
@@ -394,7 +396,7 @@ describe('standardPeerGuard', () => {
     })
 
     it('releases accounting when a stream read fails', async () => {
-      const { message, buffered, peer } = createConnection({ maxBufferedStreamSize: 1000 })
+      const { message, buffered, guard } = createConnection({ maxBufferedStreamSize: 1000 })
 
       const { request } = message(octetStreamRequest('1'))
       const reader = (await request().resolveBody() as ReadableStream<Uint8Array>).getReader()
@@ -402,7 +404,7 @@ describe('standardPeerGuard', () => {
       await expect(reader.read()).resolves.toMatchObject({ done: false })
       const pending = reader.read()
 
-      await peer.close(new Error('closed'))
+      await (guard as any).peer.close(new Error('closed'))
       await expect(pending).rejects.toThrow('closed')
       expect(buffered()).toBe(0)
     })
@@ -418,17 +420,17 @@ describe('standardPeerGuard', () => {
       await message(event('2'), 100).promise
       expect(buffered()).toBe(100 + OVERHEAD)
 
-      guard.close()
+      await guard.close()
       expect(buffered()).toBe(0)
       expect((guard as any).streams.size).toBe(0)
     })
 
     it('keeps the accounting of a newer request reusing an id', async () => {
-      const guard = new StandardPeerGuard({ maxBufferedStreamSize: 1000 })
+      const { guard, buffered } = createConnection({ maxBufferedStreamSize: 1000 })
       const settles: (() => void)[] = []
 
       // a peer that already forgot the first request when the second one arrives
-      const peer = {
+      ;(guard as any).peer = {
         message: (message: ClientPeerSendMessage, handleRequest: (request: StandardLazyRequest) => Promise<StandardResponse>) => {
           if (message.kind === 'request') {
             void handleRequest({ url: '/', method: 'POST', headers: {}, resolveBody: async () => undefined })
@@ -439,9 +441,9 @@ describe('standardPeerGuard', () => {
       }
 
       const handle = async () => ({ status: 200, headers: {}, body: undefined })
-      const first = guard.message(peer, eventStreamRequest('1'), handle, 0)
+      const first = guard.message(eventStreamRequest('1'), handle, 0)
       const older = (guard as any).streams.get('1')
-      void guard.message(peer, eventStreamRequest('1'), handle, 0)
+      void guard.message(eventStreamRequest('1'), handle, 0)
       const newer = (guard as any).streams.get('1')
       expect(newer).not.toBe(older)
 
@@ -449,8 +451,8 @@ describe('standardPeerGuard', () => {
       await first
 
       expect((guard as any).streams.get('1')).toBe(newer)
-      void guard.message(peer, event('1'), handle, 100)
-      expect((guard as any).budget.size).toBe(100 + OVERHEAD)
+      void guard.message(event('1'), handle, 100)
+      expect(buffered()).toBe(100 + OVERHEAD)
     })
 
     it('ignores messages the peer does not buffer', async () => {
@@ -504,67 +506,91 @@ describe('standardPeerGuard', () => {
     })
   })
 
-  describe('.send', () => {
-    it('sends right away when the buffered amount is unknown or below the mark', async () => {
-      const guard = new StandardPeerGuard({ sendHighWaterMark: 10 })
+  describe('send backpressure', () => {
+    function createSender(
+      options: ConstructorParameters<typeof StandardPeerGuard>[1],
+      getBufferedAmount?: () => number | null | undefined,
+      waitForDrain?: (threshold: number, signal: AbortSignal) => Promise<void>,
+    ) {
+      const guard = new StandardPeerGuard({ send: async () => {}, getBufferedAmount, waitForDrain }, options)
+      const sendWhenDrained = (guard as any).sendWhenDrained as (send: () => unknown) => Promise<void>
+      return { guard, sendWhenDrained }
+    }
+
+    it('sends right away when the buffered amount is unknown or at most the mark', async () => {
       const send = vi.fn()
 
-      await guard.send(send, () => undefined)
-      await guard.send(send, () => 10)
+      await createSender({ sendHighWaterMark: 10 }).sendWhenDrained(send)
+      await createSender({ sendHighWaterMark: 10 }, () => undefined).sendWhenDrained(send)
+      await createSender({ sendHighWaterMark: 10 }, () => 10).sendWhenDrained(send)
 
-      expect(send).toHaveBeenCalledTimes(2)
+      expect(send).toHaveBeenCalledTimes(3)
     })
 
     it('drops the message once the connection is closed', async () => {
-      const guard = new StandardPeerGuard()
       const send = vi.fn()
 
-      await guard.send(send, () => null)
-      await guard.send(send, () => {
+      await createSender({}, () => null).sendWhenDrained(send)
+      await createSender({}, () => {
         throw new Error('closed')
-      })
+      }).sendWhenDrained(send)
 
       expect(send).not.toHaveBeenCalled()
     })
 
     it('never waits with Infinity', async () => {
-      const guard = new StandardPeerGuard({ sendHighWaterMark: Infinity })
       const send = vi.fn()
+      const { guard, sendWhenDrained } = createSender({ sendHighWaterMark: Infinity }, () => Number.MAX_SAFE_INTEGER)
 
-      await guard.send(send, () => Number.MAX_SAFE_INTEGER)
-      guard.close()
-      await guard.send(send, () => null)
+      await sendWhenDrained(send)
+      await guard.close()
+      await sendWhenDrained(send)
 
       expect(send).toHaveBeenCalledTimes(2)
     })
 
-    it('waits while above the mark and lets one waiter send per drain', async () => {
-      const guard = new StandardPeerGuard({ sendHighWaterMark: 10 })
+    it('sends waiting messages in order as the connection drains', async () => {
       let bufferedAmount = 11
-      const send = vi.fn(() => {
+      const sent: number[] = []
+      const { guard, sendWhenDrained } = createSender({ sendHighWaterMark: 10 }, () => bufferedAmount)
+      const send = (i: number) => () => {
+        sent.push(i)
         bufferedAmount += 11
-      })
+      }
 
-      const sends = [1, 2, 3].map(() => guard.send(send, () => bufferedAmount))
+      const sends = [1, 2, 3].map(i => sendWhenDrained(send(i)))
 
       await tick(50)
-      expect(send).not.toHaveBeenCalled()
+      expect(sent).toEqual([])
 
       bufferedAmount = 0
-      await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1))
+      await vi.waitFor(() => expect(sent).toEqual([1]))
       await tick(50)
-      expect(send).toHaveBeenCalledTimes(1)
+      expect(sent).toEqual([1])
 
+      // a new message waits behind the earlier ones
       bufferedAmount = 0
-      await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2))
+      sends.push(sendWhenDrained(send(4)))
+      await vi.waitFor(() => expect(sent).toEqual([1, 2]))
 
-      guard.close()
+      await guard.close()
       await Promise.all(sends)
-      expect(send).toHaveBeenCalledTimes(2)
+      expect(sent).toEqual([1, 2])
     })
 
-    it('shares one drain wait between waiters and survives its rejection', async () => {
-      const guard = new StandardPeerGuard({ sendHighWaterMark: 10 })
+    it('checks the connection once per poll however many messages wait', async () => {
+      const getBufferedAmount = vi.fn(() => Number.MAX_SAFE_INTEGER)
+      const { guard, sendWhenDrained } = createSender({}, getBufferedAmount)
+
+      const sends = Array.from({ length: 100 }, () => sendWhenDrained(() => {}))
+      await tick(100)
+
+      expect(getBufferedAmount.mock.calls.length).toBeLessThan(20)
+      await guard.close()
+      await Promise.all(sends)
+    })
+
+    it('uses one drain wait at a time and survives its rejection', async () => {
       let bufferedAmount = 11
       const send = vi.fn()
       const waitForDrain = vi.fn(async (threshold: number, signal: AbortSignal) => {
@@ -578,37 +604,33 @@ describe('standardPeerGuard', () => {
 
         bufferedAmount = 0
       })
+      const { sendWhenDrained } = createSender({ sendHighWaterMark: 10 }, () => bufferedAmount, waitForDrain)
 
-      await Promise.all([
-        guard.send(send, () => bufferedAmount, waitForDrain),
-        guard.send(send, () => bufferedAmount, waitForDrain),
-      ])
+      await Promise.all([sendWhenDrained(send), sendWhenDrained(send)])
 
       expect(waitForDrain).toHaveBeenCalledTimes(2)
       expect(send).toHaveBeenCalledTimes(2)
     })
 
     it('stops waiting without sending or rejecting once closed', async () => {
-      const guard = new StandardPeerGuard()
       const send = vi.fn()
+      const { guard, sendWhenDrained } = createSender({}, () => Number.MAX_SAFE_INTEGER)
 
-      const promise = guard.send(send, () => Number.MAX_SAFE_INTEGER)
+      const promise = sendWhenDrained(send)
       await tick(30)
-      guard.close()
+      await guard.close()
 
       await expect(promise).resolves.toBeUndefined()
-      expect(send).not.toHaveBeenCalled()
-
-      await guard.send(send, () => 0)
+      await sendWhenDrained(send)
       expect(send).not.toHaveBeenCalled()
     })
 
     it('stops waiting once the connection closes', async () => {
-      const guard = new StandardPeerGuard()
       const send = vi.fn()
       let bufferedAmount: number | null = Number.MAX_SAFE_INTEGER
+      const { sendWhenDrained } = createSender({}, () => bufferedAmount)
 
-      const promise = guard.send(send, () => bufferedAmount)
+      const promise = sendWhenDrained(send)
       await tick(30)
       bufferedAmount = null
 
@@ -617,11 +639,18 @@ describe('standardPeerGuard', () => {
     })
 
     it('propagates errors from send', async () => {
-      const guard = new StandardPeerGuard()
-
-      await expect(guard.send(() => {
+      let bufferedAmount = 0
+      const { sendWhenDrained } = createSender({ sendHighWaterMark: 10 }, () => bufferedAmount)
+      const fail = () => {
         throw new Error('send failed')
-      }, () => 0)).rejects.toThrow('send failed')
+      }
+
+      await expect(sendWhenDrained(fail)).rejects.toThrow('send failed')
+
+      bufferedAmount = 11
+      const waiting = sendWhenDrained(fail)
+      bufferedAmount = 0
+      await expect(waiting).rejects.toThrow('send failed')
     })
   })
 })

@@ -330,10 +330,10 @@ describe('rpcHandler', () => {
       try {
         await once(client, 'open')
         ;(client as any)._socket.pause()
-        client.send(JSON.stringify({ id: '1', kind: 'request', json: { url: '/stream', body: { json: null } } }))
+        client.send(streamRequest.rawData)
         await tick(1000) // well under crossws' default 30 s idleTimeout
-        expect(produced).toBeLessThan(TOTAL) // today: 64
-        expect(serverPeer.bufferedAmount).toBeLessThan(16 * 1024 * 1024) // today: ~61 MiB
+        expect(produced).toBeLessThan(TOTAL)
+        expect(serverPeer.bufferedAmount).toBeLessThan(16 * 1024 * 1024)
       }
       finally {
         client.terminate()

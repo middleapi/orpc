@@ -1,12 +1,12 @@
 import type { SupportedMessagePort } from '@orpc/client/message-port'
 import type { MaybeOptionalOptions, Promisable, Value } from '@orpc/shared'
-import type { ClientPeerSendMessage, DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standard-server/peer'
+import type { ClientPeerSendMessage, DecodePeerMessageOptions, EncodePeerMessageOptions, ServerPeer } from '@standard-server/peer'
 import type { Context } from '../../context'
 import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
 import type { StandardPeerGuardOptions } from '../standard-peer'
 import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from '@orpc/client/message-port'
 import { resolveMaybeOptionalOptions, value } from '@orpc/shared'
-import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, isPeerMessage, ServerPeer } from '@standard-server/peer'
+import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, isPeerMessage } from '@standard-server/peer'
 import { createStandardPeerRequestHandler, StandardPeerGuard } from '../standard-peer'
 
 type DecodedResponseMessage = ConstructorParameters<typeof ServerPeer>[0] extends (message: infer TMessage) => unknown
@@ -41,7 +41,7 @@ export interface MessagePortHandlerOptions<_T extends Context> extends Omit<Stan
 }
 
 export class MessagePortHandler<T extends Context> {
-  private readonly peers = new WeakMap<SupportedMessagePort, { peer: ServerPeer, guard: StandardPeerGuard }>()
+  private readonly guards = new WeakMap<SupportedMessagePort, StandardPeerGuard>()
   private readonly transfer: MessagePortHandlerOptions<T>['experimental_transfer']
   private readonly encodePeerMessageOptions: MessagePortHandlerOptions<T>['encodePeerMessage']
   private readonly decodePeerMessageOptions: MessagePortHandlerOptions<T>['decodePeerMessage']
@@ -54,10 +54,7 @@ export class MessagePortHandler<T extends Context> {
     this.transfer = options.experimental_transfer
     this.encodePeerMessageOptions = options.encodePeerMessage
     this.decodePeerMessageOptions = options.decodePeerMessage
-    this.guardOptions = {
-      maxConcurrentRequests: options.maxConcurrentRequests,
-      maxBufferedStreamSize: options.maxBufferedStreamSize,
-    }
+    this.guardOptions = options
   }
 
   /**
@@ -87,22 +84,10 @@ export class MessagePortHandler<T extends Context> {
     data: unknown,
     ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): Promise<{ matched: boolean }> {
-    let state = this.peers.get(port)
+    let guard = this.guards.get(port)
 
-    if (!state) {
-      this.peers.set(port, state = {
-        guard: new StandardPeerGuard(this.guardOptions),
-        peer: new ServerPeer(async (message) => {
-          const transfer = await value(this.transfer, message, port)
-
-          if (transfer) {
-            postMessagePortMessage(port, message, transfer)
-          }
-          else {
-            postMessagePortMessage(port, await encodePeerMessage(message, this.encodePeerMessageOptions))
-          }
-        }),
-      })
+    if (!guard) {
+      this.guards.set(port, guard = this.createGuard(port))
     }
 
     let peerMessage: ClientPeerSendMessage | undefined
@@ -130,8 +115,7 @@ export class MessagePortHandler<T extends Context> {
      * Message order is important: loading -> decode -> .message.
      * This flow must stay synchronous, or we need to use `sequential` helper
      */
-    await state.guard.message(
-      state.peer,
+    await guard.message(
       peerMessage,
       createStandardPeerRequestHandler(this.handler, resolveMaybeOptionalOptions(rest)),
       size,
@@ -146,14 +130,29 @@ export class MessagePortHandler<T extends Context> {
    * @param port The same message port instance passed to `.message()`.
    */
   async close(port: SupportedMessagePort): Promise<void> {
-    const state = this.peers.get(port)
+    const guard = this.guards.get(port)
 
-    if (state) {
+    if (guard) {
       // delete before close to avoid potential race conditions
-      this.peers.delete(port)
-      state.guard.close()
-      await state.peer.close()
+      this.guards.delete(port)
+      await guard.close()
     }
+  }
+
+  private createGuard(port: SupportedMessagePort): StandardPeerGuard {
+    // No `getBufferedAmount`: a message port does not expose it, so sending never waits.
+    return new StandardPeerGuard({
+      send: async (message) => {
+        const transfer = await value(this.transfer, message, port)
+
+        if (transfer) {
+          postMessagePortMessage(port, message, transfer)
+        }
+        else {
+          postMessagePortMessage(port, await encodePeerMessage(message, this.encodePeerMessageOptions))
+        }
+      },
+    }, this.guardOptions)
   }
 }
 

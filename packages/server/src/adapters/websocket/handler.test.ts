@@ -19,6 +19,8 @@ function eventFrame(id: string, size: number) {
   return encodePeerMessage({ id, kind: 'event-stream', json: { data: { json: 'A'.repeat(size) } } })
 }
 
+const streamRequest = JSON.stringify({ id: '1', kind: 'request', json: { url: '/stream', body: { json: null } } })
+
 function createRouter() {
   const state = { running: 0, received: 0, inputError: undefined as unknown }
   let release!: () => void
@@ -51,7 +53,7 @@ describe('peer adapters: per-connection resource limits', () => {
     const ws = createWs()
     for (let i = 0; i < 1000; i++) void handler.message(ws, await request(String(i)))
     await tick(100)
-    expect(state.running).toBeLessThanOrEqual(100) // today: 1000
+    expect(state.running).toBeLessThanOrEqual(100)
     await handler.close(ws)
     await vi.waitFor(() => expect(state.running).toBe(0))
   })
@@ -63,7 +65,7 @@ describe('peer adapters: per-connection resource limits', () => {
     const calls: Promise<unknown>[] = []
     for (let i = 0; i < 20; i++) calls.push(handler.message(ws, await request(String(i))))
     await vi.waitFor(() => expect(ws.send).toHaveBeenCalledTimes(20))
-    expect(state.running).toBe(5) // today: 20
+    expect(state.running).toBe(5)
     expect(sent(ws).filter(m => m.kind === 'response' && m.json?.status === 429)).toHaveLength(15)
 
     await handler.message(ws, await encodePeerMessage({ id: '0', kind: 'cancel' }))
@@ -83,8 +85,8 @@ describe('peer adapters: per-connection resource limits', () => {
     for (let i = 0; i < 256; i++) await handler.message(ws, frame) // ~4 MiB, all unread
     release()
     await tick(50)
-    expect(sent(ws).some(m => m.id === '1' && m.kind === 'stream/cancel')).toBe(true) // today: never sent
-    expect(state.received).toBeLessThan(256) // today: 256, every frame was buffered
+    expect(sent(ws).some(m => m.id === '1' && m.kind === 'stream/cancel')).toBe(true)
+    expect(state.received).toBeLessThan(256)
     expect(state.inputError).toMatchObject({ code: 'PAYLOAD_TOO_LARGE' })
     await handler.close(ws)
   })
@@ -99,7 +101,7 @@ describe('peer adapters: per-connection resource limits', () => {
       for (let i = 0; i < 48; i++) await handler.message(ws, await eventFrame(String(c), 16 * 1024)) // 768 KiB per call
     }
     await tick(50)
-    expect(sent(ws).some(m => m.kind === 'stream/cancel')).toBe(true) // today: 6 MiB buffered, no cancel
+    expect(sent(ws).some(m => m.kind === 'stream/cancel')).toBe(true)
     await handler.close(ws)
   })
 
@@ -111,7 +113,7 @@ describe('peer adapters: per-connection resource limits', () => {
     await tick()
     const frame = await encodePeerMessage({ id: '1', kind: 'octet-stream', json: {}, binary: new Uint8Array(64 * 1024) }) as Uint8Array<ArrayBuffer>
     for (let i = 0; i < 512; i++) await handler.message(ws, frame.slice()) // 32 MiB, never read
-    expect(sent(ws).some(m => m.id === '1' && m.kind === 'stream/cancel')).toBe(true) // today: never sent
+    expect(sent(ws).some(m => m.id === '1' && m.kind === 'stream/cancel')).toBe(true)
     await handler.close(ws)
   })
 
@@ -137,10 +139,10 @@ describe('peer adapters: per-connection resource limits', () => {
     try {
       await once(client, 'open')
       ;(client as any)._socket.pause() // the client stops reading from its TCP socket
-      client.send(JSON.stringify({ id: '1', kind: 'request', json: { url: '/stream', body: { json: null } } }))
+      client.send(streamRequest)
       await tick(1000)
-      expect(produced).toBeLessThan(TOTAL) // today: 64, the whole stream was pulled
-      expect(serverWs!.bufferedAmount).toBeLessThan(16 * 1024 * 1024) // today: ~61 MiB
+      expect(produced).toBeLessThan(TOTAL)
+      expect(serverWs!.bufferedAmount).toBeLessThan(16 * 1024 * 1024)
     }
     finally {
       client.terminate()
@@ -275,7 +277,7 @@ describe('peer adapters: per-connection resource limits', () => {
       get bufferedAmount() { return buffer.amount },
       send: vi.fn((data: string | Uint8Array) => { buffer.amount += data.length }),
     }
-    const result = handler.message(ws, JSON.stringify({ id: '1', kind: 'request', json: { url: '/stream', body: { json: null } } }))
+    const result = handler.message(ws, streamRequest)
     await tick(50)
     expect(produced).toBeLessThan(10)
     const sends = ws.send.mock.calls.length
@@ -303,7 +305,7 @@ describe('peer adapters: per-connection resource limits', () => {
     try {
       await once(client, 'open')
       ;(client as any)._socket.pause()
-      client.send(JSON.stringify({ id: '1', kind: 'request', json: { url: '/stream', body: { json: null } } }))
+      client.send(streamRequest)
       await tick(500)
       expect(finished).toBe(false)
       client.terminate()
@@ -315,7 +317,6 @@ describe('peer adapters: per-connection resource limits', () => {
   })
 
   describe('reads the buffered amount', () => {
-    const streamRequest = JSON.stringify({ id: '1', kind: 'request', json: { url: '/stream', body: { json: null } } })
     const createStreamHandler = () => new RPCHandler({
       stream: os.handler(async function* () {
         yield 'x'

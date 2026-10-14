@@ -4,7 +4,7 @@ import type { Context } from '../../context'
 import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
 import type { StandardPeerGuardOptions } from '../standard-peer'
 import { loadBytes, resolveMaybeOptionalOptions, sequential, toStringOrBytes } from '@orpc/shared'
-import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
+import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage } from '@standard-server/peer'
 import { createStandardPeerRequestHandler, StandardPeerGuard } from '../standard-peer'
 
 /**
@@ -60,7 +60,7 @@ export interface WebSocketHandlerOptions<_T extends Context> extends StandardPee
 }
 
 export class WebSocketHandler<T extends Context> {
-  private readonly peers = new WeakMap<WebSocketLike, { peer: ServerPeer, guard: StandardPeerGuard }>()
+  private readonly guards = new WeakMap<WebSocketLike, StandardPeerGuard>()
   private readonly encodePeerMessageOptions: WebSocketHandlerOptions<T>['encodePeerMessage']
   private readonly decodePeerMessageOptions: WebSocketHandlerOptions<T>['decodePeerMessage']
   private readonly guardOptions: StandardPeerGuardOptions
@@ -71,11 +71,7 @@ export class WebSocketHandler<T extends Context> {
   ) {
     this.encodePeerMessageOptions = options.encodePeerMessage
     this.decodePeerMessageOptions = options.decodePeerMessage
-    this.guardOptions = {
-      maxConcurrentRequests: options.maxConcurrentRequests,
-      maxBufferedStreamSize: options.maxBufferedStreamSize,
-      sendHighWaterMark: options.sendHighWaterMark,
-    }
+    this.guardOptions = options
   }
 
   /**
@@ -95,16 +91,10 @@ export class WebSocketHandler<T extends Context> {
     data: Arrayable<string | ArrayBuffer | Pick<Uint8Array<ArrayBuffer>, 'buffer' | 'byteOffset' | 'byteLength'>>,
     ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): Promise<{ matched: boolean }> {
-    let state = this.peers.get(ws)
+    let guard = this.guards.get(ws)
 
-    if (!state) {
-      const guard = new StandardPeerGuard(this.guardOptions)
-      const peer = new ServerPeer(async (message) => {
-        const encoded = await encodePeerMessage(message, this.encodePeerMessageOptions)
-        await guard.send(() => ws.send(encoded), () => getBufferedAmount(ws))
-      })
-
-      this.peers.set(ws, state = { peer, guard })
+    if (!guard) {
+      this.guards.set(ws, guard = this.createGuard(ws))
     }
 
     /**
@@ -114,8 +104,7 @@ export class WebSocketHandler<T extends Context> {
     const encoded = toStringOrBytes(data)
     const result = decodePeerMessage(encoded, this.decodePeerMessageOptions)
     if (result.matched && isClientPeerSendMessage(result.message)) {
-      await state.guard.message(
-        state.peer,
+      await guard.message(
         result.message,
         createStandardPeerRequestHandler(this.handler, resolveMaybeOptionalOptions(rest)),
         typeof encoded === 'string' ? encoded.length : encoded.byteLength,
@@ -131,13 +120,12 @@ export class WebSocketHandler<T extends Context> {
    * @param ws The same WebSocket instance passed to `.message()`.
    */
   async close(ws: WebSocketLike): Promise<void> {
-    const state = this.peers.get(ws)
+    const guard = this.guards.get(ws)
 
-    if (state) {
+    if (guard) {
       // delete before close to avoid potential race conditions
-      this.peers.delete(ws)
-      state.guard.close()
-      await state.peer.close()
+      this.guards.delete(ws)
+      await guard.close()
     }
   }
 
@@ -167,6 +155,16 @@ export class WebSocketHandler<T extends Context> {
     // EventEmitter-based implementations like `ws` throw an unhandled `error` event,
     // so a single malformed frame would crash the process. `close` always follows and handles cleanup.
     ws.addEventListener('error', () => {})
+  }
+
+  private createGuard(ws: WebSocketLike): StandardPeerGuard {
+    return new StandardPeerGuard({
+      send: async (message, sendWhenDrained) => {
+        const encoded = await encodePeerMessage(message, this.encodePeerMessageOptions)
+        await sendWhenDrained(() => ws.send(encoded))
+      },
+      getBufferedAmount: () => getBufferedAmount(ws),
+    }, this.guardOptions)
   }
 }
 

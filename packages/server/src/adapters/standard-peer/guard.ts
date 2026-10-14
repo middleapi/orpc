@@ -1,9 +1,10 @@
 import type { Value } from '@orpc/shared'
 import type { StandardBody, StandardLazyRequest, StandardResponse } from '@standard-server/core'
-import type { ClientPeerSendMessage, PeerEventStreamMessage, PeerOctetStreamMessage, PeerRequestMessage, ServerPeer } from '@standard-server/peer'
+import type { ClientPeerSendMessage, PeerEventStreamMessage, PeerOctetStreamMessage, PeerRequestMessage, ServerPeerSendMessage } from '@standard-server/peer'
 import { COMMON_ERROR_STATUS_MAP, ORPCError, RPCSerializer } from '@orpc/client'
-import { AsyncIteratorClass, isAsyncIteratorObject, value } from '@orpc/shared'
+import { AsyncIteratorClass, isAsyncIteratorObject, once, value } from '@orpc/shared'
 import { cancelStandardBody, flattenStandardHeader } from '@standard-server/core'
+import { ServerPeer } from '@standard-server/peer'
 
 /**
  * Estimated memory a buffered stream message takes beyond its encoded size
@@ -16,7 +17,7 @@ const STREAM_MESSAGE_OVERHEAD = 128
  */
 const SEND_POLL_INTERVAL = 20
 
-const rpcSerializer = new RPCSerializer()
+const getTooManyRequestsBody = once(() => new RPCSerializer().serialize(new ORPCError('TOO_MANY_REQUESTS').toJSON()))
 
 export interface StandardPeerGuardOptions {
   /**
@@ -51,12 +52,37 @@ export interface StandardPeerGuardOptions {
    * Maximum number of bytes queued on the connection but not yet transmitted before sending waits.
    * While a client does not read, streaming responses stop pulling from procedures, as over HTTP.
    *
-   * Only applies when the connection exposes how much it has buffered.
+   * Only applies when the transport has `getBufferedAmount`.
    * Set to `Infinity` to never wait.
    *
    * @default 1024 * 1024 (1 MiB)
    */
   sendHighWaterMark?: number | undefined
+}
+
+/**
+ * How a {@link StandardPeerGuard} reaches its connection.
+ */
+export interface StandardPeerGuardTransport {
+  /**
+   * Encodes and sends a message from the peer. Pass the final send to `sendWhenDrained`,
+   * which calls it once the connection is at or below `sendHighWaterMark`, or drops it once the connection is closed.
+   */
+  send: (message: ServerPeerSendMessage, sendWhenDrained: (send: () => unknown) => Promise<void>) => Promise<void>
+
+  /**
+   * Returns the bytes buffered on the connection but not yet transmitted,
+   * `undefined` when unknown (sends right away), or `null` once closed. Throwing counts as closed.
+   * Without it, sending never waits.
+   */
+  getBufferedAmount?: (() => number | null | undefined) | undefined
+
+  /**
+   * Waits for the buffered amount to drop to `threshold`, or the signal to abort.
+   *
+   * @default polls `getBufferedAmount`
+   */
+  waitForDrain?: ((threshold: number, signal: AbortSignal) => Promise<void>) | undefined
 }
 
 interface StreamBudget {
@@ -66,49 +92,58 @@ interface StreamBudget {
 
 type StreamKind = 'event-stream' | 'octet-stream'
 
+interface SendWaiter {
+  send: () => unknown
+  resolve: (result?: unknown) => void
+  reject: (error: unknown) => void
+}
+
 /**
- * Bounds the memory one peer connection can make the server hold:
+ * A `ServerPeer` for one connection that bounds the memory the connection can make the server hold:
  * in-flight requests, unread streamed input, and responses the client does not read.
- *
- * Use one instance per connection, alongside its `ServerPeer`.
  */
 export class StandardPeerGuard {
+  private readonly peer: ServerPeer
+  private readonly getBufferedAmount: StandardPeerGuardTransport['getBufferedAmount']
+  private readonly waitForDrain: (threshold: number, signal: AbortSignal) => Promise<void>
   private readonly maxConcurrentRequests: number
   private readonly sendHighWaterMark: number
   private readonly budget: StreamBudget
   private readonly streams = new Map<string, StreamInput>()
+  private readonly waiters: SendWaiter[] = []
   private readonly controller = new AbortController()
   private activeRequests = 0
   private pendingRejections = 0
-  private waitingSends = 0
-  private pendingDrain: Promise<void> | undefined
+  private draining = false
 
-  constructor(options: StandardPeerGuardOptions = {}) {
+  constructor(transport: StandardPeerGuardTransport, options: StandardPeerGuardOptions = {}) {
+    this.peer = new ServerPeer(message => transport.send(message, this.sendWhenDrained))
+    this.getBufferedAmount = transport.getBufferedAmount
+    this.waitForDrain = transport.waitForDrain ?? poll
     this.maxConcurrentRequests = options.maxConcurrentRequests ?? 100
     this.sendHighWaterMark = options.sendHighWaterMark ?? 1024 * 1024
     this.budget = { size: 0, limit: options.maxBufferedStreamSize ?? 16 * 1024 * 1024 }
   }
 
   /**
-   * Passes a client message to the peer, enforcing the limits.
+   * Handles a client message, enforcing the limits.
    * `size` is the encoded size of the message in bytes, only read for stream messages.
    *
-   * Everything before `peer.message` runs synchronously, so message order is preserved.
+   * Everything before the peer handles the message runs synchronously, so message order is preserved.
    */
   message(
-    peer: Pick<ServerPeer, 'message'>,
     message: ClientPeerSendMessage,
     handleRequest: (request: StandardLazyRequest) => Promise<StandardResponse>,
     size: Value<number>,
   ): Promise<void> {
     if (message.kind === 'request') {
       if (this.activeRequests < this.maxConcurrentRequests) {
-        return this.handle(peer, message, handleRequest)
+        return this.handle(message, handleRequest)
       }
 
       // Rejections only pile up while their responses wait for the client to read.
-      if (this.pendingRejections < this.maxConcurrentRequests || this.waitingSends === 0) {
-        return this.reject(peer, message)
+      if (this.pendingRejections < this.maxConcurrentRequests || this.waiters.length === 0) {
+        return this.reject(message)
       }
 
       // The client does not read its rejections either: create no state and send nothing.
@@ -119,73 +154,13 @@ export class StandardPeerGuard {
       return Promise.resolve()
     }
 
-    return peer.message(message, handleRequest)
+    return this.peer.message(message, handleRequest)
   }
 
   /**
-   * Calls `send` once the connection's buffered amount is at or below `sendHighWaterMark`.
-   * Never rejects because of the wait: once the connection or this guard is closed, the message is dropped.
-   *
-   * @param send Sends the message. Called in the same synchronous step as the last check, so waiters woken together do not all send.
-   * @param getBufferedAmount Returns the bytes buffered on the connection, `undefined` when unknown (sends right away), or `null` once closed. Throwing counts as closed.
-   * @param waitForDrain Waits for the buffered amount to drop to `threshold`, polls by default. One wait is shared by all waiting sends.
+   * Ends waiting sends, releases all accounting, and closes the peer, which aborts all requests.
    */
-  async send(
-    send: () => unknown,
-    getBufferedAmount: () => number | null | undefined,
-    waitForDrain: (threshold: number, signal: AbortSignal) => Promise<void> = poll,
-  ): Promise<void> {
-    if (this.sendHighWaterMark === Infinity) {
-      await send()
-      return
-    }
-
-    const signal = this.controller.signal
-    let waiting = false
-
-    try {
-      while (!signal.aborted) {
-        let bufferedAmount: number | null | undefined
-
-        try {
-          bufferedAmount = getBufferedAmount()
-        }
-        catch {
-          return
-        }
-
-        if (bufferedAmount === null) {
-          return
-        }
-
-        if (bufferedAmount === undefined || bufferedAmount <= this.sendHighWaterMark) {
-          await send()
-          return
-        }
-
-        if (!waiting) {
-          waiting = true
-          this.waitingSends++
-        }
-
-        await (this.pendingDrain ??= waitForDrain(this.sendHighWaterMark, signal)
-          .catch(() => {})
-          .finally(() => {
-            this.pendingDrain = undefined
-          }))
-      }
-    }
-    finally {
-      if (waiting) {
-        this.waitingSends--
-      }
-    }
-  }
-
-  /**
-   * Ends waiting sends and releases all accounting. Call it before closing the peer.
-   */
-  close(): void {
+  async close(): Promise<void> {
     this.controller.abort()
 
     for (const stream of this.streams.values()) {
@@ -193,10 +168,95 @@ export class StandardPeerGuard {
     }
 
     this.streams.clear()
+    await this.peer.close()
+  }
+
+  private readonly sendWhenDrained = async (send: () => unknown): Promise<void> => {
+    if (this.waiters.length === 0) {
+      const state = this.checkSend()
+
+      if (state === 'ready') {
+        await send()
+        return
+      }
+
+      if (state === 'closed') {
+        return
+      }
+    }
+
+    await new Promise((resolve, reject) => {
+      this.waiters.push({ send, resolve, reject })
+      void this.drain()
+    })
+  }
+
+  private checkSend(): 'ready' | 'full' | 'closed' {
+    if (this.sendHighWaterMark === Infinity) {
+      return 'ready'
+    }
+
+    if (this.controller.signal.aborted) {
+      return 'closed'
+    }
+
+    let bufferedAmount: number | null | undefined
+
+    try {
+      bufferedAmount = this.getBufferedAmount?.()
+    }
+    catch {
+      return 'closed'
+    }
+
+    if (bufferedAmount === null) {
+      return 'closed'
+    }
+
+    return bufferedAmount === undefined || bufferedAmount <= this.sendHighWaterMark ? 'ready' : 'full'
+  }
+
+  /**
+   * Sends waiting messages in order as the connection drains, one loop per connection.
+   * Each send happens in the same synchronous step as its check.
+   */
+  private async drain(): Promise<void> {
+    if (this.draining) {
+      return
+    }
+
+    this.draining = true
+
+    try {
+      while (this.waiters.length) {
+        const state = this.checkSend()
+
+        if (state === 'full') {
+          await this.waitForDrain(this.sendHighWaterMark, this.controller.signal).catch(() => {})
+          continue
+        }
+
+        const waiter = this.waiters.shift()!
+
+        if (state === 'closed') {
+          waiter.resolve()
+          continue
+        }
+
+        try {
+          waiter.resolve(waiter.send())
+        }
+        catch (error) {
+          waiter.reject(error)
+        }
+      }
+    }
+    finally {
+      this.draining = false
+    }
   }
 
   private async handle(
-    peer: Pick<ServerPeer, 'message'>,
     message: PeerRequestMessage,
     handleRequest: (request: StandardLazyRequest) => Promise<StandardResponse>,
   ): Promise<void> {
@@ -205,7 +265,7 @@ export class StandardPeerGuard {
 
     try {
       // The peer calls this synchronously for a new id, before any stream message for it can arrive.
-      await peer.message(message, (request) => {
+      await this.peer.message(message, (request) => {
         stream = this.track(message, request)
         return handleRequest(stream ? { ...request, resolveBody: stream.resolveBody } : request)
       })
@@ -227,20 +287,20 @@ export class StandardPeerGuard {
   /**
    * Answers through the peer, so it still ignores a duplicate id.
    */
-  private async reject(peer: Pick<ServerPeer, 'message'>, message: PeerRequestMessage): Promise<void> {
+  private async reject(message: PeerRequestMessage): Promise<void> {
     this.pendingRejections++
 
     try {
-      await peer.message(message, async (request) => {
+      await this.peer.message(message, async (request) => {
         if (getStreamKind(message)) {
-          // Discard streamed input at once, so nothing buffers while the rejection waits to be sent.
-          await request.resolveBody().then(cancelStandardBody).catch(() => {})
+          // Tell the client to stop sending streamed input right away.
+          request.resolveBody().then(cancelStandardBody).catch(() => {})
         }
 
         return {
           status: COMMON_ERROR_STATUS_MAP.TOO_MANY_REQUESTS,
           headers: {},
-          body: rpcSerializer.serialize(new ORPCError('TOO_MANY_REQUESTS').toJSON()),
+          body: getTooManyRequestsBody(),
         }
       })
     }
@@ -262,15 +322,14 @@ export class StandardPeerGuard {
   }
 
   private admit(message: PeerEventStreamMessage | PeerOctetStreamMessage, size: Value<number>): boolean {
-    const stream = this.streams.get(message.id)
-
-    // The peer only buffers messages matching a streamed request body.
-    if (!stream || stream.kind !== message.kind) {
+    if (this.budget.limit === Infinity) {
       return true
     }
 
-    // The peer no longer reads this input.
-    if (stream.state !== 'open') {
+    const stream = this.streams.get(message.id)
+
+    // Only pass on messages that are counted. The peer would drop any other one anyway.
+    if (stream?.kind !== message.kind || stream.state !== 'open') {
       return false
     }
 
@@ -442,35 +501,42 @@ class StreamInput {
     }
   }
 
+  /**
+   * Reads one item, accounting it as read. Once overflowed, reads throw `PAYLOAD_TOO_LARGE`.
+   */
+  private async read<T extends { done?: boolean | undefined }>(next: () => Promise<T>): Promise<T> {
+    this.throwIfOverflowed()
+    let result: T
+
+    try {
+      result = await next()
+    }
+    catch (error) {
+      this.throwIfOverflowed()
+      this.release()
+      throw error
+    }
+
+    this.throwIfOverflowed()
+
+    if (result.done) {
+      this.release()
+    }
+    else {
+      this.consume()
+    }
+
+    return result
+  }
+
+  private throwIfOverflowed(): void {
+    if (this.state === 'overflowed') {
+      throw new ORPCError('PAYLOAD_TOO_LARGE')
+    }
+  }
+
   private wrapIterator(iterator: AsyncIterator<unknown>): AsyncIteratorClass<unknown> {
-    return new AsyncIteratorClass(async () => {
-      let result: IteratorResult<unknown> | undefined
-
-      try {
-        if (this.state !== 'overflowed') {
-          result = await iterator.next()
-        }
-      }
-      catch (error) {
-        if (this.state !== 'overflowed') {
-          this.release()
-          throw error
-        }
-      }
-
-      if (result === undefined || this.state === 'overflowed') {
-        throw new ORPCError('PAYLOAD_TOO_LARGE')
-      }
-
-      if (result.done) {
-        this.release()
-      }
-      else {
-        this.consume()
-      }
-
-      return result
-    }, async ({ kind }) => {
+    return new AsyncIteratorClass(() => this.read(() => iterator.next()), async ({ kind }) => {
       this.release()
 
       if (kind === 'cancelled') {
@@ -481,33 +547,14 @@ class StreamInput {
 
   private wrapReader(reader: ReadableStreamDefaultReader<Uint8Array<ArrayBuffer>>): ReadableStream<Uint8Array<ArrayBuffer>> {
     return new ReadableStream<Uint8Array<ArrayBuffer>>({
+      // A rejected pull errors the stream with the same reason.
       pull: async (controller) => {
-        let result: Awaited<ReturnType<typeof reader.read>> | undefined
-
-        try {
-          if (this.state !== 'overflowed') {
-            result = await reader.read()
-          }
-        }
-        catch (error) {
-          if (this.state !== 'overflowed') {
-            this.release()
-            controller.error(error)
-            return
-          }
-        }
-
-        if (result === undefined || this.state === 'overflowed') {
-          controller.error(new ORPCError('PAYLOAD_TOO_LARGE'))
-          return
-        }
+        const result = await this.read(() => reader.read())
 
         if (result.done) {
-          this.release()
           controller.close()
         }
         else {
-          this.consume()
           controller.enqueue(result.value)
         }
       },

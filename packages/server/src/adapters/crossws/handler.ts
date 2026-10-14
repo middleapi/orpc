@@ -5,7 +5,7 @@ import type { Context } from '../../context'
 import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
 import type { StandardPeerGuardOptions } from '../standard-peer'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
-import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
+import { decodePeerMessage, encodePeerMessage, isClientPeerSendMessage } from '@standard-server/peer'
 import { createStandardPeerRequestHandler, StandardPeerGuard } from '../standard-peer'
 
 export type CrosswsPeerLike = Pick<Peer, 'send'> & {
@@ -52,7 +52,7 @@ export interface experimental_CrosswsHandlerOptions<_T extends Context> extends 
 }
 
 export class experimental_CrosswsHandler<T extends Context> {
-  private readonly peers: WeakMap<CrosswsPeerLike, { peer: ServerPeer, guard: StandardPeerGuard }> = new WeakMap()
+  private readonly guards: WeakMap<CrosswsPeerLike, StandardPeerGuard> = new WeakMap()
   private readonly encodePeerMessageOptions: experimental_CrosswsHandlerOptions<T>['encodePeerMessage']
   private readonly decodePeerMessageOptions: experimental_CrosswsHandlerOptions<T>['decodePeerMessage']
   private readonly guardOptions: StandardPeerGuardOptions
@@ -63,11 +63,7 @@ export class experimental_CrosswsHandler<T extends Context> {
   ) {
     this.encodePeerMessageOptions = options.encodePeerMessage
     this.decodePeerMessageOptions = options.decodePeerMessage
-    this.guardOptions = {
-      maxConcurrentRequests: options.maxConcurrentRequests,
-      maxBufferedStreamSize: options.maxBufferedStreamSize,
-      sendHighWaterMark: options.sendHighWaterMark,
-    }
+    this.guardOptions = options
   }
 
   /**
@@ -83,20 +79,10 @@ export class experimental_CrosswsHandler<T extends Context> {
     message: CrosswsMessageLike,
     ...rest: MaybeOptionalOptions<FriendlyStandardHandlerHandleOptions<T>>
   ): Promise<{ matched: boolean }> {
-    let state = this.peers.get(ws)
+    let guard = this.guards.get(ws)
 
-    if (!state) {
-      const guard = new StandardPeerGuard(this.guardOptions)
-      const peer = new ServerPeer(async (message) => {
-        const encoded = await encodePeerMessage(message, this.encodePeerMessageOptions)
-        await guard.send(
-          () => ws.send(encoded),
-          () => getBufferedAmount(ws),
-          async (threshold, signal) => ws.waitForDrain?.({ threshold, signal }),
-        )
-      })
-
-      this.peers.set(ws, state = { peer, guard })
+    if (!guard) {
+      this.guards.set(ws, guard = this.createGuard(ws))
     }
 
     /**
@@ -106,8 +92,7 @@ export class experimental_CrosswsHandler<T extends Context> {
     const encodedMessage = typeof message.rawData === 'string' ? message.rawData : message.uint8Array() as Uint8Array<ArrayBuffer>
     const result = decodePeerMessage(encodedMessage, this.decodePeerMessageOptions)
     if (result.matched && isClientPeerSendMessage(result.message)) {
-      await state.guard.message(
-        state.peer,
+      await guard.message(
         result.message,
         createStandardPeerRequestHandler(this.handler, resolveMaybeOptionalOptions(rest)),
         typeof encodedMessage === 'string' ? encodedMessage.length : encodedMessage.byteLength,
@@ -123,14 +108,25 @@ export class experimental_CrosswsHandler<T extends Context> {
    * @param ws The same crossws peer instance passed to `.message()`.
    */
   async close(ws: CrosswsPeerLike): Promise<void> {
-    const state = this.peers.get(ws)
+    const guard = this.guards.get(ws)
 
-    if (state) {
+    if (guard) {
       // delete before close to avoid potential race conditions
-      this.peers.delete(ws)
-      state.guard.close()
-      await state.peer.close()
+      this.guards.delete(ws)
+      await guard.close()
     }
+  }
+
+  private createGuard(ws: CrosswsPeerLike): StandardPeerGuard {
+    return new StandardPeerGuard({
+      send: async (message, sendWhenDrained) => {
+        const encoded = await encodePeerMessage(message, this.encodePeerMessageOptions)
+        await sendWhenDrained(() => ws.send(encoded))
+      },
+      getBufferedAmount: () => getBufferedAmount(ws),
+      // only called when `getBufferedAmount` found `waitForDrain`
+      waitForDrain: (threshold, signal) => ws.waitForDrain!({ threshold, signal }),
+    }, this.guardOptions)
   }
 }
 
