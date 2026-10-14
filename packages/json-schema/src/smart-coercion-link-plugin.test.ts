@@ -85,14 +85,10 @@ describe('smartCoercionLinkPlugin', () => {
 
     const output = Array.from({ length: 200 }, (_, i) => String(i))
     const next = vi.fn().mockResolvedValue(output)
+    const run = (plugin: SmartCoercionLinkPlugin<any>) => plugin.init({} as any).interceptors![0]!({ path: ['list'], next } as any)
 
-    await expect(new SmartCoercionLinkPlugin(contract, { maxStepsPerValue: 1 }).init({} as any).interceptors![0]!({ path: ['list'], next } as any))
-      .resolves
-      .toBe(output)
-
-    await expect(new SmartCoercionLinkPlugin(contract).init({} as any).interceptors![0]!({ path: ['list'], next } as any))
-      .resolves
-      .toEqual(Array.from({ length: 200 }, (_, i) => i))
+    await expect(run(new SmartCoercionLinkPlugin(contract, { maxStepsPerValue: 1 }))).resolves.toBe(output)
+    await expect(run(new SmartCoercionLinkPlugin(contract))).resolves.toEqual(Array.from({ length: 200 }, (_, i) => i))
   })
 
   it('throw the original error when it not defined ORPCError or has no data schema', async () => {

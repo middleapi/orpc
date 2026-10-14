@@ -64,7 +64,7 @@ The plugin coerces values safely by following these rules:
 3. **Preserve original values:** Leaves the original value unchanged when conversion would be unsafe
 4. **Union-aware:** Tries to determine the best union branch to use for conversion
 5. **Deep conversion:** Applies recursively inside nested objects and arrays
-6. **Bounded work:** Keeps the work proportional to the input size, even for deeply nested input under recursive union schemas, and stops at a [step budget](#step-budget)
+6. **Bounded work:** Coerces deeply nested input under recursive union schemas without repeating work, and gives up past a [step budget](#step-budget) that grows with the input size, leaving the value to validation
 
 :::info
 JSON Schema does not natively represent `BigInt`, `Date`, `URL`, `Set`, or `Map`. For these types, oRPC relies on `x-native-type` metadata in your schema:
@@ -146,7 +146,7 @@ Supports arrays of key-value pairs with **unique keys**:
 
 ## Step Budget
 
-Coercion counts its steps, where a step applies one schema to one value, and gives up once it takes more than `maxStepsPerValue` steps per value in the input. Both plugins accept this option:
+Coercion runs before validation, and on the server even before middleware such as authentication, so it caps how much work a single untrusted value can cost. It counts steps, where a step applies one schema to one value, and gives up once it takes more than `maxStepsPerValue` steps per value in the input. Both plugins accept this option:
 
 ```ts
 const handler = new OpenAPIHandler(router, {
@@ -165,7 +165,7 @@ const handler = new OpenAPIHandler(router, {
 })
 ```
 
-When coercion runs out of steps, the plugin leaves the whole value uncoerced instead of throwing, so validation still runs and reports any mismatch. A union tries each of its branches, so values under it take about one step per branch, and the default leaves room for unions with hundreds of branches.
+When coercion runs out of steps, it leaves the value uncoerced instead of throwing, so validation still runs and reports any mismatch. A value takes about one step per union branch it is tried against, multiplied across nested unions, so the default leaves room for wide unions. If large inputs fail validation while smaller ones of the same shape pass, raise `maxStepsPerValue`.
 
 ## Advanced Usage
 

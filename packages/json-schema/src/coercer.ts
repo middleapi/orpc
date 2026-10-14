@@ -1,5 +1,5 @@
 import type { JsonSchema } from './types'
-import { get, getOwn, isPlainObject, toArray, tryOrUndefined } from '@orpc/shared'
+import { get, getOwn, isPlainObject, isTypescriptObject, toArray, tryOrUndefined } from '@orpc/shared'
 import { decodeJsonPointerSegment } from './ref-utils'
 import { JsonSchemaXNativeType } from './types'
 
@@ -17,6 +17,8 @@ const LOOSELY_SATISFIED = 1
 const SATISFIED = 2
 
 type Satisfaction = typeof UNSATISFIED | typeof LOOSELY_SATISFIED | typeof SATISFIED
+
+type CoercionResult = [satisfied: Satisfaction, coerced: unknown]
 
 interface NativeType {
   types: readonly string[]
@@ -72,9 +74,9 @@ export interface JsonSchemaCoercerOptions {
    * Maximum number of steps a coercion may take per value in the input, where a step applies one schema to one value.
    * Inputs with fewer than 100 values are budgeted as 100 values.
    *
-   * A union tries each of its branches on the same value, so wide unions take about one step per branch for each value,
-   * but deeply nested input should never multiply that work. A coercion that runs out of steps leaves the whole input
-   * untouched, so validation still runs and reports it.
+   * A value takes about one step per union branch it is tried against, multiplied across nested unions,
+   * but the depth of recursive schemas does not multiply it. A coercion that runs out of steps leaves the whole input
+   * untouched, so validation still runs and reports any mismatch.
    *
    * @default 1_000
    */
@@ -84,16 +86,16 @@ export interface JsonSchemaCoercerOptions {
 interface CoercionContext {
   rootSchema: JsonSchema
   /**
-   * Results of `$ref`s applied to nested values, by resolved schema then by value.
+   * Results of `$ref`s applied to objects, by resolved schema then by value.
    * Union branches often reach the same nested value through the same `$ref`, so without it
    * recursive unions would coerce that value once per branch at every depth.
    */
-  memo: Map<JsonSchema, Map<unknown, [satisfied: Satisfaction, coerced: unknown]>> | undefined
+  memo: Map<JsonSchema, Map<unknown, CoercionResult>> | undefined
   steps: number
   maxSteps: number
   /**
-   * Only counted once the minimum budget is spent, to extend `maxSteps` to its size,
-   * so most coercions skip counting.
+   * Counted only after the minimum budget is spent, to extend `maxSteps` to its size,
+   * so most coercions never count it.
    */
   input: unknown
 }
@@ -143,10 +145,12 @@ export class JsonSchemaCoercer {
      * Only shared between keywords that re-apply a schema to the same value, never with nested values.
      */
     appliedRefs?: Set<JsonSchema>,
-  ): [satisfied: Satisfaction, coerced: unknown] {
+  ): CoercionResult {
     if (++context.steps > context.maxSteps) {
-      // counting either throws below or extends the budget past the steps taken, so it runs at most twice
-      context.maxSteps = this.maxStepsPerValue * Math.max(countValues(context.input), MIN_BUDGETED_VALUES)
+      // Count only as far as needed to lift the budget to twice the steps taken, so a large input that stays within it
+      // is walked about as far as coercion has gone. The budget can only run out on a complete count of the input.
+      const limit = 2 * context.steps / this.maxStepsPerValue
+      context.maxSteps = this.maxStepsPerValue * Math.max(countValues(context.input, limit), MIN_BUDGETED_VALUES)
 
       if (context.steps > context.maxSteps) {
         throw new CoercionBudgetExceededError('Coercion took too many steps')
@@ -182,9 +186,9 @@ export class JsonSchemaCoercer {
          * With no other `$ref` applied to this value, the result only depends on the value and the resolved schema.
          * Coercion never mutates a value in place, so a cached result can be shared.
          */
-        let memo: Map<unknown, [satisfied: Satisfaction, coerced: unknown]> | undefined
+        let memo: Map<unknown, CoercionResult> | undefined
 
-        if (!appliedRefs?.size && typeof coerced === 'object' && coerced !== null) {
+        if (!appliedRefs?.size && isTypescriptObject(coerced)) {
           context.memo ??= new Map()
           memo = context.memo.get(resolved)
 
@@ -469,15 +473,15 @@ export class JsonSchemaCoercer {
 }
 
 /**
- * Counts the values in an input, nested ones included.
+ * Counts the values in an input, nested ones included, stopping once the count reaches `limit`.
  * Each array or object is only walked once, so shared and circular references stay finite.
  */
-function countValues(input: unknown): number {
+function countValues(input: unknown, limit: number): number {
   const walked = new Set<object>()
   const stack = [input]
   let count = 1
 
-  while (stack.length) {
+  while (stack.length && count < limit) {
     const value = stack.pop()
 
     if ((Array.isArray(value) || isPlainObject(value)) && !walked.has(value)) {
@@ -487,7 +491,7 @@ function countValues(input: unknown): number {
       for (const item of Object.values(value)) {
         count++
 
-        if (typeof item === 'object' && item !== null) {
+        if (isTypescriptObject(item)) {
           stack.push(item)
         }
       }

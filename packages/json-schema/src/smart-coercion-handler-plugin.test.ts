@@ -57,9 +57,10 @@ describe('smartCoercionHandlerPlugin', () => {
     const procedure = oc.input(z.array(z.union([z.boolean(), z.number()])))
     const input = Array.from({ length: 200 }, (_, i) => String(i))
     const next = vi.fn().mockResolvedValue('handled')
+    const run = (plugin: SmartCoercionHandlerPlugin<any>) => plugin.init({} as any).clientInterceptors![0]!({ procedure, input, next } as any)
 
-    await new SmartCoercionHandlerPlugin({ maxStepsPerValue: 1 }).init({} as any).clientInterceptors![0]!({ procedure, input, next } as any)
-    await new SmartCoercionHandlerPlugin().init({} as any).clientInterceptors![0]!({ procedure, input, next } as any)
+    await run(new SmartCoercionHandlerPlugin({ maxStepsPerValue: 1 }))
+    await run(new SmartCoercionHandlerPlugin())
 
     expect(next).toHaveBeenNthCalledWith(1, { procedure, input })
     expect(next).toHaveBeenNthCalledWith(2, { procedure, input: Array.from({ length: 200 }, (_, i) => i) })

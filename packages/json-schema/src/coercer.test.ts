@@ -21,14 +21,14 @@ const BIGINT_SCHEMA = { 'type': 'string', 'pattern': '^-?[0-9]+$', 'x-native-typ
 const URL_SCHEMA = { 'type': 'string', 'format': 'uri', 'x-native-type': 'url' }
 
 /**
- * Counts the steps a coercion takes, where a step applies one schema to one value.
+ * Coerces like {@link coerce} and counts the steps it takes, where a step applies one schema to one value.
  */
-function countCoerceSteps(run: () => unknown): number {
+function coerceCountingSteps(schema: JsonSchema | Record<string, unknown>, value: unknown): { coerced: unknown, steps: number } {
   const spy = vi.spyOn(JsonSchemaCoercer.prototype as any, 'coerceInternal')
 
   try {
-    run()
-    return spy.mock.calls.length
+    const coerced = coerce(schema, value)
+    return { coerced, steps: spy.mock.calls.length }
   }
   finally {
     spy.mockRestore()
@@ -877,15 +877,17 @@ describe('jsonSchemaCoercer', () => {
     it.each(['text', 'zzz'])('stays linear when the discriminator is %s', (type) => {
       const value = { doc: nested(14, type) }
       // before the fix: 262137 for both
-      expect(countCoerceSteps(() => coerce(TWO_BRANCH, value))).toBeLessThan(2_000)
+      expect(coerceCountingSteps(TWO_BRANCH, value).steps).toBeLessThan(2_000)
     })
 
     it('stays linear with many branches sharing a child key', () => {
       // before the fix: 1119740
-      expect(countCoerceSteps(() => coerce(SIX_BRANCH, nested(6, 'text', 'content')))).toBeLessThan(2_000)
+      expect(coerceCountingSteps(SIX_BRANCH, nested(6, 'text', 'content')).steps).toBeLessThan(2_000)
 
       const deep = nested(200, 'text', 'content')
-      expect(countCoerceSteps(() => expect(coerce(SIX_BRANCH, deep)).toBe(deep))).toBeLessThan(10_000)
+      const { coerced, steps } = coerceCountingSteps(SIX_BRANCH, deep)
+      expect(coerced).toBe(deep)
+      expect(steps).toBeLessThan(10_000)
     })
 
     it('stays linear for a record branch listed before an array branch', () => {
@@ -895,7 +897,7 @@ describe('jsonSchemaCoercer', () => {
         value = [value]
       }
       // before the fix: 131066
-      expect(countCoerceSteps(() => coerce(schema, value))).toBeLessThan(2_000)
+      expect(coerceCountingSteps(schema, value).steps).toBeLessThan(2_000)
     })
 
     it('coerces every level of a deep recursive union', () => {
@@ -919,7 +921,9 @@ describe('jsonSchemaCoercer', () => {
         expected = { n: i, children: [expected, { s: '1', children: [] }] }
       }
 
-      expect(countCoerceSteps(() => expect(coerce(schema, value)).toEqual(expected))).toBeLessThan(10_000)
+      const { coerced, steps } = coerceCountingSteps(schema, value)
+      expect(coerced).toEqual(expected)
+      expect(steps).toBeLessThan(10_000)
     })
   })
 
@@ -937,11 +941,15 @@ describe('jsonSchemaCoercer', () => {
       properties: { page: { type: 'integer' }, count: { $ref: '#/$defs/d0' } },
     }
 
+    const twoStepsPerValue = new JsonSchemaCoercer({ maxStepsPerValue: 2 })
+
     it('leaves the whole input untouched once coercion runs out of steps', () => {
       const value = { page: '2', count: '1' }
 
+      const { coerced, steps } = coerceCountingSteps(EXPONENTIAL_SCHEMA, value)
+      expect(coerced).toBe(value)
       // inputs with fewer than 100 values get the budget of 100 values
-      expect(countCoerceSteps(() => expect(coerce(EXPONENTIAL_SCHEMA, value)).toBe(value))).toBe(100_001)
+      expect(steps).toBe(100_001)
 
       expect(value).toEqual({ page: '2', count: '1' })
 
@@ -950,17 +958,15 @@ describe('jsonSchemaCoercer', () => {
     })
 
     it('extends the budget with the number of values in the input', () => {
-      const coercer = new JsonSchemaCoercer({ maxStepsPerValue: 2 })
-
       const integers = Array.from({ length: 1_000 }, (_, i) => String(i))
       const expected = Array.from({ length: 1_000 }, (_, i) => i)
 
       // one step for the array and one per item, so it never runs out
-      expect(coercer.coerce([{ type: 'array', items: { type: 'integer' } }, false], integers)).toEqual(expected)
+      expect(twoStepsPerValue.coerce([{ type: 'array', items: { type: 'integer' } }, false], integers)).toEqual(expected)
 
       // the union takes three more steps per item, more than two per value
       const union: JsonSchema = { type: 'array', items: { anyOf: [{ type: 'boolean' }, { type: 'null' }, { type: 'integer' }] } }
-      expect(coercer.coerce([union, false], integers)).toBe(integers)
+      expect(twoStepsPerValue.coerce([union, false], integers)).toBe(integers)
       expect(new JsonSchemaCoercer({ maxStepsPerValue: 5 }).coerce([union, false], integers)).toEqual(expected)
     })
 
@@ -979,12 +985,10 @@ describe('jsonSchemaCoercer', () => {
 
       const value = Array.from({ length: 10_000 }, (_, i) => ({ kind: 'c', id: String(i), active: 'on', at: '2020-01-01' }))
 
+      const { coerced, steps } = coerceCountingSteps(schema, value)
+      expect(coerced).toEqual(Array.from({ length: 10_000 }, (_, i) => ({ kind: 'c', id: i, active: true, at: new Date('2020-01-01') })))
       // well past the minimum budget, so coercion has to count the input to keep going
-      expect(countCoerceSteps(() => {
-        expect(coerce(schema, value)).toEqual(
-          Array.from({ length: 10_000 }, (_, i) => ({ kind: 'c', id: i, active: true, at: new Date('2020-01-01') })),
-        )
-      })).toBeGreaterThan(100_000)
+      expect(steps).toBeGreaterThan(100_000)
     })
 
     it('counts an input with circular references', () => {
@@ -995,7 +999,7 @@ describe('jsonSchemaCoercer', () => {
       const value = [circular, ...Array.from({ length: 1_000 }, (_, i) => ({ id: String(i + 1) }))]
 
       // runs past the minimum budget of 200 steps, so the input gets counted
-      expect(new JsonSchemaCoercer({ maxStepsPerValue: 2 }).coerce([schema, false], value)).toEqual([
+      expect(twoStepsPerValue.coerce([schema, false], value)).toEqual([
         { id: 0, self: circular },
         ...Array.from({ length: 1_000 }, (_, i) => ({ id: i + 1 })),
       ])
