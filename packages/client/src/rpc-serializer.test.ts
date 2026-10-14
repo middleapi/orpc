@@ -382,12 +382,10 @@ describe('rpcSerializer', () => {
       expect(() => serializer.deserialize(form)).toThrow(RangeError)
     })
 
-    it('rejects bigint strings longer than maxBigIntDigits', () => {
-      const digits = '9'.repeat(5000)
-      const body = { json: digits, meta: [['bigint']] }
+    it('rejects bigint strings longer than 4300 digits', () => {
+      const digits = '9'.repeat(4301)
 
-      expect(() => serializer.deserialize(body)).toThrow('at most 4300 digits')
-      expect(new RPCSerializer({ maxBigIntDigits: 5000 }).deserialize(body)).toBe(BigInt(digits))
+      expect(() => serializer.deserialize({ json: digits, meta: [['bigint']] })).toThrow('at most 4300 digits')
 
       const form = new FormData()
       form.set('data', JSON.stringify({ json: { value: digits, file: {} }, meta: [['bigint', 'value']], maps: [['file']] }))

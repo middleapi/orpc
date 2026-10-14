@@ -1,3 +1,4 @@
+import * as z from 'zod'
 import { builtInRPCSupportDataTypes } from '../../../tests/rpc/__shared__/built-in-support-data-types'
 import { RPCJsonSerializer } from './rpc-json-serializer'
 
@@ -400,76 +401,34 @@ describe('rpcJsonSerializer: deserialize', () => {
   })
 })
 
-describe('rpcJsonSerializer: maxBigIntDigits', () => {
-  it.each([
-    [undefined, 4300],
-    [5000, 5000],
-    [3, 3],
-  ])('maxBigIntDigits %s accepts up to %s digits, with or without a sign', (maxBigIntDigits, limit) => {
-    const serializer = new RPCJsonSerializer({ maxBigIntDigits })
+describe('rpcJsonSerializer: bigint digit limit', () => {
+  const serializer = new RPCJsonSerializer()
 
+  it('accepts up to 4300 digits, with or without a sign', () => {
     for (const sign of ['', '-']) {
-      expect(serializer.deserialize({ json: sign + digits(limit), meta: [['bigint']] })).toBe(BigInt(sign + digits(limit)))
-      expect(() => serializer.deserialize({ json: sign + digits(limit + 1), meta: [['bigint']] }))
-        .toThrow(`Invalid RPC serialized data: type "bigint" expects a decimal integer string of at most ${limit} digits.`)
+      expect(serializer.deserialize({ json: sign + digits(4300), meta: [['bigint']] })).toBe(BigInt(sign + digits(4300)))
+      expect(() => serializer.deserialize({ json: sign + digits(4301), meta: [['bigint']] }))
+        .toThrow('Invalid RPC serialized data: type "bigint" expects a decimal integer string of at most 4300 digits.')
     }
   })
 
-  it('disables the limit with Infinity, but still validates the format', () => {
-    const serializer = new RPCJsonSerializer({ maxBigIntDigits: Number.POSITIVE_INFINITY })
-
-    expect(serializer.deserialize({ json: digits(10_000), meta: [['bigint']] })).toBe(BigInt(digits(10_000)))
-    expect(() => serializer.deserialize({ json: '0x10', meta: [['bigint']] })).toThrow(TypeError)
-  })
-
   it('does not limit serialization', () => {
-    expect(new RPCJsonSerializer().serialize(BigInt(digits(5000)))).toEqual({ json: digits(5000), meta: [['bigint']] })
+    expect(serializer.serialize(BigInt(digits(5000)))).toEqual({ json: digits(5000), meta: [['bigint']] })
   })
 
-  it('applies alongside custom handlers for other types', () => {
-    const serializer = new RPCJsonSerializer({
-      maxBigIntDigits: 3,
-      handlers: {
-        date: {
-          condition: v => v instanceof Date,
-          serialize: (v: Date) => v.getTime(),
-          deserialize: (v: number) => new Date(v),
-        },
-      },
-    })
-
-    expect(roundTripThroughWire(serializer, { a: 999n, b: new Date(0) })).toEqual({ a: 999n, b: new Date(0) })
-    expect(() => roundTripThroughWire(serializer, { a: 1000n })).toThrow('at most 3 digits')
-  })
-
-  it('lets a custom bigint handler take precedence, even as the only custom handler', () => {
-    const serializer = new RPCJsonSerializer({
-      maxBigIntDigits: 3,
+  it('can be raised by overriding the bigint handler', () => {
+    const raised = new RPCJsonSerializer({
       handlers: {
         bigint: {
           condition: v => typeof v === 'bigint',
-          serialize: (v: bigint) => v.toString(16),
-          deserialize: (v: string) => BigInt(`0x${v}`),
+          serialize: (v: bigint) => v.toString(),
+          deserialize: v => BigInt(z.string().max(10_000).regex(/^-?\d+$/).parse(v)),
         },
       },
     })
 
-    expect(serializer.serialize(255n)).toEqual({ json: 'ff', meta: [['bigint']] })
-    expect(serializer.deserialize({ json: 'ffff', meta: [['bigint']] })).toBe(65535n)
-  })
-
-  it('keeps a disabled bigint handler disabled', () => {
-    const serializer = new RPCJsonSerializer({ maxBigIntDigits: 3, handlers: { bigint: undefined } })
-
-    expect(() => serializer.deserialize({ json: '1', meta: [['bigint']] }))
-      .toThrow('Invalid RPC serialized data: type "bigint" is not supported.')
-  })
-
-  it('does not change the limit of other instances', () => {
-    const lowered = new RPCJsonSerializer({ maxBigIntDigits: 3 })
-
-    expect(() => lowered.deserialize({ json: '1000', meta: [['bigint']] })).toThrow('at most 3 digits')
-    expect(new RPCJsonSerializer().deserialize({ json: '1000', meta: [['bigint']] })).toBe(1000n)
+    expect(roundTripThroughWire(raised, { value: BigInt(digits(5000)) })).toEqual({ value: BigInt(digits(5000)) })
+    expect(() => raised.deserialize({ json: digits(10_001), meta: [['bigint']] })).toThrow()
   })
 })
 
