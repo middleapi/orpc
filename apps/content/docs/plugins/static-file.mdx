@@ -1,6 +1,6 @@
 ---
 title: "Static File Plugin"
-description: "Serve static files alongside your procedures, with ETag caching, range requests, single page application fallback, and directory traversal protection."
+description: "Serve static files alongside your procedures, with ETag caching, range requests, cached compression, single page application fallback, and directory traversal protection."
 sidebar:
   label: "Static File"
 ---
@@ -77,6 +77,15 @@ const handler = new RPCHandler(router, {
       precompressed: false,
 
       /**
+       * Compresses files the first time a client accepts an encoding that no
+       * precompressed sidecar provides, and stores the result on disk, so each
+       * file is compressed once per encoding. See Compression below.
+       *
+       * @default undefined (disabled)
+       */
+      compressionCache: undefined,
+
+      /**
        * Whether symbolic links whose target lies outside `rootDir` can be served.
        * Enabling this exposes every file those links reach.
        *
@@ -107,7 +116,50 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 
 ## Compression
 
-Add the [Response Compression Plugin](/docs/plugins/response-compression) to compress files on the fly. It skips anything already encoded, so `precompressed` sidecars are served as they are, and it leaves `206 Partial Content` responses alone so range requests keep working.
+Set `compressionCache` to compress files that have no `precompressed` sidecar. The first request for a file in a given encoding compresses it into `dir` and is answered with the compressed copy. Later requests, including after a restart, are served straight from that copy, so each file is compressed only once per encoding.
+
+```ts
+const handler = new RPCHandler(router, {
+  plugins: [
+    new StaticFileHandlerPlugin({
+      rootDir: './public',
+      precompressed: true,
+      compressionCache: {
+        /**
+         * The directory compressed copies are stored in, created on first use.
+         */
+        dir: './.cache/static-file',
+
+        /**
+         * The encodings files are compressed with, prioritized by their order
+         * and only applied if the client supports them. `zstd` requires
+         * Node.js 22.15 or later.
+         *
+         * @default ['br', 'gzip']
+         */
+        encodings: ['br', 'gzip'],
+
+        /**
+         * The minimum file size in bytes required to trigger compression.
+         *
+         * @default 1024 (1KB)
+         */
+        threshold: 1024,
+      },
+    }),
+  ],
+})
+```
+
+Only compressible content types, such as HTML, CSS, JavaScript, JSON, and SVG, are compressed, and a copy that comes out no smaller than its file is never served. Copies are served like sidecars, with their own `ETag` and `Content-Length`, so conditional and range requests keep working.
+
+A copy is keyed by the file's real path, size, and modification and change times, so an edited or replaced file is compressed again rather than served stale. Old copies are never removed, so you can clear the directory whenever you like, such as on every deploy.
+
+:::warning
+Use a `dir` that nothing else writes to, since its copies are served as the compressed form of your files, and keep it outside `rootDir` so the copies are not reachable as files of their own. A file whose copy cannot be written is served uncompressed instead of failing the request.
+:::
+
+To compress responses on every request instead, add the [Response Compression Plugin](/docs/plugins/response-compression). It skips anything already encoded, so sidecars and cached copies are served as they are, and it leaves `206 Partial Content` responses alone so range requests keep working.
 
 ```ts
 import { ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
@@ -121,7 +173,7 @@ const handler = new RPCHandler(router, {
 ```
 
 :::tip
-Precompressing assets at build time costs nothing per request and compresses better than the on the fly pass, so reach for `precompressed` first and let the compression plugin cover whatever has no sidecar.
+Precompressing assets at build time costs nothing per request and compresses best, since it can use the slowest levels. Reach for `precompressed` first, and let `compressionCache` cover whatever has no sidecar.
 :::
 
 ## Learn More

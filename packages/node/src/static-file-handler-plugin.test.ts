@@ -2,12 +2,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { StaticFileHandlerPluginOptions } from './static-file-handler-plugin'
 import { Buffer } from 'node:buffer'
-import { mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { randomBytes } from 'node:crypto'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { createServer, request as httpRequest } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
-import { brotliCompressSync, gzipSync } from 'node:zlib'
+import { brotliCompressSync, brotliDecompressSync, gunzipSync, gzipSync, zstdDecompressSync } from 'node:zlib'
 import { os } from '@orpc/server'
 import { RPCHandler as FetchRPCHandler } from '@orpc/server/fetch'
 import { RPCHandler } from '@orpc/server/node'
@@ -907,6 +908,293 @@ describe('staticFileHandlerPlugin', () => {
       expect(res.headers['content-encoding']).toBeUndefined()
       expect(res.headers.vary).toBeUndefined()
       expect(res.body).toEqual(Buffer.from('binary identity'))
+    })
+  })
+
+  describe('compression cache', () => {
+    const largeText = 'compress me once, serve me many times. '.repeat(100)
+    let cacheCount = 0
+
+    beforeAll(() => {
+      writeFileSync(path.join(rootDir, 'large.txt'), largeText)
+    })
+
+    // Not created up front, so every test also proves the directory is created on first use
+    function createCacheDir(): string {
+      return path.join(baseDir, `compression-cache-${cacheCount++}`)
+    }
+
+    function listCacheDir(dir: string): string[] {
+      try {
+        return readdirSync(dir)
+      }
+      catch {
+        return []
+      }
+    }
+
+    /**
+     * supertest decodes the body, and a partial or zstd body cannot be decoded, so the fetch
+     * adapter is used where the encoded bytes themselves are asserted.
+     */
+    async function fetchFile(pluginOptions: Partial<StaticFileHandlerPluginOptions>, url: string, headers: Record<string, string>) {
+      const handler = new FetchRPCHandler({}, {
+        plugins: [new StaticFileHandlerPlugin({ rootDir, ...pluginOptions })],
+      })
+
+      const { response } = await handler.handle(new Request(`https://example.com${url}`, { headers }))
+
+      return response!
+    }
+
+    it('compresses a file on its first request and stores the copy on disk', async () => {
+      const dir = createCacheDir()
+
+      const res = await createStaticAgent({ compressionCache: { dir } })
+        .get('/large.txt')
+        .set('accept-encoding', 'br')
+
+      expect(res.status).toBe(200)
+      expect(res.headers['content-encoding']).toBe('br')
+      expect(res.headers.vary).toBe('accept-encoding')
+      expect(res.headers['content-type']).toBe('text/plain; charset=utf-8')
+      expect(res.text).toBe(largeText)
+
+      const entries = listCacheDir(dir)
+      expect(entries).toEqual([expect.stringMatching(/^[0-9a-f]{64}\.br$/)])
+
+      const stored = readFileSync(path.join(dir, entries[0]!))
+      expect(brotliDecompressSync(stored).toString()).toBe(largeText)
+      expect(res.headers['content-length']).toBe(`${stored.length}`)
+      expect(stored.length).toBeLessThan(largeText.length)
+    })
+
+    it('serves later requests from the stored copy instead of compressing again', async () => {
+      const dir = createCacheDir()
+      const agent = createStaticAgent({ compressionCache: { dir } })
+
+      const first = await agent.get('/large.txt').set('accept-encoding', 'br')
+      const [entry] = listCacheDir(dir)
+
+      // A marker only a read from disk can produce
+      writeFileSync(path.join(dir, entry!), brotliCompressSync('from the cache'))
+
+      const second = await agent.get('/large.txt').set('accept-encoding', 'br')
+      expect(second.headers['content-encoding']).toBe('br')
+      expect(second.text).toBe('from the cache')
+      expect(second.headers.etag).not.toBe(first.headers.etag)
+
+      // A new plugin instance, as after a restart, reuses the copy too
+      const restarted = await createStaticAgent({ compressionCache: { dir } }).get('/large.txt').set('accept-encoding', 'br')
+      expect(restarted.text).toBe('from the cache')
+      expect(restarted.headers.etag).toBe(second.headers.etag)
+      expect(listCacheDir(dir)).toHaveLength(1)
+    })
+
+    it('compresses with the first configured encoding the client accepts', async () => {
+      const dir = createCacheDir()
+      const agent = createStaticAgent({ compressionCache: { dir } })
+
+      const brRes = await agent.get('/large.txt').set('accept-encoding', 'gzip, br')
+      expect(brRes.headers['content-encoding']).toBe('br')
+
+      const gzipRes = await agent.get('/large.txt').set('accept-encoding', 'gzip, br;q=0')
+      expect(gzipRes.headers['content-encoding']).toBe('gzip')
+      expect(gzipRes.text).toBe(largeText)
+
+      // zstd is not configured by default
+      const zstdRes = await agent.get('/large.txt').set('accept-encoding', 'zstd')
+      expect(zstdRes.headers['content-encoding']).toBeUndefined()
+      expect(zstdRes.headers.vary).toBe('accept-encoding')
+      expect(zstdRes.text).toBe(largeText)
+
+      expect(listCacheDir(dir).map(entry => path.extname(entry)).sort()).toEqual(['.br', '.gz'])
+
+      const orderedRes = await createStaticAgent({ compressionCache: { dir, encodings: ['gzip', 'br'] } })
+        .get('/large.txt')
+        .set('accept-encoding', 'br, gzip')
+      expect(orderedRes.headers['content-encoding']).toBe('gzip')
+    })
+
+    it('supports zstd', async () => {
+      const dir = createCacheDir()
+
+      const response = await fetchFile({ compressionCache: { dir, encodings: ['zstd'] } }, '/large.txt', { 'accept-encoding': 'zstd' })
+
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-encoding')).toBe('zstd')
+      expect(zstdDecompressSync(Buffer.from(await response.arrayBuffer())).toString()).toBe(largeText)
+      expect(listCacheDir(dir)).toEqual([expect.stringMatching(/\.zst$/)])
+    })
+
+    it('rejects zstd on a runtime without it', async ({ onTestFinished }) => {
+      // Node.js before 22.15 has no zstd, which only a fresh copy of the module can observe
+      vi.resetModules()
+      vi.doMock('node:zlib', async importOriginal => ({ ...await importOriginal<object>(), createZstdCompress: undefined }))
+      onTestFinished(() => {
+        vi.doUnmock('node:zlib')
+        vi.resetModules()
+      })
+
+      const { StaticFileHandlerPlugin } = await import('./static-file-handler-plugin')
+
+      expect(() => new StaticFileHandlerPlugin({ rootDir, compressionCache: { dir: createCacheDir(), encodings: ['zstd'] } }))
+        .toThrow('requires Node.js 22.15 or later')
+      expect(() => new StaticFileHandlerPlugin({ rootDir, compressionCache: { dir: createCacheDir() } }))
+        .not
+        .toThrow()
+    })
+
+    it('prefers a precompressed sidecar over the cache', async () => {
+      const dir = createCacheDir()
+
+      const res = await createStaticAgent({ precompressed: true, compressionCache: { dir, threshold: 0 } })
+        .get('/compressed.txt')
+        .set('accept-encoding', 'gzip')
+
+      expect(res.headers['content-encoding']).toBe('gzip')
+      expect(res.text).toBe('gzip content')
+      expect(listCacheDir(dir)).toEqual([])
+    })
+
+    it('leaves files below the threshold and non-compressible files alone', async () => {
+      const dir = createCacheDir()
+      writeFileSync(path.join(rootDir, 'large.bin'), Buffer.alloc(4096))
+
+      const smallRes = await createStaticAgent({ compressionCache: { dir } }).get('/hello.txt').set('accept-encoding', 'br')
+      expect(smallRes.headers['content-encoding']).toBeUndefined()
+      // Never encoded at this size, so caches need not key on the encoding
+      expect(smallRes.headers.vary).toBeUndefined()
+      expect(smallRes.text).toBe('hello world')
+
+      const binaryRes = await createStaticAgent({ compressionCache: { dir, threshold: 0 } }).get('/large.bin').set('accept-encoding', 'br')
+      expect(binaryRes.headers['content-encoding']).toBeUndefined()
+      expect(binaryRes.headers.vary).toBeUndefined()
+
+      const thresholdRes = await createStaticAgent({ compressionCache: { dir, threshold: largeText.length + 1 } }).get('/large.txt').set('accept-encoding', 'br')
+      expect(thresholdRes.headers['content-encoding']).toBeUndefined()
+
+      expect(listCacheDir(dir)).toEqual([])
+    })
+
+    it('compresses a changed file again instead of serving a stale copy', async ({ onTestFinished }) => {
+      const dir = createCacheDir()
+      const filePath = path.join(rootDir, 'changing.txt')
+      onTestFinished(() => rmSync(filePath, { force: true }))
+      const agent = createStaticAgent({ compressionCache: { dir } })
+
+      writeFileSync(filePath, 'a'.repeat(2048))
+      expect((await agent.get('/changing.txt').set('accept-encoding', 'br')).text).toBe('a'.repeat(2048))
+
+      // A whole second, so restoring it below reproduces the modification time exactly
+      const mtime = new Date('2020-01-02T03:04:05Z')
+      writeFileSync(filePath, 'b'.repeat(4096))
+      utimesSync(filePath, mtime, mtime)
+      expect((await agent.get('/changing.txt').set('accept-encoding', 'br')).text).toBe('b'.repeat(4096))
+
+      /**
+       * Same size and a restored modification time, as `cp -p` or `rsync -t` leave a replaced file.
+       * The change time cannot be restored, so the new content is still noticed.
+       */
+      writeFileSync(filePath, 'c'.repeat(4096))
+      utimesSync(filePath, mtime, mtime)
+      expect((await agent.get('/changing.txt').set('accept-encoding', 'br')).text).toBe('c'.repeat(4096))
+
+      expect(listCacheDir(dir)).toHaveLength(3)
+    })
+
+    it('shares one compression between concurrent requests', async () => {
+      const dir = createCacheDir()
+      const agent = createStaticAgent({ compressionCache: { dir } })
+
+      const responses = await Promise.all(Array.from({ length: 5 }, () => agent.get('/large.txt').set('accept-encoding', 'br')))
+
+      for (const res of responses) {
+        expect(res.headers['content-encoding']).toBe('br')
+        expect(res.text).toBe(largeText)
+        expect(res.headers.etag).toBe(responses[0]!.headers.etag)
+      }
+
+      // One entry and no temporary file left behind
+      expect(listCacheDir(dir)).toEqual([expect.stringMatching(/^[0-9a-f]{64}\.br$/)])
+    })
+
+    it('serves the file as it is when compression does not make it smaller', async ({ onTestFinished }) => {
+      const dir = createCacheDir()
+      const content = randomBytes(4096).toString('latin1')
+      writeFileSync(path.join(rootDir, 'random.txt'), content, 'latin1')
+      onTestFinished(() => rmSync(path.join(rootDir, 'random.txt'), { force: true }))
+      const agent = createStaticAgent({ compressionCache: { dir } })
+
+      for (let i = 0; i < 2; i++) {
+        const res = await agent.get('/random.txt').set('accept-encoding', 'br')
+        expect(res.headers['content-encoding']).toBeUndefined()
+        expect(res.headers.vary).toBe('accept-encoding')
+        expect(res.headers['content-length']).toBe('4096')
+      }
+
+      // Kept, so the file is not compressed again on every request
+      expect(listCacheDir(dir)).toHaveLength(1)
+    })
+
+    it('serves the file as it is when the cache cannot be written', async () => {
+      const dir = path.join(baseDir, 'cache-is-a-file')
+      writeFileSync(dir, '')
+
+      const res = await createStaticAgent({ compressionCache: { dir } }).get('/large.txt').set('accept-encoding', 'br')
+
+      expect(res.status).toBe(200)
+      expect(res.headers['content-encoding']).toBeUndefined()
+      expect(res.headers.vary).toBe('accept-encoding')
+      expect(res.text).toBe(largeText)
+    })
+
+    it('answers conditional, range, and head requests from the stored copy', async () => {
+      const dir = createCacheDir()
+      const pluginOptions = { compressionCache: { dir } }
+      const headers = { 'accept-encoding': 'gzip' }
+
+      const full = await fetchFile(pluginOptions, '/large.txt', headers)
+      const fullBytes = Buffer.from(await full.arrayBuffer())
+      const etag = full.headers.get('etag')!
+      expect(gunzipSync(fullBytes).toString()).toBe(largeText)
+
+      const identityEtag = (await fetchFile(pluginOptions, '/large.txt', {})).headers.get('etag')
+      expect(etag).not.toBe(identityEtag)
+
+      const notModified = await fetchFile(pluginOptions, '/large.txt', { ...headers, 'if-none-match': etag })
+      expect(notModified.status).toBe(304)
+      expect(notModified.headers.get('vary')).toBe('accept-encoding')
+      expect(notModified.headers.get('content-encoding')).toBeNull()
+
+      const partial = await fetchFile(pluginOptions, '/large.txt', { ...headers, range: 'bytes=10-19' })
+      expect(partial.status).toBe(206)
+      expect(partial.headers.get('content-encoding')).toBe('gzip')
+      expect(partial.headers.get('content-range')).toBe(`bytes 10-19/${fullBytes.length}`)
+      expect(Buffer.from(await partial.arrayBuffer())).toEqual(fullBytes.subarray(10, 20))
+
+      const head = await createStaticAgent(pluginOptions).head('/large.txt').set(headers)
+      expect(head.status).toBe(200)
+      expect(head.headers['content-encoding']).toBe('gzip')
+      expect(head.headers['content-length']).toBe(`${fullBytes.length}`)
+    })
+
+    it('keys entries by real path, so a symlink loop cannot fill the disk', async ({ onTestFinished }) => {
+      symlinkSync('.', path.join(rootDir, 'loop'))
+      onTestFinished(() => rmSync(path.join(rootDir, 'loop'), { force: true }))
+
+      for (const allowSymlinks of [false, true]) {
+        const dir = createCacheDir()
+        const agent = createStaticAgent({ allowSymlinks, compressionCache: { dir } })
+
+        for (const url of ['/large.txt', '/loop/large.txt', '/loop/loop/loop/large.txt']) {
+          const res = await agent.get(url).set('accept-encoding', 'br')
+          expect(res.headers['content-encoding'], url).toBe('br')
+          expect(res.text, url).toBe(largeText)
+        }
+
+        expect(listCacheDir(dir)).toHaveLength(1)
+      }
     })
   })
 
