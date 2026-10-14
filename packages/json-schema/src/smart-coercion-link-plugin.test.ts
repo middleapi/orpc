@@ -77,6 +77,24 @@ describe('smartCoercionLinkPlugin', () => {
     } as any)).resolves.toEqual({ number: 456, boolean: false })
   })
 
+  it('passes the step budget to its coercer', async () => {
+    // one step for the array and three per item: more than one step per value, but well within the default
+    const contract = oc.router({
+      list: oc.output(z.array(z.union([z.boolean(), z.number()]))),
+    })
+
+    const output = Array.from({ length: 200 }, (_, i) => String(i))
+    const next = vi.fn().mockResolvedValue(output)
+
+    await expect(new SmartCoercionLinkPlugin(contract, { maxStepsPerValue: 1 }).init({} as any).interceptors![0]!({ path: ['list'], next } as any))
+      .resolves
+      .toBe(output)
+
+    await expect(new SmartCoercionLinkPlugin(contract).init({} as any).interceptors![0]!({ path: ['list'], next } as any))
+      .resolves
+      .toEqual(Array.from({ length: 200 }, (_, i) => i))
+  })
+
   it('throw the original error when it not defined ORPCError or has no data schema', async () => {
     const contract = oc.router({
       users: {

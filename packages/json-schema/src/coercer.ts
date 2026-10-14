@@ -61,18 +61,82 @@ function minSatisfaction(a: Satisfaction, b: Satisfaction): Satisfaction {
   return a < b ? a : b
 }
 
+/**
+ * Inputs with fewer values are budgeted as if they had this many,
+ * so a small input still coerces against a large schema.
+ */
+const MIN_BUDGETED_VALUES = 100
+
+export interface JsonSchemaCoercerOptions {
+  /**
+   * Maximum number of steps a coercion may take per value in the input, where a step applies one schema to one value.
+   * Inputs with fewer than 100 values are budgeted as 100 values.
+   *
+   * A union tries each of its branches on the same value, so wide unions take about one step per branch for each value,
+   * but deeply nested input should never multiply that work. A coercion that runs out of steps leaves the whole input
+   * untouched, so validation still runs and reports it.
+   *
+   * @default 1_000
+   */
+  maxStepsPerValue?: undefined | number
+}
+
+interface CoercionContext {
+  rootSchema: JsonSchema
+  /**
+   * Results of `$ref`s applied to nested values, by resolved schema then by value.
+   * Union branches often reach the same nested value through the same `$ref`, so without it
+   * recursive unions would coerce that value once per branch at every depth.
+   */
+  memo?: Map<JsonSchema, Map<object, [satisfied: Satisfaction, coerced: unknown]>>
+  steps: number
+  maxSteps: number
+  /**
+   * The input is only counted once the minimum budget is spent, to extend `maxSteps` to its size,
+   * so most coercions skip counting.
+   */
+  input: unknown
+  inputCounted: boolean
+}
+
+class CoercionBudgetExceededError extends Error {}
+
 export class JsonSchemaCoercer {
+  private readonly maxStepsPerValue: number
+
+  constructor(options: JsonSchemaCoercerOptions = {}) {
+    this.maxStepsPerValue = options.maxStepsPerValue ?? 1_000
+  }
+
   coerce([schema, optional]: [schema: JsonSchema, optional: boolean], value: unknown): unknown {
     if (optional && value === undefined) {
       return value
     }
 
-    const [, coerced] = this.coerceInternal(schema, schema, value)
-    return coerced
+    const context: CoercionContext = {
+      rootSchema: schema,
+      steps: 0,
+      maxSteps: this.maxStepsPerValue * MIN_BUDGETED_VALUES,
+      input: value,
+      inputCounted: false,
+    }
+
+    try {
+      const [, coerced] = this.coerceInternal(context, schema, value)
+      return coerced
+    }
+    catch (error) {
+      // partially coerced output would be harder to predict than the original input
+      if (error instanceof CoercionBudgetExceededError) {
+        return value
+      }
+
+      throw error
+    }
   }
 
   private coerceInternal(
-    rootSchema: JsonSchema,
+    context: CoercionContext,
     schema: JsonSchema,
     value: unknown,
     /**
@@ -81,13 +145,24 @@ export class JsonSchemaCoercer {
      */
     appliedRefs?: Set<JsonSchema>,
   ): [satisfied: Satisfaction, coerced: unknown] {
+    if (++context.steps > context.maxSteps) {
+      if (!context.inputCounted) {
+        context.maxSteps = this.maxStepsPerValue * Math.max(countValues(context.input), MIN_BUDGETED_VALUES)
+        context.inputCounted = true
+      }
+
+      if (context.steps > context.maxSteps) {
+        throw new CoercionBudgetExceededError('Coercion took too many steps')
+      }
+    }
+
     if (typeof schema === 'boolean') {
       return [schema ? SATISFIED : UNSATISFIED, value]
     }
 
     if (Array.isArray(schema.type)) {
       return this.coerceInternal(
-        rootSchema,
+        context,
         { anyOf: schema.type.map(type => ({ ...schema, type })) },
         value,
         appliedRefs,
@@ -100,18 +175,34 @@ export class JsonSchemaCoercer {
     if (typeof schema.$ref === 'string') {
       const resolved
         = schema.$ref.startsWith('#/')
-          ? get(rootSchema, schema.$ref.slice('#/'.length).split('/').map(decodeJsonPointerSegment)) as JsonSchema | undefined
+          ? get(context.rootSchema, schema.$ref.slice('#/'.length).split('/').map(decodeJsonPointerSegment)) as JsonSchema | undefined
           : schema.$ref === '#'
-            ? rootSchema
+            ? context.rootSchema
             : undefined
 
       if (resolved !== undefined && !appliedRefs?.has(resolved)) {
-        appliedRefs ??= new Set()
-        appliedRefs.add(resolved)
+        /**
+         * With no other `$ref` applied to this value, the result only depends on the value and the resolved schema.
+         * Coercion never mutates a value in place, so a cached result can be shared.
+         */
+        const memo = !appliedRefs?.size && typeof coerced === 'object' && coerced !== null
+          ? (context.memo ??= new Map()).get(resolved) ?? context.memo.set(resolved, new Map()).get(resolved)!
+          : undefined
 
-        const [subSatisfied, subCoerced] = this.coerceInternal(rootSchema, resolved, coerced, appliedRefs)
+        let result = memo?.get(coerced as object)
 
-        appliedRefs.delete(resolved)
+        if (!result) {
+          appliedRefs ??= new Set()
+          appliedRefs.add(resolved)
+
+          result = this.coerceInternal(context, resolved, coerced, appliedRefs)
+
+          appliedRefs.delete(resolved)
+
+          memo?.set(coerced as object, result)
+        }
+
+        const [subSatisfied, subCoerced] = result
 
         coerced = subCoerced
         satisfied = minSatisfaction(satisfied, subSatisfied)
@@ -221,7 +312,7 @@ export class JsonSchemaCoercer {
                 return item
               }
 
-              const [subSatisfied, subCoerced] = this.coerceInternal(rootSchema, subSchema, item)
+              const [subSatisfied, subCoerced] = this.coerceInternal(context, subSchema, item)
 
               satisfied = minSatisfaction(satisfied, subSatisfied)
 
@@ -276,7 +367,7 @@ export class JsonSchemaCoercer {
                   satisfied = minSatisfaction(satisfied, LOOSELY_SATISFIED)
                 }
                 else {
-                  const [subSatisfied, subCoerced] = this.coerceInternal(rootSchema, subSchema, value)
+                  const [subSatisfied, subCoerced] = this.coerceInternal(context, subSchema, value)
                   coercedItems[key] = subCoerced
 
                   satisfied = minSatisfaction(satisfied, subSatisfied)
@@ -317,7 +408,7 @@ export class JsonSchemaCoercer {
 
     if (schema.allOf) {
       for (const subSchema of schema.allOf) {
-        const [subSatisfied, subCoerced] = this.coerceInternal(rootSchema, subSchema, coerced, appliedRefs)
+        const [subSatisfied, subCoerced] = this.coerceInternal(context, subSchema, coerced, appliedRefs)
 
         coerced = subCoerced
         satisfied = minSatisfaction(satisfied, subSatisfied)
@@ -333,7 +424,7 @@ export class JsonSchemaCoercer {
         let best: { satisfied: Satisfaction, value: unknown } | undefined
 
         for (const subSchema of schema[key]) {
-          const [subSatisfied, subCoerced] = this.coerceInternal(rootSchema, subSchema, coerced, appliedRefs)
+          const [subSatisfied, subCoerced] = this.coerceInternal(context, subSchema, coerced, appliedRefs)
 
           if (subSatisfied === UNSATISFIED) {
             continue
@@ -361,7 +452,7 @@ export class JsonSchemaCoercer {
     }
 
     if (typeof schema.not !== 'undefined') {
-      const [notSatisfied] = this.coerceInternal(rootSchema, schema.not, coerced, appliedRefs)
+      const [notSatisfied] = this.coerceInternal(context, schema.not, coerced, appliedRefs)
 
       if (notSatisfied !== UNSATISFIED) {
         satisfied = UNSATISFIED
@@ -370,6 +461,32 @@ export class JsonSchemaCoercer {
 
     return [satisfied, coerced]
   }
+}
+
+/**
+ * Counts the values in an input, nested ones included.
+ * Each array or object is only walked once, so shared and circular references stay finite.
+ */
+function countValues(input: unknown): number {
+  const walked = new Set<object>()
+  const stack = [input]
+  let count = 0
+
+  while (stack.length) {
+    const value = stack.pop()
+    count++
+
+    if ((Array.isArray(value) || isPlainObject(value)) && !walked.has(value)) {
+      walked.add(value)
+
+      // like coercion, `Object.values` skips the holes of sparse arrays
+      for (const item of Object.values(value)) {
+        stack.push(item)
+      }
+    }
+  }
+
+  return count
 }
 
 const NUMBER_PATTERN = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/
