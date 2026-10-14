@@ -63,6 +63,8 @@ export class RPCMatcher {
 
   private readonly tree: Map<`/${string}`, TreeEntry> = new Map()
   private readonly pendingLazyRouters: Map<string, PendingLazyRouter> = new Map()
+  /** upper bound on the segment count of any pending key, so deeper pathname prefixes are never looked up */
+  private maxPendingLazyRouterDepth = 0
 
   constructor(router: AnyRouter, options: RPCMatcherOptions = {}) {
     this.filter = options.filter ?? true
@@ -95,6 +97,7 @@ export class RPCMatcher {
 
     for (const result of lazyResults) {
       this.pendingLazyRouters.set(pathToHttpPath(result.path), result)
+      this.maxPendingLazyRouterDepth = Math.max(this.maxPendingLazyRouterDepth, result.path.length)
     }
   }
 
@@ -175,20 +178,24 @@ export class RPCMatcher {
 
     let slashIndex = 0
 
-    while (slashIndex !== -1) {
+    // a pending key has exactly as many segments as its path, so prefixes deeper than
+    // the deepest pending key can never match, and scanning them would make slash-heavy
+    // pathnames cost quadratic time
+    for (let depth = 1; slashIndex !== -1 && depth <= this.maxPendingLazyRouterDepth; depth++) {
       const nextSlashIndex = pathname.indexOf('/', slashIndex + 1)
       const httpPathPrefix = nextSlashIndex === -1 ? pathname : pathname.slice(0, nextSlashIndex)
 
       if (this.pendingLazyRouters.has(httpPathPrefix)) {
-        return this.loadPendingLazyRouters(pathname, slashIndex)
+        return this.loadPendingLazyRouters(pathname, slashIndex, depth)
       }
 
       slashIndex = nextSlashIndex
     }
   }
 
-  private async loadPendingLazyRouters(pathname: `/${string}`, slashIndex: number): Promise<void> {
-    while (slashIndex !== -1) {
+  private async loadPendingLazyRouters(pathname: `/${string}`, slashIndex: number, depth: number): Promise<void> {
+    // the bound is re-read every iteration, loading a router can index deeper pending ones
+    for (; slashIndex !== -1 && depth <= this.maxPendingLazyRouterDepth; depth++) {
       const nextSlashIndex = pathname.indexOf('/', slashIndex + 1)
       const httpPathPrefix = nextSlashIndex === -1 ? pathname : pathname.slice(0, nextSlashIndex)
 
