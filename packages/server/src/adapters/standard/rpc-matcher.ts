@@ -186,7 +186,6 @@ export class RPCMatcher {
       const pending = this.pendingLazyRouters.get(httpPathPrefix)
 
       if (pending !== undefined) {
-        // rescan once loaded, since the loaded router may contain deeper pending routers
         return this.loadPendingLazyRouter(httpPathPrefix, pending).then(() => this.resolvePendingLazyRouters(pathname))
       }
 
