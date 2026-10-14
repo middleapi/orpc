@@ -212,9 +212,9 @@ describe('openapiLink', () => {
       url: '/api',
     })) as any
 
-    await expect(client.post('input')).rejects.toMatchObject({
-      code: 'MALFORMED_ORPC_RESPONSE',
-      data: { status: 0 },
-    })
+    const error = await client.post('input').catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(TypeError)
+    expect(error.message).toBe('Received a redirect response, which oRPC links do not follow.')
   })
 })

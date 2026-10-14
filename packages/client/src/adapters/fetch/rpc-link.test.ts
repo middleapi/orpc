@@ -1,6 +1,5 @@
 import { toFetchBody } from '@standard-server/fetch'
 import { createORPCClient } from '../../client'
-import { MalformedResponseError, ORPCError } from '../../error'
 import { RPCLink } from './rpc-link'
 
 vi.mock('@orpc/shared', async (loadOrigin) => {
@@ -343,7 +342,7 @@ describe('rpcLink', () => {
   it.each([
     ['opaqueredirect', 'Received a redirect response, which oRPC links do not follow.'],
     ['opaque', 'Received an opaque response, which cannot be read (was the request sent with mode \'no-cors\'?).'],
-  ] as const)('rejects %s responses with MALFORMED_ORPC_RESPONSE', async (type, message) => {
+  ] as const)('rejects %s responses with a TypeError', async (type, message) => {
     // Node cannot construct status 0 responses, so mimic the filtered response a browser returns
     const fetch = vi.fn(async () => Object.defineProperties(new Response(null), {
       type: { value: type },
@@ -357,10 +356,7 @@ describe('rpcLink', () => {
 
     const error = await orpc.ping('input').catch((e: unknown) => e)
 
-    expect(error).toBeInstanceOf(ORPCError)
-    expect(error.code).toBe('MALFORMED_ORPC_RESPONSE')
+    expect(error).toBeInstanceOf(TypeError)
     expect(error.message).toBe(message)
-    expect(error.data).toEqual({ status: 0, headers: {}, body: undefined })
-    expect(error.cause).toBeInstanceOf(MalformedResponseError)
   })
 })
