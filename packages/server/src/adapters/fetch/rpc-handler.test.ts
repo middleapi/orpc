@@ -1,6 +1,26 @@
 import type { StandardHandlerPlugin } from '../standard'
+import { createORPCClient, MalformedResponseError, ORPCError } from '@orpc/client'
+import { RPCLink } from '@orpc/client/fetch'
+import { onError } from '@orpc/shared'
 import { os } from '../../builder'
 import { RPCHandler } from './rpc-handler'
+
+const LEAKED = ['internal_session', 'node-7', 'pg-primary', 'SELECT']
+const UPSTREAM_HEADERS = { 'set-cookie': 'internal_session=abc123; HttpOnly', 'x-internal-trace': 'node-7' }
+
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...UPSTREAM_HEADERS, 'content-type': 'application/json' },
+  })
+}
+
+function htmlResponse(status: number, html: string): Response {
+  return new Response(html, {
+    status,
+    headers: { ...UPSTREAM_HEADERS, 'content-type': 'text/html', 'content-length': String(new TextEncoder().encode(html).length) },
+  })
+}
 
 describe('rpcHandler', () => {
   beforeEach(() => {
@@ -146,5 +166,51 @@ describe('rpcHandler', () => {
 
     expect(blocked.matched).toBe(false)
     expect(allowMethods).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('rpcHandler - errors from an upstream oRPC link', () => {
+  async function callThrough(upstreamResponse: () => Response, interceptor?: (error: unknown) => void) {
+    const upstream = createORPCClient<any>(new RPCLink({ origin: 'http://upstream.internal', url: '/rpc', fetch: async () => upstreamResponse() }))
+    const handler = new RPCHandler({ profile: os.handler(() => upstream.user.find({ id: '1' })) }, {
+      interceptors: interceptor ? [onError(interceptor)] : [],
+    })
+    const { response } = await handler.handle(new Request('https://example.com/profile', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ json: {} }),
+    }))
+    return { status: response!.status, text: await response!.text() }
+  }
+
+  it.each([
+    ['a non-oRPC JSON error response', () => jsonResponse(503, { message: 'db timeout on pg-primary-10.0.3.7', query: 'SELECT * FROM users' })],
+    ['a 2xx response that fails deserialization', () => jsonResponse(200, { json: 1, meta: 'bad' })],
+    ['a non-JSON error page', () => htmlResponse(502, '<html><body>pg-primary: SELECT failed</body></html>')],
+  ])('does not expose %s to the caller', async (_, upstreamResponse) => {
+    const { status, text } = await callThrough(upstreamResponse)
+    expect(status).toBe(500)
+    for (const value of LEAKED) {
+      expect(text).not.toContain(value)
+    }
+    expect(JSON.parse(text)).toEqual({ json: { defined: false, code: 'INTERNAL_SERVER_ERROR', message: 'Internal Server Error' } })
+  })
+
+  it('still relays a well-formed upstream oRPC error', async () => {
+    const { status, text } = await callThrough(() => jsonResponse(404, { json: { defined: true, code: 'NOT_FOUND', message: 'User not found' } }))
+    expect(status).toBe(404)
+    expect(JSON.parse(text)).toEqual({ json: { defined: false, code: 'NOT_FOUND', message: 'User not found' } })
+  })
+
+  it('passes the original malformed-response error to interceptors', async () => {
+    const interceptor = vi.fn()
+    await callThrough(() => jsonResponse(503, { message: 'db timeout on pg-primary-10.0.3.7' }), interceptor)
+    expect(interceptor).toHaveBeenCalledOnce()
+    const error = interceptor.mock.calls[0]![0]
+    expect(error).toBeInstanceOf(ORPCError)
+    expect(error.code).toBe('MALFORMED_ORPC_RESPONSE')
+    expect(error.message).toBe('db timeout on pg-primary-10.0.3.7')
+    expect(error.cause).toBeInstanceOf(MalformedResponseError)
+    expect(error.cause.response).toEqual(expect.objectContaining({ status: 503 }))
   })
 })

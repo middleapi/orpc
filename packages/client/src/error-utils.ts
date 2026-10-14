@@ -14,8 +14,16 @@ export function isDefinedError<T>(error: T): error is Extract<T, AnyORPCError> {
   return error instanceof ORPCError && error.defined
 }
 
+/**
+ * Converts any thrown value into an `ORPCError` that can be sent to callers.
+ * Non-`ORPCError` values become `INTERNAL_SERVER_ERROR`. So does a non-defined
+ * `ORPCError` whose `cause` is a `MalformedResponseError`, so a message inferred
+ * from an upstream response is never relayed. Other `ORPCError`s are returned as-is.
+ *
+ * @see {@link https://orpc.dev/docs/error-handling | Error Handling}
+ */
 export function toORPCError<T>(error: T): Extract<T, AnyORPCError> | ORPCError<'INTERNAL_SERVER_ERROR', undefined> {
-  return error instanceof ORPCError
+  return error instanceof ORPCError && (error.defined || !(error.cause instanceof MalformedResponseError))
     ? error
     : new ORPCError('INTERNAL_SERVER_ERROR', { cause: error })
 }
@@ -55,16 +63,16 @@ export function createORPCErrorFromJson<TCode extends ORPCErrorCode, TData>(
 /**
  * Creates the `MALFORMED_ORPC_RESPONSE` `ORPCError` used when a response
  * does not follow the expected oRPC format. Unless overridden via `options.message`,
- * the message is inferred from the response body or status. The `cause` is a
- * `MalformedResponseError` carrying the resolved response.
+ * the message is inferred from the response body or status. The resolved response is
+ * kept only on the `cause`, a `MalformedResponseError`, never in `data`, and
+ * `toORPCError` masks this error as `INTERNAL_SERVER_ERROR` when it leaves a server.
  *
  * @see {@link https://orpc.dev/docs/rpc/link#malformed-responses | RPC Link - Malformed Responses}
  * @see {@link https://orpc.dev/docs/openapi/link#malformed-responses | OpenAPI Link - Malformed Responses}
  */
-export function createORPCErrorFromMalformedResponse(options: MalformedResponseErrorOptions): ORPCError<'MALFORMED_ORPC_RESPONSE', StandardResponse> {
-  const error = new ORPCError('MALFORMED_ORPC_RESPONSE', {
+export function createORPCErrorFromMalformedResponse(options: MalformedResponseErrorOptions): ORPCError<'MALFORMED_ORPC_RESPONSE', undefined> {
+  const error = new ORPCError<'MALFORMED_ORPC_RESPONSE', undefined>('MALFORMED_ORPC_RESPONSE', {
     message: options.message ?? inferMalformedResponseMessage(options.response),
-    data: options.response,
   })
 
   error.cause = new MalformedResponseError({ ...options, message: error.message })

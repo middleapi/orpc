@@ -34,6 +34,10 @@ const example = os
   })
 ```
 
+:::info
+An `ORPCError` thrown by an oRPC client you call inside a handler is relayed to your caller with its `message` and `data`. The exception is a [malformed response](/docs/rpc/link#malformed-responses) error, which callers receive as a generic `INTERNAL_SERVER_ERROR`. To expose upstream details deliberately, catch the error and throw your own `ORPCError`.
+:::
+
 ## Typesafe Errors
 
 For end-to-end type safety, define your errors with `.errors`. This lets the client infer each error's shape and handle it safely. You can use any [Standard Schema](https://standardschema.dev/schema#what-schema-libraries-implement-the-spec) library to validate error data.

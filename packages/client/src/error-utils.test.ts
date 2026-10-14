@@ -47,6 +47,26 @@ describe('toORPCError', () => {
     expect(result.message).toBe('Internal Server Error')
     expect(result.cause).toBe('Error string')
   })
+
+  it('masks a malformed-response error as an unknown error', () => {
+    const error = createORPCErrorFromMalformedResponse({ response: { status: 502, headers: {}, body: 'upstream exploded' } })
+    const result = toORPCError(error)
+    expect(result.code).toBe('INTERNAL_SERVER_ERROR')
+    expect(result.message).toBe('Internal Server Error')
+    expect(result.data).toBeUndefined()
+    expect(result.cause).toBe(error)
+  })
+
+  it('returns a defined malformed-response error as-is', () => {
+    const error = createORPCErrorFromMalformedResponse({ response: { status: 502, headers: {}, body: 'upstream exploded' } })
+    ;(error.defined as Writable<typeof error.defined>) = true
+    expect(toORPCError(error)).toBe(error)
+  })
+
+  it('returns a MALFORMED_ORPC_RESPONSE error without a MalformedResponseError cause as-is', () => {
+    const error = new ORPCError('MALFORMED_ORPC_RESPONSE', { message: 'relayed by upstream' })
+    expect(toORPCError(error)).toBe(error)
+  })
 })
 
 describe('isORPCErrorJson', () => {
@@ -161,14 +181,14 @@ describe('createORPCErrorFromJson', () => {
 })
 
 describe('createORPCErrorFromMalformedResponse', () => {
-  it('creates a MALFORMED_ORPC_RESPONSE error with the response as data and a MalformedResponseError cause', () => {
+  it('creates a MALFORMED_ORPC_RESPONSE error with the response only on its MalformedResponseError cause', () => {
     const response = { status: 500, headers: { 'x-header': 'value' }, body: { something: 'unexpected' } }
     const error = createORPCErrorFromMalformedResponse({ response })
 
     expect(error).toBeInstanceOf(ORPCError)
     expect(error.code).toBe('MALFORMED_ORPC_RESPONSE')
     expect(error.defined).toBe(false)
-    expect(error.data).toBe(response)
+    expect(error.data).toBeUndefined()
     expect(error.cause).toBeInstanceOf(MalformedResponseError)
     expect((error.cause as MalformedResponseError).name).toBe('MalformedResponseError')
     expect((error.cause as MalformedResponseError).response).toBe(response)
