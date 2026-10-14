@@ -240,7 +240,7 @@ Per-request data passed through the link's [`headers` option](/docs/rpc/link#url
 
 ## Error Handling
 
-Errors thrown by procedures are encoded into their sub-responses, as they are for unbatched requests. A sub-request that fails at the routing interceptor level instead, for example because a routing interceptor or `mapSubrequest` throws, or because the [Rethrow Handler Plugin](/docs/plugins/rethrow) rethrows its error, gets a `500` sub-response, and the rest of the batch is unaffected. Report these errors with `onError`:
+Procedure errors are encoded into their sub-responses as usual. A sub-request that fails at the routing interceptor level instead, for example when `mapSubrequest` or a routing interceptor throws, or the [Rethrow Handler Plugin](/docs/plugins/rethrow) rethrows, gets a `500` sub-response, and the rest of the batch is unaffected. Report these errors with `onError`:
 
 ```ts
 const handler = new RPCHandler(router, {
@@ -254,14 +254,14 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-`onError` receives the sub-request as decoded from the batch, before `mapSubrequest`. Errors it throws, including rejections from an async callback, are ignored. Apart from those thrown by `mapSubrequest`, these errors also pass through the routing interceptors that run inside the batch plugin once per sub-request: your own, and with [OpenTelemetry](/docs/integrations/opentelemetry) the tracing one, which records them on the sub-request span.
+`onError` receives the sub-request as decoded from the batch, before `mapSubrequest`, and errors it throws or rejects with are ignored. Except for those thrown by `mapSubrequest`, these errors also reach your own routing interceptors, which run once per sub-request inside the batch plugin, and [OpenTelemetry](/docs/integrations/opentelemetry) records them on the sub-request span.
 
 ## Sub-request Headers
 
-Each sub-request carries its own headers inside the batch payload, so the client fully controls them. The default `mapSubrequest` lowercases their names and merges the batch request headers over them, so a header the batch request carries always wins, whatever the case of the sub-request header name. Sub-request headers the batch request does not carry are still forwarded.
+Sub-request headers come from the batch payload, so the client controls them. The default `mapSubrequest` lowercases their names and lets the batch request's own headers override them, so the batch request always wins, whatever the case of the sub-request header name.
 
 :::warning
-A proxy only sees the batch request's own headers, never the ones inside its payload. If your proxy sets a header only for some requests, such as an identity header for authenticated clients, a batched call can supply its own value whenever the proxy leaves it out. Read such headers from the transport request, for example into the context you pass to `handler.handle`, which every sub-request shares, or drop them in a custom `mapSubrequest`. A custom `mapSubrequest` replaces the default one, so merge the batch request headers there as well.
+A proxy only sees the batch request's own headers, never the ones inside its payload. If your proxy sets a header only for some requests, such as an identity header for authenticated clients, a batched call can supply its own value whenever the proxy leaves it out. Read such headers from the transport request, for example into the context you pass to `handler.handle`, which every sub-request shares, or drop them in a custom `mapSubrequest`. A custom `mapSubrequest` replaces the default one, so match header names case-insensitively there and merge the batch request headers as well.
 :::
 
 ## Limitations

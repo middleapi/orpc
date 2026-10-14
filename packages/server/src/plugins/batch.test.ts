@@ -59,25 +59,19 @@ function readLengthPrefixedChunk(buffer: Uint8Array) {
   }
 }
 
-function captureUnhandledRejections(onTestFinished: (fn: () => void) => void) {
-  const saved = process.listeners('unhandledRejection')
-  process.removeAllListeners('unhandledRejection')
-
-  const seen: unknown[] = []
-  const listener = (reason: unknown) => {
-    seen.push(reason)
-  }
+function watchUnhandledRejections(onTestFinished: (fn: () => void) => void) {
+  const listener = vi.fn()
   process.on('unhandledRejection', listener)
 
   onTestFinished(() => {
     process.off('unhandledRejection', listener)
-
-    for (const l of saved) {
-      process.on('unhandledRejection', l)
-    }
   })
 
-  return seen
+  return async () => {
+    // Node reports unhandled rejections once the microtask queue drains, so one event loop turn is enough
+    await new Promise(resolve => setImmediate(resolve))
+    expect(listener).not.toHaveBeenCalled()
+  }
 }
 
 describe('batchHandlerPlugin', () => {
@@ -240,7 +234,7 @@ describe('batchHandlerPlugin', () => {
     })
 
     it('returns 500 sub-response and reports to onError when mapSubrequest throws', async ({ onTestFinished }) => {
-      const seen = captureUnhandledRejections(onTestFinished)
+      const expectNoUnhandledRejections = watchUnhandledRejections(onTestFinished)
       const error = new Error('boom')
       const onError = vi.fn()
 
@@ -271,12 +265,11 @@ describe('batchHandlerPlugin', () => {
         expect.objectContaining({ request: expect.objectContaining({ url: '/__batch__' }) }),
       )
 
-      await new Promise(resolve => setTimeout(resolve, 10))
-      expect(seen).toEqual([])
+      await expectNoUnhandledRejections()
     })
 
     it('reports routing interceptor errors to onError without affecting other sub-requests', async ({ onTestFinished }) => {
-      const seen = captureUnhandledRejections(onTestFinished)
+      const expectNoUnhandledRejections = watchUnhandledRejections(onTestFinished)
       const error = new Error('boom')
       const onError = vi.fn()
 
@@ -303,8 +296,7 @@ describe('batchHandlerPlugin', () => {
       expect(onError).toHaveBeenCalledTimes(1)
       expect(onError).toHaveBeenCalledWith(error, expect.objectContaining({ url: '/ping?fail' }), expect.anything())
 
-      await new Promise(resolve => setTimeout(resolve, 10))
-      expect(seen).toEqual([])
+      await expectNoUnhandledRejections()
     })
 
     it.for([
@@ -315,7 +307,7 @@ describe('batchHandlerPlugin', () => {
         throw new Error('onError failed')
       }],
     ] as const)('still returns the batch response when onError %s', async ([, onError], { onTestFinished }) => {
-      const seen = captureUnhandledRejections(onTestFinished)
+      const expectNoUnhandledRejections = watchUnhandledRejections(onTestFinished)
 
       const handler = createHandler(new BatchHandlerPlugin({
         mapSubrequest: () => {
@@ -335,8 +327,7 @@ describe('batchHandlerPlugin', () => {
       expect(body[0].json.status).toBe(500)
       expect(body[0].json.body).toBe('Internal server error')
 
-      await new Promise(resolve => setTimeout(resolve, 10))
-      expect(seen).toEqual([])
+      await expectNoUnhandledRejections()
     })
   })
 
@@ -662,14 +653,42 @@ describe('batchHandlerPlugin', () => {
     it('keeps a __proto__ sub-request header name an own key', async () => {
       const { handler, seenHeaders } = createHeaderCapturingHandler()
 
-      await handler.handle(new Request('https://example.com/__batch__', {
-        method: 'POST',
-        headers: { 'orpc-batch': 'buffered', 'content-type': 'application/json' },
-        body: `[{"kind":"request","id":0,"json":{"method":"POST","url":"/ping","headers":{"__proto__":"v"}}}]`,
-      }))
+      await handler.handle(createBatchRequestWithHeaders({}, JSON.parse('{"__proto__":"v"}')))
 
       expect(Object.getOwnPropertyDescriptor(seenHeaders[0]!, '__proto__')).toMatchObject({ value: 'v' })
       expect(Object.getPrototypeOf(seenHeaders[0]!)).toBe(Object.prototype)
+    })
+
+    it('a case-variant sub-request header cannot join or override a batch request header', async () => {
+      const seen: Array<Record<string, string | null | undefined>> = []
+      const router = {
+        ping: os.$context<RequestHeadersHandlerPluginContext>().handler(({ context }) => {
+          const h = context.reqHeaders!
+          seen.push({
+            authorization: h.get('authorization'),
+            origin: h.get('origin'),
+            realIp: h.get('x-real-ip'),
+            custom: h.get('x-custom'),
+            sid: getCookie(h, 'sid'),
+          })
+          return 'ok'
+        }),
+      }
+      const handler = new RPCHandler(router, { plugins: [new BatchHandlerPlugin(), new RequestHeadersHandlerPlugin()] })
+
+      const { response } = await handler.handle(createBatchRequestWithHeaders(
+        { 'authorization': 'Bearer real', 'origin': 'https://evil.example', 'x-real-ip': '203.0.113.9', 'cookie': 'sid=real' },
+        {
+          'Authorization': 'Bearer spoofed',
+          'Origin': 'https://trusted.example',
+          'X-Real-IP': '10.0.0.1',
+          'Cookie': 'sid=spoofed',
+          'X-Custom': 'kept', // non-colliding headers are still forwarded
+        },
+      ))
+
+      expect(response!.status).toBe(207)
+      expect(seen).toEqual([{ authorization: 'Bearer real', origin: 'https://evil.example', realIp: '203.0.113.9', custom: 'kept', sid: 'real' }])
     })
   })
 
@@ -879,16 +898,21 @@ describe('batchHandlerPlugin', () => {
 describe('batchHandlerPlugin + rethrowHandlerPlugin', () => {
   const router = {
     ping: os.handler(() => 'pong'),
-    buggy: os.handler(() => { throw new TypeError('unexpected bug') }),
+    buggy: os.handler(() => {
+      throw new TypeError('unexpected bug')
+    }),
   }
 
+  const malformedBody = { method: 'POST', url: '/ping', headers: { 'standard-server': 'url-search-params' }, body: 1 }
+  const buggyProcedure = { method: 'POST', url: '/buggy', headers: {} }
+
   it.for([
-    ['buffered', { method: 'POST', url: '/ping', headers: { 'standard-server': 'url-search-params' }, body: 1 }],
-    ['buffered', { method: 'POST', url: '/buggy', headers: {} }],
-    ['streaming', { method: 'POST', url: '/ping', headers: { 'standard-server': 'url-search-params' }, body: 1 }],
-    ['streaming', { method: 'POST', url: '/buggy', headers: {} }],
-  ] as const)('%s: a routing-level sub-request error does not create an unhandled rejection', async ([mode, json], { onTestFinished }) => {
-    const seen = captureUnhandledRejections(onTestFinished)
+    { mode: 'buffered', cause: 'malformed body', json: malformedBody },
+    { mode: 'buffered', cause: 'buggy procedure', json: buggyProcedure },
+    { mode: 'streaming', cause: 'malformed body', json: malformedBody },
+    { mode: 'streaming', cause: 'buggy procedure', json: buggyProcedure },
+  ] as const)('$mode, $cause: a routing-level sub-request error does not create an unhandled rejection', async ({ mode, json }, { onTestFinished }) => {
+    const expectNoUnhandledRejections = watchUnhandledRejections(onTestFinished)
     const handler = new RPCHandler(router, {
       plugins: [
         new BatchHandlerPlugin(),
@@ -896,71 +920,14 @@ describe('batchHandlerPlugin + rethrowHandlerPlugin', () => {
       ],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com/__batch__', {
-      method: 'POST',
-      headers: { 'orpc-batch': mode, 'content-type': 'application/json' },
-      body: JSON.stringify([{ kind: 'request', id: 0, json, binary: undefined }]),
+    const { response } = await handler.handle(createBatchRequest({
+      mode,
+      messages: [{ kind: 'request', id: 0, json, binary: undefined }],
     }))
 
     expect(response!.status).toBe(207)
-    const text = new TextDecoder().decode(new Uint8Array(await response!.arrayBuffer()))
-    if (mode === 'buffered')
-      expect(JSON.parse(text)[0].json.status).toBe(500)
-    else
-      expect(text).toContain('Internal server error')
+    expect(await response!.text()).toContain('Internal server error')
 
-    await new Promise(resolve => setTimeout(resolve, 10))
-    expect(seen).toEqual([])
-  })
-})
-
-describe('batchHandlerPlugin sub-request header precedence', () => {
-  it('a case-variant sub-request header cannot join or override a batch request header', async () => {
-    const seen: Array<Record<string, string | null | undefined>> = []
-    const router = {
-      whoami: os.$context<RequestHeadersHandlerPluginContext>().handler(({ context }) => {
-        const h = context.reqHeaders!
-        seen.push({
-          authorization: h.get('authorization'),
-          origin: h.get('origin'),
-          realIp: h.get('x-real-ip'),
-          custom: h.get('x-custom'),
-          sid: getCookie(h, 'sid'),
-        })
-        return 'ok'
-      }),
-    }
-    const handler = new RPCHandler(router, { plugins: [new BatchHandlerPlugin(), new RequestHeadersHandlerPlugin()] })
-
-    const { response } = await handler.handle(new Request('https://example.com/__batch__', {
-      method: 'POST',
-      headers: {
-        'orpc-batch': 'buffered',
-        'content-type': 'application/json',
-        'authorization': 'Bearer real',
-        'origin': 'https://evil.example',
-        'x-real-ip': '203.0.113.9',
-        'cookie': 'sid=real',
-      },
-      body: JSON.stringify([{
-        kind: 'request',
-        id: 0,
-        binary: undefined,
-        json: {
-          method: 'POST',
-          url: '/whoami',
-          headers: {
-            'Authorization': 'Bearer spoofed',
-            'Origin': 'https://trusted.example',
-            'X-Real-IP': '10.0.0.1',
-            'Cookie': 'sid=spoofed',
-            'X-Custom': 'kept', // non-colliding headers are still forwarded
-          },
-        },
-      }]),
-    }))
-
-    expect(response!.status).toBe(207)
-    expect(seen).toEqual([{ authorization: 'Bearer real', origin: 'https://evil.example', realIp: '203.0.113.9', custom: 'kept', sid: 'real' }])
+    await expectNoUnhandledRejections()
   })
 })

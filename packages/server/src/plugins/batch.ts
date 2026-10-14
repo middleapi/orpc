@@ -5,7 +5,7 @@ import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-ser
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
 import { ORPCError } from '@orpc/client'
-import { toArray, value } from '@orpc/shared'
+import { setOwn, toArray, value } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
 
@@ -45,8 +45,8 @@ export interface BatchHandlerPluginOptions<T extends Context> {
    * Errors thrown by this callback, including rejections from an async callback, are ignored.
    *
    * @remarks
-   * Errors thrown after `mapSubrequest` are also visible to the routing interceptors that run
-   * inside the batch one, once per subrequest: your own routing interceptors, and the tracing
+   * Except for those thrown by `mapSubrequest`, these errors also pass through the routing
+   * interceptors that run once per subrequest inside the batch plugin: your own, and the tracing
    * one, which records them on the subrequest span when a tracer is configured.
    *
    * @default no-op
@@ -127,22 +127,19 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
        * transport actually saw, so headers the browser or a proxy sets, such as `cookie`,
        * `origin` or `x-real-ip`, cannot be overridden by a subrequest, which is just request
        * payload. Names are lowercased first, like the adapters do for the transport headers,
-       * so a case variant such as `Cookie` cannot slip past them either. A `Map` keeps a
-       * `__proto__` header name an own key of the result.
+       * so a case variant such as `Cookie` cannot slip past them either.
        */
-      const headers = new Map<string, string | string[] | undefined>()
+      const headers: StandardHeaders = {}
 
-      for (const [key, value] of Object.entries(subRequest.headers)) {
-        headers.set(key.toLowerCase(), value)
+      for (const source of [subRequest.headers, batchRequest.headers]) {
+        for (const key of Object.keys(source)) {
+          setOwn(headers, key.toLowerCase(), source[key])
+        }
       }
 
-      for (const [key, value] of Object.entries(batchRequest.headers)) {
-        headers.set(key.toLowerCase(), value)
-      }
+      headers['orpc-batch'] = undefined // useful in case batch plugin is used multiple times
 
-      headers.set('orpc-batch', undefined) // useful in case batch plugin is used multiple times
-
-      return { ...subRequest, headers: Object.fromEntries(headers) }
+      return { ...subRequest, headers }
     })
 
     this.onError = options.onError ?? (() => {})
@@ -245,23 +242,10 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
           return response
         }
         catch (error) {
-          /**
-           * Procedure errors are already turned into error responses, so only a throwing
-           * `mapSubrequest` or routing interceptor, or an error rethrown by the Rethrow Handler
-           * Plugin, ends up here. It fails this subrequest only, and is reported through `onError`
-           * instead of a detached rejection, which would terminate Node.js by default.
-           */
-          try {
-            const result: unknown = this.onError(error, subrequest, interceptorOptions)
-
-            // The result is ignored, but a rejection from an async callback must not go unhandled either
-            if (result instanceof Promise) {
-              result.catch(() => {})
-            }
-          }
-          catch {
-            // A throwing `onError` must not break the batch response
-          }
+          // Nothing awaits this error, so it must never become a rejection: Node.js terminates on
+          // unhandled ones by default. A throwing or rejecting `onError` is swallowed for the same reason.
+          const report = async () => this.onError(error, subrequest, interceptorOptions)
+          report().catch(() => {})
 
           return { status: 500, headers: {}, body: 'Internal server error' }
         }
