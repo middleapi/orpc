@@ -126,6 +126,16 @@ describe('jsonSchemaCoercer', () => {
       expect(coerce(DATE_SCHEMA, '2020-01-01T06:15:00+07:00')).toEqual(new Date('2020-01-01T06:15:00+07:00'))
       expect(coerce(DATE_SCHEMA, '2020-01-01T06:15:00-07:00')).toEqual(new Date('2020-01-01T06:15:00-07:00'))
       expect(coerce(DATE_SCHEMA, '2020-01-01T06:15:00-0700')).toEqual(new Date('2020-01-01T06:15:00-0700'))
+      expect(coerce(DATE_SCHEMA, '2020-01-01 06:15:00+07:00')).toEqual(new Date('2020-01-01T06:15:00+07:00'))
+    })
+
+    it('leaves a date followed by anything other than a time and offset untouched', () => {
+      // V8's legacy parser reads trailing words, so these would silently become another date
+      expect(coerce(DATE_SCHEMA, '2020-06-15 jan')).toBe('2020-06-15 jan')
+      expect(coerce(DATE_SCHEMA, '2020-01-15 December')).toBe('2020-01-15 December')
+      expect(coerce(DATE_SCHEMA, '2020-06-15 12:00 jan')).toBe('2020-06-15 12:00 jan')
+      expect(coerce(DATE_SCHEMA, '2020-01-01T06:15:00 GMT')).toBe('2020-01-01T06:15:00 GMT')
+      expect(coerce(DATE_SCHEMA, '2020-01-01Tfoo')).toBe('2020-01-01Tfoo')
     })
 
     it('leaves ambiguous or impossible dates untouched', () => {

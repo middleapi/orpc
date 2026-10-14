@@ -496,6 +496,38 @@ describe('openAPIComponentRegistry', () => {
       expect(result).toEqual({ $ref: '#/components/schemas/Pair' })
       expect(Object.keys(doc.components?.schemas ?? {}).sort()).toEqual(['Leaf', 'Pair'])
     })
+
+    it('does not reuse components whose date defaults differ', () => {
+      const { doc, registry } = createRegistry({
+        schemas: { Event: { type: 'string', default: new Date(0) } },
+      })
+
+      const result = registry.hoistDefs({
+        $ref: '#/$defs/Event',
+        $defs: { Event: { type: 'string', default: new Date(1) } as any },
+      })
+
+      expect(result).toEqual({ $ref: '#/components/schemas/Event2' })
+      expect(doc.components?.schemas).toEqual({
+        Event: { type: 'string', default: new Date(0) },
+        Event2: { type: 'string', default: new Date(1) },
+      })
+    })
+
+    it('reuses components that share the same date default instance', () => {
+      const date = new Date(0)
+      const { doc, registry } = createRegistry({
+        schemas: { Event: { type: 'string', default: date } },
+      })
+
+      const result = registry.hoistDefs({
+        $ref: '#/$defs/Event',
+        $defs: { Event: { type: 'string', default: date } as any },
+      })
+
+      expect(result).toEqual({ $ref: '#/components/schemas/Event' })
+      expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['Event'])
+    })
   })
 
   describe('name conflicts', () => {
