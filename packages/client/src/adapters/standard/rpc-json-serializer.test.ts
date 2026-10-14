@@ -320,6 +320,15 @@ describe('standardRPCJsonSerializer: untrusted serialized values', () => {
     }
   })
 
+  it('bigint rejects non-canonical strings and more than 4300 digits', () => {
+    expect(serializer.deserialize('9'.repeat(4300), [[BIGINT]])).toBe(BigInt('9'.repeat(4300)))
+
+    for (const bad of ['9'.repeat(4301), '0x10', ' 1 ']) {
+      expect(() => serializer.deserialize(bad, [[BIGINT]]))
+        .toThrow(`Invalid RPC serialized data: type ${BIGINT} (bigint) expects a decimal integer string of at most 4300 digits.`)
+    }
+  })
+
   it('does not expand a string into a Set or Map of its characters', () => {
     expect(() => serializer.deserialize('x'.repeat(1000), [[SET]]))
       .toThrow(`Invalid RPC serialized data: type ${SET} (set) expects an array.`)

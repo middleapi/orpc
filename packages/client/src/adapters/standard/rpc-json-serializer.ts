@@ -1,5 +1,5 @@
 import type { Segment } from '@orpc/shared'
-import { copyOnWrite, createLazyRegExp, isObject, isValidRegExpFlags } from '@orpc/shared'
+import { copyOnWrite, createLazyRegExp, DEFAULT_MAX_BIGINT_DIGITS, isObject, isValidRegExpFlags, parseBigIntString } from '@orpc/shared'
 
 export const STANDARD_RPC_JSON_SERIALIZER_BUILT_IN_TYPES = {
   BIGINT: 0,
@@ -217,13 +217,20 @@ export class StandardRPCJsonSerializer {
       const serialized: unknown = currentRef[preSegment]
 
       switch (type) {
-        case STANDARD_RPC_JSON_SERIALIZER_BUILT_IN_TYPES.BIGINT:
+        case STANDARD_RPC_JSON_SERIALIZER_BUILT_IN_TYPES.BIGINT: {
           if (typeof serialized !== 'string') {
             throw invalidSerializedType(type, 'bigint', 'a string')
           }
 
-          currentRef[preSegment] = BigInt(serialized)
+          const value = parseBigIntString(serialized, DEFAULT_MAX_BIGINT_DIGITS)
+
+          if (value === undefined) {
+            throw invalidSerializedType(type, 'bigint', `a decimal integer string of at most ${DEFAULT_MAX_BIGINT_DIGITS} digits`)
+          }
+
+          currentRef[preSegment] = value
           break
+        }
 
         case STANDARD_RPC_JSON_SERIALIZER_BUILT_IN_TYPES.DATE:
           if (typeof serialized !== 'string' && serialized !== null) {

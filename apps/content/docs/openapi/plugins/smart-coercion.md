@@ -57,6 +57,10 @@ const handler = new OpenAPIHandler(router, {
 })
 ```
 
+::: info
+The plugin accepts `maxBigIntDigits` (default 4300), the maximum digits of a string coerced to `BigInt`.
+:::
+
 ## How It Works
 
 The plugin converts values **safely** using these rules:
@@ -106,6 +110,8 @@ Support valid numeric strings or numbers:
 
 - `'12345678901234567890'` → `12345678901234567890n`
 - `12345678901234567890` → `12345678901234567890n`
+
+Strings longer than `maxBigIntDigits` digits are left unchanged.
 
 ### String → Date
 

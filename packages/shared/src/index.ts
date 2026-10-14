@@ -1,5 +1,6 @@
 export * from './args'
 export * from './array'
+export * from './bigint'
 export * from './buffer'
 export * from './chain'
 export * from './consts'

@@ -34,4 +34,24 @@ describe('smartCoercionPlugin', () => {
     expect(await coerce(z.object({ a: z.number() }), { a: '123' })).toEqual({ a: 123 })
     expect(await coerce(z.object({ a: z.boolean() }), { a: 'on' })).toEqual({ a: true })
   })
+
+  it('passes maxBigIntDigits to the coercer', async () => {
+    const plugin = new SmartCoercionPlugin({
+      schemaConverters: [
+        new ZodToJsonSchemaConverter(),
+      ],
+      maxBigIntDigits: 3,
+    })
+    const options = {} as any
+    plugin.init(options)
+
+    const procedure = { '~orpc': { inputSchema: z.bigint() } }
+    const next = vi.fn()
+
+    await options.clientInterceptors[0]({ procedure, input: '999', next })
+    await options.clientInterceptors[0]({ procedure, input: '1000', next })
+
+    expect(next).toHaveBeenNthCalledWith(1, expect.objectContaining({ input: 999n }))
+    expect(next).toHaveBeenNthCalledWith(2, expect.objectContaining({ input: '1000' }))
+  })
 })

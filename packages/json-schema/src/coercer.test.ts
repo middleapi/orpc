@@ -82,6 +82,21 @@ describe('jsonSchemaCoercer', () => {
     )).toEqual([[1, true], [2, false], [1, false]])
   })
 
+  it('leaves non-canonical bigint strings and those longer than maxBigIntDigits untouched', () => {
+    const schema = { 'type': 'string', 'x-native-type': 'bigint' } as any
+
+    expect(coercer.coerce(schema, '9'.repeat(4300))).toBe(BigInt('9'.repeat(4300)))
+    expect(coercer.coerce(schema, '9'.repeat(4301))).toBe('9'.repeat(4301))
+    expect(coercer.coerce(schema, '0x10')).toBe('0x10')
+    expect(coercer.coerce(schema, '')).toBe('')
+
+    const limited = new JsonSchemaCoercer({ maxBigIntDigits: 3 })
+    expect(limited.coerce(schema, '999')).toBe(999n)
+    expect(limited.coerce(schema, '1000')).toBe('1000')
+    // whole numbers are bounded by the JSON number range, so they are not limited
+    expect(limited.coerce(schema, 1000)).toBe(1000n)
+  })
+
   it('can coerce enum/const values', () => {
     expect(coercer.coerce({ enum: [123, '234', true] }, 123)).toEqual(123)
     expect(coercer.coerce({ enum: [123, '234', true] }, '234')).toEqual('234')
