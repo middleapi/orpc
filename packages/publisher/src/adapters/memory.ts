@@ -90,7 +90,12 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
     if (this.resumeEnabled && options?.lastEventId !== undefined) {
       const bucket = this.eventsMap.get(event)
       if (bucket?.length) {
-        const startIdx = findResumeStartIndex(bucket, options.lastEventId)
+        // Replay only the newest events when more were missed than allowed.
+        const startIdx = Math.max(
+          findResumeStartIndex(bucket, options.lastEventId),
+          bucket.length - (options.maxReplayedEvents ?? Infinity),
+        )
+
         for (let i = startIdx; i < bucket.length; i++) {
           listener(bucket[i]!.payload as T[K])
         }

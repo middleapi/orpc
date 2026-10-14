@@ -66,14 +66,32 @@ describe('publisher', () => {
 
     const unsubscribe = await publisher.subscribe('message', listener, { lastEventId, onError })
     expect(subscribeListenerSpy).toHaveBeenCalledTimes(1)
-    expect(subscribeListenerSpy).toHaveBeenNthCalledWith(1, 'message', listener, { lastEventId, onError })
+    expect(subscribeListenerSpy).toHaveBeenNthCalledWith(1, 'message', listener, { lastEventId, maxReplayedEvents: 1000, onError })
 
     const iterator = publisher.subscribe('message', { lastEventId })
     expect(subscribeListenerSpy).toHaveBeenCalledTimes(2)
-    expect(subscribeListenerSpy).toHaveBeenNthCalledWith(2, 'message', expect.any(Function), { lastEventId, onError: expect.any(Function) })
+    expect(subscribeListenerSpy).toHaveBeenNthCalledWith(2, 'message', expect.any(Function), { lastEventId, maxReplayedEvents: 1000, onError: expect.any(Function) })
 
     await unsubscribe()
     await iterator.return()
+  })
+
+  it('passes maxReplayedEvents to the adapter, letting each subscriber override the publisher default', async () => {
+    const pub = new TestPublisher<TestEvents>({ maxReplayedEvents: 5 })
+    const spy = vi.spyOn(pub, 'subscribeListener')
+    const listener = vi.fn()
+
+    const unsubscribe1 = await pub.subscribe('message', listener)
+    const unsubscribe2 = await pub.subscribe('message', listener, { maxReplayedEvents: 2 })
+    const iterator1 = pub.subscribe('message')
+    const iterator2 = pub.subscribe('message', { maxReplayedEvents: Infinity })
+
+    expect(spy.mock.calls.map(([, , options]) => options?.maxReplayedEvents)).toEqual([5, 2, 5, Infinity])
+
+    await unsubscribe1()
+    await unsubscribe2()
+    await iterator1.return()
+    await iterator2.return()
   })
 
   describe('asyncIteratorObject subscriptions', () => {
@@ -254,15 +272,20 @@ describe('publisher', () => {
       describe('while missed events are replayed during setup', () => {
         let setup: Promise<unknown>
 
-        beforeEach(() => {
-          subscribeListenerSpy.mockImplementationOnce((event: any, listener: any, options: any) => setup = (async () => {
-            const unsubscribe = await TestPublisher.prototype.subscribeListener.call(publisher, event, listener, options)
+        // Replays every missed event, like an adapter that ignores `maxReplayedEvents`.
+        function replayMissedEvents(target: TestPublisher<TestEvents>) {
+          return (event: any, listener: any, options: any) => setup = (async () => {
+            const unsubscribe = await TestPublisher.prototype.subscribeListener.call(target, event, listener, options)
             await sleep(0)
             listener({ text: 'missed 1' })
             listener({ text: 'missed 2' })
             listener({ text: 'missed 3' })
             return unsubscribe
-          })())
+          })()
+        }
+
+        beforeEach(() => {
+          subscribeListenerSpy.mockImplementationOnce(replayMissedEvents(publisher))
         })
 
         async function read(iterator: AsyncIterator<TestEvents['message']>, count: number) {
@@ -314,6 +337,39 @@ describe('publisher', () => {
           await setup
 
           expect(await read(iterator, 1)).toEqual(['missed 3'])
+
+          await iterator.return()
+        })
+
+        it('keeps only the newest maxReplayedEvents resumed events when the adapter replays more', async () => {
+          const iterator = publisher.subscribe('message', { lastEventId: '0', maxReplayedEvents: 2 })
+          await setup
+
+          await publisher.publish('message', { text: 'live 1' })
+          expect(await read(iterator, 3)).toEqual(['missed 2', 'missed 3', 'live 1'])
+
+          await iterator.return()
+        })
+
+        it('uses the publisher default maxReplayedEvents when a subscriber does not override it', async () => {
+          const pub = new TestPublisher<TestEvents>({ maxReplayedEvents: 1 })
+          vi.spyOn(pub, 'subscribeListener').mockImplementationOnce(replayMissedEvents(pub))
+          const iterator = pub.subscribe('message', { lastEventId: '0' })
+          await setup
+
+          await pub.publish('message', { text: 'live 1' })
+          expect(await read(iterator, 2)).toEqual(['missed 3', 'live 1'])
+
+          await iterator.return()
+        })
+
+        it('lets a subscriber replay more than the publisher default', async () => {
+          const pub = new TestPublisher<TestEvents>({ maxReplayedEvents: 1 })
+          vi.spyOn(pub, 'subscribeListener').mockImplementationOnce(replayMissedEvents(pub))
+          const iterator = pub.subscribe('message', { lastEventId: '0', maxReplayedEvents: 3 })
+          await setup
+
+          expect(await read(iterator, 3)).toEqual(['missed 1', 'missed 2', 'missed 3'])
 
           await iterator.return()
         })

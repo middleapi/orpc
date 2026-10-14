@@ -80,6 +80,11 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
     const headers = new Headers({ upgrade: 'websocket' })
     if (options?.lastEventId !== undefined) {
       headers.set('last-event-id', options.lastEventId)
+
+      // The Durable Object also caps the replay with its own `maxReplayedEvents`
+      if (options.maxReplayedEvents !== undefined && Number.isFinite(options.maxReplayedEvents)) {
+        headers.set('orpc-max-replayed-events', String(Math.max(options.maxReplayedEvents, 0)))
+      }
     }
     const response = await stub.fetch('http://localhost/subscribe', {
       headers,

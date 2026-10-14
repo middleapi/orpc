@@ -25,10 +25,13 @@ function toText(data: unknown): string {
   throw new TypeError(`Unexpected websocket message payload: ${String(data)}`)
 }
 
-async function openSocket(stub: DurableObjectStub, lastEventId?: string): Promise<OpenSocket> {
+async function openSocket(stub: DurableObjectStub, lastEventId?: string, maxReplayedEvents?: string): Promise<OpenSocket> {
   const headers = new Headers({ upgrade: 'websocket' })
   if (lastEventId !== undefined) {
     headers.set('last-event-id', lastEventId)
+  }
+  if (maxReplayedEvents !== undefined) {
+    headers.set('orpc-max-replayed-events', maxReplayedEvents)
   }
 
   const response = await stub.fetch('https://example.com/subscribe', { headers })
@@ -70,6 +73,14 @@ async function getAlarm(stub: DurableObjectStub): Promise<number | null> {
 async function closeSocket(socket: OpenSocket): Promise<void> {
   socket.socket.close(1000, 'done')
   await sleep(0)
+}
+
+async function replayedOrders(stub: DurableObjectStub, maxReplayedEvents?: string): Promise<number[]> {
+  const subscriber = await openSocket(stub, '0', maxReplayedEvents)
+  const messages = await readMessages<{ data: { order: number } }>(subscriber, Number(subscriber.replayedEvents))
+  await closeSocket(subscriber)
+
+  return messages.map(message => message.data.order)
 }
 
 beforeEach(() => {
@@ -201,6 +212,50 @@ describe('durable publisher object', () => {
     ])
 
     await closeSocket(subscriber)
+  })
+
+  it('replays only the newest missed messages, as many as the subscriber asks for', async () => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
+
+    for (let order = 1; order <= 5; order++) {
+      expect((await publish(stub, { data: { order } })).status).toBe(204)
+    }
+
+    expect(await replayedOrders(stub, '2')).toEqual([4, 5])
+    expect(await replayedOrders(stub, '0')).toEqual([])
+
+    // anything but a non-negative integer asks for no particular limit
+    for (const maxReplayedEvents of [undefined, '', 'abc', '-1', '1.5', '1e1']) {
+      expect(await replayedOrders(stub, maxReplayedEvents)).toEqual([1, 2, 3, 4, 5])
+    }
+  })
+
+  it('never replays more than its own maxReplayedEvents', async () => {
+    const stub = env.PUBLISHER_REPLAY3_DON.getByName(crypto.randomUUID())
+
+    for (let order = 1; order <= 5; order++) {
+      expect((await publish(stub, { data: { order } })).status).toBe(204)
+    }
+
+    expect(await replayedOrders(stub)).toEqual([3, 4, 5])
+    expect(await replayedOrders(stub, 'abc')).toEqual([3, 4, 5])
+    expect(await replayedOrders(stub, '10')).toEqual([3, 4, 5])
+    expect(await replayedOrders(stub, '2')).toEqual([4, 5])
+  })
+
+  it('replays at most 1000 missed messages by default', async () => {
+    const stub = env.PUBLISHER_RESUME3S_DON.getByName(crypto.randomUUID())
+
+    expect((await publish(stub, { data: { order: 0 } })).status).toBe(204)
+    await runInDurableObject(stub, async (_, state) => {
+      for (let order = 1; order <= 1005; order++) {
+        state.storage.sql.exec('INSERT INTO "prefix:events" (payload) VALUES (?)', JSON.stringify({ data: { order } }))
+      }
+    })
+
+    const orders = await replayedOrders(stub, '5000')
+
+    expect(orders).toEqual(Array.from({ length: 1000 }, (_, i) => i + 6))
   })
 
   it('keeps resume before new live messages', { repeats: 5 }, async () => {

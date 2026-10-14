@@ -91,14 +91,13 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
     return await this.redis.eval(script, { keys, arguments: args })
   }
 
-  protected async readStreamEntries(key: string, lastId: string): Promise<RedisStreamEntry[]> {
+  protected async readStreamEntries(key: string, lastId: string, count?: number): Promise<RedisStreamEntry[]> {
     await connectIfNeeded(this.redis)
 
-    const results = await this.redis.xRead({ key, id: lastId })
+    // Newest first, so `COUNT` keeps the newest entries.
+    const entries = await this.redis.xRevRange(key, '+', `(${lastId}`, { COUNT: count }) as Array<{ id: string, message: Record<string, string> }>
 
-    const entries: Array<{ id: string, message: Record<string, string> }> = results?.[0]?.messages ?? []
-
-    return entries.map(({ id, message }) => ({ id, data: message.data! }))
+    return entries.map(({ id, message }) => ({ id, data: message.data! })).reverse()
   }
 }
 

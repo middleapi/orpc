@@ -165,7 +165,7 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
         if (p === 'send') {
           const originalSend = getOrBind(target, p)
           return async (command: string, args: any[]) => {
-            if (command === 'XREAD') {
+            if (command === 'XREVRANGE') {
               await promise
             }
 
@@ -203,6 +203,114 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
     })
 
     expect(listener.mock.calls.map(call => call[0].order)).toEqual([1, 2, 3, 4])
+
+    await unsubscribe()
+  }, { timeout: 20_000 })
+
+  it('replays only the newest maxReplayedEvents missed events, oldest first', async () => {
+    const publisher = createTestingPublisher({
+      maxReplayedEvents: 3,
+      resume: { enabled: true, seconds: 10 },
+    })
+    const event = 'bounded-replay'
+
+    for (let i = 0; i < 10; i++) {
+      await publisher.publish(event, { order: i })
+    }
+
+    const replayed = async (options: { maxReplayedEvents?: number }) => {
+      const listener = vi.fn()
+      const unsubscribe = await publisher.subscribe(event, listener, { lastEventId: '0', ...options })
+      await unsubscribe()
+      return listener.mock.calls.map(([payload]) => payload.order)
+    }
+
+    expect(await replayed({})).toEqual([7, 8, 9])
+    expect(await replayed({ maxReplayedEvents: 5 })).toEqual([5, 6, 7, 8, 9])
+    expect(await replayed({ maxReplayedEvents: Infinity })).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    expect(await replayed({ maxReplayedEvents: 0 })).toEqual([])
+
+    const iterator = publisher.subscribe(event, { lastEventId: '0', maxReplayedEvents: 2 })
+    expect((await iterator.next()).value).toEqual({ order: 8 })
+    expect((await iterator.next()).value).toEqual({ order: 9 })
+
+    await publisher.publish(event, { order: 10 })
+    expect((await iterator.next()).value).toEqual({ order: 10 })
+
+    await iterator.return()
+  }, { timeout: 20_000 })
+
+  it('neither repeats nor reorders events published while a bounded replay is read', async () => {
+    const { resolve, promise } = promiseWithResolvers<void>()
+    const delayedRedis = new Proxy(new RedisClient(REDIS_URL), {
+      get(target, p) {
+        if (p === 'send') {
+          const originalSend = getOrBind(target, p)
+          return async (command: string, args: any[]) => {
+            if (command === 'XREVRANGE') {
+              await promise
+            }
+
+            return originalSend(command, args)
+          }
+        }
+
+        return getOrBind(target, p)
+      },
+    })
+
+    onTestFinished(() => {
+      delayedRedis.close()
+    })
+
+    const publisher = createTestingPublisher({
+      resume: { enabled: true, seconds: 10 },
+    }, { useRedis: delayedRedis })
+    const event = 'bounded-timeline'
+
+    await publisher.publish(event, { order: 1 })
+    await publisher.publish(event, { order: 2 })
+
+    const listener = vi.fn()
+    const [unsubscribe] = await Promise.all([
+      publisher.subscribe(event, listener, { lastEventId: '0', maxReplayedEvents: 2 }),
+      sleep(1000)
+        .then(() => publisher.publish(event, { order: 3 }))
+        .then(() => publisher.publish(event, { order: 4 }))
+        .then(() => publisher.publish(event, { order: 5 }))
+        .then(() => resolve()),
+    ])
+
+    // 3 reaches the subscriber over Pub/Sub, but is older than the replayed events
+    await publisher.publish(event, { order: 6 })
+
+    await waitFor(() => {
+      expect(listener).toHaveBeenCalledTimes(3)
+    })
+
+    await sleep(300)
+    expect(listener.mock.calls.map(call => call[0].order)).toEqual([4, 5, 6])
+
+    await unsubscribe()
+  }, { timeout: 20_000 })
+
+  it('treats $ as the newest event, so nothing is replayed', async () => {
+    const publisher = createTestingPublisher({
+      resume: { enabled: true, seconds: 10 },
+    })
+    const event = 'dollar'
+    const listener = vi.fn()
+
+    await publisher.publish(event, { order: 1 })
+
+    const unsubscribe = await publisher.subscribe(event, listener, { lastEventId: '$' })
+    await publisher.publish(event, { order: 2 })
+
+    await waitFor(() => {
+      expect(listener).toHaveBeenCalledTimes(1)
+    })
+
+    expect(listener).toHaveBeenCalledWith({ order: 2 })
 
     await unsubscribe()
   }, { timeout: 20_000 })

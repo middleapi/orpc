@@ -219,6 +219,77 @@ describe('memoryPublisher', () => {
     })
   })
 
+  describe('resume replay is bounded for untrusted lastEventId', () => {
+    it('keeps at most maxReplayedEvents of the newest missed events', async () => {
+      const publisher = new MemoryPublisher<{ e: { n: number } }>({
+        resume: { enabled: true },
+        maxBufferedEvents: 10,
+        maxReplayedEvents: 50,
+      })
+
+      for (let i = 0; i < 2000; i++) {
+        await publisher.publish('e', { n: i })
+      }
+
+      // Any client can send `last-event-id: 0` to request the whole retention window.
+      const iterator = publisher.subscribe('e', { lastEventId: '0' })
+      await new Promise(resolve => setTimeout(resolve, 0))
+      await publisher.publish('e', { n: -1 }) // sentinel
+
+      const received: number[] = []
+      while (true) {
+        const { value } = await iterator.next()
+        if (value!.n === -1)
+          break
+        received.push(value!.n)
+      }
+      await iterator.return()
+
+      // newest missed events kept, oldest dropped
+      expect(received).toEqual(Array.from({ length: 50 }, (_, i) => 1950 + i))
+    })
+
+    it('bounds the replay for callback subscribers, which can override the publisher limit', async () => {
+      const publisher = new MemoryPublisher<TestEvents>({
+        resume: { enabled: true },
+        maxReplayedEvents: 2,
+      })
+
+      for (let i = 0; i < 5; i++) {
+        await publisher.publish('message', { text: `${i}` })
+      }
+
+      const replayed = async (options: { maxReplayedEvents?: number }) => {
+        const listener = vi.fn()
+        const unsubscribe = await publisher.subscribe('message', listener, { lastEventId: '0', ...options })
+        await unsubscribe()
+        return listener.mock.calls.map(([payload]) => payload.text)
+      }
+
+      expect(await replayed({})).toEqual(['3', '4'])
+      expect(await replayed({ maxReplayedEvents: 3 })).toEqual(['2', '3', '4'])
+      expect(await replayed({ maxReplayedEvents: Infinity })).toEqual(['0', '1', '2', '3', '4'])
+      expect(await replayed({ maxReplayedEvents: 0 })).toEqual([])
+    })
+
+    it('replays at most 1000 missed events by default', async () => {
+      const publisher = new MemoryPublisher<TestEvents>({ resume: { enabled: true } })
+
+      for (let i = 0; i < 1005; i++) {
+        await publisher.publish('message', { text: `${i}` })
+      }
+
+      const listener = vi.fn()
+      const unsubscribe = await publisher.subscribe('message', listener, { lastEventId: '0' })
+
+      expect(listener).toHaveBeenCalledTimes(1000)
+      expect(listener.mock.calls[0]![0].text).toBe('5')
+      expect(listener.mock.calls[999]![0].text).toBe('1004')
+
+      await unsubscribe()
+    })
+  })
+
   describe('edge cases', () => {
     it('allows the same listener to be registered multiple times', async () => {
       const publisher = new MemoryPublisher<TestEvents>({

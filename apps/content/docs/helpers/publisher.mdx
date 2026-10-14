@@ -285,6 +285,19 @@ export class PublisherDO extends DurablePublisherObject {
         seconds: 300,
 
         /**
+         * Maximum number of missed events to replay to a subscriber that resumes with `lastEventId`.
+         *
+         * If more events were missed, only the newest ones are replayed, oldest first.
+         * `DurablePublisher` can ask for fewer with its own `maxReplayedEvents`, but never for more,
+         * since `lastEventId` usually comes from the client and can ask for every retained event.
+         *
+         * Set to `Infinity` to replay every retained event.
+         *
+         * @default 1000
+         */
+        maxReplayedEvents: 1000,
+
+        /**
          * Interval (in seconds) between cleanup checks for the Durable Object.
          *
          * At each interval, verify whether the Durable Object is inactive
@@ -386,6 +399,29 @@ const publish = os
 ```
 
 :::
+
+### Replay Limit
+
+When more events were missed than `maxReplayedEvents` (default `1000`), only the newest ones are replayed, oldest first, so the replay still leads straight into live events. Set the limit on the publisher, override it for a single subscription, or set it to `Infinity` to replay every retained event.
+
+```ts
+const publisher = new MemoryPublisher({
+  resume: { enabled: true },
+  maxReplayedEvents: 1000, // Replay at most the 1000 newest missed events
+})
+
+const iterator = publisher.subscribe('something-updated', {
+  signal,
+  lastEventId,
+  maxReplayedEvents: 100, // Override the publisher limit for this subscription
+})
+```
+
+:::warning
+`lastEventId` comes from the client's `last-event-id` header, so it is untrusted input: any client can ask for every event still retained for resume. The limit bounds the storage read and the memory each such subscription takes, so keep it finite.
+:::
+
+With `DurablePublisher`, the Durable Object also caps the replay with its own `resume.maxReplayedEvents` (default `1000`), and a subscriber can only ask for fewer events.
 
 ### Client Reconnection
 

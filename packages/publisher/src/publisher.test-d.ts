@@ -1,4 +1,4 @@
-import type { Publisher } from './publisher'
+import type { Publisher, PublisherOptions } from './publisher'
 
 describe('publisher', () => {
   it('key-value types', async () => {
@@ -71,5 +71,18 @@ describe('publisher', () => {
         id: string
       }>()
     }
+  })
+
+  it('maxReplayedEvents', () => {
+    const pub = {} as Publisher<{ event: { id: string } }>
+
+    expectTypeOf<PublisherOptions['maxReplayedEvents']>().toEqualTypeOf<number | undefined>()
+
+    pub.subscribe('event', () => {}, { lastEventId: '1', maxReplayedEvents: 10 })
+    pub.subscribe('event', { lastEventId: '1', maxReplayedEvents: Infinity })
+    // @ts-expect-error - must be a number
+    pub.subscribe('event', () => {}, { maxReplayedEvents: '10' })
+    // @ts-expect-error - must be a number
+    pub.subscribe('event', { maxReplayedEvents: '10' })
   })
 })

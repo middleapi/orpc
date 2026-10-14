@@ -3,8 +3,8 @@ import type { Public, ThrowableError } from '@orpc/shared'
 import type { EventMeta } from '@standard-server/core'
 import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
 import { RPCJsonSerializer } from '@orpc/client'
-import { once, parseEmptyableJSON, stringifyJSON } from '@orpc/shared'
-import { getEventMeta, unwrapEvent, withEventMeta } from '@standard-server/core'
+import { compareSequentialIds, once, parseEmptyableJSON, stringifyJSON } from '@orpc/shared'
+import { unwrapEvent, withEventMeta } from '@standard-server/core'
 import { Publisher } from '../publisher'
 
 /**
@@ -148,9 +148,11 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
   protected abstract evalScript(script: string, keys: string[], args: string[]): Promise<unknown>
 
   /**
-   * Reads the entries with an ID greater than `lastId` (`XREAD STREAMS key lastId`), oldest first.
+   * Reads the entries with an ID greater than `lastId`, oldest first. When `count` is given
+   * (always positive), reads only the newest `count` of them (`XREVRANGE key + (lastId COUNT count`,
+   * reversed), which also bounds the work Redis does. Without it, every entry is read.
    */
-  protected abstract readStreamEntries(key: string, lastId: string): Promise<RedisStreamEntry[]>
+  protected abstract readStreamEntries(key: string, lastId: string, count?: number): Promise<RedisStreamEntry[]>
 
   async publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void> {
     const channel = `${this.prefix}${event}`
@@ -192,21 +194,22 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
   protected async subscribeListener<K extends keyof T & string>(
     event: K,
     listener: (payload: T[K]) => void,
-    { lastEventId, onError }: PublisherSubscribeListenerOptions = {},
+    { lastEventId, maxReplayedEvents = Infinity, onError }: PublisherSubscribeListenerOptions = {},
   ): Promise<() => Promise<void>> {
     const channel = `${this.prefix}${event}`
 
-    let pendingPayloads: T[K][] | undefined = []
-    const resumedIds = new Set<string>()
+    let pendingMessages: Array<[id: string | undefined, payload: T[K]]> | undefined = []
+    let lastReplayedId: string | undefined
 
-    const deduplicatingListener = (payload: T[K]) => {
-      if (pendingPayloads) {
-        pendingPayloads.push(payload)
+    const deduplicatingListener = (id: string | undefined, payload: T[K]) => {
+      if (pendingMessages) {
+        pendingMessages.push([id, payload])
         return
       }
 
-      const id = getEventMeta(payload)?.id
-      if (id === undefined || !resumedIds.has(id)) {
+      // Pub/Sub order matches stream order, so an entry up to the last replayed one
+      // was either replayed already or is older than the replayed ones.
+      if (id === undefined || lastReplayedId === undefined || compareStreamIds(id, lastReplayedId) > 0) {
         listener(payload)
       }
     }
@@ -214,7 +217,7 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
     const messageListener = (message: unknown) => {
       try {
         const { id, data } = parseIfText(message) as { id?: string, data: SerializedEvent }
-        deduplicatingListener(this.deserializePayload(id, data) as T[K])
+        deduplicatingListener(id, this.deserializePayload(id, data) as T[K])
       }
       catch (error) {
         onError?.(error as ThrowableError)
@@ -225,16 +228,19 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
     const unsubscribe = await this.subscribeChannel(channel, messageListener, onError)
 
     try {
-      if (this.resumeEnabled && lastEventId !== undefined) {
-        for (const { id, data } of await this.readStreamEntries(channel, lastEventId)) {
-          resumedIds.add(id)
+      // `$` stands for the newest entry, so nothing comes after it.
+      if (this.resumeEnabled && lastEventId !== undefined && lastEventId !== '$' && maxReplayedEvents > 0) {
+        const count = Number.isFinite(maxReplayedEvents) ? maxReplayedEvents : undefined
+
+        for (const { id, data } of await this.readStreamEntries(channel, lastEventId, count)) {
+          lastReplayedId = id
           listener(this.deserializePayload(id, parseIfText(data) as SerializedEvent) as T[K])
         }
       }
 
-      const pending = pendingPayloads
-      pendingPayloads = undefined
-      pending.forEach(deduplicatingListener)
+      const pending = pendingMessages
+      pendingMessages = undefined
+      pending.forEach(([id, payload]) => deduplicatingListener(id, payload))
     }
     catch (error) {
       await unsubscribe()
@@ -260,4 +266,14 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
 
 function parseIfText(value: unknown): unknown {
   return typeof value === 'string' ? parseEmptyableJSON(value) : value
+}
+
+/**
+ * Compares stream entry IDs (`<ms>-<seq>`) in the canonical form Redis returns them.
+ */
+function compareStreamIds(a: string, b: string): number {
+  const [aMs = '', aSeq = ''] = a.split('-')
+  const [bMs = '', bSeq = ''] = b.split('-')
+
+  return compareSequentialIds(aMs, bMs) || compareSequentialIds(aSeq, bSeq)
 }

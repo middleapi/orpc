@@ -26,6 +26,19 @@ export interface DurablePublisherObjectResumeOptions {
   seconds?: number
 
   /**
+   * Maximum number of missed events to replay to a subscriber that resumes with `lastEventId`.
+   *
+   * If more events were missed, only the newest ones are replayed, oldest first.
+   * `DurablePublisher` can ask for fewer with its own `maxReplayedEvents`, but never for more,
+   * since `lastEventId` usually comes from the client and can ask for every retained event.
+   *
+   * Set to `Infinity` to replay every retained event.
+   *
+   * @default 1000
+   */
+  maxReplayedEvents?: number
+
+  /**
    * Interval (in seconds) between cleanup checks for the Durable Object.
    *
    * At each interval, verify whether the Durable Object is inactive
@@ -102,7 +115,14 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
 
   private async handleSubscribe(request: Request): Promise<Response> {
     const lastEventId = request.headers.get('last-event-id')
-    const payloads = lastEventId === null ? [] : this.resumeStorage.getAfter(lastEventId)
+    const maxReplayedEvents = request.headers.get('orpc-max-replayed-events')
+    const payloads = lastEventId === null
+      ? []
+      : this.resumeStorage.getAfter(
+          lastEventId,
+          // `DurablePublisher` sends a non-negative integer, anything else asks for no particular limit
+          maxReplayedEvents !== null && /^\d+$/.test(maxReplayedEvents) ? Number(maxReplayedEvents) : Infinity,
+        )
 
     const { '0': client, '1': server } = new WebSocketPair()
     this.ctx.acceptWebSocket(server)
@@ -134,6 +154,7 @@ interface SerializedPayload {
 class ResumeStorage {
   private readonly enabled: boolean
   private readonly seconds: number
+  private readonly maxReplayedEvents: number
   private readonly cleanupIntervalSeconds: number
   private readonly schemaPrefix: string
 
@@ -147,6 +168,7 @@ class ResumeStorage {
   ) {
     this.enabled = options.enabled
     this.seconds = options.seconds ?? 300
+    this.maxReplayedEvents = options.maxReplayedEvents ?? 1000
     this.cleanupIntervalSeconds = options.cleanupIntervalSeconds ?? 6 * 60 * 60
     const schemaPrefix = options.schemaPrefix ?? 'orpc:'
     this.schemaPrefix = schemaPrefix
@@ -205,15 +227,18 @@ class ResumeStorage {
   }
 
   /**
-   * Get all events after the specified lastEventId, ordered by ID ascending.
+   * Get the newest events after the specified lastEventId, at most `limit` and `maxReplayedEvents`
+   * of them, ordered by ID ascending.
    * Must be sync function to dealing with race condition
    */
-  getAfter(lastEventId: string): string[] {
+  getAfter(lastEventId: string, limit: number): string[] {
     if (!this.enabled) {
       return []
     }
 
     this.ensureSchemaAndCleanup()
+
+    const maxEvents = Math.min(limit, this.maxReplayedEvents)
 
     /**
      * SQLite INTEGER can exceed JavaScript's safe integer range,
@@ -221,16 +246,19 @@ class ResumeStorage {
      *
      * The alias must not be `id`: SQLite resolves ORDER BY to an output
      * alias before a table column, which would sort ids as text.
+     *
+     * Newest first, so LIMIT keeps the newest events. SQLite reads a negative LIMIT as no limit.
      */
     const result = this.ctx.storage.sql.exec(`
       SELECT CAST(id AS TEXT) AS event_id, payload
       FROM "${this.schemaPrefix}events"
       WHERE id > ?
-      ORDER BY id ASC
-    `, lastEventId)
+      ORDER BY id DESC
+      LIMIT ?
+    `, lastEventId, maxEvents === Infinity ? -1 : Math.max(maxEvents, 0))
 
     const events: string[] = []
-    for (const record of result.toArray()) {
+    for (const record of result.toArray().reverse()) {
       const payload: SerializedPayload = JSON.parse(record.payload as string)
       events.push(stringifyJSON(this.attachEventId(payload, record.event_id as string)))
     }

@@ -20,6 +20,10 @@
         "class_name": "PublisherResume3sDO"
       },
       {
+        "name": "PUBLISHER_REPLAY3_DON",
+        "class_name": "PublisherReplay3DO"
+      },
+      {
         "name": "LOCK_DON",
         "class_name": "LockDO"
       }
@@ -37,6 +41,12 @@
       "tag": "v2",
       "new_sqlite_classes": [
         "LockDO"
+      ]
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": [
+        "PublisherReplay3DO"
       ]
     }
   ]

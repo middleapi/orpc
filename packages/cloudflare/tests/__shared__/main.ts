@@ -17,5 +17,16 @@ export class PublisherResume3sDO extends DurablePublisherObject {
   }
 }
 
+export class PublisherReplay3DO extends DurablePublisherObject {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env, {
+      resume: {
+        enabled: true,
+        maxReplayedEvents: 3,
+      },
+    })
+  }
+}
+
 export class LockDO extends DurableLockObject {
 }

@@ -89,11 +89,12 @@ export class BunRedisPublisher<T extends Record<string, object>> extends BaseRed
     return await this.redis.send('EVAL', [script, String(keys.length), ...keys, ...args])
   }
 
-  protected async readStreamEntries(key: string, lastId: string): Promise<RedisStreamEntry[]> {
-    const results = await this.redis.send('XREAD', ['STREAMS', key, lastId])
-    const entries: Array<[id: string, fields: [name: string, value: string]]> = results?.[key] ?? []
+  protected async readStreamEntries(key: string, lastId: string, count?: number): Promise<RedisStreamEntry[]> {
+    // Newest first, so `COUNT` keeps the newest entries.
+    const args = count === undefined ? [key, '+', `(${lastId}`] : [key, '+', `(${lastId}`, 'COUNT', String(count)]
+    const entries: Array<[id: string, fields: [name: string, value: string]]> = await this.redis.send('XREVRANGE', args)
 
-    return entries.map(([id, fields]) => ({ id, data: fields[1] }))
+    return entries.map(([id, fields]) => ({ id, data: fields[1] })).reverse()
   }
 
   private watchSubscriber(subscriber: RedisClient): void {

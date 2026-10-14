@@ -7,8 +7,9 @@ export interface PublisherOptions {
    *
    * If the buffer exceeds this limit, the oldest event is dropped.
    * This prevents unbounded memory growth if consumers process events slowly.
-   * Missed events the adapter replays for `lastEventId` while subscribing are all kept,
-   * and the limit then applies to how much further behind the consumer falls.
+   * Missed events the adapter replays for `lastEventId` while subscribing are kept
+   * up to `maxReplayedEvents` instead, and this limit then applies to how much further
+   * behind the consumer falls.
    *
    * Set to:
    * - `0`: Disable buffering. Events must be consumed before the next one arrives.
@@ -18,6 +19,20 @@ export interface PublisherOptions {
    * @default 100
    */
   maxBufferedEvents?: number
+
+  /**
+   * Maximum number of missed events to replay when subscribing with `lastEventId`.
+   *
+   * If more events were missed, only the newest ones are replayed, oldest first, so the
+   * replay still leads straight into live events. `lastEventId` usually comes from the
+   * client's `last-event-id` header, so any client can ask for every retained event;
+   * this limit bounds the storage read and the memory each such subscription takes.
+   *
+   * Set to `Infinity` to replay every retained event.
+   *
+   * @default 1000
+   */
+  maxReplayedEvents?: number
 }
 
 export interface PublisherSubscribeListenerOptions {
@@ -27,13 +42,20 @@ export interface PublisherSubscribeListenerOptions {
   lastEventId?: string | undefined
 
   /**
+   * Maximum number of missed events to replay for `lastEventId`, keeping the newest ones.
+   *
+   * @default the publisher's `maxReplayedEvents`
+   */
+  maxReplayedEvents?: number
+
+  /**
    * Triggered when an error occur
    */
   onError?: (error: ThrowableError) => void
 }
 
 export interface PublisherSubscribeIteratorOptions
-  extends Pick<PublisherSubscribeListenerOptions, 'lastEventId'>, Pick<PublisherOptions, 'maxBufferedEvents'> {
+  extends Pick<PublisherSubscribeListenerOptions, 'lastEventId'>, Pick<PublisherOptions, 'maxBufferedEvents' | 'maxReplayedEvents'> {
   /**
    * Abort signal, automatically unsubscribes on abort
    */
@@ -42,11 +64,13 @@ export interface PublisherSubscribeIteratorOptions
 
 export abstract class Publisher<T extends Record<string, object>> {
   private readonly maxBufferedEvents: Exclude<PublisherOptions['maxBufferedEvents'], undefined>
+  private readonly maxReplayedEvents: Exclude<PublisherOptions['maxReplayedEvents'], undefined>
 
   constructor(
     options: PublisherOptions = {},
   ) {
     this.maxBufferedEvents = options.maxBufferedEvents ?? 100
+    this.maxReplayedEvents = options.maxReplayedEvents ?? 1000
   }
 
   /**
@@ -58,7 +82,9 @@ export abstract class Publisher<T extends Record<string, object>> {
    * Subscribes to a specific event using a callback function.
    * Returns an unsubscribe function to remove the listener.
    * Events missed since `lastEventId` should reach the listener before the returned promise
-   * resolves, so iterator subscribers keep them all regardless of `maxBufferedEvents`.
+   * resolves, so iterator subscribers keep them regardless of `maxBufferedEvents`.
+   * Replay only the newest `maxReplayedEvents` of them, and bound the storage read itself,
+   * since `lastEventId` usually comes from the client.
    *
    * @remarks
    * This method should be protected to avoid conflicts with `subscribe` method
@@ -107,11 +133,15 @@ export abstract class Publisher<T extends Record<string, object>> {
     listenerOptions?: PublisherSubscribeListenerOptions,
   ): Promise<() => Promise<void>> | AsyncIteratorClass<T[K], void, void> {
     if (typeof listenerOrOptions === 'function') {
-      return this.subscribeListener(event, listenerOrOptions, listenerOptions)
+      return this.subscribeListener(event, listenerOrOptions, {
+        ...listenerOptions,
+        maxReplayedEvents: listenerOptions?.maxReplayedEvents ?? this.maxReplayedEvents,
+      })
     }
 
     const signal = listenerOrOptions?.signal
     const maxBufferedEvents = listenerOrOptions?.maxBufferedEvents ?? this.maxBufferedEvents
+    const maxReplayedEvents = listenerOrOptions?.maxReplayedEvents ?? this.maxReplayedEvents
 
     throwIfAborted(signal)
 
@@ -120,7 +150,8 @@ export abstract class Publisher<T extends Record<string, object>> {
     const pullResolvers: { resolve: (result: IteratorResult<T[K]>) => void, reject: (error: Error) => void }[] = []
 
     let bufferFloor = 0
-    let bufferLimit = resuming ? Infinity : maxBufferedEvents
+    // Also bounds the replay of adapters that ignore `maxReplayedEvents`.
+    let bufferLimit = resuming ? maxReplayedEvents : maxBufferedEvents
 
     const subscription = this.subscribeListener(event, (payload) => {
       if (signal?.aborted) {
@@ -141,6 +172,7 @@ export abstract class Publisher<T extends Record<string, object>> {
       }
     }, {
       lastEventId: listenerOrOptions?.lastEventId,
+      maxReplayedEvents,
       onError: error => terminate({ kind: 'error', error }),
     })
 

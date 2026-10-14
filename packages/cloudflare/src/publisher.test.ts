@@ -215,6 +215,46 @@ describe('durable publisher', () => {
     expect(orders).toEqual([0, 1, 2, 3, 4, 5])
   })
 
+  it('replays only the newest missed events, as many as maxReplayedEvents allows', async () => {
+    const { publisher } = createTestingPublisher(env.PUBLISHER_RESUME3S_DON, { maxReplayedEvents: 2 })
+
+    for (let i = 0; i < 5; i++) {
+      await publisher.publish('timeline', { order: i })
+    }
+
+    const replayed = async (options: { maxReplayedEvents?: number }) => {
+      const listener = vi.fn()
+      const unsubscribe = await publisher.subscribe('timeline', listener, { lastEventId: '0', ...options })
+      await unsubscribe()
+      return listener.mock.calls.map(([payload]) => payload.order)
+    }
+
+    expect(await replayed({})).toEqual([3, 4])
+    expect(await replayed({ maxReplayedEvents: 3 })).toEqual([2, 3, 4])
+    expect(await replayed({ maxReplayedEvents: Infinity })).toEqual([0, 1, 2, 3, 4])
+    expect(await replayed({ maxReplayedEvents: 0 })).toEqual([])
+    expect(await replayed({ maxReplayedEvents: -1 })).toEqual([])
+  })
+
+  it('never replays more than the durable object allows', async () => {
+    const { publisher } = createTestingPublisher(env.PUBLISHER_REPLAY3_DON, { maxReplayedEvents: Infinity })
+
+    for (let i = 0; i < 5; i++) {
+      await publisher.publish('timeline', { order: i })
+    }
+
+    const iterator = publisher.subscribe('timeline', { lastEventId: '0', maxReplayedEvents: 10 })
+
+    for (const order of [2, 3, 4]) {
+      expect((await iterator.next()).value).toEqual({ order })
+    }
+
+    await publisher.publish('timeline', { order: 5 })
+    expect((await iterator.next()).value).toEqual({ order: 5 })
+
+    await iterator.return()
+  })
+
   it('throws when an event is too large to store for resume', async () => {
     const { publisher } = createTestingPublisher(env.PUBLISHER_RESUME3S_DON)
 

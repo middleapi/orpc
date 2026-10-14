@@ -66,13 +66,18 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
     return await this.redis.eval(script, keys, args)
   }
 
-  protected async readStreamEntries(key: string, lastId: string): Promise<RedisStreamEntry[]> {
-    const results = await this.redis.xread(key, lastId) as null | Array<[
-      key: string,
-      entries: Array<[id: string, fields: [name: string, value: unknown]]>,
-    ]>
+  protected async readStreamEntries(key: string, lastId: string, count?: number): Promise<RedisStreamEntry[]> {
+    // Newest first, so `COUNT` keeps the newest entries. With automatic deserialization (the default),
+    // the reply is keyed by ID, which keeps insertion order since IDs are not integers.
+    const results = await this.redis.xrevrange(key, '+', `(${lastId}`, count) as
+      | Record<string, { data: unknown }>
+      | Array<[id: string, fields: [name: string, value: unknown]]>
 
-    return results?.[0]?.[1].map(([id, fields]) => ({ id, data: fields[1] })) ?? []
+    const entries = Array.isArray(results)
+      ? results.map(([id, fields]) => ({ id, data: fields[1] }))
+      : Object.entries(results).map(([id, fields]) => ({ id, data: fields.data }))
+
+    return entries.reverse()
   }
 
   private async subscribeIfNeeded(channel: string): Promise<void> {
