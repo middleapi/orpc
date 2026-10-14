@@ -93,6 +93,16 @@ export class FetchLinkTransport<T extends ClientContext> implements StandardLink
     const fetch = this.fetch
     const response = await fetch(url, init, options, path)
 
+    // Opaque responses (status 0, no headers or body) would otherwise decode as a successful empty output.
+    // Browsers return them for redirects under `redirect: 'manual'` and for cross-origin `no-cors` requests.
+    if (response.type === 'opaqueredirect') {
+      throw new TypeError('Unexpected redirect response: redirects are not followed.')
+    }
+
+    if (response.type === 'opaque') {
+      throw new TypeError('Unexpected opaque response: the response is unreadable, likely due to a no-cors request.')
+    }
+
     const standardResponse = toStandardLazyResponse(response)
 
     return standardResponse

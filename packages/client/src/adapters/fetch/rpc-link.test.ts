@@ -338,4 +338,24 @@ describe('rpcLink', () => {
     const init = (fetch as any).mock.calls[0][1]
     expect(init).not.toHaveProperty('duplex')
   })
+
+  it.each([
+    ['opaqueredirect', 'Unexpected redirect response: redirects are not followed.'],
+    ['opaque', 'Unexpected opaque response: the response is unreadable, likely due to a no-cors request.'],
+  ])('throws on %s responses', async (type, message) => {
+    const fetch = vi.fn(async () => {
+      // Browsers return opaque responses with status 0 and no headers or body
+      const response = Response.error()
+      Object.defineProperty(response, 'type', { value: type })
+      return response
+    })
+
+    const orpc = createORPCClient(new RPCLink({
+      fetch,
+      origin: 'http://api.example.com',
+    })) as any
+
+    await expect(orpc.ping('input')).rejects.toThrow(new TypeError(message))
+    expect(fetch).toHaveBeenCalledOnce()
+  })
 })
