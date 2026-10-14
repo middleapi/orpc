@@ -13,7 +13,7 @@ npm install @orpc/node@beta
 
 ## Setup
 
-Use `TmpFileUploadHandlerPlugin` to parse file uploads into temporary files. Bodies the standard parser would buffer into an in-memory [File](https://developer.mozilla.org/en-US/docs/Web/API/File), and [`multipart/form-data`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/MIME_types#multipartform-data) file parts, stream to disk instead. Every other body is left to the standard parser.
+Use `TmpFileUploadHandlerPlugin` to parse file uploads into temporary files. Bodies the standard parser would buffer into an in-memory [File](https://developer.mozilla.org/en-US/docs/Web/API/File), and [`multipart/form-data`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/MIME_types#multipartform-data) file parts, stream to disk instead once they outgrow the [spool threshold](#keeping-small-uploads-in-memory). Every other body is left to the standard parser.
 
 ```ts
 import { TmpFileUploadHandlerPlugin } from '@orpc/node'
@@ -41,17 +41,22 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 
 ## Working with Uploaded Files
 
-Procedures receive ordinary `File` instances and read them lazily from disk, in constant memory. Each one is a `TmpFile` exposing the `path` of its backing file, so an upload can be kept with a cheap [rename](https://nodejs.org/api/fs.html#fspromisesrenameoldpath-newpath) instead of a copy:
+Procedures receive ordinary `File` instances. An upload spooled to disk is a `TmpFile`, read lazily in constant memory and exposing the `path` of its backing file, so it can be kept with a cheap [rename](https://nodejs.org/api/fs.html#fspromisesrenameoldpath-newpath) instead of a copy. A smaller upload stays in memory as a plain `File` without a `path`, so check which one you received:
 
 ```ts
 import { TmpFile } from '@orpc/node'
-import { rename } from 'node:fs/promises'
+import { rename, writeFile } from 'node:fs/promises'
 
 const uploadVideo = os
   .input(z.object({ video: z.file() }))
   .handler(async ({ input }) => {
+    const destination = `./videos/${crypto.randomUUID()}`
+
     if (input.video instanceof TmpFile) {
-      await rename(input.video.path, `./videos/${crypto.randomUUID()}`)
+      await rename(input.video.path, destination)
+    }
+    else {
+      await writeFile(destination, input.video.stream())
     }
   })
 ```
@@ -75,14 +80,14 @@ const handler = new RPCHandler(router, {
       maxBodySize: {
         /**
          * Content buffered into memory: JSON, URL-encoded forms,
-         * multipart fields and part headers, and each event of an event
-         * stream. Usually the lowest limit.
+         * multipart fields, part headers and in-memory files, and each
+         * event of an event stream. Usually the lowest limit.
          */
         memory: 1024 * 1024, // 1MB
 
         /**
-         * Content streamed into temporary files: file bodies and the
-         * file parts of a multipart body combined.
+         * Uploaded files: file bodies and the file parts of a multipart
+         * body combined, whether held in memory or spooled to disk.
          */
         file: 500 * 1024 * 1024, // 500MB
 
@@ -99,35 +104,37 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-A multipart body splits across the first two limits, fields and part headers against `memory` and file parts against `file`, and as a whole, framing included, it is bounded by the sum of both. An event stream counts against `stream` in total and each of its events against `memory`, since the decoder buffers an event until its blank line arrives. A raw binary stream reaches the procedure chunk by chunk, so only `stream` applies. A declared [Content-Length](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Length) over the applicable limit rejects immediately, and enforcement continues while the body streams in, so a lying length cannot bypass it.
+A multipart body splits across the first two limits, fields and part headers against `memory` and file parts against `file`, those held in memory against `memory` as well, and as a whole, framing included, it is bounded by the sum of both. An event stream counts against `stream` in total and each of its events against `memory`, since the decoder buffers an event until its blank line arrives. A raw binary stream reaches the procedure chunk by chunk, so only `stream` applies. A declared [Content-Length](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Length) over the applicable limit rejects immediately, and enforcement continues while the body streams in, so a lying length cannot bypass it.
 
 With all three limits configured, the plugin subsumes the [Request Limit Plugin](/docs/plugins/request-limit). When the [Request Compression Plugin](/docs/plugins/request-compression) is present, limits apply to the decompressed payload rather than the compressed wire size.
 
-## Limiting Multipart Parts
+## Keeping Small Uploads in Memory
 
-Every file part of a multipart body becomes its own temporary file, even an empty one, so byte limits alone cannot bound how many files one request creates. `maxParts` caps the number of parts a multipart body may contain, fields and files counted together, and applies even when `maxBodySize` is omitted. The part over the limit never reaches disk: the request rejects with `PAYLOAD_TOO_LARGE`, and the parts spooled before it are removed.
+Every temporary file costs filesystem work to create and remove, however few bytes it holds. If every upload spooled, a small request carrying thousands of empty file parts could create thousands of files before any middleware runs. So an upload only spools once it exceeds `spoolThreshold`; smaller ones, empty files included, stay in memory as plain `File`s, the way the standard parser keeps them.
 
 ```ts
 const handler = new RPCHandler(router, {
   plugins: [
     new TmpFileUploadHandlerPlugin({
       /**
-       * The maximum number of parts, fields and files together,
-       * a multipart body may contain.
+       * The size in bytes an uploaded file must exceed before it is
+       * spooled to a temporary file.
        *
-       * @default 1000
+       * @default 64 * 1024
        */
-      maxParts: 5000,
+      spoolThreshold: 256 * 1024, // 256KB
     }),
   ],
 })
 ```
 
-Raise it when legitimate forms carry more parts, such as a directory upload with thousands of files, or set it to `Number.POSITIVE_INFINITY` to leave the part count unlimited.
+An upload held in memory counts against `maxBodySize.memory`, shared with the fields and part headers of the same body. One that would no longer fit spools to disk instead of rejecting the request, so the memory limit bounds the memory uploads use without capping their size, while `maxBodySize.file` keeps counting every upload wherever it is held. Fields arriving after small files still need room of their own, so size `memory` for both.
+
+A lower threshold makes each temporary file cheaper for a client to cause; set it to `0` to spool every non-empty upload.
 
 ## Per-Request Limits
 
-`maxBodySize` and `maxParts` also accept a function, sync or async, receiving the handler `context`, `request`, and `prefix`, so limits can follow who is uploading. A resolver runs only when a body is parsed, and the `maxParts` one only for a multipart body:
+`maxBodySize` also accepts a function, sync or async, receiving the handler `context`, `request`, and `prefix`, so limits can follow who is uploading:
 
 ```ts
 const handler = new RPCHandler(router, {
@@ -140,9 +147,6 @@ const handler = new RPCHandler(router, {
           : 500 * 1024 * 1024, // 500MB for authenticated users
         stream: 500 * 1024 * 1024, // 500MB
       }),
-      maxParts: ({ context }) => context.user === undefined
-        ? 10 // 10 parts for guests
-        : 1000, // 1000 parts for authenticated users
     }),
   ],
 })
