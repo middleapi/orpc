@@ -41,7 +41,6 @@ describe('uploads large files through tmp files', () => {
         size: file.size,
         // Read from disk while the request is still running, in constant memory
         sha256: createHash('sha256').update(new Uint8Array(await file.arrayBuffer())).digest('hex'),
-        // Uploads under the spool threshold stay in memory, without a path
         spooledSize: file instanceof TmpFile ? statSync(file.path).size : undefined,
         spooledInsideTmpDir: file instanceof TmpFile && path.dirname(path.dirname(file.path)) === tmpDir,
       }
@@ -220,7 +219,7 @@ describe('uploads large files through tmp files', () => {
       const content = new Uint8Array(2 * 1024 * 1024).fill(7)
       await expect(client.upload({ file: new File([content], 'too-large.bin') })).rejects.toThrow()
 
-      // Under the limit the same server accepts the upload, small enough to stay in memory
+      // Under the limit the same server accepts the upload
       const small = new Uint8Array(16 * 1024).fill(7)
       await expect(client.upload({ file: new File([small], 'small.bin') })).resolves.toMatchObject({ isTmpFile: false, size: small.length })
 

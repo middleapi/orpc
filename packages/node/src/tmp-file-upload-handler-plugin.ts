@@ -72,10 +72,8 @@ export interface TmpFileUploadHandlerPluginOptions<T extends Context> {
   /**
    * The size in bytes an uploaded file must exceed before it is spooled to a
    * temporary file. Smaller files stay in memory as plain `File`s, counted
-   * against `maxBodySize.memory`, so a temporary file only ever costs a client
-   * more than this many bytes of upload, and empty or tiny files cost none. A
-   * file that no longer fits in the memory limit spools regardless. Set to `0`
-   * to spool every non-empty upload.
+   * against `maxBodySize.memory`, and spool anyway once they no longer fit.
+   * Set to `0` to spool every non-empty upload.
    *
    * @default 64 * 1024
    */
@@ -117,9 +115,8 @@ export class TmpFile extends File {
  * body parser would buffer into an in-memory `File`, and multipart file parts, are
  * streamed to disk once they outgrow the spool threshold and surfaced as lazily read
  * {@link TmpFile} instances, so requests far larger than available memory parse in
- * constant memory. Smaller uploads stay in memory as plain `File`s, so no upload costs
- * a temporary file without paying for it in bytes. Every other body is left to the
- * standard parser.
+ * constant memory. Smaller uploads stay in memory as plain `File`s. Every other body is
+ * left to the standard parser.
  *
  * Request body sizes are limited per content category: buffered in memory, uploaded
  * files, and streamed, each limit fixed or resolved per request. This subsumes the
@@ -503,28 +500,17 @@ function indexOrEnd(bytes: Buffer, byte: number, from: number): number {
   return index === -1 ? bytes.length : index
 }
 
-/**
- * A byte limit for one category of request content.
- */
 class Budget {
   private used = 0
 
   constructor(private readonly limit: number) {}
 
-  /**
-   * Takes `size` bytes from the budget, rejecting with `PAYLOAD_TOO_LARGE`
-   * when they don't fit.
-   */
   charge(size: number): void {
     if (!this.tryCharge(size)) {
       throw new ORPCError('PAYLOAD_TOO_LARGE')
     }
   }
 
-  /**
-   * Takes `size` bytes from the budget if they fit, leaving it untouched
-   * otherwise.
-   */
   tryCharge(size: number): boolean {
     if (this.used + size > this.limit) {
       return false
@@ -539,13 +525,6 @@ class Budget {
   }
 }
 
-/**
- * Receives one upload, counting it against the file budget wherever it is
- * held. It stays in memory while within the spool threshold and the memory
- * budget, and moves to a temporary file at the first chunk that doesn't fit.
- * Spilling writes everything held so far in a single append and refunds its
- * memory, so a spooled upload never counts as held in memory.
- */
 class UploadWriter {
   private held: Buffer[] = []
   private heldSize = 0
@@ -582,7 +561,7 @@ class UploadWriter {
       return this.tmpFiles.seal(this.tmpPath, name, type)
     }
 
-    // One contiguous part, however many chunks it arrived in, keeps reads and native memory proportional to its size
+    // A File keeps one part per chunk, so merge them first
     return new File([Buffer.concat(this.held, this.heldSize)], name, { type })
   }
 }
@@ -609,9 +588,6 @@ class RequestTmpFiles {
     return this.dir !== undefined
   }
 
-  /**
-   * Creates a temporary file holding `content` and returns its path.
-   */
   async create(content: Uint8Array): Promise<string> {
     try {
       this.dir ??= mkdtemp(path.join(this.tmpDir, 'orpc-upload-'))

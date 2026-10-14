@@ -38,7 +38,6 @@ describe('tmpFileUploadHandlerPlugin', () => {
     memory?: number
     file?: number
     stream?: number
-    /** Replaces the plugin built from the other options. */
     plugin?: TmpFileUploadHandlerPlugin<Context>
     onInput?: (input: any) => unknown
   } = {}) {
@@ -74,7 +73,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
           file: options.file ?? Number.POSITIVE_INFINITY,
           stream: options.stream ?? Number.POSITIVE_INFINITY,
         },
-        // Spools every non-empty upload, so small test bodies take the disk path
+        // Small test bodies still spool
         spoolThreshold: 0,
       })],
     })
@@ -117,9 +116,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
    */
   async function runThroughPlugin(options: {
     limits?: { memory?: number, file?: number, stream?: number }
-    /** Defaults to spooling every non-empty upload, so small test bodies take the disk path. */
     spoolThreshold?: number
-    /** Replaces the plugin built from `limits` and `spoolThreshold`. */
     plugin?: TmpFileUploadHandlerPlugin<Context>
     headers: Record<string, string>
     body?: Buffer
@@ -138,6 +135,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
         file: options.limits?.file ?? Number.POSITIVE_INFINITY,
         stream: options.limits?.stream ?? Number.POSITIVE_INFINITY,
       },
+      // Small test bodies still spool
       spoolThreshold: options.spoolThreshold ?? 0,
     })
     const interceptor = plugin.init({}).routingInterceptors![0]!
@@ -158,10 +156,6 @@ describe('tmpFileUploadHandlerPlugin', () => {
     })
   }
 
-  /**
-   * Resolves `body` as a file body, expecting it intact and either spooled or
-   * held in memory.
-   */
   async function expectFileBody(body: Buffer, spooled: boolean, options: Omit<Parameters<typeof runThroughPlugin>[0], 'headers' | 'body' | 'inspect'> = {}): Promise<void> {
     await runThroughPlugin({
       ...options,
@@ -191,9 +185,6 @@ describe('tmpFileUploadHandlerPlugin', () => {
     }
   }
 
-  /**
-   * Lists the tmp files every in-flight request holds.
-   */
   function listTmpFiles(): string[] {
     return readdirSync(tmpDir).flatMap(dir => readdirSync(path.join(tmpDir, dir)).map(file => path.join(tmpDir, dir, file)))
   }
@@ -255,7 +246,6 @@ describe('tmpFileUploadHandlerPlugin', () => {
 
     expect(res.status).toBe(200)
 
-    // Even when every non-empty upload spools, an empty one never costs a tmp file
     const file = captured[0]!.input as File
     expect(file).toBeInstanceOf(File)
     expect(file).not.toBeInstanceOf(TmpFile)
@@ -460,10 +450,6 @@ describe('tmpFileUploadHandlerPlugin', () => {
       return true
     }
 
-    /**
-     * Streams a first chunk, which spools to a tmp file, then lets `tamper` act
-     * on that file before ending the stream with `lastChunk`, if any.
-     */
     const tamperAfterSpool = (tamper: (file: string) => void, lastChunk?: Uint8Array) => async () => new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(Buffer.from('spooled'))
@@ -488,7 +474,6 @@ describe('tmpFileUploadHandlerPlugin', () => {
       },
     })
 
-    // A directory squatting on the spooled path fails the next append
     await expect(runThroughPlugin({
       headers: { 'standard-server': 'file' },
       resolveBody: tamperAfterSpool((file) => {
@@ -498,7 +483,6 @@ describe('tmpFileUploadHandlerPlugin', () => {
       inspect: () => {},
     })).rejects.toSatisfy(expectInternalError)
 
-    // A spooled file removed before sealing fails the seal
     await expect(runThroughPlugin({
       headers: { 'standard-server': 'file' },
       resolveBody: tamperAfterSpool(file => rmSync(file)),
@@ -633,7 +617,6 @@ describe('tmpFileUploadHandlerPlugin', () => {
             expect(entry).toMatchObject({ kind: 'field', value: expectedValue })
           }
           else {
-            // Every non-empty file spools, and an empty one stays in memory
             expect(entry).toMatchObject({ kind: 'file', fileName: expectedValue.name, type: expectedValue.type, isTmpFile: expectedValue.size > 0 })
             expect((entry as { content: Buffer }).content.equals(Buffer.from(await expectedValue.arrayBuffer()))).toBe(true)
           }
@@ -1106,7 +1089,6 @@ describe('tmpFileUploadHandlerPlugin', () => {
         },
       })
 
-      // An empty file part costs its header and never a tmp file
       expect(await countTmpFilesWhenRejected({ memory: headerCost - 1 }, body)).toBe(0)
     })
 
@@ -1117,7 +1099,6 @@ describe('tmpFileUploadHandlerPlugin', () => {
         { header: 'Content-Disposition: form-data; name="field"', content: 'f'.repeat(40) },
       ])
 
-      // Room for the first file and the field, but not for the second file as well
       await runThroughPlugin({
         limits: { memory: sum(headerSizes) + 100 + 40 },
         spoolThreshold: 1024,
@@ -1129,12 +1110,11 @@ describe('tmpFileUploadHandlerPlugin', () => {
           expect(form.get('first')).not.toBeInstanceOf(TmpFile)
           expect(form.get('second')).toBeInstanceOf(TmpFile)
           expect(await (form.get('second') as File).text()).toBe('b'.repeat(100))
-          // Spooling returned what the second file held, so the field after it still fits
+          // Spooling refunded the second file's memory
           expect(form.get('field')).toBe('f'.repeat(40))
         },
       })
 
-      // A file body under the threshold spools too once it outgrows the memory limit
       await expectFileBody(Buffer.alloc(100, 7), false, { limits: { memory: 100 }, spoolThreshold: 1024 })
       await expectFileBody(Buffer.alloc(100, 7), true, { limits: { memory: 99 }, spoolThreshold: 1024 })
 
@@ -1351,8 +1331,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
 
     /**
      * Runs a request through a plugin whose limits follow the request context:
-     * 16 bytes of every kind for a guest, 4096 for an authenticated user. Every
-     * non-empty upload spools.
+     * 16 bytes of every kind for a guest, 4096 for an authenticated user.
      */
     async function runWithContextualLimits(options: {
       context: AuthContext
@@ -1468,15 +1447,13 @@ describe('tmpFileUploadHandlerPlugin', () => {
         },
       })
 
-      // Spooled, each part would cost a tmp file for 57 bytes of memory budget
       const { body } = createMultipartBody(Array.from({ length: 5000 }, () => ({
         header: 'Content-Disposition: form-data; name="a"; filename=""',
       })))
 
-      const res = await agent.post('/upload').set(multipartHeaders).send(body) // ~390 KB
+      const res = await agent.post('/upload').set(multipartHeaders).send(body)
 
       expect(res.status).toBe(401)
-      // The request directory is created with the first tmp file, so none was
       expect(captured[0]!.tmpDirEntries).toHaveLength(0)
     })
 
@@ -1511,7 +1488,6 @@ describe('tmpFileUploadHandlerPlugin', () => {
         })
       }
 
-      // A file body follows the same rule
       await expectFileBody(atThreshold, false, { spoolThreshold: 1024, chunkSize: 7 })
       await expectFileBody(overThreshold, true, { spoolThreshold: 1024, chunkSize: 7 })
 
