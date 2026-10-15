@@ -151,7 +151,7 @@ Supports arrays of key-value pairs with **unique keys**:
 
 ## Step Budget
 
-Both plugins accept `maxStepsPerValue` (default `1000`), the maximum coercion steps per input value, where a step applies one schema to one value. Past it, the value is left uncoerced and validation still runs. Raise it if large inputs fail validation while smaller ones of the same shape pass.
+Both plugins accept `maxStepsPerValue` (default 1000), the maximum coercion steps per input value, where a step applies one schema to one value. Past it, the whole input is left uncoerced and validation still runs. Raise it if large inputs fail validation while smaller ones of the same shape pass.
 
 ## Advanced Usage
 

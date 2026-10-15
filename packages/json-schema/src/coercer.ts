@@ -67,10 +67,7 @@ function minSatisfaction(a: Satisfaction, b: Satisfaction): Satisfaction {
   return a < b ? a : b
 }
 
-/**
- * Inputs with fewer values are budgeted as if they had this many,
- * so a small input still coerces against a large schema.
- */
+/** Small inputs are budgeted as this many values, so they still coerce against large schemas. */
 const MIN_BUDGETED_VALUES = 100
 
 export interface JsonSchemaCoercerOptions {
@@ -83,32 +80,20 @@ export interface JsonSchemaCoercerOptions {
   maxBigIntDigits?: number | undefined
 
   /**
-   * Maximum number of steps a coercion may take per value in the input, where a step applies one schema to one value.
-   * Inputs with fewer than 100 values are budgeted as 100 values.
+   * Maximum coercion steps per input value, where a step applies one schema to one value.
+   * Inputs with fewer than 100 values are budgeted as 100. Past the budget the whole input is left uncoerced,
+   * so validation still runs and reports any mismatch.
    *
-   * A value takes about one step per union branch it is tried against, multiplied across nested unions,
-   * but the depth of recursive schemas does not multiply it. A coercion that runs out of steps leaves the whole input
-   * untouched, so validation still runs and reports any mismatch.
-   *
-   * @default 1_000
+   * @default 1000
    */
   maxStepsPerValue?: number | undefined
 }
 
 interface CoercionContext {
   rootSchema: JsonSchema
-  /**
-   * Results of `$ref`s applied to objects, by resolved schema then by value.
-   * Union branches often reach the same nested value through the same `$ref`, so without it
-   * recursive unions would coerce that value once per branch at every depth.
-   */
   memo: Map<JsonSchema, Map<unknown, CoercionResult>> | undefined
   steps: number
   maxSteps: number
-  /**
-   * Counted only after the minimum budget is spent, to extend `maxSteps` to its size,
-   * so most coercions never count it.
-   */
   input: unknown
 }
 
@@ -452,9 +437,9 @@ export class JsonSchemaCoercer {
   }
 
   /**
-   * Applies a resolved `$ref` to a value. With no other `$ref` applied to the value, the result only depends on
-   * the value and the resolved schema, and coercion never mutates a value in place, so the result for an object
-   * is shared by every union branch that reaches it.
+   * Shares the result for an object across every union branch that reaches it through this `$ref`, keeping recursive
+   * unions linear. Coercion never mutates values, so sharing is safe, but not while another `$ref` is applied to the
+   * value, since the cycle check then changes the result.
    */
   private coerceRef(
     context: CoercionContext,
@@ -491,25 +476,19 @@ export class JsonSchemaCoercer {
     return result
   }
 
-  /**
-   * Extends the budget once the steps taken pass it, or gives up.
-   */
   private extendBudget(context: CoercionContext): void {
-    // Count only as far as needed to lift the budget to twice the steps taken, so a large input that stays within it
-    // is walked about as far as coercion has gone. The budget can only run out on a complete count of the input.
+    // counting stops at twice the steps taken, so it costs no more than coercion so far,
+    // and the budget only runs out on a complete count
     const limit = 2 * context.steps / this.maxStepsPerValue
     context.maxSteps = this.maxStepsPerValue * Math.max(countValues(context.input, limit), MIN_BUDGETED_VALUES)
 
     if (context.steps > context.maxSteps) {
-      throw new CoercionBudgetExceededError('Coercion took too many steps')
+      throw new CoercionBudgetExceededError()
     }
   }
 }
 
-/**
- * Counts the values in an input, nested ones included, stopping once the count reaches `limit`.
- * Each array or object is only walked once, so shared and circular references stay finite.
- */
+/** Counts nested values up to `limit`, walking each array or object once so circular references count once. */
 function countValues(input: unknown, limit: number): number {
   const walked = new Set<object>()
   const stack = [input]
@@ -521,7 +500,6 @@ function countValues(input: unknown, limit: number): number {
     if ((Array.isArray(value) || isPlainObject(value)) && !walked.has(value)) {
       walked.add(value)
 
-      // like coercion, `Object.values` skips the holes of sparse arrays
       for (const item of Object.values(value)) {
         count++
 

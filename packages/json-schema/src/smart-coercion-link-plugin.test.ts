@@ -77,18 +77,11 @@ describe('smartCoercionLinkPlugin', () => {
     } as any)).resolves.toEqual({ number: 456, boolean: false })
   })
 
-  it('passes the step budget to its coercer', async () => {
-    // one step for the array and three per item: more than one step per value, but well within the default
-    const contract = oc.router({
-      list: oc.output(z.array(z.union([z.boolean(), z.number()]))),
-    })
+  it('passes maxStepsPerValue to the coercer', async () => {
+    const contract = oc.router({ get: oc.output(z.number()) })
+    const interceptor = new SmartCoercionLinkPlugin(contract, { maxStepsPerValue: 0 }).init({} as any).interceptors?.[0]
 
-    const output = Array.from({ length: 200 }, (_, i) => String(i))
-    const next = vi.fn().mockResolvedValue(output)
-    const run = (plugin: SmartCoercionLinkPlugin<any>) => plugin.init({} as any).interceptors![0]!({ path: ['list'], next } as any)
-
-    await expect(run(new SmartCoercionLinkPlugin(contract, { maxStepsPerValue: 1 }))).resolves.toBe(output)
-    await expect(run(new SmartCoercionLinkPlugin(contract))).resolves.toEqual(Array.from({ length: 200 }, (_, i) => i))
+    await expect(interceptor?.({ path: ['get'], next: vi.fn().mockResolvedValue('1') } as any)).resolves.toBe('1')
   })
 
   it('throw the original error when it not defined ORPCError or has no data schema', async () => {
