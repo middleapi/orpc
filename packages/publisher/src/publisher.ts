@@ -111,7 +111,7 @@ export abstract class Publisher<T extends Record<string, object>> {
 
     throwIfAborted(signal)
 
-    const bufferedEvents: T[K][] = []
+    const bufferedEvents = new Queue<T[K]>()
     const pullResolvers: { resolve: (result: IteratorResult<T[K]>) => void, reject: (error: Error) => void }[] = []
 
     const unsubscribePromise = this
@@ -159,7 +159,7 @@ export abstract class Publisher<T extends Record<string, object>> {
 
       if (signal?.aborted) {
         pullResolvers.length = 0
-        bufferedEvents.length = 0
+        bufferedEvents.clear()
       }
 
       // Keep this async call at the end to avoid race conditions.
@@ -173,8 +173,10 @@ export abstract class Publisher<T extends Record<string, object>> {
           return { done: true, value: undefined }
         }
 
-        if (bufferedEvents.length > 0) {
-          return { done: false, value: bufferedEvents.shift()! }
+        const value = bufferedEvents.shift()
+
+        if (value !== undefined) {
+          return { done: false, value }
         }
 
         if (terminalState?.kind === 'error') {
@@ -187,5 +189,42 @@ export abstract class Publisher<T extends Record<string, object>> {
       },
       () => terminate({ kind: 'cancelled' }),
     )
+  }
+}
+
+/**
+ * FIFO queue with O(1) `shift`, since `Array.prototype.shift` copies large arrays on every call.
+ */
+class Queue<T extends object> {
+  private readonly items: (T | undefined)[] = []
+  private head = 0
+
+  get length(): number {
+    return this.items.length - this.head
+  }
+
+  push(item: T): void {
+    this.items.push(item)
+  }
+
+  shift(): T | undefined {
+    if (this.head === this.items.length) {
+      return undefined
+    }
+
+    const item = this.items[this.head]
+    this.items[this.head++] = undefined
+
+    if (this.head >= 32 && this.head * 2 >= this.items.length) {
+      this.items.splice(0, this.head)
+      this.head = 0
+    }
+
+    return item
+  }
+
+  clear(): void {
+    this.items.length = 0
+    this.head = 0
   }
 }

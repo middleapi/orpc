@@ -136,6 +136,28 @@ describe('publisher', () => {
       expect(received).toHaveLength(100)
     })
 
+    it('keeps order while a large buffer is drained and refilled', async () => {
+      const iterator = publisher.subscribe('count', { maxBufferedEvents: Infinity })
+
+      for (let i = 0; i < 100; i++) {
+        await publisher.publish('count', { value: i })
+      }
+
+      for (let i = 0; i < 50; i++) {
+        expect((await iterator.next()).value?.value).toBe(i)
+      }
+
+      for (let i = 100; i < 200; i++) {
+        await publisher.publish('count', { value: i })
+      }
+
+      for (let i = 50; i < 200; i++) {
+        expect((await iterator.next()).value?.value).toBe(i)
+      }
+
+      await iterator.return()
+    })
+
     describe('when a subscriber falls behind', () => {
       it('delivers queued messages once the subscriber catches up', async () => {
         const iterator = publisher.subscribe('message', { maxBufferedEvents: 3 })
