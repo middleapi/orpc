@@ -109,3 +109,30 @@ describe('openapiHandler', () => {
     expect(responseStream.text).toBe('"intercepted"')
   })
 })
+
+describe('openapiHandler path decoding', () => {
+  const HTTP_API = 'abc123.execute-api.us-east-1.amazonaws.com'
+  const FUNCTION_URL = 'abc123xyz.lambda-url.us-east-1.on.aws'
+
+  const handler = new OpenAPIHandler({
+    get: os.meta(openapi({ method: 'GET', path: '/users/{id}' })).handler(({ input }) => input),
+  })
+
+  it.each([
+    ['/users/a%2Fb', HTTP_API, 'a%2Fb'],
+    ['/users/%41', HTTP_API, '%41'],
+    ['/users/100%', HTTP_API, '100%'],
+    ['/users/a b', HTTP_API, 'a b'],
+    ['/users/é\\', HTTP_API, 'é\\'],
+    ['/users/a%2Fb', FUNCTION_URL, 'a/b'], // encoded, decoded once
+  ])('%s from %s yields id %s', async (rawPath, domainName, id) => {
+    const responseStream = new TestResponseStream()
+    await handler.handle(createEvent({
+      rawPath,
+      body: null,
+      requestContext: { http: { method: 'GET' }, domainName } as APIGatewayProxyEventV2['requestContext'],
+    }), responseStream)
+
+    expect(JSON.parse(responseStream.text)).toEqual({ id })
+  })
+})
