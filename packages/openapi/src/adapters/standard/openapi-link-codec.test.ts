@@ -780,7 +780,7 @@ describe('openAPILinkCodec', () => {
 
       const result = await codec.decodeResponse({
         status: 404,
-        headers: {},
+        headers: { 'x-trace': '1' },
         resolveBody: async () => error.toJSON(),
       }, ['ping'], { context: {} })
 
@@ -788,6 +788,7 @@ describe('openAPILinkCodec', () => {
         message: 'Missing',
         data: { id: '42' },
       })
+      expect((result as any).error.cause).toEqual({ status: 404, headers: { 'x-trace': '1' }, body: error.toJSON() })
     })
 
     it('uses a custom error decoder when it returns a value', async () => {

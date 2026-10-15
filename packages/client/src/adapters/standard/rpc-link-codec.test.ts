@@ -293,13 +293,18 @@ describe('rpcLinkCodec', () => {
 
       const result = await codec.decodeResponse({
         status: 404,
-        headers: {},
+        headers: { 'x-header': 'value' },
         resolveBody: () => Promise.resolve(serialized),
       })
 
       expect(result).toEqual({
         kind: 'error',
-        error: expect.objectContaining({ code: 'NOT_FOUND', message: 'Resource not found', data: { id: '123' } }),
+        error: expect.objectContaining({
+          code: 'NOT_FOUND',
+          message: 'Resource not found',
+          data: { id: '123' },
+          cause: { status: 404, headers: { 'x-header': 'value' }, body: error.toJSON() },
+        }),
       })
     })
 

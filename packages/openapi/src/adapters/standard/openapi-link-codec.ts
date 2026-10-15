@@ -405,7 +405,12 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       }
 
       if (isORPCErrorJson(deserialized)) {
-        return { kind: 'error', error: createORPCErrorFromJson(deserialized) }
+        return {
+          kind: 'error',
+          error: createORPCErrorFromJson(deserialized, {
+            cause: { status: response.status, headers: response.headers, body: deserialized },
+          }),
+        }
       }
 
       throw new MalformedResponseError({ response: { headers: response.headers, status: response.status, body } })
