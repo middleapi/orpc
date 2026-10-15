@@ -35,46 +35,36 @@ function assertSerializedType(ok: boolean, type: string, expected: string): void
 }
 
 /**
- * The paths a deserialize call has restored so far, as a tree of segments where `true` marks a restored path.
- * Segments are keyed as strings, like property keys, so `0` and `"0"` are the same path.
+ * Paths only walk through arrays and plain objects, the containers JSON is made of.
  */
-type RestoredPaths = Map<string, RestoredPaths | true>
-
-/**
- * Steps into `segment` of the restored paths, rejecting a path that walks through an already restored one.
- * Otherwise a later entry could mutate a value after its handler validated it.
- * `serialize` emits maps before meta and children before parents, so its payloads never do.
- */
-function walkRestoredPaths(node: RestoredPaths, segment: Segment): RestoredPaths {
-  const key = String(segment)
-  const child = node.get(key)
-
-  if (child === true) {
-    throw invalidSerializedData(`segment "${segment}" was already deserialized.`)
+function isWalkable(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) {
+    return false
   }
 
-  if (child !== undefined) {
-    return child
+  if (Array.isArray(value)) {
+    return true
   }
 
-  const created: RestoredPaths = new Map()
-  node.set(key, created)
-  return created
+  // Unlike `isPlainObject`, avoids reading `constructor` from every class prototype on this hot path
+  const proto = Object.getPrototypeOf(value)
+  return proto === Object.prototype || proto === null || Object.getPrototypeOf(proto) === null
 }
 
 /**
  * Returns `parent[key]` for a path to walk through, copying it first while it is still the original value.
- * Only arrays and plain objects can be walked through: `copyOnWrite` copies them, so a write never lands in
- * a value shared with another position, which structured clone transports can deliver.
+ *
+ * A path must never walk through a value a handler returned, or a later entry could mutate it
+ * after the handler validated it. `serialize` emits children before parents, so its payloads never do.
  */
-function walkInto(parent: any, key: Segment, original: unknown): any {
+function walkInto(parent: any, key: Segment, original: unknown, restored?: Set<unknown>): any {
   const value = parent[key]
 
-  if (!Array.isArray(value) && !isPlainObject(value)) {
-    throw invalidSerializedData(`segment "${key}" is not an array or plain object.`)
+  if (!isWalkable(value) || restored?.has(value)) {
+    throw invalidSerializedData(`segment "${key}" cannot be walked into.`)
   }
 
-  return copyOnWrite(parent, key, original)
+  return value === original ? copyOnWrite(parent, key, original) : value
 }
 
 const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHandler> = {
@@ -441,7 +431,6 @@ export class RPCJsonSerializer {
 
   deserialize(serialized: RPCJsonSerialization): unknown {
     const ref = { json: serialized.json }
-    const restored: RestoredPaths = new Map()
 
     if (serialized.blobs?.length) {
       for (let i = 0; i < serialized.maps.length; i++) {
@@ -455,11 +444,9 @@ export class RPCJsonSerializer {
 
         let original: any = serialized
         let currentRef: any = ref
-        let node = restored
         let preSegment: string | number = 'json'
 
         for (let j = 0; j < segments.length; j++) {
-          node = walkRestoredPaths(node, preSegment)
           original = original[preSegment]
           currentRef = walkInto(currentRef, preSegment, original)
           preSegment = segments[j]!
@@ -470,19 +457,11 @@ export class RPCJsonSerializer {
         }
 
         currentRef[preSegment] = blob
-        node.set(String(preSegment), true)
       }
     }
 
     if (serialized.meta) {
-      /**
-       * The previous entry's walk by depth, so a shared path prefix is not walked again.
-       * It only wrote at its last segment, which the next walk still checks, so every cached depth stays valid.
-       */
-      const refs: any[] = [ref]
-      const originals: any[] = [serialized]
-      const nodes: RestoredPaths[] = [restored]
-      let previous: RPCJsonSerializationMeta | undefined
+      let restored: Set<unknown> | undefined
 
       for (const item of serialized.meta) {
         const type = item[0]
@@ -492,43 +471,26 @@ export class RPCJsonSerializer {
           throw invalidSerializedData(`type "${type}" is not supported.`)
         }
 
-        let depth = 0
+        let original: any = serialized
+        let currentRef: any = ref
+        let preSegment: string | number = 'json'
 
-        if (previous !== undefined) {
-          const max = Math.min(item.length, previous.length) - 1
-
-          while (depth < max && (depth === 0 || item[depth] === previous[depth])) {
-            depth++
-          }
-        }
-
-        let original = originals[depth]
-        let currentRef = refs[depth]
-        let node = nodes[depth]!
-        let preSegment: string | number = depth === 0 ? 'json' : item[depth]!
-
-        if (depth !== 0 && !Object.hasOwn(currentRef, preSegment)) {
-          throw invalidSerializedData(`segment "${preSegment}" does not exist.`)
-        }
-
-        for (let i = depth + 1; i < item.length; i++) {
-          node = walkRestoredPaths(node, preSegment)
+        for (let i = 1; i < item.length; i++) {
           original = original[preSegment]
-          currentRef = walkInto(currentRef, preSegment, original)
+          currentRef = walkInto(currentRef, preSegment, original, restored)
           preSegment = item[i]!
-
-          originals[i] = original
-          refs[i] = currentRef
-          nodes[i] = node
 
           if (!Object.hasOwn(currentRef, preSegment)) {
             throw invalidSerializedData(`segment "${preSegment}" does not exist.`)
           }
         }
 
-        currentRef[preSegment] = handler.deserialize(currentRef[preSegment])
-        node.set(String(preSegment), true)
-        previous = item
+        const value = handler.deserialize(currentRef[preSegment])
+        currentRef[preSegment] = value
+
+        if (isWalkable(value)) {
+          (restored ??= new Set()).add(value)
+        }
       }
     }
 
