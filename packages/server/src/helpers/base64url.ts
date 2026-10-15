@@ -62,7 +62,6 @@ export function decodeBase64url(base64url: string | undefined | null): Uint8Arra
       bytes[i] = binaryString.charCodeAt(i)
     }
 
-    // atob is forgiving (padding, +/, whitespace, non-zero unused bits), so require the exact canonical form
     return encodeBase64url(bytes) === base64url ? bytes : undefined
   }
   catch {
