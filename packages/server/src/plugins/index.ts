@@ -8,7 +8,6 @@ export {
 } from './cors'
 export * from './get-method-csrf-protection'
 export * from './method-override'
-export * from './prototype-pollution-protection'
 export * from './request-compression'
 export * from './request-headers'
 export {
