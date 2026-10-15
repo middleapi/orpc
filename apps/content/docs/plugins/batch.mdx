@@ -79,9 +79,13 @@ const link = new RPCLink({
 })
 ```
 
+:::info
+A procedure that returns an [AsyncIteratorObject](/docs/async-iterator-object) or a [`ReadableStream`](/docs/binary-data) can stay open indefinitely, so buffering it would hold back the whole batch. Once a procedure in a `buffered` batch returns one, the batch switches to streaming: the server writes out the responses collected so far, then sends the rest as they are ready.
+:::
+
 ### Keep-Alive Timer
 
-In **streaming** mode, long-running batch responses may remain idle for extended periods. The server plugin can send keep-alive frames to keep the connection alive.
+In **streaming** mode, or once a buffered batch switches to streaming, long-running batch responses may remain idle for extended periods. The server plugin can send keep-alive frames to keep the connection alive.
 
 ```ts
 const handler = new RPCHandler(router, {

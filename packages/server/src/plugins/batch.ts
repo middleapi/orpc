@@ -5,13 +5,13 @@ import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-ser
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
 import { ORPCError } from '@orpc/client'
-import { toArray, value } from '@orpc/shared'
+import { isAsyncIteratorObject, once, promiseWithResolvers, toArray, value } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
 
 /**
  * Content type for batch responses that use the length-prefixed binary framing
- * (streaming mode, and buffered mode when any sub-response contains binary).
+ * (streaming mode, and buffered mode when any sub-response contains binary or is a stream).
  *
  * Decoding is driven by the `standard-server` body hint, not this header,
  * so it only serves to describe the payload to logs, proxies, and dev tools.
@@ -53,7 +53,7 @@ export interface BatchHandlerPluginOptions<T extends Context> {
    *
    * When enabled, a zero-length length-prefixed frame is sent periodically while the
    * stream is idle (no message sent for `interval` ms). Clients ignore these frames.
-   * Only applies to streaming mode.
+   * Only applies to streaming responses: streaming mode, or a buffered batch with a stream sub-response.
    *
    * @default { enabled: true, interval: 15000 }
    */
@@ -78,6 +78,9 @@ export interface BatchHandlerPluginOptions<T extends Context> {
  * batch into sub-requests and streaming their responses back together.
  *
  * @remarks
+ * In buffered mode, the batch still streams once a sub-response is a stream
+ * (an event iterator or a `ReadableStream`), since it may never end.
+ *
  * **Note**: HTTP/2 and later already multiplex requests over a single connection, which often makes this plugin unnecessary.
  *
  * @see {@link https://orpc.dev/docs/plugins/batch | Batch Plugin}
@@ -201,6 +204,94 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       }
 
+      const status = await value(this.successStatus, interceptorOptions)
+      const headers = await value(this.headers, interceptorOptions)
+
+      /**
+       * Response messages are held here until the batch response starts streaming, which happens
+       * right away in streaming mode, and in buffered mode only once a subresponse is a stream.
+       */
+      const bufferedMessages: ServerPeerSendMessage[] = []
+      let streamController: ReadableStreamDefaultController<Uint8Array> | undefined
+      let keepAliveTimer: ReturnType<typeof setInterval> | undefined
+
+      const clearKeepAlive = () => {
+        if (keepAliveTimer !== undefined) {
+          clearInterval(keepAliveTimer)
+          keepAliveTimer = undefined
+        }
+      }
+
+      const scheduleKeepAlive = () => {
+        if (!this.keepAliveEnabled) {
+          return
+        }
+
+        clearKeepAlive()
+        keepAliveTimer = setInterval(() => {
+          try {
+            // Zero-length length-prefixed frame = keep-alive (ignored by clients)
+            const lengthBuffer = new ArrayBuffer(4)
+            new DataView(lengthBuffer).setUint32(0, 0, false)
+            streamController!.enqueue(new Uint8Array(lengthBuffer))
+          }
+          catch {
+            // Stream may already be closed or errored.
+            clearKeepAlive()
+          }
+        }, this.keepAliveInterval)
+      }
+
+      const enqueueMessage = async (message: ServerPeerSendMessage): Promise<void> => {
+        const encoded = await encodePeerMessage(message)
+        const bytes = typeof encoded === 'string' ? new TextEncoder().encode(encoded) : encoded
+
+        const lengthBuffer = new ArrayBuffer(4)
+        new DataView(lengthBuffer).setUint32(0, bytes.byteLength, false)
+        streamController!.enqueue(new Uint8Array(lengthBuffer))
+        streamController!.enqueue(bytes)
+        scheduleKeepAlive() // reset idle timer
+      }
+
+      const peer = new ServerPeer(async (message) => {
+        if (streamController === undefined) {
+          bufferedMessages.push(message)
+        }
+        else {
+          await enqueueMessage(message)
+        }
+      })
+
+      const { promise: streamingStarted, resolve: markStreamingStarted } = promiseWithResolvers<void>()
+
+      /**
+       * Opens the binary length-prefixed stream that every later message is written to,
+       * starting with the messages buffered so far, which `flushed` waits for.
+       */
+      const startStreaming = once(() => {
+        const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
+          start(controller) {
+            streamController = controller
+            scheduleKeepAlive()
+          },
+          async cancel(reason) {
+            clearKeepAlive()
+            await peer.close(reason)
+          },
+        })
+
+        markStreamingStarted()
+
+        return {
+          flushed: Promise.all(bufferedMessages.splice(0).map(enqueueMessage)),
+          response: {
+            status,
+            headers: { ...headers, 'content-type': BATCH_CONTENT_TYPE },
+            body: stream,
+          } satisfies StandardResponse,
+        }
+      })
+
       const handleIndividualRequest = async (request: StandardLazyRequest): Promise<StandardResponse> => {
         try {
           request = this.mapSubrequest(request, interceptorOptions)
@@ -208,6 +299,15 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
           if (!matched) {
             return { status: 404, headers: {}, body: 'No procedure matched' }
+          }
+
+          /**
+           * A stream is meant to be read as it arrives and might never end, so buffering it would
+           * hold back the whole batch. Start streaming before the peer sends its first message,
+           * so none of that subresponse is buffered.
+           */
+          if (response.body instanceof ReadableStream || isAsyncIteratorObject(response.body)) {
+            startStreaming()
           }
 
           return response
@@ -224,7 +324,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       }
 
-      const runSubrequests = async (peer: ServerPeer): Promise<void> => {
+      const runSubrequests = async (): Promise<void> => {
         const promise = Promise.all(messages.map(msg => peer.message(msg, handleIndividualRequest)))
         const signal = interceptorOptions.request.signal
         const closePeer = () => peer.close(signal?.reason)
@@ -243,22 +343,25 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       }
 
-      const status = await value(this.successStatus, interceptorOptions)
-      const headers = await value(this.headers, interceptorOptions)
+      if (mode === 'streaming') {
+        startStreaming()
+      }
 
-      if (mode === 'buffered') {
-        const responseMessages: ServerPeerSendMessage[] = []
-        const peer = new ServerPeer(async (message) => {
-          responseMessages.push(message)
-        })
+      const subrequests = runSubrequests()
 
-        await runSubrequests(peer)
+      // A buffered batch answers once every subresponse is ready, unless one turns out to be a stream first
+      const isStreaming = mode === 'streaming' || await Promise.race([
+        subrequests.then(() => false),
+        streamingStarted.then(() => true),
+      ])
+
+      if (!isStreaming) {
         await peer.close()
 
-        if (responseMessages.some(msg => msg.binary !== undefined)) {
+        if (bufferedMessages.some(msg => msg.binary !== undefined)) {
           const chunks: Uint8Array<ArrayBuffer>[] = []
 
-          for (const message of responseMessages) {
+          for (const message of bufferedMessages) {
             const encoded = await encodePeerMessage(message)
             const bytes = typeof encoded === 'string'
               ? new TextEncoder().encode(encoded)
@@ -282,84 +385,26 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
         return {
           matched: true,
-          response: { status, headers, body: responseMessages },
+          response: { status, headers, body: bufferedMessages },
         }
       }
 
-      // streaming mode — binary length-prefixed ReadableStream
-      let streamController: ReadableStreamDefaultController<Uint8Array>
-      let keepAliveTimer: ReturnType<typeof setInterval> | undefined
-
-      const clearKeepAlive = () => {
-        if (keepAliveTimer !== undefined) {
-          clearInterval(keepAliveTimer)
-          keepAliveTimer = undefined
-        }
-      }
-
-      const scheduleKeepAlive = () => {
-        if (!this.keepAliveEnabled) {
-          return
-        }
-
-        clearKeepAlive()
-        keepAliveTimer = setInterval(() => {
-          try {
-            // Zero-length length-prefixed frame = keep-alive (ignored by clients)
-            const lengthBuffer = new ArrayBuffer(4)
-            new DataView(lengthBuffer).setUint32(0, 0, false)
-            streamController.enqueue(new Uint8Array(lengthBuffer))
-          }
-          catch {
-            // Stream may already be closed or errored.
-            clearKeepAlive()
-          }
-        }, this.keepAliveInterval)
-      }
-
-      const peer = new ServerPeer(async (message) => {
-        const encoded = await encodePeerMessage(message)
-        const bytes = typeof encoded === 'string' ? new TextEncoder().encode(encoded) : encoded
-
-        const lengthBuffer = new ArrayBuffer(4)
-        new DataView(lengthBuffer).setUint32(0, bytes.byteLength, false)
-        streamController.enqueue(new Uint8Array(lengthBuffer))
-        streamController.enqueue(bytes)
-        scheduleKeepAlive() // reset idle timer
-      })
-
-      const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
-        start(controller) {
-          streamController = controller
-          scheduleKeepAlive()
-        },
-        async cancel(reason) {
-          clearKeepAlive()
-          await peer.close(reason)
-        },
-      })
+      const { flushed, response } = startStreaming()
 
       // DO NOT await here to block streaming response
-      runSubrequests(peer)
+      Promise.all([flushed, subrequests])
         .then(async () => {
           clearKeepAlive()
-          streamController.close()
+          streamController!.close()
           await peer.close()
         })
         .catch(async (error) => {
           clearKeepAlive()
-          streamController.error(error)
+          streamController!.error(error)
           await peer.close(error)
         })
 
-      return {
-        matched: true,
-        response: {
-          status,
-          headers: { ...headers, 'content-type': BATCH_CONTENT_TYPE },
-          body: stream,
-        },
-      }
+      return { matched: true, response }
     }
 
     return {

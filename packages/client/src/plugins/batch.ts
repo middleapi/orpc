@@ -67,6 +67,7 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
 
   /**
    * The batch response mode.
+   * A `buffered` batch still streams once a procedure in it returns a stream.
    *
    * @default 'streaming'
    */
