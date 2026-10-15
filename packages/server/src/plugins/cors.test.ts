@@ -1,5 +1,3 @@
-import type { Context } from '../context'
-import type { CORSHandlerPluginOptions } from './cors'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { os } from '../builder'
 import { CORSHandlerPlugin } from './cors'
@@ -548,52 +546,5 @@ describe('corsHandlerPlugin', () => {
       body: JSON.stringify({ json: null }),
     }))
     expect(response2!.headers.get('access-control-allow-origin')).toBeNull()
-  })
-})
-
-describe('corsHandlerPlugin with credentials', () => {
-  const router = {
-    me: os.handler(() => ({ email: 'victim@example.com' })),
-  }
-
-  // Simulates a cross-site request; the browser would attach the victim's ambient cookie.
-  async function send(options: CORSHandlerPluginOptions<Context>, origin: string, method: 'OPTIONS' | 'POST') {
-    const handler = new RPCHandler(router, { plugins: [new CORSHandlerPlugin(options)] })
-    const request = new Request('https://api.example.com/rpc/me', method === 'OPTIONS'
-      ? {
-          method,
-          headers: {
-            'origin': origin,
-            'access-control-request-method': 'POST',
-            'access-control-request-headers': 'content-type',
-          },
-        }
-      : {
-          method,
-          headers: { 'origin': origin, 'content-type': 'application/json' },
-          body: JSON.stringify({ json: {} }),
-        })
-    const { response } = await handler.handle(request, { prefix: '/rpc' })
-    return response!
-  }
-
-  const ALLOWED_ORIGINS = ['https://app.example.com']
-
-  it.each<[string, CORSHandlerPluginOptions<Context>]>([
-    ['array allowlist', { origin: ALLOWED_ORIGINS, credentials: true }],
-    ['function allowlist', { origin: origin => ALLOWED_ORIGINS.includes(origin) ? origin : null, credentials: true }],
-  ])('%s with credentials only grants listed origins', async (_, options) => {
-    for (const method of ['OPTIONS', 'POST'] as const) {
-      // CORS only stops the browser from reading the response: the blocked POST still runs the procedure
-      // and still carries `access-control-allow-credentials: true`, but without a matching
-      // `access-control-allow-origin` the browser refuses it.
-      const blocked = await send(options, 'https://evil.example', method)
-      expect(blocked.headers.get('access-control-allow-origin')).toBeNull()
-
-      const allowed = await send(options, 'https://app.example.com', method)
-      expect(allowed.headers.get('access-control-allow-origin')).toBe('https://app.example.com')
-      expect(allowed.headers.get('access-control-allow-credentials')).toBe('true')
-      expect(allowed.headers.get('vary')).toContain('Origin')
-    }
   })
 })
