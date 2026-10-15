@@ -475,6 +475,10 @@ if (error && isDefined) {
 v2 also introduces `error` factories for defining reusable typed errors outside `.errors`. See [Error Handling](/docs/error-handling).
 :::
 
+### Validation `data.issues` holds only `message` and `path`
+
+Input validation errors now send clients only the `message` and `path` of each issue in `data.issues`, with path segments replaced by their keys. Library-specific fields, such as Zod's `code` and `expected` or Valibot's `kind`, `type`, and `input`, are no longer sent. Use `error.cause.issues` on the server for library-specific details, see [Custom Validation Errors](/docs/recipes/validation-customization#custom-validation-errors).
+
 ## AsyncIteratorObject (Event Iterator)
 
 The "Event Iterator" concept was renamed to [AsyncIteratorObject](/docs/async-iterator-object) (see also [AsyncIteratorObject in Client](/docs/client/async-iterator-object)). All old names still work as deprecated aliases:

@@ -48,6 +48,8 @@ If runtime validation is disabled, the transformation is skipped. As a result, t
 
 ## Custom Validation Errors
 
+By default, an input validation error sends clients `data.issues`, which contains only the `message` and `path` of each [standard schema issue](https://standardschema.dev/#the-specifications). The full issues from your schema library are kept on the server in `error.cause.issues`, and the validated value in `error.cause.invalidData`.
+
 You can catch validation errors with [interceptors](/docs/rpc/handler#interceptors), [client interceptors](/docs/rpc/handler#client-interceptors), or [middleware](/docs/middleware) applied before `.input` or `.output` and then throw a custom error. This is useful if you want to change the error message or shape.
 
 ```ts twoslash
@@ -96,6 +98,16 @@ const handler = new RPCHandler(router, {
   ],
 })
 ```
+
+:::warning
+`error.cause.issues` and `error.cause.invalidData` can contain values the server produced, not just what the client sent. With [multiple schemas](/docs/procedure#multiple-schemas), each later `.input` schema validates the values earlier schemas transformed, and some libraries include the validated value in their issues (such as Valibot's `input`, `received`, and `path[].input`, or ArkType's `data`). Do not copy them into client-facing errors.
+
+The recipe above is safe for Zod because `z.flattenError` keeps only messages, and Zod issues do not hold input values by default. It would not be safe to copy the raw issues of libraries such as Valibot into `data`. Pick only the messages and paths you want to expose.
+:::
+
+:::warning
+Messages from validators placed after a transform can contain the transformed value. For example, Valibot's default message for `v.pipe(v.string(), v.transform(decrypt), v.email())` is `Invalid email: Received "<decrypted value>"`. oRPC cannot sanitize free-text messages, so if transforms touch sensitive data, replace those messages with the recipe above or give those validators custom messages.
+:::
 
 ### Typesafe Validation Errors
 

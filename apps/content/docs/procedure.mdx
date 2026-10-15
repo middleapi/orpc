@@ -99,6 +99,18 @@ const example = os
 A field several schemas define is validated by each in turn, so put a type-changing transform like `z.string().transform(s => new Date(s))` in only one. Stacked `.output` schemas have the same limit. Schemas that reject unknown fields, like `z.strictObject`, cannot be stacked.
 :::
 
+:::warning
+Later `.input` schemas see the values earlier schemas transformed, so their validation errors can carry those values, for example in [`error.cause.issues`](/docs/recipes/validation-customization#custom-validation-errors) or in messages from validators placed after a transform. If a transform produces sensitive data, like an ID resolved to a database record, place authorization [middleware](/docs/middleware) before the schemas validated after it:
+
+```ts
+const example = os
+  .input(z.object({ userId: z.string().transform(id => db.users.find(id)) }))
+  .use(authorize) // runs before the next schema is validated
+  .input(z.object({ amount: z.number() }))
+```
+
+:::
+
 `.output` schemas are piped, not merged, and run in reverse: the last one validates the handler result, then each earlier one validates what the next returned. Use `z.looseObject` so no schema drops a field another one needs.
 
 ```ts

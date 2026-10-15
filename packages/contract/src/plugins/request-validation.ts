@@ -5,6 +5,7 @@ import { ORPCError } from '@orpc/client'
 import { mergeTwoLevels, toArray } from '@orpc/shared'
 import { ValidationError } from '../error'
 import { getProcedureContractOrThrow } from '../router-utils'
+import { toPublicSchemaIssues } from '../schema-utils'
 
 export interface RequestValidationLinkPluginOptions<_T extends ClientContext> {
   /**
@@ -56,7 +57,7 @@ export class RequestValidationLinkPlugin<T extends ClientContext> implements Sta
             throw new ORPCError('BAD_REQUEST', {
               message: 'Input validation failed',
               data: {
-                issues: result.issues,
+                issues: toPublicSchemaIssues(result.issues),
               },
               cause: new ValidationError({
                 message: 'Input validation failed',

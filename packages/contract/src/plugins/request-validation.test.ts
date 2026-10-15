@@ -196,15 +196,32 @@ describe('requestValidationLinkPlugin', () => {
       new ORPCError('BAD_REQUEST', {
         message: 'Input validation failed',
         data: {
-          issues: expect.any(Array),
+          issues: [{ message: expect.any(String), path: [] }],
         },
         cause: new ValidationError({
           message: 'Input validation failed',
-          issues: expect.any(Array),
+          issues: [expect.objectContaining({ code: 'too_small', minimum: 2, message: expect.any(String), path: [] })],
           invalidData: 1,
         }),
       }),
     )
+
+    expect(codec.encodeInput).not.toHaveBeenCalled()
+    expect(transport.send).not.toHaveBeenCalled()
+  })
+
+  it('sends only message and path of issues in data and keeps raw issues on the cause', async () => {
+    await expect(link.call(['stackedObjectProcedure'], { parent: 'PARENT', child: 1 }, { context: {} })).rejects.toSatisfy((error: any) => {
+      expect(error).toBeInstanceOf(ORPCError)
+      expect(error.data).toEqual({ issues: [{ message: expect.any(String), path: ['child'] }] })
+      expect(error.cause).toBeInstanceOf(ValidationError)
+      expect(error.cause.issues).toEqual([
+        expect.objectContaining({ code: 'invalid_type', expected: 'string', message: expect.any(String), path: ['child'] }),
+      ])
+      expect(error.cause.invalidData).toEqual({ parent: 'parent__PARENT', child: 1 })
+
+      return true
+    })
 
     expect(codec.encodeInput).not.toHaveBeenCalled()
     expect(transport.send).not.toHaveBeenCalled()

@@ -6,7 +6,7 @@ import type { Lazyable } from './lazy'
 import type { MiddlewareDone } from './middleware'
 import type { AnyProcedure, Procedure, ProcedureHandlerOptions } from './procedure'
 import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
-import { createORPCErrorConstructorMap, reconcileORPCError, ValidationError } from '@orpc/contract'
+import { createORPCErrorConstructorMap, reconcileORPCError, toPublicSchemaIssues, ValidationError } from '@orpc/contract'
 import { getTracer, intercept, isAsyncIteratorObject, mergeTwoLevels, override, resolveMaybeOptionalOptions, runWithSpan, toArray, traceAsyncIterator, traceReadableStream, value } from '@orpc/shared'
 import { unlazy } from './lazy'
 
@@ -146,7 +146,7 @@ async function validateInput(i: number, schema: AnySchema, input: unknown): Prom
       throw new ORPCError('BAD_REQUEST', {
         message: 'Input validation failed',
         data: {
-          issues: result.issues,
+          issues: toPublicSchemaIssues(result.issues),
         },
         cause: new ValidationError({
           message: 'Input validation failed',
