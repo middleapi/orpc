@@ -69,9 +69,8 @@ const handler = new RPCHandler(router, {
       dotfiles: false,
 
       /**
-       * Serves compressible files in an encoding the client accepts, from
-       * precompressed sidecars and optionally from copies compressed on demand.
-       * Omit to always serve files as they are. See Compression below.
+       * Serves compressible files in an encoding the client accepts.
+       * See Compression below.
        *
        * @default undefined
        */
@@ -108,10 +107,7 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 
 ## Compression
 
-Set `compression` to serve compressible files, such as HTML, CSS, JavaScript, JSON, and SVG, in an encoding the client accepts through its [Accept-Encoding header](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Accept-Encoding). An encoded file comes from one of two sources, tried in order:
-
-1. **A precompressed sidecar** next to the file, such as `app.js.br`, `app.js.zst`, or `app.js.gz`, usually written by your build. Sidecars are served as soon as `compression` is set, so on its own it never compresses anything.
-2. **A copy compressed on demand** into `cacheDir`, once you set it and no sidecar provides an accepted encoding. The first request for a file in an encoding compresses it and is answered with the copy. Later requests, after a restart too, are served straight from that copy, so each file is compressed only once per encoding.
+Set `compression` to serve compressible files in an encoding the client accepts. Precompressed sidecars such as `app.js.br` are served first, and setting `cacheDir` compresses the rest on their first request.
 
 ```ts
 const handler = new RPCHandler(router, {
@@ -120,9 +116,7 @@ const handler = new RPCHandler(router, {
       rootDir: './public',
       compression: {
         /**
-         * The encodings files can be served in, prioritized by their order and
-         * only applied if the client supports them. Applies to both sidecars and
-         * compression into `cacheDir`.
+         * Encodings to serve, in order of preference.
          * Supported values: 'br' | 'zstd' | 'gzip'
          *
          * @default ['br', 'zstd', 'gzip']
@@ -130,24 +124,22 @@ const handler = new RPCHandler(router, {
         encodings: ['br', 'zstd', 'gzip'],
 
         /**
-         * Whether precompressed sidecar files next to a file are served. Disable
-         * it when your build writes none, to skip looking for them on every request.
+         * Whether sidecar files such as `app.js.br` are served.
          *
          * @default true
          */
         precompressed: true,
 
         /**
-         * The directory files are compressed into when no sidecar provides an
-         * accepted encoding, created on first use.
+         * Where files without a sidecar are compressed to, once per encoding.
+         * `zstd` requires Node.js 22.15 or later.
          *
-         * @default undefined (only sidecars are served)
+         * @default undefined
          */
         cacheDir: './.cache/static-file',
 
         /**
-         * The minimum file size in bytes required to compress a file into
-         * `cacheDir`. Sidecars are served whatever their size.
+         * The minimum file size in bytes to compress into `cacheDir`.
          *
          * @default 1024 (1KB)
          */
@@ -158,15 +150,11 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-Encoded files carry their own `ETag` and `Content-Length`, so conditional and range requests keep working, and every response that could be encoded carries [Vary](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Vary)`: Accept-Encoding`.
-
-In `cacheDir`, a copy is keyed by the file's real path, size, and modification and change times, so an edited or replaced file is compressed again rather than served stale. A copy that comes out no smaller than its file is never served, and a file whose copy cannot be written is served uncompressed instead of failing the request. Old copies are never removed, so you can clear the directory whenever you like, such as on every deploy. Compressing into `zstd` requires Node.js 22.15 or later; older versions skip it there and still serve `zstd` sidecars.
-
 :::warning
-Use a `cacheDir` that nothing else writes to, since its copies are served as the compressed form of your files, and keep it outside `rootDir` so the copies are not reachable as files of their own.
+Use a `cacheDir` outside `rootDir` that nothing else writes to. It is safe to clear at any time.
 :::
 
-To compress responses on every request instead, add the [Response Compression Plugin](/docs/plugins/response-compression). It skips anything already encoded, so sidecars and cached copies are served as they are, and it leaves `206 Partial Content` responses alone so range requests keep working.
+To compress on every request instead, add the [Response Compression Plugin](/docs/plugins/response-compression). It leaves encoded files and range responses alone.
 
 ```ts
 import { ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
@@ -178,10 +166,6 @@ const handler = new RPCHandler(router, {
   ],
 })
 ```
-
-:::tip
-Precompressing assets at build time costs nothing per request and compresses best, since it can use the slowest levels.
-:::
 
 ## Learn More
 
