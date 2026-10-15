@@ -969,6 +969,16 @@ describe('jsonSchemaCoercer', () => {
       expect(coerce({ type: 'object', properties: { page: { type: 'integer' } } }, { page: '2' })).toEqual({ page: 2 })
     })
 
+    it('still throws errors other than running out of steps', () => {
+      const value = {
+        get page(): string {
+          throw new Error('getter failed')
+        },
+      }
+
+      expect(() => coerce({ type: 'object', properties: { page: { type: 'integer' } } }, value)).toThrow('getter failed')
+    })
+
     it('extends the budget with the number of values in the input', () => {
       const integers = Array.from({ length: 1_000 }, (_, i) => String(i))
       const expected = Array.from({ length: 1_000 }, (_, i) => i)
@@ -1003,18 +1013,26 @@ describe('jsonSchemaCoercer', () => {
       expect(steps).toBeGreaterThan(100_000)
     })
 
-    it('counts an input with circular references', () => {
+    it('counts an input with circular references and non-plain objects', () => {
       const circular: Record<string, unknown> = { id: '0' }
       circular.self = circular
+      // counted as a single value, never walked into
+      const date = new Date(0)
 
-      const schema: JsonSchema = { type: 'array', items: { type: 'object', properties: { id: { type: 'integer' } } } }
-      const value = [circular, ...Array.from({ length: 1_000 }, (_, i) => ({ id: String(i + 1) }))]
+      const row: JsonSchema = { type: 'object', properties: { id: { type: 'integer' } } }
+      const schema: JsonSchema = {
+        type: 'object',
+        properties: { rows: { type: 'array', items: row }, items: { type: 'array', items: row } },
+      }
 
-      // runs past the minimum budget of 200 steps, so the input gets counted
-      expect(twoStepsPerValue.coerce([schema, false], value)).toEqual([
-        { id: 0, self: circular },
-        ...Array.from({ length: 1_000 }, (_, i) => ({ id: i + 1 })),
-      ])
+      // `items` is walked before `rows` lifts the count past what the steps taken need
+      const value = { rows: Array.from({ length: 1_000 }, (_, i) => ({ id: String(i + 1) })), items: [circular, date] }
+
+      // about two steps per value, so it runs past the minimum budget of 300 steps but stays within three per value
+      expect(new JsonSchemaCoercer({ maxStepsPerValue: 3 }).coerce([schema, false], value)).toEqual({
+        rows: Array.from({ length: 1_000 }, (_, i) => ({ id: i + 1 })),
+        items: [{ id: 0, self: circular }, date],
+      })
     })
   })
 })
