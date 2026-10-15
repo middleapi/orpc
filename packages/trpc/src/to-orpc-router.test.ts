@@ -1,6 +1,8 @@
 import type { OpenAPIMeta } from '@orpc/openapi'
 import { getOpenAPIMeta } from '@orpc/openapi'
+import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { call, createRouterClient, getEventMeta, Lazy, ORPCError, Procedure, unlazy } from '@orpc/server'
+import { RPCHandler } from '@orpc/server/fetch'
 import { isAsyncIteratorObject } from '@orpc/shared'
 import { initTRPC, lazy, tracked, TRPCError } from '@trpc/server'
 import * as z from 'zod'
@@ -259,7 +261,13 @@ describe('toORPCRouter', () => {
       await expect(
         client.lazy.lazy.throw({ input: 1234 }),
       ).rejects.toSatisfy((err: any) => {
-        return err instanceof ORPCError && err.message === 'lazy.lazy.throw'
+        expect(err).toBeInstanceOf(ORPCError)
+        expect(err.code).toBe('INTERNAL_SERVER_ERROR')
+        expect(err.message).toBe('Internal Server Error')
+        expect(err.cause).toBeInstanceOf(TRPCError)
+        expect(err.cause.cause.message).toBe('lazy.lazy.throw')
+
+        return true
       })
     })
   })
@@ -351,5 +359,98 @@ describe('toORPCRouter', () => {
       await expect(output.return?.()).resolves.toEqual({ done: true, value: undefined })
       expect(cleanupCalled).toBe(true)
     })
+  })
+})
+
+describe('error masking', () => {
+  const SECRET = 'connect ECONNREFUSED 10.0.12.7:5432 password authentication failed for user "admin"'
+  const tp = initTRPC.create()
+
+  const orpcRouter = toORPCRouter(tp.router({
+    resolver: tp.procedure.input(z.object({ id: z.string() })).mutation(() => {
+      throw new Error(SECRET)
+    }),
+    middleware: tp.procedure.use(async () => {
+      throw new Error(SECRET)
+    }).mutation(() => 'ok'),
+    thrownString: tp.procedure.mutation(() => {
+      throw SECRET
+    }),
+    thrownObject: tp.procedure.mutation(() => {
+      // eslint-disable-next-line no-throw-literal
+      throw { message: SECRET }
+    }),
+    explicit: tp.procedure.mutation(() => {
+      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Visible message', cause: new Error(SECRET) })
+    }),
+    notFound: tp.procedure.mutation(() => {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Post not found' })
+    }),
+  }))
+
+  async function rpcCall(handler: RPCHandler<any>, path: string, json: unknown) {
+    const { response } = await handler.handle(new Request(`http://localhost${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ json }),
+    }))
+    return { status: response!.status, body: await response!.text() }
+  }
+
+  it.each(['/resolver', '/middleware', '/thrownString', '/thrownObject'])('masks unexpected errors thrown in %s (RPCHandler)', async (path) => {
+    const { status, body } = await rpcCall(new RPCHandler(orpcRouter), path, { id: 'x' })
+    expect(status).toBe(500)
+    expect(body).not.toContain('password')
+    expect(body).toContain('Internal Server Error')
+  })
+
+  it('masks unexpected errors (OpenAPIHandler)', async () => {
+    const { response } = await new OpenAPIHandler(orpcRouter).handle(new Request('http://localhost/resolver', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: 'x' }),
+    }))
+    const body = await response!.text()
+    expect(response!.status).toBe(500)
+    expect(body).not.toContain('password')
+    expect(body).toContain('Internal Server Error')
+  })
+
+  it('keeps developer-provided TRPCError messages', async () => {
+    const handler = new RPCHandler(orpcRouter)
+    const explicit = await rpcCall(handler, '/explicit', undefined)
+    expect(explicit.status).toBe(500)
+    expect(explicit.body).toContain('Visible message')
+    expect(explicit.body).not.toContain('password')
+
+    const notFound = await rpcCall(handler, '/notFound', undefined)
+    expect(notFound.status).toBe(404)
+    expect(notFound.body).toContain('Post not found')
+
+    const badInput = await rpcCall(handler, '/resolver', { id: 123 })
+    expect(badInput.status).toBe(400)
+  })
+
+  it('keeps the original error reachable via cause for logging', async () => {
+    let caught: any
+    const handler = new RPCHandler(orpcRouter, {
+      clientInterceptors: [async ({ next }) => {
+        try {
+          return await next()
+        }
+        catch (e) {
+          caught = e
+          throw e
+        }
+      }],
+    })
+
+    await rpcCall(handler, '/resolver', { id: 'x' })
+
+    expect(caught).toBeInstanceOf(ORPCError)
+    expect(caught.code).toBe('INTERNAL_SERVER_ERROR')
+    expect(caught.cause).toBeInstanceOf(TRPCError)
+    expect(caught.cause.cause).toBeInstanceOf(Error)
+    expect(caught.cause.cause.message).toBe(SECRET)
   })
 })

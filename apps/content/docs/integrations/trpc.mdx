@@ -25,7 +25,16 @@ The result is a regular oRPC router that works with any oRPC feature. For exampl
 
 ### Error Formatting
 
-`toORPCRouter` does not support [tRPC Error Formatting](https://trpc.io/docs/server/error-formatting). Instead, errors thrown by tRPC are wrapped in `ORPCError`.
+`toORPCRouter` does not support [tRPC Error Formatting](https://trpc.io/docs/server/error-formatting). Instead, errors thrown by tRPC are wrapped in `ORPCError`:
+
+- A `TRPCError` you throw becomes an `ORPCError` with the same code and message.
+- Unexpected exceptions, which tRPC wraps automatically as `INTERNAL_SERVER_ERROR`, are masked like any other unknown error, so clients only see the default `Internal Server Error` message. The original exception stays available on the server as `error.cause.cause`.
+
+:::warning
+`message` and `data` are sent to the client. Do not include sensitive information in either field. See [Error Handling](/docs/error-handling).
+:::
+
+You can convert errors further with an interceptor:
 
 ```ts
 const handler = new OpenAPIHandler(orpcRouter, {

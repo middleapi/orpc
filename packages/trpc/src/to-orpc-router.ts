@@ -31,7 +31,9 @@ export type ToORPCRouterResult<TContext extends ORPC.Context, TRecord extends Re
  * Converts a tRPC router into an oRPC router that works with any oRPC feature.
  *
  * @remarks
- * **Note**: tRPC Error Formatting is not supported — errors thrown by tRPC are wrapped in `ORPCError`.
+ * **Note**: tRPC Error Formatting is not supported. A `TRPCError` you throw becomes an `ORPCError`
+ * with the same code and message. Unexpected exceptions, which tRPC wraps as `INTERNAL_SERVER_ERROR`,
+ * are masked like any other unknown error, with the original kept as `error.cause.cause`.
  *
  * @see {@link https://orpc.dev/docs/integrations/trpc | tRPC Integration}
  */
@@ -135,8 +137,24 @@ function toORPCProcedure(procedure: AnyProcedure) {
   })
 }
 
+/**
+ * tRPC wraps unknown exceptions as `new TRPCError({ code: 'INTERNAL_SERVER_ERROR', cause })`,
+ * which copies the cause's message. That message was never meant for clients.
+ */
+function isAutoWrappedTRPCError(error: TRPCError): boolean {
+  return error.code === 'INTERNAL_SERVER_ERROR'
+    && error.cause !== undefined
+    && !(error.cause instanceof TRPCError)
+    && error.message === error.cause.message
+}
+
 function toORPCError<T>(error: T): T | ORPC.ORPCError<string, undefined> {
   if (error instanceof TRPCError) {
+    if (isAutoWrappedTRPCError(error)) {
+      // default "Internal Server Error" message, original kept on the cause chain for logging
+      return new ORPC.ORPCError('INTERNAL_SERVER_ERROR', { cause: error })
+    }
+
     return new ORPC.ORPCError(error.code, {
       message: error.message,
       cause: error,
