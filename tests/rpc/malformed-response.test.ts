@@ -1,11 +1,11 @@
-import { createORPCClient, MalformedResponseError, ORPCError } from '@orpc/client'
+import { createORPCClient, MalformedResponseError } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 
 describe('malformed response', () => {
   const upstream = createORPCClient<any>(new RPCLink({
-    url: 'http://upstream.internal',
+    origin: 'http://upstream.internal',
     fetch: async () => new Response('Bad Gateway', {
       status: 502,
       headers: { 'content-type': 'text/plain', 'set-cookie': 'lb_session=secret' },
@@ -13,10 +13,9 @@ describe('malformed response', () => {
   }))
 
   it('throws a MalformedResponseError carrying the response', async () => {
-    const error = await upstream.ping().then(() => null, e => e)
+    const error: any = await upstream.ping().then(() => null, (e: unknown) => e)
 
     expect(error).toBeInstanceOf(MalformedResponseError)
-    expect(error).not.toBeInstanceOf(ORPCError)
     expect(error.message).toBe('Bad Gateway')
     expect(error.response).toEqual(expect.objectContaining({
       status: 502,

@@ -145,10 +145,7 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
         return { kind: 'error', error: createORPCErrorFromJson(deserialized) }
       }
 
-      return {
-        kind: 'error',
-        error: new MalformedResponseError({ response: { headers: response.headers, status: response.status, body } }),
-      }
+      throw new MalformedResponseError({ response: { headers: response.headers, status: response.status, body } })
     }
 
     return { kind: 'output', output: deserialized }

@@ -99,7 +99,7 @@ export class ORPCError<TCode extends ORPCErrorCode, TData> extends Error {
 
   constructor(code: TCode, ...rest: MaybeOptionalOptions<ORPCErrorOptions<TData>>) {
     const options = resolveMaybeOptionalOptions(rest)
-    const message = options.message ?? code.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')
+    const message = options.message ?? codeToMessage(code)
 
     super(message, options)
 
@@ -187,27 +187,23 @@ export class MalformedResponseError extends Error {
 }
 
 /**
- * Bounds for using a body string as the error message,
- * ignoring empty and unreasonably long values.
+ * Longer body strings are not used as the error message,
+ * e.g. full HTML error pages from a proxy or gateway.
  */
-const INFERRED_MESSAGE_MIN_LENGTH = 1
 const INFERRED_MESSAGE_MAX_LENGTH = 256
 
-function isInferableMessage(text: string): boolean {
-  return text.length >= INFERRED_MESSAGE_MIN_LENGTH && text.length <= INFERRED_MESSAGE_MAX_LENGTH
-}
-
 function inferMalformedResponseMessage(response: StandardResponse): string {
-  if (typeof response.body === 'string' && isInferableMessage(response.body)) {
-    return response.body
-  }
+  const candidate = isPlainObject(response.body) ? response.body.message : response.body
 
-  if (isPlainObject(response.body) && typeof response.body.message === 'string' && isInferableMessage(response.body.message)) {
-    return response.body.message
+  if (typeof candidate === 'string' && candidate.length > 0 && candidate.length <= INFERRED_MESSAGE_MAX_LENGTH) {
+    return candidate
   }
 
   const commonCode = Object.entries(COMMON_ERROR_STATUS_MAP).find(([, status]) => status === response.status)?.[0]
 
-  return commonCode?.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')
-    ?? 'Malformed oRPC Response'
+  return commonCode ? codeToMessage(commonCode) : 'Malformed oRPC Response'
+}
+
+function codeToMessage(code: string): string {
+  return code.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')
 }

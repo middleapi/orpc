@@ -404,10 +404,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
         return { kind: 'error', error: createORPCErrorFromJson(deserialized) }
       }
 
-      return {
-        kind: 'error',
-        error: new MalformedResponseError({ response: { headers: response.headers, status: response.status, body } }),
-      }
+      throw new MalformedResponseError({ response: { headers: response.headers, status: response.status, body } })
     }
 
     const outputStructure = meta?.outputStructure ?? DEFAULT_OPENAPI_OUTPUT_STRUCTURE

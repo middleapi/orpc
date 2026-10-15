@@ -143,17 +143,11 @@ describe('malformedResponseError', () => {
     expect(new MalformedResponseError({ response: { status: 411, headers: {}, body: undefined } }).message).toBe('Length Required')
   })
 
-  it('ignores bodies longer than 256 characters', () => {
-    const long = 'x'.repeat(257)
-
-    expect(new MalformedResponseError({ response: { status: 502, headers: {}, body: long } }).message).toBe('Bad Gateway')
-    expect(new MalformedResponseError({ response: { status: 502, headers: {}, body: { message: long } } }).message).toBe('Bad Gateway')
-  })
-
   it.each([
     ['empty string body', ''],
     ['empty body.message', { message: '' }],
     ['oversized string body', 'x'.repeat(257)],
+    ['oversized body.message', { message: 'x'.repeat(257) }],
     ['non-string body.message', { message: 42 }],
     ['non-object body', 42],
   ])('falls back to the default message when the status is uncommon and the body has no message (%s)', (_, body) => {

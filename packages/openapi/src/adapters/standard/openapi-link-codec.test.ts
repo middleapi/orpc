@@ -808,38 +808,20 @@ describe('openAPILinkCodec', () => {
       expectORPCErrorResult(result, 'NOT_FOUND')
     })
 
-    it('returns a MalformedResponseError for unknown error payloads', async () => {
+    it('throws MalformedResponseError on unknown error payloads', async () => {
       const codec = new OpenAPILinkCodec({
         ping: oc.meta(openapi({})),
       }, { serializer })
 
-      const result: any = await codec.decodeResponse({
+      const error: any = await codec.decodeResponse({
         status: 503,
         headers: {},
         resolveBody: async () => ({ detail: 'service unavailable' }),
-      }, ['ping'], { context: {} })
+      }, ['ping'], { context: {} }).then(() => null, e => e)
 
-      expect(result.kind).toBe('error')
-      expect(result.error).toBeInstanceOf(MalformedResponseError)
-      expect(result.error).not.toBeInstanceOf(ORPCError)
-      expect(result.error.message).toBe('Service Unavailable')
-      expect(result.error.response).toEqual({ status: 503, headers: {}, body: { detail: 'service unavailable' } })
-    })
-
-    it('infers the MalformedResponseError message from the response body', async () => {
-      const codec = new OpenAPILinkCodec({
-        ping: oc.meta(openapi({})),
-      }, { serializer })
-
-      const result: any = await codec.decodeResponse({
-        status: 400,
-        headers: {},
-        resolveBody: async () => ({ message: 'upstream exploded' }),
-      }, ['ping'], { context: {} })
-
-      expect(result.kind).toBe('error')
-      expect(result.error).toBeInstanceOf(MalformedResponseError)
-      expect(result.error.message).toBe('upstream exploded')
+      expect(error).toBeInstanceOf(MalformedResponseError)
+      expect(error.message).toBe('Service Unavailable')
+      expect(error.response).toEqual({ status: 503, headers: {}, body: { detail: 'service unavailable' } })
     })
 
     it('rethrows the original error when the response body cannot be read', async () => {

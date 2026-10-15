@@ -51,7 +51,7 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
   }
 
   /**
-   * @throws ORPCError, transport-level errors (network failures, timeouts, etc.)
+   * @throws ORPCError, MalformedResponseError, transport-level errors (network failures, timeouts, etc.)
    */
   call(path: string[], input: unknown, options: ClientOptions<T>): Promise<unknown> {
     return runWithSpan(`${ORPC_NAME}.${path.join('/')}`, (span) => {
