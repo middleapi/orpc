@@ -68,7 +68,6 @@ The plugin coerces values safely by following these rules:
 3. **Preserve original values:** Leaves the original value unchanged when conversion would be unsafe
 4. **Union-aware:** Tries to determine the best union branch to use for conversion
 5. **Deep conversion:** Applies recursively inside nested objects and arrays
-6. **Bounded work:** Coerces deeply nested input under recursive union schemas without repeating work, and gives up past a [step budget](#step-budget) that grows with the input size, leaving the value to validation
 
 :::info
 JSON Schema does not natively represent `BigInt`, `Date`, `URL`, `Set`, or `Map`. For these types, oRPC relies on `x-native-type` metadata in your schema:
