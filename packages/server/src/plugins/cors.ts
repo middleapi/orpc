@@ -10,6 +10,9 @@ export interface CORSHandlerPluginOptions<T extends Context> {
    * Configures the `Access-Control-Allow-Origin` header.
    * Can be a string, an array of allowed origins, or a function (optionally async) that returns the allowed origin(s).
    *
+   * A function must only return origins it has validated: returning the incoming origin
+   * unchecked allows every origin. With `credentials`, allow trusted origins only.
+   *
    * @default '*'
    */
   origin?: Value<Promisable<string | readonly string[] | null | undefined>, [origin: string, options: StandardHandlerRoutingInterceptorOptions<T>]>
@@ -42,6 +45,10 @@ export interface CORSHandlerPluginOptions<T extends Context> {
 
   /**
    * Configures the `Access-Control-Allow-Credentials` header.
+   *
+   * When enabled, set `origin` to trusted origins only, and never return the incoming
+   * origin without checking it: otherwise any website can send authenticated requests
+   * as your users and read the responses.
    */
   credentials?: boolean
 

@@ -1,3 +1,4 @@
+import type { CORSHandlerPluginOptions } from './cors'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { os } from '../builder'
 import { CORSHandlerPlugin } from './cors'
@@ -546,5 +547,74 @@ describe('corsHandlerPlugin', () => {
       body: JSON.stringify({ json: null }),
     }))
     expect(response2!.headers.get('access-control-allow-origin')).toBeNull()
+  })
+})
+
+describe('corsHandlerPlugin with credentials', () => {
+  type Ctx = { cookie?: string }
+
+  const router = {
+    me: os.$context<Ctx>().handler(({ context }) => {
+      if (context.cookie !== 'session=victim')
+        throw new Error('unauthorized')
+      return { email: 'victim@example.com' }
+    }),
+  }
+
+  // Simulates a browser sending the victim's ambient cookie on a cross-site request.
+  async function send(options: CORSHandlerPluginOptions<Ctx>, origin: string, method: 'OPTIONS' | 'POST') {
+    const handler = new RPCHandler(router, { plugins: [new CORSHandlerPlugin(options)] })
+    const request = new Request('https://api.example.com/rpc/me', method === 'OPTIONS'
+      ? {
+          method,
+          headers: {
+            'origin': origin,
+            'access-control-request-method': 'POST',
+            'access-control-request-headers': 'content-type',
+          },
+        }
+      : {
+          method,
+          headers: { 'origin': origin, 'content-type': 'application/json' },
+          body: JSON.stringify({ json: {} }),
+        })
+    const { response } = await handler.handle(request, { prefix: '/rpc', context: { cookie: 'session=victim' } })
+    return response!
+  }
+
+  it('reflecting the request origin with credentials grants every site (the pattern the docs must not recommend)', async () => {
+    const options = { origin: (origin: string) => origin, credentials: true }
+
+    const preflight = await send(options, 'https://evil.example', 'OPTIONS')
+    expect(preflight.status).toBe(204)
+    expect(preflight.headers.get('access-control-allow-origin')).toBe('https://evil.example')
+    expect(preflight.headers.get('access-control-allow-credentials')).toBe('true')
+    expect(preflight.headers.get('access-control-allow-headers')).toBe('content-type')
+
+    const actual = await send(options, 'https://evil.example', 'POST')
+    expect(actual.status).toBe(200)
+    expect(actual.headers.get('access-control-allow-origin')).toBe('https://evil.example')
+    expect(actual.headers.get('access-control-allow-credentials')).toBe('true')
+    expect(await actual.text()).toContain('victim@example.com')
+  })
+
+  const ALLOWED_ORIGINS = ['https://app.example.com']
+
+  it.each<[string, CORSHandlerPluginOptions<Ctx>]>([
+    ['array allowlist', { origin: ALLOWED_ORIGINS, credentials: true }],
+    ['function allowlist', { origin: origin => ALLOWED_ORIGINS.includes(origin) ? origin : null, credentials: true }],
+  ])('%s with credentials only grants listed origins', async (_, options) => {
+    for (const method of ['OPTIONS', 'POST'] as const) {
+      // CORS only stops the browser from reading the response: the blocked POST still runs the procedure
+      // and still carries `access-control-allow-credentials: true`, but without a matching
+      // `access-control-allow-origin` the browser refuses it.
+      const blocked = await send(options, 'https://evil.example', method)
+      expect(blocked.headers.get('access-control-allow-origin')).toBeNull()
+
+      const allowed = await send(options, 'https://app.example.com', method)
+      expect(allowed.headers.get('access-control-allow-origin')).toBe('https://app.example.com')
+      expect(allowed.headers.get('access-control-allow-credentials')).toBe('true')
+      expect(allowed.headers.get('vary')).toContain('Origin')
+    }
   })
 })
