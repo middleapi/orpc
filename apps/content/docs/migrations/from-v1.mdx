@@ -796,10 +796,6 @@ const handler = new RPCHandler(router, {
 
 </CodeGroup>
 
-:::warning
-Do not restore the v1 default when you enable `credentials`. Returning the request origin unchanged lets any website send authenticated requests as your users and read the responses. If you resolve origins with a function, return only origins you have validated, for example `origin => ALLOWED_ORIGINS.includes(origin) ? origin : null`.
-:::
-
 ## Client
 
 ### `RPCLink` splits `url` into `origin` and `url`
