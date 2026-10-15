@@ -1,3 +1,4 @@
+import type { Context } from '../context'
 import type { CORSHandlerPluginOptions } from './cors'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { os } from '../builder'
@@ -551,18 +552,12 @@ describe('corsHandlerPlugin', () => {
 })
 
 describe('corsHandlerPlugin with credentials', () => {
-  type Ctx = { cookie?: string }
-
   const router = {
-    me: os.$context<Ctx>().handler(({ context }) => {
-      if (context.cookie !== 'session=victim')
-        throw new Error('unauthorized')
-      return { email: 'victim@example.com' }
-    }),
+    me: os.handler(() => ({ email: 'victim@example.com' })),
   }
 
-  // Simulates a browser sending the victim's ambient cookie on a cross-site request.
-  async function send(options: CORSHandlerPluginOptions<Ctx>, origin: string, method: 'OPTIONS' | 'POST') {
+  // Simulates a cross-site request; the browser would attach the victim's ambient cookie.
+  async function send(options: CORSHandlerPluginOptions<Context>, origin: string, method: 'OPTIONS' | 'POST') {
     const handler = new RPCHandler(router, { plugins: [new CORSHandlerPlugin(options)] })
     const request = new Request('https://api.example.com/rpc/me', method === 'OPTIONS'
       ? {
@@ -578,7 +573,7 @@ describe('corsHandlerPlugin with credentials', () => {
           headers: { 'origin': origin, 'content-type': 'application/json' },
           body: JSON.stringify({ json: {} }),
         })
-    const { response } = await handler.handle(request, { prefix: '/rpc', context: { cookie: 'session=victim' } })
+    const { response } = await handler.handle(request, { prefix: '/rpc' })
     return response!
   }
 
@@ -600,7 +595,7 @@ describe('corsHandlerPlugin with credentials', () => {
 
   const ALLOWED_ORIGINS = ['https://app.example.com']
 
-  it.each<[string, CORSHandlerPluginOptions<Ctx>]>([
+  it.each<[string, CORSHandlerPluginOptions<Context>]>([
     ['array allowlist', { origin: ALLOWED_ORIGINS, credentials: true }],
     ['function allowlist', { origin: origin => ALLOWED_ORIGINS.includes(origin) ? origin : null, credentials: true }],
   ])('%s with credentials only grants listed origins', async (_, options) => {

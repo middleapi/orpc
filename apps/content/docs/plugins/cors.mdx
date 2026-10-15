@@ -29,7 +29,7 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 :::
 
 :::warning
-By default, `origin` is `*`, which allows any origin. The wildcard is rejected by browsers for [credentialed requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS#requests_with_credentials), so list your allowed origins explicitly when you enable `credentials`. Never return the request origin without checking it: with `credentials`, that lets any website send authenticated requests as your users and read the responses.
+By default, `origin` is `*`, which allows any origin. The wildcard is rejected by browsers for [credentialed requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS#requests_with_credentials), so list your allowed origins explicitly when you enable `credentials`.
 :::
 
 ## Dynamic Origin
@@ -46,7 +46,7 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-The function must only return origins it has validated, especially when `credentials` is enabled. The request origin is allowed whenever the function returns it, so returning it unchecked allows every website.
+The function must only return origins it has validated. The request origin is allowed whenever the function returns it, so returning it unchecked allows every website, and with `credentials` lets any of them send authenticated requests as your users and read the responses.
 
 :::warning
 To better support `Blob`, `File`, and `ReadableStream<Uint8Array>` at the root level in cross-origin scenarios,

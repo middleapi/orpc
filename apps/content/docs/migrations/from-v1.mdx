@@ -777,7 +777,7 @@ In v1, `CORSPlugin` reflected the request origin by default. In v2, `CORSHandler
 const handler = new RPCHandler(router, {
   plugins: [
     new CORSHandlerPlugin({
-      origin: ['https://app.example.com'], // origins allowed to send credentials
+      origin: ['https://app.example.com'],
       credentials: true,
     }),
   ],
