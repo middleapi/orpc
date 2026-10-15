@@ -5,8 +5,9 @@ import type { Stats } from 'node:fs'
 import type { Transform } from 'node:stream'
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream, createWriteStream } from 'node:fs'
-import { mkdir, realpath, rename, rm, stat } from 'node:fs/promises'
+import { mkdir, realpath, rename, rm, stat, utimes } from 'node:fs/promises'
 import path from 'node:path'
+import process from 'node:process'
 import { pipeline } from 'node:stream/promises'
 // A namespace import, since a named import of `createZstdCompress` fails to load before Node.js 22.15
 import * as zlib from 'node:zlib'
@@ -68,6 +69,13 @@ const CONTENT_ENCODINGS: Record<'br' | 'zstd' | 'gzip', ContentEncodingSpec> = {
 }
 
 type ContentEncoding = keyof typeof CONTENT_ENCODINGS
+
+/**
+ * Compressed output depends on the library versions as well as the content, so processes on
+ * different Node.js versions sharing one cache, as in a rolling deploy, never write different
+ * bytes to the same copy while another process is serving it.
+ */
+const COMPRESSOR_VERSIONS = `${process.versions.zlib}-${process.versions.brotli}-${process.versions.zstd}`
 
 /** Sidecars in order of preference, best compression first. */
 const PRECOMPRESSED_ENCODINGS: readonly ContentEncoding[] = ['br', 'zstd', 'gzip']
@@ -261,6 +269,11 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
         dir: path.resolve(options.compressOnDemand.cacheDir),
         // An encoding this runtime cannot compress into leaves its clients to their next accepted one
         compressors: (options.compressOnDemand.encodings ?? ['br', 'zstd', 'gzip']).flatMap((encoding) => {
+          // An own property check, so names like "constructor" cannot resolve through the prototype chain
+          if (!Object.hasOwn(CONTENT_ENCODINGS, encoding)) {
+            throw new TypeError(`[StaticFileHandlerPlugin] Unsupported compressOnDemand encoding: ${String(encoding)}`)
+          }
+
           const { createCompressor } = CONTENT_ENCODINGS[encoding]
 
           return createCompressor === undefined ? [] : [{ encoding, createCompressor }]
@@ -322,8 +335,14 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   /**
    * Resolves symbolic links and, unless `allowSymlinks` is enabled, confirms the target is
    * still inside the root, which the lexical `resolveWithinRoot` check cannot see.
+   * With `allowSymlinks` the path is returned unresolved unless `needsRealPath` is set,
+   * saving the syscall when nothing uses the real path.
    */
-  private async resolveContainedRealPath(filePath: string): Promise<string | undefined> {
+  private async resolveContainedRealPath(filePath: string, needsRealPath = false): Promise<string | undefined> {
+    if (this.allowSymlinks && !needsRealPath) {
+      return filePath
+    }
+
     const realPath = await realpath(filePath).catch(() => undefined)
 
     if (realPath === undefined || this.allowSymlinks) {
@@ -370,7 +389,8 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     // Both resolutions are always needed, so they run together and cost the latency of one
     const [stats, realPath] = await Promise.all([
       stat(filePath).catch(() => undefined),
-      this.resolveContainedRealPath(filePath),
+      // The real path only keys the compression cache
+      this.resolveContainedRealPath(filePath, this.compressOnDemand !== undefined),
     ])
 
     if (stats === undefined || realPath === undefined) {
@@ -425,7 +445,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
      * compressed again instead of a stale copy being served. The change time is part of the
      * version because, unlike the modification time, tools that copy files cannot restore it.
      */
-    const key = createHash('sha256').update(`${realPath}\0${toFileVersion(stats)}`).digest('hex')
+    const key = createHash('sha256').update(`${realPath}\0${toFileVersion(stats)}\0${COMPRESSOR_VERSIONS}`).digest('hex')
     const cachePath = path.join(compressionCache.dir, key + CONTENT_ENCODINGS[compressor.encoding].extension)
     const cachedStats = await this.statOrCompress(filePath, stats, compressor.createCompressor, cachePath)
 
@@ -586,8 +606,12 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     }
 
     const size = stats.size
-    // Size and mtime at millisecond resolution, a strictly finer validator than the one nginx treats as strong
-    const etag = `"${size.toString(16)}-${stats.mtime.getTime().toString(16)}"`
+    /**
+     * Size and mtime at millisecond resolution, a strictly finer validator than the one nginx treats
+     * as strong. An encoded variant also names its encoding, since compressed copies share the
+     * file's modification time and two encodings can come out the same size.
+     */
+    const etag = `"${size.toString(16)}-${stats.mtime.getTime().toString(16)}${contentEncoding === undefined ? '' : `-${contentEncoding}`}"`
     // Truncated to seconds, matching the precision of http dates
     const lastModifiedTime = Math.floor(stats.mtime.getTime() / 1000) * 1000
 
@@ -679,6 +703,13 @@ async function writeCompressedCopy(
     await mkdir(path.dirname(cachePath), { recursive: true })
     // `wx` refuses to write through anything already at the temporary name
     await pipeline(createReadStream(filePath), createCompressor(), createWriteStream(tmpPath, { flags: 'wx' }))
+
+    /**
+     * The copy takes the file's modification time, so its ETag and Last-Modified depend only on
+     * the content, not on when or where it was compressed, and stay stable across instances and
+     * after the cache is cleared.
+     */
+    await utimes(tmpPath, stats.atime, stats.mtime)
 
     // Renaming keeps the size and modification time, so the copy's stats are read before it moves
     const [currentStats, copyStats] = await Promise.all([stat(filePath), stat(tmpPath)])

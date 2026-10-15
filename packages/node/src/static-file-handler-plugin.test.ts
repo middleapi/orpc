@@ -949,6 +949,13 @@ describe('staticFileHandlerPlugin', () => {
       expect(brotliDecompressSync(stored).toString()).toBe(largeText)
       expect(res.headers['content-length']).toBe(`${stored.length}`)
       expect(stored.length).toBeLessThan(largeText.length)
+
+      // Validators follow the file, not the time of compression, so a cleared cache keeps them
+      const identity = await createStaticAgent({}).get('/large.txt')
+      expect(res.headers['last-modified']).toBe(identity.headers['last-modified'])
+      rmSync(dir, { recursive: true, force: true })
+      const recompressed = await createStaticAgent({ compressOnDemand: { cacheDir: dir } }).get('/large.txt').set('accept-encoding', 'br')
+      expect(recompressed.headers.etag).toBe(res.headers.etag)
     })
 
     it('serves later requests from the stored copy instead of compressing again', async () => {
@@ -1000,6 +1007,25 @@ describe('staticFileHandlerPlugin', () => {
       expect(unconfiguredRes.headers['content-encoding']).toBeUndefined()
       expect(unconfiguredRes.headers.vary).toBe('accept-encoding')
       expect(unconfiguredRes.text).toBe(largeText)
+    })
+
+    it('gives each encoding of a file its own etag', async () => {
+      const agent = createStaticAgent({ precompressed: true, compressOnDemand: { cacheDir: createCacheDir() } })
+
+      const etags = await Promise.all(['br', 'gzip', 'identity'].map(async encoding => (await agent.get('/large.txt').set('accept-encoding', encoding)).headers.etag))
+      expect(etags[0]).toMatch(/-br"$/)
+      expect(etags[1]).toMatch(/-gzip"$/)
+      expect(new Set(etags).size).toBe(3)
+
+      // Sidecars are named the same way
+      expect((await agent.get('/compressed.txt').set('accept-encoding', 'gzip')).headers.etag).toMatch(/-gzip"$/)
+    })
+
+    it('rejects unsupported encodings', () => {
+      for (const encoding of ['deflate', 'constructor']) {
+        expect(() => new StaticFileHandlerPlugin({ rootDir, compressOnDemand: { cacheDir: createCacheDir(), encodings: [encoding as any] } }), encoding)
+          .toThrow(`Unsupported compressOnDemand encoding: ${encoding}`)
+      }
     })
 
     it('supports zstd', async () => {
