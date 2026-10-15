@@ -79,18 +79,34 @@ npm install swagger-ui @types/swagger-ui
 </CodeGroup>
 :::
 
-:::info
-You can also load custom assets for the docs UI by setting `providerScriptUrl` and `providerCssUrl`.
-:::
+### Custom Assets
 
-### Swagger Presets and Plugins
+By default, the docs UI loads Scalar or Swagger UI from a CDN, pinned to an exact version and checked with [Subresource Integrity](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity), so the browser refuses a file that does not match the expected hash. The pinned version only changes when you upgrade oRPC.
 
-With Swagger UI, `presets` and `plugins` are paths to global variables, resolved in the browser when the page loads. To use your own, load them through `docsHead` and reference them by name:
+To load other assets, set `providerScriptUrl` and `providerCssUrl`, together with `providerScriptIntegrity` and `providerCssIntegrity` for their hashes. A custom URL never reuses the built-in hash.
 
 ```ts
 new OpenAPIReferenceHandlerPlugin({
   provider: 'swagger',
-  docsHead: '<script src="https://unpkg.com/swagger-ui-dist/swagger-ui-standalone-preset.js"></script>',
+  providerScriptUrl: 'https://assets.example.com/swagger-ui@5.33.2/swagger-ui-bundle.js',
+  providerScriptIntegrity: 'sha384-...',
+  providerCssUrl: 'https://assets.example.com/swagger-ui@5.33.2/swagger-ui.css',
+  providerCssIntegrity: 'sha384-...',
+})
+```
+
+:::warning
+The docs UI runs on your API's origin. When overriding the asset URLs, pin an exact version and set its integrity, or self-host the assets, so a new or compromised release cannot run there. Generate a hash with `curl -sL <url> | openssl dgst -sha384 -binary | openssl base64 -A` and prefix it with `sha384-`.
+:::
+
+### Swagger Presets and Plugins
+
+With Swagger UI, `presets` and `plugins` are paths to global variables, resolved in the browser when the page loads. To use your own, load them through `docsHead` and reference them by name. Keep assets from `swagger-ui-dist` on the same version as the Swagger UI bundle:
+
+```ts
+new OpenAPIReferenceHandlerPlugin({
+  provider: 'swagger',
+  docsHead: '<script src="https://unpkg.com/swagger-ui-dist@5.33.2/swagger-ui-standalone-preset.js" integrity="sha384-My2aDM4r2Mbm3ybHcubKm9O9U8FEjvF/O5nGvE9YK5dzqOTbWEKa79RPJ1krdMaF" crossorigin="anonymous"></script>',
   providerConfig: {
     presets: ['SwaggerUIBundle.presets.apis', 'SwaggerUIStandalonePreset'],
     plugins: ['SwaggerUIBundle.plugins.DownloadUrl'],

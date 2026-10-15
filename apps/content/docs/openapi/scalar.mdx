@@ -78,7 +78,11 @@ const server = createServer(async (req, res) => {
       <body>
         <div id="app"></div>
 
-        <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+        <script
+          src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.74.0/dist/browser/standalone.js"
+          integrity="sha384-VXnKAz61Xwc3tbw1P+KKrUP7YbcsSl1Ik4is5UnogJyw9XEYZ5Ay/T1i0zPYtSZH"
+          crossorigin="anonymous"
+        ></script>
         <script>
           Scalar.createApiReference('#app', {
             url: '/spec.json',
@@ -105,3 +109,7 @@ server.listen(3000, () => {
 ```
 
 Open `http://localhost:3000` to view the API reference UI.
+
+:::tip
+The Scalar script is pinned to an exact version with an `integrity` hash, so the browser refuses a changed or compromised file. When upgrading, update both, generating the hash with `curl -sL <url> | openssl dgst -sha384 -binary | openssl base64 -A` prefixed with `sha384-`.
+:::

@@ -1,4 +1,10 @@
+import type { Tracer, TracingSpan } from '@orpc/shared'
 import type { OpenAPIDocument, OpenAPIVersion } from '../types'
+import { os } from '@orpc/server'
+import { getTracer, setTracer } from '@orpc/shared'
+import pkg from '../../package.json'
+import { OpenAPIHandler } from '../adapters/fetch'
+import { openapi } from '../meta'
 import { OpenAPIReferenceHandlerPlugin } from './openapi-reference'
 
 describe('openAPIReferenceHandlerPlugin', () => {
@@ -226,7 +232,7 @@ describe('openAPIReferenceHandlerPlugin', () => {
     const html = await (result.response?.body as Blob).text()
 
     expect(html).toContain('<title>Scalar Default Title</title>')
-    expect(html).toContain('https://cdn.jsdelivr.net/npm/@scalar/api-reference')
+    expect(html).toContain('<script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.74.0/dist/browser/standalone.js" integrity="sha384-VXnKAz61Xwc3tbw1P+KKrUP7YbcsSl1Ik4is5UnogJyw9XEYZ5Ay/T1i0zPYtSZH" crossorigin="anonymous"></script>')
     expect(html).toContain('Scalar.createApiReference(\'#app\', scalarConfig)')
     expect(html).toContain('const scalarConfig =')
     expect(html).not.toContain('rel="stylesheet"')
@@ -282,8 +288,8 @@ describe('openAPIReferenceHandlerPlugin', () => {
     const html = await (result.response?.body as File).text()
 
     expect(html).toContain('<title>Swagger Default Title</title>')
-    expect(html).toContain('https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js')
-    expect(html).toContain('https://unpkg.com/swagger-ui-dist/swagger-ui.css')
+    expect(html).toContain('<script src="https://unpkg.com/swagger-ui-dist@5.33.2/swagger-ui-bundle.js" integrity="sha384-gNnUp++d7WqR9OKX4OMoUmV2w0JxEs1uu6NPXgcynGClIX5DOu6ol4Lp+lINyZcJ" crossorigin="anonymous"></script>')
+    expect(html).toContain('<link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.33.2/swagger-ui.css" integrity="sha384-Ov4/wv3j2bmct8cDc5X4ngJZohVPzEmc6uDPH8WeljUxO5vtoykvMEfbu9Vh6RaW" crossorigin="anonymous" />')
     expect(html).toContain('const swaggerConfig =')
     expect(html).toContain('window.ui = SwaggerUIBundle(swaggerConfig)')
 
@@ -395,5 +401,144 @@ describe('openAPIReferenceHandlerPlugin', () => {
 
     expect(config).not.toHaveProperty('presets')
     expect(config).not.toHaveProperty('plugins')
+  })
+})
+
+describe('openAPIReferenceHandlerPlugin hardening', () => {
+  const router = { ping: os.meta(openapi({ method: 'GET', path: '/ping' })).handler(() => 'pong') }
+  const spec = { openapi: '3.1.1', info: { title: 'API', version: '1.0.0' }, paths: {} } as any
+
+  function createHandler(options: Record<string, unknown> = {}) {
+    return new OpenAPIHandler(router, { plugins: [new OpenAPIReferenceHandlerPlugin({ spec, ...options } as any)] })
+  }
+
+  async function render(options: Record<string, unknown> = {}) {
+    const { response } = await createHandler(options).handle(new Request('https://api.example.com/'))
+    return response!.text()
+  }
+
+  /** Every <script>/<link> tag that loads an absolute http(s) URL. */
+  function externalTags(html: string) {
+    return html.match(/<(?:script|link)\s[^>]*(?:src|href)="https?:[^"]*"[^>]*>/g) ?? []
+  }
+
+  /** Compares the first `major.minor.patch` of each string, so a range like `^1.2.3` compares by its lower bound. */
+  function compareVersions(a: string, b: string) {
+    const [x, y] = [a, b].map(version => version.match(/\d+\.\d+\.\d+/)![0].split('.').map(Number)) as [number[], number[]]
+    const index = x.findIndex((part, i) => part !== y[i])
+    return index === -1 ? 0 : x[index]! - y[index]!
+  }
+
+  /** Records the final name of every ended span, except the internal find_procedure span. */
+  function recordSpanNames(onTestFinished: (fn: () => void) => void) {
+    const names: string[] = []
+    let active: TracingSpan | undefined
+    const noopSpan: TracingSpan = { setAttribute() {}, updateName() {}, addEvent() {}, recordException() {}, end() {} }
+    const tracer: Tracer = {
+      startSpan: () => noopSpan,
+      async startActiveSpan(name, _parent, fn) {
+        let current = name
+        const span: TracingSpan = {
+          ...noopSpan,
+          updateName(newName) { current = newName },
+          end() {
+            if (current !== 'find_procedure')
+              names.push(current)
+          },
+        }
+        const previous = active
+        active = span
+        try {
+          return await fn(span)
+        }
+        finally {
+          active = previous
+        }
+      },
+      getActiveSpan: () => active,
+      withActiveSpan: (_span, fn) => fn(),
+    }
+    const previous = getTracer()
+    setTracer(tracer)
+    onTestFinished(() => setTracer(previous))
+    return names
+  }
+
+  it('names spans after the configured paths, not the raw request url', async ({ onTestFinished }) => {
+    const names = recordSpanNames(onTestFinished)
+    const handler = createHandler()
+
+    for (const url of [
+      'https://example.com/api/spec.json?access_token=SECRET',
+      'https://example.com/api/spec.json?r=1',
+      'https://example.com/api/spec.json/?r=2',
+      'https://example.com/api/?r=3',
+      'https://example.com/api?r=4',
+    ]) {
+      const { matched } = await handler.handle(new Request(url), { prefix: '/api' })
+      expect(matched).toBe(true)
+    }
+
+    expect(names.join('\n')).not.toContain('SECRET')
+    expect(names.join('\n')).not.toContain('?')
+    expect(new Set(names)).toEqual(new Set(['GET /api/spec.json (openapi spec)', 'GET /api/ (scalar ui)']))
+  })
+
+  it.each(['scalar', 'swagger'] as const)('%s: default assets are version-pinned and carry SRI', async (provider) => {
+    const tags = externalTags(await render({ provider }))
+
+    expect(tags).toHaveLength(provider === 'swagger' ? 2 : 1) // Scalar ships its CSS inside the bundle
+    for (const tag of tags) {
+      expect(tag).toMatch(/@\d+\.\d+\.\d+\//) // exact version, e.g. swagger-ui-dist@5.x.y/
+      expect(tag).toMatch(/ integrity="sha(?:256|384|512)-[\w+/]+={0,2}"/)
+      expect(tag).toContain(' crossorigin="anonymous"')
+    }
+  })
+
+  /**
+   * Dependabot raises these devDependency ranges on every bump, so this fails until the pinned
+   * urls and hashes are refreshed too, keeping the `providerConfig` typings in line with the served UI.
+   */
+  it.each([
+    ['scalar', '@scalar/api-reference'],
+    ['swagger', 'swagger-ui'],
+  ] as const)('%s: default assets are not older than the %s devDependency', async (provider, dependency) => {
+    const tags = externalTags(await render({ provider }))
+
+    expect(tags.length).toBeGreaterThan(0)
+    for (const tag of tags) {
+      const pinned = tag.match(/@(\d+\.\d+\.\d+)\//)![1]!
+
+      expect(
+        compareVersions(pinned, pkg.devDependencies[dependency]),
+        `refresh the pinned ${provider} assets (urls and hashes) in openapi-reference.ts`,
+      ).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it('renders user-provided integrity (escaped) only next to user-provided urls', async () => {
+    const custom = await render({
+      providerScriptUrl: 'https://cdn.example.com/scalar.js',
+      providerScriptIntegrity: 'sha384-abc"<x>',
+      providerCssUrl: 'https://cdn.example.com/scalar.css',
+      providerCssIntegrity: 'sha384-def',
+    })
+    expect(custom).toContain('<script src="https://cdn.example.com/scalar.js" integrity="sha384-abc&quot;&lt;x&gt;" crossorigin="anonymous"></script>')
+    expect(custom).toContain('href="https://cdn.example.com/scalar.css" integrity="sha384-def" crossorigin="anonymous"')
+
+    // a custom url must never be paired with the built-in hash
+    const noIntegrity = await render({ providerScriptUrl: 'https://cdn.example.com/scalar.js' })
+    expect(noIntegrity).toContain('<script src="https://cdn.example.com/scalar.js"></script>')
+  })
+
+  it('lets user-provided integrity override the built-in hash of the default urls', async () => {
+    const html = await render({
+      provider: 'swagger',
+      providerScriptIntegrity: 'sha512-script',
+      providerCssIntegrity: 'sha512-css',
+    })
+
+    expect(html).toContain('<script src="https://unpkg.com/swagger-ui-dist@5.33.2/swagger-ui-bundle.js" integrity="sha512-script" crossorigin="anonymous"></script>')
+    expect(html).toContain('href="https://unpkg.com/swagger-ui-dist@5.33.2/swagger-ui.css" integrity="sha512-css" crossorigin="anonymous"')
   })
 })

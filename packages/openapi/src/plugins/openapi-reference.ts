@@ -7,6 +7,29 @@ import type { SwaggerUIOptions } from 'swagger-ui'
 import type { OpenAPIDocument, OpenAPIVersion } from '../types'
 import { getTracer, matchesHttpPath, mergeHttpPath, stringifyJSON, toArray, value } from '@orpc/shared'
 
+/**
+ * Default UI assets, pinned to exact versions with Subresource Integrity so a new
+ * (possibly compromised) publish or a tampered CDN file cannot run on the API origin.
+ *
+ * Keep each version at or above the matching `@scalar/api-reference` / `swagger-ui` devDependency
+ * (enforced by a test) so the `providerConfig` typings match the served UI. To refresh a pin,
+ * update its url and regenerate its hash with:
+ * `curl -sL <url> | openssl dgst -sha384 -binary | openssl base64 -A` (then prefix with `sha384-`).
+ * Also update the pinned urls in the docs (`plugins/openapi-reference.mdx`, `openapi/scalar.mdx`).
+ */
+const DEFAULT_SCALAR_SCRIPT = {
+  url: 'https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.74.0/dist/browser/standalone.js',
+  integrity: 'sha384-VXnKAz61Xwc3tbw1P+KKrUP7YbcsSl1Ik4is5UnogJyw9XEYZ5Ay/T1i0zPYtSZH',
+}
+const DEFAULT_SWAGGER_SCRIPT = {
+  url: 'https://unpkg.com/swagger-ui-dist@5.33.2/swagger-ui-bundle.js',
+  integrity: 'sha384-gNnUp++d7WqR9OKX4OMoUmV2w0JxEs1uu6NPXgcynGClIX5DOu6ol4Lp+lINyZcJ',
+}
+const DEFAULT_SWAGGER_CSS = {
+  url: 'https://unpkg.com/swagger-ui-dist@5.33.2/swagger-ui.css',
+  integrity: 'sha384-Ov4/wv3j2bmct8cDc5X4ngJZohVPzEmc6uDPH8WeljUxO5vtoykvMEfbu9Vh6RaW',
+}
+
 export type OpenAPIReferenceHandlerPluginProvider = 'scalar' | 'swagger'
 
 export interface OpenAPIReferenceHandlerPluginScalarConfig extends Partial<ScalarProviderConfig> {
@@ -73,17 +96,39 @@ export interface OpenAPIReferenceHandlerPluginOptions<T extends Context, TProvid
 
   /**
    * URL for the provider's main script bundle.
+   * The defaults are version-pinned and loaded with a built-in integrity hash.
    *
-   * @default 'https://cdn.jsdelivr.net/npm/@scalar/api-reference' | 'https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js'
+   * @default 'https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.74.0/dist/browser/standalone.js' | 'https://unpkg.com/swagger-ui-dist@5.33.2/swagger-ui-bundle.js'
    */
   providerScriptUrl?: undefined | string
 
   /**
-   * URL for the provider's stylesheet.
+   * [Subresource Integrity](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity)
+   * hash for the provider's script, e.g. `'sha384-...'`, rendered with `crossorigin="anonymous"`.
+   * Overrides the built-in hash of the default script. A custom `providerScriptUrl` never
+   * uses the built-in hash, so set this alongside it to keep integrity checking.
    *
-   * @default undefined | 'https://unpkg.com/swagger-ui-dist/swagger-ui.css'
+   * @default the built-in hash for the default script, otherwise undefined
+   */
+  providerScriptIntegrity?: undefined | string
+
+  /**
+   * URL for the provider's stylesheet.
+   * The defaults are version-pinned and loaded with a built-in integrity hash.
+   *
+   * @default undefined | 'https://unpkg.com/swagger-ui-dist@5.33.2/swagger-ui.css'
    */
   providerCssUrl?: undefined | string
+
+  /**
+   * [Subresource Integrity](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity)
+   * hash for the provider's stylesheet, e.g. `'sha384-...'`, rendered with `crossorigin="anonymous"`.
+   * Overrides the built-in hash of the default stylesheet. A custom `providerCssUrl` never
+   * uses the built-in hash, so set this alongside it to keep integrity checking.
+   *
+   * @default the built-in hash for the default stylesheet, otherwise undefined
+   */
+  providerCssIntegrity?: undefined | string
 
   /**
    * The URL path at which to serve the API reference UI.
@@ -129,7 +174,9 @@ export class OpenAPIReferenceHandlerPlugin<
   private readonly provider: Exclude<OpenAPIReferenceHandlerPluginOptions<T, TProvider>['provider'], undefined>
   private readonly providerConfig: OpenAPIReferenceHandlerPluginOptions<T, TProvider>['providerConfig']
   private readonly providerScriptUrl: OpenAPIReferenceHandlerPluginOptions<T, TProvider>['providerScriptUrl']
+  private readonly providerScriptIntegrity: OpenAPIReferenceHandlerPluginOptions<T, TProvider>['providerScriptIntegrity']
   private readonly providerCssUrl: OpenAPIReferenceHandlerPluginOptions<T, TProvider>['providerCssUrl']
+  private readonly providerCssIntegrity: OpenAPIReferenceHandlerPluginOptions<T, TProvider>['providerCssIntegrity']
   private readonly docsPath: Exclude<OpenAPIReferenceHandlerPluginOptions<T, TProvider>['docsPath'], undefined>
   private readonly docsTitle: OpenAPIReferenceHandlerPluginOptions<T, TProvider>['docsTitle']
   private readonly docsHead: Exclude<OpenAPIReferenceHandlerPluginOptions<T, TProvider>['docsHead'], undefined>
@@ -141,7 +188,9 @@ export class OpenAPIReferenceHandlerPlugin<
     this.provider = options.provider ?? 'scalar' as TProvider
     this.providerConfig = options.providerConfig
     this.providerScriptUrl = options.providerScriptUrl
+    this.providerScriptIntegrity = options.providerScriptIntegrity
     this.providerCssUrl = options.providerCssUrl
+    this.providerCssIntegrity = options.providerCssIntegrity
     this.docsTitle = options.docsTitle
     this.docsPath = options.docsPath ?? '/'
     this.docsHead = options.docsHead ?? ''
@@ -160,15 +209,10 @@ export class OpenAPIReferenceHandlerPlugin<
             return result
           }
 
-          const isSpecPath = matchesHttpPath(
-            routingInterceptorOptions.request.url,
-            routingInterceptorOptions.prefix ? mergeHttpPath(routingInterceptorOptions.prefix, this.specPath) : this.specPath,
-          )
-
-          const isDocsPath = matchesHttpPath(
-            routingInterceptorOptions.request.url,
-            routingInterceptorOptions.prefix ? mergeHttpPath(routingInterceptorOptions.prefix, this.docsPath) : this.docsPath,
-          )
+          const specPath = routingInterceptorOptions.prefix ? mergeHttpPath(routingInterceptorOptions.prefix, this.specPath) : this.specPath
+          const docsPath = routingInterceptorOptions.prefix ? mergeHttpPath(routingInterceptorOptions.prefix, this.docsPath) : this.docsPath
+          const isSpecPath = matchesHttpPath(routingInterceptorOptions.request.url, specPath)
+          const isDocsPath = matchesHttpPath(routingInterceptorOptions.request.url, docsPath)
 
           if (!isSpecPath && !isDocsPath) {
             return result
@@ -178,11 +222,15 @@ export class OpenAPIReferenceHandlerPlugin<
             return result
           }
 
+          /**
+           * The request url is excluded because span names should have low cardinality,
+           * so only the configured paths are used.
+           */
           const span = getTracer()?.getActiveSpan()
           const spec = await value(this.spec, routingInterceptorOptions)
 
           if (isSpecPath) {
-            span?.updateName(`${routingInterceptorOptions.request.method} ${routingInterceptorOptions.request.url} (openapi spec)`)
+            span?.updateName(`${routingInterceptorOptions.request.method} ${specPath} (openapi spec)`)
 
             const specFile = new File([stringifyJSON(spec)], `${spec.info.title}.json`, {
               type: 'application/json',
@@ -190,15 +238,15 @@ export class OpenAPIReferenceHandlerPlugin<
             return { matched: true, response: { status: 200, headers: {}, body: specFile } }
           }
 
-          span?.updateName(`${routingInterceptorOptions.request.method} ${routingInterceptorOptions.request.url} (${this.provider} ui)`)
+          span?.updateName(`${routingInterceptorOptions.request.method} ${docsPath} (${this.provider} ui)`)
 
           const docsTitle = (await value(this.docsTitle, routingInterceptorOptions)) ?? spec.info.title
           const docsHead = await value(this.docsHead, routingInterceptorOptions)
           let html: string | undefined
 
           if (this.provider === 'swagger') {
-            const scriptUrl = this.providerScriptUrl ?? 'https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js'
-            const cssUrl = this.providerCssUrl ?? 'https://unpkg.com/swagger-ui-dist/swagger-ui.css'
+            const script = resolveAsset(this.providerScriptUrl, this.providerScriptIntegrity, DEFAULT_SWAGGER_SCRIPT)
+            const css = resolveAsset(this.providerCssUrl, this.providerCssIntegrity, DEFAULT_SWAGGER_CSS)
             const config = {
               dom_id: '#app',
               spec,
@@ -215,13 +263,13 @@ export class OpenAPIReferenceHandlerPlugin<
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <title>${escapeHtmlEntities(docsTitle)}</title>
-                <link rel="stylesheet" type="text/css" href="${escapeHtmlEntities(cssUrl)}" />
+                <link rel="stylesheet" type="text/css" href="${escapeHtmlEntities(css.url)}"${integrityAttributes(css.integrity)} />
                 ${docsHead}
             </head>
             <body>
                 <div id="app"></div>
 
-                <script src="${escapeHtmlEntities(scriptUrl)}"></script>
+                <script src="${escapeHtmlEntities(script.url)}"${integrityAttributes(script.integrity)}></script>
 
                 <!-- IMPORTANT: assign to a variable first to prevent ), ( in values breaking the call expression. -->
                 <!-- IMPORTANT: escapeJsonForHtml ensures <, > cannot terminate the </script> tag prematurely. -->
@@ -243,8 +291,7 @@ export class OpenAPIReferenceHandlerPlugin<
           }
 
           else {
-            const scriptUrl = this.providerScriptUrl ?? 'https://cdn.jsdelivr.net/npm/@scalar/api-reference'
-            const cssUrl = this.providerCssUrl
+            const script = resolveAsset(this.providerScriptUrl, this.providerScriptIntegrity, DEFAULT_SCALAR_SCRIPT)
             const config: ScalarProviderConfig = {
               content: stringifyJSON(spec),
               ...this.providerConfig as any,
@@ -257,13 +304,13 @@ export class OpenAPIReferenceHandlerPlugin<
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <title>${escapeHtmlEntities(docsTitle)}</title>
-                ${cssUrl ? `<link rel="stylesheet" type="text/css" href="${escapeHtmlEntities(cssUrl)}" />` : ''}
+                ${this.providerCssUrl ? `<link rel="stylesheet" type="text/css" href="${escapeHtmlEntities(this.providerCssUrl)}"${integrityAttributes(this.providerCssIntegrity)} />` : ''}
                 ${docsHead}
             </head>
             <body>
                 <div id="app"></div>
-        
-                <script src="${escapeHtmlEntities(scriptUrl)}"></script>
+
+                <script src="${escapeHtmlEntities(script.url)}"${integrityAttributes(script.integrity)}></script>
         
                 <!-- IMPORTANT: assign to a variable first to prevent ), ( in values breaking the call expression. -->
                 <!-- IMPORTANT: escapeJsonForHtml ensures <, > cannot terminate the </script> tag prematurely. -->
@@ -295,6 +342,27 @@ export class OpenAPIReferenceHandlerPlugin<
       ],
     }
   }
+}
+
+/**
+ * Uses the built-in asset unless its url is overridden. A custom url is never paired
+ * with the built-in hash, since a mismatch would block the asset.
+ */
+function resolveAsset(
+  url: string | undefined,
+  integrity: string | undefined,
+  builtIn: { url: string, integrity: string },
+): { url: string, integrity: string | undefined } {
+  if (url === undefined) {
+    return { url: builtIn.url, integrity: integrity ?? builtIn.integrity }
+  }
+
+  return { url, integrity }
+}
+
+/** Renders the Subresource Integrity attributes of a `<script>`/`<link>` tag, if an integrity is given. */
+function integrityAttributes(integrity: string | undefined) {
+  return integrity ? ` integrity="${escapeHtmlEntities(integrity)}" crossorigin="anonymous"` : ''
 }
 
 /** Escapes a string for safe embedding in an HTML attribute value. */
