@@ -17,7 +17,7 @@ description: "Learn how RPC Serializers encode data between client and server, s
 | **null**                         |             |                                      |
 | **undefined**                    | `undefined` | Ignore `undefined` properties        |
 | **Date**                         | `date`      | Includes `Invalid Date`.             |
-| **BigInt**                       | `bigint`    |                                      |
+| **BigInt**                       | `bigint`    | [Digit limit](#bigint-digit-limit)   |
 | **URL**                          | `url`       |                                      |
 | **Record (object)**              |             | `toJSON` methods are ignored         |
 | **Array**                        |             |                                      |
@@ -93,6 +93,24 @@ const link = new RPCLink({
 ```
 
 :::
+
+## BigInt Digit Limit
+
+The built-in `bigint` handler only accepts decimal strings of up to 4300 digits, since parsing longer ones can block the event loop. To allow longer values, override it on both sides:
+
+```ts
+import { RPCSerializer } from '@orpc/client'
+
+const serializer = new RPCSerializer({
+  handlers: {
+    bigint: {
+      condition: v => typeof v === 'bigint',
+      serialize: (v: bigint) => v.toString(),
+      deserialize: v => BigInt(z.string().max(10_000).regex(/^-?\d+$/).parse(v)),
+    },
+  },
+})
+```
 
 ## RPC JSON Serializer
 

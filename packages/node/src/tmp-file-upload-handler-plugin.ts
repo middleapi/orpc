@@ -17,17 +17,19 @@ import { parseHeaderParameters, parseMultipart } from './multipart'
 export interface TmpFileUploadHandlerPluginMaxBodySize {
   /**
    * The maximum size in bytes of request body content buffered into memory:
-   * JSON, URL-encoded forms, and the fields and part headers of a multipart
-   * body in total, and each event of an event stream on its own. Exceeding it
-   * rejects with `PAYLOAD_TOO_LARGE`. Usually the lowest of the three limits,
-   * because this content cannot stream anywhere.
+   * JSON, URL-encoded forms, and the fields, part headers, and in-memory files
+   * of a multipart body in total, and each event of an event stream on its
+   * own. Exceeding it rejects with `PAYLOAD_TOO_LARGE`, except for uploads,
+   * which spool to disk instead once they no longer fit. Usually the lowest of
+   * the three limits, because this content cannot stream anywhere.
    */
   memory: number
 
   /**
-   * The maximum total size in bytes of upload content a request streams into
-   * temporary files: file bodies and the file parts of a multipart body
-   * combined. A larger body rejects the request with `PAYLOAD_TOO_LARGE`.
+   * The maximum total size in bytes of uploaded file content: file bodies and
+   * the file parts of a multipart body combined, whether held in memory or
+   * spooled to temporary files. A larger body rejects the request with
+   * `PAYLOAD_TOO_LARGE`.
    */
   file: number
 
@@ -66,6 +68,16 @@ export interface TmpFileUploadHandlerPluginOptions<T extends Context> {
    * @default unlimited for every kind
    */
   maxBodySize?: Value<Promisable<TmpFileUploadHandlerPluginMaxBodySize>, [options: StandardHandlerRoutingInterceptorOptions<T>]>
+
+  /**
+   * The size in bytes an uploaded file must exceed before it is spooled to a
+   * temporary file. Smaller files stay in memory as plain `File`s, counted
+   * against `maxBodySize.memory`, and spool anyway once they no longer fit.
+   * Set to `0` to spool every non-empty upload.
+   *
+   * @default 64 * 1024
+   */
+  spoolThreshold?: number
 }
 
 /**
@@ -101,12 +113,13 @@ export class TmpFile extends File {
 /**
  * Parses file uploads into temporary files instead of memory. Bodies the standard
  * body parser would buffer into an in-memory `File`, and multipart file parts, are
- * streamed to disk and surfaced as lazily read {@link TmpFile} instances, so requests
- * far larger than available memory parse in constant memory. Every other body is left
- * to the standard parser.
+ * streamed to disk once they outgrow the spool threshold and surfaced as lazily read
+ * {@link TmpFile} instances, so requests far larger than available memory parse in
+ * constant memory. Smaller uploads stay in memory as plain `File`s. Every other body is
+ * left to the standard parser.
  *
- * Request body sizes are limited per content category: buffered in memory, spooled
- * to disk, and streamed, each limit fixed or resolved per request. This subsumes the
+ * Request body sizes are limited per content category: buffered in memory, uploaded
+ * files, and streamed, each limit fixed or resolved per request. This subsumes the
  * request limit plugin while sizing each kind of body to what it actually costs.
  *
  * @remarks
@@ -134,6 +147,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
 
   private readonly tmpDir: string
   private readonly maxBodySize: Exclude<TmpFileUploadHandlerPluginOptions<T>['maxBodySize'], undefined>
+  private readonly spoolThreshold: number
 
   constructor(options: TmpFileUploadHandlerPluginOptions<T> = {}) {
     this.tmpDir = options.tmpDir ?? tmpdir()
@@ -142,6 +156,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
       file: Number.POSITIVE_INFINITY,
       stream: Number.POSITIVE_INFINITY,
     }
+    this.spoolThreshold = options.spoolThreshold ?? 64 * 1024
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
@@ -244,7 +259,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     }
 
     if (resolvedHint === 'file') {
-      return this.spoolFileBody(request, tmpFiles, maxBodySize.file)
+      return this.parseFileBody(request, tmpFiles, maxBodySize)
     }
 
     if (resolvedHint === 'json' || resolvedHint === 'url-search-params') {
@@ -290,8 +305,8 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     return toStandardBody(response, { hint: resolvedHint })
   }
 
-  private async spoolFileBody(request: StandardLazyRequest, tmpFiles: RequestTmpFiles, fileLimit: number): Promise<StandardBody> {
-    assertContentLengthWithin(request.headers, fileLimit)
+  private async parseFileBody(request: StandardLazyRequest, tmpFiles: RequestTmpFiles, maxBodySize: TmpFileUploadHandlerPluginMaxBodySize): Promise<StandardBody> {
+    assertContentLengthWithin(request.headers, maxBodySize.file)
 
     const stream = await request.resolveBody('octet-stream')
 
@@ -304,15 +319,13 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     const fileName = contentDisposition !== undefined ? getFilenameFromContentDisposition(contentDisposition) : undefined
     const contentType = flattenStandardHeader(request.headers['content-type'])
 
-    const limited = fileLimit === Number.POSITIVE_INFINITY ? stream : limitStream(stream, fileLimit)
+    const upload = new UploadWriter(tmpFiles, new Budget(maxBodySize.memory), new Budget(maxBodySize.file), this.spoolThreshold)
 
-    const tmpPath = await tmpFiles.allocate()
-
-    for await (const chunk of limited) {
-      await tmpFiles.append(tmpPath, chunk)
+    for await (const chunk of stream) {
+      await upload.write(chunk)
     }
 
-    return tmpFiles.seal(tmpPath, fileName ?? 'blob', contentType ?? '')
+    return upload.end(fileName ?? 'blob', contentType ?? '')
   }
 
   private async parseMultipartBody(request: StandardLazyRequest, tmpFiles: RequestTmpFiles, maxBodySize: TmpFileUploadHandlerPluginMaxBodySize): Promise<StandardBody> {
@@ -341,27 +354,20 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     const limited = totalLimit === Number.POSITIVE_INFINITY ? stream : limitStream(stream, totalLimit)
 
     const form = new FormData()
-    const used = { memory: 0, file: 0 }
-
-    const charge = (category: 'memory' | 'file', size: number): void => {
-      used[category] += size
-
-      if (used[category] > maxBodySize[category]) {
-        throw new ORPCError('PAYLOAD_TOO_LARGE')
-      }
-    }
+    const memory = new Budget(maxBodySize.memory)
+    const file = new Budget(maxBodySize.file)
 
     await parseMultipart(limited, boundary, (part) => {
       const name = part.name
 
-      charge('memory', part.headerSize)
+      memory.charge(part.headerSize)
 
       if (part.filename === undefined) {
         const chunks: Buffer[] = []
 
         return {
           write: (chunk) => {
-            charge('memory', chunk.length)
+            memory.charge(chunk.length)
 
             // The parser only guarantees the chunk until write returns, so retaining it requires a copy
             chunks.push(Buffer.from(chunk))
@@ -375,18 +381,12 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
       const filename = part.filename
       // A part without a content-type defaults to text/plain, matching the standard parser
       const type = part.type ?? 'text/plain'
-      let tmpPath: string | undefined
+      const upload = new UploadWriter(tmpFiles, memory, file, this.spoolThreshold)
 
       return {
-        write: async (chunk) => {
-          charge('file', chunk.length)
-
-          tmpPath ??= await tmpFiles.allocate()
-          await tmpFiles.append(tmpPath, chunk)
-        },
+        write: chunk => upload.write(chunk),
         end: async () => {
-          tmpPath ??= await tmpFiles.allocate()
-          form.append(name, await tmpFiles.seal(tmpPath, filename, type))
+          form.append(name, await upload.end(filename, type))
         },
       }
     })
@@ -500,10 +500,74 @@ function indexOrEnd(bytes: Buffer, byte: number, from: number): number {
   return index === -1 ? bytes.length : index
 }
 
-const EMPTY_CHUNK = new Uint8Array(0)
+class Budget {
+  private used = 0
+
+  constructor(private readonly limit: number) {}
+
+  charge(size: number): void {
+    if (!this.tryCharge(size)) {
+      throw new ORPCError('PAYLOAD_TOO_LARGE')
+    }
+  }
+
+  tryCharge(size: number): boolean {
+    if (this.used + size > this.limit) {
+      return false
+    }
+
+    this.used += size
+    return true
+  }
+
+  refund(size: number): void {
+    this.used -= size
+  }
+}
+
+class UploadWriter {
+  private held: Buffer[] = []
+  private heldSize = 0
+  private tmpPath: string | undefined
+
+  constructor(
+    private readonly tmpFiles: RequestTmpFiles,
+    private readonly memory: Budget,
+    private readonly file: Budget,
+    private readonly spoolThreshold: number,
+  ) {}
+
+  async write(chunk: Uint8Array): Promise<void> {
+    this.file.charge(chunk.length)
+
+    if (this.tmpPath !== undefined) {
+      return this.tmpFiles.append(this.tmpPath, chunk)
+    }
+
+    if (this.heldSize + chunk.length <= this.spoolThreshold && this.memory.tryCharge(chunk.length)) {
+      // Chunks are only guaranteed until write returns, so holding one requires a copy
+      this.held.push(Buffer.from(chunk))
+      this.heldSize += chunk.length
+      return
+    }
+
+    this.tmpPath = await this.tmpFiles.create(Buffer.concat([...this.held, chunk]))
+    this.memory.refund(this.heldSize)
+    this.held = []
+  }
+
+  async end(name: string, type: string): Promise<File> {
+    if (this.tmpPath !== undefined) {
+      return this.tmpFiles.seal(this.tmpPath, name, type)
+    }
+
+    // A File keeps one part per chunk, so merge them first
+    return new File([Buffer.concat(this.held, this.heldSize)], name, { type })
+  }
+}
 
 /**
- * Owns every temporary file a request creates: allocates them inside one lazily
+ * Owns every temporary file a request creates: creates them inside one lazily
  * created per-request directory and guarantees removal. Content lands through
  * self-contained appends rather than long-lived handles, so a request holds at
  * most one transient file descriptor per in-flight write no matter how many
@@ -524,10 +588,12 @@ class RequestTmpFiles {
     return this.dir !== undefined
   }
 
-  async allocate(): Promise<string> {
+  async create(content: Uint8Array): Promise<string> {
     try {
       this.dir ??= mkdtemp(path.join(this.tmpDir, 'orpc-upload-'))
-      return path.join(await this.dir, String(this.count++))
+      const tmpPath = path.join(await this.dir, String(this.count++))
+      await appendFile(tmpPath, content)
+      return tmpPath
     }
     catch (cause) {
       throw new ORPCError('INTERNAL_SERVER_ERROR', { cause })
@@ -545,8 +611,6 @@ class RequestTmpFiles {
 
   async seal(tmpPath: string, name: string, type: string): Promise<TmpFile> {
     try {
-      // An empty upload never appended, so the backing file may not exist yet
-      await appendFile(tmpPath, EMPTY_CHUNK)
       return new TmpFile(await openAsBlob(tmpPath), tmpPath, name, { type })
     }
     catch (cause) {

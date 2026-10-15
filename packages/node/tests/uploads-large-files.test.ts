@@ -31,7 +31,7 @@ describe('uploads large files through tmp files', () => {
 
   const router = {
     upload: os.input(type<File | { file: File }>()).handler(async ({ input }) => {
-      const file = (input instanceof File ? input : input.file) as TmpFile
+      const file = input instanceof File ? input : input.file
 
       return {
         isFile: file instanceof File,
@@ -41,8 +41,8 @@ describe('uploads large files through tmp files', () => {
         size: file.size,
         // Read from disk while the request is still running, in constant memory
         sha256: createHash('sha256').update(new Uint8Array(await file.arrayBuffer())).digest('hex'),
-        spooledSize: statSync(file.path).size,
-        spooledInsideTmpDir: path.dirname(path.dirname(file.path)) === tmpDir,
+        spooledSize: file instanceof TmpFile ? statSync(file.path).size : undefined,
+        spooledInsideTmpDir: file instanceof TmpFile && path.dirname(path.dirname(file.path)) === tmpDir,
       }
     }),
   }
@@ -221,7 +221,7 @@ describe('uploads large files through tmp files', () => {
 
       // Under the limit the same server accepts the upload
       const small = new Uint8Array(16 * 1024).fill(7)
-      await expect(client.upload({ file: new File([small], 'small.bin') })).resolves.toMatchObject({ isTmpFile: true, size: small.length })
+      await expect(client.upload({ file: new File([small], 'small.bin') })).resolves.toMatchObject({ isTmpFile: false, size: small.length })
 
       await vi.waitFor(() => {
         expect(readdirSync(limitedTmpDir)).toHaveLength(0)

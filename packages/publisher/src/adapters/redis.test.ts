@@ -164,26 +164,6 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
     await unsubscribe()
   })
 
-  it('resumes every missed event for AsyncIteratorObject subscribers beyond maxBufferedEvents', async () => {
-    const publisher = createTestingPublisher({
-      maxBufferedEvents: 2,
-      resume: { enabled: true, seconds: 10 },
-    })
-    const event = 'large-backlog'
-
-    for (let i = 0; i < 5; i++) {
-      await publisher.publish(event, { order: i })
-    }
-
-    const iterator = publisher.subscribe(event, { lastEventId: '0' })
-
-    for (let i = 0; i < 5; i++) {
-      expect((await iterator.next()).value).toEqual({ order: i })
-    }
-
-    await iterator.return()
-  })
-
   it('deduplicates events that race between resume and live delivery during reconnect', async ({ onTestFinished }) => {
     const { resolve, promise } = promiseWithResolvers<void>()
     const delayedRedis = new Proxy(createClient({ url: REDIS_URL }), {

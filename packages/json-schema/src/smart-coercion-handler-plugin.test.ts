@@ -50,4 +50,23 @@ describe('smartCoercionHandlerPlugin', () => {
     expect(next).toHaveBeenNthCalledWith(1, { procedure, input: { number: 123, boolean: true } })
     expect(next).toHaveBeenNthCalledWith(2, { procedure, input: { number: 456, boolean: false } })
   })
+
+  it('passes maxBigIntDigits to the coercer', async () => {
+    const plugin = new SmartCoercionHandlerPlugin({
+      converters: [{
+        condition: () => true,
+        convert: () => [{ 'type': 'string', 'pattern': '^-?[0-9]+$', 'x-native-type': 'bigint' } as any, false],
+      }],
+      maxBigIntDigits: 3,
+    })
+    const procedure = oc.input(z.unknown())
+    const interceptor = plugin.init({} as any).clientInterceptors?.[0]
+    const next = vi.fn()
+
+    await interceptor?.({ procedure, input: '999', next } as any)
+    await interceptor?.({ procedure, input: '1000', next } as any)
+
+    expect(next).toHaveBeenNthCalledWith(1, { procedure, input: 999n })
+    expect(next).toHaveBeenNthCalledWith(2, { procedure, input: '1000' })
+  })
 })

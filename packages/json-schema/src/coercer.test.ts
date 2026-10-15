@@ -208,6 +208,18 @@ describe('jsonSchemaCoercer', () => {
       expect(coerce(BIGINT_SCHEMA, '  ')).toBe('  ')
       expect(coerce(BIGINT_SCHEMA, '0x10')).toBe('0x10')
     })
+
+    it('leaves integer strings longer than maxBigIntDigits untouched', () => {
+      expect(coerce(BIGINT_SCHEMA, '9'.repeat(4300))).toBe(BigInt('9'.repeat(4300)))
+      expect(coerce(BIGINT_SCHEMA, '9'.repeat(4301))).toBe('9'.repeat(4301))
+      expect(coerce({ anyOf: [BIGINT_SCHEMA, BIGINT_SCHEMA] }, '9'.repeat(4301))).toBe('9'.repeat(4301))
+
+      const limited = new JsonSchemaCoercer({ maxBigIntDigits: 3 })
+      expect(limited.coerce([BIGINT_SCHEMA as JsonSchema, false], '999')).toBe(999n)
+      expect(limited.coerce([BIGINT_SCHEMA as JsonSchema, false], '1000')).toBe('1000')
+      // whole numbers are bounded by the JSON number range, so they are not limited
+      expect(limited.coerce([BIGINT_SCHEMA as JsonSchema, false], 1000)).toBe(1000n)
+    })
   })
 
   describe('urls', () => {

@@ -213,6 +213,36 @@ describe('rpcMatcher', () => {
     expect(loads).toEqual({ l1: 1, l2: 1, l3: 1 })
   })
 
+  it('looks up lazy prefixes no deeper than the deepest pending lazy router', async () => {
+    const loader = vi.fn(async () => ({ default: { find: os.handler(() => 'ok') } }))
+    const matcher = new RPCMatcher({ planet: os.lazy(loader) })
+    const pending = (matcher as any).pendingLazyRouters as Map<string, unknown>
+    const hasSpy = vi.spyOn(pending, 'has')
+    const getSpy = vi.spyOn(pending, 'get')
+
+    await expect(matcher.match('POST', `/${'/'.repeat(16_000)}%25`, undefined)).resolves.toBeUndefined()
+
+    // max pending depth is 1, and there are two passes (raw + normalized)
+    expect(hasSpy.mock.calls.length + getSpy.mock.calls.length).toBeLessThanOrEqual(2)
+    expect(loader).not.toHaveBeenCalled()
+  })
+
+  it('resolves lazy routers nested deeper than any pending one in a single match', async () => {
+    const deep = os.handler(() => 'deep')
+    const inner = vi.fn(async () => ({ default: { deep } }))
+    const outer = vi.fn(async () => ({ default: { lazy: new Lazy({ loader: inner, meta: {} }) } }))
+    const matcher = new RPCMatcher({ nested: { lazy: new Lazy({ loader: outer, meta: {} }) } })
+
+    // the inner lazy router (depth 3) only becomes pending once the outer one (depth 2) loads
+    const result = await matcher.match('POST', '/nested/lazy/lazy/deep', undefined)
+
+    expect(result).toBeDefined()
+    expect(result!.path).toEqual(['nested', 'lazy', 'lazy', 'deep'])
+    expect(result!.procedure).toBe(deep)
+    expect(outer).toHaveBeenCalledTimes(1)
+    expect(inner).toHaveBeenCalledTimes(1)
+  })
+
   it('support filter option', async () => {
     const filter = vi.fn((procedure: any) => procedure === procedure2)
     const matcher = new RPCMatcher(router, { filter })

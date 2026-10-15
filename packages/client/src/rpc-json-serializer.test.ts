@@ -467,6 +467,15 @@ describe('rpcJsonSerializer: security', () => {
     }
   })
 
+  it('bigint rejects non-canonical strings and more than 4300 digits', () => {
+    expect(serializer.deserialize({ json: '9'.repeat(4300), meta: [['bigint']] })).toBe(BigInt('9'.repeat(4300)))
+
+    for (const bad of ['9'.repeat(4301), '0x10', ' 1 ']) {
+      expect(() => serializer.deserialize({ json: bad, meta: [['bigint']] }))
+        .toThrow('Invalid RPC serialized data: type "bigint" expects a decimal integer string of at most 4300 digits.')
+    }
+  })
+
   it('rejects a value already restored by an earlier meta entry', () => {
     expect(() => serializer.deserialize({ json: { value: '1' }, meta: [['bigint', 'value'], ['url', 'value']] }))
       .toThrow('Invalid RPC serialized data: type "url" expects a string.')

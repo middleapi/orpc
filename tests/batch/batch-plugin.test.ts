@@ -65,80 +65,33 @@ describe.each([
     expect(fetchSpy).toHaveBeenCalledTimes(1) // ensure batch was used
   })
 
-  it('support readable stream, blob, json, and AsyncIteratorObject responses in buffered mode', async () => {
-    let isStreamClosed = false
-    let isEventsReturned = false
-
-    const streamProcedure = vi.fn(async () => new ReadableStream<Uint8Array>({
-      async start(controller) {
-        controller.enqueue(new TextEncoder().encode('part 1'))
-        await sleep(20)
-        controller.enqueue(new TextEncoder().encode('part 2'))
-        isStreamClosed = true
-        controller.close()
-      },
-    }))
-
-    const blobProcedure = vi.fn(async () => new Blob(['mixed payload'], { type: 'application/octet-stream' }))
-
-    const jsonProcedure = vi.fn(async () => ({ ok: 'buffered-mixed' }))
-
-    const eventProcedure = vi.fn(async function* () {
-      yield 'event 1'
-      await sleep(20)
-      yield { event: 2 }
-      isEventsReturned = true
-      return 'event 3'
-    })
-
+  /**
+   * Without a stream subresponse, a buffered batch is the binary framing collected into a blob
+   * once every subresponse is ready, rather than a stream.
+   */
+  it('round-trips a buffered batch of blob and json responses', async () => {
     const router = {
-      stream: os.handler(streamProcedure),
-      blob: os.handler(blobProcedure),
-      json: os.handler(jsonProcedure),
-      events: os.handler(eventProcedure),
+      blob: os.handler(() => new Blob(['buffered payload'], { type: 'application/octet-stream' })),
+      json: os.handler(() => ({ ok: 'buffered-mixed' })),
     }
 
     const { client, fetchSpy } = createClientServer(router, { mode: 'buffered' })
 
-    const [stream, file, info, iterator] = await Promise.all([
-      client.stream(),
+    const [file, info] = await Promise.all([
       client.blob(),
       client.json(),
-      client.events(),
     ])
 
-    // Buffered mode answers only after every subresponse finished, streams included, while a
-    // streaming batch would resolve these calls with both streams still open.
-    expect(isStreamClosed).toBe(true)
-    expect(isEventsReturned).toBe(true)
-
-    const reader = stream.getReader()
-    const first = await reader.read()
-    const second = await reader.read()
-    const third = await reader.read()
-
-    expect(first.done).toBe(false)
-    expect(new TextDecoder().decode(first.value)).toBe('part 1')
-    expect(second.done).toBe(false)
-    expect(new TextDecoder().decode(second.value)).toBe('part 2')
-    expect(third).toEqual({ value: undefined, done: true })
-
     expect(file).toBeInstanceOf(Blob)
-    await expect((file as Blob).text()).resolves.toBe('mixed payload')
+    await expect((file as Blob).text()).resolves.toBe('buffered payload')
     expect(info).toEqual({ ok: 'buffered-mixed' })
-
-    await expect(iterator.next()).resolves.toEqual({ value: 'event 1', done: false })
-    await expect(iterator.next()).resolves.toEqual({ value: { event: 2 }, done: false })
-    await expect(iterator.next()).resolves.toEqual({ value: 'event 3', done: true })
-
-    expect(streamProcedure).toHaveBeenCalledTimes(1)
-    expect(blobProcedure).toHaveBeenCalledTimes(1)
-    expect(jsonProcedure).toHaveBeenCalledTimes(1)
-    expect(eventProcedure).toHaveBeenCalledTimes(1)
     expect(fetchSpy).toHaveBeenCalledTimes(1) // ensure batch was used
   })
 
-  it('supports readable stream, blob, json, and AsyncIteratorObject responses in streaming mode', async () => {
+  /**
+   * A stream may never end, so a buffered batch starts streaming once a subresponse is one.
+   */
+  it.each(['streaming', 'buffered'] as const)('supports readable stream, blob, json, and AsyncIteratorObject responses in %s mode', async (mode) => {
     const part2 = promiseWithResolvers<void>()
     const event2 = promiseWithResolvers<void>()
 
@@ -151,9 +104,9 @@ describe.each([
       },
     }))
 
-    const blobProcedure = vi.fn(async () => new Blob(['streaming mixed payload'], { type: 'application/octet-stream' }))
+    const blobProcedure = vi.fn(async () => new Blob([`${mode} mixed payload`], { type: 'application/octet-stream' }))
 
-    const jsonProcedure = vi.fn(async () => ({ ok: 'streaming-mixed' }))
+    const jsonProcedure = vi.fn(async () => ({ ok: `${mode}-mixed` }))
 
     const eventProcedure = vi.fn(async function* () {
       yield 'event 1'
@@ -169,7 +122,7 @@ describe.each([
       events: os.handler(eventProcedure),
     }
 
-    const { client, fetchSpy } = createClientServer(router, { mode: 'streaming' })
+    const { client, fetchSpy } = createClientServer(router, { mode })
 
     // Both streams hold everything after their first item until the test releases it, so a batch
     // that waited for every subresponse to finish would hang here instead of resolving.
@@ -181,8 +134,8 @@ describe.each([
     ])
 
     expect(file).toBeInstanceOf(Blob)
-    await expect((file as Blob).text()).resolves.toBe('streaming mixed payload')
-    expect(info).toEqual({ ok: 'streaming-mixed' })
+    await expect((file as Blob).text()).resolves.toBe(`${mode} mixed payload`)
+    expect(info).toEqual({ ok: `${mode}-mixed` })
 
     const reader = stream.getReader()
 

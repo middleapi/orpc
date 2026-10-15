@@ -145,4 +145,21 @@ describe('smartCoercionLinkPlugin', () => {
       return true
     })
   })
+
+  it('passes maxBigIntDigits to the coercer', async () => {
+    const contract = oc.router({
+      get: oc.output(z.unknown()),
+    })
+    const plugin = new SmartCoercionLinkPlugin(contract, {
+      converters: [{
+        condition: () => true,
+        convert: () => [{ 'type': 'string', 'pattern': '^-?[0-9]+$', 'x-native-type': 'bigint' } as any, false],
+      }],
+      maxBigIntDigits: 3,
+    })
+    const interceptor = plugin.init({} as any).interceptors?.[0]
+
+    await expect(interceptor?.({ path: ['get'], next: vi.fn().mockResolvedValue('999') } as any)).resolves.toBe(999n)
+    await expect(interceptor?.({ path: ['get'], next: vi.fn().mockResolvedValue('1000') } as any)).resolves.toBe('1000')
+  })
 })

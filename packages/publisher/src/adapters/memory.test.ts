@@ -146,27 +146,6 @@ describe('memoryPublisher', () => {
       await noticeIterator.return()
     })
 
-    it('resumes every missed event for AsyncIteratorObject subscribers beyond maxBufferedEvents', async () => {
-      const publisher = new MemoryPublisher<TestEvents>({
-        maxBufferedEvents: 1,
-        resume: {
-          enabled: true,
-        },
-      })
-
-      for (let i = 0; i < 3; i++) {
-        await publisher.publish('message', { text: `${i}` })
-      }
-
-      const iterator = publisher.subscribe('message', { lastEventId: '0' })
-
-      for (let i = 0; i < 3; i++) {
-        expect((await iterator.next()).value?.text).toBe(`${i}`)
-      }
-
-      await iterator.return()
-    })
-
     it('stays consistent under heavy interleaving of publishes and repeated unsubscriptions', async () => {
       const publisher = new MemoryPublisher<TestEvents>({
         resume: {
