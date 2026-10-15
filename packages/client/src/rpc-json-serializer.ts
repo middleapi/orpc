@@ -35,27 +35,33 @@ function assertSerializedType(ok: boolean, type: string, expected: string): void
 }
 
 /**
- * Whether `value` has the shape of a copy made by `copyOnWrite`.
+ * Paths only walk through arrays and plain objects, the containers JSON is made of.
  */
-function isCopyLike(value: unknown): boolean {
-  return typeof value === 'object' && value !== null && (Array.isArray(value) || Object.getPrototypeOf(value) === Object.prototype)
+function isWalkable(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  if (Array.isArray(value)) {
+    return true
+  }
+
+  // Unlike `isPlainObject`, avoids reading `constructor` from every class prototype on this hot path
+  const proto = Object.getPrototypeOf(value)
+  return proto === Object.prototype || proto === null || Object.getPrototypeOf(proto) === null
 }
 
 /**
  * Returns `parent[key]` for a path to walk through, copying it first while it is still the original value.
  *
- * Paths must never walk through a value already restored by a blob or a handler,
- * or a later entry could mutate it after its handler validated it.
- * `serialize` emits maps before meta and children before parents, so its payloads never do.
- * Any value other than the original must be a copy made by `copyOnWrite`, which rejects most restored values
- * by shape alone. Handler results that look like a copy or are the value the handler received
- * are tracked in `restored` instead.
+ * A path must never walk through a value a handler returned, or a later entry could mutate it
+ * after the handler validated it. `serialize` emits children before parents, so its payloads never do.
  */
-function walkInto(parent: any, key: Segment, original: unknown, restored: Set<unknown> | undefined): any {
+function walkInto(parent: any, key: Segment, original: unknown, restored?: Set<unknown>): any {
   const value = parent[key]
 
-  if (restored?.has(value) || (value !== original && !isCopyLike(value))) {
-    throw invalidSerializedData(`segment "${key}" was already deserialized.`)
+  if (!isWalkable(value) || restored?.has(value)) {
+    throw invalidSerializedData(`segment "${key}" cannot be walked into.`)
   }
 
   return value === original ? copyOnWrite(parent, key, original) : value
@@ -425,7 +431,6 @@ export class RPCJsonSerializer {
 
   deserialize(serialized: RPCJsonSerialization): unknown {
     const ref = { json: serialized.json }
-    let restored: Set<unknown> | undefined
 
     if (serialized.blobs?.length) {
       for (let i = 0; i < serialized.maps.length; i++) {
@@ -443,7 +448,7 @@ export class RPCJsonSerializer {
 
         for (let j = 0; j < segments.length; j++) {
           original = original[preSegment]
-          currentRef = walkInto(currentRef, preSegment, original, restored)
+          currentRef = walkInto(currentRef, preSegment, original)
           preSegment = segments[j]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
@@ -456,6 +461,8 @@ export class RPCJsonSerializer {
     }
 
     if (serialized.meta) {
+      let restored: Set<unknown> | undefined
+
       for (const item of serialized.meta) {
         const type = item[0]
         const handler = this.handlers[type]
@@ -478,12 +485,10 @@ export class RPCJsonSerializer {
           }
         }
 
-        const input = currentRef[preSegment]
-        const value = handler.deserialize(input)
+        const value = handler.deserialize(currentRef[preSegment])
         currentRef[preSegment] = value
 
-        // Primitives cannot be mutated, so a handler returning its input only matters for objects
-        if (isCopyLike(value) || (value === input && typeof value === 'object' && value !== null)) {
+        if (isWalkable(value)) {
           (restored ??= new Set()).add(value)
         }
       }

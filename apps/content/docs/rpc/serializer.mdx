@@ -79,7 +79,7 @@ const serializer = new RPCSerializer({
 :::warning
 `deserialize` receives untrusted input. A malicious client controls `meta` and can point any handler at any JSON value, so never assume `deserialize` receives what `serialize` produced. Validate the value and throw when it does not match. Built-in handlers do the same, and [RPC Handler](/docs/rpc/handler) turns these errors into a `BAD_REQUEST` response.
 
-oRPC never changes a value after `deserialize` returns it: meta entries that reach into an already restored value are rejected with `BAD_REQUEST`. Still, return a fresh object from `deserialize` rather than a shared or cached mutable instance.
+oRPC never changes a value after `deserialize` returns it: meta entries that reach into an already restored value are rejected with `BAD_REQUEST`. Still, return a fresh object from `deserialize` rather than a shared or cached mutable instance, since procedures and middleware receive that value and may mutate it.
 :::
 
 :::info[Use a custom serializer with RPCHandler and RPCLink]
