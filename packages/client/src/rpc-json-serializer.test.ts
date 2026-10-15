@@ -606,6 +606,19 @@ describe('rpcJsonSerializer: meta cannot descend into restored values', () => {
       .toThrow('Invalid RPC serialized data: segment "json" was already deserialized.')
   })
 
+  it('rejects descent when entries share a path prefix with earlier ones', () => {
+    const json = { p: { name: 'http://evil/', age: 1, at: null }, q: '2020-01-01T00:00:00.000Z' }
+
+    expect(() => serializer.deserialize({ json, meta: [['date', 'p', 'at'], ['human', 'p'], ['url', 'p', 'name']] }))
+      .toThrow('Invalid RPC serialized data: segment "p" was already deserialized.')
+    expect(() => serializer.deserialize({ json, meta: [['human', 'p'], ['date', 'q'], ['url', 'p', 'name']] }))
+      .toThrow('Invalid RPC serialized data: segment "p" was already deserialized.')
+    expect(() => serializer.deserialize({ json: { a: { b: { name: '1', c: null } } }, meta: [['date', 'a', 'b', 'c'], ['identity', 'a', 'b'], ['bigint', 'a', 'b', 'name']] }))
+      .toThrow('Invalid RPC serialized data: segment "b" was already deserialized.')
+    expect(() => serializer.deserialize({ json: { a: { x: null } }, meta: [['date', 'a', 'x'], ['date', 'a', 'missing']] }))
+      .toThrow('Invalid RPC serialized data: segment "missing" does not exist.')
+  })
+
   it('treats numeric and string segments as the same position', () => {
     expect(() => serializer.deserialize({ json: [{ name: '123', age: 1 }], meta: [['human', 0], ['bigint', '0', 'name']] }))
       .toThrow('Invalid RPC serialized data: segment "0" was already deserialized.')

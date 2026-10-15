@@ -36,10 +36,9 @@ function assertSerializedType(ok: boolean, type: string, expected: string): void
 
 /**
  * The paths a deserialize call has restored so far, as a tree of segments where `true` marks a restored path.
+ * Segments are keyed as strings, like property keys, so `0` and `"0"` are the same path.
  */
-interface RestoredPaths {
-  [segment: PropertyKey]: RestoredPaths | true
-}
+type RestoredPaths = Map<string, RestoredPaths | true>
 
 /**
  * Steps into `segment` of the restored paths, rejecting a path that walks through an already restored one.
@@ -47,13 +46,20 @@ interface RestoredPaths {
  * `serialize` emits maps before meta and children before parents, so its payloads never do.
  */
 function walkRestoredPaths(node: RestoredPaths, segment: Segment): RestoredPaths {
-  const child = node[segment]
+  const key = String(segment)
+  const child = node.get(key)
 
   if (child === true) {
     throw invalidSerializedData(`segment "${segment}" was already deserialized.`)
   }
 
-  return child ?? (node[segment] = new NullProtoObj<RestoredPaths>())
+  if (child !== undefined) {
+    return child
+  }
+
+  const created: RestoredPaths = new Map()
+  node.set(key, created)
+  return created
 }
 
 const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHandler> = {
@@ -420,7 +426,7 @@ export class RPCJsonSerializer {
 
   deserialize(serialized: RPCJsonSerialization): unknown {
     const ref = { json: serialized.json }
-    const restored = new NullProtoObj<RestoredPaths>()
+    const restored: RestoredPaths = new Map()
 
     if (serialized.blobs?.length) {
       for (let i = 0; i < serialized.maps.length; i++) {
@@ -449,11 +455,20 @@ export class RPCJsonSerializer {
         }
 
         currentRef[preSegment] = blob
-        node[preSegment] = true
+        node.set(String(preSegment), true)
       }
     }
 
     if (serialized.meta) {
+      /**
+       * The previous entry's walk by depth, so a shared path prefix is not walked again.
+       * It only wrote at its last segment, which the next walk still checks, so every cached depth stays valid.
+       */
+      const refs: any[] = [ref]
+      const originals: any[] = [serialized]
+      const nodes: RestoredPaths[] = [restored]
+      let previous: RPCJsonSerializationMeta | undefined
+
       for (const item of serialized.meta) {
         const type = item[0]
         const handler = this.handlers[type]
@@ -462,16 +477,34 @@ export class RPCJsonSerializer {
           throw invalidSerializedData(`type "${type}" is not supported.`)
         }
 
-        let original: any = serialized
-        let currentRef: any = ref
-        let node = restored
-        let preSegment: string | number = 'json'
+        let depth = 0
 
-        for (let i = 1; i < item.length; i++) {
+        if (previous !== undefined) {
+          const max = Math.min(item.length, previous.length) - 1
+
+          while (depth < max && (depth === 0 || item[depth] === previous[depth])) {
+            depth++
+          }
+        }
+
+        let original = originals[depth]
+        let currentRef = refs[depth]
+        let node = nodes[depth]!
+        let preSegment: string | number = depth === 0 ? 'json' : item[depth]!
+
+        if (depth !== 0 && !Object.hasOwn(currentRef, preSegment)) {
+          throw invalidSerializedData(`segment "${preSegment}" does not exist.`)
+        }
+
+        for (let i = depth + 1; i < item.length; i++) {
           node = walkRestoredPaths(node, preSegment)
           original = original[preSegment]
           currentRef = copyOnWrite(currentRef, preSegment, original)
           preSegment = item[i]!
+
+          originals[i] = original
+          refs[i] = currentRef
+          nodes[i] = node
 
           if (!Object.hasOwn(currentRef, preSegment)) {
             throw invalidSerializedData(`segment "${preSegment}" does not exist.`)
@@ -479,7 +512,8 @@ export class RPCJsonSerializer {
         }
 
         currentRef[preSegment] = handler.deserialize(currentRef[preSegment])
-        node[preSegment] = true
+        node.set(String(preSegment), true)
+        previous = item
       }
     }
 
