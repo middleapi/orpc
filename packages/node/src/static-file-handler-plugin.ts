@@ -5,13 +5,13 @@ import type { Stats } from 'node:fs'
 import type { Transform } from 'node:stream'
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream, createWriteStream } from 'node:fs'
-import { mkdir, realpath, rename, rm, stat, utimes } from 'node:fs/promises'
+import { mkdir, realpath, rename, rm, stat, truncate, utimes } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { pipeline } from 'node:stream/promises'
 // A namespace import, since a named import of `createZstdCompress` fails to load before Node.js 22.15
 import * as zlib from 'node:zlib'
-import { getTracer, isAcceptableEncoding, isCompressibleContentType, matchesHttpPathPrefix, mergeHttpPath, parseAcceptEncodingQualities, safeDecodeURIComponent, safeEncodeURIComponent, toArray } from '@orpc/shared'
+import { getOwn, getTracer, isAcceptableEncoding, isCompressibleContentType, matchesHttpPathPrefix, mergeHttpPath, parseAcceptEncodingQualities, safeDecodeURIComponent, safeEncodeURIComponent, toArray } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { toWebReadableStream } from '@standard-server/node'
 import mime from 'mime'
@@ -42,14 +42,19 @@ const SHORT_NAME_ALIAS_REGEX = /^[^.]{0,6}~\d/
 interface ContentEncodingSpec {
   /** The extension of the sidecar holding a file in this encoding. */
   extension: string
-  /** `undefined` when this runtime cannot compress into the encoding. */
-  createCompressor: (() => Transform) | undefined
+  /**
+   * Creates a compressor for an input of `size` bytes, or is `undefined` when this runtime
+   * cannot compress into the encoding.
+   */
+  createCompressor: ((size: number) => Transform) | undefined
 }
 
 /**
  * Each compression level is about the strongest that still compresses a megabyte in a tenth of
  * a second, since the first request for a file waits on it. Brotli 10 and 11 are ten to thirty
- * times slower. zstd compression only exists from Node.js 22.15.
+ * times slower. zstd is told the input size, without which it sizes its window and tables for an
+ * input of any length, costing a small file tens of milliseconds and every stream tens of
+ * megabytes. zstd compression only exists from Node.js 22.15.
  */
 const CONTENT_ENCODINGS: Record<'br' | 'zstd' | 'gzip', ContentEncodingSpec> = {
   br: {
@@ -59,7 +64,7 @@ const CONTENT_ENCODINGS: Record<'br' | 'zstd' | 'gzip', ContentEncodingSpec> = {
   zstd: {
     extension: '.zst',
     createCompressor: typeof zlib.createZstdCompress === 'function'
-      ? () => zlib.createZstdCompress({ params: { [zlib.constants.ZSTD_c_compressionLevel]: 15 } })
+      ? size => zlib.createZstdCompress({ params: { [zlib.constants.ZSTD_c_compressionLevel]: 15 }, pledgedSrcSize: size })
       : undefined,
   },
   gzip: {
@@ -71,20 +76,39 @@ const CONTENT_ENCODINGS: Record<'br' | 'zstd' | 'gzip', ContentEncodingSpec> = {
 type ContentEncoding = keyof typeof CONTENT_ENCODINGS
 
 /**
- * Compressed output depends on the library versions as well as the content, so processes on
- * different Node.js versions sharing one cache, as in a rolling deploy, never write different
- * bytes to the same copy while another process is serving it.
+ * Compressed output depends on the library versions and the compression parameters as well as
+ * the content, so processes on different Node.js versions or releases of this plugin sharing one
+ * cache, as in a rolling deploy, never write different bytes to the same copy while another
+ * process is serving it. The leading number covers the parameters and the cache layout, and is
+ * raised whenever either changes.
  */
-const COMPRESSOR_VERSIONS = `${process.versions.zlib}-${process.versions.brotli}-${process.versions.zstd}`
+const COMPRESSOR_VERSIONS = `1-${process.versions.zlib}-${process.versions.brotli}-${process.versions.zstd}`
 
-/** Sidecars in order of preference, best compression first. */
-const PRECOMPRESSED_ENCODINGS: readonly ContentEncoding[] = ['br', 'zstd', 'gzip']
+/** Encodings in order of preference, best compression first. */
+const PREFERRED_ENCODINGS: readonly ContentEncoding[] = ['br', 'zstd', 'gzip']
 
+/**
+ * How many compressions run at once. Each holds a libuv thread, which file system calls share,
+ * and tens of megabytes while it works, so a burst of first requests for many files neither
+ * stalls every other request nor exhausts memory.
+ */
+const MAX_CONCURRENT_COMPRESSIONS = 2
+
+/**
+ * How long a copy that could not be stored, as on a full disk, is not attempted again, since
+ * brotli only fails to write once it has compressed the whole file.
+ */
+const FAILED_COMPRESSION_COOLDOWN_MS = 60_000
+
+/**
+ * A file found under the root, with its real path. With `allowSymlinks` nothing checks
+ * containment, so the path is left unresolved and resolved only when the file is compressed.
+ */
 type FoundFile = [filePath: string, stats: Stats, realPath: string]
 
 interface CacheCompressor {
   encoding: ContentEncoding
-  createCompressor: () => Transform
+  createCompressor: (size: number) => Transform
 }
 
 interface CompressionCache {
@@ -104,8 +128,10 @@ interface EncodedFile {
 export interface StaticFileHandlerPluginCompressOnDemandOptions {
   /**
    * The directory compressed copies are stored in, created on first use and resolved against
-   * the working directory when relative. Use a directory nothing else writes to; it can be
-   * cleared at any time.
+   * the working directory when relative. Use a directory nothing else writes to. Copies of files
+   * that have since changed are never removed, so clear it from time to time, ideally while no
+   * request is being served, such as on deploy, since a request reading a copy that is removed
+   * fails.
    */
   cacheDir: string
 
@@ -128,8 +154,9 @@ export interface StaticFileHandlerPluginCompressOnDemandOptions {
 
   /**
    * The maximum file size in bytes a request waits to compress. A larger file is compressed in
-   * the background instead, and served as it is until its copy is ready, so no request waits
-   * long on a big file. Set to `0` to never wait.
+   * the background instead, and served as it is until its copy is ready, with `no-cache` added
+   * to its `Cache-Control` so caches come back for the copy, so no request waits long on a big
+   * file. Set to `0` to never wait.
    *
    * @default 1048576 (1MB)
    */
@@ -192,9 +219,13 @@ export interface StaticFileHandlerPluginOptions {
   precompressed?: boolean
 
   /**
-   * Compresses a file with a compressible content type the first time a client accepts an
-   * encoding that no precompressed sidecar provides, and stores the copy in `cacheDir`, so every
-   * later request, after a restart too, is answered from it.
+   * Compresses a file with a compressible content type the first time a client accepts one of
+   * the configured encodings but none of the file's precompressed sidecars, and stores the copy
+   * in `cacheDir`, so every later request, after a restart too, is answered from it. Range
+   * requests are answered from the file rather than the copy, since many clients that ask for
+   * compression cannot decode a slice of a compressed one. Only a couple of files are compressed
+   * at once, and while those run, other files are served as they are, the way files over
+   * `maxSize` are.
    *
    * @default undefined (disabled)
    */
@@ -257,8 +288,10 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   private readonly compressOnDemand: CompressionCache | undefined
   private readonly allowSymlinks: Exclude<StaticFileHandlerPluginOptions['allowSymlinks'], undefined>
   private readonly mimeTypes: Exclude<StaticFileHandlerPluginOptions['mimeTypes'], undefined>
-  /** Cache lookups in progress keyed by cache path, so concurrent requests share one compression. */
-  private readonly pendingCacheLookups = new Map<string, Promise<Stats | undefined>>()
+  /** Compressions in progress keyed by cache path, so concurrent requests share one. */
+  private readonly pendingCompressions = new Map<string, Promise<Stats | undefined>>()
+  /** Cache paths whose copy could not be stored, left alone until their cooldown ends. */
+  private readonly failedCompressions = new Set<string>()
 
   constructor(options: StaticFileHandlerPluginOptions) {
     this.rootDir = path.resolve(options.rootDir)
@@ -275,21 +308,27 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     this.precompressed = options.precompressed ?? false
 
     if (options.compressOnDemand !== undefined) {
-      this.compressOnDemand = {
-        dir: path.resolve(options.compressOnDemand.cacheDir),
-        // An encoding this runtime cannot compress into leaves its clients to their next accepted one
-        compressors: (options.compressOnDemand.encodings ?? ['br', 'zstd', 'gzip']).flatMap((encoding) => {
-          // An own property check, so names like "constructor" cannot resolve through the prototype chain
-          if (!Object.hasOwn(CONTENT_ENCODINGS, encoding)) {
-            throw new TypeError(`[StaticFileHandlerPlugin] Unsupported compressOnDemand encoding: ${String(encoding)}`)
-          }
+      // An encoding this runtime cannot compress into leaves its clients to their next accepted one
+      const compressors = (options.compressOnDemand.encodings ?? PREFERRED_ENCODINGS).flatMap((encoding) => {
+        const spec = getOwn(CONTENT_ENCODINGS, encoding)
 
-          const { createCompressor } = CONTENT_ENCODINGS[encoding]
+        if (spec === undefined) {
+          throw new TypeError(`[StaticFileHandlerPlugin] Unsupported compressOnDemand encoding: ${String(encoding)}`)
+        }
 
-          return createCompressor === undefined ? [] : [{ encoding, createCompressor }]
-        }),
-        threshold: options.compressOnDemand.threshold ?? 1024,
-        maxSize: options.compressOnDemand.maxSize ?? 1024 * 1024,
+        const { createCompressor } = spec
+
+        return createCompressor === undefined ? [] : [{ encoding, createCompressor }]
+      })
+
+      // With nothing to compress into, no file is ever encoded, so none needs negotiating
+      if (compressors.length > 0) {
+        this.compressOnDemand = {
+          dir: path.resolve(options.compressOnDemand.cacheDir),
+          compressors,
+          threshold: options.compressOnDemand.threshold ?? 1024,
+          maxSize: options.compressOnDemand.maxSize ?? 1024 * 1024,
+        }
       }
     }
 
@@ -344,23 +383,17 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   }
 
   /**
-   * Resolves symbolic links and, unless `allowSymlinks` is enabled, confirms the target is
-   * still inside the root, which the lexical `resolveWithinRoot` check cannot see.
-   * With `allowSymlinks` the path is returned unresolved unless `needsRealPath` is set,
-   * saving the syscall when nothing uses the real path.
+   * Resolves symbolic links and confirms the target is still inside the root,
+   * which the lexical `resolveWithinRoot` check cannot see.
    */
-  private async resolveContainedRealPath(filePath: string, needsRealPath = false): Promise<string | undefined> {
-    if (this.allowSymlinks && !needsRealPath) {
+  private async resolveContainedRealPath(filePath: string): Promise<string | undefined> {
+    if (this.allowSymlinks) {
       return filePath
     }
 
-    const realPath = await realpath(filePath).catch(() => undefined)
-
-    if (realPath === undefined || this.allowSymlinks) {
-      return realPath
-    }
-
     const [rootDirReal, rootDirRealPrefix] = await this.rootDirRealPaths
+    // An empty string is contained by no root, so an unresolvable path is simply not contained
+    const realPath = await realpath(filePath).catch(() => '')
 
     return realPath === rootDirReal || realPath.startsWith(rootDirRealPrefix) ? realPath : undefined
   }
@@ -400,8 +433,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     // Both resolutions are always needed, so they run together and cost the latency of one
     const [stats, realPath] = await Promise.all([
       stat(filePath).catch(() => undefined),
-      // The real path only keys the compression cache
-      this.resolveContainedRealPath(filePath, this.compressOnDemand !== undefined),
+      this.resolveContainedRealPath(filePath),
     ])
 
     if (stats === undefined || realPath === undefined) {
@@ -415,7 +447,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
    * Finds the precompressed sidecar of `filePath` in the first encoding the client accepts.
    */
   private async findPrecompressedFile(filePath: string, qualities: Map<string, number>): Promise<EncodedFile | undefined> {
-    const candidates = await Promise.all(PRECOMPRESSED_ENCODINGS
+    const candidates = await Promise.all(PREFERRED_ENCODINGS
       .filter(encoding => isAcceptableEncoding(qualities, encoding))
       .map(async (encoding) => {
         const candidatePath = filePath + CONTENT_ENCODINGS[encoding].extension
@@ -435,7 +467,9 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
 
   /**
    * Finds the compressed copy of `filePath` in the cache for the first encoding the client
-   * accepts, compressing the file into the cache when no copy exists yet.
+   * accepts, compressing the file into the cache when no copy exists yet. Resolves to `'interim'`
+   * when the file is served as it is only until its copy is ready, and to `'stale'` when no copy
+   * came of a compression the request waited on, during which the file may have changed.
    */
   private async resolveCompressionCacheFile(
     compressionCache: CompressionCache,
@@ -443,10 +477,17 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     realPath: string,
     stats: Stats,
     qualities: Map<string, number>,
-  ): Promise<EncodedFile | undefined> {
+  ): Promise<EncodedFile | 'interim' | 'stale' | undefined> {
     const compressor = compressionCache.compressors.find(({ encoding }) => isAcceptableEncoding(qualities, encoding))
 
     if (compressor === undefined) {
+      return undefined
+    }
+
+    // Left unresolved by the lookup with `allowSymlinks`, so a file whose links cannot be resolved is served as it is
+    const keyPath = this.allowSymlinks ? await realpath(filePath).catch(() => undefined) : realPath
+
+    if (keyPath === undefined) {
       return undefined
     }
 
@@ -456,17 +497,23 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
      * compressed again instead of a stale copy being served. The change time is part of the
      * version because, unlike the modification time, tools that copy files cannot restore it.
      */
-    const key = createHash('sha256').update(`${realPath}\0${toFileVersion(stats)}\0${COMPRESSOR_VERSIONS}`).digest('hex')
+    const key = createHash('sha256').update(`${keyPath}\0${toFileVersion(stats)}\0${COMPRESSOR_VERSIONS}`).digest('hex')
     const cachePath = path.join(compressionCache.dir, key + CONTENT_ENCODINGS[compressor.encoding].extension)
-    const cachedStats = stats.size > compressionCache.maxSize
-      ? await this.statOrCompressInBackground(filePath, stats, compressor.createCompressor, cachePath)
-      : await this.statOrCompress(filePath, stats, compressor.createCompressor, cachePath)
+    const cachedStats = await this.statOrCompress(
+      cachePath,
+      () => writeCompressedCopy(filePath, stats, compressor.createCompressor, cachePath),
+      stats.size <= compressionCache.maxSize,
+    )
+
+    if (cachedStats === undefined || typeof cachedStats === 'string') {
+      return cachedStats
+    }
 
     /**
-     * A copy no smaller than the file saves nothing, so the file is served as it is. The copy is
-     * still kept, so the file is not compressed again on every request.
+     * A file compression does not make smaller is marked by an empty copy, which no compressed
+     * stream ever is, so it is served as it is without being compressed again on every request.
      */
-    if (cachedStats === undefined || !cachedStats.isFile() || cachedStats.size >= stats.size) {
+    if (!cachedStats.isFile() || cachedStats.size === 0 || cachedStats.size >= stats.size) {
       return undefined
     }
 
@@ -474,50 +521,60 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   }
 
   /**
-   * Stats the cached copy, compressing the file into the cache when it is missing.
+   * Stats the cached copy, compressing the file into the cache when it is missing. A request waits
+   * for the compression only when `waits` is set and a compression slot is free, and otherwise
+   * resolves to `'interim'`, leaving the copy to be written in the background or, with every slot
+   * taken, by a later request. Resolves to `undefined` while a failed copy cools down.
    */
-  private statOrCompress(
-    filePath: string,
-    stats: Stats,
-    createCompressor: () => Transform,
+  private async statOrCompress(
     cachePath: string,
-  ): Promise<Stats | undefined> {
-    let pending = this.pendingCacheLookups.get(cachePath)
+    compress: () => Promise<Stats | undefined>,
+    waits: boolean,
+  ): Promise<Stats | 'interim' | 'stale' | undefined> {
+    let compression = this.pendingCompressions.get(cachePath)
 
-    if (pending === undefined) {
-      pending = stat(cachePath)
-        .catch(() => writeCompressedCopy(filePath, stats, createCompressor, cachePath))
-        .finally(() => this.pendingCacheLookups.delete(cachePath))
+    if (compression === undefined) {
+      const cachedStats = await stat(cachePath).catch(() => undefined)
 
-      this.pendingCacheLookups.set(cachePath, pending)
+      if (cachedStats !== undefined) {
+        return cachedStats
+      }
+
+      if (this.failedCompressions.has(cachePath)) {
+        return undefined
+      }
+
+      // Started by a concurrent request while this one looked
+      compression = this.pendingCompressions.get(cachePath)
+
+      if (compression === undefined) {
+        if (this.pendingCompressions.size >= MAX_CONCURRENT_COMPRESSIONS) {
+          return 'interim'
+        }
+
+        // Looked up again first, since a compression that just finished leaves its copy but no entry
+        compression = stat(cachePath)
+          .catch(compress)
+          .then((copyStats) => {
+            this.pendingCompressions.delete(cachePath)
+
+            if (copyStats === undefined) {
+              this.failedCompressions.add(cachePath)
+              setTimeout(() => this.failedCompressions.delete(cachePath), FAILED_COMPRESSION_COOLDOWN_MS).unref()
+            }
+
+            return copyStats
+          })
+
+        this.pendingCompressions.set(cachePath, compression)
+      }
     }
 
-    return pending
-  }
-
-  /**
-   * Stats the cached copy, starting its compression without waiting for it when it is missing,
-   * so the request is answered with the file as it is while the copy is written.
-   */
-  private async statOrCompressInBackground(
-    filePath: string,
-    stats: Stats,
-    createCompressor: () => Transform,
-    cachePath: string,
-  ): Promise<Stats | undefined> {
-    // Only this method starts lookups for files this large, so one in progress is a compression
-    if (this.pendingCacheLookups.has(cachePath)) {
-      return undefined
+    if (!waits) {
+      return 'interim'
     }
 
-    const cachedStats = await stat(cachePath).catch(() => undefined)
-
-    if (cachedStats === undefined) {
-      // Never rejects, since a copy that cannot be written only resolves to `undefined`
-      void this.statOrCompress(filePath, stats, createCompressor, cachePath)
-    }
-
-    return cachedStats
+    return await compression ?? 'stale'
   }
 
   /**
@@ -621,22 +678,43 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
 
     let [filePath, stats, realPath] = found
 
+    const fileSize = stats.size
     const contentType = this.resolveContentType(filePath)
+    const range = request.method === 'GET' ? flattenStandardHeader(request.headers.range) : undefined
     const eligibleCache = this.compressOnDemand !== undefined && stats.size >= this.compressOnDemand.threshold
       ? this.compressOnDemand
       : undefined
     const negotiatesEncoding = (this.precompressed || eligibleCache !== undefined) && isCompressibleContentType(contentType)
 
     let contentEncoding: string | undefined
+    /** Whether the file is served as it is only until its compressed copy is ready. */
+    let isInterim = false
 
     if (negotiatesEncoding) {
       const qualities = parseAcceptEncodingQualities(flattenStandardHeader(request.headers['accept-encoding']))
 
-      // A sidecar is prepared ahead of time, usually with stronger compression, so it wins over the cache
+      /**
+       * A sidecar is prepared ahead of time, usually with stronger compression, so it wins over the
+       * cache. A range is answered from the file as it is rather than the cache, since clients that
+       * decode what they asked to be compressed fail on a slice from the middle of a compressed copy.
+       */
       const encoded = (this.precompressed ? await this.findPrecompressedFile(filePath, qualities) : undefined)
-        ?? (eligibleCache !== undefined ? await this.resolveCompressionCacheFile(eligibleCache, filePath, realPath, stats, qualities) : undefined)
+        ?? (eligibleCache !== undefined && range === undefined ? await this.resolveCompressionCacheFile(eligibleCache, filePath, realPath, stats, qualities) : undefined)
 
-      if (encoded !== undefined) {
+      if (encoded === 'interim') {
+        isInterim = true
+      }
+      else if (encoded === 'stale') {
+        // The file is read again for the stats, so they describe the bytes that are sent
+        const currentStats = await stat(filePath).catch(() => undefined)
+
+        if (currentStats === undefined || !currentStats.isFile()) {
+          return undefined
+        }
+
+        stats = currentStats
+      }
+      else if (encoded !== undefined) {
         filePath = encoded.filePath
         stats = encoded.stats
         contentEncoding = encoded.encoding
@@ -644,12 +722,17 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     }
 
     const size = stats.size
+    const mtime = stats.mtime.getTime().toString(16)
     /**
      * Size and mtime at millisecond resolution, a strictly finer validator than the one nginx treats
      * as strong. An encoded variant also names its encoding, since compressed copies share the
-     * file's modification time and two encodings can come out the same size.
+     * file's modification time and two encodings can come out the same size, and the size of the
+     * file itself, so it changes whenever the file's own validator does even when a changed file
+     * compresses to the same size.
      */
-    const etag = `"${size.toString(16)}-${stats.mtime.getTime().toString(16)}${contentEncoding === undefined ? '' : `-${contentEncoding}`}"`
+    const etag = contentEncoding === undefined
+      ? `"${size.toString(16)}-${mtime}"`
+      : `"${size.toString(16)}-${fileSize.toString(16)}-${mtime}-${contentEncoding}"`
     // Truncated to seconds, matching the precision of http dates
     const lastModifiedTime = Math.floor(stats.mtime.getTime() / 1000) * 1000
 
@@ -665,7 +748,8 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     }
 
     if (this.cacheControl !== false) {
-      headers['cache-control'] = this.cacheControl
+      // Replaced by the compressed copy once it is ready, so caches must come back for it instead of keeping this response
+      headers['cache-control'] = isInterim ? `${this.cacheControl}, no-cache` : this.cacheControl
     }
 
     if (isPreconditionFailed(request.headers, etag, lastModifiedTime)) {
@@ -680,9 +764,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     let start = 0
     let end = size - 1
 
-    const range = request.method === 'GET' ? flattenStandardHeader(request.headers.range) : undefined
-
-    if (range !== undefined && isRangeApplicable(request.headers, etag, lastModifiedTime)) {
+    if (range !== undefined && isRangeApplicable(request.headers, etag, lastModifiedTime, negotiatesEncoding)) {
       const parsed = parseByteRange(range, size)
 
       if (parsed === 'unsatisfiable') {
@@ -707,10 +789,12 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     /**
      * A HEAD response uses an empty stream instead of no body, because
      * the adapters strip the content headers when the body is `undefined`.
+     * The read stops at the stated length, so a file that grew since it was
+     * found never sends more than its `Content-Length`.
      */
-    const body: ReadableStream<Uint8Array<ArrayBuffer>> = request.method === 'HEAD'
+    const body: ReadableStream<Uint8Array<ArrayBuffer>> = request.method === 'HEAD' || size === 0
       ? new ReadableStream({ start: controller => controller.close() })
-      : toWebReadableStream(status === 206 ? createReadStream(filePath, { start, end }) : createReadStream(filePath))
+      : toWebReadableStream(createReadStream(filePath, { start, end }))
 
     return { status, headers, body }
   }
@@ -718,9 +802,11 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
 
 /**
  * Identifies a version of a file's content, changing whenever the content may have changed.
+ * The inode number tells a file replaced by a rename apart from the one it replaced, even when
+ * both were written within one tick of the clock the timestamps come from.
  */
 function toFileVersion(stats: Stats): string {
-  return `${stats.size}-${stats.mtimeMs}-${stats.ctimeMs}`
+  return `${stats.ino}-${stats.size}-${stats.mtimeMs}-${stats.ctimeMs}`
 }
 
 /**
@@ -731,7 +817,7 @@ function toFileVersion(stats: Stats): string {
 async function writeCompressedCopy(
   filePath: string,
   stats: Stats,
-  createCompressor: () => Transform,
+  createCompressor: (size: number) => Transform,
   cachePath: string,
 ): Promise<Stats | undefined> {
   // Written beside its final name and renamed into place, so no reader ever sees a partial copy
@@ -739,8 +825,21 @@ async function writeCompressedCopy(
 
   try {
     await mkdir(path.dirname(cachePath), { recursive: true })
-    // `wx` refuses to write through anything already at the temporary name
-    await pipeline(createReadStream(filePath), createCompressor(), createWriteStream(tmpPath, { flags: 'wx' }))
+
+    // Created before the file is opened, so a compressor that cannot be created leaves nothing open
+    const compressor = createCompressor(stats.size)
+
+    /**
+     * `wx` refuses to write through anything already at the temporary name, and `flush` makes the
+     * copy durable before it is renamed into place, since a crash could otherwise leave an empty
+     * or partial copy under its final name.
+     */
+    await pipeline(createReadStream(filePath), compressor, createWriteStream(tmpPath, { flags: 'wx', flush: true }))
+
+    // A copy no smaller than the file saves nothing, so it is emptied to mark the file as not worth compressing
+    if ((await stat(tmpPath)).size >= stats.size) {
+      await truncate(tmpPath, 0)
+    }
 
     /**
      * The copy takes the file's modification time, so its ETag and Last-Modified depend only on
@@ -825,7 +924,14 @@ function isRequestFresh(requestHeaders: StandardHeaders, etag: string, lastModif
   return false
 }
 
-function isRangeApplicable(requestHeaders: StandardHeaders, etag: string, lastModifiedTime: number): boolean {
+/**
+ * The date form only applies when the representation does not depend on Accept-Encoding. Encoded
+ * variants share the file's modification time, so a date is no strong validator for any of them
+ * and cannot tell which one a partial download came from.
+ *
+ * @see https://www.rfc-editor.org/rfc/rfc9110.html#name-if-range
+ */
+function isRangeApplicable(requestHeaders: StandardHeaders, etag: string, lastModifiedTime: number, negotiatesEncoding: boolean): boolean {
   const ifRange = flattenStandardHeader(requestHeaders['if-range'])
 
   if (ifRange === undefined) {
@@ -837,7 +943,7 @@ function isRangeApplicable(requestHeaders: StandardHeaders, etag: string, lastMo
     return ifRange === etag
   }
 
-  return Date.parse(ifRange) === lastModifiedTime
+  return !negotiatesEncoding && Date.parse(ifRange) === lastModifiedTime
 }
 
 function parseByteRange(range: string, size: number): [start: number, end: number] | 'unsatisfiable' | undefined {

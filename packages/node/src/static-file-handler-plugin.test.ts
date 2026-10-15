@@ -8,6 +8,7 @@ import { createServer, request as httpRequest } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
+import { Transform } from 'node:stream'
 import { brotliCompressSync, brotliDecompressSync, gunzipSync, gzipSync, zstdCompressSync, zstdDecompressSync } from 'node:zlib'
 import { os } from '@orpc/server'
 import { RPCHandler as FetchRPCHandler } from '@orpc/server/fetch'
@@ -902,6 +903,8 @@ describe('staticFileHandlerPlugin', () => {
 
   describe('compress on demand', () => {
     const largeText = 'compress me once, serve me many times. '.repeat(100)
+    // Node.js before 22.15 has no zstd, so clients that accept it fall back to their next encoding
+    const supportsZstd = typeof zstdCompressSync === 'function'
     let cacheCount = 0
 
     beforeAll(() => {
@@ -927,6 +930,28 @@ describe('staticFileHandlerPlugin', () => {
       })
 
       return async (url: string, init?: RequestInit) => (await handler.handle(new Request(`https://example.com${url}`, init))).response!
+    }
+
+    /**
+     * Imports a fresh copy of the plugin with parts of zlib replaced, since the module binds zlib
+     * when it loads, so only a fresh copy observes the replacement.
+     */
+    async function importPluginWithZlib(
+      onTestFinished: (fn: () => void) => void,
+      override: (zlib: typeof import('node:zlib')) => object,
+    ): Promise<typeof StaticFileHandlerPlugin> {
+      vi.resetModules()
+      vi.doMock('node:zlib', async (importOriginal) => {
+        const zlib = await importOriginal<typeof import('node:zlib')>()
+        // Defined even where it is missing, since a mock throws on reading an export it lacks
+        return { ...zlib, createZstdCompress: zlib.createZstdCompress, ...override(zlib) }
+      })
+      onTestFinished(() => {
+        vi.doUnmock('node:zlib')
+        vi.resetModules()
+      })
+
+      return (await import('./static-file-handler-plugin')).StaticFileHandlerPlugin
     }
 
     it('compresses a file on its first request and stores the copy on disk', async () => {
@@ -988,13 +1013,13 @@ describe('staticFileHandlerPlugin', () => {
       expect(brRes.headers['content-encoding']).toBe('br')
 
       const zstdRes = await agent.get('/large.txt').set('accept-encoding', 'gzip, zstd')
-      expect(zstdRes.headers['content-encoding']).toBe('zstd')
+      expect(zstdRes.headers['content-encoding']).toBe(supportsZstd ? 'zstd' : 'gzip')
 
       const gzipRes = await agent.get('/large.txt').set('accept-encoding', 'gzip, br;q=0')
       expect(gzipRes.headers['content-encoding']).toBe('gzip')
       expect(gzipRes.text).toBe(largeText)
 
-      expect(listCacheDir(dir).map(entry => path.extname(entry)).sort()).toEqual(['.br', '.gz', '.zst'])
+      expect(listCacheDir(dir).map(entry => path.extname(entry)).sort()).toEqual(supportsZstd ? ['.br', '.gz', '.zst'] : ['.br', '.gz'])
 
       const orderedRes = await createStaticAgent({ compressOnDemand: { cacheDir: dir, encodings: ['gzip', 'br'] } })
         .get('/large.txt')
@@ -1011,19 +1036,26 @@ describe('staticFileHandlerPlugin', () => {
 
     it('compresses a file over maxSize in the background, serving it as it is until the copy is ready', async () => {
       const dir = createCacheDir()
-      const agent = createStaticAgent({ compressOnDemand: { cacheDir: dir, maxSize: 1024 } })
+      const cacheControl = 'public, max-age=31536000, immutable'
+      const agent = createStaticAgent({ cacheControl, compressOnDemand: { cacheDir: dir, maxSize: 1024 } })
 
       const responses = await Promise.all(Array.from({ length: 3 }, () => agent.get('/large.txt').set('accept-encoding', 'br')))
 
       for (const res of responses) {
         expect(res.headers['content-encoding']).toBeUndefined()
         expect(res.headers.vary).toBe('accept-encoding')
+        // Replaced by the copy once it is ready, so caches must come back for it instead of keeping this for a year
+        expect(res.headers['cache-control']).toBe(`${cacheControl}, no-cache`)
         expect(res.text).toBe(largeText)
       }
+
+      // A client that accepts no encoding already gets its final response
+      expect((await agent.get('/large.txt').set('accept-encoding', 'identity')).headers['cache-control']).toBe(cacheControl)
 
       await vi.waitFor(async () => {
         const res = await agent.get('/large.txt').set('accept-encoding', 'br')
         expect(res.headers['content-encoding']).toBe('br')
+        expect(res.headers['cache-control']).toBe(cacheControl)
         expect(res.text).toBe(largeText)
       })
 
@@ -1049,7 +1081,7 @@ describe('staticFileHandlerPlugin', () => {
       }
     })
 
-    it('supports zstd', async () => {
+    it.skipIf(!supportsZstd)('supports zstd', async () => {
       const dir = createCacheDir()
 
       const fetchFile = createFetchClient({ compressOnDemand: { cacheDir: dir, encodings: ['zstd'] } })
@@ -1061,16 +1093,9 @@ describe('staticFileHandlerPlugin', () => {
     })
 
     it('skips zstd compression on a runtime without it, but still serves zstd sidecars', async ({ onTestFinished }) => {
-      // Node.js before 22.15 has no zstd, which only a fresh copy of the module can observe
-      vi.resetModules()
-      vi.doMock('node:zlib', async importOriginal => ({ ...await importOriginal<object>(), createZstdCompress: undefined }))
-      onTestFinished(() => {
-        vi.doUnmock('node:zlib')
-        vi.resetModules()
-        rmSync(path.join(rootDir, 'large.txt.zst'), { force: true })
-      })
-
-      const { StaticFileHandlerPlugin } = await import('./static-file-handler-plugin')
+      onTestFinished(() => rmSync(path.join(rootDir, 'large.txt.zst'), { force: true }))
+      // As on Node.js before 22.15
+      const StaticFileHandlerPlugin = await importPluginWithZlib(onTestFinished, () => ({ createZstdCompress: undefined }))
       const dir = createCacheDir()
       const agent = createAgent(new RPCHandler({}, {
         plugins: [new StaticFileHandlerPlugin({ rootDir, precompressed: true, compressOnDemand: { cacheDir: dir } })],
@@ -1081,9 +1106,11 @@ describe('staticFileHandlerPlugin', () => {
       expect(compressedRes.text).toBe(largeText)
       expect(listCacheDir(dir)).toEqual([expect.stringMatching(/\.gz$/)])
 
-      writeFileSync(path.join(rootDir, 'large.txt.zst'), zstdCompressSync(largeText))
+      // Served as it is, so writing the sidecar needs no zstd on this runtime either
+      writeFileSync(path.join(rootDir, 'large.txt.zst'), 'zstd sidecar')
       const sidecarRes = await agent.get('/large.txt').set('accept-encoding', 'zstd, gzip')
       expect(sidecarRes.headers['content-encoding']).toBe('zstd')
+      expect(sidecarRes.text).toBe('zstd sidecar')
     })
 
     it('prefers a precompressed sidecar over the cache, and ignores sidecars unless enabled', async ({ onTestFinished }) => {
@@ -1132,6 +1159,11 @@ describe('staticFileHandlerPlugin', () => {
       const thresholdRes = await createStaticAgent({ compressOnDemand: { cacheDir: dir, threshold: largeText.length + 1 } }).get('/large.txt').set('accept-encoding', 'br')
       expect(thresholdRes.headers['content-encoding']).toBeUndefined()
 
+      // With nothing to compress into, no file is ever encoded
+      const noEncodingsRes = await createStaticAgent({ compressOnDemand: { cacheDir: dir, encodings: [] } }).get('/large.txt').set('accept-encoding', 'br')
+      expect(noEncodingsRes.headers['content-encoding']).toBeUndefined()
+      expect(noEncodingsRes.headers.vary).toBeUndefined()
+
       expect(listCacheDir(dir)).toEqual([])
     })
 
@@ -1152,18 +1184,27 @@ describe('staticFileHandlerPlugin', () => {
 
       /**
        * Same size and a restored modification time, as `cp -p` or `rsync -t` leave a replaced file.
-       * The change time cannot be restored, so the new content is still noticed.
+       * The change time cannot be restored, so the new content is still noticed. Rewritten until the
+       * change time moves, since without fine-grained timestamps writes within one tick share it.
        */
-      writeFileSync(filePath, 'c'.repeat(4096))
-      utimesSync(filePath, mtime, mtime)
+      const changedAt = statSync(filePath).ctimeMs
+      await vi.waitFor(() => {
+        writeFileSync(filePath, 'c'.repeat(4096))
+        utimesSync(filePath, mtime, mtime)
+        expect(statSync(filePath).ctimeMs).not.toBe(changedAt)
+      }, { timeout: 5000 })
       expect((await agent.get('/changing.txt').set('accept-encoding', 'br')).text).toBe('c'.repeat(4096))
 
       expect(listCacheDir(dir)).toHaveLength(3)
     })
 
-    it('shares one compression between concurrent requests', async () => {
+    it('shares one compression between concurrent requests', async ({ onTestFinished }) => {
       const dir = createCacheDir()
-      const agent = createStaticAgent({ compressOnDemand: { cacheDir: dir } })
+      const createBrotliCompress = vi.fn()
+      const StaticFileHandlerPlugin = await importPluginWithZlib(onTestFinished, zlib => ({ createBrotliCompress: createBrotliCompress.mockImplementation(zlib.createBrotliCompress) }))
+      const agent = createAgent(new RPCHandler({}, {
+        plugins: [new StaticFileHandlerPlugin({ rootDir, compressOnDemand: { cacheDir: dir } })],
+      }))
 
       const responses = await Promise.all(Array.from({ length: 5 }, () => agent.get('/large.txt').set('accept-encoding', 'br')))
 
@@ -1173,7 +1214,9 @@ describe('staticFileHandlerPlugin', () => {
         expect(res.headers.etag).toBe(responses[0]!.headers.etag)
       }
 
-      // One entry and no temporary file left behind
+      // Independent compressions would leave the same single entry, so they are counted instead
+      expect(createBrotliCompress).toHaveBeenCalledTimes(1)
+      // No temporary file left behind
       expect(listCacheDir(dir)).toEqual([expect.stringMatching(/\.br$/)])
     })
 
@@ -1191,8 +1234,10 @@ describe('staticFileHandlerPlugin', () => {
         expect(res.headers['content-length']).toBe('4096')
       }
 
-      // Kept, so the file is not compressed again on every request
-      expect(listCacheDir(dir)).toHaveLength(1)
+      // An empty copy marks the file, so it is not compressed again on every request
+      const entries = listCacheDir(dir)
+      expect(entries).toHaveLength(1)
+      expect(statSync(path.join(dir, entries[0]!)).size).toBe(0)
     })
 
     it('serves the file as it is when the cache cannot be written', async () => {
@@ -1207,9 +1252,102 @@ describe('staticFileHandlerPlugin', () => {
       expect(res.text).toBe(largeText)
     })
 
-    it('answers conditional, range, and head requests from the stored copy', async () => {
-      const fetchFile = createFetchClient({ compressOnDemand: { cacheDir: createCacheDir() } })
+    it('compresses only a couple of files at once, serving others as they are meanwhile', async ({ onTestFinished }) => {
+      const names = ['first.txt', 'second.txt', 'third.txt']
+      for (const name of names) {
+        writeFileSync(path.join(rootDir, name), `${name} `.repeat(200))
+      }
+      onTestFinished(() => names.forEach(name => rmSync(path.join(rootDir, name), { force: true })))
+
+      // Holds every compression open until the test lets them finish
+      let release!: () => void
+      const released = new Promise<void>(resolve => release = resolve)
+      const createBrotliCompress = vi.fn(() => {
+        const chunks: Buffer[] = []
+
+        return new Transform({
+          transform: (chunk, _encoding, callback) => {
+            chunks.push(chunk)
+            callback()
+          },
+          flush: callback => void released.then(() => callback(null, brotliCompressSync(Buffer.concat(chunks)))),
+        })
+      })
+      const StaticFileHandlerPlugin = await importPluginWithZlib(onTestFinished, () => ({ createBrotliCompress }))
+      const agent = createAgent(new RPCHandler({}, {
+        plugins: [new StaticFileHandlerPlugin({ rootDir, compressOnDemand: { cacheDir: createCacheDir() } })],
+      }))
+
+      const settled: request.Response[] = []
+      const responses = Promise.all(names.map(name => agent.get(`/${name}`).set('accept-encoding', 'br').then((res) => {
+        settled.push(res)
+        return res
+      })))
+
+      // The file that found both slots taken does not wait for them
+      await vi.waitFor(() => expect(settled).toHaveLength(1))
+      expect(settled[0]!.headers['content-encoding']).toBeUndefined()
+      expect(settled[0]!.headers['cache-control']).toBe('public, max-age=0, no-cache')
+      await vi.waitFor(() => expect(createBrotliCompress).toHaveBeenCalledTimes(2))
+
+      release()
+      expect((await responses).filter(res => res.headers['content-encoding'] === 'br')).toHaveLength(2)
+      expect(createBrotliCompress).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not compress a file again for a while after its copy could not be stored', async ({ onTestFinished }) => {
+      const dir = createCacheDir()
+      // Fails like a full disk, which only refuses the copy once the file has been compressed
+      const createBrotliCompress = vi.fn(() => new Transform({ transform: (_chunk, _encoding, callback) => callback(new Error('ENOSPC: no space left on device')) }))
+      const StaticFileHandlerPlugin = await importPluginWithZlib(onTestFinished, () => ({ createBrotliCompress }))
+      const agent = createAgent(new RPCHandler({}, {
+        plugins: [new StaticFileHandlerPlugin({ rootDir, compressOnDemand: { cacheDir: dir } })],
+      }))
+
+      for (let i = 0; i < 3; i++) {
+        const res = await agent.get('/large.txt').set('accept-encoding', 'br')
+        expect(res.headers['content-encoding']).toBeUndefined()
+        expect(res.text).toBe(largeText)
+      }
+
+      expect(createBrotliCompress).toHaveBeenCalledTimes(1)
+      expect(listCacheDir(dir)).toEqual([])
+    })
+
+    it('serves a file that changed while it was compressed by what it holds now', async ({ onTestFinished }) => {
+      const filePath = path.join(rootDir, 'rewritten.txt')
+      writeFileSync(filePath, 'a'.repeat(2048))
+      onTestFinished(() => rmSync(filePath, { force: true }))
+
+      // Rewritten as its compression starts, as a deploy or a watch-mode build writing in place does
+      const StaticFileHandlerPlugin = await importPluginWithZlib(onTestFinished, zlib => ({
+        createBrotliCompress: (...args: Parameters<typeof zlib.createBrotliCompress>) => {
+          writeFileSync(filePath, 'b'.repeat(4096))
+          return zlib.createBrotliCompress(...args)
+        },
+      }))
+      const dir = createCacheDir()
+      const res = await createAgent(new RPCHandler({}, {
+        plugins: [new StaticFileHandlerPlugin({ rootDir, compressOnDemand: { cacheDir: dir } })],
+      })).get('/rewritten.txt').set('accept-encoding', 'br')
+
+      // The copy may hold half of each version, so it is dropped, and the headers follow the new file
+      expect(res.headers['content-encoding']).toBeUndefined()
+      expect(res.headers['content-length']).toBe('4096')
+      expect(res.text).toBe('b'.repeat(4096))
+      expect(listCacheDir(dir)).toEqual([])
+    })
+
+    it('answers conditional and head requests from the stored copy, and ranges from the file as it is', async () => {
+      const dir = createCacheDir()
+      const fetchFile = createFetchClient({ compressOnDemand: { cacheDir: dir } })
       const headers = { 'accept-encoding': 'gzip' }
+
+      // A range alone never compresses the file
+      const first = await fetchFile('/large.txt', { headers: { ...headers, range: 'bytes=0-9' } })
+      expect(first.status).toBe(206)
+      expect(await first.text()).toBe(largeText.slice(0, 10))
+      expect(listCacheDir(dir)).toEqual([])
 
       const full = await fetchFile('/large.txt', { headers })
       const fullBytes = Buffer.from(await full.arrayBuffer())
@@ -1224,11 +1362,19 @@ describe('staticFileHandlerPlugin', () => {
       expect(notModified.headers.get('vary')).toBe('accept-encoding')
       expect(notModified.headers.get('content-encoding')).toBeNull()
 
+      // Clients that decode what they asked to be compressed cannot decode a slice of a compressed copy
       const partial = await fetchFile('/large.txt', { headers: { ...headers, range: 'bytes=10-19' } })
       expect(partial.status).toBe(206)
-      expect(partial.headers.get('content-encoding')).toBe('gzip')
-      expect(partial.headers.get('content-range')).toBe(`bytes 10-19/${fullBytes.length}`)
-      expect(Buffer.from(await partial.arrayBuffer())).toEqual(fullBytes.subarray(10, 20))
+      expect(partial.headers.get('content-encoding')).toBeNull()
+      expect(partial.headers.get('vary')).toBe('accept-encoding')
+      expect(partial.headers.get('content-range')).toBe(`bytes 10-19/${largeText.length}`)
+      expect(await partial.text()).toBe(largeText.slice(10, 20))
+
+      // Every encoding shares the file's modification time, so a date cannot tell which one a partial download came from
+      const dated = await fetchFile('/large.txt', { headers: { ...headers, 'range': 'bytes=10-19', 'if-range': full.headers.get('last-modified')! } })
+      expect(dated.status).toBe(200)
+      expect(dated.headers.get('content-encoding')).toBeNull()
+      expect(await dated.text()).toBe(largeText)
 
       const head = await fetchFile('/large.txt', { method: 'HEAD', headers })
       expect(head.status).toBe(200)

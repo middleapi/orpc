@@ -115,7 +115,7 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 
 ## Compression
 
-Set `compressOnDemand` to compress compressible files the first time a client accepts an encoding, and serve every later request from the stored copy. When `precompressed` is also set, existing sidecars such as `app.js.br` win.
+Set `compressOnDemand` to compress compressible files the first time a client accepts an encoding, and serve every later request from the stored copy. When `precompressed` is also set, an accepted sidecar such as `app.js.br` wins.
 
 ```ts
 const handler = new RPCHandler(router, {
@@ -146,8 +146,8 @@ const handler = new RPCHandler(router, {
 
         /**
          * The maximum file size in bytes a request waits to compress. Larger
-         * files are compressed in the background and served as they are until
-         * the copy is ready.
+         * files are compressed in the background and served as they are, marked
+         * `no-cache`, until the copy is ready.
          *
          * @default 1048576 (1MB)
          */
@@ -159,7 +159,7 @@ const handler = new RPCHandler(router, {
 ```
 
 :::warning
-Use a `cacheDir` outside `rootDir` that nothing else writes to. It is safe to clear at any time.
+Use a `cacheDir` outside `rootDir` that nothing else writes to. Old copies are never removed, so clear it on deploy while the server is stopped.
 :::
 
 To compress on every request instead, add the [Response Compression Plugin](/docs/plugins/response-compression). It leaves encoded files and range responses alone.
