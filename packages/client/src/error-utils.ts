@@ -1,8 +1,7 @@
 import type { Writable } from '@orpc/shared'
-import type { StandardResponse } from '@standard-server/core'
-import type { AnyORPCError, MalformedResponseErrorOptions, ORPCErrorCode, ORPCErrorJSON } from './error'
+import type { AnyORPCError, ORPCErrorCode, ORPCErrorJSON } from './error'
 import { isPlainObject } from '@orpc/shared'
-import { COMMON_ERROR_STATUS_MAP, MalformedResponseError, ORPCError } from './error'
+import { ORPCError } from './error'
 
 /**
  * Checks if an error is an `ORPCError` that matches a definition in the procedure's `.errors` map,
@@ -50,51 +49,6 @@ export function createORPCErrorFromJson<TCode extends ORPCErrorCode, TData>(
   ;(error.defined as Writable<typeof error.defined>) = json.defined
 
   return error
-}
-
-/**
- * Creates the `MALFORMED_ORPC_RESPONSE` `ORPCError` used when a response
- * does not follow the expected oRPC format. Unless overridden via `options.message`,
- * the message is inferred from the response body or status. The `cause` is a
- * `MalformedResponseError` carrying the resolved response.
- *
- * @see {@link https://orpc.dev/docs/rpc/link#malformed-responses | RPC Link - Malformed Responses}
- * @see {@link https://orpc.dev/docs/openapi/link#malformed-responses | OpenAPI Link - Malformed Responses}
- */
-export function createORPCErrorFromMalformedResponse(options: MalformedResponseErrorOptions): ORPCError<'MALFORMED_ORPC_RESPONSE', StandardResponse> {
-  const error = new ORPCError('MALFORMED_ORPC_RESPONSE', {
-    message: options.message ?? inferMalformedResponseMessage(options.response),
-    data: options.response,
-  })
-
-  error.cause = new MalformedResponseError({ ...options, message: error.message })
-
-  return error
-}
-
-/**
- * Bounds for using a body string as the error message,
- * ignoring empty and unreasonably long values.
- */
-const INFERRED_MESSAGE_MIN_LENGTH = 1
-const INFERRED_MESSAGE_MAX_LENGTH = 256
-
-function isInferableMessage(text: string): boolean {
-  return text.length >= INFERRED_MESSAGE_MIN_LENGTH && text.length <= INFERRED_MESSAGE_MAX_LENGTH
-}
-
-function inferMalformedResponseMessage(response: StandardResponse): string | undefined {
-  if (typeof response.body === 'string' && isInferableMessage(response.body)) {
-    return response.body
-  }
-
-  if (isPlainObject(response.body) && typeof response.body.message === 'string' && isInferableMessage(response.body.message)) {
-    return response.body.message
-  }
-
-  const commonCode = Object.entries(COMMON_ERROR_STATUS_MAP).find(([, status]) => status === response.status)?.[0]
-
-  return commonCode?.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')
 }
 
 /**

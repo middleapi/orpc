@@ -303,7 +303,7 @@ describe('rpcLinkCodec', () => {
       })
     })
 
-    it('wraps non-ORPCError error response with generic MALFORMED_ORPC_RESPONSE ORPCError', async () => {
+    it('returns a MalformedResponseError for non-ORPCError error responses', async () => {
       const serialized = serializer.serialize({ something: 'unexpected' })
 
       const result = await codec.decodeResponse({
@@ -314,20 +314,18 @@ describe('rpcLinkCodec', () => {
 
       expect(result.kind).toBe('error')
       if (result.kind === 'error') {
-        expect(result.error).toBeInstanceOf(ORPCError)
-        expect(result.error.code).toBe('MALFORMED_ORPC_RESPONSE')
+        expect(result.error).toBeInstanceOf(MalformedResponseError)
+        expect(result.error).not.toBeInstanceOf(ORPCError)
         expect(result.error.message).toBe('Forbidden')
-        expect(result.error.data).toEqual(expect.objectContaining({
+        expect((result.error as MalformedResponseError).response).toEqual({
           status: 403,
           headers: { 'x-header': 'value' },
           body: serialized,
-        }))
-        expect(result.error.cause).toBeInstanceOf(MalformedResponseError)
-        expect((result.error.cause as MalformedResponseError).response).toBe(result.error.data)
+        })
       }
     })
 
-    it('infers MALFORMED_ORPC_RESPONSE message from the response body', async () => {
+    it('infers the MalformedResponseError message from the response body', async () => {
       const result = await codec.decodeResponse({
         status: 400,
         headers: {},
@@ -336,25 +334,22 @@ describe('rpcLinkCodec', () => {
 
       expect(result.kind).toBe('error')
       if (result.kind === 'error') {
-        expect(result.error.code).toBe('MALFORMED_ORPC_RESPONSE')
+        expect(result.error).toBeInstanceOf(MalformedResponseError)
         expect(result.error.message).toBe('upstream exploded')
       }
     })
 
-    it('throws MALFORMED_ORPC_RESPONSE on invalid RPC response format', async () => {
+    it('throws MalformedResponseError on invalid RPC response format', async () => {
       const error: any = await codec.decodeResponse({
         status: 200,
         headers: {},
         resolveBody: () => Promise.resolve({ meta: 123 }),
       }).then(() => null, e => e)
 
-      expect(error).toBeInstanceOf(ORPCError)
-      expect(error.code).toBe('MALFORMED_ORPC_RESPONSE')
+      expect(error).toBeInstanceOf(MalformedResponseError)
       expect(error.message).toBe('Invalid RPC response format.')
-      expect(error.data).toEqual({ status: 200, headers: {}, body: { meta: 123 } })
-      expect(error.cause).toBeInstanceOf(MalformedResponseError)
-      expect(error.cause.response).toBe(error.data)
-      expect(error.cause.cause).toBeInstanceOf(Error)
+      expect(error.response).toEqual({ status: 200, headers: {}, body: { meta: 123 } })
+      expect(error.cause).toBeInstanceOf(Error)
     })
   })
 })
