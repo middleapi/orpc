@@ -1,7 +1,6 @@
 import { decodeBase64url, encodeBase64url } from './base64url'
 
 const ALGORITHM = { name: 'HMAC', hash: 'SHA-256' }
-const SIGNATURE_LENGTH = 32 // HMAC-SHA256 output in bytes
 
 /**
  * Signs a string value using HMAC-SHA256 with a secret key.
@@ -68,7 +67,7 @@ export async function unsign(signedValue: string | undefined | null, secret: str
   const signatureBase64url = signedValue.slice(lastDotIndex + 1)
   const signature = decodeBase64url(signatureBase64url)
 
-  if (signature === undefined || signature.length !== SIGNATURE_LENGTH) {
+  if (signature === undefined) {
     return undefined
   }
 
