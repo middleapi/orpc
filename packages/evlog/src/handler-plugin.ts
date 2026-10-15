@@ -4,7 +4,7 @@ import type { StandardRequest } from '@standard-server/core'
 import type { LogLevel, RequestLogger } from 'evlog'
 import type { BaseEvlogOptions, FrameworkIntegrationHelpers, FrameworkIntegrationSpec } from 'evlog/toolkit'
 import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
-import { isAbortError, isAsyncIteratorObject, ORPC_NAME, override, sleep, toArray, wrapReadableStream } from '@orpc/shared'
+import { isAbortError, isAsyncIteratorObject, ORPC_NAME, override, safeDecodeURIComponent, safeEncodeURIComponent, sleep, toArray, wrapReadableStream } from '@orpc/shared'
 import { ErrorEvent, flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { defineFrameworkIntegration } from 'evlog/toolkit'
 import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
@@ -69,7 +69,7 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
         return {
           method: request.method,
-          path: pathname,
+          path: toCanonicalPathname(pathname),
           headers: request.headers,
           requestId: flattenStandardHeader(request.headers['x-request-id']),
         }
@@ -257,6 +257,31 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
       ],
     }
   }
+}
+
+/**
+ * Characters that must stay percent-encoded after decoding: '%' and '/' keep
+ * double-encoding and segment boundaries distinct; whitespace and control
+ * characters must never reach log output raw (terminal escapes, forged lines).
+ */
+const KEEP_ENCODED_REGEX = /[\0-\x20%/\x7F-\x9F\u2028\u2029]/g
+
+/**
+ * The pathname evlog matches `include`/`exclude`/`routes`/sampling `keep` against and logs.
+ * It must equal what the matchers route on, or a routed request could dodge path filters
+ * by percent-encoding its path or appending a slash.
+ */
+function toCanonicalPathname(pathname: string): string {
+  let canonical = pathname
+    .split('/')
+    .map(segment => safeDecodeURIComponent(segment).replace(KEEP_ENCODED_REGEX, safeEncodeURIComponent))
+    .join('/')
+
+  if (canonical.length > 1 && canonical.endsWith('/')) {
+    canonical = canonical.slice(0, -1) // matchers ignore one trailing slash
+  }
+
+  return canonical
 }
 
 function toErrorOrString(error: unknown) {

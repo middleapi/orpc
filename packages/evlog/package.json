@@ -60,6 +60,7 @@
     "@standard-server/core": "~0.10.3"
   },
   "devDependencies": {
+    "@orpc/openapi": "workspace:*",
     "evlog": "^2.30.1"
   }
 }

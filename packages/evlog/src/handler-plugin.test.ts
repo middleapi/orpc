@@ -151,6 +151,25 @@ describe('evlogHandlerPlugin', () => {
     ])
   })
 
+  it.each([
+    ['/rpc/%61dmin/deleteUser/', '/rpc/admin/deleteUser'],
+    ['/rpc/a%2Fb', '/rpc/a%2Fb'],
+    ['/rpc/a%2fb', '/rpc/a%2Fb'],
+    ['/rpc/%2561', '/rpc/%2561'],
+    ['/rpc/a%0Ab', '/rpc/a%0Ab'],
+    ['/rpc/x%1B%5B31m', '/rpc/x%1B[31m'],
+    ['/rpc/a%20b', '/rpc/a%20b'],
+    ['/rpc/%C2%85%E2%80%A8', '/rpc/%C2%85%E2%80%A8'],
+    ['/rpc/%E1%BA%A1', '/rpc/ạ'],
+    ['/rpc/%61dmin%ZZ', '/rpc/%2561dmin%25ZZ'],
+    ['/', '/'],
+    ['/hello/world?debug=1', '/hello/world'],
+  ])('extracts %s as the canonical path %s', (url, path) => {
+    const _plugin = new EvlogHandlerPlugin()
+
+    expect(mocks.spec.extractRequest({ request: createRequest(url) }).path).toBe(path)
+  })
+
   it('bypasses the routing interceptor when evlog skips the request', async () => {
     const plugin = new EvlogHandlerPlugin()
     const { routing } = getPluginHooks(plugin)

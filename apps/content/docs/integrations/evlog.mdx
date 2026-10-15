@@ -40,6 +40,24 @@ const handler = new RPCHandler(router, {
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
 :::
 
+## Filtering Routes
+
+Evlog's `include`, `exclude`, and `routes` options are supported, as are path conditions in [tail sampling](https://www.evlog.dev/learn/sampling) `keep` rules. They match against the canonical request pathname, which is also logged as the wide event's `path`:
+
+- The handler prefix is included, for example `/rpc/planet/list`.
+- Percent-escapes are decoded, except for `%`, `/`, whitespace, and control characters, which stay encoded.
+- One trailing slash is removed.
+
+```ts
+const plugin = new EvlogHandlerPlugin({
+  include: ['/rpc/**'],
+  exclude: ['/rpc/health'],
+  routes: {
+    '/rpc/admin/**': { service: 'admin-service' },
+  },
+})
+```
+
 ## Error Logging Levels
 
 Errors thrown from your procedures set the wide event's level to match their intent: `info` for abort errors, `warn` for `ORPCError` instances since they represent deliberate rejections, and `error` for everything else, including `ORPCError` with the `INTERNAL_SERVER_ERROR` code. Use the `procedureErrorLevel` option to customize this behavior:
