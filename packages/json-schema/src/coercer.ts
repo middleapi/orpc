@@ -163,14 +163,7 @@ export class JsonSchemaCoercer {
     appliedRefs?: Set<JsonSchema>,
   ): CoercionResult {
     if (++context.steps > context.maxSteps) {
-      // Count only as far as needed to lift the budget to twice the steps taken, so a large input that stays within it
-      // is walked about as far as coercion has gone. The budget can only run out on a complete count of the input.
-      const limit = 2 * context.steps / this.maxStepsPerValue
-      context.maxSteps = this.maxStepsPerValue * Math.max(countValues(context.input, limit), MIN_BUDGETED_VALUES)
-
-      if (context.steps > context.maxSteps) {
-        throw new CoercionBudgetExceededError('Coercion took too many steps')
-      }
+      this.extendBudget(context)
     }
 
     if (typeof schema === 'boolean') {
@@ -198,36 +191,7 @@ export class JsonSchemaCoercer {
             : undefined
 
       if (resolved !== undefined && !appliedRefs?.has(resolved)) {
-        /**
-         * With no other `$ref` applied to this value, the result only depends on the value and the resolved schema.
-         * Coercion never mutates a value in place, so a cached result can be shared.
-         */
-        let memo: Map<unknown, CoercionResult> | undefined
-
-        if (!appliedRefs?.size && isTypescriptObject(coerced)) {
-          context.memo ??= new Map()
-          memo = context.memo.get(resolved)
-
-          if (!memo) {
-            memo = new Map()
-            context.memo.set(resolved, memo)
-          }
-        }
-
-        let result = memo?.get(coerced)
-
-        if (!result) {
-          appliedRefs ??= new Set()
-          appliedRefs.add(resolved)
-
-          result = this.coerceInternal(context, resolved, coerced, appliedRefs)
-
-          appliedRefs.delete(resolved)
-
-          memo?.set(coerced, result)
-        }
-
-        const [subSatisfied, subCoerced] = result
+        const [subSatisfied, subCoerced] = this.coerceRef(context, resolved, coerced, appliedRefs)
 
         coerced = subCoerced
         satisfied = minSatisfaction(satisfied, subSatisfied)
@@ -485,6 +449,60 @@ export class JsonSchemaCoercer {
     }
 
     return [satisfied, coerced]
+  }
+
+  /**
+   * Applies a resolved `$ref` to a value. With no other `$ref` applied to the value, the result only depends on
+   * the value and the resolved schema, and coercion never mutates a value in place, so the result for an object
+   * is shared by every union branch that reaches it.
+   */
+  private coerceRef(
+    context: CoercionContext,
+    resolved: JsonSchema,
+    value: unknown,
+    appliedRefs: Set<JsonSchema> | undefined,
+  ): CoercionResult {
+    let memo: Map<unknown, CoercionResult> | undefined
+
+    if (!appliedRefs?.size && isTypescriptObject(value)) {
+      context.memo ??= new Map()
+      memo = context.memo.get(resolved)
+
+      if (!memo) {
+        memo = new Map()
+        context.memo.set(resolved, memo)
+      }
+
+      const cached = memo.get(value)
+
+      if (cached) {
+        return cached
+      }
+    }
+
+    appliedRefs ??= new Set()
+    appliedRefs.add(resolved)
+
+    const result = this.coerceInternal(context, resolved, value, appliedRefs)
+
+    appliedRefs.delete(resolved)
+    memo?.set(value, result)
+
+    return result
+  }
+
+  /**
+   * Extends the budget once the steps taken pass it, or gives up.
+   */
+  private extendBudget(context: CoercionContext): void {
+    // Count only as far as needed to lift the budget to twice the steps taken, so a large input that stays within it
+    // is walked about as far as coercion has gone. The budget can only run out on a complete count of the input.
+    const limit = 2 * context.steps / this.maxStepsPerValue
+    context.maxSteps = this.maxStepsPerValue * Math.max(countValues(context.input, limit), MIN_BUDGETED_VALUES)
+
+    if (context.steps > context.maxSteps) {
+      throw new CoercionBudgetExceededError('Coercion took too many steps')
+    }
   }
 }
 
