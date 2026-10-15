@@ -152,6 +152,10 @@ const link = new OpenAPILink(contract, {
 </CodeGroup>
 
 :::info
+For cross-origin requests with `credentials: 'include'`, the server must enable `credentials` in [`CORSHandlerPlugin`](/docs/plugins/cors) and list its allowed origins explicitly.
+:::
+
+:::info
 The examples above only show how to configure the link. For examples of creating a typesafe client, see [RPC Link](/docs/rpc/link#typesafe-clients) and [OpenAPI Link](/docs/openapi/link#typesafe-clients).
 :::
 
