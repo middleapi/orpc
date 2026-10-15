@@ -122,6 +122,29 @@ async function bootstrap() {
 }
 ```
 
+:::warning
+NestJS only limits the bodies it parses itself. With the Express adapter, those are `application/json` and `application/x-www-form-urlencoded` bodies (100kb by default). oRPC parses every other body, and every body when `bodyParser: false` is set, without a size limit, before oRPC middleware and input validation run. Cap these bodies with [Request Limit](/docs/plugins/request-limit) or [Tmp File Upload](/docs/plugins/tmp-file-upload):
+
+```ts
+import { RequestLimitHandlerPlugin } from '@orpc/server/plugins'
+
+@Module({
+  imports: [
+    ORPCModule.forRoot({
+      plugins: [
+        new RequestLimitHandlerPlugin({
+          maxBodySize: 1024 * 1024, // 1MB
+        }),
+      ],
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+Request Limit also checks the `Content-Length` of bodies NestJS has parsed, so keep `maxBodySize` at or above any limit you configured in NestJS.
+:::
+
 ## Configuration
 
 Configure `@orpc/nest` by importing `ORPCModule` into your NestJS module. It supports the same
