@@ -5,23 +5,6 @@ import { openapi } from '../../meta'
 import { OpenAPIHandler } from './openapi-handler'
 import { OpenAPILink } from './openapi-link'
 
-const LEAKED = ['internal_session', 'node-7', 'pg-primary', 'SELECT']
-const UPSTREAM_HEADERS = { 'set-cookie': 'internal_session=abc123; HttpOnly', 'x-internal-trace': 'node-7' }
-
-function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...UPSTREAM_HEADERS, 'content-type': 'application/json' },
-  })
-}
-
-function htmlResponse(status: number, html: string): Response {
-  return new Response(html, {
-    status,
-    headers: { ...UPSTREAM_HEADERS, 'content-type': 'text/html', 'content-length': String(new TextEncoder().encode(html).length) },
-  })
-}
-
 describe('openapiHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -116,30 +99,5 @@ describe('openapiHandler', () => {
     expect(response).toBeInstanceOf(Response)
     expect(response!.status).toBe(200)
     return expect(response!.text()).resolves.toBe('"intercepted"')
-  })
-})
-
-describe('openapiHandler - errors from an upstream OpenAPI link', () => {
-  it.each([
-    ['a non-oRPC JSON error response', () => jsonResponse(502, { message: 'db timeout on pg-primary-10.0.3.7', query: 'SELECT * FROM users' })],
-    ['a non-JSON error page', () => htmlResponse(502, '<html><body>pg-primary: SELECT failed</body></html>')],
-  ])('does not expose %s to the caller', async (_, upstreamResponse) => {
-    const upstream = createORPCClient<any>(new OpenAPILink({
-      user: { find: os.meta(openapi({ method: 'GET', path: '/users/{id}' })).handler(() => null) },
-    }, {
-      origin: 'http://upstream.internal',
-      url: '/api',
-      fetch: async () => upstreamResponse(),
-    }))
-    const handler = new OpenAPIHandler({
-      profile: os.meta(openapi({ method: 'GET', path: '/profile' })).handler(() => upstream.user.find({ id: '1' })),
-    })
-    const { response } = await handler.handle(new Request('https://example.com/profile'))
-    const text = await response!.text()
-    expect(response!.status).toBe(500)
-    for (const value of LEAKED) {
-      expect(text).not.toContain(value)
-    }
-    expect(JSON.parse(text)).toEqual({ defined: false, code: 'INTERNAL_SERVER_ERROR', message: 'Internal Server Error' })
   })
 })

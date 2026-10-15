@@ -64,8 +64,7 @@ export function createORPCErrorFromJson<TCode extends ORPCErrorCode, TData>(
  * Creates the `MALFORMED_ORPC_RESPONSE` `ORPCError` used when a response
  * does not follow the expected oRPC format. Unless overridden via `options.message`,
  * the message is inferred from the response body or status. The resolved response is
- * kept only on the `cause`, a `MalformedResponseError`, never in `data`, and
- * `toORPCError` masks this error as `INTERNAL_SERVER_ERROR` when it leaves a server.
+ * kept only on the `cause`, a `MalformedResponseError`, never in `data`.
  *
  * @see {@link https://orpc.dev/docs/rpc/link#malformed-responses | RPC Link - Malformed Responses}
  * @see {@link https://orpc.dev/docs/openapi/link#malformed-responses | OpenAPI Link - Malformed Responses}

@@ -286,7 +286,7 @@ const link = new RPCLink({
 ```
 
 :::info
-If this error propagates out of a server procedure, for example when a handler calls another service through this link without catching its errors, callers receive a generic `INTERNAL_SERVER_ERROR` instead. Interceptors on the server still see the original error.
+If this error escapes a server procedure, callers receive a generic `INTERNAL_SERVER_ERROR`, while server interceptors still see the original error.
 :::
 
 ## Event Stream Options

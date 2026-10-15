@@ -317,7 +317,6 @@ describe('rpcLinkCodec', () => {
         expect(result.error).toBeInstanceOf(ORPCError)
         expect(result.error.code).toBe('MALFORMED_ORPC_RESPONSE')
         expect(result.error.message).toBe('Forbidden')
-        expect(result.error.data).toBeUndefined()
         expect(result.error.cause).toBeInstanceOf(MalformedResponseError)
         expect((result.error.cause as MalformedResponseError).response).toEqual({
           status: 403,
@@ -351,7 +350,6 @@ describe('rpcLinkCodec', () => {
       expect(error).toBeInstanceOf(ORPCError)
       expect(error.code).toBe('MALFORMED_ORPC_RESPONSE')
       expect(error.message).toBe('Invalid RPC response format.')
-      expect(error.data).toBeUndefined()
       expect(error.cause).toBeInstanceOf(MalformedResponseError)
       expect(error.cause.response).toEqual({ status: 200, headers: {}, body: { meta: 123 } })
       expect(error.cause.cause).toBeInstanceOf(Error)

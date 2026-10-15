@@ -162,8 +162,7 @@ export interface MalformedResponseErrorOptions extends ErrorOptions {
 /**
  * Error indicating a response does not follow the expected oRPC format, carrying
  * the resolved response. Found as the `cause` of a `MALFORMED_ORPC_RESPONSE`
- * `ORPCError`, which is the only place the response is kept: it is never copied
- * into `data`, so it is not serialized when the error is sent to callers.
+ * `ORPCError`, which never copies the response into `data`.
  *
  * @see {@link https://orpc.dev/docs/rpc/link#malformed-responses | RPC Link - Malformed Responses}
  * @see {@link https://orpc.dev/docs/openapi/link#malformed-responses | OpenAPI Link - Malformed Responses}

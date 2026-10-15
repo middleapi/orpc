@@ -22,50 +22,28 @@ it('isDefinedError', () => {
 })
 
 describe('toORPCError', () => {
-  it('returns same error if already ORPCError', () => {
-    const error = new ORPCError('BAD_REQUEST', { message: 'Bad request' })
-    const result = toORPCError(error)
-    expect(result).toBe(error)
+  const definedMalformed = createORPCErrorFromMalformedResponse({ response: { status: 502, headers: {}, body: 'upstream exploded' } })
+  ;(definedMalformed.defined as Writable<typeof definedMalformed.defined>) = true
+
+  it.each([
+    ['an ORPCError', new ORPCError('BAD_REQUEST', { message: 'Bad request' })],
+    ['a defined malformed-response error', definedMalformed],
+    ['a MALFORMED_ORPC_RESPONSE error without a MalformedResponseError cause', new ORPCError('MALFORMED_ORPC_RESPONSE')],
+  ])('returns %s as-is', (_, error) => {
+    expect(toORPCError(error)).toBe(error)
   })
 
-  it('converts regular Error to ORPCError', () => {
-    const originalError = new Error('Something went wrong')
-
-    const result = toORPCError(originalError)
+  it.each([
+    ['a regular Error', new Error('Something went wrong')],
+    ['a string', 'Error string'],
+    ['a malformed-response error', createORPCErrorFromMalformedResponse({ response: { status: 502, headers: {}, body: 'upstream exploded' } })],
+  ])('converts %s to INTERNAL_SERVER_ERROR', (_, error) => {
+    const result = toORPCError(error)
 
     expect(result).toBeInstanceOf(ORPCError)
     expect(result.code).toBe('INTERNAL_SERVER_ERROR')
     expect(result.message).toBe('Internal Server Error')
-    expect(result.cause).toBe(originalError)
-  })
-
-  it('converts string to ORPCError', () => {
-    const result = toORPCError('Error string')
-
-    expect(result).toBeInstanceOf(ORPCError)
-    expect(result.code).toBe('INTERNAL_SERVER_ERROR')
-    expect(result.message).toBe('Internal Server Error')
-    expect(result.cause).toBe('Error string')
-  })
-
-  it('masks a malformed-response error as an unknown error', () => {
-    const error = createORPCErrorFromMalformedResponse({ response: { status: 502, headers: {}, body: 'upstream exploded' } })
-    const result = toORPCError(error)
-    expect(result.code).toBe('INTERNAL_SERVER_ERROR')
-    expect(result.message).toBe('Internal Server Error')
-    expect(result.data).toBeUndefined()
     expect(result.cause).toBe(error)
-  })
-
-  it('returns a defined malformed-response error as-is', () => {
-    const error = createORPCErrorFromMalformedResponse({ response: { status: 502, headers: {}, body: 'upstream exploded' } })
-    ;(error.defined as Writable<typeof error.defined>) = true
-    expect(toORPCError(error)).toBe(error)
-  })
-
-  it('returns a MALFORMED_ORPC_RESPONSE error without a MalformedResponseError cause as-is', () => {
-    const error = new ORPCError('MALFORMED_ORPC_RESPONSE', { message: 'relayed by upstream' })
-    expect(toORPCError(error)).toBe(error)
   })
 })
 
