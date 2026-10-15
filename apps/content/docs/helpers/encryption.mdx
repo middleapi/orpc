@@ -26,4 +26,6 @@ const decryptedData = await decrypt(encryptedData, secret)
 
 :::info
 The `decrypt` helper accepts `undefined` or `null` as encrypted value and returns `undefined` for invalid inputs, enabling seamless handling of optional data.
+
+Each encrypted value has exactly one accepted string form, so `decrypt` rejects any altered variant of an encrypted string, even one that would decode to the same bytes.
 :::

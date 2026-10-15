@@ -28,9 +28,12 @@ export function encodeBase64url(data: Uint8Array): string {
     .replace(/=/g, '')
 }
 
+const BASE64URL_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+
 /**
  * Decodes a base64url string to Uint8Array
- * Returns undefined if the input is invalid
+ * Only accepts canonical, unpadded base64url (the form produced by `encodeBase64url`),
+ * returns undefined for anything else, including padded or standard base64 input
  *
  * @example
  * ```ts
@@ -44,8 +47,24 @@ export function encodeBase64url(data: Uint8Array): string {
  */
 export function decodeBase64url(base64url: string | undefined | null): Uint8Array<ArrayBuffer> | undefined {
   try {
-    if (typeof base64url !== 'string') {
+    if (typeof base64url !== 'string' || !/^[\w-]*$/.test(base64url)) {
       return undefined
+    }
+
+    const remainder = base64url.length % 4
+
+    if (remainder === 1) {
+      return undefined
+    }
+
+    // Unused low bits of the last character must be zero, so each byte sequence has exactly one accepted string form
+    if (remainder !== 0) {
+      const lastIndex = BASE64URL_ALPHABET.indexOf(base64url[base64url.length - 1]!)
+      const unusedBitsMask = remainder === 2 ? 0b1111 : 0b11
+
+      if ((lastIndex & unusedBitsMask) !== 0) {
+        return undefined
+      }
     }
 
     let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/')

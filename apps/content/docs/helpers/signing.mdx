@@ -29,4 +29,6 @@ const extractedValue = getSignedValue(signedValue) // 'user123'
 
 :::info
 The `unsign` and `getSignedValue` helpers accept `undefined` or `null` as signed value and return `undefined` for invalid inputs, enabling seamless handling of optional data.
+
+Each signed value has exactly one accepted string form, so `unsign` rejects any altered variant of a signed string, even one that would decode to the same signature.
 :::
