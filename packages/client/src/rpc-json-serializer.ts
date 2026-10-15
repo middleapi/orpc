@@ -35,36 +35,25 @@ function assertSerializedType(ok: boolean, type: string, expected: string): void
 }
 
 /**
- * Paths only walk through arrays and plain objects, the containers JSON is made of.
+ * The paths a deserialize call has restored so far, as a tree of segments where `true` marks a restored path.
  */
-function isWalkable(value: unknown): boolean {
-  if (typeof value !== 'object' || value === null) {
-    return false
-  }
-
-  if (Array.isArray(value)) {
-    return true
-  }
-
-  // Unlike `isPlainObject`, avoids reading `constructor` from every class prototype on this hot path
-  const proto = Object.getPrototypeOf(value)
-  return proto === Object.prototype || proto === null || Object.getPrototypeOf(proto) === null
+interface RestoredPaths {
+  [segment: PropertyKey]: RestoredPaths | true
 }
 
 /**
- * Returns `parent[key]` for a path to walk through, copying it first while it is still the original value.
- *
- * A path must never walk through a value a handler returned, or a later entry could mutate it
- * after the handler validated it. `serialize` emits children before parents, so its payloads never do.
+ * Steps into `segment` of the restored paths, rejecting a path that walks through an already restored one.
+ * Otherwise a later entry could mutate a value after its handler validated it.
+ * `serialize` emits maps before meta and children before parents, so its payloads never do.
  */
-function walkInto(parent: any, key: Segment, original: unknown, restored?: Set<unknown>): any {
-  const value = parent[key]
+function walkRestoredPaths(node: RestoredPaths, segment: Segment): RestoredPaths {
+  const child = node[segment]
 
-  if (!isWalkable(value) || restored?.has(value)) {
-    throw invalidSerializedData(`segment "${key}" cannot be walked into.`)
+  if (child === true) {
+    throw invalidSerializedData(`segment "${segment}" was already deserialized.`)
   }
 
-  return value === original ? copyOnWrite(parent, key, original) : value
+  return child ?? (node[segment] = new NullProtoObj<RestoredPaths>())
 }
 
 const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHandler> = {
@@ -431,6 +420,7 @@ export class RPCJsonSerializer {
 
   deserialize(serialized: RPCJsonSerialization): unknown {
     const ref = { json: serialized.json }
+    const restored = new NullProtoObj<RestoredPaths>()
 
     if (serialized.blobs?.length) {
       for (let i = 0; i < serialized.maps.length; i++) {
@@ -444,11 +434,13 @@ export class RPCJsonSerializer {
 
         let original: any = serialized
         let currentRef: any = ref
+        let node = restored
         let preSegment: string | number = 'json'
 
         for (let j = 0; j < segments.length; j++) {
+          node = walkRestoredPaths(node, preSegment)
           original = original[preSegment]
-          currentRef = walkInto(currentRef, preSegment, original)
+          currentRef = copyOnWrite(currentRef, preSegment, original)
           preSegment = segments[j]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
@@ -457,12 +449,11 @@ export class RPCJsonSerializer {
         }
 
         currentRef[preSegment] = blob
+        node[preSegment] = true
       }
     }
 
     if (serialized.meta) {
-      let restored: Set<unknown> | undefined
-
       for (const item of serialized.meta) {
         const type = item[0]
         const handler = this.handlers[type]
@@ -473,11 +464,13 @@ export class RPCJsonSerializer {
 
         let original: any = serialized
         let currentRef: any = ref
+        let node = restored
         let preSegment: string | number = 'json'
 
         for (let i = 1; i < item.length; i++) {
+          node = walkRestoredPaths(node, preSegment)
           original = original[preSegment]
-          currentRef = walkInto(currentRef, preSegment, original, restored)
+          currentRef = copyOnWrite(currentRef, preSegment, original)
           preSegment = item[i]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
@@ -485,12 +478,8 @@ export class RPCJsonSerializer {
           }
         }
 
-        const value = handler.deserialize(currentRef[preSegment])
-        currentRef[preSegment] = value
-
-        if (isWalkable(value)) {
-          (restored ??= new Set()).add(value)
-        }
+        currentRef[preSegment] = handler.deserialize(currentRef[preSegment])
+        node[preSegment] = true
       }
     }
 

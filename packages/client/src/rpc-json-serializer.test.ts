@@ -596,36 +596,34 @@ describe('rpcJsonSerializer: meta cannot descend into restored values', () => {
 
   it('rejects a meta path that descends into a custom handler result', () => {
     expect(() => serializer.deserialize({ json: { p: { name: 'http://evil/', age: 1 } }, meta: [['human', 'p'], ['url', 'p', 'name']] }))
-      .toThrow('Invalid RPC serialized data: segment "p" cannot be walked into.')
+      .toThrow('Invalid RPC serialized data: segment "p" was already deserialized.')
     expect(() => serializer.deserialize({ json: { p: { name: '123', age: 1 } }, meta: [['human', 'p'], ['bigint', 'p', 'name']] }))
-      .toThrow('Invalid RPC serialized data: segment "p" cannot be walked into.')
+      .toThrow('Invalid RPC serialized data: segment "p" was already deserialized.')
   })
 
   it('rejects descent into a root-level custom handler result', () => {
     expect(() => serializer.deserialize({ json: { name: '123', age: 1 }, meta: [['human'], ['bigint', 'name']] }))
-      .toThrow('Invalid RPC serialized data: segment "json" cannot be walked into.')
+      .toThrow('Invalid RPC serialized data: segment "json" was already deserialized.')
   })
 
   it('treats numeric and string segments as the same position', () => {
     expect(() => serializer.deserialize({ json: [{ name: '123', age: 1 }], meta: [['human', 0], ['bigint', '0', 'name']] }))
-      .toThrow('Invalid RPC serialized data: segment "0" cannot be walked into.')
+      .toThrow('Invalid RPC serialized data: segment "0" was already deserialized.')
   })
 
   it('rejects descent even when the handler returned the validated object itself', () => {
     expect(() => serializer.deserialize({ json: { p: { name: '1' } }, meta: [['identity', 'p'], ['bigint', 'p', 'name']] }))
-      .toThrow('Invalid RPC serialized data: segment "p" cannot be walked into.')
+      .toThrow('Invalid RPC serialized data: segment "p" was already deserialized.')
     expect(() => serializer.deserialize({ json: { l: ['1'] }, meta: [['list', 'l'], ['bigint', 'l', 0]] }))
-      .toThrow('Invalid RPC serialized data: segment "l" cannot be walked into.')
+      .toThrow('Invalid RPC serialized data: segment "l" was already deserialized.')
   })
 
-  it('rejects descent into non-JSON values', () => {
+  it('rejects descent into a non-JSON value the handler returned as is', () => {
     // structured clone transports (e.g. MessagePort with experimental_transfer) can deliver non-JSON values
     const bytes = new Uint8Array([1])
 
     expect(() => serializer.deserialize({ json: { b: bytes }, meta: [['bytes', 'b'], ['double', 'b', 0]] }))
-      .toThrow('Invalid RPC serialized data: segment "b" cannot be walked into.')
-    expect(() => serializer.deserialize({ json: { b: bytes }, meta: [['double', 'b', 0]] }))
-      .toThrow('Invalid RPC serialized data: segment "b" cannot be walked into.')
+      .toThrow('Invalid RPC serialized data: segment "b" was already deserialized.')
     expect(bytes[0]).toBe(1)
   })
 
@@ -646,17 +644,17 @@ describe('rpcJsonSerializer: meta cannot descend into restored values', () => {
       },
     })
     expect(() => s.deserialize({ json: { c: 'USD' }, meta: [['currency', 'c'], ['date', 'c', 'symbol']] }))
-      .toThrow('Invalid RPC serialized data: segment "c" cannot be walked into.')
+      .toThrow('Invalid RPC serialized data: segment "c" was already deserialized.')
     expect(CURRENCIES.USD!.symbol).toBe('$')
   })
 
   it('rejects descent into built-in results and blobs', () => {
     expect(() => serializer.deserialize({ json: { a: ['2020-01-01T00:00:00.000Z'] }, meta: [['set', 'a'], ['date', 'a', 0]] }))
-      .toThrow('Invalid RPC serialized data: segment "a" cannot be walked into.')
+      .toThrow('Invalid RPC serialized data: segment "a" was already deserialized.')
     expect(() => serializer.deserialize({ json: { a: {} }, blobs: [new Blob()], maps: [['a']], meta: [['date', 'a', 'x']] }))
-      .toThrow('Invalid RPC serialized data: segment "a" cannot be walked into.')
+      .toThrow('Invalid RPC serialized data: segment "a" was already deserialized.')
     expect(() => serializer.deserialize({ json: { a: { x: null } }, blobs: [new Blob(), new Blob()], maps: [['a'], ['a', 'x']] }))
-      .toThrow('Invalid RPC serialized data: segment "a" cannot be walked into.')
+      .toThrow('Invalid RPC serialized data: segment "a" was already deserialized.')
   })
 
   it('still stacks handlers on the same position, governed by their own type checks', () => {
