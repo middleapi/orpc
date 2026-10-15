@@ -62,6 +62,21 @@ function walkRestoredPaths(node: RestoredPaths, segment: Segment): RestoredPaths
   return created
 }
 
+/**
+ * Returns `parent[key]` for a path to walk through, copying it first while it is still the original value.
+ * Only arrays and plain objects can be walked through: `copyOnWrite` copies them, so a write never lands in
+ * a value shared with another position, which structured clone transports can deliver.
+ */
+function walkInto(parent: any, key: Segment, original: unknown): any {
+  const value = parent[key]
+
+  if (!Array.isArray(value) && !isPlainObject(value)) {
+    throw invalidSerializedData(`segment "${key}" is not an array or plain object.`)
+  }
+
+  return copyOnWrite(parent, key, original)
+}
+
 const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHandler> = {
   undefined: {
     condition(data: unknown): boolean {
@@ -446,7 +461,7 @@ export class RPCJsonSerializer {
         for (let j = 0; j < segments.length; j++) {
           node = walkRestoredPaths(node, preSegment)
           original = original[preSegment]
-          currentRef = copyOnWrite(currentRef, preSegment, original)
+          currentRef = walkInto(currentRef, preSegment, original)
           preSegment = segments[j]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
@@ -499,7 +514,7 @@ export class RPCJsonSerializer {
         for (let i = depth + 1; i < item.length; i++) {
           node = walkRestoredPaths(node, preSegment)
           original = original[preSegment]
-          currentRef = copyOnWrite(currentRef, preSegment, original)
+          currentRef = walkInto(currentRef, preSegment, original)
           preSegment = item[i]!
 
           originals[i] = original

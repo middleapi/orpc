@@ -637,6 +637,9 @@ describe('rpcJsonSerializer: meta cannot descend into restored values', () => {
 
     expect(() => serializer.deserialize({ json: { b: bytes }, meta: [['bytes', 'b'], ['double', 'b', 0]] }))
       .toThrow('Invalid RPC serialized data: segment "b" was already deserialized.')
+    // structured clone also keeps shared references, so the same value can sit at an unrestored path
+    expect(() => serializer.deserialize({ json: { b: bytes, c: bytes }, meta: [['bytes', 'b'], ['double', 'c', 0]] }))
+      .toThrow('Invalid RPC serialized data: segment "c" is not an array or plain object.')
     expect(bytes[0]).toBe(1)
   })
 
