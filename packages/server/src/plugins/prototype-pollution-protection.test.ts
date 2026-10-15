@@ -47,13 +47,17 @@ async function expectAllowed(input: unknown) {
   expect(next).toHaveBeenCalledOnce()
 }
 
+function isBlockedError(error: unknown): boolean {
+  return error instanceof ORPCError
+    && error.code === 'BAD_REQUEST'
+    && error.message === 'Request blocked by prototype pollution protection.'
+    && error.cause === undefined
+}
+
 async function expectBlocked(input: unknown) {
   const { result, next } = invokeInterceptor(input)
 
-  await expect(result).rejects.toSatisfy(error =>
-    error instanceof ORPCError
-    && error.code === 'BAD_REQUEST'
-    && error.message === 'Request blocked by prototype pollution protection.')
+  await expect(result).rejects.toSatisfy(isBlockedError)
   expect(next).not.toHaveBeenCalled()
 }
 
@@ -172,10 +176,7 @@ describe('prototypePollutionProtectionHandlerPlugin', () => {
       const guarded = await invokeWithIterator(input())
 
       await expect(guarded.next()).resolves.toEqual({ done: false, value: { name: 'Earth' } })
-      await expect(guarded.next()).rejects.toSatisfy(error =>
-        error instanceof ORPCError
-        && error.code === 'BAD_REQUEST'
-        && error.message === 'Request blocked by prototype pollution protection.')
+      await expect(guarded.next()).rejects.toSatisfy(isBlockedError)
     })
 
     it('checks the return value too', async () => {
@@ -185,61 +186,37 @@ describe('prototypePollutionProtectionHandlerPlugin', () => {
 
       const guarded = await invokeWithIterator(input())
 
-      await expect(guarded.next()).rejects.toSatisfy(error =>
-        error instanceof ORPCError && error.code === 'BAD_REQUEST')
+      await expect(guarded.next()).rejects.toSatisfy(isBlockedError)
     })
 
     describe('error events', () => {
-      async function expectIterationBlocked(thrown: unknown) {
-        async function* input(): AsyncGenerator<unknown> {
-          throw thrown
+      async function nextAfterThrowing(error: unknown) {
+        async function* input() {
+          throw error
         }
 
-        const guarded = await invokeWithIterator(input())
-
-        await expect(guarded.next()).rejects.toSatisfy(error =>
-          error instanceof ORPCError
-          && error.code === 'BAD_REQUEST'
-          && error.message === 'Request blocked by prototype pollution protection.'
-          && error.cause === undefined)
+        return (await invokeWithIterator(input())).next()
       }
 
-      it('fails the iteration when an ErrorEvent payload pollutes', async () => {
-        await expectIterationBlocked(new ErrorEvent(JSON.parse('{"__proto__": {}}')))
+      it.each([
+        ['an ErrorEvent payload', () => new ErrorEvent(JSON.parse('{"__proto__": {}}'))],
+        ['an ORPCError data', () => new ORPCError('X', { data: JSON.parse('{"__proto__": {}}') })],
+        ['an error deeper in the cause chain', () => new ErrorEvent({ reason: 'x' }, { cause: new ErrorEvent(JSON.parse('{"__proto__": {}}')) })],
+      ])('fails the iteration when %s pollutes', async (_, createError) => {
+        await expect(nextAfterThrowing(createError())).rejects.toSatisfy(isBlockedError)
       })
 
-      it('fails the iteration when an ORPCError data pollutes', async () => {
-        await expectIterationBlocked(new ORPCError('X', { data: JSON.parse('{"__proto__": {}}') }))
-      })
+      it.each([
+        ['a benign error event', () => new ErrorEvent({ reason: 'x' })],
+        ['a cyclic cause chain', () => {
+          const first = new ErrorEvent({ reason: 'first' })
+          first.cause = new ErrorEvent({ reason: 'second' }, { cause: first })
+          return first
+        }],
+      ])('rethrows %s unchanged', async (_, createError) => {
+        const error = createError()
 
-      it('walks the cause chain of an error event', async () => {
-        await expectIterationBlocked(new ErrorEvent({ reason: 'x' }, { cause: new ErrorEvent(JSON.parse('{"__proto__": {}}')) }))
-      })
-
-      it('tolerates a cyclic cause chain without hanging', async () => {
-        const first = new ErrorEvent({ reason: 'first' })
-        const second = new ErrorEvent({ reason: 'second' }, { cause: first })
-        first.cause = second
-
-        async function* input(): AsyncGenerator<unknown> {
-          throw first
-        }
-
-        const guarded = await invokeWithIterator(input())
-
-        await expect(guarded.next()).rejects.toBe(first)
-      })
-
-      it('rethrows a benign error event unchanged', async () => {
-        const errorEvent = new ErrorEvent({ reason: 'x' })
-
-        async function* input(): AsyncGenerator<unknown> {
-          throw errorEvent
-        }
-
-        const guarded = await invokeWithIterator(input())
-
-        await expect(guarded.next()).rejects.toBe(errorEvent)
+        await expect(nextAfterThrowing(error)).rejects.toBe(error)
       })
     })
   })
@@ -329,12 +306,7 @@ describe('prototypePollutionProtectionHandlerPlugin', () => {
       ['a constructor.prototype pair', '{"json":{"settings":{"constructor":{"prototype":{"isAdmin":true}}}}}'],
       ['a polluting key kept only on the raw event in `cause`', '{"json":{"reason":"x"},"__proto__":{"isAdmin":true}}'],
     ])('blocks %s', async (_label, data) => {
-      const error = await send(`event: error\ndata: ${data}\n\n`)
-
-      expect(error).toBeInstanceOf(ORPCError)
-      expect(error.code).toBe('BAD_REQUEST')
-      expect(error.message).toBe('Request blocked by prototype pollution protection.')
-      expect(error.cause).toBeUndefined()
+      expect(await send(`event: error\ndata: ${data}\n\n`)).toSatisfy(isBlockedError)
     })
 
     it('passes benign error events through unchanged', async () => {

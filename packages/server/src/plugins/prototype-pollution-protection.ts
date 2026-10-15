@@ -35,7 +35,8 @@ export class PrototypePollutionProtectionHandlerPlugin<T extends Context> implem
             return result
           },
           mapError: (error) => {
-            return this.errorChainContainsPollutingKey(error) ? this.createBlockedError() : error
+            this.rejectPollutingInput(error)
+            return error
           },
         }))
 
@@ -55,47 +56,20 @@ export class PrototypePollutionProtectionHandlerPlugin<T extends Context> implem
 
   private rejectPollutingInput(input: unknown): void {
     if (this.containsPollutingKey(input)) {
-      throw this.createBlockedError()
+      // No `cause`, so the rejected payload cannot be reached through the error chain.
+      throw new ORPCError('BAD_REQUEST', { message: 'Request blocked by prototype pollution protection.' })
     }
-  }
-
-  /**
-   * Carries no `cause`, so the rejected payload cannot be reached through the error chain.
-   */
-  private createBlockedError(): ORPCError<'BAD_REQUEST', undefined> {
-    return new ORPCError('BAD_REQUEST', { message: 'Request blocked by prototype pollution protection.' })
-  }
-
-  /**
-   * An error event in an `AsyncIteratorObject` input carries a client-sent payload. The
-   * serializers rethrow it as an `ErrorEvent` or `ORPCError` that keeps the raw event as
-   * `cause`, whose payload may still hold keys the deserializer dropped, so every link of
-   * either type is checked.
-   */
-  private errorChainContainsPollutingKey(error: unknown): boolean {
-    const visited = new WeakSet<object>()
-    let current = error
-
-    while ((current instanceof ErrorEvent || current instanceof ORPCError) && !visited.has(current)) {
-      visited.add(current)
-
-      if (this.containsPollutingKey(current.data)) {
-        return true
-      }
-
-      current = current.cause
-    }
-
-    return false
   }
 
   /**
    * Walks the containers the built-in codecs can produce: arrays, maps, sets, and plain
    * objects, including null-prototype ones. Arrays get the same key checks as plain objects,
    * since structured clone, as used over MessagePort, keeps named keys like `__proto__` on
-   * them. Other objects, such as files and dates, carry no attacker-authored keys and are
-   * left alone. The walk is iterative, so input nested deeper than the call stack allows
-   * still gets the intended verdict instead of a `RangeError`.
+   * them. A client-sent error event in an `AsyncIteratorObject` input arrives as an
+   * `ErrorEvent` or `ORPCError` whose `cause` keeps the raw event, so both its `data` and
+   * `cause` are walked. Other objects, such as files and dates, carry no attacker-authored
+   * keys and are left alone. The walk is iterative, so input nested deeper than the call
+   * stack allows still gets the intended verdict instead of a `RangeError`.
    */
   private containsPollutingKey(root: unknown): boolean {
     const visited = new WeakSet<object>()
@@ -116,6 +90,11 @@ export class PrototypePollutionProtectionHandlerPlugin<T extends Context> implem
           stack.push(entry)
         }
 
+        continue
+      }
+
+      if (value instanceof ErrorEvent || value instanceof ORPCError) {
+        stack.push(value.data, value.cause)
         continue
       }
 

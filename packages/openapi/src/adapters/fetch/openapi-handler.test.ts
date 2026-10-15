@@ -127,7 +127,6 @@ describe('openapiHandler', () => {
     expect(matched).toBe(true)
     expect(caught).toHaveLength(1)
     expect(caught[0]).toBeInstanceOf(ORPCError)
-    expect((caught[0] as ORPCError<any, any>).code).toBe('BAD_REQUEST')
-    expect((caught[0] as ORPCError<any, any>).message).toBe('Request blocked by prototype pollution protection.')
+    expect(caught[0]).toMatchObject({ code: 'BAD_REQUEST', message: 'Request blocked by prototype pollution protection.' })
   })
 })
