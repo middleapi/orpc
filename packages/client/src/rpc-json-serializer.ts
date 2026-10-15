@@ -447,14 +447,8 @@ export class RPCJsonSerializer {
       let restored: Set<unknown> | undefined
 
       /**
-       * Consecutive entries usually share a long path prefix (e.g. the fields of one array item), so each
-       * entry resumes from the containers the previous entry walked through instead of walking from the root.
-       * For each depth `d + 1` up to `chainDepth`, `chain[3 * d]` is the segment leading into it,
-       * `chain[3 * d + 1]` its container and `chain[3 * d + 2]` that container's original value.
-       *
-       * Only containers above the previous entry's target are kept, never the value a handler just restored.
-       * Writes happen only at targets, so every reused container is still exactly what `walkInto` returned.
-       * Skipped for a single entry, which has nothing to share.
+       * `[segment, container, original]` per step of the previous entry's walk, reused for the shared path prefix.
+       * Only containers above its target are kept, so none can be a value a handler restored.
        */
       const chain: unknown[] | undefined = meta.length === 1 ? undefined : []
       let chainDepth = 0
@@ -468,16 +462,16 @@ export class RPCJsonSerializer {
         }
 
         const depth = item.length - 1
+        const shared = Math.min(depth, chainDepth)
         let d = 0
         let original: any = serialized
         let currentRef: any = ref
         let preSegment: string | number = 'json'
 
-        if (chain !== undefined && depth > 0 && chainDepth > 0) {
-          // A segment mismatch (including `0` vs `'0'`) only means walking again, which is always safe
+        if (chain !== undefined && shared > 0) {
           d = 1
 
-          while (d < depth && d < chainDepth && chain[3 * d] === item[d]) {
+          while (d < shared && chain[3 * d] === item[d]) {
             d++
           }
 
@@ -485,7 +479,6 @@ export class RPCJsonSerializer {
           original = chain[3 * d - 1]
           preSegment = item[d]!
 
-          // The deepest reused container was never checked against this entry's next segment
           if (!Object.hasOwn(currentRef, preSegment)) {
             throw invalidSerializedData(`segment "${preSegment}" does not exist.`)
           }
@@ -508,7 +501,6 @@ export class RPCJsonSerializer {
           }
         }
 
-        // Keep only this entry's containers, which all sit above the target written below
         chainDepth = depth
 
         const value = handler.deserialize(currentRef[preSegment])

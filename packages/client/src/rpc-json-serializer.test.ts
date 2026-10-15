@@ -1,3 +1,4 @@
+import type { RPCJsonSerialization } from './rpc-json-serializer'
 import { builtInRPCSupportDataTypes } from '../../../tests/rpc/__shared__/built-in-support-data-types'
 import { RPCJsonSerializer } from './rpc-json-serializer'
 
@@ -394,6 +395,17 @@ describe('rpcJsonSerializer: deserialize', () => {
     expect(serializer.deserialize(payload)).toEqual(value)
     expect(JSON.stringify(payload)).toBe(snapshot)
   })
+
+  it('restores entries that share, leave and return to a path prefix', () => {
+    const payload: RPCJsonSerialization = {
+      json: { a: { b: { x: '1', y: '2' }, z: '3' }, c: ['4', { w: '5', v: '6' }] },
+      meta: [['bigint', 'a', 'b', 'x'], ['bigint', 'a', 'z'], ['bigint', 'a', 'b', 'y'], ['bigint', 'c', 1, 'w'], ['bigint', 'c', '1', 'v'], ['bigint', 'c', 0]],
+    }
+    const snapshot = JSON.stringify(payload)
+
+    expect(serializer.deserialize(payload)).toEqual({ a: { b: { x: 1n, y: 2n }, z: 3n }, c: [4n, { w: 5n, v: 6n }] })
+    expect(JSON.stringify(payload)).toBe(snapshot)
+  })
 })
 
 describe('rpcJsonSerializer: security', () => {
@@ -591,6 +603,11 @@ describe('rpcJsonSerializer: meta cannot descend into restored values', () => {
         serialize: v => v,
         deserialize: (v: any) => v * 2 + 100,
       },
+      zero: {
+        condition: () => false,
+        serialize: v => v,
+        deserialize: () => 0,
+      },
     },
   })
 
@@ -604,6 +621,8 @@ describe('rpcJsonSerializer: meta cannot descend into restored values', () => {
   it('rejects descent into a root-level custom handler result', () => {
     expect(() => serializer.deserialize({ json: { name: '123', age: 1 }, meta: [['human'], ['bigint', 'name']] }))
       .toThrow('Invalid RPC serialized data: segment "json" cannot be walked into.')
+    expect(() => serializer.deserialize({ json: { x: '1', name: '2' }, meta: [['bigint', 'x'], ['identity'], ['bigint', 'name']] }))
+      .toThrow('Invalid RPC serialized data: segment "json" cannot be walked into.')
   })
 
   it('rejects descent when entries share a path prefix with earlier ones', () => {
@@ -615,6 +634,13 @@ describe('rpcJsonSerializer: meta cannot descend into restored values', () => {
       .toThrow('Invalid RPC serialized data: segment "p" cannot be walked into.')
     expect(() => serializer.deserialize({ json: { a: { b: { name: '1', c: null } } }, meta: [['date', 'a', 'b', 'c'], ['identity', 'a', 'b'], ['bigint', 'a', 'b', 'name']] }))
       .toThrow('Invalid RPC serialized data: segment "b" cannot be walked into.')
+    expect(() => serializer.deserialize({ json: { a: { name: '1', b: { x: '2', y: '3' } } }, meta: [['bigint', 'a', 'b', 'x'], ['identity', 'a'], ['bigint', 'a', 'b', 'y']] }))
+      .toThrow('Invalid RPC serialized data: segment "a" cannot be walked into.')
+  })
+
+  it('checks that a segment still exists after an earlier entry shrinks its array', () => {
+    expect(() => serializer.deserialize({ json: { a: [{ x: '1' }, { y: '2' }] }, meta: [['bigint', 'a', 1, 'y'], ['zero', 'a', 'length'], ['bigint', 'a', 1, 'y']] }))
+      .toThrow('Invalid RPC serialized data: segment "1" does not exist.')
   })
 
   it('treats numeric and string segments as the same position', () => {
@@ -711,113 +737,5 @@ describe('rpcJsonSerializer: meta cannot descend into restored values', () => {
     expect(s.deserialize(s.serialize({ root: blob, nested: new Set([blob]), p: new Human('x', 0) })))
       .toEqual({ root: blob, nested: new Set([blob]), p: new Human('x', 1) })
     expect(s.deserialize(s.serialize(blob))).toBe(blob)
-  })
-})
-
-describe('rpcJsonSerializer: meta entries sharing a path prefix', () => {
-  class Human {
-    constructor(public name: string, public age: number) {}
-  }
-
-  const serializer = new RPCJsonSerializer({
-    handlers: {
-      human: {
-        condition: v => v instanceof Human,
-        serialize: (v: Human) => ({ name: v.name, age: v.age }),
-        deserialize: (v: any) => {
-          if (typeof v?.name !== 'string' || typeof v?.age !== 'number')
-            throw new TypeError('invalid human')
-          return new Human(v.name, v.age)
-        },
-      },
-      identity: { // returns the very object it validated
-        condition: () => false,
-        serialize: v => v,
-        deserialize: (v: any) => {
-          if (typeof v !== 'object' || v === null)
-            throw new TypeError('invalid')
-          return v
-        },
-      },
-      zero: {
-        condition: () => false,
-        serialize: v => v,
-        deserialize: () => 0,
-      },
-    },
-  })
-
-  function deepFreeze<T>(value: T): T {
-    if (typeof value === 'object' && value !== null) {
-      Object.values(value).forEach(deepFreeze)
-      Object.freeze(value)
-    }
-    return value
-  }
-
-  it('rejects descent into a value a handler restored after an earlier entry walked through it', () => {
-    expect(() => serializer.deserialize({
-      json: { p: { x: '1', name: '2' } },
-      meta: [['bigint', 'p', 'x'], ['identity', 'p'], ['bigint', 'p', 'name']],
-    })).toThrow('Invalid RPC serialized data: segment "p" cannot be walked into.')
-
-    expect(() => serializer.deserialize({
-      json: { a: { x: '1', p: { name: '2' } } },
-      meta: [['bigint', 'a', 'x'], ['identity', 'a', 'p'], ['bigint', 'a', 'p', 'name']],
-    })).toThrow('Invalid RPC serialized data: segment "p" cannot be walked into.')
-  })
-
-  it('rejects descent into a value restored above an earlier entry\'s path', () => {
-    expect(() => serializer.deserialize({
-      json: { a: { b: { x: '1', y: '2' } } },
-      meta: [['bigint', 'a', 'b', 'x'], ['identity', 'a'], ['bigint', 'a', 'b', 'y']],
-    })).toThrow('Invalid RPC serialized data: segment "a" cannot be walked into.')
-
-    expect(() => serializer.deserialize({
-      json: { x: '1', name: '2' },
-      meta: [['bigint', 'x'], ['identity'], ['bigint', 'name']],
-    })).toThrow('Invalid RPC serialized data: segment "json" cannot be walked into.')
-  })
-
-  it('treats numeric and string segments as the same position after an earlier entry', () => {
-    expect(() => serializer.deserialize({
-      json: [{ x: '1', name: '2' }],
-      meta: [['bigint', 0, 'x'], ['identity', '0'], ['bigint', 0, 'name']],
-    })).toThrow('Invalid RPC serialized data: segment "0" cannot be walked into.')
-
-    expect(() => serializer.deserialize({
-      json: [{ x: '1', name: '2' }],
-      meta: [['bigint', '0', 'x'], ['identity', 0], ['bigint', '0', 'name']],
-    })).toThrow('Invalid RPC serialized data: segment "0" cannot be walked into.')
-  })
-
-  it('checks that a segment still exists after a write to a shared container', () => {
-    expect(() => serializer.deserialize({
-      json: { a: [{ x: '1' }, { y: '2' }] },
-      meta: [['bigint', 'a', 1, 'y'], ['zero', 'a', 'length'], ['bigint', 'a', 1, 'y']],
-    })).toThrow('Invalid RPC serialized data: segment "1" does not exist.')
-  })
-
-  it('restores entries whose paths share, diverge from and return to a prefix, without mutating the input', () => {
-    const json = deepFreeze({ a: { b: { x: '1', y: '2' }, z: '3' }, c: ['4', { w: '5', v: '6' }] })
-
-    expect(serializer.deserialize({
-      json,
-      meta: [
-        ['bigint', 'a', 'b', 'x'],
-        ['bigint', 'a', 'z'],
-        ['bigint', 'a', 'b', 'y'],
-        ['bigint', 'c', 1, 'w'],
-        ['bigint', 'c', '0'],
-        ['bigint', 'c', '1', 'v'],
-      ],
-    })).toEqual({ a: { b: { x: 1n, y: 2n }, z: 3n }, c: [4n, { w: 5n, v: 6n }] })
-  })
-
-  it('still stacks handlers on a position after a sibling entry walked through it', () => {
-    expect(serializer.deserialize({
-      json: { p: { name: 'x', age: 1, born: '2020-01-01T00:00:00.000Z' } },
-      meta: [['date', 'p', 'born'], ['identity', 'p'], ['human', 'p']],
-    })).toEqual({ p: new Human('x', 1) })
   })
 })
