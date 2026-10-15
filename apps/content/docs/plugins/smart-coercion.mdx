@@ -151,26 +151,7 @@ Supports arrays of key-value pairs with **unique keys**:
 
 ## Step Budget
 
-Coercion runs before validation, and on the server even before middleware such as authentication, so it caps how much work a single untrusted value can cost. It counts steps, where a step applies one schema to one value, and gives up once it takes more than `maxStepsPerValue` steps per value in the input. Both plugins accept this option:
-
-```ts
-const handler = new OpenAPIHandler(router, {
-  plugins: [
-    new SmartCoercionHandlerPlugin({
-      converters: [new ZodToJsonSchemaConverter()],
-      /**
-       * Maximum number of steps per value in the input.
-       * Inputs with fewer than 100 values are budgeted as 100 values.
-       *
-       * @default 1_000
-       */
-      maxStepsPerValue: 1_000,
-    }),
-  ],
-})
-```
-
-When coercion runs out of steps, it leaves the value uncoerced instead of throwing, so validation still runs and reports any mismatch. A value takes about one step per union branch it is tried against, multiplied across nested unions, so the default leaves room for wide unions. If large inputs fail validation while smaller ones of the same shape pass, raise `maxStepsPerValue`.
+Both plugins accept `maxStepsPerValue` (default `1000`), the maximum coercion steps per input value, where a step applies one schema to one value. Past it, the value is left uncoerced and validation still runs. Raise it if large inputs fail validation while smaller ones of the same shape pass.
 
 ## Advanced Usage
 
