@@ -260,8 +260,6 @@ const link = new OpenAPILink(contract, {
 })
 ```
 
-Like any error that is not an `ORPCError`, a `MalformedResponseError` thrown inside a handler (for example, from a call to another service) reaches that handler's callers as a generic `INTERNAL_SERVER_ERROR`, so the upstream's response is not sent to them.
-
 ## Event Stream Options
 
 Configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed to the server. Available options depend on the adapter. For example, the fetch adapter supports:
