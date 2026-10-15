@@ -38,9 +38,6 @@ function isWalkable(value: unknown): boolean {
   return Array.isArray(value) || isPlainObject(value)
 }
 
-/**
- * Never walks through a value a handler returned, or a later entry could mutate it after validation.
- */
 function walkInto(parent: any, key: Segment, original: unknown, restored?: Set<unknown>): any {
   const value = parent[key]
 
