@@ -630,7 +630,7 @@ describe('openAPILinkCodec', () => {
           )
         }
 
-        for (const rest of ['.', '..', './a', '../a', 'a/.', 'a/..', 'a/./b', 'a/../../admin']) {
+        for (const rest of ['.', '..', './a', '../a', 'a/.', 'a/..', 'a/./b', 'a/../../admin', '/../a']) {
           await expect(codec.encodeInput({ ...valid, rest }, ['item'], { context: {} })).rejects.toThrow(
             'Path param "rest" cannot contain "." or ".." segments in call to procedure (item).',
           )
@@ -656,8 +656,11 @@ describe('openAPILinkCodec', () => {
           })),
         }, { serializer })
 
-        expect((await rootCodec.encodeInput({ path: '/evil.example/x' }, ['file'], { context: {} })).url).toBe('/%2Fevil.example/x')
-        expect((await rootCodec.encodeInput({ path: '//evil.example/x' }, ['file'], { context: {} })).url).toBe('/%2F/evil.example/x')
+        for (const [path, url] of [['/evil.example/x', '/%2Fevil.example/x'], ['//evil.example/x', '/%2F/evil.example/x']]) {
+          const request = await rootCodec.encodeInput({ path }, ['file'], { context: {} })
+
+          expect(request.url).toBe(url)
+        }
 
         const nestedCodec = new OpenAPILinkCodec({
           item: oc.meta(openapi({
@@ -665,10 +668,9 @@ describe('openAPILinkCodec', () => {
           })),
         }, { url: '/api', serializer })
 
-        expect((await nestedCodec.encodeInput({ id: 'a', rest: '/x' }, ['item'], { context: {} })).url).toBe('/api/items/a/%2Fx')
-        await expect(nestedCodec.encodeInput({ id: 'a', rest: '/../x' }, ['item'], { context: {} })).rejects.toThrow(
-          'Path param "rest" cannot contain "." or ".." segments in call to procedure (item).',
-        )
+        const request = await nestedCodec.encodeInput({ id: 'a', rest: '/x' }, ['item'], { context: {} })
+
+        expect(request.url).toBe('/api/items/a/%2Fx')
       })
     })
 
