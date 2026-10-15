@@ -648,6 +648,28 @@ describe('openAPILinkCodec', () => {
 
         expect(request.url).toBe('/api/items/.../.well-known/a..b/v1.2/.../%252e%252e')
       })
+
+      it('encodes a leading slash in catch-all path params so the url is never protocol-relative', async () => {
+        const rootCodec = new OpenAPILinkCodec({
+          file: oc.meta(openapi({
+            path: '/{+path}',
+          })),
+        }, { serializer })
+
+        expect((await rootCodec.encodeInput({ path: '/evil.example/x' }, ['file'], { context: {} })).url).toBe('/%2Fevil.example/x')
+        expect((await rootCodec.encodeInput({ path: '//evil.example/x' }, ['file'], { context: {} })).url).toBe('/%2F/evil.example/x')
+
+        const nestedCodec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            path: '/items/{id}/{+rest}',
+          })),
+        }, { url: '/api', serializer })
+
+        expect((await nestedCodec.encodeInput({ id: 'a', rest: '/x' }, ['item'], { context: {} })).url).toBe('/api/items/a/%2Fx')
+        await expect(nestedCodec.encodeInput({ id: 'a', rest: '/../x' }, ['item'], { context: {} })).rejects.toThrow(
+          'Path param "rest" cannot contain "." or ".." segments in call to procedure (item).',
+        )
+      })
     })
 
     describe('option handling', () => {

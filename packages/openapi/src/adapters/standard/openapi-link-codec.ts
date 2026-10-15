@@ -238,6 +238,12 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       throw new TypeError(`Path param "${param.parameterName}" cannot contain "." or ".." segments in call to procedure (${path.join('.')}).`)
     }
 
+    // A leading "/" would make the URL protocol-relative ("//host/...") when the param starts the path,
+    // so the browser would send the request to another host. The handler decodes "%2F" back to "/".
+    if (param.allowsSlash && encoded.startsWith('/')) {
+      encoded = `%2F${encoded.slice(1)}`
+    }
+
     return encoded
   }
 
