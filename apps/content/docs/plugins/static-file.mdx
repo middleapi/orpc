@@ -143,6 +143,15 @@ const handler = new RPCHandler(router, {
          * @default 1024 (1KB)
          */
         threshold: 1024,
+
+        /**
+         * The maximum file size in bytes a request waits to compress. Larger
+         * files are compressed in the background and served as they are until
+         * the copy is ready.
+         *
+         * @default 1048576 (1MB)
+         */
+        maxSize: 1048576,
       },
     }),
   ],

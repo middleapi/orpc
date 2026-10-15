@@ -1009,6 +1009,27 @@ describe('staticFileHandlerPlugin', () => {
       expect(unconfiguredRes.text).toBe(largeText)
     })
 
+    it('compresses a file over maxSize in the background, serving it as it is until the copy is ready', async () => {
+      const dir = createCacheDir()
+      const agent = createStaticAgent({ compressOnDemand: { cacheDir: dir, maxSize: 1024 } })
+
+      const responses = await Promise.all(Array.from({ length: 3 }, () => agent.get('/large.txt').set('accept-encoding', 'br')))
+
+      for (const res of responses) {
+        expect(res.headers['content-encoding']).toBeUndefined()
+        expect(res.headers.vary).toBe('accept-encoding')
+        expect(res.text).toBe(largeText)
+      }
+
+      await vi.waitFor(async () => {
+        const res = await agent.get('/large.txt').set('accept-encoding', 'br')
+        expect(res.headers['content-encoding']).toBe('br')
+        expect(res.text).toBe(largeText)
+      })
+
+      expect(listCacheDir(dir)).toEqual([expect.stringMatching(/\.br$/)])
+    })
+
     it('gives each encoding of a file its own etag', async () => {
       const agent = createStaticAgent({ precompressed: true, compressOnDemand: { cacheDir: createCacheDir() } })
 

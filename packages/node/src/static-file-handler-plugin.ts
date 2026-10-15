@@ -92,6 +92,7 @@ interface CompressionCache {
   /** The configured encodings this runtime can compress into, in order of preference. */
   compressors: readonly CacheCompressor[]
   threshold: number
+  maxSize: number
 }
 
 interface EncodedFile {
@@ -124,6 +125,15 @@ export interface StaticFileHandlerPluginCompressOnDemandOptions {
    * @default 1024 (1KB)
    */
   threshold?: number
+
+  /**
+   * The maximum file size in bytes a request waits to compress. A larger file is compressed in
+   * the background instead, and served as it is until its copy is ready, so no request waits
+   * long on a big file. Set to `0` to never wait.
+   *
+   * @default 1048576 (1MB)
+   */
+  maxSize?: number
 }
 
 export interface StaticFileHandlerPluginOptions {
@@ -279,6 +289,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
           return createCompressor === undefined ? [] : [{ encoding, createCompressor }]
         }),
         threshold: options.compressOnDemand.threshold ?? 1024,
+        maxSize: options.compressOnDemand.maxSize ?? 1024 * 1024,
       }
     }
 
@@ -447,7 +458,9 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
      */
     const key = createHash('sha256').update(`${realPath}\0${toFileVersion(stats)}\0${COMPRESSOR_VERSIONS}`).digest('hex')
     const cachePath = path.join(compressionCache.dir, key + CONTENT_ENCODINGS[compressor.encoding].extension)
-    const cachedStats = await this.statOrCompress(filePath, stats, compressor.createCompressor, cachePath)
+    const cachedStats = stats.size > compressionCache.maxSize
+      ? await this.statOrCompressInBackground(filePath, stats, compressor.createCompressor, cachePath)
+      : await this.statOrCompress(filePath, stats, compressor.createCompressor, cachePath)
 
     /**
      * A copy no smaller than the file saves nothing, so the file is served as it is. The copy is
@@ -480,6 +493,31 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     }
 
     return pending
+  }
+
+  /**
+   * Stats the cached copy, starting its compression without waiting for it when it is missing,
+   * so the request is answered with the file as it is while the copy is written.
+   */
+  private async statOrCompressInBackground(
+    filePath: string,
+    stats: Stats,
+    createCompressor: () => Transform,
+    cachePath: string,
+  ): Promise<Stats | undefined> {
+    // Only this method starts lookups for files this large, so one in progress is a compression
+    if (this.pendingCacheLookups.has(cachePath)) {
+      return undefined
+    }
+
+    const cachedStats = await stat(cachePath).catch(() => undefined)
+
+    if (cachedStats === undefined) {
+      // Never rejects, since a copy that cannot be written only resolves to `undefined`
+      void this.statOrCompress(filePath, stats, createCompressor, cachePath)
+    }
+
+    return cachedStats
   }
 
   /**
