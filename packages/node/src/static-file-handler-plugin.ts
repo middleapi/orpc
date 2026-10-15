@@ -92,13 +92,13 @@ interface EncodedFile {
   stats: Stats
 }
 
-export interface StaticFileHandlerPluginCompressionCacheOptions {
+export interface StaticFileHandlerPluginCompressOnDemandOptions {
   /**
    * The directory compressed copies are stored in, created on first use and resolved against
    * the working directory when relative. Use a directory nothing else writes to; it can be
    * cleared at any time.
    */
-  dir: string
+  cacheDir: string
 
   /**
    * The encodings files are compressed into, prioritized by their order in this array and
@@ -175,12 +175,12 @@ export interface StaticFileHandlerPluginOptions {
 
   /**
    * Compresses a file with a compressible content type the first time a client accepts an
-   * encoding that no precompressed sidecar provides, and stores the copy in `dir`, so every
+   * encoding that no precompressed sidecar provides, and stores the copy in `cacheDir`, so every
    * later request, after a restart too, is answered from it.
    *
    * @default undefined (disabled)
    */
-  compressionCache?: StaticFileHandlerPluginCompressionCacheOptions
+  compressOnDemand?: StaticFileHandlerPluginCompressOnDemandOptions
 
   /**
    * Whether symbolic links whose target lies outside `rootDir` can be served.
@@ -236,7 +236,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   private readonly cacheControl: Exclude<StaticFileHandlerPluginOptions['cacheControl'], undefined>
   private readonly dotfiles: Exclude<StaticFileHandlerPluginOptions['dotfiles'], undefined>
   private readonly precompressed: Exclude<StaticFileHandlerPluginOptions['precompressed'], undefined>
-  private readonly compressionCache: CompressionCache | undefined
+  private readonly compressOnDemand: CompressionCache | undefined
   private readonly allowSymlinks: Exclude<StaticFileHandlerPluginOptions['allowSymlinks'], undefined>
   private readonly mimeTypes: Exclude<StaticFileHandlerPluginOptions['mimeTypes'], undefined>
   /** Cache lookups in progress keyed by cache path, so concurrent requests share one compression. */
@@ -256,16 +256,16 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
 
     this.precompressed = options.precompressed ?? false
 
-    if (options.compressionCache !== undefined) {
-      this.compressionCache = {
-        dir: path.resolve(options.compressionCache.dir),
+    if (options.compressOnDemand !== undefined) {
+      this.compressOnDemand = {
+        dir: path.resolve(options.compressOnDemand.cacheDir),
         // An encoding this runtime cannot compress into leaves its clients to their next accepted one
-        compressors: (options.compressionCache.encodings ?? ['br', 'zstd', 'gzip']).flatMap((encoding) => {
+        compressors: (options.compressOnDemand.encodings ?? ['br', 'zstd', 'gzip']).flatMap((encoding) => {
           const { createCompressor } = CONTENT_ENCODINGS[encoding]
 
           return createCompressor === undefined ? [] : [{ encoding, createCompressor }]
         }),
-        threshold: options.compressionCache.threshold ?? 1024,
+        threshold: options.compressOnDemand.threshold ?? 1024,
       }
     }
 
@@ -564,8 +564,8 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
     let [filePath, stats, realPath] = found
 
     const contentType = this.resolveContentType(filePath)
-    const eligibleCache = this.compressionCache !== undefined && stats.size >= this.compressionCache.threshold
-      ? this.compressionCache
+    const eligibleCache = this.compressOnDemand !== undefined && stats.size >= this.compressOnDemand.threshold
+      ? this.compressOnDemand
       : undefined
     const negotiatesEncoding = (this.precompressed || eligibleCache !== undefined) && isCompressibleContentType(contentType)
 

@@ -82,7 +82,7 @@ const handler = new RPCHandler(router, {
        *
        * @default undefined (disabled)
        */
-      compressionCache: undefined,
+      compressOnDemand: undefined,
 
       /**
        * Whether symbolic links whose target lies outside `rootDir` can be served.
@@ -115,18 +115,18 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 
 ## Compression
 
-Set `compressionCache` to compress compressible files the first time a client accepts an encoding, and serve every later request from the stored copy. When `precompressed` is also set, existing sidecars such as `app.js.br` win.
+Set `compressOnDemand` to compress compressible files the first time a client accepts an encoding, and serve every later request from the stored copy. When `precompressed` is also set, existing sidecars such as `app.js.br` win.
 
 ```ts
 const handler = new RPCHandler(router, {
   plugins: [
     new StaticFileHandlerPlugin({
       rootDir: './public',
-      compressionCache: {
+      compressOnDemand: {
         /**
          * The directory compressed copies are stored in.
          */
-        dir: './.cache/static-file',
+        cacheDir: './.cache/static-file',
 
         /**
          * Encodings to compress into, in order of preference.
@@ -150,7 +150,7 @@ const handler = new RPCHandler(router, {
 ```
 
 :::warning
-Use a `dir` outside `rootDir` that nothing else writes to. It is safe to clear at any time.
+Use a `cacheDir` outside `rootDir` that nothing else writes to. It is safe to clear at any time.
 :::
 
 To compress on every request instead, add the [Response Compression Plugin](/docs/plugins/response-compression). It leaves encoded files and range responses alone.
