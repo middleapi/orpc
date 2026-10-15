@@ -41,6 +41,20 @@ function invalidSerializedType(type: number, name: string, expected: string): Ty
   return invalidSerializedData(`type ${type} (${name}) expects ${expected}.`)
 }
 
+function isWalkable(value: unknown): boolean {
+  return Array.isArray(value) || isObject(value)
+}
+
+function walkInto(parent: any, key: Segment, original: unknown, restored?: Set<unknown>): any {
+  const value = parent[key]
+
+  if (!isWalkable(value) || restored?.has(value)) {
+    throw invalidSerializedData(`segment "${key}" cannot be walked into.`)
+  }
+
+  return value === original ? copyOnWrite(parent, key, original) : value
+}
+
 export class StandardRPCJsonSerializer {
   private readonly customSerializers: readonly StandardRPCCustomJsonSerializer[]
 
@@ -150,12 +164,12 @@ export class StandardRPCJsonSerializer {
   deserialize(json: unknown, meta: readonly StandardRPCJsonSerializedMetaItem[], maps: readonly Segment[][], getBlob: (index: number) => Blob): unknown
 
   deserialize(json: unknown, meta: readonly StandardRPCJsonSerializedMetaItem[], maps?: readonly Segment[][], getBlob?: (index: number) => Blob): unknown {
-    const ref = { data: json }
+    const ref = { json }
     /**
      * `input` is never written to, so `copyOnWrite` can tell a container still shared with
      * the caller's `json` from one already copied for a restored value.
      */
-    const input = { data: json }
+    const input = { json }
 
     if (maps && getBlob) {
       maps.forEach((segments, i) => {
@@ -167,11 +181,11 @@ export class StandardRPCJsonSerializer {
 
         let original: any = input
         let currentRef: any = ref
-        let preSegment: string | number = 'data'
+        let preSegment: string | number = 'json'
 
         segments.forEach((segment) => {
           original = original[preSegment]
-          currentRef = copyOnWrite(currentRef, preSegment, original)
+          currentRef = walkInto(currentRef, preSegment, original)
           preSegment = segment
 
           if (!Object.hasOwn(currentRef, preSegment)) {
@@ -182,6 +196,8 @@ export class StandardRPCJsonSerializer {
         currentRef[preSegment] = blob
       })
     }
+
+    let restored: Set<unknown> | undefined
 
     for (const item of meta) {
       const type = item[0]
@@ -197,11 +213,11 @@ export class StandardRPCJsonSerializer {
 
       let original: any = input
       let currentRef: any = ref
-      let preSegment: string | number = 'data'
+      let preSegment: string | number = 'json'
 
       for (let i = 1; i < item.length; i++) {
         original = original[preSegment]
-        currentRef = copyOnWrite(currentRef, preSegment, original)
+        currentRef = walkInto(currentRef, preSegment, original, restored)
         preSegment = item[i]!
 
         if (!Object.hasOwn(currentRef, preSegment)) {
@@ -210,7 +226,13 @@ export class StandardRPCJsonSerializer {
       }
 
       if (custom !== undefined) {
-        currentRef[preSegment] = custom.deserialize(currentRef[preSegment])
+        const value = custom.deserialize(currentRef[preSegment])
+        currentRef[preSegment] = value
+
+        if (isWalkable(value)) {
+          (restored ??= new Set()).add(value)
+        }
+
         continue
       }
 
@@ -305,6 +327,6 @@ export class StandardRPCJsonSerializer {
       }
     }
 
-    return ref.data
+    return ref.json
   }
 }
