@@ -4,7 +4,7 @@ import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
 import type { Promisable, Public, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standard-server/core'
 import type { OpenAPIMeta } from '../../meta'
-import { createORPCErrorFromJson, createORPCErrorFromMalformedResponse, isORPCErrorJson } from '@orpc/client'
+import { createORPCErrorFromJson, isORPCErrorJson, MalformedResponseError } from '@orpc/client'
 import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import { unlazy } from '@orpc/server'
 import { isTypescriptObject, mergeHttpPath, pathToHttpPath, safeEncodeURIComponent, stringifyJSON, value } from '@orpc/shared'
@@ -385,7 +385,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
         return this.serializer.deserialize(body)
       }
       catch (error) {
-        throw createORPCErrorFromMalformedResponse({
+        throw new MalformedResponseError({
           message: 'Invalid OpenAPI response format.',
           response: { status: response.status, headers: response.headers, body },
           cause: error,
@@ -404,10 +404,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
         return { kind: 'error', error: createORPCErrorFromJson(deserialized) }
       }
 
-      return {
-        kind: 'error',
-        error: createORPCErrorFromMalformedResponse({ response: { headers: response.headers, status: response.status, body } }),
-      }
+      throw new MalformedResponseError({ response: { headers: response.headers, status: response.status, body } })
     }
 
     const outputStructure = meta?.outputStructure ?? DEFAULT_OPENAPI_OUTPUT_STRUCTURE

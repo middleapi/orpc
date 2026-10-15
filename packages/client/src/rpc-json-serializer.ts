@@ -1,5 +1,5 @@
 import type { Segment } from '@orpc/shared'
-import { copyOnWrite, isPlainObject, NullProtoObj } from '@orpc/shared'
+import { copyOnWrite, DEFAULT_MAX_BIGINT_DIGITS, isPlainObject, NullProtoObj, parseBigIntString } from '@orpc/shared'
 
 export type RPCJsonSerializationMeta = [type: string, ...path: Segment[]]
 export type RPCJsonSerialization
@@ -57,7 +57,13 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
     },
     deserialize(serialized: string): bigint {
       assertSerializedType(typeof serialized === 'string', 'bigint', 'a string')
-      return BigInt(serialized)
+      const value = parseBigIntString(serialized, DEFAULT_MAX_BIGINT_DIGITS)
+
+      if (value === undefined) {
+        throw invalidSerializedData(`type "bigint" expects a decimal integer string of at most ${DEFAULT_MAX_BIGINT_DIGITS} digits.`)
+      }
+
+      return value
     },
     isTerminal: true,
   },

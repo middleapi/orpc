@@ -1,6 +1,6 @@
 import type { MaybeOptionalOptions, Registry } from '@orpc/shared'
 import type { StandardResponse } from '@standard-server/core'
-import { getConstructors, resolveMaybeOptionalOptions } from '@orpc/shared'
+import { getConstructors, isPlainObject, resolveMaybeOptionalOptions } from '@orpc/shared'
 
 /**
  * Default mapping between common oRPC error codes and HTTP status codes.
@@ -99,7 +99,7 @@ export class ORPCError<TCode extends ORPCErrorCode, TData> extends Error {
 
   constructor(code: TCode, ...rest: MaybeOptionalOptions<ORPCErrorOptions<TData>>) {
     const options = resolveMaybeOptionalOptions(rest)
-    const message = options.message ?? code.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')
+    const message = options.message ?? codeToMessage(code)
 
     super(message, options)
 
@@ -155,14 +155,21 @@ export type AnyORPCError = ORPCError<any, any>
 export type AnyORPCErrorJSON = ORPCErrorJSON<any, any>
 
 export interface MalformedResponseErrorOptions extends ErrorOptions {
+  /**
+   * @default inferred from the response body or status
+   */
   message?: string
   response: StandardResponse
 }
 
 /**
- * Error indicating a response does not follow the expected oRPC format, carrying
- * the resolved response. Found as the `cause` of a `MALFORMED_ORPC_RESPONSE`
- * `ORPCError`.
+ * Error thrown by links when a response does not follow the expected oRPC format,
+ * for example when a proxy or gateway answers instead of your handler. Carries the
+ * resolved response. Unless overridden via `options.message`, the message is
+ * inferred from the response body or status.
+ *
+ * Unlike `ORPCError`, it reaches a handler's callers as a generic `INTERNAL_SERVER_ERROR`
+ * when thrown from the handler, so an upstream's response is not sent to them.
  *
  * @see {@link https://orpc.dev/docs/rpc/link#malformed-responses | RPC Link - Malformed Responses}
  * @see {@link https://orpc.dev/docs/openapi/link#malformed-responses | OpenAPI Link - Malformed Responses}
@@ -173,8 +180,30 @@ export class MalformedResponseError extends Error {
   response: StandardResponse
 
   constructor(options: MalformedResponseErrorOptions) {
-    super(options.message, options)
+    super(options.message ?? inferMalformedResponseMessage(options.response), options)
 
     this.response = options.response
   }
+}
+
+/**
+ * Longer body strings are not used as the error message,
+ * e.g. full HTML error pages from a proxy or gateway.
+ */
+const INFERRED_MESSAGE_MAX_LENGTH = 256
+
+function inferMalformedResponseMessage(response: StandardResponse): string {
+  const candidate = isPlainObject(response.body) ? response.body.message : response.body
+
+  if (typeof candidate === 'string' && candidate.length > 0 && candidate.length <= INFERRED_MESSAGE_MAX_LENGTH) {
+    return candidate
+  }
+
+  const commonCode = Object.entries(COMMON_ERROR_STATUS_MAP).find(([, status]) => status === response.status)?.[0]
+
+  return commonCode ? codeToMessage(commonCode) : 'Malformed oRPC Response'
+}
+
+function codeToMessage(code: string): string {
+  return code.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')
 }

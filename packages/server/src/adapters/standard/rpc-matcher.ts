@@ -63,6 +63,8 @@ export class RPCMatcher {
 
   private readonly tree: Map<`/${string}`, TreeEntry> = new Map()
   private readonly pendingLazyRouters: Map<string, PendingLazyRouter> = new Map()
+  /** segment count of the deepest pending key, never lowered so it stays an upper bound */
+  private maxPendingLazyRouterDepth = 0
 
   constructor(router: AnyRouter, options: RPCMatcherOptions = {}) {
     this.filter = options.filter ?? true
@@ -95,6 +97,7 @@ export class RPCMatcher {
 
     for (const result of lazyResults) {
       this.pendingLazyRouters.set(pathToHttpPath(result.path), result)
+      this.maxPendingLazyRouterDepth = Math.max(this.maxPendingLazyRouterDepth, result.path.length)
     }
   }
 
@@ -175,27 +178,15 @@ export class RPCMatcher {
 
     let slashIndex = 0
 
-    while (slashIndex !== -1) {
+    // a pending key has as many segments as its path, so deeper prefixes can never match,
+    // and scanning them would cost quadratic time on slash-heavy pathnames
+    for (let depth = 1; slashIndex !== -1 && depth <= this.maxPendingLazyRouterDepth; depth++) {
       const nextSlashIndex = pathname.indexOf('/', slashIndex + 1)
       const httpPathPrefix = nextSlashIndex === -1 ? pathname : pathname.slice(0, nextSlashIndex)
-
-      if (this.pendingLazyRouters.has(httpPathPrefix)) {
-        return this.loadPendingLazyRouters(pathname, slashIndex)
-      }
-
-      slashIndex = nextSlashIndex
-    }
-  }
-
-  private async loadPendingLazyRouters(pathname: `/${string}`, slashIndex: number): Promise<void> {
-    while (slashIndex !== -1) {
-      const nextSlashIndex = pathname.indexOf('/', slashIndex + 1)
-      const httpPathPrefix = nextSlashIndex === -1 ? pathname : pathname.slice(0, nextSlashIndex)
-
       const pending = this.pendingLazyRouters.get(httpPathPrefix)
 
       if (pending !== undefined) {
-        await this.loadPendingLazyRouter(httpPathPrefix, pending)
+        return this.loadPendingLazyRouter(httpPathPrefix, pending).then(() => this.resolvePendingLazyRouters(pathname))
       }
 
       slashIndex = nextSlashIndex

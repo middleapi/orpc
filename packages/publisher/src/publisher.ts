@@ -7,8 +7,6 @@ export interface PublisherOptions {
    *
    * If the buffer exceeds this limit, the oldest event is dropped.
    * This prevents unbounded memory growth if consumers process events slowly.
-   * Missed events the adapter replays for `lastEventId` while subscribing are all kept,
-   * and the limit then applies to how much further behind the consumer falls.
    *
    * Set to:
    * - `0`: Disable buffering. Events must be consumed before the next one arrives.
@@ -57,8 +55,6 @@ export abstract class Publisher<T extends Record<string, object>> {
   /**
    * Subscribes to a specific event using a callback function.
    * Returns an unsubscribe function to remove the listener.
-   * Events missed since `lastEventId` should reach the listener before the returned promise
-   * resolves, so iterator subscribers keep them all regardless of `maxBufferedEvents`.
    *
    * @remarks
    * This method should be protected to avoid conflicts with `subscribe` method
@@ -115,43 +111,32 @@ export abstract class Publisher<T extends Record<string, object>> {
 
     throwIfAborted(signal)
 
-    const resuming = listenerOrOptions?.lastEventId !== undefined
     const bufferedEvents = new Queue<T[K]>()
     const pullResolvers: { resolve: (result: IteratorResult<T[K]>) => void, reject: (error: Error) => void }[] = []
 
-    let bufferFloor = 0
-    let bufferLimit = resuming ? Infinity : maxBufferedEvents
-
-    const subscription = this.subscribeListener(event, (payload) => {
-      if (signal?.aborted) {
-        return
-      }
-
-      const resolver = pullResolvers.shift()
-
-      if (resolver) {
-        resolver.resolve({ done: false, value: payload })
-      }
-      else {
-        bufferedEvents.push(payload)
-
-        if (bufferedEvents.length > bufferLimit) {
-          bufferedEvents.shift()
+    const unsubscribePromise = this
+      .subscribeListener(event, (payload) => {
+        if (signal?.aborted) {
+          return
         }
-      }
-    }, {
-      lastEventId: listenerOrOptions?.lastEventId,
-      onError: error => terminate({ kind: 'error', error }),
-    })
 
-    const unsubscribePromise = (
-      resuming
-        ? subscription.finally(() => {
-            bufferFloor = bufferedEvents.length
-            bufferLimit = bufferFloor + maxBufferedEvents
-          })
-        : subscription
-    ).catch(error => terminate({ kind: 'error', error }))
+        const resolver = pullResolvers.shift()
+
+        if (resolver) {
+          resolver.resolve({ done: false, value: payload })
+        }
+        else {
+          bufferedEvents.push(payload)
+
+          if (bufferedEvents.length > maxBufferedEvents) {
+            bufferedEvents.shift()
+          }
+        }
+      }, {
+        lastEventId: listenerOrOptions?.lastEventId,
+        onError: error => terminate({ kind: 'error', error }),
+      })
+      .catch(error => terminate({ kind: 'error', error }))
 
     const abortListener = () => terminate({ kind: 'error', error: signal!.reason })
     signal?.addEventListener('abort', abortListener)
@@ -191,11 +176,6 @@ export abstract class Publisher<T extends Record<string, object>> {
         const value = bufferedEvents.shift()
 
         if (value !== undefined) {
-          if (bufferedEvents.length < bufferFloor) {
-            bufferFloor = bufferedEvents.length
-            bufferLimit = bufferFloor + maxBufferedEvents
-          }
-
           return { done: false, value }
         }
 

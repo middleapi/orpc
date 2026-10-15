@@ -5,18 +5,36 @@ import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-ser
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
 import { ORPCError } from '@orpc/client'
-import { toArray, value } from '@orpc/shared'
+import { isAsyncIteratorObject, promiseWithResolvers, toArray, value } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
 
 /**
  * Content type for batch responses that use the length-prefixed binary framing
- * (streaming mode, and buffered mode when any sub-response contains binary).
+ * (streaming mode, and buffered mode when any sub-response contains binary or is a stream).
  *
  * Decoding is driven by the `standard-server` body hint, not this header,
  * so it only serves to describe the payload to logs, proxies, and dev tools.
  */
 export const BATCH_CONTENT_TYPE = 'application/vnd.orpc.batch'
+
+const textEncoder = new TextEncoder()
+
+function encodeLengthPrefix(length: number): Uint8Array<ArrayBuffer> {
+  const prefix = new Uint8Array(4)
+  new DataView(prefix.buffer).setUint32(0, length, false)
+  return prefix
+}
+
+/**
+ * Encodes a message as a length-prefixed frame: its 4-byte big-endian length, then its bytes.
+ */
+async function encodeFrame(message: ServerPeerSendMessage): Promise<Uint8Array<ArrayBuffer>[]> {
+  const encoded = await encodePeerMessage(message)
+  const bytes = typeof encoded === 'string' ? textEncoder.encode(encoded) : encoded
+
+  return [encodeLengthPrefix(bytes.byteLength), bytes]
+}
 
 export interface BatchHandlerPluginOptions<T extends Context> {
   /**
@@ -53,7 +71,7 @@ export interface BatchHandlerPluginOptions<T extends Context> {
    *
    * When enabled, a zero-length length-prefixed frame is sent periodically while the
    * stream is idle (no message sent for `interval` ms). Clients ignore these frames.
-   * Only applies to streaming mode.
+   * Only applies to streaming responses: streaming mode, or a buffered batch with a stream sub-response.
    *
    * @default { enabled: true, interval: 15000 }
    */
@@ -78,6 +96,9 @@ export interface BatchHandlerPluginOptions<T extends Context> {
  * batch into sub-requests and streaming their responses back together.
  *
  * @remarks
+ * In buffered mode, the batch still streams once a sub-response is a stream
+ * (an event iterator or a `ReadableStream`), since it may never end.
+ *
  * **Note**: HTTP/2 and later already multiplex requests over a single connection, which often makes this plugin unnecessary.
  *
  * @see {@link https://orpc.dev/docs/plugins/batch | Batch Plugin}
@@ -201,93 +222,12 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       }
 
-      const handleIndividualRequest = async (request: StandardLazyRequest): Promise<StandardResponse> => {
-        try {
-          request = this.mapSubrequest(request, interceptorOptions)
-          const { matched, response } = await interceptorOptions.next({ ...interceptorOptions, request })
-
-          if (!matched) {
-            return { status: 404, headers: {}, body: 'No procedure matched' }
-          }
-
-          return response
-        }
-        catch (err) {
-          /**
-           * Errors should not occur at the routing interceptor level.
-           * Reject the promise so it can be handled by the unhandledRejection handler
-           * for global logging or error handling.
-           */
-          Promise.reject(err)
-
-          return { status: 500, headers: {}, body: 'Internal server error' }
-        }
-      }
-
-      const runSubrequests = async (peer: ServerPeer): Promise<void> => {
-        const promise = Promise.all(messages.map(msg => peer.message(msg, handleIndividualRequest)))
-        const signal = interceptorOptions.request.signal
-        const closePeer = () => peer.close(signal?.reason)
-
-        if (signal?.aborted) {
-          closePeer()
-        }
-
-        signal?.addEventListener('abort', closePeer)
-
-        try {
-          await promise
-        }
-        finally {
-          signal?.removeEventListener('abort', closePeer)
-        }
-      }
-
       const status = await value(this.successStatus, interceptorOptions)
       const headers = await value(this.headers, interceptorOptions)
 
-      if (mode === 'buffered') {
-        const responseMessages: ServerPeerSendMessage[] = []
-        const peer = new ServerPeer(async (message) => {
-          responseMessages.push(message)
-        })
-
-        await runSubrequests(peer)
-        await peer.close()
-
-        if (responseMessages.some(msg => msg.binary !== undefined)) {
-          const chunks: Uint8Array<ArrayBuffer>[] = []
-
-          for (const message of responseMessages) {
-            const encoded = await encodePeerMessage(message)
-            const bytes = typeof encoded === 'string'
-              ? new TextEncoder().encode(encoded)
-              : encoded
-
-            const lengthBuffer = new ArrayBuffer(4)
-            new DataView(lengthBuffer).setUint32(0, bytes.byteLength, false)
-            chunks.push(new Uint8Array(lengthBuffer))
-            chunks.push(bytes)
-          }
-
-          return {
-            matched: true,
-            response: {
-              status,
-              headers,
-              body: new Blob(chunks, { type: BATCH_CONTENT_TYPE }),
-            },
-          }
-        }
-
-        return {
-          matched: true,
-          response: { status, headers, body: responseMessages },
-        }
-      }
-
-      // streaming mode — binary length-prefixed ReadableStream
-      let streamController: ReadableStreamDefaultController<Uint8Array>
+      // Response messages are held here until the batch response starts streaming
+      const bufferedMessages: ServerPeerSendMessage[] = []
+      let streamController: ReadableStreamDefaultController<Uint8Array> | undefined
       let keepAliveTimer: ReturnType<typeof setInterval> | undefined
 
       const clearKeepAlive = () => {
@@ -306,9 +246,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         keepAliveTimer = setInterval(() => {
           try {
             // Zero-length length-prefixed frame = keep-alive (ignored by clients)
-            const lengthBuffer = new ArrayBuffer(4)
-            new DataView(lengthBuffer).setUint32(0, 0, false)
-            streamController.enqueue(new Uint8Array(lengthBuffer))
+            streamController!.enqueue(encodeLengthPrefix(0))
           }
           catch {
             // Stream may already be closed or errored.
@@ -317,38 +255,139 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }, this.keepAliveInterval)
       }
 
-      const peer = new ServerPeer(async (message) => {
-        const encoded = await encodePeerMessage(message)
-        const bytes = typeof encoded === 'string' ? new TextEncoder().encode(encoded) : encoded
-
-        const lengthBuffer = new ArrayBuffer(4)
-        new DataView(lengthBuffer).setUint32(0, bytes.byteLength, false)
-        streamController.enqueue(new Uint8Array(lengthBuffer))
-        streamController.enqueue(bytes)
+      const enqueueMessage = async (message: ServerPeerSendMessage): Promise<void> => {
+        for (const chunk of await encodeFrame(message)) {
+          streamController!.enqueue(chunk)
+        }
         scheduleKeepAlive() // reset idle timer
+      }
+
+      const peer = new ServerPeer(async (message) => {
+        if (streamController === undefined) {
+          bufferedMessages.push(message)
+        }
+        else {
+          await enqueueMessage(message)
+        }
       })
 
-      const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
-        start(controller) {
-          streamController = controller
-          scheduleKeepAlive()
-        },
-        async cancel(reason) {
-          clearKeepAlive()
-          await peer.close(reason)
-        },
-      })
+      const streaming = promiseWithResolvers<{ body: ReadableStream<Uint8Array<ArrayBuffer>>, flushed: Promise<unknown> }>()
+
+      /**
+       * Opens the binary length-prefixed stream that every later message is written to,
+       * starting with the messages buffered so far, which `flushed` waits for.
+       */
+      const startStreaming = () => {
+        if (streamController !== undefined) {
+          return
+        }
+
+        const body = new ReadableStream<Uint8Array<ArrayBuffer>>({
+          start(controller) {
+            streamController = controller
+            scheduleKeepAlive()
+          },
+          async cancel(reason) {
+            clearKeepAlive()
+            await peer.close(reason)
+          },
+        })
+
+        streaming.resolve({ body, flushed: Promise.all(bufferedMessages.splice(0).map(enqueueMessage)) })
+      }
+
+      const handleIndividualRequest = async (request: StandardLazyRequest): Promise<StandardResponse> => {
+        try {
+          request = this.mapSubrequest(request, interceptorOptions)
+          const { matched, response } = await interceptorOptions.next({ ...interceptorOptions, request })
+
+          if (!matched) {
+            return { status: 404, headers: {}, body: 'No procedure matched' }
+          }
+
+          /**
+           * A stream is meant to be read as it arrives and might never end, so buffering it would
+           * hold back the whole batch. Start streaming before the peer sends its first message,
+           * so none of that subresponse is buffered.
+           */
+          if (response.body instanceof ReadableStream || isAsyncIteratorObject(response.body)) {
+            startStreaming()
+          }
+
+          return response
+        }
+        catch (err) {
+          /**
+           * Errors should not occur at the routing interceptor level.
+           * Reject the promise so it can be handled by the unhandledRejection handler
+           * for global logging or error handling.
+           */
+          Promise.reject(err)
+
+          return { status: 500, headers: {}, body: 'Internal server error' }
+        }
+      }
+
+      const runSubrequests = async (): Promise<void> => {
+        const promise = Promise.all(messages.map(msg => peer.message(msg, handleIndividualRequest)))
+        const signal = interceptorOptions.request.signal
+        const closePeer = () => peer.close(signal?.reason)
+
+        if (signal?.aborted) {
+          closePeer()
+        }
+
+        signal?.addEventListener('abort', closePeer)
+
+        try {
+          await promise
+        }
+        finally {
+          signal?.removeEventListener('abort', closePeer)
+        }
+      }
+
+      if (mode === 'streaming') {
+        startStreaming()
+      }
+
+      const subrequests = runSubrequests()
+
+      // Undefined when every subresponse finished before any turned out to be a stream
+      const started = await Promise.race([streaming.promise, subrequests.then(() => undefined)])
+
+      if (started === undefined) {
+        await peer.close()
+
+        if (bufferedMessages.some(msg => msg.binary !== undefined)) {
+          const chunks = (await Promise.all(bufferedMessages.map(encodeFrame))).flat()
+
+          return {
+            matched: true,
+            response: {
+              status,
+              headers,
+              body: new Blob(chunks, { type: BATCH_CONTENT_TYPE }),
+            },
+          }
+        }
+
+        return {
+          matched: true,
+          response: { status, headers, body: bufferedMessages },
+        }
+      }
 
       // DO NOT await here to block streaming response
-      runSubrequests(peer)
+      Promise.all([started.flushed, subrequests])
         .then(async () => {
           clearKeepAlive()
-          streamController.close()
+          streamController!.close()
           await peer.close()
         })
         .catch(async (error) => {
           clearKeepAlive()
-          streamController.error(error)
+          streamController!.error(error)
           await peer.close(error)
         })
 
@@ -357,7 +396,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         response: {
           status,
           headers: { ...headers, 'content-type': BATCH_CONTENT_TYPE },
-          body: stream,
+          body: started.body,
         },
       }
     }

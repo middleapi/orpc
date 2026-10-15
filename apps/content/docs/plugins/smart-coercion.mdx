@@ -52,6 +52,10 @@ const link = new OpenAPILink(contract, {
 ```
 
 :::info
+Both plugins accept `maxBigIntDigits` (default 4300), the maximum digits of a string coerced to `BigInt`.
+:::
+
+:::info
 This plugin relies on [JSON Schema Converters](/docs/openapi/specification#json-schema-converters) to determine how values should be coerced. Configure the appropriate converter for each validation library you use. If a required converter is unavailable, it automatically falls back to [Standard Json Schema](https://standardschema.dev/json-schema) conversion.
 :::
 
@@ -104,6 +108,8 @@ Supports integer strings and whole numbers:
 
 - `'12345678901234567890'` → `12345678901234567890n`
 - `123` → `123n`
+
+Strings longer than `maxBigIntDigits` digits are left unchanged.
 
 ### String → Date
 

@@ -1,5 +1,5 @@
 import type { JsonSchema } from './types'
-import { get, getOwn, isPlainObject, isTypescriptObject, toArray, tryOrUndefined } from '@orpc/shared'
+import { DEFAULT_MAX_BIGINT_DIGITS, get, getOwn, isPlainObject, isTypescriptObject, parseBigIntString, toArray, tryOrUndefined } from '@orpc/shared'
 import { decodeJsonPointerSegment } from './ref-utils'
 import { JsonSchemaXNativeType } from './types'
 
@@ -20,10 +20,14 @@ type Satisfaction = typeof UNSATISFIED | typeof LOOSELY_SATISFIED | typeof SATIS
 
 type CoercionResult = [satisfied: Satisfaction, coerced: unknown]
 
+interface NativeCoerceOptions {
+  maxBigIntDigits: number
+}
+
 interface NativeType {
   types: readonly string[]
   is: (value: unknown) => boolean
-  coerce: (value: unknown) => unknown
+  coerce: (value: unknown, options: NativeCoerceOptions) => unknown
   afterTypeCheck?: boolean
 }
 
@@ -36,8 +40,8 @@ const NATIVE_TYPES = new Map<unknown, NativeType>([
   [JsonSchemaXNativeType.BigInt, {
     types: ['string', 'integer', 'number'],
     is: value => typeof value === 'bigint',
-    coerce: value => typeof value === 'string'
-      ? stringToBigInt(value)
+    coerce: (value, { maxBigIntDigits }) => typeof value === 'string'
+      ? stringToBigInt(value, maxBigIntDigits)
       : typeof value === 'number' ? numberToBigInt(value) : value,
   }],
   [JsonSchemaXNativeType.Url, {
@@ -71,6 +75,14 @@ const MIN_BUDGETED_VALUES = 100
 
 export interface JsonSchemaCoercerOptions {
   /**
+   * Maximum digits, excluding a leading `-`, of a string coerced to `bigint`. Longer strings are left unchanged.
+   * `Number.POSITIVE_INFINITY` disables it.
+   *
+   * @default 4300
+   */
+  maxBigIntDigits?: number | undefined
+
+  /**
    * Maximum number of steps a coercion may take per value in the input, where a step applies one schema to one value.
    * Inputs with fewer than 100 values are budgeted as 100 values.
    *
@@ -80,7 +92,7 @@ export interface JsonSchemaCoercerOptions {
    *
    * @default 1_000
    */
-  maxStepsPerValue?: undefined | number
+  maxStepsPerValue?: number | undefined
 }
 
 interface CoercionContext {
@@ -103,9 +115,13 @@ interface CoercionContext {
 class CoercionBudgetExceededError extends Error {}
 
 export class JsonSchemaCoercer {
+  private readonly nativeCoerceOptions: NativeCoerceOptions
   private readonly maxStepsPerValue: number
 
   constructor(options: JsonSchemaCoercerOptions = {}) {
+    this.nativeCoerceOptions = {
+      maxBigIntDigits: options.maxBigIntDigits ?? DEFAULT_MAX_BIGINT_DIGITS,
+    }
     this.maxStepsPerValue = options.maxStepsPerValue ?? 1_000
   }
 
@@ -248,7 +264,7 @@ export class JsonSchemaCoercer {
       : undefined
 
     if (nativeType && !nativeType.afterTypeCheck) {
-      coerced = nativeType.coerce(coerced)
+      coerced = nativeType.coerce(coerced, this.nativeCoerceOptions)
     }
 
     if (schema.type && !nativeType?.is(coerced)) {
@@ -407,7 +423,7 @@ export class JsonSchemaCoercer {
 
     if (nativeType) {
       if (nativeType.afterTypeCheck) {
-        coerced = nativeType.coerce(coerced)
+        coerced = nativeType.coerce(coerced, this.nativeCoerceOptions)
       }
 
       if (!nativeType.is(coerced)) {
@@ -532,12 +548,8 @@ function stringToInteger(value: string): number | string {
   return num
 }
 
-function stringToBigInt(value: string): bigint | string {
-  if (!INTEGER_PATTERN.test(value)) {
-    return value
-  }
-
-  return BigInt(value)
+function stringToBigInt(value: string, maxDigits: number): bigint | string {
+  return parseBigIntString(value, maxDigits) ?? value
 }
 
 function numberToBigInt(value: number): bigint | number {

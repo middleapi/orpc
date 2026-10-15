@@ -69,6 +69,20 @@ describe('rpcHandler', () => {
     return expect(response!.text()).resolves.toBe('"intercepted"')
   })
 
+  it('rejects an oversized bigint string with 400 before running middleware', async () => {
+    const middleware = vi.fn(({ next }) => next())
+    const handler = new RPCHandler({ ping: os.use(middleware).handler(() => 'pong') })
+
+    const { response } = await handler.handle(new Request('https://example.com/ping', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ json: '9'.repeat(1_000_000), meta: [['bigint']] }),
+    }))
+
+    expect(response?.status).toBe(400)
+    expect(middleware).not.toHaveBeenCalled()
+  })
+
   it('treats GET requests as unmatched by default', async () => {
     const handler = new RPCHandler({
       ping: os.handler(() => 'pong'),
@@ -146,5 +160,32 @@ describe('rpcHandler', () => {
 
     expect(blocked.matched).toBe(false)
     expect(allowMethods).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('rpcHandler lazy router prefix scan', () => {
+  it('scans slash-heavy paths in linear time while a lazy router is still pending', async () => {
+    const ping = os.handler(() => 'pong')
+    const loader = vi.fn(async () => ({ default: { find: ping } }))
+    const handler = new RPCHandler({ ping, planet: os.lazy(loader) })
+
+    // ~16KB request target (accepted by default node:http limits); `%25` forces the normalized second pass
+    const url = `http://localhost/rpc/${'/'.repeat(16_000)}%25`
+
+    // warm up so JIT compilation does not count toward the budget
+    await handler.handle(new Request(`http://localhost/rpc/${'/'.repeat(100)}%25`, { method: 'POST' }), { prefix: '/rpc' })
+
+    const start = performance.now()
+    const result = await handler.handle(new Request(url, { method: 'POST' }), { prefix: '/rpc' })
+    const elapsed = performance.now() - start
+
+    expect(result.matched).toBe(false)
+    expect(loader).not.toHaveBeenCalled()
+    expect(elapsed).toBeLessThan(100) // ~470ms when unbounded, a few ms once bounded
+
+    // lazy routing still works
+    const ok = await handler.handle(new Request('http://localhost/rpc/planet/find', { method: 'POST' }), { prefix: '/rpc' })
+    expect(ok.matched).toBe(true)
+    expect(loader).toHaveBeenCalledTimes(1)
   })
 })
