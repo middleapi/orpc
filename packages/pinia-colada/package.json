@@ -59,8 +59,8 @@
   "devDependencies": {
     "@pinia/colada": "^1.4.8",
     "@vue/test-utils": "^2.5.1",
-    "pinia": "^4.0.2",
-    "vue": "^3.5.43",
-    "zod": "^4.6.5"
+    "pinia": "^4.1.0",
+    "vue": "^3.5.44",
+    "zod": "^4.6.7"
   }
 }

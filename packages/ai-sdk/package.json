@@ -57,7 +57,7 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
-    "ai": "^7.0.70",
-    "zod": "^4.6.5"
+    "ai": "^7.0.140",
+    "zod": "^4.6.7"
   }
 }
