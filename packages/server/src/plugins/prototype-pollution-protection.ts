@@ -4,6 +4,7 @@ import type { Context } from '../context'
 import type { ProcedureClientInterceptor } from '../procedure-client'
 import { ORPCError } from '@orpc/client'
 import { isAsyncIteratorObject, isPlainObject, isTypescriptObject, override, toArray, wrapAsyncIterator } from '@orpc/shared'
+import { ErrorEvent } from '@standard-server/core'
 
 /**
  * Rejects requests whose decoded input contains prototype-polluting keys: an own
@@ -11,7 +12,8 @@ import { isAsyncIteratorObject, isPlainObject, isTypescriptObject, override, toA
  * decoding never assigns through the prototype chain, so this plugin exists to stop such
  * keys from reaching application code that merges, clones, or path-sets input with a
  * library vulnerable to prototype pollution. An `AsyncIteratorObject` input is checked
- * value by value as it arrives, and a polluting value fails that iteration instead.
+ * as it arrives: each value, plus the payload of any error event the client sends in it,
+ * including the error's cause chain. A polluting one fails that iteration instead.
  *
  * @see {@link https://orpc.dev/docs/plugins/prototype-pollution-protection | Prototype Pollution Protection Plugin}
  */
@@ -32,6 +34,9 @@ export class PrototypePollutionProtectionHandlerPlugin<T extends Context> implem
             this.rejectPollutingInput(result.value)
             return result
           },
+          mapError: (error) => {
+            return this.errorChainContainsPollutingKey(error) ? this.createBlockedError() : error
+          },
         }))
 
         return interceptorOptions.next({ ...interceptorOptions, input: guardedInput })
@@ -50,8 +55,38 @@ export class PrototypePollutionProtectionHandlerPlugin<T extends Context> implem
 
   private rejectPollutingInput(input: unknown): void {
     if (this.containsPollutingKey(input)) {
-      throw new ORPCError('BAD_REQUEST', { message: 'Request blocked by prototype pollution protection.' })
+      throw this.createBlockedError()
     }
+  }
+
+  /**
+   * Carries no `cause`, so the rejected payload cannot be reached through the error chain.
+   */
+  private createBlockedError(): ORPCError<'BAD_REQUEST', undefined> {
+    return new ORPCError('BAD_REQUEST', { message: 'Request blocked by prototype pollution protection.' })
+  }
+
+  /**
+   * An error event in an `AsyncIteratorObject` input carries a client-sent payload. The
+   * serializers rethrow it as an `ErrorEvent` or `ORPCError` that keeps the raw event as
+   * `cause`, whose payload may still hold keys the deserializer dropped, so every link of
+   * either type is checked.
+   */
+  private errorChainContainsPollutingKey(error: unknown): boolean {
+    const visited = new WeakSet<object>()
+    let current = error
+
+    while ((current instanceof ErrorEvent || current instanceof ORPCError) && !visited.has(current)) {
+      visited.add(current)
+
+      if (this.containsPollutingKey(current.data)) {
+        return true
+      }
+
+      current = current.cause
+    }
+
+    return false
   }
 
   /**

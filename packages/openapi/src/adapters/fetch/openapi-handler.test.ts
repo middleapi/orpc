@@ -1,6 +1,7 @@
 import type { StandardHandlerPlugin } from '@orpc/server/standard'
-import { createORPCClient } from '@orpc/client'
+import { createORPCClient, ORPCError } from '@orpc/client'
 import { os } from '@orpc/server'
+import { PrototypePollutionProtectionHandlerPlugin } from '@orpc/server/plugins'
 import { openapi } from '../../meta'
 import { OpenAPIHandler } from './openapi-handler'
 import { OpenAPILink } from './openapi-link'
@@ -99,5 +100,34 @@ describe('openapiHandler', () => {
     expect(response).toBeInstanceOf(Response)
     expect(response!.status).toBe(200)
     return expect(response!.text()).resolves.toBe('"intercepted"')
+  })
+
+  it('blocks a polluting error event in an AsyncIteratorObject input with the prototype pollution protection plugin', async () => {
+    const caught: unknown[] = []
+    const handler = new OpenAPIHandler({
+      upload: os.handler(async ({ input }) => {
+        try {
+          for await (const _ of input as AsyncIterable<unknown>) {
+            // consume
+          }
+        }
+        catch (error) {
+          caught.push(error)
+        }
+        return 'done'
+      }),
+    }, { plugins: [new PrototypePollutionProtectionHandlerPlugin()] })
+
+    const { matched } = await handler.handle(new Request('https://api.example.com/upload', {
+      method: 'POST',
+      headers: { 'content-type': 'text/event-stream' },
+      body: 'event: error\ndata: {"__proto__":{"isAdmin":true}}\n\n',
+    }))
+
+    expect(matched).toBe(true)
+    expect(caught).toHaveLength(1)
+    expect(caught[0]).toBeInstanceOf(ORPCError)
+    expect((caught[0] as ORPCError<any, any>).code).toBe('BAD_REQUEST')
+    expect((caught[0] as ORPCError<any, any>).message).toBe('Request blocked by prototype pollution protection.')
   })
 })

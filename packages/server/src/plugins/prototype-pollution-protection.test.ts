@@ -1,5 +1,6 @@
 import type { AsyncIteratorClass } from '@orpc/shared'
 import { ORPCError } from '@orpc/client'
+import { ErrorEvent } from '@standard-server/core'
 import { decodePeerMessage } from '@standard-server/peer'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { RPCHandler as MessagePortRPCHandler } from '../adapters/message-port/rpc-handler'
@@ -187,6 +188,60 @@ describe('prototypePollutionProtectionHandlerPlugin', () => {
       await expect(guarded.next()).rejects.toSatisfy(error =>
         error instanceof ORPCError && error.code === 'BAD_REQUEST')
     })
+
+    describe('error events', () => {
+      async function expectIterationBlocked(thrown: unknown) {
+        async function* input(): AsyncGenerator<unknown> {
+          throw thrown
+        }
+
+        const guarded = await invokeWithIterator(input())
+
+        await expect(guarded.next()).rejects.toSatisfy(error =>
+          error instanceof ORPCError
+          && error.code === 'BAD_REQUEST'
+          && error.message === 'Request blocked by prototype pollution protection.'
+          && error.cause === undefined)
+      }
+
+      it('fails the iteration when an ErrorEvent payload pollutes', async () => {
+        await expectIterationBlocked(new ErrorEvent(JSON.parse('{"__proto__": {}}')))
+      })
+
+      it('fails the iteration when an ORPCError data pollutes', async () => {
+        await expectIterationBlocked(new ORPCError('X', { data: JSON.parse('{"__proto__": {}}') }))
+      })
+
+      it('walks the cause chain of an error event', async () => {
+        await expectIterationBlocked(new ErrorEvent({ reason: 'x' }, { cause: new ErrorEvent(JSON.parse('{"__proto__": {}}')) }))
+      })
+
+      it('tolerates a cyclic cause chain without hanging', async () => {
+        const first = new ErrorEvent({ reason: 'first' })
+        const second = new ErrorEvent({ reason: 'second' }, { cause: first })
+        first.cause = second
+
+        async function* input(): AsyncGenerator<unknown> {
+          throw first
+        }
+
+        const guarded = await invokeWithIterator(input())
+
+        await expect(guarded.next()).rejects.toBe(first)
+      })
+
+      it('rethrows a benign error event unchanged', async () => {
+        const errorEvent = new ErrorEvent({ reason: 'x' })
+
+        async function* input(): AsyncGenerator<unknown> {
+          throw errorEvent
+        }
+
+        const guarded = await invokeWithIterator(input())
+
+        await expect(guarded.next()).rejects.toBe(errorEvent)
+      })
+    })
   })
 
   describe('with an RPCHandler', () => {
@@ -238,6 +293,59 @@ describe('prototypePollutionProtectionHandlerPlugin', () => {
 
       expect(response!.status).toBe(200)
       expect(createPlanet).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('error events in an AsyncIteratorObject input', () => {
+    async function send(body: string) {
+      const caught: unknown[] = []
+      const handler = new RPCHandler({
+        upload: os.handler(async ({ input }) => {
+          try {
+            for await (const _ of input as AsyncIterable<unknown>) {
+              // consume
+            }
+          }
+          catch (error) {
+            caught.push(error)
+          }
+          return 'done'
+        }),
+      }, { plugins: [new PrototypePollutionProtectionHandlerPlugin()] })
+
+      await handler.handle(new Request('https://api.example.com/upload', {
+        method: 'POST',
+        headers: { 'content-type': 'text/event-stream' },
+        body,
+      }))
+
+      expect(caught).toHaveLength(1)
+      return caught[0] as any
+    }
+
+    it.each([
+      ['a plain error event', '{"json":{"__proto__":{"isAdmin":true}}}'],
+      ['an ORPCError-shaped error event', '{"json":{"defined":true,"code":"X","message":"m","data":{"__proto__":{"isAdmin":true}}}}'],
+      ['a constructor.prototype pair', '{"json":{"settings":{"constructor":{"prototype":{"isAdmin":true}}}}}'],
+      ['a polluting key kept only on the raw event in `cause`', '{"json":{"reason":"x"},"__proto__":{"isAdmin":true}}'],
+    ])('blocks %s', async (_label, data) => {
+      const error = await send(`event: error\ndata: ${data}\n\n`)
+
+      expect(error).toBeInstanceOf(ORPCError)
+      expect(error.code).toBe('BAD_REQUEST')
+      expect(error.message).toBe('Request blocked by prototype pollution protection.')
+      expect(error.cause).toBeUndefined()
+    })
+
+    it('passes benign error events through unchanged', async () => {
+      const orpcError = await send('event: error\ndata: {"json":{"defined":false,"code":"CLIENT_ABORTED","message":"m","data":{"reason":"user"}}}\n\n')
+      expect(orpcError).toBeInstanceOf(ORPCError)
+      expect(orpcError.code).toBe('CLIENT_ABORTED')
+      expect(orpcError.data).toEqual({ reason: 'user' })
+
+      const plain = await send('event: error\ndata: {"json":{"reason":"aborted"}}\n\n')
+      expect(plain).not.toBeInstanceOf(ORPCError)
+      expect(plain.data).toEqual({ reason: 'aborted' })
     })
   })
 
