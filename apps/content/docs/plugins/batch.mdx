@@ -60,7 +60,7 @@ const cors = new CORSHandlerPlugin({
 
 By default, the plugin uses `streaming` mode. Responses are sent as soon as they are ready, so one slow request does not block the rest of the batch.
 
-If your environment does not support streaming responses, such as some serverless platforms or older browsers, switch to `buffered` mode instead. In this mode, all responses are collected and sent together.
+If your environment does not support streaming responses, such as some serverless platforms or older browsers, switch to `buffered` mode instead. In this mode, all responses are collected and sent together, unless a procedure returns an [AsyncIteratorObject](/docs/async-iterator-object) or a [`ReadableStream`](/docs/binary-data). Such a stream can stay open indefinitely, so the batch switches to streaming as soon as one is returned: the server writes out the responses collected so far, then sends the rest as they are ready. If your client cannot read streamed responses, keep these procedures out of the batch with [`filter`](#filtering-requests).
 
 ```ts
 const link = new RPCLink({
@@ -78,10 +78,6 @@ const link = new RPCLink({
   ],
 })
 ```
-
-:::info
-A procedure that returns an [AsyncIteratorObject](/docs/async-iterator-object) or a [`ReadableStream`](/docs/binary-data) can stay open indefinitely, so buffering it would hold back the whole batch. Once a procedure in a `buffered` batch returns one, the batch switches to streaming: the server writes out the responses collected so far, then sends the rest as they are ready.
-:::
 
 ### Keep-Alive Timer
 

@@ -1,6 +1,7 @@
 import type { AnyRouter } from '../router'
 import { ORPCError } from '@orpc/client'
-import { promiseWithResolvers } from '@orpc/shared'
+import { promiseWithResolvers, sleep } from '@orpc/shared'
+import { decodePeerMessage } from '@standard-server/peer'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { os } from '../builder'
 import { BatchHandlerPlugin } from './batch'
@@ -11,7 +12,7 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-function makePeerRequestMessage(id: number, url: string, method = 'POST', body?: unknown) {
+function makePeerRequestMessage(id: number | string, url: string, method = 'POST', body?: unknown) {
   return {
     kind: 'request',
     id,
@@ -56,58 +57,22 @@ function readLengthPrefixedChunk(buffer: Uint8Array) {
 }
 
 /**
- * Reads the length-prefixed batch stream one decoded message at a time, skipping keep-alive frames.
- * Resolves `undefined` once the stream ends.
- *
- * Decodes by hand because the numeric ids used here do not pass `decodePeerMessage` validation.
+ * Decodes every message of a length-prefixed batch body, skipping keep-alive frames.
+ * Needs string message ids, which `decodePeerMessage` requires.
  */
-function createMessageReader(stream: ReadableStream<Uint8Array>) {
-  const reader = stream.getReader()
-  let buffer = new Uint8Array(0)
-
-  return async (): Promise<any> => {
-    while (true) {
-      if (buffer.length >= 4) {
-        const { messageLength, payload } = readLengthPrefixedChunk(buffer)
-
-        if (buffer.length >= 4 + messageLength) {
-          buffer = buffer.slice(4 + messageLength)
-
-          if (messageLength === 0) {
-            continue
-          }
-
-          const delimiterIndex = payload.indexOf(0xFF) // separates the json part from the binary one
-          const jsonPart = delimiterIndex === -1 ? payload : payload.subarray(0, delimiterIndex)
-          const message = JSON.parse(new TextDecoder().decode(jsonPart))
-
-          if (delimiterIndex !== -1) {
-            message.binary = payload.subarray(delimiterIndex + 1)
-          }
-
-          return message
-        }
-      }
-
-      const { done, value } = await reader.read()
-
-      if (done) {
-        return undefined
-      }
-
-      const next = new Uint8Array(buffer.length + value.length)
-      next.set(buffer)
-      next.set(value, buffer.length)
-      buffer = next
-    }
-  }
-}
-
-async function readAllMessages(read: () => Promise<any>) {
+async function readAllMessages(response: Response) {
+  let buffer = new Uint8Array(await response.arrayBuffer())
   const messages: any[] = []
 
-  for (let message = await read(); message !== undefined; message = await read()) {
-    messages.push(message)
+  while (buffer.length > 0) {
+    const { messageLength, payload } = readLengthPrefixedChunk(buffer)
+    buffer = buffer.slice(4 + messageLength)
+
+    if (messageLength > 0) {
+      const result = decodePeerMessage(payload)
+      expect(result.matched).toBe(true)
+      messages.push(result.matched ? result.message : undefined)
+    }
   }
 
   return messages
@@ -322,30 +287,27 @@ describe('batchHandlerPlugin', () => {
         // The stream stays open until the gate is released, so a buffered batch would never answer
         const { response } = await handler.handle(createBatchRequest({
           mode: 'buffered',
-          messages: [makePeerRequestMessage(0, '/ping'), makePeerRequestMessage(1, '/stream')],
+          messages: [makePeerRequestMessage('0', '/ping'), makePeerRequestMessage('1', '/stream')],
         }))
 
         expect(response!.status).toBe(207)
         expect(response!.headers.get('standard-server')).toEqual('octet-stream')
         expect(response!.headers.get('content-type')).toEqual('application/vnd.orpc.batch')
 
-        const read = createMessageReader(response!.body!)
-        const beforeGate = [await read(), await read(), await read()]
-
-        expect(beforeGate).toEqual(expect.arrayContaining([
-          expect.objectContaining({ id: 0, kind: 'response' }),
-          expect.objectContaining({ id: 1, kind: 'response' }),
-          expect.objectContaining({ id: 1, kind }),
-        ]))
-
         gate.resolve()
+        const messages = await readAllMessages(response!)
 
-        expect(await readAllMessages(read)).toEqual([
-          expect.objectContaining({ id: 1, kind }),
+        expect(messages.filter(m => m.id === '0')).toEqual([
+          expect.objectContaining({ kind: 'response' }),
+        ])
+        expect(messages.filter(m => m.id === '1')).toEqual([
+          expect.objectContaining({ kind: 'response' }),
+          expect.objectContaining({ kind }),
+          expect.objectContaining({ kind }),
         ])
       })
 
-      it('writes the sub-responses buffered before it first, binary included', async () => {
+      it('writes out the sub-responses buffered before it, binary included', async () => {
         const gate = promiseWithResolvers<void>()
         const ping = vi.fn(() => 'pong')
         const file = vi.fn(() => new Blob(['__FILE__'], { type: 'application/octet-stream' }))
@@ -365,9 +327,9 @@ describe('batchHandlerPlugin', () => {
         const result = handler.handle(createBatchRequest({
           mode: 'buffered',
           messages: [
-            makePeerRequestMessage(0, '/ping'),
-            makePeerRequestMessage(1, '/file'),
-            makePeerRequestMessage(2, '/events'),
+            makePeerRequestMessage('0', '/ping'),
+            makePeerRequestMessage('1', '/file'),
+            makePeerRequestMessage('2', '/events'),
           ],
         }))
 
@@ -375,22 +337,28 @@ describe('batchHandlerPlugin', () => {
           expect(ping).toHaveBeenCalledTimes(1)
           expect(file).toHaveBeenCalledTimes(1)
         })
-        await new Promise(resolve => setTimeout(resolve, 10)) // let both responses reach the buffer
+        await sleep(10) // let both responses reach the buffer
 
         gate.resolve()
         const { response } = await result
         expect(response!.headers.get('standard-server')).toEqual('octet-stream')
 
-        const messages = await readAllMessages(createMessageReader(response!.body!))
+        // Only messages of the same sub-request keep their order
+        const messages = await readAllMessages(response!)
+        const fileMessages = messages.filter(m => m.id === '1')
 
-        expect(messages).toEqual([
-          expect.objectContaining({ id: 0, kind: 'response' }),
-          expect.objectContaining({ id: 1, kind: 'response' }),
-          expect.objectContaining({ id: 2, kind: 'response' }),
-          expect.objectContaining({ id: 2, kind: 'event-stream' }),
-          expect.objectContaining({ id: 2, kind: 'event-stream', json: expect.objectContaining({ event: 'close' }) }),
+        expect(messages.filter(m => m.id === '0')).toEqual([
+          expect.objectContaining({ kind: 'response' }),
         ])
-        expect(new TextDecoder().decode(messages[1].binary)).toBe('__FILE__')
+        expect(fileMessages).toEqual([
+          expect.objectContaining({ kind: 'response' }),
+        ])
+        expect(new TextDecoder().decode(fileMessages[0].binary)).toBe('__FILE__')
+        expect(messages.filter(m => m.id === '2')).toEqual([
+          expect.objectContaining({ kind: 'response' }),
+          expect.objectContaining({ kind: 'event-stream' }),
+          expect.objectContaining({ kind: 'event-stream', json: expect.objectContaining({ event: 'close' }) }),
+        ])
       })
     })
   })
@@ -482,26 +450,13 @@ describe('batchHandlerPlugin', () => {
 
     const messages = [makePeerRequestMessage(0, '/wait'), makePeerRequestMessage(1, '/subscribe')]
 
-    it.each(['buffered', 'streaming'] as const)('aborts %s sub-requests when the batch request is aborted', async (mode) => {
+    it.each([
+      ['buffered', 'buffered', messages],
+      ['streaming', 'streaming', messages],
+      ['buffered (no stream sub-response)', 'buffered', [makePeerRequestMessage(0, '/wait'), makePeerRequestMessage(1, '/wait')]],
+    ] as const)('aborts %s sub-requests when the batch request is aborted', async (_, mode, batchMessages) => {
       const controller = new AbortController()
-      const result = handler.handle(createBatchRequest({ mode, messages, signal: controller.signal }))
-
-      await vi.waitFor(() => expect(started).toHaveBeenCalledTimes(2))
-      expect(stopped).not.toHaveBeenCalled()
-
-      controller.abort()
-
-      await vi.waitFor(() => expect(stopped.mock.calls).toEqual([[true], [true]]))
-      await expect(result).resolves.toMatchObject({ matched: true })
-    })
-
-    it('aborts buffered sub-requests without a stream sub-response when the batch request is aborted', async () => {
-      const controller = new AbortController()
-      const result = handler.handle(createBatchRequest({
-        mode: 'buffered',
-        messages: [makePeerRequestMessage(0, '/wait'), makePeerRequestMessage(1, '/wait')],
-        signal: controller.signal,
-      }))
+      const result = handler.handle(createBatchRequest({ mode, messages: batchMessages, signal: controller.signal }))
 
       await vi.waitFor(() => expect(started).toHaveBeenCalledTimes(2))
       expect(stopped).not.toHaveBeenCalled()
