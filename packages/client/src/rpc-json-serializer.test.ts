@@ -606,6 +606,17 @@ describe('rpcJsonSerializer: meta cannot descend into restored values', () => {
       .toThrow('Invalid RPC serialized data: segment "json" cannot be walked into.')
   })
 
+  it('rejects descent when entries share a path prefix with earlier ones', () => {
+    const json = { p: { name: 'http://evil/', age: 1, at: null }, q: '2020-01-01T00:00:00.000Z' }
+
+    expect(() => serializer.deserialize({ json, meta: [['date', 'p', 'at'], ['human', 'p'], ['url', 'p', 'name']] }))
+      .toThrow('Invalid RPC serialized data: segment "p" cannot be walked into.')
+    expect(() => serializer.deserialize({ json, meta: [['human', 'p'], ['date', 'q'], ['url', 'p', 'name']] }))
+      .toThrow('Invalid RPC serialized data: segment "p" cannot be walked into.')
+    expect(() => serializer.deserialize({ json: { a: { b: { name: '1', c: null } } }, meta: [['date', 'a', 'b', 'c'], ['identity', 'a', 'b'], ['bigint', 'a', 'b', 'name']] }))
+      .toThrow('Invalid RPC serialized data: segment "b" cannot be walked into.')
+  })
+
   it('treats numeric and string segments as the same position', () => {
     expect(() => serializer.deserialize({ json: [{ name: '123', age: 1 }], meta: [['human', 0], ['bigint', '0', 'name']] }))
       .toThrow('Invalid RPC serialized data: segment "0" cannot be walked into.')
@@ -618,14 +629,15 @@ describe('rpcJsonSerializer: meta cannot descend into restored values', () => {
       .toThrow('Invalid RPC serialized data: segment "l" cannot be walked into.')
   })
 
-  it('rejects descent into non-JSON values', () => {
+  it('rejects descent into a non-JSON value the handler returned as is', () => {
     // structured clone transports (e.g. MessagePort with experimental_transfer) can deliver non-JSON values
     const bytes = new Uint8Array([1])
 
     expect(() => serializer.deserialize({ json: { b: bytes }, meta: [['bytes', 'b'], ['double', 'b', 0]] }))
       .toThrow('Invalid RPC serialized data: segment "b" cannot be walked into.')
-    expect(() => serializer.deserialize({ json: { b: bytes }, meta: [['double', 'b', 0]] }))
-      .toThrow('Invalid RPC serialized data: segment "b" cannot be walked into.')
+    // structured clone also keeps shared references, so the same value can sit at another path
+    expect(() => serializer.deserialize({ json: { b: bytes, c: bytes }, meta: [['bytes', 'b'], ['double', 'c', 0]] }))
+      .toThrow('Invalid RPC serialized data: segment "c" cannot be walked into.')
     expect(bytes[0]).toBe(1)
   })
 
@@ -743,23 +755,11 @@ describe('rpcJsonSerializer: meta entries sharing a path prefix', () => {
     return value
   }
 
-  it('rejects descent into a value restored after a sibling entry walked through it', () => {
-    expect(() => serializer.deserialize({
-      json: { p: { name: 'http://evil/', age: 1, born: '2020-01-01T00:00:00.000Z' } },
-      meta: [['date', 'p', 'born'], ['human', 'p'], ['url', 'p', 'name']],
-    })).toThrow('Invalid RPC serialized data: segment "p" cannot be walked into.')
-
+  it('rejects descent into a value a handler restored after an earlier entry walked through it', () => {
     expect(() => serializer.deserialize({
       json: { p: { x: '1', name: '2' } },
       meta: [['bigint', 'p', 'x'], ['identity', 'p'], ['bigint', 'p', 'name']],
     })).toThrow('Invalid RPC serialized data: segment "p" cannot be walked into.')
-  })
-
-  it('rejects descent into a restored value below a shared prefix', () => {
-    expect(() => serializer.deserialize({
-      json: { a: { b: { c: { x: '1', y: '2' } } } },
-      meta: [['bigint', 'a', 'b', 'c', 'x'], ['identity', 'a', 'b'], ['bigint', 'a', 'b', 'c', 'y']],
-    })).toThrow('Invalid RPC serialized data: segment "b" cannot be walked into.')
 
     expect(() => serializer.deserialize({
       json: { a: { x: '1', p: { name: '2' } } },
@@ -779,7 +779,7 @@ describe('rpcJsonSerializer: meta entries sharing a path prefix', () => {
     })).toThrow('Invalid RPC serialized data: segment "json" cannot be walked into.')
   })
 
-  it('treats numeric and string segments as the same position', () => {
+  it('treats numeric and string segments as the same position after an earlier entry', () => {
     expect(() => serializer.deserialize({
       json: [{ x: '1', name: '2' }],
       meta: [['bigint', 0, 'x'], ['identity', '0'], ['bigint', 0, 'name']],

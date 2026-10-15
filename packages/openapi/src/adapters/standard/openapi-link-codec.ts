@@ -238,6 +238,10 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       throw new TypeError(`Path param "${param.parameterName}" cannot contain "." or ".." segments in call to procedure (${path.join('.')}).`)
     }
 
+    if (encoded.startsWith('/')) {
+      encoded = `%2F${encoded.slice(1)}`
+    }
+
     return encoded
   }
 

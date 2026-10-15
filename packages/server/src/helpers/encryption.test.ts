@@ -94,3 +94,21 @@ describe('encrypt/decrypt', () => {
     }
   })
 })
+
+describe('decrypt canonical form', () => {
+  it('accepts only the canonical ciphertext string', async () => {
+    const secret = 'test-secret-key'
+    // 16 salt + 12 iv + 8 data + 16 tag = 52 bytes -> 70 chars; last char carries 4 unused bits
+    const encrypted = await encrypt('user1234', secret)
+    expect(encrypted).toHaveLength(70)
+    expect(await decrypt(encrypted, secret)).toBe('user1234')
+
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+    const last = alphabet.indexOf(encrypted.at(-1)!)
+    for (let flip = 1; flip < 16; flip++) {
+      expect(await decrypt(encrypted.slice(0, -1) + alphabet[last ^ flip], secret)).toBeUndefined()
+    }
+    expect(await decrypt(`${encrypted}=`, secret)).toBeUndefined()
+    expect(await decrypt(`${encrypted}==`, secret)).toBeUndefined()
+  })
+})

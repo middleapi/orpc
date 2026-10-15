@@ -30,7 +30,8 @@ export function encodeBase64url(data: Uint8Array): string {
 
 /**
  * Decodes a base64url string to Uint8Array
- * Returns undefined if the input is invalid
+ * Only accepts canonical, unpadded base64url (the form produced by `encodeBase64url`),
+ * returns undefined for anything else, including padded or standard base64 input
  *
  * @example
  * ```ts
@@ -61,7 +62,7 @@ export function decodeBase64url(base64url: string | undefined | null): Uint8Arra
       bytes[i] = binaryString.charCodeAt(i)
     }
 
-    return bytes
+    return encodeBase64url(bytes) === base64url ? bytes : undefined
   }
   catch {
     return undefined

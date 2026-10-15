@@ -630,7 +630,7 @@ describe('openAPILinkCodec', () => {
           )
         }
 
-        for (const rest of ['.', '..', './a', '../a', 'a/.', 'a/..', 'a/./b', 'a/../../admin']) {
+        for (const rest of ['.', '..', './a', '../a', 'a/.', 'a/..', 'a/./b', 'a/../../admin', '/../a']) {
           await expect(codec.encodeInput({ ...valid, rest }, ['item'], { context: {} })).rejects.toThrow(
             'Path param "rest" cannot contain "." or ".." segments in call to procedure (item).',
           )
@@ -647,6 +647,30 @@ describe('openAPILinkCodec', () => {
         const request = await codec.encodeInput({ id: '...', rest: '.well-known/a..b/v1.2/.../%2e%2e' }, ['item'], { context: {} })
 
         expect(request.url).toBe('/api/items/.../.well-known/a..b/v1.2/.../%252e%252e')
+      })
+
+      it('encodes a leading slash in catch-all path params so the url is never protocol-relative', async () => {
+        const rootCodec = new OpenAPILinkCodec({
+          file: oc.meta(openapi({
+            path: '/{+path}',
+          })),
+        }, { serializer })
+
+        for (const [path, url] of [['/evil.example/x', '/%2Fevil.example/x'], ['//evil.example/x', '/%2F/evil.example/x']]) {
+          const request = await rootCodec.encodeInput({ path }, ['file'], { context: {} })
+
+          expect(request.url).toBe(url)
+        }
+
+        const nestedCodec = new OpenAPILinkCodec({
+          item: oc.meta(openapi({
+            path: '/items/{id}/{+rest}',
+          })),
+        }, { url: '/api', serializer })
+
+        const request = await nestedCodec.encodeInput({ id: 'a', rest: '/x' }, ['item'], { context: {} })
+
+        expect(request.url).toBe('/api/items/a/%2Fx')
       })
     })
 

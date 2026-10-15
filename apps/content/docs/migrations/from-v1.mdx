@@ -769,7 +769,7 @@ When serving binary data cross-origin, allow and expose both the `Content-Dispos
 
 ### CORS allows any origin by default
 
-In v1, `CORSPlugin` reflected the request origin by default. In v2, `CORSHandlerPlugin` defaults `origin` to `*`, which browsers reject for [credentialed requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS#requests_with_credentials). If you rely on `credentials`, restore the v1 behavior or list your allowed origins explicitly. The `origin` and `timingOrigin` functions can now also be async. See [CORS](/docs/plugins/cors).
+In v1, `CORSPlugin` reflected the request origin by default. In v2, `CORSHandlerPlugin` defaults `origin` to `*`, which browsers reject for [credentialed requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS#requests_with_credentials). If you rely on `credentials`, list the origins allowed to send credentials. The `origin` and `timingOrigin` functions can now also be async. See [CORS](/docs/plugins/cors).
 
 <CodeGroup>
 
@@ -777,7 +777,7 @@ In v1, `CORSPlugin` reflected the request origin by default. In v2, `CORSHandler
 const handler = new RPCHandler(router, {
   plugins: [
     new CORSHandlerPlugin({
-      origin: origin => origin, // restore the v1 default
+      origin: ['https://app.example.com'],
       credentials: true,
     }),
   ],

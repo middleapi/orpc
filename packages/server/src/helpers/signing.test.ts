@@ -1,3 +1,4 @@
+import { getCookie } from './cookie'
 import { getSignedValue, sign, unsign } from './signing'
 
 describe('signing', () => {
@@ -270,5 +271,29 @@ describe('signing', () => {
         expect(await unsign(fixture.signed, fixture.secret)).toBe(fixture.value)
       }
     })
+  })
+})
+
+describe('unsign canonical form', () => {
+  it('accepts only the canonical signature string', async () => {
+    const secret = 'my-secret-key'
+    const signed = await sign('user123', secret)
+    expect(signed).toBe('user123.oneQsU0r5dvwQFHFEjjV1uOI_IR3gZfkYHij3TRauVA')
+    expect(await unsign(signed, secret)).toBe('user123')
+
+    const variants = [
+      'user123.oneQsU0r5dvwQFHFEjjV1uOI_IR3gZfkYHij3TRauVB', // non-zero unused bits
+      'user123.oneQsU0r5dvwQFHFEjjV1uOI_IR3gZfkYHij3TRauVC',
+      'user123.oneQsU0r5dvwQFHFEjjV1uOI_IR3gZfkYHij3TRauVD',
+      'user123.oneQsU0r5dvwQFHFEjjV1uOI_IR3gZfkYHij3TRauVA=', // padding
+      'user123.oneQsU0r5dvwQFHFEjjV1uOI/IR3gZfkYHij3TRauVA', // standard-base64 char
+      'user123.oneQsU0r5dvw\nQFHFEjjV1uOI_IR3gZfkYHij3TRauVA', // whitespace
+      // percent-encoded whitespace becomes a real space after getCookie
+      getCookie(new Headers({ cookie: 'sid=user123.oneQsU0r5dvw%20QFHFEjjV1uOI_IR3gZfkYHij3TRauVA' }), 'sid'),
+    ]
+
+    for (const variant of variants) {
+      expect(await unsign(variant, secret), JSON.stringify(variant)).toBeUndefined()
+    }
   })
 })

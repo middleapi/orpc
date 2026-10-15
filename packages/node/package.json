@@ -51,7 +51,7 @@
     "@standard-server/core": "~0.10.3",
     "@standard-server/fetch": "~0.10.3",
     "@standard-server/node": "~0.10.3",
-    "mime": "^4.1.0"
+    "mime": "^4.1.1"
   },
   "devDependencies": {
     "@orpc/client": "workspace:*",

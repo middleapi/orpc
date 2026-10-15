@@ -34,29 +34,10 @@ function assertSerializedType(ok: boolean, type: string, expected: string): void
   }
 }
 
-/**
- * Paths only walk through arrays and plain objects, the containers JSON is made of.
- */
 function isWalkable(value: unknown): boolean {
-  if (typeof value !== 'object' || value === null) {
-    return false
-  }
-
-  if (Array.isArray(value)) {
-    return true
-  }
-
-  // Unlike `isPlainObject`, avoids reading `constructor` from every class prototype on this hot path
-  const proto = Object.getPrototypeOf(value)
-  return proto === Object.prototype || proto === null || Object.getPrototypeOf(proto) === null
+  return Array.isArray(value) || isPlainObject(value)
 }
 
-/**
- * Returns `parent[key]` for a path to walk through, copying it first while it is still the original value.
- *
- * A path must never walk through a value a handler returned, or a later entry could mutate it
- * after the handler validated it. `serialize` emits children before parents, so its payloads never do.
- */
 function walkInto(parent: any, key: Segment, original: unknown, restored?: Set<unknown>): any {
   const value = parent[key]
 
