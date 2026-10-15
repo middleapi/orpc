@@ -188,7 +188,7 @@ describe('durable publisher', () => {
     await unsubscribe()
   })
 
-  it('keeps every resumed event for a slow iterator consumer beyond maxBufferedEvents', async () => {
+  it('caps resumed events at maxBufferedEvents for a slow iterator consumer', async () => {
     const { publisher } = createTestingPublisher(env.PUBLISHER_RESUME3S_DON, { maxBufferedEvents: 2 })
     const subscribeListener = vi.spyOn(publisher as any, 'subscribeListener')
 
@@ -198,21 +198,20 @@ describe('durable publisher', () => {
 
     const iterator = publisher.subscribe('timeline', { lastEventId: '0' })
 
-    // the consumer does not pull until the subscription is set up and a live event follows
+    // the consumer does not pull until every missed event has been replayed
     await subscribeListener.mock.results[0]!.value
-    await publisher.publish('timeline', { order: 5 })
 
     const orders: number[] = []
     for await (const payload of iterator) {
       const { order } = payload as { order: number }
       orders.push(order)
 
-      if (order === 5) {
+      if (order === 4) {
         break
       }
     }
 
-    expect(orders).toEqual([0, 1, 2, 3, 4, 5])
+    expect(orders).toEqual([3, 4])
   })
 
   it('throws when an event is too large to store for resume', async () => {

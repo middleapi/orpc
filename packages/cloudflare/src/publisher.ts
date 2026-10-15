@@ -93,8 +93,8 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
       })
     }
 
-    // The Durable Object sends missed events first and their count in this header, and
-    // `Publisher.subscribe` expects them all to reach the listener before this resolves
+    // The Durable Object sends missed events first and their count in this header,
+    // so wait for them all to reach the listener before this resolves
     const replayedEvents = Number(response.headers.get('orpc-replayed-events'))
     let pendingReplayedEvents = Number.isInteger(replayedEvents) && replayedEvents > 0 ? replayedEvents : 0
     const replayed = promiseWithResolvers<void>()
