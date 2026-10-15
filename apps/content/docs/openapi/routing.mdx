@@ -47,8 +47,6 @@ const getFile = os
 
 A path can have only one `{+name}`, but more segments can follow it, as in `/files/{+path}/raw`.
 
-[OpenAPILink](/docs/openapi/link) sends a leading `/` in a `{+name}` value as `%2F`, so the URL never starts with `//` (which a browser would send to another host), and [OpenAPIHandler](/docs/openapi/handler) decodes it back to `/`.
-
 :::info
 To customize path parameter encoding and decoding, see [Path Parameter Styles](/docs/openapi/input-and-output-mapping#path-parameter-styles).
 :::
