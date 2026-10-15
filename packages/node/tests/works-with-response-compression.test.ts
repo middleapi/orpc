@@ -29,7 +29,7 @@ it('works with the response compression plugin', async ({ onTestFinished }) => {
 
   const handler = new RPCHandler({}, {
     plugins: [
-      new StaticFileHandlerPlugin({ rootDir, compression: {} }),
+      new StaticFileHandlerPlugin({ rootDir, precompressed: true }),
       new ResponseCompressionHandlerPlugin({ threshold: 1024 }),
     ],
   })

@@ -69,12 +69,20 @@ const handler = new RPCHandler(router, {
       dotfiles: false,
 
       /**
-       * Serves compressible files in an encoding the client accepts.
-       * See Compression below.
+       * Whether precompressed `.br`, `.zst`, and `.gz` sidecar files can be served
+       * when the client accepts their encoding.
        *
-       * @default undefined
+       * @default false
        */
-      compression: undefined,
+      precompressed: false,
+
+      /**
+       * Compresses files without a sidecar on their first request and stores
+       * the copies on disk. See Compression below.
+       *
+       * @default undefined (disabled)
+       */
+      compressionCache: undefined,
 
       /**
        * Whether symbolic links whose target lies outside `rootDir` can be served.
@@ -107,39 +115,30 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 
 ## Compression
 
-Set `compression` to serve compressible files in an encoding the client accepts. Precompressed sidecars such as `app.js.br` are served first, and setting `cacheDir` compresses the rest on their first request.
+Set `compressionCache` to compress compressible files the first time a client accepts an encoding, and serve every later request from the stored copy. When `precompressed` is also set, existing sidecars such as `app.js.br` win.
 
 ```ts
 const handler = new RPCHandler(router, {
   plugins: [
     new StaticFileHandlerPlugin({
       rootDir: './public',
-      compression: {
+      compressionCache: {
         /**
-         * Encodings to serve, in order of preference.
+         * The directory compressed copies are stored in.
+         */
+        dir: './.cache/static-file',
+
+        /**
+         * Encodings to compress into, in order of preference.
          * Supported values: 'br' | 'zstd' | 'gzip'
+         * `zstd` requires Node.js 22.15 or later.
          *
          * @default ['br', 'zstd', 'gzip']
          */
         encodings: ['br', 'zstd', 'gzip'],
 
         /**
-         * Whether sidecar files such as `app.js.br` are served.
-         *
-         * @default true
-         */
-        precompressed: true,
-
-        /**
-         * Where files without a sidecar are compressed to, once per encoding.
-         * `zstd` requires Node.js 22.15 or later.
-         *
-         * @default undefined
-         */
-        cacheDir: './.cache/static-file',
-
-        /**
-         * The minimum file size in bytes to compress into `cacheDir`.
+         * The minimum file size in bytes to compress.
          *
          * @default 1024 (1KB)
          */
@@ -151,7 +150,7 @@ const handler = new RPCHandler(router, {
 ```
 
 :::warning
-Use a `cacheDir` outside `rootDir` that nothing else writes to. It is safe to clear at any time.
+Use a `dir` outside `rootDir` that nothing else writes to. It is safe to clear at any time.
 :::
 
 To compress on every request instead, add the [Response Compression Plugin](/docs/plugins/response-compression). It leaves encoded files and range responses alone.
@@ -161,7 +160,7 @@ import { ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 
 const handler = new RPCHandler(router, {
   plugins: [
-    new StaticFileHandlerPlugin({ rootDir: './public', compression: {} }),
+    new StaticFileHandlerPlugin({ rootDir: './public', precompressed: true }),
     new ResponseCompressionHandlerPlugin(),
   ],
 })

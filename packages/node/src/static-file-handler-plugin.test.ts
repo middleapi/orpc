@@ -674,7 +674,7 @@ describe('staticFileHandlerPlugin', () => {
       symlinkSync(path.join(baseDir, 'evil.gz'), path.join(rootDir, 'sidecar.txt.gz'))
       onTestFinished(() => rmSync(path.join(rootDir, 'sidecar.txt.gz'), { force: true }))
 
-      const res = await createStaticAgent({ compression: {} }).get('/sidecar.txt').set('accept-encoding', 'gzip')
+      const res = await createStaticAgent({ precompressed: true }).get('/sidecar.txt').set('accept-encoding', 'gzip')
 
       expect(res.status).toBe(200)
       expect(res.headers['content-encoding']).toBeUndefined()
@@ -789,7 +789,7 @@ describe('staticFileHandlerPlugin', () => {
 
   describe('precompressed', () => {
     it('serves the precompressed variant when the client accepts its encoding', async () => {
-      const res = await createStaticAgent({ compression: {} })
+      const res = await createStaticAgent({ precompressed: true })
         .get('/compressed.txt')
         .set('accept-encoding', 'gzip')
 
@@ -801,7 +801,7 @@ describe('staticFileHandlerPlugin', () => {
     })
 
     it('prefers brotli over gzip', async () => {
-      const res = await createStaticAgent({ compression: {} })
+      const res = await createStaticAgent({ precompressed: true })
         .get('/compressed.txt')
         .set('accept-encoding', 'gzip;q=0.8, br;q=0.9')
 
@@ -811,7 +811,7 @@ describe('staticFileHandlerPlugin', () => {
     })
 
     it('serves the identity variant with vary when no encoding is accepted', async () => {
-      const res = await createStaticAgent({ compression: {} })
+      const res = await createStaticAgent({ precompressed: true })
         .get('/compressed.txt')
         .set('accept-encoding', 'identity')
 
@@ -832,7 +832,7 @@ describe('staticFileHandlerPlugin', () => {
     })
 
     it('honors accept-encoding q-values', async () => {
-      const agent = createStaticAgent({ compression: {} })
+      const agent = createStaticAgent({ precompressed: true })
 
       const rejectedRes = await agent.get('/compressed.txt').set('accept-encoding', 'gzip;q=0')
       expect(rejectedRes.headers['content-encoding']).toBeUndefined()
@@ -847,7 +847,7 @@ describe('staticFileHandlerPlugin', () => {
     })
 
     it('lets an explicit q-value take precedence over the wildcard', async () => {
-      const agent = createStaticAgent({ compression: {} })
+      const agent = createStaticAgent({ precompressed: true })
 
       const rejectedRes = await agent.get('/compressed.txt').set('accept-encoding', 'br;q=0, *')
       expect(rejectedRes.headers['content-encoding']).toBe('gzip')
@@ -858,7 +858,7 @@ describe('staticFileHandlerPlugin', () => {
     })
 
     it('skips accepted encodings that have no sidecar file', async () => {
-      const res = await createStaticAgent({ compression: {} })
+      const res = await createStaticAgent({ precompressed: true })
         .get('/compressed.txt')
         .set('accept-encoding', 'zstd, gzip')
 
@@ -869,7 +869,7 @@ describe('staticFileHandlerPlugin', () => {
     })
 
     it('skips a sidecar path that is not a file', async () => {
-      const res = await createStaticAgent({ compression: {} })
+      const res = await createStaticAgent({ precompressed: true })
         .get('/dir-sidecar.txt')
         .set('accept-encoding', 'br')
 
@@ -879,7 +879,7 @@ describe('staticFileHandlerPlugin', () => {
     })
 
     it('omits content-encoding from a 304', async () => {
-      const agent = createStaticAgent({ compression: {} })
+      const agent = createStaticAgent({ precompressed: true })
       const etag = (await agent.get('/compressed.txt').set('accept-encoding', 'gzip')).headers.etag!
 
       const res = await agent.get('/compressed.txt').set('accept-encoding', 'gzip').set('if-none-match', etag)
@@ -889,23 +889,8 @@ describe('staticFileHandlerPlugin', () => {
       expect(res.headers.vary).toBe('accept-encoding')
     })
 
-    it('serves sidecars only in the configured encodings, in their order', async () => {
-      const orderedRes = await createStaticAgent({ compression: { encodings: ['gzip', 'br'] } })
-        .get('/compressed.txt')
-        .set('accept-encoding', 'br, gzip')
-      expect(orderedRes.headers['content-encoding']).toBe('gzip')
-      expect(orderedRes.text).toBe('gzip content')
-
-      const restrictedRes = await createStaticAgent({ compression: { encodings: ['br'] } })
-        .get('/compressed.txt')
-        .set('accept-encoding', 'gzip')
-      expect(restrictedRes.headers['content-encoding']).toBeUndefined()
-      expect(restrictedRes.headers.vary).toBe('accept-encoding')
-      expect(restrictedRes.text).toBe('identity content')
-    })
-
     it('does not apply to non-compressible content types', async () => {
-      const res = await createStaticAgent({ compression: {} })
+      const res = await createStaticAgent({ precompressed: true })
         .get('/compressed.bin')
         .set('accept-encoding', 'gzip')
 
@@ -947,7 +932,7 @@ describe('staticFileHandlerPlugin', () => {
     it('compresses a file on its first request and stores the copy on disk', async () => {
       const dir = createCacheDir()
 
-      const res = await createStaticAgent({ compression: { cacheDir: dir } })
+      const res = await createStaticAgent({ compressionCache: { dir } })
         .get('/large.txt')
         .set('accept-encoding', 'br')
 
@@ -968,7 +953,7 @@ describe('staticFileHandlerPlugin', () => {
 
     it('serves later requests from the stored copy instead of compressing again', async () => {
       const dir = createCacheDir()
-      const agent = createStaticAgent({ compression: { cacheDir: dir } })
+      const agent = createStaticAgent({ compressionCache: { dir } })
 
       const first = await agent.get('/large.txt').set('accept-encoding', 'br')
       const [entry] = listCacheDir(dir)
@@ -982,7 +967,7 @@ describe('staticFileHandlerPlugin', () => {
       expect(second.headers.etag).not.toBe(first.headers.etag)
 
       // A new plugin instance, as after a restart, reuses the copy too
-      const restarted = await createStaticAgent({ compression: { cacheDir: dir } }).get('/large.txt').set('accept-encoding', 'br')
+      const restarted = await createStaticAgent({ compressionCache: { dir } }).get('/large.txt').set('accept-encoding', 'br')
       expect(restarted.text).toBe('from the cache')
       expect(restarted.headers.etag).toBe(second.headers.etag)
       expect(listCacheDir(dir)).toHaveLength(1)
@@ -990,7 +975,7 @@ describe('staticFileHandlerPlugin', () => {
 
     it('compresses with the first configured encoding the client accepts', async () => {
       const dir = createCacheDir()
-      const agent = createStaticAgent({ compression: { cacheDir: dir } })
+      const agent = createStaticAgent({ compressionCache: { dir } })
 
       const brRes = await agent.get('/large.txt').set('accept-encoding', 'gzip, zstd, br')
       expect(brRes.headers['content-encoding']).toBe('br')
@@ -1004,12 +989,12 @@ describe('staticFileHandlerPlugin', () => {
 
       expect(listCacheDir(dir).map(entry => path.extname(entry)).sort()).toEqual(['.br', '.gz', '.zst'])
 
-      const orderedRes = await createStaticAgent({ compression: { cacheDir: dir, encodings: ['gzip', 'br'] } })
+      const orderedRes = await createStaticAgent({ compressionCache: { dir, encodings: ['gzip', 'br'] } })
         .get('/large.txt')
         .set('accept-encoding', 'br, gzip')
       expect(orderedRes.headers['content-encoding']).toBe('gzip')
 
-      const unconfiguredRes = await createStaticAgent({ compression: { cacheDir: dir, encodings: ['br', 'gzip'] } })
+      const unconfiguredRes = await createStaticAgent({ compressionCache: { dir, encodings: ['br', 'gzip'] } })
         .get('/large.txt')
         .set('accept-encoding', 'zstd')
       expect(unconfiguredRes.headers['content-encoding']).toBeUndefined()
@@ -1020,7 +1005,7 @@ describe('staticFileHandlerPlugin', () => {
     it('supports zstd', async () => {
       const dir = createCacheDir()
 
-      const fetchFile = createFetchClient({ compression: { cacheDir: dir, encodings: ['zstd'] } })
+      const fetchFile = createFetchClient({ compressionCache: { dir, encodings: ['zstd'] } })
       const response = await fetchFile('/large.txt', { headers: { 'accept-encoding': 'zstd' } })
 
       expect(response.status).toBe(200)
@@ -1041,7 +1026,7 @@ describe('staticFileHandlerPlugin', () => {
       const { StaticFileHandlerPlugin } = await import('./static-file-handler-plugin')
       const dir = createCacheDir()
       const agent = createAgent(new RPCHandler({}, {
-        plugins: [new StaticFileHandlerPlugin({ rootDir, compression: { cacheDir: dir } })],
+        plugins: [new StaticFileHandlerPlugin({ rootDir, precompressed: true, compressionCache: { dir } })],
       }))
 
       const compressedRes = await agent.get('/large.txt').set('accept-encoding', 'zstd, gzip')
@@ -1054,62 +1039,50 @@ describe('staticFileHandlerPlugin', () => {
       expect(sidecarRes.headers['content-encoding']).toBe('zstd')
     })
 
-    it('prefers a precompressed sidecar over the cache unless sidecars are disabled', async ({ onTestFinished }) => {
+    it('prefers a precompressed sidecar over the cache, and ignores sidecars unless enabled', async ({ onTestFinished }) => {
       writeFileSync(path.join(rootDir, 'large.txt.gz'), gzipSync('gzip sidecar'))
       onTestFinished(() => rmSync(path.join(rootDir, 'large.txt.gz'), { force: true }))
 
       const sidecarDir = createCacheDir()
-      const sidecarRes = await createStaticAgent({ compression: { cacheDir: sidecarDir } })
+      const sidecarRes = await createStaticAgent({ precompressed: true, compressionCache: { dir: sidecarDir } })
         .get('/large.txt')
         .set('accept-encoding', 'gzip')
       expect(sidecarRes.headers['content-encoding']).toBe('gzip')
       expect(sidecarRes.text).toBe('gzip sidecar')
       expect(listCacheDir(sidecarDir)).toEqual([])
 
-      const cacheDir = createCacheDir()
-      const cachedRes = await createStaticAgent({ compression: { cacheDir, precompressed: false } })
+      const dir = createCacheDir()
+      const cachedRes = await createStaticAgent({ compressionCache: { dir } })
         .get('/large.txt')
         .set('accept-encoding', 'gzip')
       expect(cachedRes.headers['content-encoding']).toBe('gzip')
       expect(cachedRes.text).toBe(largeText)
-      expect(listCacheDir(cacheDir)).toHaveLength(1)
+      expect(listCacheDir(dir)).toHaveLength(1)
     })
 
-    it('serves only sidecars without a cache directory', async () => {
-      const res = await createStaticAgent({ compression: {} }).get('/large.txt').set('accept-encoding', 'br')
+    it('never compresses a file without a compression cache', async () => {
+      const res = await createStaticAgent({ precompressed: true }).get('/large.txt').set('accept-encoding', 'br')
 
       expect(res.headers['content-encoding']).toBeUndefined()
       expect(res.headers.vary).toBe('accept-encoding')
       expect(res.text).toBe(largeText)
     })
 
-    it('does nothing when sidecars are disabled and no cache directory is set', async () => {
-      const res = await createStaticAgent({ compression: { precompressed: false } }).get('/compressed.txt').set('accept-encoding', 'gzip')
-
-      expect(res.headers['content-encoding']).toBeUndefined()
-      expect(res.headers.vary).toBeUndefined()
-      expect(res.text).toBe('identity content')
-    })
-
     it('leaves files below the threshold and non-compressible files alone', async () => {
       const dir = createCacheDir()
       writeFileSync(path.join(rootDir, 'large.bin'), Buffer.alloc(4096))
 
-      const smallRes = await createStaticAgent({ compression: { cacheDir: dir } }).get('/hello.txt').set('accept-encoding', 'br')
+      const smallRes = await createStaticAgent({ compressionCache: { dir } }).get('/hello.txt').set('accept-encoding', 'br')
       expect(smallRes.headers['content-encoding']).toBeUndefined()
-      // A sidecar could still be served at this size, so caches key on the encoding
-      expect(smallRes.headers.vary).toBe('accept-encoding')
+      // Never encoded at this size, so caches need not key on the encoding
+      expect(smallRes.headers.vary).toBeUndefined()
       expect(smallRes.text).toBe('hello world')
 
-      const noSidecarRes = await createStaticAgent({ compression: { cacheDir: dir, precompressed: false } }).get('/hello.txt').set('accept-encoding', 'br')
-      // Never encoded at this size, so caches need not key on the encoding
-      expect(noSidecarRes.headers.vary).toBeUndefined()
-
-      const binaryRes = await createStaticAgent({ compression: { cacheDir: dir, threshold: 0 } }).get('/large.bin').set('accept-encoding', 'br')
+      const binaryRes = await createStaticAgent({ compressionCache: { dir, threshold: 0 } }).get('/large.bin').set('accept-encoding', 'br')
       expect(binaryRes.headers['content-encoding']).toBeUndefined()
       expect(binaryRes.headers.vary).toBeUndefined()
 
-      const thresholdRes = await createStaticAgent({ compression: { cacheDir: dir, threshold: largeText.length + 1 } }).get('/large.txt').set('accept-encoding', 'br')
+      const thresholdRes = await createStaticAgent({ compressionCache: { dir, threshold: largeText.length + 1 } }).get('/large.txt').set('accept-encoding', 'br')
       expect(thresholdRes.headers['content-encoding']).toBeUndefined()
 
       expect(listCacheDir(dir)).toEqual([])
@@ -1119,7 +1092,7 @@ describe('staticFileHandlerPlugin', () => {
       const dir = createCacheDir()
       const filePath = path.join(rootDir, 'changing.txt')
       onTestFinished(() => rmSync(filePath, { force: true }))
-      const agent = createStaticAgent({ compression: { cacheDir: dir } })
+      const agent = createStaticAgent({ compressionCache: { dir } })
 
       writeFileSync(filePath, 'a'.repeat(2048))
       expect((await agent.get('/changing.txt').set('accept-encoding', 'br')).text).toBe('a'.repeat(2048))
@@ -1143,7 +1116,7 @@ describe('staticFileHandlerPlugin', () => {
 
     it('shares one compression between concurrent requests', async () => {
       const dir = createCacheDir()
-      const agent = createStaticAgent({ compression: { cacheDir: dir } })
+      const agent = createStaticAgent({ compressionCache: { dir } })
 
       const responses = await Promise.all(Array.from({ length: 5 }, () => agent.get('/large.txt').set('accept-encoding', 'br')))
 
@@ -1162,7 +1135,7 @@ describe('staticFileHandlerPlugin', () => {
       const filePath = path.join(rootDir, 'random.txt')
       writeFileSync(filePath, randomBytes(4096))
       onTestFinished(() => rmSync(filePath, { force: true }))
-      const agent = createStaticAgent({ compression: { cacheDir: dir } })
+      const agent = createStaticAgent({ compressionCache: { dir } })
 
       for (let i = 0; i < 2; i++) {
         const res = await agent.get('/random.txt').set('accept-encoding', 'br')
@@ -1179,7 +1152,7 @@ describe('staticFileHandlerPlugin', () => {
       const dir = path.join(baseDir, 'cache-is-a-file')
       writeFileSync(dir, '')
 
-      const res = await createStaticAgent({ compression: { cacheDir: dir } }).get('/large.txt').set('accept-encoding', 'br')
+      const res = await createStaticAgent({ compressionCache: { dir } }).get('/large.txt').set('accept-encoding', 'br')
 
       expect(res.status).toBe(200)
       expect(res.headers['content-encoding']).toBeUndefined()
@@ -1188,7 +1161,7 @@ describe('staticFileHandlerPlugin', () => {
     })
 
     it('answers conditional, range, and head requests from the stored copy', async () => {
-      const fetchFile = createFetchClient({ compression: { cacheDir: createCacheDir() } })
+      const fetchFile = createFetchClient({ compressionCache: { dir: createCacheDir() } })
       const headers = { 'accept-encoding': 'gzip' }
 
       const full = await fetchFile('/large.txt', { headers })
@@ -1222,7 +1195,7 @@ describe('staticFileHandlerPlugin', () => {
 
       for (const allowSymlinks of [false, true]) {
         const dir = createCacheDir()
-        const agent = createStaticAgent({ allowSymlinks, compression: { cacheDir: dir } })
+        const agent = createStaticAgent({ allowSymlinks, compressionCache: { dir } })
 
         for (const url of ['/large.txt', '/loop/large.txt', '/loop/loop/loop/large.txt']) {
           const res = await agent.get(url).set('accept-encoding', 'br')
