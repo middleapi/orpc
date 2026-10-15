@@ -34,6 +34,33 @@ function assertSerializedType(ok: boolean, type: string, expected: string): void
   }
 }
 
+/**
+ * Whether `value` has the shape of a copy made by `copyOnWrite`.
+ */
+function isCopyLike(value: unknown): boolean {
+  return typeof value === 'object' && value !== null && (Array.isArray(value) || Object.getPrototypeOf(value) === Object.prototype)
+}
+
+/**
+ * Returns `parent[key]` for a path to walk through, copying it first while it is still the original value.
+ *
+ * Paths must never walk through a value already restored by a blob or a handler,
+ * or a later entry could mutate it after its handler validated it.
+ * `serialize` emits maps before meta and children before parents, so its payloads never do.
+ * Any value other than the original must be a copy made by `copyOnWrite`, which rejects most restored values
+ * by shape alone. Handler results that look like a copy or are the value the handler received
+ * are tracked in `restored` instead.
+ */
+function walkInto(parent: any, key: Segment, original: unknown, restored: Set<unknown> | undefined): any {
+  const value = parent[key]
+
+  if (restored?.has(value) || (value !== original && !isCopyLike(value))) {
+    throw invalidSerializedData(`segment "${key}" was already deserialized.`)
+  }
+
+  return value === original ? copyOnWrite(parent, key, original) : value
+}
+
 const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHandler> = {
   undefined: {
     condition(data: unknown): boolean {
@@ -398,6 +425,7 @@ export class RPCJsonSerializer {
 
   deserialize(serialized: RPCJsonSerialization): unknown {
     const ref = { json: serialized.json }
+    let restored: Set<unknown> | undefined
 
     if (serialized.blobs?.length) {
       for (let i = 0; i < serialized.maps.length; i++) {
@@ -415,7 +443,7 @@ export class RPCJsonSerializer {
 
         for (let j = 0; j < segments.length; j++) {
           original = original[preSegment]
-          currentRef = copyOnWrite(currentRef, preSegment, original)
+          currentRef = walkInto(currentRef, preSegment, original, restored)
           preSegment = segments[j]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
@@ -442,7 +470,7 @@ export class RPCJsonSerializer {
 
         for (let i = 1; i < item.length; i++) {
           original = original[preSegment]
-          currentRef = copyOnWrite(currentRef, preSegment, original)
+          currentRef = walkInto(currentRef, preSegment, original, restored)
           preSegment = item[i]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
@@ -450,7 +478,14 @@ export class RPCJsonSerializer {
           }
         }
 
-        currentRef[preSegment] = handler.deserialize(currentRef[preSegment])
+        const input = currentRef[preSegment]
+        const value = handler.deserialize(input)
+        currentRef[preSegment] = value
+
+        // Primitives cannot be mutated, so a handler returning its input only matters for objects
+        if (isCopyLike(value) || (value === input && typeof value === 'object' && value !== null)) {
+          (restored ??= new Set()).add(value)
+        }
       }
     }
 

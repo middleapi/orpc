@@ -1,4 +1,6 @@
 import type { StandardHandlerPlugin } from '../standard'
+import { RPCSerializer } from '@orpc/client'
+import * as z from 'zod'
 import { os } from '../../builder'
 import { RPCHandler } from './rpc-handler'
 
@@ -187,5 +189,51 @@ describe('rpcHandler lazy router prefix scan', () => {
     const ok = await handler.handle(new Request('http://localhost/rpc/planet/find', { method: 'POST' }), { prefix: '/rpc' })
     expect(ok.matched).toBe(true)
     expect(loader).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('rpcHandler: custom serializer meta ordering', () => {
+  class Person {
+    constructor(public name: string, public age: number) {}
+  }
+
+  const person = {
+    condition: (v: unknown) => v instanceof Person,
+    serialize: (v: Person) => ({ name: v.name, age: v.age }),
+    deserialize: (v: any) => {
+      if (typeof v?.name !== 'string' || typeof v?.age !== 'number')
+        throw new TypeError('invalid person')
+      return new Person(v.name, v.age)
+    },
+  }
+
+  async function post(meta: unknown) {
+    const spy = vi.fn((_options: { input: unknown }) => 'ok')
+    const handler = new RPCHandler(
+      { greet: os.input(z.object({ p: z.instanceof(Person) })).handler(spy) },
+      { serializer: new RPCSerializer({ handlers: { person } }) },
+    )
+    const { response } = await handler.handle(new Request('http://localhost/rpc/greet', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ json: { p: { name: 'http://evil/', age: 1 } }, meta }),
+    }), { prefix: '/rpc' })
+    return { status: response!.status, spy }
+  }
+
+  it('accepts the person entry alone', async () => {
+    const { status, spy } = await post([['person', 'p']])
+    expect(status).toBe(200)
+    expect(spy.mock.calls[0]![0].input).toEqual({ p: new Person('http://evil/', 1) })
+  })
+
+  it('rejects the url entry before the person entry', async () => {
+    expect((await post([['url', 'p', 'name'], ['person', 'p']])).status).toBe(400)
+  })
+
+  it('rejects the url entry after the person entry', async () => {
+    const { status, spy } = await post([['person', 'p'], ['url', 'p', 'name']])
+    expect(status).toBe(400)
+    expect(spy).not.toHaveBeenCalled()
   })
 })
