@@ -38,17 +38,7 @@ function assertSerializedType(ok: boolean, type: string, expected: string): void
  * Paths only walk through arrays and plain objects, the containers JSON is made of.
  */
 function isWalkable(value: unknown): boolean {
-  if (typeof value !== 'object' || value === null) {
-    return false
-  }
-
-  if (Array.isArray(value)) {
-    return true
-  }
-
-  // Unlike `isPlainObject`, avoids reading `constructor` from every class prototype on this hot path
-  const proto = Object.getPrototypeOf(value)
-  return proto === Object.prototype || proto === null || Object.getPrototypeOf(proto) === null
+  return Array.isArray(value) || isPlainObject(value)
 }
 
 /**
