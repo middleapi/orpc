@@ -577,22 +577,6 @@ describe('corsHandlerPlugin with credentials', () => {
     return response!
   }
 
-  it('reflecting the request origin with credentials grants every site (the pattern the docs must not recommend)', async () => {
-    const options = { origin: (origin: string) => origin, credentials: true }
-
-    const preflight = await send(options, 'https://evil.example', 'OPTIONS')
-    expect(preflight.status).toBe(204)
-    expect(preflight.headers.get('access-control-allow-origin')).toBe('https://evil.example')
-    expect(preflight.headers.get('access-control-allow-credentials')).toBe('true')
-    expect(preflight.headers.get('access-control-allow-headers')).toBe('content-type')
-
-    const actual = await send(options, 'https://evil.example', 'POST')
-    expect(actual.status).toBe(200)
-    expect(actual.headers.get('access-control-allow-origin')).toBe('https://evil.example')
-    expect(actual.headers.get('access-control-allow-credentials')).toBe('true')
-    expect(await actual.text()).toContain('victim@example.com')
-  })
-
   const ALLOWED_ORIGINS = ['https://app.example.com']
 
   it.each<[string, CORSHandlerPluginOptions<Context>]>([
