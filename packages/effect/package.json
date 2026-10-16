@@ -70,6 +70,7 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
+    "@orpc/openapi": "workspace:*",
     "effect": "^4.0.2"
   }
 }

@@ -309,7 +309,7 @@ You can also use these extensions with the [contract builder](/docs/contract/pro
 
 ### JSON Schema Converter
 
-This integration also provides `EffectSchemaToJsonSchemaConverter`, which wraps Effect's built-in [Schema.toJsonSchemaDocument](https://effect.website/docs/schema/json-schema/). Use it with tools such as the [OpenAPI Generator](/docs/openapi/specification#openapi-generator). It accepts the same options as `Schema.toJsonSchemaDocument`, such as `onExcessProperty`, `generateDescriptions`, `includeAnnotationKey`, and `referencePolicy`:
+This integration also provides `EffectSchemaToJsonSchemaConverter`, which is built on Effect's JSON Schema compiler. Use it with tools such as the [OpenAPI Generator](/docs/openapi/specification#openapi-generator) and [Smart Coercion](/docs/plugins/smart-coercion). It accepts the same options as Effect's [Schema.toJsonSchemaDocument](https://effect.website/docs/schema/json-schema/), such as `onExcessProperty`, `generateDescriptions`, `includeAnnotationKey`, and `referencePolicy`:
 
 ```ts
 import { EffectSchemaToJsonSchemaConverter } from '@orpc/experimental-effect'
@@ -323,7 +323,14 @@ const generator = new OpenAPIGenerator({
 })
 ```
 
-Schemas with an `identifier` annotation, including `Schema.Class` and recursive schemas, are preserved in `$defs`, which `OpenAPIGenerator` can then [hoist](/docs/openapi/specification#hoisting-defs) into `components.schemas`.
+`Schema.toJsonSchemaDocument` describes Effect's canonical JSON codec (`Schema.toCodecJson`), which accepts values oRPC rejects. Instead, the converter describes the values oRPC validates, following the same conventions as the other converters:
+
+- Optional fields and `Schema.UndefinedOr` do not accept `null`, and `Schema.Number` is a plain `number`.
+- `Schema.Date`, `Schema.BigInt`, `Schema.URL`, `Schema.ReadonlySet`, and `Schema.ReadonlyMap` declare an `x-native-type`, so [Smart Coercion](/docs/plugins/smart-coercion) can restore them.
+- `Schema.File` is a binary string, so the OpenAPI Generator documents it as a `multipart/form-data` upload.
+- Types oRPC cannot transfer, such as `Schema.Option`, `Schema.Duration`, and `Schema.Uint8Array`, are left unconstrained.
+
+Schemas with an `identifier` annotation, including `Schema.Class`, are preserved in `$defs` under that identifier, as are recursive schemas. `OpenAPIGenerator` can then [hoist](/docs/openapi/specification#hoisting-defs) them into `components.schemas`.
 
 :::tip
 Enable the `cache` option to reuse conversion results when the same schema instance is converted repeatedly. When enabled, repeated conversions return the same JSON schema object, so treat the results as immutable.

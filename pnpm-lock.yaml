@@ -608,6 +608,9 @@ importers:
         specifier: workspace:*
         version: link:../shared
     devDependencies:
+      '@orpc/openapi':
+        specifier: workspace:*
+        version: link:../openapi
       effect:
         specifier: ^4.0.2
         version: 4.0.2
