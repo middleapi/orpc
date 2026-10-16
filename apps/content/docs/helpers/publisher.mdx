@@ -53,13 +53,14 @@ const publisher = new MemoryPublisher<Record<string, { message: string }>>()
 
 ## Adapters
 
-| Name                | Resume Support | Adapter for                                                                      |
-| ------------------- | -------------- | -------------------------------------------------------------------------------- |
-| `MemoryPublisher`   | ✅             | In-memory storage                                                                |
-| `RedisPublisher`    | ✅             | [Redis](https://github.com/redis/redis)                                          |
-| `UpstashPublisher`  | ✅             | [Upstash Redis](https://github.com/upstash/redis-js)                             |
-| `BunRedisPublisher` | ✅             | [Bun's Redis](https://bun.com/docs/runtime/redis)                                |
-| `DurablePublisher`  | ✅             | [Cloudflare Durable Objects](https://developers.cloudflare.com/durable-objects/) |
+| Name                  | Resume Support | Adapter for                                                                      |
+| --------------------- | -------------- | -------------------------------------------------------------------------------- |
+| `MemoryPublisher`     | ✅             | In-memory storage                                                                |
+| `RedisPublisher`      | ✅             | [Redis](https://github.com/redis/redis)                                          |
+| `UpstashPublisher`    | ✅             | [Upstash Redis](https://github.com/upstash/redis-js)                             |
+| `UnixSocketPublisher` | ✅             | Processes on the same machine, over a Unix domain socket                         |
+| `BunRedisPublisher`   | ✅             | [Bun's Redis](https://bun.com/docs/runtime/redis)                                |
+| `DurablePublisher`    | ✅             | [Cloudflare Durable Objects](https://developers.cloudflare.com/durable-objects/) |
 
 <CodeGroup>
 
@@ -195,6 +196,54 @@ const publisher = new UpstashPublisher<Events>(redis, {
      */
     seconds: 300
   }
+})
+```
+
+```ts unix-socket
+// Requires the `ws` package
+import { UnixSocketPublisher, UnixSocketPublisherServer } from '@orpc/publisher/unix-socket'
+
+// Run one server, e.g. in the cluster primary or a dedicated process
+const server = new UnixSocketPublisherServer({
+  resume: {
+    /**
+     * Whether event resume support is enabled.
+     *
+     * When enabled, published events are temporarily stored so new
+     * subscribers can resume from a previous position using `lastEventId`.
+     *
+     * @default false
+     */
+    enabled: false,
+
+    /**
+     * How long (in seconds) to retain events for resume.
+     *
+     * Expired events are cleaned up lazily for performance reasons, so
+     * some events may remain available slightly longer than this period.
+     *
+     * @default 300 (5 min)
+     */
+    seconds: 300
+  }
+})
+
+/**
+ * Accepts a Unix domain socket path or a Windows named pipe.
+ * Anyone allowed to connect can publish and subscribe, so keep the
+ * socket in a directory only your app can access.
+ * A stale socket file left behind by a crashed server is replaced.
+ */
+await server.listen('/run/my-app/publisher.sock')
+
+// Then in every process that publishes or subscribes
+const publisher = new UnixSocketPublisher<Events>('/run/my-app/publisher.sock', {
+  /**
+   * Serializer for serialize and deserialize payloads.
+   *
+   * @default RPCJsonSerializer
+   */
+  serializer: undefined,
 })
 ```
 

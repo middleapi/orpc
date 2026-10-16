@@ -2,7 +2,7 @@
   "name": "@orpc/publisher",
   "type": "module",
   "version": "2.0.0-beta.44",
-  "description": "Typesafe pub/sub for oRPC event streaming, with memory, Redis, and Upstash adapters",
+  "description": "Typesafe pub/sub for oRPC event streaming, with memory, Redis, Upstash, and Unix socket adapters",
   "license": "MIT",
   "funding": [
     "https://github.com/sponsors/dinwwwh",
@@ -23,6 +23,8 @@
     "sse",
     "redis",
     "upstash",
+    "unix-socket",
+    "websocket",
     "typescript"
   ],
   "sideEffects": false,
@@ -53,6 +55,11 @@
         "types": "./dist/adapters/upstash.d.mts",
         "import": "./dist/adapters/upstash.mjs",
         "default": "./dist/adapters/upstash.mjs"
+      },
+      "./unix-socket": {
+        "types": "./dist/adapters/unix-socket.d.mts",
+        "import": "./dist/adapters/unix-socket.mjs",
+        "default": "./dist/adapters/unix-socket.mjs"
       }
     }
   },
@@ -62,7 +69,8 @@
     "./base-redis": "./src/adapters/base-redis.ts",
     "./memory": "./src/adapters/memory.ts",
     "./redis": "./src/adapters/redis.ts",
-    "./upstash": "./src/adapters/upstash.ts"
+    "./upstash": "./src/adapters/upstash.ts",
+    "./unix-socket": "./src/adapters/unix-socket.ts"
   },
   "files": [
     "dist"
@@ -73,13 +81,17 @@
   },
   "peerDependencies": {
     "@upstash/redis": ">=1.35.6",
-    "redis": ">=6.0.0"
+    "redis": ">=6.0.0",
+    "ws": ">=8.17.0"
   },
   "peerDependenciesMeta": {
     "@upstash/redis": {
       "optional": true
     },
     "redis": {
+      "optional": true
+    },
+    "ws": {
       "optional": true
     }
   },
@@ -89,7 +101,9 @@
     "@standard-server/core": "~0.10.3"
   },
   "devDependencies": {
+    "@types/ws": "^8.18.2",
     "@upstash/redis": "^1.39.0",
-    "redis": "^6.3.0"
+    "redis": "^6.3.0",
+    "ws": "^8.22.0"
   }
 }

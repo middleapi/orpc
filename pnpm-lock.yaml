@@ -953,12 +953,18 @@ importers:
         specifier: ~0.10.3
         version: 0.10.3
     devDependencies:
+      '@types/ws':
+        specifier: ^8.18.2
+        version: 8.18.2
       '@upstash/redis':
         specifier: ^1.39.0
         version: 1.39.0
       redis:
         specifier: ^6.3.0
         version: 6.3.0(@node-rs/xxhash@1.7.7)(@opentelemetry/api@1.9.1)
+      ws:
+        specifier: ^8.22.0
+        version: 8.22.0
 
   packages/ratelimit:
     dependencies:
