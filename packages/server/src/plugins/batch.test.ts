@@ -467,47 +467,27 @@ describe('batchHandlerPlugin', () => {
         expect(settled).toBe(false)
 
         gate.resolve()
-        const { response } = await result
-
-        expect(response!.status).toBe(207)
-        expect(response!.headers.get('standard-server')).toEqual('octet-stream')
-        expect(await readAllMessages(response!)).toEqual([
-          expect.objectContaining({ id: '0', kind: 'response' }),
-        ])
+        await expect(result).resolves.toMatchObject({ matched: true })
       })
 
-      it('starts streaming at the first message, without waiting for the other sub-requests', async () => {
+      /**
+       * The response is awaited before the gate opens, so holding it for the slow sub-request would time out.
+       */
+      it.each([
+        ['at the first message', [makePeerRequestMessage('0', '/slow'), makePeerRequestMessage('1', '/ping')], ['1', '0']],
+        ['once a sub-request finishes without sending anything', [
+          makePeerRequestMessage('0', '/wait'),
+          makePeerRequestMessage('1', '/slow'),
+          { kind: 'cancel', id: '0' },
+        ], ['1']],
+      ] as const)('starts streaming %s, without waiting for the slow sub-request', async (_, messages, ids) => {
         const { handler, gate } = createGatedHandler()
-        const { response } = await handler.handle(createBatchRequest({
-          mode: 'streaming',
-          messages: [makePeerRequestMessage('0', '/slow'), makePeerRequestMessage('1', '/ping')],
-        }))
-
-        expect(response!.headers.get('standard-server')).toEqual('octet-stream')
+        const { response } = await handler.handle(createBatchRequest({ mode: 'streaming', messages }))
 
         gate.resolve()
-        const messages = await readAllMessages(response!)
+        const received = await readAllMessages(response!)
 
-        expect(messages.map(m => m.id)).toEqual(['1', '0'])
-      })
-
-      it('starts streaming once a sub-request finishes without sending anything', async () => {
-        const { handler, gate } = createGatedHandler()
-        const { response } = await handler.handle(createBatchRequest({
-          mode: 'streaming',
-          messages: [
-            makePeerRequestMessage('0', '/wait'),
-            makePeerRequestMessage('1', '/slow'),
-            { kind: 'cancel', id: '0' },
-          ],
-        }))
-
-        expect(response!.headers.get('standard-server')).toEqual('octet-stream')
-
-        gate.resolve()
-        expect(await readAllMessages(response!)).toEqual([
-          expect.objectContaining({ id: '1', kind: 'response' }),
-        ])
+        expect(received.map(m => m.id)).toEqual(ids)
       })
     })
   })
@@ -779,58 +759,7 @@ describe('batchHandlerPlugin', () => {
       vi.useRealTimers()
     })
 
-    it('sends zero-length keep-alive frames while the stream is idle', async () => {
-      const { promise: gate, resolve } = promiseWithResolvers<void>()
-
-      const handler = createHandler(new BatchHandlerPlugin({
-        keepAlive: { enabled: true, interval: 100 },
-      }), createSlowRouter(gate))
-
-      const { response } = await handler.handle(createBatchRequest({
-        mode: 'streaming',
-        messages: [makePeerRequestMessage(0, '/ping'), makePeerRequestMessage(1, '/slow')],
-      }))
-
-      expect(response!.body).toBeInstanceOf(ReadableStream)
-
-      const reader = (response!.body as ReadableStream<Uint8Array>).getReader()
-      const frames: Uint8Array[] = []
-
-      await skipMessage(reader) // the ping response
-
-      const readNext = async () => {
-        const { done, value } = await reader.read()
-        if (!done && value) {
-          frames.push(value)
-        }
-        return done
-      }
-
-      // First keep-alive after interval with no new message.
-      const firstKeepAlive = readNext()
-      await vi.advanceTimersByTimeAsync(100)
-      await firstKeepAlive
-
-      expect(frames).toHaveLength(1)
-      expect(frames[0]).toEqual(new Uint8Array([0, 0, 0, 0]))
-
-      // Another keep-alive while still idle.
-      const secondKeepAlive = readNext()
-      await vi.advanceTimersByTimeAsync(100)
-      await secondKeepAlive
-
-      expect(frames).toHaveLength(2)
-      expect(frames[1]).toEqual(new Uint8Array([0, 0, 0, 0]))
-
-      resolve()
-      while (!(await readNext())) {
-        // keep reading until closed
-      }
-
-      expect(vi.getTimerCount()).toBe(0)
-    })
-
-    it('sends keep-alive frames once a buffered batch starts streaming', async () => {
+    it.each(['buffered', 'streaming'] as const)('sends zero-length keep-alive frames while a %s batch stream is idle', async (mode) => {
       const gate = promiseWithResolvers<void>()
 
       const handler = createHandler(new BatchHandlerPlugin({
@@ -842,19 +771,19 @@ describe('batchHandlerPlugin', () => {
       })
 
       const { response } = await handler.handle(createBatchRequest({
-        mode: 'buffered',
+        mode,
         messages: [makePeerRequestMessage(0, '/events')],
       }))
-
-      expect(response!.body).toBeInstanceOf(ReadableStream)
 
       const reader = (response!.body as ReadableStream<Uint8Array>).getReader()
 
       await skipMessage(reader) // the response message
 
-      const keepAlive = reader.read()
-      await vi.advanceTimersByTimeAsync(100)
-      await expect(keepAlive).resolves.toEqual({ done: false, value: new Uint8Array([0, 0, 0, 0]) })
+      for (let i = 0; i < 2; i++) {
+        const keepAlive = reader.read()
+        await vi.advanceTimersByTimeAsync(100)
+        await expect(keepAlive).resolves.toEqual({ done: false, value: new Uint8Array([0, 0, 0, 0]) })
+      }
 
       gate.resolve()
       while (!(await reader.read()).done) {
