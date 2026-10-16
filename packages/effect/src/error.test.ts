@@ -1,4 +1,4 @@
-import { ORPCError } from '@orpc/server'
+import { ORPCError } from '@orpc/client'
 import { Cause, Effect, Exit } from 'effect'
 import { catchORPCError, catchORPCErrorCode, catchORPCErrorCodes } from './error'
 

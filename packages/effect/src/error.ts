@@ -1,7 +1,66 @@
-import type { AnyORPCError, ORPCErrorCode } from '@orpc/server'
-import { ORPCError } from '@orpc/server'
+import type { AnyORPCError, ORPCErrorCode } from '@orpc/client'
+import { ORPCError } from '@orpc/client'
 import { getOwn } from '@orpc/shared'
 import { Effect, Function } from 'effect'
+
+type AnyEffect = Effect.Effect<any, any, any>
+
+/**
+ * Codes an `ORPCError` in `E` can have. Any code is possible when `E`
+ * can hold hidden `ORPCError` instances.
+ */
+type ORPCErrorCodeOf<E> = E extends ORPCError<infer TCode, any> ? TCode : AnyORPCError extends E ? ORPCErrorCode : never
+
+/**
+ * The `ORPCError`s in `E` whose code can be `TCode`, narrowed to `TCode`.
+ * Hidden `ORPCError` instances have unknown data.
+ */
+type ORPCErrorWithCode<E, TCode extends ORPCErrorCode> = E extends AnyORPCError
+  ? E extends ORPCError<infer UCode, infer UData>
+    ? 0 extends (1 & UCode)
+      ? ORPCError<TCode, UData>
+      : [UCode] extends [TCode]
+          ? E
+          : [UCode & TCode] extends [never] ? never : ORPCError<UCode & TCode, UData>
+    : never
+  : AnyORPCError extends E ? ORPCError<TCode, unknown> : never
+
+/**
+ * `E` without the `ORPCError`s whose every possible code is in `TCode`.
+ */
+type ExcludeORPCErrorCode<E, TCode extends string> = E extends ORPCError<infer UCode, any>
+  ? 0 extends (1 & UCode) ? E : [UCode] extends [TCode] ? never : E
+  : E
+
+/**
+ * `TCode` if it is a single literal code, `never` otherwise.
+ */
+type LiteralORPCErrorCode<TCode extends string, UCode extends string = TCode> = UCode extends string
+  ? [TCode] extends [UCode] ? Record<never, never> extends Record<UCode, unknown> ? never : UCode : never
+  : never
+
+/**
+ * The codes `TCases` handles: required, literal keys with a function value.
+ */
+type HandledORPCErrorCodes<TCases> = {
+  [K in keyof TCases]-?: Record<never, never> extends Pick<TCases, K> ? never : TCases[K] extends (...args: any[]) => any ? K : never
+}[keyof TCases] & string
+
+/**
+ * The handlers `catchORPCErrorCodes` accepts, keyed by the codes in `E`.
+ * Non-literal codes (e.g. hidden `ORPCError` instances) become an index
+ * signature, whose handler is bivariant so it accepts every literal handler.
+ */
+type ORPCErrorCodeCases<E> = {
+  [K in ORPCErrorCodeOf<E>]?: Record<never, never> extends Record<K, unknown>
+    ? { bivarianceHack(error: ORPCErrorWithCode<E, K>): AnyEffect }['bivarianceHack']
+    : (error: ORPCErrorWithCode<E, K>) => AnyEffect
+}
+
+/**
+ * The effects the handlers in `TCases` can return.
+ */
+type ORPCErrorCodeCasesEffect<TCases, TCase = TCases[keyof TCases]> = TCase extends (...args: any[]) => infer U ? U : never
 
 /**
  * Recovers from `ORPCError` failures in the error channel of an effect.
@@ -66,15 +125,15 @@ export const catchORPCError: {
  * @see {@link https://orpc.dev/docs/integrations/effect#catching-orpcerrors | Effect Integration - Catching ORPCErrors}
  */
 export const catchORPCErrorCode: {
-  <const TCode extends E extends ORPCError<infer TCode, any> ? TCode : AnyORPCError extends E ? ORPCErrorCode : never, E, A2, E2, R2>(
+  <const TCode extends ORPCErrorCodeOf<E>, E, A2, E2, R2>(
     code: TCode,
-    f: (error: E extends AnyORPCError ? Extract<E, ORPCError<TCode, any>> : AnyORPCError extends E ? ORPCError<TCode, unknown> : never) => Effect.Effect<A2, E2, R2>,
-  ): <A, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A | A2, E2 | Exclude<E, ORPCError<TCode, any>>, R | R2>
-  <A, E, R, const TCode extends E extends ORPCError<infer TCode, any> ? TCode : AnyORPCError extends E ? ORPCErrorCode : never, A2, E2, R2>(
+    f: (error: ORPCErrorWithCode<E, TCode>) => Effect.Effect<A2, E2, R2>,
+  ): <A, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A | A2, E2 | ExcludeORPCErrorCode<E, LiteralORPCErrorCode<TCode>>, R | R2>
+  <A, E, R, const TCode extends ORPCErrorCodeOf<E>, A2, E2, R2>(
     self: Effect.Effect<A, E, R>,
     code: TCode,
-    f: (error: E extends AnyORPCError ? Extract<E, ORPCError<TCode, any>> : AnyORPCError extends E ? ORPCError<TCode, unknown> : never) => Effect.Effect<A2, E2, R2>,
-  ): Effect.Effect<A | A2, E2 | Exclude<E, ORPCError<TCode, any>>, R | R2>
+    f: (error: ORPCErrorWithCode<E, TCode>) => Effect.Effect<A2, E2, R2>,
+  ): Effect.Effect<A | A2, E2 | ExcludeORPCErrorCode<E, LiteralORPCErrorCode<TCode>>, R | R2>
 } = Function.dual(
   3,
   (
@@ -114,42 +173,20 @@ export const catchORPCErrorCode: {
  * @see {@link https://orpc.dev/docs/integrations/effect#catching-orpcerrors | Effect Integration - Catching ORPCErrors}
  */
 export const catchORPCErrorCodes: {
-  <
-    E,
-    Cases extends
-    & { [K in E extends ORPCError<infer TCode, any> ? TCode : AnyORPCError extends E ? ORPCErrorCode : never]?: string extends K
-      ? (error: never) => Effect.Effect<any, any, any>
-      : K extends infer C extends ORPCErrorCode
-        ? (error: E extends AnyORPCError ? Extract<E, ORPCError<C, any>> : AnyORPCError extends E ? ORPCError<C, unknown> : never) => Effect.Effect<any, any, any>
-        : never }
-        & { [K in Exclude<keyof Cases, E extends ORPCError<infer TCode, any> ? TCode : AnyORPCError extends E ? ORPCErrorCode : never>]: never },
-  >(
+  <E, Cases extends ORPCErrorCodeCases<E> & { [K in Exclude<keyof Cases, ORPCErrorCodeOf<E>>]: never }>(
     cases: Cases,
   ): <A, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<
-    A | { [K in keyof Cases]: Cases[K] extends (...args: any[]) => Effect.Effect<infer A2, any, any> ? A2 : never }[keyof Cases],
-    | Exclude<E, ORPCError<keyof Cases & ORPCErrorCode, any>>
-    | { [K in keyof Cases]: Cases[K] extends (...args: any[]) => Effect.Effect<any, infer E2, any> ? E2 : never }[keyof Cases],
-    R | { [K in keyof Cases]: Cases[K] extends (...args: any[]) => Effect.Effect<any, any, infer R2> ? R2 : never }[keyof Cases]
+    A | Effect.Success<ORPCErrorCodeCasesEffect<Cases>>,
+    ExcludeORPCErrorCode<E, HandledORPCErrorCodes<Cases>> | Effect.Error<ORPCErrorCodeCasesEffect<Cases>>,
+    R | Effect.Services<ORPCErrorCodeCasesEffect<Cases>>
   >
-  <
-    A,
-    E,
-    R,
-    Cases extends
-    & { [K in E extends ORPCError<infer TCode, any> ? TCode : AnyORPCError extends E ? ORPCErrorCode : never]?: string extends K
-      ? (error: never) => Effect.Effect<any, any, any>
-      : K extends infer C extends ORPCErrorCode
-        ? (error: E extends AnyORPCError ? Extract<E, ORPCError<C, any>> : AnyORPCError extends E ? ORPCError<C, unknown> : never) => Effect.Effect<any, any, any>
-        : never }
-        & { [K in Exclude<keyof Cases, E extends ORPCError<infer TCode, any> ? TCode : AnyORPCError extends E ? ORPCErrorCode : never>]: never },
-  >(
+  <A, E, R, Cases extends ORPCErrorCodeCases<E> & { [K in Exclude<keyof Cases, ORPCErrorCodeOf<E>>]: never }>(
     self: Effect.Effect<A, E, R>,
     cases: Cases,
   ): Effect.Effect<
-    A | { [K in keyof Cases]: Cases[K] extends (...args: any[]) => Effect.Effect<infer A2, any, any> ? A2 : never }[keyof Cases],
-    | Exclude<E, ORPCError<keyof Cases & ORPCErrorCode, any>>
-    | { [K in keyof Cases]: Cases[K] extends (...args: any[]) => Effect.Effect<any, infer E2, any> ? E2 : never }[keyof Cases],
-    R | { [K in keyof Cases]: Cases[K] extends (...args: any[]) => Effect.Effect<any, any, infer R2> ? R2 : never }[keyof Cases]
+    A | Effect.Success<ORPCErrorCodeCasesEffect<Cases>>,
+    ExcludeORPCErrorCode<E, HandledORPCErrorCodes<Cases>> | Effect.Error<ORPCErrorCodeCasesEffect<Cases>>,
+    R | Effect.Services<ORPCErrorCodeCasesEffect<Cases>>
   >
 } = Function.dual(
   2,
