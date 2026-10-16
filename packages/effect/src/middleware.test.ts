@@ -1,6 +1,8 @@
-import type { WithEffectContext } from './context'
+import type { EffectWrapOptions, WithEffectContext } from './context'
 import { call, ORPCError, os } from '@orpc/server'
-import { Context, Effect } from 'effect'
+import { Context, Effect, Option, Tracer } from 'effect'
+import { z } from 'zod'
+import { handlerGen } from './handler'
 import { middlewareGen } from './middleware'
 import * as EffectModule from './runtime'
 
@@ -121,29 +123,167 @@ describe('middlewareGen', () => {
   })
 
   it('can wrap effect execution via effect/wrap', async () => {
-    let wrappedCalls = 0
+    const wrapOptions: EffectWrapOptions[] = []
+    const wrap: WithEffectContext<never>['effect/wrap'] = (effect, opts) => {
+      wrapOptions.push(opts)
+      return effect
+    }
 
     const procedure = os
       .$context<WithEffectContext<never>>()
+      .input(z.object({ id: z.string().transform(Number) }))
+      .errors({ BASE: {} })
       .use(middlewareGen(function* ({ next }) {
         return yield* next()
       }))
       .handler(() => 'output')
 
+    const signal = AbortSignal.timeout(100)
+    const context = { 'effect/context': Context.empty(), 'effect/wrap': wrap }
+
     await expect(call(
       procedure,
-      undefined,
-      {
-        context: {
-          'effect/context': Context.empty(),
-          'effect/wrap': effect => effect.pipe(Effect.tap(() => Effect.sync(() => {
-            wrappedCalls += 1
-          }))),
-        },
-      },
+      { id: '1' },
+      { path: ['wrapped', 'procedure'], context, signal, lastEventId: 'id' },
     )).resolves.toEqual('output')
 
-    expect(wrappedCalls).toBe(1)
+    expect(wrapOptions).toEqual([{
+      kind: 'middleware',
+      context,
+      // validated input of the middleware rather than the raw procedure input
+      input: { id: 1 },
+      path: ['wrapped', 'procedure'],
+      procedure,
+      signal,
+      lastEventId: 'id',
+      errors: { BASE: expect.any(Function) },
+    }])
+    expect(wrapOptions[0]).not.toHaveProperty('next')
+  })
+
+  it('invokes effect/wrap once per middlewareGen and handlerGen', async () => {
+    const wrapOptions: EffectWrapOptions[] = []
+    const wrap: WithEffectContext<never>['effect/wrap'] = (effect, opts) => {
+      wrapOptions.push(opts)
+      return effect
+    }
+
+    const procedure = os
+      .$context<WithEffectContext<never>>()
+      .use(middlewareGen(function* ({ next }) {
+        return yield* next({ context: { first: true } })
+      }))
+      .use(({ next }) => next({ context: { plain: true } }))
+      .use(middlewareGen(function* ({ next }) {
+        return yield* next({ context: { second: true } })
+      }))
+      .handler(handlerGen(function* () {
+        return 'output'
+      }))
+
+    await expect(call(procedure, undefined, {
+      context: { 'effect/context': Context.empty(), 'effect/wrap': wrap },
+    })).resolves.toEqual('output')
+
+    expect(wrapOptions.map(opts => [opts.kind, Object.keys(opts.context).filter(key => !key.startsWith('effect/'))])).toEqual([
+      ['middleware', []],
+      ['middleware', ['first', 'plain']],
+      ['handler', ['first', 'plain', 'second']],
+    ])
+  })
+
+  it('can map own and downstream failures to a different error type via effect/wrap', async () => {
+    const middlewareError = new Error('__MIDDLEWARE__')
+    const downstreamError = new Error('__DOWNSTREAM__')
+
+    const context: WithEffectContext<never> = {
+      'effect/context': Context.empty(),
+      'effect/wrap': (effect, opts) => effect.pipe(
+        Effect.mapError(error => error instanceof ORPCError
+          ? error
+          : new ORPCError('BAD_REQUEST', { message: opts.kind, cause: error })),
+      ),
+    }
+
+    await expect(call(
+      os
+        .$context<WithEffectContext<never>>()
+        .use(middlewareGen(function* () {
+          return yield* Effect.fail(middlewareError)
+        }))
+        .handler(() => 'unreachable'),
+      undefined,
+      { context },
+    )).rejects.toSatisfy(
+      error => error instanceof ORPCError && error.code === 'BAD_REQUEST' && error.cause === middlewareError,
+    )
+
+    await expect(call(
+      os
+        .$context<WithEffectContext<never>>()
+        .use(middlewareGen(function* ({ next }) {
+          return yield* next()
+        }))
+        .handler(() => {
+          throw downstreamError
+        }),
+      undefined,
+      { context },
+    )).rejects.toSatisfy(
+      error => error instanceof ORPCError && error.message === 'middleware' && error.cause === downstreamError,
+    )
+
+    // already mapped by the handler wrap, passes through the middleware wrap as-is
+    await expect(call(
+      os
+        .$context<WithEffectContext<never>>()
+        .use(middlewareGen(function* ({ next }) {
+          return yield* next()
+        }))
+        .handler(handlerGen(function* () {
+          return yield* Effect.fail(downstreamError)
+        })),
+      undefined,
+      { context },
+    )).rejects.toSatisfy(
+      error => error instanceof ORPCError && error.message === 'handler' && error.cause === downstreamError,
+    )
+  })
+
+  it('runs effect/wrap with effect/context so wrap and middleware share services and tracer', async () => {
+    const spans: string[] = []
+    const tracer = Tracer.make({
+      span(options) {
+        spans.push(options.name)
+        return Tracer.nativeTracer.span(options)
+      },
+    })
+
+    let serviceInWrap: Option.Option<Service1['Service']> | undefined
+
+    const procedure = os
+      .$context<WithEffectContext<Service1>>()
+      .use(middlewareGen(function* ({ next }) {
+        const service1 = yield* Service1
+        return yield* next({ context: { fromService: service1.id } }).pipe(Effect.withSpan('middleware'))
+      }))
+      .handler(({ context }) => `output:${context.fromService}`)
+
+    await expect(call(procedure, undefined, {
+      context: {
+        'effect/context': Context.empty().pipe(
+          Context.add(Service1, { id: 'Service1' }),
+          Context.add(Tracer.Tracer, tracer),
+        ),
+        'effect/wrap': effect => Effect.gen(function* () {
+          serviceInWrap = yield* Effect.serviceOption(Service1)
+          return yield* effect
+        }).pipe(Effect.withSpan('wrap')),
+      },
+    })).resolves.toEqual('output:Service1')
+
+    expect(serviceInWrap).toEqual(Option.some({ id: 'Service1' }))
+    expect(spans).toEqual(['wrap', 'middleware'])
   })
 
   it('forwards the provided signal to runPromise', async () => {
@@ -160,6 +300,6 @@ describe('middlewareGen', () => {
     ).resolves.toEqual('output')
 
     expect(runPromiseSpy).toHaveBeenCalledTimes(1)
-    expect(runPromiseSpy).toHaveBeenNthCalledWith(1, expect.anything(), { signal: controller.signal })
+    expect(runPromiseSpy).toHaveBeenNthCalledWith(1, expect.anything(), { context: undefined, signal: controller.signal })
   })
 })

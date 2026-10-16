@@ -1,5 +1,34 @@
-import type { AnyProcedure, Context } from '@orpc/server'
+import type { Context, MiddlewareOptions, ORPCErrorConstructorMap, ProcedureHandlerOptions } from '@orpc/server'
 import type { Effect, Context as EffectContext } from 'effect'
+
+/**
+ * The options `effect/wrap` receives when wrapping the effect of a `middlewareGen`.
+ *
+ * @see {@link https://orpc.dev/docs/integrations/effect#error-handling | Effect Integration - Error Handling}
+ */
+export interface EffectWrapMiddlewareOptions extends Omit<MiddlewareOptions<Context, unknown, ORPCErrorConstructorMap<any>>, 'next'> {
+  kind: 'middleware'
+  /**
+   * The input the middleware receives, validated by the input schemas defined before it.
+   */
+  input: unknown
+}
+
+/**
+ * The options `effect/wrap` receives when wrapping the effect of a `handlerGen`.
+ *
+ * @see {@link https://orpc.dev/docs/integrations/effect#error-handling | Effect Integration - Error Handling}
+ */
+export interface EffectWrapHandlerOptions extends ProcedureHandlerOptions<Context, unknown, ORPCErrorConstructorMap<any>> {
+  kind: 'handler'
+}
+
+/**
+ * The options `effect/wrap` receives, discriminated by `kind`.
+ *
+ * @see {@link https://orpc.dev/docs/integrations/effect#error-handling | Effect Integration - Error Handling}
+ */
+export type EffectWrapOptions = EffectWrapMiddlewareOptions | EffectWrapHandlerOptions
 
 /**
  * A context shape that provides Effect services to effectful handlers
@@ -11,6 +40,8 @@ export interface WithEffectContext<Services> {
   /**
    * A pre-built Effect context providing the services available within this oRPC context.
    * Automatically provided to any effect that runs under this context.
+   *
+   * References such as `Tracer`, `Logger` or `Scheduler` can be supplied here too.
    *
    * @example
    * ```ts
@@ -28,30 +59,44 @@ export interface WithEffectContext<Services> {
   ['effect/context']: EffectContext.Context<Services>
 
   /**
-   * An optional hook to wrap any effect before it is executed within this oRPC context.
+   * An optional hook to wrap an effect before it is executed within this oRPC context.
    * Useful for adding observability, tracing, or error handling.
+   *
+   * - Runs once per `middlewareGen` and once per `handlerGen` of a request,
+   *   each with its own effect. Use `opts.kind` to tell them apart, and keep the wrap
+   *   idempotent: failures of inner layers reach outer `middlewareGen`s through `next`,
+   *   so they pass through the wrap again.
+   * - The wrapped effect runs with `effect/context`, so the wrap sees the same services
+   *   (`Tracer`, `Logger`, ...) as the handler. Services the wrap provides take precedence
+   *   over `effect/context` for the effect it wraps.
+   * - The returned effect may fail with any error, which is thrown as-is.
+   *
+   * @see {@link https://orpc.dev/docs/integrations/effect#error-handling | Effect Integration - Error Handling}
    *
    * @example
    * ```ts
-   * import { Resource, Tracer } from '@effect/opentelemetry'
-   * import { Context, Effect, Layer } from 'effect'
+   * import { ORPCError } from '@orpc/server'
+   * import { Context, Data, Effect } from 'effect'
+   *
+   * class NotFoundError extends Data.TaggedError('NotFoundError') {}
    *
    * interface ServerContext extends WithEffectContext<never> {}
    *
-   * const TracingLive = Tracer.layerGlobal.pipe(
-   *   Layer.provide(Resource.layerFromEnv()),
-   * )
-   *
    * const context: ServerContext = {
    *   'effect/context': Context.empty(),
-   *   'effect/wrap': (effect) => effect.pipe(Effect.provide(TracingLive)),
+   *   'effect/wrap': (effect, opts) => effect.pipe(
+   *     Effect.mapError(error => error instanceof NotFoundError
+   *       ? new ORPCError('NOT_FOUND', { cause: error })
+   *       : error),
+   *     Effect.withSpan(`${opts.kind}:${opts.path.join('.')}`),
+   *   ),
    * }
    * ```
    */
   ['effect/wrap']?: <A, E>(
     effect: Effect.Effect<A, E>,
-    opts: { path: string[], procedure: AnyProcedure, signal?: undefined | AbortSignal },
-  ) => Effect.Effect<A, E>
+    opts: EffectWrapOptions,
+  ) => Effect.Effect<A, unknown>
 }
 
 /**

@@ -39,17 +39,13 @@ export function handlerGen<
   handler: HandlerGen<TCurrentContext, TInput, TYield, TReturn, TErrorConstructorMap>,
 ): ProcedureHandler<TCurrentContext, TInput, TReturn, TErrorConstructorMap> {
   return (opts, input) => {
-    let ef = Effect.gen(() => handler(opts, input)) as Effect.Effect<TReturn, InferYieldError<TYield>>
+    const effectContext = opts.context['effect/context']
+    const wrap = opts.context['effect/wrap'] as WithEffectContext<any>['effect/wrap']
+    const ef = Effect.gen(() => handler(opts, input)) as Effect.Effect<TReturn, InferYieldError<TYield>>
 
-    if (EffectContext.isContext(opts.context['effect/context'])) {
-      ef = ef.pipe(Effect.provide(opts.context['effect/context']))
-    }
-
-    if (typeof opts.context['effect/wrap'] === 'function') {
-      const intercept = opts.context['effect/wrap'] as Exclude<WithEffectContext<any>['effect/wrap'], undefined>
-      ef = intercept(ef, opts)
-    }
-
-    return runPromise(ef, { signal: opts.signal })
+    return runPromise(
+      typeof wrap === 'function' ? wrap(ef, { ...opts, kind: 'handler' }) : ef,
+      { context: EffectContext.isContext(effectContext) ? effectContext : undefined, signal: opts.signal },
+    )
   }
 }

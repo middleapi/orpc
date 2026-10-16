@@ -1,6 +1,7 @@
-import type { WithEffectContext } from './context'
+import type { EffectWrapOptions, WithEffectContext } from './context'
 import { call, ORPCError, os, type } from '@orpc/server'
-import { Context, Effect } from 'effect'
+import { Cause, Context, Effect, Option, Scheduler, Tracer } from 'effect'
+import { z } from 'zod'
 import { handlerGen } from './handler'
 import * as EffectModule from './runtime'
 
@@ -67,7 +68,7 @@ describe('handlerGen', () => {
     ).resolves.toEqual('output')
 
     expect(runPromiseSpy).toHaveBeenCalledTimes(1)
-    expect(runPromiseSpy).toHaveBeenNthCalledWith(1, expect.anything(), { signal: controller.signal })
+    expect(runPromiseSpy).toHaveBeenNthCalledWith(1, expect.anything(), { context: undefined, signal: controller.signal })
   })
 
   it('can access context, input, errors, signal, ...', async () => {
@@ -115,42 +116,170 @@ describe('handlerGen', () => {
     )).rejects.toThrow('Service2')
   })
 
-  it('can wrap effect execution and receives procedure options', async () => {
-    let wrappedCalls = 0
-    let wrappedPath: string[] | undefined
-    let wrappedProcedure: unknown
-    let wrappedSignal: unknown
+  it('can wrap effect execution and receives handler options', async () => {
+    const wrapOptions: EffectWrapOptions[] = []
+    const wrap: WithEffectContext<never>['effect/wrap'] = (effect, opts) => {
+      wrapOptions.push(opts)
+      return effect
+    }
 
     const procedure = os
       .$context<WithEffectContext<never>>()
+      .input(z.object({ id: z.string().transform(Number) }))
+      .errors({ BASE: {} })
       .handler(handlerGen(function* () {
         return 'output'
       }))
 
     const signal = AbortSignal.timeout(100)
+    const context = { 'effect/context': Context.empty(), 'effect/wrap': wrap }
 
     await expect(call(
       procedure,
-      undefined,
-      {
-        path: ['wrapped', 'procedure'],
-        context: {
-          'effect/context': Context.empty(),
-          'effect/wrap': (effect, opts) => effect.pipe(Effect.tap(() => Effect.sync(() => {
-            wrappedCalls += 1
-            wrappedPath = opts.path
-            wrappedProcedure = opts.procedure
-            wrappedSignal = opts.signal
-          }))),
-        },
-        signal,
-      },
+      { id: '1' },
+      { path: ['wrapped', 'procedure'], context, signal, lastEventId: 'id' },
     )).resolves.toEqual('output')
 
-    expect(wrappedCalls).toBe(1)
-    expect(wrappedPath).toEqual(['wrapped', 'procedure'])
-    expect(wrappedProcedure).toBe(procedure)
-    expect(wrappedSignal).toBe(signal)
+    expect(wrapOptions).toEqual([{
+      kind: 'handler',
+      context,
+      input: { id: 1 },
+      path: ['wrapped', 'procedure'],
+      procedure,
+      signal,
+      lastEventId: 'id',
+      errors: { BASE: expect.any(Function) },
+    }])
+  })
+
+  it('can map failures to a different error type via wrap', async () => {
+    const domainError = new Error('__DOMAIN__')
+
+    const procedure = os
+      .$context<WithEffectContext<never>>()
+      .handler(handlerGen(function* () {
+        return yield* Effect.fail(domainError)
+      }))
+
+    await expect(call(procedure, undefined, {
+      context: {
+        'effect/context': Context.empty(),
+        'effect/wrap': effect => effect.pipe(
+          Effect.mapError(error => new ORPCError('BAD_REQUEST', { cause: error })),
+        ),
+      },
+    })).rejects.toSatisfy(
+      error => error instanceof ORPCError && error.code === 'BAD_REQUEST' && error.cause === domainError,
+    )
+  })
+
+  it('can convert defects to ORPCError via wrap with catchCause', async () => {
+    const defect = new Error('__DEFECT__')
+
+    const procedure = os
+      .$context<WithEffectContext<never>>()
+      .handler(handlerGen(function* () {
+        throw defect
+      }))
+
+    await expect(call(procedure, undefined, {
+      context: {
+        'effect/context': Context.empty(),
+        'effect/wrap': effect => effect.pipe(
+          Effect.catchCause(cause => Effect.fail(new ORPCError('INTERNAL_SERVER_ERROR', { cause: Cause.squash(cause) }))),
+        ),
+      },
+    })).rejects.toSatisfy(
+      error => error instanceof ORPCError && error.code === 'INTERNAL_SERVER_ERROR' && error.cause === defect,
+    )
+  })
+
+  it('runs wrap with effect/context so wrap and handler share services and tracer', async () => {
+    const spans: { name: string, parent: string | undefined }[] = []
+    const tracer = Tracer.make({
+      span(options) {
+        spans.push({
+          name: options.name,
+          parent: Option.getOrUndefined(Option.map(options.parent, parent => parent._tag === 'Span' ? parent.name : undefined)),
+        })
+        return Tracer.nativeTracer.span(options)
+      },
+    })
+
+    let serviceInWrap: Option.Option<Service1['Service']> | undefined
+
+    const procedure = os
+      .$context<WithEffectContext<Service1>>()
+      .handler(handlerGen(function* () {
+        const service1 = yield* Service1
+        return yield* Effect.succeed(`output:${service1.id}`).pipe(Effect.withSpan('handler'))
+      }))
+
+    await expect(call(procedure, undefined, {
+      context: {
+        'effect/context': Context.empty().pipe(
+          Context.add(Service1, { id: 'Service1' }),
+          Context.add(Tracer.Tracer, tracer),
+        ),
+        'effect/wrap': effect => Effect.gen(function* () {
+          serviceInWrap = yield* Effect.serviceOption(Service1)
+          return yield* effect
+        }).pipe(Effect.withSpan('wrap')),
+      },
+    })).resolves.toEqual('output:Service1')
+
+    expect(serviceInWrap).toEqual(Option.some({ id: 'Service1' }))
+    expect(spans).toEqual([
+      { name: 'wrap', parent: undefined },
+      { name: 'handler', parent: 'wrap' },
+    ])
+  })
+
+  it('lets services provided by wrap take precedence over effect/context', async () => {
+    const procedure = os
+      .$context<WithEffectContext<Service1>>()
+      .handler(handlerGen(function* () {
+        const service1 = yield* Service1
+        return `output:${service1.id}`
+      }))
+
+    await expect(call(procedure, undefined, {
+      context: {
+        'effect/context': Context.empty().pipe(Context.add(Service1, { id: 'Service1' })),
+        'effect/wrap': effect => effect.pipe(Effect.provideService(Service1, { id: 'fromWrap' as any })),
+      },
+    })).resolves.toEqual('output:fromWrap')
+  })
+
+  it('runs with the scheduler supplied via effect/context', async () => {
+    const scheduleTask = vi.fn()
+
+    class TrackedScheduler extends Scheduler.MixedScheduler {
+      override makeDispatcher() {
+        const dispatcher = super.makeDispatcher()
+        const original = dispatcher.scheduleTask.bind(dispatcher)
+        dispatcher.scheduleTask = (task, priority) => {
+          scheduleTask()
+          original(task, priority)
+        }
+        return dispatcher
+      }
+    }
+
+    const procedure = os
+      .$context<WithEffectContext<never>>()
+      .handler(handlerGen(function* () {
+        yield* Effect.yieldNow
+        return 'output'
+      }))
+
+    await expect(call(procedure, undefined, {
+      context: {
+        'effect/context': Context.empty().pipe(Context.add(Scheduler.Scheduler, new TrackedScheduler('sync'))),
+      },
+    })).resolves.toEqual('output')
+
+    expect(scheduleTask).toHaveBeenCalled()
   })
 
   it('throws ORPCError failures from wrap as-is', async () => {
@@ -168,7 +297,7 @@ describe('handlerGen', () => {
       {
         context: {
           'effect/context': Context.empty(),
-          'effect/wrap': () => Effect.fail(error) as any,
+          'effect/wrap': () => Effect.fail(error),
         },
       },
     )).rejects.toBe(error)

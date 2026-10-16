@@ -116,27 +116,58 @@ const procedure = os
 
 :::
 
+`effect/context` also accepts Effect references such as `Tracer`, `Logger` or `Scheduler`, which then apply to every effect that runs under this context. For example, Effect recommends a sync scheduler on Cloudflare Workers:
+
+```ts
+import { Context, Scheduler } from 'effect'
+
+const effectContext = Context.empty().pipe(
+  Context.add(Scheduler.Scheduler, new Scheduler.MixedScheduler('sync')),
+)
+```
+
 ### Error Handling
 
 This integration preserves the original error whenever possible. If you call `Effect.fail(error)`, the error is forwarded to [middleware](/docs/middleware) and interceptors, just like a regular thrown error.
 
-To customize this behavior, wrap the effect before execution using `effect/wrap` in the context:
+To customize this behavior, wrap the effect before execution using `effect/wrap` in the context. The wrap may change the error type, for example to turn domain errors into `ORPCError`:
 
-```ts
-import { Context, Effect } from 'effect'
+```ts twoslash
+import type { WithEffectContext } from '@orpc/experimental-effect'
+import { RPCHandler } from '@orpc/server/fetch'
 
 interface ServerContext extends WithEffectContext<never> {}
+
+declare const handler: RPCHandler<ServerContext>
+// ---cut---
+import { ORPCError } from '@orpc/server'
+import { Cause, Context, Data, Effect } from 'effect'
+
+class NotFoundError extends Data.TaggedError('NotFoundError')<{
+  readonly resource: string
+}> {}
 
 export async function fetch(request: Request) {
   const { matched, response } = await handler.handle(request, {
     context: {
       'effect/context': Context.empty(),
-      'effect/wrap': (effect, opts) => effect.pipe(
-        Effect.catchCause((cause) => {
+      'effect/wrap': effect => effect.pipe(
+        // also catches defects, such as errors thrown inside the generator
+        Effect.catchCause((cause): Effect.Effect<never, unknown> => {
+          const error = Cause.squash(cause)
 
-        })
+          if (error instanceof NotFoundError) {
+            return Effect.fail(new ORPCError('NOT_FOUND', {
+              message: `${error.resource} not found`,
+              cause: error,
+            }))
+          }
+
+          // keep everything else, including interruptions, as-is
+          return Effect.failCause(cause)
+        }),
       ),
-    }
+    },
   })
 
   if (matched) {
@@ -146,6 +177,10 @@ export async function fetch(request: Request) {
   return new Response('Not Found', { status: 404 })
 }
 ```
+
+The wrap runs once for every `handlerGen` and `middlewareGen` in a request, each with its own effect. `opts.kind` (`'handler'` or `'middleware'`) tells them apart, and `opts` also holds that layer's `context`, `input`, `path`, `procedure`, `errors` and `signal`. Failures from inner layers reach outer `middlewareGen`s through `next`, so they pass through the wrap again. Keep the wrap idempotent, as the example above is: an `ORPCError` that is already mapped passes through unchanged.
+
+The wrapped effect runs with `effect/context`, so code in the wrap sees the same services, `Tracer` and `Logger` as the handler. Services the wrap provides take precedence over `effect/context` for the effect it wraps.
 
 :::info
 For app level error handling, we recommend [middleware](/docs/middleware) or interceptors.
@@ -336,23 +371,21 @@ const converter = new EffectSchemaToJsonSchemaConverter({ cache: true })
 
 ## OpenTelemetry Integration
 
-First, set up the [oRPC OpenTelemetry integration](/docs/integrations/opentelemetry). Then instrument your Effect to work seamlessly with OpenTelemetry by providing `TracingLive` through `effect/wrap` in the context. This makes Effect tracing equivalent to OpenTelemetry tracing:
+First, set up the [oRPC OpenTelemetry integration](/docs/integrations/opentelemetry). Then install [`@effect/opentelemetry`](https://www.npmjs.com/package/@effect/opentelemetry) and provide its tracer through `effect/context`. This makes Effect tracing equivalent to OpenTelemetry tracing, both in handlers and in `effect/wrap`:
 
 ```ts
-import { Resource, Tracer } from '@effect/opentelemetry'
-import { Context, Effect, Layer } from 'effect'
+import { OtelTracer } from '@effect/opentelemetry'
+import { ManagedRuntime } from 'effect'
 
 interface ServerContext extends WithEffectContext<never> {}
 
-const TracingLive = Tracer.layerGlobal.pipe(
-  Layer.provide(Resource.layerFromEnv()),
-)
+// Build the Effect tracer, backed by the global OpenTelemetry tracer provider, once
+const effectContext = await ManagedRuntime.make(OtelTracer.layerGlobal).context()
 
 export async function fetch(request: Request) {
   const { matched, response } = await handler.handle(request, {
     context: {
-      'effect/context': Context.empty(),
-      'effect/wrap': (effect, opts) => effect.pipe(Effect.provide(TracingLive)),
+      'effect/context': effectContext,
     }
   })
 
