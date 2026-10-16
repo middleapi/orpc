@@ -906,6 +906,19 @@ describe('jsonSchemaCoercer', () => {
     })
   })
 
+  it('keeps its state when the input calls back into the same coercer', () => {
+    const coercer = new JsonSchemaCoercer()
+    const schema: JsonSchema = { $defs: { int: { type: 'integer' } }, type: 'object', properties: { a: { $ref: '#/$defs/int' }, b: { $ref: '#/$defs/int' } } }
+    const value = {
+      get a(): unknown {
+        return coercer.coerce([{ type: 'integer' }, false], '1')
+      },
+      b: '2',
+    }
+
+    expect(coercer.coerce([schema, false], value)).toEqual({ a: 1, b: 2 })
+  })
+
   describe('step budget', () => {
     // each level tries both branches on the same string, so the work doubles per level
     const EXPONENTIAL_SCHEMA: JsonSchema = {

@@ -97,11 +97,21 @@ interface CoercionContext {
   input: unknown
 }
 
+function createContext(): CoercionContext {
+  return { rootSchema: true, memo: undefined, steps: 0, maxSteps: 0, input: undefined }
+}
+
 class CoercionBudgetExceededError extends Error {}
 
 export class JsonSchemaCoercer {
   private readonly nativeCoerceOptions: NativeCoerceOptions
   private readonly maxStepsPerValue: number
+
+  /**
+   * Reused between calls: until V8 warms up, building a fresh context per call adds about half the cost
+   * of coercing a small input. A nested call, from a getter in the input, builds its own.
+   */
+  private idleContext: CoercionContext | undefined = createContext()
 
   constructor(options: JsonSchemaCoercerOptions = {}) {
     this.nativeCoerceOptions = {
@@ -115,13 +125,13 @@ export class JsonSchemaCoercer {
       return value
     }
 
-    const context: CoercionContext = {
-      rootSchema: schema,
-      memo: undefined,
-      steps: 0,
-      maxSteps: this.maxStepsPerValue * MIN_BUDGETED_VALUES,
-      input: value,
-    }
+    const context = this.idleContext ?? createContext()
+    this.idleContext = undefined
+
+    context.rootSchema = schema
+    context.steps = 0
+    context.maxSteps = this.maxStepsPerValue * MIN_BUDGETED_VALUES
+    context.input = value
 
     try {
       const [, coerced] = this.coerceInternal(context, schema, value)
@@ -134,6 +144,12 @@ export class JsonSchemaCoercer {
       }
 
       throw error
+    }
+    finally {
+      // keep no reference to this call's input or results
+      context.memo = undefined
+      context.input = undefined
+      this.idleContext = context
     }
   }
 
