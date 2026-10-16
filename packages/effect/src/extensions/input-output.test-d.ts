@@ -1,6 +1,8 @@
-import type { ContractBuilder, MergedSchema, ProcedureContractBuilderWithInput, ProcedureContractBuilderWithInputOutput, ProcedureContractBuilderWithOutput } from '@orpc/contract'
-import type { Builder, BuilderWithInput, BuilderWithInputOutput, BuilderWithMiddlewares, BuilderWithOutput, Schema } from '@orpc/server'
-import { Schema as EffectSchema } from 'effect'
+import type { ContractBuilder, MergedSchema, ProcedureContractBuilderWithInput, ProcedureContractBuilderWithInputOutput, ProcedureContractBuilderWithOutput, RouterContractClient } from '@orpc/contract'
+import type { Builder, BuilderWithInput, BuilderWithInputOutput, BuilderWithMiddlewares, BuilderWithOutput, RouterClient, Schema } from '@orpc/server'
+import { oc } from '@orpc/contract'
+import { implement, os } from '@orpc/server'
+import { Context, Effect, Schema as EffectSchema, SchemaTransformation } from 'effect'
 import { z } from 'zod'
 import './input-output'
 
@@ -28,7 +30,7 @@ it('adds .input<EffectSchema> .output<EffectSchema> into ContractBuilder', async
 
   expectTypeOf(builder.output(NumberFromString)).toEqualTypeOf<
     ProcedureContractBuilderWithOutput<
-      Schema<string, number>,
+      Schema<number, string>,
       typeof errorMap
     >
   >()
@@ -47,7 +49,7 @@ describe('adds .input<EffectSchema> .output<EffectSchema> into ProcedureContract
   expectTypeOf(builder.output(NumberFromString)).toEqualTypeOf<
     ProcedureContractBuilderWithInputOutput<
       typeof schema1,
-      Schema<string, number>,
+      Schema<number, string>,
       typeof errorMap
     >
   >()
@@ -66,7 +68,7 @@ describe('adds .input<EffectSchema> .output<EffectSchema> into ProcedureContract
 
   expectTypeOf(builder.output(NumberFromString)).toEqualTypeOf<
     ProcedureContractBuilderWithOutput<
-      MergedSchema<Schema<string, number>, typeof schema2>,
+      MergedSchema<Schema<number, string>, typeof schema2>,
       typeof errorMap
     >
   >()
@@ -86,7 +88,7 @@ describe('adds .input<EffectSchema> .output<EffectSchema> into ProcedureContract
   expectTypeOf(builder.output(NumberFromString)).toEqualTypeOf<
     ProcedureContractBuilderWithInputOutput<
       typeof schema1,
-      MergedSchema<Schema<string, number>, typeof schema2>,
+      MergedSchema<Schema<number, string>, typeof schema2>,
       typeof errorMap
     >
   >()
@@ -108,7 +110,7 @@ it('adds .input<EffectSchema> .output<EffectSchema> into Builder', async () => {
     BuilderWithOutput<
       { auth: boolean },
       object,
-      Schema<string, number>,
+      Schema<number, string>,
       typeof errorMap
     >
   >()
@@ -130,7 +132,7 @@ describe('adds .input<EffectSchema> .output<EffectSchema> into BuilderWithMiddle
     BuilderWithOutput<
       { auth: boolean },
       { extra: boolean },
-      Schema<string, number>,
+      Schema<number, string>,
       typeof errorMap
     >
   >()
@@ -153,7 +155,7 @@ describe('adds .input<EffectSchema> .output<EffectSchema> into BuilderWithInput'
       { auth: boolean },
       { extra: boolean },
       typeof schema1,
-      Schema<string, number>,
+      Schema<number, string>,
       typeof errorMap
     >
   >()
@@ -176,7 +178,7 @@ describe('adds .input<EffectSchema> .output<EffectSchema> into BuilderWithOutput
     BuilderWithOutput<
       { auth: boolean },
       { extra: boolean },
-      MergedSchema<Schema<string, number>, typeof schema2>,
+      MergedSchema<Schema<number, string>, typeof schema2>,
       typeof errorMap
     >
   >()
@@ -200,8 +202,64 @@ describe('adds .input<EffectSchema> .output<EffectSchema> into BuilderWithInputO
       { auth: boolean },
       { extra: boolean },
       typeof schema1,
-      MergedSchema<Schema<string, number>, typeof schema2>,
+      MergedSchema<Schema<number, string>, typeof schema2>,
       typeof errorMap
     >
   >()
+})
+
+describe('output direction', () => {
+  const Output = EffectSchema.Struct({ n: EffectSchema.NumberFromString })
+
+  it('handler returns the decoded type and the client receives the encoded type', () => {
+    const procedure = os.output(Output).handler(() => ({ n: 42 }))
+    // @ts-expect-error the encoded type is not a valid handler output
+    os.output(Output).handler(() => ({ n: '42' }))
+
+    const client = {} as RouterClient<{ procedure: typeof procedure }>
+    expectTypeOf<Awaited<ReturnType<typeof client.procedure>>>().toEqualTypeOf<{ readonly n: string }>()
+  })
+
+  it('contract-first handler returns the decoded type and the client receives the encoded type', () => {
+    const contract = { procedure: oc.output(Output) }
+
+    implement(contract).procedure.handler(() => ({ n: 42 }))
+    // @ts-expect-error the encoded type is not a valid handler output
+    implement(contract).procedure.handler(() => ({ n: '42' }))
+
+    const client = {} as RouterContractClient<typeof contract>
+    expectTypeOf<Awaited<ReturnType<typeof client.procedure>>>().toEqualTypeOf<{ readonly n: string }>()
+  })
+
+  it('requires services only for the direction each schema runs in', () => {
+    class Formatter extends Context.Service<Formatter, { readonly format: (n: number) => string }>()('Formatter') {}
+
+    const NeedsDecodingServices = EffectSchema.String.pipe(EffectSchema.decodeTo(EffectSchema.Number, SchemaTransformation.transformEffect({
+      decode: s => Effect.gen(function* () {
+        yield* Formatter
+        return Number(s)
+      }),
+      encode: n => Effect.succeed(`${n}`),
+    })))
+
+    const NeedsEncodingServices = EffectSchema.String.pipe(EffectSchema.decodeTo(EffectSchema.Number, SchemaTransformation.transformEffect({
+      decode: s => Effect.succeed(Number(s)),
+      encode: n => Effect.gen(function* () {
+        const formatter = yield* Formatter
+        return formatter.format(n)
+      }),
+    })))
+
+    os.input(NeedsEncodingServices).output(NeedsDecodingServices)
+    oc.input(NeedsEncodingServices).output(NeedsDecodingServices)
+
+    // @ts-expect-error decoding inputs requires services
+    os.input(NeedsDecodingServices)
+    // @ts-expect-error decoding inputs requires services
+    oc.input(NeedsDecodingServices)
+    // @ts-expect-error encoding outputs requires services
+    os.output(NeedsEncodingServices)
+    // @ts-expect-error encoding outputs requires services
+    oc.output(NeedsEncodingServices)
+  })
 })

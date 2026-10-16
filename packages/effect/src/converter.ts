@@ -1,7 +1,16 @@
 import type { AnySchema } from '@orpc/contract'
 import type { JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
 import { isStandardSchemaOptional } from '@orpc/json-schema'
-import { Schema as EffectSchema } from 'effect'
+import { Schema as EffectSchema, Predicate } from 'effect'
+
+/**
+ * Effect brands `Schema.flip` results with this key but exports no guard for it.
+ */
+const FLIP_TYPE_ID = '~effect/Schema/flip'
+
+function isFlippedSchema(schema: EffectSchema.Top): schema is EffectSchema.flip<EffectSchema.Top> {
+  return Predicate.hasProperty(schema, FLIP_TYPE_ID) && schema[FLIP_TYPE_ID] === FLIP_TYPE_ID
+}
 
 export interface EffectSchemaToJsonSchemaConverterOptions extends EffectSchema.ToJsonSchemaOptions {
   /**
@@ -63,6 +72,14 @@ export class EffectSchemaToJsonSchemaConverter implements JsonSchemaConverter {
   }
 
   private convertEffect(schema: EffectSchema.Top, direction: JsonSchemaConverterDirection): JsonSchema {
+    /**
+     * `.output` stores `Schema.flip(S)`, so its output is the encoded side of `S`. Converting `S` itself in the
+     * opposite direction keeps the same `$defs` (e.g. `Schema.Class`) that `S` produces as an input.
+     */
+    if (isFlippedSchema(schema)) {
+      return this.convertEffect(EffectSchema.flip(schema), direction === 'input' ? 'output' : 'input')
+    }
+
     const { schema: jsonSchema, definitions } = EffectSchema.toJsonSchemaDocument(
       direction === 'input' ? schema : EffectSchema.toType(schema),
       this.toJsonSchemaOptions,

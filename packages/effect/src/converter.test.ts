@@ -24,6 +24,13 @@ describe('effectSchemaToJsonSchemaConverter', () => {
     expect(converter.convert(toStandardSchema(Schema.NumberFromString), direction)).toEqual([jsonSchema, false])
   })
 
+  it.each([
+    ['input', { anyOf: [{ type: 'number' }, { type: 'string', enum: ['Infinity', '-Infinity', 'NaN'] }] }],
+    ['output', { type: 'string' }],
+  ] as const)('uses the %s direction of a flipped schema', (direction, jsonSchema) => {
+    expect(converter.convert(toStandardSchema(Schema.flip(Schema.NumberFromString)), direction)).toEqual([jsonSchema, false])
+  })
+
   it('does not mutate the schema', () => {
     const schema = toStandardSchema(Schema.String)
     converter.convert(schema, 'input')
@@ -55,6 +62,19 @@ describe('effectSchemaToJsonSchemaConverter', () => {
           },
         },
       }, false])
+    })
+
+    it.each([
+      ['input', 'output'],
+      ['output', 'input'],
+    ] as const)('converts a flipped schema in the %s direction like the original in the %s direction', (direction, originalDirection) => {
+      class Planet extends Schema.Class<Planet>('Planet')({ name: Schema.String, createdAt: Schema.DateTimeUtcFromString }) {}
+
+      const Original = Schema.Struct({ count: Schema.NumberFromString, planet: Planet })
+      const [jsonSchema, optional] = converter.convert(toStandardSchema(Schema.flip(Original)), direction)
+
+      expect([jsonSchema, optional]).toEqual(converter.convert(toStandardSchema(Original), originalDirection))
+      expect(jsonSchema).toMatchObject({ properties: { planet: { $ref: '#/$defs/PlanetEncoded' } } })
     })
 
     it('resolves recursion into a $ref', () => {

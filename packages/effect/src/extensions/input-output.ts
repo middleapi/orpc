@@ -1,14 +1,39 @@
 import type { AnySchema, ErrorMap, MergedSchema, Schema } from '@orpc/contract'
 import type { Context } from '@orpc/server'
-import { ContractBuilder } from '@orpc/contract'
+import { ContractBuilder, getHiddenMetaPlugins, setHiddenMetaPlugins } from '@orpc/contract'
 import { Builder } from '@orpc/server'
 import { Schema as EffectSchema } from 'effect'
 import { toStandardSchema } from '../schema'
 
-function isEffectConstraintDecoder(
-  schema: AnySchema | EffectSchema.ConstraintDecoder<any>,
-): schema is EffectSchema.ConstraintDecoder<any> {
+function isEffectSchema<T extends EffectSchema.Constraint>(schema: AnySchema | T): schema is T {
   return EffectSchema.isSchema(schema)
+}
+
+/**
+ * Reuses one flipped schema per output schema, so procedures sharing an output schema
+ * still share one schema instance (e.g. for the JSON Schema converter `cache` option).
+ */
+const OUTPUT_STANDARD_SCHEMAS = new WeakMap<object, AnySchema>()
+
+/**
+ * Like Effect's HttpApi and RPC, outputs are encoded: the handler returns `Type`
+ * and the client receives `Encoded`, so the output schema validates through the flipped codec.
+ */
+function toOutputStandardSchema(schema: EffectSchema.ConstraintEncoder<unknown>): AnySchema {
+  let converted = OUTPUT_STANDARD_SCHEMAS.get(schema)
+
+  if (!converted) {
+    // `isSchema` guarantees a full schema, and the `.output` overloads guarantee encoding needs no services
+    converted = toStandardSchema(EffectSchema.flip(schema as EffectSchema.Codec<unknown, unknown>))
+    OUTPUT_STANDARD_SCHEMAS.set(schema, converted)
+  }
+
+  const metaPlugins = getHiddenMetaPlugins(schema)
+  if (metaPlugins) {
+    setHiddenMetaPlugins(converted, metaPlugins)
+  }
+
+  return converted
 }
 
 declare module '@orpc/contract' {
@@ -19,9 +44,9 @@ declare module '@orpc/contract' {
       schema: S,
     ): ProcedureContractBuilderWithInput<Schema<S['Encoded'], S['Type']>, TErrorMap>
 
-    output<S extends EffectSchema.ConstraintDecoder<any>>(
+    output<S extends EffectSchema.ConstraintEncoder<any>>(
       schema: S,
-    ): ProcedureContractBuilderWithOutput<Schema<S['Encoded'], S['Type']>, TErrorMap>
+    ): ProcedureContractBuilderWithOutput<Schema<S['Type'], S['Encoded']>, TErrorMap>
   }
 
   interface ProcedureContractBuilderWithInput<
@@ -32,9 +57,9 @@ declare module '@orpc/contract' {
       schema: S,
     ): ProcedureContractBuilderWithInput<MergedSchema<Schema<S['Encoded'], S['Type']>, TInputSchema>, TErrorMap>
 
-    output<S extends EffectSchema.ConstraintDecoder<any>>(
+    output<S extends EffectSchema.ConstraintEncoder<any>>(
       schema: S,
-    ): ProcedureContractBuilderWithInputOutput<TInputSchema, Schema<S['Encoded'], S['Type']>, TErrorMap>
+    ): ProcedureContractBuilderWithInputOutput<TInputSchema, Schema<S['Type'], S['Encoded']>, TErrorMap>
   }
 
   interface ProcedureContractBuilderWithOutput<
@@ -45,9 +70,9 @@ declare module '@orpc/contract' {
       schema: S,
     ): ProcedureContractBuilderWithInputOutput<Schema<S['Encoded'], S['Type']>, TOutputSchema, TErrorMap>
 
-    output<S extends EffectSchema.ConstraintDecoder<any>>(
+    output<S extends EffectSchema.ConstraintEncoder<any>>(
       schema: S,
-    ): ProcedureContractBuilderWithOutput<MergedSchema<Schema<S['Encoded'], S['Type']>, TOutputSchema>, TErrorMap>
+    ): ProcedureContractBuilderWithOutput<MergedSchema<Schema<S['Type'], S['Encoded']>, TOutputSchema>, TErrorMap>
   }
 
   interface ProcedureContractBuilderWithInputOutput<
@@ -59,20 +84,20 @@ declare module '@orpc/contract' {
       schema: S,
     ): ProcedureContractBuilderWithInputOutput<MergedSchema<Schema<S['Encoded'], S['Type']>, TInputSchema>, TOutputSchema, TErrorMap>
 
-    output<S extends EffectSchema.ConstraintDecoder<any>>(
+    output<S extends EffectSchema.ConstraintEncoder<any>>(
       schema: S,
-    ): ProcedureContractBuilderWithInputOutput<TInputSchema, MergedSchema<Schema<S['Encoded'], S['Type']>, TOutputSchema>, TErrorMap>
+    ): ProcedureContractBuilderWithInputOutput<TInputSchema, MergedSchema<Schema<S['Type'], S['Encoded']>, TOutputSchema>, TErrorMap>
   }
 }
 
 const OriginalContractBuilderInput = ContractBuilder.prototype.input
 ContractBuilder.prototype.input = function input(schema: AnySchema | EffectSchema.ConstraintDecoder<any>) {
-  return OriginalContractBuilderInput.bind(this)(isEffectConstraintDecoder(schema) ? toStandardSchema(schema) : schema)
+  return OriginalContractBuilderInput.bind(this)(isEffectSchema(schema) ? toStandardSchema(schema) : schema)
 }
 
 const OriginalContractBuilderOutput = ContractBuilder.prototype.output
-ContractBuilder.prototype.output = function output(schema: AnySchema | EffectSchema.ConstraintDecoder<any>) {
-  return OriginalContractBuilderOutput.bind(this)(isEffectConstraintDecoder(schema) ? toStandardSchema(schema) : schema)
+ContractBuilder.prototype.output = function output(schema: AnySchema | EffectSchema.ConstraintEncoder<any>) {
+  return OriginalContractBuilderOutput.bind(this)(isEffectSchema(schema) ? toOutputStandardSchema(schema) : schema)
 }
 
 declare module '@orpc/server' {
@@ -84,9 +109,9 @@ declare module '@orpc/server' {
       schema: S,
     ): BuilderWithInput<TInitialContext, object, Schema<S['Encoded'], S['Type']>, TErrorMap>
 
-    output<S extends EffectSchema.ConstraintDecoder<any>>(
+    output<S extends EffectSchema.ConstraintEncoder<any>>(
       schema: S,
-    ): BuilderWithOutput<TInitialContext, object, Schema<S['Encoded'], S['Type']>, TErrorMap>
+    ): BuilderWithOutput<TInitialContext, object, Schema<S['Type'], S['Encoded']>, TErrorMap>
   }
 
   interface BuilderWithMiddlewares<
@@ -98,9 +123,9 @@ declare module '@orpc/server' {
       schema: S,
     ): BuilderWithInput<TInitialContext, TInjectedContext, Schema<S['Encoded'], S['Type']>, TErrorMap>
 
-    output<S extends EffectSchema.ConstraintDecoder<any>>(
+    output<S extends EffectSchema.ConstraintEncoder<any>>(
       schema: S,
-    ): BuilderWithOutput<TInitialContext, TInjectedContext, Schema<S['Encoded'], S['Type']>, TErrorMap>
+    ): BuilderWithOutput<TInitialContext, TInjectedContext, Schema<S['Type'], S['Encoded']>, TErrorMap>
   }
 
   interface BuilderWithInput<
@@ -113,9 +138,9 @@ declare module '@orpc/server' {
       schema: S,
     ): BuilderWithInput<TInitialContext, TInjectedContext, MergedSchema<Schema<S['Encoded'], S['Type']>, TInputSchema>, TErrorMap>
 
-    output<S extends EffectSchema.ConstraintDecoder<any>>(
+    output<S extends EffectSchema.ConstraintEncoder<any>>(
       schema: S,
-    ): BuilderWithInputOutput<TInitialContext, TInjectedContext, TInputSchema, Schema<S['Encoded'], S['Type']>, TErrorMap>
+    ): BuilderWithInputOutput<TInitialContext, TInjectedContext, TInputSchema, Schema<S['Type'], S['Encoded']>, TErrorMap>
   }
 
   interface BuilderWithOutput<
@@ -128,9 +153,9 @@ declare module '@orpc/server' {
       schema: S,
     ): BuilderWithInputOutput<TInitialContext, TInjectedContext, Schema<S['Encoded'], S['Type']>, TOutputSchema, TErrorMap>
 
-    output<S extends EffectSchema.ConstraintDecoder<any>>(
+    output<S extends EffectSchema.ConstraintEncoder<any>>(
       schema: S,
-    ): BuilderWithOutput<TInitialContext, TInjectedContext, MergedSchema<Schema<S['Encoded'], S['Type']>, TOutputSchema>, TErrorMap>
+    ): BuilderWithOutput<TInitialContext, TInjectedContext, MergedSchema<Schema<S['Type'], S['Encoded']>, TOutputSchema>, TErrorMap>
   }
 
   interface BuilderWithInputOutput<
@@ -144,19 +169,19 @@ declare module '@orpc/server' {
       schema: S,
     ): BuilderWithInputOutput<TInitialContext, TInjectedContext, MergedSchema<Schema<S['Encoded'], S['Type']>, TInputSchema>, TOutputSchema, TErrorMap>
 
-    output<S extends EffectSchema.ConstraintDecoder<any>>(
+    output<S extends EffectSchema.ConstraintEncoder<any>>(
       schema: S,
-    ): BuilderWithInputOutput<TInitialContext, TInjectedContext, TInputSchema, MergedSchema<Schema<S['Encoded'], S['Type']>, TOutputSchema>, TErrorMap>
+    ): BuilderWithInputOutput<TInitialContext, TInjectedContext, TInputSchema, MergedSchema<Schema<S['Type'], S['Encoded']>, TOutputSchema>, TErrorMap>
 
   }
 }
 
 const OriginalBuilderInput = Builder.prototype.input
 Builder.prototype.input = function input(schema: AnySchema | EffectSchema.ConstraintDecoder<any>) {
-  return OriginalBuilderInput.bind(this)(isEffectConstraintDecoder(schema) ? toStandardSchema(schema) : schema)
+  return OriginalBuilderInput.bind(this)(isEffectSchema(schema) ? toStandardSchema(schema) : schema)
 }
 
 const OriginalBuilderOutput = Builder.prototype.output
-Builder.prototype.output = function output(schema: AnySchema | EffectSchema.ConstraintDecoder<any>) {
-  return OriginalBuilderOutput.bind(this)(isEffectConstraintDecoder(schema) ? toStandardSchema(schema) : schema)
+Builder.prototype.output = function output(schema: AnySchema | EffectSchema.ConstraintEncoder<any>) {
+  return OriginalBuilderOutput.bind(this)(isEffectSchema(schema) ? toOutputStandardSchema(schema) : schema)
 }
