@@ -266,17 +266,22 @@ The effects are lazy: the client is invoked each time the effect runs, so they w
 
 ## Effect Schema
 
-oRPC natively supports [Standard Schema](https://standardschema.dev/schema#what-schema-libraries-implement-the-spec), and [Effect Schema](https://effect.website/docs/schema/introduction/) implements that spec through [Schema.toStandardSchemaV1](https://effect.website/docs/schema/standard-schema/):
+oRPC natively supports [Standard Schema](https://standardschema.dev/schema#what-schema-libraries-implement-the-spec). Use `toStandardSchema` to turn an [Effect Schema](https://effect.website/docs/schema/introduction/) into one:
 
 ```ts
+import { toStandardSchema } from '@orpc/experimental-effect'
 import { Schema } from 'effect'
 
 const procedure = os
-  .input(Schema.toStandardSchemaV1(Schema.Struct({ name: Schema.String })))
+  .input(toStandardSchema(Schema.Struct({ name: Schema.String })))
   .handler(handlerGen(function* ({ input, context }) {
     return `Hello ${input.name}!`
   }))
 ```
+
+:::warning
+Prefer `toStandardSchema` over `Schema.toStandardSchemaV1`. Effect's adapter reports defects, such as a transformation or check that throws, as validation issues containing the error message and stack trace, which oRPC would send to the client. `toStandardSchema` rethrows them instead, so the client receives a generic `INTERNAL_SERVER_ERROR`.
+:::
 
 ### `.input` and `.output` Extensions
 
