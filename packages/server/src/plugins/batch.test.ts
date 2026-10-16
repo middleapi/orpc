@@ -377,15 +377,11 @@ describe('batchHandlerPlugin', () => {
       expect(response!.status).toBe(207)
       expect(response!.headers.get('standard-server')).toEqual('octet-stream')
       expect(response!.headers.get('content-type')).toEqual('application/vnd.orpc.batch')
-
-      expect(handlerFn).toHaveBeenCalledTimes(0)
+      expect(handlerFn).toHaveBeenCalledTimes(1)
 
       // Verify the binary format: 4-byte length prefix + encoded peer message.
       const buffer = new Uint8Array(await response!.arrayBuffer())
       expect(buffer.length).toBeGreaterThan(4)
-
-      // Streaming batch is non-blocking; handler resolves while stream is consumed.
-      expect(handlerFn).toHaveBeenCalledTimes(1)
 
       const { messageLength } = readLengthPrefixedChunk(buffer)
       expect(buffer.length).toBe(4 + messageLength)
@@ -413,6 +409,85 @@ describe('batchHandlerPlugin', () => {
       const { messageLength, payload } = readLengthPrefixedChunk(buffer)
       expect(messageLength).toBe(payload.length)
       expect(new TextDecoder().decode(payload)).toContain('__TEST__')
+    })
+
+    describe('holding the response', () => {
+      function createGatedHandler() {
+        const gate = promiseWithResolvers<void>()
+
+        const handler = createHandler(new BatchHandlerPlugin(), {
+          ping: os.handler(() => 'pong'),
+          slow: os.handler(async () => {
+            await gate.promise
+            return 'slow'
+          }),
+          wait: os.handler(({ signal }) => new Promise<void>((resolve) => {
+            if (signal!.aborted) {
+              resolve()
+            }
+            signal!.addEventListener('abort', () => resolve())
+          })),
+        })
+
+        return { handler, gate }
+      }
+
+      it('holds the response until a sub-request sends its first message', async () => {
+        const { handler, gate } = createGatedHandler()
+        let settled = false
+        const result = handler.handle(createBatchRequest({
+          mode: 'streaming',
+          messages: [makePeerRequestMessage('0', '/slow')],
+        })).finally(() => {
+          settled = true
+        })
+
+        await sleep(10)
+        expect(settled).toBe(false)
+
+        gate.resolve()
+        const { response } = await result
+
+        expect(response!.status).toBe(207)
+        expect(response!.headers.get('standard-server')).toEqual('octet-stream')
+        expect(await readAllMessages(response!)).toEqual([
+          expect.objectContaining({ id: '0', kind: 'response' }),
+        ])
+      })
+
+      it('starts streaming at the first message, without waiting for the other sub-requests', async () => {
+        const { handler, gate } = createGatedHandler()
+        const { response } = await handler.handle(createBatchRequest({
+          mode: 'streaming',
+          messages: [makePeerRequestMessage('0', '/slow'), makePeerRequestMessage('1', '/ping')],
+        }))
+
+        expect(response!.headers.get('standard-server')).toEqual('octet-stream')
+
+        gate.resolve()
+        const messages = await readAllMessages(response!)
+
+        expect(messages.map(m => m.id)).toEqual(['1', '0'])
+      })
+
+      it('starts streaming once a sub-request finishes without sending anything', async () => {
+        const { handler, gate } = createGatedHandler()
+        const { response } = await handler.handle(createBatchRequest({
+          mode: 'streaming',
+          messages: [
+            makePeerRequestMessage('0', '/wait'),
+            makePeerRequestMessage('1', '/slow'),
+            { kind: 'cancel', id: '0' },
+          ],
+        }))
+
+        expect(response!.headers.get('standard-server')).toEqual('octet-stream')
+
+        gate.resolve()
+        expect(await readAllMessages(response!)).toEqual([
+          expect.objectContaining({ id: '1', kind: 'response' }),
+        ])
+      })
     })
   })
 
@@ -696,9 +771,10 @@ describe('batchHandlerPlugin', () => {
       const { promise: gate, resolve } = promiseWithResolvers<void>()
 
       const slowRouter = {
-        ping: os.handler(async () => {
+        ping: os.handler(() => 'pong'),
+        slow: os.handler(async () => {
           await gate
-          return 'pong'
+          return 'slow'
         }),
       }
 
@@ -708,13 +784,17 @@ describe('batchHandlerPlugin', () => {
 
       const { response } = await handler.handle(createBatchRequest({
         mode: 'streaming',
-        messages: [makePeerRequestMessage(0, '/ping')],
+        messages: [makePeerRequestMessage(0, '/ping'), makePeerRequestMessage(1, '/slow')],
       }))
 
       expect(response!.body).toBeInstanceOf(ReadableStream)
 
       const reader = (response!.body as ReadableStream<Uint8Array>).getReader()
       const frames: Uint8Array[] = []
+
+      // The ping response message: its length prefix, then its payload
+      await reader.read()
+      await reader.read()
 
       const readNext = async () => {
         const { done, value } = await reader.read()
@@ -724,7 +804,7 @@ describe('batchHandlerPlugin', () => {
         return done
       }
 
-      // First keep-alive after interval with no real message yet.
+      // First keep-alive after interval with no new message.
       const firstKeepAlive = readNext()
       await vi.advanceTimersByTimeAsync(100)
       await firstKeepAlive
@@ -806,9 +886,10 @@ describe('batchHandlerPlugin', () => {
       const gate = new Promise<void>(() => {})
 
       const slowRouter = {
-        ping: os.handler(async () => {
+        ping: os.handler(() => 'pong'),
+        slow: os.handler(async () => {
           await gate
-          return 'pong'
+          return 'slow'
         }),
       }
 
@@ -818,12 +899,16 @@ describe('batchHandlerPlugin', () => {
 
       const { response } = await handler.handle(createBatchRequest({
         mode: 'streaming',
-        messages: [makePeerRequestMessage(0, '/ping')],
+        messages: [makePeerRequestMessage(0, '/ping'), makePeerRequestMessage(1, '/slow')],
       }))
 
       expect(vi.getTimerCount()).toBeGreaterThan(0)
 
       const reader = (response!.body as ReadableStream<Uint8Array>).getReader()
+
+      // The ping response message: its length prefix, then its payload
+      await reader.read()
+      await reader.read()
 
       const first = reader.read()
       await vi.advanceTimersByTimeAsync(50)
@@ -838,9 +923,10 @@ describe('batchHandlerPlugin', () => {
       const gate = new Promise<void>(() => {})
 
       const slowRouter = {
-        ping: os.handler(async () => {
+        ping: os.handler(() => 'pong'),
+        slow: os.handler(async () => {
           await gate
-          return 'pong'
+          return 'slow'
         }),
       }
 
@@ -870,10 +956,16 @@ describe('batchHandlerPlugin', () => {
         keepAlive: { enabled: true, interval: 50 },
       }), slowRouter)
 
-      await handler.handle(createBatchRequest({
+      const { response } = await handler.handle(createBatchRequest({
         mode: 'streaming',
-        messages: [makePeerRequestMessage(0, '/ping')],
+        messages: [makePeerRequestMessage(0, '/ping'), makePeerRequestMessage(1, '/slow')],
       }))
+
+      const reader = (response!.body as ReadableStream<Uint8Array>).getReader()
+
+      // The ping response message: its length prefix, then its payload
+      await reader.read()
+      await reader.read()
 
       // One keep-alive setInterval is scheduled while the stream is idle.
       expect(vi.getTimerCount()).toBe(1)

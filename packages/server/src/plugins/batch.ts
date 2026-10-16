@@ -96,6 +96,7 @@ export interface BatchHandlerPluginOptions<T extends Context> {
  * batch into sub-requests and streaming their responses back together.
  *
  * @remarks
+ * In streaming mode, the batch response is held until a sub-request sends its first message or finishes.
  * In buffered mode, the batch still streams once a sub-response is a stream
  * (an event iterator or a `ReadableStream`), since it may never end.
  *
@@ -263,6 +264,10 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       }
 
       const peer = new ServerPeer(async (message) => {
+        if (mode === 'streaming') {
+          startStreaming()
+        }
+
         if (streamController === undefined) {
           bufferedMessages.push(message)
         }
@@ -276,8 +281,10 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       /**
        * Opens the binary length-prefixed stream that every later message is written to,
        * starting with the messages buffered so far, which `flushed` waits for.
+       *
+       * A function declaration, since it and the peer above refer to each other.
        */
-      const startStreaming = () => {
+      function startStreaming() {
         if (streamController !== undefined) {
           return
         }
@@ -329,7 +336,18 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       }
 
       const runSubrequests = async (): Promise<void> => {
-        const promise = Promise.all(messages.map(msg => peer.message(msg, handleIndividualRequest)))
+        const promise = Promise.all(messages.map(async (msg) => {
+          try {
+            await peer.message(msg, handleIndividualRequest)
+          }
+          finally {
+            // A subrequest can finish without sending anything, such as when it is aborted
+            if (mode === 'streaming') {
+              startStreaming()
+            }
+          }
+        }))
+
         const signal = interceptorOptions.request.signal
         const closePeer = () => peer.close(signal?.reason)
 
@@ -347,13 +365,14 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       }
 
-      if (mode === 'streaming') {
-        startStreaming()
-      }
-
+      /**
+       * The batch response is held until there is something to send down. A streaming batch starts
+       * streaming at the first peer message or once the first subrequest finishes, whichever comes
+       * first, while a buffered batch only streams once a subresponse turns out to be a stream.
+       */
       const subrequests = runSubrequests()
 
-      // Undefined when every subresponse finished before any turned out to be a stream
+      // Undefined when every subrequest finished before the batch started streaming
       const started = await Promise.race([streaming.promise, subrequests.then(() => undefined)])
 
       if (started === undefined) {
