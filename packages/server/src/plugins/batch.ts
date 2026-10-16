@@ -96,7 +96,6 @@ export interface BatchHandlerPluginOptions<T extends Context> {
  * batch into sub-requests and streaming their responses back together.
  *
  * @remarks
- * In streaming mode, the batch response is held until a sub-request sends its first message or finishes.
  * In buffered mode, the batch still streams once a sub-response is a stream
  * (an event iterator or a `ReadableStream`), since it may never end.
  *
@@ -324,10 +323,9 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
 
         /**
-         * A streaming batch starts once its first subrequest finishes, even one that will send
-         * nothing because it was aborted. A stream is meant to be read as it arrives and might never
-         * end, so buffering it would hold back the whole batch. Either way, start streaming before
-         * the peer sends the subresponse, so none of it is buffered.
+         * A stream is meant to be read as it arrives and might never end, so buffering it would
+         * hold back the whole batch. Start streaming before the peer sends its first message,
+         * so none of that subresponse is buffered.
          */
         if (mode === 'streaming' || response.body instanceof ReadableStream || isAsyncIteratorObject(response.body)) {
           startStreaming()
@@ -357,7 +355,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
       const subrequests = runSubrequests()
 
-      // Undefined when every subrequest finished before the batch started streaming
+      // Undefined when every subresponse finished before any turned out to be a stream
       const started = await Promise.race([streaming.promise, subrequests.then(() => undefined)])
 
       if (started === undefined) {
