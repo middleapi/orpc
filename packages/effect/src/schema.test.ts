@@ -1,6 +1,6 @@
 import { getHiddenMetaPlugins, setHiddenMetaPlugins } from '@orpc/contract'
-import { Effect, Schema, SchemaTransformation } from 'effect'
-import { toStandardSchema } from './schema'
+import { Effect, Schema, SchemaIssue, SchemaTransformation } from 'effect'
+import { isConvertedEffectSchema, toStandardSchema } from './schema'
 
 const NumberFromString = Schema.String.pipe(Schema.decodeTo(Schema.Number, SchemaTransformation.transform({
   decode: Number,
@@ -63,6 +63,14 @@ describe('toStandardSchema', () => {
     expect(converted['~standard'].validate({})).toEqual({
       issues: [{ path: ['a'], message: 'Missing key' }],
     })
+  })
+
+  it('isConvertedEffectSchema', () => {
+    const schema = Schema.Struct({ a: Schema.Number })
+
+    expect(isConvertedEffectSchema(toStandardSchema(schema))).toBe(true)
+    expect(isConvertedEffectSchema(schema)).toBe(false)
+    expect(isConvertedEffectSchema(Schema.toStandardSchemaV1(Schema.Struct({ a: Schema.Number })))).toBe(false)
   })
 
   describe('validate', () => {
@@ -134,6 +142,49 @@ describe('toStandardSchema', () => {
 
         expect(() => schema['~standard'].validate('1')).toThrow()
       })
+    })
+  })
+
+  describe('options', () => {
+    const struct = Schema.Struct({ a: Schema.String.check(Schema.isMinLength(2)) })
+
+    it('leafHook', () => {
+      const schema = toStandardSchema(struct, { leafHook: issue => `leaf: ${issue._tag}` })
+
+      expect(schema['~standard'].validate({})).toEqual({
+        issues: [{ path: ['a'], message: 'leaf: MissingKey' }],
+      })
+    })
+
+    it('checkHook', () => {
+      const schema = toStandardSchema(struct, { checkHook: () => 'too short' })
+
+      expect(schema['~standard'].validate({ a: 'a' })).toEqual({
+        issues: [{ path: ['a'], message: 'too short' }],
+      })
+    })
+
+    it('parseOptions', () => {
+      const schema = toStandardSchema(Schema.Struct({ a: Schema.String, b: Schema.String }), {
+        parseOptions: { onExcessProperty: 'error', errors: 'first' },
+      })
+
+      expect(schema['~standard'].validate({ a: 'a', b: 'b', c: 'c' })).toEqual({
+        issues: [{ path: ['c'], message: 'Expected no excess property' }],
+      })
+      expect(schema['~standard'].validate({})).toEqual({
+        issues: [{ path: ['a'], message: 'Missing key' }],
+      })
+    })
+
+    it('can convert the same schema with different options', () => {
+      const first = toStandardSchema(struct, { leafHook: () => 'first' })
+      const second = toStandardSchema(struct, { leafHook: () => 'second' })
+      const third = toStandardSchema(second, { leafHook: SchemaIssue.defaultLeafHook })
+
+      expect(first['~standard'].validate({})).toEqual({ issues: [{ path: ['a'], message: 'first' }] })
+      expect(second['~standard'].validate({})).toEqual({ issues: [{ path: ['a'], message: 'second' }] })
+      expect(third['~standard'].validate({})).toEqual({ issues: [{ path: ['a'], message: 'Missing key' }] })
     })
   })
 })

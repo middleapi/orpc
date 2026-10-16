@@ -1,7 +1,28 @@
-import type { Schema } from '@orpc/contract'
+import type { AnySchema, Schema } from '@orpc/contract'
 import type { SchemaAST } from 'effect'
 import { getHiddenMetaPlugins, setHiddenMetaPlugins } from '@orpc/contract'
 import { Cause, Effect, Schema as EffectSchema, Exit, Scheduler, SchemaIssue, SchemaParser } from 'effect'
+
+export interface ToStandardSchemaOptions {
+  /**
+   * Customizes the messages of leaf issues, such as `InvalidType` or `MissingKey`.
+   */
+  leafHook?: SchemaIssue.LeafHook | undefined
+
+  /**
+   * Customizes the messages of failed checks.
+   */
+  checkHook?: SchemaIssue.CheckHook | undefined
+
+  /**
+   * Options for decoding, such as `onExcessProperty`.
+   *
+   * @default { errors: 'all' }
+   */
+  parseOptions?: SchemaAST.ParseOptions | undefined
+}
+
+const convertedSchemas = new WeakSet<object>()
 
 /**
  * Converts an Effect schema into a Standard Schema that oRPC can use for validation.
@@ -15,14 +36,15 @@ import { Cause, Effect, Schema as EffectSchema, Exit, Scheduler, SchemaIssue, Sc
  */
 export function toStandardSchema<S extends EffectSchema.ConstraintDecoder<any>>(
   schema: S,
+  options: ToStandardSchemaOptions = {},
 ): Schema<S['Encoded'], S['Type']> & S {
   const converted: any = EffectSchema.isSchema(schema)
     ? schema.rebuild(schema.ast)
     : EffectSchema.make(schema.ast)
 
   const decode = SchemaParser.decodeUnknownEffect(schema)
-  const parseOptions: SchemaAST.ParseOptions = { errors: 'all' }
-  const formatter = SchemaIssue.makeFormatterStandardSchemaV1()
+  const parseOptions: SchemaAST.ParseOptions = { errors: 'all', ...options.parseOptions }
+  const formatter = SchemaIssue.makeFormatterStandardSchemaV1(options)
 
   const validate = (value: unknown) => {
     const fiber = Effect.runFork(
@@ -65,7 +87,16 @@ export function toStandardSchema<S extends EffectSchema.ConstraintDecoder<any>>(
     setHiddenMetaPlugins(converted, metaPlugins)
   }
 
+  convertedSchemas.add(converted)
+
   return converted
+}
+
+/**
+ * Returns `true` if the schema was created by {@link toStandardSchema}.
+ */
+export function isConvertedEffectSchema(schema: object): schema is AnySchema {
+  return convertedSchemas.has(schema)
 }
 
 function unwrapValidationExit<T>(exit: Exit.Exit<T>): T {

@@ -4,12 +4,16 @@ import { RPCHandler } from '@orpc/server/fetch'
 import { Schema as EffectSchema, SchemaTransformation } from 'effect'
 import { z } from 'zod'
 import * as SchemaModule from '../schema'
-import './input-output'
+import { setInputOutputExtensionOptions } from './input-output'
 
 const toStandardSchemaSpy = vi.spyOn(SchemaModule, 'toStandardSchema')
 
 beforeEach(() => {
   vi.clearAllMocks()
+})
+
+afterEach(() => {
+  setInputOutputExtensionOptions({})
 })
 
 const standardSchema1 = z.object({ schema1: z.number().transform(n => `${n}`) })
@@ -25,8 +29,8 @@ it('accepts both standard schema and effect schema in ContractBuilder', () => {
     .output(standardSchema2)
 
   expect(toStandardSchemaSpy).toHaveBeenCalledTimes(2)
-  expect(toStandardSchemaSpy).toHaveBeenNthCalledWith(1, effectSchema1)
-  expect(toStandardSchemaSpy).toHaveBeenNthCalledWith(2, effectSchema2)
+  expect(toStandardSchemaSpy).toHaveBeenNthCalledWith(1, effectSchema1, {})
+  expect(toStandardSchemaSpy).toHaveBeenNthCalledWith(2, effectSchema2, {})
 
   expect(procedure['~orpc'].inputSchemas).toEqual([standardSchema1, toStandardSchemaSpy.mock.results[0]?.value])
   expect(procedure['~orpc'].outputSchemas).toEqual([toStandardSchemaSpy.mock.results[1]?.value, standardSchema2])
@@ -40,11 +44,44 @@ it('accepts both standard schema and effect schema in Builder', () => {
     .output(standardSchema2)
 
   expect(toStandardSchemaSpy).toHaveBeenCalledTimes(2)
-  expect(toStandardSchemaSpy).toHaveBeenNthCalledWith(1, effectSchema1)
-  expect(toStandardSchemaSpy).toHaveBeenNthCalledWith(2, effectSchema2)
+  expect(toStandardSchemaSpy).toHaveBeenNthCalledWith(1, effectSchema1, {})
+  expect(toStandardSchemaSpy).toHaveBeenNthCalledWith(2, effectSchema2, {})
 
   expect(builder['~orpc'].inputSchemas).toEqual([standardSchema1, toStandardSchemaSpy.mock.results[0]?.value])
   expect(builder['~orpc'].outputSchemas).toEqual([toStandardSchemaSpy.mock.results[1]?.value, standardSchema2])
+})
+
+it('does not convert schemas already converted by toStandardSchema', () => {
+  const input = SchemaModule.toStandardSchema(effectSchema1, { parseOptions: { onExcessProperty: 'error' } })
+  const output = SchemaModule.toStandardSchema(effectSchema2)
+  vi.clearAllMocks()
+
+  const procedure = oc.input(input).output(output)
+  const builder = os.input(input).output(output)
+
+  expect(toStandardSchemaSpy).not.toHaveBeenCalled()
+  expect(procedure['~orpc'].inputSchemas).toEqual([input])
+  expect(procedure['~orpc'].outputSchemas).toEqual([output])
+  expect(builder['~orpc'].inputSchemas).toEqual([input])
+  expect(builder['~orpc'].outputSchemas).toEqual([output])
+})
+
+it('setInputOutputExtensionOptions', () => {
+  const options = { parseOptions: { onExcessProperty: 'error' as const } }
+  setInputOutputExtensionOptions(options)
+
+  const procedure = oc.input(effectSchema1).output(effectSchema2)
+  os.input(effectSchema1).output(effectSchema2)
+
+  expect(toStandardSchemaSpy).toHaveBeenCalledTimes(4)
+  expect(toStandardSchemaSpy).toHaveBeenNthCalledWith(1, effectSchema1, options)
+  expect(toStandardSchemaSpy).toHaveBeenNthCalledWith(2, effectSchema2, options)
+  expect(toStandardSchemaSpy).toHaveBeenNthCalledWith(3, effectSchema1, options)
+  expect(toStandardSchemaSpy).toHaveBeenNthCalledWith(4, effectSchema2, options)
+
+  expect(procedure['~orpc'].inputSchemas?.[0]?.['~standard'].validate({ schema1: 1, extra: 1 })).toEqual({
+    issues: [{ path: ['extra'], message: 'Expected no excess property' }],
+  })
 })
 
 describe('defects during validation', () => {
