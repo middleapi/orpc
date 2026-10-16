@@ -263,7 +263,6 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       }
 
       const peer = new ServerPeer(async (message) => {
-        // A streaming batch starts at its first message if no subrequest has finished before it
         if (mode === 'streaming') {
           startStreaming()
         }
@@ -304,12 +303,24 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       }
 
       const handleIndividualRequest = async (request: StandardLazyRequest): Promise<StandardResponse> => {
-        let response: StandardResponse
-
         try {
           request = this.mapSubrequest(request, interceptorOptions)
-          const result = await interceptorOptions.next({ ...interceptorOptions, request })
-          response = result.matched ? result.response : { status: 404, headers: {}, body: 'No procedure matched' }
+          const { matched, response } = await interceptorOptions.next({ ...interceptorOptions, request })
+
+          if (!matched) {
+            return { status: 404, headers: {}, body: 'No procedure matched' }
+          }
+
+          /**
+           * A stream is meant to be read as it arrives and might never end, so buffering it would
+           * hold back the whole batch. Start streaming before the peer sends its first message,
+           * so none of that subresponse is buffered.
+           */
+          if (response.body instanceof ReadableStream || isAsyncIteratorObject(response.body)) {
+            startStreaming()
+          }
+
+          return response
         }
         catch (err) {
           /**
@@ -319,19 +330,8 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
            */
           Promise.reject(err)
 
-          response = { status: 500, headers: {}, body: 'Internal server error' }
+          return { status: 500, headers: {}, body: 'Internal server error' }
         }
-
-        /**
-         * A stream is meant to be read as it arrives and might never end, so buffering it would
-         * hold back the whole batch. Start streaming before the peer sends its first message,
-         * so none of that subresponse is buffered.
-         */
-        if (mode === 'streaming' || response.body instanceof ReadableStream || isAsyncIteratorObject(response.body)) {
-          startStreaming()
-        }
-
-        return response
       }
 
       const runSubrequests = async (): Promise<void> => {

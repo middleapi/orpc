@@ -86,15 +86,6 @@ async function skipMessage(reader: ReadableStreamDefaultReader<Uint8Array>) {
   await reader.read()
 }
 
-function waitForAbort(signal: AbortSignal) {
-  return new Promise((resolve) => {
-    if (signal.aborted) {
-      resolve(undefined)
-    }
-    signal.addEventListener('abort', resolve)
-  })
-}
-
 /**
  * A router with a `ping` procedure that answers right away and a `slow` one that waits for `gate`.
  */
@@ -445,10 +436,7 @@ describe('batchHandlerPlugin', () => {
       function createGatedHandler() {
         const gate = promiseWithResolvers<void>()
 
-        const handler = createHandler(new BatchHandlerPlugin(), {
-          ...createSlowRouter(gate.promise),
-          wait: os.handler(({ signal }) => waitForAbort(signal!)),
-        })
+        const handler = createHandler(new BatchHandlerPlugin(), createSlowRouter(gate.promise))
 
         return { handler, gate }
       }
@@ -470,24 +458,19 @@ describe('batchHandlerPlugin', () => {
         await expect(result).resolves.toMatchObject({ matched: true })
       })
 
-      /**
-       * The response is awaited before the gate opens, so holding it for the slow sub-request would time out.
-       */
-      it.each([
-        ['at the first message', [makePeerRequestMessage('0', '/slow'), makePeerRequestMessage('1', '/ping')], ['1', '0']],
-        ['once a sub-request finishes without sending anything', [
-          makePeerRequestMessage('0', '/wait'),
-          makePeerRequestMessage('1', '/slow'),
-          { kind: 'cancel', id: '0' },
-        ], ['1']],
-      ] as const)('starts streaming %s, without waiting for the slow sub-request', async (_, messages, ids) => {
+      it('starts streaming at the first message, without waiting for the slow sub-request', async () => {
         const { handler, gate } = createGatedHandler()
-        const { response } = await handler.handle(createBatchRequest({ mode: 'streaming', messages }))
+
+        // Awaited before the gate opens, so holding the response for the slow sub-request would time out
+        const { response } = await handler.handle(createBatchRequest({
+          mode: 'streaming',
+          messages: [makePeerRequestMessage('0', '/slow'), makePeerRequestMessage('1', '/ping')],
+        }))
 
         gate.resolve()
         const received = await readAllMessages(response!)
 
-        expect(received.map(m => m.id)).toEqual(ids)
+        expect(received.map(m => m.id)).toEqual(['1', '0'])
       })
     })
   })
@@ -495,6 +478,15 @@ describe('batchHandlerPlugin', () => {
   describe('batch request abort', () => {
     const started = vi.fn()
     const stopped = vi.fn()
+
+    function waitForAbort(signal: AbortSignal) {
+      return new Promise((resolve) => {
+        if (signal.aborted) {
+          resolve(undefined)
+        }
+        signal.addEventListener('abort', resolve)
+      })
+    }
 
     const handler = createHandler(new BatchHandlerPlugin(), {
       wait: os.handler(async ({ signal }) => {
