@@ -67,7 +67,6 @@ function minSatisfaction(a: Satisfaction, b: Satisfaction): Satisfaction {
   return a < b ? a : b
 }
 
-/** Small inputs are budgeted as this many values, so they still coerce against large schemas. */
 const MIN_BUDGETED_VALUES = 100
 
 export interface JsonSchemaCoercerOptions {
@@ -92,10 +91,7 @@ export interface JsonSchemaCoercerOptions {
 interface CoercionContext {
   rootSchema: JsonSchema
   memo: Map<JsonSchema, Map<unknown, CoercionResult>> | undefined
-  /**
-   * Set once a keyword applies several schemas to the same value, so its nested values can be reached more than once.
-   * Only then does memoizing `$ref` results pay off.
-   */
+  /** Memoizing `$ref` results only pays off once a keyword applies several schemas to the same value. */
   memoize: boolean
   steps: number
   maxSteps: number
@@ -112,10 +108,7 @@ export class JsonSchemaCoercer {
   private readonly nativeCoerceOptions: NativeCoerceOptions
   private readonly maxStepsPerValue: number
 
-  /**
-   * Reused between calls, since building a context is slow until V8 warms up.
-   * A nested call, from a getter in the input, builds its own.
-   */
+  /** Reused between calls, since building a context is slow until V8 warms up. */
   private idleContext: CoercionContext | undefined = createContext()
 
   constructor(options: JsonSchemaCoercerOptions = {}) {
@@ -198,7 +191,6 @@ export class JsonSchemaCoercer {
             : undefined
 
       if (resolved !== undefined && !appliedRefs?.has(resolved)) {
-        // the ref and this schema's own children both reach the same nested values
         if (schema.type === 'object' || schema.type === 'array') {
           context.memoize = true
         }
@@ -469,11 +461,6 @@ export class JsonSchemaCoercer {
     return [satisfied, coerced]
   }
 
-  /**
-   * Shares the result for an object across every union branch or sibling keyword that reaches it through this `$ref`,
-   * keeping recursive schemas linear. Coercion never mutates values, so sharing is safe, but not while another `$ref`
-   * is applied to the value, since the cycle check then changes the result.
-   */
   private coerceRef(
     context: CoercionContext,
     resolved: JsonSchema,
@@ -482,6 +469,7 @@ export class JsonSchemaCoercer {
   ): CoercionResult {
     let memo: Map<unknown, CoercionResult> | undefined
 
+    // while another `$ref` is applied to the value, the cycle check changes the result
     if (context.memoize && !appliedRefs?.size && isTypescriptObject(value)) {
       context.memo ??= new Map()
       memo = context.memo.get(resolved)
@@ -510,8 +498,6 @@ export class JsonSchemaCoercer {
   }
 
   private extendBudget(context: CoercionContext): void {
-    // counting stops once it covers twice the steps taken, so it costs no more than coercion so far,
-    // and the budget only runs out on a complete count
     const limit = 2 * context.steps / this.maxStepsPerValue
     context.maxSteps = this.maxStepsPerValue * Math.max(countValues(context.input, limit), MIN_BUDGETED_VALUES)
 
@@ -521,7 +507,6 @@ export class JsonSchemaCoercer {
   }
 }
 
-/** Counts nested values up to `limit`, walking each array or object once so circular references count once. */
 function countValues(input: unknown, limit: number): number {
   const walked = new Set<object>()
   const stack = [input]
