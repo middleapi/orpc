@@ -477,8 +477,8 @@ export class JsonSchemaCoercer {
   }
 
   private extendBudget(context: CoercionContext): void {
-    // counting stops at twice the steps taken, so it costs no more than coercion so far,
-    // and the budget only runs out on a complete count
+    // counting stops once it covers twice the steps taken, even inside a wide array,
+    // so it costs no more than coercion so far, and the budget only runs out on a complete count
     const limit = 2 * context.steps / this.maxStepsPerValue
     context.maxSteps = this.maxStepsPerValue * Math.max(countValues(context.input, limit), MIN_BUDGETED_VALUES)
 
@@ -494,14 +494,20 @@ function countValues(input: unknown, limit: number): number {
   const stack = [input]
   let count = 1
 
-  while (stack.length && count < limit) {
+  while (stack.length) {
     const value = stack.pop()
 
     if ((Array.isArray(value) || isPlainObject(value)) && !walked.has(value)) {
       walked.add(value)
 
-      for (const item of Object.values(value)) {
-        count++
+      const items = Array.isArray(value) ? value : Object.values(value)
+
+      for (let i = 0; i < items.length; i++) {
+        if (++count >= limit) {
+          return count
+        }
+
+        const item = items[i]
 
         if (isTypescriptObject(item)) {
           stack.push(item)

@@ -943,6 +943,25 @@ describe('jsonSchemaCoercer', () => {
       expect(new JsonSchemaCoercer({ maxStepsPerValue: 5 }).coerce([UNION_ITEMS, false], strings)).toEqual(strings.map(Number))
     })
 
+    it('stops counting a wide array once the budget covers the steps taken', () => {
+      let reads = 0
+      const items = new Proxy(Array.from<string>({ length: 15_000 }).fill('1'), {
+        get(target, key, receiver) {
+          if (typeof key === 'string' && /^\d+$/.test(key)) {
+            reads++
+          }
+
+          return Reflect.get(target, key, receiver)
+        },
+      })
+
+      // runs past the minimum budget of 10_000 steps, so the input gets counted
+      expect(new JsonSchemaCoercer({ maxStepsPerValue: 100 }).coerce([{ type: 'array', items: { type: 'integer' } }, false], items))
+        .toEqual(Array.from({ length: 15_000 }).fill(1))
+      // coercion reads each item once, and counting only a few hundred more
+      expect(reads).toBeLessThan(16_000)
+    })
+
     it('counts circular references and non-plain objects as one value each', () => {
       const value: Record<string, unknown> = { strings: Array.from({ length: 300 }, (_, i) => String(i)), bytes: new Uint8Array(1_000) }
       value.self = value
