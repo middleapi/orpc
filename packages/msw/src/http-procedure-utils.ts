@@ -91,7 +91,7 @@ export class HTTPProcedureUtils<
     private readonly path: readonly string[],
     private readonly options: HTTPProcedureUtilsOptions<TContext>,
   ) {
-    const origin = this.options.origin ?? '*'
+    const origin = (this.options.origin ?? '*').replace(/\/+$/, '')
     this.prefix = this.options.prefix === undefined
       ? undefined
       : `/${this.options.prefix.replace(/\/+$/, '').slice(1)}`

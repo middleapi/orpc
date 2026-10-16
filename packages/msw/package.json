@@ -42,7 +42,7 @@
     "type:check": "tsc -b"
   },
   "peerDependencies": {
-    "msw": ">=2.0.0"
+    "msw": ">=2.12.3"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",

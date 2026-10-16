@@ -157,6 +157,18 @@ describe('handler', () => {
     await expect(wildcardClient.planet.list()).resolves.toEqual([{ id: 1, name: 'Mars' }])
   })
 
+  it('ignores trailing slashes in origin', async () => {
+    const slashORPC = createHTTPUtils(contract, {
+      origin: 'http://localhost:3000/',
+      prefix: '/rpc',
+      handler: router => new RPCHandler(router),
+    })
+
+    server.use(slashORPC.planet.list.handler(() => [{ id: 1, name: 'Jupiter' }]))
+
+    await expect(client.planet.list()).resolves.toEqual([{ id: 1, name: 'Jupiter' }])
+  })
+
   it('serves mocks through the provided handler, e.g. with plugins', async () => {
     const factory = vi.fn((router: AnyRouter) => new RPCHandler(router, {
       routingInterceptors: [async ({ next }) => {
