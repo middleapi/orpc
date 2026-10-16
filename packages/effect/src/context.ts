@@ -12,16 +12,35 @@ export interface WithEffectContext<Services> {
    * A pre-built Effect context providing the services available within this oRPC context.
    * Automatically provided to any effect that runs under this context.
    *
+   * To provide services from a Layer, build it once with a `ManagedRuntime` and pass
+   * `await runtime.context()` here on every request.
+   *
+   * @see {@link https://orpc.dev/docs/integrations/effect#providing-services-with-layers | Effect Integration - Providing Services with Layers}
+   *
    * @example
    * ```ts
-   * import { Context } from 'effect'
+   * import type { WithEffectContext } from '@orpc/experimental-effect'
+   * import { Context, Effect, Layer, ManagedRuntime } from 'effect'
    *
-   * interface ServerContext extends WithEffectContext<Random | Logger> {}
+   * class Random extends Context.Service<Random, {
+   *   readonly next: Effect.Effect<number>
+   * }>()('app/Random') {}
+   *
+   * interface ServerContext extends WithEffectContext<Random> {}
    *
    * const context: ServerContext = {
    *   'effect/context': Context.empty().pipe(
    *     Context.add(Random, { next: Effect.sync(() => Math.random()) }),
    *   ),
+   * }
+   *
+   * // or build the services once from a Layer
+   * const runtime = ManagedRuntime.make(
+   *   Layer.succeed(Random, Random.of({ next: Effect.sync(() => Math.random()) })),
+   * )
+   *
+   * const layerContext: ServerContext = {
+   *   'effect/context': await runtime.context(),
    * }
    * ```
    */
@@ -31,20 +50,23 @@ export interface WithEffectContext<Services> {
    * An optional hook to wrap any effect before it is executed within this oRPC context.
    * Useful for adding observability, tracing, or error handling.
    *
+   * The wrap runs for every effectful middleware and handler, so provide services,
+   * including tracers such as `OtelTracer.layerGlobal`, through `effect/context` instead.
+   *
+   * @see {@link https://orpc.dev/docs/integrations/effect#error-handling | Effect Integration - Error Handling}
+   *
    * @example
    * ```ts
-   * import { Resource, Tracer } from '@effect/opentelemetry'
-   * import { Context, Effect, Layer } from 'effect'
+   * import type { WithEffectContext } from '@orpc/experimental-effect'
+   * import { Context, Effect } from 'effect'
    *
    * interface ServerContext extends WithEffectContext<never> {}
    *
-   * const TracingLive = Tracer.layerGlobal.pipe(
-   *   Layer.provide(Resource.layerFromEnv()),
-   * )
-   *
    * const context: ServerContext = {
    *   'effect/context': Context.empty(),
-   *   'effect/wrap': (effect) => effect.pipe(Effect.provide(TracingLive)),
+   *   'effect/wrap': (effect, opts) => effect.pipe(
+   *     Effect.withSpan(opts.path.join('.')),
+   *   ),
    * }
    * ```
    */
