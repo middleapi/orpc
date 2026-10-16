@@ -886,6 +886,28 @@ describe('jsonSchemaCoercer', () => {
       expect(linear.coerce([schema, false], nested(14, inner => [inner], '1'))).toEqual(nested(14, inner => ({ 0: inner }), 1))
     })
 
+    it('coerces a $ref next to keywords that reach the same nested values', () => {
+      const schema: JsonSchema = {
+        $defs: {
+          node: { $ref: '#/$defs/base', type: 'object', properties: { child: { $ref: '#/$defs/node' } } },
+          base: { type: 'object', properties: { n: { type: 'integer' }, child: { $ref: '#/$defs/node' } } },
+        },
+        $ref: '#/$defs/node',
+      }
+
+      expect(linear.coerce([schema, false], nested(14, child => ({ n: '1', child }), { n: '1' })))
+        .toEqual(nested(14, child => ({ n: 1, child }), { n: 1 }))
+    })
+
+    it('decides on memoizing for each schema a coercer is given', () => {
+      const coercer = new JsonSchemaCoercer({ maxStepsPerValue: 20 })
+      const schema: JsonSchema = { anyOf: [{ type: 'integer' }, { type: 'object', additionalProperties: { $ref: '#' } }, { type: 'array', items: { $ref: '#' } }] }
+
+      // reaches each value once, so it skips memoizing
+      expect(coercer.coerce([{ $defs: { n: { type: 'object' } }, $ref: '#/$defs/n' }, false], {})).toEqual({})
+      expect(coercer.coerce([schema, false], nested(14, inner => [inner], '1'))).toEqual(nested(14, inner => ({ 0: inner }), 1))
+    })
+
     it('coerces every level of a deep recursive union', () => {
       // z.lazy(() => z.union([z.object({ n: z.number(), children: z.array(Node) }), z.object({ s: z.string(), children: z.array(Node) })]))
       const schema: JsonSchema = {

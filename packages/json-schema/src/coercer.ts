@@ -92,20 +92,56 @@ export interface JsonSchemaCoercerOptions {
 interface CoercionContext {
   rootSchema: JsonSchema
   memo: Map<JsonSchema, Map<unknown, CoercionResult>> | undefined
+  memoize: boolean | undefined
   steps: number
   maxSteps: number
   input: unknown
 }
 
 function createContext(): CoercionContext {
-  return { rootSchema: true, memo: undefined, steps: 0, maxSteps: 0, input: undefined }
+  return { rootSchema: true, memo: undefined, memoize: undefined, steps: 0, maxSteps: 0, input: undefined }
 }
 
 class CoercionBudgetExceededError extends Error {}
 
+const CHILD_KEYWORDS = ['properties', 'patternProperties', 'additionalProperties', 'items', 'prefixItems', 'additionalItems']
+
+/**
+ * Whether a schema can apply several subschemas to the same value, so union branches or sibling keywords can reach
+ * its nested values more than once. Only then does memoizing `$ref` results pay off.
+ */
+function canRevisitValues(schema: JsonSchema): boolean {
+  const walked = new Set<object>()
+  const stack: unknown[] = [schema]
+
+  while (stack.length) {
+    const value = stack.pop()
+
+    if (!isTypescriptObject(value) || walked.has(value)) {
+      continue
+    }
+
+    walked.add(value)
+
+    if (
+      'anyOf' in value || 'oneOf' in value || 'allOf' in value || 'not' in value || Array.isArray(value.type)
+      || (typeof value.$ref === 'string' && CHILD_KEYWORDS.some(key => key in value))
+    ) {
+      return true
+    }
+
+    for (const item of Object.values(value)) {
+      stack.push(item)
+    }
+  }
+
+  return false
+}
+
 export class JsonSchemaCoercer {
   private readonly nativeCoerceOptions: NativeCoerceOptions
   private readonly maxStepsPerValue: number
+  private readonly revisitingSchemas = new WeakMap<object, boolean>()
 
   /**
    * Reused between calls: until V8 warms up, building a fresh context per call adds about half the cost
@@ -129,6 +165,7 @@ export class JsonSchemaCoercer {
     this.idleContext = undefined
 
     context.rootSchema = schema
+    context.memoize = undefined
     context.steps = 0
     context.maxSteps = this.maxStepsPerValue * MIN_BUDGETED_VALUES
     context.input = value
@@ -465,7 +502,7 @@ export class JsonSchemaCoercer {
   ): CoercionResult {
     let memo: Map<unknown, CoercionResult> | undefined
 
-    if (!appliedRefs?.size && isTypescriptObject(value)) {
+    if (!appliedRefs?.size && isTypescriptObject(value) && this.shouldMemoize(context)) {
       context.memo ??= new Map()
       memo = context.memo.get(resolved)
 
@@ -490,6 +527,26 @@ export class JsonSchemaCoercer {
     memo?.set(value, result)
 
     return result
+  }
+
+  /**
+   * Decided once per call, on its first `$ref`, so schemas without one never pay for it.
+   */
+  private shouldMemoize(context: CoercionContext): boolean {
+    if (context.memoize === undefined) {
+      // a boolean schema has no `$ref` that could get here
+      const schema = context.rootSchema as Exclude<JsonSchema, boolean>
+      let revisits = this.revisitingSchemas.get(schema)
+
+      if (revisits === undefined) {
+        revisits = canRevisitValues(schema)
+        this.revisitingSchemas.set(schema, revisits)
+      }
+
+      context.memoize = revisits
+    }
+
+    return context.memoize
   }
 
   private extendBudget(context: CoercionContext): void {
