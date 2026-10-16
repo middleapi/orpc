@@ -226,6 +226,66 @@ const procedure = os
   .handler(({ context }) => context.startedAt)
 ```
 
+### Effect Context Propagation
+
+`next()` passes the current Effect context, including provided services, the current span, and log annotations, to the rest of the chain. Combinators applied around `next()` therefore also reach downstream effectful middleware and handlers:
+
+```ts
+const procedure = os
+  .use(middlewareGen(function* ({ next }) {
+    return yield* next().pipe(
+      Effect.annotateLogs({ requestId: crypto.randomUUID() }),
+      Effect.withSpan('auth'),
+    )
+  }))
+  .handler(handlerGen(function* () {
+    // Logged with `requestId`, within the `auth` span
+    yield* Effect.log('Handling request')
+  }))
+```
+
+The Effect context travels through `effect/context`, so regular middleware in between passes it along unchanged. Services provided around `next()` are not reflected in downstream types. To make a service available in a typesafe way, pass it with `effect/context` in `next()`, which is layered on top of the current Effect context:
+
+```ts
+interface ServerContext extends WithEffectContext<never> {}
+
+const procedure = os
+  .$context<ServerContext>()
+  .use(middlewareGen(function* ({ context, next }) {
+    return yield* next({
+      context: {
+        'effect/context': context['effect/context'].pipe(
+          Context.add(Random, { next: Effect.sync(() => Math.random()) }),
+        ),
+      },
+    })
+  }))
+  .handler(handlerGen(function* () {
+    const random = yield* Random
+    return yield* random.next
+  }))
+```
+
+### Interruption
+
+An effectful middleware is interrupted when the request `signal` aborts, and `next()` can also be interrupted by combinators such as `Effect.timeout` or `Effect.race`. When `next()` is interrupted, it aborts the `signal` passed to the rest of the chain and waits for downstream middleware and the handler to settle before your finalizers run. Resources acquired around `next()` stay available until the rest of the chain is done with them:
+
+```ts
+const transaction = middlewareGen(function* ({ next }) {
+  return yield* Effect.acquireUseRelease(
+    beginTransaction,
+    tx => next({ context: { tx } }),
+    (tx, exit) => Exit.isSuccess(exit) ? tx.commit : tx.rollback,
+  )
+})
+```
+
+If the rest of the chain still returns an [AsyncIteratorObject](/docs/async-iterator-object) after `next()` was interrupted, the iterator is closed, since it can no longer be consumed.
+
+:::warning
+Effectful handlers and middleware stop as soon as the `signal` aborts, but regular ones must observe `signal` themselves. Until they settle, the interrupted `next()` keeps waiting, so `next().pipe(Effect.timeout('1 second'))` only fails after a handler that ignores `signal` finishes.
+:::
+
 ## Client Calls
 
 `createEffectClient` wraps any oRPC client, whether [server-side](/docs/client/server-side) or [client-side](/docs/client/client-side), so every procedure returns a lazy Effect instead of a promise, ready to `yield*` inside Effect generators. The output becomes the success value, and errors land in the error channel with their original types preserved, ready for utilities like `catchORPCErrorCodes`:

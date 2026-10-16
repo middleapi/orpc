@@ -2,6 +2,7 @@ import type { ErrorMap } from '@orpc/contract'
 import type { Context, Middleware, MiddlewareDone, MiddlewareNextOptions, MiddlewareOptions, MiddlewareResult, ORPCErrorConstructorMap } from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
 import type { InferEffectServices, WithEffectContext } from './context'
+import { anyAbortSignal, isAsyncIteratorObject, resolveMaybeOptionalOptions } from '@orpc/shared'
 import { Effect, Context as EffectContext } from 'effect'
 import { runPromise } from './runtime'
 
@@ -46,6 +47,10 @@ export type AnyMiddlewareGen = MiddlewareGen<any, any, any, any, any, any>
  * to continue the chain, and `middlewareGen` handles the execution and
  * error handling for you.
  *
+ * `next()` passes the current Effect context (services, spans, log annotations)
+ * downstream. When it is interrupted, it aborts the downstream signal and waits
+ * for the rest of the chain to settle before the middleware's finalizers run.
+ *
  * @see {@link https://orpc.dev/docs/integrations/effect#effectful-middleware | Effect Integration - Effectful Middleware}
  */
 export function middlewareGen<
@@ -59,10 +64,40 @@ export function middlewareGen<
   middleware: MiddlewareGen<TInContext, TOutContext, TInput, TOutput, TYield, ORPCErrorConstructorMap<TErrorMap>>,
 ): Middleware<TInContext, TOutContext, TInput, TOutput, TErrorMap> {
   const mid: Middleware<TInContext, TOutContext, TInput, TOutput, TErrorMap> = (opts, input, done) => {
-    const next: MiddlewareGenNext<TOutput> = <U extends Context = object>(...rest: MaybeOptionalOptions<MiddlewareNextOptions<U>>) => Effect.tryPromise({
-      try: async () => opts.next<U>(...rest),
-      catch: error => error,
-    })
+    const next: MiddlewareGenNext<TOutput> = <U extends Context = object>(...rest: MaybeOptionalOptions<MiddlewareNextOptions<U>>) => Effect.contextWith((fiberContext: EffectContext.Context<never>) => Effect.callback<Awaited<MiddlewareResult<U, TOutput>>, unknown>((resume, interruptSignal) => {
+      const nextOptions = resolveMaybeOptionalOptions(rest)
+      const nextEffectContext = nextOptions.context?.['effect/context']
+
+      const promise = (async () => opts.next<U>({
+        ...nextOptions,
+        context: {
+          ...nextOptions.context,
+          // Layer an explicitly passed `effect/context` on top of the fiber context.
+          'effect/context': EffectContext.isContext(nextEffectContext)
+            ? EffectContext.merge(fiberContext, nextEffectContext)
+            : fiberContext,
+        },
+        signal: anyAbortSignal([nextOptions.signal ?? opts.signal, interruptSignal]),
+      } as any))()
+
+      promise.then(
+        result => resume(Effect.succeed(result)),
+        error => resume(Effect.fail(error)),
+      )
+
+      // On interruption, wait for the rest of the chain to settle, and release
+      // a returned iterator that can no longer be consumed.
+      return Effect.promise(async () => {
+        try {
+          const result = await promise
+
+          if (isAsyncIteratorObject(result.output)) {
+            await result.output.return?.()
+          }
+        }
+        catch {}
+      })
+    }))
 
     let ef = Effect.gen(() => middleware({ ...opts, next }, input, done)) as Effect.Effect<MiddlewareResult<TOutContext, TOutput>, unknown>
 
