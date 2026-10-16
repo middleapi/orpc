@@ -51,7 +51,7 @@ Use `fakeListPlanet` anywhere your test would normally use the real `listPlanet`
 To mock at the network level instead, for example in [Storybook](https://storybook.js.org/) stories or browser tests, use the [MSW Integration](/docs/integrations/msw). It turns a contract or router into typed [MSW](https://mswjs.io/) request handlers served through a real fetch handler:
 
 ```ts
-import { createHTTPUtils } from '@orpc/experimental-msw'
+import { createHTTPUtils } from '@orpc/msw'
 import { RPCHandler } from '@orpc/server/fetch'
 
 const mock = createHTTPUtils(router, {

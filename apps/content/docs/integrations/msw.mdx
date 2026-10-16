@@ -12,7 +12,7 @@ This guide assumes you are already familiar with [MSW](https://mswjs.io/). If yo
 ## Installation
 
 ```package-install
-npm install @orpc/experimental-msw@beta
+npm install @orpc/msw@beta
 ```
 
 :::info
@@ -24,7 +24,7 @@ Requires MSW v2.12.3 or later, including MSW v3.
 Create MSW utils from a [router contract](/docs/contract/router) or an implemented [router](/docs/router) (convert [lazy routers](/docs/router#lazy-router) with [`unlazyRouter`](/docs/contract/router#router-to-contract) first). The `handler` option creates the fetch handler that serves each mock. Configure it like your production handler, so serialization, validation, and error envelopes behave exactly like your real server.
 
 ```ts
-import { createHTTPUtils } from '@orpc/experimental-msw'
+import { createHTTPUtils } from '@orpc/msw'
 import { RPCHandler } from '@orpc/server/fetch'
 
 export const mock = createHTTPUtils(contract, {

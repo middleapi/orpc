@@ -196,15 +196,15 @@ importers:
       '@orpc/experimental-lock':
         specifier: workspace:*
         version: link:packages/lock
-      '@orpc/experimental-msw':
-        specifier: workspace:*
-        version: link:packages/msw
       '@orpc/hibernation':
         specifier: workspace:*
         version: link:packages/hibernation
       '@orpc/json-schema':
         specifier: workspace:*
         version: link:packages/json-schema
+      '@orpc/msw':
+        specifier: workspace:*
+        version: link:packages/msw
       '@orpc/next':
         specifier: workspace:*
         version: link:packages/next
