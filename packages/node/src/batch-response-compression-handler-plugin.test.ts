@@ -1,5 +1,6 @@
 import type { AnyRouter } from '@orpc/server'
 import type { BatchResponseCompressionHandlerPluginOptions } from './batch-response-compression-handler-plugin'
+import { Buffer } from 'node:buffer'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { BATCH_CONTENT_TYPE, BatchHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
@@ -116,21 +117,21 @@ describe('batchResponseCompressionHandlerPlugin', () => {
 
     const { response } = await handler.handle(createBatchRequest('streaming', ['/ping', '/pending']))
     const reader = response!.body!.pipeThrough(new DecompressionStream('gzip')).getReader()
-    let received = new Uint8Array(0)
+    let received = Buffer.alloc(0)
 
     const readAtLeast = async (length: number) => {
       while (received.byteLength < length) {
         const { done, value } = await reader.read()
         expect(done).toBe(false)
-        received = new Uint8Array([...received, ...value!])
+        received = Buffer.concat([received, value!])
       }
     }
 
     // The ping response frame, then two zero-length length-prefixed frames, four bytes each
     await readAtLeast(4)
-    const messageEnd = 4 + new DataView(received.buffer).getUint32(0)
+    const messageEnd = 4 + received.readUInt32BE(0)
     await readAtLeast(messageEnd + 8)
-    expect(received.subarray(messageEnd, messageEnd + 8)).toEqual(new Uint8Array(8))
+    expect(received.subarray(messageEnd, messageEnd + 8)).toEqual(Buffer.alloc(8))
 
     pending.resolve('done')
     await reader.cancel()
