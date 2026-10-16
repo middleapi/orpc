@@ -148,6 +148,20 @@ const cache = os.middleware(async ({ context, next, path }, input, done) => {
 })
 ```
 
+## Middleware Signal
+
+Pass `signal` to `next` to override the abort signal for downstream middleware and the handler. Derive it from the current `signal` so upstream aborts still propagate:
+
+```ts
+const timeout = os.middleware(async ({ signal, next }) => {
+  const timeoutSignal = AbortSignal.timeout(5000)
+
+  return next({
+    signal: signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
+  })
+})
+```
+
 ## Inline Middleware
 
 Middleware is simply a function that can be defined inline with `.use`, which is useful for simple middleware cases.

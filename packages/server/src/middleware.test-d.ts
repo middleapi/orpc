@@ -93,6 +93,28 @@ describe('Middleware', () => {
     }
   })
 
+  it('can override signal through next', () => {
+    const signal = new AbortController().signal
+
+    const mid: Middleware<{ in: string }, object, unknown, string, typeof errorMap> = ({ next }) => {
+      return next({ signal })
+    }
+
+    const mid2: Middleware<{ in: string }, { out: number }, unknown, string, typeof errorMap> = ({ next }) => {
+      return next({ context: { out: 123 }, signal })
+    }
+
+    const mid3: Middleware<{ in: string }, { out: number }, unknown, string, typeof errorMap> = ({ next }) => {
+      // @ts-expect-error - missing out context
+      return next({ signal })
+    }
+
+    const mid4: Middleware<{ in: string }, object, unknown, string, typeof errorMap> = ({ next }) => {
+      // @ts-expect-error - invalid signal
+      return next({ signal: 'invalid' })
+    }
+  })
+
   it('can infer back error map', async () => {
     const mid: Middleware<
       { in: string },

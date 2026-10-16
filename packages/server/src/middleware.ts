@@ -8,9 +8,16 @@ export type MiddlewareResult<TOutContext extends Context, TOutput> = Promisable<
   context: TOutContext
 }>
 
-export type MiddlewareNextOptions<TOutContext extends Context> = object extends TOutContext
-  ? { context?: TOutContext }
-  : { context: TOutContext }
+export type MiddlewareNextOptions<TOutContext extends Context>
+  = & (object extends TOutContext ? { context?: TOutContext } : { context: TOutContext })
+    & {
+      /**
+       * Overrides the abort signal for the rest of the chain (downstream middleware and the handler).
+       * Derive it from the current `signal` (e.g. with `AbortSignal.any`) so upstream aborts still propagate.
+       * Defaults to the current `signal`.
+       */
+      signal?: AbortSignal | undefined
+    }
 
 export interface MiddlewareNext<TOutput> {
   <T extends Context = object>(
