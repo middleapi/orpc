@@ -879,11 +879,13 @@ describe('jsonSchemaCoercer', () => {
       expect(linear.coerce([schema, false], { page: '1', doc })).toEqual({ page: 1, doc })
     })
 
-    it('coerces a record branch listed before an array branch', () => {
-      const schema: JsonSchema = { anyOf: [{ type: 'integer' }, { type: 'object', additionalProperties: { $ref: '#' } }, { type: 'array', items: { $ref: '#' } }] }
+    // the record branch is tried first, so it turns every array into an object
+    const RECORD_OR_ARRAY: JsonSchema = { anyOf: [{ type: 'integer' }, { type: 'object', additionalProperties: { $ref: '#' } }, { type: 'array', items: { $ref: '#' } }] }
+    const nestedArrays = nested(14, inner => [inner], '1')
+    const nestedRecords = nested(14, inner => ({ 0: inner }), 1)
 
-      // the record branch is tried first, so it turns every array into an object
-      expect(linear.coerce([schema, false], nested(14, inner => [inner], '1'))).toEqual(nested(14, inner => ({ 0: inner }), 1))
+    it('coerces a record branch listed before an array branch', () => {
+      expect(linear.coerce([RECORD_OR_ARRAY, false], nestedArrays)).toEqual(nestedRecords)
     })
 
     it('coerces a $ref next to keywords that reach the same nested values', () => {
@@ -901,11 +903,10 @@ describe('jsonSchemaCoercer', () => {
 
     it('decides on memoizing for each schema a coercer is given', () => {
       const coercer = new JsonSchemaCoercer({ maxStepsPerValue: 20 })
-      const schema: JsonSchema = { anyOf: [{ type: 'integer' }, { type: 'object', additionalProperties: { $ref: '#' } }, { type: 'array', items: { $ref: '#' } }] }
 
       // reaches each value once, so it skips memoizing
       expect(coercer.coerce([{ $defs: { n: { type: 'object' } }, $ref: '#/$defs/n' }, false], {})).toEqual({})
-      expect(coercer.coerce([schema, false], nested(14, inner => [inner], '1'))).toEqual(nested(14, inner => ({ 0: inner }), 1))
+      expect(coercer.coerce([RECORD_OR_ARRAY, false], nestedArrays)).toEqual(nestedRecords)
     })
 
     it('coerces every level of a deep recursive union', () => {
@@ -929,16 +930,15 @@ describe('jsonSchemaCoercer', () => {
   })
 
   it('keeps its state when the input calls back into the same coercer', () => {
-    const coercer = new JsonSchemaCoercer()
-    const schema: JsonSchema = { $defs: { int: { type: 'integer' } }, type: 'object', properties: { a: { $ref: '#/$defs/int' }, b: { $ref: '#/$defs/int' } } }
+    const schema = { $defs: { int: { type: 'integer' } }, type: 'object', properties: { a: { $ref: '#/$defs/int' }, b: { $ref: '#/$defs/int' } } }
     const value = {
       get a(): unknown {
-        return coercer.coerce([{ type: 'integer' }, false], '1')
+        return coerce({ type: 'integer' }, '1')
       },
       b: '2',
     }
 
-    expect(coercer.coerce([schema, false], value)).toEqual({ a: 1, b: 2 })
+    expect(coerce(schema, value)).toEqual({ a: 1, b: 2 })
   })
 
   describe('step budget', () => {
