@@ -8,10 +8,11 @@ import { defaultSerializer } from './client-server'
 
 export const createNodeHttpClientServerTest: CreateOpenAPIClientServerTest = (
   router,
-  { context = {}, serializer = defaultSerializer } = {},
+  { context = {}, serializer = defaultSerializer, plugins } = {},
 ) => {
   const handler = new OpenAPIHandler(router, {
     serializer,
+    plugins,
   })
 
   const server = http.createServer(async (req, res) => {

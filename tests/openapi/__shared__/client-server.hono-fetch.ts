@@ -7,10 +7,11 @@ import { defaultSerializer } from './client-server'
 
 export const createHonoFetchClientServerTest: CreateOpenAPIClientServerTest = (
   router,
-  { context = {}, serializer = defaultSerializer } = {},
+  { context = {}, serializer = defaultSerializer, plugins } = {},
 ) => {
   const handler = new OpenAPIHandler(router, {
     serializer,
+    plugins,
   })
 
   const server = serve({

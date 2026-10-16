@@ -1,0 +1,24 @@
+{
+  "name": "@orpc/effect-playground",
+  "type": "module",
+  "version": "2.0.0-beta.44",
+  "private": true,
+  "scripts": {
+    "dev": "node --watch --import @swc-node/register/esm-register src/main.ts",
+    "start": "node --import @swc-node/register/esm-register src/main.ts",
+    "client": "node --import @swc-node/register/esm-register src/playground-client.ts",
+    "type:check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@orpc/client": "beta",
+    "@orpc/experimental-effect": "beta",
+    "@orpc/json-schema": "beta",
+    "@orpc/openapi": "beta",
+    "@orpc/server": "beta",
+    "@swc-node/register": "^1.12.1",
+    "@swc/core": "^1.16.13",
+    "@types/node": "^26.6.4",
+    "effect": "^4.0.2",
+    "typescript": "^6.0.3"
+  }
+}

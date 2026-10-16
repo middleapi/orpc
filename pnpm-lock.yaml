@@ -292,6 +292,9 @@ importers:
       crossws:
         specifier: ^0.4.15
         version: 0.4.15
+      effect:
+        specifier: ^4.0.2
+        version: 4.0.2
       eslint:
         specifier: ^10.12.0
         version: 10.12.0(jiti@2.7.0)(supports-color@10.2.2)
@@ -1303,6 +1306,39 @@ importers:
       wrangler:
         specifier: ^4.149.0
         version: 4.149.0(@types/node@26.6.4)
+
+  playgrounds/effect:
+    devDependencies:
+      '@orpc/client':
+        specifier: beta
+        version: link:../../packages/client
+      '@orpc/experimental-effect':
+        specifier: beta
+        version: link:../../packages/effect
+      '@orpc/json-schema':
+        specifier: beta
+        version: link:../../packages/json-schema
+      '@orpc/openapi':
+        specifier: beta
+        version: link:../../packages/openapi
+      '@orpc/server':
+        specifier: beta
+        version: link:../../packages/server
+      '@swc-node/register':
+        specifier: ^1.12.1
+        version: 1.12.1(@swc/core@1.16.13(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@10.2.2)(typescript@6.0.3)
+      '@swc/core':
+        specifier: ^1.16.13
+        version: 1.16.13(@swc/helpers@0.5.23)
+      '@types/node':
+        specifier: ^26.6.4
+        version: 26.6.4
+      effect:
+        specifier: ^4.0.2
+        version: 4.0.2
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
 
   playgrounds/nest:
     devDependencies:
@@ -3556,13 +3592,6 @@ packages:
     cpu: [x64]
     os: [linux]
     libc: [glibc]
-
-  '@napi-rs/wasm-runtime@1.2.3':
-    resolution: {integrity: sha512-UMduMbqO5s5zF2NkNacMT/yK5Y5QiKvWr2+50bzIIxFDwVJ2h49b+oyjaCGPhJxd2/gC2x39EHv/gHVuu36x2Q==}
-    engines: {node: ^20.19.0 || ^22.13.0 || >=23.5.0}
-    peerDependencies:
-      '@emnapi/core': ^1.7.1 || ^2.0.0-alpha.4
-      '@emnapi/runtime': ^1.7.1 || ^2.0.0-alpha.4
 
   '@napi-rs/wasm-runtime@1.2.5':
     resolution: {integrity: sha512-HshSvXzmBxNzqejd3k/KemgQ3hdREUYFRRrgxOZ+gPljDIsO2SDZrVZMd4Z/HsxudQbE62OVyVFE8z9BCurfjA==}
@@ -15043,17 +15072,17 @@ snapshots:
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true
 
-  '@napi-rs/wasm-runtime@1.2.3(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)':
-    dependencies:
-      '@emnapi/core': 1.11.2
-      '@emnapi/runtime': 1.11.2
-      '@tybys/wasm-util': 0.10.3
-    optional: true
-
   '@napi-rs/wasm-runtime@1.2.5(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
     dependencies:
       '@emnapi/core': 1.11.1
       '@emnapi/runtime': 1.11.1
+      '@tybys/wasm-util': 0.10.3
+    optional: true
+
+  '@napi-rs/wasm-runtime@1.2.5(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)':
+    dependencies:
+      '@emnapi/core': 1.11.2
+      '@emnapi/runtime': 1.11.2
       '@tybys/wasm-util': 0.10.3
     optional: true
 
@@ -16020,7 +16049,7 @@ snapshots:
     dependencies:
       '@emnapi/core': 1.11.2
       '@emnapi/runtime': 1.11.2
-      '@napi-rs/wasm-runtime': 1.2.3(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
+      '@napi-rs/wasm-runtime': 1.2.5(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
     optional: true
 
   '@oxc-resolver/binding-win32-arm64-msvc@11.24.2':
