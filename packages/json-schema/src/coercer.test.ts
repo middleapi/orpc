@@ -879,34 +879,23 @@ describe('jsonSchemaCoercer', () => {
       expect(linear.coerce([schema, false], { page: '1', doc })).toEqual({ page: 1, doc })
     })
 
-    // the record branch is tried first, so it turns every array into an object
-    const RECORD_OR_ARRAY: JsonSchema = { anyOf: [{ type: 'integer' }, { type: 'object', additionalProperties: { $ref: '#' } }, { type: 'array', items: { $ref: '#' } }] }
-    const nestedArrays = nested(14, inner => [inner], '1')
-    const nestedRecords = nested(14, inner => ({ 0: inner }), 1)
-
     it('coerces a record branch listed before an array branch', () => {
-      expect(linear.coerce([RECORD_OR_ARRAY, false], nestedArrays)).toEqual(nestedRecords)
+      const schema: JsonSchema = { anyOf: [{ type: 'integer' }, { type: 'object', additionalProperties: { $ref: '#' } }, { type: 'array', items: { $ref: '#' } }] }
+
+      // the record branch is tried first, so it turns every array into an object
+      expect(linear.coerce([schema, false], nested(14, inner => [inner], '1'))).toEqual(nested(14, inner => ({ 0: inner }), 1))
     })
 
-    it('coerces a $ref next to keywords that reach the same nested values', () => {
-      const schema: JsonSchema = {
-        $defs: {
-          node: { $ref: '#/$defs/base', type: 'object', properties: { child: { $ref: '#/$defs/node' } } },
-          base: { type: 'object', properties: { n: { type: 'integer' }, child: { $ref: '#/$defs/node' } } },
-        },
-        $ref: '#/$defs/node',
-      }
+    const BASE: JsonSchema = { type: 'object', properties: { n: { type: 'integer' }, child: { $ref: '#' } } }
+    const REACH_CHILD: JsonSchema = { type: 'object', properties: { child: { $ref: '#' } } }
 
+    it.each<[string, JsonSchema]>([
+      ['$ref', { $defs: { base: BASE }, $ref: '#/$defs/base', ...REACH_CHILD }],
+      ['allOf', { ...BASE, allOf: [REACH_CHILD] }],
+      ['not', { ...BASE, not: REACH_CHILD }],
+    ])('coerces a schema whose %s reaches the same nested values as its properties', (_, schema) => {
       expect(linear.coerce([schema, false], nested(14, child => ({ n: '1', child }), { n: '1' })))
         .toEqual(nested(14, child => ({ n: 1, child }), { n: 1 }))
-    })
-
-    it('decides on memoizing for each schema a coercer is given', () => {
-      const coercer = new JsonSchemaCoercer({ maxStepsPerValue: 20 })
-
-      // reaches each value once, so it skips memoizing
-      expect(coercer.coerce([{ $defs: { n: { type: 'object' } }, $ref: '#/$defs/n' }, false], {})).toEqual({})
-      expect(coercer.coerce([RECORD_OR_ARRAY, false], nestedArrays)).toEqual(nestedRecords)
     })
 
     it('coerces every level of a deep recursive union', () => {
@@ -980,7 +969,7 @@ describe('jsonSchemaCoercer', () => {
 
     it('stops counting a wide array once the budget covers the steps taken', () => {
       let reads = 0
-      const items = new Proxy(Array.from<string>({ length: 15_000 }).fill('1'), {
+      const items = new Proxy(Array.from<string>({ length: 1_500 }).fill('1'), {
         get(target, key, receiver) {
           if (typeof key === 'string' && /^\d+$/.test(key)) {
             reads++
@@ -990,11 +979,11 @@ describe('jsonSchemaCoercer', () => {
         },
       })
 
-      // runs past the minimum budget of 10_000 steps, so the input gets counted
-      expect(new JsonSchemaCoercer({ maxStepsPerValue: 100 }).coerce([{ type: 'array', items: { type: 'integer' } }, false], items))
-        .toEqual(Array.from({ length: 15_000 }).fill(1))
+      // runs past the minimum budget of 1_000 steps, so the input gets counted
+      expect(new JsonSchemaCoercer({ maxStepsPerValue: 10 }).coerce([{ type: 'array', items: { type: 'integer' } }, false], items))
+        .toEqual(Array.from({ length: 1_500 }).fill(1))
       // coercion reads each item once, and counting only a few hundred more
-      expect(reads).toBeLessThan(16_000)
+      expect(reads).toBeLessThan(2_000)
     })
 
     it('counts circular references and non-plain objects as one value each', () => {

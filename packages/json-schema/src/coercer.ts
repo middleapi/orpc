@@ -92,60 +92,29 @@ export interface JsonSchemaCoercerOptions {
 interface CoercionContext {
   rootSchema: JsonSchema
   memo: Map<JsonSchema, Map<unknown, CoercionResult>> | undefined
-  memoize: boolean | undefined
+  /**
+   * Set once a keyword applies several schemas to the same value, so its nested values can be reached more than once.
+   * Only then does memoizing `$ref` results pay off.
+   */
+  memoize: boolean
   steps: number
   maxSteps: number
   input: unknown
 }
 
 function createContext(): CoercionContext {
-  return { rootSchema: true, memo: undefined, memoize: undefined, steps: 0, maxSteps: 0, input: undefined }
+  return { rootSchema: true, memo: undefined, memoize: false, steps: 0, maxSteps: 0, input: undefined }
 }
 
 class CoercionBudgetExceededError extends Error {}
 
-const CHILD_KEYWORDS = ['properties', 'patternProperties', 'additionalProperties', 'items', 'prefixItems', 'additionalItems']
-
-/**
- * Whether a schema can apply several subschemas to the same value, so union branches or sibling keywords can reach
- * its nested values more than once. Only then does memoizing `$ref` results pay off.
- */
-function canRevisitValues(schema: JsonSchema): boolean {
-  const walked = new Set<object>()
-  const stack: unknown[] = [schema]
-
-  while (stack.length) {
-    const value = stack.pop()
-
-    if (!isTypescriptObject(value) || walked.has(value)) {
-      continue
-    }
-
-    walked.add(value)
-
-    if (
-      'anyOf' in value || 'oneOf' in value || 'allOf' in value || 'not' in value || Array.isArray(value.type)
-      || (typeof value.$ref === 'string' && CHILD_KEYWORDS.some(key => key in value))
-    ) {
-      return true
-    }
-
-    for (const item of Object.values(value)) {
-      stack.push(item)
-    }
-  }
-
-  return false
-}
-
 export class JsonSchemaCoercer {
   private readonly nativeCoerceOptions: NativeCoerceOptions
   private readonly maxStepsPerValue: number
-  private readonly revisitingSchemas = new WeakMap<object, boolean>()
 
   /**
-   * Reused between calls: until V8 warms up, building a fresh context per call adds about half the cost
-   * of coercing a small input. A nested call, from a getter in the input, builds its own.
+   * Reused between calls, since building a context is slow until V8 warms up.
+   * A nested call, from a getter in the input, builds its own.
    */
   private idleContext: CoercionContext | undefined = createContext()
 
@@ -165,7 +134,7 @@ export class JsonSchemaCoercer {
     this.idleContext = undefined
 
     context.rootSchema = schema
-    context.memoize = undefined
+    context.memoize = false
     context.steps = 0
     context.maxSteps = this.maxStepsPerValue * MIN_BUDGETED_VALUES
     context.input = value
@@ -229,6 +198,11 @@ export class JsonSchemaCoercer {
             : undefined
 
       if (resolved !== undefined && !appliedRefs?.has(resolved)) {
+        // the ref and this schema's own children both reach the same nested values
+        if (schema.type === 'object' || schema.type === 'array') {
+          context.memoize = true
+        }
+
         const [subSatisfied, subCoerced] = this.coerceRef(context, resolved, coerced, appliedRefs)
 
         coerced = subCoerced
@@ -434,6 +408,8 @@ export class JsonSchemaCoercer {
     }
 
     if (schema.allOf) {
+      context.memoize = true
+
       for (const subSchema of schema.allOf) {
         const [subSatisfied, subCoerced] = this.coerceInternal(context, subSchema, coerced, appliedRefs)
 
@@ -444,6 +420,8 @@ export class JsonSchemaCoercer {
 
     for (const key of ['anyOf', 'oneOf'] as const) {
       if (schema[key]) {
+        context.memoize = true
+
         /**
          * The best branch is the first one that accepts the value untouched,
          * then the most satisfied branch that accepts it after a conversion.
@@ -479,6 +457,8 @@ export class JsonSchemaCoercer {
     }
 
     if (typeof schema.not !== 'undefined') {
+      context.memoize = true
+
       const [notSatisfied] = this.coerceInternal(context, schema.not, coerced, appliedRefs)
 
       if (notSatisfied !== UNSATISFIED) {
@@ -490,9 +470,9 @@ export class JsonSchemaCoercer {
   }
 
   /**
-   * Shares the result for an object across every union branch that reaches it through this `$ref`, keeping recursive
-   * unions linear. Coercion never mutates values, so sharing is safe, but not while another `$ref` is applied to the
-   * value, since the cycle check then changes the result.
+   * Shares the result for an object across every union branch or sibling keyword that reaches it through this `$ref`,
+   * keeping recursive schemas linear. Coercion never mutates values, so sharing is safe, but not while another `$ref`
+   * is applied to the value, since the cycle check then changes the result.
    */
   private coerceRef(
     context: CoercionContext,
@@ -502,7 +482,7 @@ export class JsonSchemaCoercer {
   ): CoercionResult {
     let memo: Map<unknown, CoercionResult> | undefined
 
-    if (!appliedRefs?.size && isTypescriptObject(value) && this.shouldMemoize(context)) {
+    if (context.memoize && !appliedRefs?.size && isTypescriptObject(value)) {
       context.memo ??= new Map()
       memo = context.memo.get(resolved)
 
@@ -529,29 +509,9 @@ export class JsonSchemaCoercer {
     return result
   }
 
-  /**
-   * Decided once per call, on its first `$ref`, so schemas without one never pay for it.
-   */
-  private shouldMemoize(context: CoercionContext): boolean {
-    if (context.memoize === undefined) {
-      // a boolean schema has no `$ref` that could get here
-      const schema = context.rootSchema as Exclude<JsonSchema, boolean>
-      let revisits = this.revisitingSchemas.get(schema)
-
-      if (revisits === undefined) {
-        revisits = canRevisitValues(schema)
-        this.revisitingSchemas.set(schema, revisits)
-      }
-
-      context.memoize = revisits
-    }
-
-    return context.memoize
-  }
-
   private extendBudget(context: CoercionContext): void {
-    // counting stops once it covers twice the steps taken, even inside a wide array,
-    // so it costs no more than coercion so far, and the budget only runs out on a complete count
+    // counting stops once it covers twice the steps taken, so it costs no more than coercion so far,
+    // and the budget only runs out on a complete count
     const limit = 2 * context.steps / this.maxStepsPerValue
     context.maxSteps = this.maxStepsPerValue * Math.max(countValues(context.input, limit), MIN_BUDGETED_VALUES)
 
