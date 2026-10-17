@@ -242,31 +242,6 @@ const procedure = os
   .handler(({ context }) => context.startedAt)
 ```
 
-### Interrupting `next()`
-
-Like `try/finally` around `await next()`: when `next()` is interrupted (request abort, `Effect.timeout`, `Effect.race`, ...), the `signal` of the rest of the chain is aborted, and `next()` waits for it to settle before your finalizers run.
-
-```ts
-const transactional = middlewareGen(function* ({ next }) {
-  return yield* Effect.acquireUseRelease(
-    db.begin,
-    tx => next({ context: { tx } }),
-    (tx, exit) => Exit.isSuccess(exit) ? tx.commit : tx.rollback,
-  )
-})
-
-const timeout = middlewareGen(function* ({ next }) {
-  return yield* next().pipe(
-    Effect.timeout('5 seconds'),
-    Effect.catchIf(Cause.isTimeoutError, () => Effect.fail(new ORPCError('TIMEOUT'))),
-  )
-})
-```
-
-:::warning
-Interruption is cooperative: code that ignores its `signal` runs to completion first. Its result is discarded, and a returned [AsyncIteratorObject](/docs/async-iterator-object) is closed.
-:::
-
 ## Client Calls
 
 `createEffectClient` wraps any oRPC client, whether [server-side](/docs/client/server-side) or [client-side](/docs/client/client-side), so every procedure returns a lazy Effect instead of a promise, ready to `yield*` inside Effect generators. The output becomes the success value, and errors land in the error channel with their original types preserved, ready for utilities like `catchORPCErrorCodes`:
