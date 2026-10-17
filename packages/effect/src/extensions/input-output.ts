@@ -1,36 +1,14 @@
 import type { AnySchema, ErrorMap, MergedSchema, Schema } from '@orpc/contract'
 import type { Context } from '@orpc/server'
-import type { ToStandardSchemaOptions } from '../schema'
 import { ContractBuilder } from '@orpc/contract'
 import { Builder } from '@orpc/server'
 import { Schema as EffectSchema } from 'effect'
-import { isConvertedEffectSchema, toStandardSchema } from '../schema'
-
-let defaultOptions: ToStandardSchemaOptions = {}
-
-/**
- * Sets the options the `.input` and `.output` extensions pass to `toStandardSchema`
- * when converting Effect schemas. Schemas are converted when `.input`/`.output` is called,
- * so call this before defining procedures.
- *
- * Schemas already converted with `toStandardSchema` keep their own options.
- *
- * @see {@link https://orpc.dev/docs/integrations/effect#input-and-output-extensions | Effect Integration - .input and .output Extensions}
- */
-export function setInputOutputExtensionOptions(options: ToStandardSchemaOptions): void {
-  defaultOptions = options
-}
+import { toStandardSchema } from '../schema'
 
 function isEffectConstraintDecoder(
   schema: AnySchema | EffectSchema.ConstraintDecoder<any>,
 ): schema is EffectSchema.ConstraintDecoder<any> {
   return EffectSchema.isSchema(schema)
-}
-
-function convertEffectSchema(schema: AnySchema | EffectSchema.ConstraintDecoder<any>): AnySchema {
-  return isEffectConstraintDecoder(schema) && !isConvertedEffectSchema(schema)
-    ? toStandardSchema(schema, defaultOptions)
-    : schema
 }
 
 declare module '@orpc/contract' {
@@ -89,12 +67,12 @@ declare module '@orpc/contract' {
 
 const OriginalContractBuilderInput = ContractBuilder.prototype.input
 ContractBuilder.prototype.input = function input(schema: AnySchema | EffectSchema.ConstraintDecoder<any>) {
-  return OriginalContractBuilderInput.bind(this)(convertEffectSchema(schema))
+  return OriginalContractBuilderInput.bind(this)(isEffectConstraintDecoder(schema) ? toStandardSchema(schema) : schema)
 }
 
 const OriginalContractBuilderOutput = ContractBuilder.prototype.output
 ContractBuilder.prototype.output = function output(schema: AnySchema | EffectSchema.ConstraintDecoder<any>) {
-  return OriginalContractBuilderOutput.bind(this)(convertEffectSchema(schema))
+  return OriginalContractBuilderOutput.bind(this)(isEffectConstraintDecoder(schema) ? toStandardSchema(schema) : schema)
 }
 
 declare module '@orpc/server' {
@@ -175,10 +153,10 @@ declare module '@orpc/server' {
 
 const OriginalBuilderInput = Builder.prototype.input
 Builder.prototype.input = function input(schema: AnySchema | EffectSchema.ConstraintDecoder<any>) {
-  return OriginalBuilderInput.bind(this)(convertEffectSchema(schema))
+  return OriginalBuilderInput.bind(this)(isEffectConstraintDecoder(schema) ? toStandardSchema(schema) : schema)
 }
 
 const OriginalBuilderOutput = Builder.prototype.output
 Builder.prototype.output = function output(schema: AnySchema | EffectSchema.ConstraintDecoder<any>) {
-  return OriginalBuilderOutput.bind(this)(convertEffectSchema(schema))
+  return OriginalBuilderOutput.bind(this)(isEffectConstraintDecoder(schema) ? toStandardSchema(schema) : schema)
 }

@@ -266,31 +266,17 @@ The effects are lazy: the client is invoked each time the effect runs, so they w
 
 ## Effect Schema
 
-oRPC natively supports [Standard Schema](https://standardschema.dev/schema#what-schema-libraries-implement-the-spec). Use `toStandardSchema` to turn an [Effect Schema](https://effect.website/docs/schema/introduction/) into one:
+oRPC natively supports [Standard Schema](https://standardschema.dev/schema#what-schema-libraries-implement-the-spec), and [Effect Schema](https://effect.website/docs/schema/introduction/) implements that spec through [Schema.toStandardSchemaV1](https://effect.website/docs/schema/standard-schema/):
 
 ```ts
-import { toStandardSchema } from '@orpc/experimental-effect'
 import { Schema } from 'effect'
 
 const procedure = os
-  .input(toStandardSchema(Schema.Struct({ name: Schema.String })))
+  .input(Schema.toStandardSchemaV1(Schema.Struct({ name: Schema.String })))
   .handler(handlerGen(function* ({ input, context }) {
     return `Hello ${input.name}!`
   }))
 ```
-
-It accepts the same `leafHook`, `checkHook`, and `parseOptions` options as Effect's [Schema.toStandardSchemaV1](https://effect.website/docs/schema/standard-schema/), and returns a new schema instead of modifying the one you pass in:
-
-```ts
-const UserSchema = toStandardSchema(
-  Schema.Struct({ name: Schema.String }),
-  { parseOptions: { onExcessProperty: 'error' } },
-)
-```
-
-:::warning
-Prefer `toStandardSchema` over `Schema.toStandardSchemaV1`. Effect's adapter reports defects, such as a transformation or check that throws, as validation issues containing the error message and stack trace, which oRPC would send to the client. `toStandardSchema` rethrows them instead, so the client receives a generic `INTERNAL_SERVER_ERROR`.
-:::
 
 ### `.input` and `.output` Extensions
 
@@ -321,16 +307,6 @@ export const base = os
 You can also use these extensions with the [contract builder](/docs/contract/procedure).
 :::
 
-The extensions convert Effect schemas with `toStandardSchema` and leave schemas already converted by it unchanged, so you can still pass options for a single schema. To change the options used for all other schemas, call `setInputOutputExtensionOptions` before defining procedures:
-
-```ts
-import { setInputOutputExtensionOptions } from '@orpc/experimental-effect/extensions/input-output'
-
-setInputOutputExtensionOptions({
-  parseOptions: { onExcessProperty: 'error' },
-})
-```
-
 ### JSON Schema Converter
 
 This integration also provides `EffectSchemaToJsonSchemaConverter`, which wraps Effect's built-in [Schema.toJsonSchemaDocument](https://effect.website/docs/schema/json-schema/). Use it with tools such as the [OpenAPI Generator](/docs/openapi/specification#openapi-generator). It accepts the same options as `Schema.toJsonSchemaDocument`, such as `onExcessProperty`, `generateDescriptions`, `includeAnnotationKey`, and `referencePolicy`:
@@ -346,10 +322,6 @@ const generator = new OpenAPIGenerator({
   ],
 })
 ```
-
-:::warning
-Converter options only affect the generated JSON Schema, not validation. For example, `onExcessProperty: 'error'` produces `additionalProperties: false`, but schemas still accept and strip excess properties unless validation uses the same option, for example through `setInputOutputExtensionOptions({ parseOptions: { onExcessProperty: 'error' } })`.
-:::
 
 Schemas with an `identifier` annotation, including `Schema.Class` and recursive schemas, are preserved in `$defs`, which `OpenAPIGenerator` can then [hoist](/docs/openapi/specification#hoisting-defs) into `components.schemas`.
 
