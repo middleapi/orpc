@@ -282,9 +282,9 @@ const procedure = os
   }))
 ```
 
-### Interruption
+### Interrupting `next()`
 
-An effectful middleware is interrupted when the request `signal` aborts, and `next()` can also be interrupted by combinators such as `Effect.timeout` or `Effect.race`. When `next()` is interrupted, it aborts the `signal` passed to the rest of the chain and waits for downstream middleware and the handler to settle before your finalizers run. Resources acquired around `next()` stay available until the rest of the chain is done with them:
+Besides a request abort (see [Interruption](#interruption)), `next()` can be interrupted by combinators such as `Effect.timeout` or `Effect.race`. Either way, it aborts the `signal` passed to the rest of the chain and waits for downstream middleware and the handler to settle before your finalizers run. Resources acquired around `next()` stay available until the rest of the chain is done with them:
 
 ```ts
 const transaction = middlewareGen(function* ({ next }) {
