@@ -242,25 +242,6 @@ const procedure = os
   .handler(({ context }) => context.startedAt)
 ```
 
-### Context Propagation
-
-The Effect context around `next()`, such as services, spans, and log annotations, flows to every downstream `middlewareGen` and `handlerGen`, even through regular middleware:
-
-```ts
-const procedure = os
-  .use(middlewareGen(function* ({ next }) {
-    return yield* next().pipe(
-      Effect.withSpan('auth'),
-      Effect.annotateLogs({ requestId: crypto.randomUUID() }),
-    )
-  }))
-  .handler(handlerGen(function* () {
-    yield* Effect.log('handling request') // annotated with `requestId`, inside the `auth` span
-  }))
-```
-
-For typesafe services, extend [`effect/context`](#effect-services) instead. It takes precedence over the propagated context.
-
 ### Interrupting `next()`
 
 Like `try/finally` around `await next()`: when `next()` is interrupted (request abort, `Effect.timeout`, `Effect.race`, ...), the `signal` of the rest of the chain is aborted, and `next()` waits for it to settle before your finalizers run.
