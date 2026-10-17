@@ -24,11 +24,11 @@ export interface MiddlewareGen<
   TOutContext extends Context,
   TInput,
   TOutput,
+  TErrorMap extends ErrorMap,
   TYield extends Effect.Effect<any, any, InferEffectServices<TInContext>>,
-  TErrorConstructorMap extends ORPCErrorConstructorMap<any>,
 > {
   (
-    opts: MiddlewareGenOptions<TInContext, TOutput, TErrorConstructorMap>,
+    opts: MiddlewareGenOptions<TInContext, TOutput, ORPCErrorConstructorMap<TErrorMap>>,
     input: TInput,
     done: MiddlewareDone<TOutput>,
   ): Generator<
@@ -56,7 +56,7 @@ export function middlewareGen<
   TErrorMap extends ErrorMap = Record<never, never>,
   TYield extends Effect.Effect<any, any, InferEffectServices<TInContext>> = Effect.Effect<any, any, InferEffectServices<TInContext>>,
 >(
-  middleware: MiddlewareGen<TInContext, TOutContext, TInput, TOutput, TYield, ORPCErrorConstructorMap<TErrorMap>>,
+  middleware: MiddlewareGen<TInContext, TOutContext, TInput, TOutput, TErrorMap, TYield>,
 ): Middleware<TInContext, TOutContext, TInput, TOutput, TErrorMap> {
   const mid: Middleware<TInContext, TOutContext, TInput, TOutput, TErrorMap> = (opts, input, done) => {
     const next: MiddlewareGenNext<TOutput> = <U extends Context = object>(...rest: MaybeOptionalOptions<MiddlewareNextOptions<U>>) => Effect.tryPromise({

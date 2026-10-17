@@ -18,9 +18,9 @@ declare module '@orpc/server' {
       handler: HandlerGen<
         TInitialContext,
         InferSchemaOutput<InitialInputSchema>,
-        TYield,
         TReturn,
-        ORPCErrorConstructorMap<TErrorMap>
+        ORPCErrorConstructorMap<TErrorMap>,
+        TYield
       >,
     ): DecoratedProcedure<
       TInitialContext,
@@ -43,9 +43,9 @@ declare module '@orpc/server' {
       handler: HandlerGen<
         MergedContext<TInitialContext, TInjectedContext>,
         InferSchemaOutput<InitialInputSchema>,
-        TYield,
         TReturn,
-        ORPCErrorConstructorMap<TErrorMap>
+        ORPCErrorConstructorMap<TErrorMap>,
+        TYield
       >,
     ): DecoratedProcedure<
       TInitialContext,
@@ -69,9 +69,9 @@ declare module '@orpc/server' {
       handler: HandlerGen<
         MergedContext<TInitialContext, TInjectedContext>,
         InferSchemaOutput<TInputSchema>,
-        TYield,
         TReturn,
-        ORPCErrorConstructorMap<TErrorMap>
+        ORPCErrorConstructorMap<TErrorMap>,
+        TYield
       >,
     ): DecoratedProcedure<
       TInitialContext,
@@ -95,9 +95,9 @@ declare module '@orpc/server' {
       handler: HandlerGen<
         MergedContext<TInitialContext, TInjectedContext>,
         InferSchemaOutput<InitialInputSchema>,
-        TYield,
         TReturn,
-        ORPCErrorConstructorMap<TErrorMap>
+        ORPCErrorConstructorMap<TErrorMap>,
+        TYield
       >,
     ): DecoratedProcedure<
       TInitialContext,
@@ -122,9 +122,9 @@ declare module '@orpc/server' {
       handler: HandlerGen<
         MergedContext<TInitialContext, TInjectedContext>,
         InferSchemaOutput<TInputSchema>,
-        TYield,
         TReturn,
-        ORPCErrorConstructorMap<TErrorMap>
+        ORPCErrorConstructorMap<TErrorMap>,
+        TYield
       >,
     ): DecoratedProcedure<
       TInitialContext,
@@ -146,9 +146,9 @@ declare module '@orpc/server' {
       handler: HandlerGen<
         MergedContext<TInitialContext, TInjectedContext>,
         InferSchemaOutput<TInputSchema>,
-        Effect.Effect<any, any, InferEffectServices<MergedContext<TInitialContext, TInjectedContext>>>,
         InferSchemaInput<TOutputSchema>,
-        ORPCErrorConstructorMap<TErrorMap>
+        ORPCErrorConstructorMap<TErrorMap>,
+        Effect.Effect<any, any, InferEffectServices<MergedContext<TInitialContext, TInjectedContext>>>
       >,
     ): ImplementedProcedure<
       TInitialContext,

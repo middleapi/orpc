@@ -266,13 +266,14 @@ The effects are lazy: the client is invoked each time the effect runs, so they w
 
 ## Effect Schema
 
-oRPC natively supports [Standard Schema](https://standardschema.dev/schema#what-schema-libraries-implement-the-spec), and [Effect Schema](https://effect.website/docs/schema/introduction/) implements that spec through [Schema.toStandardSchemaV1](https://effect.website/docs/schema/standard-schema/):
+oRPC natively supports [Standard Schema](https://standardschema.dev/schema#what-schema-libraries-implement-the-spec). Convert an [Effect Schema](https://effect.website/docs/schema/introduction/) with `toStandardSchema`, which wraps Effect's [Schema.toStandardSchemaV1](https://effect.website/docs/schema/standard-schema/) and is the same conversion the [extensions below](#input-and-output-extensions) apply:
 
 ```ts
+import { toStandardSchema } from '@orpc/experimental-effect'
 import { Schema } from 'effect'
 
 const procedure = os
-  .input(Schema.toStandardSchemaV1(Schema.Struct({ name: Schema.String })))
+  .input(toStandardSchema(Schema.Struct({ name: Schema.String })))
   .handler(handlerGen(function* ({ input, context }) {
     return `Hello ${input.name}!`
   }))

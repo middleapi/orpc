@@ -1,5 +1,6 @@
-import type { ORPCErrorConstructorMap } from '@orpc/server'
+import type { Middleware, ORPCErrorConstructorMap } from '@orpc/server'
 import type { WithEffectContext } from './context'
+import type { AnyMiddlewareGen, MiddlewareGen } from './middleware'
 import { os } from '@orpc/server'
 import { Context, Effect } from 'effect'
 import { z } from 'zod'
@@ -183,5 +184,40 @@ describe('middlewareGen', () => {
         expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
         return yield* next()
       }))
+  })
+
+  it('follows Middleware order with TYield last for explicit type arguments', () => {
+    interface ServerContext extends WithEffectContext<Service1> {
+      auth: boolean
+    }
+
+    type OutContext = { user: 'user' }
+    type Input = { input: string }
+    type Output = { output: number }
+    type Yield = Effect.Effect<any, unknown, Service1>
+
+    const middleware = middlewareGen<ServerContext, OutContext, Input, Output, typeof errorMap, Yield>(
+      function* ({ context, errors, next }, input) {
+        expectTypeOf(context).toEqualTypeOf<ServerContext>()
+        expectTypeOf(input).toEqualTypeOf<Input>()
+        expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
+
+        yield* Service1
+
+        return yield* next({ context: { user: 'user' as const } })
+      },
+    )
+
+    expectTypeOf(middleware).toEqualTypeOf<Middleware<ServerContext, OutContext, Input, Output, typeof errorMap>>()
+
+    expectTypeOf<Parameters<typeof middlewareGen<ServerContext, OutContext, Input, Output, typeof errorMap, Yield>>[0]>()
+      .toEqualTypeOf<MiddlewareGen<ServerContext, OutContext, Input, Output, typeof errorMap, Yield>>()
+
+    expectTypeOf<MiddlewareGen<ServerContext, OutContext, Input, Output, typeof errorMap, Yield>>().toExtend<AnyMiddlewareGen>()
+
+    // @ts-expect-error - Service2 is not provided by ServerContext
+    middlewareGen<ServerContext, OutContext, Input, Output, typeof errorMap, Effect.Effect<any, any, Service2>>(function* ({ next }) {
+      return yield* next({ context: { user: 'user' as const } })
+    })
   })
 })

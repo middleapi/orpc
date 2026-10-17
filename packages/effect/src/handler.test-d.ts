@@ -1,6 +1,7 @@
 import type { InitialInputSchema, Schema } from '@orpc/contract'
-import type { DecoratedProcedure, DefaultInitialContext, ORPCErrorConstructorMap } from '@orpc/server'
+import type { DecoratedProcedure, DefaultInitialContext, ORPCErrorConstructorMap, ProcedureHandler } from '@orpc/server'
 import type { WithEffectContext } from './context'
+import type { AnyHandlerGen, HandlerGen } from './handler'
 import { ORPCError, os } from '@orpc/server'
 import { Context, Effect } from 'effect'
 import { z } from 'zod'
@@ -107,5 +108,83 @@ describe('handlerGen', () => {
       .handler(handlerGen(function* () {
         yield* Service2
       }))
+  })
+
+  describe('explicit type arguments', () => {
+    interface ServerContext extends WithEffectContext<Service1> {
+      auth: boolean
+    }
+
+    type Input = { input: string }
+    type Output = { output: number }
+    type Errors = ORPCErrorConstructorMap<typeof errorMap>
+    type Yield = Effect.Effect<any, 'yield-error', Service1>
+
+    it('follows ProcedureHandler order with TYield last', () => {
+      const handler = handlerGen<ServerContext, Input, Output, Errors, Yield>(function* ({ context, errors }, input) {
+        expectTypeOf(context).toEqualTypeOf<ServerContext>()
+        expectTypeOf(input).toEqualTypeOf<Input>()
+        expectTypeOf(errors).toEqualTypeOf<Errors>()
+
+        yield* Service1
+        yield* Effect.fail('yield-error' as const)
+
+        return { output: 1 }
+      })
+
+      expectTypeOf(handler).toEqualTypeOf<ProcedureHandler<ServerContext, Input, Output, Errors>>()
+
+      expectTypeOf<Parameters<typeof handlerGen<ServerContext, Input, Output, Errors, Yield>>[0]>()
+        .toEqualTypeOf<HandlerGen<ServerContext, Input, Output, Errors, Yield>>()
+
+      expectTypeOf<HandlerGen<ServerContext, Input, Output, Errors, Yield>>().toExtend<AnyHandlerGen>()
+
+      // @ts-expect-error - error is not in TYield
+      handlerGen<ServerContext, Input, Output, Errors, Yield>(function* () {
+        yield* Effect.fail('other-error' as const)
+        return { output: 1 }
+      })
+
+      // @ts-expect-error - Service2 is not provided by ServerContext
+      handlerGen<ServerContext, Input, Output, Errors, Effect.Effect<any, any, Service2>>(function* () {
+        return { output: 1 }
+      })
+    })
+
+    it('defaults omitted type arguments', () => {
+      const handler = handlerGen<ServerContext>(function* ({ input, errors }) {
+        expectTypeOf(input).toEqualTypeOf<unknown>()
+        expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<Record<never, never>>>()
+
+        yield* Service1
+
+        return 'output'
+      })
+
+      // @ts-expect-error - Service2 is not provided by ServerContext
+      handlerGen<ServerContext>(function* () {
+        yield* Service2
+      })
+
+      expectTypeOf(handler).toEqualTypeOf<
+        ProcedureHandler<ServerContext, unknown, unknown, ORPCErrorConstructorMap<Record<never, never>>>
+      >()
+
+      const procedure = os
+        .$context<ServerContext>()
+        .input(schema1)
+        .errors(errorMap)
+        .handler(handler)
+
+      expectTypeOf(procedure).toEqualTypeOf<
+        DecoratedProcedure<
+          ServerContext & object,
+          object,
+          typeof schema1,
+          Schema<unknown>,
+          typeof errorMap
+        >
+      >()
+    })
   })
 })

@@ -10,3 +10,7 @@ it('exports', async () => {
     createEffectClient: expect.any(Function),
   })
 })
+
+it('does not export internal runtime helpers', async () => {
+  await expect(import('./index')).resolves.not.toHaveProperty('runPromise')
+})
