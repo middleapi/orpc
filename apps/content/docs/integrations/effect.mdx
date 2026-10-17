@@ -189,22 +189,6 @@ if (isDefinedError(error)) {
 }
 ```
 
-Map your own [tagged errors](https://effect.website/docs/error-management/yieldable-errors/) to `errors.X(...)` with `Effect.catchTags`:
-
-```ts
-class UserNotFound extends Schema.TaggedError<UserNotFound>()('UserNotFound', {}) {}
-
-const findUser = os
-  .errors({ NOT_FOUND: {} })
-  .handler(handlerGen(function* ({ errors }) {
-    return yield* loadUser.pipe( // Effect<User, UserNotFound>
-      Effect.catchTags({
-        UserNotFound: error => Effect.fail(errors.NOT_FOUND({ cause: error })),
-      }),
-    )
-  }))
-```
-
 ### Catching ORPCErrors
 
 Use `catchORPCError` to recover from every `ORPCError` failure in the error channel of an effect, or `catchORPCErrorCode` and `catchORPCErrorCodes` to recover from specific codes only. Recovered errors are excluded from the resulting effect, and other failures re-fail with their original cause:
