@@ -6,46 +6,24 @@ import { Effect, Function } from 'effect'
 
 type AnyEffect = Effect.Effect<any, any, any>
 
-/**
- * The `ORPCError`s a handler can receive from `E`. Failure types like `Error`
- * can also hold hidden `ORPCError` instances, whose code and data are unknown.
- */
 type ORPCErrorsOf<E> = E extends AnyORPCError ? E : AnyORPCError extends E ? ORPCError<ORPCErrorCode, unknown> : never
 
-/**
- * The codes of the `ORPCError`s a handler can receive from `E`.
- */
 type ORPCErrorCodeOf<E> = ORPCErrorsOf<E>['code']
 
-/**
- * The `ORPCError`s a handler for `TCode` can receive from `E`, narrowed to
- * `TCode`. Errors whose every possible code is in `TCode` are kept as is.
- */
 type ORPCErrorWithCode<E, TCode extends ORPCErrorCode> = E extends ORPCError<infer UCode, infer UData>
   ? [Exclude<UCode, TCode>] extends [never]
       ? E
       : [UCode & TCode] extends [never] ? never : ORPCError<TCode extends UCode ? TCode : TCode & UCode, UData>
   : AnyORPCError extends E ? ORPCError<TCode, unknown> : never
 
-/**
- * `E` without the `ORPCError`s whose every possible code is in `TCode`.
- */
 type ExcludeORPCErrorCode<E, TCode extends string> = E extends ORPCError<infer UCode, any>
   ? [Exclude<UCode, TCode>] extends [never] ? never : E
   : E
 
-/**
- * `TCode` if it is a single literal code, `never` otherwise.
- */
 type LiteralORPCErrorCode<TCode extends string> = Types.IsUnion<TCode> extends true
   ? never
   : Record<never, never> extends Record<TCode, unknown> ? never : TCode
 
-/**
- * The handlers `catchORPCErrorCodes` accepts, keyed by the codes in `E`.
- * Non-literal codes (e.g. hidden `ORPCError` instances) become an index
- * signature, whose handler is bivariant so it accepts every literal handler.
- */
 type ORPCErrorCodeCases<E, TCases> = Types.NoExcessProperties<{
   [K in ORPCErrorCodeOf<E>]?: Record<never, never> extends Record<K, unknown>
     ? { bivarianceHack(error: ORPCErrorWithCode<E, K>): AnyEffect }['bivarianceHack']
@@ -59,14 +37,8 @@ type HandledORPCErrorCodes<TCases> = {
   [K in keyof TCases]-?: TCases[K] extends (...args: any[]) => any ? K : never
 }[Types.RequiredKeys<TCases>] & string
 
-/**
- * The effects the handlers in `TCases` can return.
- */
 type ORPCErrorCodeCasesEffect<TCases> = ReturnType<Extract<TCases[keyof TCases], (...args: any[]) => any>>
 
-/**
- * `self` with the codes `TCases` handles caught by its handlers.
- */
 type CatchORPCErrorCodesEffect<A, E, R, TCases> = Effect.Effect<
   A | Effect.Success<ORPCErrorCodeCasesEffect<TCases>>,
   ExcludeORPCErrorCode<E, HandledORPCErrorCodes<TCases>> | Effect.Error<ORPCErrorCodeCasesEffect<TCases>>,
