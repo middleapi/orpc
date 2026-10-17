@@ -150,6 +150,46 @@ describe('decorateMiddleware', () => {
       expect(done).not.toHaveBeenCalled()
     })
 
+    it('forwards signal overrides through the combined chain', async () => {
+      const signal = new AbortController().signal
+      const signal1 = new AbortController().signal
+      const signal2 = new AbortController().signal
+
+      const mid1 = vi.fn().mockImplementation(async ({ next }) => next({ signal: signal1 }))
+      const mid2 = vi.fn()
+        .mockImplementationOnce(async ({ next }) => next())
+        .mockImplementationOnce(async ({ next }) => next({ signal: signal2 }))
+
+      const combined = decorateMiddleware(mid1 as any).use(mid2 as any)
+      const next = vi.fn().mockImplementation(async ({ context }) => ({ output: 'final', context }))
+      const done = vi.fn()
+
+      await (combined as any)({ context: {}, signal, next }, 'input', done)
+
+      expect(mid1).toHaveBeenCalledWith(expect.objectContaining({ signal }), 'input', done)
+      expect(mid2).toHaveBeenCalledWith(expect.objectContaining({ signal: signal1 }), 'input', done)
+      expect(next).toHaveBeenCalledWith(expect.objectContaining({ signal: signal1 }))
+
+      await (combined as any)({ context: {}, signal, next }, 'input', done)
+
+      expect(next).toHaveBeenLastCalledWith(expect.objectContaining({ signal: signal2 }))
+    })
+
+    it('keeps the outer signal when no override is given', async () => {
+      const signal = new AbortController().signal
+
+      const mid1 = vi.fn().mockImplementation(async ({ next }) => next())
+      const mid2 = vi.fn().mockImplementation(async ({ next }) => next())
+
+      const combined = decorateMiddleware(mid1 as any).use(mid2 as any)
+      const next = vi.fn().mockImplementation(async ({ context }) => ({ output: 'final', context }))
+
+      await (combined as any)({ context: {}, signal, next }, 'input', vi.fn())
+
+      expect(mid2).toHaveBeenCalledWith(expect.objectContaining({ signal }), 'input', expect.any(Function))
+      expect(next).toHaveBeenCalledWith(expect.objectContaining({ signal }))
+    })
+
     it('can stop early with done', async () => {
       const mid1 = vi.fn().mockImplementation(async ({ next }) => {
         return await next({ context: { mid1: true } })

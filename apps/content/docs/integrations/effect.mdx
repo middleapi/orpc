@@ -221,7 +221,7 @@ All utilities support data-first `catchORPCError(program, handler)` and data-las
 
 ### Interruption
 
-When a request is aborted, `handlerGen` and `middlewareGen` fibers are interrupted, so finalizers such as `Effect.ensuring` and `Effect.onInterrupt` run. Handlers have no `Scope`, so wrap `Effect.acquireRelease` in `Effect.scoped`.
+When a request is aborted, `handlerGen` and `middlewareGen` fibers are interrupted, so finalizers such as `Effect.ensuring` and `Effect.onInterrupt` run. Handlers have no `Scope`, so wrap `Effect.acquireRelease` in `Effect.scoped`. A `middlewareGen` runs its finalizers only after the rest of the chain has settled, see [Interrupting `next()`](#interrupting-next).
 
 ## Effectful Middleware
 
@@ -241,6 +241,65 @@ const procedure = os
   }))
   .handler(({ context }) => context.startedAt)
 ```
+
+### Context Propagation
+
+The Effect context around `next()` flows down the chain to every `middlewareGen` and `handlerGen` after it, including through regular middleware in between. Services, spans, and log annotations applied around `next()` are visible downstream:
+
+```ts
+const procedure = os
+  .use(middlewareGen(function* ({ next }) {
+    return yield* next().pipe(
+      Effect.withSpan('auth'),
+      Effect.annotateLogs({ requestId: crypto.randomUUID() }),
+    )
+  }))
+  .handler(handlerGen(function* () {
+    // Logged with `requestId`, and spans created here nest under `auth`
+    yield* Effect.log('handling request')
+  }))
+```
+
+Services provided this way, such as with `Effect.provideService`, are not part of the oRPC context type. To make a service available to downstream handlers in a typesafe way, pass it through [`effect/context`](#effect-services) instead. It is layered on top of the propagated context:
+
+```ts
+const procedure = os
+  .$context<ServerContext>()
+  .use(middlewareGen(function* ({ context, next }) {
+    return yield* next({
+      context: {
+        'effect/context': context['effect/context'].pipe(
+          Context.add(AdditionService, {}),
+        ),
+      },
+    })
+  }))
+```
+
+### Interrupting `next()`
+
+`next()` behaves like `await next()` inside `try/finally` in a regular middleware. When it is interrupted, either because the request was aborted or because a combinator such as `Effect.timeout` or `Effect.race` gave up on it, the `signal` of the rest of the chain is aborted, so downstream `middlewareGen` and `handlerGen` fibers are interrupted. `next()` then waits for the rest of the chain to settle before the middleware's finalizers run, so resources acquired around `next()` stay valid while downstream code is still using them:
+
+```ts
+const transactional = middlewareGen(function* ({ next }) {
+  return yield* Effect.acquireUseRelease(
+    db.begin,
+    tx => next({ context: { tx } }),
+    (tx, exit) => Exit.isSuccess(exit) ? tx.commit : tx.rollback,
+  )
+})
+
+const timeout = middlewareGen(function* ({ next }) {
+  return yield* next().pipe(
+    Effect.timeout('5 seconds'),
+    Effect.catchIf(Cause.isTimeoutError, () => Effect.fail(new ORPCError('TIMEOUT'))),
+  )
+})
+```
+
+:::warning
+Stopping the rest of the chain is cooperative. Regular middleware and handlers that ignore their `signal` run to completion, and the interruption waits for them. Their results are discarded, and an [AsyncIteratorObject](/docs/async-iterator-object) returned after the interruption is closed because nothing will consume it.
+:::
 
 ## Client Calls
 

@@ -37,6 +37,7 @@ export interface WithEffectContext<Services> {
    * Useful for adding observability, tracing, or error handling.
    *
    * Runs for every effectful middleware and handler, so provide services through `effect/context` instead.
+   * The returned effect runs with the `effect/context` services, so spans it creates use the configured tracer and nest under the caller's span.
    *
    * @see {@link https://orpc.dev/docs/integrations/effect#error-handling | Effect Integration - Error Handling}
    *

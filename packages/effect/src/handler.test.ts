@@ -1,6 +1,6 @@
 import type { WithEffectContext } from './context'
 import { call, ORPCError, os, type } from '@orpc/server'
-import { Context, Effect } from 'effect'
+import { Context, Effect, Option } from 'effect'
 import { handlerGen } from './handler'
 import * as EffectModule from './runtime'
 
@@ -151,6 +151,33 @@ describe('handlerGen', () => {
     expect(wrappedPath).toEqual(['wrapped', 'procedure'])
     expect(wrappedProcedure).toBe(procedure)
     expect(wrappedSignal).toBe(signal)
+  })
+
+  it('runs effect/wrap with the services from effect/context', async () => {
+    let wrappedService: unknown
+
+    const procedure = os
+      .$context<WithEffectContext<Service1>>()
+      .handler(handlerGen(function* () {
+        return 'output'
+      }))
+
+    await expect(call(
+      procedure,
+      undefined,
+      {
+        context: {
+          'effect/context': Context.make(Service1, { id: 'Service1' }),
+          'effect/wrap': effect => effect.pipe(Effect.tap(() => Effect.serviceOption(Service1).pipe(
+            Effect.tap(service => Effect.sync(() => {
+              wrappedService = service
+            })),
+          ))),
+        },
+      },
+    )).resolves.toEqual('output')
+
+    expect(wrappedService).toEqual(Option.some({ id: 'Service1' }))
   })
 
   it('throws ORPCError failures from wrap as-is', async () => {

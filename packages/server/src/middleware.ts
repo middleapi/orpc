@@ -8,9 +8,15 @@ export type MiddlewareResult<TOutContext extends Context, TOutput> = Promisable<
   context: TOutContext
 }>
 
-export type MiddlewareNextOptions<TOutContext extends Context> = object extends TOutContext
-  ? { context?: TOutContext }
-  : { context: TOutContext }
+export type MiddlewareNextOptions<TOutContext extends Context>
+  = & (object extends TOutContext ? { context?: TOutContext } : { context: TOutContext })
+    & {
+      /**
+       * Replaces the signal passed to the rest of the chain (downstream middlewares and the handler).
+       * Defaults to the current signal.
+       */
+      signal?: AbortSignal | undefined
+    }
 
 export interface MiddlewareNext<TOutput> {
   <T extends Context = object>(
