@@ -2,7 +2,7 @@ import type { InitialInputSchema, Schema } from '@orpc/contract'
 import type { DecoratedProcedure, DefaultInitialContext, ORPCErrorConstructorMap } from '@orpc/server'
 import type { WithEffectContext } from './context'
 import { call, ORPCError, os } from '@orpc/server'
-import { Cause, Context, Effect } from 'effect'
+import { Context, Effect } from 'effect'
 import { z } from 'zod'
 import { handlerGen } from './handler'
 
@@ -124,18 +124,6 @@ describe('handlerGen', () => {
         'effect/context': effectContext,
         'effect/wrap': effect => effect.pipe(
           Effect.mapError(error => new ORPCError('BAD_REQUEST', { cause: error })),
-        ),
-      },
-    })
-
-    await call(procedure, undefined, {
-      context: {
-        'effect/context': effectContext,
-        'effect/wrap': (effect, opts) => effect.pipe(
-          Effect.catchCause(cause => Effect.fail(new ORPCError('INTERNAL_SERVER_ERROR', {
-            message: opts.kind,
-            cause: Cause.squash(cause),
-          }))),
         ),
       },
     })

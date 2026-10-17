@@ -93,8 +93,8 @@ export interface WithEffectContext<Services> {
    * }
    * ```
    */
-  ['effect/wrap']?: <A, E>(
-    effect: Effect.Effect<A, E>,
+  ['effect/wrap']?: <A>(
+    effect: Effect.Effect<A, unknown>,
     opts: EffectWrapOptions,
   ) => Effect.Effect<A, unknown>
 }

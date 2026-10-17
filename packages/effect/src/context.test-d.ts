@@ -17,6 +17,8 @@ class Service2 extends Context.Service<
   }
 >()('Service2') {}
 
+class DomainError extends Error {}
+
 type Wrap = NonNullable<WithEffectContext<Service1>['effect/wrap']>
 
 describe('WithEffectContext', () => {
@@ -34,10 +36,23 @@ describe('WithEffectContext', () => {
         Effect.catchCause(cause => Effect.fail(new ORPCError('INTERNAL_SERVER_ERROR', { cause: Cause.squash(cause) }))),
       )
 
+      const mapSome: Wrap = effect => effect.pipe(
+        Effect.catchCause((cause) => {
+          const error = Cause.squash(cause)
+
+          if (error instanceof DomainError) {
+            return Effect.fail(new ORPCError('BAD_REQUEST', { cause: error }))
+          }
+
+          return Effect.failCause(cause)
+        }),
+      )
+
       const fail: Wrap = () => Effect.fail(new ORPCError('UNAUTHORIZED'))
 
       void mapError
       void catchCause
+      void mapSome
       void fail
 
       // @ts-expect-error - must keep the success type

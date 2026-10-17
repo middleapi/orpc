@@ -153,7 +153,7 @@ export async function fetch(request: Request) {
       'effect/context': Context.empty(),
       'effect/wrap': effect => effect.pipe(
         // also catches defects, such as errors thrown inside the generator
-        Effect.catchCause((cause): Effect.Effect<never, unknown> => {
+        Effect.catchCause((cause) => {
           const error = Cause.squash(cause)
 
           if (error instanceof NotFoundError) {

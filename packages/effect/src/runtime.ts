@@ -1,6 +1,5 @@
-import type { Context } from 'effect'
 import { AbortError } from '@orpc/shared'
-import { Cause, Effect, Exit } from 'effect'
+import { Cause, Context, Effect, Exit } from 'effect'
 
 export interface RunPromiseOptions extends Effect.RunOptions {
   /**
@@ -13,11 +12,7 @@ export interface RunPromiseOptions extends Effect.RunOptions {
  * Runs an Effect as a Promise and throws the most meaningful errors.
  */
 export async function runPromise<T>(effect: Effect.Effect<T, unknown>, options: RunPromiseOptions = {}): Promise<T> {
-  const { context, ...runOptions } = options
-
-  const exit = context
-    ? await Effect.runPromiseExitWith(context)(effect, runOptions)
-    : await Effect.runPromiseExit(effect, runOptions)
+  const exit = await Effect.runPromiseExitWith(options.context ?? Context.empty())(effect, options)
 
   if (Exit.isSuccess(exit)) {
     return exit.value

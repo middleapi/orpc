@@ -2,7 +2,6 @@ import type { ErrorMap } from '@orpc/contract'
 import type { Context, Middleware, MiddlewareDone, MiddlewareNextOptions, MiddlewareOptions, MiddlewareResult, ORPCErrorConstructorMap } from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
 import type { InferEffectServices, WithEffectContext } from './context'
-import { omit } from '@orpc/shared'
 import { Effect, Context as EffectContext } from 'effect'
 import { runPromise } from './runtime'
 
@@ -69,10 +68,16 @@ export function middlewareGen<
     const wrap = opts.context['effect/wrap'] as WithEffectContext<any>['effect/wrap']
     const ef = Effect.gen(() => middleware({ ...opts, next }, input, done)) as Effect.Effect<MiddlewareResult<TOutContext, TOutput>, unknown>
 
-    return runPromise(
-      typeof wrap === 'function' ? wrap(ef, { ...omit(opts, ['next']), kind: 'middleware', input }) : ef,
-      { context: EffectContext.isContext(effectContext) ? effectContext : undefined, signal: opts.signal },
-    )
+    let wrapped = ef
+    if (typeof wrap === 'function') {
+      const { next: _next, ...rest } = opts
+      wrapped = wrap(ef, { ...rest, kind: 'middleware', input })
+    }
+
+    return runPromise(wrapped, {
+      context: EffectContext.isContext(effectContext) ? effectContext : undefined,
+      signal: opts.signal,
+    })
   }
 
   Object.defineProperty(mid, 'name', { value: middleware.name })

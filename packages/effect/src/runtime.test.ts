@@ -1,6 +1,6 @@
 import { AbortError } from '@orpc/shared'
-import { Cause, Effect } from 'effect'
-import { describe, expect, it } from 'vitest'
+import { Cause, Context, Effect, Option, Scheduler } from 'effect'
+import { describe, expect, it, vi } from 'vitest'
 import { runPromise } from './runtime'
 
 describe('runPromise & extractErrorFromCause', () => {
@@ -14,6 +14,25 @@ describe('runPromise & extractErrorFromCause', () => {
       const obj = { id: 1 }
       const result = await runPromise(Effect.succeed(obj))
       expect(result).toBe(obj)
+    })
+  })
+
+  describe('context', () => {
+    class Service1 extends Context.Service<Service1, { readonly id: 'Service1' }>()('Service1') {}
+
+    it('runs the effect with the provided services', async () => {
+      const context = Context.empty().pipe(Context.add(Service1, { id: 'Service1' }))
+
+      await expect(runPromise(Effect.serviceOption(Service1), { context })).resolves.toEqual(Option.some({ id: 'Service1' }))
+    })
+
+    it('runs the effect with the provided scheduler', async () => {
+      const scheduler = new Scheduler.MixedScheduler('sync')
+      const makeDispatcher = vi.spyOn(scheduler, 'makeDispatcher')
+      const context = Context.empty().pipe(Context.add(Scheduler.Scheduler, scheduler))
+
+      await expect(runPromise(Effect.yieldNow.pipe(Effect.as(42)), { context })).resolves.toBe(42)
+      expect(makeDispatcher).toHaveBeenCalled()
     })
   })
 
