@@ -56,18 +56,11 @@ export const base = os
 
 </CodeGroup>
 
-`.effect` also works when implementing a [contract](/docs/contract/implementation), where the return value is checked against the contract's output schema:
+`.effect` also works when [implementing a contract](/docs/contract/implementation):
 
 ```ts
-import '@orpc/experimental-effect/extensions/effect'
-
-import { implement } from '@orpc/server'
-
-const os = implement(contract)
-
-const findPlanet = os.planet.find.effect(function* ({ input }) {
-  const planet = yield* Effect.promise(() => db.planet.find(input.id))
-  return planet
+const findPlanet = implement(contract).planet.find.effect(function* ({ input }) {
+  return yield* Effect.promise(() => db.planet.find(input.id))
 })
 ```
 
@@ -133,60 +126,27 @@ const procedure = os
 
 #### Providing Services with Layers
 
-Services usually come from a [Layer](https://effect.website/docs/requirements-management/layers/). Build your application layer once with a [`ManagedRuntime`](https://effect.website/docs/runtime/#managedruntime) and pass its context to every request. The layer is built on the first `runtime.context()` call, and later calls reuse it:
+Build your [Layers](https://effect.website/docs/requirements-management/layers/) once with a [`ManagedRuntime`](https://effect.website/docs/runtime/#managedruntime) and pass `await runtime.context()` on every request:
 
 ```ts
-import type { WithEffectContext } from '@orpc/experimental-effect'
-import { Context, Effect, Layer, ManagedRuntime } from 'effect'
+import { Layer, ManagedRuntime } from 'effect'
 
-class Database extends Context.Service<Database, {
-  query: (sql: string) => Effect.Effect<ReadonlyArray<unknown>>
-}>()('app/Database') {
-  static readonly layer = Layer.effect(
-    Database,
-    Effect.gen(function* () {
-      const pool = yield* Effect.acquireRelease(
-        Effect.sync(() => createPool()),
-        pool => Effect.promise(() => pool.end()),
-      )
+const AppLayer = Layer.mergeAll(Database.layer, Users.layer)
+const runtime = ManagedRuntime.make(AppLayer)
 
-      return Database.of({
-        query: Effect.fn('Database.query')(function* (sql) {
-          return yield* Effect.promise(() => pool.query(sql))
-        }),
-      })
-    }),
-  )
-}
-
-interface ServerContext extends WithEffectContext<Database> {}
-
-const runtime = ManagedRuntime.make(Database.layer)
-
-export async function fetch(request: Request) {
-  const { matched, response } = await handler.handle(request, {
-    context: {
-      'effect/context': await runtime.context(),
-    },
-  })
-
-  if (matched) {
-    return response
-  }
-
-  return new Response('Not Found', { status: 404 })
-}
-
-// Release resources, such as the pool, on shutdown
-process.once('SIGTERM', () => {
-  void runtime.dispose()
+const { response } = await handler.handle(request, {
+  context: { 'effect/context': await runtime.context() },
 })
+
+process.once('SIGTERM', () => runtime.dispose()) // release resources on shutdown
 ```
 
-Combine several layers with `Layer.mergeAll` or `Layer.provideMerge` before creating the runtime. If your app creates more than one `ManagedRuntime`, pass them a shared `memoMap: Layer.makeMemoMapUnsafe()` so layers they have in common are built only once.
-
 :::warning
-Don't provide layers inside `effect/wrap`, such as `effect => effect.pipe(Effect.provide(AppLayer))`. The wrap runs for every `middlewareGen` and `handlerGen`, so the layer would be built, and its resources acquired and released, several times per request.
+Don't `Effect.provide` layers in `effect/wrap`: it runs for every `middlewareGen` and `handlerGen`, so the layer would be rebuilt several times per request.
+:::
+
+:::tip
+In [`@effect/vitest`](https://www.npmjs.com/package/@effect/vitest) tests, pass `yield* Effect.context<Random>()` as `effect/context` so the procedure uses the test's layers and `TestClock`.
 :::
 
 ### Error Handling
@@ -250,31 +210,15 @@ if (isDefinedError(error)) {
 }
 ```
 
-Your services likely fail with their own errors, such as a [Schema.TaggedError](https://effect.website/docs/error-management/yieldable-errors/). Map the ones the client should see to `errors.X(...)` with `Effect.catchTags`, and keep the original as the `cause`:
+Map your own [tagged errors](https://effect.website/docs/error-management/yieldable-errors/) to `errors.X(...)` with `Effect.catchTags`:
 
 ```ts
-import { Context, Effect, Schema } from 'effect'
-
-class UserNotFound extends Schema.TaggedError<UserNotFound>()('UserNotFound', {
-  id: Schema.String,
-}) {}
-
-class Users extends Context.Service<Users, {
-  findById: (id: string) => Effect.Effect<User, UserNotFound>
-}>()('app/Users') {}
+class UserNotFound extends Schema.TaggedError<UserNotFound>()('UserNotFound', {}) {}
 
 const findUser = os
-  .$context<WithEffectContext<Users>>()
-  .errors({
-    NOT_FOUND: {
-      message: 'User not found',
-    },
-  })
-  .input(Schema.toStandardSchemaV1(Schema.Struct({ id: Schema.String })))
-  .handler(handlerGen(function* ({ input, errors }) {
-    const users = yield* Users
-
-    return yield* users.findById(input.id).pipe(
+  .errors({ NOT_FOUND: {} })
+  .handler(handlerGen(function* ({ errors }) {
+    return yield* loadUser.pipe( // Effect<User, UserNotFound>
       Effect.catchTags({
         UserNotFound: error => Effect.fail(errors.NOT_FOUND({ cause: error })),
       }),
@@ -314,25 +258,7 @@ All utilities support data-first `catchORPCError(program, handler)` and data-las
 
 ### Interruption
 
-When a request is aborted, for example because the client disconnects, oRPC aborts the procedure's `signal`. This interrupts the fibers running your `handlerGen` and `middlewareGen` effects, so Effect runs their finalizers, such as `Effect.ensuring`, `Effect.onInterrupt`, and releases of `Effect.acquireRelease`. The call then rejects with the signal's reason:
-
-```ts
-const procedure = os.handler(handlerGen(function* () {
-  return yield* Effect.scoped(Effect.gen(function* () {
-    const connection = yield* Effect.acquireRelease(
-      openConnection,
-      connection => connection.close,
-    )
-
-    // On abort, the query is interrupted and the connection is closed
-    return yield* connection.query('SELECT ...')
-  }))
-}))
-```
-
-:::info
-Handlers don't get a `Scope`, so wrap code that acquires scoped resources in `Effect.scoped`. On Cloudflare Workers, enable the [`enable_request_signal`](/docs/adapters/cloudflare-workers#compatibility-flags) compatibility flag so the request signal is aborted.
-:::
+When a request is aborted, `handlerGen` and `middlewareGen` fibers are interrupted, so finalizers such as `Effect.ensuring` and `Effect.onInterrupt` run. Handlers have no `Scope`, so wrap `Effect.acquireRelease` in `Effect.scoped`.
 
 ## Effectful Middleware
 
@@ -463,7 +389,7 @@ const converter = new EffectSchemaToJsonSchemaConverter({ cache: true })
 
 ## OpenTelemetry Integration
 
-First, set up the [oRPC OpenTelemetry integration](/docs/integrations/opentelemetry). Then install [`@effect/opentelemetry`](https://www.npmjs.com/package/@effect/opentelemetry) and add `OtelTracer.layerGlobal` to the layer of your [runtime](#providing-services-with-layers). Effect's tracer then uses the globally registered OpenTelemetry tracer provider, so spans from `Effect.withSpan` and `Effect.fn('name')` are exported with oRPC's spans and nested under them:
+After setting up the [oRPC OpenTelemetry integration](/docs/integrations/opentelemetry), add `OtelTracer.layerGlobal` from `@effect/opentelemetry` to your [runtime](#providing-services-with-layers), so Effect spans nest under oRPC's:
 
 ```package-install
 npm install @effect/opentelemetry
@@ -473,109 +399,34 @@ npm install @effect/opentelemetry
 import { OtelTracer } from '@effect/opentelemetry'
 import { Layer, ManagedRuntime } from 'effect'
 
-const runtime = ManagedRuntime.make(
-  AppLayer.pipe(Layer.provideMerge(OtelTracer.layerGlobal)),
-)
-
-export async function fetch(request: Request) {
-  const { matched, response } = await handler.handle(request, {
-    context: {
-      'effect/context': await runtime.context(),
-    },
-  })
-
-  if (matched) {
-    return response
-  }
-
-  return new Response('Not Found', { status: 404 })
-}
+const runtime = ManagedRuntime.make(AppLayer.pipe(Layer.provideMerge(OtelTracer.layerGlobal)))
 ```
-
-:::info
-`OtelTracer.layerGlobal` needs no `Resource` layer, because the resource and exporters belong to the tracer provider you registered, for example with `NodeSDK`. Without other services, use `ManagedRuntime.make(OtelTracer.layerGlobal)`.
-:::
-
-## Testing
-
-Effectful procedures get their services from `effect/context`, so with [`@effect/vitest`](https://www.npmjs.com/package/@effect/vitest) you can provide test layers and pass the test's context to the procedure. See [Testing and Mocking](/docs/recipes/testing-and-mocking) for general testing patterns:
-
-```ts
-import { assert, layer } from '@effect/vitest'
-import { call } from '@orpc/server'
-import { Effect, Layer } from 'effect'
-
-const RandomTest = Layer.succeed(Random, Random.of({ next: Effect.succeed(0.5) }))
-
-layer(RandomTest)('random', (it) => {
-  it.effect('returns the next random number', () =>
-    Effect.gen(function* () {
-      const context = yield* Effect.context<Random>()
-
-      const result = yield* Effect.promise(() =>
-        call(procedure, undefined, { context: { 'effect/context': context } }),
-      )
-
-      assert.strictEqual(result, 0.5)
-    }))
-})
-```
-
-The context also holds test services such as `TestClock`, so the procedure sees the same time as the test.
 
 ## Cloudflare Workers
 
-On Cloudflare Workers, Effect recommends running the whole application on a sync scheduler, `new Scheduler.MixedScheduler('sync')`, because timers owned by one request can be discarded and leave shared fibers suspended. Provide it to your layers, and through `effect/context` to every request, and create the runtime at module scope:
+Effect recommends a sync scheduler on Workers. Add it to your [runtime](#providing-services-with-layers), so it reaches every request through `effect/context`, and create the runtime at module scope:
 
 ```ts
 import { Layer, ManagedRuntime, Scheduler } from 'effect'
 
-const SyncScheduler = Layer.succeed(
-  Scheduler.Scheduler,
-  new Scheduler.MixedScheduler('sync'),
-)
+const SyncScheduler = Layer.succeed(Scheduler.Scheduler, new Scheduler.MixedScheduler('sync'))
 
-// Start building at module scope: fibers started inside `fetch` capture that request's async context
 const runtime = ManagedRuntime.make(AppLayer.pipe(Layer.provideMerge(SyncScheduler)))
-const effectContext = runtime.context()
-
-export default {
-  async fetch(request: Request) {
-    const { matched, response } = await handler.handle(request, {
-      context: {
-        'effect/context': await effectContext,
-      },
-    })
-
-    if (matched) {
-      return response
-    }
-
-    return new Response('Not Found', { status: 404 })
-  },
-}
+const effectContext = runtime.context() // pass `await effectContext` per request
 ```
-
-Layer construction can't use request-time I/O, so read bindings from the `env` export of `cloudflare:workers`. Without layers, add the scheduler to the context directly with `Context.add(Scheduler.Scheduler, new Scheduler.MixedScheduler('sync'))`.
-
-:::warning
-The sync scheduler doesn't yield to the event loop, so CPU-heavy effects delay other requests, and it doesn't fix request-owned timers such as `Effect.sleep`. See `Scheduler.MixedScheduler` in Effect for details.
-:::
 
 ## Next.js
 
-Next.js functions such as [redirect](https://nextjs.org/docs/app/api-reference/functions/redirect) and [notFound](https://nextjs.org/docs/app/api-reference/functions/not-found) throw special errors. Thrown inside an effect, they become defects, which oRPC rethrows unchanged, so [Server Functions](/docs/integrations/next#server-functions) still hand them to Next.js. A handler that catches defects, such as `Effect.catchCause`, `Effect.catchDefect`, or a catch-all in `effect/wrap`, swallows them unless it rethrows them first with [unstable_rethrow](https://nextjs.org/docs/app/api-reference/functions/unstable_rethrow):
+If you catch defects, for example with `Effect.catchCause`, call [unstable_rethrow](https://nextjs.org/docs/app/api-reference/functions/unstable_rethrow) first so `redirect()` and `notFound()` still reach Next.js:
 
 ```ts
 import { Cause, Effect } from 'effect'
 import { unstable_rethrow } from 'next/navigation'
 
-const procedure = os.handler(handlerGen(function* () {
-  return yield* loadDashboard.pipe( // may call redirect() or notFound()
-    Effect.catchCause((cause) => {
-      unstable_rethrow(Cause.squash(cause))
-      return Effect.succeed(fallbackDashboard)
-    }),
-  )
-}))
+const safeDashboard = loadDashboard.pipe(
+  Effect.catchCause((cause) => {
+    unstable_rethrow(Cause.squash(cause))
+    return Effect.succeed(fallbackDashboard)
+  }),
+)
 ```

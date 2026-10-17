@@ -12,15 +12,14 @@ export interface WithEffectContext<Services> {
    * A pre-built Effect context providing the services available within this oRPC context.
    * Automatically provided to any effect that runs under this context.
    *
-   * To provide services from a Layer, build it once with a `ManagedRuntime` and pass
-   * `await runtime.context()` here on every request.
+   * For Layers, build them once with a `ManagedRuntime` and pass `await runtime.context()`.
    *
    * @see {@link https://orpc.dev/docs/integrations/effect#providing-services-with-layers | Effect Integration - Providing Services with Layers}
    *
    * @example
    * ```ts
    * import type { WithEffectContext } from '@orpc/experimental-effect'
-   * import { Context, Effect, Layer, ManagedRuntime } from 'effect'
+   * import { Context, Effect } from 'effect'
    *
    * class Random extends Context.Service<Random, {
    *   readonly next: Effect.Effect<number>
@@ -33,15 +32,6 @@ export interface WithEffectContext<Services> {
    *     Context.add(Random, { next: Effect.sync(() => Math.random()) }),
    *   ),
    * }
-   *
-   * // or build the services once from a Layer
-   * const runtime = ManagedRuntime.make(
-   *   Layer.succeed(Random, Random.of({ next: Effect.sync(() => Math.random()) })),
-   * )
-   *
-   * const layerContext: ServerContext = {
-   *   'effect/context': await runtime.context(),
-   * }
    * ```
    */
   ['effect/context']: EffectContext.Context<Services>
@@ -50,8 +40,7 @@ export interface WithEffectContext<Services> {
    * An optional hook to wrap any effect before it is executed within this oRPC context.
    * Useful for adding observability, tracing, or error handling.
    *
-   * The wrap runs for every effectful middleware and handler, so provide services,
-   * including tracers such as `OtelTracer.layerGlobal`, through `effect/context` instead.
+   * Runs for every effectful middleware and handler, so provide services through `effect/context` instead.
    *
    * @see {@link https://orpc.dev/docs/integrations/effect#error-handling | Effect Integration - Error Handling}
    *
