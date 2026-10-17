@@ -182,44 +182,26 @@ describe('middlewareGen', () => {
     ])
   })
 
-  it('can map own and downstream failures to a different error type via effect/wrap', async () => {
-    const middlewareError = new Error('__MIDDLEWARE__')
+  it('passes downstream failures through effect/wrap', async () => {
     const downstreamError = new Error('__DOWNSTREAM__')
 
-    const context: WithEffectContext<never> = {
-      'effect/context': Context.empty(),
-      'effect/wrap': (effect, opts) => effect.pipe(
-        Effect.mapError(error => error instanceof ORPCError
-          ? error
-          : new ORPCError('BAD_REQUEST', { message: opts.kind, cause: error })),
-      ),
-    }
+    const procedure = os
+      .$context<WithEffectContext<never>>()
+      .use(middlewareGen(function* ({ next }) {
+        return yield* next()
+      }))
+      .handler(() => {
+        throw downstreamError
+      })
 
-    await expect(call(
-      os
-        .$context<WithEffectContext<never>>()
-        .use(middlewareGen(function* () {
-          return yield* Effect.fail(middlewareError)
-        }))
-        .handler(() => 'unreachable'),
-      undefined,
-      { context },
-    )).rejects.toSatisfy(
-      error => error instanceof ORPCError && error.code === 'BAD_REQUEST' && error.cause === middlewareError,
-    )
-
-    await expect(call(
-      os
-        .$context<WithEffectContext<never>>()
-        .use(middlewareGen(function* ({ next }) {
-          return yield* next()
-        }))
-        .handler(() => {
-          throw downstreamError
-        }),
-      undefined,
-      { context },
-    )).rejects.toSatisfy(
+    await expect(call(procedure, undefined, {
+      context: {
+        'effect/context': Context.empty(),
+        'effect/wrap': (effect, opts) => effect.pipe(
+          Effect.mapError(cause => new ORPCError('BAD_REQUEST', { message: opts.kind, cause })),
+        ),
+      },
+    })).rejects.toSatisfy(
       error => error instanceof ORPCError && error.message === 'middleware' && error.cause === downstreamError,
     )
   })

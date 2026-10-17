@@ -52,11 +52,6 @@ describe('runPromise & extractErrorFromCause', () => {
       await expect(runPromise(effect)).rejects.toThrow(new AbortError('All fibers interrupted without error'))
     })
 
-    it('throws the original Error instance from Effect.fail', async () => {
-      const original = new TypeError('typed domain error')
-      await expect(runPromise(Effect.fail(original))).rejects.toThrow(original)
-    })
-
     it('throws the original defect from Effect.die', async () => {
       const defect = new RangeError('unexpected defect')
       await expect(runPromise(Effect.die(defect))).rejects.toThrow(defect)
@@ -95,8 +90,8 @@ describe('runPromise & extractErrorFromCause', () => {
       await expect(runPromise(effect)).rejects.toThrow(leftError)
     })
 
-    it('does NOT wrap errors in FiberFailure', async () => {
-      const original = new TypeError('original')
+    it('throws the original Error instance from Effect.fail, not a FiberFailure', async () => {
+      const original = new TypeError('typed domain error')
       await expect(runPromise(Effect.fail(original))).rejects.toBe(original)
     })
 

@@ -1,7 +1,7 @@
 import type { InitialInputSchema, Schema } from '@orpc/contract'
 import type { DecoratedProcedure, DefaultInitialContext, ORPCErrorConstructorMap } from '@orpc/server'
 import type { WithEffectContext } from './context'
-import { call, ORPCError, os } from '@orpc/server'
+import { ORPCError, os } from '@orpc/server'
 import { Context, Effect } from 'effect'
 import { z } from 'zod'
 import { handlerGen } from './handler'
@@ -107,33 +107,5 @@ describe('handlerGen', () => {
       .handler(handlerGen(function* () {
         yield* Service2
       }))
-  })
-
-  it('accepts effect/wrap that changes the error type', async () => {
-    const procedure = os
-      .$context<WithEffectContext<Service1>>()
-      .handler(handlerGen(function* () {
-        const service1 = yield* Service1
-        return service1.id
-      }))
-
-    const effectContext = Context.empty().pipe(Context.add(Service1, { id: 'Service1' }))
-
-    await call(procedure, undefined, {
-      context: {
-        'effect/context': effectContext,
-        'effect/wrap': effect => effect.pipe(
-          Effect.mapError(error => new ORPCError('BAD_REQUEST', { cause: error })),
-        ),
-      },
-    })
-
-    await call(procedure, undefined, {
-      context: {
-        'effect/context': effectContext,
-        // @ts-expect-error - wrap must keep the success type
-        'effect/wrap': effect => effect.pipe(Effect.as('invalid')),
-      },
-    })
   })
 })

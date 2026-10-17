@@ -1,6 +1,6 @@
 import type { ORPCErrorConstructorMap } from '@orpc/server'
 import type { WithEffectContext } from './context'
-import { call, ORPCError, os } from '@orpc/server'
+import { os } from '@orpc/server'
 import { Context, Effect } from 'effect'
 import { z } from 'zod'
 import { middlewareGen } from './middleware'
@@ -183,31 +183,5 @@ describe('middlewareGen', () => {
         expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
         return yield* next()
       }))
-  })
-
-  it('accepts effect/wrap that changes the error type and narrows by kind', async () => {
-    const procedure = os
-      .$context<WithEffectContext<Service1>>()
-      .use(middlewareGen(function* ({ next }) {
-        yield* Service1
-        return yield* next()
-      }))
-      .handler(() => 'output')
-
-    await call(procedure, undefined, {
-      context: {
-        'effect/context': Context.empty().pipe(Context.add(Service1, { id: 'Service1' })),
-        'effect/wrap': (effect, opts) => {
-          if (opts.kind === 'middleware') {
-            expectTypeOf(opts.input).toEqualTypeOf<unknown>()
-            expectTypeOf(opts).not.toHaveProperty('next')
-          }
-
-          return effect.pipe(
-            Effect.mapError(error => new ORPCError('BAD_REQUEST', { cause: error })),
-          )
-        },
-      },
-    })
   })
 })

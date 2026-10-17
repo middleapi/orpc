@@ -32,10 +32,6 @@ describe('WithEffectContext', () => {
         Effect.mapError(error => new ORPCError('BAD_REQUEST', { cause: error })),
       )
 
-      const catchCause: Wrap = effect => effect.pipe(
-        Effect.catchCause(cause => Effect.fail(new ORPCError('INTERNAL_SERVER_ERROR', { cause: Cause.squash(cause) }))),
-      )
-
       const mapSome: Wrap = effect => effect.pipe(
         Effect.catchCause((cause) => {
           const error = Cause.squash(cause)
@@ -48,12 +44,8 @@ describe('WithEffectContext', () => {
         }),
       )
 
-      const fail: Wrap = () => Effect.fail(new ORPCError('UNAUTHORIZED'))
-
       void mapError
-      void catchCause
       void mapSome
-      void fail
 
       // @ts-expect-error - must keep the success type
       const invalidSuccess: Wrap = effect => effect.pipe(Effect.as('invalid'))

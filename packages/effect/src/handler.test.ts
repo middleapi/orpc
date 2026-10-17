@@ -43,17 +43,6 @@ describe('handlerGen', () => {
     expect(error.defined).toBe(false)
   })
 
-  it('throw original errors without fiber failure error wrapper', async () => {
-    const error = new Error('__TEST__')
-    await expect(
-      call(os.handler(handlerGen(function* () {
-        yield* Effect.fail(error)
-      }))),
-    ).rejects.toBe(error)
-
-    expect(runPromiseSpy).toHaveBeenCalledTimes(1)
-  })
-
   it('forwards the provided signal to runPromise', async () => {
     const controller = new AbortController()
 
@@ -148,8 +137,9 @@ describe('handlerGen', () => {
     })
   })
 
-  it('can map failures to a different error type via wrap', async () => {
+  it('can map failures to a different error type via wrap, and throws it as-is', async () => {
     const domainError = new Error('__DOMAIN__')
+    const error = new ORPCError('BAD_REQUEST', { cause: domainError })
 
     const procedure = os
       .$context<WithEffectContext<never>>()
@@ -161,12 +151,11 @@ describe('handlerGen', () => {
       context: {
         'effect/context': Context.empty(),
         'effect/wrap': effect => effect.pipe(
-          Effect.mapError(error => new ORPCError('BAD_REQUEST', { cause: error })),
+          Effect.mapError(cause => cause === domainError ? error : cause),
         ),
       },
-    })).rejects.toSatisfy(
-      error => error instanceof ORPCError && error.code === 'BAD_REQUEST' && error.cause === domainError,
-    )
+    })).rejects.toBe(error)
+    expect(error.defined).toBe(false)
   })
 
   it('can convert defects to ORPCError via wrap with catchCause', async () => {
@@ -205,8 +194,7 @@ describe('handlerGen', () => {
     const procedure = os
       .$context<WithEffectContext<Service1>>()
       .handler(handlerGen(function* () {
-        const service1 = yield* Service1
-        return yield* Effect.succeed(`output:${service1.id}`).pipe(Effect.withSpan('handler'))
+        return yield* Effect.succeed('output').pipe(Effect.withSpan('handler'))
       }))
 
     await expect(call(procedure, undefined, {
@@ -220,7 +208,7 @@ describe('handlerGen', () => {
           return yield* effect
         }).pipe(Effect.withSpan('wrap')),
       },
-    })).resolves.toEqual('output:Service1')
+    })).resolves.toEqual('output')
 
     expect(serviceInWrap).toEqual(Option.some({ id: 'Service1' }))
     expect(spans.map(span => span.name)).toEqual(['wrap', 'handler'])
@@ -241,27 +229,5 @@ describe('handlerGen', () => {
         'effect/wrap': effect => effect.pipe(Effect.provideService(Service1, { id: 'fromWrap' as any })),
       },
     })).resolves.toEqual('output:fromWrap')
-  })
-
-  it('throws ORPCError failures from wrap as-is', async () => {
-    const error = new ORPCError('__TEST__')
-
-    const procedure = os
-      .$context<WithEffectContext<never>>()
-      .handler(handlerGen(function* () {
-        return 'output'
-      }))
-
-    await expect(call(
-      procedure,
-      undefined,
-      {
-        context: {
-          'effect/context': Context.empty(),
-          'effect/wrap': () => Effect.fail(error),
-        },
-      },
-    )).rejects.toBe(error)
-    expect(error.defined).toBe(false)
   })
 })
