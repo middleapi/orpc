@@ -1,0 +1,60 @@
+{
+  "name": "@orpc/better-auth",
+  "type": "module",
+  "version": "2.0.0-beta.43",
+  "description": "Better Auth integration for oRPC: typed sessions, refreshed session cookies and batch-aware session lookups",
+  "license": "MIT",
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
+  ],
+  "homepage": "https://orpc.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/middleapi/orpc.git",
+    "directory": "packages/better-auth"
+  },
+  "keywords": [
+    "orpc",
+    "better-auth",
+    "auth",
+    "authentication",
+    "session",
+    "typescript"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
+      }
+    }
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "prepack": "unbuild",
+    "type:check": "tsc -b"
+  },
+  "peerDependencies": {
+    "better-auth": ">=1.7.0"
+  },
+  "dependencies": {
+    "@orpc/client": "workspace:*",
+    "@orpc/server": "workspace:*",
+    "@orpc/shared": "workspace:*",
+    "@standard-server/core": "~0.10.3",
+    "@standard-server/fetch": "~0.10.3"
+  },
+  "devDependencies": {
+    "better-auth": "^1.7.7"
+  }
+}
