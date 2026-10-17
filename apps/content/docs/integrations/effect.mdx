@@ -309,12 +309,7 @@ You can also use these extensions with the [contract builder](/docs/contract/pro
 
 ### Schema Direction
 
-An Effect schema is a codec between a decoded `Type` and an `Encoded` form. Like Effect's own HttpApi and RPC modules, the extensions decode inputs and encode outputs, so the wire always carries the `Encoded` form:
-
-| Method       | Client sends or receives | Handler receives or returns |
-| ------------ | ------------------------ | --------------------------- |
-| `.input(S)`  | `S['Encoded']`           | `S['Type']`                 |
-| `.output(S)` | `S['Encoded']`           | `S['Type']`                 |
+An Effect schema is a codec between a decoded `Type` and an `Encoded` form. Like Effect's own HttpApi and RPC modules, the extensions decode inputs and encode outputs, so clients send and receive `S['Encoded']`, while handlers receive and return `S['Type']`:
 
 ```ts
 class Planet extends Schema.Class<Planet>('Planet')({
@@ -362,16 +357,10 @@ The [Response Validation Plugin](/docs/plugins/response-validation) re-runs the 
 `Schema.toStandardSchemaV1` always decodes, as Standard Schema requires. To encode outputs like the extensions do, flip the schema first:
 
 ```ts
-const find = os
-  .output(Schema.toStandardSchemaV1(Schema.flip(Planet)))
-  .handler(handlerGen(function* () {
-    return new Planet({ name: 'Earth', discoveredAt: yield* DateTime.now })
-  }))
+const find = os.output(Schema.toStandardSchemaV1(Schema.flip(Planet)))
 ```
 
-:::info
-With the extensions imported, pass schemas as they are. `.output` flips every Effect schema, including one already converted with `Schema.toStandardSchemaV1`, so a schema you flipped yourself would decode again.
-:::
+With the extensions imported, pass schemas as they are instead. `.output` flips every Effect schema, including one already converted with `Schema.toStandardSchemaV1`, so a schema you flipped yourself would decode again.
 
 ### Serializable Outputs
 

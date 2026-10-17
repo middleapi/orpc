@@ -1,39 +1,12 @@
 import type { AnySchema, ErrorMap, MergedSchema, Schema } from '@orpc/contract'
 import type { Context } from '@orpc/server'
-import { ContractBuilder, getHiddenMetaPlugins, setHiddenMetaPlugins } from '@orpc/contract'
+import { ContractBuilder } from '@orpc/contract'
 import { Builder } from '@orpc/server'
 import { Schema as EffectSchema } from 'effect'
-import { toStandardSchema } from '../schema'
+import { toOutputStandardSchema, toStandardSchema } from '../schema'
 
 function isEffectSchema<T extends EffectSchema.Constraint>(schema: AnySchema | T): schema is T {
   return EffectSchema.isSchema(schema)
-}
-
-/**
- * Reuses one flipped schema per output schema, so procedures sharing an output schema
- * still share one schema instance (e.g. for the JSON Schema converter `cache` option).
- */
-const OUTPUT_STANDARD_SCHEMAS = new WeakMap<object, AnySchema>()
-
-/**
- * Like Effect's HttpApi and RPC, outputs are encoded: the handler returns `Type`
- * and the client receives `Encoded`, so the output schema validates through the flipped codec.
- */
-function toOutputStandardSchema(schema: EffectSchema.ConstraintEncoder<unknown>): AnySchema {
-  let converted = OUTPUT_STANDARD_SCHEMAS.get(schema)
-
-  if (!converted) {
-    // `isSchema` guarantees a full schema, and the `.output` overloads guarantee encoding needs no services
-    converted = toStandardSchema(EffectSchema.flip(schema as EffectSchema.Codec<unknown, unknown>))
-    OUTPUT_STANDARD_SCHEMAS.set(schema, converted)
-  }
-
-  const metaPlugins = getHiddenMetaPlugins(schema)
-  if (metaPlugins) {
-    setHiddenMetaPlugins(converted, metaPlugins)
-  }
-
-  return converted
 }
 
 declare module '@orpc/contract' {

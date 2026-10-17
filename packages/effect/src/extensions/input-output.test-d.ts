@@ -232,22 +232,16 @@ describe('output direction', () => {
   })
 
   it('requires services only for the direction each schema runs in', () => {
-    class Formatter extends Context.Service<Formatter, { readonly format: (n: number) => string }>()('Formatter') {}
+    class Formatter extends Context.Service<Formatter, object>()('Formatter') {}
 
     const NeedsDecodingServices = EffectSchema.String.pipe(EffectSchema.decodeTo(EffectSchema.Number, SchemaTransformation.transformEffect({
-      decode: s => Effect.gen(function* () {
-        yield* Formatter
-        return Number(s)
-      }),
+      decode: s => Formatter.useSync(() => Number(s)),
       encode: n => Effect.succeed(`${n}`),
     })))
 
     const NeedsEncodingServices = EffectSchema.String.pipe(EffectSchema.decodeTo(EffectSchema.Number, SchemaTransformation.transformEffect({
       decode: s => Effect.succeed(Number(s)),
-      encode: n => Effect.gen(function* () {
-        const formatter = yield* Formatter
-        return formatter.format(n)
-      }),
+      encode: n => Formatter.useSync(() => `${n}`),
     })))
 
     os.input(NeedsEncodingServices).output(NeedsDecodingServices)

@@ -1,7 +1,7 @@
 import type { AnyRouter, RouterClient } from '@orpc/server'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
-import { getHiddenMetaPlugins, oc, setHiddenMetaPlugins } from '@orpc/contract'
+import { oc } from '@orpc/contract'
 import { call, implement, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { DateTime, Schema as EffectSchema, Option } from 'effect'
@@ -10,6 +10,7 @@ import * as SchemaModule from '../schema'
 import './input-output'
 
 const toStandardSchemaSpy = vi.spyOn(SchemaModule, 'toStandardSchema')
+const toOutputStandardSchemaSpy = vi.spyOn(SchemaModule, 'toOutputStandardSchema')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -27,10 +28,11 @@ it('accepts both standard schema and effect schema in ContractBuilder', () => {
     .output(effectSchema2)
     .output(standardSchema2)
 
-  expect(toStandardSchemaSpy).toHaveBeenNthCalledWith(1, effectSchema1)
+  expect(toStandardSchemaSpy).toHaveBeenCalledExactlyOnceWith(effectSchema1)
+  expect(toOutputStandardSchemaSpy).toHaveBeenCalledExactlyOnceWith(effectSchema2)
 
   expect(procedure['~orpc'].inputSchemas).toEqual([standardSchema1, toStandardSchemaSpy.mock.results[0]?.value])
-  expect(procedure['~orpc'].outputSchemas).toEqual([expect.objectContaining({ schema: effectSchema2 }), standardSchema2])
+  expect(procedure['~orpc'].outputSchemas).toEqual([toOutputStandardSchemaSpy.mock.results[0]?.value, standardSchema2])
 })
 
 it('accepts both standard schema and effect schema in Builder', () => {
@@ -40,42 +42,11 @@ it('accepts both standard schema and effect schema in Builder', () => {
     .output(effectSchema2)
     .output(standardSchema2)
 
-  expect(toStandardSchemaSpy).toHaveBeenNthCalledWith(1, effectSchema1)
+  expect(toStandardSchemaSpy).toHaveBeenCalledExactlyOnceWith(effectSchema1)
+  expect(toOutputStandardSchemaSpy).toHaveBeenCalledExactlyOnceWith(effectSchema2)
 
   expect(builder['~orpc'].inputSchemas).toEqual([standardSchema1, toStandardSchemaSpy.mock.results[0]?.value])
-  expect(builder['~orpc'].outputSchemas).toEqual([expect.objectContaining({ schema: effectSchema2 }), standardSchema2])
-})
-
-describe.each([
-  ['ContractBuilder', (schema: EffectSchema.Codec<any, any>) => [oc.input(schema)['~orpc'].inputSchemas![0]!, oc.output(schema)['~orpc'].outputSchemas![0]!] as const],
-  ['Builder', (schema: EffectSchema.Codec<any, any>) => [os.input(schema)['~orpc'].inputSchemas![0]!, os.output(schema)['~orpc'].outputSchemas![0]!] as const],
-] as const)('effect schema direction in %s', (_, toStandardSchemas) => {
-  it('decodes inputs and encodes outputs, even with the same schema', async () => {
-    const [inputSchema, outputSchema] = toStandardSchemas(EffectSchema.Struct({ n: EffectSchema.NumberFromString }))
-
-    expect(await inputSchema['~standard'].validate({ n: '42' })).toEqual({ value: { n: 42 } })
-    expect(await inputSchema['~standard'].validate({ n: 42 })).toHaveProperty('issues')
-
-    expect(await outputSchema['~standard'].validate({ n: 42 })).toEqual({ value: { n: '42' } })
-    expect(await outputSchema['~standard'].validate({ n: '42' })).toHaveProperty('issues')
-  })
-
-  it('keeps hidden meta plugins', () => {
-    const schema = EffectSchema.Struct({ n: EffectSchema.Number })
-    const plugin = { name: 'plugin1' }
-    setHiddenMetaPlugins(schema, [plugin])
-
-    const [inputSchema, outputSchema] = toStandardSchemas(schema)
-
-    expect(getHiddenMetaPlugins(inputSchema)).toEqual([plugin])
-    expect(getHiddenMetaPlugins(outputSchema)).toEqual([plugin])
-  })
-})
-
-it('reuses one converted output schema per effect schema', () => {
-  const schema = EffectSchema.Struct({ n: EffectSchema.Number })
-
-  expect(os.output(schema)['~orpc'].outputSchemas![0]).toBe(oc.output(schema)['~orpc'].outputSchemas![0])
+  expect(builder['~orpc'].outputSchemas).toEqual([toOutputStandardSchemaSpy.mock.results[0]?.value, standardSchema2])
 })
 
 describe('output encoding', () => {
