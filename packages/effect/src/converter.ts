@@ -73,7 +73,7 @@ export class EffectSchemaToJsonSchemaConverter implements JsonSchemaConverter {
 
   private convertEffect(schema: EffectSchema.Top, direction: JsonSchemaConverterDirection): JsonSchema {
     /**
-     * `.output` stores `Schema.flip(S)`, so its output is the encoded side of `S`. Converting `S` itself in the
+     * A flipped `Schema.flip(S)` output produces the encoded side of `S`. Converting `S` itself in the
      * opposite direction keeps the same `$defs` (e.g. `Schema.Class`) that `S` produces as an input.
      */
     if (isFlippedSchema(schema)) {

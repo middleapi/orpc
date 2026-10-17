@@ -309,84 +309,50 @@ You can also use these extensions with the [contract builder](/docs/contract/pro
 
 ### Schema Direction
 
-An Effect schema is a codec between a decoded `Type` and an `Encoded` form. Like Effect's own HttpApi and RPC modules, the extensions decode inputs and encode outputs, so clients send and receive `S['Encoded']`, while handlers receive and return `S['Type']`:
+The extensions convert Effect schemas with `Schema.toStandardSchemaV1`, so they behave like any other [Standard Schema](/docs/integrations/standard-schema), such as a Zod transform: both `.input` and `.output` decode. For a schema `S`, the client sends `S['Encoded']` and the handler receives `S['Type']`, while the handler returns `S['Encoded']` and the client receives `S['Type']`:
 
 ```ts
-class Planet extends Schema.Class<Planet>('Planet')({
-  name: Schema.String,
-  discoveredAt: Schema.DateTimeUtcFromString,
-}) {}
-
-const find = base
-  .input(Schema.Struct({ id: Schema.NumberFromString }))
-  .output(Planet)
-  .handler(handlerGen(function* ({ input }) {
-    // input.id is a number
-    return new Planet({ name: 'Earth', discoveredAt: yield* DateTime.now })
+const procedure = base
+  .output(Schema.Struct({ count: Schema.NumberFromString }))
+  .handler(handlerGen(function* () {
+    return { count: '42' }
   }))
 
-// planet is typed as { readonly name: string, readonly discoveredAt: string }
-const planet = await client.find({ id: '1' })
+// typed as number, and receives 42
+const { count } = await client.procedure()
 ```
-
-The [JSON Schema Converter](#json-schema-converter) describes the `Encoded` form in both directions too.
-
-:::warning
-Effect validates the handler output while encoding it, so the handler must return the `Type` itself, such as a `Planet` instance rather than a plain object with the same fields.
-:::
-
-#### Decoding on the Client
-
-Clients receive the `Encoded` form. To work with the `Type`, decode the output with the same schema, for example inside an [Effect client](#client-calls):
-
-```ts
-const program = Effect.gen(function* () {
-  const encoded = yield* effectClient.planet.find({ id: '1' })
-  const planet = yield* Schema.decodeUnknownEffect(Planet)(encoded)
-
-  return planet.discoveredAt // DateTime.Utc
-})
-```
-
-:::warning
-The [Response Validation Plugin](/docs/plugins/response-validation) re-runs the contract's output schemas on the client. Because they encode, it only works with schemas whose `Type` and `Encoded` forms are the same. Decode codecs explicitly, as shown above.
-:::
-
-#### Without the Extensions
-
-`Schema.toStandardSchemaV1` always decodes, as Standard Schema requires. To encode outputs like the extensions do, flip the schema first:
-
-```ts
-const find = os.output(Schema.toStandardSchemaV1(Schema.flip(Planet)))
-```
-
-With the extensions imported, pass schemas as they are instead. `.output` flips every Effect schema, including one already converted with `Schema.toStandardSchemaV1`, so a schema you flipped yourself would decode again.
 
 ### Serializable Outputs
 
-Whatever an output encodes to goes through the [RPC Serializer](/docs/rpc/serializer) or [OpenAPI Serializer](/docs/openapi/serializer), which do not know Effect data types. When an output has no schema, or its schema's `Encoded` form still holds them (as with `Schema.Option` or `Schema.DateTimeUtc`), `Option`, `DateTime`, `Duration`, `Chunk`, `HashMap`, and class instances arrive as plain objects or strings, while the client types claim they arrived intact:
+The output is sent after validation, so it must be a value the [RPC Serializer](/docs/rpc/serializer) or [OpenAPI Serializer](/docs/openapi/serializer) supports. Effect data types such as `Option`, `DateTime`, `Duration`, `Chunk`, `HashMap`, and class instances are not. Whether the handler returns them directly or an output schema decodes into them, as `Schema.OptionFromNullOr`, `Schema.DateTimeUtcFromString`, and `Schema.Class` do, they arrive as plain objects or strings, while the client types claim they arrived intact:
 
 ```ts
-const find = base.handler(handlerGen(function* () {
-  return { nickname: Option.some('Blue') }
-}))
+const procedure = base
+  .output(Schema.Struct({ nickname: Schema.OptionFromNullOr(Schema.String) }))
+  .handler(handlerGen(function* () {
+    return { nickname: 'Blue' }
+  }))
 
 // typed as Option<string>, but receives { _id: 'Option', _tag: 'Some', value: 'Blue' }
-const { nickname } = await client.find()
+const { nickname } = await client.procedure()
 ```
 
-Use an output schema whose `Encoded` form is serializable instead, such as `Schema.OptionFromNullOr`, `Schema.DateTimeUtcFromString`, `Schema.DurationFromMillis`, or a `Schema.Class`:
+Flip such schemas with `Schema.flip` instead. The handler then returns the `Type` and the client receives the serializable `Encoded` form, as with Effect's own HttpApi and RPC modules:
 
 ```ts
-const find = base
-  .output(Schema.Struct({ nickname: Schema.OptionFromNullOr(Schema.String) }))
+const procedure = base
+  .output(Schema.flip(Schema.Struct({ nickname: Schema.OptionFromNullOr(Schema.String) })))
   .handler(handlerGen(function* () {
     return { nickname: Option.some('Blue') }
   }))
 
 // typed as string | null, and receives 'Blue'
-const { nickname } = await client.find()
+const { nickname } = await client.procedure()
 ```
+
+:::tip
+A flipped schema validates the handler output while encoding it, so return real instances, such as `new Planet(...)` for a `Schema.Class`, rather than plain objects with the same fields. To get the `Type` back on the client, decode the output with the original schema, for example with `Schema.decodeUnknownEffect(schema)` inside an [Effect client](#client-calls).
+:::
 
 ### JSON Schema Converter
 
