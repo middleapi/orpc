@@ -12,10 +12,6 @@ export interface WithEffectContext<Services> {
    * A pre-built Effect context providing the services available within this oRPC context.
    * Automatically provided to any effect that runs under this context.
    *
-   * For Layers, build them once with a `ManagedRuntime` and pass `await runtime.context()`.
-   *
-   * @see {@link https://orpc.dev/docs/integrations/effect#providing-services-with-layers | Effect Integration - Providing Services with Layers}
-   *
    * @example
    * ```ts
    * import type { WithEffectContext } from '@orpc/experimental-effect'

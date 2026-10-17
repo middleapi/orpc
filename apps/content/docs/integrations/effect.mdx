@@ -124,29 +124,8 @@ const procedure = os
 
 :::
 
-#### Providing Services with Layers
-
-Build your [Layers](https://effect.website/docs/requirements-management/layers/) once with a [`ManagedRuntime`](https://effect.website/docs/runtime/#managedruntime) and pass `await runtime.context()` on every request:
-
-```ts
-import { Layer, ManagedRuntime } from 'effect'
-
-const AppLayer = Layer.mergeAll(Database.layer, Users.layer)
-const runtime = ManagedRuntime.make(AppLayer)
-
-const { response } = await handler.handle(request, {
-  context: { 'effect/context': await runtime.context() },
-})
-
-process.once('SIGTERM', () => runtime.dispose()) // release resources on shutdown
-```
-
 :::warning
 Don't `Effect.provide` layers in `effect/wrap`: it runs for every `middlewareGen` and `handlerGen`, so the layer would be rebuilt several times per request.
-:::
-
-:::tip
-In [`@effect/vitest`](https://www.npmjs.com/package/@effect/vitest) tests, pass `yield* Effect.context<Random>()` as `effect/context` so the procedure uses the test's layers and `TestClock`.
 :::
 
 ### Error Handling
@@ -389,7 +368,7 @@ const converter = new EffectSchemaToJsonSchemaConverter({ cache: true })
 
 ## OpenTelemetry Integration
 
-After setting up the [oRPC OpenTelemetry integration](/docs/integrations/opentelemetry), add `OtelTracer.layerGlobal` from `@effect/opentelemetry` to your [runtime](#providing-services-with-layers), so Effect spans nest under oRPC's:
+After setting up the [oRPC OpenTelemetry integration](/docs/integrations/opentelemetry), add `OtelTracer.layerGlobal` from `@effect/opentelemetry` to the layer behind `effect/context`, so Effect spans nest under oRPC's:
 
 ```package-install
 npm install @effect/opentelemetry
@@ -400,11 +379,12 @@ import { OtelTracer } from '@effect/opentelemetry'
 import { Layer, ManagedRuntime } from 'effect'
 
 const runtime = ManagedRuntime.make(AppLayer.pipe(Layer.provideMerge(OtelTracer.layerGlobal)))
+// pass `await runtime.context()` as `effect/context` per request
 ```
 
 ## Cloudflare Workers
 
-Effect recommends a sync scheduler on Workers. Add it to your [runtime](#providing-services-with-layers), so it reaches every request through `effect/context`, and create the runtime at module scope:
+Effect recommends a sync scheduler on Workers. Add it to the layer behind `effect/context`, and create the runtime at module scope:
 
 ```ts
 import { Layer, ManagedRuntime, Scheduler } from 'effect'
