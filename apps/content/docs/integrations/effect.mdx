@@ -317,11 +317,23 @@ import { EffectSchemaToJsonSchemaConverter } from '@orpc/experimental-effect'
 const generator = new OpenAPIGenerator({
   converters: [
     new EffectSchemaToJsonSchemaConverter({
-      onExcessProperty: 'error',
+      generateDescriptions: true,
     }),
   ],
 })
 ```
+
+:::warning
+Converter options only change the generated JSON Schema, not validation. For example, `onExcessProperty: 'error'` produces `additionalProperties: false`, but validation still accepts excess properties and strips them. To reject them during validation too, pass the same option when converting the schema:
+
+```ts
+const UserSchema = Schema.toStandardSchemaV1(
+  Schema.Struct({ name: Schema.String }),
+  { parseOptions: { onExcessProperty: 'error' } },
+)
+```
+
+:::
 
 Schemas with an `identifier` annotation, including `Schema.Class` and recursive schemas, are preserved in `$defs`, which `OpenAPIGenerator` can then [hoist](/docs/openapi/specification#hoisting-defs) into `components.schemas`.
 
