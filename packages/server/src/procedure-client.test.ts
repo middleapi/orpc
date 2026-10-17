@@ -311,30 +311,6 @@ describe('createProcedureClient', () => {
     expect(handler).toHaveBeenCalledTimes(0)
   })
 
-  it('middleware can override signal for the rest of the chain', async () => {
-    const signal = new AbortController().signal
-    const overrideSignal = new AbortController().signal
-
-    mid1.mockImplementationOnce(async ({ next }) => {
-      await next() // without override
-      return next({ signal: overrideSignal })
-    })
-
-    await expect(client(undefined, { signal })).resolves.toBe('__OUTPUT__')
-
-    expect(mid1).toHaveBeenCalledTimes(1)
-    expect(mid1).toHaveBeenCalledWith(expect.objectContaining({ signal }), undefined, expect.any(Function))
-
-    expect(mid2).toHaveBeenCalledTimes(2)
-    expect(mid2).toHaveBeenNthCalledWith(1, expect.objectContaining({ signal }), undefined, expect.any(Function))
-    expect(mid2).toHaveBeenNthCalledWith(2, expect.objectContaining({ signal: overrideSignal }), undefined, expect.any(Function))
-
-    // mid2 calls next() without signal, so the handler inherits the signal mid2 received
-    expect(handler).toHaveBeenCalledTimes(2)
-    expect(handler).toHaveBeenNthCalledWith(1, expect.objectContaining({ signal }), undefined)
-    expect(handler).toHaveBeenNthCalledWith(2, expect.objectContaining({ signal: overrideSignal }), undefined)
-  })
-
   describe('with multiple standard schemas', () => {
     it('success - input and output schemas that transform during validation', async () => {
       const inputSchema1 = z.string().transform(value => `inputSchema1__${value}`)

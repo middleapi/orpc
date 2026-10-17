@@ -247,14 +247,8 @@ describe('middlewareGen', () => {
       expect(log).toEqual(['handler-interrupted', 'mw-finalized'])
     })
 
-    it('interrupts the downstream chain when a combinator interrupts next()', async () => {
+    it('interrupts downstream effectful handlers through regular middleware when a combinator interrupts next()', async () => {
       const log: string[] = []
-      const handler = vi.fn(handlerGen(function* () {
-        yield* Effect.never.pipe(
-          Effect.onInterrupt(() => Effect.sync(() => log.push('handler-interrupted'))),
-        )
-        return 'unreachable'
-      }))
 
       const procedure = os
         .use(middlewareGen(function* ({ next }, _, done) {
@@ -262,15 +256,38 @@ describe('middlewareGen', () => {
           log.push('mw-timeout')
           return Option.getOrElse(result, () => done({ output: 'timeout' }))
         }))
-        .handler(handler)
+        .use(({ next }) => next())
+        .handler(handlerGen(function* () {
+          yield* Effect.never.pipe(
+            Effect.onInterrupt(() => Effect.sync(() => log.push('handler-interrupted'))),
+          )
+          return 'unreachable'
+        }))
 
       const signal = new AbortController().signal
       await expect(call(procedure, undefined, { signal })).resolves.toBe('timeout')
 
       expect(log).toEqual(['handler-interrupted', 'mw-timeout'])
       expect(signal.aborted).toBe(false)
-      expect(handler.mock.calls[0]![0].signal).not.toBe(signal)
-      expect(handler.mock.calls[0]![0].signal?.aborted).toBe(true)
+    })
+
+    it('waits for a regular handler, which cannot observe a combinator interrupting next()', async () => {
+      const log: string[] = []
+
+      const procedure = os
+        .use(middlewareGen(function* ({ next }, _, done) {
+          const result = yield* next().pipe(Effect.timeoutOption('10 millis'))
+          log.push('mw-timeout')
+          return Option.getOrElse(result, () => done({ output: 'timeout' }))
+        }))
+        .handler(async ({ signal }) => {
+          await sleep(30)
+          log.push(`handler-done:${signal?.aborted}`)
+          return 'slow'
+        })
+
+      await expect(call(procedure, undefined, { signal: new AbortController().signal })).resolves.toBe('timeout')
+      expect(log).toEqual(['handler-done:false', 'mw-timeout'])
     })
 
     it('cascades interruption through nested effectful middleware in order', async () => {

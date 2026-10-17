@@ -1,6 +1,7 @@
 import type { Context, ORPCErrorConstructorMap, ProcedureHandler, ProcedureHandlerOptions } from '@orpc/server'
 import type { InferEffectServices, WithEffectContext } from './context'
 import { Effect, Context as EffectContext } from 'effect'
+import { resolveInterruptSignal } from './interrupt'
 import { runPromise } from './runtime'
 
 export type InferYieldError<Eff> = [Eff] extends [never] ? never : [Eff] extends [Effect.Effect<infer _A, infer E, infer _R>] ? E : never
@@ -50,6 +51,6 @@ export function handlerGen<
       ef = intercept(ef, opts)
     }
 
-    return runPromise(ef, { signal: opts.signal })
+    return runPromise(ef, { signal: resolveInterruptSignal(opts.context, opts.signal) })
   }
 }

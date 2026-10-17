@@ -2,8 +2,9 @@ import type { ErrorMap } from '@orpc/contract'
 import type { Context, Middleware, MiddlewareDone, MiddlewareNextOptions, MiddlewareOptions, MiddlewareResult, ORPCErrorConstructorMap } from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
 import type { InferEffectServices, WithEffectContext } from './context'
-import { anyAbortSignal, isAsyncIteratorObject, resolveMaybeOptionalOptions } from '@orpc/shared'
+import { isAsyncIteratorObject, resolveMaybeOptionalOptions } from '@orpc/shared'
 import { Effect, Context as EffectContext } from 'effect'
+import { InterruptSignal, resolveInterruptSignal } from './interrupt'
 import { runPromise } from './runtime'
 
 export interface MiddlewareGenNext<TOutput> {
@@ -48,8 +49,9 @@ export type AnyMiddlewareGen = MiddlewareGen<any, any, any, any, any, any>
  * error handling for you.
  *
  * `next()` passes the current Effect context (services, spans, log annotations)
- * downstream. When it is interrupted, it aborts the downstream signal and waits
- * for the rest of the chain to settle before the middleware's finalizers run.
+ * downstream. When it is interrupted, it interrupts downstream effectful middleware
+ * and handlers, and waits for the rest of the chain to settle before the
+ * middleware's finalizers run.
  *
  * @see {@link https://orpc.dev/docs/integrations/effect#effectful-middleware | Effect Integration - Effectful Middleware}
  */
@@ -68,16 +70,17 @@ export function middlewareGen<
       const nextOptions = resolveMaybeOptionalOptions(rest)
       const nextEffectContext = nextOptions.context?.['effect/context']
 
+      // Layer an explicitly passed `effect/context` on top of the fiber context.
+      const effectContext = EffectContext.isContext(nextEffectContext)
+        ? EffectContext.merge(fiberContext, nextEffectContext)
+        : fiberContext
+
       const promise = (async () => opts.next<U>({
         ...nextOptions,
         context: {
           ...nextOptions.context,
-          // Layer an explicitly passed `effect/context` on top of the fiber context.
-          'effect/context': EffectContext.isContext(nextEffectContext)
-            ? EffectContext.merge(fiberContext, nextEffectContext)
-            : fiberContext,
+          'effect/context': EffectContext.add(effectContext, InterruptSignal, interruptSignal),
         },
-        signal: anyAbortSignal([nextOptions.signal ?? opts.signal, interruptSignal]),
       } as any))()
 
       promise.then(
@@ -110,7 +113,7 @@ export function middlewareGen<
       ef = intercept(ef, opts)
     }
 
-    return runPromise(ef, { signal: opts.signal })
+    return runPromise(ef, { signal: resolveInterruptSignal(opts.context, opts.signal) })
   }
 
   Object.defineProperty(mid, 'name', { value: middleware.name })

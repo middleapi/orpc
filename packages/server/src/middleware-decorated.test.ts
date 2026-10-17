@@ -229,40 +229,6 @@ describe('decorateMiddleware', () => {
       expect(next).toHaveBeenCalledWith(expect.objectContaining({ context: { mid1: 2, mid2: 1 } }))
     })
 
-    it('forwards signal overrides through the combined chain', async () => {
-      const signal = new AbortController().signal
-      const signal1 = new AbortController().signal
-      const signal2 = new AbortController().signal
-
-      const mid1 = vi.fn()
-        .mockImplementationOnce(async ({ next }) => next())
-        .mockImplementationOnce(async ({ next }) => next({ signal: signal1 }))
-        .mockImplementationOnce(async ({ next }) => next({ signal: signal1 }))
-      const mid2 = vi.fn()
-        .mockImplementationOnce(async ({ next }) => next())
-        .mockImplementationOnce(async ({ next }) => next())
-        .mockImplementationOnce(async ({ next }) => next({ signal: signal2 }))
-
-      const combined = decorateMiddleware(mid1 as any).use(mid2 as any)
-      const next = vi.fn().mockImplementation(async ({ context }) => ({ output: 'final', context }))
-      const done = vi.fn()
-
-      // no override: used middleware keeps the original signal, outer next falls back to it
-      await (combined as any)({ context: {}, next, signal }, 'input', done)
-      expect(mid2).toHaveBeenNthCalledWith(1, expect.objectContaining({ signal }), 'input', done)
-      expect(next).toHaveBeenNthCalledWith(1, { context: {}, signal: undefined })
-
-      // override from the first middleware reaches the used middleware and the outer next
-      await (combined as any)({ context: {}, next, signal }, 'input', done)
-      expect(mid2).toHaveBeenNthCalledWith(2, expect.objectContaining({ signal: signal1 }), 'input', done)
-      expect(next).toHaveBeenNthCalledWith(2, { context: {}, signal: signal1 })
-
-      // override from the used middleware wins
-      await (combined as any)({ context: {}, next, signal }, 'input', done)
-      expect(mid2).toHaveBeenNthCalledWith(3, expect.objectContaining({ signal: signal1 }), 'input', done)
-      expect(next).toHaveBeenNthCalledWith(3, { context: {}, signal: signal2 })
-    })
-
     it('should combine error maps & name & hidden meta plugins', () => {
       const plugins1 = [{ name: 'test', init: vi.fn() }]
       const mid1 = Object.assign(vi.fn(), {

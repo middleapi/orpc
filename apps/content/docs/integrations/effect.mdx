@@ -284,7 +284,7 @@ const procedure = os
 
 ### Interrupting `next()`
 
-Besides a request abort (see [Interruption](#interruption)), `next()` can be interrupted by combinators such as `Effect.timeout` or `Effect.race`. Either way, it aborts the `signal` passed to the rest of the chain and waits for downstream middleware and the handler to settle before your finalizers run. Resources acquired around `next()` stay available until the rest of the chain is done with them:
+Besides a request abort (see [Interruption](#interruption)), `next()` can be interrupted by combinators such as `Effect.timeout` or `Effect.race`. Either way, it interrupts downstream effectful middleware and handlers, and waits for the rest of the chain to settle before your finalizers run. Resources acquired around `next()` stay available until the rest of the chain is done with them:
 
 ```ts
 const transaction = middlewareGen(function* ({ next }) {
@@ -299,7 +299,7 @@ const transaction = middlewareGen(function* ({ next }) {
 If the rest of the chain still returns an [AsyncIteratorObject](/docs/async-iterator-object) after `next()` was interrupted, the iterator is closed, since it can no longer be consumed.
 
 :::warning
-Effectful handlers and middleware stop as soon as the `signal` aborts, but regular ones must observe `signal` themselves. Until they settle, the interrupted `next()` keeps waiting, so `next().pipe(Effect.timeout('1 second'))` only fails after a handler that ignores `signal` finishes.
+Regular middleware and handlers only see the request `signal`, so they cannot observe a `next()` interrupted by a combinator. The interrupted `next()` waits for them to finish, so `next().pipe(Effect.timeout('1 second'))` only fails after a regular handler completes.
 :::
 
 ## Client Calls

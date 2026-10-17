@@ -200,7 +200,6 @@ async function executeProcedureInternal(procedure: AnyProcedure, options: Proced
     midIndex: number,
     context: Context,
     input: unknown,
-    signal: AbortSignal | undefined,
   ): Promise<{ output: unknown, context: Record<any, any> }> => {
     let currentInput = input
     let middlewareInput = input
@@ -246,7 +245,6 @@ async function executeProcedureInternal(procedure: AnyProcedure, options: Proced
           {
             ...options,
             context,
-            signal,
             next: (...rest) => {
               const nextOptions = resolveMaybeOptionalOptions(rest)
               // context can be undefined when all field is optional
@@ -256,7 +254,6 @@ async function executeProcedureInternal(procedure: AnyProcedure, options: Proced
                 midIndex + 1,
                 { ...context, ...nextContext },
                 currentInput,
-                nextOptions.signal ?? signal,
               )
             },
             lastEventId: options.lastEventId,
@@ -272,7 +269,7 @@ async function executeProcedureInternal(procedure: AnyProcedure, options: Proced
     else {
       currentOutput = await runWithSpan(
         'handler',
-        () => procedure['~orpc'].handler({ ...options, context, input: currentInput, signal }, currentInput),
+        () => procedure['~orpc'].handler({ ...options, context, input: currentInput }, currentInput),
       )
     }
 
@@ -292,6 +289,6 @@ async function executeProcedureInternal(procedure: AnyProcedure, options: Proced
     return { output: currentOutput, context: currentContext }
   }
 
-  const { output } = await next(0, options.context, options.input, options.signal)
+  const { output } = await next(0, options.context, options.input)
   return output
 }
