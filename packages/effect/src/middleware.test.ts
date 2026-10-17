@@ -271,28 +271,6 @@ describe('middlewareGen', () => {
       expect(log).toEqual(['handler-aborted', 'mw-timeout'])
     })
 
-    it('closes an iterator returned by the downstream chain after interruption', async () => {
-      const iteratorReturn = vi.fn(async () => ({ done: true as const, value: undefined }))
-
-      const procedure = os
-        .use(middlewareGen(function* ({ next }) {
-          return yield* next()
-        }))
-        .handler(async () => {
-          await sleep(30)
-          return {
-            next: async () => ({ done: true as const, value: undefined }),
-            return: iteratorReturn,
-            [Symbol.asyncIterator]() {
-              return this
-            },
-          }
-        })
-
-      await expect(call(procedure, undefined, { signal: AbortSignal.timeout(10) })).rejects.toThrow()
-      expect(iteratorReturn).toHaveBeenCalledTimes(1)
-    })
-
     it('links a signal passed to next with interruption', async () => {
       const controller = new AbortController()
       let handlerSignal: AbortSignal | undefined
@@ -360,91 +338,26 @@ describe('middlewareGen', () => {
         .toEqual(['Service1', 'Service2'])
     })
 
-    it('layers an effect/context passed to next on top of the fiber context', async () => {
+    it('uses the effect/context passed to next instead of the fiber context', async () => {
       const procedure = os
         .$context<WithEffectContext<Service1>>()
         .use(middlewareGen(function* ({ context, next }) {
           return yield* next({
             context: { 'effect/context': context['effect/context'].pipe(Context.add(Service2, { id: 'from-next' })) },
-          }).pipe(
-            Effect.provideService(Service2, { id: 'from-fiber' }),
-            Effect.annotateLogs({ requestId: 'req-1' }),
-          )
+          }).pipe(Effect.provideService(Service2, { id: 'from-fiber' }))
         }))
         .handler(handlerGen(function* () {
           const service1 = yield* Service1
           const service2 = yield* Service2
-          const annotations = yield* References.CurrentLogAnnotations
 
-          return { service1: service1.id, service2: service2.id, annotations }
+          return [service1.id, service2.id]
         }))
 
       await expect(call(
         procedure,
         undefined,
         { context: { 'effect/context': Context.make(Service1, { id: 'Service1' }) } },
-      )).resolves.toEqual({
-        service1: 'Service1',
-        service2: 'from-next',
-        annotations: { requestId: 'req-1' },
-      })
-    })
-
-    it('keeps the inner span and annotations when a nested middleware passes effect/context to next', async () => {
-      const procedure = os
-        .$context<WithEffectContext<Service1>>()
-        .use(middlewareGen(function* ({ next }) {
-          return yield* next().pipe(
-            Effect.withSpan('outer'),
-            Effect.annotateLogs({ who: 'outer' }),
-          )
-        }))
-        .use(middlewareGen(function* ({ context, next }) {
-          return yield* next({
-            context: { 'effect/context': context['effect/context'].pipe(Context.add(Service2, { id: 'Service2' })) },
-          }).pipe(
-            Effect.withSpan('inner'),
-            Effect.annotateLogs({ who: 'inner' }),
-          )
-        }))
-        .handler(handlerGen(function* () {
-          const service1 = yield* Service1
-          const service2 = yield* Service2
-          const span = yield* Effect.currentSpan
-          const annotations = yield* References.CurrentLogAnnotations
-
-          return { service1: service1.id, service2: service2.id, span: span.name, annotations }
-        }))
-
-      await expect(call(
-        procedure,
-        undefined,
-        { context: { 'effect/context': Context.make(Service1, { id: 'Service1' }) } },
-      )).resolves.toEqual({
-        service1: 'Service1',
-        service2: 'Service2',
-        span: 'inner',
-        annotations: { who: 'inner' },
-      })
-    })
-
-    it('lets effect/context passed to next override an incoming service', async () => {
-      const procedure = os
-        .$context<WithEffectContext<Service2>>()
-        .use(middlewareGen(function* ({ context, next }) {
-          return yield* next({
-            context: { 'effect/context': context['effect/context'].pipe(Context.add(Service2, { id: 'overridden' })) },
-          })
-        }))
-        .handler(handlerGen(function* () {
-          return (yield* Service2).id
-        }))
-
-      await expect(call(
-        procedure,
-        undefined,
-        { context: { 'effect/context': Context.make(Service2, { id: 'incoming' }) } },
-      )).resolves.toEqual('overridden')
+      )).resolves.toEqual(['Service1', 'from-next'])
     })
 
     it('nests effect/wrap spans of downstream effects under the middleware span', async () => {

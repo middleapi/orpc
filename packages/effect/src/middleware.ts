@@ -2,8 +2,8 @@ import type { ErrorMap } from '@orpc/contract'
 import type { Context, Middleware, MiddlewareDone, MiddlewareNextOptions, MiddlewareOptions, MiddlewareResult, ORPCErrorConstructorMap } from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
 import type { InferEffectServices } from './context'
-import { anyAbortSignal, isAsyncIteratorObject, resolveMaybeOptionalOptions } from '@orpc/shared'
-import { Effect, Context as EffectContext } from 'effect'
+import { anyAbortSignal, resolveMaybeOptionalOptions } from '@orpc/shared'
+import { Effect } from 'effect'
 import { runWithORPCContext } from './utils'
 
 export interface MiddlewareGenNext<TOutput> {
@@ -63,14 +63,9 @@ export function middlewareGen<
     const next: MiddlewareGenNext<TOutput> = <U extends Context = object>(...rest: MaybeOptionalOptions<MiddlewareNextOptions<U>>) => Effect.contextWith(
       fiberContext => Effect.callback<Awaited<MiddlewareResult<U, TOutput>>, unknown>((resume, interruptSignal) => {
         const nextOptions = resolveMaybeOptionalOptions(rest)
-        // context can be undefined when all field is optional
-        const nextContext: Context = nextOptions.context ?? {}
 
         const promise = (async () => opts.next<U>({
-          context: {
-            ...nextContext,
-            'effect/context': layerChangedServices(fiberContext, nextContext['effect/context'], opts.context['effect/context']),
-          },
+          context: { 'effect/context': fiberContext, ...nextOptions.context },
           signal: anyAbortSignal([nextOptions.signal ?? opts.signal, interruptSignal]),
         } as any))()
 
@@ -79,10 +74,8 @@ export function middlewareGen<
           error => resume(Effect.fail(error)),
         )
 
-        // On interruption, wait for the chain to settle and close any iterator it returns.
-        return Effect.promise(() => promise
-          .then(({ output }) => isAsyncIteratorObject(output) ? output.return?.() : undefined)
-          .catch(() => {}))
+        // On interruption, wait for the chain to settle.
+        return Effect.promise(() => promise.catch(() => {}))
       }),
     )
 
@@ -95,24 +88,4 @@ export function middlewareGen<
   Object.defineProperty(mid, 'name', { value: middleware.name })
 
   return mid
-}
-
-/**
- * The `effect/context` passed to `next` is the incoming one plus changes, so only the services
- * that differ from the incoming ones are layered over the fiber context, which keeps its newer span and annotations.
- */
-function layerChangedServices(fiberContext: EffectContext.Context<never>, nextServices: unknown, incomingServices: unknown): EffectContext.Context<never> {
-  if (!EffectContext.isContext(nextServices) || nextServices === incomingServices) {
-    return fiberContext
-  }
-
-  const services = new Map(fiberContext.mapUnsafe)
-
-  for (const [key, service] of nextServices.mapUnsafe) {
-    if (!EffectContext.isContext(incomingServices) || incomingServices.mapUnsafe.get(key) !== service) {
-      services.set(key, service)
-    }
-  }
-
-  return EffectContext.makeUnsafe(services)
 }
