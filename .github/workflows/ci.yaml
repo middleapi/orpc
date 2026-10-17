@@ -64,6 +64,25 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  effect_compat:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # The minimum must match the effect peer dependency floor in packages/effect/package.json
+        effect-version: [4.0.2, latest]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      # An exact spec is needed: `pnpm add effect@<version>` saves a caret range that the lockfile already satisfies
+      - run: pnpm --filter @orpc/experimental-effect pkg set devDependencies.effect=${{ matrix.effect-version }}
+
+      - run: pnpm i --no-frozen-lockfile
+
+      - run: pnpm vitest run packages/effect
+
   publish_preview:
     runs-on: ubuntu-latest
     steps:

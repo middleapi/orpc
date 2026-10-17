@@ -1,5 +1,5 @@
 import { oc } from '@orpc/contract'
-import { os } from '@orpc/server'
+import { call, os } from '@orpc/server'
 import { Schema as EffectSchema } from 'effect'
 import { z } from 'zod'
 import * as SchemaModule from '../schema'
@@ -44,4 +44,20 @@ it('accepts both standard schema and effect schema in Builder', () => {
 
   expect(builder['~orpc'].inputSchemas).toEqual([standardSchema1, toStandardSchemaSpy.mock.results[0]?.value])
   expect(builder['~orpc'].outputSchemas).toEqual([toStandardSchemaSpy.mock.results[1]?.value, standardSchema2])
+})
+
+// effect <4.0.2 reused an inherited `~standard` adapter, so a class extending an already-converted one validated with its parent's decoder
+it('validates with an extended class schema after its parent class was used', async () => {
+  class Parent extends EffectSchema.Class<Parent>('Parent')({ a: EffectSchema.String }) {}
+  class Child extends Parent.extend<Child>('Child')({ b: EffectSchema.Number }) {}
+
+  const parentProcedure = os.input(Parent).handler(({ input }) => input)
+  const childProcedure = os.input(Child).handler(({ input }) => input)
+
+  await expect(call(parentProcedure, { a: 'a' })).resolves.toBeInstanceOf(Parent)
+  await expect(call(childProcedure, { a: 'a', b: 'b' } as any)).rejects.toThrow('Input validation failed')
+
+  const output = await call(childProcedure, { a: 'a', b: 1 })
+  expect(output).toBeInstanceOf(Child)
+  expect(output.b).toBe(1)
 })

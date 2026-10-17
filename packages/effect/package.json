@@ -60,7 +60,7 @@
     "type:check": "tsc -b"
   },
   "peerDependencies": {
-    "effect": ">=4.0.0"
+    "effect": ">=4.0.2"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
