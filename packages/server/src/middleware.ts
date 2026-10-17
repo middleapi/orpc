@@ -11,10 +11,7 @@ export type MiddlewareResult<TOutContext extends Context, TOutput> = Promisable<
 export type MiddlewareNextOptions<TOutContext extends Context>
   = & (object extends TOutContext ? { context?: TOutContext } : { context: TOutContext })
     & {
-      /**
-       * Replaces the signal passed to the rest of the chain (downstream middlewares and the handler).
-       * Defaults to the current signal.
-       */
+      /** Overrides the signal for the rest of the chain. */
       signal?: AbortSignal | undefined
     }
 

@@ -1,7 +1,7 @@
 import type { Context, ORPCErrorConstructorMap, ProcedureHandler, ProcedureHandlerOptions } from '@orpc/server'
-import type { InferEffectServices, WithEffectContext } from './context'
-import { Effect, Context as EffectContext } from 'effect'
-import { runPromise } from './runtime'
+import type { InferEffectServices } from './context'
+import { Effect } from 'effect'
+import { runWithORPCContext } from './utils'
 
 export type InferYieldError<Eff> = [Eff] extends [never] ? never : [Eff] extends [Effect.Effect<infer _A, infer E, infer _R>] ? E : never
 
@@ -39,18 +39,6 @@ export function handlerGen<
   handler: HandlerGen<TCurrentContext, TInput, TYield, TReturn, TErrorConstructorMap>,
 ): ProcedureHandler<TCurrentContext, TInput, TReturn, TErrorConstructorMap> {
   return (opts, input) => {
-    let ef = Effect.gen(() => handler(opts, input)) as Effect.Effect<TReturn, InferYieldError<TYield>>
-
-    if (typeof opts.context['effect/wrap'] === 'function') {
-      const intercept = opts.context['effect/wrap'] as Exclude<WithEffectContext<any>['effect/wrap'], undefined>
-      ef = intercept(ef, opts)
-    }
-
-    // Provided outside `effect/wrap` so the wrap also runs with these services and nests under their span.
-    if (EffectContext.isContext(opts.context['effect/context'])) {
-      ef = ef.pipe(Effect.provide(opts.context['effect/context']))
-    }
-
-    return runPromise(ef, { signal: opts.signal })
+    return runWithORPCContext(Effect.gen(() => handler(opts, input)) as Effect.Effect<TReturn, InferYieldError<TYield>>, opts)
   }
 }

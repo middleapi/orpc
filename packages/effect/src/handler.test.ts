@@ -168,11 +168,12 @@ describe('handlerGen', () => {
       {
         context: {
           'effect/context': Context.make(Service1, { id: 'Service1' }),
-          'effect/wrap': effect => effect.pipe(Effect.tap(() => Effect.serviceOption(Service1).pipe(
-            Effect.tap(service => Effect.sync(() => {
+          'effect/wrap': effect => Effect.serviceOption(Service1).pipe(
+            Effect.flatMap((service) => {
               wrappedService = service
-            })),
-          ))),
+              return effect
+            }),
+          ),
         },
       },
     )).resolves.toEqual('output')

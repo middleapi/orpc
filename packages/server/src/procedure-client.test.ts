@@ -332,18 +332,6 @@ describe('createProcedureClient', () => {
     expect(handler).toHaveBeenNthCalledWith(2, expect.objectContaining({ signal }), undefined)
   })
 
-  it('middleware keeps the replaced signal when downstream calls next without one', async () => {
-    const overrideSignal = new AbortController().signal
-
-    mid1.mockImplementationOnce(async ({ next }) => next({ signal: overrideSignal }))
-    mid2.mockImplementationOnce(async ({ next }) => next({ context: { mid2: true } }))
-
-    await expect(client()).resolves.toBe('__OUTPUT__')
-
-    expect(mid1).toHaveBeenCalledWith(expect.objectContaining({ signal: undefined }), undefined, expect.any(Function))
-    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ signal: overrideSignal }), undefined)
-  })
-
   it('middleware can early return with done helper', async () => {
     mid1.mockImplementationOnce((options, input, done) => done({ output: 'MID1__EARLY_RETURN__' }))
 

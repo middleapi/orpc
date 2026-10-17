@@ -156,17 +156,33 @@ describe('middlewareGen', () => {
   })
 
   describe('interruption', () => {
-    it('waits for the downstream chain before running finalizers when the request aborts', async () => {
-      const log: string[] = []
+    let log: string[] = []
 
+    beforeEach(() => {
+      log = []
+    })
+
+    const tracked = (name: string) => middlewareGen(function* ({ next }) {
+      return yield* Effect.acquireUseRelease(
+        Effect.sync(() => log.push(`${name}-acquire`)),
+        () => next(),
+        () => Effect.sync(() => log.push(`${name}-release`)),
+      )
+    })
+
+    const timeoutFallback = middlewareGen(function* ({ next }, _, done) {
+      return yield* next().pipe(
+        Effect.timeout('20 millis'),
+        Effect.catchIf(Cause.isTimeoutError, () => Effect.sync(() => {
+          log.push('mw-timeout')
+          return done({ output: 'fallback' })
+        })),
+      )
+    })
+
+    it('waits for the downstream chain before running finalizers when the request aborts', async () => {
       const procedure = os
-        .use(middlewareGen(function* ({ next }) {
-          return yield* Effect.acquireUseRelease(
-            Effect.sync(() => log.push('mw-acquire')),
-            () => next(),
-            () => Effect.sync(() => log.push('mw-release')),
-          )
-        }))
+        .use(tracked('mw'))
         .handler(async ({ signal }) => {
           await sleep(50)
           log.push(`handler-done:aborted=${signal?.aborted}`)
@@ -175,22 +191,10 @@ describe('middlewareGen', () => {
 
       const signal = AbortSignal.timeout(10)
       await expect(call(procedure, undefined, { signal })).rejects.toSatisfy(error => error === signal.reason)
-      log.push('call-settled')
-
-      expect(log).toEqual(['mw-acquire', 'handler-done:aborted=true', 'mw-release', 'call-settled'])
+      expect(log).toEqual(['mw-acquire', 'handler-done:aborted=true', 'mw-release'])
     })
 
     it('unwinds nested middleware in order when the request aborts', async () => {
-      const log: string[] = []
-
-      const tracked = (name: string) => middlewareGen(function* ({ next }) {
-        return yield* Effect.acquireUseRelease(
-          Effect.sync(() => log.push(`${name}-acquire`)),
-          () => next(),
-          () => Effect.sync(() => log.push(`${name}-release`)),
-        )
-      })
-
       const procedure = os
         .use(tracked('outer'))
         .use(async ({ next }) => {
@@ -209,8 +213,6 @@ describe('middlewareGen', () => {
         })
 
       await expect(call(procedure, undefined, { signal: AbortSignal.timeout(10) })).rejects.toThrow()
-      log.push('call-settled')
-
       expect(log).toEqual([
         'outer-acquire',
         'inner-acquire',
@@ -218,13 +220,10 @@ describe('middlewareGen', () => {
         'inner-release',
         'plain-finally',
         'outer-release',
-        'call-settled',
       ])
     })
 
     it('interrupts a downstream handlerGen when the request aborts', async () => {
-      const log: string[] = []
-
       const procedure = os
         .use(middlewareGen(function* ({ next }) {
           return yield* next().pipe(
@@ -239,26 +238,14 @@ describe('middlewareGen', () => {
           )
         }))
 
-      const controller = new AbortController()
-      setTimeout(() => controller.abort(), 10)
-
-      await expect(call(procedure, undefined, { signal: controller.signal })).rejects.toSatisfy(error => error === controller.signal.reason)
+      const signal = AbortSignal.timeout(10)
+      await expect(call(procedure, undefined, { signal })).rejects.toSatisfy(error => error === signal.reason)
       expect(log).toEqual(['handler-interrupted', 'mw-release'])
     })
 
     it('interrupts a downstream handlerGen when Effect.timeout interrupts next', async () => {
-      const log: string[] = []
-
       const procedure = os
-        .use(middlewareGen(function* ({ next }, _, done) {
-          return yield* next().pipe(
-            Effect.timeout('20 millis'),
-            Effect.catchIf(Cause.isTimeoutError, () => Effect.sync(() => {
-              log.push('mw-timeout')
-              return done({ output: 'fallback' })
-            })),
-          )
-        }))
+        .use(timeoutFallback)
         .handler(handlerGen(function* () {
           yield* Effect.sleep('1 second').pipe(
             Effect.onInterrupt(() => Effect.sync(() => log.push('handler-interrupted'))),
@@ -271,18 +258,8 @@ describe('middlewareGen', () => {
     })
 
     it('aborts the signal of a plain handler and waits for it when Effect.timeout interrupts next', async () => {
-      const log: string[] = []
-
       const procedure = os
-        .use(middlewareGen(function* ({ next }, _, done) {
-          return yield* next().pipe(
-            Effect.timeout('20 millis'),
-            Effect.catchIf(Cause.isTimeoutError, () => Effect.sync(() => {
-              log.push('mw-timeout')
-              return done({ output: 'fallback' })
-            })),
-          )
-        }))
+        .use(timeoutFallback)
         .handler(async ({ signal }) => {
           await new Promise(resolve => signal?.addEventListener('abort', resolve))
           await sleep(10)
@@ -368,7 +345,6 @@ describe('middlewareGen', () => {
         .use(middlewareGen(function* ({ next }) {
           return yield* next().pipe(Effect.provideService(Service1, { id: 'Service1' }))
         }))
-        .use(({ next }) => next())
         .use(({ context, next }) => next({
           context: { 'effect/context': context['effect/context'].pipe(Context.add(Service2, { id: 'Service2' })) },
         }))

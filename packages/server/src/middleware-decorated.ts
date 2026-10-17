@@ -98,7 +98,6 @@ export function decorateMiddleware<
               signal,
               next(nextOpts2: undefined | MiddlewareNextOptions<any>, ...args: []) {
                 return opts.next({
-                  ...opts,
                   context: {
                     ...nextOpts1?.context,
                     ...nextOpts2?.context,

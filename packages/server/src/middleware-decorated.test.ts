@@ -150,44 +150,26 @@ describe('decorateMiddleware', () => {
       expect(done).not.toHaveBeenCalled()
     })
 
-    it('forwards signal overrides through the combined chain', async () => {
-      const signal = new AbortController().signal
-      const signal1 = new AbortController().signal
-      const signal2 = new AbortController().signal
+    const outerSignal = new AbortController().signal
+    const signal1 = new AbortController().signal
+    const signal2 = new AbortController().signal
 
-      const mid1 = vi.fn().mockImplementation(async ({ next }) => next({ signal: signal1 }))
-      const mid2 = vi.fn()
-        .mockImplementationOnce(async ({ next }) => next())
-        .mockImplementationOnce(async ({ next }) => next({ signal: signal2 }))
+    it.each([
+      [undefined, undefined, outerSignal, outerSignal],
+      [signal1, undefined, signal1, signal1],
+      [signal1, signal2, signal1, signal2],
+    ])('forwards signal overrides through the combined chain (%#)', async (mid1Signal, mid2Signal, expectedMid2Signal, expectedNextSignal) => {
+      const mid1 = vi.fn().mockImplementation(async ({ next }) => next({ signal: mid1Signal }))
+      const mid2 = vi.fn().mockImplementation(async ({ next }) => next({ signal: mid2Signal }))
 
       const combined = decorateMiddleware(mid1 as any).use(mid2 as any)
       const next = vi.fn().mockImplementation(async ({ context }) => ({ output: 'final', context }))
       const done = vi.fn()
 
-      await (combined as any)({ context: {}, signal, next }, 'input', done)
+      await (combined as any)({ context: {}, signal: outerSignal, next }, 'input', done)
 
-      expect(mid1).toHaveBeenCalledWith(expect.objectContaining({ signal }), 'input', done)
-      expect(mid2).toHaveBeenCalledWith(expect.objectContaining({ signal: signal1 }), 'input', done)
-      expect(next).toHaveBeenCalledWith(expect.objectContaining({ signal: signal1 }))
-
-      await (combined as any)({ context: {}, signal, next }, 'input', done)
-
-      expect(next).toHaveBeenLastCalledWith(expect.objectContaining({ signal: signal2 }))
-    })
-
-    it('keeps the outer signal when no override is given', async () => {
-      const signal = new AbortController().signal
-
-      const mid1 = vi.fn().mockImplementation(async ({ next }) => next())
-      const mid2 = vi.fn().mockImplementation(async ({ next }) => next())
-
-      const combined = decorateMiddleware(mid1 as any).use(mid2 as any)
-      const next = vi.fn().mockImplementation(async ({ context }) => ({ output: 'final', context }))
-
-      await (combined as any)({ context: {}, signal, next }, 'input', vi.fn())
-
-      expect(mid2).toHaveBeenCalledWith(expect.objectContaining({ signal }), 'input', expect.any(Function))
-      expect(next).toHaveBeenCalledWith(expect.objectContaining({ signal }))
+      expect(mid2).toHaveBeenCalledWith(expect.objectContaining({ signal: expectedMid2Signal }), 'input', done)
+      expect(next).toHaveBeenCalledWith(expect.objectContaining({ signal: expectedNextSignal }))
     })
 
     it('can stop early with done', async () => {
