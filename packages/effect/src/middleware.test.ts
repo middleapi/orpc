@@ -390,6 +390,63 @@ describe('middlewareGen', () => {
       })
     })
 
+    it('keeps the inner span and annotations when a nested middleware passes effect/context to next', async () => {
+      const procedure = os
+        .$context<WithEffectContext<Service1>>()
+        .use(middlewareGen(function* ({ next }) {
+          return yield* next().pipe(
+            Effect.withSpan('outer'),
+            Effect.annotateLogs({ who: 'outer' }),
+          )
+        }))
+        .use(middlewareGen(function* ({ context, next }) {
+          return yield* next({
+            context: { 'effect/context': context['effect/context'].pipe(Context.add(Service2, { id: 'Service2' })) },
+          }).pipe(
+            Effect.withSpan('inner'),
+            Effect.annotateLogs({ who: 'inner' }),
+          )
+        }))
+        .handler(handlerGen(function* () {
+          const service1 = yield* Service1
+          const service2 = yield* Service2
+          const span = yield* Effect.currentSpan
+          const annotations = yield* References.CurrentLogAnnotations
+
+          return { service1: service1.id, service2: service2.id, span: span.name, annotations }
+        }))
+
+      await expect(call(
+        procedure,
+        undefined,
+        { context: { 'effect/context': Context.make(Service1, { id: 'Service1' }) } },
+      )).resolves.toEqual({
+        service1: 'Service1',
+        service2: 'Service2',
+        span: 'inner',
+        annotations: { who: 'inner' },
+      })
+    })
+
+    it('lets effect/context passed to next override an incoming service', async () => {
+      const procedure = os
+        .$context<WithEffectContext<Service2>>()
+        .use(middlewareGen(function* ({ context, next }) {
+          return yield* next({
+            context: { 'effect/context': context['effect/context'].pipe(Context.add(Service2, { id: 'overridden' })) },
+          })
+        }))
+        .handler(handlerGen(function* () {
+          return (yield* Service2).id
+        }))
+
+      await expect(call(
+        procedure,
+        undefined,
+        { context: { 'effect/context': Context.make(Service2, { id: 'incoming' }) } },
+      )).resolves.toEqual('overridden')
+    })
+
     it('nests effect/wrap spans of downstream effects under the middleware span', async () => {
       let index = 0
 

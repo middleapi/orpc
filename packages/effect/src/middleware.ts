@@ -66,13 +66,11 @@ export function middlewareGen<
         // context can be undefined when all field is optional
         const nextContext: Context = nextOptions.context ?? {}
 
-        // Explicitly passed services are layered on top of the fiber context.
-        const effectContext = EffectContext.isContext(nextContext['effect/context'])
-          ? EffectContext.merge(fiberContext, nextContext['effect/context'])
-          : fiberContext
-
         const promise = (async () => opts.next<U>({
-          context: { ...nextContext, 'effect/context': effectContext },
+          context: {
+            ...nextContext,
+            'effect/context': layerChangedServices(fiberContext, nextContext['effect/context'], opts.context['effect/context']),
+          },
           signal: anyAbortSignal([nextOptions.signal ?? opts.signal, interruptSignal]),
         } as any))()
 
@@ -97,4 +95,24 @@ export function middlewareGen<
   Object.defineProperty(mid, 'name', { value: middleware.name })
 
   return mid
+}
+
+/**
+ * The `effect/context` passed to `next` is the incoming one plus changes, so only the services
+ * that differ from the incoming ones are layered over the fiber context, which keeps its newer span and annotations.
+ */
+function layerChangedServices(fiberContext: EffectContext.Context<never>, nextServices: unknown, incomingServices: unknown): EffectContext.Context<never> {
+  if (!EffectContext.isContext(nextServices) || nextServices === incomingServices) {
+    return fiberContext
+  }
+
+  const services = new Map(fiberContext.mapUnsafe)
+
+  for (const [key, service] of nextServices.mapUnsafe) {
+    if (!EffectContext.isContext(incomingServices) || incomingServices.mapUnsafe.get(key) !== service) {
+      services.set(key, service)
+    }
+  }
+
+  return EffectContext.makeUnsafe(services)
 }
