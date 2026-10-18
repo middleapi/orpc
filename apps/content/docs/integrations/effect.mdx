@@ -116,21 +116,20 @@ const procedure = os
 
 :::
 
-`effect/context` also accepts Effect references such as `Tracer`, `Logger` or `Scheduler`, which then apply to every effect that runs under this context. For example, Effect recommends a sync scheduler on Cloudflare Workers:
+:::tip
+`effect/context` also accepts references like `Tracer`, `Logger` or `Scheduler`, e.g. a sync scheduler on Cloudflare Workers:
 
 ```ts
-import { Context, Scheduler } from 'effect'
-
-const effectContext = Context.empty().pipe(
-  Context.add(Scheduler.Scheduler, new Scheduler.MixedScheduler('sync')),
-)
+Context.add(Scheduler.Scheduler, new Scheduler.MixedScheduler('sync'))
 ```
+
+:::
 
 ### Error Handling
 
 This integration preserves the original error whenever possible. If you call `Effect.fail(error)`, the error is forwarded to [middleware](/docs/middleware) and interceptors, just like a regular thrown error.
 
-To customize this behavior, wrap the effect before execution using `effect/wrap` in the context. The wrap may change the error type, for example to turn domain errors into `ORPCError`:
+To customize this behavior, wrap the effect before execution using `effect/wrap` in the context:
 
 ```ts twoslash
 import type { WithEffectContext } from '@orpc/experimental-effect'
@@ -152,7 +151,6 @@ export async function fetch(request: Request) {
     context: {
       'effect/context': Context.empty(),
       'effect/wrap': effect => effect.pipe(
-        // also catches defects, such as errors thrown inside the generator
         Effect.catchCause((cause) => {
           const error = Cause.squash(cause)
 
@@ -163,7 +161,6 @@ export async function fetch(request: Request) {
             }))
           }
 
-          // keep everything else, including interruptions, as-is
           return Effect.failCause(cause)
         }),
       ),
@@ -178,9 +175,7 @@ export async function fetch(request: Request) {
 }
 ```
 
-The wrap runs once for every `handlerGen` and `middlewareGen` in a request, each with its own effect. `opts.kind` (`'handler'` or `'middleware'`) tells them apart, and `opts` also holds that layer's `context`, `input`, `path`, `procedure`, `errors` and `signal`. Failures from inner layers reach outer `middlewareGen`s through `next`, so they pass through the wrap again. Keep the wrap idempotent, as the example above is: an `ORPCError` that is already mapped passes through unchanged.
-
-The wrapped effect runs with `effect/context`, so code in the wrap sees the same services, `Tracer` and `Logger` as the handler. Services the wrap provides take precedence over `effect/context` for the effect it wraps.
+The wrap runs with `effect/context`, once per `handlerGen` and `middlewareGen` (see `opts.kind`). Keep it idempotent, since failures from inner layers pass through it again.
 
 :::info
 For app level error handling, we recommend [middleware](/docs/middleware) or interceptors.
@@ -371,7 +366,7 @@ const converter = new EffectSchemaToJsonSchemaConverter({ cache: true })
 
 ## OpenTelemetry Integration
 
-First, set up the [oRPC OpenTelemetry integration](/docs/integrations/opentelemetry). Then install [`@effect/opentelemetry`](https://www.npmjs.com/package/@effect/opentelemetry) and provide its tracer through `effect/context`. This makes Effect tracing equivalent to OpenTelemetry tracing:
+First, set up the [oRPC OpenTelemetry integration](/docs/integrations/opentelemetry). Then provide the [`@effect/opentelemetry`](https://www.npmjs.com/package/@effect/opentelemetry) tracer through `effect/context`:
 
 ```ts
 import { OtelTracer } from '@effect/opentelemetry'
@@ -379,7 +374,6 @@ import { ManagedRuntime } from 'effect'
 
 interface ServerContext extends WithEffectContext<never> {}
 
-// Build the Effect tracer, backed by the global OpenTelemetry tracer provider, once
 const effectContext = await ManagedRuntime.make(OtelTracer.layerGlobal).context()
 
 export async function fetch(request: Request) {
