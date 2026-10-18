@@ -2,10 +2,12 @@ import type { RetryLinkPluginContext } from '@orpc/client/plugins'
 import type { OpenAPIDocument } from '@orpc/openapi'
 import type { RouterClient } from '@orpc/server'
 import type { RequestHeadersHandlerPluginContext, ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
+import { BetterAuthHandlerPlugin } from '@orpc/better-auth'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import {
   BatchLinkPlugin,
+  CookiesManagementLinkPlugin,
   DedupeLinkPlugin,
   RequestCompressionLinkPlugin,
   ResponseCompressionLinkPlugin,
@@ -73,6 +75,7 @@ function createHandlerPlugins() {
   return [
     new BatchHandlerPlugin<TestContext>(),
     new BatchResponseCompressionHandlerPlugin<TestContext>({ threshold: 0 }),
+    new BetterAuthHandlerPlugin<TestContext>(),
     new CORSHandlerPlugin<TestContext>(),
     new EvlogHandlerPlugin<TestContext>(),
     new GetMethodCsrfProtectionHandlerPlugin<TestContext>(),
@@ -103,6 +106,7 @@ function createHandlerPlugins() {
 function createLinkPlugins() {
   return [
     new BatchLinkPlugin<TestClientContext>({ groups: [{ condition: () => true, context: {} }] }),
+    new CookiesManagementLinkPlugin<TestClientContext>({ getCookie: () => undefined }),
     new DedupeLinkPlugin<TestClientContext>({ groups: [{ condition: () => true, context: {} }] }),
     new RequestCompressionLinkPlugin<TestClientContext>({ threshold: 0 }),
     new RequestValidationLinkPlugin<TestClientContext>(contract),

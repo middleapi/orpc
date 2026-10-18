@@ -240,7 +240,7 @@ Per-request data passed through the link's [`headers` option](/docs/rpc/link#url
 
 ## Limitations
 
-Cookies set in a batched call are never stored, because the browser only reads headers from the batch response itself, not from each subresponse. Send procedures that set cookies outside the batch:
+Cookies set in a batched call are never stored, because the browser only reads headers from the batch response itself, not from each subresponse. The [Better Auth Integration](/docs/integrations/better-auth#batching) is an exception for the cookies it sets while reading the session. Send procedures that set cookies outside the batch:
 
 ```ts
 const link = new RPCLink({
