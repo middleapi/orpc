@@ -296,7 +296,7 @@ describe('uploads large files through tmp files', () => {
       const response = await new Promise<string>((resolve, reject) => {
         const socket = connect((server.address() as AddressInfo).port, '127.0.0.1', () => {
           socket.setNoDelay(true)
-          socket.write(`POST /upload HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: multipart/form-data; boundary=${boundary}\r\nContent-Length: ${body.length}\r\nConnection: close\r\n\r\n`)
+          socket.write(`POST /upload HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: multipart/form-data; boundary=${boundary}\r\nOrpc-Protocol: rpc\r\nContent-Length: ${body.length}\r\nConnection: close\r\n\r\n`)
 
           void (async () => {
             for (let offset = 0; offset < body.length; offset += segmentSize) {

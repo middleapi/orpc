@@ -24,6 +24,10 @@ Cookie-less cross-site requests pass, which makes the plugin the natural safegua
 
 Only requests that match a procedure are judged. The rest stay unmatched, so a handler that falls through to a static site or SPA keeps serving visitors arriving from links on other sites.
 
+:::info
+Other methods need their own protection when cookies are not marked `SameSite`, since browsers then attach them to cross-site forms. [RPC Handler](/docs/rpc/handler#csrf-protection) has it built in: it rejects forms and other requests that browsers send from another site without a CORS preflight. [OpenAPI Handler](/docs/openapi/handler#cross-site-request-forgery) accepts form bodies by design and relies on your cookies.
+:::
+
 ## Setup
 
 ```ts twoslash
@@ -49,7 +53,7 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 
 Mark authentication cookies `SameSite=Lax` or `SameSite=Strict` explicitly. Do not rely on browser defaults: only Chrome treats unmarked cookies as `Lax`, while Firefox and Safari treat them like `SameSite=None`, and Chrome still sends fresh unmarked cookies on cross-site `POST` for [two minutes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#lax).
 
-With `SameSite=None` or unmarked cookies, cross-site requests the plugin allows, such as `fetch` and `<img>`, can still carry them. In that case, fix the cookie attribute or add a [synchronizer token](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#synchronizer-token-pattern).
+With `SameSite=None` or unmarked cookies, cross-site requests the plugin allows, such as `fetch` and `<img>`, can still carry them, and so can cross-site `POST` forms. [RPC Handler](/docs/rpc/handler#csrf-protection) rejects those forms on its own, but `GET` requests and [OpenAPI Handler](/docs/openapi/handler#cross-site-request-forgery) stay exposed. In that case, fix the cookie attribute or add a [synchronizer token](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#synchronizer-token-pattern).
 
 ## Limitations
 

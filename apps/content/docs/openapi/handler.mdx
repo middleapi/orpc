@@ -73,6 +73,17 @@ const cors = new CORSHandlerPlugin({
 
 :::
 
+## Cross-Site Request Forgery
+
+`OpenAPIHandler` decodes `application/x-www-form-urlencoded` and `multipart/form-data` bodies with [bracket notation](/docs/openapi/bracket-notation), so plain HTML forms and REST clients can call your procedures. Browsers send these bodies, and `text/plain` ones, from any site without a [CORS preflight](https://developer.mozilla.org/en-US/docs/Glossary/Preflight_request), and they attach every cookie that `SameSite` allows. Unlike [RPC Handler](/docs/rpc/handler#csrf-protection), `OpenAPIHandler` does not reject these requests. If cookies authenticate your API:
+
+- Mark authentication cookies `SameSite=Lax` or `SameSite=Strict` explicitly. Only Chrome treats unmarked cookies as `Lax`. Firefox and Safari send them on cross-site `POST`, and Chrome still sends a fresh unmarked cookie for [two minutes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#lax).
+- Remember that `SameSite` treats sibling subdomains as the same site. Host untrusted content on a separate site, not a subdomain.
+- Add the [GET Method CSRF Protection Plugin](/docs/plugins/get-method-csrf-protection) for `GET` procedures that modify data, since browsers attach `SameSite=Lax` cookies to cross-site `GET` navigations.
+- Prefer an `Authorization` header for APIs that other sites call, since browsers never attach it on their own.
+
+Learn more in the [OWASP CSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html).
+
 ## Interceptors
 
 Interceptors let you observe or change different stages of an OpenAPI request. Common use cases include logging, error handling, and metrics.

@@ -5,6 +5,7 @@ import type { StandardLinkCodec, StandardLinkCodecDecodedResponse } from '../sta
 import { isAsyncIteratorObject, pathToHttpPath, stringifyJSON, value } from '@orpc/shared'
 import { mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
 import { toStandardHeaders } from '@standard-server/fetch'
+import { RPC_PROTOCOL_HEADER } from '../../consts'
 import { MalformedResponseError } from '../../error'
 import { createORPCErrorFromJson, isORPCErrorJson } from '../../error-utils'
 import { RPCSerializer } from '../../rpc-serializer'
@@ -116,7 +117,8 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
     return {
       url,
       method: expectedMethod === 'GET' ? this.fallbackMethod : expectedMethod,
-      headers,
+      // Lets the server tell this request apart from a cross-site HTML form, see RPC_PROTOCOL_HEADER
+      headers: { ...headers, [RPC_PROTOCOL_HEADER]: 'rpc' },
       body: serialized,
       signal: options.signal,
     }

@@ -73,7 +73,7 @@ describe('rpcHandlerCodec', () => {
         method: 'POST',
         url: '/ping',
         resolveBody,
-        headers: {},
+        headers: { 'content-type': 'application/json' },
         signal: undefined,
       } as any, options as any)
 
@@ -100,7 +100,7 @@ describe('rpcHandlerCodec', () => {
         method: 'QUERY',
         url: '/ping',
         resolveBody,
-        headers: {},
+        headers: { 'content-type': 'application/json' },
         signal: undefined,
       } as any, options as any)
 
@@ -110,6 +110,108 @@ describe('rpcHandlerCodec', () => {
 
       expect(input).toBe('__deserialized__')
       expect(resolveBody).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('csrf protection', () => {
+    async function decodeInput(headers: Record<string, string | string[]>, codecOptions: ConstructorParameters<typeof RPCHandlerCodec>[1] = {}, method = 'POST') {
+      const resolveBody = vi.fn().mockResolvedValue({ json: 'input' })
+      const codec = new RPCHandlerCodec(router, { allowMethods: [method as any], ...codecOptions })
+
+      const result = await codec.resolveProcedure({
+        method,
+        url: '/ping',
+        resolveBody,
+        headers,
+        signal: undefined,
+      } as any, options as any)
+
+      return { promise: result!.decodeInput(), resolveBody }
+    }
+
+    async function expectRejected(...args: Parameters<typeof decodeInput>) {
+      const { promise, resolveBody } = await decodeInput(...args)
+
+      await expect(promise).rejects.toSatisfy(error => error instanceof ORPCError && error.code === 'FORBIDDEN')
+      expect(resolveBody).not.toHaveBeenCalled()
+    }
+
+    async function expectAccepted(...args: Parameters<typeof decodeInput>) {
+      const { promise, resolveBody } = await decodeInput(...args)
+
+      await expect(promise).resolves.toBe('input')
+      expect(resolveBody).toHaveBeenCalledOnce()
+    }
+
+    it.each([
+      ['no Content-Type', {}],
+      ['an empty Content-Type', { 'content-type': '' }],
+      ['application/x-www-form-urlencoded', { 'content-type': 'application/x-www-form-urlencoded' }],
+      ['multipart/form-data with a boundary', { 'content-type': 'multipart/form-data; boundary=x' }],
+      ['text/plain with parameters and odd casing', { 'content-type': ' TEXT/Plain ;charset=utf-8' }],
+    ])('rejects a request with %s, which browsers send cross-site without a preflight', async (_, headers) => {
+      await expectRejected(headers)
+    })
+
+    it.each([
+      'application/json',
+      'application/json; charset=utf-8',
+      'text/event-stream',
+      'application/octet-stream',
+      'image/png',
+    ])('accepts a request with %s, which browsers only send cross-origin after a preflight', async (contentType) => {
+      await expectAccepted({ 'content-type': contentType })
+    })
+
+    it.each([
+      ['the orpc-protocol header RPC Link sends', { 'orpc-protocol': 'rpc' }],
+      ['the orpc-protocol header with any value', { 'orpc-protocol': 'custom' }],
+      ['sec-fetch-site: same-origin', { 'sec-fetch-site': 'same-origin' }],
+      ['sec-fetch-site: same-origin in odd casing', { 'sec-fetch-site': 'Same-Origin' }],
+    ])('accepts a form request carrying %s', async (_, headers) => {
+      await expectAccepted({ 'content-type': 'multipart/form-data; boundary=x', ...headers })
+    })
+
+    it.each([
+      ['same-site, such as a sibling subdomain', { 'sec-fetch-site': 'same-site' }],
+      ['cross-site', { 'sec-fetch-site': 'cross-site' }],
+      ['none', { 'sec-fetch-site': 'none' }],
+      ['repeated', { 'sec-fetch-site': ['same-origin', 'same-origin'] }],
+    ])('rejects a form request whose sec-fetch-site is %s', async (_, headers) => {
+      await expectRejected({ 'content-type': 'multipart/form-data; boundary=x', ...headers })
+    })
+
+    it.each(['PUT', 'PATCH', 'DELETE', 'QUERY', 'HEAD'])('also guards %s requests, which read input from the body', async (method) => {
+      await expectRejected({}, {}, method)
+    })
+
+    it('leaves GET requests alone, since they read input from the URL', async () => {
+      const resolveBody = vi.fn()
+      const codec = new RPCHandlerCodec(router, { allowMethods: ['GET'] })
+
+      const result = await codec.resolveProcedure({
+        method: 'GET',
+        url: '/ping?data=%7B%22json%22%3A%22input%22%7D',
+        resolveBody,
+        headers: {},
+        signal: undefined,
+      } as any, options as any)
+
+      await expect(result!.decodeInput()).resolves.toBe('input')
+    })
+
+    it('can be disabled', async () => {
+      await expectAccepted({}, { csrfProtection: false })
+    })
+
+    it('can be decided per request, with the request, procedure, and path', async () => {
+      const csrfProtection = vi.fn(() => false)
+      const headers = { 'content-type': 'text/plain' }
+
+      await expectAccepted(headers, { csrfProtection })
+
+      expect(csrfProtection).toHaveBeenCalledOnce()
+      expect(csrfProtection).toHaveBeenCalledWith(expect.objectContaining({ headers }), procedure, ['ping'])
     })
   })
 

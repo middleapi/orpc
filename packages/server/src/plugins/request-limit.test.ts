@@ -69,6 +69,7 @@ describe('requestLimitHandlerPlugin', () => {
     const { matched, response } = await handler.handle(new Request('https://example.com/ping', {
       method: 'POST',
       headers: {
+        'content-type': 'application/json',
         'content-length': '22',
       },
       body: JSON.stringify({}),

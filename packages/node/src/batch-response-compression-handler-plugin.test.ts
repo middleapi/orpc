@@ -203,7 +203,7 @@ describe('batchResponseCompressionHandlerPlugin', () => {
   it('leaves responses that are not batch responses alone', async () => {
     const { response } = await createHandler().handle(new Request('https://example.com/ping', {
       method: 'POST',
-      headers: { 'accept-encoding': 'gzip' },
+      headers: { 'accept-encoding': 'gzip', 'orpc-protocol': 'rpc' },
     }))
 
     expect(response!.status).toBe(200)
@@ -243,7 +243,7 @@ describe('batchResponseCompressionHandlerPlugin', () => {
 
     const { response } = await handler.handle(new Request('https://example.com/export', {
       method: 'POST',
-      headers: { 'accept-encoding': 'gzip' },
+      headers: { 'accept-encoding': 'gzip', 'orpc-protocol': 'rpc' },
     }))
 
     expect(response!.headers.get('content-encoding')).toBe(null)

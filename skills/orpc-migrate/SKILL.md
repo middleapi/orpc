@@ -107,6 +107,7 @@ Most v1 names still compile through deprecated aliases (strike-through hints, no
    - **Automatic middleware deduplication removed:** middleware applied at both router and procedure level now runs twice, with no warning. Guard shared middleware with the context-flag pattern from the dedupe-middleware recipe.
    - **Batch Plugin `exclude` became `filter` with the opposite meaning.** Usually delete `exclude`; if skipping is still needed, negate the predicate.
    - **`RPCHandler` rejects GET by default** (`allowMethods` defaults to POST/PUT/PATCH/DELETE). Simplest fix: stop sending GET from the link; only allow GET deliberately, with CSRF protection.
+   - **`RPCHandler` rejects form, text, and body-less requests without the `orpc-protocol` header** (built-in CSRF protection, also new during the v2 beta). `RPCLink` sends it; upgrade `@orpc/client` with `@orpc/server`, add `orpc-protocol` to CORS `allowHeaders` if set, and send `orpc-protocol: rpc` from custom clients. Exempt webhooks with the `csrfProtection` option.
    - **Handler `filter` takes positional arguments now;** the v1 destructured form still type-checks but reads wrong values.
    - **`.input`/`.output` now stack:** a repeated call adds a schema instead of replacing the previous one.
 4. **Sweep deprecated aliases** last: `eventIterator` to `asyncIteratorObject`, handler plugins gained a `HandlerPlugin` suffix and link plugins a `LinkPlugin` suffix, `ContractRouter*` types became `RouterContract*`. The from-v1 guide ends with the full alias cheat sheet.

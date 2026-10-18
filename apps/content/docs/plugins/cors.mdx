@@ -32,6 +32,17 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 By default, `origin` is `*`, which allows any origin. The wildcard is rejected by browsers for [credentialed requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS#requests_with_credentials), so list your allowed origins explicitly when you enable `credentials`.
 :::
 
+:::info
+By default, `allowHeaders` allows whatever headers the preflight requests. If you set it, list every header your clients send that is not [CORS-safelisted](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_request_header). This includes `Content-Type` and the `orpc-protocol` header that [RPC Link](/docs/rpc/handler#csrf-protection) sends with every request that has a body:
+
+```ts
+const cors = new CORSHandlerPlugin({
+  allowHeaders: ['Content-Type', 'orpc-protocol'],
+})
+```
+
+:::
+
 ## Dynamic Origin
 
 The `origin` and `timingOrigin` options also accept a function (optionally async) that receives the request origin and the interceptor options, including the [handler context](/docs/context). This lets you resolve the allowed origin per request:

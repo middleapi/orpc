@@ -99,6 +99,23 @@ describe('rpcHandler', () => {
     expect(decoded.message.json.status).toBe(undefined)
   })
 
+  it('accepts body-less requests without the orpc-protocol header, since the peer writes every header itself', async () => {
+    const handler = createHandler()
+    const ws = createWs()
+
+    await handler.message(ws as any, await encodePeerMessage({
+      id: '19',
+      kind: 'request',
+      json: { url: '/ping', headers: { 'sec-fetch-site': 'cross-site' }, method: 'POST' },
+    }))
+
+    const decoded = decodePeerMessage((ws as any).send.mock.calls[0][0]) as any
+
+    expect(decoded.message.kind).toBe('response')
+    expect(decoded.message.json.status).toBe(undefined)
+    expect(decoded.message.json.body).toEqual({ json: 'pong' })
+  })
+
   it('can decode messages with prefix', async () => {
     const handler = createHandler({
       decodePeerMessage: { prefix: 'orpc:' },

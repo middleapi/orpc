@@ -565,7 +565,29 @@ const handler = new RPCHandler(router)
 The simplest migration is to stop sending GET instead of allowing it: remove the `method` option from your [RPC Link](/docs/rpc/link) so every call uses POST (the default), and keep the handler's default `allowMethods`. Only allow GET when you really need it, for example for HTTP caching.
 :::
 
-The v2 [GET Method CSRF Protection Plugin](/docs/plugins/get-method-csrf-protection) replaces the v1 CSRF plugin pair. It checks the browser's `Sec-Fetch-*` headers, so it needs no matching link plugin and no configuration. Remove `SimpleCsrfProtectionPlugin` from your handler and `SimpleCsrfProtectionLinkPlugin` from your client; they no longer exist.
+The v1 CSRF plugin pair is replaced by the v2 [GET Method CSRF Protection Plugin](/docs/plugins/get-method-csrf-protection) for `GET`, and by the [built-in CSRF protection](#form-text-and-body-less-requests-need-the-orpc-protocol-header) for the other methods. The plugin checks the browser's `Sec-Fetch-*` headers, so it needs no matching link plugin and no configuration. Remove `SimpleCsrfProtectionPlugin` from your handler and `SimpleCsrfProtectionLinkPlugin` from your client; they no longer exist.
+
+### Form, text, and body-less requests need the `orpc-protocol` header
+
+:::info[Changed during the v2 beta]
+Earlier v2 betas accepted these requests. If you already run a v2 beta, upgrade `@orpc/server` and `@orpc/client` together.
+:::
+
+`RPCHandler` has built-in [CSRF protection](/docs/rpc/handler#csrf-protection), on by default. It rejects requests that read input from the body and have no `Content-Type`, or a `multipart/form-data`, `application/x-www-form-urlencoded`, or `text/plain` one. Requests with the `orpc-protocol` header, or that the browser marks `Sec-Fetch-Site: same-origin`, pass. `RPCLink` sends the header with every request that has a body, so most apps only need to:
+
+- Upgrade `@orpc/client` along with `@orpc/server`. An older `RPCLink` does not send the header, so its file uploads and calls without input are rejected.
+- Add `orpc-protocol` to CORS `allowHeaders`, if you set it.
+- Send `orpc-protocol: rpc` from custom clients and scripts that post forms, text, or empty bodies.
+
+To accept such requests without the header, for example a webhook, exempt the procedure with `csrfProtection`:
+
+```ts v2
+const handler = new RPCHandler(router, {
+  csrfProtection: (request, procedure, path) => path[0] !== 'webhooks',
+})
+```
+
+The [WebSocket](/docs/adapters/websocket) and [Message Port](/docs/adapters/message-port) adapters are not affected.
 
 ### Interceptor options renamed
 

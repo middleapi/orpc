@@ -12,8 +12,9 @@ import { getRouter, walkProcedureContractsSync } from '../../router-utils'
 
 /**
  * Methods that can invoke procedures by default. Browsers cannot trigger them
- * cross-site without a CORS preflight or an HTML form, unlike `GET`, which a plain
- * `<a>` click or redirect can trigger with `SameSite=Lax` cookies attached. Other
+ * cross-site without a CORS preflight or an HTML form, which the RPC handler's CSRF
+ * protection rejects, unlike `GET`, which a plain `<a>` click or redirect can trigger
+ * with `SameSite=Lax` cookies attached. Other
  * methods (`HEAD`, `OPTIONS`, `QUERY`, ...) have safe semantics that should not
  * invoke a procedure that can modify data.
  *

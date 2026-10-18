@@ -132,6 +132,10 @@ const link = new RPCLink({
 ```
 
 :::info
+`RPCLink` also sends `orpc-protocol: rpc` with every request that has a body. The handler's [CSRF protection](/docs/rpc/handler#csrf-protection) requires this header for form, text, and body-less requests. If you set CORS `allowHeaders` on the server, include `orpc-protocol`.
+:::
+
+:::info
 Each option can also be a function to dynamically customize values per request. For example, routing to a different `origin` based on the procedure path, or injecting headers from client context:
 
 ```ts

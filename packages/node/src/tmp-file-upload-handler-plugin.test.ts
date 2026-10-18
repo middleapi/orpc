@@ -283,6 +283,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
     const res = await agent
       .post('/upload')
       .set('content-type', response.headers.get('content-type')!)
+      .set('orpc-protocol', 'rpc')
       .send(body)
 
     expect(res.status).toBe(200)
@@ -379,6 +380,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
     const res = await agent
       .post('/upload')
       .set('content-type', `multipart/form-data; boundary=${boundary}`)
+      .set('orpc-protocol', 'rpc')
       .send(Buffer.from(body))
 
     expect(res.status).toBe(400)
@@ -393,6 +395,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
     const res = await agent
       .post('/upload')
       .set('content-type', 'multipart/form-data')
+      .set('orpc-protocol', 'rpc')
       .send(Buffer.from('irrelevant'))
 
     expect(res.status).toBe(400)
@@ -415,6 +418,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
     const res = await agent
       .post('/upload')
       .set('content-type', `multipart/form-data; boundary=${boundary}`)
+      .set('orpc-protocol', 'rpc')
       .send(Buffer.from(body))
 
     expect(res.status).toBe(413)
@@ -770,7 +774,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
       expect(readdirSync(tmpDir)).toHaveLength(0)
 
       const { agent, captured } = createAgent()
-      const res = await agent.post('/upload').set('content-type', contentType).send(body)
+      const res = await agent.post('/upload').set('content-type', contentType).set('orpc-protocol', 'rpc').send(body)
       expect(res.status).toBe(400)
       expect(captured).toHaveLength(0)
     })
@@ -1451,7 +1455,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
         header: 'Content-Disposition: form-data; name="a"; filename=""',
       })))
 
-      const res = await agent.post('/upload').set(multipartHeaders).send(body)
+      const res = await agent.post('/upload').set(multipartHeaders).set('orpc-protocol', 'rpc').send(body)
 
       expect(res.status).toBe(401)
       expect(captured[0]!.tmpDirEntries).toHaveLength(0)

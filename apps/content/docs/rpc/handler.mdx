@@ -79,7 +79,7 @@ const cors = new CORSHandlerPlugin({
 
 By default, `RPCHandler` only responds to `POST`, `PUT`, `PATCH`, and `DELETE` requests. Any other method, such as `GET` or `HEAD`, is treated as unmatched, as if no procedure exists at that path.
 
-This is a security default: cross-site, browsers can only send these methods via a [CORS preflight](https://developer.mozilla.org/en-US/docs/Glossary/Preflight_request) or an HTML form, never from a plain link. Safe methods like `GET` or `HEAD` are excluded because invoking a procedure can modify data.
+This keeps procedures out of reach of plain links, which browsers follow with `GET`. Cross-site, browsers can only send these methods after a [CORS preflight](https://developer.mozilla.org/en-US/docs/Glossary/Preflight_request) or from an HTML form, and the handler's [CSRF protection](#csrf-protection) rejects the form. Safe methods like `GET` or `HEAD` are excluded because invoking a procedure can modify data.
 
 Use `allowMethods` to replace the allowlist: tighten it to `POST` only, or also accept [`QUERY`](https://datatracker.ietf.org/doc/draft-ietf-httpbis-safe-method-w-body/), which reads input from the request body and stays preflight-protected:
 
@@ -139,6 +139,56 @@ const handler = new RPCHandler({ listPlanets }, {
   },
 })
 ```
+
+## CSRF Protection
+
+A page on another site can make the browser send some requests without a [CORS preflight](https://developer.mozilla.org/en-US/docs/Glossary/Preflight_request), with the user's cookies attached. An HTML form can submit a `multipart/form-data` body whose `data` field holds RPC input, which gives the attacker full control of the input. `RPCHandler` rejects these requests with a `403 FORBIDDEN` before decoding their input. This protection is on by default.
+
+A request that reads its input from the body is rejected when both of these are true:
+
+- Its `Content-Type` is missing or [CORS-safelisted](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_request_header): `application/x-www-form-urlencoded`, `multipart/form-data`, or `text/plain`.
+- It does not carry the `orpc-protocol` header, and the browser did not mark it `Sec-Fetch-Site: same-origin`.
+
+| Request | |
+| --- | --- |
+| HTML form from another site, including a sibling subdomain | rejected |
+| `fetch` with `mode: 'no-cors'` or `navigator.sendBeacon` from another site | rejected |
+| form, text, or empty body without `orpc-protocol` or `Sec-Fetch-Site`, such as from `curl` or over plain HTTP | rejected |
+| [RPC Link](/docs/rpc/link), which sends `orpc-protocol` on every request with a body | allowed |
+| `Content-Type: application/json` and other types that need a preflight | allowed |
+| HTML form from the same origin, such as one using the [Method Override Plugin](/docs/plugins/method-override) | allowed |
+
+The `orpc-protocol` header works because it is not CORS-safelisted. Another site can only send it after a preflight that your [CORS policy](/docs/plugins/cors) approves. Clients that implement the [RPC protocol](/docs/rpc/protocol) themselves should send `orpc-protocol: rpc` with every request that has a body.
+
+:::warning
+If you set `allowHeaders` in the [CORS Plugin](/docs/plugins/cors), or configure CORS elsewhere, include `orpc-protocol`. Otherwise browsers reject every cross-origin preflight from RPC Link:
+
+```ts
+const cors = new CORSHandlerPlugin({
+  allowHeaders: ['Content-Type', 'orpc-protocol'],
+})
+```
+
+:::
+
+`csrfProtection` disables the protection, or decides per request. A function runs only for requests the protection would reject; return `false` to let one through. For example, to accept a webhook from a service that posts form-encoded bodies:
+
+```ts
+const handler = new RPCHandler(router, {
+  csrfProtection: (request, procedure, path) => path.join('.') !== 'webhooks.payment',
+})
+```
+
+:::warning
+Any procedure you exempt can be called from a cross-site form with the user's cookies. Only exempt procedures that do not rely on cookies, such as webhooks that verify a signature.
+:::
+
+The protection does not cover:
+
+- `GET` requests, which read input from the URL. See [Enabling the GET Method](#enabling-the-get-method).
+- The [WebSocket](/docs/adapters/websocket) and [Message Port](/docs/adapters/message-port) adapters. Whoever holds the connection writes every request header there, so these adapters have no `csrfProtection` option. Browsers can attach cookies to a WebSocket handshake from another site, so check the `Origin` header before you upgrade a connection that cookies authenticate.
+
+Mark authentication cookies `SameSite=Lax` or `SameSite=Strict` as well, as [defense in depth](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#samesite-cookie-attribute).
 
 ## Interceptors
 

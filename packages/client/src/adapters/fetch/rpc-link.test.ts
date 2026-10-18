@@ -236,7 +236,7 @@ describe('rpcLink', () => {
       expect.objectContaining({ context: {} }),
       ['ping'],
     )
-    expect(toFetchBody).toHaveBeenCalledWith({ json: 'input' }, {}, toFetchRequestOptions)
+    expect(toFetchBody).toHaveBeenCalledWith({ json: 'input' }, { 'orpc-protocol': 'rpc' }, toFetchRequestOptions)
   })
 
   it('supports request without origin', async () => {

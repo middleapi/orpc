@@ -27,7 +27,8 @@ describe('hibernationHandlerPlugin', () => {
     ],
   }
 
-  const handler = new StandardHandler(new RPCHandlerCodec(router), options)
+  // Hibernation runs over WebSocket, whose RPC handler turns off the HTTP-only CSRF protection
+  const handler = new StandardHandler(new RPCHandlerCodec(router, { csrfProtection: false }), options)
 
   const createRequest = (url: string) => ({
     url,

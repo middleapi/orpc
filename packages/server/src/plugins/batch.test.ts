@@ -117,6 +117,7 @@ describe('batchHandlerPlugin', () => {
 
     const { matched, response } = await handler.handle(new Request('https://example.com/ping', {
       method: 'POST',
+      headers: { 'orpc-protocol': 'rpc' },
     }))
 
     expect(matched).toBe(true)

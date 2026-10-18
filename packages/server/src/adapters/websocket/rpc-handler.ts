@@ -6,7 +6,7 @@ import { RPCHandlerCodec, StandardHandler } from '../standard'
 import { WebSocketHandler } from './handler'
 
 export interface RPCHandlerOptions<T extends Context>
-  extends StandardHandlerOptions<T>, RPCHandlerCodecOptions<T>, WebSocketHandlerOptions<T> {}
+  extends StandardHandlerOptions<T>, Omit<RPCHandlerCodecOptions<T>, 'csrfProtection'>, WebSocketHandlerOptions<T> {}
 
 /**
  * Serves an oRPC router over the RPC protocol on a standard WebSocket
@@ -19,7 +19,11 @@ export class RPCHandler<T extends Context> extends WebSocketHandler<T> {
     router: Router<T>,
     options: NoInfer<RPCHandlerOptions<T>> = {},
   ) {
-    const codec = new RPCHandlerCodec(router, options)
+    /**
+     * The peer that owns the connection writes every request header itself, so the CSRF
+     * protection, which relies on browsers restricting headers cross-site, cannot apply.
+     */
+    const codec = new RPCHandlerCodec(router, { ...options, csrfProtection: false })
     const handler = new StandardHandler(codec, options)
     super(handler, options)
   }

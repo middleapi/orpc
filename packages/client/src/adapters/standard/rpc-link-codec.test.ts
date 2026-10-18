@@ -19,7 +19,7 @@ describe('rpcLinkCodec', () => {
 
     expect(request.url).toBe('/ping')
     expect(request.method).toBe('POST')
-    expect(request.headers).toEqual({})
+    expect(request.headers).toEqual({ 'orpc-protocol': 'rpc' })
     expect(request.body).toBeDefined()
   })
 
@@ -33,7 +33,7 @@ describe('rpcLinkCodec', () => {
       expect(request).toEqual({
         url: '/api/ping',
         method: 'POST',
-        headers: {},
+        headers: { 'orpc-protocol': 'rpc' },
         body: serializeSpy.mock.results[0]!.value,
         signal,
       })
@@ -50,6 +50,8 @@ describe('rpcLinkCodec', () => {
       expect(request.body).toBeUndefined()
       expect(request.url).toContain('/api/ping?data=')
       expect(request.signal).toBe(signal)
+      // GET input is in the URL, which the server's CSRF protection does not cover
+      expect(request.headers).toEqual({})
     })
 
     it('with method=GET falls back dataParam to empty string when serializer returns undefined', async () => {
@@ -137,6 +139,27 @@ describe('rpcLinkCodec', () => {
 
       expect(request.method).toBe('POST')
       expect(request.body).toBe(value)
+      expect(request.headers).toEqual({ 'orpc-protocol': 'rpc' })
+    })
+
+    it.each([
+      ['undefined input, sent without a body', undefined],
+      ['a root-level text file', new File(['text'], 'note.txt', { type: 'text/plain' })],
+      ['a nested file, sent as FormData', { file: new Blob(['data']) }],
+    ] as const)('sends the orpc-protocol header with %s, which the server requires for form, text, and body-less requests', async (_, input) => {
+      const codec = new RPCLinkCodec({ url: '/api', serializer })
+
+      const request = await codec.encodeInput(input, ['test'], { context: {} })
+
+      expect(request.headers).toEqual({ 'orpc-protocol': 'rpc' })
+    })
+
+    it('overrides a user-provided orpc-protocol header, so the server always accepts the request', async () => {
+      const codec = new RPCLinkCodec({ url: '/api', headers: { 'orpc-protocol': 'other' }, serializer })
+
+      const request = await codec.encodeInput('input', ['test'], { context: {} })
+
+      expect(request.headers).toEqual({ 'orpc-protocol': 'rpc' })
     })
 
     it('merges last-event-id header when present', async () => {
@@ -144,7 +167,7 @@ describe('rpcLinkCodec', () => {
 
       const request = await codec.encodeInput('input', ['ping'], { context: {}, lastEventId: '' })
 
-      expect(request.headers).toEqual({ 'x-custom': 'value', 'last-event-id': '' })
+      expect(request.headers).toEqual({ 'x-custom': 'value', 'last-event-id': '', 'orpc-protocol': 'rpc' })
     })
 
     it('does not merge last-event-id when absent', async () => {
@@ -152,7 +175,7 @@ describe('rpcLinkCodec', () => {
 
       const request = await codec.encodeInput('input', ['ping'], { context: {} })
 
-      expect(request.headers).toEqual({ 'x-custom': 'value' })
+      expect(request.headers).toEqual({ 'x-custom': 'value', 'orpc-protocol': 'rpc' })
     })
 
     it('supports fetch Headers', async () => {
@@ -168,6 +191,7 @@ describe('rpcLinkCodec', () => {
       expect(request.headers).toEqual({
         'cookie': 'a=1; b=2',
         'set-cookie': ['a1=1', 'b1=2'],
+        'orpc-protocol': 'rpc',
       })
     })
 

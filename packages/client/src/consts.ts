@@ -41,3 +41,14 @@ export const RECURSIVE_CLIENT_UNWRAP_KEYS = new Set([
    */
   'toJSON',
 ])
+
+/**
+ * Request header that RPC Link sends with every request that carries input in its body.
+ * Browsers send a header outside the CORS safelist to another origin only after a CORS
+ * preflight approves it, so its presence proves a form, text, or body-less request is not
+ * a cross-site HTML form or another request a page can send without a preflight.
+ * RPC Handler rejects those requests without it, unless they come from the same origin.
+ *
+ * @see {@link https://orpc.dev/docs/rpc/handler#csrf-protection | RPC Handler - CSRF Protection}
+ */
+export const RPC_PROTOCOL_HEADER = 'orpc-protocol'

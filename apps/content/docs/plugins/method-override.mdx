@@ -49,6 +49,10 @@ const handler = new OpenAPIHandler(router, {
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one. The plugin is most useful with [OpenAPIHandler](/docs/openapi/handler), where the HTTP method decides which procedure a request matches.
 :::
 
+:::warning
+Forms are exposed to Cross-Site Request Forgery. With [RPCHandler](/docs/rpc/handler#csrf-protection), forms from your own origin work, and forms from other sites are rejected. Browsers older than Safari 16.4, and any browser over plain HTTP, do not report their origin, so their forms are rejected too. [OpenAPIHandler](/docs/openapi/handler#cross-site-request-forgery) accepts forms from any site, so mark your authentication cookies `SameSite`.
+:::
+
 ## Learn More
 
 For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/method-override.ts).

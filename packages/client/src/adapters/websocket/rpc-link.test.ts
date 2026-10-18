@@ -129,6 +129,7 @@ describe('rpcLink', () => {
     expect(decoded.message.id).toBeTypeOf('string')
     expect(decoded.message.json).toEqual({
       url: '/ping',
+      headers: { 'orpc-protocol': 'rpc' },
       body: { json: 'input' },
     })
 
