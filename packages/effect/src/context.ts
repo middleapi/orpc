@@ -45,9 +45,14 @@ export interface WithEffectContext<Services> {
    *
    * @example
    * ```ts
-   * import { Context } from 'effect'
+   * import type { WithEffectContext } from '@orpc/experimental-effect'
+   * import { Context, Effect } from 'effect'
    *
-   * interface ServerContext extends WithEffectContext<Random | Logger> {}
+   * class Random extends Context.Service<Random, {
+   *   readonly next: Effect.Effect<number>
+   * }>()('app/Random') {}
+   *
+   * interface ServerContext extends WithEffectContext<Random> {}
    *
    * const context: ServerContext = {
    *   'effect/context': Context.empty().pipe(
@@ -62,13 +67,15 @@ export interface WithEffectContext<Services> {
    * An optional hook to wrap an effect before it is executed within this oRPC context.
    * Useful for customizing error handling, such as mapping errors to `ORPCError`.
    *
-   * Runs with `effect/context`, once per `middlewareGen` and `handlerGen` (see `opts.kind`).
-   * Keep it idempotent, since failures from inner layers pass through it again.
+   * Runs with `effect/context`, once per `middlewareGen` and `handlerGen` (see `opts.kind`), so provide
+   * services through `effect/context` rather than here. Keep it idempotent, since failures from inner
+   * layers pass through it again.
    *
    * @see {@link https://orpc.dev/docs/integrations/effect#error-handling | Effect Integration - Error Handling}
    *
    * @example
    * ```ts
+   * import type { WithEffectContext } from '@orpc/experimental-effect'
    * import { ORPCError } from '@orpc/server'
    * import { Context, Data, Effect } from 'effect'
    *
