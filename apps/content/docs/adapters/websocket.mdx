@@ -234,6 +234,29 @@ const app = App()
 
 </CodeGroup>
 
+### Idle Timeout
+
+Server handlers answer the client's [keep-alive](#keep-alive) pings automatically. To also drop clients that disappeared without closing their socket, set `idleTimeout`. A socket that sends no message (pings included) for that long is closed with code `1001` (Going Away), and its in-flight calls are aborted. Clients with [auto reconnect](#auto-reconnect) then open a new connection.
+
+```ts
+const handler = new RPCHandler(router, {
+  /**
+   * Close sockets that send no message for this many milliseconds.
+   *
+   * @default undefined (disabled)
+   */
+  idleTimeout: 60_000,
+})
+```
+
+:::warning
+Only incoming messages reset the timer, so a client that only receives an event iterator is closed too. Enable [keep-alive](#keep-alive) on every client, with an `interval` well below `idleTimeout`, e.g. the default `30_000` against `60_000`.
+:::
+
+:::info
+The timer starts on `.upgrade()`, or on the first `.message()` call when you wire messages manually. Bun, Deno and uWebSockets.js have their own built-in `idleTimeout` options, which you can use instead. Do not use it on hibernating Durable Objects, see [Hibernation Keep-Alive](/docs/integrations/hibernation#keep-alive).
+:::
+
 ## Client Adapters
 
 | Adapter     | Target                                                                          |
@@ -325,3 +348,77 @@ const link = new RPCLink({
   }
 })
 ```
+
+### Keep-Alive
+
+A connection can die without a `close` event, for example when a laptop sleeps or a phone switches networks. The socket still reports `OPEN`, so calls and event iterators on it hang. Enable `keepAlive` to detect such half-open connections:
+
+- The link sends a `ping` text frame every `interval`, even while messages are flowing.
+- If no message (the server's `pong` or anything else) arrives within `timeout` after a ping, the link closes the connection and fails its pending calls. With [auto reconnect](#auto-reconnect), the next call or `reconnect.onClose` opens a new connection.
+- Add the [Retry Plugin](/docs/plugins/retry) so event iterators reconnect and resume from their [last event ID](/docs/async-iterator-object#last-event-id--event-metadata).
+
+```ts
+const link = new RPCLink({
+  connect: () => new WebSocket('ws://localhost:3000'),
+  reconnect: { enabled: true },
+  keepAlive: {
+    /**
+     * Whether to ping the server periodically and treat the connection as lost
+     * when nothing arrives in time.
+     *
+     * @default false
+     */
+    enabled: true,
+
+    /**
+     * Interval between pings, in milliseconds. Keep it below the server's
+     * `idleTimeout` and any proxy idle timeout.
+     *
+     * @default 30_000
+     */
+    interval: 30_000,
+
+    /**
+     * How long to wait after a ping for any message before closing
+     * the connection as lost, in milliseconds.
+     *
+     * @default 10_000
+     */
+    timeout: 10_000,
+  },
+})
+```
+
+:::info
+Keep-alive is opt-in because the server has to answer pings. oRPC's WebSocket handlers do so without any option, but older servers ignore pings, so the link would drop every connection after `interval + timeout`. Update your servers before you enable it on clients.
+:::
+
+Pings and pongs are the constant text frames `ping` and `pong`, sent outside the RPC protocol. If you set `encodePeerMessage`/`decodePeerMessage` prefixes, they are prepended to these frames too. Because the frames are constant, a runtime can answer them without running your code. On Cloudflare Durable Objects, this keeps hibernating objects asleep, see [Hibernation Keep-Alive](/docs/integrations/hibernation#keep-alive).
+
+## Security
+
+When cookies authenticate the socket, verify the `Origin` header before you call `upgrade()` (or accept the connection). Browsers attach cookies to the WebSocket handshake even when another site opens it. `SameSite` is the only limit, and it treats sibling subdomains as the same site. CORS does not apply to WebSockets. Without this check, any website your users visit can open an authenticated socket on their behalf ([Cross-Site WebSocket Hijacking](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/10-Testing_WebSockets)).
+
+```ts
+const ALLOWED_ORIGINS = new Set(['https://example.com'])
+
+Bun.serve({
+  fetch(req, server) {
+    if (!ALLOWED_ORIGINS.has(req.headers.get('origin') ?? '')) {
+      return new Response('Forbidden', { status: 403 })
+    }
+
+    if (server.upgrade(req)) {
+      return
+    }
+    return new Response('Upgrade failed', { status: 500 })
+  },
+  // ...
+})
+```
+
+With `ws`, run the same check on the HTTP server's `upgrade` event, before `wss.handleUpgrade()`.
+
+:::info
+Non-browser clients can send any `Origin` header, or none. This check protects your users' browsers. It does not replace authentication.
+:::

@@ -242,4 +242,183 @@ describe('rpcHandler', () => {
     expect(decoded.message.kind).toBe('response')
     expect(decoded.message.json.status).toBe(undefined)
   })
+
+  describe('keep-alive', () => {
+    it.each([
+      ['string', 'ping'],
+      ['bytes', new TextEncoder().encode('ping')],
+      ['arrayBuffer', new TextEncoder().encode('ping').buffer],
+    ])('answers %s pings with a pong outside the peer protocol', async (_type, ping) => {
+      const handler = createHandler()
+      const ws = createWs()
+
+      const result = await handler.message(ws as any, ping)
+
+      expect(result).toEqual({ matched: true })
+      expect(ws.send).toHaveBeenCalledTimes(1)
+      expect(ws.send).toHaveBeenCalledWith('pong')
+    })
+
+    it('uses the peer message prefixes for pings and pongs', async () => {
+      const handler = createHandler({
+        decodePeerMessage: { prefix: 'in:' },
+        encodePeerMessage: { prefix: 'out:' },
+      })
+      const ws = createWs()
+
+      await expect(handler.message(ws as any, 'ping')).resolves.toEqual({ matched: false })
+      expect(ws.send).not.toHaveBeenCalled()
+
+      await expect(handler.message(ws as any, 'in:ping')).resolves.toEqual({ matched: true })
+      expect(ws.send).toHaveBeenCalledWith('out:pong')
+    })
+
+    it('answers pings from a real client via upgrade', async () => {
+      const handler = createHandler()
+
+      const wss = new WebSocketServer({ port: 0 })
+      wss.on('connection', ws => handler.upgrade(ws))
+      onTestFinished(() => wss.close())
+
+      const client = new WebSocket(`ws://localhost:${(wss.address() as AddressInfo).port}`)
+      onTestFinished(() => client.terminate())
+      await once(client, 'open')
+
+      client.send('ping')
+
+      const [data, isBinary] = await once(client, 'message')
+      expect(isBinary).toBe(false)
+      expect(data.toString()).toBe('pong')
+    })
+  })
+
+  describe('idleTimeout', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    const createUpgradableWs = () => {
+      const listeners: Record<string, (event?: any) => void> = {}
+
+      return {
+        addEventListener: vi.fn((event: string, callback: any) => {
+          listeners[event] = callback
+        }),
+        removeEventListener: vi.fn(),
+        send: vi.fn(() => undefined),
+        close: vi.fn(),
+        receive: (data: string) => listeners.message?.({ data }),
+        emitClose: () => listeners.close?.(),
+      }
+    }
+
+    it('is disabled by default', async () => {
+      const ws = createUpgradableWs()
+      createHandler().upgrade(ws)
+
+      await vi.advanceTimersByTimeAsync(3_600_000)
+
+      expect(ws.close).not.toHaveBeenCalled()
+    })
+
+    it('closes sockets that stay silent after upgrade with 1001', async () => {
+      const ws = createUpgradableWs()
+      createHandler({ idleTimeout: 1_000 }).upgrade(ws)
+
+      await vi.advanceTimersByTimeAsync(999)
+      expect(ws.close).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(1)
+      expect(ws.close).toHaveBeenCalledTimes(1)
+      expect(ws.close).toHaveBeenCalledWith(1001, 'Idle timeout')
+    })
+
+    it.each([
+      ['ping', 'ping'],
+      ['request', '{"id":"1","kind":"request","json":{"url":"/ping"}}'],
+      ['unmatched message', 'not-a-peer-message'],
+    ])('resets the timer on any incoming message (%s)', async (_type, data) => {
+      const ws = createUpgradableWs()
+      createHandler({ idleTimeout: 1_000 }).upgrade(ws)
+
+      await vi.advanceTimersByTimeAsync(900)
+      ws.receive(data)
+      await vi.advanceTimersByTimeAsync(900)
+      expect(ws.close).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(100)
+      expect(ws.close).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not reset the timer on outgoing messages', async () => {
+      let signal: AbortSignal | undefined
+      const handler = new RPCHandler({
+        stream: os.handler(async function* ({ signal: procedureSignal }) {
+          signal = procedureSignal
+          while (true) {
+            yield 'event'
+            await new Promise(resolve => setTimeout(resolve, 100))
+          }
+        }),
+      }, { idleTimeout: 1_000 })
+
+      const ws = createUpgradableWs()
+      handler.upgrade(ws)
+      ws.receive(await createRequestMessage({ url: '/stream' }) as string)
+
+      await vi.advanceTimersByTimeAsync(999)
+      expect(ws.send.mock.calls.length).toBeGreaterThan(5)
+      expect(ws.close).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(1)
+      expect(ws.close).toHaveBeenCalledWith(1001, 'Idle timeout')
+      // released immediately, without waiting for the close handshake of a possibly dead peer
+      expect(signal?.aborted).toBe(true)
+    })
+
+    it('stops the timer once the socket closes', async () => {
+      const ws = createUpgradableWs()
+      createHandler({ idleTimeout: 1_000 }).upgrade(ws)
+
+      ws.emitClose()
+      await vi.advanceTimersByTimeAsync(5_000)
+
+      expect(ws.close).not.toHaveBeenCalled()
+    })
+
+    it('starts the timer on the first message when not using upgrade', async () => {
+      const handler = createHandler({ idleTimeout: 1_000 })
+      const ws = { send: vi.fn(), close: vi.fn() }
+
+      await handler.message(ws, 'ping')
+      await vi.advanceTimersByTimeAsync(999)
+      await handler.message(ws, 'ping')
+      await vi.advanceTimersByTimeAsync(999)
+      expect(ws.close).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(1)
+      expect(ws.close).toHaveBeenCalledWith(1001, 'Idle timeout')
+
+      await handler.close(ws)
+    })
+  })
+
+  it('closes idle connections of a real client with 1001', async () => {
+    const handler = createHandler({ idleTimeout: 50 })
+
+    const wss = new WebSocketServer({ port: 0 })
+    wss.on('connection', ws => handler.upgrade(ws))
+    onTestFinished(() => wss.close())
+
+    const client = new WebSocket(`ws://localhost:${(wss.address() as AddressInfo).port}`)
+    await once(client, 'open')
+
+    const [code, reason] = await once(client, 'close')
+    expect(code).toBe(1001)
+    expect(reason.toString()).toBe('Idle timeout')
+  })
 })

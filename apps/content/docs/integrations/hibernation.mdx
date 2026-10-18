@@ -75,6 +75,45 @@ The plugin provides `HibernationAsyncIteratorClass` and `encodeHibernationRPCEve
      })
    ```
 
+## Keep-Alive
+
+When clients enable [keep-alive](/docs/adapters/websocket#keep-alive), each ping would wake a hibernating Durable Object and add billable duration. Register an auto-response so Cloudflare answers pings while the object sleeps:
+
+```ts
+import { DurableObject } from 'cloudflare:workers'
+
+export class ChatRoom extends DurableObject {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env)
+
+    // Answers keep-alive pings without waking the Durable Object
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'))
+  }
+}
+```
+
+:::info
+Auto-responses only match messages that are exactly equal to the request string. If you set peer message prefixes, add them to both strings: the link's `encodePeerMessage` prefix to `'ping'`, and its `decodePeerMessage` prefix to `'pong'`.
+:::
+
+:::warning
+Do not set the handler's [`idleTimeout`](/docs/adapters/websocket#idle-timeout) here. A pending timer keeps the Durable Object from hibernating, and auto-answered pings never reach `webSocketMessage`, so the timer would also close healthy clients. To drop dead clients, check the time of their last ping from an [alarm](https://developers.cloudflare.com/durable-objects/api/alarms/) instead:
+
+```ts
+async alarm(): Promise<void> {
+  for (const ws of this.ctx.getWebSockets()) {
+    const lastPing = this.ctx.getWebSocketAutoResponseTimestamp(ws)
+
+    if (lastPing && Date.now() - lastPing.getTime() > 60_000) {
+      ws.close(1001, 'Idle timeout')
+    }
+  }
+
+  await this.ctx.storage.setAlarm(Date.now() + 60_000)
+}
+```
+:::
+
 <Expandable title="Cloudflare Durable Object Chat Room Example?">
 
 This example shows how to build a chat room with [Cloudflare Durable Objects](https://developers.cloudflare.com/durable-objects/) and [WebSocket Hibernation](https://developers.cloudflare.com/durable-objects/examples/websocket-hibernation-server/). Everyone connected to the same Durable Object can exchange messages. You can try a working version in the Cloudflare Playground, see [Playgrounds](/docs/playgrounds).
