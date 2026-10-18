@@ -60,7 +60,7 @@ export interface WithEffectContext<Services> {
 
   /**
    * An optional hook to wrap an effect before it is executed within this oRPC context.
-   * Useful for adding observability, tracing, or error handling.
+   * Useful for customizing error handling, such as mapping errors to `ORPCError`.
    *
    * - Runs once per `middlewareGen` and once per `handlerGen` of a request,
    *   each with its own effect. Use `opts.kind` to tell them apart, and keep the wrap
@@ -84,11 +84,10 @@ export interface WithEffectContext<Services> {
    *
    * const context: ServerContext = {
    *   'effect/context': Context.empty(),
-   *   'effect/wrap': (effect, opts) => effect.pipe(
+   *   'effect/wrap': effect => effect.pipe(
    *     Effect.mapError(error => error instanceof NotFoundError
    *       ? new ORPCError('NOT_FOUND', { cause: error })
    *       : error),
-   *     Effect.withSpan(`${opts.kind}:${opts.path.join('.')}`),
    *   ),
    * }
    * ```

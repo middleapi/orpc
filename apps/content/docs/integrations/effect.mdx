@@ -371,7 +371,7 @@ const converter = new EffectSchemaToJsonSchemaConverter({ cache: true })
 
 ## OpenTelemetry Integration
 
-First, set up the [oRPC OpenTelemetry integration](/docs/integrations/opentelemetry). Then install [`@effect/opentelemetry`](https://www.npmjs.com/package/@effect/opentelemetry) and provide its tracer through `effect/context`. This makes Effect tracing equivalent to OpenTelemetry tracing, both in handlers and in `effect/wrap`:
+First, set up the [oRPC OpenTelemetry integration](/docs/integrations/opentelemetry). Then install [`@effect/opentelemetry`](https://www.npmjs.com/package/@effect/opentelemetry) and provide its tracer through `effect/context`. This makes Effect tracing equivalent to OpenTelemetry tracing:
 
 ```ts
 import { OtelTracer } from '@effect/opentelemetry'

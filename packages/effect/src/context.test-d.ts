@@ -85,7 +85,7 @@ describe('WithEffectContext', () => {
           expectTypeOf(opts).toEqualTypeOf<EffectWrapHandlerOptions>()
         }
 
-        return effect.pipe(Effect.withSpan(`${opts.kind}:${opts.path.join('.')}`))
+        return effect
       }
 
       void wrap
