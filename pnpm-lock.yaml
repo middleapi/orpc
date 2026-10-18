@@ -709,8 +709,8 @@ importers:
         specifier: workspace:*
         version: link:../openapi
       msw:
-        specifier: ^3.0.2
-        version: 3.0.2(@types/node@26.6.5)(graphql@17.0.2)(supports-color@10.2.2)(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))
+        specifier: ^3.0.3
+        version: 3.0.3(@types/node@26.6.5)(graphql@17.0.2)(supports-color@10.2.2)(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0))
       msw-v2:
         specifier: npm:msw@^2.15.0
         version: msw@2.15.0(@types/node@26.6.5)(typescript@6.0.3)
@@ -10266,8 +10266,8 @@ packages:
       typescript:
         optional: true
 
-  msw@3.0.2:
-    resolution: {integrity: sha512-/74rddlgCmlHvrXUkuYKoUjDJTiP4Nrz2uyIpOTLtxJNCS+2yY+DlLfzzRUc61cvRjCo6Jvi2+vRNZyZQa1j4A==}
+  msw@3.0.3:
+    resolution: {integrity: sha512-hsXUCt2gK12q1IUBY9VmMun+yC60eEpVzegAFN5aGZbXhrGqtgPARVWn2ew4mezYvk1G8yhFha9myGSyRyRGWg==}
     engines: {node: '>=22.12.0'}
     hasBin: true
     peerDependencies:
@@ -23210,7 +23210,7 @@ snapshots:
     transitivePeerDependencies:
       - '@types/node'
 
-  msw@3.0.2(@types/node@26.6.5)(graphql@17.0.2)(supports-color@10.2.2)(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0)):
+  msw@3.0.3(@types/node@26.6.5)(graphql@17.0.2)(supports-color@10.2.2)(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0)):
     dependencies:
       '@inquirer/confirm': 6.3.3(@types/node@26.6.5)
       '@msw/url': 0.1.2
