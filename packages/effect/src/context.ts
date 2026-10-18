@@ -9,7 +9,7 @@ import type { Effect, Context as EffectContext } from 'effect'
 export interface EffectWrapMiddlewareOptions extends Omit<MiddlewareOptions<Context, unknown, ORPCErrorConstructorMap<any>>, 'next'> {
   kind: 'middleware'
   /**
-   * The input the middleware receives, validated by the input schemas defined before it.
+   * The middleware's input, validated by the schemas defined before it.
    */
   input: unknown
 }
@@ -62,14 +62,8 @@ export interface WithEffectContext<Services> {
    * An optional hook to wrap an effect before it is executed within this oRPC context.
    * Useful for customizing error handling, such as mapping errors to `ORPCError`.
    *
-   * - Runs once per `middlewareGen` and once per `handlerGen` of a request,
-   *   each with its own effect. Use `opts.kind` to tell them apart, and keep the wrap
-   *   idempotent: failures of inner layers reach outer `middlewareGen`s through `next`,
-   *   so they pass through the wrap again.
-   * - The wrapped effect runs with `effect/context`, so the wrap sees the same services
-   *   (`Tracer`, `Logger`, ...) as the handler. Services the wrap provides take precedence
-   *   over `effect/context` for the effect it wraps.
-   * - The returned effect may fail with any error, which is thrown as-is.
+   * Runs with `effect/context`, once per `middlewareGen` and `handlerGen` (see `opts.kind`).
+   * Keep it idempotent, since failures from inner layers pass through it again.
    *
    * @see {@link https://orpc.dev/docs/integrations/effect#error-handling | Effect Integration - Error Handling}
    *
