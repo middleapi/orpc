@@ -535,6 +535,12 @@ publisher.publish('something-updated', { id: '1' })
 
 </CodeGroup>
 
+### Interrupted streams throw instead of finishing
+
+In v1, a stream cut short before the server finished it, for example by a proxy idle timeout or a serverless time limit, ended on the client as if the procedure had returned. It now throws an `EventStreamIncompleteError`, so a subscription can reconnect with the [Retry Plugin](/docs/plugins/retry#event-source-simulation) instead of silently stopping, and a TanStack Query `streamedOptions` or `liveOptions` query ends in the error state instead of succeeding with partial data. The same applies to a procedure reading an `AsyncIteratorObject` input that was cut short. See [Interrupted Streams](/docs/client/async-iterator-object#interrupted-streams).
+
+If you call a server other than oRPC through `OpenAPILink`, its streams never send the event that marks them as finished, so they now always end with this error. See [Event Streams from Other Servers](/docs/openapi/link#event-streams-from-other-servers).
+
 ## RPC Handler
 
 ### GET requests are rejected by default

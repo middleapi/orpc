@@ -78,6 +78,13 @@ export type {
 export {
   ErrorEvent,
   /**
+   * Thrown while iterating an AsyncIteratorObject whose event stream ended without a close event,
+   * meaning the connection was cut short. Carries the last event id and retry, see `getEventMeta`.
+   *
+   * @see {@link https://orpc.dev/docs/client/async-iterator-object#interrupted-streams | AsyncIteratorObject in Client - Interrupted Streams}
+   */
+  EventStreamIncompleteError,
+  /**
    * Retrieves event metadata (such as the event id and retry interval)
    * attached to a single iterator event value.
    *

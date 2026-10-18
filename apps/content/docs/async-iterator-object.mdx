@@ -71,7 +71,7 @@ const example = os
 
 ## Stop AsyncIteratorObject
 
-To end the stream, use either a `return` or `throw` statement. oRPC marks the stream as completed when the handler returns.
+To end the stream, use either a `return` or `throw` statement. oRPC marks the stream as completed when the handler returns. If the connection is cut before that, the oRPC client throws instead of finishing, see [Interrupted Streams](/docs/client/async-iterator-object#interrupted-streams).
 
 :::warning
 This behavior is specific to oRPC. Standard [SSE](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events) clients, such as [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource), do not recognize this completion signal and will automatically attempt to reconnect. For details, see the [Standard Server documentation](https://github.com/middleapi/standard-server#event-stream-body).

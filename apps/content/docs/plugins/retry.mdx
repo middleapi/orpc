@@ -81,7 +81,7 @@ const link = new RPCLink<ClientContext>({
 
 ## Event Source Simulation
 
-To replicate the behavior of [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource) for an [AsyncIteratorObject](/docs/async-iterator-object), use the following configuration:
+To reconnect an [AsyncIteratorObject](/docs/async-iterator-object) the way [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource) does, retry without a limit:
 
 ```ts
 const streaming = await client.streaming('the input', {
@@ -93,6 +93,22 @@ const streaming = await client.streaming('the input', {
 for await (const message of streaming) {
   console.log(message)
 }
+```
+
+Like EventSource, the plugin reconnects when the connection fails or the stream is [cut short](/docs/client/async-iterator-object#interrupted-streams), for example by a proxy idle timeout. It waits for the last `retry` interval the server sent, and sends the last event ID as `lastEventId`, so the procedure can [resume](/docs/async-iterator-object#last-event-id--event-metadata) where the stream stopped.
+
+Unlike EventSource:
+
+- It does not reconnect a stream that finished because the procedure returned.
+- It retries every error by default, including an `ORPCError` the procedure throws, while EventSource gives up on a response with an error status. To stop on errors the procedure throws, skip `ORPCError`s:
+
+```ts
+const streaming = await client.streaming('the input', {
+  context: {
+    retry: Number.POSITIVE_INFINITY,
+    shouldRetry: ({ error }) => !(error instanceof ORPCError),
+  }
+})
 ```
 
 ## Learn More

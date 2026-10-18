@@ -308,6 +308,41 @@ const link = new OpenAPILink(contract, {
 })
 ```
 
+## Event Streams from Other Servers
+
+An oRPC server ends every event stream with a `close` event, so a stream that ends without one throws an [`EventStreamIncompleteError`](/docs/client/async-iterator-object#interrupted-streams). Other servers never send this event. If `OpenAPILink` calls one, treat the end of its streams as completion with an interceptor:
+
+```ts
+import { EventStreamIncompleteError } from '@orpc/client'
+
+const link = new OpenAPILink(contract, {
+  interceptors: [
+    async ({ next }) => {
+      const output = await next()
+
+      if (typeof output !== 'object' || output === null || !(Symbol.asyncIterator in output)) {
+        return output
+      }
+
+      return (async function* () {
+        try {
+          return yield* output as AsyncIterable<unknown>
+        }
+        catch (error) {
+          if (!(error instanceof EventStreamIncompleteError)) {
+            throw error
+          }
+        }
+      })()
+    },
+  ],
+})
+```
+
+:::warning
+This way a stream that was cut short also looks complete. Prefer it only for servers that cannot send a `close` event.
+:::
+
 ## Lifecycle
 
 The diagram below shows how a call flows through `OpenAPILink` and where each interceptor type runs:

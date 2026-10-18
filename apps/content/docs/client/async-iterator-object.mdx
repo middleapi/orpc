@@ -67,6 +67,32 @@ catch (error) {
 }
 ```
 
+## Interrupted Streams
+
+An oRPC server always ends an event stream with a `close` event, even when the procedure returns nothing. A response that ends without one was cut short, for example by a proxy idle timeout, a serverless time limit, or a dropped connection. The iterator then throws an `EventStreamIncompleteError` instead of finishing, so partial data is never mistaken for a complete stream.
+
+The error carries the last event ID and retry interval the client received. Read them with `getEventMeta` to reconnect, or let the [Retry Plugin](/docs/plugins/retry#event-source-simulation) reconnect and resume from that ID for you.
+
+```ts
+import { EventStreamIncompleteError, getEventMeta } from '@orpc/client'
+
+try {
+  for await (const event of await client.streaming()) {
+    console.log(event.message)
+  }
+}
+catch (error) {
+  if (error instanceof EventStreamIncompleteError) {
+    const lastEventId = getEventMeta(error)?.id
+    // Reconnect with `client.streaming(undefined, { lastEventId })`
+  }
+}
+```
+
+:::warning
+Servers other than oRPC never send a `close` event, so their streams always end with this error. See [Event Streams from Other Servers](/docs/openapi/link#event-streams-from-other-servers).
+:::
+
 ## Event Metadata
 
 Use `getEventMeta` to read [event metadata](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format) for each item, such as the event ID and retry interval.

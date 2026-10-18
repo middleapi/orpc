@@ -1254,7 +1254,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
 
       for (const event of events) {
         // Two events exceed the limit only in total, and line endings around them cost nothing
-        const body = Buffer.from(`\r\n\n${event}${event}\n`)
+        const body = Buffer.from(`\r\n\n${event}${event}\nevent: close\n\n`)
         const size = Buffer.byteLength(event)
 
         // One byte per chunk spreads each event over many chunks
