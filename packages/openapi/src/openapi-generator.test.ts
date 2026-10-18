@@ -1,4 +1,5 @@
 import { oc } from '@orpc/contract'
+import { os } from '@orpc/server'
 import * as arktype from 'arktype'
 import z from 'zod'
 import { testSchema, testSchemaConverter, zodJsonSchemaConverter } from '../tests/__shared__/schema'
@@ -324,6 +325,89 @@ describe('openAPIGenerator basic & options', () => {
     expect(doc.paths?.['/planets']).toEqual({
       get: expect.objectContaining({ operationId: 'listPlanets' }),
       post: expect.objectContaining({ operationId: 'createPlanet' }),
+    })
+  })
+
+  it('reports every procedure whose route duplicates another, ignoring param names and trailing slashes', async () => {
+    const error = await generator.generate({
+      ping: oc,
+      nested: {
+        ping: oc.meta(openapi({ path: '/ping' })),
+      },
+      planet: {
+        get: oc.meta(openapi({ method: 'GET', path: '/planets/{id}' })).input(z.object({ id: z.string() })),
+        find: oc.meta(openapi({ method: 'GET', path: '/planets/{name}' })).input(z.object({ name: z.string() })),
+        list: oc.meta(openapi({ method: 'GET', path: '/planets' })),
+        search: oc.meta(openapi({ method: 'GET', prefix: '/planets', path: '/' })),
+      },
+      files: {
+        get: oc.meta(openapi({ method: 'GET', path: '/files/{+path}' })).input(z.object({ path: z.string() })),
+        raw: oc.meta(openapi({ method: 'GET', path: '/files/{+rest}//' })).input(z.object({ rest: z.string() })),
+      },
+    }).then(
+      () => { throw new Error('expected generate to reject') },
+      e => e,
+    )
+
+    expect(error).toBeInstanceOf(OpenAPIGeneratorError)
+    expect(error.message).toContain('Failed to generate the OpenAPI document (4 errors)')
+    expect(error.message).toContain(
+      'Procedure at nested.ping: POST /ping duplicates the route of the procedure at ping (POST /ping). '
+      + 'Path parameter names and trailing slashes do not make routes distinct.',
+    )
+    expect(error.message).toContain('Procedure at planet.find: GET /planets/{name} duplicates the route of the procedure at planet.get (GET /planets/{id}).')
+    expect(error.message).toContain('Procedure at planet.search: GET /planets/ duplicates the route of the procedure at planet.list (GET /planets).')
+    expect(error.message).toContain('Procedure at files.raw: GET /files/{+rest}// duplicates the route of the procedure at files.get (GET /files/{+path}).')
+  })
+
+  it('keeps routes that only overlap, and reports a catch-all that would take the operation of another route', async () => {
+    const doc = await generator.generate({
+      me: oc.meta(openapi({ method: 'GET', path: '/planets/me' })),
+      get: oc.meta(openapi({ method: 'GET', path: '/planets/{id}' })).input(z.object({ id: z.string() })),
+      delete: oc.meta(openapi({ method: 'DELETE', path: '/planets/{id}' })).input(z.object({ id: z.string() })),
+      file: oc.meta(openapi({ method: 'GET', path: '/files/{name}' })).input(z.object({ name: z.string() })),
+      nested: oc.meta(openapi({ method: 'GET', path: '/files/{+path}' })).input(z.object({ path: z.string() })),
+      literal: oc.meta(openapi({ method: 'GET', path: '/files/{_}x' })),
+      empty: oc.meta(openapi({ method: 'GET', path: '/files//' })),
+    })
+
+    expect(Object.keys(doc.paths!)).toEqual(['/planets/me', '/planets/{id}', '/files/{name}', '/files/{path}', '/files/{_}x', '/files//'])
+    expect(doc.paths!['/planets/{id}']).toEqual({
+      get: expect.objectContaining({ operationId: 'get' }),
+      delete: expect.objectContaining({ operationId: 'delete' }),
+    })
+
+    const error = await generator.generate({
+      file: oc.meta(openapi({ method: 'GET', path: '/files/{path}' })).input(z.object({ path: z.string() })),
+      nested: oc.meta(openapi({ method: 'GET', path: '/files/{+path}' })).input(z.object({ path: z.string() })),
+    }).then(
+      () => { throw new Error('expected generate to reject') },
+      e => e,
+    )
+
+    expect(error).toBeInstanceOf(OpenAPIGeneratorError)
+    expect(error.message).toContain(
+      'Procedure at nested: GET /files/{+path} and the procedure at file (GET /files/{path}) both become '
+      + 'GET /files/{path} in the OpenAPI document, which holds one operation per method and path.',
+    )
+  })
+
+  it('reports duplicate routes inside lazy routers and skips procedures excluded by filter', async () => {
+    const router = {
+      planet: os.lazy(async () => ({
+        default: {
+          get: os.meta(openapi({ method: 'GET', path: '/planets/{id}' })).input(z.object({ id: z.string() })).handler(() => 'get'),
+        },
+      })),
+      find: os.meta(openapi({ method: 'GET', path: '/planets/{name}' })).input(z.object({ name: z.string() })).handler(() => 'find'),
+    }
+
+    await expect(generator.generate(router)).rejects.toThrowError(
+      'Procedure at find: GET /planets/{name} duplicates the route of the procedure at planet.get (GET /planets/{id}).',
+    )
+
+    await expect(generator.generate(router, { filter: (_, path) => path[0] !== 'find' })).resolves.toMatchObject({
+      paths: { '/planets/{id}': { get: expect.objectContaining({ operationId: 'planet.get' }) } },
     })
   })
 

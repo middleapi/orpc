@@ -33,6 +33,12 @@ interface TreeEntry {
   catchAllKey?: string | undefined
 }
 
+interface IndexedRoute {
+  path: string[]
+  /** method and OpenAPI path as defined, for error messages */
+  route: string
+}
+
 interface PendingLazyRouter extends WalkProcedureContractsLazyResult {
   matcher?: RegExp
   /** in-flight load, shared so concurrent matches never load or re-index the same router twice */
@@ -44,6 +50,8 @@ export class OpenAPIMatcher {
   private readonly rootRouter: AnyRouter
 
   private readonly tree = createRouter<TreeEntry>()
+  /** keyed by {@link toRouteKey}, kept so lazy routers loaded later are checked against every indexed route */
+  private readonly indexedRoutes: Map<string, IndexedRoute> = new Map()
   private readonly pendingLazyRouters: Set<PendingLazyRouter> = new Set()
 
   constructor(router: AnyRouter, options: OpenAPIMatcherOptions = {}) {
@@ -53,7 +61,7 @@ export class OpenAPIMatcher {
   }
 
   private index(router: AnyRouter, path: string[] = []): void {
-    const routes: { method: string, pattern: string, entry: TreeEntry }[] = []
+    const routes: { method: string, pattern: string, route: string, entry: TreeEntry }[] = []
 
     const lazyResults = walkProcedureContractsSync(router, (contract, path) => {
       if (!value(this.filter, contract, path)) {
@@ -69,6 +77,7 @@ export class OpenAPIMatcher {
       routes.push({
         method,
         pattern,
+        route: `${method} ${openapiPath}`,
         entry: {
           path,
           contract,
@@ -87,8 +96,34 @@ export class OpenAPIMatcher {
       }
     })
 
+    // rou3 keeps every route added for the same requests, and only the first could ever match
+    const indexedRoutes = new Map<string, IndexedRoute>()
+    const duplicates: string[] = []
+
+    for (const { method, pattern, route, entry } of routes) {
+      const key = toRouteKey(method, pattern)
+      const existing = this.indexedRoutes.get(key) ?? indexedRoutes.get(key)
+
+      if (existing) {
+        duplicates.push(`Procedure at ${entry.path.join('.')}: ${route} duplicates the route of the procedure at ${existing.path.join('.')} (${existing.route}).`)
+      }
+      else {
+        indexedRoutes.set(key, { path: entry.path, route })
+      }
+    }
+
+    if (duplicates.length) {
+      throw new TypeError(
+        `[OpenAPIMatcher] Found ${duplicates.length} duplicate route${duplicates.length === 1 ? '' : 's'} (path parameter names and trailing slashes do not make routes distinct):\n\n${duplicates.join('\n\n')}`,
+      )
+    }
+
     for (const { method, pattern, entry } of routes) {
       addRoute(this.tree, method, pattern, entry)
+    }
+
+    for (const [key, route] of indexedRoutes) {
+      this.indexedRoutes.set(key, route)
     }
 
     for (const pending of pendingLazyRouters) {
@@ -252,6 +287,14 @@ function toRou3Route(path: `/${string}`): { pattern: `/${string}` } & Pick<TreeE
   pattern += toRou3Literal(path.slice(literalStart))
 
   return { pattern: pattern as `/${string}`, params, catchAllKey }
+}
+
+const TRAILING_SLASHES_REGEX = /\/+$/
+
+// rou3 ignores trailing slashes, and toRou3Route names params by position, so two patterns
+// share this key exactly when rou3 puts them on the same node, where they match the same requests
+function toRouteKey(method: string, pattern: string): string {
+  return `${method} ${pattern.replace(TRAILING_SLASHES_REGEX, '')}`
 }
 
 // rou3 syntax and the first dot of `.` / `..` segments; other dots stay unescaped, since escapes slow route registration

@@ -109,6 +109,30 @@ const router = {
 }
 ```
 
+## Duplicate Routes
+
+Every procedure needs a unique method and path. Paths that differ only in path parameter names or trailing slashes match the same requests, so they count as duplicates:
+
+```ts
+const router = {
+  find: os.meta(openapi({ method: 'GET', path: '/planets/{id}' })),
+  findByName: os.meta(openapi({ method: 'GET', path: '/planets/{name}' })), // duplicates find
+  list: os.meta(openapi({ method: 'GET', path: '/planets' })),
+  search: os.meta(openapi({ method: 'GET', path: '/planets/' })), // duplicates list
+}
+```
+
+Both procedure paths are named in the error:
+
+- The [OpenAPI Generator](/docs/openapi/specification#openapi-generator) reports duplicates as generation errors.
+- The [OpenAPI Handler](/docs/openapi/handler) throws when it is created. Routes in a [lazy router](#lazy-router) are checked when it loads, so the request that loads it fails, as does every later request that reaches it. The generator loads every lazy router, so generating the document in CI catches these duplicates before deployment.
+
+Routes that only overlap are not duplicates: a static segment takes precedence over a path parameter (`/planets/me` over `/planets/{id}`), and a path parameter over a catch-all (`/files/{name}` over `/files/{+path}`).
+
+:::info
+OpenAPI has no catch-all syntax, so `{+path}` becomes `{path}` in the generated document. The generator also reports `/files/{path}` and `/files/{+path}` with the same method, since both would become the same operation.
+:::
+
 ## Metadata Merging
 
 When `openapi` is applied multiple times, `prefix` values are concatenated in definition order, while `method`, `path`, and `successStatus` are overridden by the most recent call. For the full merge behavior of every field, see [Metadata Merging](/docs/openapi/specification#metadata-merging).

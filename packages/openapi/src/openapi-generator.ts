@@ -3,7 +3,7 @@ import type { JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } fr
 import type { AnyProcedure, AnyRouter } from '@orpc/server'
 import type { Public, Value } from '@orpc/shared'
 import type { OpenAPIMeta } from './meta'
-import type { OpenAPIErrorBodyDefinition, OpenAPIOperationContext } from './openapi-generator-operation'
+import type { DynamicPathParam, OpenAPIErrorBodyDefinition, OpenAPIOperationContext } from './openapi-generator-operation'
 import type { OpenAPIDocument, OpenAPIV3_2, OpenAPIVersion } from './types'
 import { downgradeSpecV31ToV30, downgradeSpecV32ToV31 } from '@openapi-spec/downgrader'
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
@@ -132,6 +132,10 @@ export class OpenAPIGenerator {
 
     const errors: string[] = []
 
+    // the first procedure for each route (see `toRouteKey`) and for each operation in the document
+    const routes = new Map<string, { path: string[], route: string }>()
+    const operations: typeof routes = new Map()
+
     await walkProcedureContractsAsync(router, (contract, path) => {
       if (value(options.filter, contract, path) === false) {
         return
@@ -153,6 +157,30 @@ export class OpenAPIGenerator {
         const httpPath = meta?.prefix ? mergeHttpPath(meta.prefix, postPath) : postPath
         const dynamicPathParams = getDynamicPathParams(httpPath)
         const openApiPath = toOpenAPIPath(httpPath, dynamicPathParams)
+
+        const route = `${method.toUpperCase()} ${httpPath}`
+        const routeKey = `${method} ${toRouteKey(httpPath, dynamicPathParams)}`
+        const operationKey = `${method} ${openApiPath}`
+
+        const sameRoute = routes.get(routeKey)
+        if (sameRoute) {
+          throw new OpenAPIGeneratorError(
+            `${route} duplicates the route of the procedure at ${sameRoute.path.join('.')} (${sameRoute.route}). `
+            + `Path parameter names and trailing slashes do not make routes distinct.`,
+          )
+        }
+
+        // `{+name}` renders as `{name}`, so a catch-all can take the slot of a distinct route
+        const sameOperation = operations.get(operationKey)
+        if (sameOperation) {
+          throw new OpenAPIGeneratorError(
+            `${route} and the procedure at ${sameOperation.path.join('.')} (${sameOperation.route}) both become `
+            + `${method.toUpperCase()} ${openApiPath} in the OpenAPI document, which holds one operation per method and path.`,
+          )
+        }
+
+        routes.set(routeKey, { path, route })
+        operations.set(operationKey, { path, route })
 
         let operation: OpenAPIV3_2.OperationObject
 
@@ -218,6 +246,25 @@ export class OpenAPIGenerator {
       results.every(([, optional]) => optional),
     ]
   }
+}
+
+const TRAILING_SLASHES_REGEX = /\/+$/
+
+/**
+ * Paths that differ only in param names or trailing slashes match the same requests in `OpenAPIMatcher`,
+ * so they share a key.
+ */
+function toRouteKey(path: `/${string}`, dynamicPathParams: DynamicPathParam[] | undefined): string {
+  let key = ''
+  let currentIndex = 0
+
+  for (const param of dynamicPathParams ?? []) {
+    // `_` is a valid param name, so literal text can never hold this whole segment
+    key += `${path.slice(currentIndex, param.startIndex)}{${param.allowsSlash ? '+' : ''}_}`
+    currentIndex = param.startIndex + param.segment.length
+  }
+
+  return `${key}${path.slice(currentIndex)}`.replace(TRAILING_SLASHES_REGEX, '')
 }
 
 function toVersionedOpenAPIDocument(doc: OpenAPIV3_2.OpenAPIObject, version: OpenAPIVersion): OpenAPIDocument<OpenAPIVersion> {

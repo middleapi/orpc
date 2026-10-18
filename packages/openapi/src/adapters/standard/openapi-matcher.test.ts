@@ -730,6 +730,102 @@ describe('openAPIMatcher', () => {
     })
   })
 
+  describe('duplicate routes', () => {
+    it('throws for every procedure whose route duplicates another, naming both procedures', () => {
+      const get = os.meta(openapi({ method: 'GET', path: '/planets/{id}' })).handler(() => 'get')
+      const find = os.meta(openapi({ method: 'GET', path: '/planets/{name}' })).handler(() => 'find')
+
+      expect(() => new OpenAPIMatcher({ planet: { get, find } })).toThrowError(
+        '[OpenAPIMatcher] Found 1 duplicate route (path parameter names and trailing slashes do not make routes distinct):\n\n'
+        + 'Procedure at planet.find: GET /planets/{name} duplicates the route of the procedure at planet.get (GET /planets/{id}).',
+      )
+
+      expect(() => new OpenAPIMatcher({
+        ping: os.handler(() => 'ping'),
+        nested: { ping: os.meta(openapi({ path: '/ping' })).handler(() => 'nested') },
+        list: os.meta(openapi({ method: 'GET', path: '/planets' })).handler(() => 'list'),
+        search: os.meta(openapi({ method: 'GET', prefix: '/planets', path: '/' })).handler(() => 'search'),
+        cafe: os.meta(openapi({ method: 'GET', path: '/café' })).handler(() => 'cafe'),
+        encoded: os.meta(openapi({ method: 'GET', path: '/caf%C3%A9' })).handler(() => 'encoded'),
+        files: os.meta(openapi({ method: 'GET', path: '/files/{+path}' })).handler(() => 'files'),
+        raw: os.meta(openapi({ method: 'GET', path: '/files/{+rest}//' })).handler(() => 'raw'),
+      })).toThrowError(
+        '[OpenAPIMatcher] Found 4 duplicate routes (path parameter names and trailing slashes do not make routes distinct):\n\n'
+        + 'Procedure at nested.ping: POST /ping duplicates the route of the procedure at ping (POST /ping).\n\n'
+        + 'Procedure at search: GET /planets/ duplicates the route of the procedure at list (GET /planets).\n\n'
+        + 'Procedure at encoded: GET /caf%C3%A9 duplicates the route of the procedure at cafe (GET /café).\n\n'
+        + 'Procedure at raw: GET /files/{+rest}// duplicates the route of the procedure at files (GET /files/{+path}).',
+      )
+    })
+
+    it('keeps routes that only overlap, differ in method, or are excluded by filter', async () => {
+      const me = os.meta(openapi({ method: 'GET', path: '/planets/me' })).handler(() => 'me')
+      const get = os.meta(openapi({ method: 'GET', path: '/planets/{id}' })).handler(() => 'get')
+      const remove = os.meta(openapi({ method: 'DELETE', path: '/planets/{name}' })).handler(() => 'remove')
+      const file = os.meta(openapi({ method: 'GET', path: '/files/{name}' })).handler(() => 'file')
+      const nested = os.meta(openapi({ method: 'GET', path: '/files/{+path}' })).handler(() => 'nested')
+      const raw = os.meta(openapi({ method: 'GET', path: '/files/{+path}/raw' })).handler(() => 'raw')
+      const empty = os.meta(openapi({ method: 'GET', path: '/files//raw' })).handler(() => 'empty')
+      const hidden = os.meta(openapi({ method: 'GET', path: '/planets/{slug}' })).handler(() => 'hidden')
+
+      const matcher = new OpenAPIMatcher(
+        { me, get, remove, file, nested, raw, empty, hidden },
+        { filter: (_, path) => path[0] !== 'hidden' },
+      )
+
+      await expect(matcher.match('GET', '/planets/me', undefined)).resolves.toMatchObject({ procedure: me })
+      await expect(matcher.match('GET', '/planets/earth', undefined)).resolves.toMatchObject({ procedure: get, params: { id: 'earth' } })
+      await expect(matcher.match('DELETE', '/planets/earth', undefined)).resolves.toMatchObject({ procedure: remove, params: { name: 'earth' } })
+      await expect(matcher.match('GET', '/files/a', undefined)).resolves.toMatchObject({ procedure: file })
+      await expect(matcher.match('GET', '/files/a/b', undefined)).resolves.toMatchObject({ procedure: nested })
+      await expect(matcher.match('GET', '/files/a/raw', undefined)).resolves.toMatchObject({ procedure: raw })
+      await expect(matcher.match('GET', '/files//raw', undefined)).resolves.toMatchObject({ procedure: empty })
+    })
+
+    it('throws when a lazy router duplicates an indexed route, leaving it pending without indexing any of its routes', async () => {
+      const find = os.meta(openapi({ method: 'GET', path: '/planets/{name}' })).handler(() => 'find')
+      const get = os.meta(openapi({ method: 'GET', path: '/planets/{id}' })).handler(() => 'get')
+      const other = os.meta(openapi({ method: 'GET', path: '/other' })).handler(() => 'other')
+
+      const loader = vi.fn(async () => ({ default: { get, other } }))
+
+      const matcher = new OpenAPIMatcher({
+        find,
+        planet: os.lazy(loader),
+      })
+
+      const message = '[OpenAPIMatcher] Found 1 duplicate route (path parameter names and trailing slashes do not make routes distinct):\n\n'
+        + 'Procedure at planet.get: GET /planets/{id} duplicates the route of the procedure at find (GET /planets/{name}).'
+
+      await expect(matcher.match('GET', '/planets/earth', undefined)).rejects.toThrowError(message)
+      await expect(matcher.match('GET', '/other', undefined)).rejects.toThrowError(message)
+
+      expect(loader).toHaveBeenCalledTimes(2)
+      expect(findAllRoutes((matcher as any).tree, 'GET', '/other')).toEqual([])
+    })
+
+    it('checks a lazy router against the routes of lazy routers loaded before it', async () => {
+      const first = os.meta(openapi({ method: 'GET', path: '/x' })).handler(() => 'first')
+      const second = os.meta(openapi({ method: 'GET', path: '/a/x/' })).handler(() => 'second')
+
+      const firstLoader = vi.fn(async () => ({ default: { first } }))
+      const secondLoader = vi.fn(async () => ({ default: { second } }))
+
+      const matcher = new OpenAPIMatcher({
+        a: os.meta(openapi({ prefix: '/a' })).lazy(firstLoader),
+        b: os.lazy(secondLoader),
+      })
+
+      await expect(matcher.match('GET', '/a/x', undefined)).rejects.toThrowError(
+        'Procedure at b.second: GET /a/x/ duplicates the route of the procedure at a.first (GET /a/x).',
+      )
+
+      expect(firstLoader).toHaveBeenCalledTimes(1)
+      expect(secondLoader).toHaveBeenCalledTimes(1)
+      expect(findAllRoutes<{ path: string[] }>((matcher as any).tree, 'GET', '/a/x').map(match => match.data.path)).toEqual([['a', 'first']])
+    })
+  })
+
   describe('contract-first routers', () => {
     it('wraps implementations with contract metadata and caches wrapped procedures', async () => {
       const implementation = {
