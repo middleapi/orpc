@@ -7,7 +7,7 @@
   <a href="https://www.npmjs.com/package/@orpc/bun">
     <img alt="weekly downloads" src="https://img.shields.io/npm/dw/%40orpc%2Fbun?logo=npm" />
   </a>
-  <a href="https://github.com/middleapi/orpc/blob/main/LICENCE">
+  <a href="https://github.com/middleapi/orpc/blob/main/LICENSE">
     <img alt="MIT License" src="https://img.shields.io/github/license/middleapi/orpc?logo=open-source-initiative" />
   </a>
   <a href="https://discord.gg/TXEbwRBvQn">
@@ -182,4 +182,4 @@ oRPC is inspired by existing solutions that prioritize type safety and developer
 
 ## License
 
-Distributed under the MIT License. See [LICENSE](https://github.com/middleapi/orpc/blob/main/LICENCE) for more information.
+Distributed under the MIT License. See [LICENSE](https://github.com/middleapi/orpc/blob/main/LICENSE) for more information.
