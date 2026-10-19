@@ -3,6 +3,7 @@ import type { StandardLinkInterceptor, StandardLinkInterceptorOptions, StandardL
 import type { ClientContext } from '../types'
 import { AsyncIteratorClass, isAsyncIteratorObject, override, sleep, toArray, value } from '@orpc/shared'
 import { getEventMeta } from '@standard-server/core'
+import { COMMON_ERROR_STATUS_MAP, ORPCError, ResponseError } from '../error'
 
 export interface RetryLinkPluginAttemptOptions<T extends RetryLinkPluginContext> extends StandardLinkInterceptorOptions<T> {
   /**
@@ -49,7 +50,7 @@ export interface RetryLinkPluginContext {
   /**
    * Determine whether to retry.
    *
-   * @default true
+   * @default (o) => isRetryableError(o.error)
    */
   shouldRetry?: Value<Promisable<boolean>, [RetryLinkPluginAttemptOptions<RetryLinkPluginContext>]>
 
@@ -64,6 +65,27 @@ export interface RetryLinkPluginOptions<_T extends RetryLinkPluginContext> {
    * Default retry options. Can be overridden by individual calls via the context.
    */
   default?: RetryLinkPluginContext | undefined
+}
+
+/**
+ * Default `shouldRetry` check of `RetryLinkPlugin`. Returns `false` only for errors
+ * from a 4xx response other than `408` and `429`.
+ *
+ * @see {@link https://orpc.dev/docs/plugins/retry#client-error-responses | Retry Plugin - Client Error Responses}
+ */
+export function isRetryableError(error: unknown): boolean {
+  const responseError = error instanceof ORPCError ? error.cause : error
+
+  if (!(responseError instanceof ResponseError)) {
+    return true
+  }
+
+  const { status } = responseError.response
+
+  return status < 400
+    || status >= 500
+    || status === COMMON_ERROR_STATUS_MAP.TIMEOUT
+    || status === COMMON_ERROR_STATUS_MAP.TOO_MANY_REQUESTS
 }
 
 /**
@@ -86,7 +108,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
   constructor(options: RetryLinkPluginOptions<T> = {}) {
     this.defaultRetry = options.default?.retry ?? 0
     this.defaultRetryDelay = options.default?.retryDelay ?? (o => o.lastEventRetry ?? 2000)
-    this.defaultShouldRetry = options.default?.shouldRetry ?? true
+    this.defaultShouldRetry = options.default?.shouldRetry ?? (o => isRetryableError(o.error))
     this.defaultOnRetry = options.default?.onRetry
   }
 

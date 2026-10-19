@@ -953,6 +953,16 @@ const batchPlugin = new BatchLinkPlugin({
 
 :::
 
+### Retry Plugin
+
+[`RetryLinkPlugin`](/docs/plugins/retry) no longer retries [client error responses](/docs/plugins/retry#client-error-responses) (4xx) other than `408` and `429` by default. To keep the v1 behavior, set `shouldRetry` to `true`:
+
+```ts
+const retryPlugin = new RetryLinkPlugin({
+  default: { shouldRetry: true },
+})
+```
+
 ## Contract-First
 
 Contract types and utilities changed word order from `ContractRouter*` to `RouterContract*`. Deprecated aliases exist for all of them. See [Procedure Contract](/docs/contract/procedure) and [Router Contract](/docs/contract/router).
