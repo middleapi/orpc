@@ -76,7 +76,7 @@ describe('batchResponseCompressionHandlerPlugin', () => {
    * The reason this plugin exists: `CompressionStream` cannot flush, so every message of a
    * batch that streams would sit in the compressor until the stream ended.
    */
-  it('delivers each message as soon as it is produced, without waiting for the whole batch', async () => {
+  it('delivers each message as soon as it is produced, without waiting for the stream to end', async () => {
     const slow = promiseWithResolvers<string>()
 
     const handler = createHandler({}, {
@@ -94,7 +94,7 @@ describe('batchResponseCompressionHandlerPlugin', () => {
     const readUntil = async (text: string) => {
       while (!received.includes(text)) {
         const { done, value } = await reader.read()
-        // A buffering compressor ends the stream (or stalls) before the fast message arrives
+        // A buffering compressor ends the stream (or stalls) before the first message arrives
         expect(done).toBe(false)
         received += decoder.decode(value, { stream: true })
       }

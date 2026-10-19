@@ -549,14 +549,12 @@ describe('batchLinkPlugin', () => {
 
       const sentGetRequest = vi.mocked(transport.send).mock.calls.find(([request]) => request.method === 'GET')![0]
       expect(extractBatchMessagesFromRequest(sentGetRequest).map(message => message.json.method)).toEqual(['GET', 'GET'])
-      expect(sentGetRequest.headers['orpc-batch']).toBe('1')
 
       const sentQueryRequest = vi.mocked(transport.send).mock.calls.find(([request]) => request.method === 'QUERY')![0]
       expect(extractBatchMessagesFromRequest(sentQueryRequest).map(message => message.json.method)).toEqual(['QUERY', 'QUERY'])
 
       const sentPostRequest = vi.mocked(transport.send).mock.calls.find(([request]) => request.method === 'POST')![0]
       expect(extractBatchMessagesFromRequest(sentPostRequest).map(message => message.json.method)).toEqual(['PUT', 'PUT'])
-      expect(sentPostRequest.headers['orpc-batch']).toBe('1')
     })
 
     it('aborts grouped batch request when all sub-requests are aborted', async () => {

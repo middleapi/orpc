@@ -43,8 +43,28 @@ function isBodyHeader(name: string): boolean {
 }
 
 /**
- * Builds the batch response headers: the subresponses' distinct cookies, and the headers they all
- * have with the same value, as the client does with the headers every subrequest shares.
+ * Errors should not occur at the routing interceptor level.
+ * Reject the promise so it can be handled by the unhandledRejection handler
+ * for global logging or error handling.
+ */
+function internalError(err: unknown): StandardResponse {
+  Promise.reject(err)
+
+  return { status: 500, headers: {}, body: 'Internal server error' }
+}
+
+/**
+ * What the batch needs from a subresponse before it answers, without keeping its body alive.
+ */
+interface SubresponseHead {
+  headers: StandardHeaders
+  stream: boolean
+}
+
+/**
+ * Builds the batch response headers: the headers the subresponses all have with the same value, as
+ * the client does with the headers every subrequest shares, then the batch headers, which win, and
+ * the distinct cookies of both.
  */
 function liftSubresponseHeaders(
   batchHeaders: StandardHeaders,
@@ -54,7 +74,7 @@ function liftSubresponseHeaders(
   const shared: StandardHeaders = {}
 
   for (const [name, value] of Object.entries(first)) {
-    if (value === undefined || name === 'set-cookie' || isBodyHeader(name) || batchHeaders[name] !== undefined) {
+    if (value === undefined || isBodyHeader(name)) {
       continue
     }
 
@@ -65,7 +85,7 @@ function liftSubresponseHeaders(
     }
   }
 
-  const headers: StandardHeaders = { ...batchHeaders, ...shared }
+  const headers: StandardHeaders = { ...shared, ...batchHeaders }
   const cookies = new Set([batchHeaders, ...subresponseHeaders].flatMap(other => toArray(other['set-cookie'])))
 
   if (cookies.size > 0) {
@@ -113,15 +133,15 @@ export interface BatchHandlerPluginOptions<T extends Context> {
   /**
    * Success batch response headers.
    *
-   * The batch response also gets the cookies its sub-responses set, and the headers they all
-   * share unless set here.
+   * The batch response also gets the cookies its sub-responses set, and the headers they all share.
+   * Headers set here win, and setting one to `undefined` keeps it off.
    *
    * @default {}
    */
   headers?: Value<Promisable<StandardHeaders>, [batchOptions: StandardHandlerRoutingInterceptorOptions<T>]>
 
   /**
-   * Keep-alive settings for batch responses that stream, which they do when a sub-response is a stream.
+   * Keep-alive settings for batch responses that stream.
    *
    * When enabled, a zero-length length-prefixed frame is sent periodically while the
    * stream is idle (no message sent for `interval` ms). Clients ignore these frames.
@@ -146,7 +166,7 @@ export interface BatchHandlerPluginOptions<T extends Context> {
 
 /**
  * Handles batch requests sent by the client Batch Link Plugin, splitting each
- * batch into sub-requests and streaming their responses back together.
+ * batch into sub-requests and sending their responses back together.
  *
  * @remarks
  * The batch starts the response once every sub-response is ready, so it carries the cookies sub-requests
@@ -287,19 +307,19 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       const status = await value(this.successStatus, interceptorOptions)
       const headers = await value(this.headers, interceptorOptions)
 
-      // Response messages are held here until the batch response starts streaming
+      // Messages the peer sends before the response streams, or the whole body when it does not
       const bufferedMessages: ServerPeerSendMessage[] = []
       let streamController: ReadableStreamDefaultController<Uint8Array> | undefined
       let keepAliveTimer: ReturnType<typeof setInterval> | undefined
 
       // Every subresponse waits here until all of them are ready, so the batch response carries their headers
-      const ready = messages.map(() => promiseWithResolvers<StandardResponse | undefined>())
+      const ready = messages.map(() => promiseWithResolvers<SubresponseHead | undefined>())
       const lifting = Promise.all(ready.map(({ promise }) => promise)).then((all) => {
-        const responses = all.filter(response => response !== undefined)
+        const heads = all.filter(head => head !== undefined)
 
         return {
-          batchHeaders: liftSubresponseHeaders(headers, responses.map(response => response.headers)),
-          streams: responses.some(({ body }) => body instanceof ReadableStream || isAsyncIteratorObject(body)),
+          batchHeaders: liftSubresponseHeaders(headers, heads.map(head => head.headers)),
+          streams: heads.some(head => head.stream),
         }
       })
 
@@ -344,20 +364,9 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       })
 
-      /**
-       * Errors should not occur at the routing interceptor level.
-       * Reject the promise so it can be handled by the unhandledRejection handler
-       * for global logging or error handling.
-       */
-      const internalError = (err: unknown): StandardResponse => {
-        Promise.reject(err)
-
-        return { status: 500, headers: {}, body: 'Internal server error' }
-      }
-
       const handleIndividualRequest = async (
         request: StandardLazyRequest,
-        markReady: (response: StandardResponse) => void,
+        markReady: (head: SubresponseHead) => void,
       ): Promise<StandardResponse> => {
         let response: StandardResponse
 
@@ -370,7 +379,10 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
           response = internalError(err)
         }
 
-        markReady(response)
+        markReady({
+          headers: response.headers,
+          stream: response.body instanceof ReadableStream || isAsyncIteratorObject(response.body),
+        })
         const { batchHeaders } = await lifting
 
         try {

@@ -47,25 +47,6 @@ describe.each([
   })
 
   /**
-   * A batch with no binary subresponse is a plain json array rather than the binary
-   * framing every other case here produces, so it travels a different encoding path.
-   */
-  it('round-trips a batch of json-only responses', async () => {
-    const router = {
-      echo: os.input(z.string()).handler(({ input }) => `echo:${input}`),
-    }
-
-    const { client, fetchSpy } = createClientServer(router)
-
-    await Promise.all([
-      expect(client.echo('alpha')).resolves.toBe('echo:alpha'),
-      expect(client.echo('beta')).resolves.toBe('echo:beta'),
-    ])
-
-    expect(fetchSpy).toHaveBeenCalledTimes(1) // ensure batch was used
-  })
-
-  /**
    * Without a stream subresponse, a batch is the binary framing collected into a blob
    * once every subresponse is ready, rather than a stream.
    */

@@ -88,17 +88,22 @@ async function skipMessage(reader: ReadableStreamDefaultReader<Uint8Array>) {
   await reader.read()
 }
 
+function waitForAbort(signal: AbortSignal) {
+  return new Promise((resolve) => {
+    if (signal.aborted) {
+      resolve(undefined)
+    }
+    signal.addEventListener('abort', resolve)
+  })
+}
+
 /**
- * A router with a `ping` procedure that answers right away and a `slow` one that waits for `gate`.
+ * A router with an `events` procedure that returns a stream of one event.
  */
-function createSlowRouter(gate: Promise<unknown>) {
-  return {
-    ping: os.handler(() => 'pong'),
-    slow: os.handler(async () => {
-      await gate
-      return 'slow'
-    }),
-  }
+const eventsRouter = {
+  events: os.handler(async function* () {
+    yield 'event'
+  }),
 }
 
 describe('batchHandlerPlugin', () => {
@@ -351,15 +356,16 @@ describe('batchHandlerPlugin', () => {
       it('waits for every sub-response before it streams', async () => {
         const gate = promiseWithResolvers<void>()
         const handler = createHandler(new BatchHandlerPlugin(), {
-          ...createSlowRouter(gate.promise),
-          events: os.handler(async function* () {
-            yield 'event'
+          ...eventsRouter,
+          file: os.handler(async () => {
+            await gate.promise
+            return new Blob(['__FILE__'], { type: 'application/octet-stream' })
           }),
         })
 
         let settled = false
         const result = handler.handle(createBatchRequest({
-          messages: [makePeerRequestMessage('0', '/events'), makePeerRequestMessage('1', '/slow')],
+          messages: [makePeerRequestMessage('0', '/events'), makePeerRequestMessage('1', '/file')],
         })).finally(() => {
           settled = true
         })
@@ -373,59 +379,7 @@ describe('batchHandlerPlugin', () => {
 
         const messages = await readAllMessages(response!)
         expect(messages.filter(m => m.kind === 'response').map(m => m.id).sort()).toEqual(['0', '1'])
-      })
-
-      it('writes out the sub-responses buffered before it, binary included', async () => {
-        const gate = promiseWithResolvers<void>()
-        const ping = vi.fn(() => 'pong')
-        const file = vi.fn(() => new Blob(['__FILE__'], { type: 'application/octet-stream' }))
-
-        const handler = createHandler(new BatchHandlerPlugin(), {
-          ping: os.handler(ping),
-          file: os.handler(file),
-          events: os.handler(async () => {
-            await gate.promise
-
-            return (async function* () {
-              yield 'event'
-            })()
-          }),
-        })
-
-        const result = handler.handle(createBatchRequest({
-          messages: [
-            makePeerRequestMessage('0', '/ping'),
-            makePeerRequestMessage('1', '/file'),
-            makePeerRequestMessage('2', '/events'),
-          ],
-        }))
-
-        await vi.waitFor(() => {
-          expect(ping).toHaveBeenCalledTimes(1)
-          expect(file).toHaveBeenCalledTimes(1)
-        })
-        await sleep(10) // let both responses reach the buffer
-
-        gate.resolve()
-        const { response } = await result
-        expect(response!.headers.get('standard-server')).toEqual('octet-stream')
-
-        // Only messages of the same sub-request keep their order
-        const messages = await readAllMessages(response!)
-        const fileMessages = messages.filter(m => m.id === '1')
-
-        expect(messages.filter(m => m.id === '0')).toEqual([
-          expect.objectContaining({ kind: 'response' }),
-        ])
-        expect(fileMessages).toEqual([
-          expect.objectContaining({ kind: 'response' }),
-        ])
-        expect(new TextDecoder().decode(fileMessages[0].binary)).toBe('__FILE__')
-        expect(messages.filter(m => m.id === '2')).toEqual([
-          expect.objectContaining({ kind: 'response' }),
-          expect.objectContaining({ kind: 'event-stream' }),
-          expect.objectContaining({ kind: 'event-stream', json: expect.objectContaining({ event: 'close' }) }),
-        ])
+        expect(new TextDecoder().decode(messages.find(m => m.id === '1').binary)).toBe('__FILE__')
       })
     })
   })
@@ -433,15 +387,6 @@ describe('batchHandlerPlugin', () => {
   describe('batch request abort', () => {
     const started = vi.fn()
     const stopped = vi.fn()
-
-    function waitForAbort(signal: AbortSignal) {
-      return new Promise((resolve) => {
-        if (signal.aborted) {
-          resolve(undefined)
-        }
-        signal.addEventListener('abort', resolve)
-      })
-    }
 
     const handler = createHandler(new BatchHandlerPlugin(), {
       wait: os.handler(async ({ signal }) => {
@@ -797,6 +742,19 @@ describe('batchHandlerPlugin', () => {
       )
     })
 
+    it('keeps a shared header off the batch response when the headers option sets it to undefined', async () => {
+      const handler = createHandler(new BatchHandlerPlugin({ headers: { 'cache-control': undefined } }), headersRouter)
+
+      const { response } = await handler.handle(createBatchRequest({
+        messages: [makePeerRequestMessage(0, '/login'), makePeerRequestMessage(1, '/refresh')],
+      }))
+
+      expect(response!.headers.get('cache-control')).toBe(null)
+
+      const body = await response!.json() as any[]
+      expect(body.map(m => m.json.headers['cache-control'])).toEqual(['max-age=60', 'max-age=60'])
+    })
+
     it('sets each distinct cookie once, including the ones the headers option sets', async () => {
       const handler = createHandler(new BatchHandlerPlugin({ headers: { 'set-cookie': 'theme=dark' } }), headersRouter)
 
@@ -866,13 +824,7 @@ describe('batchHandlerPlugin', () => {
      */
     const idleRouter = {
       idle: os.handler(async function* ({ signal }) {
-        await new Promise(resolve => signal?.addEventListener('abort', resolve))
-      }),
-    }
-
-    const eventsRouter = {
-      events: os.handler(async function* () {
-        yield 'event'
+        await waitForAbort(signal!)
       }),
     }
 
