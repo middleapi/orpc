@@ -13,7 +13,6 @@ export const createHonoFetchBatchClientServerTest: CreateBatchClientServerTest =
   {
     context = defaultBatchClientServerOptions.context,
     method = 'GET',
-    mode = defaultBatchClientServerOptions.mode,
     serializer = defaultBatchClientServerOptions.serializer,
   } = {},
 ) => {
@@ -48,7 +47,7 @@ export const createHonoFetchBatchClientServerTest: CreateBatchClientServerTest =
     origin: `http://localhost:${addressInfo.port}`,
     serializer,
     fetch: fetchSpy,
-    plugins: [new BatchLinkPlugin({ groups: [defaultBatchGroup], mode })],
+    plugins: [new BatchLinkPlugin({ groups: [defaultBatchGroup] })],
   })
 
   return {

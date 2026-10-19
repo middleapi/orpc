@@ -939,6 +939,8 @@ const batchPlugin = new BatchLinkPlugin({
 
 </CodeGroup>
 
+The `mode` option was removed. The server now starts the batch response once every procedure has responded, so it can carry their [headers](/docs/plugins/batch#response-headers), and [streams](/docs/plugins/batch#streaming-responses) only when a procedure returns a stream.
+
 :::warning
 Some cases still need to skip batching, for example procedures that rely on [Hibernation](/docs/integrations/hibernation), which cannot work through batched responses. For those, use `filter`. Its meaning is inverted compared to `exclude`: `exclude` returned `true` to skip batching, while `filter` returns `false` to skip batching. Negate your predicate when migrating.
 

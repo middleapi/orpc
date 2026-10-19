@@ -56,7 +56,7 @@ The whole envelope is compressed, binary subresponses included. Leave this plugi
 
 ## Why a Node.js Plugin
 
-A streaming batch sends each response as soon as its procedure resolves. A compressor that cannot flush would hold every early response in its buffer until the slowest one finished, trading streaming for compression. The web [CompressionStream](https://developer.mozilla.org/en-US/docs/Web/API/CompressionStream) has no flush, so this plugin uses [zlib](https://nodejs.org/api/zlib.html) and ends each write with a sync flush instead. The few bytes each flush costs are what keep the batch streaming, [keep-alive frames](/docs/plugins/batch#keep-alive-timer) included.
+A streaming batch sends each message of its streams as soon as it is ready. A compressor that cannot flush would hold those messages in its buffer until the stream ended, trading streaming for compression. The web [CompressionStream](https://developer.mozilla.org/en-US/docs/Web/API/CompressionStream) has no flush, so this plugin uses [zlib](https://nodejs.org/api/zlib.html) and ends each write with a sync flush instead. The few bytes each flush costs are what keep the batch streaming, [keep-alive frames](/docs/plugins/batch#keep-alive-timer) included.
 
 ## Client
 

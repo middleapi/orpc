@@ -18,7 +18,6 @@ export const createCompressionHonoFetchBatchClientServerTest: CreateBatchClientS
   {
     context = defaultBatchClientServerOptions.context,
     method = 'GET',
-    mode = defaultBatchClientServerOptions.mode,
     serializer = defaultBatchClientServerOptions.serializer,
   } = {},
 ) => {
@@ -69,7 +68,7 @@ export const createCompressionHonoFetchBatchClientServerTest: CreateBatchClientS
     serializer,
     fetch: fetchSpy,
     plugins: [
-      new BatchLinkPlugin({ groups: [defaultBatchGroup], mode }),
+      new BatchLinkPlugin({ groups: [defaultBatchGroup] }),
       // fetch already automatically decompresses response
       // new ResponseCompressionLinkPlugin(),
     ],

@@ -56,6 +56,9 @@ const contract = {
   ping: oc
     .input(z.object({ value: z.number() }))
     .output(z.object({ value: z.number() })),
+  login: oc
+    .input(z.object({ user: z.string() }))
+    .output(z.object({ user: z.string() })),
 }
 
 const spec: OpenAPIDocument<'3.2.0'> = {
@@ -67,6 +70,11 @@ const implementer = implement(contract).$context<TestContext>()
 
 const router = implementer.router({
   ping: implementer.ping.handler(({ input }) => input),
+  login: implementer.login.handler(({ input, context }) => {
+    context.resHeaders?.append('set-cookie', `session=${input.user}; HttpOnly`)
+    context.resHeaders?.set('cache-control', 'no-store')
+    return input
+  }),
 })
 
 function createHandlerPlugins() {
@@ -162,11 +170,30 @@ describe('all plugins on one handler and one link', () => {
     ])
 
     expect(exchanges).toHaveLength(1) // both calls travelled in a single batch request
-    expect(exchanges[0]!.request.headers.get('orpc-batch')).toEqual('streaming')
+    expect(exchanges[0]!.request.headers.get('orpc-batch')).toEqual('1')
     // the batch request is compressed as a whole, and decompressed before it is split
     expect(exchanges[0]!.request.headers.get('content-encoding')).toEqual('gzip')
     // the batch response is compressed as a whole, and decompressed before it is decoded
     expect(exchanges[0]!.response.headers.get('content-encoding')).toEqual('gzip')
+  })
+
+  it('sets the cookies and shared headers of batched calls on the batch response', async () => {
+    const { client, exchanges } = createClientServer()
+
+    await expect(Promise.all([
+      client.login({ user: 'alice' }),
+      client.login({ user: 'bob' }),
+    ])).resolves.toEqual([
+      { user: 'alice' },
+      { user: 'bob' },
+    ])
+
+    expect(exchanges).toHaveLength(1)
+    expect(exchanges[0]!.response.headers.getSetCookie().sort()).toEqual([
+      'session=alice; HttpOnly',
+      'session=bob; HttpOnly',
+    ])
+    expect(exchanges[0]!.response.headers.get('cache-control')).toEqual('no-store')
   })
 
   it('compresses a standalone call in both directions through every plugin', async () => {

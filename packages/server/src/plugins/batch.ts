@@ -1,4 +1,3 @@
-import type { BatchLinkPluginMode } from '@orpc/client/plugins'
 import type { Promisable, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-server/peer'
@@ -10,8 +9,8 @@ import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
 
 /**
- * Content type for batch responses that use the length-prefixed binary framing
- * (streaming mode, and buffered mode when any sub-response contains binary or is a stream).
+ * Content type for batch responses that use the length-prefixed binary framing,
+ * which they do when any sub-response contains binary or is a stream.
  *
  * Decoding is driven by the `standard-server` body hint, not this header,
  * so it only serves to describe the payload to logs, proxies, and dev tools.
@@ -36,6 +35,46 @@ async function encodeFrame(message: ServerPeerSendMessage): Promise<Uint8Array<A
   return [encodeLengthPrefix(bytes.byteLength), bytes]
 }
 
+/**
+ * Whether a header describes a subresponse's own body, which the batch response does not share.
+ */
+function isBodyHeader(name: string): boolean {
+  return name.startsWith('content-') || name === 'standard-server'
+}
+
+/**
+ * Builds the batch response headers: the subresponses' distinct cookies, and the headers they all
+ * have with the same value, as the client does with the headers every subrequest shares.
+ */
+function liftSubresponseHeaders(
+  batchHeaders: StandardHeaders,
+  subresponseHeaders: StandardHeaders[],
+): StandardHeaders {
+  const [first = {}, ...rest] = subresponseHeaders
+  const shared: StandardHeaders = {}
+
+  for (const [name, value] of Object.entries(first)) {
+    if (value === undefined || name === 'set-cookie' || isBodyHeader(name) || batchHeaders[name] !== undefined) {
+      continue
+    }
+
+    const flattened = flattenStandardHeader(value)
+
+    if (rest.every(other => flattenStandardHeader(other[name]) === flattened)) {
+      shared[name] = value
+    }
+  }
+
+  const headers: StandardHeaders = { ...batchHeaders, ...shared }
+  const cookies = new Set([batchHeaders, ...subresponseHeaders].flatMap(other => toArray(other['set-cookie'])))
+
+  if (cookies.size > 0) {
+    headers['set-cookie'] = [...cookies]
+  }
+
+  return headers
+}
+
 export interface BatchHandlerPluginOptions<T extends Context> {
   /**
    * The max size of the batch allowed.
@@ -53,6 +92,18 @@ export interface BatchHandlerPluginOptions<T extends Context> {
   mapSubrequest?: (subrequest: StandardLazyRequest, batchOptions: StandardHandlerRoutingInterceptorOptions<T>) => StandardLazyRequest
 
   /**
+   * Map each sub-response in the batch before it is sent.
+   *
+   * @default removes the headers the batch response already has with the same value, which the client
+   * merges back, and `set-cookie`, which the browser ignores there and JavaScript could read
+   */
+  mapSubresponse?: (
+    subresponse: StandardResponse,
+    partialBatchResponse: Pick<StandardResponse, 'status' | 'headers'>,
+    batchOptions: StandardHandlerRoutingInterceptorOptions<T>,
+  ) => StandardResponse
+
+  /**
    * Success batch response status code.
    *
    * @default 207
@@ -62,16 +113,18 @@ export interface BatchHandlerPluginOptions<T extends Context> {
   /**
    * Success batch response headers.
    *
+   * The batch response also gets the cookies its sub-responses set, and the headers they all
+   * share unless set here.
+   *
    * @default {}
    */
   headers?: Value<Promisable<StandardHeaders>, [batchOptions: StandardHandlerRoutingInterceptorOptions<T>]>
 
   /**
-   * Keep-alive settings for streaming batch responses.
+   * Keep-alive settings for batch responses that stream, which they do when a sub-response is a stream.
    *
    * When enabled, a zero-length length-prefixed frame is sent periodically while the
    * stream is idle (no message sent for `interval` ms). Clients ignore these frames.
-   * Only applies to streaming responses: streaming mode, or a buffered batch with a stream sub-response.
    *
    * @default { enabled: true, interval: 15000 }
    */
@@ -96,8 +149,8 @@ export interface BatchHandlerPluginOptions<T extends Context> {
  * batch into sub-requests and streaming their responses back together.
  *
  * @remarks
- * In buffered mode, the batch still streams once a sub-response is a stream
- * (an event iterator or a `ReadableStream`), since it may never end.
+ * The batch starts the response once every sub-response is ready, so it carries the cookies sub-requests
+ * set and the headers every sub-response shares. It streams when a sub-response is a stream.
  *
  * **Note**: HTTP/2 and later already multiplex requests over a single connection, which often makes this plugin unnecessary.
  *
@@ -114,6 +167,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
   private readonly maxSize: Exclude<BatchHandlerPluginOptions<T>['maxSize'], undefined>
   private readonly mapSubrequest: Exclude<BatchHandlerPluginOptions<T>['mapSubrequest'], undefined>
+  private readonly mapSubresponse: Exclude<BatchHandlerPluginOptions<T>['mapSubresponse'], undefined>
   private readonly successStatus: Exclude<BatchHandlerPluginOptions<T>['successStatus'], undefined>
   private readonly headers: Exclude<BatchHandlerPluginOptions<T>['headers'], undefined>
   private readonly keepAliveEnabled: boolean
@@ -136,6 +190,18 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       },
     }))
 
+    this.mapSubresponse = options.mapSubresponse ?? ((subresponse, { headers: batchHeaders }) => {
+      const headers: StandardHeaders = {}
+
+      for (const [name, value] of Object.entries(subresponse.headers)) {
+        if (name !== 'set-cookie' && flattenStandardHeader(value) !== flattenStandardHeader(batchHeaders[name])) {
+          headers[name] = value
+        }
+      }
+
+      return { ...subresponse, headers }
+    })
+
     this.successStatus = options.successStatus ?? 207
     this.headers = options.headers ?? {}
     this.keepAliveEnabled = options.keepAlive?.enabled ?? true
@@ -144,13 +210,9 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async (interceptorOptions) => {
-      const batchHeader = flattenStandardHeader(interceptorOptions.request.headers['orpc-batch'])
-
-      if (batchHeader === undefined) {
+      if (flattenStandardHeader(interceptorOptions.request.headers['orpc-batch']) === undefined) {
         return interceptorOptions.next()
       }
-
-      const mode: BatchLinkPluginMode = batchHeader === 'buffered' ? 'buffered' : 'streaming'
 
       let messages: ClientPeerSendMessage[]
 
@@ -230,6 +292,17 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       let streamController: ReadableStreamDefaultController<Uint8Array> | undefined
       let keepAliveTimer: ReturnType<typeof setInterval> | undefined
 
+      // Every subresponse waits here until all of them are ready, so the batch response carries their headers
+      const ready = messages.map(() => promiseWithResolvers<StandardResponse | undefined>())
+      const lifting = Promise.all(ready.map(({ promise }) => promise)).then((all) => {
+        const responses = all.filter(response => response !== undefined)
+
+        return {
+          batchHeaders: liftSubresponseHeaders(headers, responses.map(response => response.headers)),
+          streams: responses.some(({ body }) => body instanceof ReadableStream || isAsyncIteratorObject(body)),
+        }
+      })
+
       const clearKeepAlive = () => {
         if (keepAliveTimer !== undefined) {
           clearInterval(keepAliveTimer)
@@ -263,10 +336,6 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       }
 
       const peer = new ServerPeer(async (message) => {
-        if (mode === 'streaming') {
-          startStreaming()
-        }
-
         if (streamController === undefined) {
           bufferedMessages.push(message)
         }
@@ -275,67 +344,50 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         }
       })
 
-      const streaming = promiseWithResolvers<{ body: ReadableStream<Uint8Array<ArrayBuffer>>, flushed: Promise<unknown> }>()
-
       /**
-       * Opens the binary length-prefixed stream that every later message is written to,
-       * starting with the messages buffered so far, which `flushed` waits for.
-       *
-       * A function declaration, since it and the peer above refer to each other.
+       * Errors should not occur at the routing interceptor level.
+       * Reject the promise so it can be handled by the unhandledRejection handler
+       * for global logging or error handling.
        */
-      function startStreaming() {
-        if (streamController !== undefined) {
-          return
-        }
+      const internalError = (err: unknown): StandardResponse => {
+        Promise.reject(err)
 
-        const body = new ReadableStream<Uint8Array<ArrayBuffer>>({
-          start(controller) {
-            streamController = controller
-            scheduleKeepAlive()
-          },
-          async cancel(reason) {
-            clearKeepAlive()
-            await peer.close(reason)
-          },
-        })
-
-        streaming.resolve({ body, flushed: Promise.all(bufferedMessages.splice(0).map(enqueueMessage)) })
+        return { status: 500, headers: {}, body: 'Internal server error' }
       }
 
-      const handleIndividualRequest = async (request: StandardLazyRequest): Promise<StandardResponse> => {
+      const handleIndividualRequest = async (
+        request: StandardLazyRequest,
+        markReady: (response: StandardResponse) => void,
+      ): Promise<StandardResponse> => {
+        let response: StandardResponse
+
         try {
           request = this.mapSubrequest(request, interceptorOptions)
-          const { matched, response } = await interceptorOptions.next({ ...interceptorOptions, request })
-
-          if (!matched) {
-            return { status: 404, headers: {}, body: 'No procedure matched' }
-          }
-
-          /**
-           * A stream is meant to be read as it arrives and might never end, so buffering it would
-           * hold back the whole batch. Start streaming before the peer sends its first message,
-           * so none of that subresponse is buffered.
-           */
-          if (response.body instanceof ReadableStream || isAsyncIteratorObject(response.body)) {
-            startStreaming()
-          }
-
-          return response
+          const result = await interceptorOptions.next({ ...interceptorOptions, request })
+          response = result.matched ? result.response : { status: 404, headers: {}, body: 'No procedure matched' }
         }
         catch (err) {
-          /**
-           * Errors should not occur at the routing interceptor level.
-           * Reject the promise so it can be handled by the unhandledRejection handler
-           * for global logging or error handling.
-           */
-          Promise.reject(err)
+          response = internalError(err)
+        }
 
-          return { status: 500, headers: {}, body: 'Internal server error' }
+        markReady(response)
+        const { batchHeaders } = await lifting
+
+        try {
+          return this.mapSubresponse(response, { status, headers: batchHeaders }, interceptorOptions)
+        }
+        catch (err) {
+          return internalError(err)
         }
       }
 
       const runSubrequests = async (): Promise<void> => {
-        const promise = Promise.all(messages.map(msg => peer.message(msg, handleIndividualRequest)))
+        const promise = Promise.all(messages.map((msg, i) => {
+          const { resolve } = ready[i]!
+
+          // Not every message reaches the handler, such as a cancel or a repeated id
+          return peer.message(msg, request => handleIndividualRequest(request, resolve)).finally(() => resolve(undefined))
+        }))
         const signal = interceptorOptions.request.signal
         const closePeer = () => peer.close(signal?.reason)
 
@@ -354,11 +406,10 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       }
 
       const subrequests = runSubrequests()
+      const { batchHeaders, streams } = await lifting
 
-      // Undefined when every subresponse finished before any turned out to be a stream
-      const started = await Promise.race([streaming.promise, subrequests.then(() => undefined)])
-
-      if (started === undefined) {
+      if (!streams) {
+        await subrequests
         await peer.close()
 
         if (bufferedMessages.some(msg => msg.binary !== undefined)) {
@@ -368,7 +419,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
             matched: true,
             response: {
               status,
-              headers,
+              headers: batchHeaders,
               body: new Blob(chunks, { type: BATCH_CONTENT_TYPE }),
             },
           }
@@ -376,12 +427,28 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
         return {
           matched: true,
-          response: { status, headers, body: bufferedMessages },
+          response: { status, headers: batchHeaders, body: bufferedMessages },
         }
       }
 
+      /**
+       * A stream is meant to be read as it arrives and might never end, so the batch answers with
+       * the length-prefixed stream that every message is written to, starting with those buffered so far.
+       */
+      const body = new ReadableStream<Uint8Array<ArrayBuffer>>({
+        start(controller) {
+          streamController = controller
+          scheduleKeepAlive()
+        },
+        async cancel(reason) {
+          clearKeepAlive()
+          await peer.close(reason)
+        },
+      })
+      const flushed = Promise.all(bufferedMessages.splice(0).map(enqueueMessage))
+
       // DO NOT await here to block streaming response
-      Promise.all([started.flushed, subrequests])
+      Promise.all([flushed, subrequests])
         .then(async () => {
           clearKeepAlive()
           streamController!.close()
@@ -397,8 +464,8 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         matched: true,
         response: {
           status,
-          headers: { ...headers, 'content-type': BATCH_CONTENT_TYPE },
-          body: started.body,
+          headers: { ...batchHeaders, 'content-type': BATCH_CONTENT_TYPE },
+          body,
         },
       }
     }
