@@ -1,5 +1,5 @@
 import { NullProtoObj } from '@orpc/shared'
-import { MalformedResponseError, ORPCError } from './error'
+import { MalformedResponseError, ORPCError, ResponseError } from './error'
 
 describe('oRPCError', () => {
   it('works', () => {
@@ -111,6 +111,29 @@ describe('oRPCError', () => {
   })
 })
 
+describe('responseError', () => {
+  it('works', () => {
+    const response = { status: 404, headers: { 'x-request-id': 'abc' }, body: { message: 'ignored' } }
+    const cause = new Error('cause')
+    const error = new ResponseError({ message: 'custom message', response, cause })
+
+    expect(error).toBeInstanceOf(Error)
+    expect(error).not.toBeInstanceOf(ORPCError)
+    expect(error).not.toBeInstanceOf(MalformedResponseError)
+    expect(error.name).toBe('ResponseError')
+    expect(error.message).toBe('custom message')
+    expect(error.response).toBe(response)
+    expect(error.cause).toBe(cause)
+  })
+
+  it('infers message from the response status', () => {
+    const error = new ResponseError({ response: { status: 404, headers: {}, body: { message: 'ignored' } } })
+
+    expect(error.message).toBe('Received a 404 response.')
+    expect('cause' in error).toBe(false)
+  })
+})
+
 describe('malformedResponseError', () => {
   it('works', () => {
     const response = { status: 500, headers: { 'x-header': 'value' }, body: { something: 'unexpected' } }
@@ -118,6 +141,7 @@ describe('malformedResponseError', () => {
     const error = new MalformedResponseError({ message: 'Invalid RPC response format.', response, cause })
 
     expect(error).toBeInstanceOf(Error)
+    expect(error).toBeInstanceOf(ResponseError)
     expect(error).not.toBeInstanceOf(ORPCError)
     expect(error.name).toBe('MalformedResponseError')
     expect(error.message).toBe('Invalid RPC response format.')

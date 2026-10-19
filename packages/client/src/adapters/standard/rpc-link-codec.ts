@@ -5,7 +5,7 @@ import type { StandardLinkCodec, StandardLinkCodecDecodedResponse } from '../sta
 import { isAsyncIteratorObject, pathToHttpPath, stringifyJSON, value } from '@orpc/shared'
 import { mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
 import { toStandardHeaders } from '@standard-server/fetch'
-import { MalformedResponseError } from '../../error'
+import { MalformedResponseError, ResponseError } from '../../error'
 import { createORPCErrorFromJson, isORPCErrorJson } from '../../error-utils'
 import { RPCSerializer } from '../../rpc-serializer'
 
@@ -142,7 +142,12 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
 
     if (!isOk) {
       if (isORPCErrorJson(deserialized)) {
-        return { kind: 'error', error: createORPCErrorFromJson(deserialized) }
+        return {
+          kind: 'error',
+          error: createORPCErrorFromJson(deserialized, {
+            cause: new ResponseError({ response: { status: response.status, headers: response.headers, body } }),
+          }),
+        }
       }
 
       throw new MalformedResponseError({ response: { headers: response.headers, status: response.status, body } })

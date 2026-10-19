@@ -1,5 +1,5 @@
 import type { StandardUrl } from '@standard-server/core'
-import { MalformedResponseError, ORPCError } from '../../error'
+import { MalformedResponseError, ORPCError, ResponseError } from '../../error'
 import { RPCSerializer } from '../../rpc-serializer'
 import { RPCLinkCodec } from './rpc-link-codec'
 
@@ -291,9 +291,9 @@ describe('rpcLinkCodec', () => {
       const error = new ORPCError('NOT_FOUND', { message: 'Resource not found', data: { id: '123' } })
       const serialized = serializer.serialize(error.toJSON())
 
-      const result = await codec.decodeResponse({
+      const result: any = await codec.decodeResponse({
         status: 404,
-        headers: {},
+        headers: { 'x-request-id': 'abc' },
         resolveBody: () => Promise.resolve(serialized),
       })
 
@@ -301,6 +301,12 @@ describe('rpcLinkCodec', () => {
         kind: 'error',
         error: expect.objectContaining({ code: 'NOT_FOUND', message: 'Resource not found', data: { id: '123' } }),
       })
+
+      expect(result.error).toBeInstanceOf(ORPCError)
+      expect(result.error.cause).toBeInstanceOf(ResponseError)
+      expect(result.error.cause).not.toBeInstanceOf(MalformedResponseError)
+      expect(result.error.cause.message).toBe('Received a 404 response.')
+      expect(result.error.cause.response).toEqual({ status: 404, headers: { 'x-request-id': 'abc' }, body: serialized })
     })
 
     it('throws MalformedResponseError on non-ORPCError error responses', async () => {

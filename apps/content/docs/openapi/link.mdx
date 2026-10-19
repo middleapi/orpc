@@ -242,9 +242,27 @@ const link = new OpenAPILink(contract, {
 })
 ```
 
+## Error Responses
+
+When the server answers with an error, `OpenAPILink` throws an `ORPCError` whose `cause` is a `ResponseError` carrying the resolved response, so details that are not part of the error itself, such as its status or headers, stay available (errors returned by [`customErrorResponseBodyDecoder`](#custom-error-decoding) are thrown as-is):
+
+```ts
+import { onError, ORPCError, ResponseError } from '@orpc/client'
+
+const link = new OpenAPILink(contract, {
+  interceptors: [
+    onError((error) => {
+      if (error instanceof ORPCError && error.cause instanceof ResponseError) {
+        console.error('Request failed:', error.cause.response.status, error.cause.response.headers['x-request-id'])
+      }
+    }),
+  ],
+})
+```
+
 ## Malformed Responses
 
-When `OpenAPILink` cannot decode a response, for example when a proxy or gateway answers instead of your handler, it throws a `MalformedResponseError` instead of an `ORPCError`. Its message is inferred from the body or status, and it carries the resolved response:
+When `OpenAPILink` cannot decode a response, for example when a proxy or gateway answers instead of your handler, it throws a `MalformedResponseError` instead of an `ORPCError`. It extends `ResponseError`, so it carries the resolved response, and its message is inferred from the body or status:
 
 ```ts
 import { MalformedResponseError, onError } from '@orpc/client'

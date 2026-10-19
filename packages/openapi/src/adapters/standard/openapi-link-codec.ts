@@ -4,7 +4,7 @@ import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
 import type { Promisable, Public, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standard-server/core'
 import type { OpenAPIMeta } from '../../meta'
-import { createORPCErrorFromJson, isORPCErrorJson, MalformedResponseError } from '@orpc/client'
+import { createORPCErrorFromJson, isORPCErrorJson, MalformedResponseError, ResponseError } from '@orpc/client'
 import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import { unlazy } from '@orpc/server'
 import { isTypescriptObject, mergeHttpPath, pathToHttpPath, safeEncodeURIComponent, stringifyJSON, value } from '@orpc/shared'
@@ -405,7 +405,12 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       }
 
       if (isORPCErrorJson(deserialized)) {
-        return { kind: 'error', error: createORPCErrorFromJson(deserialized) }
+        return {
+          kind: 'error',
+          error: createORPCErrorFromJson(deserialized, {
+            cause: new ResponseError({ response: { status: response.status, headers: response.headers, body } }),
+          }),
+        }
       }
 
       throw new MalformedResponseError({ response: { headers: response.headers, status: response.status, body } })
