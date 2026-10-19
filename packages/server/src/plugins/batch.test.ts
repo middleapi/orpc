@@ -755,6 +755,55 @@ describe('batchHandlerPlugin', () => {
       expect(body.map(m => m.json.headers['cache-control'])).toEqual(['max-age=60', 'max-age=60'])
     })
 
+    it('merges every sub-response\'s vary fields onto the batch response', async () => {
+      const handler = createHandler(new BatchHandlerPlugin({ headers: { vary: 'Origin' } }), {
+        localized: os.$context<ResponseHeadersHandlerPluginContext>().handler(({ context }) => {
+          context.resHeaders?.set('cache-control', 'public, max-age=60')
+          context.resHeaders?.set('vary', 'Accept-Language, origin')
+          return 'ok'
+        }),
+        personal: os.$context<ResponseHeadersHandlerPluginContext>().handler(({ context }) => {
+          context.resHeaders?.set('cache-control', 'public, max-age=60')
+          context.resHeaders?.set('vary', 'Cookie')
+          return 'ok'
+        }),
+        shared: os.$context<ResponseHeadersHandlerPluginContext>().handler(({ context }) => {
+          context.resHeaders?.set('cache-control', 'public, max-age=60')
+          return 'ok'
+        }),
+      })
+
+      const { response } = await handler.handle(createBatchRequest({
+        messages: [
+          makePeerRequestMessage(0, '/localized'),
+          makePeerRequestMessage(1, '/personal'),
+          makePeerRequestMessage(2, '/shared'),
+        ],
+      }))
+
+      expect(response!.headers.get('cache-control')).toBe('public, max-age=60')
+      expect(response!.headers.get('vary')).toBe('Origin, Accept-Language, Cookie')
+    })
+
+    it('varies the batch response on everything when a sub-response varies on everything', async () => {
+      const handler = createHandler(new BatchHandlerPlugin(), {
+        any: os.$context<ResponseHeadersHandlerPluginContext>().handler(({ context }) => {
+          context.resHeaders?.set('vary', '*')
+          return 'ok'
+        }),
+        localized: os.$context<ResponseHeadersHandlerPluginContext>().handler(({ context }) => {
+          context.resHeaders?.set('vary', 'Accept-Language')
+          return 'ok'
+        }),
+      })
+
+      const { response } = await handler.handle(createBatchRequest({
+        messages: [makePeerRequestMessage(0, '/any'), makePeerRequestMessage(1, '/localized')],
+      }))
+
+      expect(response!.headers.get('vary')).toBe('*')
+    })
+
     it('sets each distinct cookie once, including the ones the headers option sets', async () => {
       const handler = createHandler(new BatchHandlerPlugin({ headers: { 'set-cookie': 'theme=dark' } }), headersRouter)
 

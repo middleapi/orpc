@@ -64,7 +64,7 @@ interface SubresponseHead {
 /**
  * Builds the batch response headers: the headers the subresponses all have with the same value, as
  * the client does with the headers every subrequest shares, then the batch headers, which win, and
- * the distinct cookies of both.
+ * the distinct cookies and `vary` fields of both. A cache must vary on whatever any subresponse varies on.
  */
 function liftSubresponseHeaders(
   batchHeaders: StandardHeaders,
@@ -90,6 +90,23 @@ function liftSubresponseHeaders(
 
   if (cookies.size > 0) {
     headers['set-cookie'] = [...cookies]
+  }
+
+  const varies = new Map<string, string>()
+
+  for (const value of [batchHeaders, ...subresponseHeaders].flatMap(other => toArray(other.vary))) {
+    for (const field of value.split(',')) {
+      const name = field.trim()
+      const key = name.toLowerCase()
+
+      if (name && !varies.has(key)) {
+        varies.set(key, name)
+      }
+    }
+  }
+
+  if (varies.size > 0) {
+    headers.vary = varies.has('*') ? '*' : [...varies.values()].join(', ')
   }
 
   return headers
@@ -134,7 +151,7 @@ export interface BatchHandlerPluginOptions<T extends Context> {
    * Success batch response headers.
    *
    * The batch response also gets the cookies its sub-responses set, and the headers they all share.
-   * Headers set here win, and setting one to `undefined` keeps it off.
+   * Headers set here win, and setting one to `undefined` keeps it off, except `set-cookie` and `vary`, which merge.
    *
    * @default {}
    */

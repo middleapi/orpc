@@ -221,7 +221,7 @@ Per-request data passed through the link's [`headers` option](/docs/rpc/link#url
 
 ## Response Headers
 
-The batch response carries the cookies of its subresponses, and the headers they all share. Other headers stay on their subresponse. To change what stays on each subresponse, set the server plugin's `mapSubresponse` option.
+The batch response carries the cookies and `Vary` fields of its subresponses, and the headers they all share. Other headers stay on their subresponse. To change what stays on each subresponse, set the server plugin's `mapSubresponse` option.
 
 ## Learn More
 
