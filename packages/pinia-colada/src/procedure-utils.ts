@@ -1,10 +1,9 @@
 import type { Client, ClientContext } from '@orpc/client'
 import type { Interceptor, MaybeOptionalOptions, PromiseWithError } from '@orpc/shared'
 import type { _EmptyObject, EntryKeyTagged, UseInfiniteQueryData, UseInfiniteQueryFnContext } from '@pinia/colada'
-import type { OperationKeyPrefixOptions, OperationKeySerializerOptions } from './key'
+import type { OperationKeyBaseOptions } from './key'
 import type { InferLiveQueryOutput, InferStreamedQueryOutput, InfiniteKeyOptions, InfiniteOptionsIn, InfiniteOptionsOut, MutationKeyOptions, MutationOptionsIn, MutationOptionsOut, OperationContext, QueryKeyOptions, QueryOptionsIn, QueryOptionsOut, StreamedKeyOptions, StreamedOptionsIn, StreamedOptionsOut, UseMutationFnContext, UseQueryFnContext } from './types'
 import { intercept, isAsyncIteratorObject, isTypescriptObject, resolveMaybeOptionalOptions } from '@orpc/shared'
-import { generateOperationKey } from './key'
 import { liveQuery } from './live-query'
 import { SharedUtils } from './shared-utils'
 import { serializableStreamedQuery } from './stream-query'
@@ -53,7 +52,7 @@ export type ProcedureUtilsMutationInterceptor<TClientContext extends ClientConte
  */
 export type ProcedureUtilsModifier<T extends object> = Partial<T> | ((options: T) => T)
 
-export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError> extends OperationKeyPrefixOptions, OperationKeySerializerOptions {
+export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError> extends OperationKeyBaseOptions {
   /**
    * Key options modifier for .queryKey and .queryOptions
    * Can be partial options or a function that receives per-call options and returns override this.options.
@@ -304,7 +303,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const key = (optionsIn as any).key
-      ?? generateOperationKey(this.path, { prefix: this.options.prefix, serializer: this.options.serializer, type: 'query', input: (optionsIn as any).input })
+      ?? this.key({ type: 'query', input: (optionsIn as any).input })
 
     return key as EntryKeyTagged<TOutput, TError>
   }
@@ -380,7 +379,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const key = (optionsIn as any).key
-      ?? generateOperationKey(this.path, { prefix: this.options.prefix, serializer: this.options.serializer, type: 'streamed', input: (optionsIn as any).input, fnOptions: (optionsIn as any).fnOptions })
+      ?? this.key({ type: 'streamed', input: (optionsIn as any).input, fnOptions: (optionsIn as any).fnOptions })
 
     return key as EntryKeyTagged<InferStreamedQueryOutput<TOutput>, TError>
   }
@@ -467,7 +466,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const key = (optionsIn as any).key
-      ?? generateOperationKey(this.path, { prefix: this.options.prefix, serializer: this.options.serializer, type: 'live', input: (optionsIn as any).input })
+      ?? this.key({ type: 'live', input: (optionsIn as any).input })
 
     return key as EntryKeyTagged<InferLiveQueryOutput<TOutput>, TError>
   }
@@ -549,9 +548,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const key = (optionsIn as any).key
-      ?? generateOperationKey(this.path, {
-        prefix: this.options.prefix,
-        serializer: this.options.serializer,
+      ?? this.key({
         type: 'infinite',
         input: (optionsIn as any).input(
           typeof (optionsIn as any).initialPageParam === 'function'
@@ -630,7 +627,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const key = optionsIn.key
-      ?? ((input: TInput) => generateOperationKey(this.path, { prefix: this.options.prefix, serializer: this.options.serializer, type: 'mutation', input: input as any }))
+      ?? ((input: TInput) => this.key({ type: 'mutation', input: input as any }))
 
     return key as MutationOptionsOut<TInput, TOutput, TError, _EmptyObject>['key']
   }

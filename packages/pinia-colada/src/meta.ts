@@ -1,13 +1,14 @@
 import type { AnyNestedClient, ClientContext, InferClientContext, InferClientError } from '@orpc/client'
 import type { AnySchema, ErrorMap, InferSchemaInput, InferSchemaOutput, Meta, MetaPlugin, ORPCErrorFromErrorMap, RouterContract } from '@orpc/contract'
 import type { ThrowableError } from '@orpc/shared'
+import type { OperationKeyBaseOptions } from './key'
 import type { RouterUtilsPlugin } from './plugin'
 import type { ProcedureUtilsOptions } from './procedure-utils'
 import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import { mergeProcedureUtilsOptions } from './procedure-utils'
 
 export type PiniaColadaMetaOptions<TClientContext extends ClientContext, TInput, TOutput, TError>
-  = Omit<ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>, 'prefix' | 'serializer'>
+  = Omit<ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>, keyof OperationKeyBaseOptions>
 
 export interface PiniaColadaMetaPlugin<
   TInputSchema extends AnySchema,

@@ -20,26 +20,15 @@ describe('sharedUtils', () => {
     expect(generateOperationKeySpy).toHaveBeenCalledWith(['path'], { input: { search: '__search__' }, type: 'query', prefix: undefined })
   })
 
-  it('.key with prefix', () => {
-    const prefixedUtils = new SharedUtils(['path'], { prefix: '__prefix__' })
-
-    expect(
-      prefixedUtils.key({ type: 'query' }),
-    ).toBe(generateOperationKeySpy.mock.results[0]!.value)
-
-    expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
-    expect(generateOperationKeySpy).toHaveBeenCalledWith(['path'], { type: 'query', prefix: '__prefix__' })
-  })
-
-  it('.key with serializer', () => {
+  it('.key with key options', () => {
     const serializer = new RPCJsonSerializer()
-    const serializedUtils = new SharedUtils(['path'], { serializer })
+    const keyedUtils = new SharedUtils(['path'], { prefix: '__prefix__', serializer })
 
     expect(
-      serializedUtils.key({ input: { search: '__search__' } }),
+      keyedUtils.key({ type: 'query' }),
     ).toBe(generateOperationKeySpy.mock.results[0]!.value)
 
     expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
-    expect(generateOperationKeySpy).toHaveBeenCalledWith(['path'], { input: { search: '__search__' }, serializer })
+    expect(generateOperationKeySpy).toHaveBeenCalledWith(['path'], { type: 'query', prefix: '__prefix__', serializer })
   })
 })

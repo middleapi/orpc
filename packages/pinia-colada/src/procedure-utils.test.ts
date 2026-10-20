@@ -440,45 +440,20 @@ describe('procedureUtils', () => {
     })
   })
 
-  describe('with prefix', () => {
-    const prefixedUtils = new ProcedureUtils(['ping'], client, { prefix: '__prefix__' })
-
-    it('includes prefix in generated keys', () => {
-      prefixedUtils.queryKey({ input: 1 } as any)
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { prefix: '__prefix__', type: 'query', input: 1 })
-
-      prefixedUtils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 0 } as any)
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { prefix: '__prefix__', type: 'infinite', input: { cursor: 0 } })
-
-      const mutationKey = prefixedUtils.mutationKey() as any
-      mutationKey('__input__')
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(3, ['ping'], { prefix: '__prefix__', type: 'mutation', input: '__input__' })
-    })
-  })
-
-  describe('with serializer', () => {
+  describe('with key options', () => {
     const serializer = new RPCJsonSerializer()
-    const serializedUtils = new ProcedureUtils(['ping'], client, { serializer })
+    const keyedUtils = new ProcedureUtils(['ping'], client, { prefix: '__prefix__', serializer })
 
-    it('passes serializer to generated keys', () => {
-      serializedUtils.key({ input: 1 } as any)
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { serializer, input: 1 })
+    it('includes key options in generated keys', () => {
+      keyedUtils.queryKey({ input: 1 } as any)
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { prefix: '__prefix__', serializer, type: 'query', input: 1 })
 
-      serializedUtils.queryKey({ input: 1 } as any)
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { serializer, type: 'query', input: 1 })
+      keyedUtils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 0 } as any)
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { prefix: '__prefix__', serializer, type: 'infinite', input: { cursor: 0 } })
 
-      serializedUtils.streamedKey({ input: 1 } as any)
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(3, ['ping'], { serializer, type: 'streamed', input: 1 })
-
-      serializedUtils.liveKey({ input: 1 } as any)
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(4, ['ping'], { serializer, type: 'live', input: 1 })
-
-      serializedUtils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 0 } as any)
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(5, ['ping'], { serializer, type: 'infinite', input: { cursor: 0 } })
-
-      const mutationKey = serializedUtils.mutationKey() as any
+      const mutationKey = keyedUtils.mutationKey() as any
       mutationKey('__input__')
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(6, ['ping'], { serializer, type: 'mutation', input: '__input__' })
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(3, ['ping'], { prefix: '__prefix__', serializer, type: 'mutation', input: '__input__' })
     })
   })
 

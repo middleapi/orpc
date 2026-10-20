@@ -13,7 +13,7 @@ export interface OperationKeyPrefixOptions {
   prefix?: string
 }
 
-export interface OperationKeySerializerOptions {
+export interface OperationKeyBaseOptions extends OperationKeyPrefixOptions {
   /**
    * Serializes inputs into JSON-compatible values when building keys.
    * Pass the serializer your link uses so custom types produce consistent keys.
@@ -23,13 +23,13 @@ export interface OperationKeySerializerOptions {
   serializer?: Public<RPCJsonSerializer>
 }
 
-export type OperationKeyOptions<TType extends OperationType, TInput> = OperationKeyPrefixOptions & OperationKeySerializerOptions & {
+export type OperationKeyOptions<TType extends OperationType, TInput> = OperationKeyBaseOptions & {
   type?: TType
   input?: PartialDeep<TInput>
   fnOptions?: TType extends 'streamed' ? SerializableStreamedQueryOptions : never
 }
 
-type OperationKeyContent<TType extends OperationType, TInput> = Omit<OperationKeyOptions<TType, TInput>, 'prefix' | 'serializer'> & {
+type OperationKeyContent<TType extends OperationType, TInput> = Omit<OperationKeyOptions<TType, TInput>, keyof OperationKeyBaseOptions> & {
   /**
    * Serializer types of non-JSON values in `input`, keyed by their JSON-encoded path,
    * so inputs with the same JSON form (like a `Date` and its ISO string) produce different keys.
@@ -69,7 +69,7 @@ export function generateOperationKey<TType extends OperationType, TInput>(
   ] as OperationKey<TType, TInput>
 }
 
-function serializeInput(serializer: Public<RPCJsonSerializer>, input: unknown): { input: unknown, inputMeta?: Record<string, string[]> } {
+function serializeInput(serializer: Public<RPCJsonSerializer>, input: unknown) {
   const { json, meta } = serializer.serializeJson(input)
 
   if (!meta?.length) {
