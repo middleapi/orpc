@@ -1,6 +1,6 @@
 import type { Public } from '@orpc/shared'
 import type { EncodePeerMessageOptions, PeerEventStreamMessage } from '@standard-server/peer'
-import { RPCJsonSerializer, toORPCError } from '@orpc/client'
+import { RPCSerializer, toORPCError } from '@orpc/client'
 import { unwrapEvent } from '@standard-server/core'
 import { encodePeerMessage } from '@standard-server/peer'
 
@@ -11,11 +11,9 @@ export interface EncodeHibernationRPCEventOptions {
   encodePeerMessage?: EncodePeerMessageOptions | undefined
 
   /**
-   * Serializer for event payloads.
-   *
-   * @default RPCJsonSerializer
+   * Override the default RPC serializer.
    */
-  serializer?: Public<RPCJsonSerializer>
+  serializer?: Public<RPCSerializer>
 
   /**
    * The type of event, each type corresponds a different operation
@@ -38,12 +36,10 @@ export interface EncodeHibernationRPCEventOptions {
 export async function encodeHibernationRPCEvent(
   id: string,
   payload: unknown,
-  { event = 'message', serializer = new RPCJsonSerializer(), encodePeerMessage: encodePeerMessageOptions }: EncodeHibernationRPCEventOptions = {},
+  { event = 'message', serializer = new RPCSerializer(), encodePeerMessage: encodePeerMessageOptions }: EncodeHibernationRPCEventOptions = {},
 ): Promise<string | Uint8Array<ArrayBuffer>> {
   const [originalData, meta] = unwrapEvent(payload)
   const data = event === 'error' ? toORPCError(originalData).toJSON() : originalData
-  // matches how RPCSerializer encodes event iterator values: undefined is sent as is
-  const serialized = data === undefined ? undefined : serializer.serializeJson(data)
 
   const message: PeerEventStreamMessage = {
     kind: 'event-stream',
@@ -51,7 +47,7 @@ export async function encodeHibernationRPCEvent(
     json: {
       ...meta,
       event: event === 'message' ? undefined : event,
-      data: serialized === undefined ? undefined : { json: serialized.json, meta: serialized.meta },
+      data: serializer.serialize(data, { useFormDataForBlobFields: false }),
     },
   }
 
