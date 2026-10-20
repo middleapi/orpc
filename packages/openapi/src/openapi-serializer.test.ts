@@ -1,8 +1,6 @@
-import type { Public } from '@orpc/shared'
 import { createORPCErrorFromJson, ORPCError } from '@orpc/client'
 import { isAsyncIteratorObject } from '@orpc/shared'
 import { ErrorEvent } from '@standard-server/core'
-import { OpenAPIJsonSerializer } from './openapi-json-serializer'
 import { OpenAPISerializer } from './openapi-serializer'
 
 describe('openAPISerializer', () => {
@@ -359,33 +357,6 @@ describe('openAPISerializer', () => {
       // index 2 leaves 1 empty slot, more than the limit of 0, so the array should be deserialized as an object
       const s = new OpenAPISerializer({ bracketNotation: { maxDeserializingEmptySlots: 0 } })
       expect(s.deserialize(form)).toEqual({ tags: { 0: 'a', 2: 'b' } })
-    })
-  })
-
-  describe('extends OpenAPIJsonSerializer', () => {
-    it('can be used wherever an OpenAPIJsonSerializer is accepted', () => {
-      const s = new OpenAPISerializer({
-        handlers: {
-          date: {
-            condition: v => v instanceof Date,
-            serialize: (v: Date) => `___TEST___${v.getTime()}`,
-          },
-        },
-      })
-
-      expect(s).toBeInstanceOf(OpenAPIJsonSerializer)
-
-      const jsonSerializer: Public<OpenAPIJsonSerializer> = s
-      const date = new Date('2023-01-01')
-      const blob = new Blob(['hello'])
-      const serialized = jsonSerializer.serializeJson({ date, file: blob })
-
-      expect(serialized).toEqual({
-        json: { date: `___TEST___${date.getTime()}`, file: blob },
-        maps: [['file']],
-        blobs: [blob],
-      })
-      expect(jsonSerializer.deserializeJson(serialized)).toEqual({ date: `___TEST___${date.getTime()}`, file: blob })
     })
   })
 
