@@ -4,9 +4,12 @@ import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-ser
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
 import { ORPCError } from '@orpc/client'
+import { BATCH_HEADER, DEFAULT_BATCH_MAX_SIZE } from '@orpc/client/plugins'
 import { isAsyncIteratorObject, promiseWithResolvers, toArray, value } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
+
+export { BATCH_HEADER, DEFAULT_BATCH_MAX_SIZE } from '@orpc/client/plugins'
 
 /**
  * Content type for batch responses that use the length-prefixed binary framing,
@@ -114,9 +117,11 @@ function liftSubresponseHeaders(
 
 export interface BatchHandlerPluginOptions<T extends Context> {
   /**
-   * The max size of the batch allowed.
+   * The max size of the batch allowed. Larger batches are rejected with a `413`.
    *
-   * @default 10
+   * The client Batch Link Plugin's `maxSize` must not exceed it, as the client splits batches by its own limit.
+   *
+   * @default DEFAULT_BATCH_MAX_SIZE (10)
    */
   maxSize?: Value<Promisable<number>, [options: StandardHandlerRoutingInterceptorOptions<T>]>
 
@@ -211,7 +216,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
   private readonly keepAliveInterval: number
 
   constructor(options: BatchHandlerPluginOptions<T> = {}) {
-    this.maxSize = options.maxSize ?? 10
+    this.maxSize = options.maxSize ?? DEFAULT_BATCH_MAX_SIZE
 
     this.mapSubrequest = options.mapSubrequest ?? ((subRequest, { request: batchRequest }) => ({
       ...subRequest,
@@ -223,7 +228,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
          * or `origin`, cannot be overridden by a subrequest, which is just request payload.
          */
         ...batchRequest.headers,
-        'orpc-batch': undefined, // useful in case batch plugin is used multiple times
+        [BATCH_HEADER]: undefined, // useful in case batch plugin is used multiple times
       },
     }))
 
@@ -247,7 +252,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async (interceptorOptions) => {
-      if (flattenStandardHeader(interceptorOptions.request.headers['orpc-batch']) === undefined) {
+      if (flattenStandardHeader(interceptorOptions.request.headers[BATCH_HEADER]) === undefined) {
         return interceptorOptions.next()
       }
 

@@ -46,15 +46,52 @@ const link = new RPCLink({
 </CodeGroup>
 
 :::warning
-`BatchHandlerPlugin` detects batch requests by checking for the `orpc-batch` header, so cross-origin batch requests need CORS to allow it. The [CORS Plugin](/docs/plugins/cors) allows requested headers by default. If you set `allowHeaders` or configure CORS elsewhere, include `orpc-batch` along with `Content-Type` and any other headers your clients send:
+`BatchHandlerPlugin` detects batch requests by checking for the `orpc-batch` header (exported as `BATCH_HEADER`), so cross-origin batch requests need CORS to allow it. The [CORS Plugin](/docs/plugins/cors) allows requested headers by default. If you set `allowHeaders` or configure CORS elsewhere, include it along with `Content-Type` and any other headers your clients send:
 
 ```ts
+import { BATCH_HEADER } from '@orpc/server/plugins'
+
 const cors = new CORSHandlerPlugin({
-  allowHeaders: ['Content-Type', 'orpc-batch'],
+  allowHeaders: ['Content-Type', BATCH_HEADER],
 })
 ```
 
 :::
+
+## Max Size
+
+Both plugins limit how many requests a batch holds with `maxSize`, and each side defaults to `DEFAULT_BATCH_MAX_SIZE` (10) independently. The client splits a larger group into several batches, while the server rejects a larger batch with a `413`, which every request in it receives. Keep the client limit at or below the server's, since raising only the client's makes every batch above the server's limit fail.
+
+<CodeGroup>
+
+```ts server.ts
+const handler = new RPCHandler(router, {
+  plugins: [
+    new BatchHandlerPlugin({
+      maxSize: 20,
+    }),
+  ],
+})
+```
+
+```ts client.ts
+const link = new RPCLink({
+  url: '/rpc',
+  plugins: [
+    new BatchLinkPlugin({
+      maxSize: 20, // must not exceed the server's maxSize
+      groups: [
+        {
+          condition: () => true,
+          context: {},
+        },
+      ],
+    }),
+  ],
+})
+```
+
+</CodeGroup>
 
 ## Streaming Responses
 

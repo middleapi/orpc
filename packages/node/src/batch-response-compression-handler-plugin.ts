@@ -3,7 +3,7 @@ import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRout
 import type { StandardBodyHint, StandardHeaders } from '@standard-server/core'
 import { Duplex } from 'node:stream'
 import { constants, createDeflate, createDeflateRaw, createGzip } from 'node:zlib'
-import { negotiateResponseCompressionEncoding, toCompressedHeaders } from '@orpc/server/plugins'
+import { BATCH_HEADER, negotiateResponseCompressionEncoding, toCompressedHeaders } from '@orpc/server/plugins'
 import { stringifyJSON, toArray } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 
@@ -71,7 +71,7 @@ export class BatchResponseCompressionHandlerPlugin<T extends Context> implements
        * a batch without it belongs to a procedure serving that content type itself, whose own file
        * semantics must survive untouched.
        */
-      if (flattenStandardHeader(interceptorOptions.request.headers['orpc-batch']) === undefined) {
+      if (flattenStandardHeader(interceptorOptions.request.headers[BATCH_HEADER]) === undefined) {
         return result
       }
 

@@ -7,6 +7,22 @@ import { captureAsyncContext, defer, isAsyncIteratorObject, loadBytes, once, pro
 import { parseStandardUrl } from '@standard-server/core'
 import { ClientPeer, decodePeerMessage, isServerPeerSendMessage } from '@standard-server/peer'
 
+/**
+ * Header that marks a request as a batch, set by the Batch Link Plugin and detected by the Batch Handler Plugin.
+ * Cross-origin batch requests need CORS to allow it.
+ *
+ * @see {@link https://orpc.dev/docs/plugins/batch#setup | Batch Plugin - Setup}
+ */
+export const BATCH_HEADER = 'orpc-batch'
+
+/**
+ * Default `maxSize` of both the Batch Link Plugin and the Batch Handler Plugin.
+ * The server rejects a batch larger than its own limit with a `413`, so the client limit must not exceed it.
+ *
+ * @see {@link https://orpc.dev/docs/plugins/batch#max-size | Batch Plugin - Max Size}
+ */
+export const DEFAULT_BATCH_MAX_SIZE = 10
+
 export interface BatchLinkPluginGroup<T extends ClientContext> {
   /**
    * Determines whether a request should be included in this batch group.
@@ -48,9 +64,11 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
   scope?: (options: StandardLinkTransportInterceptorOptions<T>) => unknown
 
   /**
-   * The maximum number of requests in the batch.
+   * The maximum number of requests in the batch. Larger batches are split.
    *
-   * @default 10
+   * Must not exceed the server Batch Handler Plugin's `maxSize`, which rejects larger batches with a `413`.
+   *
+   * @default DEFAULT_BATCH_MAX_SIZE (10)
    */
   maxSize?: Value<Promisable<number>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]>
 
@@ -131,7 +149,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
     this.groups = options.groups
     this.filter = options.filter ?? (() => true)
     this.scope = options.scope ?? (() => undefined)
-    this.maxSize = options.maxSize ?? 10
+    this.maxSize = options.maxSize ?? DEFAULT_BATCH_MAX_SIZE
     this.wait = options.wait ?? 0
     this.batchUrl = options.url ?? ((options) => {
       const [pathname] = parseStandardUrl(options[0].request.url)
@@ -357,7 +375,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
         const request: StandardRequest = {
           url,
           method,
-          headers: { ...headers, 'orpc-batch': '1' },
+          headers: { ...headers, [BATCH_HEADER]: '1' },
           signal: controller.signal,
         }
 
