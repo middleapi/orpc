@@ -8,8 +8,7 @@ const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
 /**
  * These tests depend on a real Upstash redis server — make sure to set the
  * `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` envs.
- * When writing new tests, always use unique keys to avoid conflicts with other
- * test cases.
+ * Each limiter gets a random prefix, so keys never conflict between test cases.
  */
 describe.concurrent('upstash rate limiter integration', {
   skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_REDIS_REST_TOKEN,

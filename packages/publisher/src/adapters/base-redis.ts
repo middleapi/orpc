@@ -1,7 +1,7 @@
 import type { RPCJsonSerialization } from '@orpc/client'
 import type { Public, ThrowableError } from '@orpc/shared'
 import type { EventMeta } from '@standard-server/core'
-import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
+import type { PublisherOptions, PublisherResumeOptions, PublisherSubscribeListenerOptions } from '../publisher'
 import { RPCJsonSerializer } from '@orpc/client'
 import { once, parseEmptyableJSON, stringifyJSON } from '@orpc/shared'
 import { getEventMeta, unwrapEvent, withEventMeta } from '@standard-server/core'
@@ -43,27 +43,7 @@ export interface BaseRedisPublisherOptions extends PublisherOptions {
    *
    * @default { enabled: false }
    */
-  resume?: {
-    /**
-     * Whether event resume support is enabled.
-     *
-     * When enabled, published events are temporarily stored so new
-     * subscribers can resume from a previous position using `lastEventId`.
-     *
-     * @default false
-     */
-    enabled: boolean
-
-    /**
-     * How long to retain events for resume, in milliseconds.
-     *
-     * Expired events are cleaned up lazily for performance reasons, so
-     * some events may remain available slightly longer than this period.
-     *
-     * @default 300000 (5 min)
-     */
-    ttl?: number
-  }
+  resume?: PublisherResumeOptions
 }
 
 /**

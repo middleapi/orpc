@@ -1,5 +1,5 @@
 import type { RateLimiter, RateLimitOptions, RateLimitResult } from '../types'
-import { sleep } from '@orpc/shared'
+import { blockUntilReady, resolveWeight } from '../utils'
 
 export interface MemoryRateLimiterOptions {
   /**
@@ -14,7 +14,7 @@ export interface MemoryRateLimiterOptions {
 
   /**
    * How long to wait for capacity to become available, in milliseconds.
-   * Rejects right away when the window will not reset before the timeout elapses.
+   * Gives up right away when the window will not reset before the timeout elapses.
    *
    * @default 0
    */
@@ -42,11 +42,9 @@ export class MemoryRateLimiter implements RateLimiter {
   }
 
   async limit(key: string, options?: RateLimitOptions): Promise<Required<RateLimitResult>> {
-    const weight = this.resolveWeight(options)
+    const weight = resolveWeight(options)
 
-    return this.timeout > 0
-      ? this.blockUntilReady(key, this.timeout, weight)
-      : this.checkLimit(key, weight)
+    return blockUntilReady(() => this.checkLimit(key, weight), this.timeout)
   }
 
   private rotateIfNeeded(now: number): void {
@@ -82,29 +80,5 @@ export class MemoryRateLimiter implements RateLimiter {
       remaining: Math.max(0, this.maxRequests - entry.used),
       reset,
     }
-  }
-
-  private async blockUntilReady(key: string, timeoutMs: number, weight: number): Promise<Required<RateLimitResult>> {
-    const deadlineAtMs = Date.now() + timeoutMs
-
-    while (true) {
-      const result = this.checkLimit(key, weight)
-
-      if (result.success || result.reset > deadlineAtMs) {
-        return result
-      }
-
-      await sleep(result.reset - Date.now())
-    }
-  }
-
-  private resolveWeight(options?: RateLimitOptions): number {
-    const weight = options?.weight ?? 1
-
-    if (!Number.isInteger(weight) || weight <= 0) {
-      throw new TypeError('Rate limit weight must be an integer greater than 0')
-    }
-
-    return weight
   }
 }

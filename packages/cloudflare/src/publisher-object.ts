@@ -1,8 +1,9 @@
+import type { PublisherResumeOptions } from '@orpc/publisher'
 import type { EventMeta } from '@standard-server/core'
 import { isPlainObject, stringifyJSON } from '@orpc/shared'
 import { DurableObject } from 'cloudflare:workers'
 
-export interface DurablePublisherObjectResumeOptions {
+export interface DurablePublisherObjectResumeOptions extends PublisherResumeOptions {
   /**
    * Whether event resume support is enabled.
    *
@@ -14,16 +15,6 @@ export interface DurablePublisherObjectResumeOptions {
    * @default false
    */
   enabled: boolean
-
-  /**
-   * How long to retain events for resume, in milliseconds.
-   *
-   * Expired events are cleaned up lazily for performance reasons, so
-   * some events may remain available slightly longer than this period.
-   *
-   * @default 300000 (5 min)
-   */
-  ttl?: number
 
   /**
    * Interval between cleanup checks for the Durable Object, in milliseconds.

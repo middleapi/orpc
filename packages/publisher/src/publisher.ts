@@ -18,6 +18,31 @@ export interface PublisherOptions {
   maxBufferedEvents?: number
 }
 
+/**
+ * Configuration for event resume support, shared by the adapters that support it.
+ */
+export interface PublisherResumeOptions {
+  /**
+   * Whether event resume support is enabled.
+   *
+   * When enabled, published events are temporarily stored so new
+   * subscribers can resume from a previous position using `lastEventId`.
+   *
+   * @default false
+   */
+  enabled: boolean
+
+  /**
+   * How long to retain events for resume, in milliseconds.
+   *
+   * Expired events are cleaned up lazily for performance reasons, so
+   * some events may remain available slightly longer than this period.
+   *
+   * @default 300000 (5 min)
+   */
+  ttl?: number
+}
+
 export interface PublisherSubscribeListenerOptions {
   /**
    * Resume from a specific event ID

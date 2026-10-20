@@ -36,10 +36,7 @@ describe('publisher redis adapters compatibility', { timeout: 20_000 }, () => {
       prefix,
       resume: { enabled: true, ttl: 10_000 },
     })
-    publishers.push({ name: 'upstash', publisher: new UpstashPublisher(upstashRedis, {
-      prefix,
-      resume: { enabled: true, ttl: 10_000 },
-    }) })
+    publishers.push({ name: 'upstash', publisher })
   }
 
   describe.skipIf(publishers.length < 2)('cross-adapter compatibility', () => {

@@ -50,7 +50,7 @@ if (!result.success) {
 
 ### Blocking Mode
 
-Some adapters support blocking mode, which waits until capacity becomes available instead of rejecting requests immediately. Set `timeout` to how long a request may wait, in milliseconds. A request is still rejected right away when its window will not reset before the timeout elapses.
+Some adapters support blocking mode, which waits until capacity becomes available instead of rejecting requests immediately. Set `timeout` to how long a request may wait, in milliseconds. A request still fails right away when its window will not reset before the timeout elapses.
 
 ```ts
 const limiter = new MemoryRateLimiter({
@@ -168,7 +168,7 @@ const limiter = new MemoryRateLimiter({
 
   /**
    * How long to wait for capacity to become available, in milliseconds.
-   * Rejects right away when the window will not reset before the timeout elapses.
+   * Gives up right away when the window will not reset before the timeout elapses.
    *
    * @default 0
    */
@@ -210,7 +210,7 @@ const limiter = new RedisRateLimiter(client, {
 
   /**
    * How long to wait for capacity to become available, in milliseconds.
-   * Rejects right away when the window will not reset before the timeout elapses.
+   * Gives up right away when the window will not reset before the timeout elapses.
    *
    * @default 0
    */
@@ -248,7 +248,7 @@ const limiter = new UpstashRateLimiter(redis, {
 
   /**
    * How long to wait for capacity to become available, in milliseconds.
-   * Rejects right away when the window will not reset before the timeout elapses.
+   * Gives up right away when the window will not reset before the timeout elapses.
    *
    * @default 0
    */
@@ -284,7 +284,7 @@ const limiter = new BunRedisRateLimiter(redis, {
 
   /**
    * How long to wait for capacity to become available, in milliseconds.
-   * Rejects right away when the window will not reset before the timeout elapses.
+   * Gives up right away when the window will not reset before the timeout elapses.
    *
    * @default 0
    */

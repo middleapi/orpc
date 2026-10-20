@@ -1,5 +1,5 @@
 import type { RateLimiter, RateLimitOptions, RateLimitResult } from '../types'
-import { sleep } from '@orpc/shared'
+import { blockUntilReady, resolveWeight } from '../utils'
 
 /**
  * Consumes `ARGV[1]` points from the counter at `KEYS[1]`, starts a window of
@@ -33,7 +33,7 @@ export interface BaseRedisRateLimiterOptions {
 
   /**
    * How long to wait for capacity to become available, in milliseconds.
-   * Rejects right away when the window will not reset before the timeout elapses.
+   * Gives up right away when the window will not reset before the timeout elapses.
    *
    * @default 0
    */
@@ -69,11 +69,9 @@ export abstract class BaseRedisRateLimiter implements RateLimiter {
 
   async limit(key: string, options?: RateLimitOptions): Promise<Required<RateLimitResult>> {
     key = `${this.prefix}${key}`
-    const weight = this.resolveWeight(options)
+    const weight = resolveWeight(options)
 
-    return this.timeout > 0
-      ? this.blockUntilReady(key, this.timeout, weight)
-      : this.checkLimit(key, weight)
+    return blockUntilReady(() => this.checkLimit(key, weight), this.timeout)
   }
 
   private async checkLimit(key: string, weight: number): Promise<Required<RateLimitResult>> {
@@ -89,29 +87,5 @@ export abstract class BaseRedisRateLimiter implements RateLimiter {
       remaining: Math.max(0, this.maxRequests - used),
       reset: Date.now() + ttl,
     }
-  }
-
-  private async blockUntilReady(key: string, timeoutMs: number, weight: number): Promise<Required<RateLimitResult>> {
-    const deadlineAtMs = Date.now() + timeoutMs
-
-    while (true) {
-      const result = await this.checkLimit(key, weight)
-
-      if (result.success || result.reset > deadlineAtMs) {
-        return result
-      }
-
-      await sleep(result.reset - Date.now())
-    }
-  }
-
-  private resolveWeight(options?: RateLimitOptions): number {
-    const weight = options?.weight ?? 1
-
-    if (!Number.isInteger(weight) || weight <= 0) {
-      throw new TypeError('Rate limit weight must be an integer greater than 0')
-    }
-
-    return weight
   }
 }
