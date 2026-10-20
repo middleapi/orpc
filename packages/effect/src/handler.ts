@@ -1,3 +1,4 @@
+import type { ErrorMap } from '@orpc/contract'
 import type { Context, ORPCErrorConstructorMap, ProcedureHandler, ProcedureHandlerOptions } from '@orpc/server'
 import type { InferEffectServices, WithEffectContext } from './context'
 import { Effect, Context as EffectContext } from 'effect'
@@ -32,12 +33,12 @@ export interface HandlerGen<
 export function handlerGen<
   TCurrentContext extends Context,
   TInput,
-  TErrorConstructorMap extends ORPCErrorConstructorMap<any>,
   TYield extends Effect.Effect<any, any, InferEffectServices<TCurrentContext>>,
   TReturn,
+  TErrorMap extends ErrorMap = Record<never, never>, // default is important for contract procedures without errors, whose error map is `object` and can't be inferred from
 >(
-  handler: HandlerGen<TCurrentContext, TInput, TYield, TReturn, TErrorConstructorMap>,
-): ProcedureHandler<TCurrentContext, TInput, TReturn, TErrorConstructorMap> {
+  handler: HandlerGen<TCurrentContext, TInput, TYield, TReturn, ORPCErrorConstructorMap<TErrorMap>>,
+): ProcedureHandler<TCurrentContext, TInput, TReturn, ORPCErrorConstructorMap<TErrorMap>> {
   return (opts, input) => {
     const effectContext = opts.context['effect/context']
     const wrap = opts.context['effect/wrap'] as WithEffectContext<any>['effect/wrap']
