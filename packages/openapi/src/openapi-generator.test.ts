@@ -64,9 +64,7 @@ describe('openAPIGenerator basic & options', () => {
 
   it('merges the provided base document and serialize the result', async () => {
     const serializer = {
-      serialize: vi.fn(document => document),
-      deserialize: vi.fn(document => document),
-      serializeJson: vi.fn(),
+      serializeJson: vi.fn(document => ({ json: document })),
       deserializeJson: vi.fn(),
     }
 
@@ -82,16 +80,13 @@ describe('openAPIGenerator basic & options', () => {
       },
     })
 
-    expect(serializer.serialize).toHaveBeenCalledWith({
+    expect(serializer.serializeJson).toHaveBeenCalledWith({
       openapi: '3.2.0',
       info: {
         title: 'Planet API',
         version: '1.2.3',
       },
       servers: [{ url: 'https://api.example.com' }],
-    }, {
-      asFormData: false,
-      useFormDataForBlobFields: false,
     })
 
     expect(doc).toEqual({

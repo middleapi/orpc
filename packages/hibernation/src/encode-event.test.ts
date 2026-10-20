@@ -1,5 +1,5 @@
 import type { RPCJsonSerializerHandler } from '@orpc/client'
-import { ORPCError, RPCSerializer } from '@orpc/client'
+import { ORPCError, RPCJsonSerializer, RPCSerializer } from '@orpc/client'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { encodePeerMessage } from '@standard-server/peer'
 import { encodeHibernationRPCEvent } from './encode-event'
@@ -74,6 +74,15 @@ describe('encodeHibernationRPCEvent', () => {
         json: { retry: 400, event: 'error', data: serializeData(error.toJSON()) },
       }),
     )
+  })
+
+  it('accepts an RPCJsonSerializer', async () => {
+    const id = '39483'
+    const planet = withEventMeta(new Planet('Earth', 12345), { retry: 400 })
+    const jsonSerializer = new RPCJsonSerializer({ handlers: { planet: planetHandler } })
+
+    expect(await encodeHibernationRPCEvent(id, planet, { serializer: jsonSerializer }))
+      .toEqual(await encodeHibernationRPCEvent(id, planet, { serializer }))
   })
 
   it('undefined payload', async () => {

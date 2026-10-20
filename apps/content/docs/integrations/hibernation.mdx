@@ -64,7 +64,7 @@ The plugin provides `HibernationAsyncIteratorClass` and `encodeHibernationRPCEve
 
          // yield an event to all clients
          ws.send(await encodeHibernationRPCEvent(id, { message: input.message }, {
-           // override the default RPC serializer if needed
+           // override the default serializer if needed, e.g. reuse the one passed to RPCHandler
            serializer: new RPCSerializer(),
          }))
          // return an event and stop the iterator
