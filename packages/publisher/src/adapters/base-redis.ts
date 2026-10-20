@@ -1,5 +1,5 @@
 import type { RPCJsonSerialization } from '@orpc/client'
-import type { ThrowableError } from '@orpc/shared'
+import type { Public, ThrowableError } from '@orpc/shared'
 import type { EventMeta } from '@standard-server/core'
 import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
 import { RPCJsonSerializer } from '@orpc/client'
@@ -33,7 +33,7 @@ export interface BaseRedisPublisherOptions extends PublisherOptions {
    *
    * @default RPCJsonSerializer
    */
-  serializer?: undefined | Pick<RPCJsonSerializer, 'serializeJson' | 'deserializeJson'>
+  serializer?: undefined | Public<RPCJsonSerializer>
 
   /**
    * Configuration for event resume support.
@@ -99,7 +99,7 @@ interface SerializedEvent {
  */
 export abstract class BaseRedisPublisher<T extends Record<string, object>> extends Publisher<T> {
   protected readonly prefix: string
-  protected readonly serializer: Pick<RPCJsonSerializer, 'serializeJson' | 'deserializeJson'>
+  protected readonly serializer: Public<RPCJsonSerializer>
   protected readonly resumeEnabled: boolean
   protected readonly resumeSeconds: number
 

@@ -65,6 +65,7 @@ describe('openAPIGenerator basic & options', () => {
   it('merges the provided base document and serialize the result', async () => {
     const serializer = {
       serializeJson: vi.fn(document => ({ json: document })),
+      deserializeJson: vi.fn(),
     }
 
     const generator = new OpenAPIGenerator({ serializer, converters: [zodJsonSchemaConverter] })

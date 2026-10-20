@@ -1,7 +1,7 @@
 import type { AnyORPCError } from '@orpc/client'
 import type { AnyProcedure, AnyRouter, Context } from '@orpc/server'
 import type { ResolvedStandardHandlerHandleOptions, StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '@orpc/server/standard'
-import type { Promisable } from '@orpc/shared'
+import type { Promisable, Public } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { OpenAPIMeta } from '../../meta'
 import type { OpenAPIMatcherOptions } from './openapi-matcher'
@@ -23,7 +23,7 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
   /**
    * Override the default OpenAPI serializer.
    */
-  serializer?: Pick<OpenAPISerializer, 'serialize' | 'deserialize' | 'serializeJson'>
+  serializer?: Public<OpenAPISerializer>
 
   /**
    * Mapping ORPCError Code -> HTTP Status Code
@@ -46,7 +46,7 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
 }
 
 export class OpenAPIHandlerCodecCore<T extends Context> {
-  private readonly serializer: Pick<OpenAPISerializer, 'serialize' | 'deserialize' | 'serializeJson'>
+  private readonly serializer: Public<OpenAPISerializer>
   private readonly errorStatusMap: Exclude<OpenAPIHandlerCodecOptions<T>['errorStatusMap'], undefined>
   private readonly customErrorResponseBodySerializer: OpenAPIHandlerCodecOptions<T>['customErrorResponseBodyEncoder']
 

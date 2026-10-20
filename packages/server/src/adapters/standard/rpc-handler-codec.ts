@@ -1,5 +1,5 @@
 import type { AnyORPCError } from '@orpc/client'
-import type { Promisable, Value } from '@orpc/shared'
+import type { Promisable, Public, Value } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { Context } from '../../context'
 import type { AnyProcedure } from '../../procedure'
@@ -16,7 +16,7 @@ export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOpt
   /**
    * Override the default RPC serializer.
    */
-  serializer?: Pick<RPCSerializer, 'serialize' | 'deserialize'>
+  serializer?: Public<RPCSerializer>
 
   /**
    * Resolve HTTP status for encoded successful outputs.
@@ -39,7 +39,7 @@ export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOpt
 
 export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<T> {
   private readonly matcher: RPCMatcher
-  private readonly serializer: Pick<RPCSerializer, 'serialize' | 'deserialize'>
+  private readonly serializer: Public<RPCSerializer>
   private readonly errorStatusMap: Exclude<RPCHandlerCodecOptions<T>['errorStatusMap'], undefined>
   private readonly outputStatus: RPCHandlerCodecOptions<T>['outputStatus']
 

@@ -1,10 +1,11 @@
+import type { Public } from '@orpc/shared'
 import type { StandardHeaders } from '@standard-server/core'
 import type { OpenAPIJsonSerializer } from '../../openapi-json-serializer'
 import { isTypescriptObject, NullProtoObj } from '@orpc/shared'
 
 export function serializeHeaders(
   headers: object,
-  serializer: Pick<OpenAPIJsonSerializer, 'serializeJson'>,
+  serializer: Public<OpenAPIJsonSerializer>,
 ): StandardHeaders {
   const result = new NullProtoObj<Record<string, string | string[]>>()
 
@@ -41,7 +42,7 @@ export function serializeHeaders(
 
 function serializeHeaderValue(
   value: unknown,
-  serializer: Pick<OpenAPIJsonSerializer, 'serializeJson'>,
+  serializer: Public<OpenAPIJsonSerializer>,
 ): string | undefined {
   const serialized = serializer.serializeJson(value).json
 
