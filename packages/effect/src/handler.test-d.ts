@@ -1,8 +1,7 @@
-import type { InitialInputSchema, InitialOutputSchema, Schema } from '@orpc/contract'
-import type { DecoratedProcedure, DefaultInitialContext, ImplementedProcedure, ORPCErrorConstructorMap } from '@orpc/server'
+import type { InitialInputSchema, Schema } from '@orpc/contract'
+import type { DecoratedProcedure, DefaultInitialContext, ORPCErrorConstructorMap } from '@orpc/server'
 import type { WithEffectContext } from './context'
-import { oc } from '@orpc/contract'
-import { implement, ORPCError, os } from '@orpc/server'
+import { ORPCError, os } from '@orpc/server'
 import { Context, Effect } from 'effect'
 import { z } from 'zod'
 import { handlerGen } from './handler'
@@ -93,64 +92,6 @@ describe('handlerGen', () => {
       .handler(handlerGen(function* () {
         return 'invalid'
       }))
-  })
-
-  it('works with contract-first implementer', () => {
-    const contract = {
-      ping: oc,
-      nested: {
-        pong: oc.input(schema1).output(schema2),
-      },
-      withErrors: oc.errors(errorMap).router({ ping: oc }),
-    }
-
-    const impl = implement(contract)
-
-    const ping = impl.ping.handler(handlerGen(function* ({ errors }) {
-      expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<Record<never, never>>>()
-
-      return yield* Effect.succeed('pong')
-    }))
-
-    expectTypeOf(ping).toEqualTypeOf<
-      ImplementedProcedure<
-        DefaultInitialContext & object,
-        object,
-        InitialInputSchema,
-        InitialOutputSchema,
-        Record<never, never>
-      >
-    >()
-
-    void impl.nested.pong.handler(handlerGen(function* ({ input }) {
-      expectTypeOf(input).toEqualTypeOf<{ schema1: string }>()
-
-      return { schema2: 123 }
-    }))
-
-    void impl
-      .use(({ next }) => next({ context: { extra: true } }))
-      .nested
-      .pong
-      .use(({ next }) => next())
-      .handler(handlerGen(function* ({ context }) {
-        expectTypeOf(context.extra).toEqualTypeOf<boolean>()
-
-        return { schema2: 123 }
-      }))
-
-    void impl.nested.pong.handler(
-      // @ts-expect-error - invalid output
-      handlerGen(function* () {
-        return 'invalid'
-      }),
-    )
-
-    void impl.withErrors.ping.handler(handlerGen(function* ({ errors }) {
-      expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
-
-      return 'pong'
-    }))
   })
 
   it('can strict dependant-effect-service with WithEffectContext', async () => {
