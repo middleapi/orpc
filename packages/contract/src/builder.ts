@@ -49,7 +49,7 @@ export class ContractBuilder<
    *
    * @see {@link https://orpc.dev/docs/contract/procedure | Procedure Contract}
    */
-  static create(): ContractBuilder<object> {
+  static create(): ContractBuilder<Record<never, never>> {
     return new ContractBuilder({
       errorMap: {},
       meta: {},

@@ -118,7 +118,7 @@ describe('handlerGen', () => {
         object,
         InitialInputSchema,
         InitialOutputSchema,
-        object
+        Record<never, never>
       >
     >()
 
