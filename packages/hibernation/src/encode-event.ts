@@ -24,7 +24,7 @@ export interface EncodeHibernationRPCEventOptions {
    *
    * @default 'message'
    */
-  event?: 'message' | 'error' | 'close'
+  event?: 'message' | 'error' | 'close' | undefined
 }
 
 /**

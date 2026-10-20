@@ -15,7 +15,7 @@ export interface OpenAPIMatcherOptions {
    *
    * @default true
    */
-  filter?: Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]>
+  filter?: Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]> | undefined
 }
 
 // chars normalized text keeps raw: rou3 encodes the WHATWG path percent-encode set in literal text, and

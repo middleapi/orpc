@@ -118,7 +118,7 @@ export interface BatchHandlerPluginOptions<T extends Context> {
    *
    * @default 10
    */
-  maxSize?: Value<Promisable<number>, [options: StandardHandlerRoutingInterceptorOptions<T>]>
+  maxSize?: Value<Promisable<number>, [options: StandardHandlerRoutingInterceptorOptions<T>]> | undefined
 
   /**
    * Map each subrequest in the batch before it is processed.
@@ -126,7 +126,7 @@ export interface BatchHandlerPluginOptions<T extends Context> {
    * @default merges the batch request headers into the subrequest, giving them priority over
    * the subrequest headers, and removes the `orpc-batch` header to prevent nested batching
    */
-  mapSubrequest?: (subrequest: StandardLazyRequest, batchOptions: StandardHandlerRoutingInterceptorOptions<T>) => StandardLazyRequest
+  mapSubrequest?: ((subrequest: StandardLazyRequest, batchOptions: StandardHandlerRoutingInterceptorOptions<T>) => StandardLazyRequest) | undefined
 
   /**
    * Map each sub-response in the batch before it is sent.
@@ -134,18 +134,18 @@ export interface BatchHandlerPluginOptions<T extends Context> {
    * @default removes the headers the batch response already has with the same value, which the client
    * merges back, and `set-cookie`, which the browser ignores there and JavaScript could read
    */
-  mapSubresponse?: (
+  mapSubresponse?: ((
     subresponse: StandardResponse,
     partialBatchResponse: Pick<StandardResponse, 'status' | 'headers'>,
     batchOptions: StandardHandlerRoutingInterceptorOptions<T>,
-  ) => StandardResponse
+  ) => StandardResponse) | undefined
 
   /**
    * Success batch response status code.
    *
    * @default 207
    */
-  successStatus?: Value<Promisable<number>, [batchOptions: StandardHandlerRoutingInterceptorOptions<T>]>
+  successStatus?: Value<Promisable<number>, [batchOptions: StandardHandlerRoutingInterceptorOptions<T>]> | undefined
 
   /**
    * Success batch response headers.
@@ -155,7 +155,7 @@ export interface BatchHandlerPluginOptions<T extends Context> {
    *
    * @default {}
    */
-  headers?: Value<Promisable<StandardHeaders>, [batchOptions: StandardHandlerRoutingInterceptorOptions<T>]>
+  headers?: Value<Promisable<StandardHeaders>, [batchOptions: StandardHandlerRoutingInterceptorOptions<T>]> | undefined
 
   /**
    * Keep-alive settings for batch responses that stream.
@@ -165,7 +165,7 @@ export interface BatchHandlerPluginOptions<T extends Context> {
    *
    * @default { enabled: true, interval: 15000 }
    */
-  keepAlive?: undefined | {
+  keepAlive?: {
     /**
      * If true, a keep-alive frame is sent periodically while the stream is idle.
      *
@@ -177,8 +177,8 @@ export interface BatchHandlerPluginOptions<T extends Context> {
      *
      * @default 15000
      */
-    interval?: number
-  }
+    interval?: number | undefined
+  } | undefined
 }
 
 /**

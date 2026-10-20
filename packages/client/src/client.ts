@@ -17,33 +17,33 @@ export interface ORPCClientScopedOptions<TClientContext extends ClientContext, T
   /**
    * Interceptors that wrap the entire client call lifecycle.
    */
-  interceptors?: ORPCClientInterceptor<TClientContext, TInput, TOutput, TError>[]
+  interceptors?: ORPCClientInterceptor<TClientContext, TInput, TOutput, TError>[] | undefined
 }
 
 export type ORPCClientScoped<T extends AnyNestedClient>
   = T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
     ? ORPCClientScopedOptions<UClientContext, UInput, UOutput, UError>
     : {
-        [K in keyof T]?: T[K] extends AnyNestedClient ? ORPCClientScoped<T[K]> : never
+        [K in keyof T]?: (T[K] extends AnyNestedClient ? ORPCClientScoped<T[K]> : never) | undefined
       }
 
 export interface ORPCClientOptions<T extends AnyNestedClient> {
   /**
    * Use as base path for all procedure, useful when you only want to call a subset of the procedure.
    */
-  path?: string[]
+  path?: string[] | undefined
 
   /**
    * Interceptors that wrap the entire client call lifecycle, applied to every procedure call.
    */
-  interceptors?: ORPCClientInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[]
+  interceptors?: ORPCClientInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[] | undefined
 
   /**
    * Per-procedure options following the shape of the router.
    * Allows fine-grained configuration (e.g. additional interceptors) for individual procedures
    * without affecting the rest of the router.
    */
-  scoped?: ORPCClientScoped<T>
+  scoped?: ORPCClientScoped<T> | undefined
 }
 
 /**

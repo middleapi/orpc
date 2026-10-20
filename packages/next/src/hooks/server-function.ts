@@ -6,7 +6,7 @@ import { intercept, toArray } from '@orpc/shared'
 import { useCallback, useMemo, useRef, useState, useTransition } from 'react'
 
 export interface UserSeverFunctionOptions<TInput, TOutput, TError> {
-  interceptors?: Interceptor<{ input: TInput }, PromiseWithError<TOutput, TError>>[]
+  interceptors?: Interceptor<{ input: TInput }, PromiseWithError<TOutput, TError>>[] | undefined
 }
 
 export interface UseServerFunctionExecuteOptions<TInput, TOutput, TError> extends Pick<UserSeverFunctionOptions<TInput, TOutput, TError>, 'interceptors'> {

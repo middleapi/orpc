@@ -15,7 +15,7 @@ export interface BatchResponseCompressionHandlerPluginOptions {
    *
    * @default ['gzip', 'deflate']
    */
-  encodings?: readonly ('gzip' | 'deflate' | 'deflate-raw')[]
+  encodings?: readonly ('gzip' | 'deflate' | 'deflate-raw')[] | undefined
 
   /**
    * The minimum response size in bytes required to trigger compression.
@@ -24,7 +24,7 @@ export interface BatchResponseCompressionHandlerPluginOptions {
    *
    * @default 1024 (1KB)
    */
-  threshold?: number
+  threshold?: number | undefined
 }
 
 /**

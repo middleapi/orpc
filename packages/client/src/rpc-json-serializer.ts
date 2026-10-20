@@ -21,7 +21,7 @@ export interface RPCJsonSerializerHandler {
    *
    * @default false
    */
-  isTerminal?: boolean
+  isTerminal?: boolean | undefined
 }
 
 function invalidSerializedData(detail: string): TypeError {

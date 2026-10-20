@@ -13,7 +13,7 @@ export interface ArkTypeToJsonSchemaConverterOptions extends Omit<ToJsonSchema.O
    *
    * @default false
    */
-  cache?: boolean
+  cache?: boolean | undefined
 }
 
 /**

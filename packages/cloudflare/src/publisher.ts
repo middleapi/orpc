@@ -11,7 +11,7 @@ export interface DurablePublisherOptions extends PublisherOptions {
    *
    * @default ''
    */
-  prefix?: string
+  prefix?: string | undefined
 
   /**
    * Serializer for serialize and deserialize payloads.
@@ -25,7 +25,7 @@ export interface DurablePublisherOptions extends PublisherOptions {
    *
    * @default ((namespace, event) => namespace.getByName(event))
    */
-  getStubByName?: (namespace: DurableObjectNamespace, event: string) => DurableObjectStub
+  getStubByName?: ((namespace: DurableObjectNamespace, event: string) => DurableObjectStub) | undefined
 }
 
 /**

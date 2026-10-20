@@ -9,13 +9,13 @@ export interface OperationKeyPrefixOptions {
    * Prepended as the first element of the key when present.
    * Use this to avoid key conflicts when multiple router utils share the same client.
    */
-  prefix?: string
+  prefix?: string | undefined
 }
 
 export type OperationKeyOptions<TType extends OperationType, TInput> = OperationKeyPrefixOptions & {
-  type?: TType
-  input?: PartialDeep<TInput>
-  fnOptions?: TType extends 'streamed' ? SerializableStreamedQueryOptions : never
+  type?: TType | undefined
+  input?: PartialDeep<TInput> | undefined
+  fnOptions?: (TType extends 'streamed' ? SerializableStreamedQueryOptions : never) | undefined
 }
 
 export type OperationKey<TType extends OperationType, TInput>

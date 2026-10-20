@@ -15,7 +15,7 @@ export interface ValibotToJsonSchemaConverterOptions extends Omit<ConversionConf
    *
    * @default false
    */
-  cache?: boolean
+  cache?: boolean | undefined
 }
 
 const NESTED_CONVERSION_SENTINEL = any()

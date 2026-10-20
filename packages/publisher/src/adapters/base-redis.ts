@@ -26,7 +26,7 @@ export interface BaseRedisPublisherOptions extends PublisherOptions {
    *
    * @default ''
    */
-  prefix?: string
+  prefix?: string | undefined
 
   /**
    * Serializer for serialize and deserialize payloads.
@@ -62,8 +62,8 @@ export interface BaseRedisPublisherOptions extends PublisherOptions {
      *
      * @default 300 (5 min)
      */
-    seconds?: number
-  }
+    seconds?: number | undefined
+  } | undefined
 }
 
 /**
@@ -85,7 +85,7 @@ export interface RedisStreamEntry {
 
 interface SerializedEvent {
   payload: RPCJsonSerialization
-  meta?: undefined | EventMeta
+  meta?: EventMeta | undefined
 }
 
 /**

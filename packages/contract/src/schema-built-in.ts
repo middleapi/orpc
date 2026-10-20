@@ -8,7 +8,7 @@ const ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS_SYMBOL = Symbol.for('ORPC_ASYNC_ITERA
 
 export interface AsyncIteratorObjectSchemaDetails {
   yieldSchema: AnySchema
-  returnSchema?: AnySchema
+  returnSchema?: AnySchema | undefined
 }
 
 /**

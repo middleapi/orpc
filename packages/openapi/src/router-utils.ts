@@ -14,7 +14,7 @@ export interface PopulateRouterContractOpenAPIPathsOptions {
   /**
    * Base path segments.
    */
-  path?: undefined | string[]
+  path?: string[] | undefined
 }
 
 /**

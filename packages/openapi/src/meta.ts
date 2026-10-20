@@ -300,7 +300,7 @@ export interface OpenAPIMeta {
    *
    * Explicitly setting `undefined` resets the spec instead of merging.
    */
-  spec?: Value<OpenAPIV3_2.OperationObject, [current: OpenAPIV3_2.OperationObject]>
+  spec?: Value<OpenAPIV3_2.OperationObject, [current: OpenAPIV3_2.OperationObject]> | undefined
 
   /**
    * Prefix for the path. Useful when you want to apply a common path prefix across multiple procedures.

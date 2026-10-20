@@ -12,7 +12,7 @@ import { DelegatingJsonSchemaConverter } from './convert'
 import { StandardJsonSchemaConverter } from './standard-json-schema-converter'
 
 export interface SmartCoercionLinkPluginOptions extends JsonSchemaCoercerOptions {
-  converters?: undefined | JsonSchemaConverter[]
+  converters?: JsonSchemaConverter[] | undefined
 }
 
 /**

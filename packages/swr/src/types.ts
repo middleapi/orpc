@@ -37,18 +37,18 @@ export type MatcherStrategy = 'exact' | 'partial'
 export type MatcherOptions<TStrategy extends MatcherStrategy, TInput>
   = (
     'partial' extends TStrategy
-      ? { input?: PartialDeep<TInput> }
+      ? { input?: PartialDeep<TInput> | undefined }
       : undefined extends TInput
         ? { input?: TInput }
         : { input: TInput }
   ) & {
-    strategy?: TStrategy
+    strategy?: TStrategy | undefined
   }
 
 export type Matcher = (key?: unknown) => boolean
 
 export type FetcherOptions<TClientContext extends ClientContext>
-  = object extends TClientContext ? { context?: TClientContext } : { context: TClientContext }
+  = object extends TClientContext ? { context?: TClientContext | undefined } : { context: TClientContext }
 
 export type SubscriberOptions<TClientContext extends ClientContext> = FetcherOptions<TClientContext> & {
   /**
@@ -60,13 +60,13 @@ export type SubscriberOptions<TClientContext extends ClientContext> = FetcherOpt
    *
    * @default 'reset'
    */
-  refetchMode?: 'append' | 'reset' | 'replace'
+  refetchMode?: 'append' | 'reset' | 'replace' | undefined
 
   /**
    * Maximum number of chunks to store.
    * When exceeded, the oldest chunks will be removed.
    */
-  maxChunks?: number
+  maxChunks?: number | undefined
 }
 
 export type MutatorOptions<TClientContext extends ClientContext> = FetcherOptions<TClientContext>

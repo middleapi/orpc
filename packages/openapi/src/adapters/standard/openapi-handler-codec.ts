@@ -42,7 +42,7 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
    *
    * @default ((e) => e.toJSON())
    */
-  customErrorResponseBodyEncoder?: (error: AnyORPCError) => unknown
+  customErrorResponseBodyEncoder?: ((error: AnyORPCError) => unknown) | undefined
 }
 
 export class OpenAPIHandlerCodecCore<T extends Context> {
@@ -57,7 +57,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
   }
 
   async decodeInput(
-    matched: { procedure: AnyProcedure, params?: undefined | Record<string, string> },
+    matched: { procedure: AnyProcedure, params?: Record<string, string> | undefined },
     request: StandardLazyRequest,
   ): Promise<unknown> {
     const meta = getOpenAPIMeta(matched.procedure)

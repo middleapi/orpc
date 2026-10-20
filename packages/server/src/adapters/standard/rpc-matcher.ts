@@ -27,7 +27,7 @@ export interface RPCMatcherOptions {
    *
    * @default true
    */
-  filter?: Value<boolean, [procedure: AnyProcedureContract | AnyProcedure, path: string[]]>
+  filter?: Value<boolean, [procedure: AnyProcedureContract | AnyProcedure, path: string[]]> | undefined
 
   /**
    * Restricts which HTTP methods can invoke procedures, either with a list of allowed
@@ -38,7 +38,7 @@ export interface RPCMatcherOptions {
    * @default RPC_DEFAULT_ALLOW_METHODS (['POST', 'PUT', 'PATCH', 'DELETE'])
    * @see {@link https://orpc.dev/docs/rpc/handler#supported-http-methods | RPC Handler - Supported HTTP Methods}
    */
-  allowMethods?: readonly StandardMethod[] | ((method: StandardMethod, procedure: AnyProcedure, path: string[]) => boolean)
+  allowMethods?: readonly StandardMethod[] | ((method: StandardMethod, procedure: AnyProcedure, path: string[]) => boolean) | undefined
 }
 
 // `%` or a char `encodeURIComponent` encodes, meaning normalization may change the pathname

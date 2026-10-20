@@ -13,7 +13,7 @@ export interface ORPCInstrumentationConfig extends InstrumentationConfig {
    *
    * @default true
    */
-  propagationEnabled?: boolean
+  propagationEnabled?: boolean | undefined
 }
 
 /**

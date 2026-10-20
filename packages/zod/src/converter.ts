@@ -14,7 +14,7 @@ export interface ZodToJsonSchemaConverterOptions extends Omit<ToJSONSchemaParams
    *
    * @default false
    */
-  cache?: boolean
+  cache?: boolean | undefined
 }
 
 /**

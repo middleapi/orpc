@@ -9,7 +9,7 @@ export type MiddlewareResult<TOutContext extends Context, TOutput> = Promisable<
 }>
 
 export type MiddlewareNextOptions<TOutContext extends Context> = object extends TOutContext
-  ? { context?: TOutContext }
+  ? { context?: TOutContext | undefined }
   : { context: TOutContext }
 
 export interface MiddlewareNext<TOutput> {
@@ -19,7 +19,7 @@ export interface MiddlewareNext<TOutput> {
 }
 
 export type MiddlewareDoneOptions<TOutContext, TOutput>
-  = & (object extends TOutContext ? { context?: TOutContext } : { context: TOutContext })
+  = & (object extends TOutContext ? { context?: TOutContext | undefined } : { context: TOutContext })
     & { output: TOutput }
 
 export interface MiddlewareDone<TOutput> {

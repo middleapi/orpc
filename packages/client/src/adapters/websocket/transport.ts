@@ -43,7 +43,7 @@ export interface WebSocketLinkTransportReconnectOptions {
    *
    * @default info => info.attempt === 1 ? 0 : 2_000
    */
-  delay?: undefined | ((info: WebSocketLinkTransportAttemptInfo) => number)
+  delay?: ((info: WebSocketLinkTransportAttemptInfo) => number) | undefined
 
   /**
    * Maximum number of consecutive failed attempts before giving up.
@@ -53,7 +53,7 @@ export interface WebSocketLinkTransportReconnectOptions {
    *
    * @default Infinity
    */
-  maxAttempt?: undefined | number
+  maxAttempt?: number | undefined
 
   /**
    * Maximum number of connection attempts over the transport's lifetime,
@@ -62,7 +62,7 @@ export interface WebSocketLinkTransportReconnectOptions {
    *
    * @default Infinity
    */
-  maxTotalAttempt?: undefined | number
+  maxTotalAttempt?: number | undefined
 
   /**
    * Whether to proactively reconnect right after the socket closes,
@@ -71,7 +71,7 @@ export interface WebSocketLinkTransportReconnectOptions {
    *
    * @default { enabled: false }
    */
-  onClose?: undefined | {
+  onClose?: {
     /**
      * Whether to proactively reconnect right after the socket closes,
      * rather than waiting for the next call to trigger reconnection.
@@ -86,8 +86,8 @@ export interface WebSocketLinkTransportReconnectOptions {
      *
      * @default 0
      */
-    delay?: number
-  }
+    delay?: number | undefined
+  } | undefined
 }
 
 export interface WebSocketLinkTransportOptions<_T extends ClientContext> {
@@ -103,14 +103,14 @@ export interface WebSocketLinkTransportOptions<_T extends ClientContext> {
    *
    * @default false
    */
-  connectOnInit?: undefined | boolean
+  connectOnInit?: boolean | undefined
 
   /**
    * Reconnection behavior when the connection is lost.
    *
    * @default { enabled: false }
    */
-  reconnect?: undefined | WebSocketLinkTransportReconnectOptions
+  reconnect?: WebSocketLinkTransportReconnectOptions | undefined
 
   /**
    * Options for encoding peer messages. such as `prefix` for distinguishing messages on the same channel..

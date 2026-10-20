@@ -60,12 +60,12 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
    */
   queryKey?: ProcedureUtilsModifier<
     QueryKeyOptions<TInput>
-  >
+  > | undefined
 
   /**
    * Interceptors that intercept query inside .queryOptions, guaranteed to be executed.
    */
-  queryInterceptors?: ProcedureUtilsQueryInterceptor<TClientContext, TInput, TOutput, TError>[]
+  queryInterceptors?: ProcedureUtilsQueryInterceptor<TClientContext, TInput, TOutput, TError>[] | undefined
 
   /**
    * Options modifier for .queryOptions
@@ -73,7 +73,7 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
    */
   queryOptions?: ProcedureUtilsModifier<
     QueryOptionsIn<TClientContext, TInput, TOutput, TError, TOutput | undefined>
-  >
+  > | undefined
 
   /**
    * Key options modifier for .streamedKey and .streamedOptions
@@ -81,12 +81,12 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
    */
   streamedKey?: ProcedureUtilsModifier<
     StreamedKeyOptions<TInput>
-  >
+  > | undefined
 
   /**
    * Interceptors that intercept query inside .streamedOptions, guaranteed to be executed.
    */
-  streamedInterceptors?: ProcedureUtilsStreamedInterceptor<TClientContext, TInput, TOutput, TError>[]
+  streamedInterceptors?: ProcedureUtilsStreamedInterceptor<TClientContext, TInput, TOutput, TError>[] | undefined
 
   /**
    * Options modifier for .streamedOptions
@@ -94,7 +94,7 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
    */
   streamedOptions?: ProcedureUtilsModifier<
     StreamedOptionsIn<TClientContext, TInput, InferStreamedQueryOutput<TOutput>, TError, InferStreamedQueryOutput<TOutput> | undefined>
-  >
+  > | undefined
 
   /**
    * Key options modifier for .liveKey and .liveOptions
@@ -102,12 +102,12 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
    */
   liveKey?: ProcedureUtilsModifier<
     QueryKeyOptions<TInput>
-  >
+  > | undefined
 
   /**
    * Interceptors that intercept query inside .liveOptions, guaranteed to be executed.
    */
-  liveInterceptors?: ProcedureUtilsLiveInterceptor<TClientContext, TInput, TOutput, TError>[]
+  liveInterceptors?: ProcedureUtilsLiveInterceptor<TClientContext, TInput, TOutput, TError>[] | undefined
 
   /**
    * Options modifier for .liveOptions
@@ -115,7 +115,7 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
    */
   liveOptions?: ProcedureUtilsModifier<
     QueryOptionsIn<TClientContext, TInput, InferLiveQueryOutput<TOutput>, TError, InferLiveQueryOutput<TOutput> | undefined>
-  >
+  > | undefined
 
   /**
    * Key options modifier for .infiniteKey and .infiniteOptions
@@ -123,12 +123,12 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
    */
   infiniteKey?: ProcedureUtilsModifier<
     InfiniteKeyOptions<TInput, unknown>
-  >
+  > | undefined
 
   /**
    * Interceptors that intercept query inside .infiniteOptions, guaranteed to be executed.
    */
-  infiniteInterceptors?: ProcedureUtilsInfiniteInterceptor<TClientContext, TInput, TOutput, TError>[]
+  infiniteInterceptors?: ProcedureUtilsInfiniteInterceptor<TClientContext, TInput, TOutput, TError>[] | undefined
 
   /**
    * Options modifier for .infiniteOptions
@@ -136,7 +136,7 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
    */
   infiniteOptions?: ProcedureUtilsModifier<
     InfiniteOptionsIn<TClientContext, TInput, TOutput, TError, unknown, UseInfiniteQueryData<TOutput, unknown> | undefined>
-  >
+  > | undefined
 
   /**
    * Key options modifier for .mutationKey and .mutationOptions
@@ -144,12 +144,12 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
    */
   mutationKey?: ProcedureUtilsModifier<
     MutationKeyOptions<TInput>
-  >
+  > | undefined
 
   /**
    * Interceptors that intercept mutation inside .mutationOptions, guaranteed to be executed.
    */
-  mutationInterceptors?: ProcedureUtilsMutationInterceptor<TClientContext, TInput, TOutput, TError>[]
+  mutationInterceptors?: ProcedureUtilsMutationInterceptor<TClientContext, TInput, TOutput, TError>[] | undefined
 
   /**
    * Options modifier for .mutationOptions
@@ -157,7 +157,7 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
    */
   mutationOptions?: ProcedureUtilsModifier<
     MutationOptionsIn<TClientContext, TInput, TOutput, TError, Record<any, any>>
-  >
+  > | undefined
 }
 
 const PROCEDURE_UTILS_INTERCEPTOR_KEYS: string[] = [

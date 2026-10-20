@@ -14,7 +14,7 @@ export interface OpenAPISerializerSerializeOptions {
    *
    * @default true
    */
-  useFormDataForBlobFields?: boolean
+  useFormDataForBlobFields?: boolean | undefined
 
   /**
    * When enabled, the serialized output is always returned as a FormData instance using bracket notation.

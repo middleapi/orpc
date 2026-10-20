@@ -5,11 +5,11 @@ export interface OperationKeyPrefixOptions {
    * Prepended as the first element of the key when present.
    * Use this to avoid key conflicts when multiple router utils share the same client.
    */
-  prefix?: string
+  prefix?: string | undefined
 }
 
 export type OperationKeyOptions<TInput> = OperationKeyPrefixOptions & {
-  input?: PartialDeep<TInput>
+  input?: PartialDeep<TInput> | undefined
 }
 
 export type OperationKey<TInput>

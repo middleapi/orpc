@@ -13,7 +13,7 @@ export interface UpstashRateLimiterOptions {
      * milliseconds
      */
     timeout: number
-  }
+  } | undefined
 
   /**
    * For the MultiRegion setup we do some synchronizing in the background, after returning the current limit.
@@ -27,7 +27,7 @@ export interface UpstashRateLimiterOptions {
    * })
    * ```
    */
-  waitUntil?: (promise: Promise<any>) => any
+  waitUntil?: ((promise: Promise<any>) => any) | undefined
 }
 
 /**

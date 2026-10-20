@@ -11,7 +11,7 @@ export interface MemoryLockerOptions {
    *
    * @default undefined (held until released)
    */
-  ttl?: number
+  ttl?: number | undefined
 
   /**
    * How long to wait for a lock to become available, in milliseconds.
@@ -19,7 +19,7 @@ export interface MemoryLockerOptions {
    *
    * @default 10000
    */
-  timeout?: number
+  timeout?: number | undefined
 }
 
 interface MemoryLockWaiter {

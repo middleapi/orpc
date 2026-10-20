@@ -15,7 +15,7 @@ export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
   condition?: Value<boolean, [
     response: StandardLazyResponse,
     options: StandardLinkTransportInterceptorOptions<T>,
-  ]>
+  ]> | undefined
 
   /**
    * Maximum attempts before giving up retries.
@@ -25,7 +25,7 @@ export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
   maxAttempts?: Value<number, [
     response: StandardLazyResponse,
     options: StandardLinkTransportInterceptorOptions<T>,
-  ]>
+  ]> | undefined
 
   /**
    * Maximum timeout in milliseconds to wait before giving up retries.
@@ -35,7 +35,7 @@ export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
   timeout?: Value<number, [
     response: StandardLazyResponse,
     options: StandardLinkTransportInterceptorOptions<T>,
-  ]>
+  ]> | undefined
 }
 
 /**

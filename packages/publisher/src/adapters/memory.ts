@@ -31,8 +31,8 @@ export interface MemoryPublisherOptions extends PublisherOptions {
      *
      * @default 300 (5 min)
      */
-    seconds?: number
-  }
+    seconds?: number | undefined
+  } | undefined
 }
 
 interface StoredEvent<T> {

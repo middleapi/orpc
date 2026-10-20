@@ -26,7 +26,7 @@ export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOpt
    *
    * @default DEFAULT_SUCCESS_STATUS (200)
    */
-  outputStatus?: Value<number | undefined | null, [output: unknown, procedure: AnyProcedure, path: string[], options: ResolvedStandardHandlerHandleOptions<T>]>
+  outputStatus?: Value<number | undefined | null, [output: unknown, procedure: AnyProcedure, path: string[], options: ResolvedStandardHandlerHandleOptions<T>]> | undefined
 
   /**
    * Mapping ORPCError Code -> HTTP Status Code
