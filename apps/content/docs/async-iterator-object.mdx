@@ -138,4 +138,35 @@ const publish = os
   .handler(async ({ input }) => {
     await publisher.publish('something-updated', { id: input.id })
   })
+import { defineMeta } from '@orpc/server'
+
+type CacheMeta = boolean
+
+const [cacheMeta, getCacheMeta] = defineMeta( 
+  'cache', 
+  (incoming: CacheMeta, current) => incoming, 
+) 
+
+const base = os.use(async ({ procedure, next, path }, input, done) => {
+  if (getCacheMeta(procedure) !== true) { 
+    return next()
+  }
+
+  const key = path.join('/') + JSON.stringify(input)
+
+  if (store.has(key)) {
+    return done({ output: store.get(key)! })
+  }
+
+  const result = await next()
+  store.set(key, result.output)
+
+  return result
+})
+
+const cachedProcedure = base
+  .meta(cacheMeta(true)) 
+  .handler(async () => {
+    return 'Earth'
+  })
 ```
