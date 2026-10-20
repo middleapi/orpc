@@ -1,7 +1,9 @@
+import type { Public } from '@orpc/shared'
 import { isAsyncIteratorObject, parseEmptyableJSON } from '@orpc/shared'
 import { ErrorEvent, getEventMeta, withEventMeta } from '@standard-server/core'
 import { builtInRPCSupportDataTypes } from '../../../tests/rpc/__shared__/built-in-support-data-types'
 import { ORPCError } from './error'
+import { RPCJsonSerializer } from './rpc-json-serializer'
 import { RPCSerializer } from './rpc-serializer'
 
 describe('rpcSerializer', () => {
@@ -320,6 +322,32 @@ describe('rpcSerializer', () => {
       const date = new Date('2023-01-01')
       const serialized = serializer.serialize(date)
       expect((serialized as any).json).toBe(`__TEST_DATE__${date.toISOString()}`)
+    })
+  })
+
+  describe('extends RPCJsonSerializer', () => {
+    it('can be used wherever an RPCJsonSerializer is accepted', () => {
+      const serializer = new RPCSerializer({
+        handlers: {
+          date: {
+            condition: (data: unknown): boolean => data instanceof Date,
+            serialize: (date: Date) => `__TEST_DATE__${date.toISOString()}`,
+            deserialize: (isoString: string) => new Date(isoString.replace('__TEST_DATE__', '')),
+          },
+        },
+      })
+
+      expect(serializer).toBeInstanceOf(RPCJsonSerializer)
+
+      const jsonSerializer: Public<RPCJsonSerializer> = serializer
+      const date = new Date('2023-01-01')
+      const serialized = jsonSerializer.serializeJson({ date })
+
+      expect(serialized).toEqual({
+        json: { date: `__TEST_DATE__${date.toISOString()}` },
+        meta: [['date', 'date']],
+      })
+      expect(jsonSerializer.deserializeJson(serialized)).toEqual({ date })
     })
   })
 

@@ -246,13 +246,13 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
 
   private serializePayload(payload: object): SerializedEvent {
     const [original, meta] = unwrapEvent(payload)
-    const { json, meta: jsonMeta } = this.serializer.serialize(original)
+    const { json, meta: jsonMeta } = this.serializer.serializeJson(original)
     return { payload: { json, meta: jsonMeta }, meta }
   }
 
   private deserializePayload(id: string | undefined, { payload, meta }: SerializedEvent): object {
     return withEventMeta(
-      this.serializer.deserialize(payload) as object,
+      this.serializer.deserializeJson(payload) as object,
       id === undefined ? { ...meta } : { ...meta, id },
     )
   }

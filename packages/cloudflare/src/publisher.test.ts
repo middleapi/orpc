@@ -65,7 +65,7 @@ async function waitForAccept(socket: MockSocket) {
 const serializer = new RPCJsonSerializer()
 
 function sendEvent(socket: MockSocket, text: string) {
-  socket.sendMessage(JSON.stringify({ data: serializer.serialize({ text }) }))
+  socket.sendMessage(JSON.stringify({ data: serializer.serializeJson({ text }) }))
 }
 
 describe('durable publisher', () => {

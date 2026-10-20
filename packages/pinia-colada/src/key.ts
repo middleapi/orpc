@@ -42,7 +42,7 @@ export function generateOperationKey<TType extends OperationType, TInput>(
     ...options.prefix !== undefined ? [options.prefix] : [],
     path,
     {
-      ...options.input !== undefined ? { input: serializer.serialize(options.input).json } : {},
+      ...options.input !== undefined ? { input: serializer.serializeJson(options.input).json } : {},
       ...options.type !== undefined ? { type: options.type } : {},
       ...options.fnOptions !== undefined ? { fnOptions: options.fnOptions } : {},
     },

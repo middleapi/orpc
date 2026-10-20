@@ -66,6 +66,8 @@ describe('openAPIGenerator basic & options', () => {
     const serializer = {
       serialize: vi.fn(document => document),
       deserialize: vi.fn(document => document),
+      serializeJson: vi.fn(),
+      deserializeJson: vi.fn(),
     }
 
     const generator = new OpenAPIGenerator({ serializer, converters: [zodJsonSchemaConverter] })

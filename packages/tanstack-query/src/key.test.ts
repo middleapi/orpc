@@ -26,7 +26,7 @@ describe('generateOperationKey with skipToken', () => {
   const hashers: [name: string, hash: (queryKey: QueryKey) => string][] = [
     ['hashKey', hashKey],
     ['RPCJsonSerializer', (queryKey) => {
-      const { json, meta } = serializer.serialize(queryKey)
+      const { json, meta } = serializer.serializeJson(queryKey)
 
       return hashKey([
         json,

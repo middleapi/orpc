@@ -58,9 +58,9 @@ const customSupportedDataTypes: { name: string, value: unknown, expected: unknow
  * blobs travel as separate binary parts.
  */
 function roundTripThroughWire(serializer: RPCJsonSerializer, value: unknown): unknown {
-  const { json, meta, maps, blobs } = serializer.serialize(value)
+  const { json, meta, maps, blobs } = serializer.serializeJson(value)
   const wire = JSON.parse(JSON.stringify({ json, meta, maps }))
-  return serializer.deserialize({ ...wire, blobs })
+  return serializer.deserializeJson({ ...wire, blobs })
 }
 
 describe.each([
@@ -137,7 +137,7 @@ describe('rpcJsonSerializer: wire format', () => {
   const serializer = new RPCJsonSerializer()
 
   it('produces plain JSON values plus meta describing how to restore them', () => {
-    const { json, meta } = serializer.serialize({
+    const { json, meta } = serializer.serializeJson({
       id: 7n,
       createdAt: new Date('2023-01-01T00:00:00.000Z'),
       tags: new Set(['a']),
@@ -173,7 +173,7 @@ describe('rpcJsonSerializer: wire format', () => {
   })
 
   it('omits meta entirely for pure JSON payloads', () => {
-    const serialized = serializer.serialize({ name: 'test', items: [1, 'two', true, null] })
+    const serialized = serializer.serializeJson({ name: 'test', items: [1, 'two', true, null] })
     expect(serialized.meta).toBeUndefined()
     expect(serialized.maps).toBeUndefined()
     expect(serialized.blobs).toBeUndefined()
@@ -181,7 +181,7 @@ describe('rpcJsonSerializer: wire format', () => {
 
   it('collects nested files into maps and blobs', () => {
     const file = new File(['hello'], 'hello.txt', { type: 'text/plain' })
-    const { maps, blobs } = serializer.serialize({ upload: { doc: file }, note: 'x' })
+    const { maps, blobs } = serializer.serializeJson({ upload: { doc: file }, note: 'x' })
 
     expect(maps).toEqual([['upload', 'doc']])
     expect(blobs).toEqual([file])
@@ -201,7 +201,7 @@ describe('rpcJsonSerializer: edge cases', () => {
   })
 
   it('omits undefined object properties by default', () => {
-    const serialized = serializer.serialize({ a: 1, b: undefined })
+    const serialized = serializer.serializeJson({ a: 1, b: undefined })
     expect(serialized.json).toEqual({ a: 1 })
     expect(serialized.meta).toBeUndefined()
   })
@@ -209,7 +209,7 @@ describe('rpcJsonSerializer: edge cases', () => {
   it('preserves undefined object properties when omitUndefinedProperties is false', () => {
     const custom = new RPCJsonSerializer({ omitUndefinedProperties: false })
 
-    const serialized = custom.serialize({ a: 1, b: undefined })
+    const serialized = custom.serializeJson({ a: 1, b: undefined })
     expect(serialized.json).toEqual({ a: 1, b: null })
     expect(serialized.meta).toEqual([['undefined', 'b']])
 
@@ -242,10 +242,10 @@ describe('rpcJsonSerializer: edge cases', () => {
 
   it('passes through values no handler understands', () => {
     const symbol = Symbol('sym')
-    expect(serializer.serialize(symbol).json).toBe(symbol)
+    expect(serializer.serializeJson(symbol).json).toBe(symbol)
 
     const fn = () => 'x'
-    expect(serializer.serialize(fn).json).toBe(fn)
+    expect(serializer.serializeJson(fn).json).toBe(fn)
   })
 })
 
@@ -262,7 +262,7 @@ describe('rpcJsonSerializer: custom handlers', () => {
     })
 
     const date = new Date('2023-01-01')
-    const serialized = serializer.serialize({ value: date })
+    const serialized = serializer.serializeJson({ value: date })
     expect(serialized.json).toEqual({ value: `___TEST___${date.getTime()}` })
     expect(serialized.meta).toEqual([['date', 'value']])
 
@@ -277,7 +277,7 @@ describe('rpcJsonSerializer: custom handlers', () => {
     })
 
     const date = new Date('2023-01-01')
-    const serialized = serializer.serialize({ value: date, list: [undefined] })
+    const serialized = serializer.serializeJson({ value: date, list: [undefined] })
     expect(serialized.json).toEqual({ value: date, list: [null] })
     expect(serialized.meta).toEqual([['undefined', 'list', 0]])
   })
@@ -314,7 +314,7 @@ describe('rpcJsonSerializer: custom handlers', () => {
     })
 
     const date = new Date('2023-01-01')
-    const serialized = serializer.serialize({ person: new Person('dinwwwh', date) })
+    const serialized = serializer.serializeJson({ person: new Person('dinwwwh', date) })
 
     // the nested Date stays untouched because the terminal result is not walked
     expect((serialized.json as any).person.date).toBe(date)
@@ -368,13 +368,13 @@ describe('rpcJsonSerializer: custom handlers', () => {
     })
 
     const blob = new Blob(['hello'], { type: 'text/plain' })
-    const serialized = serializer.serialize({ file: new BlobContainer(blob) })
+    const serialized = serializer.serializeJson({ file: new BlobContainer(blob) })
 
     expect(serialized.meta).toEqual([['blobContainer', 'file']])
     expect(serialized.maps).toEqual([['file']])
     expect(serialized.blobs).toEqual([blob])
 
-    const deserialized = serializer.deserialize(serialized) as any
+    const deserialized = serializer.deserializeJson(serialized) as any
     expect(deserialized.file).toBeInstanceOf(BlobContainer)
     expect(deserialized.file.blob).toBe(blob)
   })
@@ -388,11 +388,11 @@ describe('rpcJsonSerializer: deserialize', () => {
     ['blobs', { files: [new Blob(['hello'])], map: new Map([[1n, new Set(['a'])]]) }],
   ])('does not mutate the input and can deserialize repeatedly: %s', (_, value) => {
     // https://github.com/middleapi/orpc/issues/2053
-    const payload = serializer.serialize(value)
+    const payload = serializer.serializeJson(value)
     const snapshot = JSON.stringify(payload)
 
-    expect(serializer.deserialize(payload)).toEqual(value)
-    expect(serializer.deserialize(payload)).toEqual(value)
+    expect(serializer.deserializeJson(payload)).toEqual(value)
+    expect(serializer.deserializeJson(payload)).toEqual(value)
     expect(JSON.stringify(payload)).toBe(snapshot)
   })
 
@@ -403,7 +403,7 @@ describe('rpcJsonSerializer: deserialize', () => {
     }
     const snapshot = JSON.stringify(payload)
 
-    expect(serializer.deserialize(payload)).toEqual({ a: { b: { x: 1n, y: 2n }, z: 3n }, c: [4n, { w: 5n, v: 6n }] })
+    expect(serializer.deserializeJson(payload)).toEqual({ a: { b: { x: 1n, y: 2n }, z: 3n }, c: [4n, { w: 5n, v: 6n }] })
     expect(JSON.stringify(payload)).toBe(snapshot)
   })
 })
@@ -420,47 +420,47 @@ describe('rpcJsonSerializer: security', () => {
     const error = `Invalid RPC serialized data: segment "${segment}" does not exist.`
 
     expect(
-      () => serializer.deserialize({ json: { o: {} }, meta: [['date', segment]] }),
+      () => serializer.deserializeJson({ json: { o: {} }, meta: [['date', segment]] }),
     ).toThrow(error)
 
     expect(
-      () => serializer.deserialize({ json: { o: {} }, meta: [['date', 'o', segment]] }),
+      () => serializer.deserializeJson({ json: { o: {} }, meta: [['date', 'o', segment]] }),
     ).toThrow(error)
 
     expect(
-      () => serializer.deserialize({ json: { o: {} }, meta: [['date', segment, 'o']] }),
+      () => serializer.deserializeJson({ json: { o: {} }, meta: [['date', segment, 'o']] }),
     ).toThrow(error)
 
     expect(
-      () => serializer.deserialize({ json: { o: {} }, blobs: [new Blob()], maps: [[segment]] }),
+      () => serializer.deserializeJson({ json: { o: {} }, blobs: [new Blob()], maps: [[segment]] }),
     ).toThrow(error)
 
     expect(
-      () => serializer.deserialize({ json: { o: {} }, blobs: [new Blob()], maps: [['o', segment]] }),
+      () => serializer.deserializeJson({ json: { o: {} }, blobs: [new Blob()], maps: [['o', segment]] }),
     ).toThrow(error)
 
     expect(
-      () => serializer.deserialize({ json: { o: {} }, blobs: [new Blob()], maps: [[segment, 'o']] }),
+      () => serializer.deserializeJson({ json: { o: {} }, blobs: [new Blob()], maps: [[segment, 'o']] }),
     ).toThrow(error)
   })
 
   it('throws when a blobs entry is not a Blob', () => {
     for (const value of [4294967295, 'text', null, {}, []]) {
-      expect(() => serializer.deserialize({ json: [null], blobs: [value as any], maps: [[0]] }))
+      expect(() => serializer.deserializeJson({ json: [null], blobs: [value as any], maps: [[0]] }))
         .toThrow('Invalid RPC serialized data: blob 0 is not a Blob.')
     }
 
-    expect(() => serializer.deserialize({ json: [null, null], blobs: [new Blob()], maps: [[0], [1]] }))
+    expect(() => serializer.deserializeJson({ json: [null, null], blobs: [new Blob()], maps: [[0], [1]] }))
       .toThrow('Invalid RPC serialized data: blob 1 is not a Blob.')
   })
 
   it.each(['nonexistent', '__proto__', 'constructor', 'prototype', 'toString', 'hasOwnProperty', 'valueOf'])('never resolves the meta type "%s" through the prototype chain', (type) => {
-    expect(() => serializer.deserialize({ json: 1, meta: [[type]] }))
+    expect(() => serializer.deserializeJson({ json: 1, meta: [[type]] }))
       .toThrow(`Invalid RPC serialized data: type "${type}" is not supported.`)
   })
 
   it('throws instead of producing garbage for corrupted built-in payloads', () => {
-    expect(() => serializer.deserialize({ json: 'not-a-bigint', meta: [['bigint']] })).toThrow()
+    expect(() => serializer.deserializeJson({ json: 'not-a-bigint', meta: [['bigint']] })).toThrow()
   })
 
   it.each([
@@ -474,22 +474,22 @@ describe('rpcJsonSerializer: security', () => {
     ['map', 'an array', [null, 'text', 1, true, {}]],
   ])('%s rejects mistyped serialized values', (type, expected, rejected) => {
     for (const value of rejected) {
-      expect(() => serializer.deserialize({ json: { value }, meta: [[type, 'value']] }))
+      expect(() => serializer.deserializeJson({ json: { value }, meta: [[type, 'value']] }))
         .toThrow(`Invalid RPC serialized data: type "${type}" expects ${expected}.`)
     }
   })
 
   it('bigint rejects non-canonical strings and more than 4300 digits', () => {
-    expect(serializer.deserialize({ json: '9'.repeat(4300), meta: [['bigint']] })).toBe(BigInt('9'.repeat(4300)))
+    expect(serializer.deserializeJson({ json: '9'.repeat(4300), meta: [['bigint']] })).toBe(BigInt('9'.repeat(4300)))
 
     for (const bad of ['9'.repeat(4301), '0x10', ' 1 ']) {
-      expect(() => serializer.deserialize({ json: bad, meta: [['bigint']] }))
+      expect(() => serializer.deserializeJson({ json: bad, meta: [['bigint']] }))
         .toThrow('Invalid RPC serialized data: type "bigint" expects a decimal integer string of at most 4300 digits.')
     }
   })
 
   it('rejects a value already restored by an earlier meta entry', () => {
-    expect(() => serializer.deserialize({ json: { value: '1' }, meta: [['bigint', 'value'], ['url', 'value']] }))
+    expect(() => serializer.deserializeJson({ json: { value: '1' }, meta: [['bigint', 'value'], ['url', 'value']] }))
       .toThrow('Invalid RPC serialized data: type "url" expects a string.')
   })
 
@@ -506,7 +506,7 @@ describe('rpcJsonSerializer: security', () => {
   })
 
   it('restores values behind own __proto__ keys without touching prototypes', () => {
-    const restored = serializer.deserialize({
+    const restored = serializer.deserializeJson({
       json: JSON.parse('{"__proto__": {"when": "2023-01-01T00:00:00.000Z"}}'),
       meta: [['date', '__proto__', 'when']],
     }) as any
@@ -516,7 +516,7 @@ describe('rpcJsonSerializer: security', () => {
   })
 
   it('restores a value stored directly under an own __proto__ key', () => {
-    const restored = serializer.deserialize({
+    const restored = serializer.deserializeJson({
       json: JSON.parse('{"__proto__": "2023-01-01T00:00:00.000Z"}'),
       meta: [['date', '__proto__']],
     }) as any
@@ -528,7 +528,7 @@ describe('rpcJsonSerializer: security', () => {
   it('walks an own constructor/prototype chain without reaching the real Object.prototype', () => {
     const blob = new Blob(['x'])
 
-    const restored = serializer.deserialize({
+    const restored = serializer.deserializeJson({
       json: JSON.parse('{"constructor": {"prototype": {"when": "2023-01-01T00:00:00.000Z", "polluted": null}}}'),
       meta: [['date', 'constructor', 'prototype', 'when']],
       maps: [['constructor', 'prototype', 'polluted']],
@@ -542,7 +542,7 @@ describe('rpcJsonSerializer: security', () => {
   it('restores a blob stored directly under an own __proto__ key', () => {
     const blob = new Blob(['x'])
 
-    const restored = serializer.deserialize({
+    const restored = serializer.deserializeJson({
       json: JSON.parse('{"__proto__": null}'),
       maps: [['__proto__']],
       blobs: [blob],
@@ -612,46 +612,46 @@ describe('rpcJsonSerializer: meta cannot descend into restored values', () => {
   })
 
   it('rejects a meta path that descends into a custom handler result', () => {
-    expect(() => serializer.deserialize({ json: { p: { name: 'http://evil/', age: 1 } }, meta: [['human', 'p'], ['url', 'p', 'name']] }))
+    expect(() => serializer.deserializeJson({ json: { p: { name: 'http://evil/', age: 1 } }, meta: [['human', 'p'], ['url', 'p', 'name']] }))
       .toThrow('Invalid RPC serialized data: segment "p" cannot be walked into.')
-    expect(() => serializer.deserialize({ json: { p: { name: '123', age: 1 } }, meta: [['human', 'p'], ['bigint', 'p', 'name']] }))
+    expect(() => serializer.deserializeJson({ json: { p: { name: '123', age: 1 } }, meta: [['human', 'p'], ['bigint', 'p', 'name']] }))
       .toThrow('Invalid RPC serialized data: segment "p" cannot be walked into.')
   })
 
   it('rejects descent into a root-level custom handler result', () => {
-    expect(() => serializer.deserialize({ json: { name: '123', age: 1 }, meta: [['human'], ['bigint', 'name']] }))
+    expect(() => serializer.deserializeJson({ json: { name: '123', age: 1 }, meta: [['human'], ['bigint', 'name']] }))
       .toThrow('Invalid RPC serialized data: segment "json" cannot be walked into.')
-    expect(() => serializer.deserialize({ json: { x: '1', name: '2' }, meta: [['bigint', 'x'], ['identity'], ['bigint', 'name']] }))
+    expect(() => serializer.deserializeJson({ json: { x: '1', name: '2' }, meta: [['bigint', 'x'], ['identity'], ['bigint', 'name']] }))
       .toThrow('Invalid RPC serialized data: segment "json" cannot be walked into.')
   })
 
   it('rejects descent when entries share a path prefix with earlier ones', () => {
     const json = { p: { name: 'http://evil/', age: 1, at: null }, q: '2020-01-01T00:00:00.000Z' }
 
-    expect(() => serializer.deserialize({ json, meta: [['date', 'p', 'at'], ['human', 'p'], ['url', 'p', 'name']] }))
+    expect(() => serializer.deserializeJson({ json, meta: [['date', 'p', 'at'], ['human', 'p'], ['url', 'p', 'name']] }))
       .toThrow('Invalid RPC serialized data: segment "p" cannot be walked into.')
-    expect(() => serializer.deserialize({ json, meta: [['human', 'p'], ['date', 'q'], ['url', 'p', 'name']] }))
+    expect(() => serializer.deserializeJson({ json, meta: [['human', 'p'], ['date', 'q'], ['url', 'p', 'name']] }))
       .toThrow('Invalid RPC serialized data: segment "p" cannot be walked into.')
-    expect(() => serializer.deserialize({ json: { a: { b: { name: '1', c: null } } }, meta: [['date', 'a', 'b', 'c'], ['identity', 'a', 'b'], ['bigint', 'a', 'b', 'name']] }))
+    expect(() => serializer.deserializeJson({ json: { a: { b: { name: '1', c: null } } }, meta: [['date', 'a', 'b', 'c'], ['identity', 'a', 'b'], ['bigint', 'a', 'b', 'name']] }))
       .toThrow('Invalid RPC serialized data: segment "b" cannot be walked into.')
-    expect(() => serializer.deserialize({ json: { a: { name: '1', b: { x: '2', y: '3' } } }, meta: [['bigint', 'a', 'b', 'x'], ['identity', 'a'], ['bigint', 'a', 'b', 'y']] }))
+    expect(() => serializer.deserializeJson({ json: { a: { name: '1', b: { x: '2', y: '3' } } }, meta: [['bigint', 'a', 'b', 'x'], ['identity', 'a'], ['bigint', 'a', 'b', 'y']] }))
       .toThrow('Invalid RPC serialized data: segment "a" cannot be walked into.')
   })
 
   it('checks that a segment still exists after an earlier entry shrinks its array', () => {
-    expect(() => serializer.deserialize({ json: { a: [{ x: '1' }, { y: '2' }] }, meta: [['bigint', 'a', 1, 'y'], ['zero', 'a', 'length'], ['bigint', 'a', 1, 'y']] }))
+    expect(() => serializer.deserializeJson({ json: { a: [{ x: '1' }, { y: '2' }] }, meta: [['bigint', 'a', 1, 'y'], ['zero', 'a', 'length'], ['bigint', 'a', 1, 'y']] }))
       .toThrow('Invalid RPC serialized data: segment "1" does not exist.')
   })
 
   it('treats numeric and string segments as the same position', () => {
-    expect(() => serializer.deserialize({ json: [{ name: '123', age: 1 }], meta: [['human', 0], ['bigint', '0', 'name']] }))
+    expect(() => serializer.deserializeJson({ json: [{ name: '123', age: 1 }], meta: [['human', 0], ['bigint', '0', 'name']] }))
       .toThrow('Invalid RPC serialized data: segment "0" cannot be walked into.')
   })
 
   it('rejects descent even when the handler returned the validated object itself', () => {
-    expect(() => serializer.deserialize({ json: { p: { name: '1' } }, meta: [['identity', 'p'], ['bigint', 'p', 'name']] }))
+    expect(() => serializer.deserializeJson({ json: { p: { name: '1' } }, meta: [['identity', 'p'], ['bigint', 'p', 'name']] }))
       .toThrow('Invalid RPC serialized data: segment "p" cannot be walked into.')
-    expect(() => serializer.deserialize({ json: { l: ['1'] }, meta: [['list', 'l'], ['bigint', 'l', 0]] }))
+    expect(() => serializer.deserializeJson({ json: { l: ['1'] }, meta: [['list', 'l'], ['bigint', 'l', 0]] }))
       .toThrow('Invalid RPC serialized data: segment "l" cannot be walked into.')
   })
 
@@ -659,10 +659,10 @@ describe('rpcJsonSerializer: meta cannot descend into restored values', () => {
     // structured clone transports (e.g. MessagePort with experimental_transfer) can deliver non-JSON values
     const bytes = new Uint8Array([1])
 
-    expect(() => serializer.deserialize({ json: { b: bytes }, meta: [['bytes', 'b'], ['double', 'b', 0]] }))
+    expect(() => serializer.deserializeJson({ json: { b: bytes }, meta: [['bytes', 'b'], ['double', 'b', 0]] }))
       .toThrow('Invalid RPC serialized data: segment "b" cannot be walked into.')
     // structured clone also keeps shared references, so the same value can sit at another path
-    expect(() => serializer.deserialize({ json: { b: bytes, c: bytes }, meta: [['bytes', 'b'], ['double', 'c', 0]] }))
+    expect(() => serializer.deserializeJson({ json: { b: bytes, c: bytes }, meta: [['bytes', 'b'], ['double', 'c', 0]] }))
       .toThrow('Invalid RPC serialized data: segment "c" cannot be walked into.')
     expect(bytes[0]).toBe(1)
   })
@@ -683,22 +683,22 @@ describe('rpcJsonSerializer: meta cannot descend into restored values', () => {
         },
       },
     })
-    expect(() => s.deserialize({ json: { c: 'USD' }, meta: [['currency', 'c'], ['date', 'c', 'symbol']] }))
+    expect(() => s.deserializeJson({ json: { c: 'USD' }, meta: [['currency', 'c'], ['date', 'c', 'symbol']] }))
       .toThrow('Invalid RPC serialized data: segment "c" cannot be walked into.')
     expect(CURRENCIES.USD!.symbol).toBe('$')
   })
 
   it('rejects descent into built-in results and blobs', () => {
-    expect(() => serializer.deserialize({ json: { a: ['2020-01-01T00:00:00.000Z'] }, meta: [['set', 'a'], ['date', 'a', 0]] }))
+    expect(() => serializer.deserializeJson({ json: { a: ['2020-01-01T00:00:00.000Z'] }, meta: [['set', 'a'], ['date', 'a', 0]] }))
       .toThrow('Invalid RPC serialized data: segment "a" cannot be walked into.')
-    expect(() => serializer.deserialize({ json: { a: {} }, blobs: [new Blob()], maps: [['a']], meta: [['date', 'a', 'x']] }))
+    expect(() => serializer.deserializeJson({ json: { a: {} }, blobs: [new Blob()], maps: [['a']], meta: [['date', 'a', 'x']] }))
       .toThrow('Invalid RPC serialized data: segment "a" cannot be walked into.')
-    expect(() => serializer.deserialize({ json: { a: { x: null } }, blobs: [new Blob(), new Blob()], maps: [['a'], ['a', 'x']] }))
+    expect(() => serializer.deserializeJson({ json: { a: { x: null } }, blobs: [new Blob(), new Blob()], maps: [['a'], ['a', 'x']] }))
       .toThrow('Invalid RPC serialized data: segment "a" cannot be walked into.')
   })
 
   it('still stacks handlers on the same position, governed by their own type checks', () => {
-    expect(serializer.deserialize({ json: { p: { name: 'x', age: 1 } }, meta: [['identity', 'p'], ['human', 'p']] }))
+    expect(serializer.deserializeJson({ json: { p: { name: 'x', age: 1 } }, meta: [['identity', 'p'], ['human', 'p']] }))
       .toEqual({ p: new Human('x', 1) })
   })
 
@@ -708,7 +708,7 @@ describe('rpcJsonSerializer: meta cannot descend into restored values', () => {
       s: new Set([new Date(0), new Human('y', 2)]),
       m: new Map<unknown, unknown>([[1n, new Set([undefined])], ['k', [new Human('z', 3)]]]),
     }
-    expect(serializer.deserialize(serializer.serialize(value))).toEqual(value)
+    expect(serializer.deserializeJson(serializer.serializeJson(value))).toEqual(value)
     expect(roundTripThroughWire(serializer, value)).toEqual(value)
   })
 
@@ -734,8 +734,8 @@ describe('rpcJsonSerializer: meta cannot descend into restored values', () => {
       },
     })
 
-    expect(s.deserialize(s.serialize({ root: blob, nested: new Set([blob]), p: new Human('x', 0) })))
+    expect(s.deserializeJson(s.serializeJson({ root: blob, nested: new Set([blob]), p: new Human('x', 0) })))
       .toEqual({ root: blob, nested: new Set([blob]), p: new Human('x', 1) })
-    expect(s.deserialize(s.serialize(blob))).toBe(blob)
+    expect(s.deserializeJson(s.serializeJson(blob))).toBe(blob)
   })
 })
