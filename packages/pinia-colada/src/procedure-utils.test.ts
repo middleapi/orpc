@@ -1,3 +1,4 @@
+import { RPCJsonSerializer } from '@orpc/client'
 import * as KeyModule from './key'
 import * as LiveQueryModule from './live-query'
 import { isProcedureUtilsOptions, mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
@@ -452,6 +453,32 @@ describe('procedureUtils', () => {
       const mutationKey = prefixedUtils.mutationKey() as any
       mutationKey('__input__')
       expect(generateOperationKeySpy).toHaveBeenNthCalledWith(3, ['ping'], { prefix: '__prefix__', type: 'mutation', input: '__input__' })
+    })
+  })
+
+  describe('with serializer', () => {
+    const serializer = new RPCJsonSerializer()
+    const serializedUtils = new ProcedureUtils(['ping'], client, { serializer })
+
+    it('passes serializer to generated keys', () => {
+      serializedUtils.key({ input: 1 } as any)
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { serializer, input: 1 })
+
+      serializedUtils.queryKey({ input: 1 } as any)
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { serializer, type: 'query', input: 1 })
+
+      serializedUtils.streamedKey({ input: 1 } as any)
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(3, ['ping'], { serializer, type: 'streamed', input: 1 })
+
+      serializedUtils.liveKey({ input: 1 } as any)
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(4, ['ping'], { serializer, type: 'live', input: 1 })
+
+      serializedUtils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 0 } as any)
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(5, ['ping'], { serializer, type: 'infinite', input: { cursor: 0 } })
+
+      const mutationKey = serializedUtils.mutationKey() as any
+      mutationKey('__input__')
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(6, ['ping'], { serializer, type: 'mutation', input: '__input__' })
     })
   })
 
@@ -921,6 +948,7 @@ describe('isProcedureUtilsOptions', () => {
   it('accepts procedure utils options shapes', () => {
     expect(isProcedureUtilsOptions({})).toBe(true)
     expect(isProcedureUtilsOptions({ prefix: 'planet' })).toBe(true)
+    expect(isProcedureUtilsOptions({ serializer: new RPCJsonSerializer() })).toBe(true)
     expect(isProcedureUtilsOptions({ queryInterceptors: [], mutationInterceptors: [vi.fn()] })).toBe(true)
     expect(isProcedureUtilsOptions({ queryOptions: { staleTime: 1000 }, mutationKey: () => ({}) })).toBe(true)
     expect(isProcedureUtilsOptions({ liveOptions: undefined, streamedKey: undefined })).toBe(true)
@@ -931,6 +959,8 @@ describe('isProcedureUtilsOptions', () => {
     expect(isProcedureUtilsOptions(undefined)).toBe(false)
     expect(isProcedureUtilsOptions('invalid')).toBe(false)
     expect(isProcedureUtilsOptions({ prefix: 123 })).toBe(false)
+    expect(isProcedureUtilsOptions({ serializer: 'invalid' })).toBe(false)
+    expect(isProcedureUtilsOptions({ serializer: { find: { queryOptions: {} } } })).toBe(false)
     expect(isProcedureUtilsOptions({ queryInterceptors: { invalid: true } })).toBe(false)
     expect(isProcedureUtilsOptions({ queryInterceptors: [{ invalid: true }] })).toBe(false)
     expect(isProcedureUtilsOptions({ queryOptions: 'invalid' })).toBe(false)

@@ -1,8 +1,9 @@
-import type { PartialDeep } from '@orpc/shared'
+import type { PartialDeep, Public } from '@orpc/shared'
 import type { EntryKey } from '@pinia/colada'
 import type { SerializableStreamedQueryOptions } from './stream-query'
 import type { OperationType } from './types'
 import { RPCJsonSerializer } from '@orpc/client'
+import { stringifyJSON } from '@orpc/shared'
 
 export interface OperationKeyPrefixOptions {
   /**
@@ -12,19 +13,38 @@ export interface OperationKeyPrefixOptions {
   prefix?: string
 }
 
-export type OperationKeyOptions<TType extends OperationType, TInput> = OperationKeyPrefixOptions & {
+export interface OperationKeySerializerOptions {
+  /**
+   * Serializes inputs into JSON-compatible values when building keys.
+   * Pass the serializer your link uses so custom types produce consistent keys.
+   *
+   * @default new RPCJsonSerializer()
+   */
+  serializer?: Public<RPCJsonSerializer>
+}
+
+export type OperationKeyOptions<TType extends OperationType, TInput> = OperationKeyPrefixOptions & OperationKeySerializerOptions & {
   type?: TType
   input?: PartialDeep<TInput>
   fnOptions?: TType extends 'streamed' ? SerializableStreamedQueryOptions : never
 }
 
+type OperationKeyContent<TType extends OperationType, TInput> = Omit<OperationKeyOptions<TType, TInput>, 'prefix' | 'serializer'> & {
+  /**
+   * Serializer types of non-JSON values in `input`, keyed by their JSON-encoded path,
+   * so inputs with the same JSON form (like a `Date` and its ISO string) produce different keys.
+   * Keyed by path (not a list) so partial keys still match.
+   */
+  inputMeta?: Record<string, string[]>
+}
+
 export type OperationKey<TType extends OperationType, TInput>
   = EntryKey & (
-    | [path: string[], options: Omit<OperationKeyOptions<TType, TInput>, 'prefix'>]
-    | [prefix: string, path: string[], options: Omit<OperationKeyOptions<TType, TInput>, 'prefix'>]
+    | [path: string[], options: OperationKeyContent<TType, TInput>]
+    | [prefix: string, path: string[], options: OperationKeyContent<TType, TInput>]
   )
 
-const serializer = new RPCJsonSerializer()
+const defaultSerializer = new RPCJsonSerializer()
 
 /**
  * Generate a Pinia Colada entry key for a procedure.
@@ -42,9 +62,25 @@ export function generateOperationKey<TType extends OperationType, TInput>(
     ...options.prefix !== undefined ? [options.prefix] : [],
     path,
     {
-      ...options.input !== undefined ? { input: serializer.serializeJson(options.input).json } : {},
+      ...options.input !== undefined ? serializeInput(options.serializer ?? defaultSerializer, options.input) : {},
       ...options.type !== undefined ? { type: options.type } : {},
       ...options.fnOptions !== undefined ? { fnOptions: options.fnOptions } : {},
     },
   ] as OperationKey<TType, TInput>
+}
+
+function serializeInput(serializer: Public<RPCJsonSerializer>, input: unknown): { input: unknown, inputMeta?: Record<string, string[]> } {
+  const { json, meta } = serializer.serializeJson(input)
+
+  if (!meta?.length) {
+    return { input: json }
+  }
+
+  const inputMeta: Record<string, string[]> = {}
+
+  for (const [type, ...segments] of meta) {
+    (inputMeta[stringifyJSON(segments)] ??= []).push(type)
+  }
+
+  return { input: json, inputMeta }
 }

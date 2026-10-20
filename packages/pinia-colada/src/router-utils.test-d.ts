@@ -4,6 +4,7 @@ import type { Public } from '@orpc/shared'
 import type { ProcedureUtils } from './procedure-utils'
 import type { RouterUtils } from './router-utils'
 import type { SharedUtils } from './shared-utils'
+import { RPCSerializer } from '@orpc/client'
 import { os } from '@orpc/server'
 import z from 'zod'
 import { createRouterUtils } from './router-utils'
@@ -58,6 +59,7 @@ it('RouterUtils', () => {
 it('createRouterUtils', () => {
   const utils = createRouterUtils({} as RouterClient<typeof router, { batch?: boolean }>, {
     prefix: '__prefix__',
+    serializer: new RPCSerializer(),
     queryInterceptors: [
       ({ next, context, path }) => {
         expectTypeOf(context.batch).toEqualTypeOf<boolean | undefined>()

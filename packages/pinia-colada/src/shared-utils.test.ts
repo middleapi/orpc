@@ -1,3 +1,4 @@
+import { RPCJsonSerializer } from '@orpc/client'
 import * as KeyModule from './key'
 import { SharedUtils } from './shared-utils'
 
@@ -28,5 +29,17 @@ describe('sharedUtils', () => {
 
     expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
     expect(generateOperationKeySpy).toHaveBeenCalledWith(['path'], { type: 'query', prefix: '__prefix__' })
+  })
+
+  it('.key with serializer', () => {
+    const serializer = new RPCJsonSerializer()
+    const serializedUtils = new SharedUtils(['path'], { serializer })
+
+    expect(
+      serializedUtils.key({ input: { search: '__search__' } }),
+    ).toBe(generateOperationKeySpy.mock.results[0]!.value)
+
+    expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
+    expect(generateOperationKeySpy).toHaveBeenCalledWith(['path'], { input: { search: '__search__' }, serializer })
   })
 })

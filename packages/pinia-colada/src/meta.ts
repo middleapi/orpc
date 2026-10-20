@@ -7,7 +7,7 @@ import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import { mergeProcedureUtilsOptions } from './procedure-utils'
 
 export type PiniaColadaMetaOptions<TClientContext extends ClientContext, TInput, TOutput, TError>
-  = Omit<ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>, 'prefix'>
+  = Omit<ProcedureUtilsOptions<TClientContext, TInput, TOutput, TError>, 'prefix' | 'serializer'>
 
 export interface PiniaColadaMetaPlugin<
   TInputSchema extends AnySchema,

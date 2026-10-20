@@ -1,7 +1,7 @@
 import type { Client, ClientContext } from '@orpc/client'
 import type { Interceptor, MaybeOptionalOptions, PromiseWithError } from '@orpc/shared'
 import type { _EmptyObject, EntryKeyTagged, UseInfiniteQueryData, UseInfiniteQueryFnContext } from '@pinia/colada'
-import type { OperationKeyPrefixOptions } from './key'
+import type { OperationKeyPrefixOptions, OperationKeySerializerOptions } from './key'
 import type { InferLiveQueryOutput, InferStreamedQueryOutput, InfiniteKeyOptions, InfiniteOptionsIn, InfiniteOptionsOut, MutationKeyOptions, MutationOptionsIn, MutationOptionsOut, OperationContext, QueryKeyOptions, QueryOptionsIn, QueryOptionsOut, StreamedKeyOptions, StreamedOptionsIn, StreamedOptionsOut, UseMutationFnContext, UseQueryFnContext } from './types'
 import { intercept, isAsyncIteratorObject, isTypescriptObject, resolveMaybeOptionalOptions } from '@orpc/shared'
 import { generateOperationKey } from './key'
@@ -53,7 +53,7 @@ export type ProcedureUtilsMutationInterceptor<TClientContext extends ClientConte
  */
 export type ProcedureUtilsModifier<T extends object> = Partial<T> | ((options: T) => T)
 
-export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError> extends OperationKeyPrefixOptions {
+export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError> extends OperationKeyPrefixOptions, OperationKeySerializerOptions {
   /**
    * Key options modifier for .queryKey and .queryOptions
    * Can be partial options or a function that receives per-call options and returns override this.options.
@@ -196,6 +196,11 @@ export function isProcedureUtilsOptions(value: unknown): value is ProcedureUtils
         return false
       }
     }
+    else if (key === 'serializer') {
+      if (!isTypescriptObject(value[key]) || typeof value[key].serializeJson !== 'function') {
+        return false
+      }
+    }
     else if (PROCEDURE_UTILS_INTERCEPTOR_KEYS.includes(key)) {
       if (!Array.isArray(value[key]) || value[key].some(i => typeof i !== 'function')) {
         return false
@@ -299,7 +304,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const key = (optionsIn as any).key
-      ?? generateOperationKey(this.path, { prefix: this.options.prefix, type: 'query', input: (optionsIn as any).input })
+      ?? generateOperationKey(this.path, { prefix: this.options.prefix, serializer: this.options.serializer, type: 'query', input: (optionsIn as any).input })
 
     return key as EntryKeyTagged<TOutput, TError>
   }
@@ -375,7 +380,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const key = (optionsIn as any).key
-      ?? generateOperationKey(this.path, { prefix: this.options.prefix, type: 'streamed', input: (optionsIn as any).input, fnOptions: (optionsIn as any).fnOptions })
+      ?? generateOperationKey(this.path, { prefix: this.options.prefix, serializer: this.options.serializer, type: 'streamed', input: (optionsIn as any).input, fnOptions: (optionsIn as any).fnOptions })
 
     return key as EntryKeyTagged<InferStreamedQueryOutput<TOutput>, TError>
   }
@@ -462,7 +467,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const key = (optionsIn as any).key
-      ?? generateOperationKey(this.path, { prefix: this.options.prefix, type: 'live', input: (optionsIn as any).input })
+      ?? generateOperationKey(this.path, { prefix: this.options.prefix, serializer: this.options.serializer, type: 'live', input: (optionsIn as any).input })
 
     return key as EntryKeyTagged<InferLiveQueryOutput<TOutput>, TError>
   }
@@ -546,6 +551,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     const key = (optionsIn as any).key
       ?? generateOperationKey(this.path, {
         prefix: this.options.prefix,
+        serializer: this.options.serializer,
         type: 'infinite',
         input: (optionsIn as any).input(
           typeof (optionsIn as any).initialPageParam === 'function'
@@ -624,7 +630,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const key = optionsIn.key
-      ?? ((input: TInput) => generateOperationKey(this.path, { prefix: this.options.prefix, type: 'mutation', input: input as any }))
+      ?? ((input: TInput) => generateOperationKey(this.path, { prefix: this.options.prefix, serializer: this.options.serializer, type: 'mutation', input: input as any }))
 
     return key as MutationOptionsOut<TInput, TOutput, TError, _EmptyObject>['key']
   }

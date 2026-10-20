@@ -1,4 +1,5 @@
 import type { RouterUtilsPlugin } from './plugin'
+import { RPCJsonSerializer } from '@orpc/client'
 import * as KeyModule from './key'
 import { ProcedureUtils } from './procedure-utils'
 import { createRouterUtils } from './router-utils'
@@ -58,6 +59,18 @@ describe('createRouterUtils', () => {
     expect(pongUtils.key({ type: 'query' })).toBe(generateOperationKeySpy.mock.results[2]?.value)
     expect(generateOperationKeySpy).toHaveBeenNthCalledWith(3, ['key', 'pong'], { type: 'query', prefix: '__prefix__' })
     expect(pongUtils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[2]?.value.queryOptions.mock.results[0]?.value)
+  })
+
+  it('passes serializer to procedure & shared utils', () => {
+    const serializer = new RPCJsonSerializer()
+    const router = { nested: { ping: vi.fn() } } as any
+    const utils = createRouterUtils(router, { serializer }) as any
+
+    expect(utils.nested.key()).toBe(generateOperationKeySpy.mock.results[0]?.value)
+    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['nested'], { serializer })
+
+    void utils.nested.ping
+    expect(ProcedureUtils).toHaveBeenCalledWith(['nested', 'ping'], router.nested.ping, { serializer })
   })
 
   it('returns strictly equal utils on repeated access', () => {
