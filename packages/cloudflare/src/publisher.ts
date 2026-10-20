@@ -18,7 +18,7 @@ export interface DurablePublisherOptions extends PublisherOptions {
    *
    * @default RPCJsonSerializer
    */
-  serializer?: undefined | Public<RPCJsonSerializer>
+  serializer?: Public<RPCJsonSerializer> | undefined
 
   /**
    * Custom function to get the Durable Object stub for publishing.

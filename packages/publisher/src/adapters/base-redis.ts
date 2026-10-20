@@ -33,7 +33,7 @@ export interface BaseRedisPublisherOptions extends PublisherOptions {
    *
    * @default RPCJsonSerializer
    */
-  serializer?: undefined | Public<RPCJsonSerializer>
+  serializer?: Public<RPCJsonSerializer> | undefined
 
   /**
    * Configuration for event resume support.

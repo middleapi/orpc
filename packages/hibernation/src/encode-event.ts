@@ -13,7 +13,7 @@ export interface EncodeHibernationRPCEventOptions {
   /**
    * Override the default RPC serializer.
    */
-  serializer?: Public<RPCSerializer>
+  serializer?: Public<RPCSerializer> | undefined
 
   /**
    * The type of event, each type corresponds a different operation

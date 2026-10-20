@@ -23,7 +23,7 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
   /**
    * Override the default OpenAPI serializer.
    */
-  serializer?: Public<OpenAPISerializer>
+  serializer?: Public<OpenAPISerializer> | undefined
 
   /**
    * Mapping ORPCError Code -> HTTP Status Code

@@ -16,7 +16,7 @@ export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOpt
   /**
    * Override the default RPC serializer.
    */
-  serializer?: Public<RPCSerializer>
+  serializer?: Public<RPCSerializer> | undefined
 
   /**
    * Resolve HTTP status for encoded successful outputs.

@@ -37,7 +37,7 @@ export interface OpenAPILinkCodecOptions<T extends ClientContext> {
   /**
    * Override the default OpenAPI serializer.
    */
-  serializer?: Public<OpenAPISerializer>
+  serializer?: Public<OpenAPISerializer> | undefined
 
   /**
    * Customize how an error response body is converted into an ORPC error.

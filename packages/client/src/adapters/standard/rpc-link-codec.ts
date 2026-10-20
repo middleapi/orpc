@@ -51,7 +51,7 @@ export interface RPCLinkCodecOptions<T extends ClientContext> {
   /**
    * Override the default RPC serializer.
    */
-  serializer?: Public<RPCSerializer>
+  serializer?: Public<RPCSerializer> | undefined
 }
 
 const END_SLASH_REGEX = /\/$/
