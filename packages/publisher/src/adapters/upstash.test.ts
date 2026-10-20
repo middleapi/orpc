@@ -106,7 +106,7 @@ describe.concurrent(
 
     it('resumes missed events in order and preserves event metadata while rewriting ids', async () => {
       const publisher = createTestingPublisher({
-        resume: { enabled: true, seconds: 10 },
+        resume: { enabled: true, ttl: 10_000 },
       })
       const event = ('orders')
       const liveListener = vi.fn()
@@ -159,7 +159,7 @@ describe.concurrent(
 
     it('treats an empty resume backlog as a clean starting point and then continues with live messages', async () => {
       const publisher = createTestingPublisher({
-        resume: { enabled: true, seconds: 10 },
+        resume: { enabled: true, ttl: 10_000 },
       })
       const event = ('empty-backlog')
       const listener = vi.fn()
@@ -204,7 +204,7 @@ describe.concurrent(
       )
 
       const publisher = createTestingPublisher({
-        resume: { enabled: true, seconds: 10 },
+        resume: { enabled: true, ttl: 10_000 },
       }, { useRedis: redis })
       const event = ('timeline')
 
@@ -269,7 +269,7 @@ describe.concurrent(
       const prefix = `concurrent:${crypto.randomUUID()}:`
       const event = 'orders'
       const publisher = createTestingPublisher({
-        resume: { enabled: true, seconds: 10 },
+        resume: { enabled: true, ttl: 10_000 },
         prefix,
       })
       const listener = vi.fn()
@@ -294,7 +294,7 @@ describe.concurrent(
       const event = 'orders'
       const key = `${prefix}${event}`
       const publisher = createTestingPublisher({
-        resume: { enabled: true, seconds: 1 },
+        resume: { enabled: true, ttl: 1_000 },
         prefix,
       })
 
@@ -341,7 +341,7 @@ describe.concurrent(
       })
 
       const publisher = createTestingPublisher({
-        resume: { enabled: true, seconds: 10 },
+        resume: { enabled: true, ttl: 10_000 },
         serializer,
         prefix: `custom:${crypto.randomUUID()}:`,
       })
@@ -380,7 +380,7 @@ describe.concurrent(
 
     it('reports resume errors while subscribing', async () => {
       const publisher = createTestingPublisher({
-        resume: { enabled: true, seconds: 10 },
+        resume: { enabled: true, ttl: 10_000 },
       })
       const event = ('resume-errors')
       const listener = vi.fn()
@@ -507,7 +507,7 @@ describe.concurrent(
     })
 
     it('works with clients that disable automatic deserialization', async () => {
-      const publisher = createTestingPublisher({ resume: { enabled: true, seconds: 10 } }, {
+      const publisher = createTestingPublisher({ resume: { enabled: true, ttl: 10_000 } }, {
         useRedis: new Redis({
           url: UPSTASH_REDIS_REST_URL,
           token: UPSTASH_REDIS_REST_TOKEN,

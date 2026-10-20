@@ -13,23 +13,12 @@ export interface MemoryRateLimiterOptions {
   window: number
 
   /**
-   * Block until the request may pass or timeout is reached.
+   * How long to wait for capacity to become available, in milliseconds.
+   * Rejects right away when the window will not reset before the timeout elapses.
    *
-   * @default { enabled: false }
+   * @default 0
    */
-  blockingUntilReady?: {
-    /**
-     * Block until the request may pass or timeout is reached.
-     *
-     * @default false
-     */
-    enabled: boolean
-
-    /**
-     * milliseconds
-     */
-    timeout: number
-  }
+  timeout?: number
 }
 
 /**
@@ -41,7 +30,7 @@ export interface MemoryRateLimiterOptions {
 export class MemoryRateLimiter implements RateLimiter {
   private readonly maxRequests: number
   private readonly window: number
-  private readonly blockingUntilReady: MemoryRateLimiterOptions['blockingUntilReady']
+  private readonly timeout: number
 
   private current: Map<string, { used: number }> = new Map()
   private currentEpochStart: number = Date.now()
@@ -49,14 +38,14 @@ export class MemoryRateLimiter implements RateLimiter {
   constructor(options: MemoryRateLimiterOptions) {
     this.maxRequests = options.maxRequests
     this.window = options.window
-    this.blockingUntilReady = options.blockingUntilReady
+    this.timeout = options.timeout ?? 0
   }
 
   async limit(key: string, options?: RateLimitOptions): Promise<Required<RateLimitResult>> {
     const weight = this.resolveWeight(options)
 
-    return this.blockingUntilReady?.enabled
-      ? this.blockUntilReady(key, this.blockingUntilReady.timeout, weight)
+    return this.timeout > 0
+      ? this.blockUntilReady(key, this.timeout, weight)
       : this.checkLimit(key, weight)
   }
 

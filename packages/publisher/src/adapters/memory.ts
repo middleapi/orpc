@@ -24,14 +24,14 @@ export interface MemoryPublisherOptions extends PublisherOptions {
     enabled: boolean
 
     /**
-     * How long (in seconds) to retain events for resume.
+     * How long to retain events for resume, in milliseconds.
      *
      * Expired events are cleaned up lazily for performance reasons, so
      * some events may remain available slightly longer than this period.
      *
-     * @default 300 (5 min)
+     * @default 300000 (5 min)
      */
-    seconds?: number
+    ttl?: number
   }
 }
 
@@ -51,19 +51,19 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
   private readonly idGenerator = new SequentialIdGenerator()
   private readonly eventsMap: Map<keyof T, Array<StoredEvent<T[keyof T]>>> = new Map()
   private readonly resumeEnabled: boolean
-  private readonly resumeSeconds: number
+  private readonly resumeTtl: number
 
   constructor({ resume, ...options }: MemoryPublisherOptions = {}) {
     super(options)
     this.resumeEnabled = resume?.enabled ?? false
-    this.resumeSeconds = resume?.seconds ?? 300
+    this.resumeTtl = resume?.ttl ?? 300_000
   }
 
   async publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void> {
     this.cleanup()
 
     if (this.resumeEnabled) {
-      const expiresAt = Date.now() + this.resumeSeconds * 1000
+      const expiresAt = Date.now() + this.resumeTtl
 
       let bucket = this.eventsMap.get(event)
       if (!bucket) {
@@ -128,7 +128,7 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
     const now = Date.now()
 
     // Throttle: only run cleanup at most once per retention window.
-    if (now - this.lastCleanupTime < this.resumeSeconds * 1000) {
+    if (now - this.lastCleanupTime < this.resumeTtl) {
       return
     }
 

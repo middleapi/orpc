@@ -30,7 +30,7 @@ describe('publisher redis adapters compatibility', () => {
       name: 'redis',
       publisher: new RedisPublisher(redis, {
         prefix,
-        resume: { enabled: true, seconds: 10 },
+        resume: { enabled: true, ttl: 10_000 },
       }),
     })
 
@@ -44,7 +44,7 @@ describe('publisher redis adapters compatibility', () => {
       name: 'bun-redis',
       publisher: new BunRedisPublisher(bunRedis, {
         prefix,
-        resume: { enabled: true, seconds: 10 },
+        resume: { enabled: true, ttl: 10_000 },
       }),
     })
   }

@@ -83,7 +83,7 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
 
   it('resumes missed events in order and preserves event metadata while rewriting ids', async () => {
     const publisher = createTestingPublisher({
-      resume: { enabled: true, seconds: 10 },
+      resume: { enabled: true, ttl: 10_000 },
     })
     const event = 'orders'
     const liveListener = vi.fn()
@@ -136,7 +136,7 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
 
   it('treats an empty resume backlog as a clean starting point and then continues with live messages', async () => {
     const publisher = createTestingPublisher({
-      resume: { enabled: true, seconds: 10 },
+      resume: { enabled: true, ttl: 10_000 },
     })
     const event = 'empty-backlog'
     const listener = vi.fn()
@@ -182,7 +182,7 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
     })
 
     const publisher = createTestingPublisher({
-      resume: { enabled: true, seconds: 10 },
+      resume: { enabled: true, ttl: 10_000 },
     }, { useRedis: delayedRedis })
     const event = 'timeline'
 
@@ -216,7 +216,7 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
       clients.forEach(client => client.close())
     })
     const publishers = clients.map(client => createTestingPublisher({
-      resume: { enabled: true, seconds: 10 },
+      resume: { enabled: true, ttl: 10_000 },
       prefix,
     }, { useRedis: client }))
     const listener = vi.fn()
@@ -240,7 +240,7 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
     const event = 'orders'
     const key = `${prefix}${event}`
     const publisher = createTestingPublisher({
-      resume: { enabled: true, seconds: 1 },
+      resume: { enabled: true, ttl: 1_000 },
       prefix,
     })
 
@@ -290,7 +290,7 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
     const prefix = `custom:${crypto.randomUUID()}:`
     const event = 'profile-updated'
     const publisher = createTestingPublisher({
-      resume: { enabled: true, seconds: 10 },
+      resume: { enabled: true, ttl: 10_000 },
       serializer,
       prefix,
     })
@@ -330,7 +330,7 @@ describe.skipIf(!REDIS_URL)('bun redis publisher', () => {
 
   it('reports resume errors while subscribing', async () => {
     const publisher = createTestingPublisher({
-      resume: { enabled: true, seconds: 10 },
+      resume: { enabled: true, ttl: 10_000 },
     })
     const event = 'resume-errors'
     const listener = vi.fn()

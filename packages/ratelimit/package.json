@@ -71,11 +71,11 @@
     "type:check": "tsc -b"
   },
   "peerDependencies": {
-    "@upstash/ratelimit": ">=2.0.8",
+    "@upstash/redis": ">=1.35.6",
     "redis": ">=6.0.0"
   },
   "peerDependenciesMeta": {
-    "@upstash/ratelimit": {
+    "@upstash/redis": {
       "optional": true
     },
     "redis": {
@@ -88,7 +88,6 @@
     "@standard-server/core": "~0.10.3"
   },
   "devDependencies": {
-    "@upstash/ratelimit": "^2.2.0",
     "@upstash/redis": "^1.39.0",
     "redis": "^6.3.0"
   }

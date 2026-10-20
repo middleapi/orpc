@@ -1234,7 +1234,7 @@ Base64Url, Cookie, Encryption, and Signing helpers are unchanged in `@orpc/serve
 
 ### Publisher
 
-The package is now `@orpc/publisher`. The resume option was restructured, `customJsonSerializers` became a `serializer` instance (see [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer)), and the Redis adapter switched from `ioredis` to `node-redis`. See [Publisher Helpers](/docs/helpers/publisher).
+The package is now `@orpc/publisher`. `resumeRetentionSeconds` became `resume.ttl`, in milliseconds, `customJsonSerializers` became a `serializer` instance (see [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer)), and the Redis adapter switched from `ioredis` to `node-redis`. See [Publisher Helpers](/docs/helpers/publisher).
 
 <CodeGroup>
 
@@ -1243,7 +1243,7 @@ import { RedisPublisher } from '@orpc/publisher/redis'
 
 const publisher = new RedisPublisher(client, {
   subscriber,
-  resume: { enabled: true, seconds: 300 },
+  resume: { enabled: true, ttl: 300_000 },
 })
 ```
 
@@ -1259,7 +1259,7 @@ const publisher = new IORedisPublisher({
 
 </CodeGroup>
 
-The Durable Object adapter moved to `@orpc/cloudflare`, with `PublisherDurableObject` renamed to `DurablePublisherObject`.
+The Durable Object adapter moved to `@orpc/cloudflare`, with `PublisherDurableObject` renamed to `DurablePublisherObject`. Its `resume` options are in milliseconds too: `retentionSeconds` became `ttl`, and `cleanupIntervalSeconds` became `cleanupInterval`.
 
 ### Rate Limit
 
@@ -1293,6 +1293,38 @@ const example = os
     key: ({ context }) => `user:${context.user.id}`,
   }))
   .handler(async () => {})
+```
+
+</CodeGroup>
+
+Blocking mode is now a flat `timeout` option: replace `blockingUntilReady: { enabled: true, timeout }` with `timeout`.
+
+`UpstashRateLimiter` now takes an Upstash `Redis` client, like the other Upstash adapters, instead of an `@upstash/ratelimit` instance. It enforces a fixed window with `maxRequests` and `window`, shares counters with `RedisRateLimiter`, and no longer takes `waitUntil`.
+
+<CodeGroup>
+
+```ts v2
+import { UpstashRateLimiter } from '@orpc/ratelimit/upstash'
+import { Redis } from '@upstash/redis'
+
+const limiter = new UpstashRateLimiter(Redis.fromEnv(), {
+  maxRequests: 10,
+  window: 60_000,
+  timeout: 5_000,
+})
+```
+
+```ts v1
+import { UpstashRatelimiter } from '@orpc/experimental-ratelimit/upstash-ratelimit'
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis } from '@upstash/redis'
+
+const limiter = new UpstashRatelimiter(new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.fixedWindow(10, '60 s'),
+}), {
+  blockingUntilReady: { enabled: true, timeout: 5_000 },
+})
 ```
 
 </CodeGroup>

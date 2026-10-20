@@ -114,7 +114,7 @@ describe('memoryPublisher', () => {
       const publisher = new MemoryPublisher<TestEvents>({
         resume: {
           enabled: true,
-          seconds: 1,
+          ttl: 1_000,
         },
       })
 
@@ -150,7 +150,7 @@ describe('memoryPublisher', () => {
       const publisher = new MemoryPublisher<TestEvents>({
         resume: {
           enabled: true,
-          seconds: 1,
+          ttl: 1_000,
         },
       })
 
@@ -203,7 +203,7 @@ describe('memoryPublisher', () => {
       const publisher = new MemoryPublisher<TestEvents>({
         resume: {
           enabled: true,
-          seconds: 1,
+          ttl: 1_000,
         },
       })
 
@@ -234,7 +234,7 @@ describe('memoryPublisher', () => {
       const publisher = new MemoryPublisher<TestEvents>({
         resume: {
           enabled: true,
-          seconds: 1,
+          ttl: 1_000,
         },
       })
 
