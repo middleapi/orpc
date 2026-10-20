@@ -9,8 +9,6 @@ import { isAsyncIteratorObject, promiseWithResolvers, toArray, value } from '@or
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
 
-export { BATCH_HEADER, DEFAULT_BATCH_MAX_SIZE } from '@orpc/client/plugins'
-
 /**
  * Content type for batch responses that use the length-prefixed binary framing,
  * which they do when any sub-response contains binary or is a stream.
@@ -117,11 +115,11 @@ function liftSubresponseHeaders(
 
 export interface BatchHandlerPluginOptions<T extends Context> {
   /**
-   * The max size of the batch allowed. Larger batches are rejected with a `413`.
-   *
-   * The client Batch Link Plugin's `maxSize` must not exceed it, as the client splits batches by its own limit.
+   * The max size of the batch allowed. Larger batches are rejected with a `413`,
+   * so keep the client Batch Link Plugin's `maxSize` at or below it.
    *
    * @default DEFAULT_BATCH_MAX_SIZE (10)
+   * @see {@link https://orpc.dev/docs/plugins/batch#max-size | Batch Plugin - Max Size}
    */
   maxSize?: Value<Promisable<number>, [options: StandardHandlerRoutingInterceptorOptions<T>]>
 

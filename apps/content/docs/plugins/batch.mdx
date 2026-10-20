@@ -60,7 +60,7 @@ const cors = new CORSHandlerPlugin({
 
 ## Max Size
 
-Both plugins limit how many requests a batch holds with `maxSize`, and each side defaults to `DEFAULT_BATCH_MAX_SIZE` (10) independently. The client splits a larger group into several batches, while the server rejects a larger batch with a `413`, which every request in it receives. Keep the client limit at or below the server's, since raising only the client's makes every batch above the server's limit fail.
+Both plugins limit how many requests a batch holds with `maxSize`, and each side defaults to `DEFAULT_BATCH_MAX_SIZE` (10) independently. The client splits a larger group into several batches, while the server rejects a larger batch with a `413` for every request in it, so keep the client limit at or below the server's.
 
 <CodeGroup>
 
@@ -79,7 +79,7 @@ const link = new RPCLink({
   url: '/rpc',
   plugins: [
     new BatchLinkPlugin({
-      maxSize: 20, // must not exceed the server's maxSize
+      maxSize: 20,
       groups: [
         {
           condition: () => true,

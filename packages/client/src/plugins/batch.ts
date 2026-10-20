@@ -17,7 +17,6 @@ export const BATCH_HEADER = 'orpc-batch'
 
 /**
  * Default `maxSize` of both the Batch Link Plugin and the Batch Handler Plugin.
- * The server rejects a batch larger than its own limit with a `413`, so the client limit must not exceed it.
  *
  * @see {@link https://orpc.dev/docs/plugins/batch#max-size | Batch Plugin - Max Size}
  */
@@ -65,10 +64,10 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
 
   /**
    * The maximum number of requests in the batch. Larger batches are split.
-   *
-   * Must not exceed the server Batch Handler Plugin's `maxSize`, which rejects larger batches with a `413`.
+   * Keep it at or below the server Batch Handler Plugin's `maxSize`, which rejects larger batches with a `413`.
    *
    * @default DEFAULT_BATCH_MAX_SIZE (10)
+   * @see {@link https://orpc.dev/docs/plugins/batch#max-size | Batch Plugin - Max Size}
    */
   maxSize?: Value<Promisable<number>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]>
 
