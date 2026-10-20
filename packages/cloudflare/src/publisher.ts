@@ -1,5 +1,4 @@
 import type { PublisherOptions, PublisherSubscribeListenerOptions } from '@orpc/publisher'
-import type { Public } from '@orpc/shared'
 import { RPCJsonSerializer } from '@orpc/client'
 import { Publisher } from '@orpc/publisher'
 import { isTypescriptObject, promiseWithResolvers, stringifyJSON } from '@orpc/shared'
@@ -18,7 +17,7 @@ export interface DurablePublisherOptions extends PublisherOptions {
    *
    * @default RPCJsonSerializer
    */
-  serializer?: undefined | Public<RPCJsonSerializer>
+  serializer?: undefined | Pick<RPCJsonSerializer, 'serializeJson' | 'deserializeJson'>
 
   /**
    * Custom function to get the Durable Object stub for publishing.
@@ -36,7 +35,7 @@ export interface DurablePublisherOptions extends PublisherOptions {
  */
 export class DurablePublisher<T extends Record<string, object>> extends Publisher<T> {
   private readonly prefix: string
-  private readonly serializer: Public<RPCJsonSerializer>
+  private readonly serializer: Pick<RPCJsonSerializer, 'serializeJson' | 'deserializeJson'>
   private readonly getStubByName: Exclude<DurablePublisherOptions['getStubByName'], undefined>
 
   constructor(

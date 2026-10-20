@@ -69,6 +69,18 @@ describe('serializeHeaders', () => {
     expect(Object.keys(serialized)).toEqual(['x-array'])
   })
 
+  it('ignores body-level serialize defaults like asFormData', () => {
+    const formDataSerializer = new OpenAPISerializer({ serialize: { asFormData: true } })
+
+    expect(serializeHeaders({
+      'x-string': 'value',
+      'x-object': { enabled: true },
+    }, formDataSerializer)).toEqual({
+      'x-string': 'value',
+      'x-object': 'enabled,true',
+    })
+  })
+
   it('prevents prototype injection via header keys', () => {
     const serialized = serializeHeaders(JSON.parse(
       '{"__proto__": { "polluted": "yes" }, "constructor": "c", "toString": "t"}',

@@ -722,7 +722,6 @@ describe('openAPIHandlerCodec', () => {
           serialize: vi.fn().mockReturnValueOnce('__serialized__'),
           deserialize: vi.fn(),
           serializeJson: vi.fn(),
-          deserializeJson: vi.fn(),
         }
 
         const procedure = os.handler(vi.fn())
@@ -745,7 +744,6 @@ describe('openAPIHandlerCodec', () => {
           serialize: vi.fn().mockReturnValueOnce('__serialized__'),
           deserialize: vi.fn(),
           serializeJson: vi.fn(),
-          deserializeJson: vi.fn(),
         }
 
         const procedure = os.meta(openapi({ successStatus: 201 })).handler(vi.fn())

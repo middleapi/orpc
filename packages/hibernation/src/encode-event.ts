@@ -1,4 +1,3 @@
-import type { Public } from '@orpc/shared'
 import type { EncodePeerMessageOptions, PeerEventStreamMessage } from '@standard-server/peer'
 import { RPCSerializer, toORPCError } from '@orpc/client'
 import { unwrapEvent } from '@standard-server/core'
@@ -13,7 +12,7 @@ export interface EncodeHibernationRPCEventOptions {
   /**
    * Override the default RPC serializer.
    */
-  serializer?: Public<RPCSerializer>
+  serializer?: Pick<RPCSerializer, 'serialize'>
 
   /**
    * The type of event, each type corresponds a different operation
