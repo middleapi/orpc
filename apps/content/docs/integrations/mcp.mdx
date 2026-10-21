@@ -148,7 +148,7 @@ Outputs are serialized like [OpenAPI responses](/docs/openapi/serializer). Pass 
 | String                                              | Text content with the string, and structured content                          |
 | Other values                                        | Text content with the JSON, and [structured content](https://modelcontextprotocol.io/specification/latest/server/tools#structured-content) |
 | `Blob` or `File`                                    | Image or audio content by MIME type, otherwise embedded resource content      |
-| Other values containing a `Blob` or `File`          | Like other values, with each file replaced by a URI, such as `file:///report/q3.pdf`, and returned as embedded resource content under that URI |
+| Other values containing a `Blob` or `File`          | Like other values, with each file also returned as embedded resource content named by its path, such as `file:///report/q3.pdf` |
 | `ReadableStream`                                    | Like a `Blob`, typed by the `content-type` response header, such as one set with the [Response Headers Plugin](/docs/plugins/response-headers) |
 | [AsyncIteratorObject](/docs/async-iterator-object)  | The last event, mapped as above, with every event reported as [progress](https://modelcontextprotocol.io/specification/latest/basic/utilities/progress) when requested |
 | Error                                               | [Tool execution error](#error-handling)                                       |

@@ -353,8 +353,7 @@ async function consumeIteratorBody(iterator: AsyncIterable<unknown>, ctx: Server
     if (progressToken !== undefined) {
       await ctx.mcpReq.notify({
         method: 'notifications/progress',
-        // nested files are named by the URIs the result would give them, without their bytes
-        params: { progressToken, progress: ++progress, message: toText(event instanceof Blob ? event : replaceNestedBlobs(event, [], [])) },
+        params: { progressToken, progress: ++progress, message: toText(event) },
       })
     }
   }
@@ -403,64 +402,37 @@ async function toCallToolResult(serialized: unknown, contentType?: string): Prom
     return { content: [] }
   }
 
-  const { json, content } = await toJsonContent(serialized)
-
-  return { content, structuredContent: json }
+  return {
+    content: [{ type: 'text', text: toText(serialized)! }, ...await toNestedBlobContents(serialized)],
+    structuredContent: serialized,
+  }
 }
 
 async function toErrorCallToolResult(json: unknown): Promise<CallToolResult> {
-  const { content } = await toJsonContent(json)
-
-  return { content, isError: true }
+  return { content: [{ type: 'text', text: stringifyJSON(json)! }, ...await toNestedBlobContents(json)], isError: true }
 }
 
 /**
- * The JSON as text content, with each nested blob replaced by a URI and embedded as a resource under it.
+ * JSON shows a nested blob as an empty object, so each one is also embedded as a resource named by its path.
  */
-async function toJsonContent(serialized: unknown): Promise<{ json: unknown, content: ContentBlock[] }> {
+function toNestedBlobContents(json: unknown): Promise<EmbeddedResource[]> {
   const blobs: [uri: string, blob: Blob][] = []
-  const json = replaceNestedBlobs(serialized, [], blobs)
+  collectNestedBlobs(json, [], blobs)
 
-  return {
-    json,
-    content: [
-      { type: 'text', text: toText(json)! },
-      ...await Promise.all(blobs.map(([uri, blob]) => toEmbeddedResource(uri, blob))),
-    ],
-  }
+  return Promise.all(blobs.map(([uri, blob]) => toEmbeddedResource(uri, blob)))
 }
 
-/**
- * Replaces each blob nested in the JSON with the URI of the embedded resource that carries it,
- * copying only the objects and arrays on the way to a blob.
- */
-function replaceNestedBlobs(json: unknown, segments: string[], blobs: [uri: string, blob: Blob][]): unknown {
+function collectNestedBlobs(json: unknown, segments: string[], blobs: [uri: string, blob: Blob][]): void {
   if (json instanceof Blob) {
-    const uri = toResourceUri(segments, json)
-    blobs.push([uri, json])
-    return uri
+    blobs.push([toResourceUri(segments, json), json])
   }
-
-  if (!Array.isArray(json) && !isPlainObject(json)) {
-    return json
-  }
-
-  let copy: Record<string, unknown> | undefined
-
-  for (const key of Object.keys(json)) {
-    const value = (json as Record<string, unknown>)[key]
-
-    segments.push(key)
-    const replaced = replaceNestedBlobs(value, segments, blobs)
-    segments.pop()
-
-    if (replaced !== value) {
-      copy ??= (Array.isArray(json) ? [...json] : { ...json }) as Record<string, unknown>
-      copy[key] = replaced
+  else if (Array.isArray(json) || isPlainObject(json)) {
+    for (const key of Object.keys(json)) {
+      segments.push(key)
+      collectNestedBlobs((json as Record<string, unknown>)[key], segments, blobs)
+      segments.pop()
     }
   }
-
-  return copy ?? json
 }
 
 async function toBinaryContent(blob: Blob): Promise<ContentBlock> {

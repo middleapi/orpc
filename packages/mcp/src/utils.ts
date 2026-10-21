@@ -165,7 +165,7 @@ export function resolveToolOutputJsonSchema(
   const [combined, optional] = combineConvertedSchemas(converted)
 
   // an output schema requires structured content matching it in every result, which undefined, unknown, or binary outputs
-  // cannot provide, and nested files become URIs the schema does not describe
+  // cannot provide, and nested files become empty objects the schema does not describe
   if (optional || isUnconstrainedSchema(combined) || containsJsonFileSchema(combined)) {
     return undefined
   }

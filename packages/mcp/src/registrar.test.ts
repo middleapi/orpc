@@ -593,7 +593,7 @@ describe('mcpRegistrar', () => {
         .toEqual([{ type: 'resource', resource: { uri: 'file:///blob', mimeType: 'application/octet-stream', blob: 'AQID' } }])
     })
 
-    it('returns nested blob outputs as embedded resources referenced by URI', async () => {
+    it('also returns nested blob outputs as embedded resources named by their paths', async () => {
       const bytes = new Uint8Array([1, 2, 3])
 
       const client = await createTestClient('legacy', new McpRegistrar({
@@ -609,15 +609,14 @@ describe('mcpRegistrar', () => {
       const { tools } = await client.listTools()
       expect(tools[0]!.outputSchema).toBeUndefined()
 
-      const structuredContent = { title: 'Q3', file: 'file:///file/q3%20report.pdf', covers: ['file:///covers/0'] }
-
       expect(await client.callTool({ name: 'report' })).toEqual({
         content: [
-          { type: 'text', text: JSON.stringify(structuredContent) },
+          { type: 'text', text: '{"title":"Q3","file":{},"covers":[{}]}' },
           { type: 'resource', resource: { uri: 'file:///file/q3%20report.pdf', mimeType: 'application/pdf', blob: 'AQID' } },
           { type: 'resource', resource: { uri: 'file:///covers/0', mimeType: 'image/png', blob: 'AQID' } },
         ],
-        structuredContent,
+        // the in-memory transport keeps the files, which other transports serialize as empty objects
+        structuredContent: { title: 'Q3', file: expect.any(File), covers: [expect.any(File)] },
       })
     })
 
@@ -663,23 +662,6 @@ describe('mcpRegistrar', () => {
       expect(result.content).toEqual([{ type: 'image', data: 'AQID', mimeType: 'image/png' }])
       expect(onprogress).toHaveBeenCalledTimes(2)
       expect(onprogress).toHaveBeenLastCalledWith({ progress: 2 })
-    })
-
-    it('reports nested blob events as progress with their resource URIs', async () => {
-      const client = await createTestClient('legacy', new McpRegistrar({
-        render: os.handler(async function* () {
-          yield { file: new File([new Uint8Array([1])], 'draft.pdf', { type: 'application/pdf' }) }
-          yield { file: new File([new Uint8Array([1, 2, 3])], 'final.pdf', { type: 'application/pdf' }) }
-        }),
-      }))
-
-      const onprogress = vi.fn()
-      const result = await client.callTool({ name: 'render' }, { onprogress })
-
-      expect(result.structuredContent).toEqual({ file: 'file:///file/final.pdf' })
-      expect(onprogress).toHaveBeenCalledTimes(2)
-      expect(onprogress).toHaveBeenNthCalledWith(1, { progress: 1, message: '{"file":"file:///file/draft.pdf"}' })
-      expect(onprogress).toHaveBeenNthCalledWith(2, { progress: 2, message: '{"file":"file:///file/final.pdf"}' })
     })
 
     it('reports errors thrown while streaming', async () => {
@@ -753,7 +735,7 @@ describe('mcpRegistrar', () => {
       expect(parseToolError(result)).toEqual(expect.objectContaining({ code: 'PLANET_GONE', message: 'The planet is gone' }))
     })
 
-    it('returns blobs nested in error data as embedded resources referenced by URI', async () => {
+    it('also returns blobs nested in error data as embedded resources named by their paths', async () => {
       const file = new File([new Uint8Array([1, 2, 3])], 'log.txt', { type: 'text/plain' })
 
       const client = await createTestClient('legacy', new McpRegistrar({
@@ -769,7 +751,7 @@ describe('mcpRegistrar', () => {
       for (const name of ['procedure', 'stream']) {
         const result = await client.callTool({ name })
 
-        expect(parseToolError(result)).toEqual(expect.objectContaining({ code: 'CONFLICT', data: { log: 'file:///data/log/log.txt' } }))
+        expect(parseToolError(result)).toEqual(expect.objectContaining({ code: 'CONFLICT', data: { log: {} } }))
         expect((result.content as any)[1]).toEqual({
           type: 'resource',
           resource: { uri: 'file:///data/log/log.txt', mimeType: 'text/plain', blob: 'AQID' },
