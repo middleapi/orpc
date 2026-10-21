@@ -33,6 +33,7 @@
     "@orpc/evlog": "workspace:*",
     "@orpc/experimental-effect": "workspace:*",
     "@orpc/experimental-lock": "workspace:*",
+    "@orpc/experimental-mcp": "workspace:*",
     "@orpc/experimental-msw": "workspace:*",
     "@orpc/hibernation": "workspace:*",
     "@orpc/json-schema": "workspace:*",

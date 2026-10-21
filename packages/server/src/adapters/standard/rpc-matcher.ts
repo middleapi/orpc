@@ -7,8 +7,7 @@ import type { WalkProcedureContractsLazyResult } from '../../router-utils'
 import { normalizeHttpPath, pathToHttpPath, value } from '@orpc/shared'
 import { unlazy } from '../../lazy'
 import { Procedure } from '../../procedure'
-import { createContractProcedure } from '../../procedure-utils'
-import { getRouter, walkProcedureContractsSync } from '../../router-utils'
+import { resolveContractProcedure, walkProcedureContractsSync } from '../../router-utils'
 
 /**
  * Methods that can invoke procedures by default. Browsers cannot trigger them
@@ -215,16 +214,7 @@ export class RPCMatcher {
   }
 
   private async resolveProcedure(entry: TreeEntry): Promise<AnyProcedure> {
-    const { default: maybeProcedure } = await unlazy(getRouter(this.rootRouter, entry.path))
-
-    if (!(maybeProcedure instanceof Procedure)) {
-      throw new TypeError(
-        `[Contract-First] Missing or invalid implementation for procedure at path: "${entry.path.join('.')}". `
-        + `Ensure the procedure is correctly implemented and matches its contract.`,
-      )
-    }
-
-    entry.procedure = createContractProcedure(maybeProcedure, entry.contract)
+    entry.procedure = await resolveContractProcedure(this.rootRouter, entry.contract, entry.path)
 
     return entry.procedure
   }

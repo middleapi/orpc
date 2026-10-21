@@ -1,0 +1,283 @@
+---
+title: "MCP Integration"
+description: "Expose oRPC procedures as Model Context Protocol tools, reusing their OpenAPI metadata, schemas, middleware, and error handling."
+sidebar:
+  label: "MCP"
+---
+
+:::warning
+This guide assumes familiarity with the [Model Context Protocol](https://modelcontextprotocol.io/) and requires the [MCP TypeScript SDK](https://ts.sdk.modelcontextprotocol.io/v2/) v2.
+:::
+
+## Installation
+
+```package-install
+npm install @orpc/experimental-mcp@beta @modelcontextprotocol/server
+```
+
+## Creating a Registrar
+
+`McpRegistrar` registers every procedure in a [router](/docs/router) as an [MCP tool](https://modelcontextprotocol.io/specification/latest/server/tools). Tool calls run through the same standard handler as the [RPC](/docs/rpc/handler) and [OpenAPI](/docs/openapi/handler) handlers.
+
+```ts
+import { McpServer } from '@modelcontextprotocol/server'
+import { McpRegistrar } from '@orpc/experimental-mcp'
+
+const registrar = new McpRegistrar(router)
+
+const server = new McpServer({ name: 'planets', version: '1.0.0' })
+await registrar.register(server, {
+  context: {}, // provide initial context if needed
+})
+```
+
+:::info
+The router, including [lazy routers](/docs/router#lazy-router), is loaded on the first `register` call and reused afterward. [Contract-first](/docs/contract-first) routers use their contract's metadata.
+:::
+
+### Serving Over stdio
+
+For local servers that clients start as a subprocess:
+
+```ts
+import { McpServer } from '@modelcontextprotocol/server'
+import { serveStdio } from '@modelcontextprotocol/server/stdio'
+import { McpRegistrar } from '@orpc/experimental-mcp'
+
+const registrar = new McpRegistrar(router)
+
+serveStdio(async () => {
+  const server = new McpServer({ name: 'planets', version: '1.0.0' })
+  await registrar.register(server)
+  return server
+})
+```
+
+### Serving Over HTTP
+
+For remote servers, `createMcpHandler` registers the tools on a fresh server per request:
+
+```ts
+import { createMcpHandler, McpServer } from '@modelcontextprotocol/server'
+import { McpRegistrar } from '@orpc/experimental-mcp'
+
+const registrar = new McpRegistrar(router)
+
+const mcpHandler = createMcpHandler(async () => {
+  const server = new McpServer({ name: 'planets', version: '1.0.0' })
+  await registrar.register(server)
+  return server
+})
+
+export default {
+  async fetch(request: Request): Promise<Response> {
+    if (new URL(request.url).pathname === '/mcp') {
+      return mcpHandler.fetch(request)
+    }
+
+    return new Response('Not found', { status: 404 })
+  },
+}
+```
+
+:::tip
+Mount it next to your [RPC](/docs/rpc/handler) or [OpenAPI](/docs/openapi/handler) handler to serve one router to apps and agents. For Node.js, wrap it with `toNodeHandler` from `@modelcontextprotocol/node`.
+:::
+
+## Tool Definitions
+
+Tool definitions derive from [OpenAPI metadata](/docs/openapi/specification#metadata):
+
+| Tool field    | Derived from                                                                       |
+| ------------- | ---------------------------------------------------------------------------------- |
+| `name`        | `operationId`, otherwise the router path joined by `_`, such as `planet_list`      |
+| `title`       | `summary`                                                                          |
+| `description` | `description`, otherwise `summary`                                                 |
+| `annotations` | `method`: `GET`, `HEAD`, and `QUERY` imply `readOnlyHint`, `PUT` and `DELETE` imply `idempotentHint` |
+
+```ts
+import { openapi } from '@orpc/openapi'
+
+const listPlanets = os
+  .meta(openapi({
+    method: 'GET',
+    operationId: 'listPlanets',
+    summary: 'List planets',
+    description: 'List planets, newest first, optionally limited to a number of results.',
+  }))
+  .input(z.object({ limit: z.number().int().min(1).max(100).optional() }))
+  .output(z.array(PlanetSchema))
+  .handler(async ({ input }) => {
+    // ...
+  })
+```
+
+:::tip
+Models pick tools by their description and fill arguments from the input JSON Schema, so describe procedures and input fields, such as with `.describe(...)` in Zod.
+:::
+
+### Tool Meta
+
+Use `mcp.tool` [metadata](/docs/metadata) to override derived fields or set MCP-only ones:
+
+```ts
+import { mcp } from '@orpc/experimental-mcp'
+
+const deletePlanet = os
+  .meta(mcp.tool({
+    name: 'delete_planet',
+    title: 'Delete a planet',
+    description: 'Permanently delete a planet. Ask the user to confirm first.',
+    annotations: { destructiveHint: true, openWorldHint: false },
+    icons: [{ src: 'https://example.com/planet.png', mimeType: 'image/png' }],
+  }))
+  .input(z.object({ id: z.number() }))
+  .handler(async ({ input }) => {
+    // ...
+  })
+```
+
+:::info
+Repeated `mcp.tool` calls override fields, except `annotations`, which merge per hint on top of those inferred from `method`.
+:::
+
+### Filtering Procedures
+
+Use `filter` to skip procedures:
+
+```ts
+import { getOpenAPIMeta } from '@orpc/openapi'
+
+const registrar = new McpRegistrar(router, {
+  filter: (procedure, path) => !path.includes('internal') && !getOpenAPIMeta(procedure)?.deprecated,
+})
+```
+
+## Input and Output
+
+### JSON Schema Converters
+
+Tools advertise JSON Schemas converted from your input and output schemas. [Standard JSON Schema](https://standardschema.dev/json-schema) schemas, such as Zod v4.2+, need no converter; add one from the [Zod](/docs/integrations/zod), [Valibot](/docs/integrations/valibot), or [ArkType](/docs/integrations/arktype) integrations for more types, like the [OpenAPI Generator](/docs/openapi/specification#json-schema-converters):
+
+```ts
+import { ZodToJsonSchemaConverter } from '@orpc/zod'
+
+const registrar = new McpRegistrar(router, {
+  converters: [new ZodToJsonSchemaConverter()],
+})
+```
+
+### Input
+
+JSON cannot carry types such as `Date` or `BigInt`, so add the [Smart Coercion Plugin](/docs/plugins/smart-coercion) with the same converters to coerce arguments before validation:
+
+```ts
+import { SmartCoercionHandlerPlugin } from '@orpc/json-schema'
+import { ZodToJsonSchemaConverter } from '@orpc/zod'
+
+const converters = [new ZodToJsonSchemaConverter()]
+
+const registrar = new McpRegistrar(router, {
+  converters,
+  plugins: [new SmartCoercionHandlerPlugin({ converters })],
+})
+```
+
+Tool arguments are always an object, so a non-object input, such as `z.string()`, is nested under an `input` argument.
+
+### Output
+
+Outputs are serialized like [OpenAPI responses](/docs/openapi/serializer). Pass your OpenAPI handler's serializer as `serializer` to share [custom types](/docs/openapi/serializer#custom-serializers).
+
+| Output                                              | Tool result                                                                   |
+| --------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `undefined`                                         | Empty content                                                                 |
+| String                                              | Text content with the string, and structured content                          |
+| Other values                                        | Text content with the JSON, and [structured content](https://modelcontextprotocol.io/specification/latest/server/tools#structured-content) |
+| `Blob` or `File`                                    | Image or audio content by MIME type, otherwise embedded resource content      |
+| `ReadableStream`                                    | Like a `Blob`, typed by the `content-type` response header, such as one set with the [Response Headers Plugin](/docs/plugins/response-headers) |
+| [AsyncIteratorObject](/docs/async-iterator-object)  | The last event, mapped as above, with every event reported as [progress](https://modelcontextprotocol.io/specification/latest/basic/utilities/progress) when requested |
+| Error                                               | [Tool execution error](#error-handling)                                       |
+
+A tool advertises an output schema only when every result has structured content, so not for optional or binary outputs. For an AsyncIteratorObject, its yield schema is advertised, so it must yield at least once.
+
+## Error Handling
+
+Errors are returned as [tool execution errors](https://modelcontextprotocol.io/specification/latest/server/tools#error-handling) the model can read, with the [ORPCError](/docs/error-handling#orpcerror-class) JSON as text:
+
+```json
+{
+  "defined": true,
+  "code": "NOT_FOUND",
+  "message": "Planet not found",
+  "data": { "id": 42 }
+}
+```
+
+Other errors become `INTERNAL_SERVER_ERROR` without their message. Use [interceptors](#plugins-and-interceptors) to log them.
+
+## Context
+
+`register` takes the [initial context](/docs/context#initial-context) for tool calls on that server. With `createMcpHandler`, resolve it per request from the request and verified auth info:
+
+```ts
+const mcpHandler = createMcpHandler(async ({ requestInfo, authInfo }) => {
+  const server = new McpServer({ name: 'planets', version: '1.0.0' })
+
+  await registrar.register(server, {
+    context: {
+      headers: requestInfo?.headers,
+      user: await findUser(authInfo?.clientId),
+    },
+  })
+
+  return server
+})
+
+export default {
+  async fetch(request: Request): Promise<Response> {
+    const authInfo = await verifyAccessToken(request)
+    return mcpHandler.fetch(request, { authInfo })
+  },
+}
+```
+
+`context` can also be a function of the MCP request context, called on every tool call:
+
+```ts
+await registrar.register(server, {
+  context: ctx => ({ user: ctx.http?.authInfo?.extra?.user }),
+})
+```
+
+:::info
+`createMcpHandler` forwards only the request and `authInfo`. Pass anything else through `authInfo.extra`.
+:::
+
+:::warning
+`createMcpHandler` performs no authentication or `Origin` validation. Verify credentials before `mcpHandler.fetch` or in a [middleware](/docs/middleware), and validate `Origin` and `Host` for browser-reachable endpoints.
+:::
+
+## Plugins and Interceptors
+
+`McpRegistrar` accepts the same [interceptors](/docs/openapi/handler#interceptors) and [plugins](/docs/openapi/handler#plugins) as the RPC and OpenAPI handlers:
+
+```ts
+import { SmartCoercionHandlerPlugin } from '@orpc/json-schema'
+import { onError } from '@orpc/server'
+import { ZodToJsonSchemaConverter } from '@orpc/zod'
+
+const converters = [new ZodToJsonSchemaConverter()]
+
+const registrar = new McpRegistrar(router, {
+  converters,
+  plugins: [new SmartCoercionHandlerPlugin({ converters })],
+  clientInterceptors: [
+    onError((error) => {
+      console.error(error)
+    }),
+  ],
+})
+```
+
+Interceptors see each tool call as a `POST` to the procedure path, with the arguments as body and only the [trace context](https://www.w3.org/TR/trace-context/) and [baggage](https://www.w3.org/TR/baggage/) as headers. Plugins working on the procedure call, such as [Smart Coercion](/docs/plugins/smart-coercion), [Timeout](/docs/plugins/timeout), and logging, apply; HTTP plugins, such as [CORS](/docs/plugins/cors) or compression, do nothing, and [Rethrow](/docs/plugins/rethrow) is not supported.

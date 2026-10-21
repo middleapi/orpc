@@ -68,3 +68,34 @@ function concatBytes(items: Array<string | ArrayBuffer | Pick<Uint8Array<ArrayBu
 
   return result
 }
+
+/**
+ * Encodes bytes to standard, padded base64, as data URLs and many protocols require.
+ * Prefers the native `toBase64` or `Buffer`, which are far faster for large outputs.
+ */
+export function encodeBase64(bytes: Uint8Array): string {
+  const native = bytes as Uint8Array & { toBase64?: () => string }
+
+  if (typeof native.toBase64 === 'function') {
+    return native.toBase64()
+  }
+
+  // detected at runtime, so the package keeps working on runtimes without `Buffer`
+  // eslint-disable-next-line node/prefer-global/buffer
+  const NodeBuffer = (globalThis as {
+    Buffer?: { from: (buffer: ArrayBufferLike, byteOffset: number, length: number) => { toString: (encoding: 'base64') => string } }
+  }).Buffer
+
+  if (NodeBuffer !== undefined) {
+    return NodeBuffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('base64')
+  }
+
+  const chunkSize = 8192 // 8KB chunks to stay well below call stack limits
+  let binaryString = ''
+
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binaryString += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+  }
+
+  return btoa(binaryString)
+}

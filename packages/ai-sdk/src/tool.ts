@@ -5,7 +5,7 @@ import type { Context, ProcedureClientOptions } from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
 import type { FlexibleSchema, Tool } from 'ai'
 import type { FunctionTool } from './tool-meta'
-import { getAsyncIteratorObjectSchemaDetails } from '@orpc/contract'
+import { getAsyncIteratorObjectSchemasDetails } from '@orpc/contract'
 import { combineJsonSchemasWithComposition } from '@orpc/json-schema'
 import { call, Procedure } from '@orpc/server'
 import { isAsyncGeneratorFunction, mergeTwoLevels, ORPC_NAME, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
@@ -89,28 +89,8 @@ function combineSchemas(schemas: AnySchema[], merge: boolean): undefined | Flexi
   }
 }
 
-function getIteratorYieldSchemas(schemas: AnySchema[]): AnySchema[] | undefined {
-  if (schemas.length === 0) {
-    return undefined
-  }
-
-  const yieldSchemas: AnySchema[] = []
-
-  for (const schema of schemas) {
-    const details = getAsyncIteratorObjectSchemaDetails(schema)
-
-    if (!details) {
-      return undefined
-    }
-
-    yieldSchemas.push(details.yieldSchema)
-  }
-
-  return yieldSchemas
-}
-
 function combineOutputSchemas(outputSchemas: AnySchema[]): FlexibleSchema | undefined {
-  const yieldSchemas = getIteratorYieldSchemas(outputSchemas)
+  const yieldSchemas = getAsyncIteratorObjectSchemasDetails(outputSchemas)?.yieldSchemas
   return combineSchemas([...(yieldSchemas ?? outputSchemas)].reverse(), false)
 }
 
@@ -277,7 +257,7 @@ export function createToolFactory<TInitialContext extends Context = object>(
      * Output schemas are the source of truth, but an `async function*` handler always
      * returns an async iterator, so it streams even without an `asyncIteratorObject` schema.
      */
-    const isIteratorOutput = getIteratorYieldSchemas(toArray(procedure['~orpc'].outputSchemas)) !== undefined
+    const isIteratorOutput = getAsyncIteratorObjectSchemasDetails(procedure['~orpc'].outputSchemas) !== undefined
       || isAsyncGeneratorFunction(procedure['~orpc'].handler)
 
     return implementTool(procedure, {

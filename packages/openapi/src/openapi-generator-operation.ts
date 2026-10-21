@@ -5,7 +5,7 @@ import type { OpenAPIMeta } from './meta'
 import type { OpenAPIComponentRegistry } from './openapi-generator-components'
 import type { OpenAPIV3_2 } from './types'
 import type { getDynamicPathParams } from './utils'
-import { getAsyncIteratorObjectSchemaDetails } from '@orpc/contract'
+import { getAsyncIteratorObjectSchemasDetails } from '@orpc/contract'
 import {
   combineJsonObjectSchemaEntries,
   combineJsonSchemasWithComposition,
@@ -91,7 +91,7 @@ export function buildRequest(
   const inputStructure = meta?.inputStructure ?? DEFAULT_OPENAPI_INPUT_STRUCTURE
 
   if (inputStructure === 'compact') {
-    const iteratorDetails = getAsyncIteratorObjectDetails(def.inputSchemas)
+    const iteratorDetails = getAsyncIteratorObjectSchemasDetails(def.inputSchemas)
 
     if (iteratorDetails) {
       operation.requestBody = {
@@ -99,8 +99,8 @@ export function buildRequest(
         content: toAsyncIteratorObjectContent(
           ctx,
           'input',
-          ctx.convertSchemas(iteratorDetails[0], 'input'),
-          ctx.convertSchemas(iteratorDetails[1], 'input'),
+          ctx.convertSchemas(iteratorDetails.yieldSchemas, 'input'),
+          ctx.convertSchemas(iteratorDetails.returnSchemas, 'input'),
         ),
       }
 
@@ -328,7 +328,7 @@ export function buildSuccessResponse(
   const outputStructure = meta?.outputStructure ?? DEFAULT_OPENAPI_OUTPUT_STRUCTURE
 
   if (outputStructure === 'compact') {
-    const iteratorDetails = getAsyncIteratorObjectDetails(def.outputSchemas)
+    const iteratorDetails = getAsyncIteratorObjectSchemasDetails(def.outputSchemas)
 
     if (iteratorDetails) {
       operation.responses ??= {}
@@ -337,8 +337,8 @@ export function buildSuccessResponse(
         content: toAsyncIteratorObjectContent(
           ctx,
           'output',
-          ctx.convertSchemas(iteratorDetails[0], 'output'),
-          ctx.convertSchemas(iteratorDetails[1], 'output'),
+          ctx.convertSchemas(iteratorDetails.yieldSchemas, 'output'),
+          ctx.convertSchemas(iteratorDetails.returnSchemas, 'output'),
         ),
       }
 
@@ -572,29 +572,6 @@ function toErrorComponentName(code: string): string {
     .join('')
 
   return name || 'Error'
-}
-
-function getAsyncIteratorObjectDetails(schemas: AnySchema[] | undefined): [yieldSchemas: AnySchema[], returnSchemas: AnySchema[]] | undefined {
-  if (!schemas || schemas.length === 0) {
-    return undefined
-  }
-
-  const yieldSchemas: AnySchema[] = []
-  const returnSchemas: AnySchema[] = []
-
-  for (const s of schemas) {
-    const details = getAsyncIteratorObjectSchemaDetails(s)
-    if (!details) {
-      return undefined
-    }
-
-    yieldSchemas.push(details.yieldSchema)
-    if (details.returnSchema) {
-      returnSchemas.push(details.returnSchema)
-    }
-  }
-
-  return [yieldSchemas, returnSchemas]
 }
 
 function toAsyncIteratorObjectContent(
