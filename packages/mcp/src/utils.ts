@@ -2,7 +2,7 @@ import type { StandardSchemaWithJSON } from '@modelcontextprotocol/server'
 import type { AnySchema } from '@orpc/contract'
 import type { JsonSchema, JsonSchemaConverter } from '@orpc/json-schema'
 import { getAsyncIteratorObjectSchemasDetails } from '@orpc/contract'
-import { combineJsonSchemasWithComposition, ensureJsonSchemaObject, flattenJsonUnionSchema, hoistRecursiveRefToDef, isJsonFileSchema, isJsonObjectLikeSchema, isStandardSchemaOptional, isUnconstrainedSchema } from '@orpc/json-schema'
+import { combineJsonSchemasWithComposition, ensureJsonSchemaObject, hoistRecursiveRefToDef, isJsonFileSchema, isJsonObjectLikeSchema, isStandardSchemaOptional, isUnconstrainedSchema } from '@orpc/json-schema'
 import { isTypescriptObject, ORPC_NAME } from '@orpc/shared'
 
 type JsonSchemaObject = Exclude<JsonSchema, boolean>
@@ -139,8 +139,15 @@ export function resolveToolInput(args: unknown, inputJsonSchema: ToolInputJsonSc
 }
 
 /**
+ * Whether a file schema appears anywhere in the schema, such as in a property, a composition, or a def.
+ */
+function containsJsonFileSchema(schema: unknown): boolean {
+  return isTypescriptObject(schema) && (isJsonFileSchema(schema as JsonSchema) || Object.values(schema).some(containsJsonFileSchema))
+}
+
+/**
  * Resolves the JSON Schema advertised as a tool's `outputSchema`,
- * or `undefined` when the output may be undefined, unconstrained, or binary.
+ * or `undefined` when the output may be undefined, unconstrained, or contain binary values.
  *
  * Every output schema must describe an [AsyncIteratorObject](https://orpc.dev/docs/async-iterator-object)
  * for the yield schemas to be used, since tools return the last yielded value.
@@ -157,8 +164,8 @@ export function resolveToolOutputJsonSchema(
   const converted = (yieldSchemas ?? outputSchemas).map(schema => convertSchema(converter, schema, 'output'))
   const [combined, optional] = combineConvertedSchemas(converted)
 
-  // an output schema requires structured content in every result, which undefined, binary, or unknown outputs cannot provide
-  if (optional || isUnconstrainedSchema(combined) || flattenJsonUnionSchema(combined).some(isJsonFileSchema)) {
+  // an output schema requires structured content in every result, which undefined, unknown, or binary outputs cannot provide
+  if (optional || isUnconstrainedSchema(combined) || containsJsonFileSchema(combined)) {
     return undefined
   }
 

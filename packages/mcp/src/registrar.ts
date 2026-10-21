@@ -330,8 +330,19 @@ class McpHandlerCodec implements StandardHandlerCodec<Context> {
 
   private serialize(data: unknown): unknown {
     // kept as is, like the body of an OpenAPI response, so it becomes an empty tool result rather than null
-    // (blobs and streams are returned as is by the serializer)
-    return data === undefined ? undefined : this.serializer.serializeJson(data).json
+    if (data === undefined) {
+      return undefined
+    }
+
+    // blobs and streams are returned as is by the serializer
+    const { json, blobs } = this.serializer.serializeJson(data)
+
+    // a tool result carries binary data only as its own content, so nested blobs would be lost
+    if (blobs?.length && !(json instanceof Blob)) {
+      throw new TypeError('[MCP] Tool results cannot contain binary values nested inside other data. Return the Blob or File itself.')
+    }
+
+    return json
   }
 }
 

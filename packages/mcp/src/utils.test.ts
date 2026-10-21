@@ -117,6 +117,9 @@ describe('resolveToolOutputJsonSchema', () => {
     ['unconstrained', [{}, false]],
     ['binary', [{ type: 'string', contentMediaType: 'image/png' }, false]],
     ['possibly binary', [{ anyOf: [{ type: 'object' }, { type: 'string', contentMediaType: 'image/png' }] }, false]],
+    ['intersected binary', [{ allOf: [{ type: 'string' }, { type: 'string', contentMediaType: 'image/png' }] }, false]],
+    ['referenced binary', [{ $ref: '#/$defs/Image', $defs: { Image: { type: 'string', contentMediaType: 'image/png' } } }, false]],
+    ['nested binary', [{ type: 'object', properties: { image: { type: 'string', contentMediaType: 'image/png' } } }, false]],
   ] as const)('returns undefined for %s outputs', (_, result) => {
     expect(resolveToolOutputJsonSchema(createConverter(result as any), [type()])).toBeUndefined()
   })

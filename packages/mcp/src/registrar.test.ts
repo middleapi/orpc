@@ -593,6 +593,20 @@ describe('mcpRegistrar', () => {
         .toEqual([{ type: 'resource', resource: { uri: 'file:///blob', mimeType: 'application/octet-stream', blob: 'AQID' } }])
     })
 
+    it('rejects binary values nested inside other data', async () => {
+      const client = await createTestClient('legacy', new McpRegistrar({
+        report: os
+          .output(z.object({ file: z.file() }))
+          .handler(() => ({ file: new File([new Uint8Array([1, 2, 3])], 'report.pdf') })),
+      }))
+
+      const { tools } = await client.listTools()
+      expect(tools[0]!.outputSchema).toBeUndefined()
+
+      expect(parseToolError(await client.callTool({ name: 'report' })))
+        .toEqual(expect.objectContaining({ code: 'INTERNAL_SERVER_ERROR' }))
+    })
+
     it('types stream outputs with the content-type response header', async () => {
       const client = await createTestClient('legacy', new McpRegistrar({
         image: os.$context<ResponseHeadersHandlerPluginContext>().handler(({ context }) => {
