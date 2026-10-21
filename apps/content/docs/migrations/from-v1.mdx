@@ -61,7 +61,7 @@ import { COMMON_ERROR_STATUS_MAP } from '@orpc/openapi'
 const handler = new OpenAPIHandler(router, {
   customErrorResponseBodyEncoder: error => ({
     ...error.toJSON(),
-    status: COMMON_ERROR_STATUS_MAP[error.code] ?? 500,
+    status: COMMON_ERROR_STATUS_MAP[error.code] ?? 400,
   }),
 })
 ```
@@ -410,6 +410,8 @@ The `dedupeLeadingMiddlewares` config option was removed together with this beha
 ### `status` removed from errors
 
 `ORPCError` and `.errors` definitions no longer accept a `status`. HTTP status codes are now a handler concern, configured with `errorStatusMap`. Error response bodies no longer contain the field either, see [Wire Format Changes](#wire-format-changes). See [Error Handling](/docs/error-handling) and [RPC Handler](/docs/rpc/handler).
+
+Codes missing from `errorStatusMap` now fall back to `400` instead of `500`. If a custom code reports a server-side failure, add it to the map with a `5xx` status.
 
 <CodeGroup>
 

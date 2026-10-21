@@ -87,6 +87,7 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
 
   /**
    * Mapping ORPCError Code -> HTTP Status Code
+   * Codes missing from the map fall back to `DEFAULT_ERROR_STATUS` (400).
    *
    * @default COMMON_ERROR_STATUS_MAP
    */
