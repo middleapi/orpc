@@ -170,6 +170,14 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
   mutationOptions?: ProcedureUtilsModifier<
     MutationOptionsIn<TClientContext, TInput, TOutput, TError, unknown>
   > | undefined
+
+  /**
+   * Settle streamed queries once they connect and live queries on their first event,
+   * closing the stream instead of following it. Set by `StreamQuerySSRUtilsPlugin` on the server.
+   *
+   * @internal
+   */
+  snapshotStreams?: boolean | undefined
 }
 
 const PROCEDURE_UTILS_INTERCEPTOR_KEYS: string[] = [
@@ -443,7 +451,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
                   throw new Error('streamedQuery requires an AsyncIteratorObject output')
                 }
 
-                return output
+                return this.options.snapshotStreams ? takeChunks(output, 0) : output
               },
               optionsIn.queryFnOptions,
             )(fnContext)
@@ -533,7 +541,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
                 throw new Error('liveQuery requires an AsyncIteratorObject output')
               }
 
-              return output
+              return this.options.snapshotStreams ? takeChunks(output, 1) : output
             })(fnContext)
           },
         )
@@ -679,5 +687,22 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
         )
       },
     }
+  }
+}
+
+async function* takeChunks<T>(iterator: AsyncIterator<T>, count: number): AsyncGenerator<T> {
+  try {
+    for (let i = 0; i < count; i++) {
+      const result = await iterator.next()
+
+      if (result.done) {
+        return
+      }
+
+      yield result.value
+    }
+  }
+  finally {
+    await iterator.return?.()
   }
 }

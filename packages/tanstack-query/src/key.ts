@@ -1,7 +1,10 @@
-import type { PartialDeep } from '@orpc/shared'
+import type { PartialDeep, Public } from '@orpc/shared'
+import type { QueryKey, QueryKeyHashFunction } from '@tanstack/query-core'
 import type { SerializableStreamedQueryOptions } from './stream-query'
 import type { OperationType } from './types'
-import { skipToken } from '@tanstack/query-core'
+import { RPCJsonSerializer } from '@orpc/client'
+import { stringifyJSON } from '@orpc/shared'
+import { hashKey, skipToken } from '@tanstack/query-core'
 
 export interface OperationKeyPrefixOptions {
   /**
@@ -44,4 +47,22 @@ export function generateOperationKey<TType extends OperationType, TInput>(
       ...options.fnOptions !== undefined ? { fnOptions: options.fnOptions } : {},
     },
   ] as OperationKey<TType, TInput>
+}
+
+/**
+ * Creates a `queryKeyHashFn` that supports oRPC types such as `bigint` and `Date`.
+ *
+ * @see {@link https://orpc.dev/docs/integrations/tanstack-query#custom-serializers | TanStack Query Integration - Custom Serializers}
+ */
+export function createQueryKeyHashFn(
+  serializer: Public<RPCJsonSerializer> = new RPCJsonSerializer(),
+): QueryKeyHashFunction<QueryKey> {
+  return (queryKey) => {
+    const { json, meta } = serializer.serializeJson(queryKey)
+
+    return hashKey([
+      json,
+      meta?.map(entry => stringifyJSON(entry)).sort(),
+    ])
+  }
 }

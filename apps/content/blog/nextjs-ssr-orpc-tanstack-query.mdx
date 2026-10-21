@@ -190,7 +190,8 @@ That handoff needs a carefully configured `QueryClient`. Create `lib/query-clien
 
 ```ts lib/query-client.ts
 import { RPCJsonSerializer } from '@orpc/client'
-import { environmentManager, hashKey, QueryClient } from '@tanstack/react-query'
+import { createHydrationOptions, createQueryKeyHashFn } from '@orpc/tanstack-query'
+import { environmentManager, QueryClient } from '@tanstack/react-query'
 
 let browserQueryClient: QueryClient | undefined
 
@@ -209,74 +210,23 @@ export function getQueryClient(): QueryClient {
 const serializer = new RPCJsonSerializer()
 
 function createQueryClient(): QueryClient {
-  const queryClient = new QueryClient({
+  return new QueryClient({
     defaultOptions: {
       queries: {
         staleTime: 60 * 1000, // > 0 to prevent immediate refetching on mount
-
-        queryKeyHashFn: (queryKey) => {
-          const { json, meta } = serializer.serializeJson(queryKey)
-
-          return hashKey([
-            json,
-            meta?.map(entry => JSON.stringify(entry)).sort(),
-          ])
-        },
+        queryKeyHashFn: createQueryKeyHashFn(serializer),
       },
-      dehydrate: {
-        serializeData: (data) => {
-          const { json, meta } = serializer.serializeJson(data)
-          return { json, meta }
-        },
-      },
-      hydrate: {
-        deserializeData(data) {
-          return serializer.deserializeJson(data)
-        },
-      },
+      ...createHydrationOptions(serializer),
     },
-  })
-
-  if (environmentManager.isServer()) {
-    cancelStreamsOnSuccess(queryClient)
-  }
-
-  return queryClient
-}
-
-/**
- * Streamed and live queries can stay open indefinitely and would block SSR
- * forever. Only active streams hold `success` status while still `fetching`,
- * so silently cancel queries in that state: the data received so far is kept,
- * prefetching settles, and dehydration works as usual.
- *
- * Server-side query clients only. In the browser this would cancel active
- * streams and background refetches.
- */
-function cancelStreamsOnSuccess(queryClient: QueryClient): void {
-  const cancelled = new Set<string>()
-
-  queryClient.getQueryCache().subscribe(({ query }) => {
-    if (
-      query.state.status !== 'success' // no successful snapshot yet
-      || query.state.fetchStatus !== 'fetching' // already settled
-      || cancelled.has(query.queryHash)
-    ) {
-      return
-    }
-
-    cancelled.add(query.queryHash)
-    void query.cancel({ silent: true })
   })
 }
 ```
 
-A lot is going on, but each piece has one job:
+Each piece has one job:
 
 - **`getQueryClient`** creates a fresh client for every server request, so one user's data can never leak into another user's HTML, while the browser reuses a singleton.
-- **The serializer options** teach the cache handoff about oRPC's extra types. Dehydration normally goes through plain JSON, which would turn our `Date` objects into strings. `RPCJsonSerializer` round-trips them intact. See [Custom Serializers](/docs/integrations/tanstack-query#custom-serializers) to extend it with your own types.
+- **`createQueryKeyHashFn` and `createHydrationOptions`** teach query keys and the cache handoff about oRPC's extra types. Dehydration normally goes through plain JSON, which would turn our `Date` objects into strings. `RPCJsonSerializer` round-trips them intact. See [Custom Serializers](/docs/integrations/tanstack-query#custom-serializers) to extend it with your own types.
 - **`staleTime: 60 * 1000`** marks hydrated data as fresh, so the browser doesn't immediately refetch what the server just rendered.
-- **`cancelStreamsOnSuccess`** solves a problem specific to streaming: SSR waits for every query to finish, and our generators never finish. Cancelling a stream once it has a successful snapshot lets the server render what has arrived so far and move on. It matters the moment we server-render the telemetry widget, and the [Streamed and Live Queries](/docs/integrations/tanstack-query#streamed-and-live-queries) docs cover it in depth.
 
 ## Wire Up the Providers
 
@@ -480,44 +430,22 @@ Wire it into the page, inside its own suspense boundary:
 </Suspense>
 ```
 
-Think about what SSR means for a query that never completes. Two problems, and you already solved half of them:
+Think about what SSR means for a query that never completes. Two problems:
 
-1. **On the server**, waiting for the stream to end would block rendering forever. `cancelStreamsOnSuccess` in your query client cancels it right after the first reading arrives, so the HTML ships with a real temperature in it.
+1. **On the server**, waiting for the stream to end would block rendering forever.
 2. **In the browser**, the hydrated reading is a static snapshot, and `staleTime` marks it fresh, so TanStack Query sees no reason to refetch. Nothing reopens the stream, and the widget silently freezes at the SSR value.
 
-The fix for the second problem is `refetchOnMount: 'always'` on streamed and live queries. Instead of remembering to pass it at every call site, register it once as a [plugin](/docs/integrations/tanstack-query#plugins) in `lib/orpc.ts`:
+`StreamQuerySSRUtilsPlugin` fixes both. Register it once as a [plugin](/docs/integrations/tanstack-query#plugins) in `lib/orpc.ts`:
 
 ```ts lib/orpc.ts
-import type { RouterUtilsPlugin } from '@orpc/tanstack-query'
-
-/**
- * Streamed and live queries dehydrate as static snapshots during SSR, so the
- * client must always refetch on mount to open a new stream after hydration.
- */
-const streamingSSRPlugin: RouterUtilsPlugin<typeof client> = {
-  name: 'streaming-ssr',
-  initProcedureOptions(_path, options) {
-    return {
-      ...options,
-      streamedOptions: {
-        ...options.streamedOptions,
-        initialData: [],
-        refetchOnMount: 'always',
-      },
-      liveOptions: {
-        ...options.liveOptions,
-        refetchOnMount: 'always',
-      },
-    }
-  },
-}
+import { StreamQuerySSRUtilsPlugin } from '@orpc/tanstack-query'
 
 export const orpc = createTanstackQueryUtils(client, {
-  plugins: [streamingSSRPlugin],
+  plugins: [new StreamQuerySSRUtilsPlugin()],
 })
 ```
 
-The plugin also gives streamed queries `initialData: []`, so they render an empty list instead of suspending or reporting `pending` before their stream connects. Per-call options still override anything the plugin sets.
+On the server, the plugin settles live queries on their first event and closes the stream, so the HTML ships with a real temperature in it. In the browser, it sets `refetchOnMount: 'always'` on streamed and live queries, so the client reopens the stream after hydration. It also gives streamed queries `initialData: []`, so they render an empty list instead of suspending or reporting `pending` before their stream connects. Per-call options still override anything the plugin sets. The [Streamed and Live Queries](/docs/integrations/tanstack-query#streamed-and-live-queries) docs cover the details.
 
 Reload the page one last time and check your work:
 

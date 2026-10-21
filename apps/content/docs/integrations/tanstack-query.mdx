@@ -510,120 +510,33 @@ When [server-side rendering](/docs/recipes/optimizing-ssr) with [TanStack Query 
 
 ### Custom Serializers
 
-If needed, you can extend the default TanStack Query serializer to support additional types supported by oRPC by using the [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer).
+TanStack Query hashes query keys and dehydrates query data as plain JSON, which cannot represent oRPC types such as `Date`, `BigInt`, `Set`, or `Map`. Pass your [RPC Serializer](/docs/rpc/serializer#custom-serializers) to `createQueryKeyHashFn` and `createHydrationOptions` to keep them intact.
 
 ```ts
-import { hashKey, QueryClient } from '@tanstack/react-query' // or any framework adapter, e.g. @tanstack/vue-query 
+import { createHydrationOptions, createQueryKeyHashFn } from '@orpc/tanstack-query'
+import { QueryClient } from '@tanstack/react-query' // or any framework adapter, e.g. @tanstack/vue-query
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 60 * 1000, // > 0 to prevent immediate refetching on mount
-
-      queryKeyHashFn: (queryKey) => {
-        const { json, meta } = serializer.serializeJson(queryKey)
-
-        return hashKey([
-          json,
-          meta?.map(entry => JSON.stringify(entry)).sort(),
-        ])
-      },
+      queryKeyHashFn: createQueryKeyHashFn(serializer),
     },
-    dehydrate: {
-      serializeData: (data) => {
-        const { json, meta } = serializer.serializeJson(data)
-        return { json, meta }
-      },
-    },
-    hydrate: {
-      deserializeData(data) {
-        return serializer.deserializeJson(data)
-      },
-    },
+    ...createHydrationOptions(serializer), // dehydrate.serializeData and hydrate.deserializeData
   },
 })
 ```
 
 ### Streamed and Live Queries
 
-[Streamed](#streamed-query-options) and [live](#live-query-options) queries can stay open indefinitely, so prefetching them during SSR would block rendering forever. The fix: cancel the stream on the server once the query succeeds and dehydrate the result, then refetch on the client to open a new stream.
-
-#### Cancel Server Streams on Success
-
-Only active streams hold `success` status while still `fetching`: streamed queries as soon as they connect, live queries once the first event arrives. Silently cancel queries in that state; the data received so far is kept, so prefetching settles and dehydration works as usual.
+`StreamQuerySSRUtilsPlugin` lets [streamed](#streamed-query-options) and [live](#live-query-options) queries render on the server without blocking forever: streamed queries settle once they connect and live queries on their first event. In the browser, they refetch on mount to reopen the stream after hydration.
 
 ```ts
-export function createServerQueryClient(): QueryClient {
-  const queryClient = new QueryClient()
-  
-  if (typeof window === 'undefined') {
-    cancelStreamsOnSuccess(queryClient)
-  }
-
-  return queryClient
-}
-
-function cancelStreamsOnSuccess(queryClient: QueryClient): void {
-  const cancelled = new Set<string>()
-
-  queryClient.getQueryCache().subscribe(({ query }) => {
-    if (
-      query.state.status !== 'success' // no successful snapshot yet
-      || query.state.fetchStatus !== 'fetching' // already settled
-      || cancelled.has(query.queryHash)
-    ) {
-      return
-    }
-
-    cancelled.add(query.queryHash)
-    void query.cancel({ silent: true })
-  })
-}
-```
-
-:::warning
-Server-side query clients only. In the browser this would cancel active streams and background refetches.
-:::
-
-#### Resume Streams on the Client
-
-Hydrated data is a static snapshot, and a positive `staleTime` like the one [configured above](#custom-serializers) marks it fresh, so the client never refetches and no new stream opens. Fix this with `refetchOnMount: 'always'`, either globally on the browser query client:
-
-```ts
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 60 * 1000,
-      refetchOnMount: 'always',
-    },
-  },
-})
-```
-
-Or scoped to streamed and live queries with a [plugin](#plugins). Call sites can still override these defaults.
-
-```ts
-import type { RouterUtilsPlugin } from '@orpc/tanstack-query'
-
-const streamingSSRPlugin: RouterUtilsPlugin<typeof client> = {
-  name: 'streaming-ssr',
-  initProcedureOptions(_path, options) {
-    return {
-      ...options,
-      streamedOptions: {
-        ...options.streamedOptions,
-        initialData: [],
-        refetchOnMount: 'always',
-      },
-      liveOptions: {
-        ...options.liveOptions,
-        refetchOnMount: 'always',
-      },
-    }
-  },
-}
+import { StreamQuerySSRUtilsPlugin } from '@orpc/tanstack-query'
 
 export const orpc = createTanstackQueryUtils(client, {
-  plugins: [streamingSSRPlugin],
+  plugins: [new StreamQuerySSRUtilsPlugin()],
 })
 ```
+
+An environment without `window` counts as the server; pass `isServer` to override.
