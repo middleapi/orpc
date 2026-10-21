@@ -218,7 +218,7 @@ export class McpRegistrar<T extends AnyRouter> {
           }
 
           if (response.status >= 400) {
-            return toErrorCallToolResult(response.body)
+            return await toErrorCallToolResult(response.body)
           }
 
           if (isAsyncIteratorObject(response.body)) {
@@ -229,7 +229,7 @@ export class McpRegistrar<T extends AnyRouter> {
         }
         catch (e) {
           // a tool execution error the model can read, rather than a protocol error
-          return toErrorCallToolResult(e instanceof ErrorEvent ? e.data : this.codec.encodeError(toORPCError(e)).body)
+          return await toErrorCallToolResult(e instanceof ErrorEvent ? e.data : this.codec.encodeError(toORPCError(e)).body)
         }
       },
     }
@@ -353,7 +353,8 @@ async function consumeIteratorBody(iterator: AsyncIterable<unknown>, ctx: Server
     if (progressToken !== undefined) {
       await ctx.mcpReq.notify({
         method: 'notifications/progress',
-        params: { progressToken, progress: ++progress, message: toText(event) },
+        // nested files are named by the URIs the result would give them, without their bytes
+        params: { progressToken, progress: ++progress, message: toText(event instanceof Blob ? event : replaceNestedBlobs(event, [], [])) },
       })
     }
   }
@@ -402,15 +403,30 @@ async function toCallToolResult(serialized: unknown, contentType?: string): Prom
     return { content: [] }
   }
 
+  const { json, content } = await toJsonContent(serialized)
+
+  return { content, structuredContent: json }
+}
+
+async function toErrorCallToolResult(json: unknown): Promise<CallToolResult> {
+  const { content } = await toJsonContent(json)
+
+  return { content, isError: true }
+}
+
+/**
+ * The JSON as text content, with each nested blob replaced by a URI and embedded as a resource under it.
+ */
+async function toJsonContent(serialized: unknown): Promise<{ json: unknown, content: ContentBlock[] }> {
   const blobs: [uri: string, blob: Blob][] = []
   const json = replaceNestedBlobs(serialized, [], blobs)
 
   return {
+    json,
     content: [
       { type: 'text', text: toText(json)! },
       ...await Promise.all(blobs.map(([uri, blob]) => toEmbeddedResource(uri, blob))),
     ],
-    structuredContent: json,
   }
 }
 
@@ -445,10 +461,6 @@ function replaceNestedBlobs(json: unknown, segments: string[], blobs: [uri: stri
   }
 
   return copy ?? json
-}
-
-function toErrorCallToolResult(json: unknown): CallToolResult {
-  return { content: [{ type: 'text', text: stringifyJSON(json)! }], isError: true }
 }
 
 async function toBinaryContent(blob: Blob): Promise<ContentBlock> {

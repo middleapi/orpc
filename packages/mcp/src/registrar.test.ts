@@ -665,6 +665,23 @@ describe('mcpRegistrar', () => {
       expect(onprogress).toHaveBeenLastCalledWith({ progress: 2 })
     })
 
+    it('reports nested blob events as progress with their resource URIs', async () => {
+      const client = await createTestClient('legacy', new McpRegistrar({
+        render: os.handler(async function* () {
+          yield { file: new File([new Uint8Array([1])], 'draft.pdf', { type: 'application/pdf' }) }
+          yield { file: new File([new Uint8Array([1, 2, 3])], 'final.pdf', { type: 'application/pdf' }) }
+        }),
+      }))
+
+      const onprogress = vi.fn()
+      const result = await client.callTool({ name: 'render' }, { onprogress })
+
+      expect(result.structuredContent).toEqual({ file: 'file:///file/final.pdf' })
+      expect(onprogress).toHaveBeenCalledTimes(2)
+      expect(onprogress).toHaveBeenNthCalledWith(1, { progress: 1, message: '{"file":"file:///file/draft.pdf"}' })
+      expect(onprogress).toHaveBeenNthCalledWith(2, { progress: 2, message: '{"file":"file:///file/final.pdf"}' })
+    })
+
     it('reports errors thrown while streaming', async () => {
       const client = await createTestClient('legacy', new McpRegistrar({
         stream: os.handler(async function* () {
@@ -734,6 +751,30 @@ describe('mcpRegistrar', () => {
       const result = await client.callTool({ name: 'procedure' })
 
       expect(parseToolError(result)).toEqual(expect.objectContaining({ code: 'PLANET_GONE', message: 'The planet is gone' }))
+    })
+
+    it('returns blobs nested in error data as embedded resources referenced by URI', async () => {
+      const file = new File([new Uint8Array([1, 2, 3])], 'log.txt', { type: 'text/plain' })
+
+      const client = await createTestClient('legacy', new McpRegistrar({
+        procedure: os.handler(() => {
+          throw new ORPCError('CONFLICT', { data: { log: file } })
+        }),
+        stream: os.handler(async function* () {
+          yield 'first'
+          throw new ORPCError('CONFLICT', { data: { log: file } })
+        }),
+      }))
+
+      for (const name of ['procedure', 'stream']) {
+        const result = await client.callTool({ name })
+
+        expect(parseToolError(result)).toEqual(expect.objectContaining({ code: 'CONFLICT', data: { log: 'file:///data/log/log.txt' } }))
+        expect((result.content as any)[1]).toEqual({
+          type: 'resource',
+          resource: { uri: 'file:///data/log/log.txt', mimeType: 'text/plain', blob: 'AQID' },
+        })
+      }
     })
 
     it('reports output validation errors as internal errors', async () => {

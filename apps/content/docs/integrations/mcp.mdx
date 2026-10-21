@@ -153,7 +153,7 @@ Outputs are serialized like [OpenAPI responses](/docs/openapi/serializer). Pass 
 | [AsyncIteratorObject](/docs/async-iterator-object)  | The last event, mapped as above, with every event reported as [progress](https://modelcontextprotocol.io/specification/latest/basic/utilities/progress) when requested |
 | Error                                               | [Tool execution error](#error-handling)                                       |
 
-A tool advertises an output schema only when every result has structured content, so not for optional outputs or outputs with binary values. For an AsyncIteratorObject, its yield schema is advertised, so it must yield at least once.
+A tool advertises an output schema only when every result has structured content matching it, so not for optional outputs or outputs containing a `Blob` or `File`. For an AsyncIteratorObject, its yield schema is advertised, so it must yield at least once.
 
 ## Error Handling
 
