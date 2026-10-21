@@ -176,6 +176,16 @@ Like what we build over at [middleapi](https://github.com/middleapi)? You can he
 
 With thanks to [39 past sponsors](https://orpc.dev/sponsors#past-sponsors) who helped get oRPC here.
 
+## Open Source Programs
+
+oRPC's development is supported by these programs for open source maintainers:
+
+<table>
+  <tr>
+   <td align="center"><a href="https://claude.com/contact-sales/claude-for-oss" target="_blank" rel="noopener" title="Claude for Open Source"><img src="https://cdn.simpleicons.org/claude" width="64" alt="Claude"/><br />Claude for Open Source</a></td>
+  </tr>
+</table>
+
 ## References
 
 oRPC is inspired by existing solutions that prioritize type safety and developer experience. Special acknowledgments to:
