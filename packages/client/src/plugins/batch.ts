@@ -9,7 +9,7 @@ import { ClientPeer, decodePeerMessage, isServerPeerSendMessage } from '@standar
 
 /**
  * Header that marks a request as a batch, set by the Batch Link Plugin and detected by the Batch Handler Plugin.
- * Cross-origin batch requests need CORS to allow it.
+ * Nothing between the client and server, such as a CORS policy or proxy, should block or strip it.
  *
  * @see {@link https://orpc.dev/docs/plugins/batch#setup | Batch Plugin - Setup}
  */

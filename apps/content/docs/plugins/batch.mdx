@@ -46,16 +46,7 @@ const link = new RPCLink({
 </CodeGroup>
 
 :::warning
-`BatchHandlerPlugin` detects batch requests by checking for the `orpc-batch` header (exported as `BATCH_HEADER`), so cross-origin batch requests need CORS to allow it. The [CORS Plugin](/docs/plugins/cors) allows requested headers by default. If you set `allowHeaders` or configure CORS elsewhere, include it along with `Content-Type` and any other headers your clients send:
-
-```ts
-import { BATCH_HEADER } from '@orpc/server/plugins'
-
-const cors = new CORSHandlerPlugin({
-  allowHeaders: ['Content-Type', BATCH_HEADER],
-})
-```
-
+`BatchHandlerPlugin` recognizes batch requests by the `orpc-batch` header (exported as `BATCH_HEADER`), so make sure nothing between the client and server blocks or strips it, such as a CORS policy or proxy. This is usually fine by default, as the [CORS Plugin](/docs/plugins/cors) allows the headers a request asks for.
 :::
 
 ## Max Size
