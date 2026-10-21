@@ -29,7 +29,7 @@ export interface MemoryRateLimiterOptions {
      * milliseconds
      */
     timeout: number
-  }
+  } | undefined
 }
 
 /**

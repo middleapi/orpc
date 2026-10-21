@@ -16,7 +16,7 @@ export interface BunRedisPublisherOptions extends BaseRedisPublisherOptions {
    *
    * @default redis.duplicate() (lazily created on first listen)
    */
-  subscriber?: undefined | Promisable<RedisClient>
+  subscriber?: Promisable<RedisClient> | undefined
 }
 
 /**

@@ -9,6 +9,7 @@ import { mergeErrorMap, ProcedureContract, resolveMetaPlugins } from '@orpc/cont
 import { getOwn, isTypescriptObject, omit } from '@orpc/shared'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
+import { createContractProcedure } from './procedure-utils'
 import { getHiddenRouterContract } from './router-hidden'
 
 export type AugmentedRouter<
@@ -181,6 +182,29 @@ export function augmentImplementedRouter<
   }
 
   return enhanced as any
+}
+
+/**
+ * Resolves the procedure of a contract walked from a router: the procedure itself,
+ * or the implementation of a contract-first procedure, looked up by its path.
+ *
+ * @throws {TypeError} If a contract-first procedure has no valid implementation.
+ */
+export async function resolveContractProcedure(router: AnyRouter, contract: AnyProcedureContract, path: readonly string[]): Promise<AnyProcedure> {
+  if (contract instanceof Procedure) {
+    return contract
+  }
+
+  const { default: maybeProcedure } = await unlazy(getRouter(router, path))
+
+  if (!(maybeProcedure instanceof Procedure)) {
+    throw new TypeError(
+      `[Contract-First] Missing or invalid implementation for procedure at path: "${path.join('.')}". `
+      + `Ensure the procedure is correctly implemented and matches its contract.`,
+    )
+  }
+
+  return createContractProcedure(maybeProcedure, contract)
 }
 
 export function getRouter<T extends Lazyable<AnyRouter | undefined>>(

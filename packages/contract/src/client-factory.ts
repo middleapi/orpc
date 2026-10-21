@@ -20,7 +20,7 @@ export interface ContractClientFactoryOptions<
    * When provided, the client factory will automatically register the passed contract
    * into the router at the path defined by `meta.path`.
    */
-  contractRef?: undefined | RouterContract
+  contractRef?: RouterContract | undefined
 }
 
 /**

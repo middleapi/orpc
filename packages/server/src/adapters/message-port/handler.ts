@@ -23,7 +23,7 @@ export interface MessagePortHandlerOptions<_T extends Context> {
    * **Note**: Returning `null` or `undefined` disables this feature.
    * **Warning**: Ensure your message port implementation supports `transferable` objects before enabling this.
    */
-  experimental_transfer?: Value<Promisable<object[] | null | undefined>, [message: DecodedResponseMessage, port: SupportedMessagePort]>
+  experimental_transfer?: Value<Promisable<object[] | null | undefined>, [message: DecodedResponseMessage, port: SupportedMessagePort]> | undefined
 
   /**
    * Options for encoding peer messages. such as `prefix` for distinguishing messages on the same channel..

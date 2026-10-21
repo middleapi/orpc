@@ -62,14 +62,14 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
    *
    * @default defName => defName
    */
-  customComponentName?: (defName: string, defSchema: JsonSchema) => string | undefined
+  customComponentName?: ((defName: string, defSchema: JsonSchema) => string | undefined) | undefined
 
   /**
    * Filter procedures. Return `false` to exclude a procedure from the OpenAPI specification.
    *
    * @default true
    */
-  filter?: Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]>
+  filter?: Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]> | undefined
 
   /**
    * Define a custom JSON schema for the error response body when using
@@ -83,10 +83,11 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
   customErrorResponseBodySchema?: Value<
     JsonSchema | undefined | null,
     [definedErrors: OpenAPIErrorBodyDefinition[], status: number]
-  >
+  > | undefined
 
   /**
    * Mapping ORPCError Code -> HTTP Status Code
+   * Codes missing from the map fall back to `DEFAULT_ERROR_STATUS` (400).
    *
    * @default COMMON_ERROR_STATUS_MAP
    */

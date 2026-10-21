@@ -41,7 +41,7 @@ export interface BatchLinkPluginGroup<T extends ClientContext> {
    *
    * @default []
    */
-  path?: Value<string[], [items: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]>
+  path?: Value<string[], [items: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]> | undefined
 }
 
 export interface BatchLinkPluginOptions<T extends ClientContext> {
@@ -52,7 +52,7 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
    *
    * @default () => true
    */
-  filter?: Value<boolean, [options: StandardLinkTransportInterceptorOptions<T>]>
+  filter?: Value<boolean, [options: StandardLinkTransportInterceptorOptions<T>]> | undefined
 
   /**
    * Only requests with the same scope are batched together.
@@ -60,7 +60,7 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
    *
    * @default () => undefined
    */
-  scope?: (options: StandardLinkTransportInterceptorOptions<T>) => unknown
+  scope?: ((options: StandardLinkTransportInterceptorOptions<T>) => unknown) | undefined
 
   /**
    * The maximum number of requests in the batch. Larger batches are split.
@@ -69,7 +69,7 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
    * @default DEFAULT_BATCH_MAX_SIZE (10)
    * @see {@link https://orpc.dev/docs/plugins/batch#max-size | Batch Plugin - Max Size}
    */
-  maxSize?: Value<Promisable<number>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]>
+  maxSize?: Value<Promisable<number>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]> | undefined
 
   /**
    * How long (in ms) to wait for more requests before sending the batch,
@@ -78,14 +78,14 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
    *
    * @default 0
    */
-  wait?: number
+  wait?: number | undefined
 
   /**
    * URL for the batch request.
    *
    * @default URL of the first subrequest in the batch + '/__batch__'
    */
-  url?: Value<Promisable<StandardUrl>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]>
+  url?: Value<Promisable<StandardUrl>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]> | undefined
 
   /**
    * The maximum length of the URL that runtime supports,
@@ -95,28 +95,28 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
    *
    * @default 2083
    */
-  maxUrlLength?: Value<Promisable<number>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]>
+  maxUrlLength?: Value<Promisable<number>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]> | undefined
 
   /**
    * Headers used for the batch request.
    *
    * @default Common headers among all subrequests in the batch.
    */
-  headers?: Value<Promisable<StandardHeaders>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]>
+  headers?: Value<Promisable<StandardHeaders>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]> | undefined
 
   /**
    * Map each subrequest in the batch before it is sent.
    *
    * @default Removes headers that are duplicated with the batch headers
    */
-  mapSubrequest?: (subOptions: StandardLinkTransportInterceptorOptions<T>, partialBatchRequest: Pick<StandardRequest, 'url' | 'headers'>) => StandardRequest
+  mapSubrequest?: ((subOptions: StandardLinkTransportInterceptorOptions<T>, partialBatchRequest: Pick<StandardRequest, 'url' | 'headers'>) => StandardRequest) | undefined
 
   /**
    * Maps each subresponse before returning the final response.
    *
    * @default Low-priority merges headers from the batch response into each subresponse.
    */
-  mapSubresponse?: (subResponse: StandardLazyResponse, batchResponse: StandardLazyResponse, subOptions: StandardLinkTransportInterceptorOptions<T>) => StandardLazyResponse
+  mapSubresponse?: ((subResponse: StandardLazyResponse, batchResponse: StandardLazyResponse, subOptions: StandardLinkTransportInterceptorOptions<T>) => StandardLazyResponse) | undefined
 }
 
 /**

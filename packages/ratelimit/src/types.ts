@@ -24,7 +24,7 @@ export interface RateLimitOptions {
    *
    * @default 1
    */
-  weight?: number
+  weight?: number | undefined
 }
 
 /**

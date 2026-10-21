@@ -14,14 +14,14 @@ export interface PinoHandlerPluginOptions<T extends Context> {
    *
    * @default pino()
    */
-  logger?: Logger
+  logger?: Logger | undefined
 
   /**
    * Function to generate a unique ID for each request.
    *
    * @default ({ request }) => flattenStandardHeader(request.headers['x-request-id']) ?? crypto.randomUUID()
    */
-  generateRequestId?: (options: StandardHandlerRoutingInterceptorOptions<T>) => string
+  generateRequestId?: ((options: StandardHandlerRoutingInterceptorOptions<T>) => string) | undefined
 
   /**
    * If true, this plugin will log information about request lifecycle,
@@ -29,14 +29,14 @@ export interface PinoHandlerPluginOptions<T extends Context> {
    *
    * @default false
    */
-  logLifecycle?: boolean
+  logLifecycle?: boolean | undefined
 
   /**
    * If true, this plugin will log when a request signal is aborted.
    *
    * @default false
    */
-  logAbort?: boolean
+  logAbort?: boolean | undefined
 
   /**
    * Customizes the log level for errors thrown from procedures;
@@ -46,7 +46,7 @@ export interface PinoHandlerPluginOptions<T extends Context> {
    *
    * @default (error, level) => level
    */
-  procedureErrorLevel?: (error: unknown, level: pino.Level) => pino.Level
+  procedureErrorLevel?: ((error: unknown, level: pino.Level) => pino.Level) | undefined
 }
 
 /**

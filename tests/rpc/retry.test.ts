@@ -29,8 +29,13 @@ describe('retry plugin', () => {
     outOfStock: os
       .errors({ OUT_OF_STOCK: {} })
       .handler(({ errors }) => {
+        throw errors.OUT_OF_STOCK()
+      }),
+    badGateway: os
+      .errors({ BAD_GATEWAY: {} })
+      .handler(({ errors }) => {
         if (++attempts < 2) {
-          throw errors.OUT_OF_STOCK()
+          throw errors.BAD_GATEWAY()
         }
 
         return 'OK'
@@ -84,10 +89,16 @@ describe('retry plugin', () => {
   })
 
   it('retries defined errors sent with a server error status', async () => {
-    // OUT_OF_STOCK is missing from the handler's errorStatusMap, so it is sent with a 500 status
-    await expect(client.outOfStock()).resolves.toBe('OK')
+    await expect(client.badGateway()).resolves.toBe('OK')
 
     expect(fetchSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not retry errors with codes missing from the errorStatusMap', async () => {
+    // OUT_OF_STOCK is missing from the handler's errorStatusMap, so it is sent with the fallback 400 status
+    await expect(client.outOfStock()).rejects.toMatchObject({ defined: true, code: 'OUT_OF_STOCK' })
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 
   it('reconnects an AsyncIteratorObject on errors thrown mid-stream', async () => {

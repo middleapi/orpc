@@ -23,11 +23,12 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
   /**
    * Override the default OpenAPI serializer.
    */
-  serializer?: Public<OpenAPISerializer>
+  serializer?: Public<OpenAPISerializer> | undefined
 
   /**
    * Mapping ORPCError Code -> HTTP Status Code
    * The status code should be in the `4xx` or `5xx` range (must be greater than or equal to `400`).
+   * Codes missing from the map fall back to `DEFAULT_ERROR_STATUS` (400).
    *
    * @default COMMON_ERROR_STATUS_MAP
    */
@@ -42,7 +43,7 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
    *
    * @default ((e) => e.toJSON())
    */
-  customErrorResponseBodyEncoder?: (error: AnyORPCError) => unknown
+  customErrorResponseBodyEncoder?: ((error: AnyORPCError) => unknown) | undefined
 }
 
 export class OpenAPIHandlerCodecCore<T extends Context> {
@@ -57,7 +58,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
   }
 
   async decodeInput(
-    matched: { procedure: AnyProcedure, params?: undefined | Record<string, string> },
+    matched: { procedure: AnyProcedure, params?: Record<string, string> | undefined },
     request: StandardLazyRequest,
   ): Promise<unknown> {
     const meta = getOpenAPIMeta(matched.procedure)

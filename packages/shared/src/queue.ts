@@ -1,7 +1,7 @@
 import { AbortError } from '@standard-server/shared'
 
 export interface AsyncIdQueueCloseOptions {
-  id?: string
+  id?: string | undefined
   reason?: unknown
 }
 

@@ -28,7 +28,7 @@ export interface DedupeLinkPluginOptions<T extends ClientContext> {
    *
    * @default ({ request }) => request.method === 'GET' || request.method === 'QUERY'
    */
-  filter?: Value<boolean, [options: StandardLinkTransportInterceptorOptions<T>]>
+  filter?: Value<boolean, [options: StandardLinkTransportInterceptorOptions<T>]> | undefined
 
   /**
    * Only requests with the same scope are deduplicated together.
@@ -36,7 +36,7 @@ export interface DedupeLinkPluginOptions<T extends ClientContext> {
    *
    * @default () => undefined
    */
-  scope?: (options: StandardLinkTransportInterceptorOptions<T>) => unknown
+  scope?: ((options: StandardLinkTransportInterceptorOptions<T>) => unknown) | undefined
 
   /**
    * How long (in ms) to wait for more identical requests before sending,
@@ -45,7 +45,7 @@ export interface DedupeLinkPluginOptions<T extends ClientContext> {
    *
    * @default 0
    */
-  wait?: number
+  wait?: number | undefined
 }
 
 /**

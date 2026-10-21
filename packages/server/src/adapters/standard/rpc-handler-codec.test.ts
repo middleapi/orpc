@@ -260,7 +260,7 @@ describe('rpcHandlerCodec', () => {
 
       expect(fallbackResponse).toEqual({
         headers: {},
-        status: 500,
+        status: 400,
         body: '__serialized_fallback__',
       })
 

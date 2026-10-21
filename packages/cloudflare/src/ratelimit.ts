@@ -6,7 +6,7 @@ export interface CloudflareRateLimiterOptions {
    *
    * @default ''
    */
-  prefix?: string
+  prefix?: string | undefined
 }
 
 /**

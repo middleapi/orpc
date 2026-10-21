@@ -8,7 +8,7 @@ const ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS_SYMBOL = Symbol.for('ORPC_ASYNC_ITERA
 
 export interface AsyncIteratorObjectSchemaDetails {
   yieldSchema: AnySchema
-  returnSchema?: AnySchema
+  returnSchema?: AnySchema | undefined
 }
 
 /**
@@ -68,4 +68,38 @@ export function getAsyncIteratorObjectSchemaDetails(schema: AnySchema | undefine
   }
 
   return (schema['~standard'] as any)[ASYNC_ITERATOR_OBJECT_SCHEMA_DETAILS_SYMBOL]
+}
+
+export interface AsyncIteratorObjectSchemasDetails {
+  yieldSchemas: AnySchema[]
+  returnSchemas: AnySchema[]
+}
+
+/**
+ * Collects the yield and return schemas of multiple schemas, such as the `.output` schemas of a procedure,
+ * or returns `undefined` when there are none or any of them does not describe an AsyncIteratorObject.
+ */
+export function getAsyncIteratorObjectSchemasDetails(schemas: readonly AnySchema[] | undefined): undefined | AsyncIteratorObjectSchemasDetails {
+  if (!schemas || schemas.length === 0) {
+    return undefined
+  }
+
+  const yieldSchemas: AnySchema[] = []
+  const returnSchemas: AnySchema[] = []
+
+  for (const schema of schemas) {
+    const details = getAsyncIteratorObjectSchemaDetails(schema)
+
+    if (!details) {
+      return undefined
+    }
+
+    yieldSchemas.push(details.yieldSchema)
+
+    if (details.returnSchema) {
+      returnSchemas.push(details.returnSchema)
+    }
+  }
+
+  return { yieldSchemas, returnSchemas }
 }

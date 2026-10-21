@@ -22,7 +22,7 @@ export interface BaseRedisLockerOptions {
    *
    * @default ''
    */
-  prefix?: string
+  prefix?: string | undefined
 
   /**
    * How long a lock is held before it expires automatically, in milliseconds.
@@ -37,7 +37,7 @@ export interface BaseRedisLockerOptions {
    *
    * @default 10000
    */
-  timeout?: number
+  timeout?: number | undefined
 
   /**
    * How long to wait between acquisition attempts while the lock
@@ -45,7 +45,7 @@ export interface BaseRedisLockerOptions {
    *
    * @default 100
    */
-  retryInterval?: number
+  retryInterval?: number | undefined
 }
 
 /**

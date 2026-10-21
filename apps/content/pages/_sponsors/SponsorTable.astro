@@ -2,7 +2,7 @@
 import type { SponsorTier } from '../../sponsors/data'
 import { relAttribute, sponsorListingHref } from '../../sponsors/ads'
 import Avatar from '../../sponsors/Avatar.astro'
-import { linkLabel, monthYear, usd } from './format'
+import { linkLabel, monthYear, usd, years } from './format'
 
 interface Props {
   tiers: SponsorTier[]
@@ -14,13 +14,6 @@ const total = tiers.reduce((sum, tier) => sum + tier.total, 0)
 const count = tiers.reduce((sum, tier) => sum + tier.sponsors.length, 0)
 const percent = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 1 })
 
-const bands = tiers.map((tier, index) => ({
-  ...tier,
-  label: tier.title.replace(/ sponsor$/iu, ''),
-  share: percent.format(tier.total / total),
-  swatch: `background:var(--orpc-tier-${Math.min(index + 1, 5)})`,
-}))
-
 // Every cell of the Since column must use this, or the columns misalign on phones.
 const sinceCell = 'hidden sm:table-cell'
 
@@ -30,6 +23,27 @@ const sinceCell = 'hidden sm:table-cell'
 const NEW_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
 const builtAt = Date.now()
 const newUntil = (iso: string): number => Date.parse(iso) + NEW_WINDOW_MS
+
+// Whole years sponsored, highlighted from the first anniversary. Unlike "New"
+// this needs no script: a count taken at build time can only lag behind the
+// real one, never overstate it.
+function yearsSponsored(iso: string): number {
+  const anniversary = new Date(iso)
+  const count = new Date(builtAt).getUTCFullYear() - anniversary.getUTCFullYear()
+  anniversary.setUTCFullYear(anniversary.getUTCFullYear() + count)
+  return anniversary.getTime() > builtAt ? count - 1 : count
+}
+
+// Foreground text, not accent: accent on its own tint misses AA at this size.
+const tenureBadge = 'flex-none rounded-full border border-transparent bg-accent/15 px-[0.3125rem] text-[0.625rem] leading-3 font-semibold text-foreground'
+
+const bands = tiers.map((tier, index) => ({
+  ...tier,
+  sponsors: tier.sponsors.map(sponsor => ({ ...sponsor, tenure: yearsSponsored(sponsor.createdAt) })),
+  label: tier.title.replace(/ sponsor$/iu, ''),
+  share: percent.format(tier.total / total),
+  swatch: `background:var(--orpc-tier-${Math.min(index + 1, 5)})`,
+}))
 ---
 
 {/* No overflow hidden/auto on this section or around the table: it would
@@ -73,7 +87,7 @@ const newUntil = (iso: string): number => Date.parse(iso) + NEW_WINDOW_MS
         <thead>
           <tr>
             <th scope="col">Sponsor</th>
-            <th scope="col" class:list={[sinceCell, 'sm:w-28 lg:w-36']}>Since</th>
+            <th scope="col" class:list={[sinceCell, 'sm:w-36 lg:w-44']}>Since</th>
             <th scope="col" class="orpc-num w-26 sm:w-28 lg:w-36">This month</th>
           </tr>
         </thead>
@@ -126,8 +140,14 @@ const newUntil = (iso: string): number => Date.parse(iso) + NEW_WINDOW_MS
                           </span>
                         )}
                       </span>
-                      <span class="block truncate text-xs leading-4 text-muted-foreground sm:hidden">
-                        Since <time datetime={sponsor.createdAt}>{monthYear(sponsor.createdAt)}</time>
+                      <span class="flex items-center gap-1.5 text-xs leading-4 text-muted-foreground sm:hidden">
+                        <span class="truncate">
+                          Since{' '}
+                          <time class:list={[sponsor.tenure > 0 && 'font-medium text-foreground']} datetime={sponsor.createdAt}>
+                            {monthYear(sponsor.createdAt)}
+                          </time>
+                        </span>
+                        {sponsor.tenure > 0 && <span class={tenureBadge}>{years(sponsor.tenure)}</span>}
                       </span>
                       <span class="hidden truncate text-xs leading-4 text-muted-foreground sm:block">
                         {linkLabel(sponsor.link)}
@@ -136,7 +156,12 @@ const newUntil = (iso: string): number => Date.parse(iso) + NEW_WINDOW_MS
                   </a>
                 </th>
                 <td class:list={[sinceCell, 'text-muted-foreground tabular-nums']}>
-                  <time datetime={sponsor.createdAt}>{monthYear(sponsor.createdAt)}</time>
+                  <span class="flex items-center gap-1.5">
+                    <time class:list={[sponsor.tenure > 0 && 'font-medium text-foreground']} datetime={sponsor.createdAt}>
+                      {monthYear(sponsor.createdAt)}
+                    </time>
+                    {sponsor.tenure > 0 && <span class={tenureBadge}>{years(sponsor.tenure)}</span>}
+                  </span>
                 </td>
                 <td class="orpc-num font-medium text-foreground">{usd(sponsor.amount)}</td>
               </tr>

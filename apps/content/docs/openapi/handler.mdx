@@ -192,7 +192,7 @@ const handler = new OpenAPIHandler(router, {
 
 ## Custom Error Response
 
-By default, `OpenAPIHandler` determines response status codes using `COMMON_ERROR_STATUS_MAP` and encodes error bodies in the ORPC error format. Use `errorStatusMap` and `customErrorResponseBodyEncoder` to customize this behavior:
+By default, `OpenAPIHandler` determines response status codes using `COMMON_ERROR_STATUS_MAP`, falling back to `400` for codes missing from the map, and encodes error bodies in the ORPC error format. Use `errorStatusMap` and `customErrorResponseBodyEncoder` to customize this behavior:
 
 ```ts
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/openapi'

@@ -8,7 +8,7 @@ import type { JsonArraySchema, JsonObjectSchema } from './utils'
 import { get, isDeepEqual, omit, toArray } from '@orpc/shared'
 import { JSON_SCHEMA_LOGIC_KEYWORDS } from './constants'
 import { decodeJsonPointerSegment, encodeJsonPointerSegment, hoistRecursiveRefToDef, mapJsonSchemaRefs, resolveJsonSchemaRootLocalRef } from './ref-utils'
-import { ensureJsonSchemaObject, isJsonArraySchema } from './utils'
+import { ensureJsonSchemaObject, isJsonArraySchema, isUnconstrainedSchema } from './utils'
 
 /**
  * Moves a schema's `$defs` into the shared root map, renaming only the names whose bodies
@@ -173,6 +173,56 @@ export function extractJsonObjectSchemaEntries(schema: JsonSchema): JsonObjectSc
   }
 
   return result.entries.map(([n, s, ...r]) => [n, withRootDefs(s, schema.$defs), ...r])
+}
+
+const JSON_SCHEMA_OBJECT_KEYWORDS = ['properties', 'patternProperties', 'additionalProperties', 'required', 'propertyNames', 'minProperties', 'maxProperties']
+
+/**
+ * Returns true when an object can stand for every value the schema describes: the schema constrains objects,
+ * by `type` or object keywords, composes only such schemas, or is unconstrained, since an object satisfies it.
+ * Unlike {@link extractJsonObjectSchemaEntries}, an unconstrained schema counts as object-like.
+ */
+export function isJsonObjectLikeSchema(schema: JsonSchema): boolean {
+  return isJsonObjectLikeSchemaInternal(schema, typeof schema === 'object' ? schema.$defs : undefined, new Set())
+}
+
+function isJsonObjectLikeSchemaInternal(
+  schema: JsonSchema,
+  $defs: Exclude<JsonSchema, boolean>['$defs'],
+  followedRefs: ReadonlySet<string>,
+): boolean {
+  if (typeof schema === 'object' && typeof schema.$ref === 'string') {
+    // a cycle never proves the schema describes an object
+    if (followedRefs.has(schema.$ref)) {
+      return false
+    }
+
+    followedRefs = new Set(followedRefs).add(schema.$ref)
+  }
+
+  const resolved = resolveJsonSchemaRootLocalRef(schema, $defs)
+
+  if (typeof resolved === 'boolean') {
+    return true
+  }
+
+  if (resolved.type !== undefined) {
+    return resolved.type === 'object'
+  }
+
+  if (JSON_SCHEMA_OBJECT_KEYWORDS.some(keyword => keyword in resolved)) {
+    return true
+  }
+
+  for (const keyword of ['allOf', 'anyOf', 'oneOf'] as const) {
+    const members = resolved[keyword]
+
+    if (Array.isArray(members) && members.length > 0) {
+      return members.every(member => isJsonObjectLikeSchemaInternal(member, $defs, followedRefs))
+    }
+  }
+
+  return isUnconstrainedSchema(resolved)
 }
 
 type JsonObjectSchemaEntrySource = 'direct' | 'allOf' | 'anyOf' | 'oneOf'

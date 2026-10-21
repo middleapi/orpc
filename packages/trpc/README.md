@@ -60,10 +60,11 @@ You can read the documentation [here](https://orpc.dev).
 | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [@orpc/next](https://www.npmjs.com/package/@orpc/next)                               | Integrate with [Next.js Server Functions](https://nextjs.org/docs/app/getting-started/mutating-data). | [Next.js](https://orpc.dev/docs/integrations/next)                                                                                                                                                                      |
 | [@orpc/ai-sdk](https://www.npmjs.com/package/@orpc/ai-sdk)                           | Turn contracts and procedures into [AI SDK](https://ai-sdk.dev/) tools.                               | [AI SDK](https://orpc.dev/docs/integrations/ai-sdk)                                                                                                                                                                     |
+| [@orpc/mcp](https://www.npmjs.com/package/@orpc/mcp)                                 | Expose procedures as [MCP](https://modelcontextprotocol.io/) tools.                                   | [MCP](https://orpc.dev/docs/integrations/mcp)                                                                                                                                                                           |
 | [@orpc/tanstack-query](https://www.npmjs.com/package/@orpc/tanstack-query)           | Integrate with [TanStack Query](https://tanstack.com/query/latest).                                   | [TanStack Query](https://orpc.dev/docs/integrations/tanstack-query)                                                                                                                                                     |
 | [@orpc/pinia-colada](https://www.npmjs.com/package/@orpc/pinia-colada)               | Integrate with [Pinia Colada](https://pinia-colada.esm.dev/).                                         | [Pinia Colada](https://orpc.dev/docs/integrations/pinia-colada)                                                                                                                                                         |
 | [@orpc/swr](https://www.npmjs.com/package/@orpc/swr)                                 | Integrate with [SWR](https://swr.vercel.app/).                                                        | [SWR](https://orpc.dev/docs/integrations/swr)                                                                                                                                                                           |
-| [@orpc/experimental-msw](https://www.npmjs.com/package/@orpc/experimental-msw)       | Mock procedures with [Mock Service Worker](https://mswjs.io/).                                        | [MSW](https://orpc.dev/docs/integrations/msw)                                                                                                                                                                           |
+| [@orpc/msw](https://www.npmjs.com/package/@orpc/msw)                                 | Mock procedures with [Mock Service Worker](https://mswjs.io/).                                        | [MSW](https://orpc.dev/docs/integrations/msw)                                                                                                                                                                           |
 | [@orpc/experimental-effect](https://www.npmjs.com/package/@orpc/experimental-effect) | Integrate with [Effect](https://effect.website/).                                                     | [Effect](https://orpc.dev/docs/integrations/effect)                                                                                                                                                                     |
 | [@orpc/nest](https://www.npmjs.com/package/@orpc/nest)                               | Implement your contract with [NestJS](https://nestjs.com/).                                           | [NestJS](https://orpc.dev/docs/integrations/nest)                                                                                                                                                                       |
 | [@orpc/node](https://www.npmjs.com/package/@orpc/node)                               | [Node.js](https://nodejs.org/) plugins for static file serving and large uploads.                     | [Static File](https://orpc.dev/docs/plugins/static-file), [Tmp File Upload](https://orpc.dev/docs/plugins/tmp-file-upload), [Batch Response Compression](https://orpc.dev/docs/plugins/batch-response-compression)      |
@@ -175,6 +176,16 @@ Like what we build over at [middleapi](https://github.com/middleapi)? You can he
 </table>
 
 With thanks to [39 past sponsors](https://orpc.dev/sponsors#past-sponsors) who helped get oRPC here.
+
+## Open Source Programs
+
+[middleapi](https://github.com/middleapi) is supported by these open source programs:
+
+<table>
+  <tr>
+   <td align="center"><a href="https://claude.com/contact-sales/claude-for-oss" target="_blank" rel="noopener" title="Claude for Open Source"><img src="https://cdn.simpleicons.org/claude" width="64" alt="Claude"/><br />Claude for Open Source</a></td>
+  </tr>
+</table>
 
 ## References
 

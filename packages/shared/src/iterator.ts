@@ -12,15 +12,15 @@ export interface WrapAsyncIteratorOptions<TYield, TReturn, TMappedYield, TMapped
    * Useful when you want execution to happen within a specific context,
    * such as AsyncLocalStorage.
    */
-  runWith?: <T>(run: () => Promise<T>) => Promisable<T>
-  mapResult?: (result: IteratorResult<TYield, TReturn>) => Promisable<IteratorResult<TMappedYield, TMappedReturn>>
-  mapError?: (error: ThrowableError) => Promisable<ThrowableError>
-  onError?: (error: ThrowableError) => Promisable<void>
+  runWith?: (<T>(run: () => Promise<T>) => Promisable<T>) | undefined
+  mapResult?: ((result: IteratorResult<TYield, TReturn>) => Promisable<IteratorResult<TMappedYield, TMappedReturn>>) | undefined
+  mapError?: ((error: ThrowableError) => Promisable<ThrowableError>) | undefined
+  onError?: ((error: ThrowableError) => Promisable<void>) | undefined
 
   /**
    * Execute after the stream finishes or is cancelled.
    */
-  onFinish?: () => Promisable<void>
+  onFinish?: (() => Promisable<void>) | undefined
 }
 
 export function wrapAsyncIterator<TYield, TReturn, TMappedYield = TYield, TMappedReturn = TReturn>(
@@ -166,21 +166,21 @@ export interface ConsumeAsyncIteratorOptions<T, TReturn, TError> {
   /**
    * Called once error happens
    */
-  onError?: (error: TError) => void
+  onError?: ((error: TError) => void) | undefined
   /**
    * Called once AsyncIteratorObject is done
    *
    * @remarks
    * **Note**: If iterator is canceled, `undefined` can be passed on success
    */
-  onSuccess?: (value: TReturn | undefined) => void
+  onSuccess?: ((value: TReturn | undefined) => void) | undefined
   /**
    * Called once after onError or onSuccess
    *
    * @remarks
    * **Note**: If iterator is canceled, `undefined` can be passed on success
    */
-  onFinish?: (state: [error: TError, data: undefined, isSuccess: false] | [error: null, data: TReturn | undefined, isSuccess: true]) => void
+  onFinish?: ((state: [error: TError, data: undefined, isSuccess: false] | [error: null, data: TReturn | undefined, isSuccess: true]) => void) | undefined
 }
 
 /**

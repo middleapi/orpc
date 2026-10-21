@@ -16,7 +16,7 @@ export interface ResponseCompressionHandlerPluginOptions<T extends Context> {
    *
    * @default ['gzip', 'deflate']
    */
-  encodings?: readonly ('gzip' | 'deflate' | 'deflate-raw')[]
+  encodings?: readonly ('gzip' | 'deflate' | 'deflate-raw')[] | undefined
 
   /**
    * The minimum response size in bytes required to trigger compression.
@@ -25,7 +25,7 @@ export interface ResponseCompressionHandlerPluginOptions<T extends Context> {
    *
    * @default 1024 (1KB)
    */
-  threshold?: number
+  threshold?: number | undefined
 
   /**
    * Determines whether a response with the given Content-Type should be compressed.
@@ -34,7 +34,7 @@ export interface ResponseCompressionHandlerPluginOptions<T extends Context> {
    *
    * @default isCompressibleContentType (covers common text-based formats)
    */
-  isCompressibleContentType?: (contentType: string | null | undefined, options: StandardHandlerRoutingInterceptorOptions<T>) => boolean
+  isCompressibleContentType?: ((contentType: string | null | undefined, options: StandardHandlerRoutingInterceptorOptions<T>) => boolean) | undefined
 }
 
 /**

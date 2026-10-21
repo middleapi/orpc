@@ -5,7 +5,7 @@ export interface RunPromiseOptions extends Effect.RunOptions {
   /**
    * The Effect context the effect runs with, including references such as `Tracer` or `Scheduler`.
    */
-  context?: undefined | Context.Context<never>
+  context?: Context.Context<never> | undefined
 }
 
 /**

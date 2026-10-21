@@ -24,7 +24,7 @@ export interface MessagePortLinkTransportOptions<_T extends ClientContext> {
    * **Note**: Returning `null` or `undefined` disables this feature.
    * **Warning**: Make sure your message port supports `transfer` before using this feature.
    */
-  experimental_transfer?: Value<Promisable<object[] | null | undefined>, [message: DecodedRequestMessage, port: SupportedMessagePort]>
+  experimental_transfer?: Value<Promisable<object[] | null | undefined>, [message: DecodedRequestMessage, port: SupportedMessagePort]> | undefined
 
   /**
    * Options for encoding peer messages. such as `prefix` for distinguishing messages on the same channel..

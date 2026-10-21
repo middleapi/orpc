@@ -5,12 +5,12 @@ export interface ErrorMapItem {
   /**
    * Default message, can be overridden when constructing an error.
    */
-  message?: undefined | string
+  message?: string | undefined
 
   /**
    * Schema used to type and validate the error data.
    */
-  data?: undefined | AnySchema
+  data?: AnySchema | undefined
 }
 
 /**

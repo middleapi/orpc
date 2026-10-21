@@ -9,7 +9,7 @@ export interface experimental_DurableLockerOptions {
    *
    * @default ''
    */
-  prefix?: string
+  prefix?: string | undefined
 
   /**
    * How long a lock is held before it expires automatically, in milliseconds.
@@ -24,14 +24,14 @@ export interface experimental_DurableLockerOptions {
    *
    * @default 10000
    */
-  timeout?: number
+  timeout?: number | undefined
 
   /**
    * Custom function to get the Durable Object stub for a lock key.
    *
    * @default ((namespace, key) => namespace.getByName(key))
    */
-  getStubByName?: (namespace: DurableObjectNamespace, key: string) => DurableObjectStub
+  getStubByName?: ((namespace: DurableObjectNamespace, key: string) => DurableObjectStub) | undefined
 }
 
 /**

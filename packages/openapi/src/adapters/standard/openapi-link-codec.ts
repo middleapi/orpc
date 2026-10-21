@@ -27,26 +27,26 @@ export interface OpenAPILinkCodecOptions<T extends ClientContext> {
    * @example '/api'
    * @default '/'
    */
-  url?: Value<Promisable<StandardUrl>, [options: ClientOptions<T>, path: string[], input: unknown]>
+  url?: Value<Promisable<StandardUrl>, [options: ClientOptions<T>, path: string[], input: unknown]> | undefined
 
   /**
    * Inject headers into the request.
    */
-  headers?: Value<Promisable<StandardHeaders | Headers>, [options: ClientOptions<T>, path: string[], input: unknown]>
+  headers?: Value<Promisable<StandardHeaders | Headers>, [options: ClientOptions<T>, path: string[], input: unknown]> | undefined
 
   /**
    * Override the default OpenAPI serializer.
    */
-  serializer?: Public<OpenAPISerializer>
+  serializer?: Public<OpenAPISerializer> | undefined
 
   /**
    * Customize how an error response body is converted into an ORPC error.
    * Return `null` or `undefined` to fall back to the default decoding behavior.
    */
-  customErrorResponseBodyDecoder?: (
+  customErrorResponseBodyDecoder?: ((
     deserializedBody: unknown,
     response: StandardLazyResponse,
-  ) => AnyORPCError | null | undefined
+  ) => AnyORPCError | null | undefined) | undefined
 }
 
 const END_SLASH_REGEX = /\/$/
