@@ -43,14 +43,14 @@ export interface LockMiddlewareOptions<
    *
    * @default the adapter default
    */
-  ttl?: Value<Promisable<number | undefined>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
+  ttl?: Value<Promisable<number | undefined>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]> | undefined
 
   /**
    * How long to wait for the lock to become available, in milliseconds.
    *
    * @default the adapter default
    */
-  timeout?: Value<Promisable<number | undefined>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
+  timeout?: Value<Promisable<number | undefined>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]> | undefined
 
   /**
    * If your lock middleware is used multiple times
@@ -61,7 +61,7 @@ export interface LockMiddlewareOptions<
    *
    * @default true
    */
-  dedupe?: boolean
+  dedupe?: boolean | undefined
 }
 
 /**

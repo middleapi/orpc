@@ -16,7 +16,7 @@ export interface OpenAPIJsonSerializerHandler {
    *
    * @default false
    */
-  isTerminal?: boolean
+  isTerminal?: boolean | undefined
 }
 
 const DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS: Record<string, OpenAPIJsonSerializerHandler> = {
@@ -186,7 +186,7 @@ export class OpenAPIJsonSerializer {
     this.handlerEntries = handlerEntries
   }
 
-  serialize(data: unknown): OpenAPIJsonSerialization {
+  serializeJson(data: unknown): OpenAPIJsonSerialization {
     const maps: Segment[][] = []
     const blobs: Blob[] = []
 
@@ -305,7 +305,7 @@ export class OpenAPIJsonSerializer {
     return data
   }
 
-  deserialize(serialized: OpenAPIJsonSerialization): unknown {
+  deserializeJson(serialized: OpenAPIJsonSerialization): unknown {
     const ref = { json: serialized.json }
 
     if (serialized.blobs?.length) {

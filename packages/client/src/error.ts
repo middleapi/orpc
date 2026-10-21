@@ -42,7 +42,7 @@ export type ORPCErrorCode
 
 export type ORPCErrorOptions<TData>
   = & ErrorOptions
-    & { message?: string }
+    & { message?: string | undefined }
     & (undefined extends TData ? { data?: TData } : { data: TData })
 
 let ORPCErrorConstructors: WeakSet<object>
@@ -154,19 +154,46 @@ export interface ORPCErrorJSON<TCode extends string, TData> extends Pick<ORPCErr
 export type AnyORPCError = ORPCError<any, any>
 export type AnyORPCErrorJSON = ORPCErrorJSON<any, any>
 
-export interface MalformedResponseErrorOptions extends ErrorOptions {
+export interface ResponseErrorOptions extends ErrorOptions {
   /**
-   * @default inferred from the response body or status
+   * @default inferred from the response status
    */
-  message?: string
+  message?: string | undefined
   response: StandardResponse
 }
 
 /**
+ * Error carrying the resolved response a link received. Links set it as the `cause`
+ * of an `ORPCError` decoded from an error response, so details that are not part
+ * of the error itself, such as its status or headers, stay available.
+ *
+ * @see {@link https://orpc.dev/docs/rpc/link#error-responses | RPC Link - Error Responses}
+ * @see {@link https://orpc.dev/docs/openapi/link#error-responses | OpenAPI Link - Error Responses}
+ */
+export class ResponseError extends Error {
+  override readonly name: string = 'ResponseError'
+
+  response: StandardResponse
+
+  constructor(options: ResponseErrorOptions) {
+    super(options.message ?? `Received a ${options.response.status} response.`, options)
+
+    this.response = options.response
+  }
+}
+
+export interface MalformedResponseErrorOptions extends ResponseErrorOptions {
+  /**
+   * @default inferred from the response body or status
+   */
+  message?: string | undefined
+}
+
+/**
  * Error thrown by links when a response does not follow the expected oRPC format,
- * for example when a proxy or gateway answers instead of your handler. Carries the
- * resolved response. Unless overridden via `options.message`, the message is
- * inferred from the response body or status.
+ * for example when a proxy or gateway answers instead of your handler. Extends
+ * `ResponseError`, so it carries the resolved response. Unless overridden via
+ * `options.message`, the message is inferred from the response body or status.
  *
  * Unlike `ORPCError`, it reaches a handler's callers as a generic `INTERNAL_SERVER_ERROR`
  * when thrown from the handler, so an upstream's response is not sent to them.
@@ -174,15 +201,11 @@ export interface MalformedResponseErrorOptions extends ErrorOptions {
  * @see {@link https://orpc.dev/docs/rpc/link#malformed-responses | RPC Link - Malformed Responses}
  * @see {@link https://orpc.dev/docs/openapi/link#malformed-responses | OpenAPI Link - Malformed Responses}
  */
-export class MalformedResponseError extends Error {
+export class MalformedResponseError extends ResponseError {
   override readonly name = 'MalformedResponseError'
 
-  response: StandardResponse
-
   constructor(options: MalformedResponseErrorOptions) {
-    super(options.message ?? inferMalformedResponseMessage(options.response), options)
-
-    this.response = options.response
+    super({ ...options, message: options.message ?? inferMalformedResponseMessage(options.response) })
   }
 }
 

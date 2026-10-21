@@ -4,10 +4,15 @@ import type { RetryLinkPluginContext } from './retry'
 import { promiseWithResolvers } from '@orpc/shared'
 import { withEventMeta } from '@standard-server/core'
 import { StandardLink } from '../adapters/standard'
-import { RetryLinkPlugin } from './retry'
+import { MalformedResponseError, ORPCError, ResponseError } from '../error'
+import { isRetryableError, RetryLinkPlugin } from './retry'
 
 interface TestContext extends RetryLinkPluginContext {
   tag?: string
+}
+
+function makeResponse(status: number) {
+  return { status, headers: {}, body: undefined }
 }
 
 function makeCodec(): StandardLinkCodec<TestContext> {
@@ -35,6 +40,30 @@ function makeTransport(): StandardLinkTransport<TestContext> {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useRealTimers()
+})
+
+describe('isRetryableError', () => {
+  it.each([
+    [400, false],
+    [404, false],
+    [408, true],
+    [429, true],
+    [500, true],
+    [503, true],
+  ])('errors from a %i response -> %s', (status, expected) => {
+    const response = makeResponse(status)
+
+    expect(isRetryableError(new ORPCError('ERROR', { cause: new ResponseError({ response }) }))).toBe(expected)
+    expect(isRetryableError(new MalformedResponseError({ response }))).toBe(expected)
+  })
+
+  it.each([
+    new ORPCError('BAD_REQUEST'),
+    new TypeError('Failed to fetch'),
+    'FAIL',
+  ])('errors without a response -> true (%s)', (error) => {
+    expect(isRetryableError(error)).toBe(true)
+  })
 })
 
 describe('retryLinkPlugin', () => {
@@ -84,6 +113,39 @@ describe('retryLinkPlugin', () => {
 
     expect(shouldRetry).toHaveBeenCalledTimes(1)
     expect(codec.decodeResponse).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not retry client error responses by default', async () => {
+    const codec = makeCodec()
+    const transport = makeTransport()
+
+    const error = new ORPCError('BAD_REQUEST', { cause: new ResponseError({ response: makeResponse(400) }) })
+    vi.mocked(codec.decodeResponse).mockRejectedValue(error)
+
+    const link = new StandardLink(codec, transport, {
+      plugins: [new RetryLinkPlugin()],
+    })
+
+    await expect(link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 3, retryDelay: 0 } })).rejects.toBe(error)
+
+    expect(codec.decodeResponse).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries client error responses when shouldRetry allows it', async () => {
+    const codec = makeCodec()
+    const transport = makeTransport()
+
+    vi.mocked(codec.decodeResponse)
+      .mockRejectedValueOnce(new ORPCError('NOT_FOUND', { cause: new ResponseError({ response: makeResponse(404) }) }))
+      .mockResolvedValueOnce({ kind: 'output', output: 'OK' })
+
+    const link = new StandardLink(codec, transport, {
+      plugins: [new RetryLinkPlugin()],
+    })
+
+    await expect(link.call(['planet', 'create'], { name: 'Earth' }, { context: { retry: 3, retryDelay: 0, shouldRetry: true } })).resolves.toBe('OK')
+
+    expect(codec.decodeResponse).toHaveBeenCalledTimes(2)
   })
 
   it('calls onRetry cleanup with success/failure state', async () => {

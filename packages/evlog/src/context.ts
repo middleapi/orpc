@@ -8,7 +8,7 @@ export const LOGGER_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_EVLOG_LOGGE
  * @see {@link https://orpc.dev/docs/integrations/evlog#without-asynclocalstorage | Evlog Integration - Without AsyncLocalStorage}
  */
 export interface LoggerContext {
-  [LOGGER_CONTEXT_SYMBOL]?: undefined | RequestLogger
+  [LOGGER_CONTEXT_SYMBOL]?: RequestLogger | undefined
 }
 
 /**

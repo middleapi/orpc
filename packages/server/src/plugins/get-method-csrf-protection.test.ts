@@ -222,7 +222,7 @@ describe('getMethodCsrfProtectionHandlerPlugin', () => {
         }]))
 
         return handler.handle(new Request(`https://api.example.com/__batch__?data=${data}`, {
-          headers: { 'orpc-batch': 'buffered', ...transportHeaders },
+          headers: { 'orpc-batch': '1', ...transportHeaders },
         }))
       }
 

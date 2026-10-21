@@ -21,7 +21,7 @@ export interface RPCJsonSerializerHandler {
    *
    * @default false
    */
-  isTerminal?: boolean
+  isTerminal?: boolean | undefined
 }
 
 function invalidSerializedData(detail: string): TypeError {
@@ -263,7 +263,7 @@ export class RPCJsonSerializer {
     this.handlerEntries = handlerEntries
   }
 
-  serialize(data: unknown): RPCJsonSerialization {
+  serializeJson(data: unknown): RPCJsonSerialization {
     let meta: RPCJsonSerializationMeta[] | undefined = []
     const maps: Segment[][] = []
     const blobs: Blob[] = []
@@ -410,7 +410,7 @@ export class RPCJsonSerializer {
     return data
   }
 
-  deserialize(serialized: RPCJsonSerialization): unknown {
+  deserializeJson(serialized: RPCJsonSerialization): unknown {
     const ref = { json: serialized.json }
 
     if (serialized.blobs?.length) {

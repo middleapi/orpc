@@ -24,15 +24,15 @@ export interface StandardLinkOptions<T extends ClientContext> {
    * Interceptors that execute around the entire call, including transport and codec.
    * Useful for error handling, logging, metrics, ...
    */
-  interceptors?: StandardLinkInterceptor<T>[]
+  interceptors?: StandardLinkInterceptor<T>[] | undefined
 
   /**
    * Interceptors that execute around the transport layer, after encoding and before decoding.
    * Useful for modifying the request or response, adding transport-level logging, ...
    */
-  transportInterceptors?: StandardLinkTransportInterceptor<T>[]
+  transportInterceptors?: StandardLinkTransportInterceptor<T>[] | undefined
 
-  plugins?: StandardLinkPlugin<T>[]
+  plugins?: StandardLinkPlugin<T>[] | undefined
 }
 
 export class StandardLink<T extends ClientContext> implements ClientLink<T> {

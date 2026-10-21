@@ -47,35 +47,16 @@ describe.each([
   })
 
   /**
-   * A buffered batch with no binary subresponse is a plain json array rather than the binary
-   * framing every other case here produces, so it travels a different encoding path.
-   */
-  it('round-trips a buffered batch of json-only responses', async () => {
-    const router = {
-      echo: os.input(z.string()).handler(({ input }) => `echo:${input}`),
-    }
-
-    const { client, fetchSpy } = createClientServer(router, { mode: 'buffered' })
-
-    await Promise.all([
-      expect(client.echo('alpha')).resolves.toBe('echo:alpha'),
-      expect(client.echo('beta')).resolves.toBe('echo:beta'),
-    ])
-
-    expect(fetchSpy).toHaveBeenCalledTimes(1) // ensure batch was used
-  })
-
-  /**
-   * Without a stream subresponse, a buffered batch is the binary framing collected into a blob
+   * Without a stream subresponse, a batch is the binary framing collected into a blob
    * once every subresponse is ready, rather than a stream.
    */
-  it('round-trips a buffered batch of blob and json responses', async () => {
+  it('round-trips a batch of blob and json responses', async () => {
     const router = {
-      blob: os.handler(() => new Blob(['buffered payload'], { type: 'application/octet-stream' })),
-      json: os.handler(() => ({ ok: 'buffered-mixed' })),
+      blob: os.handler(() => new Blob(['blob payload'], { type: 'application/octet-stream' })),
+      json: os.handler(() => ({ ok: 'mixed' })),
     }
 
-    const { client, fetchSpy } = createClientServer(router, { mode: 'buffered' })
+    const { client, fetchSpy } = createClientServer(router)
 
     const [file, info] = await Promise.all([
       client.blob(),
@@ -83,15 +64,15 @@ describe.each([
     ])
 
     expect(file).toBeInstanceOf(Blob)
-    await expect((file as Blob).text()).resolves.toBe('buffered payload')
-    expect(info).toEqual({ ok: 'buffered-mixed' })
+    await expect((file as Blob).text()).resolves.toBe('blob payload')
+    expect(info).toEqual({ ok: 'mixed' })
     expect(fetchSpy).toHaveBeenCalledTimes(1) // ensure batch was used
   })
 
   /**
-   * A stream may never end, so a buffered batch starts streaming once a subresponse is one.
+   * A stream may never end, so a batch streams once every subresponse is ready and one of them is a stream.
    */
-  it.each(['streaming', 'buffered'] as const)('supports readable stream, blob, json, and AsyncIteratorObject responses in %s mode', async (mode) => {
+  it('supports readable stream, blob, json, and AsyncIteratorObject responses', async () => {
     const part2 = promiseWithResolvers<void>()
     const event2 = promiseWithResolvers<void>()
 
@@ -104,9 +85,9 @@ describe.each([
       },
     }))
 
-    const blobProcedure = vi.fn(async () => new Blob([`${mode} mixed payload`], { type: 'application/octet-stream' }))
+    const blobProcedure = vi.fn(async () => new Blob(['blob payload'], { type: 'application/octet-stream' }))
 
-    const jsonProcedure = vi.fn(async () => ({ ok: `${mode}-mixed` }))
+    const jsonProcedure = vi.fn(async () => ({ ok: 'mixed' }))
 
     const eventProcedure = vi.fn(async function* () {
       yield 'event 1'
@@ -122,7 +103,7 @@ describe.each([
       events: os.handler(eventProcedure),
     }
 
-    const { client, fetchSpy } = createClientServer(router, { mode })
+    const { client, fetchSpy } = createClientServer(router)
 
     // Both streams hold everything after their first item until the test releases it, so a batch
     // that waited for every subresponse to finish would hang here instead of resolving.
@@ -134,8 +115,8 @@ describe.each([
     ])
 
     expect(file).toBeInstanceOf(Blob)
-    await expect((file as Blob).text()).resolves.toBe(`${mode} mixed payload`)
-    expect(info).toEqual({ ok: `${mode}-mixed` })
+    await expect((file as Blob).text()).resolves.toBe('blob payload')
+    expect(info).toEqual({ ok: 'mixed' })
 
     const reader = stream.getReader()
 
@@ -211,7 +192,7 @@ describe.each([
       }),
     }
 
-    const { client, fetchSpy } = createClientServer(router, { mode: 'streaming' })
+    const { client, fetchSpy } = createClientServer(router)
 
     const [info, file, stream, events, endless] = await Promise.all([
       client.json(),

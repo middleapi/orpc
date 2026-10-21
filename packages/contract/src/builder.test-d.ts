@@ -92,6 +92,6 @@ describe('ContractBuilder', () => {
 
 describe('oc', () => {
   it('is a contract builder', () => {
-    expectTypeOf(oc).toEqualTypeOf<ContractBuilder<object>>()
+    expectTypeOf(oc).toEqualTypeOf<ContractBuilder<Record<never, never>>>()
   })
 })

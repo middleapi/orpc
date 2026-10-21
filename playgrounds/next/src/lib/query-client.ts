@@ -38,7 +38,7 @@ function createQueryClient(): QueryClient {
         staleTime: 60 * 1000, // > 0 to prevent immediate refetching on mount
 
         queryKeyHashFn: (queryKey) => {
-          const { json, meta } = serializer.serialize(queryKey)
+          const { json, meta } = serializer.serializeJson(queryKey)
 
           return hashKey([
             json,
@@ -48,13 +48,13 @@ function createQueryClient(): QueryClient {
       },
       dehydrate: {
         serializeData: (data) => {
-          const { json, meta } = serializer.serialize(data)
+          const { json, meta } = serializer.serializeJson(data)
           return { json, meta }
         },
       },
       hydrate: {
         deserializeData(data) {
-          return serializer.deserialize(data)
+          return serializer.deserializeJson(data)
         },
       },
     },

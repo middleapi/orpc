@@ -59,18 +59,20 @@ The following context options control retry behavior:
 
 - **retry:** Maximum number of retry attempts before throwing an error _(default: `0`)_.
 - **retryDelay:** Delay between retry attempts _(default: `(o) => o.lastEventRetry ?? 2000`)_.
-- **shouldRetry:** Function that determines whether a retry should be attempted _(default: `true`)_.
+- **shouldRetry:** Function that determines whether a retry should be attempted _(default: `(o) => isRetryableError(o.error)`, see [Client Error Responses](#client-error-responses))_.
 
 You can override the default retry behavior globally by passing `default` options when initializing the plugin:
 
 ```ts
+import { isRetryableError } from '@orpc/client/plugins'
+
 const link = new RPCLink<ClientContext>({
   plugins: [
     new RetryLinkPlugin({
       default: {
         retry: 0,
         retryDelay: o => o.lastEventRetry ?? 2000,
-        shouldRetry: o => true,
+        shouldRetry: o => isRetryableError(o.error),
       }
     }),
   ],
@@ -78,6 +80,22 @@ const link = new RPCLink<ClientContext>({
 ```
 
 :::
+
+## Client Error Responses
+
+By default, errors from a 4xx response other than `408` and `429` are not retried, since retrying would most likely fail the same way. To retry every error, set `shouldRetry` to `true`, or extend the default with `isRetryableError`:
+
+```ts
+import { ORPCError } from '@orpc/client'
+import { isRetryableError } from '@orpc/client/plugins'
+
+const planets = await client.planet.list({ limit: 10 }, {
+  context: {
+    retry: 3,
+    shouldRetry: ({ error }) => isRetryableError(error) || (error instanceof ORPCError && error.code === 'CONFLICT'),
+  }
+})
+```
 
 ## Event Source Simulation
 

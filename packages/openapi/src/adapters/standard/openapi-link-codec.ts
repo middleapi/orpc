@@ -4,7 +4,7 @@ import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
 import type { Promisable, Public, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standard-server/core'
 import type { OpenAPIMeta } from '../../meta'
-import { createORPCErrorFromJson, isORPCErrorJson, MalformedResponseError } from '@orpc/client'
+import { createORPCErrorFromJson, isORPCErrorJson, MalformedResponseError, ResponseError } from '@orpc/client'
 import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import { unlazy } from '@orpc/server'
 import { isTypescriptObject, mergeHttpPath, pathToHttpPath, safeEncodeURIComponent, stringifyJSON, value } from '@orpc/shared'
@@ -27,26 +27,26 @@ export interface OpenAPILinkCodecOptions<T extends ClientContext> {
    * @example '/api'
    * @default '/'
    */
-  url?: Value<Promisable<StandardUrl>, [options: ClientOptions<T>, path: string[], input: unknown]>
+  url?: Value<Promisable<StandardUrl>, [options: ClientOptions<T>, path: string[], input: unknown]> | undefined
 
   /**
    * Inject headers into the request.
    */
-  headers?: Value<Promisable<StandardHeaders | Headers>, [options: ClientOptions<T>, path: string[], input: unknown]>
+  headers?: Value<Promisable<StandardHeaders | Headers>, [options: ClientOptions<T>, path: string[], input: unknown]> | undefined
 
   /**
    * Override the default OpenAPI serializer.
    */
-  serializer?: Public<OpenAPISerializer>
+  serializer?: Public<OpenAPISerializer> | undefined
 
   /**
    * Customize how an error response body is converted into an ORPC error.
    * Return `null` or `undefined` to fall back to the default decoding behavior.
    */
-  customErrorResponseBodyDecoder?: (
+  customErrorResponseBodyDecoder?: ((
     deserializedBody: unknown,
     response: StandardLazyResponse,
-  ) => AnyORPCError | null | undefined
+  ) => AnyORPCError | null | undefined) | undefined
 }
 
 const END_SLASH_REGEX = /\/$/
@@ -405,7 +405,12 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       }
 
       if (isORPCErrorJson(deserialized)) {
-        return { kind: 'error', error: createORPCErrorFromJson(deserialized) }
+        return {
+          kind: 'error',
+          error: createORPCErrorFromJson(deserialized, {
+            cause: new ResponseError({ response: { status: response.status, headers: response.headers, body } }),
+          }),
+        }
       }
 
       throw new MalformedResponseError({ response: { headers: response.headers, status: response.status, body } })

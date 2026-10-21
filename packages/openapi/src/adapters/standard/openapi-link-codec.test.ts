@@ -1,4 +1,4 @@
-import { MalformedResponseError, ORPCError } from '@orpc/client'
+import { MalformedResponseError, ORPCError, ResponseError } from '@orpc/client'
 import { oc } from '@orpc/contract'
 import { openapi } from '../../meta'
 import { OpenAPISerializer } from '../../openapi-serializer'
@@ -778,9 +778,9 @@ describe('openAPILinkCodec', () => {
         data: { id: '42' },
       })
 
-      const result = await codec.decodeResponse({
+      const result: any = await codec.decodeResponse({
         status: 404,
-        headers: {},
+        headers: { 'x-request-id': 'abc' },
         resolveBody: async () => error.toJSON(),
       }, ['ping'], { context: {} })
 
@@ -788,6 +788,11 @@ describe('openAPILinkCodec', () => {
         message: 'Missing',
         data: { id: '42' },
       })
+
+      expect(result.error.cause).toBeInstanceOf(ResponseError)
+      expect(result.error.cause).not.toBeInstanceOf(MalformedResponseError)
+      expect(result.error.cause.message).toBe('Received a 404 response.')
+      expect(result.error.cause.response).toEqual({ status: 404, headers: { 'x-request-id': 'abc' }, body: error.toJSON() })
     })
 
     it('uses a custom error decoder when it returns a value', async () => {

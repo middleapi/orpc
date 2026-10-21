@@ -13,7 +13,6 @@ export const createNodeHttpBatchClientServerTest: CreateBatchClientServerTest = 
   {
     context = defaultBatchClientServerOptions.context,
     method = 'POST',
-    mode = defaultBatchClientServerOptions.mode,
     serializer = defaultBatchClientServerOptions.serializer,
   } = {},
 ) => {
@@ -45,7 +44,7 @@ export const createNodeHttpBatchClientServerTest: CreateBatchClientServerTest = 
     method,
     serializer,
     fetch: fetchSpy,
-    plugins: [new BatchLinkPlugin({ groups: [defaultBatchGroup], mode })],
+    plugins: [new BatchLinkPlugin({ groups: [defaultBatchGroup] })],
   })
 
   return {

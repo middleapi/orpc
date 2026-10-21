@@ -42,7 +42,7 @@ export interface experimental_CloudflareTracerOptions {
    *
    * @default tracing from `cloudflare:workers`
    */
-  tracing?: Tracing
+  tracing?: Tracing | undefined
 }
 
 /**

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
 import { withHiddenRouterContract } from './router-hidden'
-import { augmentImplementedRouter, augmentRouter, getRouter, unlazyRouter, walkProcedureContractsAsync, walkProcedureContractsSync } from './router-utils'
+import { augmentImplementedRouter, augmentRouter, getRouter, resolveContractProcedure, unlazyRouter, walkProcedureContractsAsync, walkProcedureContractsSync } from './router-utils'
 
 const oc = ContractModule.oc
 const resolveMetaPluginsSpy = vi.spyOn(ContractModule, 'resolveMetaPlugins')
@@ -338,6 +338,29 @@ describe('getRouter', () => {
     expect(getRouter('invalid' as any, ['invalid'])).toBeUndefined()
     expect(getRouter(router, ['__proto__'])).toBeUndefined()
     expect(getRouter(router, ['nested', 'hasOwnProperty'])).toBeUndefined()
+  })
+})
+
+describe('resolveContractProcedure', () => {
+  const contract = oc.input(schema1).output(schema2)
+
+  it('returns procedures as is', async () => {
+    expect(await resolveContractProcedure(router, procedure1, ['p1'])).toBe(procedure1)
+  })
+
+  it('resolves contract-first implementations by path, including lazy ones', async () => {
+    const resolved = await resolveContractProcedure(router, contract, ['p1'])
+    expect(resolved).toBeInstanceOf(Procedure)
+    expect(resolved['~orpc'].handler).toBe(procedure1['~orpc'].handler)
+
+    expect(await resolveContractProcedure(router, contract, ['lazy', 'p1'])).toBeInstanceOf(Procedure)
+  })
+
+  it('throws when an implementation is missing or invalid', async () => {
+    await expect(resolveContractProcedure(router, contract, ['notExist'])).rejects.toThrow(
+      '[Contract-First] Missing or invalid implementation for procedure at path: "notExist".',
+    )
+    await expect(resolveContractProcedure(router, contract, ['invalid'])).rejects.toThrow(TypeError)
   })
 })
 

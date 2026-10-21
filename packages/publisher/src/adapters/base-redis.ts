@@ -26,14 +26,14 @@ export interface BaseRedisPublisherOptions extends PublisherOptions {
    *
    * @default ''
    */
-  prefix?: string
+  prefix?: string | undefined
 
   /**
    * Serializer for serialize and deserialize payloads.
    *
    * @default RPCJsonSerializer
    */
-  serializer?: undefined | Public<RPCJsonSerializer>
+  serializer?: Public<RPCJsonSerializer> | undefined
 
   /**
    * Configuration for event resume support.
@@ -62,8 +62,8 @@ export interface BaseRedisPublisherOptions extends PublisherOptions {
      *
      * @default 300 (5 min)
      */
-    seconds?: number
-  }
+    seconds?: number | undefined
+  } | undefined
 }
 
 /**
@@ -85,7 +85,7 @@ export interface RedisStreamEntry {
 
 interface SerializedEvent {
   payload: RPCJsonSerialization
-  meta?: undefined | EventMeta
+  meta?: EventMeta | undefined
 }
 
 /**
@@ -246,13 +246,13 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
 
   private serializePayload(payload: object): SerializedEvent {
     const [original, meta] = unwrapEvent(payload)
-    const { json, meta: jsonMeta } = this.serializer.serialize(original)
+    const { json, meta: jsonMeta } = this.serializer.serializeJson(original)
     return { payload: { json, meta: jsonMeta }, meta }
   }
 
   private deserializePayload(id: string | undefined, { payload, meta }: SerializedEvent): object {
     return withEventMeta(
-      this.serializer.deserialize(payload) as object,
+      this.serializer.deserializeJson(payload) as object,
       id === undefined ? { ...meta } : { ...meta, id },
     )
   }

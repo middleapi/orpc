@@ -13,7 +13,7 @@ export interface RPCSerializerSerializeOptions {
    *
    * @default true
    */
-  useFormDataForBlobFields?: boolean
+  useFormDataForBlobFields?: boolean | undefined
 }
 
 export interface RPCSerializerOptions extends RPCJsonSerializerOptions {
@@ -29,14 +29,13 @@ export interface RPCSerializerOptions extends RPCJsonSerializerOptions {
  *
  * @see {@link https://orpc.dev/docs/rpc/serializer | RPC Serializer}
  */
-export class RPCSerializer {
-  private readonly jsonSerializer: RPCJsonSerializer
+export class RPCSerializer extends RPCJsonSerializer {
   private readonly defaultSerializeOptions: RPCSerializerOptions['serialize']
 
   constructor(
     options: RPCSerializerOptions = {},
   ) {
-    this.jsonSerializer = new RPCJsonSerializer(options)
+    super(options)
     this.defaultSerializeOptions = options.serialize
   }
 
@@ -54,21 +53,21 @@ export class RPCSerializer {
             return result
           }
 
-          return { done: result.done, value: this.serializeValue(result.value, false) }
+          return { done: result.done, value: this.serializePayload(result.value, false) }
         },
         mapError: e => new ErrorEvent(
-          this.serializeValue(toORPCError(e).toJSON(), false),
+          this.serializePayload(toORPCError(e).toJSON(), false),
           { cause: e },
         ),
       })
     }
 
     const useFormDataForBlobs = options.useFormDataForBlobFields ?? this.defaultSerializeOptions?.useFormDataForBlobFields ?? true
-    return this.serializeValue(data, useFormDataForBlobs)
+    return this.serializePayload(data, useFormDataForBlobs)
   }
 
-  private serializeValue(data: unknown, useFormDataForBlobs: boolean): unknown {
-    const { json, meta, maps, blobs } = this.jsonSerializer.serialize(data)
+  private serializePayload(data: unknown, useFormDataForBlobs: boolean): unknown {
+    const { json, meta, maps, blobs } = this.serializeJson(data)
 
     if (!useFormDataForBlobs || !blobs?.length) {
       return { json, meta }
@@ -97,14 +96,14 @@ export class RPCSerializer {
             return result
           }
 
-          return { done: result.done, value: this.deserializeValue(result.value) }
+          return { done: result.done, value: this.deserializePayload(result.value) }
         },
         mapError: (e) => {
           if (!(e instanceof ErrorEvent)) {
             return e
           }
 
-          const deserialized = this.deserializeValue(e.data)
+          const deserialized = this.deserializePayload(e.data)
 
           if (isORPCErrorJson(deserialized)) {
             return createORPCErrorFromJson(deserialized, { cause: e })
@@ -115,12 +114,12 @@ export class RPCSerializer {
       })
     }
 
-    return this.deserializeValue(data)
+    return this.deserializePayload(data)
   }
 
-  private deserializeValue(data: any): unknown {
+  private deserializePayload(data: any): unknown {
     if (!(data instanceof FormData)) {
-      return this.jsonSerializer.deserialize(data)
+      return this.deserializeJson(data)
     }
 
     const serialized = JSON.parse(data.get('data') as string)
@@ -132,6 +131,6 @@ export class RPCSerializer {
       }
     }
 
-    return this.jsonSerializer.deserialize({ ...serialized, blobs })
+    return this.deserializeJson({ ...serialized, blobs })
   }
 }

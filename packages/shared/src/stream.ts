@@ -29,7 +29,7 @@ export function replicateReadableStream<T>(
   return replicated
 }
 
-export type ReadableStreamReadResult<T> = { done: false, value: T } | { done: true, value?: undefined | T }
+export type ReadableStreamReadResult<T> = { done: false, value: T } | { done: true, value?: T | undefined }
 
 export interface WrapReadableStreamOptions<T, TMapped> {
   /**
@@ -37,15 +37,15 @@ export interface WrapReadableStreamOptions<T, TMapped> {
    * Useful when you want execution to happen within a specific context,
    * such as AsyncLocalStorage.
    */
-  runWith?: <T>(run: () => Promise<T>) => Promisable<T>
-  mapResult?: (result: ReadableStreamReadResult<T>) => Promisable<ReadableStreamReadResult<TMapped>>
-  mapError?: (error: ThrowableError) => Promisable<ThrowableError>
-  onError?: (error: ThrowableError) => Promisable<void>
+  runWith?: (<T>(run: () => Promise<T>) => Promisable<T>) | undefined
+  mapResult?: ((result: ReadableStreamReadResult<T>) => Promisable<ReadableStreamReadResult<TMapped>>) | undefined
+  mapError?: ((error: ThrowableError) => Promisable<ThrowableError>) | undefined
+  onError?: ((error: ThrowableError) => Promisable<void>) | undefined
 
   /**
    * Guaranteed to execute exactly once after the stream finishes or is cancelled.
    */
-  onFinish?: () => Promisable<void>
+  onFinish?: (() => Promisable<void>) | undefined
 }
 
 export function wrapReadableStream<T, TMapped = T>(
@@ -130,7 +130,7 @@ export function traceReadableStream<T>(
  */
 export function streamToAsyncIteratorObject<T>(
   stream: ReadableStream<T>,
-  { signal }: { signal?: undefined | AbortSignal } = {},
+  { signal }: { signal?: AbortSignal | undefined } = {},
 ): AsyncIteratorClass<T> {
   const reader = stream.getReader()
   let cancelledBySignal = false

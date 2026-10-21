@@ -37,12 +37,12 @@ export interface FetchLinkTransportOptions<T extends ClientContext> {
    * @example 'https://api.example.com'
    * @example 'http://localhost:3000'
    */
-  origin?: Value<Promisable<`https://${string}` | `http://${string}` | ({} & string) | undefined>, [options: ClientOptions<T>, path: string[]]>
+  origin?: Value<Promisable<`https://${string}` | `http://${string}` | ({} & string) | undefined>, [options: ClientOptions<T>, path: string[]]> | undefined
 
   /**
    * Options for how to convert the Standard Request to a Fetch Request, like event stream options, etc.
    */
-  toFetchRequest?: undefined | ToFetchBodyOptions
+  toFetchRequest?: ToFetchBodyOptions | undefined
 
   /**
    * Override the default fetch implementation.

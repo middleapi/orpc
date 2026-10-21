@@ -1,4 +1,6 @@
-import { loadBytes, toStringOrBytes } from './buffer'
+import { Buffer } from 'node:buffer'
+import process from 'node:process'
+import { encodeBase64, loadBytes, toStringOrBytes } from './buffer'
 
 it('loadBytes', async () => {
   const blob = new Blob(['test'], { type: 'text/plain' })
@@ -121,5 +123,70 @@ describe('toStringOrBytes', () => {
       const expectedBytes = new Uint8Array([...new TextEncoder().encode('€'), 0x21])
       expect(result).toEqual(expectedBytes)
     })
+  })
+})
+
+describe('encodeBase64', () => {
+  const large = new Uint8Array(20_000).map((_, i) => i % 256)
+
+  function expectEncodes() {
+    expect(encodeBase64(new Uint8Array([]))).toBe('')
+    expect(encodeBase64(new TextEncoder().encode('Hello World'))).toBe('SGVsbG8gV29ybGQ=')
+    expect(encodeBase64(new Uint8Array([251, 255]))).toBe('+/8=')
+    expect(encodeBase64(new Uint8Array([0, 251, 255, 0]).subarray(1, 3))).toBe('+/8=')
+    expect(encodeBase64(large)).toBe(Buffer.from(large).toString('base64'))
+  }
+
+  // runtimes like Node.js 26 ship the native toBase64, which would skip the fallbacks
+  function removeNativeToBase64() {
+    const descriptor = Object.getOwnPropertyDescriptor(Uint8Array.prototype, 'toBase64')
+
+    if (descriptor) {
+      delete (Uint8Array.prototype as any).toBase64
+      onTestFinished(() => {
+        // eslint-disable-next-line no-extend-native -- restores the native method removed above
+        Object.defineProperty(Uint8Array.prototype, 'toBase64', descriptor)
+      })
+    }
+  }
+
+  it('uses Buffer from the Node.js built-in modules when available', () => {
+    removeNativeToBase64()
+    const getBuiltinModule = vi.spyOn(process, 'getBuiltinModule')
+    onTestFinished(() => {
+      getBuiltinModule.mockRestore()
+    })
+
+    expectEncodes()
+    expect(getBuiltinModule).toHaveBeenCalledWith('node:buffer')
+  })
+
+  it('falls back to btoa without the Node.js built-in modules', () => {
+    removeNativeToBase64()
+    const getBuiltinModule = vi.spyOn(process, 'getBuiltinModule').mockReturnValue(undefined as any)
+    onTestFinished(() => {
+      getBuiltinModule.mockRestore()
+    })
+
+    expectEncodes()
+  })
+
+  it('falls back to btoa on runtimes without getBuiltinModule', () => {
+    removeNativeToBase64()
+    const getBuiltinModule = process.getBuiltinModule
+    ;(process as any).getBuiltinModule = undefined
+    onTestFinished(() => {
+      process.getBuiltinModule = getBuiltinModule
+    })
+
+    expectEncodes()
+  })
+
+  it('prefers the native toBase64', () => {
+    const toBase64 = vi.fn(() => 'native')
+    const bytes = Object.assign(new Uint8Array([1]), { toBase64 })
+
+    expect(encodeBase64(bytes)).toBe('native')
+    expect(toBase64).toHaveBeenCalledTimes(1)
   })
 })

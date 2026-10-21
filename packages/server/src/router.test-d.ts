@@ -43,7 +43,7 @@ describe('contractedRouter', () => {
         any,
         typeof inputSchema,
         Schema<unknown>,
-        object
+        Record<never, never>
       >>
     >()
 
@@ -54,7 +54,7 @@ describe('contractedRouter', () => {
         any,
         Schema<void, unknown>,
         typeof outputSchema,
-        MergedErrorMap<object, typeof errorMap>
+        MergedErrorMap<Record<never, never>, typeof errorMap>
       >>
     >()
 
@@ -72,7 +72,7 @@ describe('contractedRouter', () => {
         any,
         typeof inputSchema,
         Schema<unknown>,
-        object
+        Record<never, never>
       >
     >()
   })

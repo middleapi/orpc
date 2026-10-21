@@ -20,7 +20,7 @@ import {
   OpenAPIGeneratorError,
   toOpenAPIPath,
 } from './openapi-generator-operation'
-import { OpenAPISerializer } from './openapi-serializer'
+import { OpenAPIJsonSerializer } from './openapi-json-serializer'
 import { getDynamicPathParams } from './utils'
 
 export { OpenAPIGeneratorError } from './openapi-generator-operation'
@@ -32,7 +32,7 @@ export interface OpenAPIGeneratorOptions {
   /**
    * The serializer used to serialize the generated OpenAPI documentation
    */
-  serializer?: Public<OpenAPISerializer> | undefined
+  serializer?: Public<OpenAPIJsonSerializer> | undefined
 }
 
 export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion> {
@@ -62,14 +62,14 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
    *
    * @default defName => defName
    */
-  customComponentName?: (defName: string, defSchema: JsonSchema) => string | undefined
+  customComponentName?: ((defName: string, defSchema: JsonSchema) => string | undefined) | undefined
 
   /**
    * Filter procedures. Return `false` to exclude a procedure from the OpenAPI specification.
    *
    * @default true
    */
-  filter?: Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]>
+  filter?: Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]> | undefined
 
   /**
    * Define a custom JSON schema for the error response body when using
@@ -83,10 +83,11 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
   customErrorResponseBodySchema?: Value<
     JsonSchema | undefined | null,
     [definedErrors: OpenAPIErrorBodyDefinition[], status: number]
-  >
+  > | undefined
 
   /**
    * Mapping ORPCError Code -> HTTP Status Code
+   * Codes missing from the map fall back to `DEFAULT_ERROR_STATUS` (400).
    *
    * @default COMMON_ERROR_STATUS_MAP
    */
@@ -100,11 +101,11 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
  * @see {@link https://orpc.dev/docs/openapi/specification#openapi-generator | OpenAPI Specification - OpenAPI Generator}
  */
 export class OpenAPIGenerator {
-  private readonly serializer: Public<OpenAPISerializer>
+  private readonly serializer: Public<OpenAPIJsonSerializer>
   private readonly converter: Pick<JsonSchemaConverter, 'convert'>
 
   constructor(options: OpenAPIGeneratorOptions = {}) {
-    this.serializer = options.serializer ?? new OpenAPISerializer()
+    this.serializer = options.serializer ?? new OpenAPIJsonSerializer()
     this.converter = new DelegatingJsonSchemaConverter([
       ...toArray(options.converters),
       new StandardJsonSchemaConverter(),
@@ -196,7 +197,7 @@ export class OpenAPIGenerator {
     }
 
     const versioned = toVersionedOpenAPIDocument(doc, version)
-    return this.serializer.serialize(versioned, { asFormData: false, useFormDataForBlobFields: false }) as OpenAPIDocument<TVersion>
+    return this.serializer.serializeJson(versioned).json as OpenAPIDocument<TVersion>
   }
 
   private convertSchema(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): [JsonSchema, boolean] {

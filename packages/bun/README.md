@@ -7,7 +7,7 @@
   <a href="https://www.npmjs.com/package/@orpc/bun">
     <img alt="weekly downloads" src="https://img.shields.io/npm/dw/%40orpc%2Fbun?logo=npm" />
   </a>
-  <a href="https://github.com/middleapi/orpc/blob/main/LICENCE">
+  <a href="https://github.com/middleapi/orpc/blob/main/LICENSE">
     <img alt="MIT License" src="https://img.shields.io/github/license/middleapi/orpc?logo=open-source-initiative" />
   </a>
   <a href="https://discord.gg/TXEbwRBvQn">
@@ -57,6 +57,7 @@ You can read the documentation [here](https://orpc.dev).
 | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [@orpc/next](https://www.npmjs.com/package/@orpc/next)                               | Integrate with [Next.js Server Functions](https://nextjs.org/docs/app/getting-started/mutating-data). | [Next.js](https://orpc.dev/docs/integrations/next)                                                                                                                                                                      |
 | [@orpc/ai-sdk](https://www.npmjs.com/package/@orpc/ai-sdk)                           | Turn contracts and procedures into [AI SDK](https://ai-sdk.dev/) tools.                               | [AI SDK](https://orpc.dev/docs/integrations/ai-sdk)                                                                                                                                                                     |
+| [@orpc/mcp](https://www.npmjs.com/package/@orpc/mcp)                                 | Expose procedures as [MCP](https://modelcontextprotocol.io/) tools.                                   | [MCP](https://orpc.dev/docs/integrations/mcp)                                                                                                                                                                           |
 | [@orpc/tanstack-query](https://www.npmjs.com/package/@orpc/tanstack-query)           | Integrate with [TanStack Query](https://tanstack.com/query/latest).                                   | [TanStack Query](https://orpc.dev/docs/integrations/tanstack-query)                                                                                                                                                     |
 | [@orpc/pinia-colada](https://www.npmjs.com/package/@orpc/pinia-colada)               | Integrate with [Pinia Colada](https://pinia-colada.esm.dev/).                                         | [Pinia Colada](https://orpc.dev/docs/integrations/pinia-colada)                                                                                                                                                         |
 | [@orpc/swr](https://www.npmjs.com/package/@orpc/swr)                                 | Integrate with [SWR](https://swr.vercel.app/).                                                        | [SWR](https://orpc.dev/docs/integrations/swr)                                                                                                                                                                           |
@@ -173,6 +174,16 @@ Like what we build over at [middleapi](https://github.com/middleapi)? You can he
 
 With thanks to [39 past sponsors](https://orpc.dev/sponsors#past-sponsors) who helped get oRPC here.
 
+## Open Source Programs
+
+[middleapi](https://github.com/middleapi) is supported by these open source programs:
+
+<table>
+  <tr>
+   <td align="center"><a href="https://claude.com/contact-sales/claude-for-oss" target="_blank" rel="noopener" title="Claude for Open Source"><img src="https://cdn.simpleicons.org/claude" width="64" alt="Claude"/><br />Claude for Open Source</a></td>
+  </tr>
+</table>
+
 ## References
 
 oRPC is inspired by existing solutions that prioritize type safety and developer experience. Special acknowledgments to:
@@ -182,4 +193,4 @@ oRPC is inspired by existing solutions that prioritize type safety and developer
 
 ## License
 
-Distributed under the MIT License. See [LICENSE](https://github.com/middleapi/orpc/blob/main/LICENCE) for more information.
+Distributed under the MIT License. See [LICENSE](https://github.com/middleapi/orpc/blob/main/LICENSE) for more information.

@@ -49,22 +49,22 @@ export interface StandardHandlerOptions<TContext extends Context> {
    * - batch plugins - separate one request into multiple and call multiple next
    * - openapi spec plugin - to intercept a request and early response
    */
-  routingInterceptors?: StandardHandlerRoutingInterceptor<TContext>[]
+  routingInterceptors?: StandardHandlerRoutingInterceptor<TContext>[] | undefined
 
   /**
    * interceptor run after routing and before error handler,
    * useful for error handling, logging, metrics, etc.
    */
-  interceptors?: StandardHandlerInterceptor<TContext>[]
+  interceptors?: StandardHandlerInterceptor<TContext>[] | undefined
 
   /**
    *
    * ClientInterceptor equivalent with createRouterClient.interceptors / createProcedure.interceptors
    * useful for error handling, logging, metrics, etc. (not counting encoding/decoding)
    */
-  clientInterceptors?: ProcedureClientInterceptor<TContext, Schema<unknown>, ErrorMap>[]
+  clientInterceptors?: ProcedureClientInterceptor<TContext, Schema<unknown>, ErrorMap>[] | undefined
 
-  plugins?: StandardHandlerPlugin<TContext>[]
+  plugins?: StandardHandlerPlugin<TContext>[] | undefined
 }
 
 export class StandardHandler<T extends Context> {

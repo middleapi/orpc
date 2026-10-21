@@ -61,7 +61,7 @@ import { COMMON_ERROR_STATUS_MAP } from '@orpc/openapi'
 const handler = new OpenAPIHandler(router, {
   customErrorResponseBodyEncoder: error => ({
     ...error.toJSON(),
-    status: COMMON_ERROR_STATUS_MAP[error.code] ?? 500,
+    status: COMMON_ERROR_STATUS_MAP[error.code] ?? 400,
   }),
 })
 ```
@@ -410,6 +410,8 @@ The `dedupeLeadingMiddlewares` config option was removed together with this beha
 ### `status` removed from errors
 
 `ORPCError` and `.errors` definitions no longer accept a `status`. HTTP status codes are now a handler concern, configured with `errorStatusMap`. Error response bodies no longer contain the field either, see [Wire Format Changes](#wire-format-changes). See [Error Handling](/docs/error-handling) and [RPC Handler](/docs/rpc/handler).
+
+Codes missing from `errorStatusMap` now fall back to `400` instead of `500`. If a custom code reports a server-side failure, add it to the map with a `5xx` status.
 
 <CodeGroup>
 
@@ -939,6 +941,8 @@ const batchPlugin = new BatchLinkPlugin({
 
 </CodeGroup>
 
+The `mode` option was removed. The server now starts the batch response once every procedure has responded, so it can carry their [headers](/docs/plugins/batch#response-headers), and [streams](/docs/plugins/batch#streaming-responses) only when a procedure returns a stream.
+
 :::warning
 Some cases still need to skip batching, for example procedures that rely on [Hibernation](/docs/integrations/hibernation), which cannot work through batched responses. For those, use `filter`. Its meaning is inverted compared to `exclude`: `exclude` returned `true` to skip batching, while `filter` returns `false` to skip batching. Negate your predicate when migrating.
 
@@ -950,6 +954,16 @@ const batchPlugin = new BatchLinkPlugin({
 ```
 
 :::
+
+### Retry Plugin
+
+[`RetryLinkPlugin`](/docs/plugins/retry) no longer retries [client error responses](/docs/plugins/retry#client-error-responses) (4xx) other than `408` and `429` by default. To keep the v1 behavior, set `shouldRetry` to `true`:
+
+```ts
+const retryPlugin = new RetryLinkPlugin({
+  default: { shouldRetry: true },
+})
+```
 
 ## Contract-First
 

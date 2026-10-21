@@ -807,7 +807,7 @@ describe('openAPIGenerator operation builders', () => {
       })
     })
 
-    it('uses the common status map by default and falls back to 500 for unknown codes', () => {
+    it('uses the common status map by default and falls back to 400 for unknown codes', () => {
       const { ctx, operation } = createContext()
 
       buildErrorResponse(ctx, operation, testDef({
@@ -817,7 +817,7 @@ describe('openAPIGenerator operation builders', () => {
         },
       }))
 
-      expect(Object.keys(operation.responses ?? {})).toEqual(['404', '500'])
+      expect(Object.keys(operation.responses ?? {})).toEqual(['400', '404'])
     })
 
     it('falls back to the "Error" component name for codes without alphanumeric characters', () => {
@@ -825,7 +825,7 @@ describe('openAPIGenerator operation builders', () => {
 
       buildErrorResponse(ctx, operation, testDef({ errors: { '---': {} } }))
 
-      expect((operation.responses?.['500'] as any).content['application/json'].schema.oneOf[0]).toEqual({
+      expect((operation.responses?.['400'] as any).content['application/json'].schema.oneOf[0]).toEqual({
         $ref: '#/components/schemas/Error',
       })
     })

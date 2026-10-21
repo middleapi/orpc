@@ -510,18 +510,10 @@ When [server-side rendering](/docs/recipes/optimizing-ssr) with [TanStack Query 
 
 ### Custom Serializers
 
-If needed, you can extend the default TanStack Query serializer to support additional types supported by oRPC. Learn more about the [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer).
+If needed, you can extend the default TanStack Query serializer to support additional types supported by oRPC by using the [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer).
 
 ```ts
-import { RPCJsonSerializer } from '@orpc/client'
 import { hashKey, QueryClient } from '@tanstack/react-query' // or any framework adapter, e.g. @tanstack/vue-query 
-
-// similar to `RPCSerializer` but more typesafe
-const serializer = new RPCJsonSerializer({
-  handlers: {
-    // put custom serializers here
-  },
-})
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -529,7 +521,7 @@ const queryClient = new QueryClient({
       staleTime: 60 * 1000, // > 0 to prevent immediate refetching on mount
 
       queryKeyHashFn: (queryKey) => {
-        const { json, meta } = serializer.serialize(queryKey)
+        const { json, meta } = serializer.serializeJson(queryKey)
 
         return hashKey([
           json,
@@ -539,13 +531,13 @@ const queryClient = new QueryClient({
     },
     dehydrate: {
       serializeData: (data) => {
-        const { json, meta } = serializer.serialize(data)
+        const { json, meta } = serializer.serializeJson(data)
         return { json, meta }
       },
     },
     hydrate: {
       deserializeData(data) {
-        return serializer.deserialize(data)
+        return serializer.deserializeJson(data)
       },
     },
   },

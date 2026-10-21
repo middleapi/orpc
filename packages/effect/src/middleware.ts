@@ -64,18 +64,20 @@ export function middlewareGen<
       catch: error => error,
     })
 
-    let ef = Effect.gen(() => middleware({ ...opts, next }, input, done)) as Effect.Effect<MiddlewareResult<TOutContext, TOutput>, unknown>
+    const effectContext = opts.context['effect/context']
+    const wrap = opts.context['effect/wrap'] as WithEffectContext<any>['effect/wrap']
+    const ef = Effect.gen(() => middleware({ ...opts, next }, input, done)) as Effect.Effect<MiddlewareResult<TOutContext, TOutput>, unknown>
 
-    if (EffectContext.isContext(opts.context['effect/context'])) {
-      ef = ef.pipe(Effect.provide(opts.context['effect/context']))
+    let wrapped = ef
+    if (typeof wrap === 'function') {
+      const { next: _next, ...rest } = opts
+      wrapped = wrap(ef, { ...rest, kind: 'middleware', input })
     }
 
-    if (typeof opts.context['effect/wrap'] === 'function') {
-      const intercept = opts.context['effect/wrap'] as Exclude<WithEffectContext<any>['effect/wrap'], undefined>
-      ef = intercept(ef, opts)
-    }
-
-    return runPromise(ef, { signal: opts.signal })
+    return runPromise(wrapped, {
+      context: EffectContext.isContext(effectContext) ? effectContext : undefined,
+      signal: opts.signal,
+    })
   }
 
   Object.defineProperty(mid, 'name', { value: middleware.name })

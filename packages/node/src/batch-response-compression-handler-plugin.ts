@@ -15,7 +15,7 @@ export interface BatchResponseCompressionHandlerPluginOptions {
    *
    * @default ['gzip', 'deflate']
    */
-  encodings?: readonly ('gzip' | 'deflate' | 'deflate-raw')[]
+  encodings?: readonly ('gzip' | 'deflate' | 'deflate-raw')[] | undefined
 
   /**
    * The minimum response size in bytes required to trigger compression.
@@ -24,7 +24,7 @@ export interface BatchResponseCompressionHandlerPluginOptions {
    *
    * @default 1024 (1KB)
    */
-  threshold?: number
+  threshold?: number | undefined
 }
 
 /**
@@ -101,7 +101,7 @@ export class BatchResponseCompressionHandlerPlugin<T extends Context> implements
       let bodyHeaders: StandardHeaders
 
       /**
-       * A buffered batch with no binary subresponse stays a plain array of messages, serialized
+       * A batch with no binary or stream subresponse stays a plain array of messages, serialized
        * as json by the adapter. The header and status above already say this is a batch envelope,
        * so the array itself is the only thing left to recognise.
        */

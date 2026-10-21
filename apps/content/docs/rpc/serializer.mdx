@@ -125,16 +125,20 @@ const serializer = new RPCJsonSerializer({
   },
 })
 
-const { json, meta } = serializer.serialize({
+const { json, meta } = serializer.serializeJson({
   name: 'John',
   createdAt: new Date('2024-01-01'),
 })
 // json: { name: 'John', createdAt: '2024-01-01T00:00:00.000Z' }
 // meta: [['date', 'createdAt']]
 
-const data = serializer.deserialize({ json, meta })
+const data = serializer.deserializeJson({ json, meta })
 // data: { name: 'John', createdAt: Date }
 ```
+
+:::info[Reuse an RPC Serializer]
+`RPCSerializer` extends `RPCJsonSerializer`, so an `RPCSerializer` instance also works wherever an `RPCJsonSerializer` is accepted, such as [Publisher adapters](/docs/helpers/publisher#adapters) or [TanStack Query hydration](/docs/integrations/tanstack-query#custom-serializers). Configure your handlers once and share the same instance.
+:::
 
 ## Serialization Format
 

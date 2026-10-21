@@ -1,5 +1,5 @@
 import type { JsonSchema } from './types'
-import { ensureJsonSchemaObject, isJsonArraySchema, isJsonFileSchema, isJsonObjectSchema, isJsonPrimitiveSchema, isUnconstrainedSchema } from './utils'
+import { containsJsonFileSchema, ensureJsonSchemaObject, isJsonArraySchema, isJsonFileSchema, isJsonObjectSchema, isJsonPrimitiveSchema, isUnconstrainedSchema } from './utils'
 
 it('isJsonPrimitiveSchema', () => {
   expect(isJsonPrimitiveSchema({ type: 'string' })).toBe(true)
@@ -25,6 +25,16 @@ it('isJsonFileSchema', () => {
   expect(isJsonFileSchema({ type: 'object', format: 'binary' })).toBe(false)
   expect(isJsonFileSchema({ type: 'object', contentEncoding: 'binary' })).toBe(false)
   expect(isJsonFileSchema(true)).toBe(false)
+})
+
+it('containsJsonFileSchema', () => {
+  expect(containsJsonFileSchema({ type: 'string', contentMediaType: 'image/png' })).toBe(true)
+  expect(containsJsonFileSchema({ type: 'object', properties: { avatar: { type: 'string', format: 'binary' } } })).toBe(true)
+  expect(containsJsonFileSchema({ type: 'array', items: { anyOf: [{ type: 'number' }, { type: 'string', contentEncoding: 'binary' }] } })).toBe(true)
+  expect(containsJsonFileSchema({ $ref: '#/$defs/File', $defs: { File: { type: 'string', contentMediaType: '*/*' } } })).toBe(true)
+
+  expect(containsJsonFileSchema({ type: 'object', properties: { name: { type: 'string' } } })).toBe(false)
+  expect(containsJsonFileSchema(true)).toBe(false)
 })
 
 it('isJsonObjectSchema', () => {

@@ -11,15 +11,14 @@ import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-ser
 
 /**
  * The same suite as the plain node-http one, with batch responses compressed on the wire.
- * Its streaming test is what proves the compressor flushes: a buffering one would hold every
- * subresponse until the slowest of them resolved, which that test only allows after reading.
+ * Its stream test is what proves the compressor flushes: a buffering one would hold every
+ * stream message until the stream ended, which that test only allows after reading.
  */
 export const createCompressionNodeHttpBatchClientServerTest: CreateBatchClientServerTest = (
   router,
   {
     context = defaultBatchClientServerOptions.context,
     method = 'POST',
-    mode = defaultBatchClientServerOptions.mode,
     serializer = defaultBatchClientServerOptions.serializer,
   } = {},
 ) => {
@@ -65,7 +64,7 @@ export const createCompressionNodeHttpBatchClientServerTest: CreateBatchClientSe
     serializer,
     fetch: fetchSpy,
     // fetch already automatically decompresses the response
-    plugins: [new BatchLinkPlugin({ groups: [defaultBatchGroup], mode })],
+    plugins: [new BatchLinkPlugin({ groups: [defaultBatchGroup] })],
   })
 
   return {

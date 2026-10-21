@@ -114,7 +114,7 @@ async function startStreamingBatch() {
       return { status: 207, headers: {}, resolveBody: async () => stream }
     },
   }, {
-    plugins: [new BatchLinkPlugin({ groups: [{ condition: () => true, context: {} }], mode: 'streaming' })],
+    plugins: [new BatchLinkPlugin({ groups: [{ condition: () => true, context: {} }] })],
   })
 
   const outputA = link.call(['a'], {}, { context: {} })
@@ -351,7 +351,6 @@ describe('batchLinkPlugin', () => {
       const link = new StandardLink(codec, transport, {
         plugins: [new BatchLinkPlugin({
           groups: [defaultGroup],
-          mode: 'buffered',
         })],
       })
 
@@ -362,7 +361,7 @@ describe('batchLinkPlugin', () => {
 
       expect(transport.send).toHaveBeenCalledTimes(1)
       const sentRequest = vi.mocked(transport.send).mock.calls[0]![0]
-      expect(sentRequest.headers['orpc-batch']).toBe('buffered')
+      expect(sentRequest.headers['orpc-batch']).toBe('1')
     })
 
     it('splits batches when exceeding maxSize', async () => {
@@ -372,7 +371,6 @@ describe('batchLinkPlugin', () => {
       const link = new StandardLink(codec, transport, {
         plugins: [new BatchLinkPlugin({
           groups: [defaultGroup],
-          mode: 'buffered',
           maxSize: 2,
         })],
       })
@@ -535,7 +533,6 @@ describe('batchLinkPlugin', () => {
       const link = new StandardLink(codec, transport, {
         plugins: [new BatchLinkPlugin({
           groups: [defaultGroup],
-          mode: 'buffered',
         })],
       })
 
@@ -552,14 +549,12 @@ describe('batchLinkPlugin', () => {
 
       const sentGetRequest = vi.mocked(transport.send).mock.calls.find(([request]) => request.method === 'GET')![0]
       expect(extractBatchMessagesFromRequest(sentGetRequest).map(message => message.json.method)).toEqual(['GET', 'GET'])
-      expect(sentGetRequest.headers['orpc-batch']).toBe('buffered')
 
       const sentQueryRequest = vi.mocked(transport.send).mock.calls.find(([request]) => request.method === 'QUERY')![0]
       expect(extractBatchMessagesFromRequest(sentQueryRequest).map(message => message.json.method)).toEqual(['QUERY', 'QUERY'])
 
       const sentPostRequest = vi.mocked(transport.send).mock.calls.find(([request]) => request.method === 'POST')![0]
       expect(extractBatchMessagesFromRequest(sentPostRequest).map(message => message.json.method)).toEqual(['PUT', 'PUT'])
-      expect(sentPostRequest.headers['orpc-batch']).toBe('buffered')
     })
 
     it('aborts grouped batch request when all sub-requests are aborted', async () => {
@@ -578,7 +573,7 @@ describe('batchLinkPlugin', () => {
       })
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'streaming' })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
       })
 
       const controller1 = new AbortController()
@@ -610,7 +605,7 @@ describe('batchLinkPlugin', () => {
       const transport = makeTransport()
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered', wait: 100 })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], wait: 100 })],
       })
 
       const promise1 = link.call(['a'], {}, { context: {} })
@@ -645,7 +640,7 @@ describe('batchLinkPlugin', () => {
       const transport = makeTransport()
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered', wait: 100 })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], wait: 100 })],
       })
 
       const controller = new AbortController()
@@ -671,7 +666,6 @@ describe('batchLinkPlugin', () => {
       const link = new StandardLink(codec, transport, {
         plugins: [new BatchLinkPlugin({
           groups: [defaultGroup],
-          mode: 'buffered',
           url: async () => {
             await sleep(50)
             return '/__batch__' as const
@@ -702,7 +696,6 @@ describe('batchLinkPlugin', () => {
       const link = new StandardLink(codec, transport, {
         plugins: [new BatchLinkPlugin({
           groups: [defaultGroup],
-          mode: 'buffered',
           mapSubrequest: ({ request }) => {
             if (request.url === '/a') {
               // Runs after the peer starts sending this subrequest, before its request message
@@ -735,7 +728,6 @@ describe('batchLinkPlugin', () => {
       const link = new StandardLink(codec, transport, {
         plugins: [new BatchLinkPlugin({
           groups: [defaultGroup],
-          mode: 'buffered',
           mapSubrequest: ({ request }) => {
             queueMicrotask(() => controller.abort(new Error('TEST_ABORT')))
             return request
@@ -767,7 +759,6 @@ describe('batchLinkPlugin', () => {
       const link = new StandardLink(codec, transport, {
         plugins: [new BatchLinkPlugin({
           groups: [defaultGroup],
-          mode: 'buffered',
           mapSubrequest: ({ request }) => {
             if (request.url !== '/b') {
               return request
@@ -808,7 +799,7 @@ describe('batchLinkPlugin', () => {
       })
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered' })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
       })
 
       await Promise.all([
@@ -835,7 +826,7 @@ describe('batchLinkPlugin', () => {
       })
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'streaming', wait: 20 })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], wait: 20 })],
       })
 
       const controller1 = new AbortController()
@@ -976,7 +967,7 @@ describe('batchLinkPlugin', () => {
       })
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered' })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
       })
 
       await Promise.all([
@@ -1020,7 +1011,7 @@ describe('batchLinkPlugin', () => {
       })
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'streaming' })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
       })
 
       await Promise.all([
@@ -1067,7 +1058,7 @@ describe('batchLinkPlugin', () => {
       })
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'streaming' })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
       })
 
       await Promise.all([
@@ -1111,7 +1102,7 @@ describe('batchLinkPlugin', () => {
       })
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'streaming' })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
       })
 
       await Promise.all([
@@ -1133,7 +1124,7 @@ describe('batchLinkPlugin', () => {
       })
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered' })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
       })
 
       await Promise.all([
@@ -1155,7 +1146,7 @@ describe('batchLinkPlugin', () => {
       })
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered' })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
       })
 
       await Promise.all([
@@ -1177,7 +1168,7 @@ describe('batchLinkPlugin', () => {
       })
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered' })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
       })
 
       await Promise.all([
@@ -1201,7 +1192,7 @@ describe('batchLinkPlugin', () => {
       })
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered' })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
       })
 
       await Promise.all([
@@ -1228,7 +1219,7 @@ describe('batchLinkPlugin', () => {
       })
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered' })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
       })
 
       await Promise.all([
@@ -1255,7 +1246,7 @@ describe('batchLinkPlugin', () => {
       })
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered' })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
       })
 
       await Promise.all([
@@ -1284,7 +1275,7 @@ describe('batchLinkPlugin', () => {
       })
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered' })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
       })
 
       await Promise.all([
@@ -1295,7 +1286,7 @@ describe('batchLinkPlugin', () => {
   })
 
   describe('error batch responses', () => {
-    it.each(['buffered', 'streaming'] as const)('forwards %s batch responses with status >= 400 to every subrequest', async (mode) => {
+    it('forwards batch responses with status >= 400 to every subrequest', async () => {
       const codec = makeCodec()
       const transport = makeTransport()
 
@@ -1308,7 +1299,7 @@ describe('batchLinkPlugin', () => {
       })
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
       })
 
       await Promise.all([
@@ -1337,7 +1328,7 @@ describe('batchLinkPlugin', () => {
       })
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered' })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
       })
 
       await Promise.all([
@@ -1354,7 +1345,7 @@ describe('batchLinkPlugin', () => {
       const transport = makeTransport()
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered' })],
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
       })
 
       await Promise.all([
@@ -1365,7 +1356,7 @@ describe('batchLinkPlugin', () => {
   })
 
   describe('batch option failures', () => {
-    it.each(['maxSize', 'url', 'headers', 'mode', 'mapSubrequest'] as const)('rejects every subrequest when %s throws', async (option) => {
+    it.each(['maxSize', 'url', 'headers', 'mapSubrequest'] as const)('rejects every subrequest when %s throws', async (option) => {
       const error = new Error('option failed')
       const codec = makeCodec()
       const transport = makeTransport()
@@ -1448,7 +1439,6 @@ describe('batchLinkPlugin', () => {
       const link = new StandardLink(codec, transport, {
         plugins: [new BatchLinkPlugin({
           groups: [defaultGroup],
-          mode: 'buffered',
           maxUrlLength: 1,
         })],
       })
@@ -1477,7 +1467,6 @@ describe('batchLinkPlugin', () => {
       const link = new StandardLink(codec, transport, {
         plugins: [new BatchLinkPlugin({
           groups: [defaultGroup],
-          mode: 'buffered',
           url: () => '/custom/__batch__?existing=1#anchor',
         })],
       })
@@ -1511,7 +1500,6 @@ describe('batchLinkPlugin', () => {
       const link = new StandardLink(codec, transport, {
         plugins: [new BatchLinkPlugin({
           groups: [defaultGroup],
-          mode: 'buffered',
           url: () => '/custom-no-hash/__batch__?existing=1',
         })],
       })
@@ -1603,8 +1591,8 @@ describe('batchLinkPlugin', () => {
 
       expect(transport.send).toHaveBeenCalledTimes(2)
       expect(vi.mocked(transport.send).mock.calls.map(([request]) => request.headers)).toEqual([
-        { 'x-user': 'alice', 'orpc-batch': 'streaming' },
-        { 'x-user': 'bob', 'orpc-batch': 'streaming' },
+        { 'x-user': 'alice', 'orpc-batch': '1' },
+        { 'x-user': 'bob', 'orpc-batch': '1' },
       ])
     })
 

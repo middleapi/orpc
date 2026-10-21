@@ -56,32 +56,13 @@ const cors = new CORSHandlerPlugin({
 
 :::
 
-## Response Modes
+## Streaming Responses
 
-By default, the plugin uses `streaming` mode. Responses are sent as soon as they are ready, so one slow request does not block the rest of the batch.
-
-If your environment does not support streaming responses, such as some serverless platforms or older browsers, switch to `buffered` mode instead. In this mode, all responses are collected and sent together, unless a procedure returns an [AsyncIteratorObject](/docs/async-iterator-object) or a [`ReadableStream`](/docs/binary-data). Such a stream can stay open indefinitely, so the batch switches to streaming as soon as one is returned: the server writes out the responses collected so far, then sends the rest as they are ready. If your client cannot read streamed responses, keep these procedures out of the batch with [`filter`](#filtering-requests).
-
-```ts
-const link = new RPCLink({
-  url: '/rpc',
-  plugins: [
-    new BatchLinkPlugin({
-      mode: 'buffered',
-      groups: [
-        {
-          condition: () => true,
-          context: {},
-        },
-      ],
-    }),
-  ],
-})
-```
+The server starts the batch response once every procedure has responded, so it can carry their [headers](#response-headers). The response streams if one of them returned an [AsyncIteratorObject](/docs/async-iterator-object) or a [`ReadableStream`](/docs/binary-data). If your client cannot read streamed responses, keep these procedures out of the batch with [`filter`](#filtering-requests).
 
 ### Keep-Alive Timer
 
-In **streaming** mode, or once a buffered batch switches to streaming, long-running batch responses may remain idle for extended periods. The server plugin can send keep-alive frames to keep the connection alive.
+A streaming batch response may stay idle for long periods. The server plugin can send keep-alive frames to keep the connection alive.
 
 ```ts
 const handler = new RPCHandler(router, {
@@ -238,26 +219,9 @@ const link = new RPCLink({
 Per-request data passed through the link's [`headers` option](/docs/rpc/link#url-and-header-options) is resolved for each request, so it is safe without `scope`.
 :::
 
-## Limitations
+## Response Headers
 
-Cookies set in a batched call are never stored, because the browser only reads headers from the batch response itself, not from each subresponse. Send procedures that set cookies outside the batch:
-
-```ts
-const link = new RPCLink({
-  url: '/rpc',
-  plugins: [
-    new BatchLinkPlugin({
-      filter: ({ path }) => path[0] !== 'auth', // auth procedures set cookies
-      groups: [
-        {
-          condition: () => true,
-          context: {},
-        },
-      ],
-    }),
-  ],
-})
-```
+The batch response carries the cookies and `Vary` fields of its subresponses, and the headers they all share. Other headers stay on their subresponse. To change what stays on each subresponse, set the server plugin's `mapSubresponse` option.
 
 ## Learn More
 

@@ -23,7 +23,7 @@ export interface DurablePublisherObjectResumeOptions {
    *
    * @default 300 (5 min)
    */
-  seconds?: number
+  seconds?: number | undefined
 
   /**
    * Interval (in seconds) between cleanup checks for the Durable Object.
@@ -34,7 +34,7 @@ export interface DurablePublisherObjectResumeOptions {
    *
    * @default 6 * 60 * 60 (6 hours)
    */
-  cleanupIntervalSeconds?: number
+  cleanupIntervalSeconds?: number | undefined
 
   /**
    * Prefix for the resume storage table schema.
@@ -42,7 +42,7 @@ export interface DurablePublisherObjectResumeOptions {
    *
    * @default 'orpc:'
    */
-  schemaPrefix?: string
+  schemaPrefix?: string | undefined
 }
 
 export interface DurablePublisherObjectOptions {
@@ -54,7 +54,7 @@ export interface DurablePublisherObjectOptions {
    *
    * @default { enabled: false }
    */
-  resume?: DurablePublisherObjectResumeOptions
+  resume?: DurablePublisherObjectResumeOptions | undefined
 }
 
 /**

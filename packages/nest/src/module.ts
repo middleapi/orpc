@@ -20,31 +20,31 @@ export interface NestStandardLazyRequest extends StandardLazyRequest {
   /**
    * Route parameters extracted from the request path.
    */
-  params?: undefined | Record<string, string | string[]>
+  params?: Record<string, string | string[]> | undefined
 }
 
 export type ORPCModuleConfig
   = & OpenAPIHandlerCodecCoreOptions<DefaultInitialContext>
     & StandardHandlerOptions<DefaultInitialContext>
     & (object extends DefaultInitialContext
-      ? { context?: Value<Promisable<DefaultInitialContext>, [ctx: ExecutionContext]> }
+      ? { context?: Value<Promisable<DefaultInitialContext>, [ctx: ExecutionContext]> | undefined }
       : { context: Value<Promisable<DefaultInitialContext>, [ctx: ExecutionContext]> })
     & {
       /**
        * Customize how to convert NestJS `req` and `res` to {@link NestStandardLazyRequest}.
        * You might need to define this if you are not using express or fastify adapters.
        */
-      toNestStandardLazyRequest?: undefined | ((req: any, res: any) => NestStandardLazyRequest)
+      toNestStandardLazyRequest?: ((req: any, res: any) => NestStandardLazyRequest) | undefined
 
       /**
        * Options for how to convert the Standard Response to a Nest Response (returning value), like event stream options, etc.
        */
-      toNestResponse?: undefined | {
+      toNestResponse?: {
         /**
          * Options for the event stream, like keep-alive settings, initial comment, etc.
          */
-        eventStream?: undefined | ToEventStreamOptions
-      }
+        eventStream?: ToEventStreamOptions | undefined
+      } | undefined
     }
 
 /**
@@ -72,9 +72,9 @@ export class ORPCModule {
   }
 
   static forRootAsync(options: {
-    imports?: any[]
+    imports?: any[] | undefined
     useFactory: (...args: any[]) => Promise<ORPCModuleConfig> | ORPCModuleConfig
-    inject?: any[]
+    inject?: any[] | undefined
   }): DynamicModule {
     return {
       module: ORPCModule,
