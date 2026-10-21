@@ -9,7 +9,7 @@ Most of your code keeps working: many v1 names still compile through deprecated 
 
 :::warning[Read these first]
 
-- The RPC serializer format and the error response format changed, so v1 [RPC Link](/docs/rpc/link) clients, and v1 [OpenAPI Link](/docs/openapi/link) clients older than 1.16.0, cannot talk to a v2 server. Deploy the upgraded server and client together, or [upgrade OpenAPI Link clients to 1.16.0 first](#upgrading-the-server-before-openapi-link-clients). See [Wire Format Changes](#wire-format-changes).
+- The RPC serializer format and the error response format changed, so v1 [RPC Link](/docs/rpc/link) and [OpenAPI Link](/docs/openapi/link) clients cannot talk to a v2 server (OpenAPI Link 1.16.0+ can). Deploy the upgraded server and client together. See [Wire Format Changes](#wire-format-changes).
 - Automatic middleware deduplication was removed. Middleware applied at both router and procedure level now runs twice. See [Middleware](#middleware).
 - The Batch Plugin replaced `exclude` with `filter`, which has the opposite meaning. In most cases you can simply remove `exclude`. See [Batch Plugin](#batch-plugin).
 - A prefix now applies to every procedure, not only the ones that define a `path`, so procedures relying on the router-derived path move under the prefix. See [Routing Moved to OpenAPI Metadata](#routing-moved-to-openapi-metadata).
@@ -51,7 +51,7 @@ Two formats changed on the wire:
 - The [RPC serializer](/docs/rpc/serializer) format, described in the [RPC Protocol](/docs/rpc/protocol).
 - The error response body, which no longer contains a `status` field, since [`status` was removed from errors](#status-removed-from-errors).
 
-Because of these changes, a v1 [RPC Link](/docs/rpc/link) cannot talk to a v2 server (and vice versa), and neither can a v1 [OpenAPI Link](/docs/openapi/link) older than 1.16.0. Deploy the upgraded server and clients together, or, for OpenAPI Link, follow [Upgrading the server before OpenAPI Link clients](#upgrading-the-server-before-openapi-link-clients).
+Because of these changes, a v1 [RPC Link](/docs/rpc/link) or [OpenAPI Link](/docs/openapi/link) cannot talk to a v2 server (and vice versa). Deploy the upgraded server and clients together. The exception is OpenAPI Link 1.16.0+, which can call a v2 server, so you can upgrade the server first. Only the return value of an event iterator input is lost.
 
 If your [OpenAPI Handler](/docs/openapi/handler) endpoints have external consumers that expect the v1 error format, add the `status` field back with a [custom error response](/docs/openapi/handler#custom-error-response):
 
@@ -65,27 +65,6 @@ const handler = new OpenAPIHandler(router, {
   }),
 })
 ```
-
-### Upgrading the server before OpenAPI Link clients
-
-Starting with v1.16.0, a v1 [OpenAPI Link](/docs/openapi/link) can call a v2 [OpenAPI Handler](/docs/openapi/handler). This helps when you can't upgrade the server and its clients at the same time, for example with mobile apps or clients owned by other teams:
-
-1. Upgrade the clients to v1.16.0 or later, still on v1, and roll them out.
-2. Upgrade the server to v2.
-3. Upgrade the clients to v2 when convenient.
-
-```sh v1
-npm install @orpc/client@^1.16.0 @orpc/openapi-client@^1.16.0
-```
-
-Errors keep their `code`, `message`, `data`, and `defined`. Their `status` comes from the HTTP response, or, for errors inside an event iterator, from the v1 default for the error code. Event iterator outputs work too, including their return value.
-
-:::warning
-
-- The v1 contract the clients were built with must still match the server's routes. Watch out for [prefixes that now apply to every procedure](#routing-moved-to-openapi-metadata).
-- When a v1 client sends an event iterator as input, the v2 server receives its values but not its return value.
-
-:::
 
 ## Routing Moved to OpenAPI Metadata
 
