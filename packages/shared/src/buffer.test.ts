@@ -137,7 +137,21 @@ describe('encodeBase64', () => {
     expect(encodeBase64(large)).toBe(Buffer.from(large).toString('base64'))
   }
 
+  // runtimes like Node.js 26 ship the native toBase64, which would skip the fallbacks
+  function removeNativeToBase64() {
+    const descriptor = Object.getOwnPropertyDescriptor(Uint8Array.prototype, 'toBase64')
+
+    if (descriptor) {
+      delete (Uint8Array.prototype as any).toBase64
+      onTestFinished(() => {
+        // eslint-disable-next-line no-extend-native -- restores the native method removed above
+        Object.defineProperty(Uint8Array.prototype, 'toBase64', descriptor)
+      })
+    }
+  }
+
   it('uses Buffer from the Node.js built-in modules when available', () => {
+    removeNativeToBase64()
     const getBuiltinModule = vi.spyOn(process, 'getBuiltinModule')
     onTestFinished(() => {
       getBuiltinModule.mockRestore()
@@ -148,6 +162,7 @@ describe('encodeBase64', () => {
   })
 
   it('falls back to btoa without the Node.js built-in modules', () => {
+    removeNativeToBase64()
     const getBuiltinModule = vi.spyOn(process, 'getBuiltinModule').mockReturnValue(undefined as any)
     onTestFinished(() => {
       getBuiltinModule.mockRestore()
@@ -157,6 +172,7 @@ describe('encodeBase64', () => {
   })
 
   it('falls back to btoa on runtimes without getBuiltinModule', () => {
+    removeNativeToBase64()
     const getBuiltinModule = process.getBuiltinModule
     ;(process as any).getBuiltinModule = undefined
     onTestFinished(() => {
