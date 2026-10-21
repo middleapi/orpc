@@ -1,0 +1,68 @@
+{
+  "name": "@orpc/mcp",
+  "type": "module",
+  "version": "2.0.0-beta.44",
+  "description": "MCP integration for oRPC: expose procedures as typesafe Model Context Protocol tools",
+  "license": "MIT",
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
+  ],
+  "homepage": "https://orpc.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/middleapi/orpc.git",
+    "directory": "packages/mcp"
+  },
+  "keywords": [
+    "orpc",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "tools",
+    "llm",
+    "agents",
+    "typescript",
+    "typesafe"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
+      }
+    }
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "prepack": "unbuild",
+    "type:check": "tsc -b"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/server": ">=2.0.0"
+  },
+  "dependencies": {
+    "@orpc/client": "workspace:*",
+    "@orpc/contract": "workspace:*",
+    "@orpc/json-schema": "workspace:*",
+    "@orpc/openapi": "workspace:*",
+    "@orpc/server": "workspace:*",
+    "@orpc/shared": "workspace:*",
+    "@standard-server/core": "~0.10.3"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.3.1",
+    "@modelcontextprotocol/server": "^2.3.1",
+    "@orpc/zod": "workspace:*",
+    "zod": "^4.6.7"
+  }
+}

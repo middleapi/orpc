@@ -4,6 +4,7 @@
  */
 
 import type { JsonSchema } from './types'
+import { findDeepMatches, isPlainObject } from '@orpc/shared'
 import { JSON_SCHEMA_LOGIC_KEYWORDS, JSON_SCHEMA_PRIMITIVE_TYPES } from './constants'
 
 export function isJsonPrimitiveSchema(schema: JsonSchema): schema is JsonSchema & object {
@@ -33,6 +34,13 @@ export type JsonFileSchema = JsonSchema & object & { type: 'string', contentMedi
  */
 export function isJsonFileSchema(schema: JsonSchema): schema is JsonFileSchema {
   return typeof schema !== 'boolean' && schema.type === 'string' && (typeof schema.contentMediaType === 'string' || schema.format === 'binary' || schema.contentEncoding === 'binary')
+}
+
+/**
+ * Returns true when a file schema appears anywhere in the schema, such as in a property, a composition, or a def.
+ */
+export function containsJsonFileSchema(schema: JsonSchema): boolean {
+  return findDeepMatches(v => isPlainObject(v) && isJsonFileSchema(v as JsonSchema), schema).values.length > 0
 }
 
 export type JsonObjectSchema = JsonSchema & object & { type: 'object' }
