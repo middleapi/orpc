@@ -39,13 +39,13 @@ allowBuilds:
 # Entries go inert once the version ages past it, so prune them on the next bump
 # instead of letting versions accumulate.
 minimumReleaseAgeExclude:
-  - '@standard-server/aws-lambda@0.10.3'
-  - '@standard-server/core@0.10.3'
-  - '@standard-server/fastify@0.10.3'
-  - '@standard-server/fetch@0.10.3'
-  - '@standard-server/node@0.10.3'
-  - '@standard-server/peer@0.10.3'
-  - '@standard-server/shared@0.10.3'
+  - '@standard-server/aws-lambda@0.11.0'
+  - '@standard-server/core@0.11.0'
+  - '@standard-server/fastify@0.11.0'
+  - '@standard-server/fetch@0.11.0'
+  - '@standard-server/node@0.11.0'
+  - '@standard-server/peer@0.11.0'
+  - '@standard-server/shared@0.11.0'
   - blume@2.2.1
   - effect@4.0.0
   - rou3@1.0.0

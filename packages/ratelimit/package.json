@@ -85,7 +85,7 @@
   "dependencies": {
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.10.3"
+    "@standard-server/core": "~0.11.0"
   },
   "devDependencies": {
     "@upstash/ratelimit": "^2.2.0",

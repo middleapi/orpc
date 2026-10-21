@@ -57,7 +57,7 @@
     "@orpc/openapi": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.10.3"
+    "@standard-server/core": "~0.11.0"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.3.1",
