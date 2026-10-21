@@ -102,6 +102,39 @@ describe('toEventIterator', () => {
     expect(runInSpanContextSpy).toHaveBeenCalledTimes(5)
   })
 
+  it('with oRPC v2 events (message without event name, close event)', async () => {
+    const stream = new ReadableStream<string>({
+      async pull(controller) {
+        controller.enqueue(': \n\n')
+        controller.enqueue('data: {"order": 1}\nid: id-1\n\n')
+        controller.enqueue(': ping\n\n')
+        controller.enqueue('data: "two"\n\n')
+        controller.enqueue('event: close\ndata: {"order": 3}\nid: id-3\n\n')
+        controller.close()
+      },
+    }).pipeThrough(new TextEncoderStream())
+
+    const generator = toEventIterator(stream)
+
+    expect(await generator.next()).toSatisfy(({ done, value }) => {
+      expect(done).toEqual(false)
+      expect(value).toEqual({ order: 1 })
+      expect(getEventMeta(value)).toEqual(expect.objectContaining({ id: 'id-1' }))
+
+      return true
+    })
+
+    expect(await generator.next()).toEqual({ done: false, value: 'two' })
+
+    expect(await generator.next()).toSatisfy(({ done, value }) => {
+      expect(done).toEqual(true)
+      expect(value).toEqual({ order: 3 })
+      expect(getEventMeta(value)).toEqual(expect.objectContaining({ id: 'id-3' }))
+
+      return true
+    })
+  })
+
   it('with empty stream', async () => {
     const generator = toEventIterator(null)
     expect(generator).toSatisfy(isAsyncIteratorObject)
