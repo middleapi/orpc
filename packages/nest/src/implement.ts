@@ -308,11 +308,6 @@ interface NestHandlerCodecMatch {
   params: NestStandardLazyRequest['params']
 }
 
-/**
- * NestJS has already routed the request before the interceptor runs, so instead of matching
- * the request url, this codec resolves the procedure attached to the context by `withMatch`.
- * This lets a single standard handler (and its plugins) be reused across requests.
- */
 class NestHandlerCodec<T extends Context> extends OpenAPIHandlerCodecCore<T> implements StandardHandlerCodec<T> {
   private readonly CONTEXT_SYMBOL = Symbol('ORPC_NEST_HANDLER_CODEC_CONTEXT')
 
