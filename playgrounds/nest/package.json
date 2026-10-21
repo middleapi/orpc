@@ -1,6 +1,6 @@
 {
   "name": "@orpc/nest-playground",
-  "version": "1.15.7",
+  "version": "1.16.0",
   "private": true,
   "scripts": {
     "preview": "nest build && unbuild --stub && node dist/main.mjs",

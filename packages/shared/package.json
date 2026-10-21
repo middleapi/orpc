@@ -1,7 +1,7 @@
 {
   "name": "@orpc/shared",
   "type": "module",
-  "version": "1.15.7",
+  "version": "1.16.0",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
