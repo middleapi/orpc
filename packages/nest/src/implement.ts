@@ -1,26 +1,28 @@
 import type { CallHandler, ExecutionContext, NestInterceptor } from '@nestjs/common'
 import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
-import type { ContractedRouter, DefaultInitialContext } from '@orpc/server'
+import type { AnyProcedure, Context, ContractedRouter, DefaultInitialContext } from '@orpc/server'
+import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '@orpc/server/standard'
 import type { Promisable } from '@orpc/shared'
-import type { StandardBodyHint } from '@standard-server/core'
+import type { StandardBodyHint, StandardLazyRequest } from '@standard-server/core'
 import type { Request as ExpressRequest, Response as ExpressResponse } from 'express'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
 import type { NestStandardLazyRequest, ORPCModuleConfig } from './module'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { Readable } from 'node:stream'
 import * as NestCommon from '@nestjs/common'
 import { applyDecorators, Delete, Get, Head, HttpCode, HttpException, Inject, Injectable, Optional, Options, Patch, Post, Put, StreamableFile, UseInterceptors } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
-import { ProcedureContract } from '@orpc/contract'
+import { getPathMeta, ProcedureContract } from '@orpc/contract'
 import { DEFAULT_OPENAPI_METHOD, getDynamicPathParams, getOpenAPIMeta } from '@orpc/openapi'
+import { OpenAPIHandlerCodecCore } from '@orpc/openapi/standard'
 import { DEFAULT_SUCCESS_STATUS, getRouter, Procedure, unlazy } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
-import { isAsyncIteratorObject, mergeHttpPath, stringifyJSON, value } from '@orpc/shared'
+import { isAsyncIteratorObject, mergeHttpPath, NullProtoObj, stringifyJSON, value } from '@orpc/shared'
 import { flattenStandardHeader, generateContentDisposition } from '@standard-server/core'
 import { toEventStream, toStandardLazyRequest } from '@standard-server/node'
 import { mergeMap } from 'rxjs'
 
-import { NestHandlerCodec } from './handler-codec'
 import { ORPC_MODULE_CONFIG_SYMBOL } from './module'
 
 // Namespace access so NestJS < 11.2 (no QueryMethod export) loads without a SyntaxError
@@ -303,6 +305,43 @@ export class ImplementInterceptor implements NestInterceptor {
   }
 }
 
+interface NestHandlerCodecMatch {
+  procedure: AnyProcedure
+  params: NestStandardLazyRequest['params']
+}
+
+/**
+ * NestJS has already routed the request before the interceptor runs, so instead of matching
+ * the request url, this codec resolves the procedure stored by `run` in AsyncLocalStorage.
+ * This lets a single standard handler (and its plugins) be reused across requests.
+ */
+class NestHandlerCodec<T extends Context> extends OpenAPIHandlerCodecCore<T> implements StandardHandlerCodec<T> {
+  private readonly storage = new AsyncLocalStorage<NestHandlerCodecMatch>()
+
+  run<R>(match: NestHandlerCodecMatch, fn: () => R): R {
+    return this.storage.run(match, fn)
+  }
+
+  resolveProcedure(request: StandardLazyRequest): StandardHandlerCodecResolvedProcedure | undefined {
+    const match = this.storage.getStore()
+
+    if (!match) {
+      return undefined
+    }
+
+    const { procedure, params } = match
+
+    return {
+      path: getPathMeta(procedure) ?? [],
+      procedure,
+      decodeInput: () => this.decodeInput({
+        procedure,
+        params: toORPCOpenAPIParams(procedure, params),
+      }, request),
+    }
+  }
+}
+
 /**
  * Destroys the stream once the request is aborted, because Nest's Express adapter only pipes a StreamableFile
  * and never destroys it on client disconnect, which would leave the underlying event iterator or stream uncanceled.
@@ -316,6 +355,43 @@ function toStreamableFile(stream: Readable, signal: AbortSignal | undefined, opt
   }
 
   return new StreamableFile(stream, options)
+}
+
+function flattenParamValue(value: string | string[]): string {
+  return Array.isArray(value) ? value.join('/') : value
+}
+
+function toORPCOpenAPIParams(contract: AnyProcedureContract, params: NestStandardLazyRequest['params']): undefined | Record<string, string> {
+  const meta = getOpenAPIMeta(contract)
+
+  if (!params || meta?.path === undefined || Object.keys(params).length === 0) {
+    return undefined
+  }
+
+  // NullProtoObj prevents prototype injection when a param is named like `__proto__`
+  const orpcParams: Record<string, string> = new NullProtoObj()
+  // express use `path` while fastify use `*` for rest matching
+  const restKey = Object.hasOwn(params, '*') ? '*' : 'path'
+
+  for (const [key, value] of Object.entries(params)) {
+    if (key === restKey) {
+      const restParams = getDynamicPathParams(
+        meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path,
+      )?.filter(c => c.allowsSlash)
+
+      if (restParams?.length) {
+        for (const c of restParams) {
+          orpcParams[c.parameterName] = flattenParamValue(value)
+        }
+
+        continue
+      }
+    }
+
+    orpcParams[key] = flattenParamValue(value)
+  }
+
+  return orpcParams
 }
 
 function toNestPattern(path: `/${string}`): `/${string}` {

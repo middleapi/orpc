@@ -2,6 +2,7 @@ import type { CallHandler, CanActivate, ExecutionContext, NestInterceptor } from
 import type { Request as ExpressRequest } from 'express'
 import type { FastifyReply } from 'fastify'
 import type { NestStandardLazyRequest } from './module'
+import { AsyncResource } from 'node:async_hooks'
 import { Buffer } from 'node:buffer'
 import { once } from 'node:events'
 import { request as httpRequest } from 'node:http'
@@ -235,6 +236,39 @@ describe('requirements', () => {
     routingInterceptor.mockResolvedValueOnce({ matched: false })
     const res = await supertest(app.getHttpServer()).post('/procedure')
     expect(res.status).toBe(500)
+  })
+
+  it('should error if a routing interceptor calls next outside the request async context', async () => {
+    // bound here, outside any request, so `next` runs without the procedure resolved for the request
+    const runOutsideRequest = AsyncResource.bind((fn: () => unknown) => fn())
+    const handler = vi.fn()
+    const contract = oc.meta(openapi({
+      path: '/procedure',
+    }))
+
+    @Controller()
+    class ImplController {
+      @Implement(contract)
+      procedure() {
+        return implement(contract).handler(handler)
+      }
+    }
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ImplController],
+      imports: [
+        ORPCModule.forRoot({
+          routingInterceptors: [({ next }) => runOutsideRequest(next) as any],
+        }),
+      ],
+    }).compile()
+
+    const app = moduleRef.createNestApplication()
+    await app.init()
+
+    const res = await supertest(app.getHttpServer()).post('/procedure')
+    expect(res.status).toBe(500)
+    expect(handler).not.toHaveBeenCalled()
   })
 })
 
