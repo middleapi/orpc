@@ -15,7 +15,7 @@ export interface PublisherOptions {
    *
    * @default 100
    */
-  maxBufferedEvents?: number
+  maxBufferedEvents?: number | undefined
 }
 
 /**
@@ -40,7 +40,7 @@ export interface PublisherResumeOptions {
    *
    * @default 300000 (5 min)
    */
-  ttl?: number
+  ttl?: number | undefined
 }
 
 export interface PublisherSubscribeListenerOptions {
@@ -52,7 +52,7 @@ export interface PublisherSubscribeListenerOptions {
   /**
    * Triggered when an error occur
    */
-  onError?: (error: ThrowableError) => void
+  onError?: ((error: ThrowableError) => void) | undefined
 }
 
 export interface PublisherSubscribeIteratorOptions
@@ -60,7 +60,7 @@ export interface PublisherSubscribeIteratorOptions
   /**
    * Abort signal, automatically unsubscribes on abort
    */
-  signal?: AbortSignal | undefined | null
+  signal?: AbortSignal | null | undefined
 }
 
 export abstract class Publisher<T extends Record<string, object>> {

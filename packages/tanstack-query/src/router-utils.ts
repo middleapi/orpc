@@ -26,7 +26,7 @@ export type RouterUtilsScoped<T extends AnyNestedClient>
   = T extends Client<infer UClientContext, infer UInput, infer UOutput, infer UError>
     ? ProcedureUtilsOptions<UClientContext, UInput, UOutput, UError>
     : {
-        [K in keyof T]?: T[K] extends AnyNestedClient ? RouterUtilsScoped<T[K]> : never
+        [K in keyof T]?: (T[K] extends AnyNestedClient ? RouterUtilsScoped<T[K]> : never) | undefined
       }
 
 export interface RouterUtilsOptions<T extends AnyNestedClient> extends OperationKeyPrefixOptions {
@@ -40,27 +40,27 @@ export interface RouterUtilsOptions<T extends AnyNestedClient> extends Operation
   /**
    * Interceptors that intercept queryFn inside .queryOptions
    */
-  queryInterceptors?: ProcedureUtilsQueryInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[]
+  queryInterceptors?: ProcedureUtilsQueryInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[] | undefined
 
   /**
    * Interceptors that intercept queryFn inside .streamedOptions
    */
-  streamedInterceptors?: ProcedureUtilsStreamedInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[]
+  streamedInterceptors?: ProcedureUtilsStreamedInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[] | undefined
 
   /**
    * Interceptors that intercept queryFn inside .liveOptions
    */
-  liveInterceptors?: ProcedureUtilsLiveInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[]
+  liveInterceptors?: ProcedureUtilsLiveInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[] | undefined
 
   /**
    * Interceptors that intercept queryFn inside .infiniteOptions
    */
-  infiniteInterceptors?: ProcedureUtilsInfiniteInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[]
+  infiniteInterceptors?: ProcedureUtilsInfiniteInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[] | undefined
 
   /**
    * Interceptors that intercept mutationFn inside .mutationOptions
    */
-  mutationInterceptors?: ProcedureUtilsMutationInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[]
+  mutationInterceptors?: ProcedureUtilsMutationInterceptor<InferClientContext<T>, unknown, unknown, InferClientError<T>>[] | undefined
 
   /**
    * Per-procedure options following the shape of the router.

@@ -236,6 +236,37 @@ describe('requirements', () => {
     const res = await supertest(app.getHttpServer()).post('/procedure')
     expect(res.status).toBe(500)
   })
+
+  it('should error if a routing interceptor replaces the context without spreading it', async () => {
+    const handler = vi.fn()
+    const contract = oc.meta(openapi({
+      path: '/procedure',
+    }))
+
+    @Controller()
+    class ImplController {
+      @Implement(contract)
+      procedure() {
+        return implement(contract).handler(handler)
+      }
+    }
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ImplController],
+      imports: [
+        ORPCModule.forRoot({
+          routingInterceptors: [({ next, ...options }) => next({ ...options, context: {} })],
+        }),
+      ],
+    }).compile()
+
+    const app = moduleRef.createNestApplication()
+    await app.init()
+
+    const res = await supertest(app.getHttpServer()).post('/procedure')
+    expect(res.status).toBe(500)
+    expect(handler).not.toHaveBeenCalled()
+  })
 })
 
 describe('routing', () => {

@@ -42,7 +42,7 @@ export type ORPCErrorCode
 
 export type ORPCErrorOptions<TData>
   = & ErrorOptions
-    & { message?: string }
+    & { message?: string | undefined }
     & (undefined extends TData ? { data?: TData } : { data: TData })
 
 let ORPCErrorConstructors: WeakSet<object>
@@ -158,7 +158,7 @@ export interface ResponseErrorOptions extends ErrorOptions {
   /**
    * @default inferred from the response status
    */
-  message?: string
+  message?: string | undefined
   response: StandardResponse
 }
 
@@ -186,7 +186,7 @@ export interface MalformedResponseErrorOptions extends ResponseErrorOptions {
   /**
    * @default inferred from the response body or status
    */
-  message?: string
+  message?: string | undefined
 }
 
 /**

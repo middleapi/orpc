@@ -14,7 +14,7 @@ export interface RequestCompressionLinkPluginOptions<T extends ClientContext> {
    *
    * @default 'gzip'
    */
-  encoding?: 'gzip' | 'deflate' | 'deflate-raw'
+  encoding?: 'gzip' | 'deflate' | 'deflate-raw' | undefined
 
   /**
    * The minimum request size in bytes required to trigger compression.
@@ -23,7 +23,7 @@ export interface RequestCompressionLinkPluginOptions<T extends ClientContext> {
    *
    * @default 1024 (1KB)
    */
-  threshold?: number
+  threshold?: number | undefined
 
   /**
    * Determines whether a request with the given Content-Type should be compressed.
@@ -32,7 +32,7 @@ export interface RequestCompressionLinkPluginOptions<T extends ClientContext> {
    *
    * @default isCompressibleContentType (covers common text-based formats)
    */
-  isCompressibleContentType?: (contentType: string | null | undefined, options: StandardLinkTransportInterceptorOptions<T>) => boolean
+  isCompressibleContentType?: ((contentType: string | null | undefined, options: StandardLinkTransportInterceptorOptions<T>) => boolean) | undefined
 }
 
 /**

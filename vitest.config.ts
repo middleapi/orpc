@@ -47,7 +47,7 @@ export default defineConfig(({ mode }) => ({
         },
       },
       {
-        // also test @orpc/experimental-msw against MSW v2
+        // also test @orpc/msw against MSW v2
         resolve: {
           alias: { msw: 'msw-v2' },
         },

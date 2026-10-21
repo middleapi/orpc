@@ -39,3 +39,4 @@ export type {
 } from './response-headers'
 export * from './rethrow'
 export * from './timeout'
+export { BATCH_HEADER, DEFAULT_BATCH_MAX_SIZE } from '@orpc/client/plugins'

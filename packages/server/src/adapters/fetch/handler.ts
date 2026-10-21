@@ -12,7 +12,7 @@ export interface FetchHandlerOptions<_T extends Context> {
   /**
    * Options for how to convert the Fetch Response to a Standard Response, like event stream options, etc.
    */
-  toFetchResponse?: undefined | ToFetchResponseOptions
+  toFetchResponse?: ToFetchResponseOptions | undefined
 }
 
 export class FetchHandler<T extends Context> {

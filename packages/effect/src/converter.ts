@@ -13,7 +13,7 @@ export interface EffectSchemaToJsonSchemaConverterOptions extends EffectSchema.T
    *
    * @default false
    */
-  cache?: boolean
+  cache?: boolean | undefined
 }
 
 /**

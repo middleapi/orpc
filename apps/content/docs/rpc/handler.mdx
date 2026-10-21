@@ -259,7 +259,7 @@ const handler = new RPCHandler(router, {
 
 ## Custom Error Response
 
-By default, `RPCHandler` uses `COMMON_ERROR_STATUS_MAP` to determine response status codes. Use `errorStatusMap` to customize them:
+By default, `RPCHandler` uses `COMMON_ERROR_STATUS_MAP` to determine response status codes, and codes missing from the map fall back to `400`. Use `errorStatusMap` to customize them:
 
 ```ts
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/server'

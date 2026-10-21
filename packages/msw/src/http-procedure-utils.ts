@@ -17,13 +17,13 @@ export type HTTPProcedureUtilsOptions<TContext extends Context>
      *
      * @default '*'
      */
-      origin?: string
+      origin?: string | undefined
 
       /**
        * The path prefix procedures are served under, matching the `prefix`
        * the corresponding handler is mounted at in production.
        */
-      prefix?: `/${string}`
+      prefix?: `/${string}` | undefined
 
       /**
        * Creates the fetch handler that serves each mock, using the same
@@ -49,7 +49,7 @@ export type HTTPProcedureUtilsOptions<TContext extends Context>
      *
      * @see {@link https://orpc.dev/docs/integrations/msw#advanced-configuration | MSW Integration - Advanced Configuration}
      */
-      context?: Value<Promisable<TContext>, [info: ResponseResolverInfo<HttpRequestResolverExtras<PathParams>>]>
+      context?: Value<Promisable<TContext>, [info: ResponseResolverInfo<HttpRequestResolverExtras<PathParams>>]> | undefined
     } : {
     /**
      * The context passed to the created handler for each request, resolved

@@ -22,7 +22,7 @@ export interface TimeoutHandlerPluginOptions<T extends Context> {
    *
    * @default undefined (streaming responses run without limit)
    */
-  streamingTimeout?: Value<number | null | undefined, [options: StandardHandlerInterceptorOptions<T>]>
+  streamingTimeout?: Value<number | null | undefined, [options: StandardHandlerInterceptorOptions<T>]> | undefined
 }
 
 /**

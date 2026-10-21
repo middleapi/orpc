@@ -10,7 +10,7 @@ export interface MethodOverrideHandlerPluginOptions {
    *
    * @default 'method'
    */
-  param?: string
+  param?: string | undefined
 
   /**
    * The methods a POST request may be overridden to.
@@ -20,7 +20,7 @@ export interface MethodOverrideHandlerPluginOptions {
    *
    * @default ['PUT', 'PATCH', 'DELETE']
    */
-  methods?: readonly StandardMethod[]
+  methods?: readonly StandardMethod[] | undefined
 }
 
 /**

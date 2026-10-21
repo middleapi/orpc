@@ -13,6 +13,12 @@ export function monthYear(iso: string): string {
   return monthYearFormat.format(new Date(iso))
 }
 
+const yearsFormat = new Intl.NumberFormat('en-US', { style: 'unit', unit: 'year', unitDisplay: 'long' })
+
+export function years(count: number): string {
+  return yearsFormat.format(count)
+}
+
 export function linkLabel(link: string): string {
   const url = new URL(link)
   const host = url.hostname.replace(/^www\./u, '')

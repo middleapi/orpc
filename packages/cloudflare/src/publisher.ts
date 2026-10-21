@@ -11,21 +11,21 @@ export interface DurablePublisherOptions extends PublisherOptions {
    *
    * @default ''
    */
-  prefix?: string
+  prefix?: string | undefined
 
   /**
    * Serializer for serialize and deserialize payloads.
    *
    * @default RPCJsonSerializer
    */
-  serializer?: undefined | Public<RPCJsonSerializer>
+  serializer?: Public<RPCJsonSerializer> | undefined
 
   /**
    * Custom function to get the Durable Object stub for publishing.
    *
    * @default ((namespace, event) => namespace.getByName(event))
    */
-  getStubByName?: (namespace: DurableObjectNamespace, event: string) => DurableObjectStub
+  getStubByName?: ((namespace: DurableObjectNamespace, event: string) => DurableObjectStub) | undefined
 }
 
 /**

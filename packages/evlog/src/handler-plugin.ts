@@ -13,14 +13,14 @@ export interface EvlogHandlerPluginOptions<_T extends Context> extends BaseEvlog
   /**
    * AsyncLocalStorage instance backing `useLogger()`.
    */
-  storage?: FrameworkIntegrationSpec<{ request: StandardRequest }>['storage']
+  storage?: FrameworkIntegrationSpec<{ request: StandardRequest }>['storage'] | undefined
 
   /**
    * If true, this plugin will log when a request signal is aborted.
    *
    * @default false
    */
-  logAbort?: boolean
+  logAbort?: boolean | undefined
 
   /**
    * Customizes the log level for errors thrown from procedures;
@@ -30,7 +30,7 @@ export interface EvlogHandlerPluginOptions<_T extends Context> extends BaseEvlog
    *
    * @default (error, level) => level
    */
-  procedureErrorLevel?: (error: unknown, level: LogLevel) => LogLevel
+  procedureErrorLevel?: ((error: unknown, level: LogLevel) => LogLevel) | undefined
 }
 
 /**

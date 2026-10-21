@@ -14,7 +14,7 @@ export const LOGGER_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_PINO_LOGGER
  * @see {@link https://orpc.dev/docs/integrations/pino#using-the-logger-in-your-code | Pino Integration - Using the Logger in Your Code}
  */
 export interface LoggerContext {
-  [LOGGER_CONTEXT_SYMBOL]?: undefined | Logger
+  [LOGGER_CONTEXT_SYMBOL]?: Logger | undefined
 }
 
 /**

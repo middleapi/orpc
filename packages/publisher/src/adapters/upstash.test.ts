@@ -464,6 +464,7 @@ describe.concurrent(
       const invalidRedis = new Redis({
         url: 'http://invalid:6379',
         token: 'invalid',
+        retry: false,
       })
       const publisher = createTestingPublisher({}, { useRedis: invalidRedis })
       const event1 = ('connection-error')
@@ -564,7 +565,7 @@ describe.concurrent(
     })
 
     it('establishes a single subscription when waiters retry after a failed attempt', async () => {
-      const invalidRedis = new Redis({ url: 'http://invalid:6379', token: 'invalid' })
+      const invalidRedis = new Redis({ url: 'http://invalid:6379', token: 'invalid', retry: false })
       let failNext = true
       let subscribes = 0
       const flakyRedis = new Proxy(redis, {

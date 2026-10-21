@@ -15,20 +15,20 @@ export interface CORSHandlerPluginOptions<T extends Context> {
    *
    * @default '*'
    */
-  origin?: Value<Promisable<string | readonly string[] | null | undefined>, [origin: string, options: StandardHandlerRoutingInterceptorOptions<T>]>
+  origin?: Value<Promisable<string | readonly string[] | null | undefined>, [origin: string, options: StandardHandlerRoutingInterceptorOptions<T>]> | undefined
 
   /**
    * Configures the `Timing-Allow-Origin` header.
    * Can be a string, an array of allowed origins, or a function (optionally async) that returns the allowed origin(s).
    */
-  timingOrigin?: Value<Promisable<string | readonly string[] | null | undefined>, [origin: string, options: StandardHandlerRoutingInterceptorOptions<T>]>
+  timingOrigin?: Value<Promisable<string | readonly string[] | null | undefined>, [origin: string, options: StandardHandlerRoutingInterceptorOptions<T>]> | undefined
 
   /**
    * Configures the `Access-Control-Allow-Methods` header for preflight requests.
    *
    * @default ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH', 'QUERY']
    */
-  allowMethods?: readonly string[]
+  allowMethods?: readonly string[] | undefined
 
   /**
    * Configures the `Access-Control-Allow-Headers` header for preflight requests.
@@ -36,12 +36,12 @@ export interface CORSHandlerPluginOptions<T extends Context> {
    * When set, it replaces that fallback, so include every non-safelisted header
    * clients send, such as `Content-Type`.
    */
-  allowHeaders?: readonly string[]
+  allowHeaders?: readonly string[] | undefined
 
   /**
    * Configures the `Access-Control-Max-Age` header (in seconds) for preflight requests.
    */
-  maxAge?: number
+  maxAge?: number | undefined
 
   /**
    * Configures the `Access-Control-Allow-Credentials` header.
@@ -49,12 +49,12 @@ export interface CORSHandlerPluginOptions<T extends Context> {
    * When enabled, `origin` must allow trusted origins only: every allowed origin can send
    * authenticated requests as your users and read the responses.
    */
-  credentials?: boolean
+  credentials?: boolean | undefined
 
   /**
    * Configures the `Access-Control-Expose-Headers` header.
    */
-  exposeHeaders?: readonly string[]
+  exposeHeaders?: readonly string[] | undefined
 }
 
 /**

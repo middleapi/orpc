@@ -13,12 +13,12 @@ export interface ORPCErrorFactoryOptions<TData> {
    * Optional schema used to type and validate the error data.
    * Must be a synchronous schema.
    */
-  data?: Schema<TData>
+  data?: Schema<TData> | undefined
 
   /**
    * Optional default message, can be overridden when constructing an error.
    */
-  message?: string
+  message?: string | undefined
 }
 
 export interface ORPCErrorFactory<TCode extends ORPCErrorCode, TData> extends ErrorMapItem {

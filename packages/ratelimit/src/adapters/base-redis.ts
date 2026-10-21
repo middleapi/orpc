@@ -19,7 +19,7 @@ export interface BaseRedisRateLimiterOptions {
    *
    * @default ''
    */
-  prefix?: string
+  prefix?: string | undefined
 
   /**
    * Maximum number of requests allowed within the window.
@@ -37,7 +37,7 @@ export interface BaseRedisRateLimiterOptions {
    *
    * @default 0
    */
-  timeout?: number
+  timeout?: number | undefined
 }
 
 /**

@@ -17,7 +17,7 @@ export interface ResponseCompressionLinkPluginOptions<_T extends ClientContext> 
    *
    * @default ['gzip', 'deflate']
    */
-  encodings?: readonly ('gzip' | 'deflate' | 'deflate-raw')[]
+  encodings?: readonly ('gzip' | 'deflate' | 'deflate-raw')[] | undefined
 }
 
 /**

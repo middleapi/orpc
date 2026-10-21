@@ -16,7 +16,7 @@ export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOpt
   /**
    * Override the default RPC serializer.
    */
-  serializer?: Public<RPCSerializer>
+  serializer?: Public<RPCSerializer> | undefined
 
   /**
    * Resolve HTTP status for encoded successful outputs.
@@ -26,11 +26,12 @@ export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOpt
    *
    * @default DEFAULT_SUCCESS_STATUS (200)
    */
-  outputStatus?: Value<number | undefined | null, [output: unknown, procedure: AnyProcedure, path: string[], options: ResolvedStandardHandlerHandleOptions<T>]>
+  outputStatus?: Value<number | undefined | null, [output: unknown, procedure: AnyProcedure, path: string[], options: ResolvedStandardHandlerHandleOptions<T>]> | undefined
 
   /**
    * Mapping ORPCError Code -> HTTP Status Code
    * The status code should be in the `4xx` or `5xx` range (must be greater than or equal to `400`).
+   * Codes missing from the map fall back to `DEFAULT_ERROR_STATUS` (400).
    *
    * @default COMMON_ERROR_STATUS_MAP
    */

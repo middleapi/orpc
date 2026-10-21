@@ -17,7 +17,7 @@ export interface RPCLinkCodecOptions<T extends ClientContext> {
    *
    * @default '/'
    */
-  url?: Value<Promisable<StandardUrl>, [options: ClientOptions<T>, path: string[], input: unknown]>
+  url?: Value<Promisable<StandardUrl>, [options: ClientOptions<T>, path: string[], input: unknown]> | undefined
 
   /**
    * The maximum length of the URL.
@@ -26,14 +26,14 @@ export interface RPCLinkCodecOptions<T extends ClientContext> {
    *
    * @default 2083
    */
-  maxUrlLength?: Value<Promisable<number>, [options: ClientOptions<T>, path: string[], input: unknown]>
+  maxUrlLength?: Value<Promisable<number>, [options: ClientOptions<T>, path: string[], input: unknown]> | undefined
 
   /**
    * The method used to make the request.
    *
    * @default 'POST'
    */
-  method?: Value<Promisable<'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'QUERY'>, [options: ClientOptions<T>, path: string[], input: unknown]>
+  method?: Value<Promisable<'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'QUERY'>, [options: ClientOptions<T>, path: string[], input: unknown]> | undefined
 
   /**
    * The method to use when the payload cannot safely pass to the server with method return from method function.
@@ -41,17 +41,17 @@ export interface RPCLinkCodecOptions<T extends ClientContext> {
    *
    * @default 'POST'
    */
-  fallbackMethod?: 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'QUERY'
+  fallbackMethod?: 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'QUERY' | undefined
 
   /**
    * Inject headers to the request.
    */
-  headers?: Value<Promisable<StandardHeaders | Headers>, [options: ClientOptions<T>, path: string[], input: unknown]>
+  headers?: Value<Promisable<StandardHeaders | Headers>, [options: ClientOptions<T>, path: string[], input: unknown]> | undefined
 
   /**
    * Override the default RPC serializer.
    */
-  serializer?: Public<RPCSerializer>
+  serializer?: Public<RPCSerializer> | undefined
 }
 
 const END_SLASH_REGEX = /\/$/

@@ -11,7 +11,7 @@ export interface SerializableStreamedQueryOptions {
    *
    * @default 'reset'
    */
-  refetchMode?: 'append' | 'reset' | 'replace'
+  refetchMode?: 'append' | 'reset' | 'replace' | undefined
 
   /**
    * Limits the number of data chunks stored in the query result.
@@ -19,7 +19,7 @@ export interface SerializableStreamedQueryOptions {
    *
    * @default Number.POSITIVE_INFINITY (unlimited)
    */
-  maxChunks?: number
+  maxChunks?: number | undefined
 }
 
 /**

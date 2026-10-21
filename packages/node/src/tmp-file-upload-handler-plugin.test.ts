@@ -1253,8 +1253,9 @@ describe('tmpFileUploadHandlerPlugin', () => {
       ]
 
       for (const event of events) {
-        // Two events exceed the limit only in total, and line endings around them cost nothing
-        const body = Buffer.from(`\r\n\n${event}${event}\n`)
+        // Two events exceed the limit only in total, and line endings around them cost nothing.
+        // The close event ends the stream, which would otherwise read as cut off
+        const body = Buffer.from(`\r\n\n${event}${event}\nevent: close\n\n`)
         const size = Buffer.byteLength(event)
 
         // One byte per chunk spreads each event over many chunks

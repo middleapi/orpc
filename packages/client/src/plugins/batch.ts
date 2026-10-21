@@ -7,6 +7,21 @@ import { captureAsyncContext, defer, isAsyncIteratorObject, loadBytes, once, pro
 import { parseStandardUrl } from '@standard-server/core'
 import { ClientPeer, decodePeerMessage, isServerPeerSendMessage } from '@standard-server/peer'
 
+/**
+ * Header that marks a request as a batch, set by the Batch Link Plugin and detected by the Batch Handler Plugin.
+ * Nothing between the client and server, such as a CORS policy or proxy, should block or strip it.
+ *
+ * @see {@link https://orpc.dev/docs/plugins/batch#setup | Batch Plugin - Setup}
+ */
+export const BATCH_HEADER = 'orpc-batch'
+
+/**
+ * Default `maxSize` of both the Batch Link Plugin and the Batch Handler Plugin.
+ *
+ * @see {@link https://orpc.dev/docs/plugins/batch#max-size | Batch Plugin - Max Size}
+ */
+export const DEFAULT_BATCH_MAX_SIZE = 10
+
 export interface BatchLinkPluginGroup<T extends ClientContext> {
   /**
    * Determines whether a request should be included in this batch group.
@@ -26,7 +41,7 @@ export interface BatchLinkPluginGroup<T extends ClientContext> {
    *
    * @default []
    */
-  path?: Value<string[], [items: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]>
+  path?: Value<string[], [items: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]> | undefined
 }
 
 export interface BatchLinkPluginOptions<T extends ClientContext> {
@@ -37,7 +52,7 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
    *
    * @default () => true
    */
-  filter?: Value<boolean, [options: StandardLinkTransportInterceptorOptions<T>]>
+  filter?: Value<boolean, [options: StandardLinkTransportInterceptorOptions<T>]> | undefined
 
   /**
    * Only requests with the same scope are batched together.
@@ -45,14 +60,16 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
    *
    * @default () => undefined
    */
-  scope?: (options: StandardLinkTransportInterceptorOptions<T>) => unknown
+  scope?: ((options: StandardLinkTransportInterceptorOptions<T>) => unknown) | undefined
 
   /**
-   * The maximum number of requests in the batch.
+   * The maximum number of requests in the batch. Larger batches are split.
+   * Keep it at or below the server Batch Handler Plugin's `maxSize`, which rejects larger batches with a `413`.
    *
-   * @default 10
+   * @default DEFAULT_BATCH_MAX_SIZE (10)
+   * @see {@link https://orpc.dev/docs/plugins/batch#max-size | Batch Plugin - Max Size}
    */
-  maxSize?: Value<Promisable<number>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]>
+  maxSize?: Value<Promisable<number>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]> | undefined
 
   /**
    * How long (in ms) to wait for more requests before sending the batch,
@@ -61,14 +78,14 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
    *
    * @default 0
    */
-  wait?: number
+  wait?: number | undefined
 
   /**
    * URL for the batch request.
    *
    * @default URL of the first subrequest in the batch + '/__batch__'
    */
-  url?: Value<Promisable<StandardUrl>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]>
+  url?: Value<Promisable<StandardUrl>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]> | undefined
 
   /**
    * The maximum length of the URL that runtime supports,
@@ -78,28 +95,28 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
    *
    * @default 2083
    */
-  maxUrlLength?: Value<Promisable<number>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]>
+  maxUrlLength?: Value<Promisable<number>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]> | undefined
 
   /**
    * Headers used for the batch request.
    *
    * @default Common headers among all subrequests in the batch.
    */
-  headers?: Value<Promisable<StandardHeaders>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]>
+  headers?: Value<Promisable<StandardHeaders>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]> | undefined
 
   /**
    * Map each subrequest in the batch before it is sent.
    *
    * @default Removes headers that are duplicated with the batch headers
    */
-  mapSubrequest?: (subOptions: StandardLinkTransportInterceptorOptions<T>, partialBatchRequest: Pick<StandardRequest, 'url' | 'headers'>) => StandardRequest
+  mapSubrequest?: ((subOptions: StandardLinkTransportInterceptorOptions<T>, partialBatchRequest: Pick<StandardRequest, 'url' | 'headers'>) => StandardRequest) | undefined
 
   /**
    * Maps each subresponse before returning the final response.
    *
    * @default Low-priority merges headers from the batch response into each subresponse.
    */
-  mapSubresponse?: (subResponse: StandardLazyResponse, batchResponse: StandardLazyResponse, subOptions: StandardLinkTransportInterceptorOptions<T>) => StandardLazyResponse
+  mapSubresponse?: ((subResponse: StandardLazyResponse, batchResponse: StandardLazyResponse, subOptions: StandardLinkTransportInterceptorOptions<T>) => StandardLazyResponse) | undefined
 }
 
 /**
@@ -131,7 +148,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
     this.groups = options.groups
     this.filter = options.filter ?? (() => true)
     this.scope = options.scope ?? (() => undefined)
-    this.maxSize = options.maxSize ?? 10
+    this.maxSize = options.maxSize ?? DEFAULT_BATCH_MAX_SIZE
     this.wait = options.wait ?? 0
     this.batchUrl = options.url ?? ((options) => {
       const [pathname] = parseStandardUrl(options[0].request.url)
@@ -357,7 +374,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
         const request: StandardRequest = {
           url,
           method,
-          headers: { ...headers, 'orpc-batch': '1' },
+          headers: { ...headers, [BATCH_HEADER]: '1' },
           signal: controller.signal,
         }
 

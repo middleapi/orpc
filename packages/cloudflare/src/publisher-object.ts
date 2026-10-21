@@ -25,7 +25,7 @@ export interface DurablePublisherObjectResumeOptions extends PublisherResumeOpti
    *
    * @default 6 * 60 * 60 * 1000 (6 hours)
    */
-  cleanupInterval?: number
+  cleanupInterval?: number | undefined
 
   /**
    * Prefix for the resume storage table schema.
@@ -33,7 +33,7 @@ export interface DurablePublisherObjectResumeOptions extends PublisherResumeOpti
    *
    * @default 'orpc:'
    */
-  schemaPrefix?: string
+  schemaPrefix?: string | undefined
 }
 
 export interface DurablePublisherObjectOptions {
@@ -45,7 +45,7 @@ export interface DurablePublisherObjectOptions {
    *
    * @default { enabled: false }
    */
-  resume?: DurablePublisherObjectResumeOptions
+  resume?: DurablePublisherObjectResumeOptions | undefined
 }
 
 /**

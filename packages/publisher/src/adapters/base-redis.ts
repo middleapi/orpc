@@ -26,14 +26,14 @@ export interface BaseRedisPublisherOptions extends PublisherOptions {
    *
    * @default ''
    */
-  prefix?: string
+  prefix?: string | undefined
 
   /**
    * Serializer for serialize and deserialize payloads.
    *
    * @default RPCJsonSerializer
    */
-  serializer?: undefined | Public<RPCJsonSerializer>
+  serializer?: Public<RPCJsonSerializer> | undefined
 
   /**
    * Configuration for event resume support.
@@ -43,7 +43,7 @@ export interface BaseRedisPublisherOptions extends PublisherOptions {
    *
    * @default { enabled: false }
    */
-  resume?: PublisherResumeOptions
+  resume?: PublisherResumeOptions | undefined
 }
 
 /**
@@ -65,7 +65,7 @@ export interface RedisStreamEntry {
 
 interface SerializedEvent {
   payload: RPCJsonSerialization
-  meta?: undefined | EventMeta
+  meta?: EventMeta | undefined
 }
 
 /**

@@ -12,7 +12,7 @@ export interface MemoryPublisherOptions extends PublisherOptions {
    *
    * @default { enabled: false }
    */
-  resume?: PublisherResumeOptions
+  resume?: PublisherResumeOptions | undefined
 }
 
 interface StoredEvent<T> {

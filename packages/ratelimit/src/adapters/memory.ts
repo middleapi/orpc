@@ -18,7 +18,7 @@ export interface MemoryRateLimiterOptions {
    *
    * @default 0
    */
-  timeout?: number
+  timeout?: number | undefined
 }
 
 /**

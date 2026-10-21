@@ -1,6 +1,8 @@
 it('exports plugins', async () => {
   await expect(import('./index')).resolves.toMatchObject({
     BatchLinkPlugin: expect.any(Function),
+    BATCH_HEADER: 'orpc-batch',
+    DEFAULT_BATCH_MAX_SIZE: 10,
     DedupeLinkPlugin: expect.any(Function),
     RetryLinkPlugin: expect.any(Function),
     RetryAfterLinkPlugin: expect.any(Function),
