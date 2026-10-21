@@ -1,4 +1,6 @@
 import type { StandardHandlerPlugin } from '../standard'
+import { isAbortError } from '@orpc/shared'
+import { z } from 'zod'
 import { os } from '../../builder'
 import { RPCHandler } from './rpc-handler'
 
@@ -81,6 +83,29 @@ describe('rpcHandler', () => {
 
     expect(response?.status).toBe(400)
     expect(middleware).not.toHaveBeenCalled()
+  })
+
+  it('reports a request aborted before handling as the abort, not as invalid input', async () => {
+    const procedureHandler = vi.fn(() => 'pong')
+    const interceptor = vi.fn(({ next }) => next())
+    const handler = new RPCHandler(
+      { ping: os.input(z.object({ slug: z.string() })).handler(procedureHandler) },
+      { interceptors: [interceptor] },
+    )
+
+    const controller = new AbortController()
+    controller.abort()
+
+    // Next.js drops the body of a request aborted before it reaches the route
+    const { response } = await handler.handle(new Request('https://example.com/ping', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-length': '24' },
+      signal: controller.signal,
+    }))
+
+    expect(response?.status).not.toBe(400)
+    expect(procedureHandler).not.toHaveBeenCalled()
+    await expect(interceptor.mock.results[0]!.value).rejects.toSatisfy(isAbortError)
   })
 
   it('treats GET requests as unmatched by default', async () => {

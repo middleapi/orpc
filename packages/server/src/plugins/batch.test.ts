@@ -438,14 +438,14 @@ describe('batchHandlerPlugin', () => {
       expect(stopped.mock.calls).toEqual([[true], [true]])
     })
 
-    it('aborts sub-requests when the batch request is already aborted', async () => {
+    it('does not run sub-requests when the batch request is already aborted', async () => {
       const { response } = await handler.handle(createBatchRequest({
         messages: [makePeerRequestMessage(0, '/wait')],
         signal: AbortSignal.abort(),
       }))
       await response!.arrayBuffer()
 
-      expect(stopped.mock.calls).toEqual([[true]])
+      expect(started).not.toHaveBeenCalled()
     })
   })
 

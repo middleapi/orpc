@@ -6,7 +6,7 @@ import type { ProcedureClientInterceptor } from '../../procedure-client'
 import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from './codec'
 import type { StandardHandlerPlugin } from './plugin'
 import { ORPCError, toORPCError } from '@orpc/client'
-import { getTracer, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, ORPC_NAME, override, recordSpanError, runWithSpan, toArray, toTracingException, traceAsyncIterator, traceReadableStream, value, wrapAsyncIterator, wrapReadableStream } from '@orpc/shared'
+import { getTracer, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, ORPC_NAME, override, recordSpanError, runWithSpan, throwIfAborted, toArray, toTracingException, traceAsyncIterator, traceReadableStream, value, wrapAsyncIterator, wrapReadableStream } from '@orpc/shared'
 import { ErrorEvent, flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { createProcedureClient } from '../../procedure-client'
 import { CompositeStandardHandlerPlugin } from './plugin'
@@ -131,6 +131,12 @@ export class StandardHandler<T extends Context> {
             { context, prefix, request, path, procedure, decodeInput },
 
             async ({ context, prefix, request, path, procedure, decodeInput }) => {
+              /**
+               * An aborted request can arrive without its body (Next.js drops it, for example),
+               * which would decode as missing input and fail validation, so report the abort instead.
+               */
+              throwIfAborted(request.signal)
+
               step = 'decode_input'
               let input = await runWithSpan('decode_input', decodeInput)
               step = undefined

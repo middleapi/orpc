@@ -363,6 +363,49 @@ describe('standardHandler', () => {
       expect(codec.encodeError.mock.calls[0]?.[0]).toBe(orpcError)
     })
 
+    it('rejects a request aborted before decoding with the abort reason instead of decoding it', async () => {
+      const interceptor = vi.fn(({ next }) => next())
+      handler = new StandardHandler(codec as any, { interceptors: [interceptor] })
+
+      const resolved = makeResolved()
+      codec.resolveProcedure.mockResolvedValue(resolved)
+      codec.encodeError.mockResolvedValue({ status: 500, headers: {}, body: 'internal' })
+
+      const controller = new AbortController()
+      const reason = new sharedExperimental.AbortError('client closed')
+      controller.abort(reason)
+
+      const result = await handler.handle(makeRequest({ signal: controller.signal }), OPTIONS)
+
+      expect(result).toEqual({ matched: true, response: { status: 500, headers: {}, body: 'internal' } })
+      expect(resolved.decodeInput).not.toHaveBeenCalled()
+      expect(createProcedureClient).not.toHaveBeenCalled()
+      await expect(interceptor.mock.results[0]!.value).rejects.toBe(reason)
+
+      const error = codec.encodeError.mock.calls[0]?.[0]
+      expect(error).toBeInstanceOf(ORPCError)
+      expect(error.code).toBe('INTERNAL_SERVER_ERROR')
+      expect(error.cause).toBe(reason)
+    })
+
+    it('checks the signal an interceptor passes on before decoding', async () => {
+      const controller = new AbortController()
+      controller.abort()
+
+      handler = new StandardHandler(codec as any, {
+        interceptors: [({ next, ...options }) => next({ ...options, request: { ...options.request, signal: controller.signal } })],
+      })
+
+      const resolved = makeResolved()
+      codec.resolveProcedure.mockResolvedValue(resolved)
+      codec.encodeError.mockResolvedValue({ status: 500, headers: {}, body: 'internal' })
+
+      await handler.handle(makeRequest(), OPTIONS)
+
+      expect(resolved.decodeInput).not.toHaveBeenCalled()
+      expect(codec.encodeError.mock.calls[0]?.[0].cause).toBe(controller.signal.reason)
+    })
+
     it('encodes ORPCError from procedure call as-is', async () => {
       const procedureError = new ORPCError('BAD_GATEWAY')
       client.mockRejectedValue(procedureError)
