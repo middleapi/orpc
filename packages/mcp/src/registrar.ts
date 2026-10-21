@@ -112,7 +112,7 @@ const METHOD_ANNOTATIONS: Partial<Record<NonNullable<OpenAPIMeta['method']>, Too
  * @example
  * ```ts
  * import { McpServer } from '@modelcontextprotocol/server'
- * import { McpRegistrar } from '@orpc/experimental-mcp'
+ * import { McpRegistrar } from '@orpc/mcp'
  *
  * const registrar = new McpRegistrar(router)
  *

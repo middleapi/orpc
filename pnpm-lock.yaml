@@ -196,9 +196,6 @@ importers:
       '@orpc/experimental-lock':
         specifier: workspace:*
         version: link:packages/lock
-      '@orpc/experimental-mcp':
-        specifier: workspace:*
-        version: link:packages/mcp
       '@orpc/experimental-msw':
         specifier: workspace:*
         version: link:packages/msw
@@ -208,6 +205,9 @@ importers:
       '@orpc/json-schema':
         specifier: workspace:*
         version: link:packages/json-schema
+      '@orpc/mcp':
+        specifier: workspace:*
+        version: link:packages/mcp
       '@orpc/next':
         specifier: workspace:*
         version: link:packages/next
