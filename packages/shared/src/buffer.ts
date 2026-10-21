@@ -69,6 +69,14 @@ function concatBytes(items: Array<string | ArrayBuffer | Pick<Uint8Array<ArrayBu
   return result
 }
 
+interface NodeBuiltinModulesGlobal {
+  process?: {
+    getBuiltinModule?: (id: 'node:buffer') => {
+      Buffer: { from: (buffer: ArrayBufferLike, byteOffset: number, length: number) => { toString: (encoding: 'base64') => string } }
+    } | undefined
+  }
+}
+
 /**
  * Encodes bytes to standard, padded base64, as data URLs and many protocols require.
  * Prefers the native `toBase64` or `Buffer`, which are far faster for large outputs.
@@ -80,11 +88,9 @@ export function encodeBase64(bytes: Uint8Array): string {
     return native.toBase64()
   }
 
-  // detected at runtime, so the package keeps working on runtimes without `Buffer`
-  // eslint-disable-next-line node/prefer-global/buffer
-  const NodeBuffer = (globalThis as {
-    Buffer?: { from: (buffer: ArrayBufferLike, byteOffset: number, length: number) => { toString: (encoding: 'base64') => string } }
-  }).Buffer
+  // loaded at runtime, so the package keeps working on runtimes without Node.js built-ins
+  // eslint-disable-next-line node/prefer-global/process
+  const NodeBuffer = (globalThis as NodeBuiltinModulesGlobal).process?.getBuiltinModule?.('node:buffer')?.Buffer
 
   if (NodeBuffer !== undefined) {
     return NodeBuffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('base64')

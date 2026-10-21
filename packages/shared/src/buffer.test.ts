@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer'
+import process from 'node:process'
 import { encodeBase64, loadBytes, toStringOrBytes } from './buffer'
 
 it('loadBytes', async () => {
@@ -136,14 +137,30 @@ describe('encodeBase64', () => {
     expect(encodeBase64(large)).toBe(Buffer.from(large).toString('base64'))
   }
 
-  it('uses Buffer when available', () => {
+  it('uses Buffer from the Node.js built-in modules when available', () => {
+    const getBuiltinModule = vi.spyOn(process, 'getBuiltinModule')
+    onTestFinished(() => {
+      getBuiltinModule.mockRestore()
+    })
+
+    expectEncodes()
+    expect(getBuiltinModule).toHaveBeenCalledWith('node:buffer')
+  })
+
+  it('falls back to btoa without the Node.js built-in modules', () => {
+    const getBuiltinModule = vi.spyOn(process, 'getBuiltinModule').mockReturnValue(undefined as any)
+    onTestFinished(() => {
+      getBuiltinModule.mockRestore()
+    })
+
     expectEncodes()
   })
 
-  it('falls back to btoa without Buffer', () => {
-    vi.stubGlobal('Buffer', undefined)
+  it('falls back to btoa on runtimes without getBuiltinModule', () => {
+    const getBuiltinModule = process.getBuiltinModule
+    ;(process as any).getBuiltinModule = undefined
     onTestFinished(() => {
-      vi.unstubAllGlobals()
+      process.getBuiltinModule = getBuiltinModule
     })
 
     expectEncodes()
