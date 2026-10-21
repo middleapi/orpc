@@ -9,6 +9,7 @@ import { getAsyncIteratorObjectSchemasDetails } from '@orpc/contract'
 import {
   combineJsonObjectSchemaEntries,
   combineJsonSchemasWithComposition,
+  containsJsonFileSchema,
   extractJsonObjectSchemaEntries,
   flattenJsonUnionSchema,
   isJsonFileSchema,
@@ -17,7 +18,7 @@ import {
   matchArrayableJsonSchema,
 } from '@orpc/json-schema'
 import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '@orpc/server'
-import { findDeepMatches, isPlainObject, stringifyJSON, value } from '@orpc/shared'
+import { stringifyJSON, value } from '@orpc/shared'
 import {
   DEFAULT_OPENAPI_INPUT_STRUCTURE,
   DEFAULT_OPENAPI_METHOD,
@@ -636,10 +637,7 @@ function toBodyContent(ctx: OpenAPIOperationContext, direction: JsonSchemaConver
 
   if (rest.length > 0) {
     const restSchema = fileSchemasByMediaType.size ? combineJsonSchemasWithComposition('anyOf', rest) : schema
-    const hasNestedFiles = findDeepMatches(
-      v => isPlainObject(v) && isJsonFileSchema(v as any),
-      restSchema,
-    ).values.length > 0
+    const hasNestedFiles = containsJsonFileSchema(restSchema)
 
     const contentType = hasNestedFiles ? 'multipart/form-data' : 'application/json'
     const fileSchemas = fileSchemasByMediaType.get(contentType)

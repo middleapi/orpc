@@ -2,7 +2,7 @@ import type { StandardSchemaWithJSON } from '@modelcontextprotocol/server'
 import type { AnySchema } from '@orpc/contract'
 import type { JsonSchema, JsonSchemaConverter } from '@orpc/json-schema'
 import { getAsyncIteratorObjectSchemasDetails } from '@orpc/contract'
-import { combineJsonSchemasWithComposition, ensureJsonSchemaObject, hoistRecursiveRefToDef, isJsonFileSchema, isJsonObjectLikeSchema, isStandardSchemaOptional, isUnconstrainedSchema } from '@orpc/json-schema'
+import { combineJsonSchemasWithComposition, containsJsonFileSchema, ensureJsonSchemaObject, hoistRecursiveRefToDef, isJsonObjectLikeSchema, isStandardSchemaOptional, isUnconstrainedSchema } from '@orpc/json-schema'
 import { isTypescriptObject, ORPC_NAME } from '@orpc/shared'
 
 type JsonSchemaObject = Exclude<JsonSchema, boolean>
@@ -136,13 +136,6 @@ export function resolveToolInput(args: unknown, inputJsonSchema: ToolInputJsonSc
   return inputJsonSchema.wrapped && isTypescriptObject(args)
     ? args[WRAPPED_INPUT_KEY]
     : args
-}
-
-/**
- * Whether a file schema appears anywhere in the schema, such as in a property, a composition, or a def.
- */
-function containsJsonFileSchema(schema: unknown): boolean {
-  return isTypescriptObject(schema) && (isJsonFileSchema(schema as JsonSchema) || Object.values(schema).some(containsJsonFileSchema))
 }
 
 /**
