@@ -593,18 +593,32 @@ describe('mcpRegistrar', () => {
         .toEqual([{ type: 'resource', resource: { uri: 'file:///blob', mimeType: 'application/octet-stream', blob: 'AQID' } }])
     })
 
-    it('rejects binary values nested inside other data', async () => {
+    it('returns nested blob outputs as embedded resources referenced by URI', async () => {
+      const bytes = new Uint8Array([1, 2, 3])
+
       const client = await createTestClient('legacy', new McpRegistrar({
         report: os
-          .output(z.object({ file: z.file() }))
-          .handler(() => ({ file: new File([new Uint8Array([1, 2, 3])], 'report.pdf') })),
+          .output(z.object({ title: z.string(), file: z.file(), covers: z.array(z.file()) }))
+          .handler(() => ({
+            title: 'Q3',
+            file: new File([bytes], 'q3 report.pdf', { type: 'application/pdf' }),
+            covers: [new File([bytes], '', { type: 'image/png' })],
+          })),
       }))
 
       const { tools } = await client.listTools()
       expect(tools[0]!.outputSchema).toBeUndefined()
 
-      expect(parseToolError(await client.callTool({ name: 'report' })))
-        .toEqual(expect.objectContaining({ code: 'INTERNAL_SERVER_ERROR' }))
+      const structuredContent = { title: 'Q3', file: 'file:///file/q3%20report.pdf', covers: ['file:///covers/0'] }
+
+      expect(await client.callTool({ name: 'report' })).toEqual({
+        content: [
+          { type: 'text', text: JSON.stringify(structuredContent) },
+          { type: 'resource', resource: { uri: 'file:///file/q3%20report.pdf', mimeType: 'application/pdf', blob: 'AQID' } },
+          { type: 'resource', resource: { uri: 'file:///covers/0', mimeType: 'image/png', blob: 'AQID' } },
+        ],
+        structuredContent,
+      })
     })
 
     it('types stream outputs with the content-type response header', async () => {

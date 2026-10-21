@@ -1,4 +1,4 @@
-import type { CallToolResult, ContentBlock, McpServer, RegisteredTool, ServerContext, StandardSchemaWithJSON, ToolAnnotations } from '@modelcontextprotocol/server'
+import type { CallToolResult, ContentBlock, EmbeddedResource, McpServer, RegisteredTool, ServerContext, StandardSchemaWithJSON, ToolAnnotations } from '@modelcontextprotocol/server'
 import type { AnyORPCError } from '@orpc/client'
 import type { AnyProcedureContract } from '@orpc/contract'
 import type { JsonSchemaConverter } from '@orpc/json-schema'
@@ -14,7 +14,7 @@ import { DelegatingJsonSchemaConverter, StandardJsonSchemaConverter } from '@orp
 import { getOpenAPIMeta, OpenAPIJsonSerializer } from '@orpc/openapi'
 import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS, ErrorEvent, resolveContractProcedure, walkProcedureContractsAsync } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
-import { encodeBase64, getOwn, isAsyncIteratorObject, loadBytes, pathToHttpPath, resolveMaybeOptionalOptions, safeEncodeURIComponent, stringifyJSON, throwIfAborted, toArray, value } from '@orpc/shared'
+import { encodeBase64, getOwn, isAsyncIteratorObject, isPlainObject, loadBytes, pathToHttpPath, resolveMaybeOptionalOptions, safeEncodeURIComponent, stringifyJSON, throwIfAborted, toArray, value } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { getMcpToolMeta } from './meta'
 import { resolveToolInput, resolveToolInputJsonSchema, resolveToolOutputJsonSchema, toPassthroughStandardSchema } from './utils'
@@ -330,19 +330,8 @@ class McpHandlerCodec implements StandardHandlerCodec<Context> {
 
   private serialize(data: unknown): unknown {
     // kept as is, like the body of an OpenAPI response, so it becomes an empty tool result rather than null
-    if (data === undefined) {
-      return undefined
-    }
-
-    // blobs and streams are returned as is by the serializer
-    const { json, blobs } = this.serializer.serializeJson(data)
-
-    // a tool result carries binary data only as its own content, so nested blobs would be lost
-    if (blobs?.length && !(json instanceof Blob)) {
-      throw new TypeError('[MCP] Tool results cannot contain binary values nested inside other data. Return the Blob or File itself.')
-    }
-
-    return json
+    // (blobs, nested or not, and streams are kept as is by the serializer)
+    return data === undefined ? undefined : this.serializer.serializeJson(data).json
   }
 }
 
@@ -413,10 +402,49 @@ async function toCallToolResult(serialized: unknown, contentType?: string): Prom
     return { content: [] }
   }
 
+  const blobs: [uri: string, blob: Blob][] = []
+  const json = replaceNestedBlobs(serialized, [], blobs)
+
   return {
-    content: [{ type: 'text', text: toText(serialized)! }],
-    structuredContent: serialized,
+    content: [
+      { type: 'text', text: toText(json)! },
+      ...await Promise.all(blobs.map(([uri, blob]) => toEmbeddedResource(uri, blob))),
+    ],
+    structuredContent: json,
   }
+}
+
+/**
+ * Replaces each blob nested in the JSON with the URI of the embedded resource that carries it,
+ * copying only the objects and arrays on the way to a blob.
+ */
+function replaceNestedBlobs(json: unknown, segments: string[], blobs: [uri: string, blob: Blob][]): unknown {
+  if (json instanceof Blob) {
+    const uri = toResourceUri(segments, json)
+    blobs.push([uri, json])
+    return uri
+  }
+
+  if (!Array.isArray(json) && !isPlainObject(json)) {
+    return json
+  }
+
+  let copy: Record<string, unknown> | undefined
+
+  for (const key of Object.keys(json)) {
+    const value = (json as Record<string, unknown>)[key]
+
+    segments.push(key)
+    const replaced = replaceNestedBlobs(value, segments, blobs)
+    segments.pop()
+
+    if (replaced !== value) {
+      copy ??= (Array.isArray(json) ? [...json] : { ...json }) as Record<string, unknown>
+      copy[key] = replaced
+    }
+  }
+
+  return copy ?? json
 }
 
 function toErrorCallToolResult(json: unknown): CallToolResult {
@@ -424,20 +452,29 @@ function toErrorCallToolResult(json: unknown): CallToolResult {
 }
 
 async function toBinaryContent(blob: Blob): Promise<ContentBlock> {
-  const data = encodeBase64(await loadBytes(blob))
-  const mimeType = blob.type || 'application/octet-stream'
-  const name = blob instanceof File ? blob.name : undefined
-
-  if (mimeType.startsWith('image/')) {
-    return { type: 'image', data, mimeType }
+  if (blob.type.startsWith('image/')) {
+    return { type: 'image', data: encodeBase64(await loadBytes(blob)), mimeType: blob.type }
   }
 
-  if (mimeType.startsWith('audio/')) {
-    return { type: 'audio', data, mimeType }
+  if (blob.type.startsWith('audio/')) {
+    return { type: 'audio', data: encodeBase64(await loadBytes(blob)), mimeType: blob.type }
   }
 
+  return toEmbeddedResource(toResourceUri([], blob), blob)
+}
+
+async function toEmbeddedResource(uri: string, blob: Blob): Promise<EmbeddedResource> {
   return {
     type: 'resource',
-    resource: { uri: `file:///${safeEncodeURIComponent(name || 'blob')}`, mimeType, blob: data },
+    resource: { uri, mimeType: blob.type || 'application/octet-stream', blob: encodeBase64(await loadBytes(blob)) },
   }
+}
+
+/**
+ * Names a blob by its path in the output and its file name, such as `file:///report/q3.pdf`.
+ */
+function toResourceUri(segments: readonly string[], blob: Blob): string {
+  const names = blob instanceof File && blob.name !== '' ? [...segments, blob.name] : segments
+
+  return `file:///${names.length === 0 ? 'blob' : names.map(safeEncodeURIComponent).join('/')}`
 }

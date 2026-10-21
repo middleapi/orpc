@@ -164,7 +164,8 @@ export function resolveToolOutputJsonSchema(
   const converted = (yieldSchemas ?? outputSchemas).map(schema => convertSchema(converter, schema, 'output'))
   const [combined, optional] = combineConvertedSchemas(converted)
 
-  // an output schema requires structured content in every result, which undefined, unknown, or binary outputs cannot provide
+  // an output schema requires structured content matching it in every result, which undefined, unknown, or binary outputs
+  // cannot provide, and nested files become URIs the schema does not describe
   if (optional || isUnconstrainedSchema(combined) || containsJsonFileSchema(combined)) {
     return undefined
   }
