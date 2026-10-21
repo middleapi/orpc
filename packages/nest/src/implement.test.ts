@@ -1661,6 +1661,40 @@ describe('compatibility', () => {
     await app.close()
   })
 
+  it('builds the handler once instead of on every request', async () => {
+    const contract = oc.meta(openapi({ path: '/reuse-handler' }))
+
+    @Controller()
+    class ImplController {
+      @Implement(contract)
+      reuseHandler() {
+        return implement(contract).handler(() => 'ok')
+      }
+    }
+
+    const init = vi.fn(options => options)
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ImplController],
+      imports: [
+        ORPCModule.forRoot({
+          plugins: [{ name: 'spy', init }],
+        }),
+      ],
+    }).compile()
+
+    const app = moduleRef.createNestApplication()
+    await app.init()
+
+    const initCalls = init.mock.calls.length
+    expect(initCalls).toBeGreaterThan(0)
+
+    await supertest(app.getHttpServer()).post('/reuse-handler').expect(200, '"ok"')
+    await supertest(app.getHttpServer()).post('/reuse-handler').expect(200, '"ok"')
+
+    expect(init).toHaveBeenCalledTimes(initCalls)
+  })
+
   describe('handler plugins from ORPCModule take effect during input decoding', () => {
     const contract = oc
       .meta(openapi({ method: 'POST', path: '/request-limit' }))
