@@ -2,7 +2,6 @@ import type { CallHandler, CanActivate, ExecutionContext, NestInterceptor } from
 import type { Request as ExpressRequest } from 'express'
 import type { FastifyReply } from 'fastify'
 import type { NestStandardLazyRequest } from './module'
-import { AsyncResource } from 'node:async_hooks'
 import { Buffer } from 'node:buffer'
 import { once } from 'node:events'
 import { request as httpRequest } from 'node:http'
@@ -238,9 +237,7 @@ describe('requirements', () => {
     expect(res.status).toBe(500)
   })
 
-  it('should error if a routing interceptor calls next outside the request async context', async () => {
-    // bound here, outside any request, so `next` runs without the procedure resolved for the request
-    const runOutsideRequest = AsyncResource.bind((fn: () => unknown) => fn())
+  it('should error if a routing interceptor replaces the context without spreading it', async () => {
     const handler = vi.fn()
     const contract = oc.meta(openapi({
       path: '/procedure',
@@ -258,7 +255,7 @@ describe('requirements', () => {
       controllers: [ImplController],
       imports: [
         ORPCModule.forRoot({
-          routingInterceptors: [({ next }) => runOutsideRequest(next) as any],
+          routingInterceptors: [({ next, ...options }) => next({ ...options, context: {} })],
         }),
       ],
     }).compile()

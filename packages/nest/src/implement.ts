@@ -1,14 +1,13 @@
 import type { CallHandler, ExecutionContext, NestInterceptor } from '@nestjs/common'
 import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
 import type { AnyProcedure, Context, ContractedRouter, DefaultInitialContext } from '@orpc/server'
-import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '@orpc/server/standard'
+import type { ResolvedStandardHandlerHandleOptions, StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '@orpc/server/standard'
 import type { Promisable } from '@orpc/shared'
 import type { StandardBodyHint, StandardLazyRequest } from '@standard-server/core'
 import type { Request as ExpressRequest, Response as ExpressResponse } from 'express'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
 import type { NestStandardLazyRequest, ORPCModuleConfig } from './module'
-import { AsyncLocalStorage } from 'node:async_hooks'
 import { Readable } from 'node:stream'
 import * as NestCommon from '@nestjs/common'
 import { applyDecorators, Delete, Get, Head, HttpCode, HttpException, Inject, Injectable, Optional, Options, Patch, Post, Put, StreamableFile, UseInterceptors } from '@nestjs/common'
@@ -210,10 +209,9 @@ export class ImplementInterceptor implements NestInterceptor {
 
         const context = await value(this.config.context ?? {} as DefaultInitialContext, ctx)
 
-        const result = await this.codec.run(
-          { procedure, params: standardRequest.params },
-          () => this.handler.handle(standardRequest, { context }),
-        )
+        const result = await this.handler.handle(standardRequest, {
+          context: this.codec.withMatch(context, { procedure, params: standardRequest.params }),
+        })
 
         if (!result.matched) {
           throw new TypeError(
@@ -312,18 +310,18 @@ interface NestHandlerCodecMatch {
 
 /**
  * NestJS has already routed the request before the interceptor runs, so instead of matching
- * the request url, this codec resolves the procedure stored by `run` in AsyncLocalStorage.
+ * the request url, this codec resolves the procedure attached to the context by `withMatch`.
  * This lets a single standard handler (and its plugins) be reused across requests.
  */
 class NestHandlerCodec<T extends Context> extends OpenAPIHandlerCodecCore<T> implements StandardHandlerCodec<T> {
-  private readonly storage = new AsyncLocalStorage<NestHandlerCodecMatch>()
+  private readonly CONTEXT_SYMBOL = Symbol('ORPC_NEST_HANDLER_CODEC_CONTEXT')
 
-  run<R>(match: NestHandlerCodecMatch, fn: () => R): R {
-    return this.storage.run(match, fn)
+  withMatch(context: T, match: NestHandlerCodecMatch): T {
+    return { ...context, [this.CONTEXT_SYMBOL]: match }
   }
 
-  resolveProcedure(request: StandardLazyRequest): StandardHandlerCodecResolvedProcedure | undefined {
-    const match = this.storage.getStore()
+  resolveProcedure(request: StandardLazyRequest, options: ResolvedStandardHandlerHandleOptions<T>): StandardHandlerCodecResolvedProcedure | undefined {
+    const match = options.context[this.CONTEXT_SYMBOL] as NestHandlerCodecMatch | undefined
 
     if (!match) {
       return undefined
