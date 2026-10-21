@@ -9,7 +9,7 @@ import { getMalformedResponseErrorCode, toHttpPath, toStandardHeaders } from '@o
 import { fallbackContractConfig, isContractProcedure, ORPCError } from '@orpc/contract'
 import { get, isObject, value } from '@orpc/shared'
 import { mergeStandardHeaders } from '@orpc/standard-server'
-import { getDynamicParams, standardizeHTTPPath } from './utils'
+import { fillORPCErrorJsonStatus, getDynamicParams, standardizeHTTPPath } from './utils'
 
 export interface StandardOpenapiLinkCodecOptions<T extends ClientContext> {
   /**
@@ -234,8 +234,10 @@ export class StandardOpenapiLinkCodec<T extends ClientContext> implements Standa
         throw error
       }
 
-      if (isORPCErrorJson(deserialized)) {
-        throw createORPCErrorFromJson(deserialized)
+      const errorJson = fillORPCErrorJsonStatus(deserialized, response.status)
+
+      if (isORPCErrorJson(errorJson)) {
+        throw createORPCErrorFromJson(errorJson)
       }
 
       throw new ORPCError<string, StandardResponse>(getMalformedResponseErrorCode(response.status), {

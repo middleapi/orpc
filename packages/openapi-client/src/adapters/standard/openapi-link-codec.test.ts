@@ -420,6 +420,29 @@ describe('standardOpenapiLinkCodecOptions', () => {
       expect(getMalformedResponseErrorCodeSpy).toHaveBeenCalledWith(409)
     })
 
+    it('deserialize error without status (OpenAPIHandler v2)', async () => {
+      const codec = new StandardOpenapiLinkCodec({ ping: oc }, serializer, {
+        url: 'http://localhost:3000',
+      })
+
+      await expect(codec.decode({
+        headers: { 'x-custom': 'value' },
+        body: async () => ({ defined: true, code: 'BAD_GATEWAY', message: 'message', data: 'data' }),
+        status: 409,
+      }, { context: {}, signal }, ['ping'])).rejects.toSatisfy((error: any) => {
+        expect(error).toBeInstanceOf(ORPCError)
+        expect(error.defined).toBe(true)
+        expect(error.code).toEqual('BAD_GATEWAY')
+        expect(error.status).toBe(409)
+        expect(error.message).toBe('message')
+        expect(error.data).toBe('data')
+
+        return true
+      })
+
+      expect(getMalformedResponseErrorCodeSpy).not.toHaveBeenCalled()
+    })
+
     it('throw if not found a procedure', async () => {
       const codec = new StandardOpenapiLinkCodec({ ping: oc }, serializer, {
         url: 'http://localhost:3000',

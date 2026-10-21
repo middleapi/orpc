@@ -47,7 +47,12 @@ export function toEventIterator(
           return { done: true, value: undefined }
         }
 
-        switch (value.event) {
+        /**
+         * oRPC v2 servers omit `event` for messages, relying on the SSE default type "message".
+         */
+        const event = value.event ?? (value.data !== undefined ? 'message' : undefined)
+
+        switch (event) {
           case 'message': {
             let message = parseEmptyableJSON(value.data)
 
@@ -70,7 +75,8 @@ export function toEventIterator(
             throw error
           }
 
-          case 'done': {
+          case 'done':
+          case 'close': { // oRPC v2 servers send `close` instead of `done`
             let done = parseEmptyableJSON(value.data)
 
             if (isTypescriptObject(done)) {

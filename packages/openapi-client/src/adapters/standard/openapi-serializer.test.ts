@@ -359,6 +359,27 @@ describe('standardOpenAPIJsonSerializer', () => {
         })
       })
 
+      it('on error has ORPCError format without status (OpenAPIHandler v2)', async () => {
+        const error = new ErrorEvent({
+          data: { defined: false, code: 'NOT_FOUND', message: 'message', data: { order: 3 } },
+        })
+
+        const serialized = openapiSerializer.deserialize((async function* () {
+          throw error
+        })()) as any
+
+        await expect(serialized.next()).rejects.toSatisfy((e: any) => {
+          expect(e).toBeInstanceOf(ORPCError)
+          expect(e.code).toBe('NOT_FOUND')
+          expect(e.status).toBe(404)
+          expect(e.message).toBe('message')
+          expect(e.data).toEqual({ order: 3 })
+          expect(e.cause).toBe(error)
+
+          return true
+        })
+      })
+
       it('on error has invalid ORPCError format', async () => {
         const date = new Date()
         const error = withEventMeta(new ErrorEvent({
