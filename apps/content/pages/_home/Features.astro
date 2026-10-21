@@ -1,6 +1,8 @@
 ---
 // Each card is one capability in one plain sentence; the vendor names live in
 // the "Runs on" and "Works with" strip above, so the grid stays capability-led.
+// Rows group the cards by theme: types, data, one router for every client,
+// then extending and operating it.
 import Icon from 'blume/components/Icon.astro'
 
 const features = [
@@ -40,6 +42,11 @@ const features = [
     body: 'The same router answers REST calls and writes its own OpenAPI document.',
   },
   {
+    icon: 'bot',
+    title: 'AI agents with MCP',
+    body: 'The same router serves AI agents as MCP tools, described by the metadata you already wrote.',
+  },
+  {
     icon: 'file-pen',
     title: 'Contract first',
     body: 'Write the contract first, then let TypeScript check that the server matches it.',
@@ -48,11 +55,6 @@ const features = [
     icon: 'blocks',
     title: 'Middleware and plugins',
     body: 'Extend any layer with middleware, plugins, and interceptors, all fully typed.',
-  },
-  {
-    icon: 'plug',
-    title: 'Works with your stack',
-    body: 'TanStack Query, SWR, Pinia Colada, NestJS, and Next.js Server Actions work out of the box.',
   },
   {
     icon: 'activity',
@@ -64,8 +66,7 @@ const features = [
     title: 'Runs anywhere',
     body: 'One router runs on Node, Bun, Deno, Cloudflare Workers, and AWS Lambda.',
   },
-]
----
+]---
 
 <section class="border-b border-border">
   <div class="mx-auto max-w-6xl px-6 py-20 sm:py-28">
