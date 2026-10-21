@@ -178,7 +178,7 @@ With thanks to [39 past sponsors](https://orpc.dev/sponsors#past-sponsors) who h
 
 ## Open Source Programs
 
-oRPC's development is supported by these programs for open source maintainers:
+What we build at [middleapi](https://github.com/middleapi) is supported by these programs for open source maintainers:
 
 <table>
   <tr>
