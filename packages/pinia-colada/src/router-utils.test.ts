@@ -1,5 +1,5 @@
 import type { RouterUtilsPlugin } from './plugin'
-import { RPCJsonSerializer } from '@orpc/client'
+import { createORPCClient, RPCJsonSerializer } from '@orpc/client'
 import * as KeyModule from './key'
 import { ProcedureUtils } from './procedure-utils'
 import { createRouterUtils } from './router-utils'
@@ -98,6 +98,15 @@ describe('createRouterUtils', () => {
   it('stops recursive on symbol', () => {
     const utils = createRouterUtils(client) as any
     expect(utils[Symbol.for('a')]).toBe(undefined)
+  })
+
+  it('can be converted to primitive values', () => {
+    const utils = createRouterUtils(createORPCClient({ call: vi.fn() }) as any) as any
+
+    expect(String(utils.planet)).toBe('[object Object]')
+    expect(`${utils.planet.find.queryOptions.name}`).toBe('[object Object]')
+    expect(utils.planet.then).toBeUndefined()
+    expect(utils.planet.toJSON).toBeUndefined()
   })
 
   it('stops recursive on RECURSIVE_CLIENT_UNWRAP_KEYS', () => {
