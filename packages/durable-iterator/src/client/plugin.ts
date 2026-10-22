@@ -164,10 +164,7 @@ export class DurableIteratorLinkPlugin<T extends ClientContext> implements Stand
               }
             })
 
-            /**
-             * The iterator was closed (aborted or returned) while refreshing,
-             * so nothing is left to update, and reconnecting would reopen the closed websocket.
-             */
+            // closed (aborted or returned) while refreshing, nothing left to update
             if (!newTokenAndPayload || isFinished) {
               return
             }
@@ -182,27 +179,20 @@ export class DurableIteratorLinkPlugin<T extends ClientContext> implements Stand
             /**
              * The next refresh cycle doesn't depend on the logic below,
              * so we place it last to avoid interfering with recursion.
-             */
-            if (canProactivelyUpdateToken) {
-            /**
+             *
              * Proactively update the token before expiration
              * to avoid reconnecting when the old token expires.
+             * The update fails if the websocket is not open or the connection drops mid-update.
              */
-              await durableClient.updateToken({ token: tokenAndPayload.token }).catch(() => {
-                /**
-                 * The update fails if the websocket is not open or the connection drops mid-update.
-                 * Reconnect instead, the new connection carries the new token.
-                 */
-                if (!isFinished) {
-                  websocket.reconnect()
-                }
-              })
-            }
-            else {
+            const isTokenUpdated = canProactivelyUpdateToken
+              && await durableClient.updateToken({ token: tokenAndPayload.token }).then(() => true, () => false)
+
             /**
-             * Proactive update requires the same channel and tags.
-             * If they differ, we must reconnect instead to make new token effective.
+             * Proactive update requires the same channel and tags, and an open connection.
+             * Otherwise, we must reconnect instead to make new token effective,
+             * unless closed meanwhile since reconnecting would reopen the closed websocket.
              */
+            if (!isTokenUpdated && !isFinished) {
               websocket.reconnect()
             }
           },

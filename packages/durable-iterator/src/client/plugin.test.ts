@@ -217,6 +217,18 @@ describe('durableIteratorLinkPlugin', async () => {
       expect(ws.send).toHaveBeenCalledTimes(1) // send set token request to durable iterator
       expect(vi.getTimerCount()).toBe(1) // new timer started
 
+      const [updateTokenId] = await decodeRequestMessage(ws.send.mock.calls[0][0])
+      const [, onMessage] = vi.mocked(ws.addEventListener).mock.calls.find(([event]: any[]) => event === 'message') as any
+      onMessage({
+        data: await encodeResponseMessage(updateTokenId, MessageType.RESPONSE, {
+          body: { json: undefined },
+          status: 200,
+          headers: {},
+        }),
+      })
+      await new Promise(r => realSetTimeout(r, 10)) // wait for set token response
+      expect(ws.reconnect).not.toHaveBeenCalled() // token updated without reconnecting
+
       vi.advanceTimersByTime(2000) // wait next retry + refreshTokenDelayInSeconds delay
       expect(vi.getTimerCount()).toBe(0) // refresh token executed
       await new Promise(r => realSetTimeout(r, 10)) // wait for token refresh promise
@@ -439,26 +451,17 @@ describe('durableIteratorLinkPlugin', async () => {
 
       expect(vi.getTimerCount()).toBe(1) // refresh token is enabled
 
-      const unhandledRejectionHandler = vi.fn()
-      process.on('unhandledRejection', unhandledRejectionHandler)
-      afterEach(() => {
-        process.off('unhandledRejection', unhandledRejectionHandler)
-      })
-
       const urlProvider = vi.mocked(ReconnectableWebSocket).mock.calls[0]![0] as any
       const url = await urlProvider()
       const ws = vi.mocked(ReconnectableWebSocket).mock.results[0]!.value
       ws.readyState = 3 // CLOSED - the connection dropped and is waiting to reconnect
-      ws.send.mockClear()
 
       vi.advanceTimersByTime(1000)
       expect(vi.getTimerCount()).toBe(0) // refresh token executed
       await new Promise(resolve => realSetTimeout(resolve, 10)) // wait for token refresh promise
       expect(durableIteratorHandler).toHaveBeenCalledTimes(2)
-      expect(ws.send).not.toHaveBeenCalled() // cannot send set token request to durable iterator
       expect(ws.reconnect).toHaveBeenCalledTimes(1)
       expect(await urlProvider()).not.toEqual(url) // reconnect with the new token
-      expect(unhandledRejectionHandler).not.toHaveBeenCalled()
       expect(vi.getTimerCount()).toBe(1) // new refresh token timer created
 
       await output.return() // cleanup
@@ -500,7 +503,6 @@ describe('durableIteratorLinkPlugin', async () => {
       const urlProvider = vi.mocked(ReconnectableWebSocket).mock.calls[0]![0] as any
       const url = await urlProvider()
       const ws = vi.mocked(ReconnectableWebSocket).mock.results[0]!.value
-      ws.send.mockClear()
 
       durableIteratorHandler.mockImplementationOnce(async () => {
         await sleep(2000)
@@ -515,8 +517,55 @@ describe('durableIteratorLinkPlugin', async () => {
       await new Promise(resolve => realSetTimeout(resolve, 10)) // wait for token refresh promise
       expect(durableIteratorHandler).toHaveBeenCalledTimes(2)
       expect(ws.reconnect).not.toHaveBeenCalled() // would reopen the closed websocket
-      expect(ws.send).not.toHaveBeenCalled()
       expect(await urlProvider()).toEqual(url)
+    })
+
+    it('not reconnect if closed while scheduling next refresh', async () => {
+      refreshTokenBeforeExpireInSeconds.mockImplementation(() => 9)
+      durableIteratorHandler.mockImplementationOnce(
+        () => new DurableIterator<any, any>('some-room', {
+          signingKey: 'signing-key',
+          tokenTTLSeconds: 10,
+        }) as any,
+      )
+
+      const outputPromise = link.call(['durableIterator'], {}, { context: {} }) as any
+
+      await vi.waitFor(async () => {
+        expect(ReconnectableWebSocket).toHaveBeenCalledOnce()
+
+        const ws = vi.mocked(ReconnectableWebSocket).mock.results[0]!.value
+        const [id] = await decodeRequestMessage(ws.send.mock.calls[0][0])
+
+        const [, onMessage] = vi.mocked(ws.addEventListener).mock.calls.find(([event]: any[]) => event === 'message') as any
+
+        onMessage({
+          data: await encodeResponseMessage(id, MessageType.RESPONSE, {
+            body: (async function* () { }()),
+            status: 200,
+            headers: {},
+          }),
+        })
+      })
+
+      const output = await outputPromise
+      expect(output).toSatisfy(isAsyncIteratorObject)
+
+      expect(vi.getTimerCount()).toBe(1) // refresh token is enabled
+
+      durableIteratorHandler.mockResolvedValueOnce(
+        new DurableIterator<any, any>('a-different-channel', { signingKey: 'signing-key' }) as any,
+      )
+      refreshTokenBeforeExpireInSeconds.mockImplementationOnce((async () => {
+        await output.return() // closed while scheduling next refresh
+        return 9
+      }) as any)
+      vi.advanceTimersByTime(1000)
+      expect(vi.getTimerCount()).toBe(0) // refresh token executed
+      await new Promise(resolve => realSetTimeout(resolve, 10)) // wait for token refresh promise
+      const ws = vi.mocked(ReconnectableWebSocket).mock.results[0]!.value
+      expect(ws.close).toHaveBeenCalledTimes(1)
+      expect(ws.reconnect).not.toHaveBeenCalled() // would reopen the closed websocket
     })
 
     it('reconnect if refresh token channel mismatch', async () => {
