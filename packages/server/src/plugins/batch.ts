@@ -44,6 +44,14 @@ function isBodyHeader(name: string): boolean {
 }
 
 /**
+ * Whether untrusted batch JSON is a list of client peer messages.
+ * `isPeerMessage` must run first, since `isClientPeerSendMessage` does not check `id` or `binary`.
+ */
+function isClientPeerSendMessages(maybe: unknown): maybe is ClientPeerSendMessage[] {
+  return Array.isArray(maybe) && maybe.every((m: unknown) => isPeerMessage(m) && isClientPeerSendMessage(m))
+}
+
+/**
  * Errors should not occur at the routing interceptor level.
  * Reject the promise so it can be handled by the unhandledRejection handler
  * for global logging or error handling.
@@ -271,7 +279,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
           const mightBeMessages = JSON.parse(data)
 
-          if (!Array.isArray(mightBeMessages) || mightBeMessages.some(m => !isPeerMessage(m) || !isClientPeerSendMessage(m))) {
+          if (!isClientPeerSendMessages(mightBeMessages)) {
             return {
               matched: true,
               response: { status: 400, headers: {}, body: 'Invalid batch request data parameter' },
@@ -283,7 +291,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         else {
           const mightBeMessages = await interceptorOptions.request.resolveBody()
 
-          if (!Array.isArray(mightBeMessages) || mightBeMessages.some(m => !isPeerMessage(m) || !isClientPeerSendMessage(m))) {
+          if (!isClientPeerSendMessages(mightBeMessages)) {
             return {
               matched: true,
               response: { status: 400, headers: {}, body: 'Invalid batch request body' },

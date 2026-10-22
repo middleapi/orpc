@@ -29,6 +29,15 @@ function makePeerRequestMessage(id: string, url: string, method = 'POST', body?:
  */
 const DEEPLY_NESTED_ARRAY_JSON = `${'['.repeat(10_000)}${']'.repeat(10_000)}`
 
+const INVALID_MESSAGE_IDS = [
+  ['true', true],
+  ['an object', {}],
+  ['an array', []],
+  ['null', null],
+  ['a number', 0],
+  ['missing', undefined],
+] as const
+
 function createBatchRequest(options: {
   messages?: unknown
   method?: 'POST' | 'GET' | 'QUERY'
@@ -215,14 +224,7 @@ describe('batchHandlerPlugin', () => {
       expect(handlerFn).toHaveBeenCalledTimes(0)
     })
 
-    it.each([
-      ['true', true],
-      ['an object', {}],
-      ['an array', []],
-      ['null', null],
-      ['a number', 0],
-      ['missing', undefined],
-    ])('returns 400 for a batch body whose message id is %s', async (_, id) => {
+    it.each(INVALID_MESSAGE_IDS)('returns 400 for a batch body whose message id is %s', async (_, id) => {
       const handler = createHandler()
 
       const { response } = await handler.handle(createBatchRequest({
@@ -538,14 +540,7 @@ describe('batchHandlerPlugin', () => {
       expect(await response!.text()).toContain('Invalid batch request data parameter')
     })
 
-    it.each([
-      ['true', true],
-      ['an object', {}],
-      ['an array', []],
-      ['null', null],
-      ['a number', 0],
-      ['missing', undefined],
-    ])('returns 400 for GET batch data whose message id is %s', async (_, id) => {
+    it.each(INVALID_MESSAGE_IDS)('returns 400 for GET batch data whose message id is %s', async (_, id) => {
       const handler = createHandler()
       const data = encodeURIComponent(JSON.stringify([
         { ...makePeerRequestMessage('0', '/ping', 'GET'), id },
