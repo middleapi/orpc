@@ -19,7 +19,7 @@ import type {
   StreamedOptionsIn,
   StreamedOptionsOut,
 } from './types'
-import { anyAbortSignal, intercept, isAsyncIteratorObject, isTypescriptObject, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
+import { intercept, isAsyncIteratorObject, isTypescriptObject, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
 import { skipToken } from '@tanstack/query-core'
 import { generateOperationKey } from './key'
 import { liveQuery } from './live-query'
@@ -172,12 +172,12 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
   > | undefined
 
   /**
-   * Settle streamed queries once they connect and live queries on their first event,
-   * aborting the call instead of following it. Set by `StreamQuerySSRUtilsPlugin` on the server.
+   * Cancel streamed queries once they connect and live queries on their first event,
+   * keeping the data received so far. Set by `StreamQuerySSRUtilsPlugin` on the server.
    *
    * @internal
    */
-  snapshotStreams?: boolean | undefined
+  cancelStreamsOnFirstData?: boolean | undefined
 }
 
 const PROCEDURE_UTILS_INTERCEPTOR_KEYS: string[] = [
@@ -445,14 +445,13 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
             return serializableStreamedQuery(
               async (queryContext) => {
-                const snapshot = this.options.snapshotStreams ? new AbortController() : undefined
-                const output = await this.call(input, { signal: anyAbortSignal([queryContext.signal, snapshot?.signal]), context })
+                const output = await this.call(input, { signal: queryContext.signal, context })
 
                 if (!isAsyncIteratorObject(output)) {
                   throw new Error('streamedQuery requires an AsyncIteratorObject output')
                 }
 
-                return snapshot ? takeChunks(output, 0, snapshot) : output
+                return this.options.cancelStreamsOnFirstData ? takeChunks(output, 0, queryContext) : output
               },
               optionsIn.queryFnOptions,
             )(fnContext)
@@ -533,9 +532,8 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
             }
 
             return liveQuery(async (queryContext) => {
-              const snapshot = this.options.snapshotStreams ? new AbortController() : undefined
               const output = await this.call(input, {
-                signal: anyAbortSignal([queryContext.signal, snapshot?.signal]),
+                signal: queryContext.signal,
                 context,
               })
 
@@ -543,7 +541,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
                 throw new Error('liveQuery requires an AsyncIteratorObject output')
               }
 
-              return snapshot ? takeChunks(output, 1, snapshot) : output
+              return this.options.cancelStreamsOnFirstData ? takeChunks(output, 1, queryContext) : output
             })(fnContext)
           },
         )
@@ -693,10 +691,10 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 }
 
 /**
- * Yields the first `count` chunks, then aborts the call and closes the iterator.
- * Aborts first, since the iterator's cleanup may wait on `signal`.
+ * Yields the first `count` chunks, then cancels the query, keeping its data, and closes the iterator.
+ * Cancels first, since the iterator's cleanup may wait on `signal`.
  */
-async function* takeChunks<T>(iterator: AsyncIterator<T>, count: number, controller: AbortController): AsyncGenerator<T> {
+async function* takeChunks<T>(iterator: AsyncIterator<T>, count: number, context: QueryFunctionContext): AsyncGenerator<T> {
   try {
     for (let i = 0; i < count; i++) {
       const result = await iterator.next()
@@ -707,9 +705,10 @@ async function* takeChunks<T>(iterator: AsyncIterator<T>, count: number, control
 
       yield result.value
     }
+
+    void context.client.getQueryCache().find({ queryKey: context.queryKey, exact: true })?.cancel({ revert: true })
   }
   finally {
-    controller.abort()
     await iterator.return?.()
   }
 }

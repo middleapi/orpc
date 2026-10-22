@@ -33,15 +33,15 @@ export function createHydrationOptions(
 
 export interface StreamQuerySSRUtilsPluginOptions {
   /**
-   * Whether utils run on the server, where streamed and live queries settle on their first snapshot.
+   * Whether utils run on the server, where streamed and live queries are cancelled once they have data.
    * Defaults to `true` when there is no global `window`.
    */
   isServer?: boolean | undefined
 }
 
 /**
- * Router utils plugin for SSR of streamed and live queries. On the server, streamed queries
- * settle once they connect and live queries on their first event, then the call is aborted;
+ * Router utils plugin for SSR of streamed and live queries. On the server, streamed queries are
+ * cancelled once they connect and live queries on their first event, keeping the data received so far;
  * in the browser, they refetch on mount so streams reopen after hydration.
  *
  * @see {@link https://orpc.dev/docs/integrations/tanstack-query#streamed-and-live-queries | TanStack Query Integration - Streamed and Live Queries}
@@ -60,7 +60,7 @@ export class StreamQuerySSRUtilsPlugin<T extends AnyNestedClient = AnyNestedClie
     options: ProcedureUtilsOptions<InferClientContext<T>, any, any, InferClientError<T>>,
   ): ProcedureUtilsOptions<InferClientContext<T>, any, any, InferClientError<T>> {
     return mergeProcedureUtilsOptions<any, any, any, any>({
-      snapshotStreams: this.isServer,
+      cancelStreamsOnFirstData: this.isServer,
       streamedOptions: { initialData: [], refetchOnMount: 'always' },
       liveOptions: { refetchOnMount: 'always' },
     }, options)

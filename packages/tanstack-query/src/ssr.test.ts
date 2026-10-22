@@ -1,7 +1,7 @@
 import type { Client } from '@orpc/client'
 import { RPCJsonSerializer } from '@orpc/client'
 import { sleep } from '@orpc/shared'
-import { dehydrate, hydrate, QueryClient } from '@tanstack/query-core'
+import { dehydrate, hydrate, QueryCache, QueryClient } from '@tanstack/query-core'
 import { createRouterUtils } from './router-utils'
 import { createHydrationOptions, StreamQuerySSRUtilsPlugin } from './ssr'
 
@@ -81,24 +81,28 @@ describe('streamQuerySSRUtilsPlugin', () => {
     vi.unstubAllGlobals()
   })
 
-  it('settles live queries on their first event on the server', async () => {
-    const queryClient = new QueryClient()
+  it('cancels live queries on their first event on the server', async () => {
+    const onSuccess = vi.fn()
+    const queryClient = new QueryClient({ queryCache: new QueryCache({ onSuccess }) })
     const utils = createRouterUtils(client, { plugins: [new StreamQuerySSRUtilsPlugin({ isServer: true })] })
 
-    await queryClient.prefetchQuery(utils.stream.liveOptions())
+    await expect(queryClient.fetchQuery(utils.stream.liveOptions())).resolves.toBe(1)
 
     expect(queryClient.getQueryState(utils.stream.liveKey())).toMatchObject({ status: 'success', fetchStatus: 'idle', data: 1 })
+    expect(onSuccess).not.toHaveBeenCalled()
     expect(cleanup).toHaveBeenCalledTimes(1)
     expect(vi.mocked(client.stream).mock.calls[0]![1]!.signal!.aborted).toBe(true)
   })
 
-  it('settles streamed queries once they connect on the server', async () => {
-    const queryClient = new QueryClient()
+  it('cancels streamed queries once they connect on the server', async () => {
+    const onSuccess = vi.fn()
+    const queryClient = new QueryClient({ queryCache: new QueryCache({ onSuccess }) })
     const utils = createRouterUtils(client, { plugins: [new StreamQuerySSRUtilsPlugin({ isServer: true })] })
 
-    await queryClient.prefetchQuery(utils.stream.streamedOptions())
+    await expect(queryClient.fetchQuery(utils.stream.streamedOptions())).resolves.toEqual([])
 
     expect(queryClient.getQueryState(utils.stream.streamedKey())).toMatchObject({ status: 'success', fetchStatus: 'idle', data: [] })
+    expect(onSuccess).not.toHaveBeenCalled()
     await expect(vi.mocked(client.stream).mock.results[0]!.value.next()).resolves.toEqual({ done: true, value: undefined })
     expect(vi.mocked(client.stream).mock.calls[0]![1]!.signal!.aborted).toBe(true)
   })
@@ -122,7 +126,7 @@ describe('streamQuerySSRUtilsPlugin', () => {
     expect(signal.aborted).toBe(true)
   })
 
-  it('aborts the call before closing the stream on the server', async () => {
+  it('cancels the query before closing the stream on the server', async () => {
     const queryClient = new QueryClient()
     const signalClient = {
       stream: vi.fn(async function* (_input, { signal }) {
@@ -163,10 +167,10 @@ describe('streamQuerySSRUtilsPlugin', () => {
   })
 
   it('detects the server by the absence of window', () => {
-    expect(new StreamQuerySSRUtilsPlugin().initProcedureOptions([], {})).toMatchObject({ snapshotStreams: true })
+    expect(new StreamQuerySSRUtilsPlugin().initProcedureOptions([], {})).toMatchObject({ cancelStreamsOnFirstData: true })
 
     vi.stubGlobal('window', {})
-    expect(new StreamQuerySSRUtilsPlugin().initProcedureOptions([], {})).toMatchObject({ snapshotStreams: false })
+    expect(new StreamQuerySSRUtilsPlugin().initProcedureOptions([], {})).toMatchObject({ cancelStreamsOnFirstData: false })
   })
 
   it('refetches streamed and live queries on mount', () => {
