@@ -94,6 +94,7 @@ export type {
   AsyncCleanupFn,
   AsyncIteratorClassNextFn,
   DistributiveOmit,
+  IntersectPick,
   MaybeOptionalOptions,
   PromiseWithError,
   Public,
