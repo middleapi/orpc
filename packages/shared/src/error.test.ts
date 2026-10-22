@@ -1,5 +1,27 @@
+import { runInNewContext } from 'node:vm'
 import { AbortError } from '@standard-server/shared'
-import { isAbortError } from './error'
+import { isAbortError, isErrorLike } from './error'
+
+describe('isErrorLike', () => {
+  it('returns true for Error instances', () => {
+    expect(isErrorLike(new Error('boom'))).toBe(true)
+    expect(isErrorLike(new TypeError('boom'))).toBe(true)
+  })
+
+  it('returns true for errors from another realm', () => {
+    const error = runInNewContext('new TypeError("boom")')
+
+    expect(error instanceof Error).toBe(false)
+    expect(isErrorLike(error)).toBe(true)
+  })
+
+  it('returns false for non-Error values', () => {
+    expect(isErrorLike(null)).toBe(false)
+    expect(isErrorLike(undefined)).toBe(false)
+    expect(isErrorLike('boom')).toBe(false)
+    expect(isErrorLike({ name: 'Error', message: 'boom' })).toBe(false)
+  })
+})
 
 describe('isAbortError', () => {
   it('returns true for AbortError', () => {
@@ -12,6 +34,20 @@ describe('isAbortError', () => {
     error.name = 'RequestAbortError'
 
     expect(isAbortError(error)).toBe(true)
+  })
+
+  it('returns true for an AbortError from another realm', () => {
+    const error = runInNewContext('const e = new Error("aborted"); e.name = "AbortError"; e')
+
+    expect(error instanceof Error).toBe(false)
+    expect(isAbortError(error)).toBe(true)
+  })
+
+  it('returns false when the error name is not a string', () => {
+    const error = new Error('aborted') as any
+    error.name = 123
+
+    expect(isAbortError(error)).toBe(false)
   })
 
   it('returns false for other Error instances', () => {

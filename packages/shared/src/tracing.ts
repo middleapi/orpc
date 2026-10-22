@@ -1,5 +1,5 @@
 import type { Promisable } from 'type-fest'
-import { isAbortError } from './error'
+import { isAbortError, isErrorLike } from './error'
 
 const TRACER_SYMBOL = Symbol.for('ORPC_TRACER')
 
@@ -113,11 +113,11 @@ export function setSpanAttributeIfDefined(span: TracingSpan | undefined, key: st
 }
 
 export function toTracingException(error: unknown): TracingException {
-  if (error instanceof Error) {
+  if (isErrorLike(error)) {
     const exception: TracingException = {
-      message: error.message,
-      name: error.name,
-      stack: error.stack,
+      message: typeof error.message === 'string' ? error.message : String(error),
+      name: typeof error.name === 'string' ? error.name : undefined,
+      stack: typeof error.stack === 'string' ? error.stack : undefined,
     }
 
     if ('code' in error && (typeof error.code === 'string' || typeof error.code === 'number')) {
