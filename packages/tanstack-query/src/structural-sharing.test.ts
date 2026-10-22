@@ -176,6 +176,37 @@ describe('structuralSharing', () => {
       expect(sharing(new Box(old), nextBox)).toBe(nextBox)
     })
 
+    it('compares dates with own fields through a custom date handler', () => {
+      const zoned = createStructuralSharing(new RPCJsonSerializer({
+        handlers: {
+          date: {
+            condition: value => value instanceof Date,
+            serialize: (value: Date & { zone?: string }) => [value.getTime(), value.zone ?? null],
+            deserialize: ([time, zone]: any) => Object.assign(new Date(time), zone === null ? {} : { zone }),
+          },
+        },
+      }))
+
+      const old = Object.assign(new Date(0), { zone: 'UTC' })
+      const next = Object.assign(new Date(0), { zone: 'PST' })
+
+      expect(zoned(old, Object.assign(new Date(0), { zone: 'UTC' }))).toBe(old)
+      expect(zoned(old, next)).toBe(next)
+    })
+
+    it('ignores inherited enumerable keys of dates', () => {
+      // eslint-disable-next-line no-extend-native -- simulates a polluted prototype
+      Object.defineProperty(Date.prototype, 'polluted', { value: 1, enumerable: true, configurable: true })
+
+      try {
+        const old = new Date(0)
+        expect(sharing(old, new Date(0))).toBe(old)
+      }
+      finally {
+        delete (Date.prototype as any).polluted
+      }
+    })
+
     it('takes new instances of types without a handler', () => {
       const next = new Planet()
       expect(sharing(new Planet(), next)).toBe(next)

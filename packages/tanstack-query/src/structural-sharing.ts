@@ -36,8 +36,9 @@ function replaceEqualDeep(a: any, b: any, depth: number, serializer: Public<RPCJ
     return b
   }
 
-  // the most common non-JSON value, compared directly since serializing it is much slower
-  if (proto === Date.prototype) {
+  // the most common non-JSON value, compared directly since serializing it is much slower,
+  // unless it carries own fields that a custom date handler may serialize too
+  if (proto === Date.prototype && !hasOwnEnumerableKey(a) && !hasOwnEnumerableKey(b)) {
     return Object.is(a.getTime(), b.getTime()) ? a : b
   }
 
@@ -107,6 +108,17 @@ function isSameMeta(a: RPCJsonSerializationMeta[] = [], b: RPCJsonSerializationM
     const other = b[i]!
     return entry.length === other.length && entry.every((segment, j) => segment === other[j])
   })
+}
+
+function hasOwnEnumerableKey(value: object): boolean {
+  // for...in avoids the array allocation of Object.keys, which matters on this hot path
+  for (const key in value) {
+    if (Object.hasOwn(value, key)) {
+      return true
+    }
+  }
+
+  return false
 }
 
 function isPlainArray(value: unknown[]): boolean {
