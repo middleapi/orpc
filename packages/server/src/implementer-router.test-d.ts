@@ -90,6 +90,16 @@ describe('RouterImplementer', () => {
         & ProcedureImplementer<{ auth: boolean }, object, typeof schema2, typeof schema2, object>
       >()
     })
+
+    it('conflict procedure/router names with private implementer members', () => {
+      const implementer = {} as RouterImplementer<{
+        config: ProcedureContract<typeof schema1, typeof schema1, object>
+      }, { auth: boolean }>
+
+      expectTypeOf(implementer.config).toEqualTypeOf<
+        ProcedureImplementer<{ auth: boolean }, object, typeof schema1, typeof schema1, object>
+      >()
+    })
   })
 
   describe('.use', () => {

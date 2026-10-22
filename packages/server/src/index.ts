@@ -64,6 +64,7 @@ export type {
   InitialInputSchema,
   InitialOutputSchema,
   MergedErrorMap,
+  MergedSchema,
   Meta,
   MetaPlugin,
   MetaPluginDefinition,
@@ -92,6 +93,7 @@ export {
 export type {
   AsyncCleanupFn,
   AsyncIteratorClassNextFn,
+  DistributiveOmit,
   MaybeOptionalOptions,
   PromiseWithError,
   Registry,

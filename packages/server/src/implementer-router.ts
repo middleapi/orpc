@@ -1,5 +1,5 @@
 import type { ErrorMap, InferRouterContractErrorMap, RouterContract } from '@orpc/contract'
-import type { IntersectPick, Public } from '@orpc/shared'
+import type { IntersectPick } from '@orpc/shared'
 import type { Context, MergedContext, MergedInitialContext } from './context'
 import type { AnyMiddleware, Middleware } from './middleware'
 import type { DecoratedMiddleware } from './middleware-decorated'
@@ -185,7 +185,8 @@ export type RouterImplementer<
   TInitialContext extends Context,
 > = TContract extends ProcedureContract<infer $InputSchema, infer $OutputSchema, infer $ErrorMap>
   ? ProcedureImplementer<TInitialContext, object, $InputSchema, $OutputSchema, $ErrorMap>
-  : Public<SharedRouterImplementer<TContract, TInitialContext>> & {
+  // `Pick` instead of `Public` from `@orpc/shared` keeps inferred types nameable when only `@orpc/server` is installed
+  : Pick<SharedRouterImplementer<TContract, TInitialContext>, keyof SharedRouterImplementer<TContract, TInitialContext>> & {
     [K in keyof TContract]: TContract[K] extends RouterContract
       ? RouterImplementer<TContract[K], TInitialContext>
       : never
