@@ -7,7 +7,7 @@ import { ORPCError } from '@orpc/client'
 import { BATCH_HEADER, DEFAULT_BATCH_MAX_SIZE } from '@orpc/client/plugins'
 import { isAsyncIteratorObject, promiseWithResolvers, toArray, value } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
-import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
+import { encodePeerMessage, isClientPeerSendMessage, isPeerMessage, ServerPeer } from '@standard-server/peer'
 
 /**
  * Content type for batch responses that use the length-prefixed binary framing,
@@ -271,7 +271,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
           const mightBeMessages = JSON.parse(data)
 
-          if (!Array.isArray(mightBeMessages) || mightBeMessages.some(m => !isClientPeerSendMessage(m))) {
+          if (!Array.isArray(mightBeMessages) || mightBeMessages.some(m => !isPeerMessage(m) || !isClientPeerSendMessage(m))) {
             return {
               matched: true,
               response: { status: 400, headers: {}, body: 'Invalid batch request data parameter' },
@@ -283,7 +283,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         else {
           const mightBeMessages = await interceptorOptions.request.resolveBody()
 
-          if (!Array.isArray(mightBeMessages) || mightBeMessages.some(m => !isClientPeerSendMessage(m))) {
+          if (!Array.isArray(mightBeMessages) || mightBeMessages.some(m => !isPeerMessage(m) || !isClientPeerSendMessage(m))) {
             return {
               matched: true,
               response: { status: 400, headers: {}, body: 'Invalid batch request body' },

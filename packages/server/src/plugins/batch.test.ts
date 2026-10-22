@@ -15,7 +15,7 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-function makePeerRequestMessage(id: number | string, url: string, method = 'POST', body?: unknown) {
+function makePeerRequestMessage(id: string, url: string, method = 'POST', body?: unknown) {
   return {
     kind: 'request',
     id,
@@ -23,6 +23,11 @@ function makePeerRequestMessage(id: number | string, url: string, method = 'POST
     binary: undefined,
   }
 }
+
+/**
+ * An array nested deep enough that `JSON.stringify` overflows the stack on it, written as JSON by hand for that reason.
+ */
+const DEEPLY_NESTED_ARRAY_JSON = `${'['.repeat(10_000)}${']'.repeat(10_000)}`
 
 function createBatchRequest(options: {
   messages?: unknown
@@ -135,8 +140,8 @@ describe('batchHandlerPlugin', () => {
     it('handles batch POST requests', async () => {
       const handler = createHandler()
       const peerMessages = [
-        makePeerRequestMessage(0, '/ping'),
-        makePeerRequestMessage(1, '/ping'),
+        makePeerRequestMessage('0', '/ping'),
+        makePeerRequestMessage('1', '/ping'),
       ]
 
       const { matched, response } = await handler.handle(createBatchRequest({
@@ -163,8 +168,8 @@ describe('batchHandlerPlugin', () => {
       const handler = createHandler(new BatchHandlerPlugin(), binaryRouter)
 
       const peerMessages = [
-        makePeerRequestMessage(0, '/file'),
-        makePeerRequestMessage(1, '/ping'),
+        makePeerRequestMessage('0', '/file'),
+        makePeerRequestMessage('1', '/ping'),
       ]
 
       const { response } = await handler.handle(createBatchRequest({
@@ -186,7 +191,7 @@ describe('batchHandlerPlugin', () => {
       const handler = createHandler()
 
       const { matched, response } = await handler.handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/nonexistent')],
+        messages: [makePeerRequestMessage('0', '/nonexistent')],
       }))
 
       expect(matched).toBe(true)
@@ -194,7 +199,7 @@ describe('batchHandlerPlugin', () => {
 
       const body = await response!.json() as any
       expect(body).toHaveLength(1)
-      expect(body[0]).toMatchObject({ kind: 'response', id: 0 })
+      expect(body[0]).toMatchObject({ kind: 'response', id: '0' })
       expect(body[0].json.status).toBe(404)
     })
 
@@ -203,6 +208,39 @@ describe('batchHandlerPlugin', () => {
 
       const { response } = await handler.handle(createBatchRequest({
         messages: 'not-an-array',
+      }))
+
+      expect(response!.status).toBe(400)
+      expect(await response!.text()).toContain('Invalid batch request body')
+      expect(handlerFn).toHaveBeenCalledTimes(0)
+    })
+
+    it.each([
+      ['true', true],
+      ['an object', {}],
+      ['an array', []],
+      ['null', null],
+      ['a number', 0],
+      ['missing', undefined],
+    ])('returns 400 for a batch body whose message id is %s', async (_, id) => {
+      const handler = createHandler()
+
+      const { response } = await handler.handle(createBatchRequest({
+        messages: [{ ...makePeerRequestMessage('0', '/ping'), id }],
+      }))
+
+      expect(response!.status).toBe(400)
+      expect(await response!.text()).toContain('Invalid batch request body')
+      expect(handlerFn).toHaveBeenCalledTimes(0)
+    })
+
+    it('returns 400 for a batch body whose message id is a deeply nested array', async () => {
+      const handler = createHandler()
+
+      const { response } = await handler.handle(new Request('https://example.com/__batch__', {
+        method: 'POST',
+        headers: { 'orpc-batch': '1', 'content-type': 'application/json' },
+        body: `[{"id":${DEEPLY_NESTED_ARRAY_JSON},"kind":"request","json":{"url":"/ping"}}]`,
       }))
 
       expect(response!.status).toBe(400)
@@ -222,7 +260,7 @@ describe('batchHandlerPlugin', () => {
           'content-type': 'application/json',
           'content-encoding': 'gzip, gzip, gzip, gzip, gzip, gzip',
         },
-        body: JSON.stringify([makePeerRequestMessage(0, '/ping')]),
+        body: JSON.stringify([makePeerRequestMessage('0', '/ping')]),
       }))
 
       expect(response!.status).toBe(400)
@@ -236,7 +274,7 @@ describe('batchHandlerPlugin', () => {
       })
 
       const { response } = await handler.handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/ping')],
+        messages: [makePeerRequestMessage('0', '/ping')],
       }))
 
       expect(response!.status).toBe(400)
@@ -247,8 +285,8 @@ describe('batchHandlerPlugin', () => {
     it('returns 413 when batch size exceeds maxSize', async () => {
       const handler = createHandler(new BatchHandlerPlugin({ maxSize: 1 }))
       const peerMessages = [
-        makePeerRequestMessage(0, '/ping'),
-        makePeerRequestMessage(1, '/ping'),
+        makePeerRequestMessage('0', '/ping'),
+        makePeerRequestMessage('1', '/ping'),
       ]
 
       const { response } = await handler.handle(createBatchRequest({
@@ -274,7 +312,7 @@ describe('batchHandlerPlugin', () => {
       }))
 
       const { response } = await handler.handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/ping')],
+        messages: [makePeerRequestMessage('0', '/ping')],
       }))
 
       expect(response!.status).toBe(207)
@@ -300,7 +338,7 @@ describe('batchHandlerPlugin', () => {
       }))
 
       const { response } = await handler.handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/ping')],
+        messages: [makePeerRequestMessage('0', '/ping')],
       }))
 
       expect(response!.status).toBe(207)
@@ -407,12 +445,12 @@ describe('batchHandlerPlugin', () => {
       }),
     })
 
-    const messages = [makePeerRequestMessage(0, '/wait'), makePeerRequestMessage(1, '/subscribe')]
+    const messages = [makePeerRequestMessage('0', '/wait'), makePeerRequestMessage('1', '/subscribe')]
 
     it.each([
       // The stream sub-response waits for `wait`, so its generator never starts
       ['with', messages, 1],
-      ['without', [makePeerRequestMessage(0, '/wait'), makePeerRequestMessage(1, '/wait')], 2],
+      ['without', [makePeerRequestMessage('0', '/wait'), makePeerRequestMessage('1', '/wait')], 2],
     ] as const)('aborts sub-requests %s a stream sub-response when the batch request is aborted', async (_, batchMessages, running) => {
       const controller = new AbortController()
       const result = handler.handle(createBatchRequest({ messages: batchMessages, signal: controller.signal }))
@@ -429,7 +467,7 @@ describe('batchHandlerPlugin', () => {
 
     it('aborts sub-requests when the response stream is cancelled', async () => {
       const { response } = await handler.handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/subscribe'), makePeerRequestMessage(1, '/subscribe')],
+        messages: [makePeerRequestMessage('0', '/subscribe'), makePeerRequestMessage('1', '/subscribe')],
       }))
 
       await vi.waitFor(() => expect(started).toHaveBeenCalledTimes(2))
@@ -440,7 +478,7 @@ describe('batchHandlerPlugin', () => {
 
     it('aborts sub-requests when the batch request is already aborted', async () => {
       const { response } = await handler.handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/wait')],
+        messages: [makePeerRequestMessage('0', '/wait')],
         signal: AbortSignal.abort(),
       }))
       await response!.arrayBuffer()
@@ -453,7 +491,7 @@ describe('batchHandlerPlugin', () => {
     it('handles batch GET requests via query param', async () => {
       const handler = createHandler()
       const data = encodeURIComponent(JSON.stringify([
-        makePeerRequestMessage(0, '/ping', 'GET'),
+        makePeerRequestMessage('0', '/ping', 'GET'),
       ]))
 
       const { matched, response } = await handler.handle(createBatchRequest({
@@ -500,11 +538,48 @@ describe('batchHandlerPlugin', () => {
       expect(await response!.text()).toContain('Invalid batch request data parameter')
     })
 
+    it.each([
+      ['true', true],
+      ['an object', {}],
+      ['an array', []],
+      ['null', null],
+      ['a number', 0],
+      ['missing', undefined],
+    ])('returns 400 for GET batch data whose message id is %s', async (_, id) => {
+      const handler = createHandler()
+      const data = encodeURIComponent(JSON.stringify([
+        { ...makePeerRequestMessage('0', '/ping', 'GET'), id },
+      ]))
+
+      const { response } = await handler.handle(createBatchRequest({
+        method: 'GET',
+        data,
+      }))
+
+      expect(response!.status).toBe(400)
+      expect(await response!.text()).toContain('Invalid batch request data parameter')
+      expect(handlerFn).toHaveBeenCalledTimes(0)
+    })
+
+    it('returns 400 for GET batch data whose message id is a deeply nested array', async () => {
+      const handler = createHandler()
+      const data = encodeURIComponent(`[{"id":${DEEPLY_NESTED_ARRAY_JSON},"kind":"request","json":{"method":"GET","url":"/ping"}}]`)
+
+      const { response } = await handler.handle(createBatchRequest({
+        method: 'GET',
+        data,
+      }))
+
+      expect(response!.status).toBe(400)
+      expect(await response!.text()).toContain('Invalid batch request data parameter')
+      expect(handlerFn).toHaveBeenCalledTimes(0)
+    })
+
     it('returns 400 when a GET batch contains a non-GET sub-request', async () => {
       const handler = createHandler()
       const data = encodeURIComponent(JSON.stringify([
-        makePeerRequestMessage(0, '/ping', 'GET'),
-        makePeerRequestMessage(1, '/ping', 'POST'),
+        makePeerRequestMessage('0', '/ping', 'GET'),
+        makePeerRequestMessage('1', '/ping', 'POST'),
       ]))
 
       const { response } = await handler.handle(createBatchRequest({
@@ -520,7 +595,7 @@ describe('batchHandlerPlugin', () => {
     it('returns 400 when a GET batch sub-request omits the method (defaults to POST)', async () => {
       const handler = createHandler()
       const data = encodeURIComponent(JSON.stringify([
-        { kind: 'request', id: 0, json: { url: '/ping', headers: {} } },
+        { kind: 'request', id: '0', json: { url: '/ping', headers: {} } },
       ]))
 
       const { response } = await handler.handle(createBatchRequest({
@@ -541,7 +616,7 @@ describe('batchHandlerPlugin', () => {
       const { response } = await handler.handle(createBatchRequest({
         method: 'QUERY',
         messages: [
-          { kind: 'response', id: 0, json: { method: 'POST', url: '/ping', headers: {} } },
+          { kind: 'response', id: '0', json: { method: 'POST', url: '/ping', headers: {} } },
         ],
       }))
 
@@ -555,8 +630,8 @@ describe('batchHandlerPlugin', () => {
       const { response } = await handler.handle(createBatchRequest({
         method: 'QUERY',
         messages: [
-          makePeerRequestMessage(0, '/ping', 'QUERY'),
-          makePeerRequestMessage(1, '/ping', 'POST'),
+          makePeerRequestMessage('0', '/ping', 'QUERY'),
+          makePeerRequestMessage('1', '/ping', 'POST'),
         ],
       }))
 
@@ -586,7 +661,7 @@ describe('batchHandlerPlugin', () => {
         method: 'POST',
         headers: { 'orpc-batch': '1', 'content-type': 'application/json', ...headers },
         body: JSON.stringify([
-          { kind: 'request', id: 0, json: { method: 'POST', url: '/ping', headers: subRequestHeaders }, binary: undefined },
+          { kind: 'request', id: '0', json: { method: 'POST', url: '/ping', headers: subRequestHeaders }, binary: undefined },
         ]),
       })
     }
@@ -657,7 +732,7 @@ describe('batchHandlerPlugin', () => {
 
     it('moves cookies and shared headers onto the batch response', async () => {
       const { response } = await createHandler(undefined, headersRouter).handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/login'), makePeerRequestMessage(1, '/refresh')],
+        messages: [makePeerRequestMessage('0', '/login'), makePeerRequestMessage('1', '/refresh')],
       }))
 
       expect(response!.status).toBe(207)
@@ -667,8 +742,8 @@ describe('batchHandlerPlugin', () => {
       expect(response!.headers.get('content-language')).toBe(null)
 
       const body = await response!.json() as any[]
-      expect(body.find(m => m.id === 0).json.headers).toEqual({ 'content-language': 'en', 'x-only': 'login' })
-      expect(body.find(m => m.id === 1).json.headers).toEqual({ 'content-language': 'en' })
+      expect(body.find(m => m.id === '0').json.headers).toEqual({ 'content-language': 'en', 'x-only': 'login' })
+      expect(body.find(m => m.id === '1').json.headers).toEqual({ 'content-language': 'en' })
     })
 
     it.each([
@@ -676,14 +751,14 @@ describe('batchHandlerPlugin', () => {
       ['lacks it', '/ping'],
     ])('keeps a header on the sub-responses when one of them %s', async (_, url) => {
       const { response } = await createHandler(undefined, headersRouter).handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/login'), makePeerRequestMessage(1, url)],
+        messages: [makePeerRequestMessage('0', '/login'), makePeerRequestMessage('1', url)],
       }))
 
       expect(response!.headers.getSetCookie()).toEqual(['session=abc; HttpOnly', 'theme=dark'])
       expect(response!.headers.get('cache-control')).toBe(null)
 
       const body = await response!.json() as any[]
-      expect(body.find(m => m.id === 0).json.headers['cache-control']).toBe('max-age=60')
+      expect(body.find(m => m.id === '0').json.headers['cache-control']).toBe('max-age=60')
     })
 
     it('merges cookies with, and keeps shared headers off, the ones the headers option sets', async () => {
@@ -692,7 +767,7 @@ describe('batchHandlerPlugin', () => {
       }), headersRouter)
 
       const { response } = await handler.handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/login'), makePeerRequestMessage(1, '/refresh')],
+        messages: [makePeerRequestMessage('0', '/login'), makePeerRequestMessage('1', '/refresh')],
       }))
 
       expect(response!.headers.getSetCookie()).toEqual(['batch=1', 'session=abc; HttpOnly', 'theme=dark', 'token=xyz; HttpOnly'])
@@ -706,13 +781,13 @@ describe('batchHandlerPlugin', () => {
       const handler = createHandler(new BatchHandlerPlugin({ headers: { 'x-only': 'login' } }), headersRouter)
 
       const { response } = await handler.handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/login'), makePeerRequestMessage(1, '/refresh')],
+        messages: [makePeerRequestMessage('0', '/login'), makePeerRequestMessage('1', '/refresh')],
       }))
 
       expect(response!.headers.get('x-only')).toBe('login')
 
       const body = await response!.json() as any[]
-      expect(body.find(m => m.id === 0).json.headers).toEqual({ 'content-language': 'en' })
+      expect(body.find(m => m.id === '0').json.headers).toEqual({ 'content-language': 'en' })
     })
 
     it('lets mapSubresponse keep headers on each sub-response, cookies included', async () => {
@@ -720,7 +795,7 @@ describe('batchHandlerPlugin', () => {
       const handler = createHandler(new BatchHandlerPlugin({ mapSubresponse }), headersRouter)
 
       const { response } = await handler.handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/login'), makePeerRequestMessage(1, '/refresh')],
+        messages: [makePeerRequestMessage('0', '/login'), makePeerRequestMessage('1', '/refresh')],
       }))
 
       // The batch response still carries them
@@ -728,7 +803,7 @@ describe('batchHandlerPlugin', () => {
       expect(response!.headers.get('cache-control')).toBe('max-age=60')
 
       const body = await response!.json() as any[]
-      expect(body.find(m => m.id === 1).json.headers).toEqual({
+      expect(body.find(m => m.id === '1').json.headers).toEqual({
         'set-cookie': 'token=xyz; HttpOnly',
         'cache-control': 'max-age=60',
         'content-language': 'en',
@@ -746,7 +821,7 @@ describe('batchHandlerPlugin', () => {
       const handler = createHandler(new BatchHandlerPlugin({ headers: { 'cache-control': undefined } }), headersRouter)
 
       const { response } = await handler.handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/login'), makePeerRequestMessage(1, '/refresh')],
+        messages: [makePeerRequestMessage('0', '/login'), makePeerRequestMessage('1', '/refresh')],
       }))
 
       expect(response!.headers.get('cache-control')).toBe(null)
@@ -775,9 +850,9 @@ describe('batchHandlerPlugin', () => {
 
       const { response } = await handler.handle(createBatchRequest({
         messages: [
-          makePeerRequestMessage(0, '/localized'),
-          makePeerRequestMessage(1, '/personal'),
-          makePeerRequestMessage(2, '/shared'),
+          makePeerRequestMessage('0', '/localized'),
+          makePeerRequestMessage('1', '/personal'),
+          makePeerRequestMessage('2', '/shared'),
         ],
       }))
 
@@ -798,7 +873,7 @@ describe('batchHandlerPlugin', () => {
       })
 
       const { response } = await handler.handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/any'), makePeerRequestMessage(1, '/localized')],
+        messages: [makePeerRequestMessage('0', '/any'), makePeerRequestMessage('1', '/localized')],
       }))
 
       expect(response!.headers.get('vary')).toBe('*')
@@ -808,7 +883,7 @@ describe('batchHandlerPlugin', () => {
       const handler = createHandler(new BatchHandlerPlugin({ headers: { 'set-cookie': 'theme=dark' } }), headersRouter)
 
       const { response } = await handler.handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/login'), makePeerRequestMessage(1, '/login')],
+        messages: [makePeerRequestMessage('0', '/login'), makePeerRequestMessage('1', '/login')],
       }))
 
       expect(response!.headers.getSetCookie()).toEqual(['theme=dark', 'session=abc; HttpOnly'])
@@ -849,7 +924,7 @@ describe('batchHandlerPlugin', () => {
   describe('configuration options', () => {
     it('supports custom successStatus', async () => {
       const handler = createHandler(new BatchHandlerPlugin({ successStatus: 200 }))
-      const peerMessages = [makePeerRequestMessage(0, '/ping')]
+      const peerMessages = [makePeerRequestMessage('0', '/ping')]
 
       const { response } = await handler.handle(createBatchRequest({
         messages: peerMessages,
@@ -889,7 +964,7 @@ describe('batchHandlerPlugin', () => {
       })
 
       const { response } = await handler.handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/events')],
+        messages: [makePeerRequestMessage('0', '/events')],
       }))
 
       const reader = (response!.body as ReadableStream<Uint8Array>).getReader()
@@ -916,7 +991,7 @@ describe('batchHandlerPlugin', () => {
       }), eventsRouter)
 
       const { response } = await handler.handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/events')],
+        messages: [makePeerRequestMessage('0', '/events')],
       }))
 
       expect(response!.body).toBeInstanceOf(ReadableStream)
@@ -933,7 +1008,7 @@ describe('batchHandlerPlugin', () => {
       }), idleRouter)
 
       const { response } = await handler.handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/idle')],
+        messages: [makePeerRequestMessage('0', '/idle')],
       }))
 
       expect(vi.getTimerCount()).toBeGreaterThan(0)
@@ -978,7 +1053,7 @@ describe('batchHandlerPlugin', () => {
       }), idleRouter)
 
       await handler.handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/idle')],
+        messages: [makePeerRequestMessage('0', '/idle')],
       }))
 
       // One keep-alive setInterval is scheduled while the stream is idle.
@@ -1003,7 +1078,7 @@ describe('batchHandlerPlugin', () => {
       }), eventsRouter)
 
       const { response } = await handler.handle(createBatchRequest({
-        messages: [makePeerRequestMessage(0, '/events')],
+        messages: [makePeerRequestMessage('0', '/events')],
       }))
 
       const reader = (response!.body as ReadableStream<Uint8Array>).getReader()
