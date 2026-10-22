@@ -72,6 +72,12 @@ export function serializableStreamedQuery<
       (prev = []) => limitArraySize(prev, maxChunks),
     )
 
+    // close without reading, so a generator the query no longer wants never starts
+    if (context.signal.aborted) {
+      await stream[Symbol.asyncIterator]().return?.()
+      throw context.signal.reason
+    }
+
     for await (const chunk of stream) {
       if (context.signal.aborted) {
         throw context.signal.reason

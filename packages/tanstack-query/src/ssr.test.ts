@@ -103,7 +103,9 @@ describe('streamQuerySSRUtilsPlugin', () => {
     await expect(queryClient.fetchQuery(utils.stream.streamedOptions())).resolves.toEqual([])
     expect(vi.mocked(client.stream).mock.calls[0]![1]!.signal!.aborted).toBe(true)
 
-    await vi.waitFor(() => expect(cleanup).toHaveBeenCalledTimes(1))
+    // the stream is closed before its generator starts
+    await expect(vi.mocked(client.stream).mock.results[0]!.value.next()).resolves.toEqual({ done: true, value: undefined })
+    expect(cleanup).not.toHaveBeenCalled()
     expect(queryClient.getQueryState(utils.stream.streamedKey())).toMatchObject({ status: 'success', fetchStatus: 'idle', data: [] })
     expect(onSuccess).not.toHaveBeenCalled()
   })
