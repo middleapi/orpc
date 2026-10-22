@@ -3,7 +3,7 @@ import type { StandardHandlerInterceptor, StandardHandlerOptions, StandardHandle
 import type { Logger } from 'pino'
 import type { LoggerContext } from './context'
 import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
-import { isAbortError, isAsyncIteratorObject, ORPC_NAME, override, toArray, wrapReadableStream } from '@orpc/shared'
+import { isAbortError, isAsyncIteratorObject, isErrorLike, ORPC_NAME, override, toArray, wrapReadableStream } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 import pino from 'pino'
 import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
@@ -145,7 +145,7 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
          * Any error here is internal (interceptor/framework), not business logic.
          * Indicates unexpected handler failure.
          */
-        logger.error(error)
+        logger.error(toLoggableError(logger, error))
         throw error
       }
     }
@@ -229,7 +229,26 @@ function logProcedureError(
   error: unknown,
   procedureErrorLevel: Exclude<PinoHandlerPluginOptions<any>['procedureErrorLevel'], undefined>,
 ) {
-  logger?.[procedureErrorLevel(error, defaultProcedureErrorLevel(error))](error)
+  if (!logger) {
+    return
+  }
+
+  logger[procedureErrorLevel(error, defaultProcedureErrorLevel(error))](toLoggableError(logger, error))
+}
+
+/**
+ * pino only serializes values that pass `instanceof Error`, so it would log an error
+ * from another realm (e.g. `node:vm`, iframes) without its message or stack.
+ * Nest such errors under the logger's error key so they reach pino's error serializer.
+ */
+function toLoggableError(logger: Logger, error: unknown): unknown {
+  if (error instanceof Error || !isErrorLike(error)) {
+    return error
+  }
+
+  const errorKey = (logger as unknown as Record<symbol, string | undefined>)[pino.symbols.errorKeySym] ?? 'err'
+
+  return { [errorKey]: error }
 }
 
 function defaultProcedureErrorLevel(error: unknown): pino.Level {

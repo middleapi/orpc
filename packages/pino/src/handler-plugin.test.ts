@@ -1,7 +1,9 @@
 import type { StandardLazyRequest } from '@standard-server/core'
+import { runInNewContext } from 'node:vm'
 import { ORPCError, os } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
 import { AbortError } from '@orpc/shared'
+import pino from 'pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
 import { PinoHandlerPlugin } from './handler-plugin'
@@ -399,6 +401,105 @@ describe('pinoHandlerPlugin', () => {
     expect(globalSpies.error).toHaveBeenCalledTimes(0)
     expect(globalSpies.info).toHaveBeenCalledTimes(1)
     expect(globalSpies.info).toHaveBeenCalledWith(abortedStreamError)
+  })
+
+  describe('errors from another realm', () => {
+    function createPinoLogger(options: pino.LoggerOptions = {}) {
+      const lines: any[] = []
+      const logger = pino({ base: null, timestamp: false, ...options }, {
+        write: (line: string) => {
+          lines.push(JSON.parse(line))
+        },
+      })
+
+      return { logger, lines }
+    }
+
+    it('logs procedure errors with their name, message and stack', async () => {
+      const error = runInNewContext('new TypeError("boom")')
+      const { logger, lines } = createPinoLogger()
+      const handler = new StandardHandler(createCodec(os.handler(() => {
+        throw error
+      })) as any, {
+        plugins: [new PinoHandlerPlugin({ logger })],
+      })
+
+      await handler.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
+
+      expect(error instanceof Error).toBe(false)
+      expect(lines).toEqual([
+        expect.objectContaining({
+          level: pino.levels.values.error,
+          msg: 'boom',
+          err: expect.objectContaining({ type: 'TypeError', message: 'boom', stack: error.stack }),
+        }),
+      ])
+    })
+
+    it('logs abort errors at info level with their details', async () => {
+      const error = runInNewContext('const e = new Error("aborted"); e.name = "AbortError"; e')
+      const { logger, lines } = createPinoLogger()
+      const handler = new StandardHandler(createCodec(os.handler(async function* () {
+        throw error
+      })) as any, {
+        plugins: [new PinoHandlerPlugin({ logger })],
+      })
+
+      const result = await handler.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
+
+      await expect((async () => {
+        for await (const _ of result.response?.body as AsyncIterable<unknown>) {
+          // consume only
+        }
+      })()).rejects.toBe(error)
+
+      expect(lines).toEqual([
+        expect.objectContaining({
+          level: pino.levels.values.info,
+          msg: 'aborted',
+          err: expect.objectContaining({ type: 'Error', message: 'aborted', stack: error.stack }),
+        }),
+      ])
+    })
+
+    it('logs internal errors under a custom errorKey', async () => {
+      const error = runInNewContext('new Error("internal-error")')
+      const { logger, lines } = createPinoLogger({ errorKey: 'error' })
+      const handler = new StandardHandler(createCodec(os.handler(() => 'pong')) as any, {
+        plugins: [new PinoHandlerPlugin({ logger })],
+        routingInterceptors: [
+          async () => {
+            throw error
+          },
+        ],
+      })
+
+      await expect(handler.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })).rejects.toBe(error)
+
+      expect(lines).toEqual([
+        expect.objectContaining({
+          level: pino.levels.values.error,
+          msg: 'internal-error',
+          error: expect.objectContaining({ type: 'Error', message: 'internal-error', stack: error.stack }),
+        }),
+      ])
+    })
+
+    it('logs non-error values as is', async () => {
+      const { logger, lines } = createPinoLogger()
+      const handler = new StandardHandler(createCodec(os.handler(() => {
+        // eslint-disable-next-line no-throw-literal
+        throw { reason: 'not an error' }
+      })) as any, {
+        plugins: [new PinoHandlerPlugin({ logger })],
+      })
+
+      await handler.handle(createRequest('GET', '/ping'), { prefix: undefined, context: {} })
+
+      expect(lines).toEqual([
+        expect.objectContaining({ level: pino.levels.values.error, reason: 'not an error' }),
+      ])
+    })
   })
 
   describe('edge cases', () => {
