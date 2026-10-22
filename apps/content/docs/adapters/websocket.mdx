@@ -328,54 +328,43 @@ const link = new RPCLink({
 
 ### Dead Connections
 
-A connection can die without a `close` event, for example when a laptop sleeps, a phone switches networks, or a router silently drops an idle connection. The socket keeps reporting `OPEN` until the operating system gives up on it, and calls and event iterators on it wait until then. In our tests on Linux, that took Chromium about 7.5 minutes when the client was only listening and about 16 minutes while it was sending. The `ws` package never noticed.
-
-If that is too long for your app, send your own pings and close the socket when the server stops answering:
+A connection can die silently, for example when a laptop sleeps, and the browser may take minutes to fire `close`. To detect it sooner, send your own pings:
 
 ```ts
 const link = new RPCLink({
   reconnect: { enabled: true },
   connect: () => {
-    const websocket = new WebSocket('ws://localhost:3000')
+    const ws = new WebSocket('ws://localhost:3000')
+    let interval: ReturnType<typeof setInterval>
+    let timeout: ReturnType<typeof setTimeout> | undefined
 
-    let pingInterval: ReturnType<typeof setInterval> | undefined
-    let pongTimeout: ReturnType<typeof setTimeout> | undefined
-
-    websocket.addEventListener('open', () => {
-      // Ping on a fixed schedule, even while messages are arriving
-      pingInterval = setInterval(() => {
-        websocket.send('ping')
-
-        pongTimeout ??= setTimeout(() => {
-          websocket.close()
-          // A dead connection may not fire `close` for minutes, so fire it now:
-          // the link fails pending calls and opens a new connection for the next call
-          websocket.dispatchEvent(new CloseEvent('close', { code: 4000, reason: 'Ping timeout' }))
+    ws.addEventListener('open', () => {
+      interval = setInterval(() => {
+        ws.send('ping')
+        timeout ??= setTimeout(() => {
+          ws.close()
+          // `close` may fire minutes later on a dead connection, so fire it now
+          ws.dispatchEvent(new CloseEvent('close', { code: 4000, reason: 'Ping timeout' }))
         }, 10_000)
       }, 30_000)
     })
-
-    // Any message proves the connection is alive, not only the pong
-    websocket.addEventListener('message', () => {
-      clearTimeout(pongTimeout)
-      pongTimeout = undefined
+    ws.addEventListener('message', () => {
+      clearTimeout(timeout)
+      timeout = undefined
+    })
+    ws.addEventListener('close', () => {
+      clearInterval(interval)
+      clearTimeout(timeout)
     })
 
-    websocket.addEventListener('close', () => {
-      clearInterval(pingInterval)
-      clearTimeout(pongTimeout)
-    })
-
-    return websocket
+    return ws
   },
 })
 ```
 
-Then answer pings on the server:
+On the server, answer pings and drop dead clients (Bun, Deno and uWebSockets.js have a built-in `idleTimeout` for the latter):
 
-<CodeGroup>
-
-```ts ws
+```ts
 wss.on('connection', (ws) => {
   ws.addEventListener('message', (event) => {
     if (event.data === 'ping') {
@@ -383,65 +372,30 @@ wss.on('connection', (ws) => {
     }
   })
 
-  handler.upgrade(ws)
-})
-```
-
-```ts Bun
-Bun.serve({
-  // ...
-  websocket: {
-    async message(ws, message) {
-      if (message === 'ping') {
-        ws.send('pong')
-        return
-      }
-
-      await handler.message(ws, message)
-    },
-    // ...
-  },
-})
-```
-
-</CodeGroup>
-
-:::info
-- `ping` and `pong` are not RPC messages, so oRPC ignores them on both sides.
-- Add the [Retry Plugin](/docs/plugins/retry) so event iterators reconnect and resume from their [last event ID](/docs/async-iterator-object#last-event-id--event-metadata).
-- `CloseEvent` and `dispatchEvent` are browser APIs, so this snippet is for browser clients.
-- On Cloudflare Durable Objects, answer pings with an auto-response so they don't wake a hibernating object, see [Hibernation Keep-Alive](/docs/integrations/hibernation#keep-alive).
-:::
-
-The server has the same problem with clients that disappear. Bun, Deno and uWebSockets.js close them with their built-in `idleTimeout` options. With `ws`, use protocol-level pings, which browsers answer automatically:
-
-```ts
-wss.on('connection', (ws) => {
   let isAlive = true
   ws.on('pong', () => {
     isAlive = true
   })
-
   const interval = setInterval(() => {
     if (!isAlive) {
-      // fires `close`, so the handler aborts this socket's calls
-      ws.terminate()
-      return
+      return ws.terminate()
     }
-
     isAlive = false
     ws.ping()
   }, 30_000)
-
   ws.on('close', () => clearInterval(interval))
 
   handler.upgrade(ws)
 })
 ```
 
+:::info
+Use the [Retry Plugin](/docs/plugins/retry) to resume event iterators after reconnecting. On Cloudflare, see [Hibernation Keep-Alive](/docs/integrations/hibernation#keep-alive).
+:::
+
 ## Security
 
-When cookies authenticate the socket, verify the `Origin` header before you call `upgrade()` (or accept the connection). Browsers attach cookies to the WebSocket handshake even when another site opens it. `SameSite` is the only limit, and it treats sibling subdomains as the same site. CORS does not apply to WebSockets. Without this check, any website your users visit can open an authenticated socket on their behalf ([Cross-Site WebSocket Hijacking](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/10-Testing_WebSockets)).
+If cookies authenticate the socket, check the `Origin` header before upgrading. Browsers send cookies on cross-site WebSocket handshakes, and CORS does not apply to WebSockets.
 
 ```ts
 const ALLOWED_ORIGINS = new Set(['https://example.com'])
@@ -455,14 +409,9 @@ Bun.serve({
     if (server.upgrade(req)) {
       return
     }
+
     return new Response('Upgrade failed', { status: 500 })
   },
   // ...
 })
 ```
-
-With `ws`, run the same check on the HTTP server's `upgrade` event, before `wss.handleUpgrade()`.
-
-:::info
-Non-browser clients can send any `Origin` header, or none. This check protects your users' browsers. It does not replace authentication.
-:::

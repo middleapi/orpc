@@ -77,27 +77,19 @@ The plugin provides `HibernationAsyncIteratorClass` and `encodeHibernationRPCEve
 
 ## Keep-Alive
 
-When clients [send pings](/docs/adapters/websocket#dead-connections), each ping would wake a hibernating Durable Object and add billable duration. Register an auto-response so Cloudflare answers pings while the object sleeps:
+Answer [client pings](/docs/adapters/websocket#dead-connections) without waking the Durable Object:
 
 ```ts
-import { DurableObject } from 'cloudflare:workers'
-
 export class ChatRoom extends DurableObject {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
-
-    // Answers keep-alive pings without waking the Durable Object
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'))
   }
 }
 ```
 
-:::info
-Auto-responses only match messages that are exactly equal to the request string, so use the same strings as your client.
-:::
-
 :::warning
-Do not detect idle clients with `setTimeout` or `setInterval` here. A pending timer keeps the Durable Object from hibernating, and auto-answered pings never reach `webSocketMessage`. To drop dead clients, check the time of their last ping from an [alarm](https://developers.cloudflare.com/durable-objects/api/alarms/) instead:
+Timers prevent hibernation, so drop dead clients from an [alarm](https://developers.cloudflare.com/durable-objects/api/alarms/) instead:
 
 ```ts
 async alarm(): Promise<void> {
