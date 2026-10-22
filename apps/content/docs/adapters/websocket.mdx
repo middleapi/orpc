@@ -362,7 +362,7 @@ const link = new RPCLink({
 })
 ```
 
-On the server, answer pings and drop dead clients (Bun, Deno and uWebSockets.js have a built-in `idleTimeout` for the latter):
+On the server, reply `pong` to `ping`. Bun, Deno and uWebSockets.js already drop dead clients by default (`idleTimeout`). With `ws`, add a heartbeat:
 
 ```ts
 wss.on('connection', (ws) => {
