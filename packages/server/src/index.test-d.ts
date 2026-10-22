@@ -1,4 +1,4 @@
-import type { DistributiveOmit, MergedSchema, Schema } from './index'
+import type { DistributiveOmit, MergedSchema, Public, Schema } from './index'
 import { expectTypeOf, it } from 'vitest'
 
 it('exports helper types that can appear in inferred builder types', () => {
@@ -9,4 +9,10 @@ it('exports helper types that can appear in inferred builder types', () => {
 
   expectTypeOf<DistributiveOmit<{ a: string, b: number } | { b: number, c: boolean }, 'b'>>()
     .toEqualTypeOf<{ a: string } | { c: boolean }>()
+
+  class WithPrivate {
+    private secret = 1
+    value = 'value'
+  }
+  expectTypeOf<Public<WithPrivate>>().toEqualTypeOf<{ value: string }>()
 })

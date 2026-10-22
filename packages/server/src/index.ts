@@ -96,6 +96,7 @@ export type {
   DistributiveOmit,
   MaybeOptionalOptions,
   PromiseWithError,
+  Public,
   Registry,
   ThrowableError,
 } from '@orpc/shared'
