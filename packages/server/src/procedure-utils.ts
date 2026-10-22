@@ -60,8 +60,10 @@ export type CallOptions<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
 >
-  = & ProcedureClientOptions<TInitialContext, TOutputSchema, TErrorMap, object>
-    & Omit<ClientOptions<object>, 'context'>
+  = & Omit<ClientOptions<object>, 'context'>
+    // Keep last: its conditional `context` must end the intersection, otherwise spreading
+    // generic options (`{ ...options, path }`) merges into a trailing plain member and fails assignability
+    & ProcedureClientOptions<TInitialContext, TOutputSchema, TErrorMap, object>
 
 export type CallRest<
   TInitialContext extends Context,

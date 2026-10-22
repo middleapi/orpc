@@ -1,3 +1,7 @@
+import type { AnySchema, ErrorMap, InferSchemaInput } from '@orpc/contract'
+import type { Context } from './context'
+import type { Procedure } from './procedure'
+import type { CallOptions } from './procedure-utils'
 import z from 'zod'
 import { os } from './builder'
 import { call } from './procedure-utils'
@@ -56,5 +60,23 @@ describe('call', () => {
     // @ts-expect-error require input is invalid
     call(procedure, undefined, { context: { auth: 'invalid' } })
     call(procedure, undefined, { context: { auth: true } })
+  })
+
+  it('can spread generic options', () => {
+    function forward<
+      TInitialContext extends Context,
+      TInputSchema extends AnySchema,
+      TOutputSchema extends AnySchema,
+      TErrorMap extends ErrorMap,
+    >(
+      procedure: Procedure<TInitialContext, any, TInputSchema, TOutputSchema, TErrorMap>,
+      input: InferSchemaInput<TInputSchema>,
+      options: CallOptions<TInitialContext, TOutputSchema, TErrorMap>,
+      context: TInitialContext,
+    ) {
+      call(procedure, input, options)
+      call(procedure, input, { ...options, path: ['x'] })
+      call(procedure, input, { ...options, context })
+    }
   })
 })
