@@ -465,6 +465,88 @@ describe('retryLinkPlugin', () => {
       expect(retriedReturn).toHaveBeenCalledTimes(1)
     })
 
+    it('aborts the in-flight reconnect request when the iterator is closed', async () => {
+      vi.useFakeTimers()
+
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(codec.decodeResponse).mockResolvedValueOnce({
+        kind: 'output',
+        output: (async function* () {
+          throw new Error('DISCONNECTED')
+        })(),
+      })
+
+      let reconnectSignal: AbortSignal | undefined
+      vi.mocked(transport.send)
+        .mockResolvedValueOnce({ status: 200, headers: {}, resolveBody: async () => undefined })
+        .mockImplementation((_request, _path, { signal }) => {
+          reconnectSignal = signal
+
+          // the reconnect request never resolves unless its signal is aborted
+          return new Promise<never>((_, reject) => {
+            signal?.addEventListener('abort', () => reject(signal.reason))
+          })
+        })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      const iterator = await link.call(['stream'], undefined, { context: { retry: Number.POSITIVE_INFINITY, retryDelay: 10 } }) as AsyncIterator<any>
+
+      const nextPromise = iterator.next()
+
+      await vi.advanceTimersByTimeAsync(20)
+      expect(transport.send).toHaveBeenCalledTimes(2) // reconnect request is in flight
+
+      await iterator.return?.()
+
+      expect(reconnectSignal?.aborted).toBe(true)
+      await expect(nextPromise).resolves.toEqual({ done: true, value: undefined })
+      expect(transport.send).toHaveBeenCalledTimes(2)
+    })
+
+    it('still aborts the in-flight reconnect request when the caller signal is aborted', async () => {
+      vi.useFakeTimers()
+
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(codec.decodeResponse).mockResolvedValueOnce({
+        kind: 'output',
+        output: (async function* () {
+          throw new Error('DISCONNECTED')
+        })(),
+      })
+
+      vi.mocked(transport.send)
+        .mockResolvedValueOnce({ status: 200, headers: {}, resolveBody: async () => undefined })
+        .mockImplementation((_request, _path, { signal }) => new Promise<never>((_, reject) => {
+          signal?.addEventListener('abort', () => reject(signal.reason))
+        }))
+
+      const controller = new AbortController()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new RetryLinkPlugin()],
+      })
+
+      const iterator = await link.call(['stream'], undefined, { context: { retry: Number.POSITIVE_INFINITY, retryDelay: 10 }, signal: controller.signal }) as AsyncIterator<any>
+
+      const nextPromise = iterator.next()
+      const nextExpectation = expect(nextPromise).rejects.toThrow('ABORTED')
+
+      await vi.advanceTimersByTimeAsync(20)
+      expect(transport.send).toHaveBeenCalledTimes(2) // reconnect request is in flight
+
+      controller.abort(new Error('ABORTED'))
+
+      await nextExpectation
+      expect(transport.send).toHaveBeenCalledTimes(2)
+    })
+
     it('stops reconnecting once the iterator is closed', async () => {
       vi.useFakeTimers()
 
