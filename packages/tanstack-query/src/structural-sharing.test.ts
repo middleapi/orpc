@@ -100,6 +100,15 @@ describe('structuralSharing', () => {
     expect(structuralSharing(old, next)).toBe(old)
   })
 
+  it('keeps the prototype of changed null-prototype objects', () => {
+    const old = Object.assign(Object.create(null), { a: 1, b: { c: 1 } })
+    const result = structuralSharing(old, Object.assign(Object.create(null), { a: 2, b: { c: 1 } }))
+
+    expect(Object.getPrototypeOf(result)).toBe(null)
+    expect(result.toString).toBeUndefined()
+    expect(result.b).toBe(old.b)
+  })
+
   it('keeps __proto__ as an own key', () => {
     const old = JSON.parse('{"__proto__":{"a":1},"b":1}')
     const next = JSON.parse('{"__proto__":{"a":1},"b":2}')

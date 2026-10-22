@@ -49,7 +49,8 @@ function replaceEqualDeep(a: any, b: any, depth: number, serializer: Public<RPCJ
 
   const aKeys = isArray ? a : Object.keys(a)
   const bKeys = isArray ? b : Object.keys(b)
-  const copy: any = isArray ? [] : {}
+  // keep the prototype of null-prototype objects, while `{}` stays the fast path for ordinary ones
+  const copy: any = isArray ? [] : proto === Object.prototype ? {} : Object.create(proto)
   let equalItems = 0
 
   for (let i = 0; i < bKeys.length; i++) {
@@ -73,7 +74,7 @@ function replaceEqualDeep(a: any, b: any, depth: number, serializer: Public<RPCJ
       setOwn(copy, key, value)
     }
     else {
-    // same as always calling setOwn, but a plain assignment keeps this hot loop about 30% faster
+      // same as always calling setOwn, but a plain assignment keeps this hot loop about 30% faster
       copy[key] = value
     }
   }
