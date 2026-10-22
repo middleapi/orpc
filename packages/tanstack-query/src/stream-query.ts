@@ -11,7 +11,7 @@ export interface SerializableStreamedQueryOptions {
    *
    * @default 'reset'
    */
-  refetchMode?: 'append' | 'reset' | 'replace'
+  refetchMode?: 'append' | 'reset' | 'replace' | undefined
 
   /**
    * Limits the number of data chunks stored in the query result.
@@ -19,7 +19,7 @@ export interface SerializableStreamedQueryOptions {
    *
    * @default Number.POSITIVE_INFINITY (unlimited)
    */
-  maxChunks?: number
+  maxChunks?: number | undefined
 }
 
 /**
@@ -55,10 +55,10 @@ export function serializableStreamedQuery<
         })
       }
       else {
-        context.client.setQueryData<Array<TQueryFnData>>(
-          context.queryKey,
-          (prev = []) => limitArraySize(prev, maxChunks),
-        )
+        // not `setQueryData`: trimming is not new data, so it should not report a success
+        query.setState({
+          data: limitArraySize(query.state.data as Array<TQueryFnData>, maxChunks),
+        })
       }
     }
 
@@ -71,6 +71,12 @@ export function serializableStreamedQuery<
       context.queryKey,
       (prev = []) => limitArraySize(prev, maxChunks),
     )
+
+    // close without reading, so a generator the query no longer wants never starts
+    if (context.signal.aborted) {
+      await stream[Symbol.asyncIterator]().return?.()
+      throw context.signal.reason
+    }
 
     for await (const chunk of stream) {
       if (context.signal.aborted) {

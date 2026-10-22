@@ -1,8 +1,9 @@
 import type { CallHandler, ExecutionContext, NestInterceptor } from '@nestjs/common'
 import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
-import type { ContractedRouter, DefaultInitialContext } from '@orpc/server'
+import type { AnyProcedure, Context, ContractedRouter, DefaultInitialContext } from '@orpc/server'
+import type { ResolvedStandardHandlerHandleOptions, StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '@orpc/server/standard'
 import type { Promisable } from '@orpc/shared'
-import type { StandardBodyHint } from '@standard-server/core'
+import type { StandardBodyHint, StandardLazyRequest } from '@standard-server/core'
 import type { Request as ExpressRequest, Response as ExpressResponse } from 'express'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
@@ -158,7 +159,8 @@ function implementRouterContract(
 @Injectable()
 export class ImplementInterceptor implements NestInterceptor {
   private readonly config: ORPCModuleConfig
-  private readonly codec: OpenAPIHandlerCodecCore<DefaultInitialContext>
+  private readonly codec: NestHandlerCodec<DefaultInitialContext>
+  private readonly handler: StandardHandler<DefaultInitialContext>
   private readonly toNestStandardLazyRequest: Exclude<ORPCModuleConfig['toNestStandardLazyRequest'], undefined>
   private readonly httpAdapterHost: HttpAdapterHost
 
@@ -170,7 +172,8 @@ export class ImplementInterceptor implements NestInterceptor {
     this.config = config ?? {} as ORPCModuleConfig
     this.httpAdapterHost = httpAdapterHost
 
-    this.codec = new OpenAPIHandlerCodecCore(this.config)
+    this.codec = new NestHandlerCodec(this.config)
+    this.handler = new StandardHandler(this.codec, this.config)
     this.toNestStandardLazyRequest = this.config.toNestStandardLazyRequest ?? ((req: ExpressRequest | FastifyRequest, res: ExpressResponse | FastifyReply) => {
       const standardRequest: NestStandardLazyRequest = toStandardLazyRequest(
         'raw' in req ? req.raw : req,
@@ -204,21 +207,10 @@ export class ImplementInterceptor implements NestInterceptor {
 
         const standardRequest = this.toNestStandardLazyRequest(req, res)
 
-        const handler = new StandardHandler({
-          resolveProcedure: request => Promise.resolve({
-            path: getPathMeta(procedure) ?? [],
-            procedure,
-            decodeInput: () => this.codec.decodeInput({
-              procedure,
-              params: toORPCOpenAPIParams(procedure, standardRequest.params),
-            }, request),
-          }),
-          encodeError: this.codec.encodeError.bind(this.codec),
-          encodeOutput: this.codec.encodeOutput.bind(this.codec),
-        }, this.config)
+        const context = await value(this.config.context ?? {} as DefaultInitialContext, ctx)
 
-        const result = await handler.handle(standardRequest, {
-          context: await value(this.config.context ?? {} as DefaultInitialContext, ctx),
+        const result = await this.handler.handle(standardRequest, {
+          context: this.codec.withMatch(context, { procedure, params: standardRequest.params }),
         })
 
         if (!result.matched) {
@@ -308,6 +300,38 @@ export class ImplementInterceptor implements NestInterceptor {
           : body // NestJS auto stringify JSON later
       }),
     )
+  }
+}
+
+interface NestHandlerCodecMatch {
+  procedure: AnyProcedure
+  params: NestStandardLazyRequest['params']
+}
+
+class NestHandlerCodec<T extends Context> extends OpenAPIHandlerCodecCore<T> implements StandardHandlerCodec<T> {
+  private readonly CONTEXT_SYMBOL = Symbol('ORPC_NEST_HANDLER_CODEC_CONTEXT')
+
+  withMatch(context: T, match: NestHandlerCodecMatch): T {
+    return { ...context, [this.CONTEXT_SYMBOL]: match }
+  }
+
+  resolveProcedure(request: StandardLazyRequest, options: ResolvedStandardHandlerHandleOptions<T>): StandardHandlerCodecResolvedProcedure | undefined {
+    const match = options.context[this.CONTEXT_SYMBOL] as NestHandlerCodecMatch | undefined
+
+    if (!match) {
+      return undefined
+    }
+
+    const { procedure, params } = match
+
+    return {
+      path: getPathMeta(procedure) ?? [],
+      procedure,
+      decodeInput: () => this.decodeInput({
+        procedure,
+        params: toORPCOpenAPIParams(procedure, params),
+      }, request),
+    }
   }
 }
 

@@ -93,10 +93,10 @@ export interface WithEffectContext<Services> {
    * }
    * ```
    */
-  ['effect/wrap']?: <A>(
+  ['effect/wrap']?: (<A>(
     effect: Effect.Effect<A, unknown>,
     opts: EffectWrapOptions,
-  ) => Effect.Effect<A, unknown>
+  ) => Effect.Effect<A, unknown>) | undefined
 }
 
 /**

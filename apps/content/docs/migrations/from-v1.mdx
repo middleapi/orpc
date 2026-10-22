@@ -9,7 +9,7 @@ Most of your code keeps working: many v1 names still compile through deprecated 
 
 :::warning[Read these first]
 
-- The RPC serializer format and the error response format changed, so v1 [RPC Link](/docs/rpc/link) and [OpenAPI Link](/docs/openapi/link) clients cannot talk to a v2 server. Deploy the upgraded server and client together. See [Wire Format Changes](#wire-format-changes).
+- The RPC serializer format and the error response format changed, so v1 [RPC Link](/docs/rpc/link) and [OpenAPI Link](/docs/openapi/link) clients cannot talk to a v2 server (OpenAPI Link 1.16.0+ can). Deploy the upgraded server and client together. See [Wire Format Changes](#wire-format-changes).
 - Automatic middleware deduplication was removed. Middleware applied at both router and procedure level now runs twice. See [Middleware](#middleware).
 - The Batch Plugin replaced `exclude` with `filter`, which has the opposite meaning. In most cases you can simply remove `exclude`. See [Batch Plugin](#batch-plugin).
 - A prefix now applies to every procedure, not only the ones that define a `path`, so procedures relying on the router-derived path move under the prefix. See [Routing Moved to OpenAPI Metadata](#routing-moved-to-openapi-metadata).
@@ -51,7 +51,7 @@ Two formats changed on the wire:
 - The [RPC serializer](/docs/rpc/serializer) format, described in the [RPC Protocol](/docs/rpc/protocol).
 - The error response body, which no longer contains a `status` field, since [`status` was removed from errors](#status-removed-from-errors).
 
-Because of these changes, a v1 [RPC Link](/docs/rpc/link) or [OpenAPI Link](/docs/openapi/link) cannot talk to a v2 server (and vice versa). Deploy the upgraded server and clients together.
+Because of these changes, a v1 [RPC Link](/docs/rpc/link) or [OpenAPI Link](/docs/openapi/link) cannot talk to a v2 server (and vice versa). Deploy the upgraded server and clients together. The exception is OpenAPI Link 1.16.0+, which can call a v2 server, so you can upgrade the server first. Only the return value of an event iterator input is lost.
 
 If your [OpenAPI Handler](/docs/openapi/handler) endpoints have external consumers that expect the v1 error format, add the `status` field back with a [custom error response](/docs/openapi/handler#custom-error-response):
 
@@ -61,7 +61,7 @@ import { COMMON_ERROR_STATUS_MAP } from '@orpc/openapi'
 const handler = new OpenAPIHandler(router, {
   customErrorResponseBodyEncoder: error => ({
     ...error.toJSON(),
-    status: COMMON_ERROR_STATUS_MAP[error.code] ?? 500,
+    status: COMMON_ERROR_STATUS_MAP[error.code] ?? 400,
   }),
 })
 ```
@@ -410,6 +410,8 @@ The `dedupeLeadingMiddlewares` config option was removed together with this beha
 ### `status` removed from errors
 
 `ORPCError` and `.errors` definitions no longer accept a `status`. HTTP status codes are now a handler concern, configured with `errorStatusMap`. Error response bodies no longer contain the field either, see [Wire Format Changes](#wire-format-changes). See [Error Handling](/docs/error-handling) and [RPC Handler](/docs/rpc/handler).
+
+Codes missing from `errorStatusMap` now fall back to `400` instead of `500`. If a custom code reports a server-side failure, add it to the map with a `5xx` status.
 
 <CodeGroup>
 
@@ -910,7 +912,7 @@ Link plugins were renamed with a `LinkPlugin` suffix. Deprecated aliases exist f
 | `DedupeRequestsPlugin` | [`DedupeLinkPlugin`](/docs/plugins/dedupe)          |
 | `RetryAfterPlugin`     | [`RetryAfterLinkPlugin`](/docs/plugins/retry-after) |
 
-v2 also adds new plugins: [Timeout](/docs/plugins/timeout), [Request Compression](/docs/plugins/request-compression), and [Response Compression](/docs/plugins/response-compression).
+v2 also adds new plugins: [Timeout](/docs/plugins/timeout), [Signal Sync](/docs/plugins/signal-sync), [Request Compression](/docs/plugins/request-compression), and [Response Compression](/docs/plugins/response-compression).
 
 ### Batch Plugin
 
@@ -1234,7 +1236,7 @@ Base64Url, Cookie, Encryption, and Signing helpers are unchanged in `@orpc/serve
 
 ### Publisher
 
-The package is now `@orpc/publisher`. The resume option was restructured, `customJsonSerializers` became a `serializer` instance (see [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer)), and the Redis adapter switched from `ioredis` to `node-redis`. See [Publisher Helpers](/docs/helpers/publisher).
+The package is now `@orpc/publisher`. `resumeRetentionSeconds` became `resume.ttl`, in milliseconds, `customJsonSerializers` became a `serializer` instance (see [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer)), and the Redis adapter switched from `ioredis` to `node-redis`. See [Publisher Helpers](/docs/helpers/publisher).
 
 <CodeGroup>
 
@@ -1243,7 +1245,7 @@ import { RedisPublisher } from '@orpc/publisher/redis'
 
 const publisher = new RedisPublisher(client, {
   subscriber,
-  resume: { enabled: true, seconds: 300 },
+  resume: { enabled: true, ttl: 300_000 },
 })
 ```
 
@@ -1259,7 +1261,7 @@ const publisher = new IORedisPublisher({
 
 </CodeGroup>
 
-The Durable Object adapter moved to `@orpc/cloudflare`, with `PublisherDurableObject` renamed to `DurablePublisherObject`.
+The Durable Object adapter moved to `@orpc/cloudflare`, with `PublisherDurableObject` renamed to `DurablePublisherObject`. Its `resume` options are in milliseconds too: `retentionSeconds` became `ttl`, and `cleanupIntervalSeconds` became `cleanupInterval`.
 
 ### Rate Limit
 
@@ -1293,6 +1295,38 @@ const example = os
     key: ({ context }) => `user:${context.user.id}`,
   }))
   .handler(async () => {})
+```
+
+</CodeGroup>
+
+Blocking mode is now a flat `timeout` option: replace `blockingUntilReady: { enabled: true, timeout }` with `timeout`.
+
+`UpstashRateLimiter` now takes an Upstash `Redis` client, like the other Upstash adapters, instead of an `@upstash/ratelimit` instance. It enforces a fixed window with `maxRequests` and `window`, shares counters with `RedisRateLimiter`, and no longer takes `waitUntil`.
+
+<CodeGroup>
+
+```ts v2
+import { UpstashRateLimiter } from '@orpc/ratelimit/upstash'
+import { Redis } from '@upstash/redis'
+
+const limiter = new UpstashRateLimiter(Redis.fromEnv(), {
+  maxRequests: 10,
+  window: 60_000,
+  timeout: 5_000,
+})
+```
+
+```ts v1
+import { UpstashRatelimiter } from '@orpc/experimental-ratelimit/upstash-ratelimit'
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis } from '@upstash/redis'
+
+const limiter = new UpstashRatelimiter(new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.fixedWindow(10, '60 s'),
+}), {
+  blockingUntilReady: { enabled: true, timeout: 5_000 },
+})
 ```
 
 </CodeGroup>

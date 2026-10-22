@@ -2,7 +2,7 @@ import type { AnyProcedureContract } from '@orpc/contract'
 import type { AnyProcedure, AnyRouter, WalkProcedureContractsLazyResult } from '@orpc/server'
 import type { Value } from '@orpc/shared'
 import type { MatchedRoute } from 'rou3'
-import { createContractProcedure, getRouter, Procedure, unlazy, walkProcedureContractsSync } from '@orpc/server'
+import { Procedure, resolveContractProcedure, unlazy, walkProcedureContractsSync } from '@orpc/server'
 import { mergeHttpPath, pathToHttpPath, safeDecodeURIComponent, safeEncodeURIComponent, setOwn, value } from '@orpc/shared'
 import { addRoute, createRouter, findAllRoutes, findRoute, routeToRegExp } from 'rou3'
 import { DEFAULT_OPENAPI_METHOD } from '../../constants'
@@ -15,7 +15,7 @@ export interface OpenAPIMatcherOptions {
    *
    * @default true
    */
-  filter?: Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]>
+  filter?: Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]> | undefined
 }
 
 // chars normalized text keeps raw: rou3 encodes the WHATWG path percent-encode set in literal text, and
@@ -202,16 +202,7 @@ export class OpenAPIMatcher {
   }
 
   private async resolveProcedure(entry: TreeEntry): Promise<AnyProcedure> {
-    const { default: maybeProcedure } = await unlazy(getRouter(this.rootRouter, entry.path))
-
-    if (!(maybeProcedure instanceof Procedure)) {
-      throw new TypeError(
-        `[Contract-First] Missing or invalid implementation for procedure at path: "${entry.path.join('.')}". `
-        + `Ensure the procedure is correctly implemented and matches its contract.`,
-      )
-    }
-
-    entry.procedure = createContractProcedure(maybeProcedure, entry.contract)
+    entry.procedure = await resolveContractProcedure(this.rootRouter, entry.contract, entry.path)
 
     return entry.procedure
   }

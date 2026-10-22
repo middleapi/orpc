@@ -1,6 +1,8 @@
 it('exports plugins', async () => {
   await expect(import('.')).resolves.toMatchObject({
     BatchHandlerPlugin: expect.any(Function),
+    BATCH_HEADER: expect.any(String),
+    DEFAULT_BATCH_MAX_SIZE: expect.any(Number),
     CORSHandlerPlugin: expect.any(Function),
     RequestHeadersHandlerPlugin: expect.any(Function),
     ResponseHeadersHandlerPlugin: expect.any(Function),
@@ -10,5 +12,6 @@ it('exports plugins', async () => {
     RequestCompressionHandlerPlugin: expect.any(Function),
     RequestLimitHandlerPlugin: expect.any(Function),
     ResponseCompressionHandlerPlugin: expect.any(Function),
+    SignalSyncHandlerPlugin: expect.any(Function),
   })
 })

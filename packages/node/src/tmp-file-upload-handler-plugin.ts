@@ -51,7 +51,7 @@ export interface TmpFileUploadHandlerPluginOptions<T extends Context> {
    *
    * @default os.tmpdir()
    */
-  tmpDir?: string
+  tmpDir?: string | undefined
 
   /**
    * The size limit for each kind of request body, either fixed or resolved
@@ -67,7 +67,7 @@ export interface TmpFileUploadHandlerPluginOptions<T extends Context> {
    *
    * @default unlimited for every kind
    */
-  maxBodySize?: Value<Promisable<TmpFileUploadHandlerPluginMaxBodySize>, [options: StandardHandlerRoutingInterceptorOptions<T>]>
+  maxBodySize?: Value<Promisable<TmpFileUploadHandlerPluginMaxBodySize>, [options: StandardHandlerRoutingInterceptorOptions<T>]> | undefined
 
   /**
    * The size in bytes an uploaded file must exceed before it is spooled to a
@@ -77,7 +77,7 @@ export interface TmpFileUploadHandlerPluginOptions<T extends Context> {
    *
    * @default 64 * 1024
    */
-  spoolThreshold?: number
+  spoolThreshold?: number | undefined
 }
 
 /**

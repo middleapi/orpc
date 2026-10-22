@@ -184,15 +184,12 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
     })
   }, { timeout: 20_000 })
 
-  describe('blockingUntilReady', () => {
+  describe('timeout', () => {
     it('waits until the next window when capacity is unavailable', async () => {
       const limiter = await createTestingRateLimiter({
         maxRequests: 2,
         window: 1000,
-        blockingUntilReady: {
-          enabled: true,
-          timeout: 4000,
-        },
+        timeout: 4000,
       })
 
       const key = 'blocking'
@@ -217,10 +214,7 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
       const limiter = await createTestingRateLimiter({
         maxRequests: 2,
         window: 1000,
-        blockingUntilReady: {
-          enabled: true,
-          timeout: 4000,
-        },
+        timeout: 4000,
       })
 
       const key = 'blocking-weighted'
@@ -247,10 +241,7 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
       const limiter = await createTestingRateLimiter({
         maxRequests: 2,
         window: 10_000,
-        blockingUntilReady: {
-          enabled: true,
-          timeout: 100,
-        },
+        timeout: 100,
       })
 
       const key = 'blocking-timeout'

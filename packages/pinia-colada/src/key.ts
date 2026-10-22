@@ -10,7 +10,7 @@ export interface OperationKeyPrefixOptions {
    * Prepended as the first element of the key when present.
    * Use this to avoid key conflicts when multiple router utils share the same client.
    */
-  prefix?: string
+  prefix?: string | undefined
 }
 
 export interface OperationKeyBaseOptions extends OperationKeyPrefixOptions {
@@ -20,13 +20,13 @@ export interface OperationKeyBaseOptions extends OperationKeyPrefixOptions {
    *
    * @default new RPCJsonSerializer()
    */
-  serializer?: Public<RPCJsonSerializer>
+  serializer?: Public<RPCJsonSerializer> | undefined
 }
 
 export type OperationKeyOptions<TType extends OperationType, TInput> = OperationKeyBaseOptions & {
-  type?: TType
-  input?: PartialDeep<TInput>
-  fnOptions?: TType extends 'streamed' ? SerializableStreamedQueryOptions : never
+  type?: TType | undefined
+  input?: PartialDeep<TInput> | undefined
+  fnOptions?: (TType extends 'streamed' ? SerializableStreamedQueryOptions : never) | undefined
 }
 
 type OperationKeyContent<TType extends OperationType, TInput> = Omit<OperationKeyOptions<TType, TInput>, keyof OperationKeyBaseOptions> & {
@@ -35,7 +35,7 @@ type OperationKeyContent<TType extends OperationType, TInput> = Omit<OperationKe
    * so inputs with the same JSON form (like a `Date` and its ISO string) produce different keys.
    * Keyed by path (not a list) so partial keys still match.
    */
-  inputMeta?: Record<string, string[]>
+  inputMeta?: Record<string, string[]> | undefined
 }
 
 export type OperationKey<TType extends OperationType, TInput>

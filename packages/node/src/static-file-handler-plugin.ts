@@ -52,7 +52,7 @@ export interface StaticFileHandlerPluginOptions {
    *
    * @default '/'
    */
-  path?: `/${string}`
+  path?: `/${string}` | undefined
 
   /**
    * The file served when the request path resolves to a directory.
@@ -60,7 +60,7 @@ export interface StaticFileHandlerPluginOptions {
    *
    * @default 'index.html'
    */
-  indexFile?: string | false
+  indexFile?: string | false | undefined
 
   /**
    * A file served with status 200 when no file matches the request path,
@@ -68,14 +68,14 @@ export interface StaticFileHandlerPluginOptions {
    *
    * @default undefined
    */
-  fallbackFile?: string
+  fallbackFile?: string | undefined
 
   /**
    * The `Cache-Control` response header value. Set to `false` to omit the header.
    *
    * @default 'public, max-age=0'
    */
-  cacheControl?: string | false
+  cacheControl?: string | false | undefined
 
   /**
    * Whether files and directories whose name starts with a dot can be served.
@@ -84,7 +84,7 @@ export interface StaticFileHandlerPluginOptions {
    *
    * @default false
    */
-  dotfiles?: boolean
+  dotfiles?: boolean | undefined
 
   /**
    * Whether precompressed sidecar files (`.br`, `.zst`, `.gz`) can be served
@@ -92,7 +92,7 @@ export interface StaticFileHandlerPluginOptions {
    *
    * @default false
    */
-  precompressed?: boolean
+  precompressed?: boolean | undefined
 
   /**
    * Whether symbolic links whose target lies outside `rootDir` can be served.
@@ -100,7 +100,7 @@ export interface StaticFileHandlerPluginOptions {
    *
    * @default false
    */
-  allowSymlinks?: boolean
+  allowSymlinks?: boolean | undefined
 
   /**
    * Content types keyed by lowercase file extension without the dot, taking precedence over
@@ -108,7 +108,7 @@ export interface StaticFileHandlerPluginOptions {
    * own charset. Extensions that neither this nor the detection recognises are served as
    * `application/octet-stream`.
    */
-  mimeTypes?: Record<string, string>
+  mimeTypes?: Record<string, string> | undefined
 }
 
 /**

@@ -12,7 +12,7 @@ export interface ClientOptions<T extends ClientContext> {
 
 export type FriendlyClientOptions<T extends ClientContext>
   = & Omit<ClientOptions<T>, 'context'>
-    & (object extends T ? { context?: T } : { context: T })
+    & (object extends T ? { context?: T | undefined } : { context: T })
 
 export type ClientRest<TClientContext extends ClientContext, TInput> = object extends TClientContext
   ? undefined extends TInput

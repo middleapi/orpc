@@ -35,7 +35,7 @@ export interface RetryLinkPluginContext {
    *
    * @default 0
    */
-  retry?: Value<Promisable<number>, [Omit<StandardLinkInterceptorOptions<RetryLinkPluginContext>, 'next'>]>
+  retry?: Value<Promisable<number>, [Omit<StandardLinkInterceptorOptions<RetryLinkPluginContext>, 'next'>]> | undefined
 
   /**
    * Delay (in ms) before retrying.
@@ -45,19 +45,19 @@ export interface RetryLinkPluginContext {
    *
    * @default (o) => o.lastEventRetry ?? 2000
    */
-  retryDelay?: Value<Promisable<number>, [RetryLinkPluginAttemptOptions<RetryLinkPluginContext>]>
+  retryDelay?: Value<Promisable<number>, [RetryLinkPluginAttemptOptions<RetryLinkPluginContext>]> | undefined
 
   /**
    * Determine whether to retry.
    *
    * @default (o) => isRetryableError(o.error)
    */
-  shouldRetry?: Value<Promisable<boolean>, [RetryLinkPluginAttemptOptions<RetryLinkPluginContext>]>
+  shouldRetry?: Value<Promisable<boolean>, [RetryLinkPluginAttemptOptions<RetryLinkPluginContext>]> | undefined
 
   /**
    * Hook called before each retry. Can return a cleanup callback.
    */
-  onRetry?: (options: RetryLinkPluginAttemptOptions<RetryLinkPluginContext>) => void | ((isSuccess: boolean) => void)
+  onRetry?: ((options: RetryLinkPluginAttemptOptions<RetryLinkPluginContext>) => void | ((isSuccess: boolean) => void)) | undefined
 }
 
 export interface RetryLinkPluginOptions<_T extends RetryLinkPluginContext> {

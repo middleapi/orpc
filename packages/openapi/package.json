@@ -122,13 +122,13 @@
     "@orpc/json-schema": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.10.3",
-    "@standard-server/fetch": "~0.10.3",
+    "@standard-server/core": "~0.11.0",
+    "@standard-server/fetch": "~0.11.0",
     "rou3": "^1.0.0"
   },
   "devDependencies": {
     "@scalar/api-reference": "^1.74.0",
-    "@standard-server/aws-lambda": "~0.10.3",
+    "@standard-server/aws-lambda": "~0.11.0",
     "@types/swagger-ui": "^5.32.0",
     "fastify": "^5.12.7",
     "swagger-ui": "^5.33.2",

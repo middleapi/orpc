@@ -1,8 +1,9 @@
+import type { PublisherResumeOptions } from '@orpc/publisher'
 import type { EventMeta } from '@standard-server/core'
 import { isPlainObject, stringifyJSON } from '@orpc/shared'
 import { DurableObject } from 'cloudflare:workers'
 
-export interface DurablePublisherObjectResumeOptions {
+export interface DurablePublisherObjectResumeOptions extends PublisherResumeOptions {
   /**
    * Whether event resume support is enabled.
    *
@@ -16,25 +17,15 @@ export interface DurablePublisherObjectResumeOptions {
   enabled: boolean
 
   /**
-   * How long (in seconds) to retain events for resume.
-   *
-   * Expired events are cleaned up lazily for performance reasons, so
-   * some events may remain available slightly longer than this period.
-   *
-   * @default 300 (5 min)
-   */
-  seconds?: number
-
-  /**
-   * Interval (in seconds) between cleanup checks for the Durable Object.
+   * Interval between cleanup checks for the Durable Object, in milliseconds.
    *
    * At each interval, verify whether the Durable Object is inactive
    * (no active WebSocket connections and no stored events). If inactive, all
    * data is deleted to free resources; otherwise, another check is scheduled.
    *
-   * @default 6 * 60 * 60 (6 hours)
+   * @default 6 * 60 * 60 * 1000 (6 hours)
    */
-  cleanupIntervalSeconds?: number
+  cleanupInterval?: number | undefined
 
   /**
    * Prefix for the resume storage table schema.
@@ -42,7 +33,7 @@ export interface DurablePublisherObjectResumeOptions {
    *
    * @default 'orpc:'
    */
-  schemaPrefix?: string
+  schemaPrefix?: string | undefined
 }
 
 export interface DurablePublisherObjectOptions {
@@ -54,7 +45,7 @@ export interface DurablePublisherObjectOptions {
    *
    * @default { enabled: false }
    */
-  resume?: DurablePublisherObjectResumeOptions
+  resume?: DurablePublisherObjectResumeOptions | undefined
 }
 
 /**
@@ -133,8 +124,8 @@ interface SerializedPayload {
 
 class ResumeStorage {
   private readonly enabled: boolean
-  private readonly seconds: number
-  private readonly cleanupIntervalSeconds: number
+  private readonly ttl: number
+  private readonly cleanupInterval: number
   private readonly schemaPrefix: string
 
   private isInitedSchema = false
@@ -146,8 +137,8 @@ class ResumeStorage {
     options: DurablePublisherObjectResumeOptions = { enabled: false },
   ) {
     this.enabled = options.enabled
-    this.seconds = options.seconds ?? 300
-    this.cleanupIntervalSeconds = options.cleanupIntervalSeconds ?? 6 * 60 * 60
+    this.ttl = options.ttl ?? 300_000
+    this.cleanupInterval = options.cleanupInterval ?? 6 * 60 * 60 * 1000
     const schemaPrefix = options.schemaPrefix ?? 'orpc:'
     this.schemaPrefix = schemaPrefix
   }
@@ -316,15 +307,16 @@ class ResumeStorage {
     const now = Date.now()
 
     // Defer cleanup to improve performance
-    if (this.lastCleanupTime && this.lastCleanupTime + this.seconds * 1000 > now) {
+    if (this.lastCleanupTime && this.lastCleanupTime + this.ttl > now) {
       return
     }
 
     this.lastCleanupTime = now
 
+    // `stored_at` is in whole seconds, so round up to never delete an event before its ttl
     this.ctx.storage.sql.exec(`
       DELETE FROM "${this.schemaPrefix}events" WHERE stored_at < unixepoch() - ?
-    `, this.seconds)
+    `, Math.ceil(this.ttl / 1000))
   }
 
   private async initAlarm(): Promise<void> {
@@ -335,7 +327,7 @@ class ResumeStorage {
      * next cleanup is due. In that case, reschedule it instead of reusing it.
      */
     const alarmFiresTooEarly = currentAlarm !== null
-      && currentAlarm < Date.now() + this.seconds * 1000
+      && currentAlarm < Date.now() + this.ttl
 
     if (currentAlarm === null || alarmFiresTooEarly) {
       await this.scheduleAlarm()
@@ -351,7 +343,7 @@ class ResumeStorage {
   }
 
   private scheduleAlarm(): Promise<void> {
-    return this.ctx.storage.setAlarm(Date.now() + this.cleanupIntervalSeconds * 1000)
+    return this.ctx.storage.setAlarm(Date.now() + this.cleanupInterval)
   }
 
   private attachEventId(message: SerializedPayload, id: string): SerializedPayload {

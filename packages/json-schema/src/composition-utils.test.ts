@@ -6,6 +6,7 @@ import {
   deduplicateJsonSchemas,
   extractJsonObjectSchemaEntries,
   flattenJsonUnionSchema,
+  isJsonObjectLikeSchema,
   matchArrayableJsonSchema,
 } from './composition-utils'
 
@@ -2111,5 +2112,44 @@ describe('deduplicateJsonSchemas', () => {
       { type: 'string', default: new Date(0) },
       { type: 'string', default: new Date(1) },
     ])
+  })
+})
+
+describe('isJsonObjectLikeSchema', () => {
+  it.each([
+    [true, true],
+    [{ type: 'object' }, true],
+    [{ type: 'string' }, false],
+    [{ type: ['object', 'null'] }, false],
+    [{ type: 'string', required: ['a'] }, false],
+    [{ properties: { id: { type: 'number' } } }, true],
+    [{ additionalProperties: false }, true],
+    [{ required: ['id'] }, true],
+    [{}, true],
+    [{ description: 'anything' }, true],
+    [{ const: 'value' }, false],
+    [{ enum: [1, 2] }, false],
+    [{ anyOf: [{ type: 'object' }, { properties: {} }] }, true],
+    [{ anyOf: [{ type: 'object' }, { type: 'null' }] }, false],
+    [{ anyOf: [{ type: 'string', required: ['a'] }, { type: 'object' }] }, false],
+    [{ oneOf: [{ type: 'object' }, true] }, true],
+    [{ allOf: [{ type: 'object' }, { description: 'anything' }] }, true],
+    [{ allOf: [{ type: 'object' }, {}] }, true],
+  ])('%j → %s', (schema, expected) => {
+    expect(isJsonObjectLikeSchema(schema as any)).toBe(expected)
+  })
+
+  it('follows refs into $defs', () => {
+    const $defs: Record<string, JsonSchema> = {
+      object: { type: 'object' },
+      string: { type: 'string' },
+      union: { anyOf: [{ $ref: '#/$defs/object' }, { $ref: '#/$defs/union' }] },
+    }
+
+    expect(isJsonObjectLikeSchema({ $ref: '#/$defs/object', $defs })).toBe(true)
+    expect(isJsonObjectLikeSchema({ $ref: '#/$defs/string', $defs })).toBe(false)
+    expect(isJsonObjectLikeSchema({ anyOf: [{ $ref: '#/$defs/object' }, { $ref: '#/$defs/string' }], $defs })).toBe(false)
+    // a cycle never proves the schema describes an object
+    expect(isJsonObjectLikeSchema({ $ref: '#/$defs/union', $defs })).toBe(false)
   })
 })

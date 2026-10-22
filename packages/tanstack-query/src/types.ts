@@ -34,9 +34,9 @@ export type QueryKeyOptions<TInput>
 
 export type QueryOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TSelectData, TInitialData>
   = & (undefined extends TInput ? { input?: TInput | SkipToken } : { input: TInput | SkipToken })
-    & (object extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
+    & (object extends TClientContext ? { context?: TClientContext | undefined } : { context: TClientContext })
     & Omit<QueryObserverOptions<TOutput, TError, TSelectData>, 'queryKey' | '_defaulted' | '_optimisticResults'>
-    & { queryKey?: QueryKey, initialData?: TInitialData }
+    & { queryKey?: QueryKey | undefined, initialData?: TInitialData }
 
 export type QueryOptionsOut<TOutput, TError, TSelectData, TInitialData>
   = & Pick<
@@ -49,12 +49,12 @@ export type QueryOptionsOut<TOutput, TError, TSelectData, TInitialData>
   }
 
 export type StreamedKeyOptions<TInput>
-  = | ((undefined extends TInput ? { input?: TInput | SkipToken } : { input: TInput | SkipToken }) & { queryFnOptions?: SerializableStreamedQueryOptions })
+  = | ((undefined extends TInput ? { input?: TInput | SkipToken } : { input: TInput | SkipToken }) & { queryFnOptions?: SerializableStreamedQueryOptions | undefined })
     | { queryKey: QueryKey }
 
 export type StreamedOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TSelectData, TInitialData>
   = & QueryOptionsIn<TClientContext, TInput, TOutput, TError, TSelectData, TInitialData>
-    & { queryFnOptions?: SerializableStreamedQueryOptions }
+    & { queryFnOptions?: SerializableStreamedQueryOptions | undefined }
 
 export type StreamedOptionsOut<TOutput, TError, TSelectData, TInitialData> = QueryOptionsOut<TOutput, TError, TSelectData, TInitialData>
 
@@ -63,8 +63,8 @@ export type InfiniteKeyOptions<TInput, TPageParam>
     | { queryKey: QueryKey }
 
 export type InfiniteOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TSelectData, TPageParam, TInitialData>
-  = & { input: ((pageParam: TPageParam) => TInput) | SkipToken, initialData?: TInitialData, queryKey?: QueryKey }
-    & (object extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
+  = & { input: ((pageParam: TPageParam) => TInput) | SkipToken, initialData?: TInitialData, queryKey?: QueryKey | undefined }
+    & (object extends TClientContext ? { context?: TClientContext | undefined } : { context: TClientContext })
     & Omit<InfiniteQueryObserverOptions<TOutput, TError, TSelectData, QueryKey, TPageParam>, 'queryKey' | '_defaulted' | '_optimisticResults'>
 
 export type InfiniteOptionsOut<TOutput, TError, TSelectData, TPageParam, TInitialData>
@@ -80,7 +80,7 @@ export type InfiniteOptionsOut<TOutput, TError, TSelectData, TPageParam, TInitia
 export type MutationKeyOptions = Pick<MutationOptionsIn<any, any, any, any, any>, 'mutationKey'>
 
 export type MutationOptionsIn<TClientContext extends ClientContext, TInput, TOutput, TError, TMutationContext>
-  = & (object extends TClientContext ? { context?: TClientContext } : { context: TClientContext })
+  = & (object extends TClientContext ? { context?: TClientContext | undefined } : { context: TClientContext })
     & MutationOptionsOut<TInput, TOutput, TError, TMutationContext>
 
 export type MutationOptionsOut<TInput, TOutput, TError, TMutationContext> = MutationObserverOptions<TOutput, TError, TInput, TMutationContext>

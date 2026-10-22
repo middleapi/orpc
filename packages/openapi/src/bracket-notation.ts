@@ -16,7 +16,7 @@ export interface BracketNotationSerializerOptions {
    *
    * @default 1_000
    */
-  maxDeserializingEmptySlots?: number
+  maxDeserializingEmptySlots?: number | undefined
 }
 
 export class BracketNotationSerializer {

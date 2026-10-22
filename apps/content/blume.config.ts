@@ -9,7 +9,7 @@ import { sponsorAdsInjectPlugin } from './sponsors/inject'
 
 export default defineConfig({
   title: 'oRPC',
-  description: 'Build APIs that are typesafe end to end, with OpenAPI included',
+  description: 'Build end-to-end typesafe APIs and serve them over RPC, OpenAPI, and MCP',
   logo: '/logo.svg',
   banner: {
     content: 'You are reading the v2 docs, currently in beta.',

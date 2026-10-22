@@ -13,7 +13,7 @@ export interface OpenAPIReferenceHandlerPluginScalarConfig extends Partial<Scala
 }
 
 export interface OpenAPIReferenceHandlerPluginSwaggerConfig extends Partial<Omit<SwaggerUIOptions, 'dom_id' | 'presets' | 'plugins'>> {
-  dom_id?: undefined | never
+  dom_id?: undefined
 
   /**
    * Paths to global variables holding the presets, resolved in the browser,
@@ -21,7 +21,7 @@ export interface OpenAPIReferenceHandlerPluginSwaggerConfig extends Partial<Omit
    *
    * @default ['SwaggerUIBundle.presets.apis']
    */
-  presets?: undefined | string[]
+  presets?: string[] | undefined
 
   /**
    * Paths to global variables holding the plugins, resolved in the browser,
@@ -29,7 +29,7 @@ export interface OpenAPIReferenceHandlerPluginSwaggerConfig extends Partial<Omit
    *
    * @default ['SwaggerUIBundle.plugins.DownloadUrl']
    */
-  plugins?: undefined | string[]
+  plugins?: string[] | undefined
 }
 
 export interface OpenAPIReferenceHandlerPluginOptions<T extends Context, TProvider extends OpenAPIReferenceHandlerPluginProvider> {
@@ -45,59 +45,59 @@ export interface OpenAPIReferenceHandlerPluginOptions<T extends Context, TProvid
    * as if the plugin were not installed. Useful for restricting access
    * to authenticated users.
    */
-  allow?: Value<Promisable<boolean>, [StandardHandlerRoutingInterceptorOptions<T>]>
+  allow?: Value<Promisable<boolean>, [StandardHandlerRoutingInterceptorOptions<T>]> | undefined
 
   /**
    * The URL path at which to serve the OpenAPI JSON.
    *
    * @default '/spec.json'
    */
-  specPath?: StandardUrl
+  specPath?: StandardUrl | undefined
 
   /**
    * The UI provider to use for rendering the API reference.
    *
    * @default 'scalar'
    */
-  provider?: TProvider
+  provider?: TProvider | undefined
 
   /**
    * Provider-specific configuration passed directly to the chosen UI library.
    * Options differ depending on `provider`.
    */
-  providerConfig?: undefined | (
+  providerConfig?: (
     TProvider extends 'swagger'
       ? OpenAPIReferenceHandlerPluginSwaggerConfig
       : OpenAPIReferenceHandlerPluginScalarConfig
-  )
+  ) | undefined
 
   /**
    * URL for the provider's main script bundle.
    *
    * @default 'https://cdn.jsdelivr.net/npm/@scalar/api-reference' | 'https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js'
    */
-  providerScriptUrl?: undefined | string
+  providerScriptUrl?: string | undefined
 
   /**
    * URL for the provider's stylesheet.
    *
    * @default undefined | 'https://unpkg.com/swagger-ui-dist/swagger-ui.css'
    */
-  providerCssUrl?: undefined | string
+  providerCssUrl?: string | undefined
 
   /**
    * The URL path at which to serve the API reference UI.
    *
    * @default '/'
    */
-  docsPath?: StandardUrl
+  docsPath?: StandardUrl | undefined
 
   /**
    * The document title for the API reference UI.
    *
    * @default spec.info.title
    */
-  docsTitle?: Value<Promisable<string>, [StandardHandlerRoutingInterceptorOptions<T>]>
+  docsTitle?: Value<Promisable<string>, [StandardHandlerRoutingInterceptorOptions<T>]> | undefined
 
   /**
    * Raw HTML to inject into the `<head>` of the API reference page.
@@ -105,7 +105,7 @@ export interface OpenAPIReferenceHandlerPluginOptions<T extends Context, TProvid
    *
    * @default ''
    */
-  docsHead?: Value<Promisable<string>, [StandardHandlerRoutingInterceptorOptions<T>]>
+  docsHead?: Value<Promisable<string>, [StandardHandlerRoutingInterceptorOptions<T>]> | undefined
 }
 
 /**

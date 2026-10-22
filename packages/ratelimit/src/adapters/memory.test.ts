@@ -87,12 +87,12 @@ describe('memoryRateLimiter', () => {
     expect(results.length - successCount).toBe(90)
   })
 
-  describe('blockingUntilReady', () => {
+  describe('timeout', () => {
     it('blocks and retries until a slot opens up', async () => {
       const limiter = new MemoryRateLimiter({
         maxRequests: 1,
         window: 500,
-        blockingUntilReady: { enabled: true, timeout: 1000 },
+        timeout: 1000,
       })
 
       expect(await limiter.limit('key')).toEqual({ success: true, limit: 1, remaining: 0, reset: 500 })
@@ -107,7 +107,7 @@ describe('memoryRateLimiter', () => {
       const limiter = new MemoryRateLimiter({
         maxRequests: 3,
         window: 500,
-        blockingUntilReady: { enabled: true, timeout: 1000 },
+        timeout: 1000,
       })
 
       expect(await limiter.limit('key', { weight: 3 })).toEqual({ success: true, limit: 3, remaining: 0, reset: 500 })
@@ -122,7 +122,7 @@ describe('memoryRateLimiter', () => {
       const limiter = new MemoryRateLimiter({
         maxRequests: 1,
         window: 2000,
-        blockingUntilReady: { enabled: true, timeout: 100 },
+        timeout: 100,
       })
 
       expect(await limiter.limit('key')).toEqual({ success: true, limit: 1, remaining: 0, reset: 2000 })
@@ -133,11 +133,11 @@ describe('memoryRateLimiter', () => {
       expect(await pending).toEqual({ success: false, limit: 1, remaining: 0, reset: 2000 })
     })
 
-    it('ignores the blocking option when disabled', async () => {
+    it('does not block when timeout is 0', async () => {
       const limiter = new MemoryRateLimiter({
         maxRequests: 1,
         window: 1000,
-        blockingUntilReady: { enabled: false, timeout: 5000 },
+        timeout: 0,
       })
 
       expect(await limiter.limit('key')).toEqual({ success: true, limit: 1, remaining: 0, reset: 1000 })

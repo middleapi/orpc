@@ -37,7 +37,7 @@ export interface RateLimitMiddlewareOptions<
    *
    * @default 1
    */
-  weight?: Value<Promisable<number>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
+  weight?: Value<Promisable<number>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]> | undefined
 
   /**
    * If your ratelimit middleware is used multiple times
@@ -47,7 +47,7 @@ export interface RateLimitMiddlewareOptions<
    *
    * @default true
    */
-  dedupe?: boolean
+  dedupe?: boolean | undefined
 }
 
 /**

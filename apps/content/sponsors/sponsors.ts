@@ -40,18 +40,6 @@ export default [
     "type": "User"
   },
   {
-    "name": "Nexa",
-    "login": "nexa-ca",
-    "avatar": "https://avatars.githubusercontent.com/u/199146462?v=4",
-    "link": "https://github.com/nexa-ca?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
-    "rel": "sponsored",
-    "tierTitle": "Premium Sponsor",
-    "tierLevel": 4,
-    "amount": 200,
-    "createdAt": "2026-09-21T17:06:10Z",
-    "type": "Organization"
-  },
-  {
     "name": "LN Markets",
     "login": "ln-markets",
     "avatar": "https://avatars.githubusercontent.com/u/70597625?v=4",
@@ -962,6 +950,18 @@ export default [
     "amount": -1,
     "createdAt": "2026-09-09T19:11:39Z",
     "type": "User"
+  },
+  {
+    "name": "Nexa",
+    "login": "nexa-ca",
+    "avatar": "https://avatars.githubusercontent.com/u/199146462?v=4",
+    "link": "https://github.com/nexa-ca?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "rel": "sponsored",
+    "tierTitle": "Past Sponsor",
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2026-09-21T17:06:10Z",
+    "type": "Organization"
   },
   {
     "name": "Laduni",

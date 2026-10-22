@@ -24,7 +24,7 @@ describe('publisher redis adapters compatibility', { timeout: 20_000 }, () => {
     const redis = createClient({ url: `rediss://default:${UPSTASH_REDIS_REST_TOKEN}@${new URL(UPSTASH_REDIS_REST_URL).host}:6379` })
     const publisher = new RedisPublisher(redis, {
       prefix,
-      resume: { enabled: true, seconds: 10 },
+      resume: { enabled: true, ttl: 10_000 },
     })
     publishers.push({ name: 'redis', publisher })
   }
@@ -34,12 +34,9 @@ describe('publisher redis adapters compatibility', { timeout: 20_000 }, () => {
     const upstashRedis = new Redis({ url: UPSTASH_REDIS_REST_URL, token: UPSTASH_REDIS_REST_TOKEN })
     const publisher = new UpstashPublisher(upstashRedis, {
       prefix,
-      resume: { enabled: true, seconds: 10 },
+      resume: { enabled: true, ttl: 10_000 },
     })
-    publishers.push({ name: 'upstash', publisher: new UpstashPublisher(upstashRedis, {
-      prefix,
-      resume: { enabled: true, seconds: 10 },
-    }) })
+    publishers.push({ name: 'upstash', publisher })
   }
 
   describe.skipIf(publishers.length < 2)('cross-adapter compatibility', () => {

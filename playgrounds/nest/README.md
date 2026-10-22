@@ -38,14 +38,6 @@ Like what we build over at [middleapi](https://github.com/middleapi)? You can he
   </tr>
 </table>
 
-### Premium Sponsors
-
-<table>
-  <tr>
-   <td align="center"><a href="https://github.com/nexa-ca?ref=middleapi&amp;utm_source=middleapi&amp;utm_medium=sponsor" target="_blank" rel="noopener sponsored" title="Nexa"><img src="https://avatars.githubusercontent.com/u/199146462?v=4" width="279" alt="Nexa"/><br />Nexa</a></td>
-  </tr>
-</table>
-
 ### Organization Sponsors
 
 <table>
@@ -117,4 +109,4 @@ Like what we build over at [middleapi](https://github.com/middleapi)? You can he
   </tr>
 </table>
 
-With thanks to [39 past sponsors](https://orpc.dev/sponsors#past-sponsors) who helped get oRPC here.
+With thanks to [40 past sponsors](https://orpc.dev/sponsors#past-sponsors) who helped get oRPC here.

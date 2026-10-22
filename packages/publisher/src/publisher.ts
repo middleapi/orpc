@@ -15,7 +15,32 @@ export interface PublisherOptions {
    *
    * @default 100
    */
-  maxBufferedEvents?: number
+  maxBufferedEvents?: number | undefined
+}
+
+/**
+ * Configuration for event resume support, shared by the adapters that support it.
+ */
+export interface PublisherResumeOptions {
+  /**
+   * Whether event resume support is enabled.
+   *
+   * When enabled, published events are temporarily stored so new
+   * subscribers can resume from a previous position using `lastEventId`.
+   *
+   * @default false
+   */
+  enabled: boolean
+
+  /**
+   * How long to retain events for resume, in milliseconds.
+   *
+   * Expired events are cleaned up lazily for performance reasons, so
+   * some events may remain available slightly longer than this period.
+   *
+   * @default 300000 (5 min)
+   */
+  ttl?: number | undefined
 }
 
 export interface PublisherSubscribeListenerOptions {
@@ -27,7 +52,7 @@ export interface PublisherSubscribeListenerOptions {
   /**
    * Triggered when an error occur
    */
-  onError?: (error: ThrowableError) => void
+  onError?: ((error: ThrowableError) => void) | undefined
 }
 
 export interface PublisherSubscribeIteratorOptions
@@ -35,7 +60,7 @@ export interface PublisherSubscribeIteratorOptions
   /**
    * Abort signal, automatically unsubscribes on abort
    */
-  signal?: AbortSignal | undefined | null
+  signal?: AbortSignal | null | undefined
 }
 
 export abstract class Publisher<T extends Record<string, object>> {

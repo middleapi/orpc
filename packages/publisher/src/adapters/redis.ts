@@ -11,7 +11,7 @@ export interface RedisPublisherOptions extends BaseRedisPublisherOptions {
    *
    * @default redis.duplicate()
    */
-  subscriber?: undefined | RedisClientType<any, any, any, any, any>
+  subscriber?: RedisClientType<any, any, any, any, any> | undefined
 }
 
 /**

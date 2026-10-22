@@ -1,3 +1,5 @@
+import { encodeBase64 } from '@orpc/shared'
+
 /**
  * Encodes a Uint8Array to base64url format
  * Base64url is URL-safe and doesn't use padding
@@ -13,16 +15,7 @@
  * @see {@link https://orpc.dev/docs/helpers/base64url | Base64Url Helpers}
  */
 export function encodeBase64url(data: Uint8Array): string {
-  const chunkSize = 8192 // 8KB chunks to stay well below call stack limits
-  let binaryString = ''
-
-  for (let i = 0; i < data.length; i += chunkSize) {
-    const chunk = data.subarray(i, i + chunkSize)
-    binaryString += String.fromCharCode(...chunk)
-  }
-
-  const base64 = btoa(binaryString)
-  return base64
+  return encodeBase64(data)
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=/g, '')

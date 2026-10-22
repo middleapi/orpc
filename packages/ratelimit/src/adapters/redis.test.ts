@@ -198,15 +198,12 @@ describe.concurrent('redis rate limiter integration', {
     })
   })
 
-  describe('blockingUntilReady', () => {
+  describe('timeout', () => {
     it('waits until the next window when capacity is unavailable', async () => {
       const limiter = await createTestingRateLimiter({
         maxRequests: 2,
         window: 1000,
-        blockingUntilReady: {
-          enabled: true,
-          timeout: 4000,
-        },
+        timeout: 4000,
       })
 
       const key = 'blocking'
@@ -231,10 +228,7 @@ describe.concurrent('redis rate limiter integration', {
       const limiter = await createTestingRateLimiter({
         maxRequests: 2,
         window: 1000,
-        blockingUntilReady: {
-          enabled: true,
-          timeout: 4000,
-        },
+        timeout: 4000,
       })
 
       const key = 'blocking-weighted'
@@ -261,10 +255,7 @@ describe.concurrent('redis rate limiter integration', {
       const limiter = await createTestingRateLimiter({
         maxRequests: 2,
         window: 10_000,
-        blockingUntilReady: {
-          enabled: true,
-          timeout: 100,
-        },
+        timeout: 100,
       })
 
       const key = 'blocking-timeout'

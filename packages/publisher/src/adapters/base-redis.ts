@@ -1,7 +1,7 @@
 import type { RPCJsonSerialization } from '@orpc/client'
 import type { Public, ThrowableError } from '@orpc/shared'
 import type { EventMeta } from '@standard-server/core'
-import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
+import type { PublisherOptions, PublisherResumeOptions, PublisherSubscribeListenerOptions } from '../publisher'
 import { RPCJsonSerializer } from '@orpc/client'
 import { once, parseEmptyableJSON, stringifyJSON } from '@orpc/shared'
 import { getEventMeta, unwrapEvent, withEventMeta } from '@standard-server/core'
@@ -12,7 +12,7 @@ import { Publisher } from '../publisher'
  * trimming and setting a TTL when `ARGV[2..4]` are given. One script keeps Pub/Sub order
  * equal to stream order. Kept on one line because `EVAL` sends it with every call.
  */
-const PUBLISH_SCRIPT = `local id=redis.call('XADD',KEYS[1],'*','data',ARGV[1]) if ARGV[2] then redis.call('XTRIM',KEYS[1],'MINID',ARGV[2],ARGV[3]) redis.call('EXPIRE',KEYS[1],ARGV[4]) end redis.call('PUBLISH',KEYS[1],'{"data":'..ARGV[1]..',"id":"'..id..'"}')`
+const PUBLISH_SCRIPT = `local id=redis.call('XADD',KEYS[1],'*','data',ARGV[1]) if ARGV[2] then redis.call('XTRIM',KEYS[1],'MINID',ARGV[2],ARGV[3]) redis.call('PEXPIRE',KEYS[1],ARGV[4]) end redis.call('PUBLISH',KEYS[1],'{"data":'..ARGV[1]..',"id":"'..id..'"}')`
 
 /**
  * Options shared by every Redis-backed publisher adapter.
@@ -26,14 +26,14 @@ export interface BaseRedisPublisherOptions extends PublisherOptions {
    *
    * @default ''
    */
-  prefix?: string
+  prefix?: string | undefined
 
   /**
    * Serializer for serialize and deserialize payloads.
    *
    * @default RPCJsonSerializer
    */
-  serializer?: undefined | Public<RPCJsonSerializer>
+  serializer?: Public<RPCJsonSerializer> | undefined
 
   /**
    * Configuration for event resume support.
@@ -43,27 +43,7 @@ export interface BaseRedisPublisherOptions extends PublisherOptions {
    *
    * @default { enabled: false }
    */
-  resume?: {
-    /**
-     * Whether event resume support is enabled.
-     *
-     * When enabled, published events are temporarily stored so new
-     * subscribers can resume from a previous position using `lastEventId`.
-     *
-     * @default false
-     */
-    enabled: boolean
-
-    /**
-     * How long (in seconds) to retain events for resume.
-     *
-     * Expired events are cleaned up lazily for performance reasons, so
-     * some events may remain available slightly longer than this period.
-     *
-     * @default 300 (5 min)
-     */
-    seconds?: number
-  }
+  resume?: PublisherResumeOptions | undefined
 }
 
 /**
@@ -85,7 +65,7 @@ export interface RedisStreamEntry {
 
 interface SerializedEvent {
   payload: RPCJsonSerialization
-  meta?: undefined | EventMeta
+  meta?: EventMeta | undefined
 }
 
 /**
@@ -101,7 +81,7 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
   protected readonly prefix: string
   protected readonly serializer: Public<RPCJsonSerializer>
   protected readonly resumeEnabled: boolean
-  protected readonly resumeSeconds: number
+  protected readonly resumeTtl: number
 
   /**
    * Tests switch this to `=` for deterministic trimming.
@@ -116,7 +96,7 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
     this.prefix = prefix ?? ''
     this.serializer = serializer ?? new RPCJsonSerializer()
     this.resumeEnabled = resume?.enabled ?? false
-    this.resumeSeconds = resume?.seconds ?? 300
+    this.resumeTtl = resume?.ttl ?? 300_000
   }
 
   /**
@@ -162,11 +142,10 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
     }
 
     const now = Date.now()
-    const windowMs = this.resumeSeconds * 1000
 
     // Entries are inserted in time order, so expired ones come first.
     for (const [trimmedChannel, trimTime] of this.lastTrimTimes) {
-      if (trimTime + windowMs >= now) {
+      if (trimTime + this.resumeTtl >= now) {
         break
       }
 
@@ -180,9 +159,9 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
 
       args.push(
         this.xTrimExactness,
-        `${now - windowMs}-0`,
+        `${now - this.resumeTtl}-0`,
         // 2x so entries added late in a window outlive it until the next trim refreshes the TTL.
-        String(this.resumeSeconds * 2),
+        String(this.resumeTtl * 2),
       )
     }
 

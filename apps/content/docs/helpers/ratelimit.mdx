@@ -19,7 +19,7 @@ The core concept is the `RateLimiter` interface, which defines a standard way to
 | -------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------- |
 | [`MemoryRateLimiter`](#memory)         | ✅            | In-memory storage                                                                                         |
 | [`RedisRateLimiter`](#redis)           | ✅            | [Redis](https://github.com/redis/redis)                                                                   |
-| [`UpstashRateLimiter`](#upstash)       | ✅            | [Upstash Rate Limit](https://www.npmjs.com/package/@upstash/ratelimit)                                    |
+| [`UpstashRateLimiter`](#upstash)       | ✅            | [Upstash Redis](https://github.com/upstash/redis-js)                                                      |
 | [`BunRedisRateLimiter`](#bun-redis)    | ✅            | [Bun's Redis](https://bun.com/docs/runtime/redis)                                                         |
 | [`CloudflareRateLimiter`](#cloudflare) | ❌            | [Cloudflare's Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) |
 
@@ -50,16 +50,13 @@ if (!result.success) {
 
 ### Blocking Mode
 
-Some adapters support blocking mode, which waits until capacity becomes available instead of rejecting requests immediately.
+Some adapters support blocking mode, which waits until capacity becomes available instead of rejecting requests immediately. Set `timeout` to how long a request may wait, in milliseconds. A request still fails right away when its window will not reset before the timeout elapses.
 
 ```ts
 const limiter = new MemoryRateLimiter({
   maxRequests: 10,
   window: 60000,
-  blockingUntilReady: {
-    enabled: true, // Disabled by default
-    timeout: 5000, // Wait up to 5 seconds
-  },
+  timeout: 5000, // Wait up to 5 seconds, 0 (no waiting) by default
 })
 ```
 
@@ -169,19 +166,13 @@ const limiter = new MemoryRateLimiter({
    */
   window: 60000,
 
-  blockingUntilReady: {
-    /**
-     * Block until the request may pass or timeout is reached.
-     *
-     * @default false
-     */
-    enabled: false,
-
-    /**
-     * milliseconds
-     */
-    timeout: 5000
-  },
+  /**
+   * How long to wait for capacity to become available, in milliseconds.
+   * Gives up right away when the window will not reset before the timeout elapses.
+   *
+   * @default 0
+   */
+  timeout: 0,
 })
 ```
 
@@ -217,68 +208,53 @@ const limiter = new RedisRateLimiter(client, {
    */
   window: 60000,
 
-  blockingUntilReady: {
-    /**
-     * Block until the request may pass or timeout is reached.
-     *
-     * @default false
-     */
-    enabled: false,
-
-    /**
-     * milliseconds
-     */
-    timeout: 5000
-  },
+  /**
+   * How long to wait for capacity to become available, in milliseconds.
+   * Gives up right away when the window will not reset before the timeout elapses.
+   *
+   * @default 0
+   */
+  timeout: 0,
 })
 ```
 
 ### Upstash
 
-Delegates to an `@upstash/ratelimit` instance, so the algorithm and limits are configured there. A good fit for serverless and edge runtimes.
+Stores counters in Upstash Redis, so it shares counters with `RedisRateLimiter`. A good fit for serverless and edge runtimes.
 
-````ts
-import { Ratelimit } from '@upstash/ratelimit'
-import { Redis } from '@upstash/redis'
+```ts
 import { UpstashRateLimiter } from '@orpc/ratelimit/upstash'
+import { Redis } from '@upstash/redis'
 
 const redis = Redis.fromEnv()
-const ratelimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(10, '60 s'),
-  prefix: 'orpc:', // Optional key prefix
-})
 
-const limiter = new UpstashRateLimiter(ratelimit, {
-  blockingUntilReady: {
-    /**
-     * Block until the request may pass or timeout is reached.
-     *
-     * @default false
-     */
-    enabled: false,
-
-    /**
-     * milliseconds
-     */
-    timeout: 5000
-  },
+const limiter = new UpstashRateLimiter(redis, {
+  /**
+   * The prefix to use for Redis keys.
+   *
+   * @default ''
+   */
+  prefix: '',
 
   /**
-   * For the MultiRegion setup we do some synchronizing in the background, after returning the current limit.
-   * Or when analytics is enabled, we send the analytics asynchronously after returning the limit.
-   * In most case you can simply ignore this.
-   *
-   * On Vercel Edge or Cloudflare workers, you might need `.bind` before assign:
-   * ```ts
-   * const ratelimiter = new UpstashRateLimiter(ratelimit, {
-   *   waitUntil: ctx.waitUntil.bind(ctx),
-   * })
-   * ```
+   * Maximum number of requests allowed within the window.
    */
-  waitUntil: undefined
+  maxRequests: 10,
+
+  /**
+   * The duration of the fixed window in milliseconds.
+   */
+  window: 60000,
+
+  /**
+   * How long to wait for capacity to become available, in milliseconds.
+   * Gives up right away when the window will not reset before the timeout elapses.
+   *
+   * @default 0
+   */
+  timeout: 0,
 })
-````
+```
 
 ### Bun Redis
 
@@ -306,19 +282,13 @@ const limiter = new BunRedisRateLimiter(redis, {
    */
   window: 60000,
 
-  blockingUntilReady: {
-    /**
-     * Block until the request may pass or timeout is reached.
-     *
-     * @default false
-     */
-    enabled: false,
-
-    /**
-     * milliseconds
-     */
-    timeout: 5000
-  },
+  /**
+   * How long to wait for capacity to become available, in milliseconds.
+   * Gives up right away when the window will not reset before the timeout elapses.
+   *
+   * @default 0
+   */
+  timeout: 0,
 })
 ```
 

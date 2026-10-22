@@ -13,7 +13,7 @@ export interface RPCSerializerSerializeOptions {
    *
    * @default true
    */
-  useFormDataForBlobFields?: boolean
+  useFormDataForBlobFields?: boolean | undefined
 }
 
 export interface RPCSerializerOptions extends RPCJsonSerializerOptions {
