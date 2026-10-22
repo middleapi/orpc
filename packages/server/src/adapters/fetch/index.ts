@@ -4,5 +4,11 @@ export {
    */
   RequestLimitHandlerPlugin as BodyLimitPlugin,
 } from '../../plugins/request-limit'
+export type {
+  /**
+   * @deprecated Use `RequestLimitHandlerPluginOptions` from `@orpc/server/plugins` instead.
+   */
+  RequestLimitHandlerPluginOptions as BodyLimitPluginOptions,
+} from '../../plugins/request-limit'
 export * from './handler'
 export * from './rpc-handler'

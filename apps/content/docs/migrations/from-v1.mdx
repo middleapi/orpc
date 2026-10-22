@@ -1337,24 +1337,25 @@ The Cloudflare rate limiter moved to `@orpc/cloudflare`.
 
 These renames still compile through deprecated aliases, so you can migrate them gradually:
 
-| v1 name                      | v2 name                       | Package                          |
-| ---------------------------- | ----------------------------- | -------------------------------- |
-| `InferClientErrorUnion`      | `InferClientError`            | `@orpc/client`                   |
-| `ClientPromiseResult`        | `PromiseWithError`            | `@orpc/client`                   |
-| `eventIterator`              | `asyncIteratorObject`         | `@orpc/server`, `@orpc/contract` |
-| `consumeEventIterator`       | `consumeAsyncIterator`        | `@orpc/client`                   |
-| `InferRouterCurrentContexts` | `InferRouterFinalContexts`    | `@orpc/server`                   |
-| `CORSPlugin`                 | `CORSHandlerPlugin`           | `@orpc/server/plugins`           |
-| `BodyLimitPlugin`            | `RequestLimitHandlerPlugin`   | `@orpc/server/plugins`           |
-| `ClientRetryPlugin`          | `RetryLinkPlugin`             | `@orpc/client/plugins`           |
-| `DedupeRequestsPlugin`       | `DedupeLinkPlugin`            | `@orpc/client/plugins`           |
-| `RetryAfterPlugin`           | `RetryAfterLinkPlugin`        | `@orpc/client/plugins`           |
-| `AnyContractRouter`          | `RouterContract`              | `@orpc/contract`                 |
-| `ContractRouterClient`       | `RouterContractClient`        | `@orpc/contract`                 |
-| `minifyContractRouter`       | `minifyRouterContract`        | `@orpc/contract`                 |
-| `useServerAction`            | `useServerFunction`           | `@orpc/next/hooks`               |
-| `useOptimisticServerAction`  | `useOptimisticServerFunction` | `@orpc/next/hooks`               |
-| `createFormAction`           | `createServerFormFunction`    | `@orpc/next`                     |
-| `createORPCVueColadaUtils`   | `createPiniaColadaUtils`      | `@orpc/pinia-colada`             |
+| v1 name                      | v2 name                            | Package                          |
+| ---------------------------- | ---------------------------------- | -------------------------------- |
+| `InferClientErrorUnion`      | `InferClientError`                 | `@orpc/client`                   |
+| `ClientPromiseResult`        | `PromiseWithError`                 | `@orpc/client`                   |
+| `eventIterator`              | `asyncIteratorObject`              | `@orpc/server`, `@orpc/contract` |
+| `consumeEventIterator`       | `consumeAsyncIterator`             | `@orpc/client`                   |
+| `InferRouterCurrentContexts` | `InferRouterFinalContexts`         | `@orpc/server`                   |
+| `CORSPlugin`                 | `CORSHandlerPlugin`                | `@orpc/server/plugins`           |
+| `BodyLimitPlugin`            | `RequestLimitHandlerPlugin`        | `@orpc/server/plugins`           |
+| `BodyLimitPluginOptions`     | `RequestLimitHandlerPluginOptions` | `@orpc/server/plugins`           |
+| `ClientRetryPlugin`          | `RetryLinkPlugin`                  | `@orpc/client/plugins`           |
+| `DedupeRequestsPlugin`       | `DedupeLinkPlugin`                 | `@orpc/client/plugins`           |
+| `RetryAfterPlugin`           | `RetryAfterLinkPlugin`             | `@orpc/client/plugins`           |
+| `AnyContractRouter`          | `RouterContract`                   | `@orpc/contract`                 |
+| `ContractRouterClient`       | `RouterContractClient`             | `@orpc/contract`                 |
+| `minifyContractRouter`       | `minifyRouterContract`             | `@orpc/contract`                 |
+| `useServerAction`            | `useServerFunction`                | `@orpc/next/hooks`               |
+| `useOptimisticServerAction`  | `useOptimisticServerFunction`      | `@orpc/next/hooks`               |
+| `createFormAction`           | `createServerFormFunction`         | `@orpc/next`                     |
+| `createORPCVueColadaUtils`   | `createPiniaColadaUtils`           | `@orpc/pinia-colada`             |
 
 If anything is missing from this guide, check the corresponding page in the v2 docs, or open an issue on [GitHub](https://github.com/middleapi/orpc/issues).
