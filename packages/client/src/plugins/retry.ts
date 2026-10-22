@@ -1,7 +1,7 @@
 import type { Promisable, Value } from '@orpc/shared'
 import type { StandardLinkInterceptor, StandardLinkInterceptorOptions, StandardLinkOptions, StandardLinkPlugin } from '../adapters/standard'
 import type { ClientContext } from '../types'
-import { AsyncIteratorClass, isAsyncIteratorObject, override, sleep, toArray, value } from '@orpc/shared'
+import { anyAbortSignal, AsyncIteratorClass, isAsyncIteratorObject, override, sleep, toArray, value } from '@orpc/shared'
 import { getEventMeta } from '@standard-server/core'
 import { COMMON_ERROR_STATUS_MAP, ORPCError, ResponseError } from '../error'
 
@@ -134,11 +134,22 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
       let attempt = 1
       let isIteratorAborted = false
 
+      /**
+       * Reconnects belong to the returned iterator, so closing the iterator also aborts them.
+       * The combined signal is created once to avoid piling up listeners on long-lived streams.
+       */
+      const iteratorController = new AbortController()
+      let reconnectSignal: AbortSignal | undefined
+
       const callNext = async (initialError?: { error: unknown }) => {
         let currentError = initialError
 
+        const signal = initialError
+          ? reconnectSignal ??= anyAbortSignal([callOptions.signal, iteratorController.signal])
+          : callOptions.signal
+
         while (true) {
-          const updatedCallOptions = { ...callOptions, lastEventId }
+          const updatedCallOptions = { ...callOptions, lastEventId, signal }
           let retryDelayMs = 0
 
           if (currentError) {
@@ -240,7 +251,12 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
           isIteratorAborted = true
 
           if (kind === 'cancelled') {
-            await current.return?.()
+            try {
+              await current.return?.()
+            }
+            finally {
+              iteratorController.abort()
+            }
           }
         },
       ))
