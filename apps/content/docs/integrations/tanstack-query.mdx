@@ -529,7 +529,7 @@ const queryClient = new QueryClient({
 
 ### Streamed and Live Queries
 
-`StreamQuerySSRUtilsPlugin` lets [streamed](#streamed-query-options) and [live](#live-query-options) queries render on the server without blocking forever: streamed queries settle once they connect and live queries on their first event. In the browser, they refetch on mount to reopen the stream after hydration.
+`StreamQuerySSRUtilsPlugin` lets [streamed](#streamed-query-options) and [live](#live-query-options) queries render on the server without blocking forever: streamed queries settle once they connect and live queries on their first event. The plugin then closes the stream and aborts the call's `signal`, so procedures called [in-process](/docs/recipes/optimizing-ssr) with `createRouterClient` stop too. In the browser, they refetch on mount to reopen the stream after hydration.
 
 ```ts
 import { StreamQuerySSRUtilsPlugin } from '@orpc/tanstack-query'

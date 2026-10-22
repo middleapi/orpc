@@ -89,6 +89,7 @@ describe('streamQuerySSRUtilsPlugin', () => {
 
     expect(queryClient.getQueryState(utils.stream.liveKey())).toMatchObject({ status: 'success', fetchStatus: 'idle', data: 1 })
     expect(cleanup).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(client.stream).mock.calls[0]![1]!.signal!.aborted).toBe(true)
   })
 
   it('settles streamed queries once they connect on the server', async () => {
@@ -99,6 +100,26 @@ describe('streamQuerySSRUtilsPlugin', () => {
 
     expect(queryClient.getQueryState(utils.stream.streamedKey())).toMatchObject({ status: 'success', fetchStatus: 'idle', data: [] })
     await expect(vi.mocked(client.stream).mock.results[0]!.value.next()).resolves.toEqual({ done: true, value: undefined })
+    expect(vi.mocked(client.stream).mock.calls[0]![1]!.signal!.aborted).toBe(true)
+  })
+
+  it('forwards query cancellation to the call on the server', async () => {
+    const queryClient = new QueryClient()
+    const pendingClient = {
+      stream: vi.fn(async function* (_input, { signal }) {
+        await new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason)))
+      }),
+    } as unknown as typeof client
+    const utils = createRouterUtils(pendingClient, { plugins: [new StreamQuerySSRUtilsPlugin({ isServer: true })] })
+
+    void queryClient.prefetchQuery(utils.stream.liveOptions())
+    await vi.waitFor(() => expect(pendingClient.stream).toHaveBeenCalledTimes(1))
+
+    const signal = vi.mocked(pendingClient.stream).mock.calls[0]![1]!.signal!
+    expect(signal.aborted).toBe(false)
+
+    await queryClient.cancelQueries()
+    expect(signal.aborted).toBe(true)
   })
 
   it('settles live queries whose stream ends before the first event on the server', async () => {
@@ -116,6 +137,7 @@ describe('streamQuerySSRUtilsPlugin', () => {
     void queryClient.prefetchQuery(utils.stream.liveOptions())
 
     await vi.waitFor(() => expect(queryClient.getQueryData(utils.stream.liveKey())).toBe(2))
+    expect(vi.mocked(client.stream).mock.calls[0]![1]!.signal!.aborted).toBe(false)
     await queryClient.cancelQueries()
   })
 

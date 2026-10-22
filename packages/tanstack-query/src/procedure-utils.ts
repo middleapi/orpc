@@ -19,7 +19,7 @@ import type {
   StreamedOptionsIn,
   StreamedOptionsOut,
 } from './types'
-import { intercept, isAsyncIteratorObject, isTypescriptObject, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
+import { anyAbortSignal, intercept, isAsyncIteratorObject, isTypescriptObject, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
 import { skipToken } from '@tanstack/query-core'
 import { generateOperationKey } from './key'
 import { liveQuery } from './live-query'
@@ -173,7 +173,7 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
 
   /**
    * Settle streamed queries once they connect and live queries on their first event,
-   * closing the stream instead of following it. Set by `StreamQuerySSRUtilsPlugin` on the server.
+   * closing the stream and aborting the call instead of following it. Set by `StreamQuerySSRUtilsPlugin` on the server.
    *
    * @internal
    */
@@ -445,13 +445,14 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
             return serializableStreamedQuery(
               async (queryContext) => {
-                const output = await this.call(input, { signal: queryContext.signal, context })
+                const snapshot = this.options.snapshotStreams ? new AbortController() : undefined
+                const output = await this.call(input, { signal: anyAbortSignal([queryContext.signal, snapshot?.signal]), context })
 
                 if (!isAsyncIteratorObject(output)) {
                   throw new Error('streamedQuery requires an AsyncIteratorObject output')
                 }
 
-                return this.options.snapshotStreams ? takeChunks(output, 0) : output
+                return snapshot ? takeChunks(output, 0, snapshot) : output
               },
               optionsIn.queryFnOptions,
             )(fnContext)
@@ -532,8 +533,9 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
             }
 
             return liveQuery(async (queryContext) => {
+              const snapshot = this.options.snapshotStreams ? new AbortController() : undefined
               const output = await this.call(input, {
-                signal: queryContext.signal,
+                signal: anyAbortSignal([queryContext.signal, snapshot?.signal]),
                 context,
               })
 
@@ -541,7 +543,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
                 throw new Error('liveQuery requires an AsyncIteratorObject output')
               }
 
-              return this.options.snapshotStreams ? takeChunks(output, 1) : output
+              return snapshot ? takeChunks(output, 1, snapshot) : output
             })(fnContext)
           },
         )
@@ -690,7 +692,12 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
   }
 }
 
-async function* takeChunks<T>(iterator: AsyncIterator<T>, count: number): AsyncGenerator<T> {
+/**
+ * Yields the first `count` chunks, then closes the iterator and aborts the call.
+ * The abort only reaches the procedure, not the query, and lets in-process clients
+ * such as `createRouterClient` stop handlers that watch `signal` instead of `.return()`.
+ */
+async function* takeChunks<T>(iterator: AsyncIterator<T>, count: number, controller: AbortController): AsyncGenerator<T> {
   try {
     for (let i = 0; i < count; i++) {
       const result = await iterator.next()
@@ -703,6 +710,11 @@ async function* takeChunks<T>(iterator: AsyncIterator<T>, count: number): AsyncG
     }
   }
   finally {
-    await iterator.return?.()
+    try {
+      await iterator.return?.()
+    }
+    finally {
+      controller.abort()
+    }
   }
 }

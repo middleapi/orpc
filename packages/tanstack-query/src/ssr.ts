@@ -41,8 +41,8 @@ export interface StreamQuerySSRUtilsPluginOptions {
 
 /**
  * Router utils plugin for SSR of streamed and live queries. On the server, streamed queries
- * settle once they connect and live queries on their first event; in the browser, they refetch
- * on mount so streams reopen after hydration.
+ * settle once they connect and live queries on their first event, then the stream is closed and
+ * the call's `signal` aborted; in the browser, they refetch on mount so streams reopen after hydration.
  *
  * @see {@link https://orpc.dev/docs/integrations/tanstack-query#streamed-and-live-queries | TanStack Query Integration - Streamed and Live Queries}
  */
