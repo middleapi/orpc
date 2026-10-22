@@ -87,11 +87,12 @@ describe('streamQuerySSRUtilsPlugin', () => {
     const utils = createRouterUtils(client, { plugins: [new StreamQuerySSRUtilsPlugin({ isServer: true })] })
 
     await expect(queryClient.fetchQuery(utils.stream.liveOptions())).resolves.toBe(1)
+    expect(vi.mocked(client.stream).mock.calls[0]![1]!.signal!.aborted).toBe(true)
 
+    // the stream ignores the signal, so it closes on its next event, which is dropped
+    await vi.waitFor(() => expect(cleanup).toHaveBeenCalledTimes(1))
     expect(queryClient.getQueryState(utils.stream.liveKey())).toMatchObject({ status: 'success', fetchStatus: 'idle', data: 1 })
     expect(onSuccess).not.toHaveBeenCalled()
-    expect(cleanup).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(client.stream).mock.calls[0]![1]!.signal!.aborted).toBe(true)
   })
 
   it('cancels streamed queries once they connect on the server', async () => {
@@ -100,11 +101,11 @@ describe('streamQuerySSRUtilsPlugin', () => {
     const utils = createRouterUtils(client, { plugins: [new StreamQuerySSRUtilsPlugin({ isServer: true })] })
 
     await expect(queryClient.fetchQuery(utils.stream.streamedOptions())).resolves.toEqual([])
+    expect(vi.mocked(client.stream).mock.calls[0]![1]!.signal!.aborted).toBe(true)
 
+    await vi.waitFor(() => expect(cleanup).toHaveBeenCalledTimes(1))
     expect(queryClient.getQueryState(utils.stream.streamedKey())).toMatchObject({ status: 'success', fetchStatus: 'idle', data: [] })
     expect(onSuccess).not.toHaveBeenCalled()
-    await expect(vi.mocked(client.stream).mock.results[0]!.value.next()).resolves.toEqual({ done: true, value: undefined })
-    expect(vi.mocked(client.stream).mock.calls[0]![1]!.signal!.aborted).toBe(true)
   })
 
   it('forwards query cancellation to the call on the server', async () => {
@@ -124,27 +125,6 @@ describe('streamQuerySSRUtilsPlugin', () => {
 
     await queryClient.cancelQueries()
     expect(signal.aborted).toBe(true)
-  })
-
-  it('cancels the query before closing the stream on the server', async () => {
-    const queryClient = new QueryClient()
-    const signalClient = {
-      stream: vi.fn(async function* (_input, { signal }) {
-        const aborted = new Promise(resolve => signal.addEventListener('abort', resolve))
-
-        try {
-          yield 1
-        }
-        finally {
-          await aborted
-        }
-      }),
-    } as unknown as typeof client
-    const utils = createRouterUtils(signalClient, { plugins: [new StreamQuerySSRUtilsPlugin({ isServer: true })] })
-
-    await queryClient.prefetchQuery(utils.stream.liveOptions())
-
-    expect(queryClient.getQueryState(utils.stream.liveKey())).toMatchObject({ status: 'success', fetchStatus: 'idle', data: 1 })
   })
 
   it('settles live queries whose stream ends before the first event on the server', async () => {
@@ -167,10 +147,14 @@ describe('streamQuerySSRUtilsPlugin', () => {
   })
 
   it('detects the server by the absence of window', () => {
-    expect(new StreamQuerySSRUtilsPlugin().initProcedureOptions([], {})).toMatchObject({ cancelStreamsOnFirstData: true })
+    expect(new StreamQuerySSRUtilsPlugin().initProcedureOptions([], {})).toMatchObject({
+      streamedInterceptors: [expect.any(Function)],
+      liveInterceptors: [expect.any(Function)],
+    })
 
     vi.stubGlobal('window', {})
-    expect(new StreamQuerySSRUtilsPlugin().initProcedureOptions([], {})).toMatchObject({ cancelStreamsOnFirstData: false })
+    expect(new StreamQuerySSRUtilsPlugin().initProcedureOptions([], {})).not.toHaveProperty('streamedInterceptors')
+    expect(new StreamQuerySSRUtilsPlugin().initProcedureOptions([], {})).not.toHaveProperty('liveInterceptors')
   })
 
   it('refetches streamed and live queries on mount', () => {

@@ -170,14 +170,6 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
   mutationOptions?: ProcedureUtilsModifier<
     MutationOptionsIn<TClientContext, TInput, TOutput, TError, unknown>
   > | undefined
-
-  /**
-   * Cancel streamed queries once they connect and live queries on their first event,
-   * keeping the data received so far. Set by `StreamQuerySSRUtilsPlugin` on the server.
-   *
-   * @internal
-   */
-  cancelStreamsOnFirstData?: boolean | undefined
 }
 
 const PROCEDURE_UTILS_INTERCEPTOR_KEYS: string[] = [
@@ -451,7 +443,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
                   throw new Error('streamedQuery requires an AsyncIteratorObject output')
                 }
 
-                return this.options.cancelStreamsOnFirstData ? takeChunks(output, 0, queryContext) : output
+                return output
               },
               optionsIn.queryFnOptions,
             )(fnContext)
@@ -541,7 +533,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
                 throw new Error('liveQuery requires an AsyncIteratorObject output')
               }
 
-              return this.options.cancelStreamsOnFirstData ? takeChunks(output, 1, queryContext) : output
+              return output
             })(fnContext)
           },
         )
@@ -687,28 +679,5 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
         )
       },
     }
-  }
-}
-
-/**
- * Yields the first `count` chunks, then cancels the query, keeping its data, and closes the iterator.
- * Cancels first, since the iterator's cleanup may wait on `signal`.
- */
-async function* takeChunks<T>(iterator: AsyncIterator<T>, count: number, context: QueryFunctionContext): AsyncGenerator<T> {
-  try {
-    for (let i = 0; i < count; i++) {
-      const result = await iterator.next()
-
-      if (result.done) {
-        return
-      }
-
-      yield result.value
-    }
-
-    void context.client.getQueryCache().find({ queryKey: context.queryKey, exact: true })?.cancel({ revert: true })
-  }
-  finally {
-    await iterator.return?.()
   }
 }
