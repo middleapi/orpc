@@ -392,26 +392,3 @@ wss.on('connection', (ws) => {
 :::info
 Use the [Retry Plugin](/docs/plugins/retry) to resume event iterators after reconnecting. On Cloudflare, see [Hibernation Keep-Alive](/docs/integrations/hibernation#keep-alive).
 :::
-
-## Security
-
-If cookies authenticate the socket, check the `Origin` header before upgrading. Browsers send cookies on cross-site WebSocket handshakes, and CORS does not apply to WebSockets.
-
-```ts
-const ALLOWED_ORIGINS = new Set(['https://example.com'])
-
-Bun.serve({
-  fetch(req, server) {
-    if (!ALLOWED_ORIGINS.has(req.headers.get('origin') ?? '')) {
-      return new Response('Forbidden', { status: 403 })
-    }
-
-    if (server.upgrade(req)) {
-      return
-    }
-
-    return new Response('Upgrade failed', { status: 500 })
-  },
-  // ...
-})
-```
