@@ -108,6 +108,23 @@ describe('streamQuerySSRUtilsPlugin', () => {
     expect(onSuccess).not.toHaveBeenCalled()
   })
 
+  it.each(['reset', 'append', 'replace'] as const)('cancels streamed queries only after they connect on the server (%s)', async (refetchMode) => {
+    const queryClient = new QueryClient()
+    const abortedOnCall: boolean[] = []
+    const connectClient = {
+      stream: vi.fn((input, options) => {
+        abortedOnCall.push(options.signal.aborted)
+        return client.stream(input, options)
+      }),
+    } as unknown as typeof client
+    const utils = createRouterUtils(connectClient, { plugins: [new StreamQuerySSRUtilsPlugin({ isServer: true })] })
+
+    await expect(queryClient.fetchQuery(utils.stream.streamedOptions({ queryFnOptions: { refetchMode } }))).resolves.toEqual([])
+
+    expect(abortedOnCall).toEqual([false])
+    expect(vi.mocked(connectClient.stream).mock.calls[0]![1]!.signal!.aborted).toBe(true)
+  })
+
   it('forwards query cancellation to the call on the server', async () => {
     const queryClient = new QueryClient()
     const pendingClient = {

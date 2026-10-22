@@ -55,10 +55,10 @@ export function serializableStreamedQuery<
         })
       }
       else {
-        context.client.setQueryData<Array<TQueryFnData>>(
-          context.queryKey,
-          (prev = []) => limitArraySize(prev, maxChunks),
-        )
+        // not `setQueryData`: trimming is not new data, so it should not report a success
+        query.setState({
+          data: limitArraySize(query.state.data as Array<TQueryFnData>, maxChunks),
+        })
       }
     }
 
