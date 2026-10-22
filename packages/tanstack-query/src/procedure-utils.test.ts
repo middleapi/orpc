@@ -1,3 +1,4 @@
+import { RPCJsonSerializer } from '@orpc/client'
 import { InfiniteQueryObserver, QueryClient, QueryObserver, skipToken } from '@tanstack/query-core'
 import * as KeyModule from './key'
 import * as LiveQuery from './live-query'
@@ -36,24 +37,25 @@ describe('procedureUtils', () => {
     expect(generateOperationKeySpy).toHaveBeenCalledTimes(1)
   })
 
-  describe('with prefix', () => {
-    const prefixedUtils = new ProcedureUtils(['ping'], client, { prefix: '__prefix__' })
+  describe('with key options', () => {
+    const serializer = new RPCJsonSerializer()
+    const keyedUtils = new ProcedureUtils(['ping'], client, { prefix: '__prefix__', serializer })
 
-    it('includes prefix in generated keys', () => {
-      prefixedUtils.queryKey({ input: 1 } as any)
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { prefix: '__prefix__', type: 'query', input: 1 })
+    it('includes key options in generated keys', () => {
+      keyedUtils.queryKey({ input: 1 } as any)
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, ['ping'], { prefix: '__prefix__', serializer, type: 'query', input: 1 })
 
-      prefixedUtils.streamedKey({ input: 1, queryFnOptions: { maxChunks: 1 } } as any)
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { prefix: '__prefix__', type: 'streamed', input: 1, fnOptions: { maxChunks: 1 } })
+      keyedUtils.streamedKey({ input: 1, queryFnOptions: { maxChunks: 1 } } as any)
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['ping'], { prefix: '__prefix__', serializer, type: 'streamed', input: 1, fnOptions: { maxChunks: 1 } })
 
-      prefixedUtils.liveKey({ input: 1 } as any)
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(3, ['ping'], { prefix: '__prefix__', type: 'live', input: 1 })
+      keyedUtils.liveKey({ input: 1 } as any)
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(3, ['ping'], { prefix: '__prefix__', serializer, type: 'live', input: 1 })
 
-      prefixedUtils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 0 } as any)
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(4, ['ping'], { prefix: '__prefix__', type: 'infinite', input: { cursor: 0 } })
+      keyedUtils.infiniteKey({ input: (cursor: number) => ({ cursor }), initialPageParam: 0 } as any)
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(4, ['ping'], { prefix: '__prefix__', serializer, type: 'infinite', input: { cursor: 0 } })
 
-      prefixedUtils.mutationKey()
-      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(5, ['ping'], { prefix: '__prefix__', type: 'mutation' })
+      keyedUtils.mutationKey()
+      expect(generateOperationKeySpy).toHaveBeenNthCalledWith(5, ['ping'], { prefix: '__prefix__', serializer, type: 'mutation' })
     })
   })
 
@@ -485,6 +487,106 @@ describe('skipToken queries do not share a query with unskipped ones', () => {
     expect(unskipped.getCurrentResult().status).toBe('success')
     expect(skipped.getCurrentResult().status).toBe('pending')
     expect(client).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('structural sharing', () => {
+  const client = vi.fn()
+  const utils = new ProcedureUtils<Record<never, never>, undefined, any, Error>(['planet', 'list'], client)
+  const planets = () => [{ name: 'Earth', createdAt: new Date('2025-01-01'), tags: new Set(['blue']) }]
+
+  it('.queryOptions keeps the previous data when nothing changed', async () => {
+    client.mockImplementation(async () => planets())
+    const observer = new QueryObserver(queryClient, utils.queryOptions())
+    onTestFinished(observer.subscribe(() => {}))
+    await vi.waitFor(() => expect(observer.getCurrentResult().status).toBe('success'))
+
+    const data = observer.getCurrentResult().data
+    await observer.refetch()
+    expect(client).toHaveBeenCalledTimes(2)
+    expect(observer.getCurrentResult().data).toBe(data)
+  })
+
+  it('.queryOptions can opt out with structuralSharing: false', async () => {
+    client.mockImplementation(async () => planets())
+    const observer = new QueryObserver(queryClient, utils.queryOptions({ structuralSharing: false }))
+    onTestFinished(observer.subscribe(() => {}))
+    await vi.waitFor(() => expect(observer.getCurrentResult().status).toBe('success'))
+
+    const data = observer.getCurrentResult().data
+    await observer.refetch()
+    expect(observer.getCurrentResult().data).not.toBe(data)
+    expect(observer.getCurrentResult().data).toEqual(data)
+  })
+
+  it('.liveOptions keeps the previous data across equal events', async () => {
+    const results = new Set<any>()
+    client.mockImplementation(async function* () {
+      yield planets()
+      yield planets()
+      yield [{ ...planets()[0], name: 'Mars' }]
+    })
+    const observer = new QueryObserver(queryClient, utils.liveOptions())
+    onTestFinished(observer.subscribe(result => result.data && results.add(result.data)))
+    await vi.waitFor(() => expect(observer.getCurrentResult().fetchStatus).toBe('idle'))
+
+    const [first, second] = results
+    expect(results.size).toBe(2)
+    expect(second[0].name).toBe('Mars')
+    expect(second[0].createdAt).toBe(first[0].createdAt)
+    expect(second[0].tags).toBe(first[0].tags)
+  })
+
+  it('.infiniteOptions keeps unchanged pages', async () => {
+    client.mockImplementation(async () => planets())
+    const observer = new InfiniteQueryObserver(queryClient, utils.infiniteOptions({
+      input: () => undefined,
+      initialPageParam: 0,
+      getNextPageParam: lastPage => lastPage.length,
+    }))
+    onTestFinished(observer.subscribe(() => {}))
+    await vi.waitFor(() => expect(observer.getCurrentResult().status).toBe('success'))
+
+    const data = observer.getCurrentResult().data
+    await observer.fetchNextPage()
+    expect(observer.getCurrentResult().data!.pages[0]).toBe(data!.pages[0])
+    expect(observer.getCurrentResult().data!.pages).toHaveLength(2)
+
+    const twoPages = observer.getCurrentResult().data
+    await observer.refetch()
+    expect(observer.getCurrentResult().data).toBe(twoPages)
+  })
+
+  it('uses the serializer option to compare custom types', async () => {
+    class Person {
+      constructor(public name: string) {}
+    }
+
+    const serializer = new RPCJsonSerializer({
+      handlers: {
+        person: {
+          condition: value => value instanceof Person,
+          serialize: (value: Person) => value.name,
+          deserialize: name => new Person(name as string),
+        },
+      },
+    })
+
+    client.mockImplementation(async () => [new Person('Earth')])
+    const utils = new ProcedureUtils<Record<never, never>, undefined, any, Error>(['planet', 'list'], client, { serializer })
+    const observer = new QueryObserver(queryClient, utils.queryOptions())
+    onTestFinished(observer.subscribe(() => {}))
+    await vi.waitFor(() => expect(observer.getCurrentResult().status).toBe('success'))
+
+    const data = observer.getCurrentResult().data
+    await observer.refetch()
+    expect(client).toHaveBeenCalledTimes(2)
+    expect(observer.getCurrentResult().data).toBe(data)
+  })
+
+  it('is not set on .streamedOptions or .mutationOptions', () => {
+    expect('structuralSharing' in utils.streamedOptions()).toBe(false)
+    expect('structuralSharing' in utils.mutationOptions()).toBe(false)
   })
 })
 
@@ -1170,6 +1272,7 @@ describe('isProcedureUtilsOptions', () => {
   it('accepts procedure utils options shapes', () => {
     expect(isProcedureUtilsOptions({})).toBe(true)
     expect(isProcedureUtilsOptions({ prefix: 'planet' })).toBe(true)
+    expect(isProcedureUtilsOptions({ serializer: new RPCJsonSerializer() })).toBe(true)
     expect(isProcedureUtilsOptions({ queryInterceptors: [], mutationInterceptors: [vi.fn()] })).toBe(true)
     expect(isProcedureUtilsOptions({ queryOptions: { staleTime: 1000 }, mutationKey: () => ({}) })).toBe(true)
     expect(isProcedureUtilsOptions({ liveOptions: undefined, streamedKey: undefined })).toBe(true)
@@ -1180,6 +1283,7 @@ describe('isProcedureUtilsOptions', () => {
     expect(isProcedureUtilsOptions(undefined)).toBe(false)
     expect(isProcedureUtilsOptions('invalid')).toBe(false)
     expect(isProcedureUtilsOptions({ prefix: 123 })).toBe(false)
+    expect(isProcedureUtilsOptions({ serializer: { ping: {} } })).toBe(false)
     expect(isProcedureUtilsOptions({ queryInterceptors: { invalid: true } })).toBe(false)
     expect(isProcedureUtilsOptions({ queryInterceptors: [{ invalid: true }] })).toBe(false)
     expect(isProcedureUtilsOptions({ queryOptions: 'invalid' })).toBe(false)

@@ -190,7 +190,7 @@ That handoff needs a carefully configured `QueryClient`. Create `lib/query-clien
 
 ```ts lib/query-client.ts
 import { RPCJsonSerializer } from '@orpc/client'
-import { createHydrationOptions, createQueryKeyHashFn } from '@orpc/tanstack-query'
+import { createHydrationOptions } from '@orpc/tanstack-query'
 import { environmentManager, QueryClient } from '@tanstack/react-query'
 
 let browserQueryClient: QueryClient | undefined
@@ -214,7 +214,6 @@ function createQueryClient(): QueryClient {
     defaultOptions: {
       queries: {
         staleTime: 60 * 1000, // > 0 to prevent immediate refetching on mount
-        queryKeyHashFn: createQueryKeyHashFn(serializer),
       },
       ...createHydrationOptions(serializer),
     },
@@ -225,7 +224,7 @@ function createQueryClient(): QueryClient {
 Each piece has one job:
 
 - **`getQueryClient`** creates a fresh client for every server request, so one user's data can never leak into another user's HTML, while the browser reuses a singleton.
-- **`createQueryKeyHashFn` and `createHydrationOptions`** teach query keys and the cache handoff about oRPC's extra types. Dehydration normally goes through plain JSON, which would turn our `Date` objects into strings. `RPCJsonSerializer` round-trips them intact. See [Custom Serializers](/docs/integrations/tanstack-query#custom-serializers) to extend it with your own types.
+- **`createHydrationOptions`** teaches the cache handoff about oRPC's extra types. Dehydration normally goes through plain JSON, which would turn our `Date` objects into strings. `RPCJsonSerializer` round-trips them intact. See [Custom Serializers](/docs/integrations/tanstack-query#custom-serializers) to extend it with your own types.
 - **`staleTime: 60 * 1000`** marks hydrated data as fresh, so the browser doesn't immediately refetch what the server just rendered.
 
 ## Wire Up the Providers

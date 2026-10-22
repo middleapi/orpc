@@ -1,4 +1,5 @@
 import type { RouterUtilsPlugin } from './plugin'
+import { RPCJsonSerializer } from '@orpc/client'
 import * as KeyModule from './key'
 import { ProcedureUtils } from './procedure-utils'
 import { createRouterUtils } from './router-utils'
@@ -33,30 +34,32 @@ describe('createRouterUtils', () => {
   client.key.pong = vi.fn()
 
   it('create nested procedure & shared utils', () => {
+    const serializer = new RPCJsonSerializer()
     const utils = createRouterUtils(client, {
       prefix: '__prefix__',
+      serializer,
     }) as any
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(1)
-    expect(ProcedureUtils).toHaveBeenCalledWith([], client, { prefix: '__prefix__' })
+    expect(ProcedureUtils).toHaveBeenCalledWith([], client, { prefix: '__prefix__', serializer })
     expect(utils.key({ type: 'infinite' })).toBe(generateOperationKeySpy.mock.results[0]?.value)
-    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, [], { type: 'infinite', prefix: '__prefix__' })
+    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(1, [], { type: 'infinite', prefix: '__prefix__', serializer })
     expect(utils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[0]?.value.queryOptions.mock.results[0]?.value)
 
     const keyUtils = utils.key
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(2)
-    expect(ProcedureUtils).toHaveBeenNthCalledWith(2, ['key'], client.key, { prefix: '__prefix__' })
+    expect(ProcedureUtils).toHaveBeenNthCalledWith(2, ['key'], client.key, { prefix: '__prefix__', serializer })
     expect(keyUtils.key({ type: 'live' })).toBe(generateOperationKeySpy.mock.results[1]?.value)
-    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['key'], { type: 'live', prefix: '__prefix__' })
+    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(2, ['key'], { type: 'live', prefix: '__prefix__', serializer })
     expect(keyUtils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[1]?.value.queryOptions.mock.results[0]?.value)
 
     const pongUtils = keyUtils.pong
 
     expect(ProcedureUtils).toHaveBeenCalledTimes(3)
-    expect(ProcedureUtils).toHaveBeenNthCalledWith(3, ['key', 'pong'], client.key.pong, { prefix: '__prefix__' })
+    expect(ProcedureUtils).toHaveBeenNthCalledWith(3, ['key', 'pong'], client.key.pong, { prefix: '__prefix__', serializer })
     expect(pongUtils.key({ type: 'query' })).toBe(generateOperationKeySpy.mock.results[2]?.value)
-    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(3, ['key', 'pong'], { type: 'query', prefix: '__prefix__' })
+    expect(generateOperationKeySpy).toHaveBeenNthCalledWith(3, ['key', 'pong'], { type: 'query', prefix: '__prefix__', serializer })
     expect(pongUtils.queryOptions()).toBe(vi.mocked(ProcedureUtils).mock.results[2]?.value.queryOptions.mock.results[0]?.value)
   })
 

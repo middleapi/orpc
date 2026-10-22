@@ -179,6 +179,26 @@ queryClient.setQueryData(orpc.planet.find.queryKey({ input: { id: 123 } }), (old
 })
 ```
 
+### Key Serializer
+
+oRPC serializes inputs with the [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer) when building keys, so keys are plain JSON and match by value. Native types like `Date`, `BigInt`, `Set`, and `Map` are supported by default, and keys keep track of each value's type, so a `Date` and its ISO string produce different keys. To support [custom types](/docs/rpc/serializer#custom-serializers), pass the same serializer your [link](/docs/rpc/link#custom-serializer) uses:
+
+```ts
+import { RPCSerializer } from '@orpc/client'
+
+const serializer = new RPCSerializer({
+  handlers: {
+    // ...custom handlers
+  },
+})
+
+const link = new RPCLink({ url, serializer })
+
+const orpc = createTanstackQueryUtils(client, {
+  serializer,
+})
+```
+
 ## Calling Clients
 
 The `.call` method provides direct access to the underlying procedure client when needed.
@@ -258,7 +278,7 @@ const customQuery = useQuery(orpc.planet.find.queryOptions({
 ```
 
 :::info
-When you configure `queryKey`, it also affects `.queryOptions` because it is used internally to generate query keys. The same applies to live, streamed, infinite, and mutation options when you configure their keys.
+When you configure `queryKey`, it also affects `.queryOptions` because it is used internally to generate query keys. The same applies to live, streamed, infinite, and mutation options when you configure their keys. Custom keys skip the [key serializer](#key-serializer), so keep them JSON-compatible.
 :::
 
 ## Interceptors
@@ -504,23 +524,40 @@ const query = useInfiniteQuery(
 )
 ```
 
+## Structural Sharing
+
+`.queryOptions`, `.liveOptions`, and `.infiniteOptions` use oRPC's structural sharing by default. Unlike TanStack Query's default [structural sharing](https://tanstack.com/query/latest/docs/framework/react/guides/render-optimizations#structural-sharing), it also keeps unchanged `Date`, `URL`, `Map`, and `Set` values, so refetches and live events that return the same data do not cause re-renders.
+
+```ts
+import { createStructuralSharing } from '@orpc/tanstack-query'
+
+// Opt out per call
+orpc.planet.list.queryOptions({ input: { limit: 10 }, structuralSharing: false })
+
+// Use it for queries not built with oRPC utils
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { structuralSharing: createStructuralSharing() } },
+})
+```
+
+With a [key serializer](#key-serializer), equal instances of [custom types](/docs/rpc/serializer#custom-serializers) are kept too, compared by what their handler serializes them to. For queries not built with oRPC utils, pass it to `createStructuralSharing(serializer)`.
+
 ## Server-Side Rendering (SSR)
 
 When [server-side rendering](/docs/recipes/optimizing-ssr) with [TanStack Query hydration](https://tanstack.com/query/latest/docs/framework/react/guides/ssr), two things need special care: oRPC types that JSON cannot represent, and streamed or live queries that never complete.
 
 ### Custom Serializers
 
-TanStack Query hashes query keys and dehydrates query data as plain JSON, which cannot represent oRPC types such as `Date`, `BigInt`, `Set`, or `Map`. Pass your [RPC Serializer](/docs/rpc/serializer#custom-serializers) to `createQueryKeyHashFn` and `createHydrationOptions` to keep them intact.
+TanStack Query dehydrates query data as plain JSON, which cannot represent oRPC types such as `Date`, `BigInt`, `Set`, or `Map`. Pass your [RPC Serializer](/docs/rpc/serializer#custom-serializers) to `createHydrationOptions` to keep them intact.
 
 ```ts
-import { createHydrationOptions, createQueryKeyHashFn } from '@orpc/tanstack-query'
+import { createHydrationOptions } from '@orpc/tanstack-query'
 import { QueryClient } from '@tanstack/react-query' // or any framework adapter, e.g. @tanstack/vue-query
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 60 * 1000, // > 0 to prevent immediate refetching on mount
-      queryKeyHashFn: createQueryKeyHashFn(serializer),
     },
     ...createHydrationOptions(serializer), // dehydrate.serializeData and hydrate.deserializeData
   },

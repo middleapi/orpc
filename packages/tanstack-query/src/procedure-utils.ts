@@ -1,7 +1,7 @@
 import type { Client, ClientContext } from '@orpc/client'
 import type { Interceptor, MaybeOptionalOptions, PromiseWithError } from '@orpc/shared'
 import type { DataTag, InfiniteData, MutationFunctionContext, QueryFunctionContext, QueryKey, SkipToken } from '@tanstack/query-core'
-import type { OperationKeyPrefixOptions } from './key'
+import type { OperationKeyBaseOptions } from './key'
 import type {
   InferLiveQueryOutput,
   InferStreamedQueryOutput,
@@ -21,10 +21,10 @@ import type {
 } from './types'
 import { intercept, isAsyncIteratorObject, isTypescriptObject, resolveMaybeOptionalOptions, toArray } from '@orpc/shared'
 import { skipToken } from '@tanstack/query-core'
-import { generateOperationKey } from './key'
 import { liveQuery } from './live-query'
 import { SharedUtils } from './shared-utils'
 import { serializableStreamedQuery } from './stream-query'
+import { createStructuralSharing } from './structural-sharing'
 import { OPERATION_CONTEXT_SYMBOL } from './types'
 
 export interface ProcedureUtilsQueryInterceptorOptions<TClientContext extends ClientContext, TInput> {
@@ -65,7 +65,7 @@ export type ProcedureUtilsMutationInterceptor<TClientContext extends ClientConte
  */
 export type ProcedureUtilsModifier<T extends object> = Partial<T> | ((options: T) => T)
 
-export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError> extends OperationKeyPrefixOptions {
+export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TInput, TOutput, TError> extends OperationKeyBaseOptions {
   /**
    * Key options modifier for .queryKey and .queryOptions
    * Can be partial options or a function that receives per-call options and returns override this.options.
@@ -208,6 +208,11 @@ export function isProcedureUtilsOptions(value: unknown): value is ProcedureUtils
         return false
       }
     }
+    else if (key === 'serializer') {
+      if (!isTypescriptObject(value[key]) || typeof value[key].serializeJson !== 'function') {
+        return false
+      }
+    }
     else if (PROCEDURE_UTILS_INTERCEPTOR_KEYS.includes(key)) {
       if (!Array.isArray(value[key]) || value[key].some(i => typeof i !== 'function')) {
         return false
@@ -307,7 +312,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const queryKey = (optionsIn as any).queryKey
-      ?? generateOperationKey(this.path, { prefix: this.options.prefix, type: 'query', input: (optionsIn as any).input })
+      ?? this.key({ type: 'query', input: (optionsIn as any).input })
 
     return queryKey as DataTag<QueryKey, TOutput, TError>
   }
@@ -332,6 +337,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     const queryKey = this.queryKey(optionsIn)
 
     return {
+      structuralSharing: createStructuralSharing(this.options.serializer),
       ...optionsIn as any,
       queryKey,
       queryFn: (fnContext) => {
@@ -382,7 +388,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const queryKey = (optionsIn as any).queryKey
-      ?? generateOperationKey(this.path, { prefix: this.options.prefix, type: 'streamed', input: (optionsIn as any).input, fnOptions: (optionsIn as any).queryFnOptions })
+      ?? this.key({ type: 'streamed', input: (optionsIn as any).input, fnOptions: (optionsIn as any).queryFnOptions })
 
     return queryKey as DataTag<QueryKey, InferStreamedQueryOutput<TOutput>, TError>
   }
@@ -470,7 +476,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const queryKey = (optionsIn as any).queryKey
-      ?? generateOperationKey(this.path, { prefix: this.options.prefix, type: 'live', input: (optionsIn as any).input })
+      ?? this.key({ type: 'live', input: (optionsIn as any).input })
 
     return queryKey as DataTag<QueryKey, InferLiveQueryOutput<TOutput>, TError>
   }
@@ -497,6 +503,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     const queryKey = this.liveKey(optionsIn)
 
     return {
+      structuralSharing: createStructuralSharing(this.options.serializer),
       ...optionsIn as any,
       queryKey,
       queryFn: (fnContext) => {
@@ -556,8 +563,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     }
 
     const queryKey = (optionsIn as any).queryKey
-      ?? generateOperationKey(this.path, {
-        prefix: this.options.prefix,
+      ?? this.key({
         type: 'infinite',
         input: (optionsIn as any).input === skipToken ? skipToken : (optionsIn as any).input((optionsIn as any).initialPageParam),
       })
@@ -581,6 +587,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
     const queryKey = this.infiniteKey(optionsIn)
 
     return {
+      structuralSharing: createStructuralSharing(this.options.serializer),
       ...optionsIn as any,
       queryKey,
       queryFn: (fnContext) => {
@@ -628,7 +635,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
       optionsIn = { ...this.options.mutationKey, ...optionsIn }
     }
 
-    const mutationKey = optionsIn.mutationKey ?? generateOperationKey(this.path, { prefix: this.options.prefix, type: 'mutation' })
+    const mutationKey = optionsIn.mutationKey ?? this.key({ type: 'mutation' })
     return mutationKey as DataTag<QueryKey, TOutput, TError>
   }
 

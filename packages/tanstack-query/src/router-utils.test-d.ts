@@ -3,6 +3,7 @@ import type { RouterClient } from '@orpc/server'
 import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils'
 import type { RouterUtils, RouterUtilsScoped } from './router-utils'
 import type { SharedUtils } from './shared-utils'
+import { RPCSerializer } from '@orpc/client'
 import { os } from '@orpc/server'
 import z from 'zod'
 import { createRouterUtils } from './router-utils'
@@ -92,6 +93,7 @@ it('RouterUtilsScoped', () => {
 it('createRouterUtils', () => {
   const utils = createRouterUtils({} as RouterClient<typeof scopedRouter, { batch?: boolean }>, {
     prefix: '__prefix__',
+    serializer: new RPCSerializer(),
     scoped: {
       nested: {
         ping: {
