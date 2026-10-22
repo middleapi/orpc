@@ -1,5 +1,6 @@
 import type { AnyORPCErrorJSON, AnySchema, Context, ErrorMap, InferSchemaInput, InferSchemaOutput, Lazyable, ORPCError, ORPCErrorCode, ORPCErrorFromErrorMap, ORPCErrorJSON, Procedure, ProcedureClientOptions, ThrowableError } from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
+import { parseFormData } from '@orpc/openapi/helpers'
 import { createProcedureClient, toORPCError } from '@orpc/server'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
 import { unstable_rethrow } from 'next/navigation'
@@ -22,6 +23,11 @@ export type ServerFunctionResult<TOutput, TError> = [error: null, data: TOutput]
 
 export interface ServerFunction<TInput, TOutput, TError extends AnyORPCErrorJSON> {
   (...rest: ServerFunctionRest<TInput>): Promise<ServerFunctionResult<TOutput, TError>>
+  /**
+   * The [`useActionState`](https://react.dev/reference/react/useActionState) shape, picked when called with two arguments.
+   * The previous state is ignored, and `FormData` input is deserialized using bracket notation.
+   */
+  (prevState: unknown, input: TInput | FormData): Promise<ServerFunctionResult<TOutput, TError>>
 }
 
 export type ProcedureServerFunction<
@@ -42,6 +48,9 @@ export type ProcedureServerFunction<
  * @remarks
  * **Note**: Instead of throwing, the returned function resolves an `[error, data]` tuple
  * with errors serialized as plain JSON (`ORPCErrorJSON`).
+ *
+ * **Note**: When called with two arguments, the returned function follows the `useActionState`
+ * shape `(prevState, input | FormData)`, so it can be passed to `useActionState` directly.
  *
  * @see {@link https://orpc.dev/docs/integrations/next#server-functions | Next.js Integration - Server Functions}
  */
@@ -70,7 +79,14 @@ export function createServerFunction<
   const options = resolveMaybeOptionalOptions(rest)
   const client = createProcedureClient(procedure, options)
 
-  return async (...[input]) => {
+  return async (...args: unknown[]) => {
+    let input = args[0]
+
+    if (args.length > 1) {
+      // `useActionState` shape: `(prevState, input | FormData)`
+      input = args[1] instanceof FormData ? parseFormData(args[1]) : args[1]
+    }
+
     try {
       return [null, await client(input as any)]
     }
