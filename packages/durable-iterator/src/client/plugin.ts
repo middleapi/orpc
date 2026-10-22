@@ -146,19 +146,28 @@ export class DurableIteratorLinkPlugin<T extends ClientContext> implements Stand
         refreshTokenBeforeExpireTimeoutId = setTimeout(
           async () => {
           // retry until success or finished
-            const newTokenAndPayload = await retry({ times: Number.POSITIVE_INFINITY, delay: delayMilliseconds }, async (exit) => {
+            const newTokenAndPayload = await retry({ times: Number.POSITIVE_INFINITY, delay: delayMilliseconds }, async () => {
+              if (isFinished) {
+                return undefined
+              }
+
               try {
                 const output = await next()
                 return this.validateToken(output, options.path)
               }
               catch (err) {
                 if (isFinished) {
-                  exit(err)
+                  return undefined
                 }
 
                 throw err
               }
             })
+
+            // closed (aborted or returned) while refreshing, nothing left to update
+            if (!newTokenAndPayload || isFinished) {
+              return
+            }
 
             const canProactivelyUpdateToken
               = newTokenAndPayload.payload.chn === tokenAndPayload.payload.chn
@@ -170,19 +179,20 @@ export class DurableIteratorLinkPlugin<T extends ClientContext> implements Stand
             /**
              * The next refresh cycle doesn't depend on the logic below,
              * so we place it last to avoid interfering with recursion.
-             */
-            if (canProactivelyUpdateToken) {
-            /**
+             *
              * Proactively update the token before expiration
              * to avoid reconnecting when the old token expires.
+             * The update fails if the websocket is not open or the connection drops mid-update.
              */
-              await durableClient.updateToken({ token: tokenAndPayload.token })
-            }
-            else {
+            const isTokenUpdated = canProactivelyUpdateToken
+              && await durableClient.updateToken({ token: tokenAndPayload.token }).then(() => true, () => false)
+
             /**
-             * Proactive update requires the same channel and tags.
-             * If they differ, we must reconnect instead to make new token effective.
+             * Proactive update requires the same channel and tags, and an open connection.
+             * Otherwise, we must reconnect instead to make new token effective,
+             * unless closed meanwhile since reconnecting would reopen the closed websocket.
              */
+            if (!isTokenUpdated && !isFinished) {
               websocket.reconnect()
             }
           },
@@ -205,6 +215,11 @@ export class DurableIteratorLinkPlugin<T extends ClientContext> implements Stand
       const iterator_ = await durableClient.subscribe(undefined, {
         context: {
           retry: Number.POSITIVE_INFINITY,
+          /**
+           * Stop retrying once the iterator is closed (aborted or returned),
+           * otherwise it would retry forever against the closed websocket.
+           */
+          shouldRetry: () => !isFinished,
         },
         lastEventId: options.lastEventId, // we can use user provided lastEventId for initial connection
       })
