@@ -14,7 +14,7 @@ This adapter requires the Lambda Node.js runtime with [response streaming](https
 <CodeGroup>
 
 ```ts RPC
-import type { APIGatewayProxyEventV2, AwsLambdaGlobal } from '@standard-server/aws-lambda'
+import type { APIGatewayProxyEventV2, AwsLambdaGlobal } from '@orpc/server/aws-lambda'
 import { onError } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/aws-lambda'
 import { CORSHandlerPlugin } from '@orpc/server/plugins'
@@ -51,7 +51,7 @@ export const rpc = awslambda.streamifyResponse<APIGatewayProxyEventV2>(async (ev
 ```
 
 ```ts OpenAPI
-import type { APIGatewayProxyEventV2, AwsLambdaGlobal } from '@standard-server/aws-lambda'
+import type { APIGatewayProxyEventV2, AwsLambdaGlobal } from '@orpc/openapi/aws-lambda'
 import { OpenAPIHandler } from '@orpc/openapi/aws-lambda'
 import { onError } from '@orpc/server'
 import { CORSHandlerPlugin } from '@orpc/server/plugins'

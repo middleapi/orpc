@@ -14,5 +14,9 @@ export {
 } from '@orpc/client'
 
 export type {
+  JsonSchema,
+} from '@orpc/json-schema'
+
+export type {
   StandardBodyHint,
 } from '@standard-server/core'

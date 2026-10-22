@@ -21,3 +21,11 @@ export {
   OPERATION_CONTEXT_SYMBOL as PINIA_COLADA_OPERATION_CONTEXT_SYMBOL,
   type OperationContext as PiniaColadaOperationContext,
 } from './types'
+
+export type {
+  AnyNestedClient,
+} from '@orpc/client'
+
+export type {
+  Public,
+} from '@orpc/shared'
