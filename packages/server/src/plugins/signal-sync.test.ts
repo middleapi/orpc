@@ -3,6 +3,7 @@ import { AbortError, promiseWithResolvers } from '@orpc/shared'
 import { RPCHandler } from '../adapters/fetch'
 import { os } from '../builder'
 import { SignalSyncHandlerPlugin } from './signal-sync'
+import { TimeoutHandlerPlugin } from './timeout'
 
 describe('signalSyncHandlerPlugin', () => {
   async function handle(procedure: AnyProcedure, init?: RequestInit): Promise<Response> {
@@ -134,6 +135,47 @@ describe('signalSyncHandlerPlugin', () => {
     expect(cancel).toHaveBeenCalledExactlyOnceWith(reason)
   })
 
+  it('should end the output right away when the signal aborts before the procedure returns', async () => {
+    const cancel = vi.fn()
+    const reason = new Error('timed out')
+
+    const controller = new AbortController()
+    const response = await handle(os.handler(() => {
+      controller.abort(reason)
+      return new ReadableStream({ cancel })
+    }), { signal: controller.signal })
+
+    await expect(response.body!.getReader().read()).rejects.toBe(reason)
+    expect(cancel).toHaveBeenCalledExactlyOnceWith(reason)
+  })
+
+  it.each([
+    ['before', false],
+    ['after', true],
+  ])('should end streaming responses on streamingTimeout when registered %s the timeout plugin', async (_, reverse) => {
+    const { promise: release, resolve } = promiseWithResolvers<void>()
+    const plugins = [
+      new SignalSyncHandlerPlugin(),
+      new TimeoutHandlerPlugin({ timeout: null, streamingTimeout: 50 }),
+    ]
+
+    const handler = new RPCHandler(os.handler(async function* () {
+      yield 'first'
+      await release // ignores the signal
+      yield 'second'
+    }), {
+      plugins: reverse ? plugins.reverse() : plugins,
+    })
+
+    const { response } = await handler.handle(new Request('http://localhost', { method: 'POST' }))
+    const text = await response!.text()
+
+    expect(text).toContain('first')
+    expect(text).toContain('event: error')
+    expect(text).not.toContain('second')
+    resolve()
+  })
+
   it.each([
     ['an event iterator body finishes', async function* () {
       yield 'first'
@@ -153,6 +195,23 @@ describe('signalSyncHandlerPlugin', () => {
     }))
 
     await expect(response.text()).resolves.toContain('first')
+    expect(signal?.aborted).toBe(false)
+  })
+
+  it('should not abort the signal when a readable stream body errors', async () => {
+    let signal: AbortSignal | undefined
+    const error = new Error('read failed')
+
+    const response = await handle(os.handler((options) => {
+      signal = options.signal
+      return new ReadableStream({
+        pull() {
+          throw error
+        },
+      })
+    }))
+
+    await expect(response.body!.getReader().read()).rejects.toBe(error)
     expect(signal?.aborted).toBe(false)
   })
 
