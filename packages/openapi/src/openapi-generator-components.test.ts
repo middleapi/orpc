@@ -1,4 +1,5 @@
 import type { JsonSchema } from '@orpc/json-schema'
+import type { OpenAPIComponentRegistryDocument } from './openapi-generator-components'
 import type { OpenAPIV3_2 } from './types'
 import { OpenAPIComponentRegistry } from './openapi-generator-components'
 
@@ -865,6 +866,35 @@ describe('openAPIComponentRegistry', () => {
         properties: { planet: { $ref: '#/components/schemas/Planet' } },
       })
       expect(doc.components?.schemas).toEqual({ Planet: { type: 'string' } })
+    })
+  })
+
+  describe('non-OpenAPI documents', () => {
+    it('collects components into any document with a components.schemas slot', () => {
+      const doc: OpenAPIComponentRegistryDocument & { openrpc: string } = { openrpc: '1.3.2' }
+      const registry = new OpenAPIComponentRegistry(doc, undefined)
+
+      expect(registry.toOpenAPISchema({
+        type: 'array',
+        items: { $ref: '#/$defs/Planet' },
+        $defs: { Planet: { type: 'string' } },
+      }, 'output')).toEqual({
+        type: 'array',
+        items: { $ref: '#/components/schemas/Planet' },
+      })
+      expect(registry.register('Moon', { type: 'number' })).toEqual({ $ref: '#/components/schemas/Moon' })
+      expect(doc).toEqual({
+        openrpc: '1.3.2',
+        components: { schemas: { Planet: { type: 'string' }, Moon: { type: 'number' } } },
+      })
+    })
+
+    it('accepts an empty document', () => {
+      const doc: OpenAPIComponentRegistryDocument = {}
+      const registry = new OpenAPIComponentRegistry(doc, undefined)
+
+      expect(registry.register('Planet', { type: 'string' })).toEqual({ $ref: '#/components/schemas/Planet' })
+      expect(doc).toEqual({ components: { schemas: { Planet: { type: 'string' } } } })
     })
   })
 })

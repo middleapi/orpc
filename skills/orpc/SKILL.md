@@ -18,6 +18,7 @@ Package map:
 - `@orpc/client`: `createORPCClient`, `RPCLink`, `safe`, `createSafeClient`, `isDefinedError`
 - `@orpc/contract`: contract-first API definitions implemented separately from their logic (see the `orpc-contract` skill)
 - `@orpc/openapi`: `OpenAPIHandler`, `OpenAPILink`, OpenAPI 3.2 spec generation
+- `@orpc/openrpc`: `OpenRPCHandler`, `OpenRPCLink`, OpenRPC document generation (JSON-RPC 2.0)
 - Integration packages such as `@orpc/tanstack-query` and `@orpc/nest`
 
 ## Define procedures
@@ -211,6 +212,7 @@ const safeClient = createSafeClient(orpc) // every call returns [error, data]
 
 - Streaming / SSE: return an async generator from `.handler`, validate events with `asyncIteratorObject`, resume via `lastEventId`: [AsyncIteratorObject](https://orpc.dev/docs/async-iterator-object)
 - OpenAPI: serve the same router as REST with routing metadata plus `OpenAPIHandler`, and generate a spec (covered in depth by the `orpc-openapi` skill): [OpenAPI Handler](https://orpc.dev/docs/openapi/handler)
+- JSON-RPC 2.0: serve the same router with `OpenRPCHandler` (each procedure is a method named by its dot-joined path, such as `planet.find`), call it with `OpenRPCLink`, and generate an OpenRPC document with `OpenRPCGenerator`; streaming and files are not supported: [OpenRPC Handler](https://orpc.dev/docs/openrpc/handler)
 - Contract-first: define contracts with `@orpc/contract`, implement with `implement` (covered in depth by the `orpc-contract` skill): [Contracts](https://orpc.dev/docs/contract/procedure)
 - Plugins for handler and link: batch, CORS, dedupe, retry, compression, request limits, smart coercion, static files, timeout, tmp file upload, and more. Fetch a plugin's docs page before configuring it; option names are not guessable: [Plugins](https://orpc.dev/docs/plugins/batch)
 - Integrations: [TanStack Query](https://orpc.dev/docs/integrations/tanstack-query) (`createTanstackQueryUtils`), [SWR](https://orpc.dev/docs/integrations/swr), [Pinia Colada](https://orpc.dev/docs/integrations/pinia-colada), [Next.js](https://orpc.dev/docs/integrations/next), [NestJS](https://orpc.dev/docs/integrations/nest), [AI SDK](https://orpc.dev/docs/integrations/ai-sdk), [MCP](https://orpc.dev/docs/integrations/mcp) (`McpRegistrar` exposes procedures as MCP tools), [OpenTelemetry](https://orpc.dev/docs/integrations/opentelemetry)
@@ -229,7 +231,7 @@ This skill is an overview; fetch exact docs instead of guessing APIs, and if thi
 Doc map, all under `https://orpc.dev/docs/`:
 
 - Top level: `procedure`, `router`, `middleware`, `context`, `error-handling`, `metadata`, plus `binary-data` (file uploads) and `async-iterator-object` (streaming/SSE)
-- `rpc/*`, `openapi/*`: protocol details, handlers, links; `contract/*`: contract-first (the `orpc-contract` skill)
+- `rpc/*`, `openapi/*`, `openrpc/*`: protocol details, handlers, links; `contract/*`: contract-first (the `orpc-contract` skill)
 - `client/*`: server- and client-side clients, error handling, `DynamicLink`
 - `adapters/*`: per-runtime serving quirks (fetch-api, node-http, aws-lambda, fastify, websocket, message-port, expo)
 - `plugins/*`: twenty handler/link plugins; `helpers/*`: cookie, encryption, form-data, lock, publisher, ratelimit, signing, base64url

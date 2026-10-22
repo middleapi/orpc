@@ -175,6 +175,9 @@ importers:
       '@hono/node-server':
         specifier: ^2.1.5
         version: 2.1.5(hono@4.13.5)
+      '@open-rpc/client-js':
+        specifier: ^2.1.0
+        version: 2.1.0
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -217,6 +220,9 @@ importers:
       '@orpc/openapi':
         specifier: workspace:*
         version: link:packages/openapi
+      '@orpc/openrpc':
+        specifier: workspace:*
+        version: link:packages/openrpc
       '@orpc/opentelemetry':
         specifier: workspace:*
         version: link:packages/opentelemetry
@@ -911,6 +917,49 @@ importers:
       swagger-ui:
         specifier: ^5.33.2
         version: 5.33.2(@types/react@19.3.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+
+  packages/openrpc:
+    dependencies:
+      '@orpc/client':
+        specifier: workspace:*
+        version: link:../client
+      '@orpc/contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@orpc/json-schema':
+        specifier: workspace:*
+        version: link:../json-schema
+      '@orpc/openapi':
+        specifier: workspace:*
+        version: link:../openapi
+      '@orpc/server':
+        specifier: workspace:*
+        version: link:../server
+      '@orpc/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@standard-server/core':
+        specifier: ~0.11.0
+        version: 0.11.0
+      '@standard-server/fetch':
+        specifier: ~0.11.0
+        version: 0.11.0
+    devDependencies:
+      '@open-rpc/schema-utils-js':
+        specifier: ^2.2.1
+        version: 2.2.1
+      '@orpc/zod':
+        specifier: workspace:*
+        version: link:../zod
+      '@standard-server/aws-lambda':
+        specifier: ~0.11.0
+        version: 0.11.0
+      fastify:
+        specifier: ^5.12.7
+        version: 5.12.7
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -3506,6 +3555,21 @@ packages:
     peerDependencies:
       jsep: ^0.4.0||^1.0.0
 
+  '@json-schema-spec/json-pointer@0.1.2':
+    resolution: {integrity: sha512-BYY7IavBjwsWWSmVcMz2A9mKiDD9RvacnsItgmy1xV8cmgbtxFfKmKMtkVpD7pYtkx4mIW4800yZBXueVFIWPw==}
+
+  '@json-schema-tools/dereferencer@1.6.6':
+    resolution: {integrity: sha512-cX/tiSKY8tUUs4pmYsRyKkpDmFIlQvFIwgn0QlKCHIxDoRUmkqY7GsBDArn817WWPbObpuc5hl6gmhT/85qc4Q==}
+
+  '@json-schema-tools/meta-schema@1.8.3':
+    resolution: {integrity: sha512-YfiOLIOq3YV83mqppXg7K4RFvHcajcr/ZlrCX33VcReoVoLJxZbn4UQT5jldwEi8oQBETL+BrotBgOQ4S0JaKg==}
+
+  '@json-schema-tools/reference-resolver@1.3.0':
+    resolution: {integrity: sha512-/DHUA7gEc10AtQSZe9lhflLNsLxtwBRQWmfNRtJZ3QGLws30rvfx7tr/q8b1mwwRWQaayKfTuDsy+frjcBhv7A==}
+
+  '@json-schema-tools/traverse@1.15.1':
+    resolution: {integrity: sha512-i5MGGT3Tip2LSDi7L3cO6x0pax8RlqrWaW8RuvIxx3Gy+h+OWS4Du3bRYc1IWX/Baa+fDxC2xNuDcbCNScLOqA==}
+
   '@keyv/bigmap@1.3.1':
     resolution: {integrity: sha512-WbzE9sdmQtKy8vrNPa9BRnwZh5UF4s1KTmSK0KUVLo3eff5BlQNNWDnFOouNpKfPKDnms9xynJjsMYjMaT/aFQ==}
     engines: {node: '>= 18'}
@@ -3894,6 +3958,22 @@ packages:
 
   '@open-draft/until@3.0.1':
     resolution: {integrity: sha512-s7/9ELP4aP9YZtW7RJaa0Xf3RISaRH9+EFN18FtykJYRHGNrl8f9ymvoNXzjhrjmftFvkQudtuDU9RYhk0xs3A==}
+
+  '@open-rpc/client-js@2.1.0':
+    resolution: {integrity: sha512-Rvk8rKHRfQhIAWjnkz2BxssYbffkTnIboN9txfAmoQxfiVWrsThRDIaC8QF3AhDuc0NXvxuFnQlKhTad7Pn0yw==}
+
+  '@open-rpc/schema-utils-js@2.2.1':
+    resolution: {integrity: sha512-lXsJrkViY08eoqD9X/3Gq0QiN4/jaPEiNdQCB3eZDv4vp26JaIWQ/r2WwYlA8rJZb4lYGIvKr3zM/rTcu7yMuw==}
+
+  '@open-rpc/spec-types@0.0.2':
+    resolution: {integrity: sha512-4FbovmeH3XVcf7loRpaqxqCAFbX9jDfp85cbvdeNYumL/BWOWA1a6CwScfZWBvIH/eXmrmzhu8nUW4eJTuD3ZQ==}
+
+  '@open-rpc/spec@1.4.1':
+    resolution: {integrity: sha512-XoCq9X7FDv2kXz7nK8JZMDtUrGPRyDwbt7HsZRuBtvqzxAyma/c6t33vlCyxEePxMb4aGfX3MJbI2gz9JIqNvg==}
+
+  '@open-rpc/specification-extension-spec@1.0.2':
+    resolution: {integrity: sha512-EPVI1Mgp5vDSN2Xn+eWjd2t30WU+R0nFeNoP/dp3ox5/qUhNdqlNcwGJDNoJlqK56rk09FYXWJXKLHae4eBE8w==}
+    engines: {node: '>=18.0.0'}
 
   '@openapi-contrib/openapi-schema-to-json-schema@3.2.0':
     resolution: {integrity: sha512-Gj6C0JwCr8arj0sYuslWXUBSP/KnUlEGnPW4qxlXvAl543oaNQgMgIgkQUA6vs5BCCvwTEiL8m/wdWzfl4UvSw==}
@@ -8054,6 +8134,9 @@ packages:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
 
+  detect-node@2.1.0:
+    resolution: {integrity: sha512-T0NIuQpnTvFDATNuHN5roPwSBG83rFsuO+MXXH9/3N1eFbn4wcPjttvjMLEPWJ0RGUYgQE7cGgS3tNxbqCGM7g==}
+
   devalue@5.9.4:
     resolution: {integrity: sha512-sPAT4pztbu6586/hrhOnMKS17IJrvg12mXiSPSS3W5qDeN2RGgvZ0diZCm31dBbnevfVmujNO3IM2wrS4Y2Rhg==}
 
@@ -9468,6 +9551,9 @@ packages:
   is-unsafe@2.0.2:
     resolution: {integrity: sha512-HgbIHPBH0KHHCcjLfGsCvhtPTVxjaAZlXjwdz7/GQC40SjSe4sfQsar8J5VFo8JOSbarkpV0OLG95bbaNd9aAQ==}
 
+  is-url@1.2.4:
+    resolution: {integrity: sha512-ITvGim8FhRiYe4IQ5uHSkj7pVaPDrCTkNd3yq3cV7iZAcJdHTUMPMEHcqSOy9xZ9qFenQCvi+2wjH9a1nXqHww==}
+
   is-weakmap@2.0.2:
     resolution: {integrity: sha512-K5pXYOm9wqY1RgjpL3YTkF39tni1XajUIkawTLUo9EZEVUFga5gSQJF8nNS7ZwJQ02y+1YCNYcMh+HIf1ZqE+w==}
     engines: {node: '>= 0.4'}
@@ -9492,6 +9578,14 @@ packages:
 
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
+
+  isomorphic-fetch@3.0.0:
+    resolution: {integrity: sha512-qvUtwJ3j6qwsF3jLxkZ72qCgjMysPzDfeV240JHiGZsANBYd+EEuu35v7dfrJ9Up0Ak07D7GGSkGhCHTqg/5wA==}
+
+  isomorphic-ws@5.0.0:
+    resolution: {integrity: sha512-muId7Zzn9ywDsyXgTIafTry2sV3nySZeUDe6YedVd1Hvuuep5AsIlqK+XefWpYTyJG5e503F2xIuT2lcU6rCSw==}
+    peerDependencies:
+      ws: '*'
 
   istanbul-lib-coverage@3.2.2:
     resolution: {integrity: sha512-O8dpsF+r0WV/8MNRKfnmrtCWhuKjxrq2w+jpzBL5UZKTi2LeVWnWOmWRxFlesJONmc+wLAGvKQZEOanko0LFTg==}
@@ -11835,6 +11929,9 @@ packages:
     resolution: {integrity: sha512-Mcc5wHehp9aXz1ax6bZUyY5afg9u2rv5cqQI3mRrYkGC8rW2hM02jWuwjtL++LS5qinSyhj2QfLyNsuc+VsExg==}
     engines: {node: '>=10.0.0'}
 
+  strict-event-emitter-types@2.0.0:
+    resolution: {integrity: sha512-Nk/brWYpD85WlOgzw5h173aci0Teyv8YdIAEtV+N88nDB0dLlazZyJMIsN6eo1/AR61l+p6CJTG1JIyFaoNEEA==}
+
   strict-event-emitter@0.5.1:
     resolution: {integrity: sha512-vMgjE/GGEPEFnhFub6pa4FmJBRBVOLpIII2hvCZ8Kzb7K0hlHo7mQv6xYrBvCL2LtAIBwFUK8wvuJgTVSQ5MFQ==}
 
@@ -12852,6 +12949,9 @@ packages:
       webpack-cli:
         optional: true
 
+  whatwg-fetch@3.6.20:
+    resolution: {integrity: sha512-EqhiFU6daOA8kpjOWTL0olhVOF3i7OrFzSYiGsEMB8GcXS+RrzauAERX65xMeNWVqxA6HXH2m69Z9LaKKdisfg==}
+
   whatwg-mimetype@5.0.0:
     resolution: {integrity: sha512-sXcNcHOC51uPGF0P/D4NVtrkjSU2fNsm9iog4ZvZJsL3rjoDAzXZhkm2MWt1y+PUdggKAYVoMAIYcs78wJ51Cw==}
     engines: {node: '>=20'}
@@ -12941,6 +13041,18 @@ packages:
   write-file-atomic@7.0.1:
     resolution: {integrity: sha512-OTIk8iR8/aCRWBqvxrzxR0hgxWpnYBblY1S5hDWBQfk/VFmJwzmJgQFN3WsoUKHISv2eAwe+PpbUzyL1CKTLXg==}
     engines: {node: ^20.17.0 || >=22.9.0}
+
+  ws@8.18.3:
+    resolution: {integrity: sha512-PEIGCY5tSlUt50cqyMXfCzX+oOPqN0vuGqWzbcJ2xvnkzkq46oOpz7dQaTDBdfICb4N14+GARUDw2XV2N4tvzg==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
 
   ws@8.21.0:
     resolution: {integrity: sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==}
@@ -14921,6 +15033,29 @@ snapshots:
       jsep: 1.4.0
     optional: true
 
+  '@json-schema-spec/json-pointer@0.1.2': {}
+
+  '@json-schema-tools/dereferencer@1.6.6':
+    dependencies:
+      '@json-schema-tools/reference-resolver': 1.3.0
+      '@json-schema-tools/traverse': 1.15.1
+      fast-safe-stringify: 2.1.1
+    transitivePeerDependencies:
+      - encoding
+
+  '@json-schema-tools/meta-schema@1.8.3': {}
+
+  '@json-schema-tools/reference-resolver@1.3.0':
+    dependencies:
+      '@json-schema-spec/json-pointer': 0.1.2
+      isomorphic-fetch: 3.0.0
+    transitivePeerDependencies:
+      - encoding
+
+  '@json-schema-tools/traverse@1.15.1':
+    dependencies:
+      '@json-schema-tools/meta-schema': 1.8.3
+
   '@keyv/bigmap@1.3.1(keyv@5.6.0)':
     dependencies:
       hashery: 1.5.1
@@ -15307,6 +15442,39 @@ snapshots:
   '@open-draft/until@2.1.0': {}
 
   '@open-draft/until@3.0.1': {}
+
+  '@open-rpc/client-js@2.1.0':
+    dependencies:
+      isomorphic-ws: 5.0.0(ws@8.18.3)
+      strict-event-emitter-types: 2.0.0
+      ws: 8.18.3
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
+  '@open-rpc/schema-utils-js@2.2.1':
+    dependencies:
+      '@json-schema-tools/dereferencer': 1.6.6
+      '@json-schema-tools/meta-schema': 1.8.3
+      '@json-schema-tools/reference-resolver': 1.3.0
+      '@open-rpc/spec-types': 0.0.2
+      '@open-rpc/specification-extension-spec': 1.0.2
+      ajv: 6.15.0
+      detect-node: 2.1.0
+      fast-safe-stringify: 2.1.1
+      fs-extra: 10.1.0
+      is-url: 1.2.4
+      isomorphic-fetch: 3.0.0
+    transitivePeerDependencies:
+      - encoding
+
+  '@open-rpc/spec-types@0.0.2':
+    dependencies:
+      '@open-rpc/spec': 1.4.1
+
+  '@open-rpc/spec@1.4.1': {}
+
+  '@open-rpc/specification-extension-spec@1.0.2': {}
 
   '@openapi-contrib/openapi-schema-to-json-schema@3.2.0':
     dependencies:
@@ -20461,6 +20629,8 @@ snapshots:
 
   detect-libc@2.1.2: {}
 
+  detect-node@2.1.0: {}
+
   devalue@5.9.4: {}
 
   devlop@1.1.0:
@@ -21545,7 +21715,6 @@ snapshots:
       graceful-fs: 4.2.11
       jsonfile: 6.2.1
       universalify: 2.0.1
-    optional: true
 
   fs-minipass@2.1.0:
     dependencies:
@@ -22241,6 +22410,8 @@ snapshots:
 
   is-unsafe@2.0.2: {}
 
+  is-url@1.2.4: {}
+
   is-weakmap@2.0.2:
     optional: true
 
@@ -22264,6 +22435,17 @@ snapshots:
   isarray@2.0.5: {}
 
   isexe@2.0.0: {}
+
+  isomorphic-fetch@3.0.0:
+    dependencies:
+      node-fetch: 2.7.0
+      whatwg-fetch: 3.6.20
+    transitivePeerDependencies:
+      - encoding
+
+  isomorphic-ws@5.0.0(ws@8.18.3):
+    dependencies:
+      ws: 8.18.3
 
   istanbul-lib-coverage@3.2.2: {}
 
@@ -22427,7 +22609,6 @@ snapshots:
       universalify: 2.0.1
     optionalDependencies:
       graceful-fs: 4.2.11
-    optional: true
 
   jsonpath-plus@10.4.0:
     dependencies:
@@ -25043,6 +25224,8 @@ snapshots:
 
   streamsearch@1.1.0: {}
 
+  strict-event-emitter-types@2.0.0: {}
+
   strict-event-emitter@0.5.1: {}
 
   string-argv@0.3.2: {}
@@ -25782,8 +25965,7 @@ snapshots:
       unist-util-is: 6.0.1
       unist-util-visit-parents: 6.0.2
 
-  universalify@2.0.1:
-    optional: true
+  universalify@2.0.1: {}
 
   unpipe@1.0.0: {}
 
@@ -26150,6 +26332,8 @@ snapshots:
       - uglify-js
     optional: true
 
+  whatwg-fetch@3.6.20: {}
+
   whatwg-mimetype@5.0.0: {}
 
   whatwg-url@16.0.1(@noble/hashes@1.8.0):
@@ -26292,6 +26476,8 @@ snapshots:
   write-file-atomic@7.0.1:
     dependencies:
       signal-exit: 4.1.0
+
+  ws@8.18.3: {}
 
   ws@8.21.0: {}
 
