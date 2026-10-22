@@ -274,5 +274,28 @@ describe('openRPCLink', () => {
 
       expect(fetch).toHaveBeenCalledOnce()
     })
+
+    it('derives statuses for custom-decoded errors, so client errors are not retried', async () => {
+      const fetch = createFetch(request => error(request, { code: request.params[0], message: 'Application error' }))
+      const client = createORPCClient(new OpenRPCLink({
+        fetch,
+        plugins: [new RetryLinkPlugin({ default: { retry: 2, retryDelay: 0 } })],
+        customErrorDecoder: e => e.code === 1001
+          ? new ORPCError('OUT_OF_STOCK', { message: e.message })
+          : new ORPCError('INTERNAL_SERVER_ERROR', { message: e.message }),
+      })) as any
+
+      const outOfStock = await client.order(1001).catch((e: unknown) => e)
+
+      expect(outOfStock).toBeInstanceOf(ORPCError)
+      expect(outOfStock.code).toBe('OUT_OF_STOCK')
+      expect(outOfStock.cause).toBeInstanceOf(ResponseError)
+      expect(outOfStock.cause.response.status).toBe(400)
+      expect(fetch).toHaveBeenCalledOnce()
+
+      await expect(client.order(1002)).rejects.toThrow('Application error')
+
+      expect(fetch).toHaveBeenCalledTimes(4)
+    })
   })
 })

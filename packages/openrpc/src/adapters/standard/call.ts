@@ -30,13 +30,15 @@ export interface JsonRpcCall {
 
 /**
  * Marks the sub-requests the envelope plugin creates, one per JSON-RPC call.
- * The codec only resolves marked requests, so a raw HTTP request can never route to a procedure.
+ * The codec only resolves marked requests, so a raw HTTP request can never route to a procedure:
+ * a JSON body or headers cannot carry a symbol-keyed property.
  *
  * It is an own enumerable property, so it survives `{ ...request, headers }` spreads in interceptors.
+ * The symbol is registered, so separate copies of this package (such as a plugin from another install) agree on it.
  *
  * @internal
  */
-export const JSON_RPC_CALL_SYMBOL: unique symbol = Symbol('ORPC_JSON_RPC_CALL')
+export const JSON_RPC_CALL_SYMBOL: unique symbol = Symbol.for('ORPC_JSON_RPC_CALL')
 
 /**
  * A {@link StandardLazyRequest} marked as a JSON-RPC call.

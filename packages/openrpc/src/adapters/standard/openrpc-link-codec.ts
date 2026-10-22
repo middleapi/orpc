@@ -71,6 +71,9 @@ export interface OpenRPCLinkCodecOptions<T extends ClientContext> {
    * Convert a JSON-RPC error object into an `ORPCError`.
    * Return `null` or `undefined` to fall back to the default decoding behavior.
    *
+   * A returned error without a `cause` gets the same `ResponseError` cause as default-decoded errors,
+   * with the status derived from the returned error's code (see `errorStatusMap`).
+   *
    * @see {@link https://orpc.dev/docs/openrpc/link#error-responses | OpenRPC Link - Error Responses}
    */
   customErrorDecoder?: ((
@@ -258,27 +261,42 @@ export class OpenRPCLinkCodec<T extends ClientContext> implements StandardLinkCo
     const customError = this.customErrorDecoder?.(error, response)
 
     if (customError !== undefined && customError !== null) {
+      if (customError.cause === undefined) {
+        // like the `cause` option of `new Error`: an own, non-enumerable property
+        Object.defineProperty(customError, 'cause', {
+          value: this.createResponseError(error, snapshot, customError.code),
+          writable: true,
+          configurable: true,
+        })
+      }
+
       return customError
     }
 
     const data = error.data
     const lossless = isOpenRPCErrorData(data)
     const code = lossless ? data.code : fromJsonRpcErrorCode(error.code)
-
-    const cause = new ResponseError({
-      message: `Received JSON-RPC error ${error.code}.`,
-      response: {
-        ...snapshot,
-        // JSON-RPC servers usually deliver errors with 200, so derive a status that status-based plugins understand
-        status: snapshot.status >= 400 ? snapshot.status : getOwn(this.errorStatusMap, code) ?? DEFAULT_ERROR_STATUS,
-      },
-    })
+    const cause = this.createResponseError(error, snapshot, code)
 
     if (lossless) {
       return createORPCErrorFromJson({ code, defined: data.defined, message: error.message, data: data.data }, { cause })
     }
 
     return new ORPCError(code, { message: error.message, data, cause })
+  }
+
+  /**
+   * The `cause` of a decoded error. JSON-RPC servers usually deliver errors with 200, so a status below 400
+   * is replaced with the status of the oRPC error `code`, which status-based plugins (such as retry) understand.
+   */
+  private createResponseError(error: JsonRpcErrorObject, snapshot: StandardResponse, code: string): ResponseError {
+    return new ResponseError({
+      message: `Received JSON-RPC error ${error.code}.`,
+      response: {
+        ...snapshot,
+        status: snapshot.status >= 400 ? snapshot.status : getOwn(this.errorStatusMap, code) ?? DEFAULT_ERROR_STATUS,
+      },
+    })
   }
 }
 

@@ -1,6 +1,7 @@
-import type { ContractRouterClient } from '@orpc/contract'
+import type { RouterContractClient } from '@orpc/contract'
 import { createORPCClient, isDefinedError, safe } from '@orpc/client'
 import { oc } from '@orpc/contract'
+import { ResponseValidationLinkPlugin } from '@orpc/contract/plugins'
 import { SmartCoercionHandlerPlugin, SmartCoercionLinkPlugin } from '@orpc/json-schema'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { implement, os } from '@orpc/server'
@@ -32,6 +33,18 @@ const nativeContract = {
 }
 
 const nativeImplementer = implement(nativeContract)
+
+/**
+ * JSON-RPC sends an `undefined` output as `result: null`, and a notification resolves `undefined`,
+ * so the output schemas decide which calls pass response validation.
+ */
+const validatedContract = {
+  nothing: oc.output(z.void()),
+  maybe: oc.input(z.boolean()).output(z.string().nullish()),
+  planet: oc.output(z.object({ name: z.string() })),
+}
+
+const validatedImplementer = implement(validatedContract)
 
 describe.each([
   ['hono-fetch', createHonoFetchClientServerTest],
@@ -176,7 +189,7 @@ describe.each([
       link: { plugins: [new SmartCoercionLinkPlugin(nativeContract, { converters: [new ZodToJsonSchemaConverter()] })] },
     })
 
-    const client = createORPCClient<ContractRouterClient<typeof nativeContract>>(link)
+    const client = createORPCClient<RouterContractClient<typeof nativeContract>>(link)
 
     beforeEach(() => {
       received.mockClear()
@@ -227,6 +240,41 @@ describe.each([
       expect(definedError).toMatchObject({ code: 'CONFLICT', defined: true })
       expect(definedError?.data.at).toBeInstanceOf(Date)
       expect(definedError?.data.at).toEqual(date)
+    })
+  })
+
+  describe('with the response validation plugin', () => {
+    const validatedRouter = validatedImplementer.router({
+      nothing: validatedImplementer.nothing.handler(() => undefined),
+      maybe: validatedImplementer.maybe.handler(({ input }) => input ? 'yes' : undefined),
+      planet: validatedImplementer.planet.handler(() => ({ name: 'Earth' })),
+    })
+
+    const { link } = createClientServer(validatedRouter, {
+      link: { plugins: [new ResponseValidationLinkPlugin(validatedContract)] },
+    })
+
+    const { link: notificationLink } = createClientServer(validatedRouter, {
+      link: { notification: true, plugins: [new ResponseValidationLinkPlugin(validatedContract)] },
+    })
+
+    const client = createORPCClient<RouterContractClient<typeof validatedContract>>(link)
+    const notificationClient = createORPCClient<RouterContractClient<typeof validatedContract>>(notificationLink)
+
+    it('accepts an undefined output as null when the schema is nullish', async () => {
+      await expect(client.maybe(true)).resolves.toBe('yes')
+      await expect(client.maybe(false)).resolves.toBe(null)
+      await expect(client.planet()).resolves.toEqual({ name: 'Earth' })
+    })
+
+    it('rejects an undefined output that arrives as null when the schema is void', async () => {
+      await expect(client.nothing()).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message: 'Output validation failed' })
+    })
+
+    it('validates the undefined a notification resolves', async () => {
+      await expect(notificationClient.maybe(true)).resolves.toBe(undefined)
+      await expect(notificationClient.nothing()).resolves.toBe(undefined)
+      await expect(notificationClient.planet()).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message: 'Output validation failed' })
     })
   })
 })

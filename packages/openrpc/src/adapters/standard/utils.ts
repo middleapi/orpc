@@ -207,13 +207,21 @@ export function liftSubresponseHeaders(subresponseHeaders: readonly StandardHead
 }
 
 /**
+ * Whether `JSON.stringify` keeps a value as an object member: `undefined`, functions, and symbols are dropped,
+ * which would leave a response without its required `result` member.
+ */
+export function isJsonMemberValue(value: unknown): boolean {
+  return value !== undefined && typeof value !== 'function' && typeof value !== 'symbol'
+}
+
+/**
  * The body of a per-call sub-response, which the envelope completes with `jsonrpc` and `id`.
  */
 export type JsonRpcPartialResponseBody = { result: unknown } | { error: JsonRpcErrorObject }
 
 /**
  * Whether a sub-response body is {@link JsonRpcPartialResponseBody}: a plain object with exactly one own
- * `result` (not `undefined`) or valid `error` member. Other keys are ignored.
+ * `result` (that JSON keeps, see {@link isJsonMemberValue}) or valid `error` member. Other keys are ignored.
  */
 export function isPartialResponseBody(body: unknown): body is JsonRpcPartialResponseBody {
   if (!isPlainObject(body)) {
@@ -227,7 +235,7 @@ export function isPartialResponseBody(body: unknown): body is JsonRpcPartialResp
     return false
   }
 
-  return hasResult ? body.result !== undefined : isJsonRpcErrorObject(body.error)
+  return hasResult ? isJsonMemberValue(body.result) : isJsonRpcErrorObject(body.error)
 }
 
 /**

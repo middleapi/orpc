@@ -1,4 +1,4 @@
-import type { ContractRouterClient } from '@orpc/contract'
+import type { RouterContractClient } from '@orpc/contract'
 import type { OpenRPCClient } from '@orpc/openrpc'
 import type { AddressInfo } from 'node:net'
 import * as http from 'node:http'
@@ -218,7 +218,7 @@ describe('openRPCLink against a foreign JSON-RPC server', () => {
     missing: oc,
   }
 
-  type ForeignClient = OpenRPCClient<ContractRouterClient<typeof contract>>
+  type ForeignClient = OpenRPCClient<RouterContractClient<typeof contract>>
 
   const { origin, received } = createForeignServer()
 

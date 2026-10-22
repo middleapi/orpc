@@ -142,6 +142,13 @@ export interface OpenAPIJsonSerializerOptions {
   omitUndefinedProperties?: boolean | undefined
 }
 
+/**
+ * Handles one-way serialization of oRPC payloads into JSON-friendly values,
+ * partially supporting complex data types beyond plain JSON such as `Date`, `BigInt`, and `Set`.
+ * `OpenAPISerializer` builds on it, and `handlers` support more types.
+ *
+ * @see {@link https://orpc.dev/docs/openrpc/handler#custom-serializer | OpenRPC Handler - Custom Serializer}
+ */
 export class OpenAPIJsonSerializer {
   private readonly inlineBuiltInHandlers: boolean
   private readonly handlerEntries: OpenAPIJsonSerializerHandler[] | undefined

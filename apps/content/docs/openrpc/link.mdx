@@ -193,7 +193,7 @@ const link = new OpenRPCLink({
 })
 ```
 
-Use `customErrorDecoder` to convert JSON-RPC errors yourself, such as the application errors of another server. It receives the JSON-RPC error object and the response, and the errors it returns are thrown as-is:
+Use `customErrorDecoder` to convert JSON-RPC errors yourself, such as the application errors of another server. It receives the JSON-RPC error object and the response. Errors it returns without a `cause` get the same `ResponseError` cause, with the status of their own code from `errorStatusMap` (`400` for codes missing from it), so the Retry Plugin does not retry an `OUT_OF_STOCK`; an error with its own `cause` is kept as is:
 
 ```ts
 import { ORPCError } from '@orpc/client'
@@ -247,13 +247,14 @@ Plugins package reusable interceptors:
 | [Retry](/docs/plugins/retry) | Supported. Errors get [derived statuses](#error-responses), so client errors are not retried. Each attempt is a new request with a new `id`. |
 | [Retry After](/docs/plugins/retry-after) | Supported with [`errorResponseStatus: 'mapped'`](/docs/openrpc/handler#http-status-codes) on the server, since it needs a `429` or `503` response. |
 | [Timeout](/docs/plugins/timeout), [Request Compression](/docs/plugins/request-compression), [Response Compression](/docs/plugins/response-compression) | Supported. |
-| [Request Validation](/docs/plugins/request-validation), [Response Validation](/docs/plugins/response-validation), [Smart Coercion](/docs/plugins/smart-coercion) | Supported, with a contract. |
+| [Request Validation](/docs/plugins/request-validation), [Smart Coercion](/docs/plugins/smart-coercion) | Supported, with a contract. |
+| [Response Validation](/docs/plugins/response-validation) | Supported, with a contract. An `undefined` output arrives as `null`, so declare outputs that can be empty with `.nullish()` instead of `z.void()` or `.optional()`. [Notifications](#notifications) resolve `undefined`, which fails validation unless the output schema accepts it. |
 | [Dedupe](/docs/plugins/dedupe) | No effect, JSON-RPC requests are `POST` requests with unique ids. |
 | [Batch](/docs/plugins/batch) | Not supported, the link sends one HTTP request per call. |
 
 ## Restoring Native Types
 
-JSON-RPC carries plain JSON, so a `Date` or `BigInt` travels as a string. With a [contract](/docs/contract-first), the [Smart Coercion Plugin](/docs/plugins/smart-coercion) restores them on both sides: the handler plugin coerces params before input validation, and the link plugin coerces results and error data. It finds these types through the [`x-native-type` metadata](/docs/plugins/smart-coercion#how-it-works) of your JSON Schemas, which converters add for schemas such as `z.date()` or `z.bigint()`; a `URL` needs a schema that carries `x-native-type: 'url'`. The client then has the contract's own types, without `OpenRPCClient`:
+JSON-RPC carries plain JSON, so a `Date` or `BigInt` travels as a string. With a [contract](/docs/contract-first), the [Smart Coercion Plugin](/docs/plugins/smart-coercion) restores them on both sides: the handler plugin coerces params before input validation, and the link plugin coerces results and error data. It finds these types through the [`x-native-type` metadata](/docs/plugins/smart-coercion#how-it-works) of your JSON Schemas, which converters add for schemas such as `z.date()` or `z.bigint()`; a `URL` needs a schema that carries `x-native-type: 'url'`. The client then has the contract's own types, without `OpenRPCClient`. An `undefined` output still arrives as `null`, so declare outputs that can be empty with `.nullish()` instead of `z.void()` or `.optional()` in the contract, to keep its types accurate:
 
 ```ts
 import type { RouterContractClient } from '@orpc/contract'

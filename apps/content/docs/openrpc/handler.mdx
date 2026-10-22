@@ -295,7 +295,7 @@ const handler = new OpenRPCHandler(router, {
 ```
 
 :::info
-`interceptors` see the response of each call before the envelope completes it: `{ result }` on success or `{ error }` with a JSON-RPC error object. An interceptor that replaces it with anything else makes the call fail with `-32603` "Internal error".
+`interceptors` see the response of each successful call before the envelope completes it, with `{ result }` as its body. Procedure errors, including input validation errors, are thrown through them as with other handlers, so catch them or use `onError`. The handler encodes an error as `{ error }` with a JSON-RPC error object afterwards, and only `routingInterceptors` see that body. A body other than `{ result }` or `{ error }` with a valid error object makes the call fail with `-32603` "Internal error".
 :::
 
 ## Plugins
@@ -372,6 +372,8 @@ const handler = new OpenRPCHandler(router, {
 Results and error data are serialized like [OpenAPI responses](/docs/openapi/serializer). To support more types, pass an `OpenAPIJsonSerializer` from `@orpc/openapi` with custom handlers as `serializer`, and give the same serializer to the [OpenRPC Generator](/docs/openrpc/specification#openrpc-generator) and [OpenRPC Link](/docs/openrpc/link#options):
 
 ```ts
+import { OpenAPIJsonSerializer } from '@orpc/openapi'
+
 const serializer = new OpenAPIJsonSerializer({
   handlers: {
     person: {
@@ -385,6 +387,8 @@ const handler = new OpenRPCHandler(router, {
   serializer,
 })
 ```
+
+A result that serializes to a function, a symbol, or `undefined` fails its call with `-32603` "Internal error". A value that `JSON.stringify` cannot serialize, such as a class instance holding a `BigInt`, fails the whole HTTP response, including the rest of a batch.
 
 ## Framework Body Parsers
 
@@ -402,6 +406,7 @@ Frameworks that parse request bodies themselves can answer a JSON-RPC request be
 
 ```ts
 import { OpenRPCEnvelopeHandlerPlugin, OpenRPCHandlerCodec } from '@orpc/openrpc/standard'
+import { StandardHandler } from '@orpc/server/standard'
 
 const codec = new OpenRPCHandlerCodec(router, {
   filter: (procedure, path) => !path.includes('internal'),

@@ -4,6 +4,7 @@ import {
   cancelQuietly,
   createJsonRpcProtocolErrorResponse,
   encodeJsonRpcError,
+  isJsonMemberValue,
   isJsonRpcMediaType,
   isPartialResponseBody,
   liftSubresponseHeaders,
@@ -324,6 +325,16 @@ describe('liftSubresponseHeaders', () => {
   })
 })
 
+describe('isJsonMemberValue', () => {
+  it.each([[null], [0], [''], [false], [{}], [[]], [new Date(0)]])('accepts %j', (value) => {
+    expect(isJsonMemberValue(value)).toBe(true)
+  })
+
+  it.each([[undefined], [() => 1], [Symbol('value')]])('rejects %s, which JSON.stringify drops', (value) => {
+    expect(isJsonMemberValue(value)).toBe(false)
+  })
+})
+
 describe('isPartialResponseBody', () => {
   it.each([
     [{ result: null }],
@@ -343,6 +354,8 @@ describe('isPartialResponseBody', () => {
     [[{ result: 1 }]],
     [{}],
     [{ result: undefined }],
+    [{ result: () => 1 }],
+    [{ result: Symbol('result') }],
     [{ result: 1, error: { code: 1, message: 'x' } }],
     [{ result: undefined, error: { code: 1, message: 'x' } }],
     [{ error: { code: 1.5, message: 'x' } }],

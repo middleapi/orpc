@@ -119,6 +119,56 @@ describe('openRPCHandler', () => {
     expect(get).toEqual({ matched: false })
   })
 
+  it('answers a result JSON cannot carry with "Internal error", keeping the other calls of a batch', async () => {
+    const handler = new OpenRPCHandler({
+      ping: os.handler(() => 'pong'),
+      fn: os.handler(() => () => 1),
+      symbol: os.handler(() => Symbol('result')),
+    })
+
+    const { response } = await handler.handle(
+      createRequest([
+        { jsonrpc: '2.0', method: 'ping', id: 1 },
+        { jsonrpc: '2.0', method: 'fn', id: 2 },
+        { jsonrpc: '2.0', method: 'symbol', id: 3 },
+      ]),
+      { prefix: '/rpc' },
+    )
+
+    const internalError = { code: -32603, message: 'Internal Server Error', data: { code: 'INTERNAL_SERVER_ERROR', defined: false } }
+
+    await expect(response!.json()).resolves.toEqual([
+      { jsonrpc: '2.0', id: 1, result: 'pong' },
+      { jsonrpc: '2.0', id: 2, error: internalError },
+      { jsonrpc: '2.0', id: 3, error: internalError },
+    ])
+
+    const single = await handler.handle(createRequest({ jsonrpc: '2.0', method: 'fn', id: 1 }), { prefix: '/rpc' })
+
+    await expect(single.response!.json()).resolves.toEqual({ jsonrpc: '2.0', id: 1, error: internalError })
+  })
+
+  it('resolves empty params for by-name inputs with async validation', async () => {
+    const handler = new OpenRPCHandler({
+      list: os.input(z.object({ cursor: z.string().optional() }).refine(async () => true)).handler(({ input }) => input),
+      empty: os.input(z.object({}).refine(async () => true)).handler(({ input }) => input),
+    })
+
+    const { response } = await handler.handle(
+      createRequest([
+        { jsonrpc: '2.0', method: 'list', id: 1 },
+        { jsonrpc: '2.0', method: 'list', params: [], id: 2 },
+        { jsonrpc: '2.0', method: 'list', params: null, id: 3 },
+        { jsonrpc: '2.0', method: 'list', params: {}, id: 4 },
+        { jsonrpc: '2.0', method: 'empty', id: 5 },
+        { jsonrpc: '2.0', method: 'empty', params: [], id: 6 },
+      ]),
+      { prefix: '/rpc' },
+    )
+
+    await expect(response!.json()).resolves.toEqual([1, 2, 3, 4, 5, 6].map(id => ({ jsonrpc: '2.0', id, result: {} })))
+  })
+
   it('passes the codec and envelope options through', async () => {
     const handler = new OpenRPCHandler(router, {
       filter: (_, path) => path[0] !== 'missing',

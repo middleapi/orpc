@@ -333,6 +333,35 @@ describe('openRPCHandlerCodec', () => {
         '[OpenRPCHandler] Procedure "planet.find" returned a Blob at the root, which JSON-RPC cannot send.',
       )
     })
+
+    it.each([
+      ['function', () => 1],
+      ['symbol', Symbol('result')],
+    ])('rejects a result that serializes to a %s, which JSON.stringify would drop', async (kind, output) => {
+      await expect(codec.encodeOutput(output, find, ['planet', 'find'])).rejects.toThrow(new TypeError(
+        `[OpenRPCHandler] Procedure "planet.find" returned a result that serializes to ${kind}, which JSON-RPC cannot send.`,
+      ))
+    })
+
+    it('rejects undefined a custom serializer produces at the root', async () => {
+      class Missing {}
+
+      const custom = new OpenRPCHandlerCodec(router, {
+        serializer: new OpenAPIJsonSerializer({
+          handlers: { missing: { condition: value => value instanceof Missing, serialize: () => undefined, isTerminal: true } },
+        }),
+      })
+
+      await expect(custom.encodeOutput(new Missing(), find, ['planet', 'find'])).rejects.toThrow(
+        '[OpenRPCHandler] Procedure "planet.find" returned a result that serializes to undefined, which JSON-RPC cannot send.',
+      )
+    })
+
+    it('keeps nested functions, which JSON.stringify drops as members', async () => {
+      const response = await codec.encodeOutput({ a: 1, fn: () => 1 }, find, ['planet', 'find'])
+
+      expect(JSON.parse(JSON.stringify(response.body))).toEqual({ result: { a: 1 } })
+    })
   })
 
   describe('.encodeError', () => {

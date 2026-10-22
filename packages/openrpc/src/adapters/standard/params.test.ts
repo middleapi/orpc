@@ -13,41 +13,37 @@ function customSchema(validate: (value: unknown) => any): AnySchema {
 describe('decodeJsonRpcParams', () => {
   const procedure = oc.input(z.object({ a: z.string().optional() }))
 
-  it('unwraps a single positional param', () => {
-    expect(decodeJsonRpcParams(['value'], procedure)).toBe('value')
-    expect(decodeJsonRpcParams([null], procedure)).toBe(null)
-    expect(decodeJsonRpcParams([[1, 2]], procedure)).toEqual([1, 2])
+  it('unwraps a single positional param', async () => {
+    await expect(decodeJsonRpcParams(['value'], procedure)).resolves.toBe('value')
+    await expect(decodeJsonRpcParams([null], procedure)).resolves.toBe(null)
+    await expect(decodeJsonRpcParams([[1, 2]], procedure)).resolves.toEqual([1, 2])
 
     const value = {}
-    expect(decodeJsonRpcParams([value], procedure)).toBe(value)
+    await expect(decodeJsonRpcParams([value], procedure)).resolves.toBe(value)
   })
 
-  it('passes non-empty by-name params through', () => {
+  it('passes non-empty by-name params through', async () => {
     const params = { a: 'value' }
-    expect(decodeJsonRpcParams(params, procedure)).toBe(params)
+    await expect(decodeJsonRpcParams(params, procedure)).resolves.toBe(params)
 
     const nullPrototype = Object.assign(Object.create(null), { a: 'value' })
-    expect(decodeJsonRpcParams(nullPrototype, procedure)).toBe(nullPrototype)
+    await expect(decodeJsonRpcParams(nullPrototype, procedure)).resolves.toBe(nullPrototype)
   })
 
-  it('rejects more than one positional param as invalid params', () => {
-    expect(() => decodeJsonRpcParams([1, 2], procedure)).toThrow(
+  it('rejects more than one positional param as invalid params', async () => {
+    await expect(decodeJsonRpcParams([1, 2], procedure)).rejects.toThrow(
       new ORPCError('BAD_REQUEST', { message: 'Invalid params: expected at most 1 positional parameter, received 2.' }),
     )
 
-    try {
-      decodeJsonRpcParams([1, 2, 3], procedure)
-      expect.unreachable()
-    }
-    catch (error) {
-      expect(error).toBeInstanceOf(ORPCError)
-      expect((error as ORPCError<any, any>).code).toBe('BAD_REQUEST')
-      expect((error as ORPCError<any, any>).message).toBe('Invalid params: expected at most 1 positional parameter, received 3.')
-    }
+    const error = await decodeJsonRpcParams([1, 2, 3], procedure).catch(error => error)
+
+    expect(error).toBeInstanceOf(ORPCError)
+    expect((error as ORPCError<any, any>).code).toBe('BAD_REQUEST')
+    expect((error as ORPCError<any, any>).message).toBe('Invalid params: expected at most 1 positional parameter, received 3.')
   })
 
-  it.each([['string'], [1], [true], [new Date()], [new Map()]])('rejects other params: %s', (params) => {
-    expect(() => decodeJsonRpcParams(params, procedure)).toThrow(
+  it.each([['string'], [1], [true], [new Date()], [new Map()]])('rejects other params: %s', async (params) => {
+    await expect(decodeJsonRpcParams(params, procedure)).rejects.toThrow(
       new ORPCError('BAD_REQUEST', { message: 'Invalid params: expected an array or an object.' }),
     )
   })
@@ -71,54 +67,86 @@ describe('decodeJsonRpcParams', () => {
       ['z.object({ a: optional }).optional()', z.object({ a: z.string().optional() }).optional(), undefined, {}],
       ['z.string().optional()', z.string().optional(), undefined, undefined],
       ['z.any()', z.any(), undefined, {}],
-      ['async refine', z.object({}).refine(async () => true), undefined, {}],
-    ] as const)('normalizes empty params for %s', (_, schema, absent, object) => {
+      ['z.object({}) with async refine', z.object({}).refine(async () => true), {}, {}],
+      ['z.object({ a: optional }) with async refine', z.object({ a: z.string().optional() }).refine(async () => true), {}, {}],
+      ['z.object({ a: optional with async refine })', z.object({ a: z.string().optional().refine(async () => true) }), {}, {}],
+      ['z.object({ a: required }) with async refine', z.object({ a: z.string() }).refine(async () => true), undefined, {}],
+      ['z.void() with async refine', z.void().refine(async () => true), undefined, undefined],
+      ['z.object({}).optional() with async refine', z.object({}).optional().refine(async () => true), undefined, {}],
+      ['async validation that rejects', customSchema(() => Promise.reject(new Error('async failure'))), undefined, {}],
+      ['validation that throws', customSchema(() => {
+        throw new Error('sync failure')
+      }), undefined, {}],
+    ] as const)('normalizes empty params for %s', async (_, schema, absent, object) => {
       for (const procedure of [schema ? oc.input(schema) : oc, schema ? os.input(schema).handler(() => {}) : os.handler(() => {})]) {
-        expect(decodeJsonRpcParams(EMPTY_PARAMS.absent, procedure)).toEqual(absent)
-        expect(decodeJsonRpcParams(EMPTY_PARAMS.null, procedure)).toEqual(absent)
-        expect(decodeJsonRpcParams(EMPTY_PARAMS['[]'], procedure)).toEqual(absent)
-        expect(decodeJsonRpcParams(EMPTY_PARAMS['{}'], procedure)).toEqual(object)
-        expect(decodeJsonRpcParams(EMPTY_PARAMS['null-prototype {}'], procedure)).toEqual(object)
+        await expect(decodeJsonRpcParams(EMPTY_PARAMS.absent, procedure)).resolves.toEqual(absent)
+        await expect(decodeJsonRpcParams(EMPTY_PARAMS.null, procedure)).resolves.toEqual(absent)
+        await expect(decodeJsonRpcParams(EMPTY_PARAMS['[]'], procedure)).resolves.toEqual(absent)
+        await expect(decodeJsonRpcParams(EMPTY_PARAMS['{}'], procedure)).resolves.toEqual(object)
+        await expect(decodeJsonRpcParams(EMPTY_PARAMS['null-prototype {}'], procedure)).resolves.toEqual(object)
       }
     })
 
-    it('combines several input schemas', () => {
+    it('combines several input schemas', async () => {
       const procedure = oc.input(z.object({ a: z.string().optional() })).input(z.void())
 
       // `undefined` passes z.void() but not the object, and `{}` the object but not z.void()
-      expect(decodeJsonRpcParams(undefined, procedure)).toBe(undefined)
-      expect(decodeJsonRpcParams({}, procedure)).toEqual({})
+      await expect(decodeJsonRpcParams(undefined, procedure)).resolves.toBe(undefined)
+      await expect(decodeJsonRpcParams({}, procedure)).resolves.toEqual({})
     })
 
-    it('returns a fresh object every time', () => {
+    it('combines sync and async input schemas', async () => {
+      const procedure = oc.input(z.object({ a: z.string().optional() })).input(z.object({}).refine(async () => true))
+
+      await expect(decodeJsonRpcParams(undefined, procedure)).resolves.toEqual({})
+      await expect(decodeJsonRpcParams([], procedure)).resolves.toEqual({})
+      await expect(decodeJsonRpcParams({}, procedure)).resolves.toEqual({})
+    })
+
+    it('returns a fresh object every time', async () => {
       const procedure = oc.input(z.object({ a: z.string().optional() }))
-      const first = decodeJsonRpcParams(undefined, procedure)
+      const first = await decodeJsonRpcParams(undefined, procedure)
 
       expect(first).toEqual({})
-      expect(decodeJsonRpcParams(undefined, procedure)).not.toBe(first)
+      await expect(decodeJsonRpcParams(undefined, procedure)).resolves.not.toBe(first)
     })
 
-    it('probes the input schemas once per procedure', () => {
+    it('probes the input schemas once per procedure', async () => {
       const validate = vi.fn((value: unknown) => value === undefined ? { value } : { issues: [{ message: 'expected undefined' }] })
       const procedure = oc.input(customSchema(validate))
 
-      expect(decodeJsonRpcParams({ a: 1 }, procedure)).toEqual({ a: 1 })
-      expect(decodeJsonRpcParams(['x'], procedure)).toBe('x')
+      await expect(decodeJsonRpcParams({ a: 1 }, procedure)).resolves.toEqual({ a: 1 })
+      await expect(decodeJsonRpcParams(['x'], procedure)).resolves.toBe('x')
       expect(validate).not.toHaveBeenCalled()
 
-      expect(decodeJsonRpcParams([], procedure)).toBe(undefined)
+      await expect(decodeJsonRpcParams([], procedure)).resolves.toBe(undefined)
       expect(validate).toHaveBeenCalledTimes(2)
       expect(validate).toHaveBeenCalledWith(undefined)
       expect(validate).toHaveBeenCalledWith({})
 
-      expect(decodeJsonRpcParams({}, procedure)).toBe(undefined)
-      expect(decodeJsonRpcParams(undefined, procedure)).toBe(undefined)
-      expect(decodeJsonRpcParams(null, procedure)).toBe(undefined)
+      await expect(decodeJsonRpcParams({}, procedure)).resolves.toBe(undefined)
+      await expect(decodeJsonRpcParams(undefined, procedure)).resolves.toBe(undefined)
+      await expect(decodeJsonRpcParams(null, procedure)).resolves.toBe(undefined)
       expect(validate).toHaveBeenCalledTimes(2)
 
       // another procedure with the same schema gets its own probe
-      expect(decodeJsonRpcParams([], oc.input(customSchema(validate)))).toBe(undefined)
+      await expect(decodeJsonRpcParams([], oc.input(customSchema(validate)))).resolves.toBe(undefined)
       expect(validate).toHaveBeenCalledTimes(4)
+    })
+
+    it('probes async input schemas once per procedure, even for concurrent calls', async () => {
+      const validate = vi.fn(async (value: unknown) => value === undefined ? { issues: [{ message: 'expected an object' }] } : { value })
+      const procedure = oc.input(customSchema(validate))
+
+      await expect(Promise.all([
+        decodeJsonRpcParams(undefined, procedure),
+        decodeJsonRpcParams([], procedure),
+        decodeJsonRpcParams(null, procedure),
+      ])).resolves.toEqual([{}, {}, {}])
+
+      expect(validate).toHaveBeenCalledTimes(2)
+      expect(validate).toHaveBeenCalledWith(undefined)
+      expect(validate).toHaveBeenCalledWith({})
     })
   })
 })

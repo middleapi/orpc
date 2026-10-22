@@ -31,10 +31,18 @@ describe('getJsonRpcCall', () => {
     expect(getJsonRpcCall(rewritten)).toBe(call)
   })
 
-  it('cannot be forged with a same-named symbol', () => {
+  it('ignores an unregistered same-named symbol', () => {
     const request = { ...createRequest(), [Symbol('ORPC_JSON_RPC_CALL')]: call }
 
     expect(getJsonRpcCall(request)).toBeUndefined()
+  })
+
+  it('uses a registered symbol, so separate copies of the package agree on the marker', () => {
+    expect(Symbol.keyFor(JSON_RPC_CALL_SYMBOL)).toBe('ORPC_JSON_RPC_CALL')
+
+    const request = { ...createRequest(), [Symbol.for('ORPC_JSON_RPC_CALL')]: call }
+
+    expect(getJsonRpcCall(request)).toBe(call)
   })
 
   it('is not exported from the entry point', async () => {

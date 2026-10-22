@@ -1,9 +1,7 @@
-import type { AnyProcedureContract } from '@orpc/contract'
+import type { AnyProcedureContract, AnySchema } from '@orpc/contract'
 import type { JsonRpcParams } from '../../json-rpc'
 import { ORPCError } from '@orpc/client'
-import { isStandardSchemaOptional } from '@orpc/json-schema'
 import { isPlainObject } from '@orpc/shared'
-import { acceptsEmptyObject } from '../../utils'
 
 /**
  * Which empty input values a procedure's input schemas accept.
@@ -13,9 +11,43 @@ interface EmptyInputProbe {
   emptyObjectOk: boolean
 }
 
-const EMPTY_INPUT_PROBES = new WeakMap<AnyProcedureContract, EmptyInputProbe>()
+const EMPTY_INPUT_PROBES = new WeakMap<AnyProcedureContract, Promise<EmptyInputProbe>>()
 
-function probeEmptyInput(procedure: AnyProcedureContract): EmptyInputProbe | undefined {
+/**
+ * Whether every schema accepts the value `createValue` returns (a fresh one per schema), awaiting async validation.
+ * A validation that throws or rejects does not accept it.
+ */
+async function acceptsEmptyValue(schemas: readonly AnySchema[], createValue: () => unknown): Promise<boolean> {
+  for (const schema of schemas) {
+    try {
+      const result = await schema['~standard'].validate(createValue())
+
+      if (result.issues !== undefined) {
+        return false
+      }
+    }
+    catch {
+      return false
+    }
+  }
+
+  return true
+}
+
+async function probeInputSchemas(schemas: readonly AnySchema[]): Promise<EmptyInputProbe> {
+  const [undefinedOk, emptyObjectOk] = await Promise.all([
+    acceptsEmptyValue(schemas, () => undefined),
+    acceptsEmptyValue(schemas, () => ({})),
+  ])
+
+  return { undefinedOk, emptyObjectOk }
+}
+
+/**
+ * Probes the input schemas once per procedure. The probe is async, like the input validation itself,
+ * so schemas with async validation resolve the same as sync ones.
+ */
+function probeEmptyInput(procedure: AnyProcedureContract): Promise<EmptyInputProbe> | undefined {
   const inputSchemas = procedure['~orpc'].inputSchemas
 
   if (!inputSchemas?.length) {
@@ -25,11 +57,7 @@ function probeEmptyInput(procedure: AnyProcedureContract): EmptyInputProbe | und
   let probe = EMPTY_INPUT_PROBES.get(procedure)
 
   if (probe === undefined) {
-    probe = {
-      undefinedOk: inputSchemas.every(schema => isStandardSchemaOptional(schema, 'input')),
-      emptyObjectOk: inputSchemas.every(acceptsEmptyObject),
-    }
-
+    probe = probeInputSchemas(inputSchemas)
     EMPTY_INPUT_PROBES.set(procedure, probe)
   }
 
@@ -43,8 +71,8 @@ function probeEmptyInput(procedure: AnyProcedureContract): EmptyInputProbe | und
  * `absent` (no params, `null`, `[]`) prefers `undefined`, and `object` (`{}`) prefers `{}`,
  * unless only the other value passes the input schemas.
  */
-function resolveEmptyInput(kind: 'absent' | 'object', procedure: AnyProcedureContract): unknown {
-  const probe = probeEmptyInput(procedure)
+async function resolveEmptyInput(kind: 'absent' | 'object', procedure: AnyProcedureContract): Promise<unknown> {
+  const probe = await probeEmptyInput(procedure)
 
   if (probe === undefined) {
     return kind === 'object' ? {} : undefined
@@ -64,10 +92,10 @@ function resolveEmptyInput(kind: 'absent' | 'object', procedure: AnyProcedureCon
  * - `{}`: the empty input the procedure accepts (`{}` preferred),
  * - any other object: the object itself (by-name).
  *
- * Throws a `BAD_REQUEST` `ORPCError` (JSON-RPC "Invalid params") for more than one positional param
+ * Rejects with a `BAD_REQUEST` `ORPCError` (JSON-RPC "Invalid params") for more than one positional param
  * or any other value.
  */
-export function decodeJsonRpcParams(params: unknown, procedure: AnyProcedureContract): unknown {
+export async function decodeJsonRpcParams(params: unknown, procedure: AnyProcedureContract): Promise<unknown> {
   if (params === undefined || params === null) {
     return resolveEmptyInput('absent', procedure)
   }

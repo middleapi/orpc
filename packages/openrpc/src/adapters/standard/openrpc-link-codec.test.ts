@@ -576,6 +576,56 @@ describe('openRPCLinkCodec', () => {
           expect(result.error.defined).toBe(true)
         })
 
+        it('gets a ResponseError cause with the status of its own code when it returns an error without one', async () => {
+          const codec = new OpenRPCLinkCodec({
+            errorStatusMap: { CONFLICT: 409, INTERNAL_SERVER_ERROR: 500 },
+            customErrorDecoder: error => new ORPCError(
+              error.code === 1 ? 'CONFLICT' : error.code === 2 ? 'INTERNAL_SERVER_ERROR' : 'OUT_OF_STOCK',
+              { message: error.message },
+            ),
+          })
+
+          const decode = async (code: number, status?: number) => {
+            const { options, body } = await encodeCall(codec)
+            const result = await codec.decodeResponse(jsonResponse({ jsonrpc: '2.0', id: body.id, error: { code, message: 'x' } }, { status }), ['ping'], options)
+
+            return (result as { error: ORPCError<any, any> }).error
+          }
+
+          const conflict = await decode(1)
+          expect(conflict.code).toBe('CONFLICT')
+          expect(conflict.cause).toBeInstanceOf(ResponseError)
+          expect((conflict.cause as ResponseError).message).toBe('Received JSON-RPC error 1.')
+          expect((conflict.cause as ResponseError).response).toEqual({ status: 409, headers: { 'content-type': 'application/json' }, body: { jsonrpc: '2.0', id: expect.any(Number), error: { code: 1, message: 'x' } } })
+          expect(Object.getOwnPropertyDescriptor(conflict, 'cause')).toMatchObject({ enumerable: false, writable: true, configurable: true })
+          expect(isRetryableError(conflict)).toBe(false)
+
+          // codes missing from the map fall back to DEFAULT_ERROR_STATUS (400)
+          const outOfStock = await decode(1001)
+          expect((outOfStock.cause as ResponseError).response.status).toBe(400)
+          expect(isRetryableError(outOfStock)).toBe(false)
+
+          const internal = await decode(2)
+          expect((internal.cause as ResponseError).response.status).toBe(500)
+          expect(isRetryableError(internal)).toBe(true)
+
+          // an error status of the response itself is kept
+          const unavailable = await decode(1, 503)
+          expect((unavailable.cause as ResponseError).response.status).toBe(503)
+        })
+
+        it('keeps the cause of an error it returns', async () => {
+          const cause = new Error('custom cause')
+          const customError = new ORPCError('OUT_OF_STOCK', { cause })
+          const codec = new OpenRPCLinkCodec({ customErrorDecoder: () => customError })
+          const { options, body } = await encodeCall(codec)
+
+          const result = await codec.decodeResponse(jsonResponse({ jsonrpc: '2.0', id: body.id, error: { code: 1001, message: 'x' } }), ['ping'], options)
+
+          expect(result).toEqual({ kind: 'error', error: customError })
+          expect(customError.cause).toBe(cause)
+        })
+
         it('is not called for results', async () => {
           const customErrorDecoder = vi.fn()
           const codec = new OpenRPCLinkCodec({ customErrorDecoder })

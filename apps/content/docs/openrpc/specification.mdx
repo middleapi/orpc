@@ -295,7 +295,7 @@ const spec = await generator.generate(router, {
 
 - OpenRPC requires unique error codes per method, so errors that map to the same code share one entry, whose message joins theirs, such as `Bad Gateway (BAD_GATEWAY) or Service Unavailable (SERVICE_UNAVAILABLE)`, without `data`. Map them to different codes to list them separately.
 - OpenRPC Error Objects carry a `data` value, not a schema, so the schemas of error data are not part of the document.
-- The protocol errors from `-32700` to `-32603` are never listed: OpenRPC assumes any API can return them.
+- The JSON-RPC protocol errors, such as Parse error, Invalid Request, and Method not found, are not added to each method, since OpenRPC assumes any API can return them. Typesafe errors are still listed when their code is in that range, such as `BAD_REQUEST` at `-32602` or server errors at `-32603` with the default map.
 
 ### Filtering Procedures
 

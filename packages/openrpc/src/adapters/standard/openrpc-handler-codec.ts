@@ -14,7 +14,7 @@ import { getOwn, isAsyncIteratorObject, pathToHttpPath, value } from '@orpc/shar
 import { assertJsonRpcErrorCodeMap, isEventIteratorProcedure, toProcedurePath } from '../../utils'
 import { getJsonRpcCall } from './call'
 import { decodeJsonRpcParams } from './params'
-import { cancelQuietly, encodeJsonRpcError } from './utils'
+import { cancelQuietly, encodeJsonRpcError, isJsonMemberValue } from './utils'
 
 export interface OpenRPCHandlerCodecOptions<_T extends Context> {
   /**
@@ -132,7 +132,8 @@ export class OpenRPCHandlerCodec<T extends Context> implements StandardHandlerCo
   }
 
   /**
-   * @throws {TypeError} If the output is a stream, an event iterator, or contains binary data, which JSON-RPC cannot send.
+   * @throws {TypeError} If the output is a stream, an event iterator, contains binary data, or serializes to a
+   * function, a symbol, or `undefined`, which JSON-RPC cannot send.
    */
   async encodeOutput(output: unknown, _procedure: AnyProcedure, path: string[]): Promise<StandardResponse> {
     const kind = getUnsendableOutputKind(output)
@@ -150,10 +151,15 @@ export class OpenRPCHandlerCodec<T extends Context> implements StandardHandlerCo
       throw new TypeError(`[OpenRPCHandler] Procedure "${path.join('.')}" returned a Blob at ${locations}, which JSON-RPC cannot send. Exclude it with the "filter" option.`)
     }
 
+    // `undefined` serializes to `null`, but a function, a symbol, or a custom handler's `undefined` would be dropped
+    // by `JSON.stringify`, leaving the response without its required `result` member
+    if (!isJsonMemberValue(json)) {
+      throw new TypeError(`[OpenRPCHandler] Procedure "${path.join('.')}" returned a result that serializes to ${typeof json}, which JSON-RPC cannot send.`)
+    }
+
     return {
       status: DEFAULT_SUCCESS_STATUS,
       headers: {},
-      // `undefined` serializes to `null`, so the response always has its required `result` member
       body: { result: json },
     }
   }
