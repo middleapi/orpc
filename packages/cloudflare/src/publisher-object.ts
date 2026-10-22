@@ -313,10 +313,10 @@ class ResumeStorage {
 
     this.lastCleanupTime = now
 
-    // `stored_at` is in seconds
+    // `stored_at` is in whole seconds, so round up to never delete an event before its ttl
     this.ctx.storage.sql.exec(`
       DELETE FROM "${this.schemaPrefix}events" WHERE stored_at < unixepoch() - ?
-    `, this.ttl / 1000)
+    `, Math.ceil(this.ttl / 1000))
   }
 
   private async initAlarm(): Promise<void> {
