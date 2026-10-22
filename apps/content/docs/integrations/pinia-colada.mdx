@@ -162,7 +162,7 @@ queryCache.setQueryData(orpc.planet.find.queryKey({ input: { id: 123 } }), (old)
 
 ### Key Serializer
 
-Because Pinia Colada requires entry keys to be serializable, oRPC serializes inputs with the [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer) when building keys. Native types like `Date`, `URL`, and `BigInt` are supported by default, and keys keep track of each value's type, so a `Date` and its ISO string produce different keys. To support [custom types](/docs/rpc/serializer#custom-serializers), pass the same serializer your [link](/docs/rpc/link#custom-serializer) uses:
+Because Pinia Colada requires entry keys to be serializable, oRPC serializes inputs with the [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer) when building keys. Native types like `Date`, `URL`, and `BigInt` are supported by default. To support [custom types](/docs/rpc/serializer#custom-serializers), pass the same serializer your [link](/docs/rpc/link#custom-serializer) uses:
 
 ```ts
 import { RPCSerializer } from '@orpc/client'
