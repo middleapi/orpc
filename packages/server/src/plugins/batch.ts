@@ -277,7 +277,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
             }
           }
 
-          const mightBeMessages = JSON.parse(data)
+          const mightBeMessages: unknown = JSON.parse(data)
 
           if (!isClientPeerSendMessages(mightBeMessages)) {
             return {
