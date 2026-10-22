@@ -1,4 +1,5 @@
 import type { LogLevel } from 'evlog'
+import { runInNewContext } from 'node:vm'
 import { ORPCError, RPCSerializer } from '@orpc/client'
 import { AbortError, ORPC_NAME, sleep } from '@orpc/shared'
 import { ErrorEvent } from '@standard-server/core'
@@ -496,6 +497,38 @@ describe('evlogHandlerPlugin', () => {
 
     expect(logger.error).toHaveBeenCalledWith(internalError)
     expect(logger.setLevel).not.toHaveBeenCalled()
+  })
+
+  it('logs errors from another realm as is and downgrades abort errors from another realm to info level', async () => {
+    const logger = createLogger()
+    const plugin = new EvlogHandlerPlugin()
+    const { interceptor } = getPluginHooks(plugin)
+    const unexpectedError = runInNewContext('new TypeError("boom")')
+
+    await expect(interceptor({
+      next: vi.fn().mockRejectedValue(unexpectedError),
+      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+      path: ['ping'],
+      request: createRequest('/ping'),
+    })).rejects.toBe(unexpectedError)
+
+    expect(logger.error).toHaveBeenCalledWith(unexpectedError)
+    expect(logger.setLevel).not.toHaveBeenCalled()
+
+    logger.error.mockClear()
+    logger.setLevel.mockClear()
+
+    const abortError = runInNewContext('const e = new Error("aborted"); e.name = "AbortError"; e')
+
+    await expect(interceptor({
+      next: vi.fn().mockRejectedValue(abortError),
+      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+      path: ['ping'],
+      request: createRequest('/ping'),
+    })).rejects.toBe(abortError)
+
+    expect(logger.error).toHaveBeenCalledWith(abortError)
+    expect(logger.setLevel).toHaveBeenCalledWith('info')
   })
 
   it('skips procedure error logging when no logger is in the context', async () => {

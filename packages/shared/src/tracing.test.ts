@@ -1,3 +1,4 @@
+import { runInNewContext } from 'node:vm'
 import {
   getTracer,
   recordSpanError,
@@ -104,6 +105,17 @@ describe('tracing', () => {
         expect.objectContaining({ message: 'aborted', name: 'AbortError' }),
       )
     })
+
+    it('records AbortError from another realm at info level', () => {
+      const mockSpan = createMockSpan() as any
+      const error = runInNewContext('const e = new Error("aborted"); e.name = "AbortError"; e')
+      recordSpanError(mockSpan, error)
+
+      expect(mockSpan.recordException).toHaveBeenCalledWith(
+        'info',
+        expect.objectContaining({ message: 'aborted', name: 'AbortError', stack: error.stack }),
+      )
+    })
   })
 
   describe('setSpanAttributeIfDefined', () => {
@@ -144,6 +156,20 @@ describe('tracing', () => {
       error.code = 'CODE'
       const exception = toTracingException(error)
       expect(exception.code).toBe('CODE')
+    })
+
+    it('converts error from another realm to exception', () => {
+      const error = runInNewContext('const e = new TypeError("boom"); e.code = "CODE"; e')
+      const exception = toTracingException(error)
+
+      expect(error instanceof Error).toBe(false)
+      expect(exception).toEqual({ message: 'boom', name: 'TypeError', stack: error.stack, code: 'CODE' })
+      expect(exception.stack).toContain('TypeError: boom')
+    })
+
+    it('falls back to string message when error-like value has no string message', () => {
+      const error = { [Symbol.toStringTag]: 'Error', message: 123 }
+      expect(toTracingException(error)).toEqual({ message: '[object Error]' })
     })
 
     it('converts non-error to exception', () => {
