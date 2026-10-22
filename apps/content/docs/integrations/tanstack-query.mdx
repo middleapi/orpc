@@ -526,7 +526,7 @@ const query = useInfiniteQuery(
 
 ## Structural Sharing
 
-`.queryOptions`, `.liveOptions`, and `.infiniteOptions` use oRPC's structural sharing by default. Unlike TanStack Query's default [structural sharing](https://tanstack.com/query/latest/docs/framework/react/guides/render-optimizations#structural-sharing), it also keeps unchanged `Date`, `URL`, `Map`, and `Set` values, so refetches and live events that return the same data do not cause re-renders.
+`.queryOptions`, `.liveOptions`, and `.infiniteOptions` use oRPC's structural sharing by default, and this per-query setting takes precedence over `defaultOptions.queries.structuralSharing` on the `QueryClient`. Unlike TanStack Query's default [structural sharing](https://tanstack.com/query/latest/docs/framework/react/guides/render-optimizations#structural-sharing), it also keeps unchanged `Date`, `URL`, `Map`, and `Set` values, so refetches and live events that return the same data do not cause re-renders.
 
 ```ts
 import { createStructuralSharing } from '@orpc/tanstack-query'
