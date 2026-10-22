@@ -32,6 +32,7 @@ export interface OpenRPCLinkCodecOptions<T extends ClientContext> {
   /**
    * Send the call as a JSON-RPC notification (a request without `id`), which the server never answers.
    * The call resolves `undefined` once the server accepts it, or rejects with the error the server reports, if any.
+   * Client types are not affected: the call keeps its output type, but still resolves `undefined`.
    *
    * @default false
    * @see {@link https://orpc.dev/docs/openrpc/link#notifications | OpenRPC Link - Notifications}

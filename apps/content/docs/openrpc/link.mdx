@@ -111,10 +111,14 @@ const link = new OpenRPCLink({
   notification: (options, path) => path.at(-1) === 'track',
 })
 
-await client.analytics.track({ event: 'signup' }) // resolves undefined
+await client.analytics.track({ event: 'signup' }) // resolves undefined, whatever the output type
 ```
 
 A notification resolves `undefined` once the server accepts it. It rejects with the error the server still reports, if any, or with a [`MalformedResponseError`](#malformed-responses) when the server answers with an HTTP error status and no JSON-RPC error.
+
+:::warning
+Client types do not know which calls are notifications. A call sent as a notification keeps its procedure's output type (`null` for an empty output with [`OpenRPCClient`](#typesafe-clients)), but always resolves `undefined`. Only send calls whose results you ignore as notifications, and do not read their return value.
+:::
 
 :::info
 [OpenRPC Handler](/docs/openrpc/handler#notifications) runs a notification to completion before it answers, so the call resolves after the procedure finishes, but without its output or errors.

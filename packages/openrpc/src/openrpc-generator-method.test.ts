@@ -401,6 +401,39 @@ describe('buildMethod', () => {
       ])
       expect(doc.components?.schemas).toHaveProperty('Planet')
     })
+
+    it('keeps refs into the input itself resolvable once hoisted', () => {
+      const Home: JsonSchema = { type: 'object', properties: { x: { type: 'number' } }, required: ['x'] }
+      const Input: Exclude<JsonSchema, boolean> = {
+        type: 'object',
+        properties: { home: Home, work: { $ref: '#/properties/home' } },
+        required: ['home', 'work'],
+      }
+
+      const byName = createContext()
+
+      expect(buildMethod(byName.ctx, oc.input(jsonSchema(Input)), ['a']).params).toEqual([
+        { name: 'home', required: true, schema: Home },
+        { name: 'work', required: true, schema: { $ref: '#/components/schemas/__schema0/properties/home' } },
+      ])
+      expect(byName.doc.components?.schemas).toEqual({
+        __schema0: { ...Input, properties: { home: Home, work: { $ref: '#/components/schemas/__schema0/properties/home' } } },
+      })
+
+      // `minProperties` cannot be split into params
+      const byPosition = createContext()
+
+      expect(buildMethod(byPosition.ctx, oc.input(jsonSchema({ ...Input, minProperties: 1 })), ['a']).params).toEqual([
+        { name: 'input', required: true, schema: { $ref: '#/components/schemas/__schema0' } },
+      ])
+      expect(byPosition.doc.components?.schemas).toEqual({
+        __schema0: {
+          ...Input,
+          minProperties: 1,
+          properties: { home: Home, work: { $ref: '#/components/schemas/__schema0/properties/home' } },
+        },
+      })
+    })
   })
 
   describe('result', () => {

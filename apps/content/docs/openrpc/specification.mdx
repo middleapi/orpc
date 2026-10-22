@@ -436,6 +436,10 @@ The generated document works with the tools of the [OpenRPC](https://open-rpc.or
 - [`@open-rpc/schema-utils-js`](https://github.com/open-rpc/schema-utils-js) validates the document with `validateOpenRPCDocument`.
 - [`@open-rpc/generator`](https://github.com/open-rpc/generator) generates clients and documentation from a 1.3 document.
 
+:::warning
+Recursive schemas, such as `z.json()` or tree types, become self-referencing components. `validateOpenRPCDocument` accepts them, but `parseOpenRPCDocument` from `@open-rpc/schema-utils-js` fails on a document that contains any recursive schema when it dereferences the document, which it does by default. This includes tools built on it, such as `@open-rpc/generator` and its generated clients. Pass `{ dereference: false }` to `parseOpenRPCDocument`, or keep recursive procedures out of the document you pass to those tools with the [`filter`](#filtering-procedures) option.
+:::
+
 :::info
 The playground and the inspector run in the browser, so they need [CORS](/docs/plugins/cors) access to your API:
 

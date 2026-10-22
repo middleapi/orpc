@@ -2,7 +2,7 @@ import type { AnySchema } from '@orpc/contract'
 import type { JsonSchema, JsonSchemaConverter } from '@orpc/json-schema'
 import type { OpenRPCGeneratorGenerateOptions } from './openrpc-generator'
 import type { OpenRPCDocument, OpenRPCMethodObject } from './types'
-import { validateOpenRPCDocument } from '@open-rpc/schema-utils-js'
+import { parseOpenRPCDocument, validateOpenRPCDocument } from '@open-rpc/schema-utils-js'
 import { eventIterator, oc } from '@orpc/contract'
 import { openapi } from '@orpc/openapi'
 import { implement, os } from '@orpc/server'
@@ -285,6 +285,10 @@ describe('openRPCGenerator', () => {
       expect(doc14.openrpc).toBe('1.4.1')
       expect(validateOpenRPCDocument(doc13 as any)).toBe(true)
       expect(validateOpenRPCDocument(doc14 as any)).toBe(true)
+
+      // the recursive Category is a self-referencing component, which schema-utils-js reads without dereferencing
+      // (its default dereferencing overflows the stack on any cycle, as documented in Tooling)
+      await expect(parseOpenRPCDocument(clone(doc13) as any, { dereference: false })).resolves.toMatchObject({ openrpc: '1.3.2' })
 
       // draft 2020-12 leftovers draft-07 tools would misread
       expect(findDeepMatches(v => typeof v === 'object' && v !== null && ('$defs' in v || '$schema' in v || 'prefixItems' in v), doc13).values).toEqual([])
