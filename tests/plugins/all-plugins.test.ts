@@ -35,6 +35,7 @@ import {
   ResponseCompressionHandlerPlugin,
   ResponseHeadersHandlerPlugin,
   RethrowHandlerPlugin,
+  SignalSyncHandlerPlugin,
   TimeoutHandlerPlugin,
 } from '@orpc/server/plugins'
 import pino from 'pino'
@@ -95,6 +96,7 @@ function createHandlerPlugins() {
     new ResponseCompressionHandlerPlugin<TestContext>({ threshold: 0 }),
     new ResponseHeadersHandlerPlugin<TestContext>(),
     new RethrowHandlerPlugin<TestContext>({ filter: () => false }),
+    new SignalSyncHandlerPlugin<TestContext>(),
     new SmartCoercionHandlerPlugin(),
     new StaticFileHandlerPlugin<TestContext>({ rootDir: import.meta.dirname, path: '/static' }),
     new TimeoutHandlerPlugin<TestContext>({ timeout: 5000 }),

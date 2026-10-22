@@ -113,6 +113,10 @@ const example = os
   })
 ```
 
+:::info
+In-process `fetch` calls and some runtimes behind the [Fetch adapter](/docs/adapters/fetch-api) only cancel the response body without aborting the `signal`. Use the [Signal Sync Plugin](/docs/plugins/signal-sync) to abort it.
+:::
+
 ## Publisher Helper
 
 You can combine the [AsyncIteratorObject](/docs/async-iterator-object) with the [Publisher Helper](/docs/helpers/publisher) to build real-time features like chat, notifications, or live updates with resume support.

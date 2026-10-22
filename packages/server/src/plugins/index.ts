@@ -38,5 +38,6 @@ export type {
   ResponseHeadersHandlerPluginContext as ResponseHeadersPluginContext,
 } from './response-headers'
 export * from './rethrow'
+export * from './signal-sync'
 export * from './timeout'
 export { BATCH_HEADER, DEFAULT_BATCH_MAX_SIZE } from '@orpc/client/plugins'

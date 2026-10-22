@@ -12,5 +12,6 @@ it('exports plugins', async () => {
     RequestCompressionHandlerPlugin: expect.any(Function),
     RequestLimitHandlerPlugin: expect.any(Function),
     ResponseCompressionHandlerPlugin: expect.any(Function),
+    SignalSyncHandlerPlugin: expect.any(Function),
   })
 })

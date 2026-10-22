@@ -1,0 +1,41 @@
+---
+title: "Signal Sync Plugin"
+description: "Keep the request signal and streaming responses in sync, aborting the signal when the body is cancelled and ending the body when the signal aborts."
+sidebar:
+  label: "Signal Sync"
+---
+
+When a client stops reading a streaming response, adapters like [Node.js](/docs/adapters/node-http) abort the request signal, but in-process `fetch` calls and some runtimes behind the [Fetch adapter](/docs/adapters/fetch-api) only cancel the response body, so a procedure waiting on something keeps running. In the other direction, an aborted signal only ends the body once the procedure honors it.
+
+## Setup
+
+Use `SignalSyncHandlerPlugin` to keep the request signal and streaming outputs ([AsyncIteratorObject](/docs/async-iterator-object) or `ReadableStream`) in sync:
+
+- When the output is cancelled before it finishes, the signal aborts with an `AbortError`.
+- When the signal aborts, the output ends with the abort reason, an `error` event for an AsyncIteratorObject, and is cancelled, even if the procedure ignores the signal.
+
+```ts
+import { SignalSyncHandlerPlugin } from '@orpc/server/plugins'
+
+const handler = new RPCHandler(router, {
+  plugins: [
+    new SignalSyncHandlerPlugin(),
+  ],
+})
+```
+
+:::info
+The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
+:::
+
+:::tip
+Combined with the `streamingTimeout` of the [Timeout Plugin](/docs/plugins/timeout#streaming-responses), streaming responses end as soon as the timeout exceeds.
+:::
+
+:::warning
+Cancelling only asks the output to stop. An async generator stops at its next `yield` or once its pending `await` settles, so honor the signal to stop early, see [Signal and Side-Effects](/docs/async-iterator-object#signal-and-side-effects).
+:::
+
+## Learn More
+
+For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/signal-sync.ts).

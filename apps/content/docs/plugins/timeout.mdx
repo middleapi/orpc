@@ -60,6 +60,10 @@ const handler = new RPCHandler(router, {
 })
 ```
 
+:::tip
+Add the [Signal Sync Plugin](/docs/plugins/signal-sync) to end streaming responses as soon as the timeout exceeds, even if the procedure ignores the signal.
+:::
+
 :::info
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
 :::
