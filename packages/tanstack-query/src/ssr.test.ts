@@ -122,6 +122,27 @@ describe('streamQuerySSRUtilsPlugin', () => {
     expect(signal.aborted).toBe(true)
   })
 
+  it('aborts the call before closing the stream on the server', async () => {
+    const queryClient = new QueryClient()
+    const signalClient = {
+      stream: vi.fn(async function* (_input, { signal }) {
+        const aborted = new Promise(resolve => signal.addEventListener('abort', resolve))
+
+        try {
+          yield 1
+        }
+        finally {
+          await aborted
+        }
+      }),
+    } as unknown as typeof client
+    const utils = createRouterUtils(signalClient, { plugins: [new StreamQuerySSRUtilsPlugin({ isServer: true })] })
+
+    await queryClient.prefetchQuery(utils.stream.liveOptions())
+
+    expect(queryClient.getQueryState(utils.stream.liveKey())).toMatchObject({ status: 'success', fetchStatus: 'idle', data: 1 })
+  })
+
   it('settles live queries whose stream ends before the first event on the server', async () => {
     const queryClient = new QueryClient()
     const emptyClient = { stream: vi.fn(async function* () {}) } as unknown as typeof client

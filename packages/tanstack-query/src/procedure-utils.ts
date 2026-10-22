@@ -173,7 +173,7 @@ export interface ProcedureUtilsOptions<TClientContext extends ClientContext, TIn
 
   /**
    * Settle streamed queries once they connect and live queries on their first event,
-   * closing the stream and aborting the call instead of following it. Set by `StreamQuerySSRUtilsPlugin` on the server.
+   * aborting the call instead of following it. Set by `StreamQuerySSRUtilsPlugin` on the server.
    *
    * @internal
    */
@@ -693,9 +693,8 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 }
 
 /**
- * Yields the first `count` chunks, then closes the iterator and aborts the call.
- * The abort only reaches the procedure, not the query, and lets in-process clients
- * such as `createRouterClient` stop handlers that watch `signal` instead of `.return()`.
+ * Yields the first `count` chunks, then aborts the call and closes the iterator.
+ * Aborts first, since the iterator's cleanup may wait on `signal`.
  */
 async function* takeChunks<T>(iterator: AsyncIterator<T>, count: number, controller: AbortController): AsyncGenerator<T> {
   try {
@@ -710,11 +709,7 @@ async function* takeChunks<T>(iterator: AsyncIterator<T>, count: number, control
     }
   }
   finally {
-    try {
-      await iterator.return?.()
-    }
-    finally {
-      controller.abort()
-    }
+    controller.abort()
+    await iterator.return?.()
   }
 }
