@@ -17,6 +17,7 @@ interface ORPCClientContext extends ClientRetryPluginContext {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.useRealTimers()
 })
 
 describe('clientRetryPlugin', () => {
@@ -536,22 +537,98 @@ describe('clientRetryPlugin', () => {
     it('cleanup correctly if throw and retry after .return', async () => {
       const cleanup = vi.fn()
 
-      handlerFn.mockImplementation(async function* () {
-        try {
-          throw new Error('fail')
+      let resolveRetryRequest!: () => void
+      const retryRequest = new Promise<void>((resolve) => {
+        resolveRetryRequest = resolve
+      })
+
+      let times = 0
+      handlerFn.mockImplementation(async () => {
+        times++
+
+        if (times === 2) {
+          await retryRequest
         }
-        finally {
-          cleanup()
-        }
+
+        return (async function* () {
+          try {
+            throw new Error('fail')
+          }
+          finally {
+            cleanup()
+          }
+        })()
       })
 
       const iterator = await client('hello', { context: { retry: 1, retryDelay: 0 } })
 
       const promise = expect(iterator.next()).rejects.toThrow('Internal server error')
-      await new Promise(r => setTimeout(r, 1))
+      await vi.waitFor(() => expect(handlerFn).toHaveBeenCalledTimes(2)) // retry request is in flight
       await iterator.return()
+      resolveRetryRequest()
       await promise
       expect(cleanup).toHaveBeenCalledTimes(2)
+    })
+
+    it('should stop retrying if .return is called during the retry delay', async () => {
+      vi.useFakeTimers()
+
+      handlerFn.mockRejectedValue(new Error('fail'))
+      handlerFn.mockImplementationOnce(async function* () {
+        throw new Error('fail')
+      })
+
+      const clean = vi.fn()
+      const onRetry = vi.fn(() => clean)
+
+      const iterator = await client('hello', { context: { retry: Number.POSITIVE_INFINITY, retryDelay: 10, onRetry } })
+
+      const promise = expect(iterator.next()).rejects.toThrow('Internal server error')
+      await vi.advanceTimersByTimeAsync(35)
+      expect(handlerFn).toHaveBeenCalledTimes(4) // initial call + 3 failed retries, now waiting for the 4th retry
+
+      await iterator.return()
+      await vi.advanceTimersByTimeAsync(1000)
+
+      expect(handlerFn).toHaveBeenCalledTimes(4)
+      expect(onRetry).toHaveBeenCalledTimes(4)
+      expect(clean).toHaveBeenCalledTimes(4)
+      expect(clean).toHaveBeenLastCalledWith(false)
+      await promise
+    })
+
+    it('should stop retrying if .return is called while a retry request is in flight', async () => {
+      vi.useFakeTimers()
+
+      let failRetryRequest!: () => void
+      const retryRequest = new Promise<void>((resolve) => {
+        failRetryRequest = resolve
+      })
+
+      handlerFn.mockRejectedValue(new Error('fail'))
+      handlerFn.mockImplementationOnce(async function* () {
+        throw new Error('fail')
+      })
+      handlerFn.mockImplementationOnce(async () => {
+        await retryRequest
+        throw new Error('fail')
+      })
+
+      const onRetry = vi.fn()
+
+      const iterator = await client('hello', { context: { retry: Number.POSITIVE_INFINITY, retryDelay: 10, onRetry } })
+
+      const promise = expect(iterator.next()).rejects.toThrow('Internal server error')
+      await vi.advanceTimersByTimeAsync(10)
+      expect(handlerFn).toHaveBeenCalledTimes(2)
+
+      await iterator.return()
+      failRetryRequest()
+      await vi.advanceTimersByTimeAsync(1000)
+
+      expect(handlerFn).toHaveBeenCalledTimes(2)
+      expect(onRetry).toHaveBeenCalledTimes(1)
+      await promise
     })
   })
 })

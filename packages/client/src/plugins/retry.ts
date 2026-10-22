@@ -86,6 +86,7 @@ export class ClientRetryPlugin<T extends ClientRetryPluginContext> implements St
       let lastEventRetry: undefined | number
       let callback: void | ((isSuccess: boolean) => void)
       let attemptIndex = 0
+      let isIteratorAborted = false
 
       const next = async (initialError?: { error: unknown }) => {
         let currentError = initialError
@@ -94,7 +95,7 @@ export class ClientRetryPlugin<T extends ClientRetryPluginContext> implements St
           const updatedInterceptorOptions = { ...interceptorOptions, lastEventId }
 
           if (currentError) {
-            if (attemptIndex >= maxAttempts) {
+            if (isIteratorAborted || attemptIndex >= maxAttempts) {
               throw currentError.error
             }
 
@@ -119,6 +120,12 @@ export class ClientRetryPlugin<T extends ClientRetryPluginContext> implements St
             const retryDelayMs = await value(retryDelay, attemptOptions)
 
             await new Promise(resolve => setTimeout(resolve, retryDelayMs))
+
+            if (isIteratorAborted) {
+              callback?.(false)
+              callback = undefined
+              throw currentError.error
+            }
 
             attemptIndex++
           }
@@ -148,7 +155,6 @@ export class ClientRetryPlugin<T extends ClientRetryPluginContext> implements St
       }
 
       let current = output
-      let isIteratorAborted = false
 
       return overlayProxy(() => current, new AsyncIteratorClass(
         async () => {
