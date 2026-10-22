@@ -82,6 +82,12 @@ describe.concurrent('redis locker integration', {
     expect(fn).toHaveBeenCalledExactlyOnceWith({ waited: true })
   })
 
+  it('accepts a ttl that is not a whole number of milliseconds', async () => {
+    const { locker } = createTestingLocker({ ttl: 0.1 * 3 * 1000 }) // 300.00000000000006
+
+    await expect(locker.lock('fractional-ttl', () => 'ok')).resolves.toBe('ok')
+  })
+
   it('tracks locks independently per key', async () => {
     const { locker } = createTestingLocker()
     const holder = await hold(locker, 'alice')

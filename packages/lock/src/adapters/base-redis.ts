@@ -84,7 +84,8 @@ export abstract class BaseRedisLocker implements Locker {
 
   async lock<T>(key: string, fn: (options: LockCallbackOptions) => Promisable<T>, options: LockOptions = {}): Promise<T> {
     const prefixedKey = `${this.prefix}${key}`
-    const ttl = options.ttl ?? this.ttl
+    // Redis takes whole milliseconds, so round up to never expire the lock before its ttl.
+    const ttl = Math.ceil(options.ttl ?? this.ttl)
     const deadline = Date.now() + (options.timeout ?? this.timeout)
     const token = crypto.randomUUID()
     let waited = false

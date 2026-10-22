@@ -96,7 +96,8 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
     this.prefix = prefix ?? ''
     this.serializer = serializer ?? new RPCJsonSerializer()
     this.resumeEnabled = resume?.enabled ?? false
-    this.resumeTtl = resume?.ttl ?? 300_000
+    // Redis takes whole milliseconds, so round up to never expire an event before its ttl.
+    this.resumeTtl = Math.ceil(resume?.ttl ?? 300_000)
   }
 
   /**

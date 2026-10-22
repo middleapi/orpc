@@ -279,6 +279,14 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
     await unsubscribeResumed()
   })
 
+  it('accepts a resume ttl that is not a whole number of milliseconds', async () => {
+    const publisher = createTestingPublisher({
+      resume: { enabled: true, ttl: 0.1 * 3 * 1000 }, // 300.00000000000006
+    })
+
+    await expect(publisher.publish('fractional-ttl', { order: 1 })).resolves.toBeUndefined()
+  })
+
   it('rejects a client whose keyPrefix is not a string', () => {
     expect(() => new RedisPublisher(createClient({ keyPrefix: Buffer.from('app:') })))
       .toThrow('RedisPublisher only supports a string keyPrefix on the Redis client.')

@@ -106,6 +106,18 @@ describe.concurrent('redis rate limiter integration', {
     expect(Math.abs(denied.reset - first.reset)).toBeLessThanOrEqual(tolerance)
   })
 
+  it('accepts a window that is not a whole number of milliseconds', async () => {
+    const limiter = await createTestingRateLimiter({
+      maxRequests: 3,
+      window: 0.1 * 3 * 1000, // 300.00000000000006
+    })
+
+    await expect(limiter.limit('fractional-window')).resolves.toMatchObject({
+      success: true,
+      remaining: 2,
+    })
+  })
+
   it('uses an empty prefix when none is provided', async () => {
     const limiter = await createTestingRateLimiter({
       prefix: undefined,

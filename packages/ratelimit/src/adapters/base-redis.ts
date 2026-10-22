@@ -58,7 +58,8 @@ export abstract class BaseRedisRateLimiter implements RateLimiter {
   constructor(options: BaseRedisRateLimiterOptions) {
     this.prefix = options.prefix ?? ''
     this.maxRequests = options.maxRequests
-    this.window = options.window
+    // Redis takes whole milliseconds, so round up to never shorten the window.
+    this.window = Math.ceil(options.window)
     this.timeout = options.timeout ?? 0
   }
 
