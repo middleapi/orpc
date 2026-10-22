@@ -1,10 +1,12 @@
 import type { OpenAPIMeta } from '@orpc/openapi'
-import { getOpenAPIMeta } from '@orpc/openapi'
-import { call, createRouterClient, getEventMeta, Lazy, ORPCError, Procedure, unlazy } from '@orpc/server'
+import { getOpenAPIMeta, openapi } from '@orpc/openapi'
+import { OpenAPIHandler } from '@orpc/openapi/fetch'
+import { call, createRouterClient, getEventMeta, Lazy, ORPCError, os, Procedure, unlazy } from '@orpc/server'
 import { isAsyncIteratorObject } from '@orpc/shared'
 import { initTRPC, lazy, tracked, TRPCError } from '@trpc/server'
 import * as z from 'zod'
 import { toORPCRouter } from './to-orpc-router'
+import { toTRPCMeta } from './to-trpc-meta'
 
 const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
 
@@ -108,6 +110,55 @@ describe('toORPCRouter', () => {
     expect(orpcRouter.ping['~orpc'].meta).toEqual({ meta1: 'test' })
     expect(orpcRouter.openapi['~orpc'].meta).toEqual({ '~openapi': { path: '/openapi', description: 'OpenAPI procedure' } })
     expect(getOpenAPIMeta(orpcRouter.openapi)).toEqual({ path: '/openapi', description: 'OpenAPI procedure' })
+  })
+
+  describe('keeps meta when composed by builder', () => {
+    const orpcRouter = toORPCRouter(t.router({
+      ping: t.procedure
+        .meta({ ...toTRPCMeta(openapi({ method: 'GET', path: '/ping', tags: ['trpc'] })), meta1: 'test' })
+        .query(() => 'pong'),
+    }))
+
+    const expectedMeta = { '~openapi': { method: 'GET', path: '/ping', tags: ['trpc'] }, 'meta1': 'test' }
+
+    it('.router', () => {
+      const router = os.$context<{ a: string }>().router(orpcRouter)
+
+      expect(router.ping['~orpc'].meta).toEqual(expectedMeta)
+    })
+
+    it('.use(...).router', async () => {
+      const middleware = vi.fn(({ next }) => next())
+      const router = os.$context<{ a: string }>().use(middleware).router(orpcRouter)
+
+      expect(router.ping['~orpc'].meta).toEqual(expectedMeta)
+
+      await expect(call(router.ping, undefined, { context: { a: 'test' } })).resolves.toEqual('pong')
+      expect(middleware).toHaveBeenCalledTimes(1)
+      expect(middleware.mock.calls[0]![0].procedure['~orpc'].meta).toEqual(expectedMeta)
+    })
+
+    it('.lazy', async () => {
+      const router = os.$context<{ a: string }>().lazy(async () => ({ default: orpcRouter }))
+      const { default: unlazied } = await unlazy(router)
+
+      expect(unlazied.ping['~orpc'].meta).toEqual(expectedMeta)
+    })
+
+    it('.meta(openapi.prefix(...)).router', async () => {
+      const router = os.$context<{ a: string }>().meta(openapi.prefix('/api')).router(orpcRouter)
+
+      expect(getOpenAPIMeta(router.ping)).toEqual({ method: 'GET', path: '/ping', tags: ['trpc'], prefix: '/api' })
+
+      const handler = new OpenAPIHandler(router)
+      const { matched, response } = await handler.handle(new Request('http://localhost/api/ping'), {
+        context: { a: 'test' },
+      })
+
+      expect(matched).toBe(true)
+      expect(response?.status).toBe(200)
+      await expect(response?.json()).resolves.toEqual('pong')
+    })
   })
 
   describe('calls', () => {

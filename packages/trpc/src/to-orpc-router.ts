@@ -2,7 +2,7 @@ import type { AsyncIteratorClass } from '@orpc/shared'
 import type { AnyProcedure, AnyRouter, inferRouterContext } from '@trpc/server'
 import type { Parser, TrackedData } from '@trpc/server/unstable-core-do-not-import'
 import * as ORPC from '@orpc/server'
-import { isTypescriptObject, set, wrapAsyncIterator } from '@orpc/shared'
+import { isPlainObject, isTypescriptObject, set, wrapAsyncIterator } from '@orpc/shared'
 import { isTrackedEnvelope, TRPCError } from '@trpc/server'
 import { isAsyncIterable, isObject } from '@trpc/server/unstable-core-do-not-import'
 
@@ -76,10 +76,31 @@ function recordToORPCRouterRecord(records: AnyRouter['_def']['record']) {
 function toORPCProcedure(procedure: AnyProcedure) {
   const inputSchema = toStandardSchema(procedure._def.inputs.at(-1))
   const outputSchema = toStandardSchema((procedure._def as any).output)
+  const meta = (procedure._def.meta ?? {}) as ORPC.Meta
 
   return new ORPC.Procedure({
     errorMap: {},
-    meta: (procedure._def.meta ?? {}) as ORPC.Meta,
+    meta,
+    // Router composition (`.router`, `.lazy`, ...) rebuilds meta from plugins only,
+    // so tRPC meta must also be a plugin to survive it
+    metaPlugins: [{
+      name: '~trpc/meta',
+      init: (current) => {
+        const merged: ORPC.Meta = { ...current }
+
+        for (const [key, value] of Object.entries(meta)) {
+          const existing = current[key]
+
+          // Merge one level deep and skip undefined entries, so values like `prefix: undefined`
+          // from `toTRPCMeta(openapi(...))` do not override an outer `openapi.prefix(...)`
+          merged[key] = isPlainObject(existing) && isPlainObject(value)
+            ? { ...existing, ...Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) }
+            : value
+        }
+
+        return merged
+      },
+    }],
     orderedMiddlewares: [],
     inputSchemas: inputSchema ? [inputSchema] : undefined,
     outputSchemas: outputSchema ? [outputSchema] : undefined,
