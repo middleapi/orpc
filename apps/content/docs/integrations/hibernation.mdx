@@ -77,7 +77,7 @@ The plugin provides `HibernationAsyncIteratorClass` and `encodeHibernationRPCEve
 
 ## Keep-Alive
 
-When clients enable [keep-alive](/docs/adapters/websocket#keep-alive), each ping would wake a hibernating Durable Object and add billable duration. Register an auto-response so Cloudflare answers pings while the object sleeps:
+When clients [send pings](/docs/adapters/websocket#dead-connections), each ping would wake a hibernating Durable Object and add billable duration. Register an auto-response so Cloudflare answers pings while the object sleeps:
 
 ```ts
 import { DurableObject } from 'cloudflare:workers'
@@ -93,11 +93,11 @@ export class ChatRoom extends DurableObject {
 ```
 
 :::info
-Auto-responses only match messages that are exactly equal to the request string. If you set peer message prefixes, add them to both strings: the link's `encodePeerMessage` prefix to `'ping'`, and its `decodePeerMessage` prefix to `'pong'`.
+Auto-responses only match messages that are exactly equal to the request string, so use the same strings as your client.
 :::
 
 :::warning
-Do not set the handler's [`idleTimeout`](/docs/adapters/websocket#idle-timeout) here. A pending timer keeps the Durable Object from hibernating, and auto-answered pings never reach `webSocketMessage`, so the timer would also close healthy clients. To drop dead clients, check the time of their last ping from an [alarm](https://developers.cloudflare.com/durable-objects/api/alarms/) instead:
+Do not detect idle clients with `setTimeout` or `setInterval` here. A pending timer keeps the Durable Object from hibernating, and auto-answered pings never reach `webSocketMessage`. To drop dead clients, check the time of their last ping from an [alarm](https://developers.cloudflare.com/durable-objects/api/alarms/) instead:
 
 ```ts
 async alarm(): Promise<void> {

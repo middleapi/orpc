@@ -234,29 +234,6 @@ const app = App()
 
 </CodeGroup>
 
-### Idle Timeout
-
-Server handlers answer the client's [keep-alive](#keep-alive) pings automatically. To also drop clients that disappeared without closing their socket, set `idleTimeout`. A socket that sends no message (pings included) for that long is closed with code `1001` (Going Away), and its in-flight calls are aborted. Clients with [auto reconnect](#auto-reconnect) then open a new connection.
-
-```ts
-const handler = new RPCHandler(router, {
-  /**
-   * Close sockets that send no message for this many milliseconds.
-   *
-   * @default undefined (disabled)
-   */
-  idleTimeout: 60_000,
-})
-```
-
-:::warning
-Only incoming messages reset the timer, so a client that only receives an event iterator is closed too. Enable [keep-alive](#keep-alive) on every client, with an `interval` well below `idleTimeout`, e.g. the default `30_000` against `60_000`.
-:::
-
-:::info
-The timer starts on `.upgrade()`, or on the first `.message()` call when you wire messages manually. Bun, Deno and uWebSockets.js have their own built-in `idleTimeout` options, which you can use instead. Do not use it on hibernating Durable Objects, see [Hibernation Keep-Alive](/docs/integrations/hibernation#keep-alive).
-:::
-
 ## Client Adapters
 
 | Adapter     | Target                                                                          |
@@ -349,51 +326,118 @@ const link = new RPCLink({
 })
 ```
 
-### Keep-Alive
+### Dead Connections
 
-A connection can die without a `close` event, for example when a laptop sleeps or a phone switches networks. The socket still reports `OPEN`, so calls and event iterators on it hang. Enable `keepAlive` to detect such half-open connections:
+A connection can die without a `close` event, for example when a laptop sleeps, a phone switches networks, or a router silently drops an idle connection. The socket keeps reporting `OPEN` until the operating system gives up on it, and calls and event iterators on it wait until then. In our tests on Linux, that took Chromium about 7.5 minutes when the client was only listening and about 16 minutes while it was sending. The `ws` package never noticed.
 
-- The link sends a `ping` text frame every `interval`, even while messages are flowing.
-- If no message (the server's `pong` or anything else) arrives within `timeout` after a ping, the link closes the connection and fails its pending calls. With [auto reconnect](#auto-reconnect), the next call or `reconnect.onClose` opens a new connection.
-- Add the [Retry Plugin](/docs/plugins/retry) so event iterators reconnect and resume from their [last event ID](/docs/async-iterator-object#last-event-id--event-metadata).
+If that is too long for your app, send your own pings and close the socket when the server stops answering:
 
 ```ts
 const link = new RPCLink({
-  connect: () => new WebSocket('ws://localhost:3000'),
   reconnect: { enabled: true },
-  keepAlive: {
-    /**
-     * Whether to ping the server periodically and treat the connection as lost
-     * when nothing arrives in time.
-     *
-     * @default false
-     */
-    enabled: true,
+  connect: () => {
+    const websocket = new WebSocket('ws://localhost:3000')
 
-    /**
-     * Interval between pings, in milliseconds. Keep it below the server's
-     * `idleTimeout` and any proxy idle timeout.
-     *
-     * @default 30_000
-     */
-    interval: 30_000,
+    let pingInterval: ReturnType<typeof setInterval> | undefined
+    let pongTimeout: ReturnType<typeof setTimeout> | undefined
 
-    /**
-     * How long to wait after a ping for any message before closing
-     * the connection as lost, in milliseconds.
-     *
-     * @default 10_000
-     */
-    timeout: 10_000,
+    websocket.addEventListener('open', () => {
+      // Ping on a fixed schedule, even while messages are arriving
+      pingInterval = setInterval(() => {
+        websocket.send('ping')
+
+        pongTimeout ??= setTimeout(() => {
+          websocket.close()
+          // A dead connection may not fire `close` for minutes, so fire it now:
+          // the link fails pending calls and opens a new connection for the next call
+          websocket.dispatchEvent(new CloseEvent('close', { code: 4000, reason: 'Ping timeout' }))
+        }, 10_000)
+      }, 30_000)
+    })
+
+    // Any message proves the connection is alive, not only the pong
+    websocket.addEventListener('message', () => {
+      clearTimeout(pongTimeout)
+      pongTimeout = undefined
+    })
+
+    websocket.addEventListener('close', () => {
+      clearInterval(pingInterval)
+      clearTimeout(pongTimeout)
+    })
+
+    return websocket
   },
 })
 ```
 
+Then answer pings on the server:
+
+<CodeGroup>
+
+```ts ws
+wss.on('connection', (ws) => {
+  ws.addEventListener('message', (event) => {
+    if (event.data === 'ping') {
+      ws.send('pong')
+    }
+  })
+
+  handler.upgrade(ws)
+})
+```
+
+```ts Bun
+Bun.serve({
+  // ...
+  websocket: {
+    async message(ws, message) {
+      if (message === 'ping') {
+        ws.send('pong')
+        return
+      }
+
+      await handler.message(ws, message)
+    },
+    // ...
+  },
+})
+```
+
+</CodeGroup>
+
 :::info
-Keep-alive is opt-in because the server has to answer pings. oRPC's WebSocket handlers do so without any option, but older servers ignore pings, so the link would drop every connection after `interval + timeout`. Update your servers before you enable it on clients.
+- `ping` and `pong` are not RPC messages, so oRPC ignores them on both sides.
+- Add the [Retry Plugin](/docs/plugins/retry) so event iterators reconnect and resume from their [last event ID](/docs/async-iterator-object#last-event-id--event-metadata).
+- `CloseEvent` and `dispatchEvent` are browser APIs, so this snippet is for browser clients.
+- On Cloudflare Durable Objects, answer pings with an auto-response so they don't wake a hibernating object, see [Hibernation Keep-Alive](/docs/integrations/hibernation#keep-alive).
 :::
 
-Pings and pongs are the constant text frames `ping` and `pong`, sent outside the RPC protocol. If you set `encodePeerMessage`/`decodePeerMessage` prefixes, they are prepended to these frames too. Because the frames are constant, a runtime can answer them without running your code. On Cloudflare Durable Objects, this keeps hibernating objects asleep, see [Hibernation Keep-Alive](/docs/integrations/hibernation#keep-alive).
+The server has the same problem with clients that disappear. Bun, Deno and uWebSockets.js close them with their built-in `idleTimeout` options. With `ws`, use protocol-level pings, which browsers answer automatically:
+
+```ts
+wss.on('connection', (ws) => {
+  let isAlive = true
+  ws.on('pong', () => {
+    isAlive = true
+  })
+
+  const interval = setInterval(() => {
+    if (!isAlive) {
+      // fires `close`, so the handler aborts this socket's calls
+      ws.terminate()
+      return
+    }
+
+    isAlive = false
+    ws.ping()
+  }, 30_000)
+
+  ws.on('close', () => clearInterval(interval))
+
+  handler.upgrade(ws)
+})
+```
 
 ## Security
 

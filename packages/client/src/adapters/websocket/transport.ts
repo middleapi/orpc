@@ -5,7 +5,6 @@ import type { ClientContext, ClientOptions } from '../../types'
 import type { StandardLinkTransport } from '../standard'
 import { AbortError, loadBytes, promiseWithResolvers, runWithSignal, sequential, sleep, toStringOrBytes } from '@orpc/shared'
 import { ClientPeer, decodePeerMessage, encodePeerMessage, isServerPeerSendMessage } from '@standard-server/peer'
-import { WEBSOCKET_KEEP_ALIVE_PING } from './keep-alive'
 
 /**
  * Some env maybe not available WebSocket global, like node 20
@@ -14,7 +13,6 @@ const WEBSOCKET_CONNECTING = 0 satisfies WebSocket['CONNECTING']
 const WEBSOCKET_OPEN = 1 satisfies WebSocket['OPEN']
 
 export type WebSocketLike = Pick<WebSocket, 'addEventListener' | 'removeEventListener' | 'send' | 'readyState'>
-  & Partial<Pick<WebSocket, 'close'>>
 
 export interface WebSocketLinkTransportAttemptInfo {
   /**
@@ -92,36 +90,6 @@ export interface WebSocketLinkTransportReconnectOptions {
   }
 }
 
-export interface WebSocketLinkTransportKeepAliveOptions {
-  /**
-   * Whether to ping the server periodically and treat the connection as lost
-   * when nothing arrives in time, instead of waiting for a `close` event that
-   * a half-open connection never fires.
-   *
-   * Requires a server that answers pings, like oRPC's WebSocket handlers.
-   *
-   * @default false
-   */
-  enabled: boolean
-
-  /**
-   * Interval between pings, in milliseconds. Pings are sent on this fixed
-   * cadence even while messages are flowing, so the server always hears from the client.
-   * Keep it below the server's `idleTimeout` and any proxy idle timeout.
-   *
-   * @default 30_000
-   */
-  interval?: undefined | number
-
-  /**
-   * How long to wait after a ping for any message (the pong or anything else)
-   * before closing the connection as lost, in milliseconds.
-   *
-   * @default 10_000
-   */
-  timeout?: undefined | number
-}
-
 export interface WebSocketLinkTransportOptions<_T extends ClientContext> {
   /**
    * Returns a WebSocket instance for peer communication.
@@ -145,14 +113,6 @@ export interface WebSocketLinkTransportOptions<_T extends ClientContext> {
   reconnect?: undefined | WebSocketLinkTransportReconnectOptions
 
   /**
-   * Detects dead (half-open) connections with periodic pings.
-   * A lost connection fails its calls and, with `reconnect`, is replaced on the next call.
-   *
-   * @default { enabled: false }
-   */
-  keepAlive?: undefined | WebSocketLinkTransportKeepAliveOptions
-
-  /**
    * Options for encoding peer messages. such as `prefix` for distinguishing messages on the same channel..
    */
   encodePeerMessage?: EncodePeerMessageOptions | undefined
@@ -171,9 +131,6 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
   private readonly reconnectMaxTotalAttempt: number
   private readonly reconnectOnCloseEnabled: boolean
   private readonly reconnectOnCloseDelay: number
-  private readonly keepAliveEnabled: boolean
-  private readonly keepAliveInterval: number
-  private readonly keepAliveTimeout: number
   private readonly encodePeerMessageOptions: WebSocketLinkTransportOptions<T>['encodePeerMessage']
   private readonly decodePeerMessageOptions: WebSocketLinkTransportOptions<T>['decodePeerMessage']
 
@@ -185,9 +142,6 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
     this.reconnectMaxTotalAttempt = options.reconnect?.maxTotalAttempt ?? Infinity
     this.reconnectOnCloseEnabled = this.reconnectEnabled && (options.reconnect?.onClose?.enabled ?? false)
     this.reconnectOnCloseDelay = options.reconnect?.onClose?.delay ?? 0
-    this.keepAliveEnabled = options.keepAlive?.enabled ?? false
-    this.keepAliveInterval = options.keepAlive?.interval ?? 30_000
-    this.keepAliveTimeout = options.keepAlive?.timeout ?? 10_000
 
     this.encodePeerMessageOptions = options.encodePeerMessage
     this.decodePeerMessageOptions = options.decodePeerMessage
@@ -208,12 +162,12 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
 
   private totalAttempt = 0
   private attempt = 0
-  private current: undefined | Promise<void | { websocket: WebSocketLike, peer: ClientPeer, isLost: () => boolean }>
+  private current: undefined | Promise<void | { websocket: WebSocketLike, peer: ClientPeer }>
   private async getConnectedPeer(): Promise<ClientPeer> {
     const current = this.current
     const resolved = await current
 
-    if (resolved && (!this.reconnectEnabled || (resolved.websocket.readyState === WEBSOCKET_OPEN && !resolved.isLost()))) {
+    if (resolved && (!this.reconnectEnabled || resolved.websocket.readyState === WEBSOCKET_OPEN)) {
       return resolved.peer
     }
 
@@ -239,7 +193,6 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       }
 
       let closeReason: undefined | AbortError
-      let onLost: undefined | (() => void)
 
       const peer = new ClientPeer(async (message) => {
         // `send` silently discards data once the socket is closed, so requests would never settle
@@ -260,28 +213,12 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       }
 
       /**
-       * Fails pending and future calls on this connection. Runs once: on `close`, or earlier
-       * when keep-alive gives up, because a half-open connection fires `close` late or never.
-       */
-      const lose = async (reason: AbortError) => {
-        if (closeReason) {
-          return
-        }
-
-        closeReason = reason
-        onLost?.()
-        connectingResolvers?.resolve()
-        await peer.close(reason)
-      }
-
-      /**
        * Message order is important: loading -> decode -> .message.
        * This flow must stay synchronous, or we need to use `sequential` helper
        */
       websocket.addEventListener('message', sequential(async (event: MessageEvent) => {
         // For better compatibility avoid control or depend on websocket.binaryType
         const message = event.data instanceof Blob ? await loadBytes(event.data) : toStringOrBytes(event.data)
-        // keep-alive pongs are not peer messages, so they are not matched here
         const result = decodePeerMessage(message, this.decodePeerMessageOptions)
         if (result.matched && isServerPeerSendMessage(result.message)) {
           // Not awaited: `peer.message` runs handling message may be slow,
@@ -290,7 +227,11 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
         }
       }))
 
-      websocket.addEventListener('close', event => lose(new AbortError(`WebSocket closed (code ${event.code}: ${event.reason})`)))
+      websocket.addEventListener('close', async (event) => {
+        closeReason = new AbortError(`WebSocket closed (code ${event.code}: ${event.reason})`)
+        connectingResolvers?.resolve()
+        await peer.close(closeReason)
+      })
 
       // EventEmitter-based implementations like `ws` throw an unhandled `error` event,
       // so a refused connection or malformed frame would crash the process. `close` always follows and handles cleanup.
@@ -302,20 +243,16 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
         throw closeReason
       }
 
-      const stopKeepAlive = this.keepAliveEnabled ? this.startKeepAlive(websocket, lose) : undefined
-
-      onLost = () => {
-        stopKeepAlive?.()
-
-        if (this.reconnectOnCloseEnabled) {
+      if (this.reconnectOnCloseEnabled) {
+        websocket.addEventListener('close', () => {
           sleep(this.reconnectOnCloseDelay)
             .then(() => this.getConnectedPeer())
             .catch(() => {})
-        }
+        })
       }
 
       this.attempt = 0
-      return { websocket, peer, isLost: () => closeReason !== undefined }
+      return { websocket, peer }
     })().catch((error) => {
       if (!this.reconnectEnabled) {
         throw error
@@ -330,36 +267,5 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
     })
 
     return this.getConnectedPeer()
-  }
-
-  /**
-   * Pings on a fixed cadence, so the server's idle timer keeps resetting even while
-   * it streams to us, and calls `lose` when nothing arrives within `timeout` of a ping.
-   * Any incoming message proves the connection is alive, not only the pong.
-   *
-   * @returns a function that stops the timers
-   */
-  private startKeepAlive(websocket: WebSocketLike, lose: (reason: AbortError) => Promise<void>): () => void {
-    const ping = `${this.encodePeerMessageOptions?.prefix ?? ''}${WEBSOCKET_KEEP_ALIVE_PING}`
-    let timeoutId: ReturnType<typeof setTimeout> | undefined
-
-    websocket.addEventListener('message', () => {
-      clearTimeout(timeoutId)
-      timeoutId = undefined
-    })
-
-    const intervalId = setInterval(() => {
-      websocket.send(ping)
-
-      timeoutId ??= setTimeout(() => {
-        void lose(new AbortError(`WebSocket keep-alive timed out (no message within ${this.keepAliveTimeout}ms of a ping)`))
-        websocket.close?.()
-      }, this.keepAliveTimeout)
-    }, this.keepAliveInterval)
-
-    return () => {
-      clearInterval(intervalId)
-      clearTimeout(timeoutId)
-    }
   }
 }

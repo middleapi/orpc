@@ -74,11 +74,13 @@ describe('rpcLink', () => {
       async receive(data: unknown) {
         await Promise.all([...messageListeners].map(listener => listener({ data })))
       },
-      // fires `close` right away, like a socket whose peer answers the closing handshake
-      async close(code = 1006, reason = '') {
+      async close(event: Partial<{ code: number, reason: string }> = {}) {
         websocket.readyState = WEBSOCKET_CLOSED
 
-        await Promise.all([...closeListeners].map(listener => listener({ code, reason })))
+        await Promise.all([...closeListeners].map(listener => listener({
+          code: event.code ?? 1006,
+          reason: event.reason ?? '',
+        })))
       },
     }
 
@@ -277,7 +279,7 @@ describe('rpcLink', () => {
     await ws.receive(await createResponseMessage({ id: firstRequest.message.id }))
     await expect(firstCall).resolves.toEqual('pong')
 
-    await ws.close(4001, 'server restart')
+    await ws.close({ code: 4001, reason: 'server restart' })
 
     await expect(orpc.ping('second')).rejects.toThrow(new AbortError('WebSocket closed (code 4001: server restart)'))
     expect(ws.send).toHaveBeenCalledTimes(1)
@@ -477,7 +479,7 @@ describe('rpcLink', () => {
     await firstSocket.receive(await createResponseMessage({ id: firstRequest.message.id, body: { json: 'pong-1' } }))
     await expect(firstCall).resolves.toEqual('pong-1')
 
-    await firstSocket.close(4001, 'server restart')
+    await firstSocket.close({ code: 4001, reason: 'server restart' })
 
     const secondCall = orpc.ping('second')
 
@@ -515,7 +517,7 @@ describe('rpcLink', () => {
     await firstSocket.receive(await createResponseMessage({ id: firstRequest.message.id }))
     await expect(firstCall).resolves.toEqual('pong')
 
-    await firstSocket.close(1001, 'going away')
+    await firstSocket.close({ code: 1001, reason: 'going away' })
 
     await vi.waitFor(() => expect(connect).toHaveBeenCalledTimes(2))
 
@@ -561,7 +563,7 @@ describe('rpcLink', () => {
     await firstSocket.receive(await createResponseMessage({ id: firstRequest.message.id }))
     await expect(firstCall).resolves.toEqual('pong')
 
-    await firstSocket.close(1001, 'going away')
+    await firstSocket.close({ code: 1001, reason: 'going away' })
 
     await vi.waitFor(() => expect(connect).toHaveBeenCalledTimes(2))
     expect(unhandledRejectionHandler).toHaveBeenCalledTimes(0) // no background error
@@ -593,207 +595,6 @@ describe('rpcLink', () => {
     await vi.advanceTimersByTimeAsync(10_000)
 
     expect(connect).toHaveBeenCalledTimes(3)
-  })
-
-  describe('keepAlive', () => {
-    beforeEach(() => {
-      vi.useFakeTimers()
-    })
-
-    afterEach(() => {
-      vi.useRealTimers()
-    })
-
-    // a half-open connection: the socket keeps reporting OPEN and `close()` never fires the `close` event
-    const createHalfOpenWs = () => Object.assign(createWs(), { close: vi.fn() })
-
-    it('does not ping by default', async () => {
-      const ws = createWs()
-      createORPCClient(new RPCLink({ connect: () => ws, connectOnInit: true }))
-
-      await vi.advanceTimersByTimeAsync(120_000)
-
-      expect(ws.send).not.toHaveBeenCalled()
-    })
-
-    it('pings on a fixed cadence, even while messages arrive', async () => {
-      const ws = createWs()
-      createORPCClient(new RPCLink({ connect: () => ws, connectOnInit: true, keepAlive: { enabled: true } }))
-
-      await vi.advanceTimersByTimeAsync(29_999)
-      expect(ws.send).toHaveBeenCalledTimes(0)
-
-      await vi.advanceTimersByTimeAsync(1)
-      expect(ws.send).toHaveBeenCalledTimes(1)
-      expect(ws.send).toHaveBeenLastCalledWith('ping')
-
-      await ws.receive('pong')
-      await vi.advanceTimersByTimeAsync(15_000)
-      await ws.receive(await createResponseMessage({ id: 'unknown' }))
-      await vi.advanceTimersByTimeAsync(15_000)
-
-      expect(ws.send).toHaveBeenCalledTimes(2)
-      expect(ws.send).toHaveBeenLastCalledWith('ping')
-
-      await ws.receive('pong')
-      await vi.advanceTimersByTimeAsync(30_000)
-      expect(ws.send).toHaveBeenCalledTimes(3)
-
-      await ws.receive('pong')
-      await vi.advanceTimersByTimeAsync(10_000)
-      expect(ws.readyState).toBe(WEBSOCKET_OPEN)
-    })
-
-    it('treats any message after a ping as proof of life, not only the pong', async () => {
-      const ws = createHalfOpenWs()
-      createORPCClient(new RPCLink({
-        connect: () => ws,
-        connectOnInit: true,
-        keepAlive: { enabled: true, interval: 1_000, timeout: 500 },
-      }))
-
-      await vi.advanceTimersByTimeAsync(1_400)
-      await ws.receive(await createResponseMessage({ id: 'unknown' }))
-      await vi.advanceTimersByTimeAsync(500)
-
-      expect(ws.close).not.toHaveBeenCalled()
-    })
-
-    it('does not postpone the deadline when pings outpace the timeout', async () => {
-      const ws = createHalfOpenWs()
-      createORPCClient(new RPCLink({
-        connect: () => ws,
-        connectOnInit: true,
-        keepAlive: { enabled: true, interval: 100, timeout: 250 },
-      }))
-
-      await vi.advanceTimersByTimeAsync(349)
-      expect(ws.send).toHaveBeenCalledTimes(3)
-      expect(ws.close).not.toHaveBeenCalled()
-
-      await vi.advanceTimersByTimeAsync(1)
-      expect(ws.close).toHaveBeenCalledTimes(1)
-    })
-
-    it('fails pending calls on a half-open connection and reconnects for the next call', async () => {
-      const deadSocket = createHalfOpenWs()
-      const freshSocket = createWs()
-      const connect = vi.fn()
-        .mockImplementationOnce(() => deadSocket)
-        .mockImplementationOnce(() => freshSocket)
-      const orpc = createORPCClient(new RPCLink({
-        connect,
-        reconnect: { enabled: true },
-        keepAlive: { enabled: true, interval: 1_000, timeout: 500 },
-      })) as any
-
-      const pending = expect(orpc.ping('first')).rejects.toThrow(
-        new AbortError('WebSocket keep-alive timed out (no message within 500ms of a ping)'),
-      )
-
-      await vi.advanceTimersByTimeAsync(1_000)
-      expect(deadSocket.send).toHaveBeenCalledTimes(2)
-      expect(deadSocket.send).toHaveBeenLastCalledWith('ping')
-
-      await vi.advanceTimersByTimeAsync(499)
-      expect(deadSocket.close).not.toHaveBeenCalled()
-
-      await vi.advanceTimersByTimeAsync(1)
-      expect(deadSocket.close).toHaveBeenCalledTimes(1)
-      await pending
-
-      // not reused although it still reports OPEN, because its `close` event never came
-      expect(deadSocket.readyState).toBe(WEBSOCKET_OPEN)
-
-      const nextCall = orpc.ping('second')
-
-      await vi.advanceTimersByTimeAsync(0)
-      expect(connect).toHaveBeenCalledTimes(2)
-      expect(connect).toHaveBeenNthCalledWith(2, { totalAttempt: 2, attempt: 1 })
-      expect(freshSocket.send).toHaveBeenCalledTimes(1)
-
-      await freshSocket.receive(await createResponseMessage({ id: getSentRequest(freshSocket).message.id }))
-      await expect(nextCall).resolves.toEqual('pong')
-
-      // the lost connection's timers are stopped
-      await vi.advanceTimersByTimeAsync(5_000)
-      expect(deadSocket.send).toHaveBeenCalledTimes(2)
-    })
-
-    it('fails later calls fast instead of hanging when reconnect is disabled', async () => {
-      const ws = createHalfOpenWs()
-      const connect = vi.fn(() => ws)
-      const orpc = createORPCClient(new RPCLink({
-        connect,
-        connectOnInit: true,
-        keepAlive: { enabled: true, interval: 1_000, timeout: 500 },
-      })) as any
-
-      await vi.advanceTimersByTimeAsync(1_500)
-
-      await expect(orpc.ping('input')).rejects.toThrow(
-        new AbortError('WebSocket keep-alive timed out (no message within 500ms of a ping)'),
-      )
-      expect(connect).toHaveBeenCalledTimes(1)
-      expect(ws.send).toHaveBeenCalledTimes(1) // the ping only
-    })
-
-    it('proactively reconnects after a keep-alive timeout when reconnect.onClose is enabled', async () => {
-      const connect = vi.fn(() => createHalfOpenWs())
-      createORPCClient(new RPCLink({
-        connect,
-        connectOnInit: true,
-        reconnect: { enabled: true, onClose: { enabled: true } },
-        keepAlive: { enabled: true, interval: 1_000, timeout: 500 },
-      }))
-
-      await vi.advanceTimersByTimeAsync(1_500)
-      expect(connect).toHaveBeenCalledTimes(1)
-      expect(connect.mock.results[0]!.value.close).toHaveBeenCalledTimes(1)
-
-      // without waiting for a `close` event, which a half-open connection never fires
-      await vi.advanceTimersByTimeAsync(10)
-      expect(connect).toHaveBeenCalledTimes(2)
-    })
-
-    it('stops pinging once the socket closes', async () => {
-      const ws = createWs()
-      createORPCClient(new RPCLink({ connect: () => ws, connectOnInit: true, keepAlive: { enabled: true, interval: 1_000 } }))
-
-      await vi.advanceTimersByTimeAsync(1_000)
-      expect(ws.send).toHaveBeenCalledTimes(1)
-
-      await ws.close(1001, 'going away')
-      await vi.advanceTimersByTimeAsync(60_000)
-
-      expect(ws.send).toHaveBeenCalledTimes(1)
-    })
-
-    it('does not ping before the socket opens', async () => {
-      const ws = createWs(WEBSOCKET_CONNECTING)
-      createORPCClient(new RPCLink({ connect: () => ws, connectOnInit: true, keepAlive: { enabled: true, interval: 1_000 } }))
-
-      await vi.advanceTimersByTimeAsync(5_000)
-      expect(ws.send).toHaveBeenCalledTimes(0)
-
-      await ws.open()
-      await vi.advanceTimersByTimeAsync(1_000)
-      expect(ws.send).toHaveBeenCalledTimes(1)
-    })
-
-    it('prefixes pings with the encodePeerMessage prefix', async () => {
-      const ws = createWs()
-      createORPCClient(new RPCLink({
-        connect: () => ws,
-        connectOnInit: true,
-        keepAlive: { enabled: true, interval: 1_000 },
-        encodePeerMessage: { prefix: 'orpc:' },
-      }))
-
-      await vi.advanceTimersByTimeAsync(1_000)
-
-      expect(ws.send).toHaveBeenCalledWith('orpc:ping')
-    })
   })
 
   // `ws` is EventEmitter-based, so an `error` event without a listener throws and crashes the process
