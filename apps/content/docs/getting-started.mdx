@@ -25,6 +25,8 @@ Install the server and client packages, plus a schema library for validating inp
 npm install @orpc/server@beta @orpc/client@beta zod
 ```
 
+These docs cover oRPC v2, currently in beta, so every install command in them uses the `@beta` tag. A plain `npm install @orpc/server` still installs v1, the current stable release, whose APIs differ from what these docs show. If your project is on v1, read the [v1 docs](https://v1.orpc.dev), or upgrade with [Migrating from oRPC v1](/docs/migrations/from-v1).
+
 ## Define a Router
 
 A procedure is a function that clients can call remotely. Build one with the `os` builder (short for oRPC server): optionally describe the input it accepts with a schema, then implement it with `.handler`. A router is a plain object that groups procedures and gives each one its calling path, like `planet.list`.

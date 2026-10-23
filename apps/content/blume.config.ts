@@ -257,6 +257,10 @@ export default defineConfig({
     },
     mcp: {
       enabled: true,
+      // Sent to every connecting agent and reused as the server's ai-catalog
+      // description. Pretrained oRPC knowledge is mostly v1, so name the
+      // version and how to install it; update once v2 leaves beta.
+      instructions: 'Search and read the oRPC v2 documentation as Markdown. v2 is in beta and installs with the `@beta` tag (`npm install @orpc/server@beta @orpc/client@beta`); a plain install gets v1, whose APIs differ. If a project has `@orpc/*` 1.x installed, use the v1 docs at https://v1.orpc.dev, or https://orpc.dev/docs/migrations/from-v1 to upgrade.',
     },
     skills: '../../skills',
   },
