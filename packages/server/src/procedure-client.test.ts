@@ -298,6 +298,40 @@ describe('createProcedureClient', () => {
     )
   })
 
+  it('middleware can replace the signal for the rest of the chain', async () => {
+    const signal = new AbortController().signal
+    const overrideSignal = new AbortController().signal
+
+    mid1.mockImplementationOnce(async ({ next }) => next({ signal: overrideSignal }))
+
+    await expect(client(undefined, { signal })).resolves.toBe('__OUTPUT__')
+
+    expect(interceptor).toHaveBeenCalledWith(expect.objectContaining({ signal }))
+    expect(mid1).toHaveBeenCalledWith(expect.objectContaining({ signal }), undefined, expect.any(Function))
+    expect(mid2).toHaveBeenCalledWith(expect.objectContaining({ signal: overrideSignal }), undefined, expect.any(Function))
+    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ signal: overrideSignal }), undefined)
+  })
+
+  it('middleware signal override applies to its own next call only', async () => {
+    const signal = new AbortController().signal
+    const overrideSignal = new AbortController().signal
+
+    mid1.mockImplementationOnce(async ({ next }) => {
+      await next({ signal: overrideSignal })
+      return next({ context: { second: true } })
+    })
+
+    await expect(client(undefined, { signal })).resolves.toBe('__OUTPUT__')
+
+    expect(mid2).toHaveBeenCalledTimes(2)
+    expect(mid2).toHaveBeenNthCalledWith(1, expect.objectContaining({ signal: overrideSignal }), undefined, expect.any(Function))
+    expect(mid2).toHaveBeenNthCalledWith(2, expect.objectContaining({ signal, context: { second: true } }), undefined, expect.any(Function))
+
+    expect(handler).toHaveBeenCalledTimes(2)
+    expect(handler).toHaveBeenNthCalledWith(1, expect.objectContaining({ signal: overrideSignal }), undefined)
+    expect(handler).toHaveBeenNthCalledWith(2, expect.objectContaining({ signal }), undefined)
+  })
+
   it('middleware can early return with done helper', async () => {
     mid1.mockImplementationOnce((options, input, done) => done({ output: 'MID1__EARLY_RETURN__' }))
 

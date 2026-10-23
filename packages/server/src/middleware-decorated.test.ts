@@ -150,6 +150,28 @@ describe('decorateMiddleware', () => {
       expect(done).not.toHaveBeenCalled()
     })
 
+    const outerSignal = new AbortController().signal
+    const signal1 = new AbortController().signal
+    const signal2 = new AbortController().signal
+
+    it.each([
+      [undefined, undefined, outerSignal, outerSignal],
+      [signal1, undefined, signal1, signal1],
+      [signal1, signal2, signal1, signal2],
+    ])('forwards signal overrides through the combined chain (%#)', async (mid1Signal, mid2Signal, expectedMid2Signal, expectedNextSignal) => {
+      const mid1 = vi.fn().mockImplementation(async ({ next }) => next({ signal: mid1Signal }))
+      const mid2 = vi.fn().mockImplementation(async ({ next }) => next({ signal: mid2Signal }))
+
+      const combined = decorateMiddleware(mid1 as any).use(mid2 as any)
+      const next = vi.fn().mockImplementation(async ({ context }) => ({ output: 'final', context }))
+      const done = vi.fn()
+
+      await (combined as any)({ context: {}, signal: outerSignal, next }, 'input', done)
+
+      expect(mid2).toHaveBeenCalledWith(expect.objectContaining({ signal: expectedMid2Signal }), 'input', done)
+      expect(next).toHaveBeenCalledWith(expect.objectContaining({ signal: expectedNextSignal }))
+    })
+
     it('can stop early with done', async () => {
       const mid1 = vi.fn().mockImplementation(async ({ next }) => {
         return await next({ context: { mid1: true } })
