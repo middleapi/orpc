@@ -63,6 +63,6 @@
     "@cloudflare/vitest-pool-workers": "^0.23.0",
     "@vitest/coverage-istanbul": "^4.1.11",
     "vitest": "^4.1.11",
-    "wrangler": "^4.151.0"
+    "wrangler": "^4.151.3"
   }
 }

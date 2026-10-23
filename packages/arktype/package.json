@@ -53,8 +53,8 @@
     "@orpc/json-schema": "workspace:*"
   },
   "devDependencies": {
-    "@ark/schema": "^0.56.7",
-    "arktype": "^2.2.8",
+    "@ark/schema": "^0.56.8",
+    "arktype": "^2.2.9",
     "zod": "^4.6.7"
   }
 }
