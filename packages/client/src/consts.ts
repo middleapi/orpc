@@ -7,7 +7,7 @@
  * proxy for them can cause unexpected behavior, compatibility issues, or
  * infinite proxy chains.
  */
-export const RECURSIVE_CLIENT_UNWRAP_KEYS = new Set([
+export const RECURSIVE_CLIENT_UNWRAP_KEYS = new Set<PropertyKey>([
   /**
    * Prevents the client from being treated as a thenable when users
    * accidentally write `await client`.
