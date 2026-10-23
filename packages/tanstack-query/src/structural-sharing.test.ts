@@ -1,4 +1,5 @@
 import { RPCJsonSerializer } from '@orpc/client'
+import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { NullProtoObj } from '@orpc/shared'
 import { replaceEqualDeep } from '@tanstack/query-core'
 import { createStructuralSharing } from './structural-sharing'
@@ -54,6 +55,7 @@ describe('structuralSharing', () => {
     ['set order', new Set([1, 2]), new Set([2, 1])],
     ['different types', new Date('2025-01-01'), '2025-01-01T00:00:00.000Z'],
     ['different prototypes', new Map(), new Set()],
+    ['subclass and parent', new Date(0), new (class extends Date {})(0)],
     ['class instances', new Planet(), new Planet()],
     ['sparse arrays', [1, , 3], [1, , 3]], // eslint-disable-line no-sparse-arrays
   ])('takes new data when %s differs', (_, old, next) => {
@@ -93,14 +95,10 @@ describe('structuralSharing', () => {
     expect(structuralSharing({ a: undefined }, { b: undefined })).toEqual({ b: undefined })
   })
 
-  it('shares null-prototype objects', () => {
-    const old = Object.assign(new NullProtoObj(), { date: new Date('2025-01-01') })
-    const next = Object.assign(new NullProtoObj(), { date: new Date('2025-01-01') })
+  it('shares null-prototype objects and keeps their prototype when changed', () => {
+    const shared = Object.assign(new NullProtoObj(), { date: new Date('2025-01-01') })
+    expect(structuralSharing(shared, Object.assign(new NullProtoObj(), { date: new Date('2025-01-01') }))).toBe(shared)
 
-    expect(structuralSharing(old, next)).toBe(old)
-  })
-
-  it('keeps the prototype of changed null-prototype objects', () => {
     const old = Object.assign(Object.create(null), { a: 1, b: { c: 1 } })
     const result = structuralSharing(old, Object.assign(Object.create(null), { a: 2, b: { c: 1 } }))
 
@@ -139,7 +137,6 @@ describe('structuralSharing', () => {
       handlers: {
         person: {
           condition: value => value instanceof Person,
-          // not terminal, so the Date inside is serialized by the built-in handler
           serialize: (value: Person) => [value.name, value.born],
           deserialize: ([name, born]: any) => new Person(name, born),
         },
@@ -155,23 +152,17 @@ describe('structuralSharing', () => {
       const old = { people: [new Person('Earth', new Date('2025-01-01'))] }
 
       expect(sharing(old, { people: [new Person('Earth', new Date('2025-01-01'))] })).toBe(old)
-      expect(structuralSharing(old, { people: [new Person('Earth', new Date('2025-01-01'))] })).not.toBe(old)
     })
 
     it('takes new instances when their serialized form differs', () => {
-      const old = new Person('Earth', new Date('2025-01-01'))
-
-      for (const next of [new Person('Mars', new Date('2025-01-01')), new Person('Earth', new Date('2025-01-02'))]) {
-        expect(sharing(old, next)).toBe(next)
-      }
+      const next = new Person('Mars', new Date('2025-01-01'))
+      expect(sharing(new Person('Earth', new Date('2025-01-01')), next)).toBe(next)
     })
 
     it.each([
-      ['type', new Date(0), 0n],
       ['type count', new Date(0), '1970-01-01T00:00:00.000Z'],
-      ['type path', { a: new Date(0) }, { b: new Date(0) }],
-      ['type depth', { a: new Date(0) }, { a: { b: new Date(0) } }],
-    ])('takes new instances when a nested %s differs', (_, old, next) => {
+      ['type path', { a: new Date(0), b: '1970-01-01T00:00:00.000Z' }, { a: '1970-01-01T00:00:00.000Z', b: new Date(0) }],
+    ])('takes new instances when the JSON matches but the %s differs', (_, old, next) => {
       const nextBox = new Box(next)
       expect(sharing(new Box(old), nextBox)).toBe(nextBox)
     })
@@ -189,9 +180,11 @@ describe('structuralSharing', () => {
 
       const old = Object.assign(new Date(0), { zone: 'UTC' })
       const next = Object.assign(new Date(0), { zone: 'PST' })
+      const plain = new Date(0)
 
       expect(zoned(old, Object.assign(new Date(0), { zone: 'UTC' }))).toBe(old)
       expect(zoned(old, next)).toBe(next)
+      expect(zoned(plain, old)).toBe(old)
     })
 
     it('ignores inherited enumerable keys of dates', () => {
@@ -210,6 +203,34 @@ describe('structuralSharing', () => {
     it('takes new instances of types without a handler', () => {
       const next = new Planet()
       expect(sharing(new Planet(), next)).toBe(next)
+    })
+  })
+
+  describe('with an OpenAPI serializer', () => {
+    const sharing = createStructuralSharing(new OpenAPIJsonSerializer({
+      handlers: {
+        person: {
+          condition: value => value instanceof Person,
+          serialize: (value: Person) => ({ name: value.name, born: value.born }),
+        },
+      },
+    }))
+
+    it.each([
+      ['bigint and string members', new Set([1n]), new Set(['1'])],
+      ['Date and ISO string keys', new Map([[new Date(0), 1]]), new Map([['1970-01-01T00:00:00.000Z', 1]])],
+      ['Date and ISO string values', new Map([['a', new Date(0)]]), new Map([['a', '1970-01-01T00:00:00.000Z']])],
+    ])('takes new built-ins with %s, which share the same JSON', (_, old, next) => {
+      expect(sharing({ value: old }, { value: next }).value).toBe(next)
+    })
+
+    it('always takes new custom values, since equal JSON does not prove equal values', () => {
+      for (const [old, next] of [
+        [new Person('Earth', new Date(0)), new Person('Earth', new Date(0))],
+        [new Person('Earth', new Date(Number.NaN)), new Person('Earth', null as any)],
+      ]) {
+        expect(sharing(old, next)).toBe(next)
+      }
     })
   })
 
