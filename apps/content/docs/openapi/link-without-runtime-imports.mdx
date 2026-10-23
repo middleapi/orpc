@@ -1,6 +1,6 @@
 ---
 title: "OpenAPI Link Without Runtime Imports"
-description: "Use build-time macros to embed a minified contract in your client bundle, so OpenAPI Link works without maintaining a separate contract or shipping server code to the client."
+description: "Use build-time macros to embed a minified contract in your client bundle, so OpenAPI Link works without a separate contract or shipping server code."
 ---
 
 [OpenAPI Link](/docs/openapi/link) needs a contract at runtime to know each procedure's method and path. With [RPC Link](/docs/rpc/link) a type import is enough, but with OpenAPI Link you must either maintain a [contract](/docs/contract/router) or import your [router](/docs/router), which pulls server code into the client bundle. [Safely Importing Router on the Client](/docs/contract/router#safely-importing-router-on-the-client) avoids that by exporting a minified contract to a JSON file, but you must regenerate the file every time the router changes.
