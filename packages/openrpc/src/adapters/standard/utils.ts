@@ -2,12 +2,14 @@ import type { AnyORPCError } from '@orpc/client'
 import type { OpenAPIJsonSerializer } from '@orpc/openapi'
 import type { Public } from '@orpc/shared'
 import type { StandardBody, StandardHeaders } from '@standard-server/core'
-import type { JsonRpcErrorObject, JsonRpcErrorResponse, JsonRpcId, JsonRpcParams, OpenRPCErrorData } from '../../json-rpc'
-import { getOwn, isPlainObject, toArray } from '@orpc/shared'
+import type { JsonRpcErrorObject, JsonRpcErrorResponse, JsonRpcId, JsonRpcParams, JsonRpcResponse, OpenRPCErrorData } from '../../json-rpc'
+import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
+import { DEFAULT_ERROR_STATUS } from '@orpc/server'
+import { getOwn, isAsyncIteratorObject, isPlainObject, toArray } from '@orpc/shared'
 import { cancelStandardBody, flattenStandardHeader } from '@standard-server/core'
 import { JSON_RPC_ERROR_CODES, JSON_RPC_VERSION } from '../../constants'
 import { isJsonRpcErrorObject, toJsonRpcErrorCode } from '../../json-rpc'
-import { isJsonRpcId } from '../../utils'
+import { assertJsonRpcErrorCodeMap, isJsonRpcId } from '../../utils'
 
 /**
  * Media types accepted for JSON-RPC request bodies. None is CORS-safelisted, so a cross-site
@@ -24,7 +26,7 @@ export function isJsonRpcMediaType(contentType: string | readonly string[] | und
   return mediaType !== undefined && JSON_RPC_MEDIA_TYPES.has(mediaType)
 }
 
-export type ParsedJsonRpcRequest
+type ParsedJsonRpcRequest
   = | {
     valid: true
     method: string
@@ -112,6 +114,42 @@ export function encodeJsonRpcError(error: AnyORPCError, options: EncodeJsonRpcEr
   }
 }
 
+export interface JsonRpcErrorEncoderOptions extends EncodeJsonRpcErrorOptions {
+  /**
+   * @default COMMON_ERROR_STATUS_MAP
+   */
+  errorStatusMap?: Record<string, number> | undefined
+}
+
+/**
+ * An `ORPCError` encoded as a JSON-RPC error object, with the HTTP status of its per-call response.
+ */
+export interface EncodedJsonRpcError {
+  status: number
+  error: JsonRpcErrorObject
+}
+
+/**
+ * Validates the error options once and returns the encoder the codec and the envelope plugin share.
+ *
+ * @throws {TypeError} If an `errorCodeMap` value is not an integer.
+ */
+export function createJsonRpcErrorEncoder(options: JsonRpcErrorEncoderOptions, owner: string): (error: AnyORPCError) => EncodedJsonRpcError {
+  assertJsonRpcErrorCodeMap(options.errorCodeMap, owner)
+
+  const errorStatusMap = options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP
+  const encodeOptions: EncodeJsonRpcErrorOptions = {
+    serializer: options.serializer,
+    errorCodeMap: options.errorCodeMap,
+    customErrorEncoder: options.customErrorEncoder,
+  }
+
+  return error => ({
+    status: getOwn(errorStatusMap, error.code) ?? DEFAULT_ERROR_STATUS,
+    error: encodeJsonRpcError(error, encodeOptions),
+  })
+}
+
 /**
  * A JSON-RPC protocol error code produced by the envelope itself.
  */
@@ -120,7 +158,7 @@ export type JsonRpcProtocolErrorCode = typeof JSON_RPC_ERROR_CODES[keyof typeof 
 /**
  * The canonical messages of the JSON-RPC 2.0 specification.
  */
-export const JSON_RPC_PROTOCOL_ERROR_MESSAGES: Record<JsonRpcProtocolErrorCode, string> = {
+const JSON_RPC_PROTOCOL_ERROR_MESSAGES: Record<JsonRpcProtocolErrorCode, string> = {
   [JSON_RPC_ERROR_CODES.PARSE_ERROR]: 'Parse error',
   [JSON_RPC_ERROR_CODES.INVALID_REQUEST]: 'Invalid Request',
   [JSON_RPC_ERROR_CODES.METHOD_NOT_FOUND]: 'Method not found',
@@ -165,7 +203,7 @@ export function omitBodyHeaders(headers: StandardHeaders): StandardHeaders {
  */
 export function liftSubresponseHeaders(subresponseHeaders: readonly StandardHeaders[]): StandardHeaders {
   const [first = {}, ...rest] = subresponseHeaders
-  const shared: StandardHeaders = {}
+  const headers: StandardHeaders = {}
 
   for (const [name, value] of Object.entries(first)) {
     if (value === undefined || isBodyHeader(name)) {
@@ -175,11 +213,10 @@ export function liftSubresponseHeaders(subresponseHeaders: readonly StandardHead
     const flattened = flattenStandardHeader(value)
 
     if (rest.every(other => flattenStandardHeader(other[name]) === flattened)) {
-      shared[name] = value
+      headers[name] = value
     }
   }
 
-  const headers: StandardHeaders = { ...shared }
   const cookies = new Set(subresponseHeaders.flatMap(other => toArray(other['set-cookie'])))
 
   if (cookies.size > 0) {
@@ -215,27 +252,54 @@ export function isJsonMemberValue(value: unknown): boolean {
 }
 
 /**
- * The body of a per-call sub-response, which the envelope completes with `jsonrpc` and `id`.
+ * Completes the body of a per-call sub-response, `{ result }` or `{ error }`, into the JSON-RPC response for `id`.
+ * Returns `undefined` unless the body is a plain object with exactly one own `result` (that JSON keeps,
+ * see {@link isJsonMemberValue}) or valid `error` member. Other keys are ignored.
  */
-export type JsonRpcPartialResponseBody = { result: unknown } | { error: JsonRpcErrorObject }
-
-/**
- * Whether a sub-response body is {@link JsonRpcPartialResponseBody}: a plain object with exactly one own
- * `result` (that JSON keeps, see {@link isJsonMemberValue}) or valid `error` member. Other keys are ignored.
- */
-export function isPartialResponseBody(body: unknown): body is JsonRpcPartialResponseBody {
+export function completeJsonRpcResponse(body: unknown, id: JsonRpcId): JsonRpcResponse | undefined {
   if (!isPlainObject(body)) {
-    return false
+    return undefined
   }
 
   const hasResult = Object.hasOwn(body, 'result')
-  const hasError = Object.hasOwn(body, 'error')
 
-  if (hasResult === hasError) {
-    return false
+  if (hasResult === Object.hasOwn(body, 'error')) {
+    return undefined
   }
 
-  return hasResult ? isJsonMemberValue(body.result) : isJsonRpcErrorObject(body.error)
+  if (hasResult) {
+    return isJsonMemberValue(body.result) ? { jsonrpc: JSON_RPC_VERSION, id, result: body.result } : undefined
+  }
+
+  return isJsonRpcErrorObject(body.error) ? { jsonrpc: JSON_RPC_VERSION, id, error: body.error } : undefined
+}
+
+/**
+ * Describes a value JSON-RPC cannot carry as a whole: a stream, an event iterator, or a form or binary body.
+ * Returns `undefined` for any other value.
+ */
+export function getUnsupportedValueKind(value: unknown): string | undefined {
+  if (value instanceof ReadableStream) {
+    return 'a ReadableStream'
+  }
+
+  if (isAsyncIteratorObject(value)) {
+    return 'an AsyncIteratorObject'
+  }
+
+  if (value instanceof Blob) {
+    return 'a Blob'
+  }
+
+  if (typeof FormData !== 'undefined' && value instanceof FormData) {
+    return 'a FormData'
+  }
+
+  if (typeof URLSearchParams !== 'undefined' && value instanceof URLSearchParams) {
+    return 'a URLSearchParams'
+  }
+
+  return undefined
 }
 
 /**

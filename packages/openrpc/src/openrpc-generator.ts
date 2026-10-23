@@ -140,7 +140,6 @@ export class OpenRPCGenerator {
       methods: methods ?? [],
     }
 
-    const baseMethodCount = doc.methods.length
     const baseSchemaNames = new Set(Object.keys(doc.components?.schemas ?? {}))
     const customComponentName = options.customComponentName
 
@@ -173,7 +172,7 @@ export class OpenRPCGenerator {
         }
 
         methodNames.add(method.name)
-        doc.methods.push(method)
+        doc.methods.push(toDraft07Method(method))
       }
       catch (e) {
         if (!(e instanceof OpenRPCGeneratorError)) {
@@ -193,8 +192,6 @@ export class OpenRPCGenerator {
     }
 
     // components are lowered only now: while generating, they are compared against new defs in their converted form
-    doc.methods = doc.methods.map((method, index) => index < baseMethodCount ? method : toDraft07Method(method))
-
     const schemas = doc.components?.schemas
 
     if (schemas) {

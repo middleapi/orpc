@@ -3,24 +3,23 @@ import type { Context } from '@orpc/server'
 import type { StandardHandlerHandleResult, StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '@orpc/server/standard'
 import type { Promisable, Value } from '@orpc/shared'
 import type { StandardHeaders } from '@standard-server/core'
-import type { JsonRpcErrorObject, JsonRpcId, JsonRpcResponse } from '../../json-rpc'
+import type { JsonRpcId, JsonRpcResponse } from '../../json-rpc'
 import type { JsonRpcCallRequest } from './call'
 import type { OpenRPCHandlerCodecOptions } from './openrpc-handler-codec'
-import type { EncodeJsonRpcErrorOptions, JsonRpcProtocolErrorCode } from './utils'
-import { COMMON_ERROR_STATUS_MAP, ORPCError } from '@orpc/client'
+import type { EncodedJsonRpcError, JsonRpcProtocolErrorCode } from './utils'
+import { ORPCError } from '@orpc/client'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
-import { DEFAULT_ERROR_STATUS } from '@orpc/server'
-import { getOwn, matchesHttpPath, mergeHttpPath, pathToHttpPath, toArray, value } from '@orpc/shared'
+import { matchesHttpPath, mergeHttpPath, pathToHttpPath, toArray, value } from '@orpc/shared'
 import { DEFAULT_JSON_RPC_MAX_BATCH_SIZE, JSON_RPC_ERROR_CODES, JSON_RPC_VERSION } from '../../constants'
 import { isJsonRpcErrorObject } from '../../json-rpc'
-import { assertJsonRpcErrorCodeMap, JSON_RPC_METHOD_SEPARATOR } from '../../utils'
+import { JSON_RPC_METHOD_SEPARATOR } from '../../utils'
 import { getJsonRpcCall, JSON_RPC_CALL_SYMBOL } from './call'
 import {
   cancelQuietly,
+  completeJsonRpcResponse,
+  createJsonRpcErrorEncoder,
   createJsonRpcProtocolErrorResponse,
-  encodeJsonRpcError,
   isJsonRpcMediaType,
-  isPartialResponseBody,
   liftSubresponseHeaders,
   omitBodyHeaders,
   parseJsonRpcRequest,
@@ -64,20 +63,16 @@ const MAPPED_PROTOCOL_ERROR_STATUS: Record<JsonRpcProtocolErrorCode, number> = {
 }
 
 /**
- * The outcome of one JSON-RPC call (a single request or a batch item).
+ * The outcome of one JSON-RPC call (a single request or a batch item):
+ * - `response`: `undefined` for notifications, which are never answered.
+ * - `headers`: the sub-response headers, including the ones describing its body.
+ * - `status`: the sub-response status, used for single calls with `errorResponseStatus: 'mapped'`.
  */
-interface JsonRpcCallResult {
-  /**
-   * `undefined` for notifications, which are never answered.
-   */
-  response: JsonRpcResponse | undefined
-  /**
-   * The sub-response headers, without the ones describing its body.
-   */
+type JsonRpcCallResult = AnsweredJsonRpcCallResult | { response: undefined, headers: StandardHeaders, status?: undefined }
+
+interface AnsweredJsonRpcCallResult {
+  response: JsonRpcResponse
   headers: StandardHeaders
-  /**
-   * The sub-response status, used for single calls with `errorResponseStatus: 'mapped'`.
-   */
   status: number
 }
 
@@ -111,23 +106,19 @@ export class OpenRPCEnvelopeHandlerPlugin<T extends Context> implements Standard
 
   private readonly maxBatchSize: Exclude<OpenRPCEnvelopeHandlerPluginOptions<T>['maxBatchSize'], undefined>
   private readonly errorResponseStatus: Exclude<OpenRPCEnvelopeHandlerPluginOptions<T>['errorResponseStatus'], undefined>
-  private readonly errorStatusMap: Exclude<OpenRPCEnvelopeHandlerPluginOptions<T>['errorStatusMap'], undefined>
-  private readonly encodeErrorOptions: EncodeJsonRpcErrorOptions
+  private readonly encodeJsonRpcError: (error: AnyORPCError) => EncodedJsonRpcError
 
   /**
    * @throws {TypeError} If an `errorCodeMap` value is not an integer.
    */
   constructor(options: OpenRPCEnvelopeHandlerPluginOptions<T> = {}) {
-    assertJsonRpcErrorCodeMap(options.errorCodeMap, 'OpenRPCEnvelopeHandlerPlugin')
+    this.encodeJsonRpcError = createJsonRpcErrorEncoder(
+      { ...options, serializer: options.serializer ?? new OpenAPIJsonSerializer() },
+      'OpenRPCEnvelopeHandlerPlugin',
+    )
 
     this.maxBatchSize = options.maxBatchSize ?? DEFAULT_JSON_RPC_MAX_BATCH_SIZE
     this.errorResponseStatus = options.errorResponseStatus ?? 'always-200'
-    this.errorStatusMap = options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP
-    this.encodeErrorOptions = {
-      serializer: options.serializer ?? new OpenAPIJsonSerializer(),
-      errorCodeMap: options.errorCodeMap,
-      customErrorEncoder: options.customErrorEncoder,
-    }
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
@@ -165,33 +156,20 @@ export class OpenRPCEnvelopeHandlerPlugin<T extends Context> implements Standard
           return this.reject(error)
         }
 
-        return this.protocolError(null, JSON_RPC_ERROR_CODES.PARSE_ERROR)
+        return this.answer(this.protocolError(null, JSON_RPC_ERROR_CODES.PARSE_ERROR))
       }
 
       if (payload === undefined) {
-        return this.protocolError(null, JSON_RPC_ERROR_CODES.PARSE_ERROR)
+        return this.answer(this.protocolError(null, JSON_RPC_ERROR_CODES.PARSE_ERROR))
       }
 
       if (!Array.isArray(payload)) {
-        const result = await this.call(interceptorOptions, payload, false)
-
-        if (result.response === undefined) {
-          return { matched: true, response: { status: 204, headers: result.headers, body: undefined } }
-        }
-
-        return {
-          matched: true,
-          response: {
-            status: this.errorResponseStatus === 'mapped' ? result.status : 200,
-            headers: result.headers,
-            body: result.response,
-          },
-        }
+        return this.answer(await this.call(interceptorOptions, payload, false))
       }
 
       if (payload.length === 0) {
         // the specification answers an empty batch with a single response, not an array
-        return this.protocolError(null, JSON_RPC_ERROR_CODES.INVALID_REQUEST)
+        return this.answer(this.protocolError(null, JSON_RPC_ERROR_CODES.INVALID_REQUEST))
       }
 
       const maxBatchSize = await value(this.maxBatchSize, interceptorOptions)
@@ -240,7 +218,7 @@ export class OpenRPCEnvelopeHandlerPlugin<T extends Context> implements Standard
 
     // an invalid request object is answered even without an `id`, as the specification requires
     if (!parsed.valid) {
-      return this.callProtocolError(parsed.id, JSON_RPC_ERROR_CODES.INVALID_REQUEST)
+      return this.protocolError(parsed.id, JSON_RPC_ERROR_CODES.INVALID_REQUEST)
     }
 
     const { method, params, notification } = parsed
@@ -280,39 +258,38 @@ export class OpenRPCEnvelopeHandlerPlugin<T extends Context> implements Standard
       Promise.reject(error)
 
       return notification
-        ? { response: undefined, headers: {}, status: 500 }
-        : this.callProtocolError(id, JSON_RPC_ERROR_CODES.INTERNAL_ERROR)
+        ? { response: undefined, headers: {} }
+        : this.protocolError(id, JSON_RPC_ERROR_CODES.INTERNAL_ERROR)
     }
 
     if (!result.matched) {
       return notification
-        ? { response: undefined, headers: {}, status: 404 }
-        : this.callProtocolError(id, JSON_RPC_ERROR_CODES.METHOD_NOT_FOUND)
+        ? { response: undefined, headers: {} }
+        : this.protocolError(id, JSON_RPC_ERROR_CODES.METHOD_NOT_FOUND)
     }
 
-    const { status, body } = result.response
-    const headers = omitBodyHeaders(result.response.headers)
+    const { status, headers, body } = result.response
 
     if (notification) {
       await cancelQuietly(body)
-      return { response: undefined, headers, status }
+      return { response: undefined, headers }
     }
+
+    const response = completeJsonRpcResponse(body, id)
 
     // only reachable through a custom error encoder or an interceptor that replaced the body
-    if (!isPartialResponseBody(body)) {
+    if (response === undefined) {
       await cancelQuietly(body)
-      return { ...this.callProtocolError(id, JSON_RPC_ERROR_CODES.INTERNAL_ERROR), headers }
+      return { ...this.protocolError(id, JSON_RPC_ERROR_CODES.INTERNAL_ERROR), headers }
     }
-
-    // own-property checks only: `in` would also see a member inherited from a (null-constructor) prototype
-    const response: JsonRpcResponse = Object.hasOwn(body, 'result')
-      ? { jsonrpc: JSON_RPC_VERSION, id, result: (body as { result: unknown }).result }
-      : { jsonrpc: JSON_RPC_VERSION, id, error: (body as { error: JsonRpcErrorObject }).error }
 
     return { response, headers, status }
   }
 
-  private callProtocolError(id: JsonRpcId, code: JsonRpcProtocolErrorCode): JsonRpcCallResult {
+  /**
+   * A protocol error with the canonical message and no `data`.
+   */
+  private protocolError(id: JsonRpcId, code: JsonRpcProtocolErrorCode): AnsweredJsonRpcCallResult {
     return {
       response: createJsonRpcProtocolErrorResponse(id, code),
       headers: {},
@@ -321,16 +298,14 @@ export class OpenRPCEnvelopeHandlerPlugin<T extends Context> implements Standard
   }
 
   /**
-   * Answers a request the envelope cannot read with a protocol error, `id: null`, and no `data`.
+   * Answers a single (non-batch) request: `204` for a notification, otherwise its JSON-RPC response.
    */
-  private protocolError(id: JsonRpcId, code: JsonRpcProtocolErrorCode): StandardHandlerHandleResult {
+  private answer({ response, headers, status }: JsonRpcCallResult): StandardHandlerHandleResult {
     return {
       matched: true,
-      response: {
-        status: this.errorResponseStatus === 'mapped' ? MAPPED_PROTOCOL_ERROR_STATUS[code] : 200,
-        headers: {},
-        body: createJsonRpcProtocolErrorResponse(id, code),
-      },
+      response: response === undefined
+        ? { status: 204, headers: omitBodyHeaders(headers), body: undefined }
+        : { status: this.errorResponseStatus === 'mapped' ? status : 200, headers: omitBodyHeaders(headers), body: response },
     }
   }
 
@@ -339,27 +314,13 @@ export class OpenRPCEnvelopeHandlerPlugin<T extends Context> implements Standard
    * with the status of the error code, whatever `errorResponseStatus` is.
    */
   private reject(error: AnyORPCError): StandardHandlerHandleResult {
-    const encoded = encodeJsonRpcError(error, this.encodeErrorOptions)
+    const encoded = this.encodeJsonRpcError(error)
 
     // a custom error encoder can return an invalid error object
-    if (!isJsonRpcErrorObject(encoded)) {
-      return {
-        matched: true,
-        response: {
-          status: 500,
-          headers: {},
-          body: createJsonRpcProtocolErrorResponse(null, JSON_RPC_ERROR_CODES.INTERNAL_ERROR),
-        },
-      }
-    }
+    const { response, status } = isJsonRpcErrorObject(encoded.error)
+      ? { response: { jsonrpc: JSON_RPC_VERSION, id: null, error: encoded.error }, status: encoded.status }
+      : this.protocolError(null, JSON_RPC_ERROR_CODES.INTERNAL_ERROR)
 
-    return {
-      matched: true,
-      response: {
-        status: getOwn(this.errorStatusMap, error.code) ?? DEFAULT_ERROR_STATUS,
-        headers: {},
-        body: { jsonrpc: JSON_RPC_VERSION, id: null, error: encoded },
-      },
-    }
+    return { matched: true, response: { status, headers: {}, body: response } }
   }
 }

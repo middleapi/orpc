@@ -6,13 +6,13 @@ import type { JsonRpcErrorObject, JsonRpcErrorResponse, JsonRpcParams, JsonRpcRe
 import { COMMON_ERROR_STATUS_MAP, createORPCErrorFromJson, MalformedResponseError, ORPCError, ResponseError } from '@orpc/client'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { DEFAULT_ERROR_STATUS } from '@orpc/server'
-import { getOwn, isAsyncIteratorObject, isPlainObject, value } from '@orpc/shared'
+import { getOwn, isPlainObject, value } from '@orpc/shared'
 import { toStandardHeaders } from '@standard-server/fetch'
 import { JSON_RPC_VERSION } from '../../constants'
 import { fromJsonRpcErrorCode, isJsonRpcResponse, isOpenRPCErrorData } from '../../json-rpc'
 import { JSON_RPC_METHOD_SEPARATOR } from '../../utils'
 import { encodeJsonRpcParams } from './params'
-import { cancelQuietly, isJsonRpcMediaType } from './utils'
+import { cancelQuietly, getUnsupportedValueKind, isJsonRpcMediaType } from './utils'
 
 export interface OpenRPCLinkCodecOptions<T extends ClientContext> {
   /**
@@ -91,7 +91,6 @@ interface OpenRPCLinkCall {
    * `undefined` for notifications.
    */
   id: number | undefined
-  notification: boolean
 }
 
 const UNSUPPORTED_INPUT_MESSAGE = '[OpenRPCLink] JSON-RPC cannot send Blob, File, FormData, URLSearchParams, or streams'
@@ -144,7 +143,7 @@ export class OpenRPCLinkCodec<T extends ClientContext> implements StandardLinkCo
       ...(id !== undefined && { id }),
     }
 
-    this.calls.set(options, { id, notification })
+    this.calls.set(options, { id })
 
     return {
       method: 'POST',
@@ -180,7 +179,7 @@ export class OpenRPCLinkCodec<T extends ClientContext> implements StandardLinkCo
 
     const snapshot: StandardResponse = { status: response.status, headers: response.headers, body }
 
-    if (call?.notification) {
+    if (call !== undefined && call.id === undefined) {
       if (isJsonRpcResponse(body) && Object.hasOwn(body, 'error')) {
         return { kind: 'error', error: this.decodeError((body as JsonRpcErrorResponse).error, snapshot, response) }
       }
@@ -218,21 +217,19 @@ export class OpenRPCLinkCodec<T extends ClientContext> implements StandardLinkCo
   }
 
   private encodeJsonRpcParams(input: unknown, path: readonly string[]): JsonRpcParams | undefined {
-    if (isUnsupportedInput(input)) {
-      throw new TypeError(`${UNSUPPORTED_INPUT_MESSAGE} in call to procedure (${path.join(JSON_RPC_METHOD_SEPARATOR)}).`)
+    const unsupported = () => new TypeError(`${UNSUPPORTED_INPUT_MESSAGE} in call to procedure (${path.join(JSON_RPC_METHOD_SEPARATOR)}).`)
+
+    if (getUnsupportedValueKind(input) !== undefined) {
+      throw unsupported()
     }
 
-    let json: unknown
+    const serialized = input === undefined ? undefined : this.serializer.serializeJson(input)
 
-    if (input !== undefined) {
-      const serialized = this.serializer.serializeJson(input)
-
-      if (serialized.blobs?.length) {
-        throw new TypeError(`${UNSUPPORTED_INPUT_MESSAGE} in call to procedure (${path.join(JSON_RPC_METHOD_SEPARATOR)}).`)
-      }
-
-      json = serialized.json
+    if (serialized?.blobs?.length) {
+      throw unsupported()
     }
+
+    const json = serialized?.json
 
     if (this.encodeParams === undefined) {
       return encodeJsonRpcParams(json)
@@ -250,12 +247,10 @@ export class OpenRPCLinkCodec<T extends ClientContext> implements StandardLinkCo
   }
 
   /**
-   * Request ids are 1, 2, 3, ... per codec, wrapping before they lose integer precision.
+   * Request ids are 1, 2, 3, ... per codec.
    */
   private generateId(): number {
-    this.lastId = this.lastId >= Number.MAX_SAFE_INTEGER ? 1 : this.lastId + 1
-
-    return this.lastId
+    return ++this.lastId
   }
 
   private decodeError(error: JsonRpcErrorObject, snapshot: StandardResponse, response: StandardLazyResponse): AnyORPCError {
@@ -299,14 +294,6 @@ export class OpenRPCLinkCodec<T extends ClientContext> implements StandardLinkCo
       },
     })
   }
-}
-
-function isUnsupportedInput(input: unknown): boolean {
-  return input instanceof Blob
-    || (typeof ReadableStream !== 'undefined' && input instanceof ReadableStream)
-    || (typeof FormData !== 'undefined' && input instanceof FormData)
-    || (typeof URLSearchParams !== 'undefined' && input instanceof URLSearchParams)
-    || isAsyncIteratorObject(input)
 }
 
 function toResolvedStandardHeaders(headers: Headers | StandardHeaders): StandardHeaders {

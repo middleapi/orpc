@@ -5,16 +5,15 @@ import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from
 import type { Public, Value } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { JsonRpcErrorObject } from '../../json-rpc'
-import type { EncodeJsonRpcErrorOptions } from './utils'
-import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
+import type { EncodedJsonRpcError } from './utils'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
-import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '@orpc/server'
+import { DEFAULT_SUCCESS_STATUS } from '@orpc/server'
 import { RPCMatcher } from '@orpc/server/standard'
-import { getOwn, isAsyncIteratorObject, pathToHttpPath, value } from '@orpc/shared'
-import { assertJsonRpcErrorCodeMap, isEventIteratorProcedure, toProcedurePath } from '../../utils'
+import { pathToHttpPath, value } from '@orpc/shared'
+import { isEventIteratorProcedure, toProcedurePath } from '../../utils'
 import { getJsonRpcCall } from './call'
 import { decodeJsonRpcParams } from './params'
-import { cancelQuietly, encodeJsonRpcError, isJsonMemberValue } from './utils'
+import { cancelQuietly, createJsonRpcErrorEncoder, getUnsupportedValueKind, isJsonMemberValue } from './utils'
 
 export interface OpenRPCHandlerCodecOptions<_T extends Context> {
   /**
@@ -80,14 +79,14 @@ export interface OpenRPCHandlerCodecOptions<_T extends Context> {
 export class OpenRPCHandlerCodec<T extends Context> implements StandardHandlerCodec<T> {
   private readonly matcher: RPCMatcher
   private readonly serializer: Public<OpenAPIJsonSerializer>
-  private readonly errorStatusMap: Exclude<OpenRPCHandlerCodecOptions<T>['errorStatusMap'], undefined>
-  private readonly encodeErrorOptions: EncodeJsonRpcErrorOptions
+  private readonly encodeJsonRpcError: (error: AnyORPCError) => EncodedJsonRpcError
 
   /**
    * @throws {TypeError} If an `errorCodeMap` value is not an integer.
    */
   constructor(router: AnyRouter, options: OpenRPCHandlerCodecOptions<T> = {}) {
-    assertJsonRpcErrorCodeMap(options.errorCodeMap, 'OpenRPCHandlerCodec')
+    this.serializer = options.serializer ?? new OpenAPIJsonSerializer()
+    this.encodeJsonRpcError = createJsonRpcErrorEncoder({ ...options, serializer: this.serializer }, 'OpenRPCHandlerCodec')
 
     const filter = options.filter ?? true
 
@@ -95,14 +94,6 @@ export class OpenRPCHandlerCodec<T extends Context> implements StandardHandlerCo
       allowMethods: ['POST'],
       filter: (procedure, path) => !isEventIteratorProcedure(procedure) && value(filter, procedure, path),
     })
-
-    this.serializer = options.serializer ?? new OpenAPIJsonSerializer()
-    this.errorStatusMap = options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP
-    this.encodeErrorOptions = {
-      serializer: this.serializer,
-      errorCodeMap: options.errorCodeMap,
-      customErrorEncoder: options.customErrorEncoder,
-    }
   }
 
   async resolveProcedure(request: StandardLazyRequest): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
@@ -136,7 +127,7 @@ export class OpenRPCHandlerCodec<T extends Context> implements StandardHandlerCo
    * function, a symbol, or `undefined`, which JSON-RPC cannot send.
    */
   async encodeOutput(output: unknown, _procedure: AnyProcedure, path: string[]): Promise<StandardResponse> {
-    const kind = getUnsendableOutputKind(output)
+    const kind = getUnsupportedValueKind(output)
 
     if (kind !== undefined) {
       await cancelQuietly(output)
@@ -165,34 +156,12 @@ export class OpenRPCHandlerCodec<T extends Context> implements StandardHandlerCo
   }
 
   encodeError(error: AnyORPCError): StandardResponse {
+    const encoded = this.encodeJsonRpcError(error)
+
     return {
-      status: getOwn(this.errorStatusMap, error.code) ?? DEFAULT_ERROR_STATUS,
+      status: encoded.status,
       headers: {},
-      body: { error: encodeJsonRpcError(error, this.encodeErrorOptions) },
+      body: { error: encoded.error },
     }
   }
-}
-
-function getUnsendableOutputKind(output: unknown): string | undefined {
-  if (output instanceof ReadableStream) {
-    return 'a ReadableStream'
-  }
-
-  if (isAsyncIteratorObject(output)) {
-    return 'an AsyncIteratorObject'
-  }
-
-  if (output instanceof Blob) {
-    return 'a Blob'
-  }
-
-  if (typeof FormData !== 'undefined' && output instanceof FormData) {
-    return 'a FormData'
-  }
-
-  if (typeof URLSearchParams !== 'undefined' && output instanceof URLSearchParams) {
-    return 'a URLSearchParams'
-  }
-
-  return undefined
 }

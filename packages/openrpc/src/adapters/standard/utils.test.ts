@@ -2,11 +2,13 @@ import { ORPCError } from '@orpc/client'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import {
   cancelQuietly,
+  completeJsonRpcResponse,
+  createJsonRpcErrorEncoder,
   createJsonRpcProtocolErrorResponse,
   encodeJsonRpcError,
+  getUnsupportedValueKind,
   isJsonMemberValue,
   isJsonRpcMediaType,
-  isPartialResponseBody,
   liftSubresponseHeaders,
   omitBodyHeaders,
   parseJsonRpcRequest,
@@ -335,16 +337,16 @@ describe('isJsonMemberValue', () => {
   })
 })
 
-describe('isPartialResponseBody', () => {
+describe('completeJsonRpcResponse', () => {
   it.each([
-    [{ result: null }],
-    [{ result: 0 }],
-    [{ result: { a: 1 } }],
-    [{ error: { code: -32602, message: 'Invalid params' } }],
-    [{ error: { code: 1, message: 'x', data: 1 }, extra: true }],
-    [Object.assign(Object.create(null), { result: 'null prototype' })],
-  ])('accepts %j', (body) => {
-    expect(isPartialResponseBody(body)).toBe(true)
+    [{ result: null }, { result: null }],
+    [{ result: 0 }, { result: 0 }],
+    [{ result: { a: 1 } }, { result: { a: 1 } }],
+    [{ error: { code: -32602, message: 'Invalid params' } }, { error: { code: -32602, message: 'Invalid params' } }],
+    [{ error: { code: 1, message: 'x', data: 1 }, extra: true }, { error: { code: 1, message: 'x', data: 1 } }],
+    [Object.assign(Object.create(null), { result: 'null prototype' }), { result: 'null prototype' }],
+  ])('completes %j', (body, member) => {
+    expect(completeJsonRpcResponse(body, 7)).toEqual({ jsonrpc: '2.0', id: 7, ...member })
   })
 
   it.each([
@@ -365,7 +367,57 @@ describe('isPartialResponseBody', () => {
     [Object.create({ result: 1 })],
     [new Blob(['x'])],
   ])('rejects %j', (body) => {
-    expect(isPartialResponseBody(body)).toBe(false)
+    expect(completeJsonRpcResponse(body, 7)).toBeUndefined()
+  })
+})
+
+describe('getUnsupportedValueKind', () => {
+  it.each([
+    [new ReadableStream(), 'a ReadableStream'],
+    [(async function* () {})(), 'an AsyncIteratorObject'],
+    [new Blob(['x']), 'a Blob'],
+    [new File(['x'], 'x.txt'), 'a Blob'],
+    [new FormData(), 'a FormData'],
+    [new URLSearchParams(), 'a URLSearchParams'],
+  ])('describes %s', (value, kind) => {
+    expect(getUnsupportedValueKind(value)).toBe(kind)
+  })
+
+  it.each([[undefined], [null], [1], ['x'], [{ a: new Blob(['nested']) }], [[1]], [new Date(0)]])('returns undefined for %s', (value) => {
+    expect(getUnsupportedValueKind(value)).toBeUndefined()
+  })
+})
+
+describe('createJsonRpcErrorEncoder', () => {
+  const serializer = new OpenAPIJsonSerializer()
+
+  it('encodes the error with the status of its code', () => {
+    const encode = createJsonRpcErrorEncoder({ serializer }, 'Test')
+
+    expect(encode(new ORPCError('NOT_FOUND'))).toEqual({
+      status: 404,
+      error: { code: -32004, message: 'Not Found', data: { code: 'NOT_FOUND', defined: false } },
+    })
+    expect(encode(new ORPCError('UNKNOWN_CODE')).status).toBe(400)
+  })
+
+  it('uses the given maps and custom encoder', () => {
+    const encode = createJsonRpcErrorEncoder({
+      serializer,
+      errorCodeMap: { OUT_OF_STOCK: 1001 },
+      errorStatusMap: { OUT_OF_STOCK: 409 },
+      customErrorEncoder: error => error.code === 'CUSTOM' ? { code: 1, message: 'custom' } : null,
+    }, 'Test')
+
+    expect(encode(new ORPCError('OUT_OF_STOCK', { message: 'Out of stock' }))).toEqual({
+      status: 409,
+      error: { code: 1001, message: 'Out of stock', data: { code: 'OUT_OF_STOCK', defined: false } },
+    })
+    expect(encode(new ORPCError('CUSTOM')).error).toEqual({ code: 1, message: 'custom' })
+  })
+
+  it('validates the error code map once, naming its owner', () => {
+    expect(() => createJsonRpcErrorEncoder({ serializer, errorCodeMap: { A: 1.5 } }, 'Owner')).toThrow('[Owner] "errorCodeMap.A"')
   })
 })
 

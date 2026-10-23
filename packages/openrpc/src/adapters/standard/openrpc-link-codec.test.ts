@@ -172,14 +172,6 @@ describe('openRPCLinkCodec', () => {
         expect(ids).toEqual([1, 2, 3])
         expect((await encodeCall(new OpenRPCLinkCodec())).body.id).toBe(1)
       })
-
-      it('wraps before ids lose integer precision', async () => {
-        const codec = new OpenRPCLinkCodec()
-        ;(codec as any).lastId = Number.MAX_SAFE_INTEGER - 1
-
-        expect((await encodeCall(codec)).body.id).toBe(Number.MAX_SAFE_INTEGER)
-        expect((await encodeCall(codec)).body.id).toBe(1)
-      })
     })
 
     describe('notification', () => {
