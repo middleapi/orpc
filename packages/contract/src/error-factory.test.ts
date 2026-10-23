@@ -230,10 +230,17 @@ describe('createORPCErrorConstructorMap', () => {
     expect(await map).toBe(map)
   })
 
-  it('does not resolve error codes through Object.prototype', () => {
-    const e = (constructors as any).toString()
+  it('can be converted to primitive values', () => {
+    const map = constructors as any
 
-    expect(e.code).toEqual('toString')
+    expect(String(map)).toBe('[object Object]')
+    expect(map.toJSON).toBe(undefined)
+  })
+
+  it('does not resolve error codes through Object.prototype', () => {
+    const e = (constructors as any).constructor()
+
+    expect(e.code).toEqual('constructor')
     expect(e.defined).toEqual(false)
   })
 })

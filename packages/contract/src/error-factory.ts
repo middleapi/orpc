@@ -3,7 +3,7 @@ import type { MaybeOptionalOptions, Writable } from '@orpc/shared'
 import type { ErrorMap, ErrorMapItem } from './error'
 import type { AnySchema, InferSchemaInput, Schema } from './schema'
 
-import { ORPCError } from '@orpc/client'
+import { ORPCError, RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
 import { getOwn, resolveMaybeOptionalOptions } from '@orpc/shared'
 import { ValidationError } from './error'
 import { type } from './schema-utils'
@@ -138,6 +138,9 @@ export type ORPCErrorConstructorMap<T extends ErrorMap> = {
  * - If the code exists in the provided `errorMap`, the corresponding constructor
  *   will create a **defined** `ORPCError`.
  * - If the code does not exist, a fallback `ORPCError` constructor is returned.
+ * - Symbols and {@link RECURSIVE_CLIENT_UNWRAP_KEYS} (`then`, `toString`, ...)
+ *   resolve to the `errorMap` value instead, so the map is not thenable and can
+ *   be converted to a string.
  *
  * The `in` operator can be used to check whether an error code is explicitly
  * defined in the map.
@@ -156,7 +159,7 @@ export type ORPCErrorConstructorMap<T extends ErrorMap> = {
 export function createORPCErrorConstructorMap<T extends ErrorMap>(errorMap: T): ORPCErrorConstructorMap<T> {
   const proxy = new Proxy(errorMap, {
     get(target, code) {
-      if (typeof code !== 'string' || code === 'then') {
+      if (typeof code !== 'string' || RECURSIVE_CLIENT_UNWRAP_KEYS.has(code)) {
         return Reflect.get(target, code)
       }
 
