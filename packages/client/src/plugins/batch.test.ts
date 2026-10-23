@@ -1133,6 +1133,64 @@ describe('batchLinkPlugin', () => {
       ])
     })
 
+    it.each([
+      ['true', true],
+      ['an object', {}],
+      ['an array', []],
+      ['null', null],
+      ['a number', 0],
+      ['missing', undefined],
+    ] as const)('rejects on array batch responses whose message id is %s', async (_, id) => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(transport.send).mockImplementation(async () => {
+        return {
+          status: 207,
+          headers: {},
+          resolveBody: async () => [{ kind: 'response', id, json: { status: 200, headers: {}, body: 'result' } }],
+        }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {} })).rejects.toThrow('Invalid batch response format'),
+        expect(link.call(['b'], {}, { context: {} })).rejects.toThrow('Invalid batch response format'),
+      ])
+    })
+
+    it('rejects on array batch responses whose message binary is not binary', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(transport.send).mockImplementation(async (request) => {
+        const messages = extractBatchMessagesFromRequest(request)
+
+        return {
+          status: 207,
+          headers: {},
+          resolveBody: async () => messages.map(message => ({
+            kind: 'response',
+            id: message.id,
+            json: { status: 200, headers: {} },
+            binary: {},
+          })),
+        }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {} })).rejects.toThrow('Invalid batch response format'),
+        expect(link.call(['b'], {}, { context: {} })).rejects.toThrow('Invalid batch response format'),
+      ])
+    })
+
     it('rejects on malformed blob batch responses with incomplete headers', async () => {
       const codec = makeCodec()
       const transport = makeTransport()

@@ -8,8 +8,17 @@ export { createRouterUtils as createTanstackQueryUtils } from './router-utils'
 export * from './shared-utils'
 export * from './ssr'
 export * from './stream-query'
+export * from './structural-sharing'
 export * from './types'
 export {
   OPERATION_CONTEXT_SYMBOL as TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL,
   type OperationContext as TanstackQueryOperationContext,
 } from './types'
+
+export type {
+  AnyNestedClient,
+} from '@orpc/client'
+
+export type {
+  Public,
+} from '@orpc/shared'

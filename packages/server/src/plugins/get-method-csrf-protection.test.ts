@@ -211,7 +211,7 @@ describe('getMethodCsrfProtectionHandlerPlugin', () => {
       function createBatchRequest(handler: RPCHandler<any>, transportHeaders: Record<string, string>) {
         const data = encodeURIComponent(JSON.stringify([{
           kind: 'request',
-          id: 0,
+          id: '0',
           json: {
             method: 'GET',
             url: '/deletePlanet',
@@ -230,7 +230,7 @@ describe('getMethodCsrfProtectionHandlerPlugin', () => {
         const { response } = await createBatchRequest(createHandler([new BatchHandlerPlugin()]), CROSS_SITE_NAVIGATION)
 
         const body = await response!.json() as any
-        expect(body[0]).toMatchObject({ kind: 'response', id: 0 })
+        expect(body[0]).toMatchObject({ kind: 'response', id: '0' })
         expect(body[0].json.status).toBe(403)
         expect(deletePlanet).not.toHaveBeenCalled()
       })

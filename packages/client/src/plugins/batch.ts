@@ -5,7 +5,7 @@ import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInte
 import type { ClientContext } from '../types'
 import { captureAsyncContext, defer, isAsyncIteratorObject, loadBytes, once, promiseWithResolvers, safeEncodeURIComponent, splitInHalf, stringifyJSON, toArray, value } from '@orpc/shared'
 import { parseStandardUrl } from '@standard-server/core'
-import { ClientPeer, decodePeerMessage, isServerPeerSendMessage } from '@standard-server/peer'
+import { ClientPeer, decodePeerMessage, isPeerMessage, isServerPeerSendMessage } from '@standard-server/peer'
 
 /**
  * Header that marks a request as a batch, set by the Batch Link Plugin and detected by the Batch Handler Plugin.
@@ -433,7 +433,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
 
         const body = await batchResponse.resolveBody()
 
-        if (Array.isArray(body) && body.every(v => isServerPeerSendMessage(v))) {
+        if (Array.isArray(body) && body.every((v: unknown) => isPeerMessage(v) && isServerPeerSendMessage(v))) {
           for (const message of body) {
             await peer.message(message)
           }

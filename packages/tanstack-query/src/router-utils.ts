@@ -1,6 +1,6 @@
 import type { AnyNestedClient, Client, InferClientContext, InferClientError } from '@orpc/client'
 import type { Public } from '@orpc/shared'
-import type { OperationKeyPrefixOptions } from './key'
+import type { OperationKeyBaseOptions } from './key'
 import type { RouterUtilsPlugin } from './plugin'
 import type { ProcedureUtilsInfiniteInterceptor, ProcedureUtilsLiveInterceptor, ProcedureUtilsMutationInterceptor, ProcedureUtilsOptions, ProcedureUtilsQueryInterceptor, ProcedureUtilsStreamedInterceptor } from './procedure-utils'
 import { RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
@@ -29,7 +29,7 @@ export type RouterUtilsScoped<T extends AnyNestedClient>
         [K in keyof T]?: (T[K] extends AnyNestedClient ? RouterUtilsScoped<T[K]> : never) | undefined
       }
 
-export interface RouterUtilsOptions<T extends AnyNestedClient> extends OperationKeyPrefixOptions {
+export interface RouterUtilsOptions<T extends AnyNestedClient> extends OperationKeyBaseOptions {
   /**
    * Base path for all query keys.
    *
@@ -108,6 +108,7 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
         plugin.initProcedureOptions(path, mergeProcedureUtilsOptions(
           pick(options, [
             'prefix',
+            'serializer',
             'queryInterceptors',
             'streamedInterceptors',
             'liveInterceptors',

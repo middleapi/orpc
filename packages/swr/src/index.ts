@@ -11,3 +11,7 @@ export {
   type OperationContext as SWROperationContext,
 } from './types'
 export * from './utils'
+
+export type {
+  Public,
+} from '@orpc/shared'

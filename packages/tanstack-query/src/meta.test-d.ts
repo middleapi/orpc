@@ -2,6 +2,7 @@ import type { ClientContext, ORPCError } from '@orpc/client'
 import type { PromiseWithError } from '@orpc/shared'
 import type { SkipToken } from '@tanstack/query-core'
 import type { OperationContext } from './types'
+import { RPCJsonSerializer } from '@orpc/client'
 import { oc, type } from '@orpc/contract'
 import { tanstackQuery } from './meta'
 
@@ -42,6 +43,11 @@ describe('tanstackQuery', () => {
         // @ts-expect-error - staleTime must be a number
         staleTime: 'invalid',
       },
+    }))
+
+    oc.output(type<number, Date>(vi.fn())).meta(tanstackQuery({
+      // @ts-expect-error - serializer belongs to the client, not the contract
+      serializer: new RPCJsonSerializer(),
     }))
   })
 })

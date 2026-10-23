@@ -22,9 +22,9 @@ function createBatchRequest(
   return new Request('https://example.com/__batch__', {
     method: 'POST',
     headers: { ...headers, 'content-type': 'application/json', 'orpc-batch': '1' },
-    body: JSON.stringify(urls.map((url, id) => ({
+    body: JSON.stringify(urls.map((url, index) => ({
       kind: 'request',
-      id,
+      id: String(index),
       json: { method: 'POST', url, headers: {}, body: undefined },
       binary: undefined,
     }))),

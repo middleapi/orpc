@@ -7,7 +7,7 @@ import { ORPCError } from '@orpc/client'
 import { BATCH_HEADER, DEFAULT_BATCH_MAX_SIZE } from '@orpc/client/plugins'
 import { isAsyncIteratorObject, promiseWithResolvers, toArray, value } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
-import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
+import { encodePeerMessage, isClientPeerSendMessage, isPeerMessage, ServerPeer } from '@standard-server/peer'
 
 /**
  * Content type for batch responses that use the length-prefixed binary framing,
@@ -41,6 +41,14 @@ async function encodeFrame(message: ServerPeerSendMessage): Promise<Uint8Array<A
  */
 function isBodyHeader(name: string): boolean {
   return name.startsWith('content-') || name === 'standard-server'
+}
+
+/**
+ * Whether untrusted batch JSON is a list of client peer messages.
+ * `isPeerMessage` must run first, since `isClientPeerSendMessage` does not check `id` or `binary`.
+ */
+function isClientPeerSendMessages(maybe: unknown): maybe is ClientPeerSendMessage[] {
+  return Array.isArray(maybe) && maybe.every((m: unknown) => isPeerMessage(m) && isClientPeerSendMessage(m))
 }
 
 /**
@@ -269,9 +277,9 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
             }
           }
 
-          const mightBeMessages = JSON.parse(data)
+          const mightBeMessages: unknown = JSON.parse(data)
 
-          if (!Array.isArray(mightBeMessages) || mightBeMessages.some(m => !isClientPeerSendMessage(m))) {
+          if (!isClientPeerSendMessages(mightBeMessages)) {
             return {
               matched: true,
               response: { status: 400, headers: {}, body: 'Invalid batch request data parameter' },
@@ -283,7 +291,7 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         else {
           const mightBeMessages = await interceptorOptions.request.resolveBody()
 
-          if (!Array.isArray(mightBeMessages) || mightBeMessages.some(m => !isClientPeerSendMessage(m))) {
+          if (!isClientPeerSendMessages(mightBeMessages)) {
             return {
               matched: true,
               response: { status: 400, headers: {}, body: 'Invalid batch request body' },

@@ -1,10 +1,9 @@
 import type { PartialDeep, Public } from '@orpc/shared'
-import type { QueryKey, QueryKeyHashFunction } from '@tanstack/query-core'
 import type { SerializableStreamedQueryOptions } from './stream-query'
 import type { OperationType } from './types'
 import { RPCJsonSerializer } from '@orpc/client'
 import { stringifyJSON } from '@orpc/shared'
-import { hashKey, skipToken } from '@tanstack/query-core'
+import { skipToken } from '@tanstack/query-core'
 
 export interface OperationKeyPrefixOptions {
   /**
@@ -14,24 +13,52 @@ export interface OperationKeyPrefixOptions {
   prefix?: string | undefined
 }
 
-export type OperationKeyOptions<TType extends OperationType, TInput> = OperationKeyPrefixOptions & {
+export interface OperationKeyBaseOptions extends OperationKeyPrefixOptions {
+  /**
+   * Serializes inputs into JSON-compatible values when building keys,
+   * and compares custom types in structural sharing.
+   * Pass the serializer your link uses so custom types are supported.
+   *
+   * @default new RPCJsonSerializer()
+   */
+  serializer?: Public<RPCJsonSerializer> | undefined
+}
+
+export type OperationKeyOptions<TType extends OperationType, TInput> = OperationKeyBaseOptions & {
   type?: TType | undefined
   input?: (TType extends 'mutation' ? never : PartialDeep<TInput>) | undefined
   fnOptions?: (TType extends 'streamed' ? SerializableStreamedQueryOptions : never) | undefined
 }
 
-type OperationKeyContent<TType extends OperationType, TInput> = Omit<OperationKeyOptions<TType, TInput>, 'prefix'> & {
+type OperationKeyContent<TType extends OperationType, TInput> = Omit<OperationKeyOptions<TType, TInput>, keyof OperationKeyBaseOptions> & {
   /**
    * Set in place of `input` when the operation is disabled with `skipToken`,
    * because query key hashers drop symbols.
    */
   skipToken?: TType extends 'mutation' ? never : true
+
+  /**
+   * Serializer types of non-JSON values in `input`, keyed by their JSON-encoded path,
+   * so inputs with the same JSON form (like a `Date` and its ISO string) produce different keys.
+   * Keyed by path (not a list) so partial keys still match.
+   */
+  inputMeta?: Record<string, string[]> | undefined
 }
 
 export type OperationKey<TType extends OperationType, TInput>
   = | [path: string[], options: OperationKeyContent<TType, TInput>]
     | [prefix: string, path: string[], options: OperationKeyContent<TType, TInput>]
 
+const defaultSerializer = new RPCJsonSerializer()
+
+/**
+ * Generate a TanStack Query key for a procedure.
+ *
+ * The input is serialized to JSON-compatible values, so keys hash and partially match
+ * by value, including types like `Date`, `Set`, `Map` and custom serializer types.
+ *
+ * @see {@link https://orpc.dev/docs/integrations/tanstack-query#key-serializer | TanStack Query Integration - Key Serializer}
+ */
 export function generateOperationKey<TType extends OperationType, TInput>(
   path: string[],
   options: OperationKeyOptions<TType, TInput> = {},
@@ -42,27 +69,25 @@ export function generateOperationKey<TType extends OperationType, TInput>(
     {
       ...options.input === skipToken
         ? { skipToken: true }
-        : options.input !== undefined ? { input: options.input } : {},
+        : options.input !== undefined ? serializeInput(options.serializer ?? defaultSerializer, options.input) : {},
       ...options.type !== undefined ? { type: options.type } : {},
       ...options.fnOptions !== undefined ? { fnOptions: options.fnOptions } : {},
     },
   ] as OperationKey<TType, TInput>
 }
 
-/**
- * Creates a `queryKeyHashFn` that supports oRPC types such as `bigint` and `Date`.
- *
- * @see {@link https://orpc.dev/docs/integrations/tanstack-query#custom-serializers | TanStack Query Integration - Custom Serializers}
- */
-export function createQueryKeyHashFn(
-  serializer: Public<RPCJsonSerializer> = new RPCJsonSerializer(),
-): QueryKeyHashFunction<QueryKey> {
-  return (queryKey) => {
-    const { json, meta } = serializer.serializeJson(queryKey)
+function serializeInput(serializer: Public<RPCJsonSerializer>, input: unknown) {
+  const { json, meta } = serializer.serializeJson(input)
 
-    return hashKey([
-      json,
-      meta?.map(entry => stringifyJSON(entry)).sort(),
-    ])
+  if (!meta?.length) {
+    return { input: json }
   }
+
+  const inputMeta: Record<string, string[]> = {}
+
+  for (const [type, ...segments] of meta) {
+    (inputMeta[stringifyJSON(segments)] ??= []).push(type)
+  }
+
+  return { input: json, inputMeta }
 }

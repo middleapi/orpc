@@ -1,6 +1,6 @@
 import { environmentManager, QueryClient } from '@tanstack/react-query'
 import { RPCJsonSerializer } from '@orpc/client'
-import { createHydrationOptions, createQueryKeyHashFn } from '@orpc/tanstack-query'
+import { createHydrationOptions } from '@orpc/tanstack-query'
 
 let browserQueryClient: QueryClient | undefined
 
@@ -30,7 +30,6 @@ function createQueryClient(): QueryClient {
     defaultOptions: {
       queries: {
         staleTime: 60 * 1000, // > 0 to prevent immediate refetching on mount
-        queryKeyHashFn: createQueryKeyHashFn(serializer),
       },
       ...createHydrationOptions(serializer),
     },

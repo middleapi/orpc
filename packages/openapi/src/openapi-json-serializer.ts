@@ -142,6 +142,12 @@ export interface OpenAPIJsonSerializerOptions {
   omitUndefinedProperties?: boolean | undefined
 }
 
+/**
+ * The JSON layer behind `OpenAPISerializer`: one-way serialization of types like `Date`, `BigInt`,
+ * and `Set` into JSON-friendly values, for places that only accept JSON.
+ *
+ * @see {@link https://orpc.dev/docs/openapi/serializer#openapi-json-serializer | OpenAPI Serializer - OpenAPI JSON Serializer}
+ */
 export class OpenAPIJsonSerializer {
   private readonly inlineBuiltInHandlers: boolean
   private readonly handlerEntries: OpenAPIJsonSerializerHandler[] | undefined

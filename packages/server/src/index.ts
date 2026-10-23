@@ -64,6 +64,7 @@ export type {
   InitialInputSchema,
   InitialOutputSchema,
   MergedErrorMap,
+  MergedSchema,
   Meta,
   MetaPlugin,
   MetaPluginDefinition,
@@ -92,8 +93,11 @@ export {
 export type {
   AsyncCleanupFn,
   AsyncIteratorClassNextFn,
+  DistributiveOmit,
+  IntersectPick,
   MaybeOptionalOptions,
   PromiseWithError,
+  Public,
   Registry,
   ThrowableError,
 } from '@orpc/shared'

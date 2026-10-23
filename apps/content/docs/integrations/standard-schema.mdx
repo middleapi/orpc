@@ -25,8 +25,8 @@ const example = os
 If your library does not implement Standard JSON Schema, or you want more control over the conversion, you can build your own converter by implementing the `JsonSchemaConverter` interface and passing it to the `converters` option. The first converter whose `condition` matches handles the schema:
 
 ```ts
-import type { AnySchema } from '@orpc/contract'
 import type {
+  AnySchema,
   JsonSchema,
   JsonSchemaConverter,
   JsonSchemaConverterDirection

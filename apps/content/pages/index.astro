@@ -20,37 +20,8 @@ const description
   = 'Build end-to-end typesafe APIs in TypeScript. One oRPC router gives you a typed client, '
     + 'a REST API with an OpenAPI document, and MCP tools for AI agents.'
 
-// schema.org JSON-LD, absolute when the site URL is known (production).
-// PageLayout carries no structured data of its own — Blume only emits it for
-// generated content pages — so the home page declares its own graph: the site
-// identity node plus the project as a free developer application.
-const siteBase = (config.site ?? '').replace(/\/$/, '')
-const jsonLd = {
-  '@context': 'https://schema.org',
-  '@graph': [
-    {
-      '@type': 'WebSite',
-      '@id': `${siteBase}/#website`,
-      'url': `${siteBase}/`,
-      'name': config.title,
-      'description': description,
-      'inLanguage': 'en',
-    },
-    {
-      '@type': 'SoftwareApplication',
-      '@id': `${siteBase}/#software`,
-      'name': 'oRPC',
-      'applicationCategory': 'DeveloperApplication',
-      'operatingSystem': 'Cross-platform',
-      'url': siteBase,
-      'description': description,
-      'license': 'https://github.com/middleapi/orpc/blob/main/LICENSE',
-      'codeRepository': 'https://github.com/middleapi/orpc',
-      'isAccessibleForFree': true,
-      'offers': { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD' },
-    },
-  ],
-}
+// PageLayout emits the page's schema.org JSON-LD: the WebSite and WebPage
+// nodes, plus the SoftwareApplication from `seo.software` in blume.config.ts.
 ---
 
 <PageLayout
@@ -68,12 +39,6 @@ const jsonLd = {
   page={{ title: 'oRPC - Typesafe APIs Made Simple 🪄', description, route: '/' }}
   x={config.x}
 >
-  <script
-    is:inline
-    type="application/ld+json"
-    set:html={JSON.stringify(jsonLd).replaceAll('<', '\\u003c')}
-  />
-
   <Hero />
   <Runtimes />
   <Features />

@@ -137,7 +137,7 @@ const data = serializer.deserializeJson({ json, meta })
 ```
 
 :::info[Reuse an RPC Serializer]
-`RPCSerializer` extends `RPCJsonSerializer`, so an `RPCSerializer` instance also works wherever an `RPCJsonSerializer` is accepted, such as [Publisher adapters](/docs/helpers/publisher#adapters), [TanStack Query hydration](/docs/integrations/tanstack-query#custom-serializers), or [Pinia Colada keys](/docs/integrations/pinia-colada#key-serializer). Configure your handlers once and share the same instance.
+`RPCSerializer` extends `RPCJsonSerializer`, so an `RPCSerializer` instance also works wherever an `RPCJsonSerializer` is accepted, such as [Publisher adapters](/docs/helpers/publisher#adapters), [TanStack Query keys](/docs/integrations/tanstack-query#key-serializer) and [hydration](/docs/integrations/tanstack-query#custom-serializers), or [Pinia Colada keys](/docs/integrations/pinia-colada#key-serializer). Configure your handlers once and share the same instance.
 :::
 
 ## Serialization Format
