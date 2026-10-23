@@ -1,4 +1,4 @@
-import type { ORPCErrorConstructorMap } from '@orpc/server'
+import type { Middleware, ORPCErrorConstructorMap } from '@orpc/server'
 import type { WithEffectContext } from './context'
 import { os } from '@orpc/server'
 import { Context, Effect } from 'effect'
@@ -183,5 +183,17 @@ describe('middlewareGen', () => {
         expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
         return yield* next()
       }))
+  })
+
+  it('accepts explicit type arguments in Middleware order with TYield last', () => {
+    const middleware = middlewareGen<WithEffectContext<Service1>, { user: 'user' }, { id: string }, number, typeof errorMap, Effect.Effect<any, any, Service1>>(
+      function* ({ errors, next }, input) {
+        expectTypeOf(input).toEqualTypeOf<{ id: string }>()
+        expectTypeOf(errors).toEqualTypeOf<ORPCErrorConstructorMap<typeof errorMap>>()
+        yield* Service1
+        return yield* next({ context: { user: 'user' as const } })
+      },
+    )
+    expectTypeOf(middleware).toEqualTypeOf<Middleware<WithEffectContext<Service1>, { user: 'user' }, { id: string }, number, typeof errorMap>>()
   })
 })

@@ -100,6 +100,17 @@ describe('InferEffectServices', () => {
     expectTypeOf<InferEffectServices<{ auth: boolean }>>().toEqualTypeOf<never>()
   })
 
+  it('does not distribute over union contexts', () => {
+    expectTypeOf<InferEffectServices<WithEffectContext<Service1> | WithEffectContext<Service2>>>().toEqualTypeOf<never>()
+    expectTypeOf<InferEffectServices<WithEffectContext<Service1> | { auth: boolean }>>().toEqualTypeOf<never>()
+    expectTypeOf<InferEffectServices<WithEffectContext<Service1 | Service2> | WithEffectContext<Service1>>>().toEqualTypeOf<Service1>()
+  })
+
+  it('infers services from intersection and any contexts', () => {
+    expectTypeOf<InferEffectServices<WithEffectContext<Service1> & { auth: boolean }>>().toEqualTypeOf<Service1>()
+    expectTypeOf<InferEffectServices<any>>().toEqualTypeOf<unknown>()
+  })
+
   it('accepts a context with more services than required', () => {
     expectTypeOf<WithEffectContext<Service1 | Service2>>().toExtend<WithEffectContext<Service1>>()
   })

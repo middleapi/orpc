@@ -1,5 +1,5 @@
 import type { InitialInputSchema, Schema } from '@orpc/contract'
-import type { DecoratedProcedure, DefaultInitialContext, ORPCErrorConstructorMap } from '@orpc/server'
+import type { DecoratedProcedure, DefaultInitialContext, ORPCErrorConstructorMap, ProcedureHandler } from '@orpc/server'
 import type { WithEffectContext } from './context'
 import { ORPCError, os } from '@orpc/server'
 import { Context, Effect } from 'effect'
@@ -107,5 +107,26 @@ describe('handlerGen', () => {
       .handler(handlerGen(function* () {
         yield* Service2
       }))
+  })
+
+  it('accepts explicit type arguments in ProcedureHandler order with TYield last', () => {
+    type Errors = ORPCErrorConstructorMap<typeof errorMap>
+
+    const handler = handlerGen<WithEffectContext<Service1>, { id: string }, number, Errors, Effect.Effect<any, any, Service1>>(
+      function* ({ errors }, input) {
+        expectTypeOf(input).toEqualTypeOf<{ id: string }>()
+        expectTypeOf(errors).toEqualTypeOf<Errors>()
+        yield* Service1
+        return 1
+      },
+    )
+    expectTypeOf(handler).toEqualTypeOf<ProcedureHandler<WithEffectContext<Service1>, { id: string }, number, Errors>>()
+
+    const defaults = handlerGen<WithEffectContext<Service1>>(function* () {
+      yield* Service1
+    })
+    expectTypeOf(defaults).toEqualTypeOf<
+      ProcedureHandler<WithEffectContext<Service1>, unknown, unknown, ORPCErrorConstructorMap<Record<never, never>>>
+    >()
   })
 })

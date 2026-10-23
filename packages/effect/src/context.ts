@@ -101,7 +101,8 @@ export interface WithEffectContext<Services> {
 
 /**
  * Infers the Effect services available in an oRPC context that extends `WithEffectContext`.
+ * For a union context, only the services every member provides are inferred.
  *
  * @see {@link https://orpc.dev/docs/integrations/effect#effect-services | Effect Integration - Effect Services}
  */
-export type InferEffectServices<T extends Context> = T extends WithEffectContext<infer Services> ? Services : never
+export type InferEffectServices<T extends Context> = [T] extends [{ 'effect/context': EffectContext.Context<infer Services> }] ? Services : never

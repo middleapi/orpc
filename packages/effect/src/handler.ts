@@ -3,14 +3,12 @@ import type { InferEffectServices, WithEffectContext } from './context'
 import { Effect, Context as EffectContext } from 'effect'
 import { runPromise } from './runtime'
 
-export type InferYieldError<Eff> = [Eff] extends [never] ? never : [Eff] extends [Effect.Effect<infer _A, infer E, infer _R>] ? E : never
-
 export interface HandlerGen<
   TCurrentContext extends Context,
   TInput,
-  TYield extends Effect.Effect<any, any, InferEffectServices<TCurrentContext>>,
   TReturn,
   TErrorConstructorMap extends ORPCErrorConstructorMap<any>,
+  TYield extends Effect.Effect<any, any, InferEffectServices<TCurrentContext>>,
 > {
   (
     opts: ProcedureHandlerOptions<TCurrentContext, TInput, TErrorConstructorMap>,
@@ -22,6 +20,8 @@ export interface HandlerGen<
   >
 }
 
+export type AnyHandlerGen = HandlerGen<any, any, any, any, any>
+
 /**
  * Creates a procedure handler from an Effect generator function.
  * Inside the generator you can yield Effect operations, and `handlerGen`
@@ -31,17 +31,17 @@ export interface HandlerGen<
  */
 export function handlerGen<
   TCurrentContext extends Context,
-  TInput,
-  TErrorConstructorMap extends ORPCErrorConstructorMap<any>,
-  TYield extends Effect.Effect<any, any, InferEffectServices<TCurrentContext>>,
-  TReturn,
+  TInput = unknown,
+  TReturn = unknown,
+  TErrorConstructorMap extends ORPCErrorConstructorMap<any> = ORPCErrorConstructorMap<Record<never, never>>,
+  TYield extends Effect.Effect<any, any, InferEffectServices<TCurrentContext>> = Effect.Effect<any, any, InferEffectServices<TCurrentContext>>,
 >(
-  handler: HandlerGen<TCurrentContext, TInput, TYield, TReturn, TErrorConstructorMap>,
+  handler: HandlerGen<TCurrentContext, TInput, TReturn, TErrorConstructorMap, TYield>,
 ): ProcedureHandler<TCurrentContext, TInput, TReturn, TErrorConstructorMap> {
   return (opts, input) => {
     const effectContext = opts.context['effect/context']
     const wrap = opts.context['effect/wrap'] as WithEffectContext<any>['effect/wrap']
-    const ef = Effect.gen(() => handler(opts, input)) as Effect.Effect<TReturn, InferYieldError<TYield>>
+    const ef = Effect.gen(() => handler(opts, input)) as Effect.Effect<TReturn, unknown>
 
     return runPromise(
       typeof wrap === 'function' ? wrap(ef, { ...opts, kind: 'handler' }) : ef,
