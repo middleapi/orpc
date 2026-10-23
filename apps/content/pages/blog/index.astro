@@ -66,6 +66,7 @@ const feed = data.feeds.find(f => f.href.startsWith('/blog'))
 
 // schema.org JSON-LD: the index as a Blog with its posts, absolute when the
 // site URL is known (production); crawlers read JSON-LD from the body fine.
+// PageLayout's own graph would call the index a TechArticle, so it is off.
 const siteBase = (config.site ?? '').replace(/\/$/, '')
 const blogJsonLd = {
   '@context': 'https://schema.org',
@@ -95,6 +96,7 @@ const blogJsonLd = {
   siteUrl={config.site}
   ogEnabled={config.og.enabled}
   page={{ title: `Blog - ${config.title}`, description: 'News, announcements, and writing from the oRPC team.', route: '/blog' }}
+  structuredDataEnabled={false}
   x={config.x}
 >
   <script

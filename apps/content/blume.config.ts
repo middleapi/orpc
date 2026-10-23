@@ -85,6 +85,26 @@ export default defineConfig({
   ],
 
   seo: {
+    /** The publisher of every page's JSON-LD: the team behind oRPC, not the product itself. */
+    organization: {
+      name: 'middleapi',
+      url: 'https://github.com/middleapi',
+      sameAs: [
+        'https://x.com/middleapi',
+        'https://opencollective.com/middleapi',
+      ],
+    },
+    /** The homepage's SoftwareApplication JSON-LD node, which tells search engines and agents what oRPC is. */
+    software: {
+      license: 'https://github.com/middleapi/orpc/blob/main/LICENSE',
+      operatingSystem: 'Cross-platform',
+      price: 0,
+      sameAs: [
+        'https://github.com/middleapi/orpc',
+        'https://www.npmjs.com/package/@orpc/server',
+        'https://www.npmjs.com/package/@orpc/client',
+      ],
+    },
     x: { creator: '@middleapi', handle: '@middleapi' },
     og: {
       titles: {
@@ -218,6 +238,23 @@ export default defineConfig({
     },
   ],
   agents: {
+    llmsTxt: {
+      // The llms.txt "details" block, right after the title and summary: what
+      // oRPC is, when to reach for it, and how to install it. No headings, the
+      // spec reserves them for the page sections that follow.
+      details: [
+        'oRPC is an open-source (MIT) TypeScript library for end-to-end typesafe APIs. You write procedures, plain functions with optional input and output schemas (Zod, Valibot, ArkType, or any Standard Schema library), group them into a router, and serve it over HTTP. From that one router you get a fully typed client with no code generation, a REST API with a generated OpenAPI document, MCP tools for AI agents, and typed realtime streams.',
+        '',
+        'Reach for oRPC when:',
+        '',
+        '- A TypeScript frontend, mobile app, or service calls a TypeScript backend and both sides should share types without a build step.',
+        '- You want tRPC-style RPC but also need a public REST API or an OpenAPI spec from the same code.',
+        '- You want to design the API as a contract first, then implement it and call it from clients that only import the contract.',
+        '- The API runs on Node.js, Bun, Deno, or Cloudflare Workers, inside a framework like Next.js, Nuxt, SvelteKit, or Hono, or feeds TanStack Query.',
+        '',
+        'Install the server and client with `npm install @orpc/server@beta @orpc/client@beta zod`, then follow [Getting Started](https://orpc.dev/docs/getting-started). These docs cover oRPC v2, currently in beta. The v1 docs live at https://v1.orpc.dev, and [Migrating from oRPC v1](https://orpc.dev/docs/migrations/from-v1) lists what changed.',
+      ].join('\n'),
+    },
     mcp: {
       enabled: true,
     },

@@ -70,6 +70,8 @@ const minutes = Math.max(1, Math.round(words / 200))
 const dateFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'long' })
 
 // schema.org JSON-LD, matching what Blume emits for generated blog pages.
+// PageLayout's own graph would describe the post as a second, TechArticle
+// node, so it is turned off below.
 const siteBase = (config.site ?? '').replace(/\/$/, '')
 const postJsonLd = {
   '@context': 'https://schema.org',
@@ -106,6 +108,7 @@ const postJsonLd = {
   siteUrl={config.site}
   ogEnabled={config.og.enabled}
   page={{ title: `${entry.data.title} - ${config.title}`, description: entry.data.description, route: route.path }}
+  structuredDataEnabled={false}
   x={config.x}
 >
   <script
