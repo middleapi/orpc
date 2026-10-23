@@ -4,8 +4,6 @@ import { setOwn, stringifyJSON } from '@orpc/shared'
 
 export type StructuralSharing = <T>(oldData: unknown, newData: T) => T
 
-type Serializer = Public<RPCJsonSerializer> | undefined
-
 /**
  * Creates a `structuralSharing` function that works like TanStack Query's default, but also keeps
  * the previous reference for equal `Date`, `URL`, `Map` and `Set` values, which oRPC's serializer
@@ -20,7 +18,7 @@ export function createStructuralSharing(serializer?: Public<RPCJsonSerializer>):
   return (oldData, newData) => replaceEqualDeep(oldData, newData, 0, serializer)
 }
 
-function replaceEqualDeep(a: any, b: any, depth: number, serializer: Serializer): any {
+function replaceEqualDeep(a: any, b: any, depth: number, serializer: Public<RPCJsonSerializer> | undefined): any {
   if (Object.is(a, b)) {
     return a
   }
@@ -55,7 +53,7 @@ function replaceEqualDeep(a: any, b: any, depth: number, serializer: Serializer)
   return replaceEqualSerialized(a, b, depth, serializer)
 }
 
-function replaceEqualArray(a: any[], b: any[], depth: number, serializer: Serializer): any[] {
+function replaceEqualArray(a: any[], b: any[], depth: number, serializer: Public<RPCJsonSerializer> | undefined): any[] {
   let copy: any[] | undefined
 
   for (let i = 0; i < b.length; i++) {
@@ -90,7 +88,7 @@ function copyArrayPrefix(a: any[], end: number): any[] {
   return copy
 }
 
-function replaceEqualObject(a: any, b: any, proto: object | null, depth: number, serializer: Serializer): any {
+function replaceEqualObject(a: any, b: any, proto: object | null, depth: number, serializer: Public<RPCJsonSerializer> | undefined): any {
   const bKeys = Object.keys(b)
   let copy: any
 
@@ -137,7 +135,7 @@ function assign(object: any, key: string, value: unknown): void {
   }
 }
 
-function replaceEqualBuiltIn(a: any, b: any, proto: object, depth: number, serializer: Serializer): object {
+function replaceEqualBuiltIn(a: any, b: any, proto: object, depth: number, serializer: Public<RPCJsonSerializer> | undefined): object {
   if (proto === Date.prototype) {
     return Object.is(a.getTime(), b.getTime()) ? a : b
   }
@@ -183,7 +181,7 @@ function replaceEqualBuiltIn(a: any, b: any, proto: object, depth: number, seria
   return a
 }
 
-function replaceEqualSerialized(a: object, b: object, depth: number, serializer: Serializer): object {
+function replaceEqualSerialized(a: object, b: object, depth: number, serializer: Public<RPCJsonSerializer> | undefined): object {
   const aSerialized = serializer?.serializeJson(a)
 
   if (!aSerialized?.meta?.length) {
