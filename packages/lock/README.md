@@ -21,9 +21,40 @@
   </a>
 </div>
 
+**oRPC** is a TypeScript framework for building end-to-end typesafe APIs. Write your API once as plain TypeScript functions, and oRPC gives you a fully typed client, a REST API with an OpenAPI document, and MCP tools for AI agents, with no code generation. It runs on Node.js, Bun, Deno, Cloudflare Workers, and more.
+
+Define procedures on the server and serve them with an [RPC handler](https://orpc.dev/docs/rpc/handler):
+
+```ts
+import { os } from '@orpc/server'
+import * as z from 'zod'
+
+export const router = {
+  planet: {
+    find: os
+      .input(z.object({ id: z.number() }))
+      .handler(({ input }) => ({ id: input.id, name: 'Earth' })),
+  },
+}
+```
+
+Then call them from a client that knows every input and output, without generating anything:
+
+```ts
+import type { RouterClient } from '@orpc/server'
+import type { router } from './router'
+import { createORPCClient } from '@orpc/client'
+import { RPCLink } from '@orpc/client/fetch'
+
+const link = new RPCLink({ origin: 'http://localhost:3000', url: '/rpc' })
+const client: RouterClient<typeof router> = createORPCClient(link)
+
+const planet = await client.planet.find({ id: 1 }) // { id: number, name: string }
+```
+
 ## Documentation
 
-You can read the documentation [here](https://orpc.dev).
+Read the full documentation at [orpc.dev](https://orpc.dev), starting with the [Getting Started guide](https://orpc.dev/docs/getting-started).
 
 ## Packages
 
