@@ -1,4 +1,5 @@
 import { RPCJsonSerializer } from '@orpc/client'
+import { OpenAPIJsonSerializer } from '@orpc/openapi'
 import { hashKey, partialMatchKey, QueryClient, skipToken } from '@tanstack/query-core'
 import { generateOperationKey } from './key'
 
@@ -135,6 +136,12 @@ describe('generateOperationKey serializer', () => {
 
     expect(generateOperationKey(['path'], { input: { p: new Point(1, 2) } })).toEqual([['path'], {
       input: { p: new Point(1, 2) },
+    }])
+  })
+
+  it('accepts an OpenAPI serializer, whose keys carry no type info', () => {
+    expect(generateOperationKey(['path'], { serializer: new OpenAPIJsonSerializer(), input: { a: new Date(0) } })).toEqual([['path'], {
+      input: { a: '1970-01-01T00:00:00.000Z' },
     }])
   })
 

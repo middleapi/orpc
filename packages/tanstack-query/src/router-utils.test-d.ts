@@ -4,6 +4,7 @@ import type { ProcedureUtils, ProcedureUtilsOptions } from './procedure-utils'
 import type { RouterUtils, RouterUtilsScoped } from './router-utils'
 import type { SharedUtils } from './shared-utils'
 import { RPCSerializer } from '@orpc/client'
+import { OpenAPISerializer } from '@orpc/openapi'
 import { os } from '@orpc/server'
 import z from 'zod'
 import { createRouterUtils } from './router-utils'
@@ -88,6 +89,10 @@ it('RouterUtilsScoped', () => {
   expectTypeOf(utils.nested?.pong).toExtend<
    undefined | ProcedureUtilsOptions<{ batch?: boolean }, unknown, unknown, Error>
   >()
+})
+
+it('createRouterUtils accepts an OpenAPI serializer', () => {
+  createRouterUtils({} as RouterClient<typeof scopedRouter>, { serializer: new OpenAPISerializer() })
 })
 
 it('createRouterUtils', () => {

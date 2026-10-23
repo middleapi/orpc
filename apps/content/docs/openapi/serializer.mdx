@@ -92,6 +92,33 @@ const link = new OpenAPILink(contract, {
 
 :::
 
+## OpenAPI JSON Serializer
+
+`OpenAPIJsonSerializer` is the JSON layer behind `OpenAPISerializer`. Use it directly wherever only JSON is accepted.
+
+```ts twoslash
+import { OpenAPIJsonSerializer } from '@orpc/openapi'
+
+const serializer = new OpenAPIJsonSerializer({
+  handlers: {
+    // same handlers as OpenAPISerializer
+  },
+})
+
+const { json } = serializer.serializeJson({
+  name: 'John',
+  createdAt: new Date('2024-01-01'),
+})
+// json: { name: 'John', createdAt: '2024-01-01T00:00:00.000Z' }
+
+const data = serializer.deserializeJson({ json })
+// data: { name: 'John', createdAt: '2024-01-01T00:00:00.000Z' }
+```
+
+:::info[Reuse an OpenAPI Serializer]
+`OpenAPISerializer` extends `OpenAPIJsonSerializer`, so an `OpenAPISerializer` instance also works wherever an `OpenAPIJsonSerializer` is accepted, such as [MCP outputs](/docs/integrations/mcp#output), [TanStack Query keys](/docs/integrations/tanstack-query#key-serializer), or [Pinia Colada keys](/docs/integrations/pinia-colada#key-serializer). Configure your handlers once and share the same instance.
+:::
+
 ## Serialization Format
 
 In most cases, serialized data is JSON-serializable.

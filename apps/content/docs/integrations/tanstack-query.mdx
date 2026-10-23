@@ -181,22 +181,10 @@ queryClient.setQueryData(orpc.planet.find.queryKey({ input: { id: 123 } }), (old
 
 ### Key Serializer
 
-oRPC serializes inputs with the [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer) when building keys, so keys are plain JSON and match by value. Native types like `Date`, `BigInt`, `Set`, and `Map` are supported by default, and keys keep track of each value's type, so a `Date` and its ISO string produce different keys. To support [custom types](/docs/rpc/serializer#custom-serializers), pass the same serializer your [link](/docs/rpc/link#custom-serializer) uses:
+oRPC serializes inputs with the [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer) when building keys, so inputs like `Date`, `BigInt`, `Set`, and `Map` match by value, and a `Date` and its ISO string produce different keys. You can pass a custom [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer), or an [OpenAPI JSON Serializer](/docs/openapi/serializer#openapi-json-serializer) if you don't need type-aware keys:
 
 ```ts
-import { RPCSerializer } from '@orpc/client'
-
-const serializer = new RPCSerializer({
-  handlers: {
-    // ...custom handlers
-  },
-})
-
-const link = new RPCLink({ url, serializer })
-
-const orpc = createTanstackQueryUtils(client, {
-  serializer,
-})
+const orpc = createTanstackQueryUtils(client, { serializer })
 ```
 
 ## Calling Clients
@@ -540,7 +528,7 @@ const queryClient = new QueryClient({
 })
 ```
 
-With a [key serializer](#key-serializer), equal instances of [custom types](/docs/rpc/serializer#custom-serializers) are kept too, compared by what their handler serializes them to. For queries not built with oRPC utils, pass it to `createStructuralSharing(serializer)`.
+With an RPC [key serializer](#key-serializer), equal instances of [custom types](/docs/rpc/serializer#custom-serializers) are kept too, compared by what their handler serializes them to. For queries not built with oRPC utils, pass it to `createStructuralSharing(serializer)`.
 
 ## Server-Side Rendering (SSR)
 
