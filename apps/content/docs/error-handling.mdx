@@ -79,10 +79,6 @@ const exampleProcedure = os
   })
 ```
 
-:::warning
-For compatibility, do not use these error codes: `then`, `bind`, `call`, `apply`, `valueOf`, `toString`, `toJSON`.
-:::
-
 :::tip
 You can use typesafe errors across your entire project, but we recommend reserving them for application-specific cases. For common errors like `UNAUTHORIZED` or `RATE_LIMITED`, the client usually already understands the meaning. Skipping explicit schemas for those errors can also reduce type complexity and improve TypeScript performance.
 :::

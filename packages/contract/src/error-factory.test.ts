@@ -232,6 +232,15 @@ describe('createORPCErrorConstructorMap', () => {
     expect(String(map)).toBe('[object Object]')
   })
 
+  it('still constructs defined RECURSIVE_CLIENT_UNWRAP_KEYS codes except then', async () => {
+    const map = createORPCErrorConstructorMap({ toJSON: {}, then: {} }) as any
+
+    const e = map.toJSON()
+    expect(e.code).toEqual('toJSON')
+    expect(e.defined).toEqual(true)
+    expect(await map).toBe(map)
+  })
+
   it('does not resolve error codes through Object.prototype', () => {
     const e = (constructors as any).constructor()
 
