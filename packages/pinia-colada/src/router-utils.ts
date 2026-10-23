@@ -127,7 +127,6 @@ function createRouterUtilsInternal<T extends AnyNestedClient>(
       const value = Reflect.get(target, prop)
 
       if (RECURSIVE_CLIENT_UNWRAP_KEYS.has(prop)) {
-        // utils have a null prototype, so fall back to Object.prototype to keep primitive conversion (valueOf/toString) working
         return value ?? Reflect.get(Object.prototype, prop)
       }
 

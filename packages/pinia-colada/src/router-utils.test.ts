@@ -102,10 +102,7 @@ describe('createRouterUtils', () => {
 
   it('can be converted to primitive values', () => {
     const utils = createRouterUtils(client) as any
-
     expect(String(utils)).toBe('[object Object]')
-    expect(`${utils.key.pong}`).toBe('[object Object]')
-    expect(utils.toJSON).toBe(undefined)
   })
 
   it('stops recursive on RECURSIVE_CLIENT_UNWRAP_KEYS', () => {

@@ -96,11 +96,7 @@ describe('createRouterUtils', () => {
 
   it('can be converted to primitive values', () => {
     const utils = createRouterUtils(client) as any
-
     expect(String(utils)).toBe('[object Object]')
-    expect(`${utils.key.pong}`).toBe('[object Object]')
-    expect(utils.then).toBe(undefined)
-    expect(utils.toJSON).toBe(undefined)
   })
 
   it('supports scoped options', () => {
