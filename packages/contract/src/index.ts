@@ -41,7 +41,15 @@ export type {
    */
   RouterContractClient as ContractRouterClient,
 } from './router-client'
-export * from './router-utils'
+export {
+  getProcedureContractOrThrow,
+  getRouterContract,
+  minifyRouterContract,
+} from './router-utils'
+export type {
+  AugmentContractRouterOptions,
+  AugmentedContractRouter,
+} from './router-utils'
 export {
   /**
    * @deprecated Use `getRouterContract` instead.
@@ -53,7 +61,11 @@ export {
   minifyRouterContract as minifyContractRouter,
 } from './router-utils'
 export * from './schema'
-export * from './schema-built-in'
+export {
+  asyncIteratorObject,
+  getAsyncIteratorObjectSchemasDetails,
+} from './schema-built-in'
+export type { AsyncIteratorObjectSchemasDetails } from './schema-built-in'
 export {
   /**
    * @deprecated Use `asyncIteratorObject` instead.

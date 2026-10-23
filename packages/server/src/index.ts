@@ -4,14 +4,20 @@ export * from './constants'
 export * from './context'
 export * from './implementer'
 export * from './implementer-procedure'
-export * from './implementer-router'
+export type {
+  RouterImplementer,
+  RouterImplementerWithMiddlewares,
+  SharedRouterImplementer,
+  SharedRouterImplementerWithMiddlewares,
+} from './implementer-router'
 export * from './lazy'
 export * from './middleware'
-export * from './middleware-decorated'
+export type { DecoratedMiddleware } from './middleware-decorated'
 export * from './procedure'
 export * from './procedure-client'
 export * from './procedure-decorated'
-export * from './procedure-utils'
+export { call } from './procedure-utils'
+export type { CallOptions, CallRest } from './procedure-utils'
 export * from './router'
 export type {
   /**
@@ -20,8 +26,19 @@ export type {
   InferRouterFinalContexts as InferRouterCurrentContexts,
 } from './router'
 export * from './router-client'
-export * from './router-hidden'
-export * from './router-utils'
+export {
+  getRouter,
+  resolveContractProcedure,
+  unlazyRouter,
+  walkProcedureContractsAsync,
+  walkProcedureContractsSync,
+} from './router-utils'
+export type {
+  AugmentedRouter,
+  AugmentedRouterWithMiddlewares,
+  UnlaziedRouter,
+  WalkProcedureContractsLazyResult,
+} from './router-utils'
 
 export type {
   AnyORPCError,
@@ -44,7 +61,6 @@ export type {
 } from '@orpc/client'
 
 export {
-  cloneORPCError,
   COMMON_ERROR_STATUS_MAP,
   isDefinedError,
   ORPCError,
@@ -85,7 +101,6 @@ export {
   defineMeta,
   error,
   eventIterator,
-  reconcileORPCError,
   type,
   ValidationError,
 } from '@orpc/contract'

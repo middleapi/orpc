@@ -1,9 +1,28 @@
 export * from './contract-utils'
-export * from './key'
-export * from './live-query'
+export type {
+  OperationKey,
+  OperationKeyBaseOptions,
+  OperationKeyOptions,
+  OperationKeyPrefixOptions,
+} from './key'
 export * from './meta'
-export * from './plugin'
-export * from './procedure-utils'
+export type { RouterUtilsPlugin } from './plugin'
+export { mergeProcedureUtilsOptions } from './procedure-utils'
+export type {
+  ProcedureUtils,
+  ProcedureUtilsInfiniteInterceptor,
+  ProcedureUtilsInfiniteInterceptorOptions,
+  ProcedureUtilsLiveInterceptor,
+  ProcedureUtilsLiveInterceptorOptions,
+  ProcedureUtilsModifier,
+  ProcedureUtilsMutationInterceptor,
+  ProcedureUtilsMutationInterceptorOptions,
+  ProcedureUtilsOptions,
+  ProcedureUtilsQueryInterceptor,
+  ProcedureUtilsQueryInterceptorOptions,
+  ProcedureUtilsStreamedInterceptor,
+  ProcedureUtilsStreamedInterceptorOptions,
+} from './procedure-utils'
 export * from './router-utils'
 export {
   /**
@@ -14,8 +33,8 @@ export {
 export {
   createRouterUtils as createPiniaColadaUtils,
 } from './router-utils'
-export * from './shared-utils'
-export * from './stream-query'
+export type { SharedUtils } from './shared-utils'
+export type { SerializableStreamedQueryOptions } from './stream-query'
 export * from './types'
 export {
   OPERATION_CONTEXT_SYMBOL as PINIA_COLADA_OPERATION_CONTEXT_SYMBOL,

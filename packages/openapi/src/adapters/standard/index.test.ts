@@ -5,3 +5,9 @@ it('exports OpenAPIMatcher, OpenAPIHandlerCodec, OpenAPILinkCodec', async () => 
     OpenAPILinkCodec: expect.any(Function),
   })
 })
+
+it('does not export internal helpers', async () => {
+  const mod = await import('.')
+
+  expect(mod).not.toHaveProperty('serializeHeaders')
+})
