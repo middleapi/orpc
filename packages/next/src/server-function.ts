@@ -83,7 +83,6 @@ export function createServerFunction<
     let input = args[0]
 
     if (args.length > 1) {
-      // `useActionState` shape: `(prevState, input | FormData)`
       input = args[1] instanceof FormData ? parseFormData(args[1]) : args[1]
     }
 

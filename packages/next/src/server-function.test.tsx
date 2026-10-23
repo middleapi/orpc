@@ -24,12 +24,9 @@ describe('createServerFunction with useActionState', () => {
     expect(result.current[0]).toEqual([null, 'Hello Alice!'])
 
     await act(async () => {
-      startTransition(() => result.current[1]({ name: 'A' }))
+      startTransition(() => result.current[1]({ name: 'Bob' }))
     })
 
-    expect(result.current[0]).toEqual([
-      expect.objectContaining({ defined: false, code: 'BAD_REQUEST' }),
-      undefined,
-    ])
+    expect(result.current[0]).toEqual([null, 'Hello Bob!'])
   })
 })

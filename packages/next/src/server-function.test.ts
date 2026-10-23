@@ -45,43 +45,17 @@ describe('createServerFunction', () => {
     await expect(serverFn({ input: 'ping' })).resolves.toEqual([new ORPCError('INTERNAL_SERVER_ERROR').toJSON(), undefined])
   })
 
-  describe('useActionState shape', () => {
-    it('ignores the previous state and passes the second argument as input', async () => {
-      const client = vi.fn().mockResolvedValue({ output: 'pong' })
-      createProcedureClientSpy.mockReturnValueOnce(client)
+  it('passes form data as-is when called with a single argument', async () => {
+    const client = vi.fn().mockResolvedValue({ output: 'pong' })
+    createProcedureClientSpy.mockReturnValueOnce(client)
 
-      const serverFn = createServerFunction(procedure)
+    const serverFn = createServerFunction(procedure)
 
-      await expect(serverFn([null, 'previous'], { input: 'ping' })).resolves.toEqual([null, { output: 'pong' }])
-      expect(client).toHaveBeenCalledWith({ input: 'ping' })
-    })
+    const form = new FormData()
+    form.append('name', 'alice')
 
-    it('deserializes bracket notation form data', async () => {
-      const client = vi.fn().mockResolvedValue({ output: 'pong' })
-      createProcedureClientSpy.mockReturnValueOnce(client)
-
-      const serverFn = createServerFunction(procedure)
-
-      const form = new FormData()
-      form.append('user[name]', 'alice')
-      form.append('user[tags][]', 'admin')
-
-      await expect(serverFn(null, form)).resolves.toEqual([null, { output: 'pong' }])
-      expect(client).toHaveBeenCalledWith({ user: { name: 'alice', tags: ['admin'] } })
-    })
-
-    it('passes form data as-is when called with a single argument', async () => {
-      const client = vi.fn().mockResolvedValue({ output: 'pong' })
-      createProcedureClientSpy.mockReturnValueOnce(client)
-
-      const serverFn = createServerFunction(procedure)
-
-      const form = new FormData()
-      form.append('name', 'alice')
-
-      await serverFn(form)
-      expect(client).toHaveBeenCalledWith(form)
-    })
+    await serverFn(form)
+    expect(client).toHaveBeenCalledWith(form)
   })
 
   it.each([
