@@ -217,6 +217,9 @@ importers:
       '@orpc/openapi':
         specifier: workspace:*
         version: link:packages/openapi
+      '@orpc/openrpc':
+        specifier: workspace:*
+        version: link:packages/openrpc
       '@orpc/opentelemetry':
         specifier: workspace:*
         version: link:packages/opentelemetry
