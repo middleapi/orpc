@@ -1,4 +1,5 @@
-import type { AwsLambdaGlobal, HttpResponseStream } from '@standard-server/aws-lambda'
+import type { StandardHandlerPlugin } from '@orpc/server/standard'
+import type { APIGatewayProxyEventV2, AwsLambdaGlobal, HttpResponseStream } from '@standard-server/aws-lambda'
 import { Buffer } from 'node:buffer'
 import { Writable } from 'node:stream'
 import { os } from '@orpc/server'
@@ -6,9 +7,15 @@ import { OpenRPCHandler } from './openrpc-handler'
 
 class TestResponseStream extends Writable implements HttpResponseStream {
   chunks: Buffer[] = []
-  metadata: { statusCode: number } | undefined
+  metadata: { statusCode: number, headers: Record<string, string>, cookies: string[] } | undefined
 
-  setContentType(): void {}
+  get text(): string {
+    return Buffer.concat(this.chunks).toString()
+  }
+
+  setContentType(): void {
+    // noop
+  }
 
   override _write(chunk: any, _encoding: BufferEncoding, callback: () => void): void {
     this.chunks.push(Buffer.from(chunk))
@@ -16,7 +23,24 @@ class TestResponseStream extends Writable implements HttpResponseStream {
   }
 }
 
-it('openRPCHandler serves JSON-RPC on AWS Lambda', async () => {
+function createEvent(override: Partial<APIGatewayProxyEventV2> = {}): APIGatewayProxyEventV2 {
+  return {
+    rawPath: '/',
+    rawQueryString: '',
+    headers: {
+      'host': 'example.com',
+      'content-type': 'application/json',
+    },
+    requestContext: { http: { method: 'POST' } },
+    body: JSON.stringify({ jsonrpc: '2.0', method: 'ping', id: 1 }),
+    isBase64Encoded: false,
+    ...override,
+  }
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+
   vi.stubGlobal('awslambda', {
     streamifyResponse: handler => handler,
     HttpResponseStream: {
@@ -26,25 +50,60 @@ it('openRPCHandler serves JSON-RPC on AWS Lambda', async () => {
       },
     },
   } satisfies AwsLambdaGlobal)
+})
 
-  try {
-    const handler = new OpenRPCHandler({ ping: os.handler(() => 'pong') })
-    const stream = new TestResponseStream()
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
-    const { matched } = await handler.handle({
-      rawPath: '/rpc',
-      rawQueryString: '',
-      headers: { 'host': 'example.com', 'content-type': 'application/json' },
-      requestContext: { http: { method: 'POST' } },
-      body: JSON.stringify({ jsonrpc: '2.0', method: 'ping', id: 1 }),
-      isBase64Encoded: false,
-    } as any, stream, { prefix: '/rpc' })
+describe('openRPCHandler', () => {
+  it('accepts context and prefix options in handle method', async () => {
+    const handler = new OpenRPCHandler({
+      ping: os
+        .$context<{ userId: string }>()
+        .handler(({ context }) => context.userId),
+    })
 
-    expect(matched).toBe(true)
-    expect(stream.metadata?.statusCode).toBe(200)
-    expect(JSON.parse(Buffer.concat(stream.chunks).toString())).toEqual({ jsonrpc: '2.0', id: 1, result: 'pong' })
-  }
-  finally {
-    vi.unstubAllGlobals()
-  }
+    const responseStream = new TestResponseStream()
+    const result = await handler.handle(createEvent({ rawPath: '/api/v1' }), responseStream, {
+      context: { userId: 'u_123' },
+      prefix: '/api/v1',
+    })
+
+    expect(result.matched).toBe(true)
+    expect(responseStream.metadata?.statusCode).toBe(200)
+    expect(JSON.parse(responseStream.text)).toEqual({ jsonrpc: '2.0', id: 1, result: 'u_123' })
+
+    const mismatchStream = new TestResponseStream()
+    const mismatchResult = await handler.handle(createEvent({ rawPath: '/invalid' }), mismatchStream, {
+      context: { userId: 'u_123' },
+      prefix: '/api/v1',
+    })
+
+    expect(mismatchResult.matched).toBe(false)
+    expect(mismatchStream.metadata).toBeUndefined()
+    expect(mismatchStream.text).toBe('')
+  })
+
+  it('supports standard handler plugins', async () => {
+    const plugin: StandardHandlerPlugin<any> = {
+      name: 'test',
+      init(options) {
+        return {
+          ...options,
+          routingInterceptors: [
+            async () => ({ matched: true, response: { status: 200, headers: {}, body: 'intercepted' } }),
+          ],
+        }
+      },
+    }
+
+    const handler = new OpenRPCHandler({}, { plugins: [plugin] })
+
+    const responseStream = new TestResponseStream()
+    const result = await handler.handle(createEvent({ requestContext: { http: { method: 'GET' } }, body: undefined }), responseStream)
+
+    expect(result.matched).toBe(true)
+    expect(responseStream.text).toBe('"intercepted"')
+  })
 })

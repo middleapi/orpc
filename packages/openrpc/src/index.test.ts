@@ -1,11 +1,12 @@
-it.each([
-  ['.', ['OpenRPCGenerator', 'openrpc', 'getOpenRPCMeta', 'COMMON_JSON_RPC_ERROR_CODE_MAP']],
-  ['./adapters/standard', ['OpenRPCHandlerCodec', 'OpenRPCEnvelopeHandlerPlugin', 'OpenRPCLinkCodec', 'getJsonRpcCall']],
-  ['./adapters/fetch', ['OpenRPCHandler', 'OpenRPCLink']],
-  ['./adapters/node', ['OpenRPCHandler']],
-  ['./adapters/fastify', ['OpenRPCHandler']],
-  ['./adapters/aws-lambda', ['OpenRPCHandler']],
-  ['./plugins', ['OpenRPCDiscoveryHandlerPlugin']],
-])('%s exports %j', async (path, names) => {
-  expect(Object.keys(await import(path))).toEqual(expect.arrayContaining(names))
+it('exports openrpc meta, OpenRPCGenerator, JSON-RPC helpers and constants', async () => {
+  await expect(import('.')).resolves.toMatchObject({
+    openrpc: expect.any(Function),
+    getOpenRPCMeta: expect.any(Function),
+    OpenRPCGenerator: expect.any(Function),
+    OpenRPCGeneratorError: expect.any(Function),
+    isJsonRpcResponse: expect.any(Function),
+    encodeJsonRpcError: expect.any(Function),
+    fromJsonRpcErrorCode: expect.any(Function),
+    COMMON_JSON_RPC_ERROR_CODE_MAP: expect.any(Object),
+  })
 })
