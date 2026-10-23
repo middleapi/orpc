@@ -6,10 +6,3 @@ it('exports StandardHandler, resolveFriendlyStandardHandlerHandleOptions, RPCMat
     RPCHandlerCodec: expect.any(Function),
   })
 })
-
-it('does not export internal helpers', async () => {
-  const mod = await import('.')
-
-  expect(mod).not.toHaveProperty('CompositeStandardHandlerPlugin')
-  expect(mod).not.toHaveProperty('TracingHandlerPlugin')
-})

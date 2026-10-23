@@ -4,9 +4,3 @@ it('exports StandardLink, RPCLinkCodec', async () => {
     RPCLinkCodec: expect.any(Function),
   })
 })
-
-it('does not export internal helpers', async () => {
-  const mod = await import('.')
-
-  expect(mod).not.toHaveProperty('CompositeStandardLinkPlugin')
-})

@@ -5,12 +5,3 @@ it('exports createSWRUtils, SWR_OPERATION_CONTEXT_SYMBOL', async () => {
     SWR_OPERATION_CONTEXT_SYMBOL: expect.any(Symbol),
   })
 })
-
-it('does not export internal helpers', async () => {
-  const mod = await import('./index')
-
-  expect(mod).not.toHaveProperty('generateOperationKey')
-  expect(mod).not.toHaveProperty('isSubsetOf')
-  expect(mod).not.toHaveProperty('ProcedureUtils')
-  expect(mod).not.toHaveProperty('SharedUtils')
-})

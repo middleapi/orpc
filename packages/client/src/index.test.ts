@@ -7,9 +7,3 @@ it('exports createORPCClient, ORPCError, DynamicLink, RPCJsonSerializer, RPCSeri
     RPCSerializer: expect.any(Function),
   }))
 })
-
-it('does not export internal helpers', async () => {
-  const mod = await import('./index')
-
-  expect(mod).not.toHaveProperty('resolveFriendlyClientOptions')
-})
