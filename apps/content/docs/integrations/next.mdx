@@ -113,53 +113,23 @@ export const serverFunction = createServerFunction(procedure)
 
 ### `useActionState`
 
-Server functions can be passed directly to React's [`useActionState`](https://react.dev/reference/react/useActionState): the previous state is ignored, `FormData` is deserialized using [Bracket Notation](/docs/openapi/bracket-notation), and the state is the same `[error, data]` tuple. The form works even before JavaScript loads.
+Server functions can be passed directly to React's [`useActionState`](https://react.dev/reference/react/useActionState). The previous state is ignored, `FormData` is parsed with [Bracket Notation](/docs/openapi/bracket-notation), and the form works before JavaScript loads.
 
-<CodeGroup>
+```tsx
+const [state, submit, isPending] = useActionState(serverFunction, null)
+const [error, data] = state ?? [null, undefined]
 
-```tsx client
-'use client'
-
-import { getIssueMessage } from '@orpc/next'
-import { useActionState } from 'react'
-import { addTodo } from './path/to/server/function'
-
-export default function Page() {
-  const [state, submit, isPending] = useActionState(addTodo, null)
-  const [error, todo] = state ?? [null, undefined]
-
-  return (
-    <form action={submit}>
-      <input name="title" />
-      <span>{getIssueMessage(error, 'title')}</span>
-
-      <button type="submit" disabled={isPending}>Add Todo</button>
-      {todo && <p>Added: {todo.title}</p>}
-    </form>
-  )
-}
+return (
+  <form action={submit}>
+    <input name="title" />
+    <span>{getIssueMessage(error, 'title')}</span>
+    <button type="submit" disabled={isPending}>Submit</button>
+  </form>
+)
 ```
-
-```ts server
-'use server'
-
-const procedure = os
-  .input(z.object({ title: z.string().min(1) }))
-  .handler(async ({ input }) => {
-    return { id: crypto.randomUUID(), title: input.title }
-  })
-
-export const addTodo = createServerFunction(procedure)
-```
-
-</CodeGroup>
 
 :::warning
-Server functions tell the `useActionState` shape apart by argument count, so don't pass extra input with `.bind`: `addTodo.bind(null, input)` treats the bound input as the previous state. Use hidden inputs instead.
-:::
-
-:::tip
-Form values arrive as strings, so use coercing schemas such as `z.coerce.number()` for other types.
+Don't pass extra input with `.bind`, since the bound value is treated as the previous state. Use hidden inputs instead.
 :::
 
 ### `createServerFunctionable`
