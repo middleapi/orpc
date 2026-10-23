@@ -107,7 +107,7 @@ const postJsonLd = {
   searchEnabled={config.search.enabled}
   siteUrl={config.site}
   ogEnabled={config.og.enabled}
-  page={{ title: `${entry.data.title} - ${config.title}`, description: entry.data.description, route: route.path }}
+  page={{ title: `${entry.data.seo?.title ?? entry.data.title} - ${config.title}`, description: entry.data.description, route: route.path }}
   structuredDataEnabled={false}
   x={config.x}
 >

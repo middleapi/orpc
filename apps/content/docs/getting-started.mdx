@@ -73,7 +73,7 @@ A few things to notice:
 
 ## Create a Server
 
-Clients reach your router through an HTTP server. `RPCHandler` does the translation: it matches each incoming request to a procedure, validates the input, runs your handler, and sends the result back. This example uses [Node's built-in HTTP module](/docs/adapters/node-http). The same router also runs on Bun and Deno through the [Fetch API adapter](/docs/adapters/fetch-api), and on [Cloudflare Workers](/docs/adapters/cloudflare-workers).
+Clients reach your router through an HTTP server. `RPCHandler` does the translation: it matches each incoming request to a procedure, validates the input, runs your handler, and sends the result back. This example uses [Node's built-in HTTP module](/docs/adapters/node-http). The same router also runs on Bun and Deno through the [Fetch API adapter](/docs/adapters/fetch-api), and on [Cloudflare Workers](/docs/adapters/cloudflare-workers). Adapters also mount it inside [Next.js](/docs/adapters/next), [Nuxt](/docs/adapters/nuxt), [SvelteKit](/docs/adapters/svelte-kit), [Astro](/docs/adapters/astro), [TanStack Start](/docs/adapters/tanstack-start), [React Router](/docs/adapters/react-router), [SolidStart](/docs/adapters/solid-start), [Hono](/docs/adapters/hono), [Express](/docs/adapters/express), [Fastify](/docs/adapters/fastify), [Elysia](/docs/adapters/elysia), and [H3](/docs/adapters/h3).
 
 ```ts twoslash
 /// <reference types="node" />
