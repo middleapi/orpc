@@ -13,7 +13,7 @@ If you want to add oRPC features to an existing tRPC app without a full migratio
 | --------------------- | ---------------------------- | ------------------- |
 | **Router**            | `t.router()`                 | plain object        |
 | **Procedure**         | `t.procedure`                | `os`                |
-| **Context**           | `t.context()`                | `os.$context()`     |
+| **Context**           | `initTRPC.context<T>()`      | `os.$context<T>()`  |
 | **Create Middleware** | `t.middleware()`             | `os.middleware()`   |
 | **Use Middleware**    | `t.procedure.use()`          | `os.use()`          |
 | **Input Validation**  | `t.procedure.input(schema)`  | `os.input(schema)`  |
@@ -259,7 +259,7 @@ Learn more about oRPC [Router](/docs/router).
 
 ### 5. Error Handling
 
-Error handling is similar, but `ORPCError` takes the error code as its first argument.
+Error handling is similar, but `ORPCError` takes the error code as its first argument and accepts a `data` option directly.
 
 <CodeGroup>
 
@@ -275,7 +275,6 @@ throw new ORPCError('BAD_REQUEST', {
 throw new TRPCError({
   code: 'BAD_REQUEST',
   message: 'Invalid input',
-  data: 'some data',
   cause: validationError
 })
 ```
@@ -373,12 +372,14 @@ const { planets } = await client.planet.list({ cursor: 0 })
 ```
 
 ```ts trpc/client.ts
-import { createTRPCProxyClient, httpLink } from '@trpc/client'
+import { createTRPCClient, httpLink } from '@trpc/client'
+import superjson from 'superjson'
 
-export const client = createTRPCProxyClient<typeof appRouter>({
+export const client = createTRPCClient<typeof appRouter>({
   links: [
     httpLink({
-      url: 'http://localhost:3000/api/trpc'
+      url: 'http://localhost:3000/api/trpc',
+      transformer: superjson,
     })
   ]
 })
