@@ -29,9 +29,44 @@ Each procedure becomes a method, in the same way [OpenRPC Handler](/docs/openrpc
 - **Params**: an object input is described as one by-name param per property, any other input as a single by-position `input` param, and a method without input has no params.
 - **Result**: the output schema, which also allows `null` when the output is optional.
 - **Errors**: the [typesafe errors](/docs/error-handling) with their JSON-RPC codes. Pass the handler's `errorCodeMap` to the generator too.
-- **Metadata**: `summary`, `description`, `tags`, and `deprecated` from [`openapi` metadata](/docs/openapi/specification#metadata).
+- **Metadata**: from [`openrpc` metadata](#metadata).
 
 Procedures with an [event iterator](/docs/async-iterator-object) are skipped, as the handler does not serve them. Reusable schemas, such as Zod schemas with `.meta({ id: 'Planet' })`, are placed in `components.schemas`.
+
+## Metadata
+
+Use `openrpc` metadata to describe a procedure's method. Fields left undefined fall back to its [`openapi` metadata](/docs/openapi/specification#metadata), so procedures already documented for OpenAPI need no extra metadata.
+
+```ts
+import { openrpc } from '@orpc/openrpc'
+
+const findPlanet = os
+  .meta(openrpc({
+    summary: 'Find a planet',
+    description: 'Returns a single planet.',
+    tags: ['planets'],
+    deprecated: false,
+    externalDocs: { url: 'https://example.com/planets' },
+    examples: [
+      { name: 'Earth', input: { id: 1 }, output: { id: 1, name: 'Earth' } },
+    ],
+  }))
+  .input(z.object({ id: z.number() }))
+  .handler(({ input }) => getPlanet(input.id))
+```
+
+Example inputs are described as params the same way the method's params are, here `[{ "name": "id", "value": 1 }]`.
+
+Use `spec` to customize the generated Method Object: an object replaces it, and a function receives and returns it:
+
+```ts
+const findPlanet = os
+  .meta(openrpc({
+    spec: method => ({ ...method, 'x-rate-limit': 100 }),
+  }))
+```
+
+When `openrpc` is applied multiple times, fields are overridden by the most recent call, except `tags`, which are concatenated, and `spec`, which is combined: two functions are chained, a function combined with an object is applied to that object, and between two objects the most recent one wins.
 
 ## Service Discovery
 

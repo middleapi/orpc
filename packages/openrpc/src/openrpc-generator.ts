@@ -18,6 +18,7 @@ import { getOpenAPIMeta, OpenAPIComponentRegistry, OpenAPIJsonSerializer } from 
 import { walkProcedureContractsAsync } from '@orpc/server'
 import { clone, getOwn, toArray, value } from '@orpc/shared'
 import { COMMON_JSON_RPC_ERROR_CODE_MAP, DEFAULT_JSON_RPC_ERROR_CODE } from './constants'
+import { getOpenRPCMeta } from './meta'
 import { isEventIteratorProcedure } from './utils'
 
 export class OpenRPCGeneratorError extends TypeError {}
@@ -123,6 +124,18 @@ export class OpenRPCGenerator {
       )
     }
 
+    const spec = getOpenRPCMeta(contract)?.spec
+    const method = typeof spec === 'object' ? spec : this.generateMethod(registry, contract, name, errorCodeMap)
+
+    return typeof spec === 'function' ? spec(method) : method
+  }
+
+  private generateMethod(
+    registry: OpenAPIComponentRegistry,
+    contract: AnyProcedureContract,
+    name: string,
+    errorCodeMap: Record<string, number>,
+  ): OpenRPCMethodObject {
     const def = contract['~orpc']
     const [inputSchema, inputOptional] = this.convertSchemas(def.inputSchemas, 'input')
     const [outputSchema, outputOptional] = this.convertSchemas(def.outputSchemas, 'output')
@@ -131,13 +144,15 @@ export class OpenRPCGenerator {
       throw new OpenRPCGeneratorError('File/Blob schemas cannot be sent over JSON-RPC.')
     }
 
-    const meta = getOpenAPIMeta(contract)
+    const meta = getOpenRPCMeta(contract)
+    const openapiMeta = getOpenAPIMeta(contract)
     const method: OpenRPCMethodObject = {
       name,
-      summary: meta?.summary,
-      description: meta?.description,
-      deprecated: meta?.deprecated,
-      tags: meta?.tags?.map(tag => ({ name: tag })),
+      summary: meta?.summary ?? openapiMeta?.summary,
+      description: meta?.description ?? openapiMeta?.description,
+      deprecated: meta?.deprecated ?? openapiMeta?.deprecated,
+      tags: (meta?.tags ?? openapiMeta?.tags)?.map(tag => ({ name: tag })),
+      externalDocs: meta?.externalDocs,
       params: [],
       result: {
         name: 'result',
@@ -149,11 +164,6 @@ export class OpenRPCGenerator {
       errors: buildErrors(def.errorMap, errorCodeMap),
     }
 
-    // no input, or an input like `z.void()` or `z.any()`, needs no params
-    if (isUnconstrainedSchema(inputSchema) && inputOptional) {
-      return method
-    }
-
     const entries = toByNameEntries(inputSchema)
 
     // an optional object can be sent by-name only when no param is required
@@ -163,10 +173,21 @@ export class OpenRPCGenerator {
         .sort(([, , a], [, , b]) => Number(a) - Number(b))
         .map(([name, schema, optional]) => toContentDescriptor(registry, name, schema, optional))
     }
-    else {
+    // no input, or an input like `z.void()` or `z.any()`, needs no params
+    else if (!isUnconstrainedSchema(inputSchema) || !inputOptional) {
       method.paramStructure = 'by-position'
       method.params = [toContentDescriptor(registry, 'input', inputSchema, inputOptional)]
     }
+
+    method.examples = meta?.examples?.map(example => ({
+      name: example.name,
+      summary: example.summary,
+      description: example.description,
+      params: method.paramStructure === 'by-name'
+        ? Object.entries(example.input ?? {}).map(([name, value]) => ({ name, value }))
+        : example.input === undefined ? [] : [{ name: 'input', value: example.input }],
+      result: Object.hasOwn(example, 'output') ? { name: 'result', value: example.output } : undefined,
+    }))
 
     return method
   }

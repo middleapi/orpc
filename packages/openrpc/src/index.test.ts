@@ -1,5 +1,5 @@
 it.each([
-  ['.', ['OpenRPCGenerator', 'COMMON_JSON_RPC_ERROR_CODE_MAP']],
+  ['.', ['OpenRPCGenerator', 'openrpc', 'getOpenRPCMeta', 'COMMON_JSON_RPC_ERROR_CODE_MAP']],
   ['./adapters/standard', ['OpenRPCHandlerCodec', 'OpenRPCEnvelopeHandlerPlugin', 'OpenRPCLinkCodec', 'getJsonRpcCall']],
   ['./adapters/fetch', ['OpenRPCHandler', 'OpenRPCLink']],
   ['./adapters/node', ['OpenRPCHandler']],

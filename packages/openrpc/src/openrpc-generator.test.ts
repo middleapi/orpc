@@ -2,6 +2,7 @@ import { eventIterator, oc } from '@orpc/contract'
 import { openapi } from '@orpc/openapi'
 import { os } from '@orpc/server'
 import { z } from 'zod'
+import { openrpc } from './meta'
 import { OpenRPCGenerator, OpenRPCGeneratorError } from './openrpc-generator'
 
 const planet = z.object({ id: z.number(), name: z.string() }).meta({ id: 'Planet' })
@@ -103,6 +104,36 @@ describe('openRPCGenerator', () => {
     expect(doc.methods.map(method => 'name' in method && method.name)).toEqual(['custom', 'planet.find'])
     expect(doc.methods[1]).toMatchObject({ errors: [{ code: 404 }, { code: -32000 }] })
     expect(Object.keys(doc.components!.schemas!)).toEqual(['Shared', 'Planet'])
+  })
+
+  it('applies openrpc meta', async () => {
+    const examples = [{ name: 'earth', input: { id: 1 }, output: 'Earth' }, { name: 'no result', input: { id: 2 } }]
+    const doc = await generator.generate({
+      byName: oc
+        .meta(openapi({ summary: 'OpenAPI summary', description: 'OpenAPI description', tags: ['openapi'] }))
+        .meta(openrpc({ summary: 'Find a planet', tags: ['planets'], externalDocs: { url: 'https://example.com' }, examples }))
+        .input(z.object({ id: z.number() })),
+      byPosition: oc.meta(openrpc({ examples: [{ name: 'one', input: 1 }] })).input(z.number()),
+      replaced: oc.meta(openrpc({ spec: { name: 'custom', params: [] } })),
+      transformed: oc.meta(openrpc({ spec: method => ({ ...method, summary: 'Transformed' }) })),
+    })
+
+    expect(doc.methods).toEqual([
+      expect.objectContaining({
+        name: 'byName',
+        summary: 'Find a planet',
+        description: 'OpenAPI description',
+        tags: [{ name: 'planets' }],
+        externalDocs: { url: 'https://example.com' },
+        examples: [
+          { name: 'earth', params: [{ name: 'id', value: 1 }], result: { name: 'result', value: 'Earth' } },
+          { name: 'no result', params: [{ name: 'id', value: 2 }] },
+        ],
+      }),
+      expect.objectContaining({ name: 'byPosition', examples: [{ name: 'one', params: [{ name: 'input', value: 1 }] }] }),
+      { name: 'custom', params: [] },
+      expect.objectContaining({ name: 'transformed', summary: 'Transformed', result: { name: 'result', schema: {} } }),
+    ])
   })
 
   it('works with routers and gives components valid names', async () => {
