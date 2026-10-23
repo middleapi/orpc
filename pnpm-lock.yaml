@@ -187,12 +187,12 @@ importers:
       '@orpc/contract':
         specifier: workspace:*
         version: link:packages/contract
+      '@orpc/effect':
+        specifier: workspace:*
+        version: link:packages/effect
       '@orpc/evlog':
         specifier: workspace:*
         version: link:packages/evlog
-      '@orpc/experimental-effect':
-        specifier: workspace:*
-        version: link:packages/effect
       '@orpc/experimental-lock':
         specifier: workspace:*
         version: link:packages/lock
