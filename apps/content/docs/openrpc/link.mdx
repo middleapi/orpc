@@ -27,7 +27,7 @@ const planet = await client.planet.find({ id: 1 }) // { "jsonrpc": "2.0", "id": 
 An object input is sent as by-name `params`, any other input as `[input]`, and an `undefined` input without `params`.
 
 :::info
-Results are plain JSON, so use `JsonifiedClient` from `@orpc/openapi` to type them: a `Date` is a string, and an `undefined` output arrives as `null`. With a [contract](/docs/contract-first), the [Smart Coercion Plugin](/docs/plugins/smart-coercion) can restore native types instead.
+Results are plain JSON, so use `JsonifiedClient` from `@orpc/openapi` to type them, such as a `Date` as a string. An `undefined` output arrives as `null`, although `JsonifiedClient` still types it as `undefined`, so check it with `== null`. With a [contract](/docs/contract-first), the [Smart Coercion Plugin](/docs/plugins/smart-coercion) can restore native types instead.
 :::
 
 ## Error Handling

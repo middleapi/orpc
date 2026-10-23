@@ -179,14 +179,15 @@ export class OpenRPCGenerator {
       method.params = [toContentDescriptor(registry, 'input', inputSchema, inputOptional)]
     }
 
+    // Example Objects require a `value`, so examples describe what is sent: undefined params are omitted, and an undefined result is `null`
     method.examples = meta?.examples?.map(example => ({
       name: example.name,
       summary: example.summary,
       description: example.description,
       params: method.paramStructure === 'by-name'
-        ? Object.entries(example.input ?? {}).map(([name, value]) => ({ name, value }))
+        ? Object.entries(example.input ?? {}).filter(([, value]) => value !== undefined).map(([name, value]) => ({ name, value }))
         : example.input === undefined ? [] : [{ name: 'input', value: example.input }],
-      result: Object.hasOwn(example, 'output') ? { name: 'result', value: example.output } : undefined,
+      result: Object.hasOwn(example, 'output') ? { name: 'result', value: example.output ?? null } : undefined,
     }))
 
     return method

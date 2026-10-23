@@ -55,7 +55,7 @@ const findPlanet = os
   .handler(({ input }) => getPlanet(input.id))
 ```
 
-Example inputs are described as params the same way the method's params are, here `[{ "name": "id", "value": 1 }]`.
+Example inputs are described as params the same way the method's params are, here `[{ "name": "id", "value": 1 }]`. As on the wire, `undefined` params are left out and an `undefined` output is shown as `null`.
 
 Use `spec` to customize the generated Method Object: an object replaces it, and a function receives and returns it:
 
