@@ -1,5 +1,5 @@
 import type { RouterUtilsPlugin } from './plugin'
-import { createORPCClient, RPCJsonSerializer } from '@orpc/client'
+import { RPCJsonSerializer } from '@orpc/client'
 import * as KeyModule from './key'
 import { ProcedureUtils } from './procedure-utils'
 import { createRouterUtils } from './router-utils'
@@ -95,12 +95,12 @@ describe('createRouterUtils', () => {
   })
 
   it('can be converted to primitive values', () => {
-    const utils = createRouterUtils(createORPCClient({ call: vi.fn() }) as any) as any
+    const utils = createRouterUtils(client) as any
 
-    expect(String(utils.planet)).toBe('[object Object]')
-    expect(`${utils.planet.find.queryOptions.name}`).toBe('[object Object]')
-    expect(utils.planet.then).toBeUndefined()
-    expect(utils.planet.toJSON).toBeUndefined()
+    expect(String(utils)).toBe('[object Object]')
+    expect(`${utils.key.pong}`).toBe('[object Object]')
+    expect(utils.then).toBe(undefined)
+    expect(utils.toJSON).toBe(undefined)
   })
 
   it('supports scoped options', () => {
