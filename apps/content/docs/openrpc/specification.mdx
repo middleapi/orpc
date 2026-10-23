@@ -1,142 +1,15 @@
 ---
 title: "OpenRPC Specification"
-description: "Generate OpenRPC 1.3 or 1.4 documents from your oRPC contracts and routers with OpenRPCGenerator, configure openrpc metadata, and serve the document with rpc.discover."
+description: "Generate OpenRPC documents from oRPC contracts and routers, and serve them with OpenRPC Service Discovery."
 ---
-
-## Metadata
-
-Use `openrpc` metadata to control how a procedure appears as a method in the generated [OpenRPC](https://spec.open-rpc.org) document:
-
-```ts
-import { oc } from '@orpc/contract'
-import { openrpc } from '@orpc/openrpc'
-import { z } from 'zod'
-
-const findPlanet = oc
-  .meta(openrpc({
-    summary: 'Find a planet',
-    description: 'Returns a single planet.',
-    tags: ['planets'],
-    externalDocs: { url: 'https://example.com/docs/planets' },
-  }))
-  .input(z.object({ id: z.number() }))
-  .output(z.object({ id: z.number(), name: z.string() }))
-```
-
-| Field          | Becomes                                                                                       | Falls back to          |
-| -------------- | --------------------------------------------------------------------------------------------- | ---------------------- |
-| `summary`      | `summary`                                                                                     | OpenAPI `summary`      |
-| `description`  | `description`                                                                                 | OpenAPI `description`  |
-| `deprecated`   | `deprecated`                                                                                  | OpenAPI `deprecated`   |
-| `tags`         | `tags`, as Tag Objects                                                                        | OpenAPI `tags`         |
-| `externalDocs` | `externalDocs`                                                                                |                        |
-| `examples`     | `examples`, see [Examples](#examples)                                                         |                        |
-| `spec`         | The whole Method Object, see [Customizing the Method Object](#customizing-the-method-object)  |                        |
-
-:::info
-Fields left undefined fall back to the procedure's [OpenAPI metadata](/docs/openapi/specification#metadata), so procedures already documented for OpenAPI need no extra metadata. Use `getOpenRPCMeta(procedure)` to read the `openrpc` metadata of a procedure or contract.
-:::
-
-### Metadata Merging
-
-When `openrpc` is applied multiple times, fields such as `summary` and `description` are overridden by the most recent call, except:
-
-- `tags` are concatenated in definition order.
-- `examples` are replaced, not merged.
-- `spec` values are combined like [OpenAPI `spec`](/docs/openapi/specification#metadata-merging): two functions are chained, a function combined with an object is applied to that object, and between two objects the most recent one wins.
-
-Setting a field to `undefined` in a later call resets it, so it falls back to its default again:
-
-```ts
-const router = os
-  .meta(openrpc({ tags: ['planets'] }))
-  .router({
-    find: os
-      .meta(openrpc({ tags: ['read'] })) // tags: ['planets', 'read']
-      .handler(async () => {}),
-    internal: os
-      .meta(openrpc({ tags: undefined })) // no tags
-      .handler(async () => {}),
-  })
-```
-
-### Examples
-
-Use `examples` to document example calls of a method:
-
-```ts
-const findPlanet = os
-  .meta(openrpc({
-    examples: [
-      {
-        name: 'earth',
-        summary: 'Find the Earth',
-        input: { id: 1 },
-        output: { id: 1, name: 'Earth' },
-      },
-    ],
-  }))
-  .input(z.object({ id: z.number() }))
-  .output(z.object({ id: z.number(), name: z.string() }))
-  .handler(async ({ input }) => ({ id: input.id, name: 'Earth' }))
-```
-
-Each example becomes an [Example Pairing Object](https://spec.open-rpc.org/#example-pairing-object). Its `input` is mapped to example params the same way the method's [params](#params-mapping) are: one example param per property for a by-name method, a single `input` param for a by-position method. Values are serialized with the generator's [serializer](#custom-serializer):
-
-```json
-{
-  "name": "earth",
-  "summary": "Find the Earth",
-  "params": [{ "name": "id", "value": 1 }],
-  "result": { "name": "result", "value": { "id": 1, "name": "Earth" } }
-}
-```
-
-:::info
-Leave out the `output` key to document a notification example, which has no `result`. The `input` of an example for a by-name method must be an object.
-:::
-
-### Customizing the Method Object
-
-Use `spec` to customize the generated [Method Object](https://spec.open-rpc.org/#method-object). If `spec` is an object, it replaces the generated Method Object entirely. If `spec` is a function, it receives the generated Method Object and returns an extended version:
-
-```ts
-const findPlanet = os
-  .meta(openrpc({
-    spec: current => ({
-      ...current,
-      servers: [{ name: 'primary', url: 'https://primary.example.com/rpc' }],
-      links: [{ name: 'list', method: 'planet.list' }],
-    }),
-  }))
-```
-
-:::warning
-JSON-RPC calls are routed by the procedure path, so keep the method `name` unchanged. The `params` and `result` schemas of the Method Object are lowered to [JSON Schema draft-07](#json-schema-draft-07) like generated ones.
-:::
 
 ## OpenRPC Generator
 
-`OpenRPCGenerator` turns a [contract](/docs/contract/router) or a [router](/docs/router) into an OpenRPC document that describes each procedure as the JSON-RPC method [OpenRPC Handler](/docs/openrpc/handler) serves it as:
+`OpenRPCGenerator` describes a contract or router as an [OpenRPC](https://spec.open-rpc.org) 1.3 document, with JSON Schemas from your [schema converters](/docs/openapi/specification#openapi-generator):
 
 ```ts
-import { openrpc, OpenRPCGenerator } from '@orpc/openrpc'
-import { os } from '@orpc/server'
+import { OpenRPCGenerator } from '@orpc/openrpc'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
-import { z } from 'zod'
-
-const PlanetSchema = z.object({ id: z.number(), name: z.string() }).meta({ id: 'Planet' })
-
-const router = {
-  planet: {
-    find: os
-      .meta(openrpc({ summary: 'Find a planet', tags: ['planets'] }))
-      .errors({ NOT_FOUND: { message: 'Planet not found' } })
-      .input(z.object({ id: z.number() }))
-      .output(PlanetSchema)
-      .handler(async ({ input }) => ({ id: input.id, name: 'Earth' })),
-  },
-}
 
 const generator = new OpenRPCGenerator({
   converters: [new ZodToJsonSchemaConverter()],
@@ -144,316 +17,37 @@ const generator = new OpenRPCGenerator({
 
 const spec = await generator.generate(router, {
   base: {
-    info: {
-      title: 'Planet API',
-      version: '1.0.0',
-    },
-    servers: [
-      { name: 'production', url: 'https://example.com/rpc' },
-    ],
+    info: { title: 'Planets', version: '1.0.0' },
+    servers: [{ url: 'https://example.com/rpc' }],
   },
-})
-```
-
-```json
-{
-  "openrpc": "1.3.2",
-  "info": { "title": "Planet API", "version": "1.0.0" },
-  "servers": [{ "name": "production", "url": "https://example.com/rpc" }],
-  "methods": [
-    {
-      "name": "planet.find",
-      "summary": "Find a planet",
-      "tags": [{ "name": "planets" }],
-      "paramStructure": "by-name",
-      "params": [
-        { "name": "id", "required": true, "schema": { "type": "number" } }
-      ],
-      "result": {
-        "name": "result",
-        "schema": { "$ref": "#/components/schemas/Planet" }
-      },
-      "errors": [
-        {
-          "code": -32004,
-          "message": "Planet not found",
-          "data": { "code": "NOT_FOUND", "defined": true }
-        }
-      ]
-    }
-  ],
-  "components": {
-    "schemas": {
-      "Planet": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "number" },
-          "name": { "type": "string" }
-        },
-        "required": ["id", "name"],
-        "additionalProperties": false
-      }
-    }
-  }
-}
-```
-
-`base` provides the document fields to start from, such as `info`, `servers`, `components`, or `methods`, which come before the generated ones. `info` defaults to `{ title: 'API Reference', version: '0.0.0' }`, and the `openrpc` field comes from [`version`](#openrpc-version).
-
-:::info
-- Use absolute `servers[].url` values: the OpenRPC meta-schema validates them as URIs.
-- [`rpc.discover`](#service-discovery) is never listed in `methods`, as is the convention.
-:::
-
-### OpenRPC Version
-
-`version` selects the OpenRPC version, `DEFAULT_OPENRPC_VERSION` (`1.3.2`) by default. Any `1.3.x` or `1.4.x` value works, since both versions share one document structure, but some tools, such as [`@open-rpc/generator`](https://github.com/open-rpc/generator), only accept 1.3 documents.
-
-```ts
-const spec = await generator.generate(router, {
-  version: '1.4.1',
-})
-```
-
-### Json Schema Converters
-
-`OpenRPCGenerator` relies on JSON Schema converters to translate your input and output schemas into JSON Schemas, like the [OpenAPI Generator](/docs/openapi/specification#json-schema-converters). oRPC provides dedicated converters through the [Zod](/docs/integrations/zod), [Valibot](/docs/integrations/valibot), and [ArkType](/docs/integrations/arktype) integrations:
-
-```ts
-import { ArkTypeToJsonSchemaConverter } from '@orpc/arktype'
-import { ValibotToJsonSchemaConverter } from '@orpc/valibot'
-import { ZodToJsonSchemaConverter } from '@orpc/zod'
-
-const generator = new OpenRPCGenerator({
-  converters: [
-    new ZodToJsonSchemaConverter(),
-    new ValibotToJsonSchemaConverter(),
-    new ArkTypeToJsonSchemaConverter(),
-  ],
-})
-```
-
-:::info
-When no matching converter is configured, `OpenRPCGenerator` falls back to [Standard Json Schema](https://standardschema.dev/json-schema) conversion. See [Standard Schema Integration](/docs/integrations/standard-schema) for details.
-:::
-
-### Params Mapping
-
-A procedure takes a single input, while a JSON-RPC method takes params by-name or by-position. The generator describes the input with the params structure [OpenRPC Handler reads](/docs/openrpc/protocol#params):
-
-| Input schema                                                                   | `paramStructure` | `params`                                       |
-| ------------------------------------------------------------------------------ | ---------------- | ---------------------------------------------- |
-| None, or "no value", such as `z.void()`                                        | Omitted          | `[]`                                           |
-| An object that splits into its properties, such as `z.object({ id: z.number() })` | `by-name`     | One param per property, required params first  |
-| Anything else, such as `z.string()`, a tuple, a union, a record, or `z.any()`  | `by-position`    | A single `input` param                         |
-
-An object splits into by-name params only when nothing is lost: an object schema with `properties`, `required`, and no or unconstrained additional properties, such as `z.object`, `z.strictObject`, or `z.looseObject`. Composed, nullable, or pattern-constrained objects, records, and objects with typed additional properties, such as `.catchall()`, stay a single `input` param. An optional object splits only when all of its properties are optional too.
-
-The `description` and `deprecated` annotations of each property, or of the whole input, are lifted onto its param, since draft-07 has no `deprecated` keyword.
-
-:::tip
-Clients that follow the document always reach the procedure: send the input object as by-name `params`, wrap any other input as `[input]`, and omit `params` when the method has none.
-:::
-
-### Results
-
-Every method has a `result` named `result`, since a JSON-RPC response always carries one:
-
-| Output schema                                | `result.schema`                                      |
-| -------------------------------------------- | ---------------------------------------------------- |
-| None                                         | `{}`                                                 |
-| "No value", such as `z.void()`               | `{ "type": "null" }`                                 |
-| Optional, such as `z.string().optional()`    | `{ "anyOf": [<schema>, { "type": "null" }] }`        |
-| Anything else                                | The output schema                                    |
-
-An `undefined` output is sent as `null`, so optional outputs also allow `null`.
-
-### Errors
-
-The [typesafe errors](/docs/error-handling#typesafe-errors) of a procedure are listed in its `errors`, with the JSON-RPC code the handler sends, the error message, and the oRPC error code as `data`:
-
-```json
-{
-  "code": -32004,
-  "message": "Planet not found",
-  "data": { "code": "NOT_FOUND", "defined": true }
-}
-```
-
-Codes come from `errorCodeMap`, `COMMON_JSON_RPC_ERROR_CODE_MAP` by default. Pass the same map as [OpenRPC Handler](/docs/openrpc/protocol#error-codes):
-
-```ts
-import { COMMON_JSON_RPC_ERROR_CODE_MAP } from '@orpc/openrpc'
-
-const spec = await generator.generate(router, {
-  errorCodeMap: {
-    ...COMMON_JSON_RPC_ERROR_CODE_MAP,
-    OUT_OF_STOCK: 1001,
-  },
-})
-```
-
-- OpenRPC requires unique error codes per method, so errors that map to the same code share one entry, whose message joins theirs, such as `Bad Gateway (BAD_GATEWAY) or Service Unavailable (SERVICE_UNAVAILABLE)`, without `data`. Map them to different codes to list them separately.
-- OpenRPC Error Objects carry a `data` value, not a schema, so the schemas of error data are not part of the document.
-- The JSON-RPC protocol errors, such as Parse error, Invalid Request, and Method not found, are not added to each method, since OpenRPC assumes any API can return them. Typesafe errors are still listed when their code is in that range, such as `BAD_REQUEST` at `-32602` or server errors at `-32603` with the default map.
-
-### Filtering Procedures
-
-Use `filter` to exclude procedures from the document. Pass the same filter as [OpenRPC Handler](/docs/openrpc/handler#filtering-procedures), so the document lists exactly the methods the handler serves:
-
-```ts
-const spec = await generator.generate(router, {
   filter: (procedure, path) => !path.includes('internal'),
 })
 ```
 
-:::info
-Procedures with an [AsyncIteratorObject](/docs/async-iterator-object) input or output schema are always excluded, like in the handler.
-:::
+Each procedure becomes a method, in the same way [OpenRPC Handler](/docs/openrpc/handler#methods-and-params) maps them:
 
-### Custom Serializer
+- **Params**: an object input is described as one by-name param per property, any other input as a single by-position `input` param, and a method without input has no params.
+- **Result**: the output schema, which also allows `null` when the output is optional.
+- **Errors**: the [typesafe errors](/docs/error-handling) with their JSON-RPC codes. Pass the handler's `errorCodeMap` to the generator too.
+- **Metadata**: `summary`, `description`, `tags`, and `deprecated` from [`openapi` metadata](/docs/openapi/specification#metadata).
 
-The generator serializes the document and example values with an `OpenAPIJsonSerializer` from `@orpc/openapi`. If [OpenRPC Handler](/docs/openrpc/handler#custom-serializer) uses a custom serializer, pass the same one to the generator:
-
-```ts
-const generator = new OpenRPCGenerator({
-  serializer,
-})
-```
-
-### Hoisting `$defs`
-
-Root `$defs` generated by your converters, such as Zod schemas with `.meta({ id: 'Planet' })`, are moved into `components.schemas` and referenced from there. Component names may only contain `A-Z`, `a-z`, `0-9`, `.`, `_`, and `-`, so any other character is replaced with `_`. Use `customComponentName` to rename them:
-
-```ts
-const spec = await generator.generate(router, {
-  customComponentName: (defName, defSchema) => `Api${defName}`,
-})
-```
-
-### JSON Schema Draft-07
-
-OpenRPC 1.x documents use JSON Schema draft-07, while converters produce draft 2020-12, so the generator lowers the schemas it generates:
-
-| Draft 2020-12                                | Draft-07                                        |
-| -------------------------------------------- | ----------------------------------------------- |
-| `prefixItems`, with `items`                  | `items` as an array, with `additionalItems`     |
-| `dependentRequired`, `dependentSchemas`      | `dependencies`                                  |
-| `$ref` with sibling keywords                 | `allOf: [{ $ref }]` with the siblings           |
-| `$schema`                                    | Removed                                         |
-
-Other keywords are kept, and draft-07 tools ignore the ones they do not know. Schemas from `base`, such as `base.components.schemas` and `base.methods`, are left as they are, so write them in draft-07.
-
-### Unsupported Procedures
-
-`generate` throws an `OpenRPCGeneratorError` that lists every procedure it cannot describe:
-
-- Procedures with a `File` or `Blob` schema in their input or output, which JSON-RPC cannot carry.
-- A router that is itself a procedure, which has no method name.
-- Router keys that are empty or contain `.`, which calls cannot reach, see [Methods](/docs/openrpc/protocol#methods).
-- Methods whose name starts with `rpc.`, which JSON-RPC reserves.
-- Duplicate method names, including those of `base.methods`.
-- Examples of a by-name method whose input is not an object.
-
-```txt
-[OpenRPCGenerator] Failed to generate the OpenRPC document (2 errors):
-
-Procedure at rpc.ping: method names starting with "rpc." are reserved by JSON-RPC.
-
-Procedure at upload: the input schema contains a File/Blob schema, which JSON-RPC cannot carry.
-
-Exclude procedures with the "filter" option (use the same filter on OpenRPCHandler).
-```
+Procedures with an [event iterator](/docs/async-iterator-object) are skipped, as the handler does not serve them. Reusable schemas, such as Zod schemas with `.meta({ id: 'Planet' })`, are placed in `components.schemas`.
 
 ## Service Discovery
 
-`OpenRPCDiscoveryHandlerPlugin` serves the OpenRPC document through [OpenRPC Service Discovery](https://spec.open-rpc.org/#service-discovery-method), the `rpc.discover` method, and over `GET`:
+`OpenRPCDiscoveryHandlerPlugin` answers the `rpc.discover` method with the document, as the [OpenRPC Service Discovery](https://spec.open-rpc.org/#service-discovery-method) method, and also serves it over `GET` at `/openrpc.json`, relative to the prefix:
 
 ```ts
-import type { OpenRPCDocument } from '@orpc/openrpc'
-import { OpenRPCGenerator } from '@orpc/openrpc'
-import { OpenRPCHandler } from '@orpc/openrpc/fetch'
 import { OpenRPCDiscoveryHandlerPlugin } from '@orpc/openrpc/plugins'
-import { ZodToJsonSchemaConverter } from '@orpc/zod'
-
-const generator = new OpenRPCGenerator({
-  converters: [new ZodToJsonSchemaConverter()],
-})
-
-let spec: Promise<OpenRPCDocument> | undefined
 
 const handler = new OpenRPCHandler(router, {
   plugins: [
     new OpenRPCDiscoveryHandlerPlugin({
-      // generated on first use, then reused
-      spec: () => spec ??= generator.generate(router, {
-        base: { info: { title: 'Planet API', version: '1.0.0' } },
-      }),
+      spec: () => generator.generate(router), // memoize it for production
+      specPath: '/openrpc.json', // or false to disable the GET endpoint
     }),
   ],
 })
 ```
 
-```bash
-curl -X POST https://example.com/rpc \
-  -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","method":"rpc.discover","id":1}'
-
-curl https://example.com/rpc/openrpc.json
-```
-
-- `rpc.discover` answers with the document as its `result`, in a single call or a batch, and ignores params. It never reaches a procedure, and it is never listed in the document's `methods`.
-- `GET` requests to `specPath`, `/openrpc.json` by default, receive the document as JSON. `specPath` is relative to the handler prefix, so with `prefix: '/rpc'` the document is at `/rpc/openrpc.json`. Make sure your server routes that path to the handler too, such as with `app.all('/rpc/*', ...)` in Fastify, or set `specPath: false` to only answer `rpc.discover`.
-- When `allow` resolves to `false`, the plugin behaves as if it were not installed: `rpc.discover` answers "Method not found", and the `GET` request stays unmatched.
-
-```ts
-const handler = new OpenRPCHandler(router, {
-  plugins: [
-    new OpenRPCDiscoveryHandlerPlugin({
-      spec: () => spec ??= generator.generate(router),
-      allow: ({ context }) => context.user?.isAdmin === true,
-      specPath: '/openrpc.json',
-    }),
-  ],
-})
-```
-
-:::tip
-Memoize a generated document, as shown above: a batch can call `rpc.discover` many times, and `spec` runs for each call. An error thrown by `spec` is thrown from `handler.handle` for a single call, and gives `-32603` "Internal error" for a batch call.
-:::
-
-:::info
-The plugin also works with [RPC Handler](/docs/rpc/handler) and [OpenAPI Handler](/docs/openapi/handler), where it only serves the `GET` endpoint. A procedure that matches the same `GET` path takes precedence.
-:::
-
-## Tooling
-
-The generated document works with the tools of the [OpenRPC](https://open-rpc.org) ecosystem, for example:
-
-- [OpenRPC Playground](https://playground.open-rpc.org) renders interactive documentation: `https://playground.open-rpc.org/?schemaUrl=https://example.com/rpc/openrpc.json`.
-- [OpenRPC Inspector](https://inspector.open-rpc.org) sends JSON-RPC requests to your API: `https://inspector.open-rpc.org/?url=https://example.com/rpc`.
-- [`@open-rpc/client-js`](https://github.com/open-rpc/client-js) calls your API from JavaScript without oRPC.
-- [`@open-rpc/schema-utils-js`](https://github.com/open-rpc/schema-utils-js) validates the document with `validateOpenRPCDocument`.
-- [`@open-rpc/generator`](https://github.com/open-rpc/generator) generates clients and documentation from a 1.3 document.
-
-:::warning
-Recursive schemas, such as `z.json()` or tree types, become self-referencing components. `validateOpenRPCDocument` accepts them, but `parseOpenRPCDocument` from `@open-rpc/schema-utils-js` fails on a document that contains any recursive schema when it dereferences the document, which it does by default. This includes tools built on it, such as `@open-rpc/generator` and its generated clients. Pass `{ dereference: false }` to `parseOpenRPCDocument`, or keep recursive procedures out of the document you pass to those tools with the [`filter`](#filtering-procedures) option.
-:::
-
-:::info
-The playground and the inspector run in the browser, so they need [CORS](/docs/plugins/cors) access to your API:
-
-```ts
-const handler = new OpenRPCHandler(router, {
-  plugins: [
-    new CORSHandlerPlugin({
-      origin: ['https://playground.open-rpc.org', 'https://inspector.open-rpc.org'],
-    }),
-    new OpenRPCDiscoveryHandlerPlugin({
-      spec: () => spec ??= generator.generate(router),
-    }),
-  ],
-})
-```
-
-:::
+Tools such as the [OpenRPC Playground](https://playground.open-rpc.org) can then load the document from `http://localhost:3000/rpc/openrpc.json`.

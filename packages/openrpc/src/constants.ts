@@ -1,14 +1,9 @@
 import type { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
 
-/**
- * The `jsonrpc` member every JSON-RPC 2.0 request and response carries.
- */
 export const JSON_RPC_VERSION = '2.0'
 
 /**
  * Error codes the JSON-RPC 2.0 specification reserves for protocol errors.
- *
- * @see {@link https://orpc.dev/docs/openrpc/protocol#error-codes | JSON-RPC Protocol - Error Codes}
  */
 export const JSON_RPC_ERROR_CODES = {
   PARSE_ERROR: -32700,
@@ -19,21 +14,10 @@ export const JSON_RPC_ERROR_CODES = {
 } as const
 
 /**
- * JSON-RPC error code for `ORPCError` codes missing from the error code map,
- * the first of the "implementation-defined server error" range.
+ * Default mapping between common oRPC error codes and JSON-RPC error codes.
+ * Spread it to build a custom `errorCodeMap`.
  *
- * @see {@link https://orpc.dev/docs/openrpc/protocol#error-codes | JSON-RPC Protocol - Error Codes}
- */
-export const DEFAULT_JSON_RPC_ERROR_CODE = -32000
-
-/**
- * Default mapping from common oRPC error codes to JSON-RPC error codes.
- *
- * `BAD_REQUEST` maps to "Invalid params" (-32602), server errors to "Internal error" (-32603),
- * and other client errors to `-32000 - (status - 400)`, which keeps -32700, -32600, and -32601
- * for the protocol errors of the JSON-RPC envelope. Spread it to build a custom `errorCodeMap`.
- *
- * @see {@link https://orpc.dev/docs/openrpc/protocol#error-codes | JSON-RPC Protocol - Error Codes}
+ * @see {@link https://orpc.dev/docs/openrpc/handler#error-codes | OpenRPC Handler - Error Codes}
  */
 export const COMMON_JSON_RPC_ERROR_CODE_MAP = {
   BAD_REQUEST: -32602,
@@ -62,15 +46,8 @@ export const COMMON_JSON_RPC_ERROR_CODE_MAP = {
 } satisfies Record<keyof typeof COMMON_ERROR_STATUS_MAP, number>
 
 /**
- * Default maximum number of request objects in one batch request.
- *
- * @see {@link https://orpc.dev/docs/openrpc/handler#batch-requests | OpenRPC Handler - Batch Requests}
+ * The JSON-RPC error code of ORPCError codes missing from the error code map (an implementation-defined server error).
  */
-export const DEFAULT_JSON_RPC_MAX_BATCH_SIZE = 100
+export const DEFAULT_JSON_RPC_ERROR_CODE = -32000
 
-/**
- * The OpenRPC version `OpenRPCGenerator` targets by default.
- *
- * @see {@link https://orpc.dev/docs/openrpc/specification#openrpc-version | OpenRPC Specification - OpenRPC Version}
- */
-export const DEFAULT_OPENRPC_VERSION = '1.3.2'
+export const DEFAULT_JSON_RPC_MAX_BATCH_SIZE = 100

@@ -1,178 +1,97 @@
-import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
-import type { JsonSchema, JsonSchemaConverter } from '@orpc/json-schema'
+import type { AnyProcedureContract, AnySchema, RouterContract } from '@orpc/contract'
+import type { JsonObjectSchemaEntry, JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
 import type { AnyProcedure, AnyRouter } from '@orpc/server'
 import type { Public, Value } from '@orpc/shared'
-import type { OpenRPCMethodContext } from './openrpc-generator-method'
-import type { OpenRPCContentDescriptorObject, OpenRPCDocument, OpenRPCMethodObject, OpenRPCReferenceObject } from './types'
-import { DelegatingJsonSchemaConverter, StandardJsonSchemaConverter } from '@orpc/json-schema'
-import { OpenAPIComponentRegistry, OpenAPIJsonSerializer } from '@orpc/openapi'
+import type { OpenRPCContentDescriptorObject, OpenRPCDocument, OpenRPCErrorObject, OpenRPCMethodObject } from './types'
+import { ORPCError } from '@orpc/client'
+import {
+  combineJsonSchemasWithComposition,
+  containsJsonFileSchema,
+  DelegatingJsonSchemaConverter,
+  extractJsonObjectSchemaEntries,
+  hoistRecursiveRefToDef,
+  isUnconstrainedSchema,
+  resolveJsonSchemaRootLocalRef,
+  StandardJsonSchemaConverter,
+} from '@orpc/json-schema'
+import { getOpenAPIMeta, OpenAPIComponentRegistry, OpenAPIJsonSerializer } from '@orpc/openapi'
 import { walkProcedureContractsAsync } from '@orpc/server'
-import { clone, isPlainObject, setOwn, toArray, value } from '@orpc/shared'
-import { DEFAULT_OPENRPC_VERSION } from './constants'
-import { toDraft07JsonSchema } from './json-schema-draft-07'
-import { buildMethod, OpenRPCGeneratorError, toOpenRPCComponentName } from './openrpc-generator-method'
-import { assertJsonRpcErrorCodeMap, isEventIteratorProcedure, JSON_RPC_METHOD_SEPARATOR, RESERVED_JSON_RPC_METHOD_PREFIX } from './utils'
+import { clone, getOwn, toArray, value } from '@orpc/shared'
+import { COMMON_JSON_RPC_ERROR_CODE_MAP, DEFAULT_JSON_RPC_ERROR_CODE } from './constants'
+import { isEventIteratorProcedure } from './utils'
 
-export { OpenRPCGeneratorError } from './openrpc-generator-method'
-
-/**
- * OpenRPC versions `OpenRPCGenerator` can target. Both share one document structure.
- *
- * @see {@link https://orpc.dev/docs/openrpc/specification#openrpc-version | OpenRPC Specification - OpenRPC Version}
- */
-export type OpenRPCVersion = `1.3.${number}` | `1.4.${number}`
+export class OpenRPCGeneratorError extends TypeError {}
 
 export interface OpenRPCGeneratorOptions {
-  /**
-   * Converters that translate input and output schemas into JSON Schemas.
-   * Schemas implementing [Standard JSON Schema](https://standardschema.dev/json-schema) need no converter.
-   *
-   * @see {@link https://orpc.dev/docs/openrpc/specification#json-schema-converters | OpenRPC Specification - Json Schema Converters}
-   */
   converters?: JsonSchemaConverter[] | undefined
 
   /**
-   * The serializer used to serialize the generated OpenRPC document and example values.
-   *
-   * @default new OpenAPIJsonSerializer()
+   * The serializer used to serialize the generated document.
    */
   serializer?: Public<OpenAPIJsonSerializer> | undefined
 }
 
 export interface OpenRPCGeneratorGenerateOptions {
   /**
-   * The OpenRPC version of the generated document. 1.3 and 1.4 documents share one structure,
-   * but some tools, such as `@open-rpc/generator`, only accept 1.3.
-   *
-   * @default DEFAULT_OPENRPC_VERSION ('1.3.2')
-   * @see {@link https://orpc.dev/docs/openrpc/specification#openrpc-version | OpenRPC Specification - OpenRPC Version}
-   */
-  version?: OpenRPCVersion | undefined
-
-  /**
-   * OpenRPC document fields to start from, such as `info`, `servers`, or `components`.
-   * The `openrpc` field is derived from `version`.
-   *
-   * @remarks
-   * - `base.methods` come first, before the generated methods.
-   * - `base.components.schemas` are kept as they are, so write them as JSON Schema draft-07.
-   * - Use absolute `servers[].url` values, the meta-schema validates them as URIs.
-   *
-   * @default { info: { title: 'API Reference', version: '0.0.0' } }
+   * Document fields to start from, such as `info`, `servers`, or `components`.
    */
   base?: Partial<Omit<OpenRPCDocument, 'openrpc'>> | undefined
 
   /**
-   * Filter procedures. Return `false` to exclude a procedure from the OpenRPC document.
-   * Procedures with event iterator inputs or outputs are always excluded, as JSON-RPC cannot carry them.
-   *
-   * @remarks
-   * **Note**: Pass the same function as the `filter` of `OpenRPCHandler`, so the document lists exactly the methods it serves.
+   * Filter procedures. Return `false` to exclude a procedure. Pass the same filter to `OpenRPCHandler`.
    *
    * @default true
-   * @see {@link https://orpc.dev/docs/openrpc/specification#filtering-procedures | OpenRPC Specification - Filtering Procedures}
    */
   filter?: Value<boolean, [contract: AnyProcedureContract | AnyProcedure, path: string[]]> | undefined
 
   /**
-   * Mapping ORPCError Code -> JSON-RPC Error Code, used for the `errors` of each method.
-   * A given map replaces (does not extend) the default, codes missing from it fall back to
-   * `DEFAULT_JSON_RPC_ERROR_CODE` (-32000).
-   *
-   * @remarks
-   * **Note**: Pass the same map as the `errorCodeMap` of `OpenRPCHandler`.
+   * Mapping ORPCError Code -> JSON-RPC error code. Pass the same map to `OpenRPCHandler`.
    *
    * @default COMMON_JSON_RPC_ERROR_CODE_MAP
-   * @see {@link https://orpc.dev/docs/openrpc/specification#errors | OpenRPC Specification - Errors}
    */
   errorCodeMap?: Record<string, number> | undefined
-
-  /**
-   * Root-level `$defs` are always moved into `components.schemas`.
-   * Use this to customize the component name of a hoisted def.
-   *
-   * @remarks
-   * - The returned name is a preference, conflicting names are still postfixed (`Planet`, `PlanetInput`, `Planet2`, ...).
-   * - Return `undefined` to keep the original def name.
-   * - Characters OpenRPC does not allow in component keys (anything but `A-Z`, `a-z`, `0-9`, `.`, `_`, and `-`) are replaced with `_`.
-   *
-   * @default defName => defName
-   * @see {@link https://orpc.dev/docs/openrpc/specification#hoisting-defs | OpenRPC Specification - Hoisting $defs}
-   */
-  customComponentName?: ((defName: string, defSchema: JsonSchema) => string | undefined) | undefined
 }
 
 /**
- * Generates an OpenRPC document from a contract or router, describing every procedure as the JSON-RPC method
- * `OpenRPCHandler` serves it as. Relies on JSON schema converters to translate input and output schemas into JSON Schemas,
- * which are lowered to the JSON Schema draft-07 that OpenRPC uses.
+ * Root keywords of an object input that by-name params can express, so splitting it into one param per property loses nothing.
+ */
+const BY_NAME_ROOT_KEYWORDS = new Set(['type', 'properties', 'required', 'additionalProperties', 'title', 'description', '$defs', '$comment', 'examples', 'default'])
+
+/**
+ * Generates an OpenRPC 1.3 document from a contract or router: each procedure becomes a method
+ * named after its path joined by `.`, and procedures with event iterators are skipped.
  *
- * @see {@link https://orpc.dev/docs/openrpc/specification#openrpc-generator | OpenRPC Specification - OpenRPC Generator}
+ * @see {@link https://orpc.dev/docs/openrpc/specification | OpenRPC Specification}
  */
 export class OpenRPCGenerator {
+  private readonly converter: DelegatingJsonSchemaConverter
   private readonly serializer: Public<OpenAPIJsonSerializer>
-  private readonly converter: Pick<JsonSchemaConverter, 'convert'>
 
   constructor(options: OpenRPCGeneratorOptions = {}) {
+    this.converter = new DelegatingJsonSchemaConverter([...toArray(options.converters), new StandardJsonSchemaConverter()])
     this.serializer = options.serializer ?? new OpenAPIJsonSerializer()
-    this.converter = new DelegatingJsonSchemaConverter([
-      ...toArray(options.converters),
-      new StandardJsonSchemaConverter(),
-    ])
   }
 
-  /**
-   * Throws an {@link OpenRPCGeneratorError} listing every procedure that cannot be described,
-   * such as procedures with File/Blob schemas or method names JSON-RPC cannot route.
-   */
-  async generate(
-    router: RouterContract | AnyRouter,
-    options: OpenRPCGeneratorGenerateOptions = {},
-  ): Promise<OpenRPCDocument> {
-    assertJsonRpcErrorCodeMap(options.errorCodeMap, 'OpenRPCGenerator')
-
-    const { openrpc: _openrpc, info, methods, ...base } = (clone(options.base) ?? {}) as Partial<OpenRPCDocument>
-
+  async generate(router: RouterContract | AnyRouter, options: OpenRPCGeneratorGenerateOptions = {}): Promise<OpenRPCDocument> {
+    const base = clone(options.base) ?? {}
     const doc: OpenRPCDocument = {
-      openrpc: options.version ?? DEFAULT_OPENRPC_VERSION,
-      info: info ?? { title: 'API Reference', version: '0.0.0' },
       ...base,
-      methods: methods ?? [],
+      openrpc: '1.3.2',
+      info: base.info ?? { title: 'API Reference', version: '0.0.0' },
+      methods: base.methods ?? [],
     }
 
-    const baseSchemaNames = new Set(Object.keys(doc.components?.schemas ?? {}))
-    const customComponentName = options.customComponentName
-
-    const ctx: OpenRPCMethodContext = {
-      converter: this.converter,
-      registry: new OpenAPIComponentRegistry(
-        doc,
-        (defName, defSchema) => toOpenRPCComponentName(customComponentName?.(defName, defSchema) ?? defName),
-      ),
-      serializer: this.serializer,
-      errorCodeMap: options.errorCodeMap,
-    }
-
-    const methodNames = new Set(doc.methods.flatMap(method => 'name' in method ? [method.name] : []))
+    // OpenRPC requires component names to match ^[a-zA-Z0-9.\-_]+$
+    const registry = new OpenAPIComponentRegistry(doc, name => name.replace(/[^\w.-]/g, '_') || '_')
     const errors: string[] = []
 
     await walkProcedureContractsAsync(router, (contract, path) => {
-      // same exclusions as the handler, which answers "Method not found" for these procedures
       if (value(options.filter, contract, path) === false || isEventIteratorProcedure(contract)) {
         return
       }
 
       try {
-        assertRoutableMethodPath(path)
-
-        const method = buildMethod(ctx, contract, path)
-
-        if (methodNames.has(method.name)) {
-          throw new OpenRPCGeneratorError(`duplicate method name "${method.name}".`)
-        }
-
-        methodNames.add(method.name)
-        doc.methods.push(toDraft07Method(method))
+        doc.methods.push(this.buildMethod(registry, contract, path, options.errorCodeMap))
       }
       catch (e) {
         if (!(e instanceof OpenRPCGeneratorError)) {
@@ -184,71 +103,144 @@ export class OpenRPCGenerator {
     })
 
     if (errors.length) {
-      throw new OpenRPCGeneratorError(
-        `[OpenRPCGenerator] Failed to generate the OpenRPC document (${errors.length} error${errors.length === 1 ? '' : 's'}):\n\n`
-        + `${errors.join('\n\n')}\n\n`
-        + `Exclude procedures with the "filter" option (use the same filter on OpenRPCHandler).`,
-      )
-    }
-
-    // components are lowered only now: while generating, they are compared against new defs in their converted form
-    const schemas = doc.components?.schemas
-
-    if (schemas) {
-      for (const name of Object.keys(schemas)) {
-        if (!baseSchemaNames.has(name)) {
-          setOwn(schemas, name, toDraft07JsonSchema(schemas[name]!))
-        }
-      }
+      throw new OpenRPCGeneratorError(`[OpenRPCGenerator] Failed to generate the OpenRPC document:\n\n${errors.join('\n\n')}`)
     }
 
     return this.serializer.serializeJson(doc).json as OpenRPCDocument
   }
-}
 
-/**
- * Throws when JSON-RPC calls to the method named after `path` could not reach the procedure.
- */
-function assertRoutableMethodPath(path: readonly string[]): void {
-  if (path.length === 0) {
-    throw new OpenRPCGeneratorError('the root procedure has no method name, nest it in a router.')
-  }
+  private buildMethod(
+    registry: OpenAPIComponentRegistry,
+    contract: AnyProcedureContract,
+    path: string[],
+    errorCodeMap: Record<string, number> = COMMON_JSON_RPC_ERROR_CODE_MAP,
+  ): OpenRPCMethodObject {
+    const name = path.join('.')
 
-  const invalidKey = path.find(key => key === '' || key.includes(JSON_RPC_METHOD_SEPARATOR))
+    if (!path.length || path.some(key => key === '' || key.includes('.')) || name.startsWith('rpc.')) {
+      throw new OpenRPCGeneratorError(
+        `"${name}" is not a valid method name: router keys must be non-empty without ".", and names starting with "rpc." are reserved.`,
+      )
+    }
 
-  if (invalidKey !== undefined) {
-    throw new OpenRPCGeneratorError(
-      `the router key "${invalidKey}" ${invalidKey === '' ? 'is empty' : `contains "${JSON_RPC_METHOD_SEPARATOR}"`}, `
-      + `so calls to the method "${path.join(JSON_RPC_METHOD_SEPARATOR)}" cannot reach this procedure.`,
-    )
-  }
+    const def = contract['~orpc']
+    const [inputSchema, inputOptional] = this.convertSchemas(def.inputSchemas, 'input')
+    const [outputSchema, outputOptional] = this.convertSchemas(def.outputSchemas, 'output')
 
-  if (path.join(JSON_RPC_METHOD_SEPARATOR).startsWith(RESERVED_JSON_RPC_METHOD_PREFIX)) {
-    throw new OpenRPCGeneratorError(`method names starting with "${RESERVED_JSON_RPC_METHOD_PREFIX}" are reserved by JSON-RPC.`)
-  }
-}
+    if (containsJsonFileSchema(inputSchema) || containsJsonFileSchema(outputSchema)) {
+      throw new OpenRPCGeneratorError('File/Blob schemas cannot be sent over JSON-RPC.')
+    }
 
-function toDraft07Method(method: OpenRPCMethodObject | OpenRPCReferenceObject): OpenRPCMethodObject | OpenRPCReferenceObject {
-  if (!('name' in method)) {
+    const meta = getOpenAPIMeta(contract)
+    const method: OpenRPCMethodObject = {
+      name,
+      summary: meta?.summary,
+      description: meta?.description,
+      deprecated: meta?.deprecated,
+      tags: meta?.tags?.map(tag => ({ name: tag })),
+      params: [],
+      result: {
+        name: 'result',
+        // `undefined` is sent as `null`
+        schema: outputOptional && !isUnconstrainedSchema(outputSchema)
+          ? { anyOf: [registry.toOpenAPISchema(outputSchema, 'output'), { type: 'null' }] }
+          : registry.toOpenAPISchema(outputSchema, 'output'),
+      },
+      errors: buildErrors(def.errorMap, errorCodeMap),
+    }
+
+    // no input, or an input like `z.void()` or `z.any()`, needs no params
+    if (isUnconstrainedSchema(inputSchema) && inputOptional) {
+      return method
+    }
+
+    const entries = toByNameEntries(inputSchema)
+
+    // an optional object can be sent by-name only when no param is required
+    if (entries && (!inputOptional || entries.every(([, , optional]) => optional))) {
+      method.paramStructure = 'by-name'
+      method.params = entries
+        .sort(([, , a], [, , b]) => Number(a) - Number(b))
+        .map(([name, schema, optional]) => toContentDescriptor(registry, name, schema, optional))
+    }
+    else {
+      method.paramStructure = 'by-position'
+      method.params = [toContentDescriptor(registry, 'input', inputSchema, inputOptional)]
+    }
+
     return method
   }
 
-  return {
-    ...method,
-    ...(Array.isArray(method.params) && { params: method.params.map(toDraft07ContentDescriptor) }),
-    ...(method.result !== undefined && { result: toDraft07ContentDescriptor(method.result) }),
+  private convertSchemas(schemas: readonly AnySchema[] | undefined, direction: JsonSchemaConverterDirection): [JsonSchema, boolean] {
+    const converted = (schemas ?? []).map((schema): [JsonSchema, boolean] => {
+      const [jsonSchema, optional] = this.converter.convert(schema, direction)
+
+      if (typeof jsonSchema !== 'object') {
+        return [jsonSchema, optional]
+      }
+
+      const { $schema: _$schema, ...rest } = jsonSchema
+      // composing would retarget root-relative refs, so move a schema that points into itself under a def first
+      return [hoistRecursiveRefToDef(rest), optional]
+    })
+
+    if (converted.length <= 1) {
+      return converted[0] ?? [{}, true]
+    }
+
+    return [
+      combineJsonSchemasWithComposition('allOf', converted.map(([jsonSchema]) => jsonSchema).filter(s => !isUnconstrainedSchema(s))),
+      converted.every(([, optional]) => optional),
+    ]
   }
 }
 
-function toDraft07ContentDescriptor(
-  descriptor: OpenRPCContentDescriptorObject | OpenRPCReferenceObject,
-): OpenRPCContentDescriptorObject | OpenRPCReferenceObject {
-  // a spec override can put anything here, only content descriptors carry a schema
-  if (!isPlainObject(descriptor) || !Object.hasOwn(descriptor, 'schema')) {
-    return descriptor
+/**
+ * The properties of an object input, or `undefined` when it is not a plain object schema.
+ */
+function toByNameEntries(schema: JsonSchema): JsonObjectSchemaEntry[] | undefined {
+  const root = resolveJsonSchemaRootLocalRef(schema)
+
+  if (
+    typeof root !== 'object'
+    || root.type !== 'object'
+    || Object.keys(root).some(key => !BY_NAME_ROOT_KEYWORDS.has(key) && !key.startsWith('x-'))
+    || !(root.additionalProperties === undefined || typeof root.additionalProperties === 'boolean' || isUnconstrainedSchema(root.additionalProperties))
+    || Object.hasOwn(root.properties ?? {}, '')
+  ) {
+    return undefined
   }
 
-  const contentDescriptor = descriptor as OpenRPCContentDescriptorObject
+  return extractJsonObjectSchemaEntries(schema)
+}
 
-  return { ...contentDescriptor, schema: toDraft07JsonSchema(contentDescriptor.schema) }
+function toContentDescriptor(registry: OpenAPIComponentRegistry, name: string, schema: JsonSchema, optional: boolean): OpenRPCContentDescriptorObject {
+  return {
+    name,
+    description: typeof schema === 'object' ? schema.description : undefined,
+    required: optional ? undefined : true,
+    schema: registry.toOpenAPISchema(schema, 'input') as JsonSchema,
+  }
+}
+
+/**
+ * OpenRPC requires unique error codes per method, so ORPCErrors mapped to the same code share an entry.
+ */
+function buildErrors(errorMap: AnyProcedureContract['~orpc']['errorMap'], errorCodeMap: Record<string, number>): OpenRPCErrorObject[] | undefined {
+  const groups = new Map<number, { code: string, message: string }[]>()
+
+  for (const code of Object.keys(errorMap)) {
+    const config = errorMap[code]
+
+    if (config) {
+      const jsonRpcCode = getOwn(errorCodeMap, code) ?? DEFAULT_JSON_RPC_ERROR_CODE
+      groups.set(jsonRpcCode, [...groups.get(jsonRpcCode) ?? [], { code, message: new ORPCError(code, { message: config.message }).message }])
+    }
+  }
+
+  return groups.size === 0
+    ? undefined
+    : Array.from(groups, ([code, group]): OpenRPCErrorObject => group.length === 1
+        ? { code, message: group[0]!.message, data: { code: group[0]!.code, defined: true } }
+        : { code, message: group.map(error => `${error.message} (${error.code})`).join(' or ') })
 }

@@ -67,13 +67,6 @@ export interface StandardHandlerOptions<TContext extends Context> {
   plugins?: StandardHandlerPlugin<TContext>[] | undefined
 }
 
-/**
- * Serves standard requests with a protocol codec, which resolves the procedure and encodes its output,
- * and runs the routing interceptors, interceptors, and plugins around it.
- * Adapter handlers, such as `RPCHandler`, combine it with the codec of their protocol.
- *
- * @see {@link https://orpc.dev/docs/openrpc/handler#custom-adapters | OpenRPC Handler - Custom Adapters}
- */
 export class StandardHandler<T extends Context> {
   private readonly routingInterceptors: StandardHandlerOptions<T>['routingInterceptors']
   private readonly interceptors: StandardHandlerOptions<T>['interceptors']

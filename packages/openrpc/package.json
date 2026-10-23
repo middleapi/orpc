@@ -94,7 +94,6 @@
     "@standard-server/fetch": "~0.11.0"
   },
   "devDependencies": {
-    "@open-rpc/schema-utils-js": "^2.2.1",
     "@orpc/zod": "workspace:*",
     "@standard-server/aws-lambda": "~0.11.0",
     "fastify": "^5.12.7",

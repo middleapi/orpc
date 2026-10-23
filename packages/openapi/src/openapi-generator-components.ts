@@ -6,7 +6,7 @@ import {
   ensureJsonSchemaObject,
   mapJsonSchemaRefs,
 } from '@orpc/json-schema'
-import { get, getOwn, isDeepEqual, isPlainObject, setOwn } from '@orpc/shared'
+import { getOwn, isDeepEqual, isPlainObject, setOwn } from '@orpc/shared'
 
 const DEFS_REF_PREFIX = '#/$defs/'
 const COMPONENTS_REF_PREFIX = '#/components/schemas/'
@@ -259,18 +259,12 @@ function areSchemasEquivalentForReuse(candidate: unknown, existing: unknown, ctx
   })
 }
 
-/**
- * Splits a `<prefix><name>` ref into the decoded name and the still-encoded pointer segments after it,
- * so a ref deep into a named schema (`#/$defs/Planet/properties/name`) keeps its tail.
- */
-function parsePrefixedRef(ref: string, prefix: string): { name: string, segments: string[] } | undefined {
+function parseRefName(ref: string, prefix: string): string | undefined {
   if (!ref.startsWith(prefix)) {
     return undefined
   }
 
-  const [encodedName, ...segments] = ref.slice(prefix.length).split('/')
-
-  return { name: decodeJsonPointerSegment(encodedName!), segments }
+  return ref.slice(prefix.length).split('/').map(decodeJsonPointerSegment).join('/')
 }
 
 function resolveNamedRef(
@@ -278,17 +272,15 @@ function resolveNamedRef(
   prefix: string,
   getNamed: (name: string) => unknown,
 ): { key: string, schema: JsonSchema } | undefined {
-  const parsed = parsePrefixedRef(ref, prefix)
+  const name = parseRefName(ref, prefix)
 
-  if (parsed === undefined) {
+  if (name === undefined) {
     return undefined
   }
 
-  const schema = get(getNamed(parsed.name), parsed.segments.map(decodeJsonPointerSegment)) as JsonSchema | undefined
+  const schema = getNamed(name) as JsonSchema | undefined
 
-  return schema === undefined
-    ? undefined
-    : { key: [prefix + encodeJsonPointerSegment(parsed.name), ...parsed.segments].join('/'), schema }
+  return schema === undefined ? undefined : { key: prefix + name, schema }
 }
 
 function areSchemaRefsEquivalentForReuse(candidateRef: string, existingRef: string, ctx: ReuseComparisonContext): boolean {
@@ -317,19 +309,18 @@ function areSchemaRefsEquivalentForReuse(candidateRef: string, existingRef: stri
 
 function rewriteComponentSchemaRefs(schema: JsonSchema, renameMap: ReadonlyMap<string, string>): JsonSchema {
   return mapJsonSchemaRefs(schema, (ref) => {
-    const parsed = parsePrefixedRef(ref, DEFS_REF_PREFIX)
+    const refName = parseRefName(ref, DEFS_REF_PREFIX)
 
-    if (parsed === undefined) {
+    if (refName === undefined) {
       return ref
     }
 
-    const renamedName = renameMap.get(parsed.name)
+    const renamedName = renameMap.get(refName)
 
     if (renamedName === undefined) {
       return ref
     }
 
-    // a ref deep into the def keeps pointing at the same place inside the component
-    return [COMPONENTS_REF_PREFIX + encodeJsonPointerSegment(renamedName), ...parsed.segments].join('/')
+    return COMPONENTS_REF_PREFIX + encodeJsonPointerSegment(renamedName)
   })
 }

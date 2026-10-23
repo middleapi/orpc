@@ -193,44 +193,6 @@ describe('openAPIComponentRegistry', () => {
       })
     })
 
-    it('rewrites refs deep into a def to point into its component', () => {
-      const { doc, registry } = createRegistry({ schemas: { Planet: { type: 'string' } } })
-
-      const result = registry.hoistDefs({
-        type: 'object',
-        properties: {
-          name: { $ref: '#/$defs/Planet/properties/name' },
-          moon: { $ref: '#/$defs/domain~1Moon/anyOf/0' },
-          missing: { $ref: '#/$defs/Missing/properties/name' },
-        },
-        $defs: {
-          // conflicts with the existing Planet, so refs into it follow the rename
-          'Planet': {
-            type: 'object',
-            properties: { name: { type: 'string' }, alias: { $ref: '#/$defs/Planet/properties/name' } },
-          },
-          'domain/Moon': { anyOf: [{ type: 'number' }, { type: 'string' }] },
-        },
-      })
-
-      expect(result).toEqual({
-        type: 'object',
-        properties: {
-          name: { $ref: '#/components/schemas/Planet2/properties/name' },
-          moon: { $ref: '#/components/schemas/domain~1Moon/anyOf/0' },
-          missing: { $ref: '#/$defs/Missing/properties/name' },
-        },
-      })
-      expect(doc.components?.schemas).toEqual({
-        'Planet': { type: 'string' },
-        'Planet2': {
-          type: 'object',
-          properties: { name: { type: 'string' }, alias: { $ref: '#/components/schemas/Planet2/properties/name' } },
-        },
-        'domain/Moon': { anyOf: [{ type: 'number' }, { type: 'string' }] },
-      })
-    })
-
     it('hoists a def named __proto__ as an own component', () => {
       const { doc, registry } = createRegistry()
 
@@ -349,68 +311,6 @@ describe('openAPIComponentRegistry', () => {
       expect(registry.hoistDefs(structuredClone(wrapper))).toEqual({ $ref: '#/components/schemas/Wrapper' })
       expect(registry.hoistDefs(structuredClone(wrapper))).toEqual({ $ref: '#/components/schemas/Wrapper' })
       expect(Object.keys(doc.components?.schemas ?? {}).sort()).toEqual(['Data', 'Wrapper'])
-    })
-
-    it('reuses components containing refs deep into a def', () => {
-      const { doc, registry } = createRegistry()
-
-      const schema = {
-        $ref: '#/$defs/Planet',
-        $defs: {
-          Planet: {
-            type: 'object' as const,
-            properties: { name: { type: 'string' as const }, alias: { $ref: '#/$defs/Planet/properties/name' } },
-          },
-        },
-      }
-
-      expect(registry.hoistDefs(structuredClone(schema))).toEqual({ $ref: '#/components/schemas/Planet' })
-      expect(registry.hoistDefs(structuredClone(schema))).toEqual({ $ref: '#/components/schemas/Planet' })
-      expect(doc.components?.schemas).toEqual({
-        Planet: {
-          type: 'object',
-          properties: { name: { type: 'string' }, alias: { $ref: '#/components/schemas/Planet/properties/name' } },
-        },
-      })
-    })
-
-    it('does not reuse a component whose deep ref points at a different schema', () => {
-      const { doc, registry } = createRegistry({
-        schemas: {
-          Planet: {
-            type: 'object',
-            properties: {
-              name: { type: 'string' },
-              mass: { type: 'number' },
-              alias: { $ref: '#/components/schemas/Planet/properties/name' },
-            },
-          },
-        },
-      })
-
-      const result = registry.hoistDefs({
-        $ref: '#/$defs/Planet',
-        $defs: {
-          Planet: {
-            type: 'object',
-            properties: {
-              name: { type: 'string' },
-              mass: { type: 'number' },
-              alias: { $ref: '#/$defs/Planet/properties/mass' },
-            },
-          },
-        },
-      })
-
-      expect(result).toEqual({ $ref: '#/components/schemas/Planet2' })
-      expect(doc.components?.schemas?.Planet2).toEqual({
-        type: 'object',
-        properties: {
-          name: { type: 'string' },
-          mass: { type: 'number' },
-          alias: { $ref: '#/components/schemas/Planet2/properties/mass' },
-        },
-      })
     })
 
     it.each([
@@ -969,32 +869,11 @@ describe('openAPIComponentRegistry', () => {
     })
   })
 
-  describe('non-OpenAPI documents', () => {
-    it('collects components into any document with a components.schemas slot', () => {
-      const doc: OpenAPIComponentRegistryDocument & { openrpc: string } = { openrpc: '1.3.2' }
-      const registry = new OpenAPIComponentRegistry(doc, undefined)
+  it('collects components into a non-OpenAPI document', () => {
+    const doc: OpenAPIComponentRegistryDocument & { openrpc: string } = { openrpc: '1.3.2' }
+    const registry = new OpenAPIComponentRegistry(doc, undefined)
 
-      expect(registry.toOpenAPISchema({
-        type: 'array',
-        items: { $ref: '#/$defs/Planet' },
-        $defs: { Planet: { type: 'string' } },
-      }, 'output')).toEqual({
-        type: 'array',
-        items: { $ref: '#/components/schemas/Planet' },
-      })
-      expect(registry.register('Moon', { type: 'number' })).toEqual({ $ref: '#/components/schemas/Moon' })
-      expect(doc).toEqual({
-        openrpc: '1.3.2',
-        components: { schemas: { Planet: { type: 'string' }, Moon: { type: 'number' } } },
-      })
-    })
-
-    it('accepts an empty document', () => {
-      const doc: OpenAPIComponentRegistryDocument = {}
-      const registry = new OpenAPIComponentRegistry(doc, undefined)
-
-      expect(registry.register('Planet', { type: 'string' })).toEqual({ $ref: '#/components/schemas/Planet' })
-      expect(doc).toEqual({ components: { schemas: { Planet: { type: 'string' } } } })
-    })
+    expect(registry.register('Planet', { type: 'string' })).toEqual({ $ref: '#/components/schemas/Planet' })
+    expect(doc).toEqual({ openrpc: '1.3.2', components: { schemas: { Planet: { type: 'string' } } } })
   })
 })

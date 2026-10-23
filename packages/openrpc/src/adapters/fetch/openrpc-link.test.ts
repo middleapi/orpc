@@ -1,301 +1,113 @@
-import type { NestedClient } from '@orpc/client'
-import { createORPCClient, isDefinedError, MalformedResponseError, ORPCError, ResponseError, safe } from '@orpc/client'
+import type { JsonifiedClient } from '@orpc/openapi'
+import type { RouterClient } from '@orpc/server'
+import { createORPCClient, isDefinedError, ORPCError, safe } from '@orpc/client'
 import { RetryLinkPlugin } from '@orpc/client/plugins'
+import { os } from '@orpc/server'
+import { z } from 'zod'
+import { OpenRPCHandler } from './openrpc-handler'
 import { OpenRPCLink } from './openrpc-link'
 
-/**
- * A fake JSON-RPC server: answers every request with `respond(request)`, echoing the request id.
- */
-function createFetch(respond: (request: any) => { status?: number, body?: unknown, headers?: Record<string, string> } | undefined) {
-  return vi.fn(async (_url: string, init: RequestInit) => {
-    const request = JSON.parse(init.body as string)
-    const reply = respond(request)
+const flaky = vi.fn()
 
-    if (reply?.body === undefined) {
-      return new Response(null, { status: reply?.status ?? 204, headers: reply?.headers })
-    }
+const router = {
+  planet: {
+    find: os
+      .errors({ NOT_FOUND: { data: z.object({ id: z.number() }) } })
+      .input(z.object({ id: z.number() }))
+      .handler(({ input, errors }) => {
+        if (input.id !== 1) {
+          throw errors.NOT_FOUND({ data: { id: input.id } })
+        }
 
-    return new Response(JSON.stringify(reply.body), {
-      status: reply.status ?? 200,
-      headers: { 'content-type': 'application/json', ...reply.headers },
-    })
-  })
+        return { id: 1, discoveredAt: new Date(0) }
+      }),
+    echo: os.input(z.any()).handler(({ input }) => input),
+    flaky: os.handler(flaky),
+  },
 }
 
-function result(request: any, value: unknown) {
-  return { body: { jsonrpc: '2.0', id: request.id, result: value } }
+const handler = new OpenRPCHandler(router)
+
+function createClient(fetch: (request: Request) => Promise<Response>, options: ConstructorParameters<typeof OpenRPCLink>[0] = {}) {
+  return createORPCClient<JsonifiedClient<RouterClient<typeof router>>>(new OpenRPCLink({
+    url: '/rpc',
+    origin: 'http://localhost',
+    fetch: (url, init) => fetch(new Request(url, init)),
+    ...options,
+  }))
 }
 
-function error(request: any, error: unknown, status?: number) {
-  return { status, body: { jsonrpc: '2.0', id: request.id, error } }
+function respond(body: unknown, status = 200) {
+  return createClient(async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }))
 }
 
 describe('openRPCLink', () => {
-  it('sends a JSON-RPC request and resolves the result', async () => {
-    const fetch = createFetch(request => result(request, { id: request.params.id, name: 'earth' }))
-    const client = createORPCClient(new OpenRPCLink({
-      fetch,
-      origin: 'http://localhost:3000',
-      url: '/rpc',
-      headers: { 'x-api-key': 'key' },
-    })) as any
+  const bodies: unknown[] = []
+  const fetch = vi.fn(async (request: Request) => {
+    bodies.push(await request.clone().json())
+    return (await handler.handle(request, { prefix: '/rpc' })).response!
+  })
+  const client = createClient(fetch)
 
-    await expect(client.planet.find({ id: 1, at: new Date('2024-01-02T03:04:05.000Z') })).resolves.toEqual({ id: 1, name: 'earth' })
-
-    expect(fetch).toHaveBeenCalledOnce()
-    const [url, init, options, path] = fetch.mock.calls[0]! as any[]
-    expect(url).toBe('http://localhost:3000/rpc')
-    expect(init.method).toBe('POST')
-    expect(init.redirect).toBe('manual')
-    expect(new Headers(init.headers).get('content-type')).toBe('application/json')
-    expect(new Headers(init.headers).get('x-api-key')).toBe('key')
-    expect(JSON.parse(init.body)).toEqual({
-      jsonrpc: '2.0',
-      method: 'planet.find',
-      params: { id: 1, at: '2024-01-02T03:04:05.000Z' },
-      id: 1,
-    })
-    expect(options).toEqual(expect.objectContaining({ context: {} }))
-    expect(path).toEqual(['planet', 'find'])
+  beforeEach(() => {
+    fetch.mockClear()
+    bodies.length = 0
   })
 
-  it('sends non-object inputs by-position and omits undefined inputs', async () => {
-    const fetch = createFetch(request => result(request, request.params ?? null))
-    const client = createORPCClient(new OpenRPCLink({ fetch })) as any
+  it('sends JSON-RPC requests and decodes results', async () => {
+    await expect(client.planet.find({ id: 1 })).resolves.toEqual({ id: 1, discoveredAt: '1970-01-01T00:00:00.000Z' })
+    await expect(client.planet.echo('text')).resolves.toBe('text')
+    await expect(client.planet.echo([1, 2])).resolves.toEqual([1, 2])
+    await expect(client.planet.echo(undefined)).resolves.toBe(null)
 
-    await expect(client.echo('earth')).resolves.toEqual(['earth'])
-    await expect(client.echo()).resolves.toBeNull()
-
-    expect(fetch.mock.calls[0]![0]).toBe('/')
-    expect(JSON.parse(fetch.mock.calls[1]![1].body as string)).toEqual({ jsonrpc: '2.0', method: 'echo', id: 2 })
+    expect(bodies).toEqual([
+      { jsonrpc: '2.0', id: 1, method: 'planet.find', params: { id: 1 } },
+      { jsonrpc: '2.0', id: 2, method: 'planet.echo', params: ['text'] },
+      { jsonrpc: '2.0', id: 3, method: 'planet.echo', params: [[1, 2]] },
+      { jsonrpc: '2.0', id: 4, method: 'planet.echo' },
+    ])
   })
 
-  it('uses globalThis.fetch by default', async () => {
-    const fetch = createFetch(request => result(request, 'pong'))
-    vi.stubGlobal('fetch', fetch)
+  it('restores ORPCErrors of oRPC servers', async () => {
+    const [error] = await safe(client.planet.find({ id: 2 }))
 
-    try {
-      const client = createORPCClient(new OpenRPCLink()) as any
-
-      await expect(client.ping()).resolves.toBe('pong')
-      expect(fetch).toHaveBeenCalledOnce()
-    }
-    finally {
-      vi.unstubAllGlobals()
-    }
+    expect(isDefinedError(error)).toBe(true)
+    expect(error).toMatchObject({ code: 'NOT_FOUND', data: { id: 2 }, cause: { response: { status: 404 } } })
   })
 
-  it('resolves context-dependent options', async () => {
-    const fetch = createFetch(request => result(request, 'ok'))
-    const link = new OpenRPCLink<{ token: string }>({
-      fetch,
-      url: ({ context }) => context.token === 'admin' ? '/admin/rpc' : '/rpc',
-      headers: async ({ context }) => ({ authorization: `Bearer ${context.token}` }),
-    })
-    const client = createORPCClient<NestedClient<{ token: string }>>(link) as any
-
-    await client.ping(undefined, { context: { token: 'admin' } })
-
-    const [url, init] = fetch.mock.calls[0]!
-    expect(url).toBe('/admin/rpc')
-    expect(new Headers(init.headers).get('authorization')).toBe('Bearer admin')
+  it('decodes errors of other servers by their code', async () => {
+    await expect(respond({ jsonrpc: '2.0', id: 1, error: { code: -32601, message: 'Method not found' } }).planet.echo(1))
+      .rejects
+      .toMatchObject({ code: 'NOT_FOUND', defined: false, message: 'Method not found' })
+    await expect(respond({ jsonrpc: '2.0', id: null, error: { code: 3, message: 'execution reverted', data: '0x' } }).planet.echo(1))
+      .rejects
+      .toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message: 'execution reverted', data: '0x' })
   })
 
-  it('forwards the abort signal', async () => {
-    const controller = new AbortController()
-    const fetch = createFetch(request => result(request, 'ok'))
-    const client = createORPCClient(new OpenRPCLink({ fetch })) as any
-
-    await client.ping(undefined, { signal: controller.signal })
-
-    expect(fetch.mock.calls[0]![1].signal).toBe(controller.signal)
+  it.each([
+    [{ jsonrpc: '2.0', id: 2, result: 1 }],
+    [{ jsonrpc: '2.0', id: null, result: 1 }],
+    [{ jsonrpc: '2.0', id: 1, result: 1, error: { code: 1, message: 'x' } }],
+    [[{ jsonrpc: '2.0', id: 1, result: 1 }]],
+    ['<html></html>'],
+  ])('rejects malformed response %j', async (body) => {
+    await expect(respond(body).planet.echo(1)).rejects.toThrow('Invalid JSON-RPC response.')
   })
 
-  it('spreads params for foreign APIs with encodeParams', async () => {
-    const fetch = createFetch(request => result(request, '0x1'))
-    const client = createORPCClient(new OpenRPCLink({
-      fetch,
-      encodeParams: input => input as unknown[],
-    })) as any
+  it('retries errors with a server status, but not client errors', async () => {
+    const retry = createClient(fetch, { plugins: [new RetryLinkPlugin({ default: { retry: 1 } })] })
 
-    await expect(client.eth_getBalance(['0xabc', 'latest'])).resolves.toBe('0x1')
+    flaky.mockImplementationOnce(() => {
+      throw new ORPCError('SERVICE_UNAVAILABLE')
+    }).mockReturnValueOnce('ok')
+    await expect(retry.planet.flaky()).resolves.toBe('ok')
 
-    expect(JSON.parse(fetch.mock.calls[0]![1].body as string)).toEqual({
-      jsonrpc: '2.0',
-      method: 'eth_getBalance',
-      params: ['0xabc', 'latest'],
-      id: 1,
-    })
+    await expect(retry.planet.find({ id: 2 })).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    expect(fetch).toHaveBeenCalledTimes(3)
   })
 
-  it('throws defined errors that isDefinedError recognizes', async () => {
-    const fetch = createFetch(request => error(request, {
-      code: -32004,
-      message: 'Planet not found',
-      data: { code: 'NOT_FOUND', defined: true, data: { id: 1 } },
-    }))
-    const client = createORPCClient(new OpenRPCLink({ fetch })) as any
-
-    const [err, data, definedError] = await safe(client.planet.find({ id: 1 }))
-
-    expect(data).toBeUndefined()
-    expect(definedError).toBe(err)
-    expect(isDefinedError(err)).toBe(true)
-    expect(err).toBeInstanceOf(ORPCError)
-    expect((err as any).code).toBe('NOT_FOUND')
-    expect((err as any).data).toEqual({ id: 1 })
-    expect((err as any).cause).toBeInstanceOf(ResponseError)
-    expect((err as any).cause.response.status).toBe(404)
-  })
-
-  it('decodes errors of foreign JSON-RPC servers', async () => {
-    const fetch = createFetch(request => error(request, { code: -32601, message: 'Method not found' }))
-    const client = createORPCClient(new OpenRPCLink({ fetch })) as any
-
-    const err = await client.unknown().catch((e: unknown) => e)
-
-    expect(err).toBeInstanceOf(ORPCError)
-    expect(err.code).toBe('NOT_FOUND')
-    expect(err.defined).toBe(false)
-    expect(err.message).toBe('Method not found')
-  })
-
-  it('throws MalformedResponseError for non-JSON-RPC responses', async () => {
-    const fetch = vi.fn(async () => new Response('<html>Bad Gateway</html>', { status: 502, headers: { 'content-type': 'text/html' } }))
-    const client = createORPCClient(new OpenRPCLink({ fetch })) as any
-
-    const err = await client.ping().catch((e: unknown) => e)
-
-    expect(err).toBeInstanceOf(MalformedResponseError)
-    expect(err.message).toBe('Bad Gateway')
-    expect(err.response.status).toBe(502)
-  })
-
-  it('throws MalformedResponseError for a mismatched response id', async () => {
-    const fetch = createFetch(() => ({ body: { jsonrpc: '2.0', id: 999, result: 'pong' } }))
-    const client = createORPCClient(new OpenRPCLink({ fetch })) as any
-
-    const err = await client.ping().catch((e: unknown) => e)
-
-    expect(err).toBeInstanceOf(MalformedResponseError)
-    expect(err.message).toBe('JSON-RPC response id does not match the request id.')
-    expect(err.response.body).toEqual({ jsonrpc: '2.0', id: 999, result: 'pong' })
-  })
-
-  it('throws before sending unsupported inputs', async () => {
-    const fetch = createFetch(request => result(request, 'ok'))
-    const client = createORPCClient(new OpenRPCLink({ fetch })) as any
-
-    await expect(client.upload(new Blob(['x']))).rejects.toThrow(
-      '[OpenRPCLink] JSON-RPC cannot send Blob, File, FormData, URLSearchParams, or streams in call to procedure (upload).',
-    )
+  it('throws for inputs JSON-RPC cannot send', async () => {
+    await expect(client.planet.echo(new Blob(['x']))).rejects.toThrow('JSON-RPC cannot send streams or binary data')
     expect(fetch).not.toHaveBeenCalled()
-  })
-
-  describe('notifications', () => {
-    it('sends a notification and resolves undefined once accepted', async () => {
-      const fetch = createFetch(() => undefined)
-      const client = createORPCClient(new OpenRPCLink({ fetch, notification: true })) as any
-
-      await expect(client.log({ level: 'info' })).resolves.toBeUndefined()
-
-      expect(JSON.parse(fetch.mock.calls[0]![1].body as string)).toEqual({
-        jsonrpc: '2.0',
-        method: 'log',
-        params: { level: 'info' },
-      })
-    })
-
-    it('chooses notifications per call', async () => {
-      const fetch = createFetch(request => request.id === undefined ? undefined : result(request, 'pong'))
-      const client = createORPCClient(new OpenRPCLink<{ notify?: boolean }>({
-        fetch,
-        notification: ({ context }) => context.notify === true,
-      })) as any
-
-      await expect(client.ping(undefined, { context: { notify: true } })).resolves.toBeUndefined()
-      await expect(client.ping()).resolves.toBe('pong')
-
-      expect(JSON.parse(fetch.mock.calls[1]![1].body as string).id).toBe(1)
-    })
-
-    it('rejects with the error the server reports', async () => {
-      const fetch = createFetch(() => ({
-        status: 415,
-        body: {
-          jsonrpc: '2.0',
-          id: null,
-          error: { code: -32015, message: 'Unsupported media type', data: { code: 'UNSUPPORTED_MEDIA_TYPE', defined: false } },
-        },
-      }))
-      const client = createORPCClient(new OpenRPCLink({ fetch, notification: true })) as any
-
-      const err = await client.log().catch((e: unknown) => e)
-
-      expect(err).toBeInstanceOf(ORPCError)
-      expect(err.code).toBe('UNSUPPORTED_MEDIA_TYPE')
-      expect(err.cause.response.status).toBe(415)
-    })
-  })
-
-  describe('retries', () => {
-    it('retries server errors delivered with 200, with a new id per attempt', async () => {
-      let attempts = 0
-      const fetch = createFetch((request) => {
-        attempts++
-
-        return attempts === 1
-          ? error(request, { code: -32603, message: 'Internal server error', data: { code: 'INTERNAL_SERVER_ERROR', defined: false } })
-          : result(request, 'pong')
-      })
-      const client = createORPCClient(new OpenRPCLink({
-        fetch,
-        plugins: [new RetryLinkPlugin({ default: { retry: 2, retryDelay: 0 } })],
-      })) as any
-
-      await expect(client.ping()).resolves.toBe('pong')
-
-      expect(fetch).toHaveBeenCalledTimes(2)
-      expect(fetch.mock.calls.map(([, init]) => JSON.parse(init.body as string).id)).toEqual([1, 2])
-    })
-
-    it('does not retry client errors delivered with 200', async () => {
-      const fetch = createFetch(request => error(request, {
-        code: -32602,
-        message: 'Input validation failed',
-        data: { code: 'BAD_REQUEST', defined: false },
-      }))
-      const client = createORPCClient(new OpenRPCLink({
-        fetch,
-        plugins: [new RetryLinkPlugin({ default: { retry: 2, retryDelay: 0 } })],
-      })) as any
-
-      await expect(client.ping()).rejects.toThrow('Input validation failed')
-
-      expect(fetch).toHaveBeenCalledOnce()
-    })
-
-    it('derives statuses for custom-decoded errors, so client errors are not retried', async () => {
-      const fetch = createFetch(request => error(request, { code: request.params[0], message: 'Application error' }))
-      const client = createORPCClient(new OpenRPCLink({
-        fetch,
-        plugins: [new RetryLinkPlugin({ default: { retry: 2, retryDelay: 0 } })],
-        customErrorDecoder: e => e.code === 1001
-          ? new ORPCError('OUT_OF_STOCK', { message: e.message })
-          : new ORPCError('INTERNAL_SERVER_ERROR', { message: e.message }),
-      })) as any
-
-      const outOfStock = await client.order(1001).catch((e: unknown) => e)
-
-      expect(outOfStock).toBeInstanceOf(ORPCError)
-      expect(outOfStock.code).toBe('OUT_OF_STOCK')
-      expect(outOfStock.cause).toBeInstanceOf(ResponseError)
-      expect(outOfStock.cause.response.status).toBe(400)
-      expect(fetch).toHaveBeenCalledOnce()
-
-      await expect(client.order(1002)).rejects.toThrow('Application error')
-
-      expect(fetch).toHaveBeenCalledTimes(4)
-    })
   })
 })

@@ -4,108 +4,68 @@ import type { AnyProcedure, AnyRouter, Context } from '@orpc/server'
 import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '@orpc/server/standard'
 import type { Public, Value } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
-import type { JsonRpcErrorObject } from '../../json-rpc'
-import type { EncodedJsonRpcError } from './utils'
+import { COMMON_ERROR_STATUS_MAP, ORPCError } from '@orpc/client'
 import { OpenAPIJsonSerializer } from '@orpc/openapi'
-import { DEFAULT_SUCCESS_STATUS } from '@orpc/server'
+import { DEFAULT_ERROR_STATUS } from '@orpc/server'
 import { RPCMatcher } from '@orpc/server/standard'
-import { pathToHttpPath, value } from '@orpc/shared'
-import { isEventIteratorProcedure, toProcedurePath } from '../../utils'
-import { getJsonRpcCall } from './call'
-import { decodeJsonRpcParams } from './params'
-import { cancelQuietly, createJsonRpcErrorEncoder, getUnsupportedValueKind, isJsonMemberValue } from './utils'
+import { getOwn, isAsyncIteratorObject, pathToHttpPath, value } from '@orpc/shared'
+import { cancelStandardBody } from '@standard-server/core'
+import { encodeJsonRpcError } from '../../json-rpc'
+import { isEventIteratorProcedure } from '../../utils'
+import { getJsonRpcCall } from './utils'
 
 export interface OpenRPCHandlerCodecOptions<_T extends Context> {
   /**
-   * Filter which procedures are exposed as JSON-RPC methods. Return `false` to exclude a procedure,
-   * which then answers "Method not found". Pass the same filter to `OpenRPCGenerator`.
-   *
-   * @remarks
-   * **Note**: Procedures with an event iterator input or output are always excluded,
-   * since JSON-RPC over HTTP cannot stream.
+   * Filter which procedures are exposed as JSON-RPC methods. Excluded procedures answer "Method not found".
+   * Procedures with an event iterator input or output are always excluded.
    *
    * @default true
-   * @see {@link https://orpc.dev/docs/openrpc/handler#filtering-procedures | OpenRPC Handler - Filtering Procedures}
    */
   filter?: Value<boolean, [procedure: AnyProcedureContract | AnyProcedure, path: string[]]> | undefined
 
   /**
-   * Serializes results and error data into JSON, converting types such as `Date`, `BigInt`, and `Set`
-   * the same way OpenAPI responses do.
+   * Serializes results and error data into JSON the same way OpenAPI responses are.
    *
    * @default new OpenAPIJsonSerializer()
    */
   serializer?: Public<OpenAPIJsonSerializer> | undefined
 
   /**
-   * Mapping ORPCError Code -> JSON-RPC error code (an integer).
-   * A given map replaces the default one, and codes missing from it fall back to `DEFAULT_JSON_RPC_ERROR_CODE` (-32000).
-   * Pass the same map to `OpenRPCGenerator`.
+   * Mapping ORPCError Code -> JSON-RPC error code. Codes missing from the map fall back to
+   * `DEFAULT_JSON_RPC_ERROR_CODE` (-32000). Pass the same map to `OpenRPCGenerator`.
    *
    * @default COMMON_JSON_RPC_ERROR_CODE_MAP
-   * @see {@link https://orpc.dev/docs/openrpc/protocol#error-codes | JSON-RPC Protocol - Error Codes}
+   * @see {@link https://orpc.dev/docs/openrpc/handler#error-codes | OpenRPC Handler - Error Codes}
    */
   errorCodeMap?: Record<string, number> | undefined
-
-  /**
-   * Mapping ORPCError Code -> HTTP Status Code of the per-call response, which inner plugins
-   * (such as the rate limit plugin) see. It only becomes the HTTP status with `errorResponseStatus: 'mapped'`.
-   * Codes missing from the map fall back to `DEFAULT_ERROR_STATUS` (400).
-   *
-   * @default COMMON_ERROR_STATUS_MAP
-   * @see {@link https://orpc.dev/docs/openrpc/handler#http-status-codes | OpenRPC Handler - HTTP Status Codes}
-   */
-  errorStatusMap?: Record<string, number> | undefined
-
-  /**
-   * Customize the JSON-RPC error object built for an ORPCError.
-   *
-   * @remarks
-   * - Return `null | undefined` to fallback to default behavior
-   * - Must return a valid JSON-RPC error object (integer `code`, string `message`) and must not throw
-   *
-   * @default `{ code: errorCodeMap[error.code], message: error.message, data: { code, defined, data } }`
-   * @see {@link https://orpc.dev/docs/openrpc/handler#custom-error-response | OpenRPC Handler - Custom Error Response}
-   */
-  customErrorEncoder?: ((error: AnyORPCError) => JsonRpcErrorObject | null | undefined) | undefined
 }
 
 /**
- * The codec of `OpenRPCHandler`. It only resolves the per-call sub-requests created by
- * `OpenRPCEnvelopeHandlerPlugin`, never a raw HTTP request, so use the two together.
- *
- * @see {@link https://orpc.dev/docs/openrpc/handler#custom-adapters | OpenRPC Handler - Custom Adapters}
+ * The codec of `OpenRPCHandler`. It only resolves the per-call sub-requests created by `OpenRPCEnvelopeHandlerPlugin`,
+ * so use the two together.
  */
 export class OpenRPCHandlerCodec<T extends Context> implements StandardHandlerCodec<T> {
   private readonly matcher: RPCMatcher
   private readonly serializer: Public<OpenAPIJsonSerializer>
-  private readonly encodeJsonRpcError: (error: AnyORPCError) => EncodedJsonRpcError
+  private readonly errorCodeMap: OpenRPCHandlerCodecOptions<T>['errorCodeMap']
 
-  /**
-   * @throws {TypeError} If an `errorCodeMap` value is not an integer.
-   */
   constructor(router: AnyRouter, options: OpenRPCHandlerCodecOptions<T> = {}) {
-    this.serializer = options.serializer ?? new OpenAPIJsonSerializer()
-    this.encodeJsonRpcError = createJsonRpcErrorEncoder({ ...options, serializer: this.serializer }, 'OpenRPCHandlerCodec')
-
     const filter = options.filter ?? true
 
     this.matcher = new RPCMatcher(router, {
       allowMethods: ['POST'],
       filter: (procedure, path) => !isEventIteratorProcedure(procedure) && value(filter, procedure, path),
     })
+    this.serializer = options.serializer ?? new OpenAPIJsonSerializer()
+    this.errorCodeMap = options.errorCodeMap
   }
 
   async resolveProcedure(request: StandardLazyRequest): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
-    const call = getJsonRpcCall(request)
+    const method = getJsonRpcCall(request)?.method
+    const path = method?.split('.')
 
-    if (call === undefined) {
-      return undefined
-    }
-
-    const path = toProcedurePath(call.method)
-
-    if (path === undefined) {
+    // `rpc.*` names are reserved, and an empty segment would alias another path (`a.` -> `/a/` -> `/a`)
+    if (!method || method.startsWith('rpc.') || !path || path.includes('')) {
       return undefined
     }
 
@@ -116,52 +76,75 @@ export class OpenRPCHandlerCodec<T extends Context> implements StandardHandlerCo
     }
 
     return {
-      procedure: matched.procedure,
-      path: matched.path,
-      decodeInput: async () => decodeJsonRpcParams(await request.resolveBody(), matched.procedure),
+      ...matched,
+      decodeInput: async () => decodeParams(await request.resolveBody(), matched.procedure),
     }
   }
 
-  /**
-   * @throws {TypeError} If the output is a stream, an event iterator, contains binary data, or serializes to a
-   * function, a symbol, or `undefined`, which JSON-RPC cannot send.
-   */
   async encodeOutput(output: unknown, _procedure: AnyProcedure, path: string[]): Promise<StandardResponse> {
-    const kind = getUnsupportedValueKind(output)
-
-    if (kind !== undefined) {
-      await cancelQuietly(output)
-      throw new TypeError(`[OpenRPCHandler] Procedure "${path.join('.')}" returned ${kind}, which JSON-RPC cannot send. Exclude it with the "filter" option.`)
+    if (output instanceof ReadableStream || isAsyncIteratorObject(output)) {
+      await cancelStandardBody(output).catch(() => {})
+      throw new TypeError(`[OpenRPCHandler] Procedure "${path.join('.')}" returned a stream, which JSON-RPC cannot send.`)
     }
 
-    const { json, maps, blobs } = this.serializer.serializeJson(output)
+    const { json, blobs } = this.serializer.serializeJson(output)
 
-    if (blobs?.length) {
-      const locations = maps.map(segments => segments.length ? `"${segments.join('.')}"` : 'the root').join(', ')
-
-      throw new TypeError(`[OpenRPCHandler] Procedure "${path.join('.')}" returned a Blob at ${locations}, which JSON-RPC cannot send. Exclude it with the "filter" option.`)
+    // `JSON.stringify` drops functions and symbols, which would leave the response without its required `result`
+    if (blobs?.length || typeof json === 'function' || typeof json === 'symbol') {
+      throw new TypeError(`[OpenRPCHandler] Procedure "${path.join('.')}" returned a value JSON-RPC cannot send.`)
     }
 
-    // `undefined` serializes to `null`, but a function, a symbol, or a custom handler's `undefined` would be dropped
-    // by `JSON.stringify`, leaving the response without its required `result` member
-    if (!isJsonMemberValue(json)) {
-      throw new TypeError(`[OpenRPCHandler] Procedure "${path.join('.')}" returned a result that serializes to ${typeof json}, which JSON-RPC cannot send.`)
-    }
-
-    return {
-      status: DEFAULT_SUCCESS_STATUS,
-      headers: {},
-      body: { result: json },
-    }
+    // `undefined` serializes to `null`
+    return { status: 200, headers: {}, body: { result: json } }
   }
 
   encodeError(error: AnyORPCError): StandardResponse {
-    const encoded = this.encodeJsonRpcError(error)
-
     return {
-      status: encoded.status,
+      // the status the per-call plugins (such as rate limiting) see, the HTTP status of JSON-RPC errors is always 200
+      status: getOwn(COMMON_ERROR_STATUS_MAP, error.code) ?? DEFAULT_ERROR_STATUS,
       headers: {},
-      body: { error: encoded.error },
+      body: { error: encodeJsonRpcError(error, this.serializer, this.errorCodeMap) },
     }
   }
+}
+
+/**
+ * `[x]` is `x` (by-position), a non-empty object is the input itself (by-name), and empty params
+ * (absent, `[]`, or `{}`) are whichever of `undefined` or `{}` the input schemas accept,
+ * since generic clients send any of them for methods without required params.
+ */
+async function decodeParams(params: unknown, procedure: AnyProcedure): Promise<unknown> {
+  if (Array.isArray(params)) {
+    if (params.length > 1) {
+      throw new ORPCError('BAD_REQUEST', {
+        message: `Invalid params: expected at most 1 positional parameter, received ${params.length}.`,
+      })
+    }
+
+    if (params.length === 1) {
+      return params[0]
+    }
+  }
+  else if (params !== undefined && Object.keys(params as object).length > 0) {
+    return params
+  }
+
+  const [preferred, other] = params === undefined || Array.isArray(params) ? [undefined, {}] : [{}, undefined]
+
+  return await acceptsInput(procedure, preferred) || !await acceptsInput(procedure, other) ? preferred : other
+}
+
+async function acceptsInput(procedure: AnyProcedure, input: unknown): Promise<boolean> {
+  for (const schema of procedure['~orpc'].inputSchemas ?? []) {
+    try {
+      if ((await schema['~standard'].validate(input)).issues) {
+        return false
+      }
+    }
+    catch {
+      return false
+    }
+  }
+
+  return true
 }

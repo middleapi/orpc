@@ -1,286 +1,37 @@
 ---
 title: "OpenRPC Link"
-description: "Use OpenRPCLink to call OpenRPC Handler or any JSON-RPC 2.0 server through a typesafe oRPC client, with notifications, positional params, and error decoding."
+description: "Use OpenRPCLink to call OpenRPCHandler, or any JSON-RPC 2.0 server, with a typesafe oRPC client."
 ---
 
 ## Overview
 
-`OpenRPCLink` calls any [JSON-RPC 2.0](/docs/openrpc/protocol) server over HTTP, such as [OpenRPC Handler](/docs/openrpc/handler). Each call is a `POST` request to `url`, with the procedure path joined by `.` as the JSON-RPC `method`, so no contract is needed:
+`OpenRPCLink` sends each call as a JSON-RPC 2.0 request over HTTP `POST`, whose `method` is the procedure path joined by `.`. It needs no contract, so it can call [OpenRPC Handler](/docs/openrpc/handler) or any other JSON-RPC server.
 
 ```ts
-import { createORPCClient, onError } from '@orpc/client'
-import { RetryLinkPlugin } from '@orpc/client/plugins'
-import { OpenRPCLink } from '@orpc/openrpc/fetch'
-
-const link = new OpenRPCLink({
-  origin: 'https://example.com',
-  url: '/rpc',
-  headers: () => ({
-    authorization: `Bearer ${getAuthToken()}`,
-  }),
-  interceptors: [
-    onError((error) => {
-      console.error(error)
-    }),
-  ],
-  plugins: [
-    new RetryLinkPlugin(),
-  ],
-  fetch: (url, init) => { // <- only available in fetch adapter
-    return globalThis.fetch(url, {
-      ...init,
-      credentials: 'include', // Include cookies on cross-origin requests
-    })
-  },
-})
-
-export const client = createORPCClient(link)
-```
-
-```http
-POST /rpc HTTP/1.1
-Host: example.com
-Content-Type: application/json
-
-{"jsonrpc":"2.0","method":"planet.find","params":{"id":1},"id":1}
-```
-
-## Typesafe Clients
-
-After you create an `OpenRPCLink`, pass it to `createORPCClient` to build a typesafe client for either a [contract](/docs/contract/router) or a [router](/docs/router):
-
-```ts
-import type { RouterContractClient } from '@orpc/contract'
-import type { OpenRPCClient } from '@orpc/openrpc'
+import type { JsonifiedClient } from '@orpc/openapi'
 import type { RouterClient } from '@orpc/server'
 import { createORPCClient } from '@orpc/client'
-
-// if you are following contract-first approach
-const contractClient: OpenRPCClient<RouterContractClient<typeof contract>> = createORPCClient(link)
-
-// if you are following normal approach
-const routerClient: OpenRPCClient<RouterClient<typeof router>> = createORPCClient(link)
-```
-
-:::info
-`OpenRPCClient` types outputs and error data the way they travel as JSON, such as a `Date` as a `string`, and an `undefined` output as `null`, since a JSON-RPC response always has a `result`. To receive native types instead, see [Restoring Native Types](#restoring-native-types).
-:::
-
-## Options
-
-- `url`: The JSON-RPC endpoint, `/` by default. Every call goes to this URL, so it should match the handler's `prefix`.
-- `origin`: Server protocol and domain. Omit in the browser to use the current origin.
-- `headers`: Headers sent with every request, such as auth or trace IDs. Keys should be lowercase.
-- `serializer`: Serializes the input to JSON like [OpenAPI requests](/docs/openapi/serializer), `new OpenAPIJsonSerializer()` from `@orpc/openapi` by default. Use the handler's [custom serializer](/docs/openrpc/handler#custom-serializer) here too.
-
-Each of `url`, `origin`, and `headers` can also be a function, to compute the value per call from the [client context](/docs/client/client-side#client-context) and procedure path:
-
-```ts
-interface ClientContext {
-  token?: string
-}
-
-const link = new OpenRPCLink<ClientContext>({
-  origin: (options, path) => path[0] === 'internal' ? 'https://internal.example.com' : 'https://example.com',
-  url: '/rpc',
-  headers: ({ context }) => ({
-    authorization: context?.token ? `Bearer ${context.token}` : undefined,
-  }),
-})
-
-const client: OpenRPCClient<RouterClient<typeof router, ClientContext>> = createORPCClient(link)
-
-const planet = await client.planet.find({ id: 1 }, {
-  context: { token: 'abc123' },
-})
-```
-
-`OpenRPCLink` also accepts [interceptors](/docs/rpc/link#interceptors) and [plugins](#plugins), like [RPC Link](/docs/rpc/link).
-
-:::info
-`OpenRPCLink` combines `OpenRPCLinkCodec` from `@orpc/openrpc/standard`, which encodes calls as JSON-RPC requests and decodes the responses, with a fetch transport. To call JSON-RPC over another HTTP transport, pass the codec to a `StandardLink` from `@orpc/client/standard` with your own transport.
-:::
-
-## Notifications
-
-Use `notification` to send calls as JSON-RPC [notifications](/docs/openrpc/protocol#notifications), requests without an `id` that the server never answers. It is a boolean, or a function of the call:
-
-```ts
-const link = new OpenRPCLink({
-  url: '/rpc',
-  notification: (options, path) => path.at(-1) === 'track',
-})
-
-await client.analytics.track({ event: 'signup' }) // resolves undefined, whatever the output type
-```
-
-A notification resolves `undefined` once the server accepts it. It rejects with the error the server still reports, if any, or with a [`MalformedResponseError`](#malformed-responses) when the server answers with an HTTP error status and no JSON-RPC error.
-
-:::warning
-Client types do not know which calls are notifications. A call sent as a notification keeps its procedure's output type (`null` for an empty output with [`OpenRPCClient`](#typesafe-clients)), but always resolves `undefined`. Only send calls whose results you ignore as notifications, and do not read their return value.
-:::
-
-:::info
-[OpenRPC Handler](/docs/openrpc/handler#notifications) runs a notification to completion before it answers, so the call resolves after the procedure finishes, but without its output or errors.
-:::
-
-## Positional Params
-
-By default, the link maps the serialized input to `params` the same way [OpenRPC Handler](/docs/openrpc/protocol#params) reads them:
-
-| Input                 | `params`                        |
-| --------------------- | ------------------------------- |
-| `undefined`           | Omitted                         |
-| Object                | The object (by-name)            |
-| Anything else         | `[input]` (by-position)         |
-
-Many JSON-RPC servers take several positional params instead, such as the Ethereum `eth_getBalance(address, block)` method. Use `encodeParams` to send a tuple input as positional params. It receives the serialized input and the procedure path, and returns the `params`, or `undefined` to omit them:
-
-```ts
-import type { RouterContractClient } from '@orpc/contract'
-import type { OpenRPCClient } from '@orpc/openrpc'
-import { createORPCClient } from '@orpc/client'
-import { oc } from '@orpc/contract'
 import { OpenRPCLink } from '@orpc/openrpc/fetch'
-import { z } from 'zod'
-
-const contract = {
-  eth_blockNumber: oc.output(z.string()),
-  eth_getBalance: oc
-    .input(z.tuple([z.string(), z.string()]))
-    .output(z.string()),
-}
-
-const link = new OpenRPCLink({
-  origin: 'https://rpc.example.com',
-  encodeParams: input => Array.isArray(input) ? input : undefined,
-})
-
-const client: OpenRPCClient<RouterContractClient<typeof contract>> = createORPCClient(link)
-
-const balance = await client.eth_getBalance(['0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae', 'latest'])
-// sends {"jsonrpc":"2.0","method":"eth_getBalance","params":["0xde0b...","latest"],"id":1}
-```
-
-:::warning
-`encodeParams` must return an array, a plain object, or `undefined`, otherwise the call throws a `TypeError` before sending. OpenRPC Handler takes at most one positional param, so do not spread inputs when calling it.
-:::
-
-## Error Responses
-
-When the server answers with a JSON-RPC error, `OpenRPCLink` throws an `ORPCError`:
-
-- **From oRPC servers**, `error.data` carries the oRPC error code, the `defined` flag, and the error data, see [Errors](/docs/openrpc/protocol#errors). The link restores the exact `ORPCError`, so [`isDefinedError` and `safe`](/docs/client/error-handling) work as with any other link.
-- **From other servers**, the JSON-RPC error code becomes the closest oRPC error code, the `message` is kept, `error.data` becomes the error `data`, and `defined` is `false`:
-
-| JSON-RPC Code                                                                        | oRPC Error Code         |
-| ------------------------------------------------------------------------------------ | ----------------------- |
-| `-32700` Parse error, `-32600` Invalid Request, `-32602` Invalid params             | `BAD_REQUEST`           |
-| `-32601` Method not found                                                            | `NOT_FOUND`             |
-| `-32603` Internal error                                                              | `INTERNAL_SERVER_ERROR` |
-| A code of the [common map](/docs/openrpc/protocol#error-codes), such as `-32001`    | Its oRPC code, such as `UNAUTHORIZED` |
-| Any other code                                                                       | `INTERNAL_SERVER_ERROR` |
-
-The `cause` of the error is a `ResponseError` carrying the response, with a message such as `Received JSON-RPC error -32004.`. JSON-RPC servers usually answer errors with HTTP `200`, so when the status is below `400`, `response.status` holds the status of the oRPC error code from `errorStatusMap` instead, `COMMON_ERROR_STATUS_MAP` by default. Plugins that decide by status, such as the [Retry Plugin](/docs/plugins/retry), then treat the error like an HTTP error, for example, without retrying a `BAD_REQUEST`:
-
-```ts
-import { onError, ORPCError, ResponseError } from '@orpc/client'
-
-const link = new OpenRPCLink({
-  interceptors: [
-    onError((error) => {
-      if (error instanceof ORPCError && error.cause instanceof ResponseError) {
-        console.error(error.cause.message, error.cause.response.status) // "Received JSON-RPC error -32004.", 404
-      }
-    }),
-  ],
-})
-```
-
-Use `customErrorDecoder` to convert JSON-RPC errors yourself, such as the application errors of another server. It receives the JSON-RPC error object and the response. Errors it returns without a `cause` get the same `ResponseError` cause, with the status of their own code from `errorStatusMap` (`400` for codes missing from it), so the Retry Plugin does not retry an `OUT_OF_STOCK`; an error with its own `cause` is kept as is:
-
-```ts
-import { ORPCError } from '@orpc/client'
-
-const link = new OpenRPCLink({
-  customErrorDecoder: (error, response) => {
-    if (error.code === 1001) {
-      return new ORPCError('OUT_OF_STOCK', {
-        message: error.message,
-        data: error.data,
-      })
-    }
-
-    // fallback to default error decoding logic by returning null or undefined
-    return null
-  },
-})
-```
-
-## Malformed Responses
-
-When a response is not a valid answer to the call, for example when a proxy or gateway answers instead of the JSON-RPC server, `OpenRPCLink` throws a `MalformedResponseError` instead of an `ORPCError`. It extends `ResponseError`, so it carries the resolved response:
-
-| Response                                                                                     | Message                                                  |
-| -------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Not a JSON-RPC response object, such as an array, HTML, or an empty `204`, with a status below `400` | `Invalid JSON-RPC response.`                     |
-| Not a JSON-RPC response object, with a status of `400` or more                               | Inferred from the body or status, such as `Bad Gateway`  |
-| A response whose `id` is not the request `id` (`null` is allowed on errors)                  | `JSON-RPC response id does not match the request id.`    |
-| A body that cannot be read                                                                   | `Failed to read the JSON-RPC response body.`             |
-
-```ts
-import { MalformedResponseError, onError } from '@orpc/client'
-
-const link = new OpenRPCLink({
-  interceptors: [
-    onError((error) => {
-      if (error instanceof MalformedResponseError) {
-        console.error('Malformed response:', error.response.status, error.response.body)
-      }
-    }),
-  ],
-})
-```
-
-## Plugins
-
-Plugins package reusable interceptors:
-
-| Plugin | Support |
-| --- | --- |
-| [Retry](/docs/plugins/retry) | Supported. Errors get [derived statuses](#error-responses), so client errors are not retried. Each attempt is a new request with a new `id`. |
-| [Retry After](/docs/plugins/retry-after) | Supported with [`errorResponseStatus: 'mapped'`](/docs/openrpc/handler#http-status-codes) on the server, since it needs a `429` or `503` response. |
-| [Timeout](/docs/plugins/timeout), [Request Compression](/docs/plugins/request-compression), [Response Compression](/docs/plugins/response-compression) | Supported. |
-| [Request Validation](/docs/plugins/request-validation), [Smart Coercion](/docs/plugins/smart-coercion) | Supported, with a contract. |
-| [Response Validation](/docs/plugins/response-validation) | Supported, with a contract. An `undefined` output arrives as `null`, so declare outputs that can be empty with `.nullish()` instead of `z.void()` or `.optional()`. [Notifications](#notifications) resolve `undefined`, which fails validation unless the output schema accepts it. |
-| [Dedupe](/docs/plugins/dedupe) | No effect, JSON-RPC requests are `POST` requests with unique ids. |
-| [Batch](/docs/plugins/batch) | Not supported, the link sends one HTTP request per call. |
-
-## Restoring Native Types
-
-JSON-RPC carries plain JSON, so a `Date` or `BigInt` travels as a string. With a [contract](/docs/contract-first), the [Smart Coercion Plugin](/docs/plugins/smart-coercion) restores them on both sides: the handler plugin coerces params before input validation, and the link plugin coerces results and error data. It finds these types through the [`x-native-type` metadata](/docs/plugins/smart-coercion#how-it-works) of your JSON Schemas, which converters add for schemas such as `z.date()` or `z.bigint()`; a `URL` needs a schema that carries `x-native-type: 'url'`. The client then has the contract's own types, without `OpenRPCClient`. An `undefined` output still arrives as `null`, so declare outputs that can be empty with `.nullish()` instead of `z.void()` or `.optional()` in the contract, to keep its types accurate:
-
-```ts
-import type { RouterContractClient } from '@orpc/contract'
-import { createORPCClient } from '@orpc/client'
-import { SmartCoercionHandlerPlugin, SmartCoercionLinkPlugin } from '@orpc/json-schema'
-import { OpenRPCHandler, OpenRPCLink } from '@orpc/openrpc/fetch'
-import { ZodToJsonSchemaConverter } from '@orpc/zod'
-
-const converters = [new ZodToJsonSchemaConverter()]
-
-const handler = new OpenRPCHandler(router, {
-  plugins: [
-    new SmartCoercionHandlerPlugin({ converters }),
-  ],
-})
 
 const link = new OpenRPCLink({
   url: '/rpc',
-  plugins: [
-    new SmartCoercionLinkPlugin(contract, { converters }),
-  ],
+  origin: 'http://localhost:3000',
+  headers: () => ({ authorization: 'Bearer token' }),
 })
 
-const client: RouterContractClient<typeof contract> = createORPCClient(link)
+const client: JsonifiedClient<RouterClient<typeof router>> = createORPCClient(link)
+
+const planet = await client.planet.find({ id: 1 }) // { "jsonrpc": "2.0", "id": 1, "method": "planet.find", "params": { "id": 1 } }
 ```
+
+An object input is sent as by-name `params`, any other input as `[input]`, and an `undefined` input without `params`.
+
+:::info
+Results are plain JSON, so use `JsonifiedClient` from `@orpc/openapi` to type them: a `Date` is a string, and an `undefined` output arrives as `null`. With a [contract](/docs/contract-first), the [Smart Coercion Plugin](/docs/plugins/smart-coercion) can restore native types instead.
+:::
+
+## Error Handling
+
+Errors from oRPC servers are restored as the original `ORPCError`, so [typesafe errors](/docs/client/error-handling) work as usual. Errors from other servers become an `ORPCError` with the code that matches their JSON-RPC error code (`INTERNAL_SERVER_ERROR` when none does), their message, and their `data`.
+
+Since JSON-RPC errors arrive with HTTP status `200`, the error's `cause` gets the HTTP status of its code, so the [Retry Plugin](/docs/plugins/retry) retries server errors but not client errors. A response that is not a JSON-RPC response for the request throws a `MalformedResponseError`.
