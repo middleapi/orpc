@@ -40,8 +40,20 @@ new CloudflareTracer().enable()
 :::
 
 :::tip
-During local development, [Local Explorer](https://developers.cloudflare.com/workers/local-development/local-explorer/) shows these spans without deploying: press `e` in `wrangler dev`, or open `/cdn-cgi/local/explorer` on the Vite dev server.
+During local development, [Local Explorer](https://developers.cloudflare.com/workers/local-development/local-explorer/) shows these spans without deploying: press `e` in `wrangler dev`, or open `/cdn-cgi/local/explorer` on the Vite dev server. Local development needs Wrangler `4.151.0` or `@cloudflare/vite-plugin` `1.64.0` or later, which ship the tracing APIs oRPC uses.
 :::
+
+## Context Propagation
+
+Workers already join service binding and Durable Object calls into one trace. oRPC links also send a W3C `traceparent` header built from the active span, so servers outside Cloudflare, such as one using the [OpenTelemetry integration](/docs/integrations/opentelemetry), continue the same trace.
+
+Workers decide whether to keep a trace only after the invocation, so the header always marks the trace as sampled, and the downstream server records it even if Workers later drop their part. Set `propagationEnabled` to `false` to stop sending the header and let downstream servers sample on their own:
+
+```ts
+new CloudflareTracer({
+  propagationEnabled: false,
+}).enable()
+```
 
 ## Middleware Span
 
@@ -70,4 +82,4 @@ Define the `name` property on your middleware to improve span naming and make tr
 Workers Traces still lack some APIs oRPC relies on, so:
 
 - Streamed inputs and outputs record no `yielded` and `enqueued` events.
-- Trace context propagation is not configurable by oRPC.
+- Handlers ignore an incoming `traceparent` header, since Workers Traces cannot start a span under a remote parent.

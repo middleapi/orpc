@@ -1,4 +1,4 @@
-import type { Promisable, Tracer, TracingAttributeValue, TracingException, TracingExceptionLevel, TracingSpan } from '@orpc/shared'
+import type { Promisable, Tracer, TracingAttributeValue, TracingException, TracingExceptionLevel, TracingHeaders, TracingSpan } from '@orpc/shared'
 import { setTracer, toSpanAttributeValue } from '@orpc/shared'
 /**
  * A namespace import keeps `@orpc/cloudflare` loadable on runtimes that predate the
@@ -43,7 +43,19 @@ export interface experimental_CloudflareTracerOptions {
    * @default tracing from `cloudflare:workers`
    */
   tracing?: Tracing | undefined
+
+  /**
+   * Whether oRPC links send a W3C `traceparent` header, so servers outside Cloudflare join the trace.
+   *
+   * @default true
+   */
+  propagationEnabled?: boolean | undefined
 }
+
+/**
+ * Workers report all-zero IDs when tracing is disabled.
+ */
+const INVALID_TRACE_ID = '00000000000000000000000000000000'
 
 /**
  * Records oRPC spans with Cloudflare Workers Traces.
@@ -53,8 +65,26 @@ export interface experimental_CloudflareTracerOptions {
 export class experimental_CloudflareTracer implements Tracer {
   private readonly tracing: Tracing
 
+  readonly inject: Tracer['inject']
+
   constructor(options: experimental_CloudflareTracerOptions = {}) {
     this.tracing = options.tracing ?? workers.tracing
+
+    if (options.propagationEnabled ?? true) {
+      this.inject = (span: TracingSpan, headers: TracingHeaders) => {
+        const { traceId, spanId } = (span as CloudflareSpan).span.spanContext()
+
+        if (traceId === INVALID_TRACE_ID) {
+          return
+        }
+
+        /**
+         * Workers sample traces after the invocation, and `traceFlags` only echoes an upstream decision,
+         * so the sampled flag is always set: it means the trace may have been recorded.
+         */
+        headers.traceparent = `00-${traceId}-${spanId}-01`
+      }
+    }
   }
 
   startSpan(name: string): TracingSpan {

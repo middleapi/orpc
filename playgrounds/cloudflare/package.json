@@ -32,6 +32,6 @@
     "ts-pattern": "^5.9.2",
     "typescript": "^6.0.3",
     "vite": "^8.3.4",
-    "wrangler": "^4.151.0"
+    "wrangler": "^4.152.0"
   }
 }
