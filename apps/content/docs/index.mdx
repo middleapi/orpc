@@ -1,0 +1,126 @@
+---
+title: "What is oRPC?"
+description: "An overview of oRPC, the open-source TypeScript framework for typesafe APIs: what it does, its core concepts, how it compares, and when to use it."
+seo:
+  title: "What is oRPC? Typesafe TypeScript APIs with OpenAPI"
+sidebar:
+  label: "Introduction"
+  icon: book-open
+---
+
+**oRPC** is an open-source (MIT) TypeScript framework for building end-to-end typesafe APIs. You write procedures, plain functions with optional input and output schemas, and clients call them like local functions with inputs, outputs, and errors fully typed, without code generation. The same procedures can also be served as a REST API with an OpenAPI document, and as MCP tools for AI agents.
+
+oRPC runs on Node.js, Bun, Deno, Cloudflare Workers, and AWS Lambda, and inside frameworks like Next.js, Nuxt, SvelteKit, Hono, Express, and Fastify.
+
+## A Quick Look
+
+Define procedures on the server and group them into a router:
+
+```ts twoslash
+import { os } from '@orpc/server'
+import * as z from 'zod'
+
+export const router = {
+  planet: {
+    find: os
+      .input(z.object({ id: z.number() }))
+      .handler(async ({ input }) => {
+        return { id: input.id, name: 'Earth' }
+      }),
+  },
+}
+```
+
+Then call them from a client that only imports the router's type:
+
+```ts
+import type { RouterClient } from '@orpc/server'
+import type { router } from './router'
+import { createORPCClient } from '@orpc/client'
+import { RPCLink } from '@orpc/client/fetch'
+
+const link = new RPCLink({ origin: 'http://localhost:3000', url: '/rpc' })
+const client: RouterClient<typeof router> = createORPCClient(link)
+
+const planet = await client.planet.find({ id: 1 }) // { id: number, name: string }
+```
+
+[Getting Started](/docs/getting-started) walks through the full setup, including the server.
+
+## One Router, Every Client
+
+The same router can be served to several kinds of clients at once:
+
+```ts
+import { McpRegistrar } from '@orpc/mcp'
+import { OpenAPIGenerator } from '@orpc/openapi'
+import { OpenAPIHandler } from '@orpc/openapi/fetch'
+import { RPCHandler } from '@orpc/server/fetch'
+import { ZodToJsonSchemaConverter } from '@orpc/zod'
+
+const rpc = new RPCHandler(router) // typed RPC for oRPC clients
+const rest = new OpenAPIHandler(router) // REST endpoints for any HTTP client
+const mcp = new McpRegistrar(router) // MCP tools for AI agents
+
+const generator = new OpenAPIGenerator({ converters: [new ZodToJsonSchemaConverter()] })
+const spec = await generator.generate(router) // the OpenAPI document
+```
+
+See the [RPC Handler](/docs/rpc/handler), [OpenAPI Handler](/docs/openapi/handler), [OpenAPI Specification](/docs/openapi/specification), and [MCP](/docs/integrations/mcp) pages.
+
+## Key Features
+
+- **Typed errors:** declare errors per procedure with `.errors()`, and the client handles each by name ([Error Handling](/docs/error-handling)).
+- **Any schema library:** Zod, Valibot, ArkType, or any [Standard Schema](/docs/integrations/standard-schema) library.
+- **Native types:** `Date`, `BigInt`, `Set`, `Map`, files, and streams arrive as the type you sent ([RPC Serializer](/docs/rpc/serializer), [Binary Data](/docs/binary-data)).
+- **Realtime streams:** an async generator becomes a typed Server-Sent Events stream ([AsyncIteratorObject](/docs/async-iterator-object)).
+- **Contract-first:** define the API as a [contract](/docs/contract-first), then implement it with full type checking.
+- **Integrations:** [TanStack Query](/docs/integrations/tanstack-query), [Next.js](/docs/integrations/next), [AI SDK](/docs/integrations/ai-sdk), [OpenTelemetry](/docs/integrations/opentelemetry), and more.
+
+## Core Concepts
+
+| Concept | What it is |
+| --- | --- |
+| [Procedure](/docs/procedure) | A function clients call remotely, built with `os`. |
+| [Router](/docs/router) | A plain object of procedures. Each key path names a procedure, like `planet.find`. |
+| [Context](/docs/context) | Typed dependencies a procedure needs, like the current user. |
+| [Middleware](/docs/middleware) | Code that runs around a procedure, for example to authenticate. |
+| [Handler](/docs/rpc/handler) | Serves a router over a protocol: `RPCHandler` or `OpenAPIHandler`. |
+| [Adapter](/docs/adapters/fetch-api) | Connects a handler to a runtime or framework. |
+| [Link](/docs/rpc/link) | The client-side counterpart of a handler: `RPCLink` or `OpenAPILink`. |
+| [Contract](/docs/contract-first) | The API's shape without implementation, built with `oc`. |
+
+## How oRPC Compares
+
+Like [tRPC](https://trpc.io/), oRPC gives you typesafe RPC without code generation, and adds first-party OpenAPI, contract-first, per-procedure typed errors, and native types without a transformer. Unlike [Hono](https://hono.dev/), it is not a web framework: it runs inside one, including Hono. See the [comparison](/docs/comparison) for details, or [migrate from tRPC](/docs/migrations/from-trpc).
+
+## When to Use oRPC
+
+- A TypeScript frontend or service calls a TypeScript backend, and both sides should share types.
+- You need a REST API or OpenAPI document alongside typed RPC, from the same code.
+- You want to design the API as a contract first.
+- AI agents should call your API as MCP tools.
+
+These docs cover oRPC v2, currently in beta, so install commands use the `@beta` tag. Coming from v1, see [Migrating from oRPC v1](/docs/migrations/from-v1).
+
+## Using oRPC with AI Assistants
+
+Assistants trained on older material often write v1 code. Give yours the current docs:
+
+- **Agent skills:** `npx skills add middleapi/orpc`
+- **Docs MCP server:** `https://orpc.dev/mcp`
+- **LLM context:** [llms.txt](/llms.txt) and [llms-full.txt](/llms-full.txt)
+
+## FAQ
+
+### Does oRPC need code generation?
+
+No. The client's types come from the router's type, `RouterClient<typeof router>`.
+
+### Can clients in other languages call an oRPC API?
+
+Yes. The [OpenAPI Handler](/docs/openapi/handler) serves standard REST endpoints, and the generated OpenAPI document works with any OpenAPI tooling.
+
+### Does oRPC replace my web framework?
+
+No. A handler only answers requests that match a procedure, so oRPC runs inside your existing server or framework through an [adapter](/docs/adapters/fetch-api).
