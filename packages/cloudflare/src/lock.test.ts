@@ -93,6 +93,16 @@ describe('durableLocker', () => {
     await expect(other.lock('key', () => 'ok')).resolves.toBe('ok')
   })
 
+  it('shares locks with lockers created by prefix', async () => {
+    const { locker } = createTestingLocker()
+    const holder = await hold(locker, 'tenant:key')
+
+    await expect(locker.prefix('tenant:').lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
+    await expect(locker.prefix('other:').lock('key', () => 'ok', { timeout: 0 })).resolves.toBe('ok')
+
+    await holder.release()
+  })
+
   it('tracks locks independently per key', async () => {
     const { locker } = createTestingLocker()
     const holder = await hold(locker, 'alice')

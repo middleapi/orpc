@@ -58,13 +58,13 @@ export interface BaseRedisLockerOptions {
  * @see {@link https://orpc.dev/docs/helpers/lock#adapters | Lock Helpers - Adapters}
  */
 export abstract class BaseRedisLocker implements Locker {
-  protected readonly prefix: string
+  protected readonly keyPrefix: string
   protected readonly ttl: number
   protected readonly timeout: number
   protected readonly retryInterval: number
 
   constructor(options: BaseRedisLockerOptions) {
-    this.prefix = options.prefix ?? ''
+    this.keyPrefix = options.prefix ?? ''
     this.ttl = options.ttl
     this.timeout = options.timeout ?? 10_000
     this.retryInterval = options.retryInterval ?? 100
@@ -83,7 +83,7 @@ export abstract class BaseRedisLocker implements Locker {
   protected abstract evalScript(script: string, keys: string[], args: string[]): Promise<unknown>
 
   async lock<T>(key: string, fn: (options: LockCallbackOptions) => Promisable<T>, options: LockOptions = {}): Promise<T> {
-    const prefixedKey = `${this.prefix}${key}`
+    const prefixedKey = `${this.keyPrefix}${key}`
     const ttl = options.ttl ?? this.ttl
     const deadline = Date.now() + (options.timeout ?? this.timeout)
     const token = crypto.randomUUID()

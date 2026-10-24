@@ -11,9 +11,19 @@ import { BaseRedisLocker } from '@orpc/experimental-lock/base-redis'
 export class experimental_BunRedisLocker extends BaseRedisLocker {
   constructor(
     private readonly redis: RedisClient,
-    options: BaseRedisLockerOptions,
+    private readonly options: BaseRedisLockerOptions,
   ) {
     super(options)
+  }
+
+  /**
+   * Creates a locker with `prefix` appended to this locker's prefix, sharing its Redis client.
+   *
+   * @see {@link https://orpc.dev/docs/helpers/lock#adapters | Lock Helpers - Adapters}
+   */
+  prefix(prefix: string): experimental_BunRedisLocker {
+    // eslint-disable-next-line new-cap
+    return new experimental_BunRedisLocker(this.redis, { ...this.options, prefix: `${this.keyPrefix}${prefix}` })
   }
 
   protected async acquire(key: string, token: string, ttl: number): Promise<boolean> {

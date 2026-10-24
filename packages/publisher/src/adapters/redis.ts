@@ -15,6 +15,12 @@ export interface RedisPublisherOptions extends BaseRedisPublisherOptions {
 }
 
 /**
+ * The `onError` callbacks of the subscriptions on each subscriber, so publishers sharing
+ * a subscriber, such as those created by `prefix`, add a single `error` listener to it.
+ */
+const subscriberOnErrors = new WeakMap<object, Array<(error: ThrowableError) => void>>()
+
+/**
  * Publisher adapter for Redis. Distributes events across processes via
  * Redis Pub/Sub, with optional resume support backed by Redis Streams.
  *
@@ -29,11 +35,11 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
    */
   private readonly channelPrefix: string
 
-  private readonly onErrors: Array<(error: ThrowableError) => void> = []
+  private readonly onErrors: Array<(error: ThrowableError) => void>
 
   constructor(
     private readonly redis: RedisClientType<any, any, any, any, any>,
-    { subscriber, ...options }: RedisPublisherOptions = {},
+    private readonly options: RedisPublisherOptions = {},
   ) {
     super(options)
 
@@ -43,13 +49,29 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
       throw new TypeError('RedisPublisher only supports a string keyPrefix on the Redis client.')
     }
 
-    this.subscriber = subscriber ?? redis.duplicate()
+    this.subscriber = options.subscriber ?? redis.duplicate()
     this.channelPrefix = keyPrefix ?? ''
 
-    this.subscriber.on('error', (error) => {
-      // Snapshot, since a callback may unsubscribe itself mid-dispatch.
-      this.onErrors.slice().forEach(onError => onError(error))
-    })
+    if (!subscriberOnErrors.has(this.subscriber)) {
+      const onErrors: Array<(error: ThrowableError) => void> = []
+      subscriberOnErrors.set(this.subscriber, onErrors)
+
+      this.subscriber.on('error', (error) => {
+        // Snapshot, since a callback may unsubscribe itself mid-dispatch.
+        onErrors.slice().forEach(onError => onError(error))
+      })
+    }
+
+    this.onErrors = subscriberOnErrors.get(this.subscriber)!
+  }
+
+  /**
+   * Creates a publisher with `prefix` appended to this publisher's prefix, sharing its Redis client and subscriber.
+   *
+   * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
+   */
+  prefix(prefix: string): RedisPublisher<T> {
+    return new RedisPublisher(this.redis, { ...this.options, subscriber: this.subscriber, prefix: `${this.eventPrefix}${prefix}` })
   }
 
   protected async publishMessage(channel: string, message: string): Promise<void> {

@@ -57,6 +57,14 @@ describe.concurrent('upstash rate limiter integration', {
     })
   })
 
+  it('shares counters with limiters created by prefix', async () => {
+    const limiter = createTestingRateLimiter({ maxRequests: 1, window: 10_000 })
+
+    await expect(limiter.limit('tenant:key')).resolves.toMatchObject({ success: true, remaining: 0 })
+    await expect(limiter.prefix('tenant:').limit('key')).resolves.toMatchObject({ success: false, remaining: 0 })
+    await expect(limiter.prefix('other:').limit('key')).resolves.toMatchObject({ success: true, remaining: 0 })
+  })
+
   it('returns a stable reset timestamp within the same window', async () => {
     const window = 2000
     const limiter = createTestingRateLimiter({

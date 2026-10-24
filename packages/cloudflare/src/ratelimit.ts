@@ -18,17 +18,26 @@ export interface CloudflareRateLimiterOptions {
  * @see {@link https://orpc.dev/docs/helpers/ratelimit#adapters | Rate Limit Helpers - Adapters}
  */
 export class CloudflareRateLimiter implements RateLimiter {
-  private readonly prefix: string
+  private readonly keyPrefix: string
 
   constructor(
     private readonly ratelimit: RateLimit,
-    options: CloudflareRateLimiterOptions = {},
+    private readonly options: CloudflareRateLimiterOptions = {},
   ) {
-    this.prefix = options.prefix ?? ''
+    this.keyPrefix = options.prefix ?? ''
+  }
+
+  /**
+   * Creates a limiter with `prefix` appended to this limiter's prefix, sharing its binding.
+   *
+   * @see {@link https://orpc.dev/docs/helpers/ratelimit#adapters | Rate Limit Helpers - Adapters}
+   */
+  prefix(prefix: string): CloudflareRateLimiter {
+    return new CloudflareRateLimiter(this.ratelimit, { ...this.options, prefix: `${this.keyPrefix}${prefix}` })
   }
 
   async limit(key: string, options: RateLimitOptions = {}): Promise<RateLimitResult> {
-    key = `${this.prefix}${key}`
+    key = `${this.keyPrefix}${key}`
     const weight = this.resolveWeight(options)
 
     for (let i = 0; i < weight; i++) {

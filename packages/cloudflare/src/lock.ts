@@ -42,25 +42,35 @@ export interface experimental_DurableLockerOptions {
  * @see {@link https://orpc.dev/docs/helpers/lock#adapters | Lock Helpers - Adapters}
  */
 export class experimental_DurableLocker implements Locker {
-  private readonly prefix: string
+  private readonly keyPrefix: string
   private readonly ttl: number
   private readonly timeout: number
   private readonly getStubByName: Exclude<experimental_DurableLockerOptions['getStubByName'], undefined>
 
   constructor(
     private readonly namespace: DurableObjectNamespace<any>,
-    options: experimental_DurableLockerOptions,
+    private readonly options: experimental_DurableLockerOptions,
   ) {
-    this.prefix = options.prefix ?? ''
+    this.keyPrefix = options.prefix ?? ''
     this.ttl = options.ttl
     this.timeout = options.timeout ?? 10_000
     this.getStubByName = options.getStubByName ?? ((namespace, key) => namespace.getByName(key))
   }
 
+  /**
+   * Creates a locker with `prefix` appended to this locker's prefix, sharing its namespace.
+   *
+   * @see {@link https://orpc.dev/docs/helpers/lock#adapters | Lock Helpers - Adapters}
+   */
+  prefix(prefix: string): experimental_DurableLocker {
+    // eslint-disable-next-line new-cap
+    return new experimental_DurableLocker(this.namespace, { ...this.options, prefix: `${this.keyPrefix}${prefix}` })
+  }
+
   async lock<T>(key: string, fn: (options: LockCallbackOptions) => Promisable<T>, options: LockOptions = {}): Promise<T> {
     throwIfAborted(options.signal)
 
-    const response = await this.getStubByName(this.namespace, `${this.prefix}${key}`).fetch('http://localhost/acquire', {
+    const response = await this.getStubByName(this.namespace, `${this.keyPrefix}${key}`).fetch('http://localhost/acquire', {
       headers: { upgrade: 'websocket' },
     })
 

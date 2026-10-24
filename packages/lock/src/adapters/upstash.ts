@@ -12,9 +12,18 @@ import { BaseRedisLocker } from './base-redis'
 export class UpstashLocker extends BaseRedisLocker {
   constructor(
     private readonly redis: Redis,
-    options: BaseRedisLockerOptions,
+    private readonly options: BaseRedisLockerOptions,
   ) {
     super(options)
+  }
+
+  /**
+   * Creates a locker with `prefix` appended to this locker's prefix, sharing its Redis client.
+   *
+   * @see {@link https://orpc.dev/docs/helpers/lock#adapters | Lock Helpers - Adapters}
+   */
+  prefix(prefix: string): UpstashLocker {
+    return new UpstashLocker(this.redis, { ...this.options, prefix: `${this.keyPrefix}${prefix}` })
   }
 
   protected async acquire(key: string, token: string, ttl: number): Promise<boolean> {

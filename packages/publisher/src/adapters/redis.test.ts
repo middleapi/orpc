@@ -87,6 +87,36 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
     await unsubscribeResumeAttempt()
   })
 
+  it('shares the subscriber with publishers created by prefix', async () => {
+    const publisher = createTestingPublisher()
+    const tenant = publisher.prefix('tenant:')
+    const event = crypto.randomUUID()
+    const listener = vi.fn()
+    const onError = vi.fn()
+
+    const unsubscribe = await tenant.subscribe(event, listener, { onError })
+
+    await publisher.publish(`tenant:${event}`, { order: 1 })
+    await publisher.prefix('other:').publish(event, { order: 2 })
+    await tenant.publish(event, { order: 3 })
+
+    await vi.waitFor(() => {
+      expect(listener).toHaveBeenCalledTimes(2)
+    })
+    expect(listener).toHaveBeenNthCalledWith(1, { order: 1 })
+    expect(listener).toHaveBeenNthCalledWith(2, { order: 3 })
+
+    const subscriber = (publisher as any).subscriber
+    expect((tenant as any).subscriber).toBe(subscriber)
+    expect(subscriber.listenerCount('error')).toBe(1)
+
+    const error = new Error('boom')
+    subscriber.emit('error', error)
+    expect(onError).toHaveBeenCalledExactlyOnceWith(error)
+
+    await unsubscribe()
+  })
+
   it('resumes missed events in order and preserves event metadata while rewriting ids', async () => {
     const publisher = createTestingPublisher({
       resume: { enabled: true, ttl: 10_000 },

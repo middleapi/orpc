@@ -264,6 +264,24 @@ describe('durable publisher', () => {
     await unsubscribe()
   })
 
+  it('delivers events to publishers created by prefix', async () => {
+    const { publisher } = createTestingPublisher(env.PUBLISHER_DON)
+    const listener = vi.fn()
+
+    const unsubscribe = await publisher.prefix('tenant:').subscribe('message', listener)
+
+    await publisher.publish('tenant:message', { text: 'original' })
+    await publisher.prefix('tenant:').publish('message', { text: 'prefixed' })
+
+    await vi.waitFor(() => {
+      expect(listener).toHaveBeenCalledTimes(2)
+    })
+    expect(listener).toHaveBeenNthCalledWith(1, { text: 'original' })
+    expect(listener).toHaveBeenNthCalledWith(2, { text: 'prefixed' })
+
+    await unsubscribe()
+  })
+
   it('throws when publish fails', async () => {
     const stub = {
       fetch: vi.fn(async () => new Response(null, {

@@ -35,22 +35,31 @@ export interface DurablePublisherOptions extends PublisherOptions {
  * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
  */
 export class DurablePublisher<T extends Record<string, object>> extends Publisher<T> {
-  private readonly prefix: string
+  private readonly eventPrefix: string
   private readonly serializer: Public<RPCJsonSerializer>
   private readonly getStubByName: Exclude<DurablePublisherOptions['getStubByName'], undefined>
 
   constructor(
     private readonly namespace: DurableObjectNamespace<any>,
-    { prefix, getStubByName, ...options }: DurablePublisherOptions = {},
+    private readonly options: DurablePublisherOptions = {},
   ) {
     super(options)
-    this.prefix = prefix ?? ''
+    this.eventPrefix = options.prefix ?? ''
     this.serializer = options.serializer ?? new RPCJsonSerializer()
-    this.getStubByName = getStubByName ?? ((namespace, event) => namespace.getByName(event))
+    this.getStubByName = options.getStubByName ?? ((namespace, event) => namespace.getByName(event))
+  }
+
+  /**
+   * Creates a publisher with `prefix` appended to this publisher's prefix, sharing its namespace.
+   *
+   * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
+   */
+  prefix(prefix: string): DurablePublisher<T> {
+    return new DurablePublisher(this.namespace, { ...this.options, prefix: `${this.eventPrefix}${prefix}` })
   }
 
   async publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void> {
-    const stub = this.getStubByName(this.namespace, this.prefix + event)
+    const stub = this.getStubByName(this.namespace, this.eventPrefix + event)
 
     const [data, meta] = unwrapEvent(payload)
     const { json, meta: jsonMeta } = this.serializer.serializeJson(data)
@@ -75,7 +84,7 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
   }
 
   protected async subscribeListener<K extends keyof T & string>(event: K, listener: (payload: T[K]) => void, options?: PublisherSubscribeListenerOptions): Promise<() => Promise<void>> {
-    const stub = this.getStubByName(this.namespace, this.prefix + event)
+    const stub = this.getStubByName(this.namespace, this.eventPrefix + event)
 
     const headers = new Headers({ upgrade: 'websocket' })
     if (options?.lastEventId !== undefined) {

@@ -26,21 +26,36 @@ export interface BunRedisPublisherOptions extends BaseRedisPublisherOptions {
  * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
  */
 export class BunRedisPublisher<T extends Record<string, object>> extends BaseRedisPublisher<T> {
-  private readonly getSubscriber: () => Promise<RedisClient>
+  private getSubscriber: () => Promise<RedisClient>
 
-  private readonly onErrors: Array<(error: ThrowableError) => void> = []
+  private onErrors: Array<(error: ThrowableError) => void> = []
 
   constructor(
     private readonly redis: RedisClient,
-    { subscriber, ...options }: BunRedisPublisherOptions = {},
+    private readonly options: BunRedisPublisherOptions = {},
   ) {
     super(options)
 
     this.getSubscriber = once(async () => {
-      const client = await (subscriber ?? redis.duplicate())
+      const client = await (options.subscriber ?? redis.duplicate())
       this.watchSubscriber(client)
       return client
     })
+  }
+
+  /**
+   * Creates a publisher with `prefix` appended to this publisher's prefix, sharing its Redis client and subscriber.
+   *
+   * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
+   */
+  prefix(prefix: string): BunRedisPublisher<T> {
+    const publisher = new BunRedisPublisher<T>(this.redis, { ...this.options, prefix: `${this.eventPrefix}${prefix}` })
+
+    // Share the lazily created subscriber, which reports its errors to `onErrors` of this publisher.
+    publisher.getSubscriber = this.getSubscriber
+    publisher.onErrors = this.onErrors
+
+    return publisher
   }
 
   protected async publishMessage(channel: string, message: string): Promise<void> {

@@ -95,6 +95,16 @@ describe.skipIf(!REDIS_URL)('bun redis locker integration', async () => {
     await holder.release()
   }, { timeout: 20_000 })
 
+  it('shares locks with lockers created by prefix', async () => {
+    const { locker } = createTestingLocker()
+    const holder = await hold(locker, 'tenant:key')
+
+    await expect(locker.prefix('tenant:').lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
+    await expect(locker.prefix('other:').lock('key', () => 'ok', { timeout: 0 })).resolves.toBe('ok')
+
+    await holder.release()
+  })
+
   it('releases the lock when the callback throws', async () => {
     const { locker } = createTestingLocker()
 

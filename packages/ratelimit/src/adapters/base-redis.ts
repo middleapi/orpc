@@ -50,13 +50,13 @@ export interface BaseRedisRateLimiterOptions {
  * @see {@link https://orpc.dev/docs/helpers/ratelimit#adapters | Rate Limit Helpers - Adapters}
  */
 export abstract class BaseRedisRateLimiter implements RateLimiter {
-  protected readonly prefix: string
+  protected readonly keyPrefix: string
   protected readonly maxRequests: number
   protected readonly window: number
   protected readonly timeout: number
 
   constructor(options: BaseRedisRateLimiterOptions) {
-    this.prefix = options.prefix ?? ''
+    this.keyPrefix = options.prefix ?? ''
     this.maxRequests = options.maxRequests
     this.window = options.window
     this.timeout = options.timeout ?? 0
@@ -68,7 +68,7 @@ export abstract class BaseRedisRateLimiter implements RateLimiter {
   protected abstract evalScript(script: string, keys: string[], args: string[]): Promise<unknown>
 
   async limit(key: string, options?: RateLimitOptions): Promise<Required<RateLimitResult>> {
-    key = `${this.prefix}${key}`
+    key = `${this.keyPrefix}${key}`
     const weight = resolveWeight(options)
 
     return blockUntilReady(() => this.checkLimit(key, weight), this.timeout)

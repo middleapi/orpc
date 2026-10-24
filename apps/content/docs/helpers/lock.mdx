@@ -183,6 +183,9 @@ const locker = new RedisLocker(client, {
    */
   retryInterval: 100,
 })
+
+// Creates a locker with an extra prefix that shares this client, e.g. per tenant
+const tenantLocker = locker.prefix('tenant:123:')
 ```
 
 ### Upstash
@@ -225,6 +228,9 @@ const locker = new UpstashLocker(redis, {
    */
   retryInterval: 100,
 })
+
+// Creates a locker with an extra prefix that shares this client, e.g. per tenant
+const tenantLocker = locker.prefix('tenant:123:')
 ```
 
 ### Bun Redis
@@ -265,6 +271,9 @@ const locker = new BunRedisLocker(redis, {
    */
   retryInterval: 100,
 })
+
+// Creates a locker with an extra prefix that shares this client, e.g. per tenant
+const tenantLocker = locker.prefix('tenant:123:')
 ```
 
 ### Cloudflare
@@ -316,6 +325,9 @@ export default {
        */
       getStubByName: (namespace, key) => namespace.getByName(key),
     })
+
+    // Creates a locker with an extra prefix that shares this client, e.g. per tenant
+    const tenantLocker = locker.prefix('tenant:123:')
   },
 }
 ```

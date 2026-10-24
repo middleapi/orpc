@@ -78,7 +78,7 @@ interface SerializedEvent {
  * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
  */
 export abstract class BaseRedisPublisher<T extends Record<string, object>> extends Publisher<T> {
-  protected readonly prefix: string
+  protected readonly eventPrefix: string
   protected readonly serializer: Public<RPCJsonSerializer>
   protected readonly resumeEnabled: boolean
   protected readonly resumeTtl: number
@@ -93,7 +93,7 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
   constructor({ prefix, serializer, resume, ...options }: BaseRedisPublisherOptions = {}) {
     super(options)
 
-    this.prefix = prefix ?? ''
+    this.eventPrefix = prefix ?? ''
     this.serializer = serializer ?? new RPCJsonSerializer()
     this.resumeEnabled = resume?.enabled ?? false
     this.resumeTtl = resume?.ttl ?? 300_000
@@ -133,7 +133,7 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
   protected abstract readStreamEntries(key: string, lastId: string): Promise<RedisStreamEntry[]>
 
   async publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void> {
-    const channel = `${this.prefix}${event}`
+    const channel = `${this.eventPrefix}${event}`
     const data = this.serializePayload(payload)
 
     if (!this.resumeEnabled) {
@@ -173,7 +173,7 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
     listener: (payload: T[K]) => void,
     { lastEventId, onError }: PublisherSubscribeListenerOptions = {},
   ): Promise<() => Promise<void>> {
-    const channel = `${this.prefix}${event}`
+    const channel = `${this.eventPrefix}${event}`
 
     let pendingPayloads: T[K][] | undefined = []
     const resumedIds = new Set<string>()

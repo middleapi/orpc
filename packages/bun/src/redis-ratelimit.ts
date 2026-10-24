@@ -13,9 +13,18 @@ export interface BunRedisRateLimiterOptions extends BaseRedisRateLimiterOptions 
 export class BunRedisRateLimiter extends BaseRedisRateLimiter {
   constructor(
     private readonly redis: RedisClient,
-    options: BunRedisRateLimiterOptions,
+    private readonly options: BunRedisRateLimiterOptions,
   ) {
     super(options)
+  }
+
+  /**
+   * Creates a limiter with `prefix` appended to this limiter's prefix, sharing its Redis client.
+   *
+   * @see {@link https://orpc.dev/docs/helpers/ratelimit#adapters | Rate Limit Helpers - Adapters}
+   */
+  prefix(prefix: string): BunRedisRateLimiter {
+    return new BunRedisRateLimiter(this.redis, { ...this.options, prefix: `${this.keyPrefix}${prefix}` })
   }
 
   protected async evalScript(script: string, keys: string[], args: string[]): Promise<unknown> {

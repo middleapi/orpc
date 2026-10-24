@@ -72,6 +72,15 @@ describe('cloudflareRateLimiter', () => {
     expect(limit).toHaveBeenNthCalledWith(3, { key: 'prefix:user:123' })
   })
 
+  it('shares the underlying limiter with limiters created by prefix', async () => {
+    const limit = vi.fn(async () => ({ success: true }))
+    const limiter = new CloudflareRateLimiter({ limit }, { prefix: 'prefix:' })
+
+    await limiter.prefix('tenant:').limit('user:123')
+
+    expect(limit).toHaveBeenCalledExactlyOnceWith({ key: 'prefix:tenant:user:123' })
+  })
+
   it('uses the key unmodified when no prefix is configured', async () => {
     const limit = vi.fn(async () => ({ success: true }))
     const limiter = new CloudflareRateLimiter({ limit })

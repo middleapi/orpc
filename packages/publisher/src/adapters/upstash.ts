@@ -20,9 +20,18 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
 
   constructor(
     private readonly redis: Redis,
-    options: UpstashPublisherOptions = {},
+    private readonly options: UpstashPublisherOptions = {},
   ) {
     super(options)
+  }
+
+  /**
+   * Creates a publisher with `prefix` appended to this publisher's prefix, sharing its Redis client.
+   *
+   * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
+   */
+  prefix(prefix: string): UpstashPublisher<T> {
+    return new UpstashPublisher(this.redis, { ...this.options, prefix: `${this.eventPrefix}${prefix}` })
   }
 
   protected async publishMessage(channel: string, message: string): Promise<void> {

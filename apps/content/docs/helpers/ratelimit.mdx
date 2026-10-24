@@ -216,6 +216,9 @@ const limiter = new RedisRateLimiter(client, {
    */
   timeout: 0,
 })
+
+// Creates a limiter with an extra prefix that shares this client, e.g. per tenant
+const tenantLimiter = limiter.prefix('tenant:123:')
 ```
 
 ### Upstash
@@ -254,6 +257,9 @@ const limiter = new UpstashRateLimiter(redis, {
    */
   timeout: 0,
 })
+
+// Creates a limiter with an extra prefix that shares this client, e.g. per tenant
+const tenantLimiter = limiter.prefix('tenant:123:')
 ```
 
 ### Bun Redis
@@ -290,6 +296,9 @@ const limiter = new BunRedisRateLimiter(redis, {
    */
   timeout: 0,
 })
+
+// Creates a limiter with an extra prefix that shares this client, e.g. per tenant
+const tenantLimiter = limiter.prefix('tenant:123:')
 ```
 
 ### Cloudflare
@@ -309,6 +318,9 @@ export default {
        */
       prefix: ''
     })
+
+    // Creates a limiter with an extra prefix that shares this client, e.g. per tenant
+    const tenantLimiter = limiter.prefix('tenant:123:')
   }
 }
 ```

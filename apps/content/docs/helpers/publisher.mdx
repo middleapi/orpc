@@ -150,6 +150,9 @@ const publisher = new RedisPublisher<Events>(client, {
     ttl: 300_000
   }
 })
+
+// Creates a publisher with an extra prefix that shares this client, e.g. per tenant
+const tenantPublisher = publisher.prefix('tenant:123:')
 ```
 
 ```ts upstash
@@ -196,6 +199,9 @@ const publisher = new UpstashPublisher<Events>(redis, {
     ttl: 300_000
   }
 })
+
+// Creates a publisher with an extra prefix that shares this client, e.g. per tenant
+const tenantPublisher = publisher.prefix('tenant:123:')
 ```
 
 ```ts bun
@@ -253,6 +259,9 @@ const publisher = new BunRedisPublisher<Events>(redis, {
     ttl: 300_000
   }
 })
+
+// Creates a publisher with an extra prefix that shares this client, e.g. per tenant
+const tenantPublisher = publisher.prefix('tenant:123:')
 ```
 
 ```ts cloudflare
@@ -331,6 +340,9 @@ export default {
        */
       getStubByName: (namespace, event) => namespace.getByName(event)
     })
+
+    // Creates a publisher with an extra prefix that shares this client, e.g. per tenant
+    const tenantPublisher = publisher.prefix('tenant:123:')
   },
 }
 ```
