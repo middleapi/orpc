@@ -9,17 +9,17 @@ If you want to add oRPC features to an existing tRPC app without a full migratio
 
 ## Core Concepts Comparison
 
-| Concept               | tRPC                         | oRPC                |
-| --------------------- | ---------------------------- | ------------------- |
-| **Router**            | `t.router()`                 | plain object        |
-| **Procedure**         | `t.procedure`                | `os`                |
-| **Context**           | `initTRPC.context<T>()`      | `os.$context<T>()`  |
-| **Create Middleware** | `t.middleware()`             | `os.middleware()`   |
-| **Use Middleware**    | `t.procedure.use()`          | `os.use()`          |
-| **Input Validation**  | `t.procedure.input(schema)`  | `os.input(schema)`  |
-| **Output Validation** | `t.procedure.output(schema)` | `os.output(schema)` |
-| **Error Handling**    | `TRPCError`                  | `ORPCError`         |
-| **Serializer**        | `superjson`                  | built-in            |
+| Concept               | tRPC                             | oRPC                |
+| --------------------- | -------------------------------- | ------------------- |
+| **Router**            | `t.router()`                     | plain object        |
+| **Procedure**         | `t.procedure`                    | `os`                |
+| **Context**           | `initTRPC.context<T>()`          | `os.$context<T>()`  |
+| **Create Middleware** | `t.middleware()`                 | `os.middleware()`   |
+| **Use Middleware**    | `t.procedure.use()`              | `os.use()`          |
+| **Input Validation**  | `t.procedure.input(schema)`      | `os.input(schema)`  |
+| **Output Validation** | `t.procedure.output(schema)`     | `os.output(schema)` |
+| **Error Handling**    | `TRPCError`                      | `ORPCError`         |
+| **Serializer**        | `transformer` (e.g. `superjson`) | built-in            |
 
 :::info
 See [oRPC vs tRPC Comparison](/docs/comparison) for a broader comparison.
@@ -291,7 +291,7 @@ This example uses [Next.js](https://nextjs.org/). If you use another framework, 
 
 <CodeGroup>
 
-```ts app/api/orpc/[[...rest ]/route.ts]
+```ts title="app/api/orpc/[[...rest]]/route.ts"
 import { RPCHandler } from '@orpc/server/fetch'
 
 const handler = new RPCHandler(appRouter, {
@@ -321,7 +321,7 @@ export const GET = handleRequest
 export const POST = handleRequest
 ```
 
-```ts app/api/trpc/[trpc /route.ts]
+```ts title="app/api/trpc/[trpc]/route.ts"
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch'
 
 function handler(req: Request) {
