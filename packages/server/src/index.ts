@@ -4,10 +4,10 @@ export * from './constants'
 export * from './context'
 export * from './implementer'
 export * from './implementer-procedure'
+export { SharedRouterImplementer } from './implementer-router'
 export type {
   RouterImplementer,
   RouterImplementerWithMiddlewares,
-  SharedRouterImplementer,
   SharedRouterImplementerWithMiddlewares,
 } from './implementer-router'
 export * from './lazy'

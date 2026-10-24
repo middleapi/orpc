@@ -7,9 +7,8 @@ export type {
 } from './key'
 export * from './meta'
 export type { RouterUtilsPlugin } from './plugin'
-export { mergeProcedureUtilsOptions } from './procedure-utils'
+export { mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
 export type {
-  ProcedureUtils,
   ProcedureUtilsInfiniteInterceptor,
   ProcedureUtilsInfiniteInterceptorOptions,
   ProcedureUtilsLiveInterceptor,
@@ -33,7 +32,7 @@ export {
 export {
   createRouterUtils as createPiniaColadaUtils,
 } from './router-utils'
-export type { SharedUtils } from './shared-utils'
+export { SharedUtils } from './shared-utils'
 export type { SerializableStreamedQueryOptions } from './stream-query'
 export * from './types'
 export {
