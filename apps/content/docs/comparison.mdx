@@ -14,7 +14,7 @@ oRPC, [tRPC](https://trpc.io/), and [Hono](https://hono.dev/) all deliver end-to
 - 🟡 Lacks features or requires third-party integrations
 - 🛑 Not supported or not documented
 
-Last checked against tRPC 11.19 and Hono 4.13, the latest releases on npm, in October 2026.
+Checked against tRPC 11.19 and Hono 4.13 (October 2026).
 
 ### Type Safety
 
@@ -42,7 +42,7 @@ oRPC types errors per procedure or globally: throw a plain `ORPCError`, [declare
 | [Bracket notation](/docs/openapi/bracket-notation) | ✅ | 🛑 | 🛑 |
 | [Lazy router (code splitting, faster cold starts)](/docs/router#lazy-router) | ✅ | ✅ | 🛑 |
 
-oRPC serves the same procedures over its [RPC protocol](/docs/rpc/protocol) and RESTful [OpenAPI endpoints](/docs/openapi/handler), and generates the OpenAPI spec with its own first-party package. tRPC's official `@trpc/openapi` generator is still in alpha and describes tRPC's own endpoints rather than RESTful routes, and Hono's OpenAPI and contract-first support come from third-party middleware such as `@hono/zod-openapi`. Native types like `Date` or `Map` work out of the box in oRPC; tRPC needs a transformer, and Hono has no serialization layer: what you pass to `c.json()` is what you get.
+oRPC serves the same procedures over its [RPC protocol](/docs/rpc/protocol) and RESTful [OpenAPI endpoints](/docs/openapi/handler), and generates the spec with a first-party package. tRPC's `@trpc/openapi` is alpha and covers only tRPC-style endpoints, and Hono relies on third-party middleware like `@hono/zod-openapi`. Native types like `Date` or `Map` work out of the box in oRPC; tRPC needs a transformer, and Hono has no serialization layer: what you pass to `c.json()` is what you get.
 
 ### Integrations & Ecosystem
 

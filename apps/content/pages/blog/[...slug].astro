@@ -69,9 +69,8 @@ const words = (entry.body ?? '').split(/\s+/).filter(Boolean).length
 const minutes = Math.max(1, Math.round(words / 200))
 const dateFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'long' })
 
-// PageLayout attaches the generated OG card only on static routes, so this
-// dynamic route points at the post's card (Blume renders one for every content
-// route) by hand. Without it, shares get no image and the small Twitter card.
+// PageLayout skips the generated OG card on dynamic routes, so point at the
+// post's card explicitly.
 const ogImage = config.og.enabled ? `/og${route.path}.png` : undefined
 
 // schema.org JSON-LD, matching what Blume emits for generated blog pages.
